@@ -1,0 +1,141 @@
+version: "3"
+
+vars:
+  BINARY_NAME: opm
+  BUILD_DIR: bin
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "v0.0.0-dev"
+  COMMIT:
+    sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+  BUILD_DATE:
+    sh: date -u +"%Y-%m-%dT%H:%M:%SZ"
+  LDFLAGS: >-
+    -X github.com/opmodel/cli/internal/version.Version={{.VERSION}}
+    -X github.com/opmodel/cli/internal/version.GitCommit={{.COMMIT}}
+    -X github.com/opmodel/cli/internal/version.BuildDate={{.BUILD_DATE}}
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  build:
+    desc: Build the CLI binary
+    cmds:
+      - go build -ldflags "{{.LDFLAGS}}" -o {{.BUILD_DIR}}/{{.BINARY_NAME}} ./cmd/opm
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - "{{.BUILD_DIR}}/{{.BINARY_NAME}}"
+
+  build:all:
+    desc: Build for all platforms
+    cmds:
+      - GOOS=linux GOARCH=amd64 go build -ldflags "{{.LDFLAGS}}" -o {{.BUILD_DIR}}/{{.BINARY_NAME}}-linux-amd64 ./cmd/opm
+      - GOOS=linux GOARCH=arm64 go build -ldflags "{{.LDFLAGS}}" -o {{.BUILD_DIR}}/{{.BINARY_NAME}}-linux-arm64 ./cmd/opm
+      - GOOS=darwin GOARCH=amd64 go build -ldflags "{{.LDFLAGS}}" -o {{.BUILD_DIR}}/{{.BINARY_NAME}}-darwin-amd64 ./cmd/opm
+      - GOOS=darwin GOARCH=arm64 go build -ldflags "{{.LDFLAGS}}" -o {{.BUILD_DIR}}/{{.BINARY_NAME}}-darwin-arm64 ./cmd/opm
+      - GOOS=windows GOARCH=amd64 go build -ldflags "{{.LDFLAGS}}" -o {{.BUILD_DIR}}/{{.BINARY_NAME}}-windows-amd64.exe ./cmd/opm
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./...
+
+  test:unit:
+    desc: Run unit tests only
+    cmds:
+      - go test ./internal/... ./pkg/...
+
+  test:integration:
+    desc: Run integration tests (requires cluster or envtest)
+    cmds:
+      - go test ./tests/integration/... -v
+
+  test:e2e:
+    desc: Run end-to-end tests
+    cmds:
+      - go test ./tests/e2e/... -v
+
+  test:verbose:
+    desc: Run all tests with verbose output
+    cmds:
+      - go test -v ./...
+
+  test:run:
+    desc: Run a specific test by name
+    summary: |
+      Run a specific test by name using the TEST parameter.
+
+      Usage:
+        task test:run TEST=TestModuleLoad
+        task test:run TEST=TestParse
+    vars:
+      TEST: '{{.TEST | default ""}}'
+    preconditions:
+      - sh: '[ -n "{{.TEST}}" ]'
+        msg: "TEST variable is required. Usage: task test:run TEST=TestName"
+    cmds:
+      - go test -v ./... -run "{{.TEST}}"
+
+  test:coverage:
+    desc: Run tests with coverage
+    cmds:
+      - go test -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+    generates:
+      - coverage.out
+      - coverage.html
+
+  lint:
+    desc: Run linters
+    cmds:
+      - golangci-lint run ./...
+
+  lint:fix:
+    desc: Run linters and fix issues
+    cmds:
+      - golangci-lint run --fix ./...
+
+  fmt:
+    desc: Format code
+    cmds:
+      - go fmt ./...
+      - goimports -w .
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  tidy:
+    desc: Tidy go modules
+    cmds:
+      - go mod tidy
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf {{.BUILD_DIR}}
+      - rm -f coverage.out coverage.html
+
+  install:
+    desc: Install the CLI to $GOPATH/bin
+    cmds:
+      - go install -ldflags "{{.LDFLAGS}}" ./cmd/opm
+
+  check:
+    desc: Run all checks (fmt, vet, lint, test)
+    cmds:
+      - task: fmt
+      - task: vet
+      - task: lint
+      - task: test
+
+  generate:
+    desc: Run go generate
+    cmds:
+      - go generate ./...

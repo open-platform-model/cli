@@ -1,0 +1,34 @@
+# Build artifacts
+bin/
+dist/
+*.exe
+*.test
+*.out
+
+# Go
+vendor/
+
+# Coverage
+coverage.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Temporary files
+*.tmp
+*.bak
+*.log
