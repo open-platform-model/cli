@@ -61,3 +61,14 @@ Go CLI for OPM module operations. Uses cobra, CUE SDK, and zap logging.
 - Fresh CUE context per command (avoid memory bloat)
 - Directory-based module loading (not file paths)
 - Commands use `RunE` for error handling
+
+## Glossary
+
+See [full glossary](../opm/docs/glossary.md) for detailed definitions.
+
+### Personas
+
+- **Infrastructure Operator** - Operates underlying infrastructure (clusters, cloud, networking)
+- **Module Author** - Develops and maintains ModuleDefinitions with sane defaults
+- **Platform Operator** - Curates module catalog, bridges infrastructure and end-users
+- **End-user** - Consumes modules via ModuleRelease with concrete values
