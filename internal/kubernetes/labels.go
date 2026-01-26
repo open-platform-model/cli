@@ -7,7 +7,7 @@ const (
 	LabelManagedBy = "app.kubernetes.io/managed-by"
 
 	// LabelManagedByValue is the value for LabelManagedBy for OPM-managed resources.
-	LabelManagedByValue = "opm-platform-model"
+	LabelManagedByValue = "open-platform-model"
 
 	// LabelModuleName identifies the OPM module that created this resource.
 	LabelModuleName = "module.opmodel.dev/name"
