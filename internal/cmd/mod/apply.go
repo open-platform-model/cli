@@ -8,10 +8,11 @@ import (
 
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/opmodel/cli/internal/cmd"
-	opmcue "github.com/opmodel/cli/internal/cue"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
+	"github.com/opmodel/cli/internal/render"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // applyOptions holds the flags for the apply command.
@@ -53,30 +54,27 @@ func NewApplyCmd() *cobra.Command {
 
 // runApply applies the module to the cluster.
 func runApply(ctx context.Context, opts *applyOptions) error {
-	// Load the module
-	loader := opmcue.NewLoader()
-	module, err := loader.LoadModule(ctx, opts.dir, opts.values)
+	// Create render pipeline
+	pipeline := render.NewPipeline(&render.Options{
+		Dir:         opts.dir,
+		ValuesFiles: opts.values,
+		Verbose:     false, // Apply command doesn't show render verbosity by default
+	})
+
+	// Execute render pipeline
+	result, err := pipeline.Render(ctx)
 	if err != nil {
-		if errors.Is(err, opmcue.ErrModuleNotFound) {
-			return fmt.Errorf("%w: %v", cmd.ErrNotFound, err)
-		}
-		if errors.Is(err, opmcue.ErrInvalidModule) {
-			return fmt.Errorf("%w: %v", cmd.ErrValidation, err)
-		}
-		return fmt.Errorf("loading module: %w", err)
+		return fmt.Errorf("%w: render failed: %v", cmd.ErrValidation, err)
 	}
 
-	// Render manifests
-	renderer := opmcue.NewRenderer()
-	manifestSet, err := renderer.RenderModule(ctx, module)
-	if err != nil {
-		if errors.Is(err, opmcue.ErrNoManifests) {
-			return fmt.Errorf("%w: no manifests found in module", cmd.ErrValidation)
-		}
-		if errors.Is(err, opmcue.ErrRenderFailed) {
-			return fmt.Errorf("%w: %v", cmd.ErrValidation, err)
-		}
-		return fmt.Errorf("rendering manifests: %w", err)
+	if len(result.Manifests) == 0 {
+		return fmt.Errorf("%w: no manifests generated", cmd.ErrValidation)
+	}
+
+	// Convert manifests to unstructured objects
+	objects := make([]*unstructured.Unstructured, len(result.Manifests))
+	for i, m := range result.Manifests {
+		objects[i] = &unstructured.Unstructured{Object: m.Object}
 	}
 
 	// Create Kubernetes client
@@ -104,9 +102,9 @@ func runApply(ctx context.Context, opts *applyOptions) error {
 
 	// Build labels
 	labels := kubernetes.ModuleLabels(
-		module.Metadata.Name,
+		result.ModuleName,
 		namespace,
-		module.Metadata.Version,
+		result.ModuleVersion,
 		"", // component set per-resource
 	)
 
@@ -119,15 +117,12 @@ func runApply(ctx context.Context, opts *applyOptions) error {
 		Timeout:   opts.timeout,
 	}
 
-	// Get objects to apply
-	objects := manifestSet.Objects()
-
 	// Show diff before applying if requested
 	if opts.showDiff {
 		diffOpts := kubernetes.DiffOptions{
 			Namespace:       namespace,
 			UseColor:        !output.IsNoColor(),
-			ModuleName:      module.Metadata.Name,
+			ModuleName:      result.ModuleName,
 			ModuleNamespace: namespace,
 		}
 
@@ -158,23 +153,23 @@ func runApply(ctx context.Context, opts *applyOptions) error {
 	// Show what we're doing
 	if opts.dryRun {
 		fmt.Printf("Dry-run: would apply %d resources for module %s to namespace %s\n",
-			len(objects), module.Metadata.Name, namespace)
+			len(objects), result.ModuleName, namespace)
 	} else {
 		fmt.Printf("Applying %d resources for module %s to namespace %s...\n",
-			len(objects), module.Metadata.Name, namespace)
+			len(objects), result.ModuleName, namespace)
 	}
 
 	// Apply with spinner if waiting
-	var result *kubernetes.ApplyResult
+	var applyResult *kubernetes.ApplyResult
 	if opts.wait && !opts.dryRun {
 		err = spinner.New().
 			Title("Applying resources...").
 			Action(func() {
-				result, err = k8sClient.Apply(ctx, objects, applyOpts)
+				applyResult, err = k8sClient.Apply(ctx, objects, applyOpts)
 			}).
 			Run()
 	} else {
-		result, err = k8sClient.Apply(ctx, objects, applyOpts)
+		applyResult, err = k8sClient.Apply(ctx, objects, applyOpts)
 	}
 
 	if err != nil {
@@ -186,14 +181,14 @@ func runApply(ctx context.Context, opts *applyOptions) error {
 
 	// Report results
 	if opts.dryRun {
-		fmt.Printf("Dry-run complete: %d resources would be created/updated\n", result.Created)
+		fmt.Printf("Dry-run complete: %d resources would be created/updated\n", applyResult.Created)
 	} else {
-		fmt.Printf("Applied %d resources\n", result.Created)
+		fmt.Printf("Applied %d resources\n", applyResult.Created)
 	}
 
-	if len(result.Errors) > 0 {
+	if len(applyResult.Errors) > 0 {
 		fmt.Println("\nErrors:")
-		for _, e := range result.Errors {
+		for _, e := range applyResult.Errors {
 			fmt.Printf("  - %v\n", e)
 		}
 	}

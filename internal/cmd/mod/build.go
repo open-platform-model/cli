@@ -3,14 +3,13 @@ package mod
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/opmodel/cli/internal/cmd"
-	opmcue "github.com/opmodel/cli/internal/cue"
 	"github.com/opmodel/cli/internal/output"
+	"github.com/opmodel/cli/internal/render"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -22,6 +21,7 @@ type buildOptions struct {
 	outputFmt  string
 	outputDir  string
 	outputFile string
+	verbose    bool
 }
 
 // NewBuildCmd creates the mod build command.
@@ -42,6 +42,7 @@ func NewBuildCmd() *cobra.Command {
 	c.Flags().StringVarP(&opts.outputFmt, "output", "o", "yaml", "Output format (yaml, json, dir)")
 	c.Flags().StringVar(&opts.outputDir, "output-dir", "", "Directory to write manifests (for -o dir)")
 	c.Flags().StringVar(&opts.outputFile, "output-file", "", "File to write output (stdout if not specified)")
+	c.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "Verbose output (show pipeline phases)")
 
 	return c
 }
@@ -62,50 +63,46 @@ func runBuild(ctx context.Context, opts *buildOptions) error {
 		return fmt.Errorf("%w: directory %s", cmd.ErrNotFound, opts.dir)
 	}
 
-	// Load the module
-	loader := opmcue.NewLoader()
-	module, err := loader.LoadModule(ctx, opts.dir, opts.values)
+	// Create render pipeline
+	pipeline := render.NewPipeline(&render.Options{
+		Dir:         opts.dir,
+		ValuesFiles: opts.values,
+		Verbose:     opts.verbose,
+	})
+
+	// Execute render pipeline
+	result, err := pipeline.Render(ctx)
 	if err != nil {
-		if errors.Is(err, opmcue.ErrModuleNotFound) {
-			return fmt.Errorf("%w: %v", cmd.ErrNotFound, err)
-		}
-		if errors.Is(err, opmcue.ErrInvalidModule) {
+		// Check if we have partial results even with errors
+		if result != nil && len(result.Manifests) > 0 {
+			// We have some manifests, continue to output
+			if !opts.verbose {
+				fmt.Fprintf(os.Stderr, "Warning: render completed with errors: %v\n", err)
+			}
+		} else {
 			return fmt.Errorf("%w: %v", cmd.ErrValidation, err)
 		}
-		return fmt.Errorf("loading module: %w", err)
 	}
 
-	// Render manifests
-	renderer := opmcue.NewRenderer()
-	manifestSet, err := renderer.RenderModule(ctx, module)
-	if err != nil {
-		if errors.Is(err, opmcue.ErrNoManifests) {
-			return fmt.Errorf("%w: no manifests found in module", cmd.ErrValidation)
-		}
-		if errors.Is(err, opmcue.ErrRenderFailed) {
-			return fmt.Errorf("%w: %v", cmd.ErrValidation, err)
-		}
-		return fmt.Errorf("rendering manifests: %w", err)
+	if len(result.Manifests) == 0 {
+		return fmt.Errorf("%w: no manifests generated", cmd.ErrValidation)
 	}
-
-	// Sort for apply order
-	manifestSet.SortForApply()
 
 	// Output based on format
 	switch opts.outputFmt {
 	case "yaml":
-		return outputYAML(manifestSet, opts.outputFile)
+		return outputYAMLFromManifests(result.Manifests, opts.outputFile)
 	case "json":
-		return outputJSON(manifestSet, opts.outputFile)
+		return outputJSONFromManifests(result.Manifests, opts.outputFile)
 	case "dir":
-		return outputDir(manifestSet, opts.outputDir)
+		return outputDirFromManifests(result.Manifests, opts.outputDir)
 	}
 
 	return nil
 }
 
-// outputYAML outputs manifests as YAML.
-func outputYAML(ms *opmcue.ManifestSet, outputFile string) error {
+// outputYAMLFromManifests outputs manifests as YAML.
+func outputYAMLFromManifests(manifests []render.Manifest, outputFile string) error {
 	var out *os.File
 	var err error
 
@@ -119,11 +116,13 @@ func outputYAML(ms *opmcue.ManifestSet, outputFile string) error {
 		out = os.Stdout
 	}
 
-	for i, m := range ms.Manifests {
+	for i, m := range manifests {
 		if i > 0 {
 			fmt.Fprintln(out, "---")
 		}
-		data, err := yaml.Marshal(m.Object.Object)
+		// Add source comment
+		fmt.Fprintf(out, "# Source: %s/%s\n", m.TransformerID, m.ComponentName)
+		data, err := yaml.Marshal(m.Object)
 		if err != nil {
 			return fmt.Errorf("marshaling manifest: %w", err)
 		}
@@ -133,8 +132,8 @@ func outputYAML(ms *opmcue.ManifestSet, outputFile string) error {
 	return nil
 }
 
-// outputJSON outputs manifests as JSON.
-func outputJSON(ms *opmcue.ManifestSet, outputFile string) error {
+// outputJSONFromManifests outputs manifests as JSON.
+func outputJSONFromManifests(manifests []render.Manifest, outputFile string) error {
 	var out *os.File
 	var err error
 
@@ -149,9 +148,9 @@ func outputJSON(ms *opmcue.ManifestSet, outputFile string) error {
 	}
 
 	// Output as JSON array
-	objects := make([]map[string]interface{}, len(ms.Manifests))
-	for i, m := range ms.Manifests {
-		objects[i] = m.Object.Object
+	objects := make([]map[string]interface{}, len(manifests))
+	for i, m := range manifests {
+		objects[i] = m.Object
 	}
 
 	encoder := json.NewEncoder(out)
@@ -159,18 +158,19 @@ func outputJSON(ms *opmcue.ManifestSet, outputFile string) error {
 	return encoder.Encode(objects)
 }
 
-// outputDir writes manifests to individual files in a directory.
-func outputDir(ms *opmcue.ManifestSet, dir string) error {
+// outputDirFromManifests writes manifests to individual files in a directory.
+func outputDirFromManifests(manifests []render.Manifest, dir string) error {
 	// Create directory
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("creating output directory: %w", err)
 	}
 
-	for i, m := range ms.Manifests {
-		// Generate filename
-		kind := m.Object.GetKind()
-		name := m.Object.GetName()
-		ns := m.Object.GetNamespace()
+	for i, m := range manifests {
+		// Generate filename from object
+		kind, _ := m.Object["kind"].(string)
+		metadata, _ := m.Object["metadata"].(map[string]interface{})
+		name, _ := metadata["name"].(string)
+		ns, _ := metadata["namespace"].(string)
 
 		filename := fmt.Sprintf("%03d-%s-%s", i, kind, name)
 		if ns != "" {
@@ -178,19 +178,22 @@ func outputDir(ms *opmcue.ManifestSet, dir string) error {
 		}
 		filename += ".yaml"
 
-		filepath := filepath.Join(dir, filename)
+		filePath := filepath.Join(dir, filename)
 
-		data, err := yaml.Marshal(m.Object.Object)
+		// Add source comment
+		comment := fmt.Sprintf("# Source: %s/%s\n", m.TransformerID, m.ComponentName)
+		data, err := yaml.Marshal(m.Object)
 		if err != nil {
 			return fmt.Errorf("marshaling manifest: %w", err)
 		}
 
-		if err := os.WriteFile(filepath, data, 0644); err != nil {
-			return fmt.Errorf("writing %s: %w", filepath, err)
+		fullData := append([]byte(comment), data...)
+		if err := os.WriteFile(filePath, fullData, 0644); err != nil {
+			return fmt.Errorf("writing %s: %w", filePath, err)
 		}
 	}
 
-	fmt.Printf("Wrote %d manifests to %s\n", len(ms.Manifests), dir)
+	fmt.Printf("Wrote %d manifests to %s\n", len(manifests), dir)
 	return nil
 }
 

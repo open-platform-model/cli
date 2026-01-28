@@ -110,8 +110,11 @@ func runInit(dir string, opts *initOptions) error {
 
 	// Print success message
 	fmt.Printf("Created module %s in %s\n", moduleName, result.TargetDir)
-	fmt.Printf("Template: %s (%s)\n", tmpl.Name, tmpl.Description)
-	fmt.Printf("Files created: %d\n", len(result.Files))
+	fmt.Printf("Template: %s (%s)\n\n", tmpl.Name, tmpl.Description)
+
+	// Print file tree with descriptions
+	tree := output.RenderFileTree(moduleName, tmpl.FileDescriptions)
+	fmt.Print(tree)
 
 	// Print next steps
 	fmt.Println("\nNext steps:")

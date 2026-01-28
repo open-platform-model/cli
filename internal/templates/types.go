@@ -14,6 +14,18 @@ type Template struct {
 
 	// UseCase describes when to use this template.
 	UseCase string
+
+	// FileDescriptions maps relative file paths to their descriptions for tree output.
+	FileDescriptions map[string]string
+}
+
+// FileInfo represents a file with its path and description.
+type FileInfo struct {
+	// Path is the relative file path from the module root.
+	Path string
+
+	// Description explains the purpose of the file.
+	Description string
 }
 
 // TemplateData holds the data passed to template rendering.
