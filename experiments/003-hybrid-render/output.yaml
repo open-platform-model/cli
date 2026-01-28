@@ -1,0 +1,362 @@
+# Source: service/api
+apiVersion: v1
+kind: Service
+metadata:
+    labels:
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/instance: all-blueprints-release-production
+        app.kubernetes.io/managed-by: open-platform-model
+        app.kubernetes.io/name: api
+        app.kubernetes.io/version: 0.1.0
+        component.opmodel.dev/name: api
+        core.opm.dev/category: workload
+        core.opm.dev/workload-type: stateless
+        module.opmodel.dev/name: opm.dev@v0#AllBlueprintsModule
+        module.opmodel.dev/version: 0.1.0
+    name: api
+    namespace: production
+spec:
+    ports:
+        - port: 8080
+          protocol: TCP
+          targetPort: 8080
+    selector:
+        app.kubernetes.io/name: api
+    type: ClusterIP
+---
+# Source: service/web
+apiVersion: v1
+kind: Service
+metadata:
+    labels:
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/instance: all-blueprints-release-production
+        app.kubernetes.io/managed-by: open-platform-model
+        app.kubernetes.io/name: web
+        app.kubernetes.io/version: 0.1.0
+        component.opmodel.dev/name: web
+        core.opm.dev/category: workload
+        core.opm.dev/workload-type: stateless
+        module.opmodel.dev/name: opm.dev@v0#AllBlueprintsModule
+        module.opmodel.dev/version: 0.1.0
+    name: web
+    namespace: production
+spec:
+    ports:
+        - port: 80
+          protocol: TCP
+          targetPort: 80
+    selector:
+        app.kubernetes.io/name: web
+    type: ClusterIP
+---
+# Source: statefulset/database
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+    labels:
+        app.kubernetes.io/component: database
+        app.kubernetes.io/instance: all-blueprints-release-production
+        app.kubernetes.io/managed-by: open-platform-model
+        app.kubernetes.io/name: database
+        app.kubernetes.io/version: 0.1.0
+        component.opmodel.dev/name: database
+        core.opm.dev/category: workload
+        core.opm.dev/persistence: "true"
+        core.opm.dev/workload-type: stateful
+        module.opmodel.dev/name: opm.dev@v0#AllBlueprintsModule
+        module.opmodel.dev/version: 0.1.0
+    name: database
+    namespace: production
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app.kubernetes.io/name: database
+    serviceName: database
+    template:
+        metadata:
+            labels:
+                app.kubernetes.io/name: database
+        spec:
+            containers:
+                - env:
+                    - name: POSTGRES_DB
+                      value: appdb
+                    - name: POSTGRES_USER
+                      value: admin
+                    - name: POSTGRES_PASSWORD
+                      value: secure-db-password
+                  image: postgres:14.5
+                  imagePullPolicy: IfNotPresent
+                  name: database
+                  volumeMounts:
+                    - mountPath: /var/lib/postgresql/data
+                      name: data
+            restartPolicy: Always
+    volumeClaimTemplates:
+        - metadata:
+            name: data
+          spec:
+            accessModes:
+                - ReadWriteOnce
+            resources:
+                requests:
+                    storage: 20Gi
+            storageClassName: standard
+---
+# Source: deployment/api
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    labels:
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/instance: all-blueprints-release-production
+        app.kubernetes.io/managed-by: open-platform-model
+        app.kubernetes.io/name: api
+        app.kubernetes.io/version: 0.1.0
+        component.opmodel.dev/name: api
+        core.opm.dev/category: workload
+        core.opm.dev/workload-type: stateless
+        module.opmodel.dev/name: opm.dev@v0#AllBlueprintsModule
+        module.opmodel.dev/version: 0.1.0
+    name: api
+    namespace: production
+spec:
+    replicas: 3
+    selector:
+        matchLabels:
+            app.kubernetes.io/name: api
+    template:
+        metadata:
+            labels:
+                app.kubernetes.io/name: api
+        spec:
+            containers:
+                - env:
+                    - name: LOG_LEVEL
+                      value: info
+                  image: myapp/api:v1.0.0
+                  imagePullPolicy: IfNotPresent
+                  name: api-server
+                  ports:
+                    - containerPort: 8080
+                      name: api
+                      protocol: TCP
+            restartPolicy: Always
+---
+# Source: daemonset/log-agent
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+    labels:
+        app.kubernetes.io/component: logging
+        app.kubernetes.io/instance: all-blueprints-release-production
+        app.kubernetes.io/managed-by: open-platform-model
+        app.kubernetes.io/name: log-agent
+        app.kubernetes.io/version: 0.1.0
+        component.opmodel.dev/name: log-agent
+        core.opm.dev/category: workload
+        core.opm.dev/workload-type: daemon
+        module.opmodel.dev/name: opm.dev@v0#AllBlueprintsModule
+        module.opmodel.dev/version: 0.1.0
+    name: log-agent
+    namespace: production
+spec:
+    selector:
+        matchLabels:
+            app.kubernetes.io/name: log-agent
+    template:
+        metadata:
+            labels:
+                app.kubernetes.io/name: log-agent
+        spec:
+            containers:
+                - image: prom/node-exporter:v1.6.1
+                  imagePullPolicy: IfNotPresent
+                  name: node-exporter
+                  ports:
+                    - containerPort: 9100
+                      name: metrics
+                      protocol: TCP
+            restartPolicy: Always
+    updateStrategy:
+        rollingUpdate:
+            maxUnavailable: 1
+        type: RollingUpdate
+---
+# Source: deployment/web
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    labels:
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/instance: all-blueprints-release-production
+        app.kubernetes.io/managed-by: open-platform-model
+        app.kubernetes.io/name: web
+        app.kubernetes.io/version: 0.1.0
+        component.opmodel.dev/name: web
+        core.opm.dev/category: workload
+        core.opm.dev/workload-type: stateless
+        module.opmodel.dev/name: opm.dev@v0#AllBlueprintsModule
+        module.opmodel.dev/version: 0.1.0
+    name: web
+    namespace: production
+spec:
+    replicas: 2
+    selector:
+        matchLabels:
+            app.kubernetes.io/name: web
+    template:
+        metadata:
+            labels:
+                app.kubernetes.io/name: web
+        spec:
+            containers:
+                - image: nginx:1.21.0
+                  imagePullPolicy: IfNotPresent
+                  name: nginx
+                  ports:
+                    - containerPort: 80
+                      name: http
+                      protocol: TCP
+            restartPolicy: Always
+---
+# Source: cronjob/backup
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+    labels:
+        app.kubernetes.io/component: backup
+        app.kubernetes.io/instance: all-blueprints-release-production
+        app.kubernetes.io/managed-by: open-platform-model
+        app.kubernetes.io/name: backup
+        app.kubernetes.io/version: 0.1.0
+        component.opmodel.dev/name: backup
+        core.opm.dev/category: workload
+        core.opm.dev/workload-type: scheduled-task
+        module.opmodel.dev/name: opm.dev@v0#AllBlueprintsModule
+        module.opmodel.dev/version: 0.1.0
+    name: backup
+    namespace: production
+spec:
+    concurrencyPolicy: Forbid
+    failedJobsHistoryLimit: 1
+    jobTemplate:
+        metadata:
+            labels:
+                app.kubernetes.io/name: backup
+        spec:
+            template:
+                metadata:
+                    labels:
+                        app.kubernetes.io/name: backup
+                spec:
+                    containers:
+                        - env:
+                            - name: PGPASSWORD
+                              value: secure-db-password
+                            - name: PGHOST
+                              value: database
+                            - name: PGUSER
+                              value: admin
+                            - name: BACKUP_LOCATION
+                              value: /backups
+                          image: postgres:14.5
+                          imagePullPolicy: IfNotPresent
+                          name: backup-runner
+                    restartPolicy: OnFailure
+    schedule: 0 2 * * *
+    startingDeadlineSeconds: 300
+    successfulJobsHistoryLimit: 3
+---
+# Source: job/migration
+apiVersion: batch/v1
+kind: Job
+metadata:
+    labels:
+        app.kubernetes.io/component: migration
+        app.kubernetes.io/instance: all-blueprints-release-production
+        app.kubernetes.io/managed-by: open-platform-model
+        app.kubernetes.io/name: migration
+        app.kubernetes.io/version: 0.1.0
+        component.opmodel.dev/name: migration
+        core.opm.dev/category: workload
+        core.opm.dev/workload-type: task
+        module.opmodel.dev/name: opm.dev@v0#AllBlueprintsModule
+        module.opmodel.dev/version: 0.1.0
+    name: migration
+    namespace: production
+spec:
+    activeDeadlineSeconds: 3600
+    backoffLimit: 3
+    completions: 1
+    parallelism: 1
+    template:
+        metadata:
+            labels:
+                app.kubernetes.io/name: migration
+        spec:
+            containers:
+                - env:
+                    - name: MIGRATION_VERSION
+                      value: v2.0.0
+                    - name: DATABASE_URL
+                      value: postgres://admin:password@database:5432/appdb
+                  image: myapp/migrations:v2.0.0
+                  imagePullPolicy: IfNotPresent
+                  name: migration-runner
+            restartPolicy: OnFailure
+    ttlSecondsAfterFinished: 86400
+---
+# Source: statefulset/cache
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+    labels:
+        app.kubernetes.io/component: cache
+        app.kubernetes.io/instance: all-blueprints-release-production
+        app.kubernetes.io/managed-by: open-platform-model
+        app.kubernetes.io/name: cache
+        app.kubernetes.io/version: 0.1.0
+        component.opmodel.dev/name: cache
+        core.opm.dev/category: workload
+        core.opm.dev/persistence: "true"
+        core.opm.dev/workload-type: stateful
+        module.opmodel.dev/name: opm.dev@v0#AllBlueprintsModule
+        module.opmodel.dev/version: 0.1.0
+    name: cache
+    namespace: production
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app.kubernetes.io/name: cache
+    serviceName: cache
+    template:
+        metadata:
+            labels:
+                app.kubernetes.io/name: cache
+        spec:
+            containers:
+                - image: redis:7.0
+                  imagePullPolicy: IfNotPresent
+                  name: redis
+                  ports:
+                    - containerPort: 6379
+                      name: redis
+                      protocol: TCP
+                  volumeMounts:
+                    - mountPath: /data
+                      name: data
+            restartPolicy: Always
+    volumeClaimTemplates:
+        - metadata:
+            name: data
+          spec:
+            accessModes:
+                - ReadWriteOnce
+            resources:
+                requests:
+                    storage: 5Gi
+            storageClassName: standard
