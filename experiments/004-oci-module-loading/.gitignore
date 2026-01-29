@@ -1,9 +1,0 @@
-# Binaries
-004-oci-module-loading
-
-# Test outputs
-*.yaml
-*.json
-
-# CUE cache
-.cue-cache/
