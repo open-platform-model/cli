@@ -4,6 +4,23 @@
 
 Go CLI for OPM module operations. Uses cobra, CUE SDK, and zap logging.
 
+## Constitution
+
+This project follows the **Open Platform Model Constitution**.
+All agents MUST read and adhere to `openspec/config.yaml`.
+
+**Core Principles:**
+
+1. **Type Safety First**: All definitions in CUE. Validation at definition time.
+2. **Separation of Concerns**: Module (Dev) -> ModuleRelease (Consumer). Clear ownership boundaries.
+3. **Composability**: Definitions compose without implicit coupling. Resources, Traits, Blueprints are independent.
+4. **Declarative Intent**: Express WHAT, not HOW. Provider-specific steps in ProviderDefinitions.
+5. **Portability by Design**: Definitions must be runtime-agnostic.
+6. **Semantic Versioning**: SemVer v2.0.0 and Conventional Commits v1 required.
+7. **Simplicity & YAGNI**: Justify complexity. Prefer explicit over implicit.
+
+**Governance**: The constitution supersedes this file in case of conflict.
+
 ## Build/Test Commands
 
 - Build: `task build` (output: ./bin/opm)
