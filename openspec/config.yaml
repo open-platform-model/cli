@@ -1,0 +1,156 @@
+schema: spec-driven
+
+context: |
+  # OPM CLI Development Constitution
+  
+  ## Core Principles (CLI Application)
+  
+  ### I. Type Safety First
+  All CLI configuration MUST be validated at load time. Invalid flags, config files,
+  or module inputs MUST be rejected before any operation begins—never during execution.
+  - Use CUE for config validation (~/.opm/config.cue)
+  - Use Go's strong typing; avoid interface{} where possible
+  - Validate early: flags → config → module → execute
+  Rationale: Users should know immediately if their input is invalid.
+  
+  ### II. Separation of Concerns
+  The CLI MUST maintain clear boundaries between:
+  - Commands (cmd/): User interaction, flag parsing, output formatting
+  - Business logic (internal/): CUE operations, K8s interactions, rendering
+  - Shared utilities (pkg/): Reusable, stateless helpers
+  Each package has a single responsibility. Commands orchestrate; they don't implement.
+  Rationale: Prevents spaghetti code and makes testing easier.
+  
+  ### III. Composability
+  Commands and packages MUST compose without tight coupling:
+  - Commands call business logic via interfaces
+  - Business logic packages don't import command packages
+  - Output formatting is separate from data generation
+  Rationale: Enables reuse and makes the codebase easier to extend.
+  
+  ### IV. Declarative Intent
+  CLI output MUST express WHAT was done, not HOW:
+  - Success: "Module validated" not "Ran cue vet, parsed AST, checked schema..."
+  - Errors: State what's wrong and how to fix it, not internal stack traces
+  - Verbose mode (-v) can show the HOW for debugging
+  Rationale: Users care about outcomes, not implementation details.
+  
+  ### V. Portability by Design
+  The CLI MUST work across platforms without modification:
+  - No hardcoded paths (use os.UserHomeDir, filepath.Join)
+  - No shell-specific behavior in commands
+  - Test on Linux, macOS, Windows
+  Rationale: Users shouldn't need to modify behavior per platform.
+  
+  ### VI. Semantic Versioning
+  CLI releases MUST follow SemVer 2.0.0:
+  - MAJOR: Breaking flag changes, removed commands
+  - MINOR: New commands, new flags with defaults
+  - PATCH: Bug fixes, performance improvements
+  All commits MUST follow Conventional Commits: type(scope): description
+  Rationale: Enables predictable upgrades and changelog automation.
+  
+  ### VII. Simplicity & YAGNI
+  Start simple. New flags, commands, or packages MUST be justified:
+  - Prefer fewer flags with smart defaults over many options
+  - Prefer explicit configuration over magic inference
+  - If a feature isn't requested, don't build it
+  Rationale: Every flag is a maintenance burden and UX complexity.
+  
+  ## Technology Standards
+  
+  ### CLI Framework & UX
+  - spf13/cobra: Commands, auto-generated help, shell completion
+  - charmbracelet/lipgloss: Terminal styling
+  - charmbracelet/log: Structured logging with key-value output
+  - charmbracelet/glamour: Markdown rendering in terminal
+  - charmbracelet/huh: Interactive prompts for init commands
+  
+  ### Configuration
+  - CUE-native config (~/.opm/config.cue) - NOT viper/yaml
+  - Aligns with Principle I: config validated by CUE schema at load time
+  
+  ### CUE Integration
+  - cuelang.org/go: Native CUE evaluation (no external cue binary)
+  - Fresh CUE context per command (avoid memory bloat)
+  - Directory-based module loading (not file paths)
+  
+  ### Kubernetes
+  - k8s.io/client-go: Server-side apply, resource discovery
+  - k8s.io/apimachinery: Unstructured types, version parsing
+  
+  ### Distribution
+  - oras.land/oras-go/v2: OCI push/pull for module distribution
+  
+  ### Diff & Comparison
+  - homeport/dyff: Human-readable semantic diffs
+  
+  ### Testing
+  - stretchr/testify: Assertions and mocking
+  - sigs.k8s.io/controller-runtime/pkg/envtest: K8s integration tests
+  
+  ## Code Style
+  
+  ### Go Patterns
+  - Accept interfaces, return structs
+  - Context propagation for all async operations
+  - Wrap errors with context: fmt.Errorf("loading module: %w", err)
+  - Commands use RunE for error handling
+  - Table-driven tests with testify assertions
+  
+  ### Import Order
+  1. Standard library
+  2. External packages
+  3. Internal packages
+  
+  ## Validation Gates (before merge)
+  1. task fmt — All Go files formatted
+  2. task lint — golangci-lint passes
+  3. task test — All tests pass
+  
+  ## Commit Standards
+  - Format: type(scope): description
+  - Types: feat, fix, refactor, docs, test, chore
+  - Scope: cmd, cue, kubernetes, output, config, etc.
+  - Keep descriptions concise
+  - No AI attribution in commit messages
+
+rules:
+  proposal:
+    - Identify affected command(s) and package(s)
+    - State whether this is MAJOR/MINOR/PATCH per SemVer
+    - Complexity additions MUST include justification (Principle VII)
+    - New flags MUST have sensible defaults
+  
+  specs:
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Define command syntax: "opm <group> <command> [args] [flags]"
+    - Document all flags with types, defaults, and descriptions
+    - Specify exit codes (0=success, 1=usage error, 2=execution error)
+    - Include example output for success and error cases
+    - Specify error messages and suggested fixes
+  
+  design:
+    - MUST include "Research & Decisions" section when exploration was done
+    - Document what was explored, alternatives considered, and rationale
+    - Format: |
+        ## Research & Decisions
+        
+        ### [Topic]
+        **Context**: [Why this decision was needed]
+        **Explored**: [What was investigated - link to exploration notes]
+        **Options considered**:
+        1. [Option A] - [pros/cons]
+        2. [Option B] - [pros/cons]
+        **Decision**: [Chosen option]
+        **Rationale**: [Why this option was selected]
+    - Include Go pseudo-code or function signatures
+    - Reference upstream patterns (Timoni, kubectl) when applicable
+    - Data flow diagrams for pipeline commands (build, apply, etc.)
+    - Error handling: what errors can occur and how they're surfaced
+  
+  tasks:
+    - Include validation gates as final tasks (task lint, task test)
+    - Group implementation tasks by package
+    - Specify table-driven test patterns for test tasks
+    - Include integration test tasks where K8s interaction is involved
