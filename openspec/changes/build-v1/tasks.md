@@ -26,9 +26,9 @@
 
 ## Phase 2: Module Loading
 
-### 2.1 Loader Implementation
+### 2.1 ModuleLoader Implementation
 
-- [x] 2.1.1 Create `internal/build/loader.go`
+- [x] 2.1.1 Create `internal/build/module.go`
 - [x] 2.1.2 Implement `LoadedModule` and `LoadedComponent` types
 - [x] 2.1.3 Implement module loading via cue/load
 - [x] 2.1.4 Implement values.cue auto-discovery (required)
@@ -141,7 +141,7 @@
 
 ### 9.1 Unit Tests
 
-- [x] 9.1.1 Add unit tests for Loader
+- [x] 9.1.1 Add unit tests for ModuleLoader
 - [x] 9.1.2 Add unit tests for ProviderLoader
 - [x] 9.1.3 Add unit tests for Matcher
 - [x] 9.1.4 Add unit tests for Executor

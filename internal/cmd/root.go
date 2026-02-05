@@ -28,12 +28,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "opm",
 		Short: "Open Platform Model CLI",
-		Long: `OPM CLI manages module lifecycle and configuration for the Open Platform Model.
-
-Commands:
-  mod       Module operations (init, vet, tidy, build, apply, delete, diff, status)
-  config    Configuration management (init, vet)
-  version   Show version information`,
+	Long:  `OPM CLI manages module lifecycle and configuration for the Open Platform Model.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -60,7 +55,7 @@ Commands:
 }
 
 // initializeGlobals sets up logging and loads configuration.
-func initializeGlobals(cmd *cobra.Command) error {
+func initializeGlobals(_ *cobra.Command) error {
 	// Setup logging based on verbose flag
 	output.SetupLogging(verboseFlag)
 

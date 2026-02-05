@@ -87,7 +87,7 @@ func (pl *ProviderLoader) Load(ctx context.Context, name string) (*LoadedProvide
 	}
 
 	for iter.Next() {
-		tfName := iter.Label()
+		tfName := iter.Selector().Unquoted()
 		tfValue := iter.Value()
 
 		transformer, err := pl.extractTransformer(name, tfName, tfValue)
@@ -109,6 +109,8 @@ func (pl *ProviderLoader) Load(ctx context.Context, name string) (*LoadedProvide
 }
 
 // extractTransformer extracts a transformer's metadata and requirements.
+//
+//nolint:unparam // error return allows for future validation
 func (pl *ProviderLoader) extractTransformer(providerName, name string, value cue.Value) (*LoadedTransformer, error) {
 	transformer := &LoadedTransformer{
 		Name:              name,
@@ -122,79 +124,53 @@ func (pl *ProviderLoader) extractTransformer(providerName, name string, value cu
 		Value:             value,
 	}
 
-	// Extract required labels
-	if reqLabels := value.LookupPath(cue.ParsePath("requiredLabels")); reqLabels.Exists() {
-		iter, err := reqLabels.Fields()
-		if err == nil {
-			for iter.Next() {
-				if str, err := iter.Value().String(); err == nil {
-					transformer.RequiredLabels[iter.Label()] = str
-				}
-			}
-		}
-	}
+	// Extract required fields
+	pl.extractLabelsField(value, "requiredLabels", transformer.RequiredLabels)
+	transformer.RequiredResources = pl.extractStringList(value, "requiredResources")
+	transformer.RequiredTraits = pl.extractStringList(value, "requiredTraits")
 
-	// Extract required resources
-	if reqRes := value.LookupPath(cue.ParsePath("requiredResources")); reqRes.Exists() {
-		iter, err := reqRes.List()
-		if err == nil {
-			for iter.Next() {
-				if str, err := iter.Value().String(); err == nil {
-					transformer.RequiredResources = append(transformer.RequiredResources, str)
-				}
-			}
-		}
-	}
-
-	// Extract required traits
-	if reqTraits := value.LookupPath(cue.ParsePath("requiredTraits")); reqTraits.Exists() {
-		iter, err := reqTraits.List()
-		if err == nil {
-			for iter.Next() {
-				if str, err := iter.Value().String(); err == nil {
-					transformer.RequiredTraits = append(transformer.RequiredTraits, str)
-				}
-			}
-		}
-	}
-
-	// Extract optional labels
-	if optLabels := value.LookupPath(cue.ParsePath("optionalLabels")); optLabels.Exists() {
-		iter, err := optLabels.Fields()
-		if err == nil {
-			for iter.Next() {
-				if str, err := iter.Value().String(); err == nil {
-					transformer.OptionalLabels[iter.Label()] = str
-				}
-			}
-		}
-	}
-
-	// Extract optional resources
-	if optRes := value.LookupPath(cue.ParsePath("optionalResources")); optRes.Exists() {
-		iter, err := optRes.List()
-		if err == nil {
-			for iter.Next() {
-				if str, err := iter.Value().String(); err == nil {
-					transformer.OptionalResources = append(transformer.OptionalResources, str)
-				}
-			}
-		}
-	}
-
-	// Extract optional traits
-	if optTraits := value.LookupPath(cue.ParsePath("optionalTraits")); optTraits.Exists() {
-		iter, err := optTraits.List()
-		if err == nil {
-			for iter.Next() {
-				if str, err := iter.Value().String(); err == nil {
-					transformer.OptionalTraits = append(transformer.OptionalTraits, str)
-				}
-			}
-		}
-	}
+	// Extract optional fields
+	pl.extractLabelsField(value, "optionalLabels", transformer.OptionalLabels)
+	transformer.OptionalResources = pl.extractStringList(value, "optionalResources")
+	transformer.OptionalTraits = pl.extractStringList(value, "optionalTraits")
 
 	return transformer, nil
+}
+
+// extractLabelsField extracts a labels map field from a CUE value.
+func (pl *ProviderLoader) extractLabelsField(value cue.Value, field string, labels map[string]string) {
+	fieldVal := value.LookupPath(cue.ParsePath(field))
+	if !fieldVal.Exists() {
+		return
+	}
+	iter, err := fieldVal.Fields()
+	if err != nil {
+		return
+	}
+	for iter.Next() {
+		if str, err := iter.Value().String(); err == nil {
+			labels[iter.Selector().Unquoted()] = str
+		}
+	}
+}
+
+// extractStringList extracts a string list field from a CUE value.
+func (pl *ProviderLoader) extractStringList(value cue.Value, field string) []string {
+	result := make([]string, 0)
+	fieldVal := value.LookupPath(cue.ParsePath(field))
+	if !fieldVal.Exists() {
+		return result
+	}
+	iter, err := fieldVal.List()
+	if err != nil {
+		return result
+	}
+	for iter.Next() {
+		if str, err := iter.Value().String(); err == nil {
+			result = append(result, str)
+		}
+	}
+	return result
 }
 
 // GetByFQN returns a transformer by its fully qualified name.

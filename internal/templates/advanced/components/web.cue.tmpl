@@ -1,18 +1,24 @@
 // Web component template for frontend services.
 package components
 
-import "opmodel.dev/core@v0"
+import (
+	resources_workload "opmodel.dev/resources/workload@v0"
+	traits_workload "opmodel.dev/traits/workload@v0"
+	traits_network "opmodel.dev/traits/network@v0"
+)
 
 // _web is a reusable web server component template.
-_web: core.#Component & {
-	metadata: {
-		name:        "web"
-		description: "Web frontend component"
-	}
+#web: {
+	resources_workload.#Container
+	traits_workload.#Replicas
+	traits_network.#Expose
+
 	spec: {
 		container: {
 			image: string
-			ports: [{containerPort: 8080}]
+			ports: http: {
+				targetPort: 8080
+			}
 			resources: {
 				requests: {
 					cpu:    "100m"
@@ -25,5 +31,11 @@ _web: core.#Component & {
 			}
 		}
 		replicas: int | *2
+		expose: {
+			ports: http: container.ports.http & {
+				exposedPort: 8080
+			}
+			type: "ClusterIP"
+		}
 	}
 }

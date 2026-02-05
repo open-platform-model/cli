@@ -8,7 +8,7 @@
 internal/
 ├── build/                  # Core render pipeline (implements Pipeline interface)
 │   ├── pipeline.go             # Pipeline struct, Render() method
-│   ├── loader.go               # Module and values loading
+│   ├── module.go               # Module and values loading
 │   ├── provider.go             # Provider loading and transformer indexing
 │   ├── matcher.go              # Component-transformer matching
 │   ├── executor.go             # Parallel transformer execution
@@ -35,7 +35,7 @@ internal/
 // internal/build/pipeline.go
 type pipeline struct {
     config   *config.OPMConfig
-    loader   *Loader
+    module   *ModuleLoader
     provider *ProviderLoader
     matcher  *Matcher
     executor *Executor
@@ -47,7 +47,7 @@ func NewPipeline(cfg *config.OPMConfig) Pipeline {
 
 func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResult, error) {
     // Phase 1: Load module and values
-    module, err := p.loader.Load(ctx, opts)
+    module, err := p.module.Load(ctx, opts)
     if err != nil {
         return nil, err // Fatal error
     }
@@ -180,7 +180,7 @@ RenderOptions
     │
     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ Loader                                                                   │
+│ ModuleLoader                                                                   │
 │                                                                          │
 │   ModulePath ──▶ Load cue.mod/ ──▶ Evaluate module.cue                  │
 │                                          │                               │
@@ -303,7 +303,7 @@ Flags:
 | File | Purpose |
 |------|---------|
 | `internal/build/pipeline.go` | Pipeline implementation |
-| `internal/build/loader.go` | Module loading |
+| `internal/build/module.go` | Module loading |
 | `internal/build/provider.go` | Provider loading |
 | `internal/build/matcher.go` | Component-transformer matching |
 | `internal/build/executor.go` | Parallel execution |

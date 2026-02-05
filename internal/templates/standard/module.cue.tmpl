@@ -5,7 +5,9 @@
 // - values.cue: default values
 package main
 
-import "opmodel.dev/core@v0"
+import (
+	"opmodel.dev/core@v0"
+)
 
 // Module definition
 core.#Module
@@ -13,16 +15,16 @@ core.#Module
 // Module metadata
 metadata: {
 	apiVersion:  "{{.ModulePath}}@v0"
-	name:        "{{.ModuleName}}"
+	name:        "{{.ModuleNamePascal}}"
 	version:     "{{.Version}}"
 	description: string | *"A standard OPM module"
+	defaultNamespace: "default"
 }
 
 // Components are defined in components.cue
-#components: _components
 
-// Spec defines the configuration schema for this module.
-#spec: {
+// Schema and default values are defined in values.cue
+#values: {
 	// Web component configuration
 	web: {
 		// Container image (required)

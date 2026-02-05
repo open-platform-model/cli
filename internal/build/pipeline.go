@@ -15,7 +15,7 @@ import (
 // and parallel transformer execution.
 type pipeline struct {
 	config   *config.OPMConfig
-	loader   *Loader
+	module   *ModuleLoader
 	provider *ProviderLoader
 	matcher  *Matcher
 	executor *Executor
@@ -26,7 +26,7 @@ type pipeline struct {
 func NewPipeline(cfg *config.OPMConfig) Pipeline {
 	return &pipeline{
 		config:   cfg,
-		loader:   NewLoader(),
+		module:   NewModuleLoader(),
 		provider: NewProviderLoader(cfg),
 		matcher:  NewMatcher(),
 		executor: NewExecutor(runtime.NumCPU()),
@@ -36,7 +36,7 @@ func NewPipeline(cfg *config.OPMConfig) Pipeline {
 // Render executes the pipeline and returns results.
 //
 // The render process follows these phases:
-//  1. Load module and values (Loader)
+//  1. Load module and values (ModuleLoader)
 //  2. Load provider and transformers (ProviderLoader)
 //  3. Match components to transformers (Matcher)
 //  4. Execute transformers in parallel (Executor)
@@ -51,16 +51,19 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	}
 
 	// Phase 1: Load module and values
-	module, err := p.loader.Load(ctx, opts)
+	module, err := p.module.Load(ctx, opts)
 	if err != nil {
 		return nil, err // Fatal: module loading failed
 	}
 
 	// Phase 2: Load provider
 	providerName := opts.Provider
-	if providerName == "" && p.config != nil && p.config.Config != nil {
-		// Use default provider from config if not specified
-		// TODO: Add defaultProvider to config
+	// Default to the only configured provider if not specified
+	if providerName == "" && p.config != nil && len(p.config.Providers) == 1 {
+		for name := range p.config.Providers {
+			providerName = name
+			break
+		}
 	}
 	provider, err := p.provider.Load(ctx, providerName)
 	if err != nil {
@@ -83,7 +86,12 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	// Phase 4: Execute transformers in parallel (only for matched components)
 	var resources []*Resource
 	if len(matchResult.ByTransformer) > 0 {
-		execResult := p.executor.Execute(ctx, matchResult, module)
+		// Build transformer map for executor
+		transformerMap := make(map[string]*LoadedTransformer)
+		for _, tf := range provider.Transformers {
+			transformerMap[tf.FQN] = tf
+		}
+		execResult := p.executor.ExecuteWithTransformers(ctx, matchResult, module, transformerMap)
 		resources = execResult.Resources
 		errors = append(errors, execResult.Errors...)
 	}
@@ -115,7 +123,8 @@ func collectWarnings(result *MatchResult, strict bool) []string {
 
 	if !strict {
 		// In non-strict mode, report unhandled traits as warnings
-		for _, detail := range result.Details {
+		for i := range result.Details {
+			detail := &result.Details[i]
 			if detail.Matched && len(detail.UnhandledTraits) > 0 {
 				for _, trait := range detail.UnhandledTraits {
 					warnings = append(warnings,

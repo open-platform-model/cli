@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -217,9 +216,27 @@ func TestGetFileDescription(t *testing.T) {
 	}
 }
 
-// newTestCommand creates a command with silenced output for testing
-func newTestCommand(cmd *cobra.Command) *cobra.Command {
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-	return cmd
+func TestToPascalCase(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"my-app", "MyApp"},
+		{"my-special-app", "MySpecialApp"},
+		{"simple", "Simple"},
+		{"my_app", "MyApp"},
+		{"MY-APP", "MYAPP"},
+		{"a-b-c", "ABC"},
+		{"test", "Test"},
+		{"hello-world", "HelloWorld"},
+		{"api-server", "ApiServer"},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := toPascalCase(tt.input)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

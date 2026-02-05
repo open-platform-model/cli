@@ -94,9 +94,9 @@ A developer wants to control how rendered manifests are output.
 
 | ID | Requirement |
 |----|-------------|
-| FR-B-030 | Loader MUST require `values.cue` at module root. |
-| FR-B-031 | Loader MUST unify `values.cue` with `--values` files in order. |
-| FR-B-032 | Loader MUST construct `#ModuleRelease` from module + values. |
+| FR-B-030 | ModuleLoader MUST require `values.cue` at module root. |
+| FR-B-031 | ModuleLoader MUST unify `values.cue` with `--values` files in order. |
+| FR-B-032 | ModuleLoader MUST construct `#ModuleRelease` from module + values. |
 | FR-B-033 | `--namespace` MUST take precedence over `module.metadata.defaultNamespace`. |
 | FR-B-034 | `--name` MUST take precedence over `module.metadata.name`. |
 

@@ -109,7 +109,7 @@ func TestResolveConfigPath_Default(t *testing.T) {
 	assert.Empty(t, result.Shadowed)
 }
 
-func TestConfigSource_String(t *testing.T) {
+func TestSource_String(t *testing.T) {
 	assert.Equal(t, "flag", string(SourceFlag))
 	assert.Equal(t, "env", string(SourceEnv))
 	assert.Equal(t, "config", string(SourceConfig))

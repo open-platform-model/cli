@@ -8,14 +8,11 @@ import (
 )
 
 // Logger is the global logger instance.
-var Logger *log.Logger
-
-func init() {
-	Logger = log.NewWithOptions(os.Stderr, log.Options{
-		ReportTimestamp: false,
-		ReportCaller:    false,
-	})
-}
+// Initialized with default options; call SetupLogging to configure.
+var Logger = log.NewWithOptions(os.Stderr, log.Options{
+	ReportTimestamp: false,
+	ReportCaller:    false,
+})
 
 // SetupLogging configures the logger based on verbosity.
 func SetupLogging(verbose bool) {

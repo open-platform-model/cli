@@ -20,7 +20,7 @@ type Pipeline interface {
 	// Render errors (unmatched components, transform failures) are in RenderResult.Errors.
 	//
 	// The context is used for cancellation. Long-running operations should
-	// check ctx.Done() and return ctx.Err() if cancelled.
+	// check ctx.Done() and return ctx.Err() if canceled.
 	Render(ctx context.Context, opts RenderOptions) (*RenderResult, error)
 }
 

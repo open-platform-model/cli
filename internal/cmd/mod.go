@@ -10,15 +10,7 @@ func NewModCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mod",
 		Short: "Module operations",
-		Long: `Module operations for OPM modules.
-
-Commands:
-  init      Create a new module from template
-  build     Render module to manifests
-  apply     Apply manifests to cluster (not yet implemented)
-  delete    Delete resources from cluster (not yet implemented)
-  diff      Show differences with cluster (not yet implemented)
-  status    Show resource status (not yet implemented)`,
+	Long: `Module operations for OPM modules.`,
 	}
 
 	// Add subcommands

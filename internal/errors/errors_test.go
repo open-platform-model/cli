@@ -1,3 +1,4 @@
+//nolint:revive // Package name matches the package it tests
 package errors
 
 import (
@@ -15,8 +16,8 @@ func TestSentinelErrors(t *testing.T) {
 	assert.NotEqual(t, ErrValidation, ErrNotFound)
 }
 
-func TestErrorDetailError(t *testing.T) {
-	detail := &ErrorDetail{
+func TestDetailErrorError(t *testing.T) {
+	detail := &DetailError{
 		Type:     "validation failed",
 		Message:  "invalid value",
 		Location: "/path/to/file.cue:42",
@@ -35,8 +36,8 @@ func TestErrorDetailError(t *testing.T) {
 	assert.Contains(t, output, "Hint: Use semver format")
 }
 
-func TestErrorDetailUnwrap(t *testing.T) {
-	detail := &ErrorDetail{
+func TestDetailErrorUnwrap(t *testing.T) {
+	detail := &DetailError{
 		Type:    "test",
 		Message: "test message",
 		Cause:   ErrValidation,
@@ -57,8 +58,8 @@ func TestNewValidationError(t *testing.T) {
 	require.NotNil(t, err)
 	assert.True(t, errors.Is(err, ErrValidation))
 
-	detail, ok := err.(*ErrorDetail)
-	require.True(t, ok)
+	var detail *DetailError
+	require.True(t, errors.As(err, &detail))
 	assert.Equal(t, "validation failed", detail.Type)
 	assert.Equal(t, "invalid value", detail.Message)
 	assert.Equal(t, "/path/to/file.cue:42", detail.Location)
@@ -76,8 +77,8 @@ func TestNewConnectivityError(t *testing.T) {
 	require.NotNil(t, err)
 	assert.True(t, errors.Is(err, ErrConnectivity))
 
-	detail, ok := err.(*ErrorDetail)
-	require.True(t, ok)
+	var detail *DetailError
+	require.True(t, errors.As(err, &detail))
 	assert.Equal(t, "connectivity failed", detail.Type)
 	assert.Equal(t, "localhost:5000", detail.Context["Registry"])
 }
@@ -92,8 +93,8 @@ func TestNewNotFoundError(t *testing.T) {
 	require.NotNil(t, err)
 	assert.True(t, errors.Is(err, ErrNotFound))
 
-	detail, ok := err.(*ErrorDetail)
-	require.True(t, ok)
+	var detail *DetailError
+	require.True(t, errors.As(err, &detail))
 	assert.Equal(t, "not found", detail.Type)
 }
 

@@ -46,7 +46,7 @@ func PathsFromEnv() (*Paths, error) {
 
 // ExpandPath expands ~ to the user's home directory.
 func ExpandPath(path string) (string, error) {
-	if len(path) == 0 {
+	if path == "" {
 		return path, nil
 	}
 

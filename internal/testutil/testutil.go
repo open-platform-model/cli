@@ -8,7 +8,7 @@ import (
 )
 
 // TempDir creates a temporary directory for tests and returns a cleanup function.
-func TempDir(t *testing.T) (string, func()) {
+func TempDir(t *testing.T) (dir string, cleanup func()) {
 	t.Helper()
 	dir, err := os.MkdirTemp("", "opm-test-*")
 	if err != nil {
@@ -52,7 +52,7 @@ func WriteFile(t *testing.T, dir, name, content string) string {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatalf("failed to create parent dirs for %s: %v", path, err)
 	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write file %s: %v", path, err)
 	}
 	return path

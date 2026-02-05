@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -111,7 +112,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	}
 
 	// Validate output format
-	outputFormat, valid := output.ParseOutputFormat(buildOutputFlag)
+	outputFormat, valid := output.ParseFormat(buildOutputFlag)
 	if !valid {
 		return &ExitError{
 			Code: ExitGeneralError,
@@ -256,15 +257,19 @@ func writeVerboseOutput(result *build.RenderResult, jsonOutput bool) {
 }
 
 // printRenderErrors prints render errors in a user-friendly format.
-func printRenderErrors(errors []error) {
+func printRenderErrors(errs []error) {
 	output.Error("render completed with errors")
-	for _, err := range errors {
-		switch e := err.(type) {
-		case *build.UnmatchedComponentError:
-			output.Error(fmt.Sprintf("component %q: no matching transformer", e.ComponentName))
-			if len(e.Available) > 0 {
+	for _, err := range errs {
+		var unmatchedErr *build.UnmatchedComponentError
+		var transformErr *build.TransformError
+		var unhandledTraitErr *build.UnhandledTraitError
+
+		switch {
+		case errors.As(err, &unmatchedErr):
+			output.Error(fmt.Sprintf("component %q: no matching transformer", unmatchedErr.ComponentName))
+			if len(unmatchedErr.Available) > 0 {
 				output.Info("Available transformers:")
-				for _, t := range e.Available {
+				for _, t := range unmatchedErr.Available {
 					output.Info(fmt.Sprintf("  %s", t.FQN))
 					if len(t.RequiredLabels) > 0 {
 						output.Info(fmt.Sprintf("    requiredLabels: %v", t.RequiredLabels))
@@ -277,11 +282,11 @@ func printRenderErrors(errors []error) {
 					}
 				}
 			}
-		case *build.TransformError:
+		case errors.As(err, &transformErr):
 			output.Error(fmt.Sprintf("component %q: transform failed with %s: %v",
-				e.ComponentName, e.TransformerFQN, e.Cause))
-		case *build.UnhandledTraitError:
-			output.Error(fmt.Sprintf("component %q: unhandled trait %q", e.ComponentName, e.TraitFQN))
+				transformErr.ComponentName, transformErr.TransformerFQN, transformErr.Cause))
+		case errors.As(err, &unhandledTraitErr):
+			output.Error(fmt.Sprintf("component %q: unhandled trait %q", unhandledTraitErr.ComponentName, unhandledTraitErr.TraitFQN))
 		default:
 			output.Error(err.Error())
 		}

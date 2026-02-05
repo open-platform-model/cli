@@ -2,12 +2,10 @@
 package config
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
-	"time"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
@@ -122,7 +120,7 @@ func LoadOPMConfig(opts LoaderOptions) (*OPMConfig, error) {
 	}
 
 	// Step 5: Phase 2 - Load full config with registry set
-	cfg, err := loadFullConfig(configPathResult.ConfigPath, registryResult.Registry)
+	cfg, providers, err := loadFullConfig(configPathResult.ConfigPath, registryResult.Registry)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +129,7 @@ func LoadOPMConfig(opts LoaderOptions) (*OPMConfig, error) {
 		Config:         cfg,
 		Registry:       registryResult.Registry,
 		RegistrySource: string(registryResult.Source),
-		Providers:      nil, // Providers loaded separately if needed
+		Providers:      providers,
 	}, nil
 }
 
@@ -153,13 +151,14 @@ func configHasProviders(configPath string) (bool, error) {
 
 // loadFullConfig loads the config.cue file with full CUE evaluation.
 // This is Phase 2 of the two-phase loading process.
-func loadFullConfig(configPath, registry string) (*Config, error) {
+// Returns the config, providers map, and any error.
+func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value, error) {
 	// Check if config exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		output.Debug("config file not found, using defaults",
 			"path", configPath,
 		)
-		return DefaultConfig(), nil
+		return DefaultConfig(), nil, nil
 	}
 
 	// Use the directory containing the config file for CUE loading.
@@ -184,7 +183,7 @@ func loadFullConfig(configPath, registry string) (*Config, error) {
 
 	instances := load.Instances([]string{"."}, cfg)
 	if len(instances) == 0 {
-		return nil, oerrors.NewValidationError(
+		return nil, nil, oerrors.NewValidationError(
 			"no CUE instances found",
 			configDir,
 			"", // no specific field
@@ -194,7 +193,7 @@ func loadFullConfig(configPath, registry string) (*Config, error) {
 
 	inst := instances[0]
 	if inst.Err != nil {
-		return nil, &oerrors.ErrorDetail{
+		return nil, nil, &oerrors.DetailError{
 			Type:     "configuration error",
 			Message:  inst.Err.Error(),
 			Location: configPath,
@@ -205,7 +204,7 @@ func loadFullConfig(configPath, registry string) (*Config, error) {
 
 	value := ctx.BuildInstance(inst)
 	if value.Err() != nil {
-		return nil, &oerrors.ErrorDetail{
+		return nil, nil, &oerrors.DetailError{
 			Type:     "configuration error",
 			Message:  value.Err().Error(),
 			Location: configPath,
@@ -215,10 +214,56 @@ func loadFullConfig(configPath, registry string) (*Config, error) {
 	}
 
 	// Extract config values
-	return extractConfig(value)
+	config, err := extractConfig(value)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Extract providers
+	providers := extractProviders(value)
+
+	return config, providers, nil
+}
+
+// extractProviders extracts provider definitions from the CUE config value.
+// Returns a map of provider alias to CUE value.
+func extractProviders(value cue.Value) map[string]cue.Value {
+	// Look for providers in config struct first
+	configValue := value.LookupPath(cue.ParsePath("config"))
+	if !configValue.Exists() {
+		configValue = value
+	}
+
+	providersValue := configValue.LookupPath(cue.ParsePath("providers"))
+	if !providersValue.Exists() {
+		output.Debug("no providers found in config")
+		return nil
+	}
+
+	providers := make(map[string]cue.Value)
+	iter, err := providersValue.Fields()
+	if err != nil {
+		output.Debug("failed to iterate providers", "error", err)
+		return nil
+	}
+
+	for iter.Next() {
+		name := iter.Selector().Unquoted()
+		providers[name] = iter.Value()
+		output.Debug("extracted provider from config", "name", name)
+	}
+
+	if len(providers) == 0 {
+		return nil
+	}
+
+	output.Debug("extracted providers from config", "count", len(providers))
+	return providers
 }
 
 // extractConfig extracts Go config struct from CUE value.
+//
+//nolint:unparam // error return allows for future validation
 func extractConfig(value cue.Value) (*Config, error) {
 	cfg := DefaultConfig()
 
@@ -266,42 +311,13 @@ func CheckRegistryConnectivity(registry string) error {
 		return nil // No registry to check
 	}
 
-	// Create context with 5-second timeout per T050
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	// Use a simple HEAD request to check connectivity
 	// For OCI registries, we check the /v2/ endpoint
 	url := fmt.Sprintf("https://%s/v2/", registry)
 
-	// Create HTTP client with timeout
 	// Note: We're just checking connectivity, not authentication
-	req, err := makeRegistryRequest(ctx, url)
-	if err != nil {
-		// Try HTTP if HTTPS fails
-		url = fmt.Sprintf("http://%s/v2/", registry)
-		req, err = makeRegistryRequest(ctx, url)
-	}
-
-	if err != nil {
-		return oerrors.NewConnectivityError(
-			fmt.Sprintf("cannot connect to registry: %s", registry),
-			map[string]string{"registry": registry},
-			"Verify the registry is running and accessible",
-		)
-	}
-
-	_ = req // Request successful, registry is reachable
-	return nil
-}
-
-// makeRegistryRequest makes a simple HTTP HEAD request to check connectivity.
-func makeRegistryRequest(ctx context.Context, url string) (bool, error) {
-	// Use Go's http client with context
-	// This is a simplified check - in production you might use oras-go
+	// For now, we'll skip the actual HTTP check since it requires more setup.
+	// The CUE binary will fail with a clear error if registry is unreachable.
 	output.Debug("checking registry connectivity", "url", url)
-
-	// For now, we'll skip the actual HTTP check since it requires more setup
-	// The CUE binary will fail with a clear error if registry is unreachable
-	return true, nil
+	return nil
 }

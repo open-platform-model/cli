@@ -7,18 +7,18 @@ import (
 	"github.com/opmodel/cli/internal/output"
 )
 
-// ConfigSource indicates where a configuration value came from.
-type ConfigSource string
+// Source indicates where a configuration value came from.
+type Source string
 
 const (
 	// SourceFlag indicates value came from command-line flag.
-	SourceFlag ConfigSource = "flag"
+	SourceFlag Source = "flag"
 	// SourceEnv indicates value came from environment variable.
-	SourceEnv ConfigSource = "env"
+	SourceEnv Source = "env"
 	// SourceConfig indicates value came from config file.
-	SourceConfig ConfigSource = "config"
+	SourceConfig Source = "config"
 	// SourceDefault indicates value is the built-in default.
-	SourceDefault ConfigSource = "default"
+	SourceDefault Source = "default"
 )
 
 // ResolveRegistryOptions contains options for registry resolution.
@@ -34,9 +34,9 @@ type ResolveRegistryResult struct {
 	// Registry is the resolved registry URL.
 	Registry string
 	// Source indicates where the registry came from.
-	Source ConfigSource
+	Source Source
 	// Shadowed contains values that were overridden by higher precedence.
-	Shadowed map[ConfigSource]string
+	Shadowed map[Source]string
 }
 
 // ResolveRegistry resolves the registry URL using precedence:
@@ -45,14 +45,15 @@ type ResolveRegistryResult struct {
 // Per FR-009: The CLI MUST resolve the registry URL using this precedence.
 func ResolveRegistry(opts ResolveRegistryOptions) ResolveRegistryResult {
 	result := ResolveRegistryResult{
-		Shadowed: make(map[ConfigSource]string),
+		Shadowed: make(map[Source]string),
 	}
 
 	// Collect all potential values
 	envValue := os.Getenv("OPM_REGISTRY")
 
 	// Resolve using precedence: flag > env > config
-	if opts.FlagValue != "" {
+	switch {
+	case opts.FlagValue != "":
 		result.Registry = opts.FlagValue
 		result.Source = SourceFlag
 		// Record shadowed values
@@ -62,14 +63,14 @@ func ResolveRegistry(opts ResolveRegistryOptions) ResolveRegistryResult {
 		if opts.ConfigValue != "" {
 			result.Shadowed[SourceConfig] = opts.ConfigValue
 		}
-	} else if envValue != "" {
+	case envValue != "":
 		result.Registry = envValue
 		result.Source = SourceEnv
 		// Record shadowed values
 		if opts.ConfigValue != "" {
 			result.Shadowed[SourceConfig] = opts.ConfigValue
 		}
-	} else if opts.ConfigValue != "" {
+	case opts.ConfigValue != "":
 		result.Registry = opts.ConfigValue
 		result.Source = SourceConfig
 	}
@@ -89,9 +90,9 @@ type ResolveConfigPathResult struct {
 	// ConfigPath is the resolved config file path.
 	ConfigPath string
 	// Source indicates where the config path came from.
-	Source ConfigSource
+	Source Source
 	// Shadowed contains values that were overridden by higher precedence.
-	Shadowed map[ConfigSource]string
+	Shadowed map[Source]string
 }
 
 // ResolveConfigPath resolves the config file path using precedence:
@@ -100,7 +101,7 @@ type ResolveConfigPathResult struct {
 // Per FR-018: The CLI MUST resolve configuration values using precedence.
 func ResolveConfigPath(opts ResolveConfigPathOptions) (ResolveConfigPathResult, error) {
 	result := ResolveConfigPathResult{
-		Shadowed: make(map[ConfigSource]string),
+		Shadowed: make(map[Source]string),
 	}
 
 	envValue := os.Getenv("OPM_CONFIG")
@@ -113,7 +114,8 @@ func ResolveConfigPath(opts ResolveConfigPathOptions) (ResolveConfigPathResult, 
 	defaultPath := paths.ConfigFile
 
 	// Resolve using precedence: flag > env > default
-	if opts.FlagValue != "" {
+	switch {
+	case opts.FlagValue != "":
 		result.ConfigPath = opts.FlagValue
 		result.Source = SourceFlag
 		// Record shadowed values
@@ -121,12 +123,12 @@ func ResolveConfigPath(opts ResolveConfigPathOptions) (ResolveConfigPathResult, 
 			result.Shadowed[SourceEnv] = envValue
 		}
 		result.Shadowed[SourceDefault] = defaultPath
-	} else if envValue != "" {
+	case envValue != "":
 		result.ConfigPath = envValue
 		result.Source = SourceEnv
 		// Record shadowed values
 		result.Shadowed[SourceDefault] = defaultPath
-	} else {
+	default:
 		result.ConfigPath = defaultPath
 		result.Source = SourceDefault
 	}

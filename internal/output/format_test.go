@@ -6,17 +6,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestOutputFormatValid(t *testing.T) {
+func TestFormatValid(t *testing.T) {
 	tests := []struct {
-		format OutputFormat
+		format Format
 		valid  bool
 	}{
 		{FormatYAML, true},
 		{FormatJSON, true},
 		{FormatTable, true},
 		{FormatDir, true},
-		{OutputFormat("invalid"), false},
-		{OutputFormat(""), false},
+		{Format("invalid"), false},
+		{Format(""), false},
 	}
 
 	for _, tt := range tests {
@@ -26,17 +26,17 @@ func TestOutputFormatValid(t *testing.T) {
 	}
 }
 
-func TestOutputFormatString(t *testing.T) {
+func TestFormatString(t *testing.T) {
 	assert.Equal(t, "yaml", FormatYAML.String())
 	assert.Equal(t, "json", FormatJSON.String())
 	assert.Equal(t, "table", FormatTable.String())
 	assert.Equal(t, "dir", FormatDir.String())
 }
 
-func TestParseOutputFormat(t *testing.T) {
+func TestParseFormat(t *testing.T) {
 	tests := []struct {
 		input string
-		want  OutputFormat
+		want  Format
 		valid bool
 	}{
 		{"yaml", FormatYAML, true},
@@ -47,13 +47,13 @@ func TestParseOutputFormat(t *testing.T) {
 		{"TABLE", FormatTable, true},
 		{"dir", FormatDir, true},
 		{"DIR", FormatDir, true},
-		{"invalid", OutputFormat("invalid"), false},
-		{"", OutputFormat(""), false},
+		{"invalid", Format("invalid"), false},
+		{"", Format(""), false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			got, valid := ParseOutputFormat(tt.input)
+			got, valid := ParseFormat(tt.input)
 			assert.Equal(t, tt.want, got)
 			assert.Equal(t, tt.valid, valid)
 		})

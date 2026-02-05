@@ -2,32 +2,54 @@
 // Separated from module.cue for better maintainability.
 package main
 
-import "opmodel.dev/core@v0"
+import (
+	resources_workload "opmodel.dev/resources/workload@v0"
+	traits_workload "opmodel.dev/traits/workload@v0"
+	traits_network "opmodel.dev/traits/network@v0"
+)
 
-// _components is a hidden field containing component definitions.
-// It's referenced by #components in module.cue.
-_components: {
+// #components contains component definitions using resources and traits.
+#components: {
 	// Web frontend component
-	web: core.#Component & {
-		metadata: name: "web"
+	web: {
+		resources_workload.#Container
+		traits_workload.#Replicas
+		traits_network.#Expose
+
 		spec: {
 			container: {
-				image: values.web.image
-				ports: [{containerPort: values.web.port}]
+				image: #values.web.image
+				ports: http: {
+					targetPort: 80
+				}
+				env: apiUrl: {
+					name:  "API_URL"
+					value: "http://api:\(#values.api.port)"
+				}
 			}
-			replicas: values.web.replicas
+			replicas: #values.web.replicas
+			expose: {
+				ports: http: container.ports.http & {
+					exposedPort: #values.web.port
+				}
+				type: "ClusterIP"
+			}
 		}
 	}
 
 	// API backend component
-	api: core.#Component & {
-		metadata: name: "api"
+	api: {
+		resources_workload.#Container
+		traits_workload.#Replicas
+
 		spec: {
 			container: {
-				image: values.api.image
-				ports: [{containerPort: values.api.port}]
+				image: #values.api.image
+				ports: http: {
+					targetPort: #values.api.port
+				}
 			}
-			replicas: values.api.replicas
+			replicas: #values.api.replicas
 		}
 	}
 }

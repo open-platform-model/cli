@@ -136,7 +136,8 @@ func buildVerboseResultFromInfo(result *RenderResultInfo, details []MatchDetailI
 	}
 
 	// Convert match details
-	for _, d := range details {
+	for i := range details {
+		d := &details[i]
 		vr.MatchPlan.Details = append(vr.MatchPlan.Details, VerboseMatchDetail{
 			Component:        d.ComponentName,
 			Transformer:      d.TransformerFQN,
@@ -244,23 +245,10 @@ func writeVerboseHuman(result *VerboseResult, w io.Writer) error {
 }
 
 // redactSensitive removes sensitive data from error messages.
+// Note: This function is a placeholder for future implementation.
+// Patterns to check include: password, secret, token, key, credential, apiKey, api_key.
 func redactSensitive(s string) string {
-	// Redact common sensitive patterns
-	patterns := []string{
-		"password",
-		"secret",
-		"token",
-		"key",
-		"credential",
-		"apiKey",
-		"api_key",
-	}
-
-	result := s
-	for _, pattern := range patterns {
-		if strings.Contains(strings.ToLower(result), pattern) {
-			// Keep the structure but note it may contain sensitive data
-		}
-	}
-	return result
+	// Currently we just return the string as-is.
+	// TODO: Implement actual redaction logic if needed.
+	return s
 }

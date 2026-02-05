@@ -3,25 +3,25 @@ package output
 
 import "strings"
 
-// OutputFormat specifies the output format.
-type OutputFormat string
+// Format specifies the output format.
+type Format string
 
 const (
 	// FormatYAML outputs as YAML.
-	FormatYAML OutputFormat = "yaml"
+	FormatYAML Format = "yaml"
 
 	// FormatJSON outputs as JSON.
-	FormatJSON OutputFormat = "json"
+	FormatJSON Format = "json"
 
 	// FormatTable outputs as a formatted table.
-	FormatTable OutputFormat = "table"
+	FormatTable Format = "table"
 
 	// FormatDir outputs to a directory.
-	FormatDir OutputFormat = "dir"
+	FormatDir Format = "dir"
 )
 
 // Valid returns true if the format is valid.
-func (f OutputFormat) Valid() bool {
+func (f Format) Valid() bool {
 	switch f {
 	case FormatYAML, FormatJSON, FormatTable, FormatDir:
 		return true
@@ -31,13 +31,13 @@ func (f OutputFormat) Valid() bool {
 }
 
 // String returns the string representation.
-func (f OutputFormat) String() string {
+func (f Format) String() string {
 	return string(f)
 }
 
-// ParseOutputFormat parses a string into an OutputFormat.
-func ParseOutputFormat(s string) (OutputFormat, bool) {
-	f := OutputFormat(strings.ToLower(s))
+// ParseFormat parses a string into an Format.
+func ParseFormat(s string) (Format, bool) {
+	f := Format(strings.ToLower(s))
 	return f, f.Valid()
 }
 

@@ -62,7 +62,7 @@ func TestOPMConfig(t *testing.T) {
 		Config:         cfg,
 		Registry:       "resolved-registry.example.com",
 		RegistrySource: "env",
-		Providers:      nil, // Providers are CUE values, tested separately
+		// Note: Providers field is a CUE value, tested separately
 	}
 
 	assert.NotNil(t, opmCfg.Config)

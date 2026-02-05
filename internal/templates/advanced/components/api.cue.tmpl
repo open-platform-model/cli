@@ -1,18 +1,22 @@
 // API component template for backend services.
 package components
 
-import "opmodel.dev/core@v0"
+import (
+	resources_workload "opmodel.dev/resources/workload@v0"
+	traits_workload "opmodel.dev/traits/workload@v0"
+)
 
 // _api is a reusable API server component template.
-_api: core.#Component & {
-	metadata: {
-		name:        "api"
-		description: "API backend component"
-	}
+#api: {
+	resources_workload.#Container
+	traits_workload.#Replicas
+
 	spec: {
 		container: {
 			image: string
-			ports: [{containerPort: 3000}]
+			ports: http: {
+				targetPort: 3000
+			}
 			resources: {
 				requests: {
 					cpu:    "200m"

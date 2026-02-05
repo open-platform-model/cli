@@ -2,10 +2,13 @@
 package e2e
 
 import (
+	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,34 +22,43 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic("failed to create temp dir: " + err.Error())
 	}
-	defer os.RemoveAll(tmpDir)
 
 	opmBinary = filepath.Join(tmpDir, "opm")
 
 	// Build the binary
-	cmd := exec.Command("go", "build", "-o", opmBinary, "../../cmd/opm")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	cmd := exec.CommandContext(ctx, "go", "build", "-o", opmBinary, "../../cmd/opm")
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
+		cancel()
+		os.RemoveAll(tmpDir)
 		panic("failed to build opm binary: " + err.Error())
 	}
+	cancel() // Call cancel explicitly before os.Exit
 
-	os.Exit(m.Run())
+	code := m.Run()
+	os.RemoveAll(tmpDir)
+	os.Exit(code)
 }
 
 // runOPM runs the opm binary with the given arguments and returns output
-func runOPM(t *testing.T, workDir string, args ...string) (string, string, error) {
+func runOPM(t *testing.T, workDir string, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 
-	cmd := exec.Command(opmBinary, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, opmBinary, args...)
 	cmd.Dir = workDir
 
-	stdout, err := cmd.Output()
-	var stderr []byte
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		stderr = exitErr.Stderr
+	stdoutBytes, err := cmd.Output()
+	var stderrBytes []byte
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		stderrBytes = exitErr.Stderr
 	}
 
-	return string(stdout), string(stderr), err
+	return string(stdoutBytes), string(stderrBytes), err
 }
 
 func TestE2E_ModInit_SimpleTemplate(t *testing.T) {
@@ -87,17 +99,13 @@ func TestE2E_ModInit_InvalidTemplate(t *testing.T) {
 	assert.Error(t, err)
 
 	// Check exit code is 2 (validation error)
-	if exitErr, ok := err.(*exec.ExitError); ok {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
 		assert.Equal(t, 2, exitErr.ExitCode(), "expected exit code 2 for validation error")
 	}
 }
 
 func TestE2E_ModInit_ThenVet(t *testing.T) {
-	// TODO: Enable this test after templates are fixed to conform to OPM core schema
-	// Current templates have issues:
-	// - Double @v0 in apiVersion (ModulePath already contains @v0)
-	// - Name format doesn't match FQN regex requirements
-	t.Skip("templates need fixes to pass mod vet against OPM core schema")
 
 	if _, err := exec.LookPath("cue"); err != nil {
 		t.Skip("cue binary not available")
@@ -145,8 +153,9 @@ func TestE2E_ModInit_DirectoryExists(t *testing.T) {
 	assert.Error(t, err)
 
 	// Check exit code is 2 (validation error)
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		assert.Equal(t, 2, exitErr.ExitCode(), "expected exit code 2 for validation error")
+	var exitErr2 *exec.ExitError
+	if errors.As(err, &exitErr2) {
+		assert.Equal(t, 2, exitErr2.ExitCode(), "expected exit code 2 for validation error")
 	}
 }
 

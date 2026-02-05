@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/spf13/cobra"
 
@@ -57,7 +58,7 @@ func runModInit(cmd *cobra.Command, args []string) error {
 
 	// Validate template name
 	if !templates.IsValidTemplate(modInitTemplate) {
-		return &oerrors.ErrorDetail{
+		return &oerrors.DetailError{
 			Type:    "validation failed",
 			Message: fmt.Sprintf("unknown template: %s", modInitTemplate),
 			Hint:    fmt.Sprintf("Valid templates: %s", strings.Join(templates.ValidTemplates(), ", ")),
@@ -73,7 +74,7 @@ func runModInit(cmd *cobra.Command, args []string) error {
 
 	// Check if directory already exists
 	if _, err := os.Stat(targetDir); err == nil {
-		return &oerrors.ErrorDetail{
+		return &oerrors.DetailError{
 			Type:     "validation failed",
 			Message:  fmt.Sprintf("directory already exists: %s", targetDir),
 			Location: targetDir,
@@ -94,9 +95,10 @@ func runModInit(cmd *cobra.Command, args []string) error {
 	}
 
 	data := templates.TemplateData{
-		ModuleName: moduleName,
-		ModulePath: fmt.Sprintf("example.com/%s@v0", moduleName),
-		Version:    "0.1.0",
+		ModuleName:       moduleName,
+		ModuleNamePascal: toPascalCase(moduleName),
+		ModulePath:       fmt.Sprintf("example.com/%s", moduleName),
+		Version:          "0.1.0",
 	}
 
 	// Render the template
@@ -159,4 +161,26 @@ func getFileDescription(filename string) string {
 	}
 
 	return ""
+}
+
+// toPascalCase converts a kebab-case or snake_case string to PascalCase.
+// Examples: "my-app" -> "MyApp", "my_service" -> "MyService"
+func toPascalCase(s string) string {
+	var result strings.Builder
+	capitalizeNext := true
+
+	for _, r := range s {
+		if r == '-' || r == '_' {
+			capitalizeNext = true
+			continue
+		}
+		if capitalizeNext {
+			result.WriteRune(unicode.ToUpper(r))
+			capitalizeNext = false
+		} else {
+			result.WriteRune(r)
+		}
+	}
+
+	return result.String()
 }

@@ -31,9 +31,9 @@ type TransformerComponentMetadata struct {
 	Traits    []string          `json:"traits,omitempty"`
 }
 
-// BuildTransformerContext constructs the context for a transformer execution.
+// NewTransformerContext constructs the context for a transformer execution.
 // This context is unified with the transformer's #transform function.
-func BuildTransformerContext(module *LoadedModule, component *LoadedComponent) *TransformerContext {
+func NewTransformerContext(module *LoadedModule, component *LoadedComponent) *TransformerContext {
 	// Extract resource FQNs
 	resourceFQNs := make([]string, 0, len(component.Resources))
 	for fqn := range component.Resources {

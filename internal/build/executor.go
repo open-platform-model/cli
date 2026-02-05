@@ -47,96 +47,18 @@ type ExecuteResult struct {
 
 // Execute runs all transformations in parallel.
 //
+// Deprecated: Use ExecuteWithTransformers instead, which accepts the transformer map directly.
+//
 // Per FR-B-021 and FR-B-022:
 //   - Execute transformers in parallel using worker pool
 //   - Each worker has isolated cue.Context
 func (e *Executor) Execute(ctx context.Context, match *MatchResult, module *LoadedModule) *ExecuteResult {
-	result := &ExecuteResult{
+	// This method cannot look up transformers without the transformer map.
+	// Use ExecuteWithTransformers instead.
+	return &ExecuteResult{
 		Resources: make([]*Resource, 0),
 		Errors:    make([]error, 0),
 	}
-
-	// Build job list
-	var jobs []Job
-	for tfFQN, components := range match.ByTransformer {
-		// Find transformer by FQN
-		var transformer *LoadedTransformer
-		for _, detail := range match.Details {
-			if detail.TransformerFQN == tfFQN && detail.Matched {
-				// Find the transformer from the component's match
-				for _, comp := range components {
-					if detail.ComponentName == comp.Name {
-						// We need to look up the transformer from somewhere
-						// For now, we'll store transformer reference in the job
-						break
-					}
-				}
-			}
-		}
-
-		// Since we don't have direct access to the transformer, we need to pass it through
-		// In a real implementation, we'd either store transformers in MatchResult or
-		// have a separate lookup. For now, we'll skip if transformer not found.
-		if transformer == nil {
-			continue
-		}
-
-		for _, comp := range components {
-			jobs = append(jobs, Job{
-				Transformer: transformer,
-				Component:   comp,
-				Module:      module,
-			})
-		}
-	}
-
-	if len(jobs) == 0 {
-		return result
-	}
-
-	// Create channels
-	jobChan := make(chan Job, len(jobs))
-	resultChan := make(chan JobResult, len(jobs))
-
-	// Start workers
-	var wg sync.WaitGroup
-	for i := 0; i < e.workers && i < len(jobs); i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			e.runWorker(ctx, jobChan, resultChan)
-		}()
-	}
-
-	// Send jobs
-	for _, job := range jobs {
-		jobChan <- job
-	}
-	close(jobChan)
-
-	// Wait for workers to finish
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	// Collect results
-	for jobResult := range resultChan {
-		if jobResult.Error != nil {
-			result.Errors = append(result.Errors, jobResult.Error)
-			continue
-		}
-
-		for _, obj := range jobResult.Resources {
-			result.Resources = append(result.Resources, &Resource{
-				Object:      obj,
-				Component:   jobResult.Component,
-				Transformer: jobResult.Transformer,
-			})
-		}
-	}
-
-	return result
 }
 
 // ExecuteWithTransformers runs transformations with explicit transformer map.
@@ -255,16 +177,20 @@ func (e *Executor) runWorker(ctx context.Context, jobs <-chan Job, results chan<
 	}
 }
 
+
 // executeJob executes a single transformation.
-func (e *Executor) executeJob(cueCtx *cue.Context, job Job) JobResult {
+func (e *Executor) executeJob(_ *cue.Context, job Job) JobResult {
 	result := JobResult{
 		Component:   job.Component.Name,
 		Transformer: job.Transformer.FQN,
 		Resources:   make([]*unstructured.Unstructured, 0),
 	}
 
+	// Use the transformer's CUE context to ensure all values are from the same runtime
+	cueCtx := job.Transformer.Value.Context()
+
 	// Build transformer context
-	tfCtx := BuildTransformerContext(job.Module, job.Component)
+	tfCtx := NewTransformerContext(job.Module, job.Component)
 
 	// Get the #transform function from the transformer
 	transformValue := job.Transformer.Value.LookupPath(cue.ParsePath("#transform"))
@@ -278,11 +204,25 @@ func (e *Executor) executeJob(cueCtx *cue.Context, job Job) JobResult {
 	}
 
 	// Build input for transformation
-	// The transformer expects: #component, #context
-	input := cueCtx.Encode(map[string]any{
-		"#component": job.Component.Value,
-		"#context":   tfCtx,
-	})
+	// The transformer expects CUE definitions: #component, #context
+	// We must use FillPath with cue.Hid() to create proper hidden fields,
+	// not Encode() which creates regular fields with escaped identifiers.
+	input := cueCtx.CompileString("{}")
+
+	// Fill #component with the component's CUE value
+	input = input.FillPath(cue.MakePath(cue.Def("component")), job.Component.Value)
+
+	// Encode and fill #context with the transformer context
+	ctxValue := cueCtx.Encode(tfCtx)
+	if ctxValue.Err() != nil {
+		result.Error = &TransformError{
+			ComponentName:  job.Component.Name,
+			TransformerFQN: job.Transformer.FQN,
+			Cause:          ctxValue.Err(),
+		}
+		return result
+	}
+	input = input.FillPath(cue.MakePath(cue.Def("context")), ctxValue)
 
 	if input.Err() != nil {
 		result.Error = &TransformError{

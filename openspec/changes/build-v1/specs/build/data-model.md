@@ -15,7 +15,7 @@ This document defines the **internal** data types for the build command implemen
 // This is the internal implementation, not exposed to consumers.
 type pipeline struct {
     config   *config.OPMConfig
-    loader   *Loader
+    module   *ModuleLoader
     provider *ProviderLoader
     matcher  *Matcher
     executor *Executor
@@ -26,7 +26,7 @@ type pipeline struct {
 func NewPipeline(cfg *config.OPMConfig) Pipeline {
     return &pipeline{
         config:   cfg,
-        loader:   NewLoader(),
+        module:   NewModuleLoader(),
         provider: NewProviderLoader(cfg),
         matcher:  NewMatcher(),
         executor: NewExecutor(runtime.NumCPU()),
@@ -34,13 +34,13 @@ func NewPipeline(cfg *config.OPMConfig) Pipeline {
 }
 ```
 
-### Loader
+### ModuleLoader
 
 ```go
-// internal/build/loader.go
+// internal/build/module.go
 
-// Loader handles module and values loading.
-type Loader struct{}
+// ModuleLoader handles module and values loading.
+type ModuleLoader struct{}
 
 // LoadedModule is the result of loading a module.
 type LoadedModule struct {
@@ -349,7 +349,7 @@ func GetWeight(gvk schema.GroupVersionKind) int
 ```text
 pipeline (internal)
     │
-    ├──▶ Loader ──▶ LoadedModule
+    ├──▶ ModuleLoader ──▶ LoadedModule
     │                    │
     │                    └──▶ []*LoadedComponent
     │

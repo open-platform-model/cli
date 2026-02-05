@@ -1,18 +1,22 @@
 // Database component template with persistent storage.
 package components
 
-import "opmodel.dev/core@v0"
+import (
+	resources_workload "opmodel.dev/resources/workload@v0"
+	resources_storage "opmodel.dev/resources/storage@v0"
+)
 
 // _db is a reusable database component template.
-_db: core.#Component & {
-	metadata: {
-		name:        "db"
-		description: "Database component with persistent storage"
-	}
+#db: {
+	resources_workload.#Container
+	resources_storage.#PersistentVolume
+
 	spec: {
 		container: {
 			image: string
-			ports: [{containerPort: 5432}]
+			ports: db: {
+				targetPort: 5432
+			}
 			resources: {
 				requests: {
 					cpu:    "200m"

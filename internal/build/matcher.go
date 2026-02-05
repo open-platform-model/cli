@@ -190,7 +190,8 @@ func (r *MatchResult) ToMatchPlan() MatchPlan {
 		for _, comp := range components {
 			// Find the detail for this match
 			reason := ""
-			for _, detail := range r.Details {
+			for i := range r.Details {
+				detail := &r.Details[i]
 				if detail.ComponentName == comp.Name && detail.TransformerFQN == tfFQN && detail.Matched {
 					reason = detail.Reason
 					break
@@ -220,9 +221,10 @@ func (r *MatchResult) ToMatchPlan() MatchPlan {
 // Useful for error messages showing why nothing matched.
 func (r *MatchResult) GetUnmatchedDetails(componentName string) []MatchDetail {
 	var details []MatchDetail
-	for _, detail := range r.Details {
+	for i := range r.Details {
+		detail := &r.Details[i]
 		if detail.ComponentName == componentName && !detail.Matched {
-			details = append(details, detail)
+			details = append(details, *detail)
 		}
 	}
 	return details

@@ -10,11 +10,7 @@ func NewConfigCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Configuration management",
-		Long: `Configuration management for the OPM CLI.
-
-Commands:
-  init    Initialize default configuration
-  vet     Validate configuration`,
+	Long: `Configuration management for the OPM CLI.`,
 	}
 
 	// Add subcommands

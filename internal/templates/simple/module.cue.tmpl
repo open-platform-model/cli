@@ -2,7 +2,11 @@
 // This is a simple single-file module with inline components.
 package main
 
-import "opmodel.dev/core@v0"
+import (
+	"opmodel.dev/core@v0"
+	resources_workload "opmodel.dev/resources/workload@v0"
+	traits_workload "opmodel.dev/traits/workload@v0"
+)
 
 // Module definition
 core.#Module
@@ -10,33 +14,39 @@ core.#Module
 // Module metadata
 metadata: {
 	apiVersion:  "{{.ModulePath}}@v0"
-	name:        "{{.ModuleName}}"
+	name:        "{{.ModuleNamePascal}}"
 	version:     "{{.Version}}"
 	description: string | *"A simple OPM module"
+	defaultNamespace: "default"
 }
 
-// Components define the workloads for this module.
-// In a simple template, components are defined inline.
-#components: {
-	// Example: web server component
-	app: core.#Component & {
-		metadata: name: "app"
-		spec: {
-			container: {
-				image: values.image
-				ports: [{containerPort: 8080}]
-			}
-			replicas: values.replicas
-		}
-	}
-}
-
-// Spec defines the configuration schema for this module.
-// Users provide values that conform to this schema.
-#spec: {
+// Schema and default values
+#values: {
 	// Container image to deploy (required)
 	image!: string
 
 	// Number of replicas (optional, defaults to 1)
 	replicas?: int & >=1 | *1
+
+	// Port to expose (defaults to 8080)
+	port?: int & >0 & <=65535 | *8080
+}
+
+// Components define the workloads for this module.
+#components: {
+	// Example: web server component
+	app: {
+		resources_workload.#Container
+		traits_workload.#Replicas
+
+		spec: {
+			container: {
+				image: #values.image
+				ports: http: {
+					targetPort: #values.port
+				}
+			}
+			replicas: #values.replicas
+		}
+	}
 }

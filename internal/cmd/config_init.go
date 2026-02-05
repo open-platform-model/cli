@@ -54,7 +54,7 @@ func runConfigInit(cmd *cobra.Command, args []string) error {
 
 	// Check if config exists
 	if _, err := os.Stat(paths.ConfigFile); err == nil && !configInitForce {
-		return &oerrors.ErrorDetail{
+		return &oerrors.DetailError{
 			Type:     "validation failed",
 			Message:  "configuration already exists",
 			Location: paths.ConfigFile,

@@ -22,8 +22,8 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
-// ErrorDetail captures structured error information per contracts/error-format.md.
-type ErrorDetail struct {
+// DetailError captures structured error information per contracts/error-format.md.
+type DetailError struct {
 	// Type is the error category (required).
 	Type string
 
@@ -47,7 +47,7 @@ type ErrorDetail struct {
 }
 
 // Error implements the error interface.
-func (e *ErrorDetail) Error() string {
+func (e *DetailError) Error() string {
 	var b strings.Builder
 
 	b.WriteString("Error: ")
@@ -86,13 +86,13 @@ func (e *ErrorDetail) Error() string {
 }
 
 // Unwrap returns the underlying error.
-func (e *ErrorDetail) Unwrap() error {
+func (e *DetailError) Unwrap() error {
 	return e.Cause
 }
 
 // NewValidationError creates a validation error with details.
 func NewValidationError(message, location, field, hint string) error {
-	return &ErrorDetail{
+	return &DetailError{
 		Type:     "validation failed",
 		Message:  message,
 		Location: location,
@@ -104,7 +104,7 @@ func NewValidationError(message, location, field, hint string) error {
 
 // NewConnectivityError creates a connectivity error with details.
 func NewConnectivityError(message string, context map[string]string, hint string) error {
-	return &ErrorDetail{
+	return &DetailError{
 		Type:    "connectivity failed",
 		Message: message,
 		Context: context,
@@ -115,7 +115,7 @@ func NewConnectivityError(message string, context map[string]string, hint string
 
 // NewNotFoundError creates a not found error with details.
 func NewNotFoundError(message, location, hint string) error {
-	return &ErrorDetail{
+	return &DetailError{
 		Type:     "not found",
 		Message:  message,
 		Location: location,
@@ -126,7 +126,7 @@ func NewNotFoundError(message, location, hint string) error {
 
 // NewPermissionError creates a permission denied error with details.
 func NewPermissionError(message string, context map[string]string, hint string) error {
-	return &ErrorDetail{
+	return &DetailError{
 		Type:    "permission denied",
 		Message: message,
 		Context: context,

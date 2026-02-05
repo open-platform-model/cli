@@ -3,11 +3,8 @@
 // - module.cue: metadata and schema
 // - components.cue: component composition
 // - scopes.cue: scope definitions
-// - policies.cue: policy definitions
 // - values.cue: default values
-// - debug_values.cue: comprehensive values for validation
 // - components/: component templates (subpackage)
-// - scopes/: scope templates (subpackage)
 package main
 
 import "opmodel.dev/core@v0"
@@ -18,22 +15,16 @@ core.#Module
 // Module metadata
 metadata: {
 	apiVersion:  "{{.ModulePath}}@v0"
-	name:        "{{.ModuleName}}"
+	name:        "{{.ModuleNamePascal}}"
 	version:     "{{.Version}}"
 	description: string | *"An advanced OPM module with multi-package architecture"
+	defaultNamespace: "default"
 }
 
-// Components from components.cue
-#components: _components
+// Components are defined in components.cue
 
-// Scopes from scopes.cue
-#scopes: _scopes
-
-// Policies from policies.cue
-#policies: _policies
-
-// Spec defines the configuration schema for this module.
-#spec: {
+// #values defines the configuration schema for this module.
+#values: {
 	// Web frontend configuration
 	web: {
 		image!:    string

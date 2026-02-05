@@ -58,7 +58,7 @@ func runConfigVet(cmd *cobra.Command, args []string) error {
 
 	// Check 1: Config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return &oerrors.ErrorDetail{
+		return &oerrors.DetailError{
 			Type:     "not found",
 			Message:  "configuration file not found",
 			Location: configPath,
@@ -73,7 +73,7 @@ func runConfigVet(cmd *cobra.Command, args []string) error {
 	moduleFile := filepath.Join(configDir, "cue.mod", "module.cue")
 
 	if _, err := os.Stat(moduleFile); os.IsNotExist(err) {
-		return &oerrors.ErrorDetail{
+		return &oerrors.DetailError{
 			Type:     "not found",
 			Message:  "cue.mod/module.cue not found",
 			Location: moduleFile,

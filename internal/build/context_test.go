@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBuildTransformerContext(t *testing.T) {
+func TestNewTransformerContext(t *testing.T) {
 	module := &LoadedModule{
 		Name:      "my-module",
 		Namespace: "default",
@@ -26,7 +26,7 @@ func TestBuildTransformerContext(t *testing.T) {
 		},
 	}
 
-	ctx := BuildTransformerContext(module, component)
+	ctx := NewTransformerContext(module, component)
 
 	assert.Equal(t, "my-module", ctx.Name)
 	assert.Equal(t, "default", ctx.Namespace)

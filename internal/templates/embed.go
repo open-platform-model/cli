@@ -55,10 +55,14 @@ func IsValidTemplate(name string) bool {
 
 // TemplateData contains data for template rendering.
 type TemplateData struct {
-	// ModuleName is the name of the module (e.g., "my-app").
+	// ModuleName is the name of the module in kebab-case (e.g., "my-app").
 	ModuleName string
 
-	// ModulePath is the full module path (e.g., "example.com/my-app@v0").
+	// ModuleNamePascal is the PascalCase version of the module name (e.g., "MyApp").
+	// Used for the FQN name field which requires uppercase first letter.
+	ModuleNamePascal string
+
+	// ModulePath is the module path without version (e.g., "example.com/my-app").
 	ModulePath string
 
 	// Version is the initial module version (e.g., "0.1.0").

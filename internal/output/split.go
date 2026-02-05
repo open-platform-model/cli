@@ -14,7 +14,7 @@ type SplitOptions struct {
 	// OutDir is the directory for split output
 	OutDir string
 	// Format specifies output format: "yaml" or "json"
-	Format OutputFormat
+	Format Format
 }
 
 // WriteSplitManifests writes each resource to a separate file.
@@ -25,7 +25,7 @@ func WriteSplitManifests(resources []ResourceInfo, opts SplitOptions) error {
 	}
 
 	// Ensure output directory exists
-	if err := os.MkdirAll(opts.OutDir, 0755); err != nil {
+	if err := os.MkdirAll(opts.OutDir, 0o755); err != nil {
 		return fmt.Errorf("creating output directory: %w", err)
 	}
 
@@ -57,7 +57,7 @@ func WriteSplitUnstructured(objects []*unstructured.Unstructured, opts SplitOpti
 	}
 
 	// Ensure output directory exists
-	if err := os.MkdirAll(opts.OutDir, 0755); err != nil {
+	if err := os.MkdirAll(opts.OutDir, 0o755); err != nil {
 		return fmt.Errorf("creating output directory: %w", err)
 	}
 
@@ -83,7 +83,7 @@ func WriteSplitUnstructured(objects []*unstructured.Unstructured, opts SplitOpti
 }
 
 // buildFilenameFromInfo creates a filename for a resource.
-func buildFilenameFromInfo(res ResourceInfo, format OutputFormat, usedNames map[string]int) string {
+func buildFilenameFromInfo(res ResourceInfo, format Format, usedNames map[string]int) string {
 	ext := ".yaml"
 	if format == FormatJSON {
 		ext = ".json"
@@ -104,7 +104,7 @@ func buildFilenameFromInfo(res ResourceInfo, format OutputFormat, usedNames map[
 }
 
 // buildFilenameFromUnstructured creates a filename for an unstructured resource.
-func buildFilenameFromUnstructured(obj *unstructured.Unstructured, format OutputFormat, usedNames map[string]int) string {
+func buildFilenameFromUnstructured(obj *unstructured.Unstructured, format Format, usedNames map[string]int) string {
 	ext := ".yaml"
 	if format == FormatJSON {
 		ext = ".json"
@@ -141,8 +141,8 @@ func sanitizeName(name string) string {
 }
 
 // writeResourceFileFromInfo writes a single resource to a file.
-func writeResourceFileFromInfo(res ResourceInfo, filepath string, format OutputFormat) error {
-	f, err := os.Create(filepath)
+func writeResourceFileFromInfo(res ResourceInfo, destPath string, format Format) error {
+	f, err := os.Create(destPath)
 	if err != nil {
 		return err
 	}
@@ -152,8 +152,8 @@ func writeResourceFileFromInfo(res ResourceInfo, filepath string, format OutputF
 }
 
 // writeResourceFile writes a single unstructured resource to a file.
-func writeResourceFile(obj *unstructured.Unstructured, filepath string, format OutputFormat) error {
-	f, err := os.Create(filepath)
+func writeResourceFile(obj *unstructured.Unstructured, destPath string, format Format) error {
+	f, err := os.Create(destPath)
 	if err != nil {
 		return err
 	}

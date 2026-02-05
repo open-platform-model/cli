@@ -16,7 +16,7 @@ import (
 // ManifestOptions controls manifest output formatting.
 type ManifestOptions struct {
 	// Format specifies output format: "yaml" or "json"
-	Format OutputFormat
+	Format Format
 	// Writer is the output destination
 	Writer io.Writer
 }
@@ -49,9 +49,10 @@ func WriteManifests(resources []ResourceInfo, opts ManifestOptions) error {
 		return writeJSON(resources, opts.Writer)
 	case FormatYAML:
 		return writeYAML(resources, opts.Writer)
-	default:
-		return writeYAML(resources, opts.Writer) // Default to YAML
+	case FormatTable, FormatDir:
+		return fmt.Errorf("format %s not supported for manifest output", opts.Format)
 	}
+	return writeYAML(resources, opts.Writer) // Default to YAML
 }
 
 // WriteUnstructuredManifests writes unstructured resources directly.
@@ -81,9 +82,10 @@ func WriteUnstructuredManifests(objects []*unstructured.Unstructured, opts Manif
 		return writeJSONObjects(objects, opts.Writer)
 	case FormatYAML:
 		return writeYAMLObjects(objects, opts.Writer)
-	default:
-		return writeYAMLObjects(objects, opts.Writer)
+	case FormatTable, FormatDir:
+		return fmt.Errorf("format %s not supported for manifest output", opts.Format)
 	}
+	return writeYAMLObjects(objects, opts.Writer) // Default to YAML
 }
 
 // sortResourceInfos sorts resources by weight, then by namespace, then by name.
@@ -186,7 +188,7 @@ func writeJSONObjects(objects []*unstructured.Unstructured, w io.Writer) error {
 }
 
 // WriteResource writes a single resource to the writer.
-func WriteResource(resource *unstructured.Unstructured, format OutputFormat, w io.Writer) error {
+func WriteResource(resource *unstructured.Unstructured, format Format, w io.Writer) error {
 	switch format {
 	case FormatJSON:
 		encoder := json.NewEncoder(w)
@@ -200,13 +202,15 @@ func WriteResource(resource *unstructured.Unstructured, format OutputFormat, w i
 			err = closeErr
 		}
 		return err
-	default:
-		encoder := yaml.NewEncoder(w)
-		encoder.SetIndent(2)
-		err := encoder.Encode(resource.Object)
-		if closeErr := encoder.Close(); closeErr != nil && err == nil {
-			err = closeErr
-		}
-		return err
+	case FormatTable, FormatDir:
+		return fmt.Errorf("format %s not supported for single resource output", format)
 	}
+	// Default to YAML
+	encoder := yaml.NewEncoder(w)
+	encoder.SetIndent(2)
+	err := encoder.Encode(resource.Object)
+	if closeErr := encoder.Close(); closeErr != nil && err == nil {
+		err = closeErr
+	}
+	return err
 }
