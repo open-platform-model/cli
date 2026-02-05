@@ -2,88 +2,97 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/config"
-	"github.com/opmodel/cli/internal/cue"
 	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
 )
 
 // NewConfigVetCmd creates the config vet command.
 func NewConfigVetCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "vet",
-		Short: "Validate configuration file",
+		Short: "Validate configuration",
 		Long: `Validate the OPM CLI configuration file.
 
-Checks that:
-  - The config file exists at ~/.opm/config.cue (or OPM_CONFIG)
-  - The config file is valid CUE
-  - All required fields are present
+Checks performed:
+  1. Config file exists at resolved path
+  2. cue.mod/module.cue exists
+  3. Config file is syntactically valid CUE
+  4. Config evaluates without errors (imports resolve, constraints pass)
+
+The config path is resolved using precedence:
+  --config flag > OPM_CONFIG env > ~/.opm/config.cue
 
 Examples:
-  # Validate configuration
-  opm config vet`,
+  # Validate default configuration
+  opm config vet
+
+  # Validate custom config path
+  opm config vet --config /path/to/config.cue`,
 		RunE: runConfigVet,
 	}
+
+	return cmd
 }
 
 func runConfigVet(cmd *cobra.Command, args []string) error {
-	// Get paths
-	paths, err := config.PathsFromEnv()
+	// Resolve config path using precedence
+	pathResult, err := config.ResolveConfigPath(config.ResolveConfigPathOptions{
+		FlagValue: GetConfigPath(),
+	})
 	if err != nil {
-		return oerrors.Wrap(oerrors.ErrNotFound, "could not determine config path")
+		return oerrors.Wrap(oerrors.ErrNotFound, "could not resolve config path")
 	}
 
-	// Check config file override from flag
-	if configPath := GetConfigPath(); configPath != "" {
-		paths.ConfigFile = configPath
-	}
-
-	// Check if config exists
-	if _, err := os.Stat(paths.ConfigFile); os.IsNotExist(err) {
-		return oerrors.NewNotFoundError(
-			"configuration file does not exist",
-			paths.ConfigFile,
-			"Run 'opm config init' to create default configuration",
-		)
-	}
-
-	// Check if cue.mod/module.cue exists
-	cueModFile := paths.HomeDir + "/cue.mod/module.cue"
-	if _, err := os.Stat(cueModFile); os.IsNotExist(err) {
-		return oerrors.NewNotFoundError(
-			"cue.mod/module.cue does not exist",
-			cueModFile,
-			"Run 'opm config init' to create configuration",
-		)
-	}
-
-	// Get registry from global flag
-	registry := GetRegistry()
+	configPath := pathResult.ConfigPath
 
 	output.Debug("validating config",
-		"config", paths.ConfigFile,
-		"home", paths.HomeDir,
-		"registry", registry,
+		"path", configPath,
+		"source", pathResult.Source,
 	)
 
-	// Use CUE vet to validate the config
-	if err := cue.Vet(paths.HomeDir, false, registry); err != nil {
-		// Enhance error message with config context
-		if detail, ok := err.(*oerrors.ErrorDetail); ok {
-			detail.Context = map[string]string{
-				"Config": paths.ConfigFile,
-			}
-			return detail
+	// Check 1: Config file exists
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return &oerrors.ErrorDetail{
+			Type:     "not found",
+			Message:  "configuration file not found",
+			Location: configPath,
+			Hint:     "Run 'opm config init' to create default configuration",
+			Cause:    oerrors.ErrNotFound,
 		}
-		return fmt.Errorf("validating config: %w", err)
 	}
 
-	output.Println("Configuration is valid: " + paths.ConfigFile)
+	// Check 2: cue.mod/module.cue exists
+	// Determine the home directory from config path
+	configDir := filepath.Dir(configPath)
+	moduleFile := filepath.Join(configDir, "cue.mod", "module.cue")
+
+	if _, err := os.Stat(moduleFile); os.IsNotExist(err) {
+		return &oerrors.ErrorDetail{
+			Type:     "not found",
+			Message:  "cue.mod/module.cue not found",
+			Location: moduleFile,
+			Hint:     "Run 'opm config init' to create configuration",
+			Cause:    oerrors.ErrNotFound,
+		}
+	}
+
+	// Check 3 & 4: Validate CUE syntax and evaluation
+	// Use LoadOPMConfig which handles registry resolution and CUE evaluation
+	_, err = config.LoadOPMConfig(config.LoaderOptions{
+		RegistryFlag: GetRegistryFlag(),
+		ConfigFlag:   configPath,
+	})
+	if err != nil {
+		// The error from LoadOPMConfig already includes hints
+		return err
+	}
+
+	output.Println("Configuration is valid: " + configPath)
 	return nil
 }

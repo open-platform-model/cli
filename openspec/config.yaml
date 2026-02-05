@@ -59,35 +59,7 @@ context: |
   
   ## Technology Standards
   
-  ### CLI Framework & UX
-  - spf13/cobra: Commands, auto-generated help, shell completion
-  - charmbracelet/lipgloss: Terminal styling
-  - charmbracelet/log: Structured logging with key-value output
-  - charmbracelet/glamour: Markdown rendering in terminal
-  - charmbracelet/huh: Interactive prompts for init commands
-  
-  ### Configuration
-  - CUE-native config (~/.opm/config.cue) - NOT viper/yaml
-  - Aligns with Principle I: config validated by CUE schema at load time
-  
-  ### CUE Integration
-  - cuelang.org/go: Native CUE evaluation (no external cue binary)
-  - Fresh CUE context per command (avoid memory bloat)
-  - Directory-based module loading (not file paths)
-  
-  ### Kubernetes
-  - k8s.io/client-go: Server-side apply, resource discovery
-  - k8s.io/apimachinery: Unstructured types, version parsing
-  
-  ### Distribution
-  - oras.land/oras-go/v2: OCI push/pull for module distribution
-  
-  ### Diff & Comparison
-  - homeport/dyff: Human-readable semantic diffs
-  
-  ### Testing
-  - stretchr/testify: Assertions and mocking
-  - sigs.k8s.io/controller-runtime/pkg/envtest: K8s integration tests
+  Can be found in [AGENTS.md](../AGENTS.md)
   
   ## Code Style
   
@@ -117,20 +89,16 @@ context: |
 
 rules:
   proposal:
+    - "Focus: WHY we're doing this, WHAT's in/out of scope"
+    - "Updates when: Scope changes, intent clarifies, approach fundamentally shifts"
     - Identify affected command(s) and package(s)
     - State whether this is MAJOR/MINOR/PATCH per SemVer
     - Complexity additions MUST include justification (Principle VII)
     - New flags MUST have sensible defaults
   
-  specs:
-    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
-    - Define command syntax: "opm <group> <command> [args] [flags]"
-    - Document all flags with types, defaults, and descriptions
-    - Specify exit codes (0=success, 1=usage error, 2=execution error)
-    - Include example output for success and error cases
-    - Specify error messages and suggested fixes
-  
   design:
+    - "Focus: HOW we'll implement it technically"
+    - "Updates when: Implementation reveals better approach, constraints change"
     - MUST include "Research & Decisions" section when exploration was done
     - Document what was explored, alternatives considered, and rationale
     - Format: |
@@ -148,8 +116,23 @@ rules:
     - Reference upstream patterns (Timoni, kubectl) when applicable
     - Data flow diagrams for pipeline commands (build, apply, etc.)
     - Error handling: what errors can occur and how they're surfaced
+    - Define command syntax: "opm <group> <command> [args] [flags]"
+    - Document all flags with types, defaults, and descriptions
+    - Specify exit codes (0=success, 1=usage error, 2=execution error)
+    - Specify error messages and suggested fixes
+    - Include example output for success and error cases
+  
+  specs:
+    - "Focus: WHAT behavior is changing (not HOW it's implemented)"
+    - "Updates when: New or changed requirements emerge"
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Describe observable behavior and user-facing outcomes
+    - Use ADDED/MODIFIED/REMOVED sections to show deltas from current behavior
+    - Include scenarios that demonstrate requirements
   
   tasks:
+    - "Focus: STEPS to take for implementation"
+    - "Updates when: Tasks complete, new tasks discovered, blockers identified"
     - Include validation gates as final tasks (task lint, task test)
     - Group implementation tasks by package
     - Specify table-driven test patterns for test tasks

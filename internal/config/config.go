@@ -30,10 +30,6 @@ type Config struct {
 
 	// Kubernetes contains Kubernetes-specific settings.
 	Kubernetes KubernetesConfig `json:"kubernetes,omitempty"`
-
-	// CacheDir is the local cache directory.
-	// Env: OPM_CACHE_DIR, Default: ~/.opm/cache
-	CacheDir string `json:"cacheDir,omitempty"`
 }
 
 // DefaultConfig returns a Config with all default values populated.
@@ -44,7 +40,6 @@ func DefaultConfig() *Config {
 			Kubeconfig: "~/.kube/config",
 			Namespace:  "default",
 		},
-		CacheDir: "~/.opm/cache",
 	}
 }
 

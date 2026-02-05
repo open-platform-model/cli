@@ -14,7 +14,7 @@ func NewConfigCmd() *cobra.Command {
 
 Commands:
   init    Initialize default configuration
-  vet     Validate configuration file`,
+  vet     Validate configuration`,
 	}
 
 	// Add subcommands

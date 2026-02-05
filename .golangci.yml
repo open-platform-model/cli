@@ -1,30 +1,18 @@
+version: "2"
 run:
-  timeout: 5m
   modules-download-mode: readonly
-
 linters:
   enable:
-    # Default linters
-    - errcheck
-    - gosimple
-    - govet
-    - ineffassign
-    - staticcheck
-    - unused
-    # Additional linters
     - bodyclose
     - dogsled
     - dupl
     - errname
     - errorlint
     - exhaustive
-    - exportloopref
     - gochecknoinits
     - goconst
     - gocritic
     - gocyclo
-    - gofmt
-    - goimports
     - goprintffuncname
     - gosec
     - misspell
@@ -37,108 +25,111 @@ linters:
     - revive
     - rowserrcheck
     - sqlclosecheck
-    - stylecheck
+    - staticcheck
     - tparallel
     - unconvert
     - unparam
     - whitespace
-
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-    exclude-functions:
-      - io.Copy
-      - io.WriterTo.WriteTo
-
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
-      - shadow
-
-  gocyclo:
-    min-complexity: 15
-
-  dupl:
-    threshold: 150
-
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-
-  misspell:
-    locale: US
-
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - whyNoLint
-      - hugeParam
-
-  revive:
+  settings:
+    dupl:
+      threshold: 150
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      exclude-functions:
+        - io.Copy
+        - io.WriterTo.WriteTo
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+    gocritic:
+      disabled-checks:
+        - whyNoLint
+        - hugeParam
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+    gocyclo:
+      min-complexity: 15
+    gosec:
+      excludes:
+        - G104
+    govet:
+      disable:
+        - fieldalignment
+        - shadow
+      enable-all: true
+    misspell:
+      locale: US
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: var-naming
+        - name: var-declaration
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unreachable-code
+    staticcheck:
+      checks:
+        - all
+        - -ST1000
+        - -ST1003
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: exported
-      - name: if-return
-      - name: increment-decrement
-      - name: var-naming
-      - name: var-declaration
-      - name: package-comments
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: unexported-return
-      - name: indent-error-flow
-      - name: errorf
-      - name: empty-block
-      - name: superfluous-else
-      - name: unreachable-code
-
-  gosec:
-    excludes:
-      - G104 # Unhandled errors (we use errcheck instead)
-
-  stylecheck:
-    checks:
-      - all
-      - -ST1000 # Package comments
-      - -ST1003 # Underscores in package names
-
-  nolintlint:
-    require-explanation: true
-    require-specific: true
-
+      - linters:
+          - dupl
+          - errcheck
+          - goconst
+          - gosec
+        path: _test\.go
+      - linters:
+          - gochecknoinits
+        path: cmd/
+      - linters:
+          - gochecknoinits
+        path: internal/cmd/
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-rules:
-    # Exclude some linters from running on tests files
-    - path: _test\.go
-      linters:
-        - dupl
-        - gosec
-        - goconst
-        - errcheck
-
-    # Exclude some linters from cmd files
-    - path: cmd/
-      linters:
-        - gochecknoinits
-
-    # Allow init functions in cmd
-    - path: internal/cmd/
-      linters:
-        - gochecknoinits
-
   max-issues-per-linter: 0
   max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

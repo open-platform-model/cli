@@ -14,22 +14,18 @@ func NewModCmd() *cobra.Command {
 
 Commands:
   init      Create a new module from template
-  vet       Validate module schema
-  tidy      Update module dependencies
-  build     Render module to manifests (see 004-render-and-lifecycle-spec)
-  apply     Apply manifests to cluster (see 004-render-and-lifecycle-spec)
-  delete    Delete resources from cluster (see 004-render-and-lifecycle-spec)
-  diff      Show differences with cluster (see 004-render-and-lifecycle-spec)
-  status    Show resource status (see 004-render-and-lifecycle-spec)`,
+  build     Render module to manifests
+  apply     Apply manifests to cluster (not yet implemented)
+  delete    Delete resources from cluster (not yet implemented)
+  diff      Show differences with cluster (not yet implemented)
+  status    Show resource status (not yet implemented)`,
 	}
 
 	// Add subcommands
 	cmd.AddCommand(NewModInitCmd())
-	cmd.AddCommand(NewModVetCmd())
-	cmd.AddCommand(NewModTidyCmd())
+	cmd.AddCommand(NewModBuildCmd())
 
-	// Stub commands for 004-render-and-lifecycle-spec
-	cmd.AddCommand(NewModBuildStubCmd())
+	// Stub commands for future implementation
 	cmd.AddCommand(NewModApplyStubCmd())
 	cmd.AddCommand(NewModDeleteStubCmd())
 	cmd.AddCommand(NewModDiffStubCmd())

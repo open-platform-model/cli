@@ -20,9 +20,6 @@ var (
 
 	// ErrNotFound indicates a resource, module, or file was not found.
 	ErrNotFound = errors.New("not found")
-
-	// ErrVersion indicates a CUE binary version mismatch.
-	ErrVersion = errors.New("version mismatch")
 )
 
 // ErrorDetail captures structured error information per contracts/error-format.md.
@@ -124,16 +121,6 @@ func NewNotFoundError(message, location, hint string) error {
 		Location: location,
 		Hint:     hint,
 		Cause:    ErrNotFound,
-	}
-}
-
-// NewVersionError creates a version mismatch error.
-func NewVersionError(required, found string) error {
-	return &ErrorDetail{
-		Type:    "CUE binary version mismatch",
-		Message: fmt.Sprintf("Required: %s (matches OPM CLI's CUE SDK)\nFound: %s", required, found),
-		Hint:    "Install a compatible CUE version or upgrade OPM CLI.",
-		Cause:   ErrVersion,
 	}
 }
 

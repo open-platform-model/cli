@@ -8,7 +8,7 @@ const DefaultConfigTemplate = `// OPM CLI Configuration
 package config
 
 import (
-	prov "opmodel.dev/providers@v0"
+	provs "opmodel.dev/providers@v0"
 )
 
 config: {
@@ -16,14 +16,10 @@ config: {
 	// Override with --registry flag or OPM_REGISTRY env var.
 	registry: "registry.opmodel.dev"
 
-	// cacheDir is the local cache directory path.
-	// Override with OPM_CACHE_DIR env var.
-	cacheDir: "~/.opm/cache"
-
 	// providers maps provider aliases to their definitions.
 	// Providers are loaded from the registry via CUE imports.
 	providers: {
-		kubernetes: prov.#Registry["kubernetes"]
+		kubernetes: provs.#Registry["kubernetes"]
 	}
 
 	kubernetes: {

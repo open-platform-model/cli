@@ -11,9 +11,6 @@ type Paths struct {
 	// ConfigFile is the path to the config file (~/.opm/config.cue).
 	ConfigFile string
 
-	// CacheDir is the path to the cache directory (~/.opm/cache).
-	CacheDir string
-
 	// HomeDir is the path to the OPM home directory (~/.opm).
 	HomeDir string
 }
@@ -28,7 +25,6 @@ func DefaultPaths() (*Paths, error) {
 	opmHome := filepath.Join(homeDir, ".opm")
 	return &Paths{
 		ConfigFile: filepath.Join(opmHome, "config.cue"),
-		CacheDir:   filepath.Join(opmHome, "cache"),
 		HomeDir:    opmHome,
 	}, nil
 }
@@ -43,11 +39,6 @@ func PathsFromEnv() (*Paths, error) {
 	// Check for OPM_CONFIG override
 	if configPath := os.Getenv("OPM_CONFIG"); configPath != "" {
 		paths.ConfigFile = configPath
-	}
-
-	// Check for OPM_CACHE_DIR override
-	if cacheDir := os.Getenv("OPM_CACHE_DIR"); cacheDir != "" {
-		paths.CacheDir = cacheDir
 	}
 
 	return paths, nil

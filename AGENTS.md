@@ -21,6 +21,45 @@ All agents MUST read and adhere to `openspec/config.yaml`.
 
 **Governance**: The constitution supersedes this file in case of conflict.
 
+## Technology Standards
+
+### CLI Framework & UX
+
+- spf13/cobra: Commands, auto-generated help, shell completion
+- charmbracelet/lipgloss: Terminal styling
+- charmbracelet/log: Structured logging with key-value output
+- charmbracelet/glamour: Markdown rendering in terminal
+- charmbracelet/huh: Interactive prompts for init commands
+
+### Configuration
+
+- CUE-native config (~/.opm/config.cue) - NOT viper/yaml
+- Aligns with Principle I: config validated by CUE schema at load time
+
+### CUE Integration
+
+- cuelang.org/go: Native CUE evaluation (no external cue binary)
+- Fresh CUE context per command (avoid memory bloat)
+- Directory-based module loading (not file paths)
+
+### Kubernetes
+
+- k8s.io/client-go: Server-side apply, resource discovery
+- k8s.io/apimachinery: Unstructured types, version parsing
+
+### Distribution
+
+- oras.land/oras-go/v2: OCI push/pull for module distribution
+
+### Diff & Comparison
+
+- homeport/dyff: Human-readable semantic diffs
+
+### Testing
+
+- stretchr/testify: Assertions and mocking
+- sigs.k8s.io/controller-runtime/pkg/envtest: K8s integration tests
+
 ## Build/Test Commands
 
 - Build: `task build` (output: ./bin/opm)
@@ -29,7 +68,7 @@ All agents MUST read and adhere to `openspec/config.yaml`.
 - Single test: `go test ./pkg/loader -v -run TestName`
 - Coverage: `task test:coverage`
 - All checks: `task check` (fmt + vet + test)
-- Run: `task run -- mod vet ./testdata/test-module`
+- Run: `task run -- mod init ./my-module`
 
 ## Code Style
 
@@ -46,10 +85,10 @@ All agents MUST read and adhere to `openspec/config.yaml`.
 ├── cmd/opm/           # CLI entry point (main.go, root.go, version.go)
 ├── internal/
 │   ├── cmd/           # Command implementations
-│   │   ├── config/    # config init, config vet commands
-│   │   └── mod/       # mod apply, build, delete, init, status, template, tidy, vet
+│   │   ├── config/    # config init command
+│   │   └── mod/       # mod apply, build, delete, init, status, template
 │   ├── config/        # Config loading, validation, paths
-│   ├── cue/           # CUE loader, renderer, manifest, values
+│   ├── errors/        # Error types and handling
 │   ├── kubernetes/    # K8s client, apply, delete, discovery, health, status
 │   ├── output/        # Spinner, table, log, styles, format
 │   ├── templates/     # Module templates (simple, standard, advanced)

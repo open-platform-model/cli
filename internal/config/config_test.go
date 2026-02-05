@@ -18,9 +18,6 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(t, "default", cfg.Kubernetes.Namespace)
 	assert.Empty(t, cfg.Kubernetes.Context) // No default context
 
-	// Check cache dir default
-	assert.Equal(t, "~/.opm/cache", cfg.CacheDir)
-
 	// Registry should be empty by default
 	assert.Empty(t, cfg.Registry)
 }
@@ -33,14 +30,12 @@ func TestConfig_Fields(t *testing.T) {
 			Context:    "my-cluster",
 			Namespace:  "my-namespace",
 		},
-		CacheDir: "/custom/cache",
 	}
 
 	assert.Equal(t, "registry.example.com", cfg.Registry)
 	assert.Equal(t, "/custom/kubeconfig", cfg.Kubernetes.Kubeconfig)
 	assert.Equal(t, "my-cluster", cfg.Kubernetes.Context)
 	assert.Equal(t, "my-namespace", cfg.Kubernetes.Namespace)
-	assert.Equal(t, "/custom/cache", cfg.CacheDir)
 }
 
 func TestResolvedValue(t *testing.T) {

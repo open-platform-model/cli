@@ -13,7 +13,6 @@ func TestSentinelErrors(t *testing.T) {
 	assert.NotEqual(t, ErrValidation, ErrConnectivity)
 	assert.NotEqual(t, ErrValidation, ErrPermission)
 	assert.NotEqual(t, ErrValidation, ErrNotFound)
-	assert.NotEqual(t, ErrValidation, ErrVersion)
 }
 
 func TestErrorDetailError(t *testing.T) {
@@ -96,19 +95,6 @@ func TestNewNotFoundError(t *testing.T) {
 	detail, ok := err.(*ErrorDetail)
 	require.True(t, ok)
 	assert.Equal(t, "not found", detail.Type)
-}
-
-func TestNewVersionError(t *testing.T) {
-	err := NewVersionError("v0.15.x", "v0.12.0")
-
-	require.NotNil(t, err)
-	assert.True(t, errors.Is(err, ErrVersion))
-
-	detail, ok := err.(*ErrorDetail)
-	require.True(t, ok)
-	assert.Equal(t, "CUE binary version mismatch", detail.Type)
-	assert.Contains(t, detail.Message, "v0.15.x")
-	assert.Contains(t, detail.Message, "v0.12.0")
 }
 
 func TestNewPermissionError(t *testing.T) {

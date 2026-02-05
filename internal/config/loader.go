@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"time"
 
@@ -161,11 +162,9 @@ func loadFullConfig(configPath, registry string) (*Config, error) {
 		return DefaultConfig(), nil
 	}
 
-	// Get the directory containing config.cue
-	paths, err := DefaultPaths()
-	if err != nil {
-		return nil, err
-	}
+	// Use the directory containing the config file for CUE loading.
+	// This ensures custom config paths work correctly.
+	configDir := filepath.Dir(configPath)
 
 	// Set CUE_REGISTRY if registry is provided
 	if registry != "" {
@@ -180,16 +179,16 @@ func loadFullConfig(configPath, registry string) (*Config, error) {
 	ctx := cuecontext.New()
 
 	cfg := &load.Config{
-		Dir: paths.HomeDir,
+		Dir: configDir,
 	}
 
 	instances := load.Instances([]string{"."}, cfg)
 	if len(instances) == 0 {
 		return nil, oerrors.NewValidationError(
 			"no CUE instances found",
-			paths.HomeDir,
+			configDir,
 			"", // no specific field
-			"Ensure config.cue exists in ~/.opm/",
+			"Ensure config.cue exists in the configuration directory",
 		)
 	}
 
@@ -234,13 +233,6 @@ func extractConfig(value cue.Value) (*Config, error) {
 	if registryVal := configValue.LookupPath(cue.ParsePath("registry")); registryVal.Exists() {
 		if str, err := registryVal.String(); err == nil {
 			cfg.Registry = str
-		}
-	}
-
-	// Extract cacheDir
-	if cacheDirVal := configValue.LookupPath(cue.ParsePath("cacheDir")); cacheDirVal.Exists() {
-		if str, err := cacheDirVal.String(); err == nil {
-			cfg.CacheDir = str
 		}
 	}
 

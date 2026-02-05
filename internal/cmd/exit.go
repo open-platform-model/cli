@@ -18,7 +18,6 @@ const (
 	ExitConnectivityError = 3
 	ExitPermissionDenied  = 4
 	ExitNotFound          = 5
-	ExitVersionMismatch   = 6
 )
 
 // ExitCodeFromError maps an error to the appropriate exit code.
@@ -37,8 +36,6 @@ func ExitCodeFromError(err error) int {
 		return ExitPermissionDenied
 	case errors.Is(err, oerrors.ErrNotFound):
 		return ExitNotFound
-	case errors.Is(err, oerrors.ErrVersion):
-		return ExitVersionMismatch
 	}
 
 	// Check Kubernetes API errors

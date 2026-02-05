@@ -48,11 +48,6 @@ func TestExitCodeFromError(t *testing.T) {
 			wantCode: ExitNotFound,
 		},
 		{
-			name:     "version mismatch error",
-			err:      oerrors.ErrVersion,
-			wantCode: ExitVersionMismatch,
-		},
-		{
 			name:     "unknown error returns general error",
 			err:      errors.New("unknown error"),
 			wantCode: ExitGeneralError,
@@ -118,5 +113,4 @@ func TestExitCodeConstants(t *testing.T) {
 	assert.Equal(t, 3, ExitConnectivityError)
 	assert.Equal(t, 4, ExitPermissionDenied)
 	assert.Equal(t, 5, ExitNotFound)
-	assert.Equal(t, 6, ExitVersionMismatch)
 }

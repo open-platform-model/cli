@@ -2,23 +2,29 @@
 
 ## Intent
 
-Implement the `opm mod build` command that renders OPM modules into platform-specific manifests (primarily Kubernetes). This is the core rendering pipeline that transforms abstract module definitions into deployable resources.
+Implement the `opm mod build` command and the `internal/build` package that renders OPM modules into platform-specific manifests (primarily Kubernetes). This change implements the Pipeline interface defined in render-pipeline-v1.
+
+## SemVer Impact
+
+**MINOR** - Adds new command `mod build` without breaking existing functionality.
 
 ## Scope
 
 **In scope:**
 
 - `opm mod build` command implementation
-- Render pipeline (load → match → transform → output)
-- Provider and transformer integration
+- `internal/build/` package implementing Pipeline interface
+- `internal/output/` package for manifest formatting
+- Render pipeline phases: load → match → transform → result
+- Provider and transformer integration via CUE
 - ModuleRelease construction from local module
 - YAML/JSON output formats
-- Split file output (`--split`). Splits into multiple files.
-- Verbose/debug output modes
-- Strict mode for trait enforcement
+- Split file output (`--split`)
+- Verbose output modes
 
 **Out of scope:**
 
+- Pipeline interface definition (see render-pipeline-v1)
 - Deployment to cluster (see deploy-v1)
 - New transformer definitions (see platform-adapter-spec)
 - Bundle rendering (future)
@@ -26,20 +32,21 @@ Implement the `opm mod build` command that renders OPM modules into platform-spe
 
 ## Dependencies
 
-This change depends on and references:
-
-- **platform-adapter-spec**: Provider and Transformer definitions (`#Provider`, `#Transformer`, `#TransformerContext`)
-- **core**: Configuration loading from `~/.opm/config.cue`
-- **deploy-v1**: Deployment lifecycle commands (apply, delete, status)
-- **catalog/v0/core**: Module, ModuleRelease, Component definitions
+| Dependency | Relationship |
+|------------|--------------|
+| render-pipeline-v1 | Implements: Pipeline interface, RenderResult |
+| platform-adapter-spec | References: #Provider, #Transformer definitions |
+| config-v1 | Uses: Configuration loading, provider resolution |
+| deploy-v1 | Consumed by: apply, diff, status commands |
 
 ## Approach
 
-1. Implement render pipeline in Go with CUE SDK for module loading and transformer execution
-2. Use parallel goroutines for transformer execution with isolated CUE contexts
-3. Leverage existing `#Provider` and `#Transformer` definitions from platform specs
-4. Follow fail-on-end pattern for error aggregation
-5. Construct `#ModuleRelease` internally from local module path + values files
+1. Implement Pipeline interface in `internal/build/` package
+2. Use CUE SDK for module loading and transformer execution
+3. Use parallel goroutines for transformer execution with isolated CUE contexts
+4. Leverage existing `#Provider` and `#Transformer` definitions from platform specs
+5. Follow fail-on-end pattern for error aggregation
+6. Separate output formatting into `internal/output/` (CLI-specific, not part of Pipeline)
 
 ## Success Criteria
 
@@ -50,20 +57,30 @@ This change depends on and references:
 | SC-003 | 100% of matched components produce valid Kubernetes resources |
 | SC-004 | Error messages for unmatched components include actionable guidance |
 | SC-005 | Verbose output shows transformer matching decisions |
+| SC-006 | deploy-v1 can use Pipeline.Render() without modification to this implementation |
+
+## Complexity Justification (Principle VII)
+
+| Component | Justification |
+|-----------|---------------|
+| Parallel execution | Required for performance with many components; isolated CUE contexts prevent memory issues |
+| Separate output package | CLI-specific concerns (YAML format, split files) don't belong in reusable Pipeline |
+| CUE-based matching | Matching logic in CUE ensures consistency with transformer definitions |
 
 ## Risks & Edge Cases
 
 | Case | Handling |
 |------|----------|
 | Two transformers with identical requirements | Error with "multiple exact transformer matches" |
-| Transformer produces zero resources | Empty output is valid |
+| Transformer produces zero resources | Empty resource list is valid |
 | Output fails Kubernetes schema validation | Warning logged; apply will fail server-side |
 | Invalid values file | Fail with clear CUE validation error |
 | Values file conflict | Return CUE's native unification error |
 
 ## Non-Goals
 
-- **Deployment**: Handled by `deploy-v1` (`mod apply`, `mod delete`, `mod status`)
-- **Transformer Authoring**: Handled by `platform-adapter-spec`
-- **Bundle Rendering**: Deferred to future bundle-spec
-- **Remote Module Resolution**: Build operates on local paths only
+- **Pipeline interface design**: Defined in render-pipeline-v1
+- **Deployment operations**: Handled by deploy-v1
+- **Transformer authoring**: Handled by platform-adapter-spec
+- **Bundle rendering**: Deferred to future bundle-spec
+- **Remote module resolution**: Build operates on local paths only
