@@ -162,7 +162,7 @@ func buildVerboseResultFromInfo(result *RenderResultInfo, details []MatchDetailI
 
 	// Convert errors
 	for _, err := range result.Errors {
-		vr.Errors = append(vr.Errors, redactSensitive(err.Error()))
+		vr.Errors = append(vr.Errors, err.Error())
 	}
 
 	return vr
@@ -242,13 +242,4 @@ func writeVerboseHuman(result *VerboseResult, w io.Writer) error {
 
 	_, err := w.Write([]byte(sb.String()))
 	return err
-}
-
-// redactSensitive removes sensitive data from error messages.
-// Note: This function is a placeholder for future implementation.
-// Patterns to check include: password, secret, token, key, credential, apiKey, api_key.
-func redactSensitive(s string) string {
-	// Currently we just return the string as-is.
-	// TODO: Implement actual redaction logic if needed.
-	return s
 }

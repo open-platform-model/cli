@@ -75,4 +75,8 @@ type OPMConfig struct {
 	// Key: provider alias (e.g., "kubernetes")
 	// Value: loaded CUE value referencing the provider's #Provider definition
 	Providers map[string]cue.Value
+
+	// CueContext is the CUE context used to load providers.
+	// Shared with module loader to ensure all values are from the same runtime.
+	CueContext *cue.Context
 }

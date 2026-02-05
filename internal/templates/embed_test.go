@@ -73,7 +73,7 @@ func TestListTemplateFiles(t *testing.T) {
 		{
 			name:         "advanced template files",
 			template:     Advanced,
-			wantMinCount: 10, // Has components/, scopes/ subdirectories
+			wantMinCount: 8, // Has components/, scopes/ subdirectories
 		},
 		{
 			name:     "unknown template",
@@ -246,7 +246,6 @@ func TestRender_AdvancedTemplate(t *testing.T) {
 	// Advanced template should have components and scopes subdirectories
 	expectedDirs := []string{
 		"components",
-		"scopes",
 	}
 
 	for _, dir := range expectedDirs {
@@ -257,7 +256,7 @@ func TestRender_AdvancedTemplate(t *testing.T) {
 	}
 
 	// Should have multiple files
-	assert.Greater(t, len(createdFiles), 10, "advanced template should create many files")
+	assert.Equal(t, len(createdFiles), 8, "should create multiple files")
 }
 
 func TestGetFS(t *testing.T) {

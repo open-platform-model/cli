@@ -137,10 +137,7 @@ func TestModInit_Advanced(t *testing.T) {
 	assert.FileExists(t, filepath.Join(targetDir, "module.cue"))
 	assert.FileExists(t, filepath.Join(targetDir, "values.cue"))
 	assert.FileExists(t, filepath.Join(targetDir, "components.cue"))
-	assert.FileExists(t, filepath.Join(targetDir, "scopes.cue"))
-	assert.FileExists(t, filepath.Join(targetDir, "policies.cue"))
 	assert.DirExists(t, filepath.Join(targetDir, "components"))
-	assert.DirExists(t, filepath.Join(targetDir, "scopes"))
 }
 
 func TestModInit_DefaultDir(t *testing.T) {

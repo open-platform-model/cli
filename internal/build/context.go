@@ -33,7 +33,7 @@ type TransformerComponentMetadata struct {
 
 // NewTransformerContext constructs the context for a transformer execution.
 // This context is unified with the transformer's #transform function.
-func NewTransformerContext(module *LoadedModule, component *LoadedComponent) *TransformerContext {
+func NewTransformerContext(release *BuiltRelease, component *LoadedComponent) *TransformerContext {
 	// Extract resource FQNs
 	resourceFQNs := make([]string, 0, len(component.Resources))
 	for fqn := range component.Resources {
@@ -47,12 +47,12 @@ func NewTransformerContext(module *LoadedModule, component *LoadedComponent) *Tr
 	}
 
 	return &TransformerContext{
-		Name:      module.Name,
-		Namespace: module.Namespace,
+		Name:      release.Metadata.Name,
+		Namespace: release.Metadata.Namespace,
 		ModuleMetadata: &TransformerModuleMetadata{
-			Name:    module.Name,
-			Version: module.Version,
-			Labels:  module.Labels,
+			Name:    release.Metadata.Name,
+			Version: release.Metadata.Version,
+			Labels:  release.Metadata.Labels,
 		},
 		ComponentMetadata: &TransformerComponentMetadata{
 			Name:      component.Name,

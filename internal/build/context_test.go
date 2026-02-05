@@ -8,11 +8,13 @@ import (
 )
 
 func TestNewTransformerContext(t *testing.T) {
-	module := &LoadedModule{
-		Name:      "my-module",
-		Namespace: "default",
-		Version:   "1.0.0",
-		Labels:    map[string]string{"env": "prod"},
+	release := &BuiltRelease{
+		Metadata: ReleaseMetadata{
+			Name:      "my-module",
+			Namespace: "default",
+			Version:   "1.0.0",
+			Labels:    map[string]string{"env": "prod"},
+		},
 	}
 
 	component := &LoadedComponent{
@@ -26,7 +28,7 @@ func TestNewTransformerContext(t *testing.T) {
 		},
 	}
 
-	ctx := NewTransformerContext(module, component)
+	ctx := NewTransformerContext(release, component)
 
 	assert.Equal(t, "my-module", ctx.Name)
 	assert.Equal(t, "default", ctx.Namespace)

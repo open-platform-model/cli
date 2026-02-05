@@ -111,18 +111,12 @@ func sortResourceInfos(resources []ResourceInfo) {
 }
 
 // writeYAML writes resources as YAML documents separated by ---.
+// The yaml.v3 encoder automatically adds document separators between documents.
 func writeYAML(resources []ResourceInfo, w io.Writer) error {
 	encoder := yaml.NewEncoder(w)
 	encoder.SetIndent(2)
 
-	for i, res := range resources {
-		if i > 0 {
-			// Write document separator
-			if _, err := fmt.Fprintln(w, "---"); err != nil {
-				return fmt.Errorf("writing separator: %w", err)
-			}
-		}
-
+	for _, res := range resources {
 		if err := encoder.Encode(res.GetObject().Object); err != nil {
 			return fmt.Errorf("encoding resource %s/%s: %w",
 				res.GetKind(), res.GetName(), err)
@@ -133,17 +127,12 @@ func writeYAML(resources []ResourceInfo, w io.Writer) error {
 }
 
 // writeYAMLObjects writes unstructured objects as YAML documents.
+// The yaml.v3 encoder automatically adds document separators between documents.
 func writeYAMLObjects(objects []*unstructured.Unstructured, w io.Writer) error {
 	encoder := yaml.NewEncoder(w)
 	encoder.SetIndent(2)
 
-	for i, obj := range objects {
-		if i > 0 {
-			if _, err := fmt.Fprintln(w, "---"); err != nil {
-				return fmt.Errorf("writing separator: %w", err)
-			}
-		}
-
+	for _, obj := range objects {
 		if err := encoder.Encode(obj.Object); err != nil {
 			return fmt.Errorf("encoding resource %s/%s: %w",
 				obj.GetKind(), obj.GetName(), err)

@@ -26,9 +26,9 @@ var (
 // NewRootCmd creates the root command for the OPM CLI.
 func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
-		Use:   "opm",
-		Short: "Open Platform Model CLI",
-	Long:  `OPM CLI manages module lifecycle and configuration for the Open Platform Model.`,
+		Use:           "opm",
+		Short:         "Open Platform Model CLI",
+		Long:          `OPM CLI manages module lifecycle and configuration for the Open Platform Model.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {

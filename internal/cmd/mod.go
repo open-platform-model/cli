@@ -10,7 +10,7 @@ func NewModCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mod",
 		Short: "Module operations",
-	Long: `Module operations for OPM modules.`,
+		Long:  `Module operations for OPM modules.`,
 	}
 
 	// Add subcommands

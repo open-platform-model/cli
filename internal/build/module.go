@@ -7,18 +7,19 @@ import (
 	"path/filepath"
 
 	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/load"
 
 	"github.com/opmodel/cli/internal/output"
 )
 
 // ModuleLoader handles module and values loading.
-type ModuleLoader struct{}
+type ModuleLoader struct {
+	cueCtx *cue.Context
+}
 
 // NewModuleLoader creates a new ModuleLoader instance.
-func NewModuleLoader() *ModuleLoader {
-	return &ModuleLoader{}
+func NewModuleLoader(ctx *cue.Context) *ModuleLoader {
+	return &ModuleLoader{cueCtx: ctx}
 }
 
 // LoadedModule is the result of loading a module.
@@ -35,33 +36,16 @@ type LoadedModule struct {
 	Version          string
 	DefaultNamespace string
 	Labels           map[string]string
-
-	// Components extracted from module
-	Components []*LoadedComponent
 }
 
 // LoadedComponent is a component with extracted metadata.
+// Components are now extracted by ReleaseBuilder, but this type is still used.
 type LoadedComponent struct {
 	Name      string
 	Labels    map[string]string    // Effective labels (merged from resources/traits)
 	Resources map[string]cue.Value // FQN -> resource value
 	Traits    map[string]cue.Value // FQN -> trait value
 	Value     cue.Value            // Full component value
-}
-
-// Metadata returns ModuleMetadata for RenderResult.
-func (m *LoadedModule) Metadata() ModuleMetadata {
-	names := make([]string, len(m.Components))
-	for i, c := range m.Components {
-		names[i] = c.Name
-	}
-	return ModuleMetadata{
-		Name:       m.Name,
-		Namespace:  m.Namespace,
-		Version:    m.Version,
-		Labels:     m.Labels,
-		Components: names,
-	}
 }
 
 // Load loads a module with its values.
@@ -71,7 +55,7 @@ func (m *LoadedModule) Metadata() ModuleMetadata {
 //  2. Auto-discover and load values.cue (required)
 //  3. Unify with --values files in order
 //  4. Apply --namespace and --name overrides
-//  5. Extract components with metadata
+//  5. Return raw module value for release building
 func (l *ModuleLoader) Load(ctx context.Context, opts RenderOptions) (*LoadedModule, error) {
 	// Resolve absolute path
 	absPath, err := filepath.Abs(opts.ModulePath)
@@ -107,8 +91,8 @@ func (l *ModuleLoader) Load(ctx context.Context, opts RenderOptions) (*LoadedMod
 		defer os.Unsetenv("CUE_REGISTRY")
 	}
 
-	// Create fresh CUE context
-	cueCtx := cuecontext.New()
+	// Use the shared CUE context
+	cueCtx := l.cueCtx
 
 	// Load the module
 	cfg := &load.Config{
@@ -142,14 +126,6 @@ func (l *ModuleLoader) Load(ctx context.Context, opts RenderOptions) (*LoadedMod
 		}
 	}
 
-	// Check if this is a ModuleRelease (has concrete components) or Module (has #components)
-	isRelease := l.isModuleRelease(value)
-	if isRelease {
-		output.Debug("module release detected, using concrete components")
-	} else {
-		output.Debug("module detected, using #components definition")
-	}
-
 	// Extract module metadata
 	module, err := l.extractModule(value, opts)
 	if err != nil {
@@ -158,18 +134,10 @@ func (l *ModuleLoader) Load(ctx context.Context, opts RenderOptions) (*LoadedMod
 	module.Path = absPath
 	module.Value = value
 
-	// Extract components from the appropriate field based on module type
-	components, err := l.extractComponentsFromModule(value, isRelease)
-	if err != nil {
-		return nil, err // Error already has context
-	}
-	module.Components = components
-
 	output.Debug("loaded module",
 		"name", module.Name,
 		"namespace", module.Namespace,
 		"version", module.Version,
-		"components", len(module.Components),
 	)
 
 	return module, nil
@@ -285,118 +253,4 @@ func (l *ModuleLoader) resolveNamespace(flagValue, defaultNamespace string) stri
 		return flagValue
 	}
 	return defaultNamespace
-}
-
-// extractComponents extracts components from the module value.
-func (l *ModuleLoader) extractComponents(value cue.Value) ([]*LoadedComponent, error) {
-	var components []*LoadedComponent
-
-	// Look for components at module.components or components
-	componentsPath := cue.ParsePath("module.components")
-	componentsValue := value.LookupPath(componentsPath)
-	if !componentsValue.Exists() {
-		componentsPath = cue.ParsePath("components")
-		componentsValue = value.LookupPath(componentsPath)
-	}
-
-	if !componentsValue.Exists() {
-		// No components is valid (empty module)
-		return components, nil
-	}
-
-	// Iterate over components (struct fields)
-	iter, err := componentsValue.Fields()
-	if err != nil {
-		return nil, fmt.Errorf("iterating components: %w", err)
-	}
-
-	for iter.Next() {
-		name := iter.Selector().Unquoted()
-		compValue := iter.Value()
-
-		comp, err := l.extractComponent(name, compValue)
-		if err != nil {
-			return nil, fmt.Errorf("extracting component %s: %w", name, err)
-		}
-		components = append(components, comp)
-	}
-
-	return components, nil
-}
-
-// extractComponent extracts a single component's metadata.
-//
-//nolint:unparam // error return allows for future validation
-func (l *ModuleLoader) extractComponent(name string, value cue.Value) (*LoadedComponent, error) {
-	comp := &LoadedComponent{
-		Name:      name,
-		Labels:    make(map[string]string),
-		Resources: make(map[string]cue.Value),
-		Traits:    make(map[string]cue.Value),
-		Value:     value,
-	}
-
-	// Extract #resources
-	resourcesValue := value.LookupPath(cue.ParsePath("#resources"))
-	if resourcesValue.Exists() {
-		iter, err := resourcesValue.Fields()
-		if err == nil {
-			for iter.Next() {
-				fqn := iter.Selector().Unquoted()
-				comp.Resources[fqn] = iter.Value()
-
-				// Extract labels from resource
-				l.extractLabelsFromValue(iter.Value(), comp.Labels)
-			}
-		}
-	}
-
-	// Extract #traits
-	traitsValue := value.LookupPath(cue.ParsePath("#traits"))
-	if traitsValue.Exists() {
-		iter, err := traitsValue.Fields()
-		if err == nil {
-			for iter.Next() {
-				fqn := iter.Selector().Unquoted()
-				comp.Traits[fqn] = iter.Value()
-
-				// Extract labels from trait
-				l.extractLabelsFromValue(iter.Value(), comp.Labels)
-			}
-		}
-	}
-
-	// Extract component-level labels
-	labelsValue := value.LookupPath(cue.ParsePath("labels"))
-	if labelsValue.Exists() {
-		iter, err := labelsValue.Fields()
-		if err == nil {
-			for iter.Next() {
-				if str, err := iter.Value().String(); err == nil {
-					comp.Labels[iter.Selector().Unquoted()] = str
-				}
-			}
-		}
-	}
-
-	return comp, nil
-}
-
-// extractLabelsFromValue extracts labels from a value (resource or trait).
-func (l *ModuleLoader) extractLabelsFromValue(value cue.Value, labels map[string]string) {
-	labelsValue := value.LookupPath(cue.ParsePath("labels"))
-	if !labelsValue.Exists() {
-		return
-	}
-
-	iter, err := labelsValue.Fields()
-	if err != nil {
-		return
-	}
-
-	for iter.Next() {
-		if str, err := iter.Value().String(); err == nil {
-			labels[iter.Selector().Unquoted()] = str
-		}
-	}
 }

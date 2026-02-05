@@ -8,8 +8,9 @@ This delta adds the `opm mod build` command and its implementation in `internal/
 
 1. **Implements Pipeline interface**: Core logic in `internal/build/` satisfies render-pipeline-v1 contract.
 2. **Separate output formatting**: CLI-specific formatting in `internal/output/`, not in Pipeline.
-3. **CUE-based matching**: Transformer matching evaluated in CUE for consistency.
-4. **Parallel execution**: Isolated CUE contexts per worker for performance.
+3. **#config pattern**: Modules use `#config` for schema, `values` for defaults, enabling type-safe configuration.
+4. **Release building phase**: ReleaseBuilder injects values into #config before component extraction.
+5. **Parallel execution**: FillPath injection for #component and #context.
 
 ## Dependencies
 
@@ -86,7 +87,7 @@ A developer wants to control how rendered manifests are output.
 |----|-------------|
 | FR-B-020 | `internal/build.Pipeline` MUST implement render-pipeline-v1 `Pipeline` interface. |
 | FR-B-021 | Pipeline MUST execute transformers in parallel. |
-| FR-B-022 | Pipeline MUST use isolated `cue.Context` per worker. |
+| FR-B-022 | Pipeline MUST use FillPath for #component and #context injection. |
 | FR-B-023 | Pipeline MUST aggregate errors (fail-on-end pattern). |
 | FR-B-024 | Pipeline MUST order resources by weight for sequential apply. |
 
@@ -96,18 +97,28 @@ A developer wants to control how rendered manifests are output.
 |----|-------------|
 | FR-B-030 | ModuleLoader MUST require `values.cue` at module root. |
 | FR-B-031 | ModuleLoader MUST unify `values.cue` with `--values` files in order. |
-| FR-B-032 | ModuleLoader MUST construct `#ModuleRelease` from module + values. |
+| FR-B-032 | ModuleLoader MUST extract metadata (name, namespace, version) from module. |
 | FR-B-033 | `--namespace` MUST take precedence over `module.metadata.defaultNamespace`. |
 | FR-B-034 | `--name` MUST take precedence over `module.metadata.name`. |
+
+### Module Configuration Pattern
+
+| ID | Requirement |
+|----|-------------|
+| FR-B-035 | Modules MUST define `#config` for user-facing configuration schema. |
+| FR-B-036 | Modules MUST define `values: #config` to declare values satisfy the schema. |
+| FR-B-037 | Components in `#components` MUST reference `#config` for configuration values. |
+| FR-B-038 | ReleaseBuilder MUST inject `values` into `#config` via `FillPath` before component extraction. |
+| FR-B-039 | ReleaseBuilder MUST validate all extracted components are fully concrete. |
 
 ### Transformer Matching
 
 | ID | Requirement |
 |----|-------------|
-| FR-B-040 | Matcher MUST evaluate `#Matches` predicate in CUE. |
-| FR-B-041 | Matcher MUST check required labels, resources, and traits. |
-| FR-B-042 | Matcher MUST allow multiple transformers to match one component. |
-| FR-B-043 | Matcher MUST report unmatched components with available transformers. |
+| FR-B-040 | Matcher MUST check requiredLabels, requiredResources, requiredTraits. |
+| FR-B-041 | Matcher MUST allow multiple transformers to match one component. |
+| FR-B-042 | Matcher MUST report unmatched components with available transformers. |
+| FR-B-043 | Matcher MUST track which traits were handled by matched transformers. |
 
 ### Output Formatting
 
@@ -117,7 +128,6 @@ A developer wants to control how rendered manifests are output.
 | FR-B-051 | Output MUST support JSON format. |
 | FR-B-052 | Split output MUST use pattern `<lowercase-kind>-<resource-name>.yaml`. |
 | FR-B-053 | Output MUST be deterministic (same input = same output). |
-| FR-B-054 | Verbose logging MUST redact sensitive values (secrets). |
 
 ### Error Handling
 
@@ -127,6 +137,8 @@ A developer wants to control how rendered manifests are output.
 | FR-B-061 | Unhandled traits in `--strict` mode MUST cause error. |
 | FR-B-062 | Unhandled traits in normal mode MUST cause warning. |
 | FR-B-063 | Values file conflicts MUST return CUE's native unification error. |
+| FR-B-064 | Non-concrete component after release building MUST fail with ReleaseValidationError. |
+| FR-B-065 | Module missing `values` field MUST fail with descriptive error. |
 
 ---
 
@@ -155,12 +167,15 @@ A developer wants to control how rendered manifests are output.
 
 | Case | Handling |
 |------|----------|
-| Two transformers with identical requirements | Error: "multiple exact transformer matches" |
+| Two transformers with identical requirements | Both execute, both produce resources |
 | Transformer produces zero resources | Empty result is valid |
 | Invalid values file | Fail with CUE validation error |
 | Values file conflict | Return CUE's native unification error |
 | No namespace provided (and no default) | Fail with "namespace required" error |
 | Empty module (no components) | Success with empty resources |
+| Non-concrete component after release building | Fail with ReleaseValidationError including component name |
+| Module missing `values` field | Fail with "module missing 'values' field" error |
+| Module missing `#components` field | Fail with "module missing '#components' field" error |
 
 ---
 

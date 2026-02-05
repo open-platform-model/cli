@@ -2,10 +2,10 @@ package build
 
 import (
 	"context"
+	"sort"
 	"sync"
 
 	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/cuecontext"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/opmodel/cli/internal/output"
@@ -28,14 +28,14 @@ func NewExecutor(workers int) *Executor {
 type Job struct {
 	Transformer *LoadedTransformer
 	Component   *LoadedComponent
-	Module      *LoadedModule
+	Release     *BuiltRelease
 }
 
 // JobResult is the result of executing a job.
 type JobResult struct {
 	Component   string
 	Transformer string
-	Resources   []*unstructured.Unstructured // May produce multiple resources
+	Resources   []*unstructured.Unstructured
 	Error       error
 }
 
@@ -45,36 +45,15 @@ type ExecuteResult struct {
 	Errors    []error
 }
 
-// Execute runs all transformations in parallel.
-//
-// Deprecated: Use ExecuteWithTransformers instead, which accepts the transformer map directly.
-//
-// Per FR-B-021 and FR-B-022:
-//   - Execute transformers in parallel using worker pool
-//   - Each worker has isolated cue.Context
-func (e *Executor) Execute(ctx context.Context, match *MatchResult, module *LoadedModule) *ExecuteResult {
-	// This method cannot look up transformers without the transformer map.
-	// Use ExecuteWithTransformers instead.
-	return &ExecuteResult{
-		Resources: make([]*Resource, 0),
-		Errors:    make([]error, 0),
-	}
-}
-
 // ExecuteWithTransformers runs transformations with explicit transformer map.
-// This is the primary execution method that accepts transformers directly.
 func (e *Executor) ExecuteWithTransformers(
 	ctx context.Context,
 	match *MatchResult,
-	module *LoadedModule,
+	release *BuiltRelease,
 	transformers map[string]*LoadedTransformer,
 ) *ExecuteResult {
-	result := &ExecuteResult{
-		Resources: make([]*Resource, 0),
-		Errors:    make([]error, 0),
-	}
+	result := &ExecuteResult{Resources: make([]*Resource, 0), Errors: make([]error, 0)}
 
-	// Build job list
 	var jobs []Job
 	for tfFQN, components := range match.ByTransformer {
 		transformer, ok := transformers[tfFQN]
@@ -82,12 +61,11 @@ func (e *Executor) ExecuteWithTransformers(
 			output.Debug("transformer not found for FQN", "fqn", tfFQN)
 			continue
 		}
-
 		for _, comp := range components {
 			jobs = append(jobs, Job{
 				Transformer: transformer,
 				Component:   comp,
-				Module:      module,
+				Release:     release,
 			})
 		}
 	}
@@ -96,16 +74,11 @@ func (e *Executor) ExecuteWithTransformers(
 		return result
 	}
 
-	output.Debug("executing jobs",
-		"count", len(jobs),
-		"workers", e.workers,
-	)
+	output.Debug("executing jobs", "count", len(jobs), "workers", e.workers)
 
-	// Create channels
 	jobChan := make(chan Job, len(jobs))
 	resultChan := make(chan JobResult, len(jobs))
 
-	// Start workers
 	var wg sync.WaitGroup
 	workerCount := e.workers
 	if workerCount > len(jobs) {
@@ -120,25 +93,21 @@ func (e *Executor) ExecuteWithTransformers(
 		}()
 	}
 
-	// Send jobs
 	for _, job := range jobs {
 		jobChan <- job
 	}
 	close(jobChan)
 
-	// Wait for workers to finish
 	go func() {
 		wg.Wait()
 		close(resultChan)
 	}()
 
-	// Collect results
 	for jobResult := range resultChan {
 		if jobResult.Error != nil {
 			result.Errors = append(result.Errors, jobResult.Error)
 			continue
 		}
-
 		for _, obj := range jobResult.Resources {
 			result.Resources = append(result.Resources, &Resource{
 				Object:      obj,
@@ -148,51 +117,32 @@ func (e *Executor) ExecuteWithTransformers(
 		}
 	}
 
-	output.Debug("execution complete",
-		"resources", len(result.Resources),
-		"errors", len(result.Errors),
-	)
-
+	output.Debug("execution complete", "resources", len(result.Resources), "errors", len(result.Errors))
 	return result
 }
 
-// runWorker processes jobs from the job channel.
 func (e *Executor) runWorker(ctx context.Context, jobs <-chan Job, results chan<- JobResult) {
-	// Each worker gets its own CUE context (per FR-B-022)
-	cueCtx := cuecontext.New()
-
 	for job := range jobs {
 		select {
 		case <-ctx.Done():
-			results <- JobResult{
-				Component:   job.Component.Name,
-				Transformer: job.Transformer.FQN,
-				Error:       ctx.Err(),
-			}
+			results <- JobResult{Component: job.Component.Name, Transformer: job.Transformer.FQN, Error: ctx.Err()}
 			return
 		default:
-			result := e.executeJob(cueCtx, job)
-			results <- result
+			results <- e.executeJob(job)
 		}
 	}
 }
 
-
-// executeJob executes a single transformation.
-func (e *Executor) executeJob(_ *cue.Context, job Job) JobResult {
+func (e *Executor) executeJob(job Job) JobResult {
 	result := JobResult{
 		Component:   job.Component.Name,
 		Transformer: job.Transformer.FQN,
 		Resources:   make([]*unstructured.Unstructured, 0),
 	}
 
-	// Use the transformer's CUE context to ensure all values are from the same runtime
 	cueCtx := job.Transformer.Value.Context()
 
-	// Build transformer context
-	tfCtx := NewTransformerContext(job.Module, job.Component)
-
-	// Get the #transform function from the transformer
+	// Get the #transform from the transformer
 	transformValue := job.Transformer.Value.LookupPath(cue.ParsePath("#transform"))
 	if !transformValue.Exists() {
 		result.Error = &TransformError{
@@ -203,38 +153,50 @@ func (e *Executor) executeJob(_ *cue.Context, job Job) JobResult {
 		return result
 	}
 
-	// Build input for transformation
-	// The transformer expects CUE definitions: #component, #context
-	// We must use FillPath with cue.Hid() to create proper hidden fields,
-	// not Encode() which creates regular fields with escaped identifiers.
-	input := cueCtx.CompileString("{}")
-
-	// Fill #component with the component's CUE value
-	input = input.FillPath(cue.MakePath(cue.Def("component")), job.Component.Value)
-
-	// Encode and fill #context with the transformer context
-	ctxValue := cueCtx.Encode(tfCtx)
-	if ctxValue.Err() != nil {
+	// Component.Value is already concrete from release building
+	// Use FillPath to inject #component directly
+	unified := transformValue.FillPath(cue.ParsePath("#component"), job.Component.Value)
+	if unified.Err() != nil {
 		result.Error = &TransformError{
 			ComponentName:  job.Component.Name,
 			TransformerFQN: job.Transformer.FQN,
-			Cause:          ctxValue.Err(),
-		}
-		return result
-	}
-	input = input.FillPath(cue.MakePath(cue.Def("context")), ctxValue)
-
-	if input.Err() != nil {
-		result.Error = &TransformError{
-			ComponentName:  job.Component.Name,
-			TransformerFQN: job.Transformer.FQN,
-			Cause:          input.Err(),
+			Cause:          unified.Err(),
 		}
 		return result
 	}
 
-	// Unify transformer with input
-	unified := transformValue.Unify(input)
+	// Build #context by filling individual fields
+	// We need to use regular field names, not definitions, since we're using Encode
+	tfCtx := NewTransformerContext(job.Release, job.Component)
+
+	// Fill the regular fields first
+	unified = unified.FillPath(cue.ParsePath("#context.name"), cueCtx.Encode(tfCtx.Name))
+	unified = unified.FillPath(cue.ParsePath("#context.namespace"), cueCtx.Encode(tfCtx.Namespace))
+
+	// Fill the definition fields using the proper definition selector
+	moduleMetaMap := map[string]any{
+		"name":    tfCtx.ModuleMetadata.Name,
+		"version": tfCtx.ModuleMetadata.Version,
+	}
+	if len(tfCtx.ModuleMetadata.Labels) > 0 {
+		moduleMetaMap["labels"] = tfCtx.ModuleMetadata.Labels
+	}
+	unified = unified.FillPath(cue.MakePath(cue.Def("context"), cue.Def("moduleMetadata")), cueCtx.Encode(moduleMetaMap))
+
+	compMetaMap := map[string]any{
+		"name": tfCtx.ComponentMetadata.Name,
+	}
+	if len(tfCtx.ComponentMetadata.Labels) > 0 {
+		compMetaMap["labels"] = tfCtx.ComponentMetadata.Labels
+	}
+	if len(tfCtx.ComponentMetadata.Resources) > 0 {
+		compMetaMap["resources"] = tfCtx.ComponentMetadata.Resources
+	}
+	if len(tfCtx.ComponentMetadata.Traits) > 0 {
+		compMetaMap["traits"] = tfCtx.ComponentMetadata.Traits
+	}
+	unified = unified.FillPath(cue.MakePath(cue.Def("context"), cue.Def("componentMetadata")), cueCtx.Encode(compMetaMap))
+
 	if unified.Err() != nil {
 		result.Error = &TransformError{
 			ComponentName:  job.Component.Name,
@@ -247,44 +209,39 @@ func (e *Executor) executeJob(_ *cue.Context, job Job) JobResult {
 	// Extract output
 	outputValue := unified.LookupPath(cue.ParsePath("output"))
 	if !outputValue.Exists() {
-		// No output is valid (transformer produces nothing)
+		// No output is valid - transformer doesn't apply
 		return result
 	}
 
-	// Output can be a single resource or a list
+	// Check for errors in output (e.g., missing required fields)
+	if outputValue.Err() != nil {
+		result.Error = &TransformError{
+			ComponentName:  job.Component.Name,
+			TransformerFQN: job.Transformer.FQN,
+			Cause:          outputValue.Err(),
+		}
+		return result
+	}
+
+	// Decode output
 	if outputValue.Kind() == cue.ListKind {
-		// List of resources
 		iter, err := outputValue.List()
 		if err != nil {
-			result.Error = &TransformError{
-				ComponentName:  job.Component.Name,
-				TransformerFQN: job.Transformer.FQN,
-				Cause:          err,
-			}
+			result.Error = &TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
 			return result
 		}
-
 		for iter.Next() {
 			obj, err := e.decodeResource(iter.Value())
 			if err != nil {
-				result.Error = &TransformError{
-					ComponentName:  job.Component.Name,
-					TransformerFQN: job.Transformer.FQN,
-					Cause:          err,
-				}
+				result.Error = &TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
 				return result
 			}
 			result.Resources = append(result.Resources, obj)
 		}
 	} else {
-		// Single resource
 		obj, err := e.decodeResource(outputValue)
 		if err != nil {
-			result.Error = &TransformError{
-				ComponentName:  job.Component.Name,
-				TransformerFQN: job.Transformer.FQN,
-				Cause:          err,
-			}
+			result.Error = &TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
 			return result
 		}
 		result.Resources = append(result.Resources, obj)
@@ -293,17 +250,127 @@ func (e *Executor) executeJob(_ *cue.Context, job Job) JobResult {
 	return result
 }
 
-// decodeResource decodes a CUE value to an unstructured Kubernetes resource.
 func (e *Executor) decodeResource(value cue.Value) (*unstructured.Unstructured, error) {
 	var obj map[string]any
 	if err := value.Decode(&obj); err != nil {
 		return nil, err
 	}
-
+	// Post-process to convert OPM maps to Kubernetes arrays
+	normalizeK8sResource(obj)
 	return &unstructured.Unstructured{Object: obj}, nil
 }
 
-// errMissingTransform is returned when transformer lacks #transform.
+// normalizeK8sResource converts OPM-style maps to Kubernetes-style arrays
+// for container ports and env variables throughout the resource tree.
+func normalizeK8sResource(obj map[string]any) {
+	// Process spec.template.spec.containers (Deployment, StatefulSet, DaemonSet, Job)
+	if spec, ok := obj["spec"].(map[string]any); ok {
+		// Direct containers (for Pod-like resources)
+		if containers, ok := spec["containers"].([]any); ok {
+			normalizeContainers(containers)
+		}
+		// template.spec.containers (Deployment, StatefulSet, DaemonSet)
+		if template, ok := spec["template"].(map[string]any); ok {
+			if templateSpec, ok := template["spec"].(map[string]any); ok {
+				if containers, ok := templateSpec["containers"].([]any); ok {
+					normalizeContainers(containers)
+				}
+				if initContainers, ok := templateSpec["initContainers"].([]any); ok {
+					normalizeContainers(initContainers)
+				}
+			}
+		}
+		// jobTemplate.spec.template.spec.containers (CronJob)
+		if jobTemplate, ok := spec["jobTemplate"].(map[string]any); ok {
+			if jobSpec, ok := jobTemplate["spec"].(map[string]any); ok {
+				if template, ok := jobSpec["template"].(map[string]any); ok {
+					if templateSpec, ok := template["spec"].(map[string]any); ok {
+						if containers, ok := templateSpec["containers"].([]any); ok {
+							normalizeContainers(containers)
+						}
+						if initContainers, ok := templateSpec["initContainers"].([]any); ok {
+							normalizeContainers(initContainers)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// normalizeContainers processes a list of containers, converting maps to arrays.
+func normalizeContainers(containers []any) {
+	for _, c := range containers {
+		container, ok := c.(map[string]any)
+		if !ok {
+			continue
+		}
+		// Convert ports map to array
+		if ports, ok := container["ports"].(map[string]any); ok {
+			container["ports"] = mapToPortsArray(ports)
+		}
+		// Convert env map to array
+		if env, ok := container["env"].(map[string]any); ok {
+			container["env"] = mapToEnvArray(env)
+		}
+	}
+}
+
+// mapToPortsArray converts a map of port definitions to a Kubernetes ports array.
+// Input: {"http": {"name": "http", "targetPort": 80, "protocol": "TCP"}}
+// Output: [{"name": "http", "containerPort": 80, "protocol": "TCP"}]
+func mapToPortsArray(ports map[string]any) []any {
+	result := make([]any, 0, len(ports))
+	// Collect keys and sort for deterministic output
+	keys := make([]string, 0, len(ports))
+	for k := range ports {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, portName := range keys {
+		port, ok := ports[portName].(map[string]any)
+		if !ok {
+			continue
+		}
+		k8sPort := map[string]any{
+			"name": portName,
+		}
+		// Map targetPort to containerPort
+		if targetPort, ok := port["targetPort"]; ok {
+			k8sPort["containerPort"] = targetPort
+		}
+		if protocol, ok := port["protocol"]; ok {
+			k8sPort["protocol"] = protocol
+		}
+		result = append(result, k8sPort)
+	}
+	return result
+}
+
+// mapToEnvArray converts a map of env definitions to a Kubernetes env array.
+// Input: {"apiUrl": {"name": "API_URL", "value": "http://api:3000"}}
+// Output: [{"name": "API_URL", "value": "http://api:3000"}]
+func mapToEnvArray(env map[string]any) []any {
+	result := make([]any, 0, len(env))
+	// Collect keys and sort for deterministic output
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		envVar, ok := env[k].(map[string]any)
+		if !ok {
+			continue
+		}
+		// Copy the env var definition directly - it already has name/value
+		result = append(result, envVar)
+	}
+	return result
+}
+
 var errMissingTransform = &transformMissingError{}
 
 type transformMissingError struct{}

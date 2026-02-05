@@ -3,12 +3,21 @@ package build
 import (
 	"testing"
 
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/opmodel/cli/internal/config"
 )
 
 func TestNewPipeline(t *testing.T) {
 	// Test that NewPipeline creates a valid pipeline
-	p := NewPipeline(nil)
+	cfg := &config.OPMConfig{
+		CueContext: cuecontext.New(),
+		Registry:   "",
+		Providers:  make(map[string]cue.Value),
+	}
+	p := NewPipeline(cfg)
 	assert.NotNil(t, p)
 }
 

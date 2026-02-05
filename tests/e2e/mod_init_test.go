@@ -106,7 +106,6 @@ func TestE2E_ModInit_InvalidTemplate(t *testing.T) {
 }
 
 func TestE2E_ModInit_ThenVet(t *testing.T) {
-
 	if _, err := exec.LookPath("cue"); err != nil {
 		t.Skip("cue binary not available")
 	}

@@ -15,9 +15,9 @@ Implement the `opm mod build` command and the `internal/build` package that rend
 - `opm mod build` command implementation
 - `internal/build/` package implementing Pipeline interface
 - `internal/output/` package for manifest formatting
-- Render pipeline phases: load → match → transform → result
+- 6-phase render pipeline: load → release build → provider → match → transform → result
+- Release building with `#config` pattern for concrete components
 - Provider and transformer integration via CUE
-- ModuleRelease construction from local module
 - YAML/JSON output formats
 - Split file output (`--split`)
 - Verbose output modes
@@ -39,14 +39,52 @@ Implement the `opm mod build` command and the `internal/build` package that rend
 | config-v1 | Uses: Configuration loading, provider resolution |
 | deploy-v1 | Consumed by: apply, diff, status commands |
 
+## Key Design: #config Pattern
+
+Modules use a schema/values separation:
+
+```cue
+// module.cue - Schema (constraints only)
+#config: {
+    web: { image: string, replicas: int & >=1 }
+}
+values: #config
+
+// values.cue - Defaults
+values: web: { image: "nginx:1.25", replicas: 2 }
+
+// components.cue - References #config
+#components: web: { spec: container: image: #config.web.image }
+```
+
+At build time, `ReleaseBuilder` executes `FillPath(#config, values)` to make all configuration references concrete before component extraction.
+
+**Why this pattern?**
+
+- The `#ModuleRelease` synthesis approach (wrapping modules at runtime) was complex and required importing core schemas
+- The `#config` pattern keeps everything self-contained within the module
+- CUE's `FillPath` is simple and explicit
+- Users get schema validation via `values: #config` declaration
+
+## Namespace Resolution
+
+Namespace is resolved with this precedence (highest first):
+
+1. `--namespace` flag
+2. `module.metadata.defaultNamespace`
+
+If neither is provided, build fails with actionable error message.
+
 ## Approach
 
 1. Implement Pipeline interface in `internal/build/` package
-2. Use CUE SDK for module loading and transformer execution
-3. Use parallel goroutines for transformer execution with isolated CUE contexts
-4. Leverage existing `#Provider` and `#Transformer` definitions from platform specs
-5. Follow fail-on-end pattern for error aggregation
-6. Separate output formatting into `internal/output/` (CLI-specific, not part of Pipeline)
+2. Use 6-phase architecture: load → release build → provider → match → transform → result
+3. Use `ReleaseBuilder` to inject values into `#config` and extract concrete components
+4. Use CUE SDK for module loading and transformer execution
+5. Use `FillPath` for `#component` and `#context` injection in transformers
+6. Use parallel goroutines for transformer execution
+7. Follow fail-on-end pattern for error aggregation
+8. Separate output formatting into `internal/output/` (CLI-specific, not part of Pipeline)
 
 ## Success Criteria
 
@@ -58,24 +96,30 @@ Implement the `opm mod build` command and the `internal/build` package that rend
 | SC-004 | Error messages for unmatched components include actionable guidance |
 | SC-005 | Verbose output shows transformer matching decisions |
 | SC-006 | deploy-v1 can use Pipeline.Render() without modification to this implementation |
+| SC-007 | Modules using #config pattern build successfully with concrete components |
 
 ## Complexity Justification (Principle VII)
 
 | Component | Justification |
 |-----------|---------------|
-| Parallel execution | Required for performance with many components; isolated CUE contexts prevent memory issues |
+| ReleaseBuilder | Separates concrete component extraction from raw module loading; enables clear error messages for non-concrete values |
+| Parallel execution | Required for performance with many components |
 | Separate output package | CLI-specific concerns (YAML format, split files) don't belong in reusable Pipeline |
-| CUE-based matching | Matching logic in CUE ensures consistency with transformer definitions |
+| FillPath injection | Clean way to inject #component and #context without complex CUE expression building |
 
 ## Risks & Edge Cases
 
 | Case | Handling |
 |------|----------|
-| Two transformers with identical requirements | Error with "multiple exact transformer matches" |
+| Two transformers match same component | Both execute, both produce resources |
 | Transformer produces zero resources | Empty resource list is valid |
 | Output fails Kubernetes schema validation | Warning logged; apply will fail server-side |
 | Invalid values file | Fail with clear CUE validation error |
 | Values file conflict | Return CUE's native unification error |
+| Non-concrete component after release building | Fail with ReleaseValidationError including component name |
+| Module missing `values` field | Fail with descriptive error about #config pattern |
+| Module missing `#components` field | Fail with descriptive error |
+| No namespace and no defaultNamespace | Fail with actionable error suggesting --namespace or defaultNamespace |
 
 ## Non-Goals
 
@@ -84,3 +128,4 @@ Implement the `opm mod build` command and the `internal/build` package that rend
 - **Transformer authoring**: Handled by platform-adapter-spec
 - **Bundle rendering**: Deferred to future bundle-spec
 - **Remote module resolution**: Build operates on local paths only
+- **#ModuleRelease synthesis**: Superseded by #config pattern

@@ -122,10 +122,8 @@ func Render(templateName TemplateName, targetDir string, data TemplateData) ([]s
 			return fmt.Errorf("reading template %s: %w", path, err)
 		}
 
-		// Remove .tmpl extension from target filename
-		if strings.HasSuffix(targetPath, ".tmpl") {
-			targetPath = strings.TrimSuffix(targetPath, ".tmpl")
-		}
+		// Remove .tmpl extension from target filename (TrimSuffix is a no-op if suffix not present)
+		targetPath = strings.TrimSuffix(targetPath, ".tmpl")
 
 		// Ensure parent directory exists
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
@@ -149,10 +147,7 @@ func Render(templateName TemplateName, targetDir string, data TemplateData) ([]s
 		}
 
 		// Add the cleaned path (without .tmpl) to createdFiles
-		cleanPath := relPath
-		if strings.HasSuffix(cleanPath, ".tmpl") {
-			cleanPath = strings.TrimSuffix(cleanPath, ".tmpl")
-		}
+		cleanPath := strings.TrimSuffix(relPath, ".tmpl")
 		createdFiles = append(createdFiles, cleanPath)
 		return nil
 	})
@@ -183,10 +178,8 @@ func ListTemplateFiles(templateName TemplateName) ([]string, error) {
 			return err
 		}
 
-		// Remove .tmpl extension
-		if strings.HasSuffix(relPath, ".tmpl") {
-			relPath = strings.TrimSuffix(relPath, ".tmpl")
-		}
+		// Remove .tmpl extension (TrimSuffix is a no-op if suffix not present)
+		relPath = strings.TrimSuffix(relPath, ".tmpl")
 
 		files = append(files, relPath)
 		return nil

@@ -125,14 +125,25 @@ func (pl *ProviderLoader) extractTransformer(providerName, name string, value cu
 	}
 
 	// Extract required fields
+	// Note: requiredLabels is a map of string -> string
 	pl.extractLabelsField(value, "requiredLabels", transformer.RequiredLabels)
-	transformer.RequiredResources = pl.extractStringList(value, "requiredResources")
-	transformer.RequiredTraits = pl.extractStringList(value, "requiredTraits")
 
-	// Extract optional fields
+	// Note: requiredResources and requiredTraits are maps where keys are FQNs
+	// The values are the resource/trait definitions (not used for matching)
+	transformer.RequiredResources = pl.extractMapKeys(value, "requiredResources")
+	transformer.RequiredTraits = pl.extractMapKeys(value, "requiredTraits")
+
+	// Extract optional fields (same pattern)
 	pl.extractLabelsField(value, "optionalLabels", transformer.OptionalLabels)
-	transformer.OptionalResources = pl.extractStringList(value, "optionalResources")
-	transformer.OptionalTraits = pl.extractStringList(value, "optionalTraits")
+	transformer.OptionalResources = pl.extractMapKeys(value, "optionalResources")
+	transformer.OptionalTraits = pl.extractMapKeys(value, "optionalTraits")
+
+	output.Debug("extracted transformer",
+		"name", name,
+		"fqn", transformer.FQN,
+		"requiredResources", transformer.RequiredResources,
+		"requiredTraits", transformer.RequiredTraits,
+	)
 
 	return transformer, nil
 }
@@ -154,21 +165,28 @@ func (pl *ProviderLoader) extractLabelsField(value cue.Value, field string, labe
 	}
 }
 
-// extractStringList extracts a string list field from a CUE value.
-func (pl *ProviderLoader) extractStringList(value cue.Value, field string) []string {
+// extractMapKeys extracts the keys from a map field as a string slice.
+// This is used for requiredResources, requiredTraits, etc. where the CUE structure is:
+//
+//	requiredResources: { "fqn1": definition1, "fqn2": definition2 }
+//
+// We only need the keys (FQNs) for matching.
+func (pl *ProviderLoader) extractMapKeys(value cue.Value, field string) []string {
 	result := make([]string, 0)
 	fieldVal := value.LookupPath(cue.ParsePath(field))
 	if !fieldVal.Exists() {
 		return result
 	}
-	iter, err := fieldVal.List()
+
+	// Iterate over struct fields to get keys
+	iter, err := fieldVal.Fields()
 	if err != nil {
 		return result
 	}
 	for iter.Next() {
-		if str, err := iter.Value().String(); err == nil {
-			result = append(result, str)
-		}
+		// The selector is the FQN key
+		key := iter.Selector().Unquoted()
+		result = append(result, key)
 	}
 	return result
 }

@@ -136,3 +136,24 @@ func (e *ModuleValidationError) Component() string {
 func (e *ModuleValidationError) Unwrap() error {
 	return e.Cause
 }
+
+// ReleaseValidationError indicates the release failed validation.
+// This typically happens when values are incomplete or non-concrete.
+type ReleaseValidationError struct {
+	// Message describes what validation failed.
+	Message string
+
+	// Cause is the underlying error.
+	Cause error
+}
+
+func (e *ReleaseValidationError) Error() string {
+	if e.Cause != nil {
+		return fmt.Sprintf("release validation failed: %s: %v", e.Message, e.Cause)
+	}
+	return fmt.Sprintf("release validation failed: %s", e.Message)
+}
+
+func (e *ReleaseValidationError) Unwrap() error {
+	return e.Cause
+}

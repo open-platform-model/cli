@@ -120,7 +120,7 @@ func LoadOPMConfig(opts LoaderOptions) (*OPMConfig, error) {
 	}
 
 	// Step 5: Phase 2 - Load full config with registry set
-	cfg, providers, err := loadFullConfig(configPathResult.ConfigPath, registryResult.Registry)
+	cfg, providers, cueCtx, err := loadFullConfig(configPathResult.ConfigPath, registryResult.Registry)
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +130,7 @@ func LoadOPMConfig(opts LoaderOptions) (*OPMConfig, error) {
 		Registry:       registryResult.Registry,
 		RegistrySource: string(registryResult.Source),
 		Providers:      providers,
+		CueContext:     cueCtx,
 	}, nil
 }
 
@@ -151,14 +152,14 @@ func configHasProviders(configPath string) (bool, error) {
 
 // loadFullConfig loads the config.cue file with full CUE evaluation.
 // This is Phase 2 of the two-phase loading process.
-// Returns the config, providers map, and any error.
-func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value, error) {
+// Returns the config, providers map, CUE context, and any error.
+func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value, *cue.Context, error) {
 	// Check if config exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		output.Debug("config file not found, using defaults",
 			"path", configPath,
 		)
-		return DefaultConfig(), nil, nil
+		return DefaultConfig(), nil, cuecontext.New(), nil
 	}
 
 	// Use the directory containing the config file for CUE loading.
@@ -183,7 +184,7 @@ func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value,
 
 	instances := load.Instances([]string{"."}, cfg)
 	if len(instances) == 0 {
-		return nil, nil, oerrors.NewValidationError(
+		return nil, nil, nil, oerrors.NewValidationError(
 			"no CUE instances found",
 			configDir,
 			"", // no specific field
@@ -193,7 +194,7 @@ func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value,
 
 	inst := instances[0]
 	if inst.Err != nil {
-		return nil, nil, &oerrors.DetailError{
+		return nil, nil, nil, &oerrors.DetailError{
 			Type:     "configuration error",
 			Message:  inst.Err.Error(),
 			Location: configPath,
@@ -204,7 +205,7 @@ func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value,
 
 	value := ctx.BuildInstance(inst)
 	if value.Err() != nil {
-		return nil, nil, &oerrors.DetailError{
+		return nil, nil, nil, &oerrors.DetailError{
 			Type:     "configuration error",
 			Message:  value.Err().Error(),
 			Location: configPath,
@@ -216,13 +217,13 @@ func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value,
 	// Extract config values
 	config, err := extractConfig(value)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Extract providers
 	providers := extractProviders(value)
 
-	return config, providers, nil
+	return config, providers, ctx, nil
 }
 
 // extractProviders extracts provider definitions from the CUE config value.
