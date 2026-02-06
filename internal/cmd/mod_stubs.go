@@ -25,32 +25,6 @@ func NewModBuildStubCmd() *cobra.Command {
 	}
 }
 
-// NewModApplyStubCmd creates a stub for mod apply.
-func NewModApplyStubCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "apply",
-		Short: "Apply manifests to cluster (not implemented)",
-		Long:  "Apply rendered manifests to a Kubernetes cluster.\n\n" + stubMessage,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			output.Println("opm mod apply: " + stubMessage)
-			return nil
-		},
-	}
-}
-
-// NewModDeleteStubCmd creates a stub for mod delete.
-func NewModDeleteStubCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "delete",
-		Short: "Delete resources from cluster (not implemented)",
-		Long:  "Delete resources created by this module from the cluster.\n\n" + stubMessage,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			output.Println("opm mod delete: " + stubMessage)
-			return nil
-		},
-	}
-}
-
 // NewModDiffStubCmd creates a stub for mod diff.
 func NewModDiffStubCmd() *cobra.Command {
 	return &cobra.Command{
