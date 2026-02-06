@@ -3,6 +3,8 @@ version: "3"
 vars:
   BINARY_NAME: opm
   BUILD_DIR: bin
+  CLUSTER_NAME: opm-dev
+  K8S_VERSION: "1.34.0"
   VERSION:
     sh: git describe --tags --always --dirty 2>/dev/null || echo "v0.0.0-dev"
   COMMIT:
@@ -52,6 +54,14 @@ tasks:
 
   test:integration:
     desc: Run integration tests (requires cluster or envtest)
+    summary: |
+      Run integration tests against a live Kubernetes cluster or envtest.
+
+      A running cluster is required. To create one:
+        task cluster:create
+
+      To check if a cluster is running:
+        task cluster:status
     cmds:
       - go test ./tests/integration/... -v
 
@@ -89,6 +99,42 @@ tasks:
     generates:
       - coverage.out
       - coverage.html
+
+  cluster:create:
+    desc: Create a local kind cluster for development
+    preconditions:
+      - sh: command -v kind
+        msg: "kind is not installed. Install it: https://kind.sigs.k8s.io/docs/user/quick-start/#installation"
+    cmds:
+      - kind create cluster --name {{.CLUSTER_NAME}} --config hack/kind-config.yaml --image kindest/node:v{{.K8S_VERSION}}
+
+  cluster:delete:
+    desc: Delete the local kind cluster
+    preconditions:
+      - sh: command -v kind
+        msg: "kind is not installed. Install it: https://kind.sigs.k8s.io/docs/user/quick-start/#installation"
+    cmds:
+      - kind delete cluster --name {{.CLUSTER_NAME}}
+
+  cluster:status:
+    desc: Show the status of the local kind cluster
+    preconditions:
+      - sh: command -v kind
+        msg: "kind is not installed. Install it: https://kind.sigs.k8s.io/docs/user/quick-start/#installation"
+    cmds:
+      - |
+        if kind get clusters 2>/dev/null | grep -q "^{{.CLUSTER_NAME}}$"; then
+          echo "Cluster '{{.CLUSTER_NAME}}' is running"
+          kubectl cluster-info --context kind-{{.CLUSTER_NAME}}
+        else
+          echo "Cluster '{{.CLUSTER_NAME}}' is not running"
+        fi
+
+  cluster:recreate:
+    desc: Delete and recreate the local kind cluster
+    cmds:
+      - task: cluster:delete
+      - task: cluster:create
 
   lint:
     desc: Run linters
