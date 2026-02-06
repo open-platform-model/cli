@@ -3,36 +3,37 @@
 ## Architecture
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              CLI Commands                                │
-├─────────────────┬─────────────────┬─────────────────┬───────────────────┤
-│   mod apply     │   mod delete    │    mod diff     │    mod status     │
-└────────┬────────┴────────┬────────┴────────┬────────┴─────────┬─────────┘
-         │                 │                 │                  │
-         ▼                 │                 ▼                  │
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          internal/build/                                 │
-│                                                                          │
-│   build.NewPipeline(cfg).Render(ctx, opts) ──▶ *RenderResult            │
-│                                                      │                   │
-│                                           ┌──────────┴──────────┐       │
-│                                           ▼                     ▼       │
-│                                    Resources []*Resource    Errors      │
-└─────────────────────────────────────────────────────────────────────────┘
-         │                 │                 │                  │
-         ▼                 ▼                 ▼                  ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         internal/kubernetes/                             │
-├─────────────────┬─────────────────┬─────────────────┬───────────────────┤
-│   apply.go      │   delete.go     │    diff.go      │    health.go      │
-│                 │   discovery.go  │                 │    status.go      │
-└────────┬────────┴────────┬────────┴────────┬────────┴─────────┬─────────┘
-         │                 │                 │                  │
-         ▼                 ▼                 ▼                  ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           k8s.io/client-go                               │
-│                    (Server-Side Apply, Discovery)                        │
-└─────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│                  CLI Commands                │
+├─────────────────┬───────────────────────────┤
+│   mod apply     │       mod delete          │
+└────────┬────────┴───────────┬───────────────┘
+         │                    │
+         ▼                    │
+┌─────────────────────────────────────────────┐
+│                internal/build/               │
+│                                              │
+│   build.NewPipeline(cfg).Render(ctx, opts)   │
+│                          ──▶ *RenderResult   │
+│                                   │          │
+│                        ┌──────────┴────────┐ │
+│                        ▼                   ▼ │
+│                 Resources []*Resource  Errors │
+└─────────────────────────────────────────────┘
+         │                    │
+         ▼                    ▼
+┌─────────────────────────────────────────────┐
+│            internal/kubernetes/              │
+├─────────────────┬───────────────────────────┤
+│   apply.go      │   delete.go               │
+│   client.go     │   discovery.go            │
+└────────┬────────┴───────────┬───────────────┘
+         │                    │
+         ▼                    ▼
+┌─────────────────────────────────────────────┐
+│              k8s.io/client-go                │
+│        (Server-Side Apply, Discovery)        │
+└─────────────────────────────────────────────┘
 ```
 
 ## Key Design Decisions
@@ -114,17 +115,6 @@ metadata:
 
 Note: Resources are already ordered in `RenderResult.Resources` by build-v1.
 
-### 5. Health Evaluation by Category
-
-**Decision**: Different health logic per resource category.
-
-| Category | Resources | Health Criteria |
-|----------|-----------|-----------------|
-| Workloads | Deployment, StatefulSet, DaemonSet | `Ready` condition is True |
-| Jobs | Job, CronJob | `Complete` condition is True |
-| Passive | ConfigMap, Secret, Service | Healthy on creation |
-| Custom | CRD instances | `Ready` if present, else passive |
-
 ## Data Flow
 
 ### Apply Flow
@@ -184,53 +174,6 @@ RenderOptions ──▶ Pipeline.Render() ──▶ RenderResult
                     └─────────────────────┘
 ```
 
-### Diff Flow
-
-```text
-RenderOptions ──▶ Pipeline.Render() ──▶ RenderResult
-                                              │
-                                              ▼
-                                       Resources []*Resource
-                                              │
-                                              ▼
-                    ┌─────────────────────────────────────────┐
-                    │ For each resource:                      │
-                    │   1. Fetch live state from cluster      │
-                    │   2. Compare rendered vs live           │
-                    │   3. Collect diffs                      │
-                    └─────────────────────────────────────────┘
-                                              │
-                                              ▼
-                    ┌─────────────────────────────────────────┐
-                    │ Output with dyff                        │
-                    │ (colorized semantic diff)               │
-                    └─────────────────────────────────────────┘
-```
-
-### Status Flow
-
-```text
---name, --namespace ──▶ Build Label Selector
-                              │
-                              ▼
-                    ┌─────────────────────┐
-                    │ Discover Resources  │
-                    │ (via labels)        │
-                    └─────────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────────┐
-                    │ Evaluate Health     │
-                    │ (per category)      │
-                    └─────────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────────┐
-                    │ Output Table        │
-                    │ or JSON/YAML        │
-                    └─────────────────────┘
-```
-
 ## Resource Weights
 
 Defined in `pkg/weights/weights.go` (shared with build-v1).
@@ -256,7 +199,8 @@ Defined in `pkg/weights/weights.go` (shared with build-v1).
 |-------|----------------|
 | render-pipeline-v1 | Interface definitions |
 | build-v1 | Pipeline implementation, rendering |
-| deploy-v1 (this) | Kubernetes operations, health checking |
+| deploy-v1 (this) | Kubernetes apply, delete, client infrastructure, resource labeling |
+| diff-status-v1 | Kubernetes diff, status, health checking |
 | Kubernetes API | Scheduling, actual state, admission control |
 | User | kubeconfig, RBAC permissions |
 
@@ -267,11 +211,6 @@ Defined in `pkg/weights/weights.go` (shared with build-v1).
 | `internal/kubernetes/client.go` | K8s client initialization |
 | `internal/kubernetes/apply.go` | Server-side apply logic |
 | `internal/kubernetes/delete.go` | Deletion with label discovery |
-| `internal/kubernetes/diff.go` | Diff with dyff integration |
-| `internal/kubernetes/health.go` | Resource health evaluation |
 | `internal/kubernetes/discovery.go` | Label-based resource discovery |
-| `internal/kubernetes/status.go` | Status table output |
 | `internal/cmd/mod/apply.go` | Apply command |
 | `internal/cmd/mod/delete.go` | Delete command |
-| `internal/cmd/mod/diff.go` | Diff command |
-| `internal/cmd/mod/status.go` | Status command |

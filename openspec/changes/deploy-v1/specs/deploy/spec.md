@@ -2,12 +2,12 @@
 
 ## Overview
 
-This delta adds deployment lifecycle commands to the OPM CLI: `mod apply`, `mod delete`, `mod diff`, and `mod status`. These commands consume the Pipeline interface from render-pipeline-v1 (implemented by build-v1) and manage module resources on Kubernetes.
+This delta adds deployment lifecycle commands to the OPM CLI: `mod apply` and `mod delete`. These commands consume the Pipeline interface from render-pipeline-v1 (implemented by build-v1) and manage module resources on Kubernetes.
 
 ## Design Decisions
 
 1. **Go API integration**: Commands call `build.NewPipeline().Render()` directly, not subprocess.
-2. **Label-based discovery**: `mod delete` and `mod status` discover resources via labels, not re-rendering.
+2. **Label-based discovery**: `mod delete` discovers resources via labels, not re-rendering.
 3. **Server-side apply**: Use SSA with force for idempotent operations.
 4. **Weighted ordering**: Resources applied/deleted in weight order for dependency handling.
 
@@ -24,28 +24,17 @@ This delta adds deployment lifecycle commands to the OPM CLI: `mod apply`, `mod 
 
 A developer wants to deploy their rendered module to a Kubernetes cluster.
 
-**Independent Test**: Given a valid module, `opm mod apply` deploys resources and `opm mod status` shows healthy.
+**Independent Test**: Given a valid module, `opm mod apply` deploys resources successfully.
 
 **Acceptance Scenarios**:
 
 1. **Given** a valid module, **When** running `opm mod apply`, **Then** resources are deployed.
-2. **Given** a deployed module, **When** running `opm mod status`, **Then** health summary is displayed.
-3. **Given** a deployed module, **When** running `opm mod delete`, **Then** all resources are removed.
-4. **Given** a module with CRDs and CRs, **When** running `opm mod apply`, **Then** CRDs are created first.
+2. **Given** a deployed module, **When** running `opm mod delete`, **Then** all resources are removed.
+3. **Given** a module with CRDs and CRs, **When** running `opm mod apply`, **Then** CRDs are created first.
+4. **Given** pending changes, **When** running `opm mod apply`, **Then** changes are applied.
+5. **Given** dry-run request, **When** running `opm mod apply --dry-run`, **Then** no changes are made.
 
-### User Story 2 - Preview Changes Before Deployment (Priority: P2)
-
-A developer needs to preview changes before applying them.
-
-**Independent Test**: Deploy, modify locally, `opm mod diff` shows changes.
-
-**Acceptance Scenarios**:
-
-1. **Given** a deployed module with local modifications, **When** running `opm mod diff`, **Then** colorized diff is shown.
-2. **Given** pending changes, **When** running `opm mod apply`, **Then** changes are applied.
-3. **Given** dry-run request, **When** running `opm mod apply --dry-run`, **Then** no changes are made.
-
-### User Story 3 - Delete Module Without Source (Priority: P2)
+### User Story 2 - Delete Module Without Source (Priority: P2)
 
 A developer wants to delete a deployed module after deleting the source files.
 
@@ -87,28 +76,6 @@ A developer wants to delete a deployed module after deleting the source files.
 | FR-D-025 | `mod delete` MUST require `--name` and `-n` for identification. |
 | FR-D-026 | `mod delete` MUST prompt for confirmation (unless --force). |
 
-### mod diff
-
-| ID | Requirement |
-|----|-------------|
-| FR-D-030 | `mod diff` MUST call Pipeline.Render() to get resources. |
-| FR-D-031 | `mod diff` MUST fetch live state from cluster. |
-| FR-D-032 | `mod diff` MUST show semantic diff using dyff. |
-| FR-D-033 | `mod diff` MUST handle missing resources (show as additions). |
-| FR-D-034 | `mod diff` MUST handle extra resources (show as deletions). |
-| FR-D-035 | `mod diff` MAY process partial RenderResult (with warnings). |
-
-### mod status
-
-| ID | Requirement |
-|----|-------------|
-| FR-D-040 | `mod status` MUST discover resources via OPM labels. |
-| FR-D-041 | `mod status` MUST evaluate health per resource category. |
-| FR-D-042 | `mod status` MUST support `--watch` for continuous monitoring. |
-| FR-D-043 | `mod status` MUST support `--output` (table, yaml, json). |
-| FR-D-044 | `mod status` MUST show Ready/NotReady for workloads. |
-| FR-D-045 | `mod status` MUST show Complete/Running for jobs. |
-
 ### Kubernetes Integration
 
 | ID | Requirement |
@@ -135,7 +102,6 @@ A developer wants to delete a deployed module after deleting the source files.
 | ID | Requirement |
 |----|-------------|
 | NFR-D-001 | `mod apply` MUST be idempotent. |
-| NFR-D-002 | `mod status` MUST report health within 60 seconds of change. |
 | NFR-D-003 | No enforced limits on module complexity. |
 
 ---
@@ -145,9 +111,7 @@ A developer wants to delete a deployed module after deleting the source files.
 | ID | Criteria |
 |----|----------|
 | SC-D-001 | New user can init, build, apply in under 3 minutes. |
-| SC-D-002 | `mod diff` accurately reflects delta 100% of time. |
 | SC-D-003 | `mod apply` is fully idempotent. |
-| SC-D-004 | `mod status` reports correct health within 60 seconds. |
 
 ---
 
@@ -156,7 +120,6 @@ A developer wants to delete a deployed module after deleting the source files.
 | Case | Handling |
 |------|----------|
 | Render errors | `mod apply` fails before touching cluster |
-| Partial render | `mod diff` can still compare successful resources |
 | Cluster unreachable | Fail fast with connectivity error |
 | RBAC denied | Pass through Kubernetes API error |
 | Field conflict | Log warning, take ownership |
@@ -202,36 +165,6 @@ Flags:
       --context string      Kubernetes context
 ```
 
-### mod diff
-
-```text
-opm mod diff [path] [flags]
-
-Arguments:
-  path    Path to module directory (default: .)
-
-Flags:
-  -f, --values strings      Additional values files
-  -n, --namespace string    Target namespace
-      --name string         Release name
-      --kubeconfig string   Path to kubeconfig
-      --context string      Kubernetes context
-```
-
-### mod status
-
-```text
-opm mod status [flags]
-
-Flags:
-  -n, --namespace string    Target namespace (required)
-      --name string         Module name (required)
-  -o, --output string       Output format: table, yaml, json (default: table)
-      --watch               Continuous monitoring
-      --kubeconfig string   Path to kubeconfig
-      --context string      Kubernetes context
-```
-
 ---
 
 ## Exit Codes
@@ -242,15 +175,3 @@ Flags:
 | 1 | Usage error |
 | 2 | Render error |
 | 3 | Kubernetes error |
-
----
-
-## Resource Health Evaluation
-
-| Category | Resources | Health Criteria |
-|----------|-----------|-----------------|
-| Workloads | Deployment, StatefulSet, DaemonSet | `Ready` condition True |
-| Jobs | Job | `Complete` condition True |
-| CronJobs | CronJob | Always healthy (passive) |
-| Passive | ConfigMap, Secret, Service, PVC | Healthy on creation |
-| Custom | CRD instances | `Ready` if present, else passive |

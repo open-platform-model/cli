@@ -2,11 +2,11 @@
 
 ## Intent
 
-Implement deployment lifecycle commands: `opm mod apply`, `opm mod delete`, `opm mod diff`, and `opm mod status`. These commands manage the full lifecycle of modules on Kubernetes clusters by consuming rendered resources from the build pipeline.
+Implement deployment lifecycle commands: `opm mod apply` and `opm mod delete`. These commands manage module resources on Kubernetes clusters by consuming rendered resources from the build pipeline.
 
 ## SemVer Impact
 
-**MINOR** - Adds new commands (`apply`, `delete`, `diff`, `status`) without breaking existing functionality.
+**MINOR** - Adds new commands (`apply`, `delete`) without breaking existing functionality.
 
 ## Scope
 
@@ -14,17 +14,16 @@ Implement deployment lifecycle commands: `opm mod apply`, `opm mod delete`, `opm
 
 - `opm mod apply` - Deploy module to cluster with server-side apply
 - `opm mod delete` - Remove module from cluster with label discovery
-- `opm mod diff` - Preview changes before deployment
-- `opm mod status` - Check health of deployed resources
 - Integration with build pipeline via `Pipeline.Render()` Go API
 - Server-side apply with field ownership
 - Resource ordering (weighted apply/delete)
 - Resource labeling for module discovery
-- Resource health checking
+- Kubernetes client infrastructure (`internal/kubernetes/`)
 
 **Out of scope:**
 
 - Rendering/transformation logic (see render-pipeline-v1, build-v1)
+- `opm mod diff` and `opm mod status` (see diff-status-v1)
 - Bundle deployment (future)
 - Custom resource health definitions
 
@@ -44,7 +43,6 @@ Implement deployment lifecycle commands: `opm mod apply`, `opm mod delete`, `opm
 4. Implement server-side apply for idempotent operations
 5. Use resource weights (from `pkg/weights/`) for ordered apply/delete
 6. Label all resources for module-based discovery
-7. Use dyff for colorized diff output
 
 ## Complexity Justification (Principle VII)
 
@@ -52,7 +50,6 @@ Implement deployment lifecycle commands: `opm mod apply`, `opm mod delete`, `opm
 |-----------|---------------|
 | Server-side apply | Required for idempotent operations with field ownership tracking |
 | Weighted ordering | Essential for CRD/workload dependencies |
-| Health checking | Necessary for deployment validation |
 | Resource labeling | Required for `mod delete` discovery without maintaining state |
 | Integration via Go API | Enables type-safe resource handling and avoids subprocess overhead |
 
@@ -62,9 +59,7 @@ Implement deployment lifecycle commands: `opm mod apply`, `opm mod delete`, `opm
 |----|----------|
 | SC-001 | `mod apply` is fully idempotent - multiple runs produce no changes |
 | SC-002 | `mod delete` removes all module resources without re-rendering |
-| SC-003 | `mod diff` accurately reflects delta between local and cluster |
-| SC-004 | `mod status` correctly reports Ready/NotReady within 60 seconds |
-| SC-005 | New user can init, build, and apply a module in under 3 minutes |
+| SC-003 | New user can init, build, and apply a module in under 3 minutes |
 
 ## Risks & Edge Cases
 
@@ -74,4 +69,3 @@ Implement deployment lifecycle commands: `opm mod apply`, `opm mod delete`, `opm
 | RBAC permission denied | Pass through Kubernetes API error |
 | Field conflict on apply | Log warning, take ownership (force apply) |
 | Module deleted from disk | `mod delete` still works via label discovery |
-| Partial render (some errors) | `mod diff` can still compare successful resources |
