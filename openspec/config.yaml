@@ -99,6 +99,7 @@ rules:
   design:
     - "Focus: HOW we'll implement it technically"
     - "Updates when: Implementation reveals better approach, constraints change"
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY) to indicate requirement strength
     - MUST include "Research & Decisions" section when exploration was done
     - Document what was explored, alternatives considered, and rationale
     - Format: |
@@ -133,7 +134,8 @@ rules:
   tasks:
     - "Focus: STEPS to take for implementation"
     - "Updates when: Tasks complete, new tasks discovered, blockers identified"
-    - Include validation gates as final tasks (task lint, task test)
+    - Break tasks into chunks of max 2 hours
+    - Each task should be independently testable
     - Group implementation tasks by package
-    - Specify table-driven test patterns for test tasks
+    - Include validation gates as final tasks (task lint, task test)
     - Include integration test tasks where K8s interaction is involved

@@ -21,6 +21,26 @@ All agents MUST read and adhere to `openspec/config.yaml`.
 
 **Governance**: The constitution supersedes this file in case of conflict.
 
+## Build/Test Commands
+
+- Build: `task build` (output: ./bin/opm)
+- Test all: `task test`
+- Test verbose: `task test:verbose`
+- Single test: `go test ./pkg/loader -v -run TestName`
+- Coverage: `task test:coverage`
+- All checks: `task check` (fmt + vet + test)
+- Run: `task run -- mod init ./my-module`
+
+## OPM and CUE
+
+Use these environment variables during development and validation. Commands like "cue mod tidy" or "cue vet ./..."
+
+```bash
+export CUE_REGISTRY=localhost:5000
+export OPM_REGISTRY=localhost:5000
+export CUE_CACHE_DIR=/var/home/emil/Dev/open-platform-model/.cue-cache
+```
+
 ## Technology Standards
 
 ### CLI Framework & UX
@@ -59,16 +79,6 @@ All agents MUST read and adhere to `openspec/config.yaml`.
 
 - stretchr/testify: Assertions and mocking
 - sigs.k8s.io/controller-runtime/pkg/envtest: K8s integration tests
-
-## Build/Test Commands
-
-- Build: `task build` (output: ./bin/opm)
-- Test all: `task test`
-- Test verbose: `task test:verbose`
-- Single test: `go test ./pkg/loader -v -run TestName`
-- Coverage: `task test:coverage`
-- All checks: `task check` (fmt + vet + test)
-- Run: `task run -- mod init ./my-module`
 
 ## Code Style
 
