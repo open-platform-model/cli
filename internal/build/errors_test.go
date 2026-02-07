@@ -82,12 +82,12 @@ func TestTransformError(t *testing.T) {
 	cause := errors.New("CUE evaluation failed: field not found")
 	err := &TransformError{
 		ComponentName:  "database",
-		TransformerFQN: "opmodel.dev/transformers/kubernetes@v0#StatefulSetTransformer",
+		TransformerFQN: "opmodel.dev/transformers/kubernetes@v0#StatefulsetTransformer",
 		Cause:          cause,
 	}
 
 	t.Run("Error message", func(t *testing.T) {
-		expected := `component "database", transformer "opmodel.dev/transformers/kubernetes@v0#StatefulSetTransformer": CUE evaluation failed: field not found`
+		expected := `component "database", transformer "opmodel.dev/transformers/kubernetes@v0#StatefulsetTransformer": CUE evaluation failed: field not found`
 		assert.Equal(t, expected, err.Error())
 	})
 
