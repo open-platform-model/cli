@@ -1,7 +1,15 @@
 # TODO
 
+## CRITICAL
+
+- [ ] Add #ModuleRelease.values to #Module.#config validation during processing. Meaning it should take the schema (#Module.#config) and validate it against the values (unified #ModuleRelease.values).
+  - By leaning on the CUE evaluator we can allow developers to include mandatory fields (!) and optional fields (?) in #Module.#config. This was not possible before.
+  - NOTE: Investigate wheter we should also allow for using default (*) in values.
+  - Extract the schema and unified values separately and evaluate.
+  - Ensure that the log output is referencing the corret files and line relative to the execution directory. Meaning it MUST give the user the correct path to the file and line that fails the evaluator.
+- [ ] Refactor the init process template to omit the "deps" struct. Make sure "cue mod tidy" is ran on the config after init to ensure the latest version is pulled. Omitting the deps will ensure the latest version is pulled during init of config.
 - [ ] Update the CLI kubernetes SDK to 1.34+
-  - [ ] Also remember to fix issues like these while we are at it.
+  - Also remember to fix warnings like these while we are at it. This is caused by the transformers output is of an older k8s version.
 
     ```bash
     ❯ opm mod delete --name Blog -n default --verbose
@@ -31,6 +39,9 @@
     1 resource(s) failed to delete
     ```
 
+## OPTIONAL
+
+- [ ] Add check during processing: Check if a module author has referenced "values" and not "#config" in a component. This will not work and should warn the user.
 - [ ] Add "opm mod list". It should list all modules in the defined namespace (default ns is, default). "-A" should list in all namespaces.
 - [ ] Rendering log issues:
   - [ ] 'loading module path=/var/home/emil/Dev/open-platform-model/cli/testing/blog values_files=[]' should show all value files, including the default lookup of values.cue.
