@@ -20,18 +20,6 @@ metadata: {
 	defaultNamespace: "default"
 }
 
-// Schema and default values
-#values: {
-	// Container image to deploy (required)
-	image!: string
-
-	// Number of replicas (optional, defaults to 1)
-	replicas?: int & >=1 | *1
-
-	// Port to expose (defaults to 8080)
-	port?: int & >0 & <=65535 | *8080
-}
-
 // Components define the workloads for this module.
 #components: {
 	// Example: web server component
@@ -41,12 +29,24 @@ metadata: {
 
 		spec: {
 			container: {
-				image: #values.image
+				image: #config.image
 				ports: http: {
-					targetPort: #values.port
+					targetPort: #config.port
 				}
 			}
-			replicas: #values.replicas
+			replicas: #config.replicas
 		}
 	}
+}
+
+// Configuration schema
+#config: {
+	// Container image to deploy
+	image!: string
+
+	// Number of replicas
+	replicas?: int & >=1
+
+	// Port to expose
+	port?: int & >0 & <=65535
 }

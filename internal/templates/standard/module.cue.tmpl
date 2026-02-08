@@ -24,17 +24,17 @@ metadata: {
 // Components are defined in components.cue
 
 // Schema and default values are defined in values.cue
-#values: {
+#config: {
 	// Web component configuration
 	web: {
 		// Container image (required)
 		image!: string
 
-		// Number of replicas (defaults to 2 for production)
-		replicas?: int & >=1 | *2
+		// Number of replicas
+		replicas?: int & >=1
 
-		// Port to expose (defaults to 8080)
-		port?: int & >0 & <=65535 | *8080
+		// Port to expose
+		port?: int & >0 & <=65535
 	}
 
 	// API component configuration
@@ -42,10 +42,10 @@ metadata: {
 		// Container image (required)
 		image!: string
 
-		// Number of replicas (defaults to 2)
-		replicas?: int & >=1 | *2
+		// Number of replicas
+		replicas?: int & >=1
 
-		// Port to expose (defaults to 3000)
-		port?: int & >0 & <=65535 | *3000
+		// Port to expose
+		port?: int & >0 & <=65535
 	}
 }

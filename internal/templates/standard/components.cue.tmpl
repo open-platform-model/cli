@@ -18,19 +18,19 @@ import (
 
 		spec: {
 			container: {
-				image: #values.web.image
+				image: #config.web.image
 				ports: http: {
 					targetPort: 80
 				}
 				env: apiUrl: {
 					name:  "API_URL"
-					value: "http://api:\(#values.api.port)"
+					value: "http://api:\(#config.api.port)"
 				}
 			}
-			replicas: #values.web.replicas
+			replicas: #config.web.replicas
 			expose: {
 				ports: http: container.ports.http & {
-					exposedPort: #values.web.port
+					exposedPort: #config.web.port
 				}
 				type: "ClusterIP"
 			}
@@ -44,12 +44,12 @@ import (
 
 		spec: {
 			container: {
-				image: #values.api.image
+				image: #config.api.image
 				ports: http: {
-					targetPort: #values.api.port
+					targetPort: #config.api.port
 				}
 			}
-			replicas: #values.api.replicas
+			replicas: #config.api.replicas
 		}
 	}
 }

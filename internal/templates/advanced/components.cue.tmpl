@@ -10,32 +10,32 @@ import (
 	// Web frontend using the web component template
 	web: comps.#web & {
 		spec: {
-			container: image: #values.web.image
-			replicas: #values.web.replicas
+			container: image: #config.web.image
+			replicas: #config.web.replicas
 		}
 	}
 
 	// API backend using the api component template
 	api: comps.#api & {
 		spec: {
-			container: image: #values.api.image
-			replicas: #values.api.replicas
+			container: image: #config.api.image
+			replicas: #config.api.replicas
 		}
 	}
 
 	// Background worker using the worker component template
 	worker: comps.#worker & {
 		spec: {
-			container: image: #values.worker.image
-			replicas: #values.worker.replicas
+			container: image: #config.worker.image
+			replicas: #config.worker.replicas
 		}
 	}
 
 	// Database using the db component template
 	db: comps.#db & {
 		spec: {
-			container: image: #values.db.image
-			storage: size: #values.db.storageSize
+			container: image: #config.db.image
+			storage: size: #config.db.storageSize
 		}
 	}
 }
