@@ -1,53 +1,58 @@
 ## ADDED Requirements
 
-### Requirement: Component list-output annotation
+### Requirement: CLI extracts component annotations during release building
 
-The `#Component` CUE definition SHALL support an optional `"transformer.opmodel.dev/list-output"?: bool` annotation that declares the component's transformers may produce list or map outputs.
+The release builder SHALL extract `metadata.annotations` from each component's CUE value and store them in `LoadedComponent.Annotations`.
 
-#### Scenario: Component with list-output annotation set to true
+#### Scenario: Component with list-output annotation is loaded
 
-- **WHEN** a module author defines a component with `"transformer.opmodel.dev/list-output": true`
-- **THEN** the CUE evaluator SHALL accept the annotation without validation errors
+- **WHEN** the release builder extracts a component whose `metadata.annotations` contains `"transformer.opmodel.dev/list-output": true`
+- **THEN** `LoadedComponent.Annotations` SHALL contain the key `"transformer.opmodel.dev/list-output"` with value `"true"`
 
-#### Scenario: Component without list-output annotation
+#### Scenario: Component without annotations is loaded
 
-- **WHEN** a module author defines a component without the `"transformer.opmodel.dev/list-output"` annotation
-- **THEN** the component SHALL behave identically to current behavior with no changes to validation or output handling
+- **WHEN** the release builder extracts a component that has no `metadata.annotations`
+- **THEN** `LoadedComponent.Annotations` SHALL be an empty map (not nil)
 
-#### Scenario: Component with list-output annotation set to false
+#### Scenario: Component with multiple annotations
 
-- **WHEN** a module author defines a component with `"transformer.opmodel.dev/list-output": false`
-- **THEN** the CUE evaluator SHALL accept the annotation and the component SHALL behave identically to one without the annotation
+- **WHEN** the release builder extracts a component with multiple annotations
+- **THEN** `LoadedComponent.Annotations` SHALL contain all annotation key-value pairs
 
-### Requirement: Transformer output type accepts list or struct
+### Requirement: Annotations propagated to transformer context
 
-The `#Transformer.#transform.output` CUE constraint SHALL accept both struct (`{...}`) and list (`[...{...}]`) output shapes.
+The `TransformerComponentMetadata` SHALL include an `Annotations` field that carries component annotations into the transformer execution context, making them accessible to CUE transformers via `#context.#componentMetadata.annotations`.
 
-#### Scenario: Transformer produces a single resource struct
+#### Scenario: Annotations available in transformer context
 
-- **WHEN** a transformer's `#transform` function returns `output: { apiVersion: "apps/v1", kind: "Deployment", ... }`
-- **THEN** the CUE evaluator SHALL accept the output as valid
+- **WHEN** a component has `"transformer.opmodel.dev/list-output": true` in its propagated `metadata.annotations`
+- **THEN** the transformer SHALL be able to access the annotation via `#context.#componentMetadata.annotations`
 
-#### Scenario: Transformer produces a map of resources
-
-- **WHEN** a transformer's `#transform` function returns `output: { "vol-a": { apiVersion: "v1", kind: "PersistentVolumeClaim", ... }, "vol-b": { ... } }`
-- **THEN** the CUE evaluator SHALL accept the output as valid
-
-#### Scenario: Transformer produces a list of resources
-
-- **WHEN** a transformer's `#transform` function returns `output: [{ apiVersion: "v1", kind: "PersistentVolumeClaim", ... }, { ... }]`
-- **THEN** the CUE evaluator SHALL accept the output as valid
-
-### Requirement: Annotation propagated to transformer context
-
-The `#TransformerContext.#componentMetadata` CUE definition SHALL include an optional `annotations` field that carries component annotations to transformers.
-
-#### Scenario: Component annotation available in transformer context
-
-- **WHEN** a component has `"transformer.opmodel.dev/list-output": true`
-- **THEN** the transformer SHALL be able to access the annotation value via `#context.#componentMetadata.annotations`
-
-#### Scenario: Component without annotations
+#### Scenario: No annotations in transformer context when component has none
 
 - **WHEN** a component has no annotations
-- **THEN** `#context.#componentMetadata.annotations` SHALL be absent or empty and SHALL NOT cause validation errors
+- **THEN** the `annotations` field SHALL be omitted from the transformer context (not present as empty)
+
+### Requirement: Executor handles map output from transformers
+
+The executor SHALL correctly decode map output (struct without `apiVersion` at top level) where each field value is a separate Kubernetes resource. This formalizes existing behavior.
+
+#### Scenario: Executor decodes single resource output
+
+- **WHEN** a transformer produces `output` as a struct with `apiVersion` at the top level
+- **THEN** the executor SHALL decode it as a single `*unstructured.Unstructured` resource
+
+#### Scenario: Executor decodes map output
+
+- **WHEN** a transformer produces `output` as a struct without `apiVersion` at the top level (e.g., PVC, ConfigMap, or Secret transformer)
+- **THEN** the executor SHALL iterate struct fields and decode each value as a separate `*unstructured.Unstructured` resource
+
+#### Scenario: Executor decodes list output
+
+- **WHEN** a transformer produces `output` as a CUE list
+- **THEN** the executor SHALL iterate list elements and decode each as a separate `*unstructured.Unstructured` resource
+
+#### Scenario: All decoded resources attributed to source component and transformer
+
+- **WHEN** the executor decodes multiple resources from a single transformer output (map or list)
+- **THEN** each `Resource` in the result SHALL have its `Component` and `Transformer` fields set to the source component name and transformer FQN
