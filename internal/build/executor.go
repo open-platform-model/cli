@@ -195,6 +195,9 @@ func (e *Executor) executeJob(job Job) JobResult {
 	if len(tfCtx.ComponentMetadata.Traits) > 0 {
 		compMetaMap["traits"] = tfCtx.ComponentMetadata.Traits
 	}
+	if len(tfCtx.ComponentMetadata.Annotations) > 0 {
+		compMetaMap["annotations"] = tfCtx.ComponentMetadata.Annotations
+	}
 	unified = unified.FillPath(cue.MakePath(cue.Def("context"), cue.Def("componentMetadata")), cueCtx.Encode(compMetaMap))
 
 	if unified.Err() != nil {

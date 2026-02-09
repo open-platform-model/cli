@@ -134,11 +134,12 @@ func (b *ReleaseBuilder) extractComponents(concreteModule cue.Value) (map[string
 // extractComponent extracts a single component with its metadata
 func (b *ReleaseBuilder) extractComponent(name string, value cue.Value) *LoadedComponent {
 	comp := &LoadedComponent{
-		Name:      name,
-		Labels:    make(map[string]string),
-		Resources: make(map[string]cue.Value),
-		Traits:    make(map[string]cue.Value),
-		Value:     value,
+		Name:        name,
+		Labels:      make(map[string]string),
+		Annotations: make(map[string]string),
+		Resources:   make(map[string]cue.Value),
+		Traits:      make(map[string]cue.Value),
+		Value:       value,
 	}
 
 	// Extract metadata.name if present, otherwise use field name
@@ -173,6 +174,9 @@ func (b *ReleaseBuilder) extractComponent(name string, value cue.Value) *LoadedC
 		}
 	}
 
+	// Extract annotations from metadata
+	b.extractAnnotations(value, comp.Annotations)
+
 	// Extract labels from metadata
 	labelsValue := value.LookupPath(cue.ParsePath("metadata.labels"))
 	if labelsValue.Exists() {
@@ -187,6 +191,37 @@ func (b *ReleaseBuilder) extractComponent(name string, value cue.Value) *LoadedC
 	}
 
 	return comp
+}
+
+// extractAnnotations extracts annotations from component metadata into the target map.
+// CUE annotation values (bool, string) are converted to strings.
+func (b *ReleaseBuilder) extractAnnotations(value cue.Value, annotations map[string]string) {
+	annotationsValue := value.LookupPath(cue.ParsePath("metadata.annotations"))
+	if !annotationsValue.Exists() {
+		return
+	}
+	iter, err := annotationsValue.Fields()
+	if err != nil {
+		return
+	}
+	for iter.Next() {
+		key := iter.Selector().Unquoted()
+		v := iter.Value()
+		switch v.Kind() {
+		case cue.BoolKind:
+			if b, err := v.Bool(); err == nil {
+				if b {
+					annotations[key] = "true"
+				} else {
+					annotations[key] = "false"
+				}
+			}
+		default:
+			if str, err := v.String(); err == nil {
+				annotations[key] = str
+			}
+		}
+	}
 }
 
 // extractMetadata extracts release metadata from the module

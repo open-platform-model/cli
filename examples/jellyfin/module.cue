@@ -42,9 +42,10 @@ metadata: {
 	// PVC size for the /config directory
 	configStorageSize: string
 
-	// Media library mount points (struct-keyed)
+	// Media library mount points with persistent storage
 	media: [Name=string]: {
 		mountPath: string
+		size:      string
 	}
 }
 

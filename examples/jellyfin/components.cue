@@ -123,10 +123,10 @@ import (
 					name: "config"
 					persistentClaim: size: #config.configStorageSize
 				}
-				for name, _lib in #config.media {
+				for name, lib in #config.media {
 					(name): {
 						"name": name
-						emptyDir: {}
+						persistentClaim: size: lib.size
 					}
 				}
 			}

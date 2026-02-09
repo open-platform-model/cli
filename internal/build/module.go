@@ -41,11 +41,12 @@ type LoadedModule struct {
 // LoadedComponent is a component with extracted metadata.
 // Components are now extracted by ReleaseBuilder, but this type is still used.
 type LoadedComponent struct {
-	Name      string
-	Labels    map[string]string    // Effective labels (merged from resources/traits)
-	Resources map[string]cue.Value // FQN -> resource value
-	Traits    map[string]cue.Value // FQN -> trait value
-	Value     cue.Value            // Full component value
+	Name        string
+	Labels      map[string]string    // Effective labels (merged from resources/traits)
+	Annotations map[string]string    // Annotations from metadata.annotations
+	Resources   map[string]cue.Value // FQN -> resource value
+	Traits      map[string]cue.Value // FQN -> trait value
+	Value       cue.Value            // Full component value
 }
 
 // Load loads a module with its values.

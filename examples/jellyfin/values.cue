@@ -19,17 +19,18 @@ values: {
 
 	// PVC size for Jellyfin config/metadata directory.
 	// Can grow to 50GB+ for large collections (thumbnails, metadata cache).
-	configStorageSize: "10Gi"
+	configStorageSize: "15Gi"
 
-	// Media library mount points.
-	// These use emptyDir by default — operators SHOULD override with real
-	// storage (NFS, hostPath, external PVCs) at ModuleRelease time.
+	// Media library mount points with persistent storage.
+	// Operators can override sizes at ModuleRelease time.
 	media: {
 		tvshows: {
 			mountPath: "/data/tvshows"
+			size:      "100Gi"
 		}
 		movies: {
 			mountPath: "/data/movies"
+			size:      "100Gi"
 		}
 	}
 }

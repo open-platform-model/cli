@@ -25,10 +25,11 @@ type TransformerModuleMetadata struct {
 
 // TransformerComponentMetadata contains component metadata for transformers.
 type TransformerComponentMetadata struct {
-	Name      string            `json:"name"`
-	Labels    map[string]string `json:"labels,omitempty"`
-	Resources []string          `json:"resources,omitempty"`
-	Traits    []string          `json:"traits,omitempty"`
+	Name        string            `json:"name"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	Resources   []string          `json:"resources,omitempty"`
+	Traits      []string          `json:"traits,omitempty"`
 }
 
 // NewTransformerContext constructs the context for a transformer execution.
@@ -55,10 +56,11 @@ func NewTransformerContext(release *BuiltRelease, component *LoadedComponent) *T
 			Labels:  release.Metadata.Labels,
 		},
 		ComponentMetadata: &TransformerComponentMetadata{
-			Name:      component.Name,
-			Labels:    component.Labels,
-			Resources: resourceFQNs,
-			Traits:    traitFQNs,
+			Name:        component.Name,
+			Labels:      component.Labels,
+			Annotations: component.Annotations,
+			Resources:   resourceFQNs,
+			Traits:      traitFQNs,
 		},
 	}
 }
@@ -84,6 +86,9 @@ func (c *TransformerContext) ToMap() map[string]any {
 	}
 	if len(c.ComponentMetadata.Traits) > 0 {
 		componentMetadata["traits"] = c.ComponentMetadata.Traits
+	}
+	if len(c.ComponentMetadata.Annotations) > 0 {
+		componentMetadata["annotations"] = c.ComponentMetadata.Annotations
 	}
 
 	return map[string]any{
