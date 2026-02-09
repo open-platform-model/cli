@@ -1,5 +1,7 @@
 # AGENTS.md - CLI Repository (Go Implementation)
 
+> **⚠️ UNDER HEAVY DEVELOPMENT** - This project is actively being developed and APIs may change frequently.
+
 ## Overview
 
 Go CLI for OPM module operations. Uses cobra, CUE SDK, and zap logging.
