@@ -223,7 +223,10 @@ func (e *Executor) executeJob(job Job) JobResult {
 		return result
 	}
 
-	// Decode output
+	// Decode output - handles three cases:
+	// 1. List: iterate elements, decode each as a resource
+	// 2. Struct with apiVersion: single resource (e.g., Deployment)
+	// 3. Struct without apiVersion: map of resources keyed by name (e.g., PVC per volume)
 	if outputValue.Kind() == cue.ListKind {
 		iter, err := outputValue.List()
 		if err != nil {
@@ -238,16 +241,38 @@ func (e *Executor) executeJob(job Job) JobResult {
 			}
 			result.Resources = append(result.Resources, obj)
 		}
-	} else {
+	} else if e.isSingleResource(outputValue) {
 		obj, err := e.decodeResource(outputValue)
 		if err != nil {
 			result.Error = &TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
 			return result
 		}
 		result.Resources = append(result.Resources, obj)
+	} else {
+		// Map of resources: iterate struct fields and decode each value
+		iter, err := outputValue.Fields()
+		if err != nil {
+			result.Error = &TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
+			return result
+		}
+		for iter.Next() {
+			obj, err := e.decodeResource(iter.Value())
+			if err != nil {
+				result.Error = &TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
+				return result
+			}
+			result.Resources = append(result.Resources, obj)
+		}
 	}
 
 	return result
+}
+
+// isSingleResource checks whether a CUE struct value represents a single Kubernetes
+// resource (has apiVersion at top level) vs a map of multiple resources keyed by name.
+func (e *Executor) isSingleResource(value cue.Value) bool {
+	apiVersion := value.LookupPath(cue.ParsePath("apiVersion"))
+	return apiVersion.Exists()
 }
 
 func (e *Executor) decodeResource(value cue.Value) (*unstructured.Unstructured, error) {
