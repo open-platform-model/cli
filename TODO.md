@@ -2,11 +2,15 @@
 
 ## Feature
 
+- [ ] Find a way top create something similar like "timoni vendor crd" but fully in CUE. I MUST utilize "cue import openapi".
+  - Example found here: <https://github.com/cue-lang/cue/issues/2691>
 - [ ] Add #ModuleRelease.values to #Module.#config validation during processing. Meaning it should take the schema (#Module.#config) and validate it against the values (unified #ModuleRelease.values).
   - By leaning on the CUE evaluator we can allow developers to include mandatory fields (!) and optional fields (?) in #Module.#config. This was not possible before.
   - NOTE: Investigate wheter we should also allow for using default (*) in values.
   - Extract the schema and unified values separately and evaluate.
   - Ensure that the log output is referencing the corret files and line relative to the execution directory. Meaning it MUST give the user the correct path to the file and line that fails the evaluator.
+- [ ] Add a "opm config update" command. It will extract the current values, initialize the latest config available, and reapply the values.
+  - This is a helper command so that users can "upgrade" their configuration more easily.
 - [ ] During "opm mod init" the module.cue in cue.mod should initialize as a blank slate, allowing opm to grab the latest versions of all OPM modules. Either by running "opm mod tidy" (internally) or by running something similar to "cue mod get" on each dependency.
 - [ ] Add "opm mod list". It should list all modules in the defined namespace (default ns is, default). "-A" should list in all namespaces.
 - [ ] Add check during processing: Check if a module author has referenced "values" and not "#config" in a component. This will not work and should warn the user.
@@ -15,7 +19,7 @@
 ## Bugfix
 
 - [ ] Update the CLI kubernetes SDK to 1.34+
-  - Also remember to fix warnings like these while we are at it. This is caused by the transformers output is of an older k8s version.
+  - Fix warnings like "Warning: v1 ComponentStatus is deprecated in v1.19+" and "Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice" while we are at it. This is caused by the transformers output is of an older k8s version.
 
     ```bash
     ❯ opm mod delete --name Blog -n default --verbose
@@ -74,6 +78,9 @@
 
 ## Investigation
 
+- [ ] Test if the CLI has staged apply and delete. If not we must design a staged apply and delete sytem.
+  - For resources that we MUST wait for status we need the CLI to wait for that resource to be reporting ok before moving on to the next.
+  - Investigate if this should be configurable in the model. Either in the module as a Policy or in each component.
 
 ### Possible in controller?
 
