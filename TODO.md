@@ -91,6 +91,9 @@
 
 ## Investigation
 
+- [ ] Investigate how to redesigh the "opm mod delete" workflow to be smarter. It should find ALL resources, even if the user has changed the module (and didn't apply the changes) before running "delete".
+  - It should not rely on the output of the module, only the identifiers of the module.
+  - Might have to improve the identification, using a hash of the metadata (name, namespace, version, etc).
 - [ ] Test if the CLI has staged apply and delete. If not we must design a staged apply and delete sytem.
   - For resources that we MUST wait for status we need the CLI to wait for that resource to be reporting ok before moving on to the next.
   - Investigate if this should be configurable in the model. Either in the module as a Policy or in each component.
