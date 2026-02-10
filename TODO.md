@@ -3,6 +3,7 @@
 ## Feature
 
 - [ ] Rework "opm mod delete" to allow "name" and "namespace" as possitional arguments instead of flags. Keep "--release-id" as flag (overrides both arguments).
+- [ ] Add `--ignore-not-found` flag to `opm mod delete` and `opm mod status` for idempotent operations. Currently these commands fail with an error when no resources match the selector. The flag would suppress this error and exit 0 instead.
 - [ ] Find a way top create something similar like "timoni vendor crd" but fully in CUE. I MUST utilize "cue import openapi".
   - Example found here: <https://github.com/cue-lang/cue/issues/2691>
 - [ ] Add #ModuleRelease.values to #Module.#config validation during processing. Meaning it should take the schema (#Module.#config) and validate it against the values (unified #ModuleRelease.values).
@@ -17,7 +18,8 @@
   - Note: Can now leverage `release-id` labels for discovery (see deterministic-release-identity).
 - [ ] Add check during processing: Check if a module author has referenced "values" and not "#config" in a component. This will not work and should warn the user.
   - This can be utilized with the future "opm mod publish" command, so that an author cannot publish a module that is not valid.
-- [ ] "opm mod delete --name blog --namespace default --verbose" proceeds but with no change, 0 resources deleted. We should add validtion to first look for the module and inform the caller if not found.
+- [x] ~~"opm mod delete --name blog --namespace default --verbose" proceeds but with no change, 0 resources deleted. We should add validation to first look for the module and inform the caller if not found.~~
+  - **Resolved:** Implemented in `refine-resource-discovery` change. Commands now return `NoResourcesFoundError` when no resources match the selector.
 
 ## Bugfix
 
@@ -105,9 +107,9 @@
 
 - [ ] When running "opm mod delete" is the build pipeline really required? Do we need to build the whole module to delete?
 - [x] ~~Investigate how to redesign the "opm mod delete" workflow to be smarter. It should find ALL resources, even if the user has changed the module (and didn't apply the changes) before running "delete".~~
-  - **Resolved:** Implemented in `deterministic-release-identity` change. Each release now gets a deterministic UUID v5 identity (`module-release.opmodel.dev/uuid` label) computed from `{fqn}:{name}:{namespace}`. The `opm mod delete` command now supports:
-    - `--release-id <uuid>` flag for direct UUID-based deletion
-    - Dual-strategy discovery: queries by both `release-id` and `name+namespace` labels, returning the union
+  - **Resolved:** Implemented across `deterministic-release-identity` and `refine-resource-discovery` changes. Each release now gets a deterministic UUID v5 identity (`module-release.opmodel.dev/uuid` label) computed by the CUE catalog schemas. The `opm mod delete` command now supports:
+    - `--release-id <uuid>` flag for direct UUID-based deletion (mutually exclusive with `--name`)
+    - Fails with an error when no resources match the selector (catches typos and misconfigurations)
     - Resources can be found even if module name changed, as long as release-id is known
 - [ ] Test if the CLI has staged apply and delete. If not we must design a staged apply and delete sytem.
   - For resources that we MUST wait for status we need the CLI to wait for that resource to be reporting ok before moving on to the next.
