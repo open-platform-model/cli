@@ -24,29 +24,3 @@ func NewModBuildStubCmd() *cobra.Command {
 		},
 	}
 }
-
-// NewModDiffStubCmd creates a stub for mod diff.
-func NewModDiffStubCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "diff",
-		Short: "Show differences with cluster (not implemented)",
-		Long:  "Show differences between local module and cluster state.\n\n" + stubMessage,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			output.Println("opm mod diff: " + stubMessage)
-			return nil
-		},
-	}
-}
-
-// NewModStatusStubCmd creates a stub for mod status.
-func NewModStatusStubCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "status",
-		Short: "Show resource status (not implemented)",
-		Long:  "Show status of resources created by this module.\n\n" + stubMessage,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			output.Println("opm mod status: " + stubMessage)
-			return nil
-		},
-	}
-}

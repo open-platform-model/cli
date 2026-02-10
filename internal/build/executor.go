@@ -2,6 +2,7 @@ package build
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"sync"
 
@@ -291,11 +292,18 @@ func (e *Executor) decodeResource(value cue.Value) (*unstructured.Unstructured, 
 // normalizeK8sResource converts OPM-style maps to Kubernetes-style arrays
 // for container ports and env variables throughout the resource tree.
 func normalizeK8sResource(obj map[string]any) {
+	// Coerce annotation values to strings (Kubernetes requires map[string]string)
+	normalizeAnnotations(obj)
+
 	// Process spec.template.spec.containers (Deployment, StatefulSet, DaemonSet, Job)
 	if spec, ok := obj["spec"].(map[string]any); ok {
 		// Direct containers (for Pod-like resources)
 		if containers, ok := spec["containers"].([]any); ok {
 			normalizeContainers(containers)
+		}
+		// Convert volumes map to array
+		if volumes, ok := spec["volumes"].(map[string]any); ok {
+			spec["volumes"] = mapToVolumesArray(volumes)
 		}
 		// template.spec.containers (Deployment, StatefulSet, DaemonSet)
 		if template, ok := spec["template"].(map[string]any); ok {
@@ -305,6 +313,10 @@ func normalizeK8sResource(obj map[string]any) {
 				}
 				if initContainers, ok := templateSpec["initContainers"].([]any); ok {
 					normalizeContainers(initContainers)
+				}
+				// Convert volumes map to array
+				if volumes, ok := templateSpec["volumes"].(map[string]any); ok {
+					templateSpec["volumes"] = mapToVolumesArray(volumes)
 				}
 			}
 		}
@@ -318,6 +330,10 @@ func normalizeK8sResource(obj map[string]any) {
 						}
 						if initContainers, ok := templateSpec["initContainers"].([]any); ok {
 							normalizeContainers(initContainers)
+						}
+						// Convert volumes map to array
+						if volumes, ok := templateSpec["volumes"].(map[string]any); ok {
+							templateSpec["volumes"] = mapToVolumesArray(volumes)
 						}
 					}
 				}
@@ -340,6 +356,10 @@ func normalizeContainers(containers []any) {
 		// Convert env map to array
 		if env, ok := container["env"].(map[string]any); ok {
 			container["env"] = mapToEnvArray(env)
+		}
+		// Convert volumeMounts map to array
+		if volumeMounts, ok := container["volumeMounts"].(map[string]any); ok {
+			container["volumeMounts"] = mapToVolumeMountsArray(volumeMounts)
 		}
 	}
 }
@@ -395,6 +415,85 @@ func mapToEnvArray(env map[string]any) []any {
 		}
 		// Copy the env var definition directly - it already has name/value
 		result = append(result, envVar)
+	}
+	return result
+}
+
+// normalizeAnnotations coerces all annotation values to strings.
+// CUE may decode booleans or numbers for annotations, but Kubernetes
+// requires annotations to be map[string]string.
+func normalizeAnnotations(obj map[string]any) {
+	metadata, ok := obj["metadata"].(map[string]any)
+	if !ok {
+		return
+	}
+	annotations, ok := metadata["annotations"].(map[string]any)
+	if !ok {
+		return
+	}
+	for k, v := range annotations {
+		switch val := v.(type) {
+		case string:
+			// already correct
+		case bool:
+			if val {
+				annotations[k] = "true"
+			} else {
+				annotations[k] = "false"
+			}
+		default:
+			annotations[k] = fmt.Sprintf("%v", v)
+		}
+	}
+}
+
+// mapToVolumeMountsArray converts a map of volume mount definitions to a Kubernetes volumeMounts array.
+// Input:  {"config": {"name": "config", "mountPath": "/config"}, "data": {"name": "data", "mountPath": "/data"}}
+// Output: [{"name": "config", "mountPath": "/config"}, {"name": "data", "mountPath": "/data"}]
+func mapToVolumeMountsArray(volumeMounts map[string]any) []any {
+	result := make([]any, 0, len(volumeMounts))
+	keys := make([]string, 0, len(volumeMounts))
+	for k := range volumeMounts {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		vm, ok := volumeMounts[key].(map[string]any)
+		if !ok {
+			continue
+		}
+		// Ensure the name field is set (use the map key if not present)
+		if _, hasName := vm["name"]; !hasName {
+			vm["name"] = key
+		}
+		result = append(result, vm)
+	}
+	return result
+}
+
+
+// mapToVolumesArray converts a map of volume definitions to a Kubernetes volumes array.
+// Input:  {"config": {"name": "config", "persistentVolumeClaim": {"claimName": "config"}}}
+// Output: [{"name": "config", "persistentVolumeClaim": {"claimName": "config"}}]
+func mapToVolumesArray(volumes map[string]any) []any {
+	result := make([]any, 0, len(volumes))
+	keys := make([]string, 0, len(volumes))
+	for k := range volumes {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		vol, ok := volumes[key].(map[string]any)
+		if !ok {
+			continue
+		}
+		// Ensure the name field is set (use the map key if not present)
+		if _, hasName := vol["name"]; !hasName {
+			vol["name"] = key
+		}
+		result = append(result, vol)
 	}
 	return result
 }

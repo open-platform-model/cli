@@ -20,10 +20,8 @@ func NewModCmd() *cobra.Command {
 	// Implemented commands
 	cmd.AddCommand(NewModApplyCmd())
 	cmd.AddCommand(NewModDeleteCmd())
-
-	// Stub commands for future implementation
-	cmd.AddCommand(NewModDiffStubCmd())
-	cmd.AddCommand(NewModStatusStubCmd())
+	cmd.AddCommand(NewModDiffCmd())
+	cmd.AddCommand(NewModStatusCmd())
 
 	return cmd
 }

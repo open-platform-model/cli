@@ -1,0 +1,183 @@
+//go:build integration
+
+package kubernetes
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/opmodel/cli/internal/build"
+)
+
+// --- 8.1 / 8.2: Integration test for diff showing modifications ---
+
+func TestDiffIntegration_ShowsModifications(t *testing.T) {
+	ctx := context.Background()
+
+	client, err := NewClient(ClientOptions{})
+	require.NoError(t, err, "need a valid kubeconfig for integration tests")
+
+	moduleName := "diff-integration-test"
+	namespace := "default"
+	comparer := NewComparer()
+
+	// Create and apply a ConfigMap
+	cm := &unstructured.Unstructured{}
+	cm.SetAPIVersion("v1")
+	cm.SetKind("ConfigMap")
+	cm.SetName("opm-diff-test")
+	cm.SetNamespace(namespace)
+	cm.Object["data"] = map[string]interface{}{
+		"key": "original-value",
+	}
+
+	resources := []*build.Resource{
+		{Object: cm, Component: "test-component"},
+	}
+	meta := build.ModuleMetadata{
+		Name:      moduleName,
+		Namespace: namespace,
+		Version:   "0.1.0",
+	}
+
+	// Apply the original resource
+	applyResult, err := Apply(ctx, client, resources, meta, ApplyOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 1, applyResult.Applied)
+
+	// Modify locally
+	modifiedCM := cm.DeepCopy()
+	modifiedCM.Object["data"] = map[string]interface{}{
+		"key": "modified-value",
+	}
+	modifiedResources := []*build.Resource{
+		{Object: modifiedCM, Component: "test-component"},
+	}
+
+	// Diff should show modifications
+	diffResult, err := Diff(ctx, client, modifiedResources, meta, comparer)
+	require.NoError(t, err)
+	assert.Equal(t, 1, diffResult.Modified, "should detect 1 modified resource")
+	assert.Equal(t, 0, diffResult.Added)
+	assert.Equal(t, 0, diffResult.Orphaned)
+
+	// Cleanup
+	_, err = Delete(ctx, client, DeleteOptions{
+		ModuleName: moduleName,
+		Namespace:  namespace,
+	})
+	require.NoError(t, err)
+}
+
+// --- 8.3: Integration test for status reporting health ---
+
+func TestStatusIntegration_ReportsHealth(t *testing.T) {
+	ctx := context.Background()
+
+	client, err := NewClient(ClientOptions{})
+	require.NoError(t, err, "need a valid kubeconfig for integration tests")
+
+	moduleName := "status-integration-test"
+	namespace := "default"
+
+	// Create and apply a ConfigMap (passive resource = always healthy)
+	cm := &unstructured.Unstructured{}
+	cm.SetAPIVersion("v1")
+	cm.SetKind("ConfigMap")
+	cm.SetName("opm-status-test")
+	cm.SetNamespace(namespace)
+	cm.Object["data"] = map[string]interface{}{
+		"key": "value",
+	}
+
+	resources := []*build.Resource{
+		{Object: cm, Component: "test-component"},
+	}
+	meta := build.ModuleMetadata{
+		Name:      moduleName,
+		Namespace: namespace,
+		Version:   "0.1.0",
+	}
+
+	// Apply
+	applyResult, err := Apply(ctx, client, resources, meta, ApplyOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 1, applyResult.Applied)
+
+	// Check status
+	statusResult, err := GetModuleStatus(ctx, client, StatusOptions{
+		Name:      moduleName,
+		Namespace: namespace,
+	})
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, len(statusResult.Resources), 1)
+	assert.Equal(t, HealthReady, statusResult.AggregateStatus)
+
+	// Cleanup
+	_, err = Delete(ctx, client, DeleteOptions{
+		ModuleName: moduleName,
+		Namespace:  namespace,
+	})
+	require.NoError(t, err)
+}
+
+// --- 8.4: Integration test for diff with no prior deployment (all additions) ---
+
+func TestDiffIntegration_AllAdditions(t *testing.T) {
+	ctx := context.Background()
+
+	client, err := NewClient(ClientOptions{})
+	require.NoError(t, err, "need a valid kubeconfig for integration tests")
+
+	moduleName := "diff-additions-test"
+	namespace := "default"
+	comparer := NewComparer()
+
+	// Create a resource that doesn't exist on cluster
+	cm := &unstructured.Unstructured{}
+	cm.SetAPIVersion("v1")
+	cm.SetKind("ConfigMap")
+	cm.SetName("opm-diff-additions-test")
+	cm.SetNamespace(namespace)
+	cm.Object["data"] = map[string]interface{}{
+		"key": "value",
+	}
+
+	resources := []*build.Resource{
+		{Object: cm, Component: "test-component"},
+	}
+	meta := build.ModuleMetadata{
+		Name:      moduleName,
+		Namespace: namespace,
+		Version:   "0.1.0",
+	}
+
+	// Diff without prior deployment — all should be additions
+	diffResult, err := Diff(ctx, client, resources, meta, comparer)
+	require.NoError(t, err)
+	assert.Equal(t, 0, diffResult.Modified)
+	assert.Equal(t, 1, diffResult.Added, "resource should show as added")
+	assert.Equal(t, 0, diffResult.Orphaned)
+}
+
+// --- 8.5: Integration test for status with no matching resources ---
+
+func TestStatusIntegration_NoResources(t *testing.T) {
+	ctx := context.Background()
+
+	client, err := NewClient(ClientOptions{})
+	require.NoError(t, err, "need a valid kubeconfig for integration tests")
+
+	// Query for a module that doesn't exist
+	statusResult, err := GetModuleStatus(ctx, client, StatusOptions{
+		Name:      "nonexistent-module",
+		Namespace: "default",
+	})
+	require.NoError(t, err)
+	assert.Empty(t, statusResult.Resources, "should find no resources")
+	assert.Equal(t, HealthUnknown, statusResult.AggregateStatus)
+}
