@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"sync"
 
 	"cuelang.org/go/cue"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -12,20 +11,26 @@ import (
 	"github.com/opmodel/cli/internal/output"
 )
 
-// Executor runs transformers in parallel.
-type Executor struct {
-	workers int
+// Executor runs transformer jobs sequentially.
+//
+// CUE's *cue.Context is not safe for concurrent use — multiple goroutines
+// calling FillPath on values from the same context causes adt.Vertex panics.
+// Since transformer and component values share a context (from config/module loading),
+// all CUE operations (FillPath, Decode, LookupPath) must run single-threaded.
+//
+// Sequential execution is the correct approach because:
+//   - CUE evaluation (FillPath + Decode) dominates job runtime
+//   - True parallelism requires isolated *cue.Context per worker, which requires
+//     re-loading entire CUE module graphs (expensive, complex)
+//   - For typical modules (5-15 jobs), sequential execution is fast enough
+type Executor struct{}
+
+// NewExecutor creates a new Executor.
+func NewExecutor(_ int) *Executor {
+	return &Executor{}
 }
 
-// NewExecutor creates a new Executor with the specified worker count.
-func NewExecutor(workers int) *Executor {
-	if workers < 1 {
-		workers = 1
-	}
-	return &Executor{workers: workers}
-}
-
-// Job is a unit of work for a worker.
+// Job is a unit of work: one transformer applied to one component.
 type Job struct {
 	Transformer *LoadedTransformer
 	Component   *LoadedComponent
@@ -46,7 +51,12 @@ type ExecuteResult struct {
 	Errors    []error
 }
 
-// ExecuteWithTransformers runs transformations with explicit transformer map.
+// ExecuteWithTransformers runs transformations sequentially.
+//
+// For each (transformer, component) pair from the match result, it:
+//  1. Looks up the transformer's #transform definition
+//  2. Injects #component and #context via FillPath
+//  3. Extracts and decodes the output as Kubernetes resources
 func (e *Executor) ExecuteWithTransformers(
 	ctx context.Context,
 	match *MatchResult,
@@ -55,6 +65,7 @@ func (e *Executor) ExecuteWithTransformers(
 ) *ExecuteResult {
 	result := &ExecuteResult{Resources: make([]*Resource, 0), Errors: make([]error, 0)}
 
+	// Build job list
 	var jobs []Job
 	for tfFQN, components := range match.ByTransformer {
 		transformer, ok := transformers[tfFQN]
@@ -75,36 +86,19 @@ func (e *Executor) ExecuteWithTransformers(
 		return result
 	}
 
-	output.Debug("executing jobs", "count", len(jobs), "workers", e.workers)
+	output.Debug("executing jobs", "count", len(jobs))
 
-	jobChan := make(chan Job, len(jobs))
-	resultChan := make(chan JobResult, len(jobs))
-
-	var wg sync.WaitGroup
-	workerCount := e.workers
-	if workerCount > len(jobs) {
-		workerCount = len(jobs)
-	}
-
-	for i := 0; i < workerCount; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			e.runWorker(ctx, jobChan, resultChan)
-		}()
-	}
-
+	// Execute sequentially — CUE context is not safe for concurrent use
 	for _, job := range jobs {
-		jobChan <- job
-	}
-	close(jobChan)
+		// Check for context cancellation between jobs
+		select {
+		case <-ctx.Done():
+			result.Errors = append(result.Errors, ctx.Err())
+			return result
+		default:
+		}
 
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	for jobResult := range resultChan {
+		jobResult := e.executeJob(job)
 		if jobResult.Error != nil {
 			result.Errors = append(result.Errors, jobResult.Error)
 			continue
@@ -122,18 +116,10 @@ func (e *Executor) ExecuteWithTransformers(
 	return result
 }
 
-func (e *Executor) runWorker(ctx context.Context, jobs <-chan Job, results chan<- JobResult) {
-	for job := range jobs {
-		select {
-		case <-ctx.Done():
-			results <- JobResult{Component: job.Component.Name, Transformer: job.Transformer.FQN, Error: ctx.Err()}
-			return
-		default:
-			results <- e.executeJob(job)
-		}
-	}
-}
-
+// executeJob executes a single transformer job.
+//
+// It injects the component value and context metadata into the transformer's
+// #transform definition via CUE FillPath, then extracts and decodes the output.
 func (e *Executor) executeJob(job Job) JobResult {
 	result := JobResult{
 		Component:   job.Component.Name,
@@ -143,7 +129,6 @@ func (e *Executor) executeJob(job Job) JobResult {
 
 	cueCtx := job.Transformer.Value.Context()
 
-	// Get the #transform from the transformer
 	transformValue := job.Transformer.Value.LookupPath(cue.ParsePath("#transform"))
 	if !transformValue.Exists() {
 		result.Error = &TransformError{
@@ -154,8 +139,7 @@ func (e *Executor) executeJob(job Job) JobResult {
 		return result
 	}
 
-	// Component.Value is already concrete from release building
-	// Use FillPath to inject #component directly
+	// Inject #component into the transformer
 	unified := transformValue.FillPath(cue.ParsePath("#component"), job.Component.Value)
 	if unified.Err() != nil {
 		result.Error = &TransformError{
@@ -166,15 +150,12 @@ func (e *Executor) executeJob(job Job) JobResult {
 		return result
 	}
 
-	// Build #context by filling individual fields
-	// We need to use regular field names, not definitions, since we're using Encode
+	// Build and inject #context
 	tfCtx := NewTransformerContext(job.Release, job.Component)
 
-	// Fill the regular fields first
 	unified = unified.FillPath(cue.ParsePath("#context.name"), cueCtx.Encode(tfCtx.Name))
 	unified = unified.FillPath(cue.ParsePath("#context.namespace"), cueCtx.Encode(tfCtx.Namespace))
 
-	// Fill the definition fields using the proper definition selector
 	moduleMetaMap := map[string]any{
 		"name":    tfCtx.ModuleMetadata.Name,
 		"version": tfCtx.ModuleMetadata.Version,
@@ -213,11 +194,10 @@ func (e *Executor) executeJob(job Job) JobResult {
 	// Extract output
 	outputValue := unified.LookupPath(cue.ParsePath("output"))
 	if !outputValue.Exists() {
-		// No output is valid - transformer doesn't apply
+		// No output is valid — transformer doesn't produce resources for this component
 		return result
 	}
 
-	// Check for errors in output (e.g., missing required fields)
 	if outputValue.Err() != nil {
 		result.Error = &TransformError{
 			ComponentName:  job.Component.Name,
@@ -227,7 +207,7 @@ func (e *Executor) executeJob(job Job) JobResult {
 		return result
 	}
 
-	// Decode output - handles three cases:
+	// Decode output — handles three cases:
 	// 1. List: iterate elements, decode each as a resource
 	// 2. Struct with apiVersion: single resource (e.g., Deployment)
 	// 3. Struct without apiVersion: map of resources keyed by name (e.g., PVC per volume)
@@ -314,7 +294,6 @@ func normalizeK8sResource(obj map[string]any) {
 				if initContainers, ok := templateSpec["initContainers"].([]any); ok {
 					normalizeContainers(initContainers)
 				}
-				// Convert volumes map to array
 				if volumes, ok := templateSpec["volumes"].(map[string]any); ok {
 					templateSpec["volumes"] = mapToVolumesArray(volumes)
 				}
@@ -331,7 +310,6 @@ func normalizeK8sResource(obj map[string]any) {
 						if initContainers, ok := templateSpec["initContainers"].([]any); ok {
 							normalizeContainers(initContainers)
 						}
-						// Convert volumes map to array
 						if volumes, ok := templateSpec["volumes"].(map[string]any); ok {
 							templateSpec["volumes"] = mapToVolumesArray(volumes)
 						}
@@ -349,15 +327,12 @@ func normalizeContainers(containers []any) {
 		if !ok {
 			continue
 		}
-		// Convert ports map to array
 		if ports, ok := container["ports"].(map[string]any); ok {
 			container["ports"] = mapToPortsArray(ports)
 		}
-		// Convert env map to array
 		if env, ok := container["env"].(map[string]any); ok {
 			container["env"] = mapToEnvArray(env)
 		}
-		// Convert volumeMounts map to array
 		if volumeMounts, ok := container["volumeMounts"].(map[string]any); ok {
 			container["volumeMounts"] = mapToVolumeMountsArray(volumeMounts)
 		}
@@ -365,11 +340,8 @@ func normalizeContainers(containers []any) {
 }
 
 // mapToPortsArray converts a map of port definitions to a Kubernetes ports array.
-// Input: {"http": {"name": "http", "targetPort": 80, "protocol": "TCP"}}
-// Output: [{"name": "http", "containerPort": 80, "protocol": "TCP"}]
 func mapToPortsArray(ports map[string]any) []any {
 	result := make([]any, 0, len(ports))
-	// Collect keys and sort for deterministic output
 	keys := make([]string, 0, len(ports))
 	for k := range ports {
 		keys = append(keys, k)
@@ -384,7 +356,6 @@ func mapToPortsArray(ports map[string]any) []any {
 		k8sPort := map[string]any{
 			"name": portName,
 		}
-		// Map targetPort to containerPort
 		if targetPort, ok := port["targetPort"]; ok {
 			k8sPort["containerPort"] = targetPort
 		}
@@ -397,11 +368,8 @@ func mapToPortsArray(ports map[string]any) []any {
 }
 
 // mapToEnvArray converts a map of env definitions to a Kubernetes env array.
-// Input: {"apiUrl": {"name": "API_URL", "value": "http://api:3000"}}
-// Output: [{"name": "API_URL", "value": "http://api:3000"}]
 func mapToEnvArray(env map[string]any) []any {
 	result := make([]any, 0, len(env))
-	// Collect keys and sort for deterministic output
 	keys := make([]string, 0, len(env))
 	for k := range env {
 		keys = append(keys, k)
@@ -413,15 +381,12 @@ func mapToEnvArray(env map[string]any) []any {
 		if !ok {
 			continue
 		}
-		// Copy the env var definition directly - it already has name/value
 		result = append(result, envVar)
 	}
 	return result
 }
 
 // normalizeAnnotations coerces all annotation values to strings.
-// CUE may decode booleans or numbers for annotations, but Kubernetes
-// requires annotations to be map[string]string.
 func normalizeAnnotations(obj map[string]any) {
 	metadata, ok := obj["metadata"].(map[string]any)
 	if !ok {
@@ -448,8 +413,6 @@ func normalizeAnnotations(obj map[string]any) {
 }
 
 // mapToVolumeMountsArray converts a map of volume mount definitions to a Kubernetes volumeMounts array.
-// Input:  {"config": {"name": "config", "mountPath": "/config"}, "data": {"name": "data", "mountPath": "/data"}}
-// Output: [{"name": "config", "mountPath": "/config"}, {"name": "data", "mountPath": "/data"}]
 func mapToVolumeMountsArray(volumeMounts map[string]any) []any {
 	result := make([]any, 0, len(volumeMounts))
 	keys := make([]string, 0, len(volumeMounts))
@@ -463,7 +426,6 @@ func mapToVolumeMountsArray(volumeMounts map[string]any) []any {
 		if !ok {
 			continue
 		}
-		// Ensure the name field is set (use the map key if not present)
 		if _, hasName := vm["name"]; !hasName {
 			vm["name"] = key
 		}
@@ -473,8 +435,6 @@ func mapToVolumeMountsArray(volumeMounts map[string]any) []any {
 }
 
 // mapToVolumesArray converts a map of volume definitions to a Kubernetes volumes array.
-// Input:  {"config": {"name": "config", "persistentVolumeClaim": {"claimName": "config"}}}
-// Output: [{"name": "config", "persistentVolumeClaim": {"claimName": "config"}}]
 func mapToVolumesArray(volumes map[string]any) []any {
 	result := make([]any, 0, len(volumes))
 	keys := make([]string, 0, len(volumes))
@@ -488,7 +448,6 @@ func mapToVolumesArray(volumes map[string]any) []any {
 		if !ok {
 			continue
 		}
-		// Ensure the name field is set (use the map key if not present)
 		if _, hasName := vol["name"]; !hasName {
 			vol["name"] = key
 		}

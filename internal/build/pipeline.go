@@ -3,8 +3,13 @@ package build
 
 import (
 	"context"
-	"runtime"
+	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
+
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/load"
 
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
@@ -13,10 +18,9 @@ import (
 
 // pipeline implements the Pipeline interface.
 // It orchestrates module loading, release building, provider loading,
-// component matching, and parallel transformer execution.
+// component matching, and transformer execution.
 type pipeline struct {
 	config         *config.OPMConfig
-	module         *ModuleLoader
 	releaseBuilder *ReleaseBuilder
 	provider       *ProviderLoader
 	matcher        *Matcher
@@ -28,19 +32,18 @@ type pipeline struct {
 func NewPipeline(cfg *config.OPMConfig) Pipeline {
 	return &pipeline{
 		config:         cfg,
-		module:         NewModuleLoader(cfg.CueContext),
 		releaseBuilder: NewReleaseBuilder(cfg.CueContext, cfg.Registry),
 		provider:       NewProviderLoader(cfg),
 		matcher:        NewMatcher(),
-		executor:       NewExecutor(runtime.NumCPU()),
+		executor:       NewExecutor(0),
 	}
 }
 
 // Render executes the pipeline and returns results.
 //
 // The render process follows these phases:
-//  1. Load module and values (ModuleLoader)
-//  2. Build #ModuleRelease with concrete components (ReleaseBuilder)
+//  1. Resolve module path and extract metadata (name, namespace)
+//  2. Build #ModuleRelease via CUE overlay (loads module with overlay + values)
 //  3. Load provider and transformers (ProviderLoader)
 //  4. Match components to transformers (Matcher)
 //  5. Execute transformers in parallel (Executor)
@@ -54,21 +57,31 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		return nil, err
 	}
 
-	// Phase 1: Load raw module and values
-	module, err := p.module.Load(ctx, opts)
+	// Phase 1: Resolve module path and extract metadata
+	modulePath, err := p.resolveModulePath(opts.ModulePath)
 	if err != nil {
-		return nil, err // Fatal: module loading failed
+		return nil, err
 	}
 
-	// Phase 2: Build #ModuleRelease (makes components concrete)
+	moduleMeta, err := p.extractModuleMetadata(modulePath, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	// Phase 2: Build #ModuleRelease (loads module with overlay, unifies values)
 	releaseName := opts.Name
 	if releaseName == "" {
-		releaseName = module.Name
+		releaseName = moduleMeta.name
 	}
-	release, err := p.releaseBuilder.Build(module.Value, ReleaseOptions{
+	namespace := p.resolveNamespace(opts.Namespace, moduleMeta.defaultNamespace)
+	if namespace == "" {
+		return nil, &NamespaceRequiredError{ModuleName: moduleMeta.name}
+	}
+
+	release, err := p.releaseBuilder.Build(modulePath, ReleaseOptions{
 		Name:      releaseName,
-		Namespace: module.Namespace,
-	})
+		Namespace: namespace,
+	}, opts.Values)
 	if err != nil {
 		return nil, err // Fatal: release building failed (likely incomplete values)
 	}
@@ -140,6 +153,102 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	}, nil
 }
 
+// moduleMetadataPreview contains lightweight module metadata extracted
+// before the full overlay build. Used for name/namespace resolution.
+type moduleMetadataPreview struct {
+	name             string
+	defaultNamespace string
+}
+
+// resolveModulePath validates and resolves the module directory path.
+func (p *pipeline) resolveModulePath(modulePath string) (string, error) {
+	absPath, err := filepath.Abs(modulePath)
+	if err != nil {
+		return "", fmt.Errorf("resolving module path: %w", err)
+	}
+
+	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+		return "", fmt.Errorf("module directory not found: %s", absPath)
+	}
+
+	cueModPath := filepath.Join(absPath, "cue.mod")
+	if _, err := os.Stat(cueModPath); os.IsNotExist(err) {
+		return "", fmt.Errorf("not a CUE module: missing cue.mod/ directory in %s", absPath)
+	}
+
+	valuesPath := filepath.Join(absPath, "values.cue")
+	if _, err := os.Stat(valuesPath); os.IsNotExist(err) {
+		return "", fmt.Errorf("values.cue required but not found in %s", absPath)
+	}
+
+	return absPath, nil
+}
+
+// extractModuleMetadata does a lightweight CUE load to extract module name
+// and defaultNamespace without building the full module release.
+func (p *pipeline) extractModuleMetadata(modulePath string, opts RenderOptions) (*moduleMetadataPreview, error) {
+	// Set CUE_REGISTRY if provided
+	if opts.Registry != "" {
+		os.Setenv("CUE_REGISTRY", opts.Registry)
+		defer os.Unsetenv("CUE_REGISTRY")
+	}
+
+	cfg := &load.Config{Dir: modulePath}
+	instances := load.Instances([]string{"."}, cfg)
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("no CUE instances found in %s", modulePath)
+	}
+
+	inst := instances[0]
+	if inst.Err != nil {
+		return nil, fmt.Errorf("loading module: %w", inst.Err)
+	}
+
+	value := p.releaseBuilder.cueCtx.BuildInstance(inst)
+	if value.Err() != nil {
+		return nil, fmt.Errorf("building module: %w", value.Err())
+	}
+
+	meta := &moduleMetadataPreview{}
+
+	// Extract name from metadata
+	for _, path := range []string{"metadata.name", "module.metadata.name"} {
+		if v := value.LookupPath(cue.ParsePath(path)); v.Exists() {
+			if str, err := v.String(); err == nil {
+				meta.name = str
+				break
+			}
+		}
+	}
+
+	// Extract defaultNamespace from metadata
+	for _, path := range []string{"metadata.defaultNamespace", "module.metadata.defaultNamespace"} {
+		if v := value.LookupPath(cue.ParsePath(path)); v.Exists() {
+			if str, err := v.String(); err == nil {
+				meta.defaultNamespace = str
+				break
+			}
+		}
+	}
+
+	output.Debug("extracted module metadata",
+		"name", meta.name,
+		"defaultNamespace", meta.defaultNamespace,
+	)
+
+	return meta, nil
+}
+
+// resolveNamespace resolves the target namespace using precedence:
+// 1. --namespace flag (highest)
+// 2. module.metadata.defaultNamespace
+func (p *pipeline) resolveNamespace(flagValue, defaultNamespace string) string {
+	if flagValue != "" {
+		return flagValue
+	}
+	return defaultNamespace
+}
+
 // componentsToSlice converts component map to slice for matcher
 func (p *pipeline) componentsToSlice(m map[string]*LoadedComponent) []*LoadedComponent {
 	result := make([]*LoadedComponent, 0, len(m))
@@ -205,7 +314,6 @@ func collectWarnings(result *MatchResult, strict bool) []string {
 		for componentName, traitCounts := range traitUnhandledCount {
 			matchCount := componentMatchCount[componentName]
 			for trait, unhandledCount := range traitCounts {
-				// If unhandledCount equals matchCount, no transformer handled this trait
 				if unhandledCount == matchCount {
 					warnings = append(warnings,
 						"component "+componentName+": unhandled trait "+trait)

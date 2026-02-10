@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestReleaseBuilder_Build(t *testing.T) {
+func TestReleaseBuilder_BuildFromValue(t *testing.T) {
 	ctx := cuecontext.New()
 	builder := NewReleaseBuilder(ctx, "")
 
@@ -82,7 +82,7 @@ func TestReleaseBuilder_Build(t *testing.T) {
 			moduleValue := ctx.CompileString(tt.cue)
 			require.NoError(t, moduleValue.Err())
 
-			release, err := builder.Build(moduleValue, tt.opts)
+			release, err := builder.BuildFromValue(moduleValue, tt.opts)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -118,7 +118,7 @@ func TestReleaseBuilder_ExtractMetadata(t *testing.T) {
 	}`)
 	require.NoError(t, moduleValue.Err())
 
-	release, err := builder.Build(moduleValue, ReleaseOptions{
+	release, err := builder.BuildFromValue(moduleValue, ReleaseOptions{
 		Name:      "my-release",
 		Namespace: "production",
 	})
@@ -129,11 +129,13 @@ func TestReleaseBuilder_ExtractMetadata(t *testing.T) {
 	assert.Equal(t, "1.0.0", release.Metadata.Version)
 }
 
-func TestReleaseBuilder_ExtractMetadata_ReleaseIdentityFromLabels(t *testing.T) {
+func TestReleaseBuilder_ExtractMetadata_LegacyPathNoReleaseIdentity(t *testing.T) {
 	ctx := cuecontext.New()
 	builder := NewReleaseBuilder(ctx, "")
 
-	// Module with release-id label (as would be set by CUE catalog schema)
+	// Module with release-id label — BuildFromValue (legacy path) does NOT extract
+	// ReleaseIdentity from labels. Release identity is only computed by the CUE overlay
+	// in the Build() path. The label is still preserved in the Labels map.
 	moduleValue := ctx.CompileString(`{
 		metadata: {
 			name: "test-module"
@@ -151,7 +153,7 @@ func TestReleaseBuilder_ExtractMetadata_ReleaseIdentityFromLabels(t *testing.T) 
 	}`)
 	require.NoError(t, moduleValue.Err())
 
-	release, err := builder.Build(moduleValue, ReleaseOptions{
+	release, err := builder.BuildFromValue(moduleValue, ReleaseOptions{
 		Name:      "my-release",
 		Namespace: "production",
 	})
@@ -160,10 +162,10 @@ func TestReleaseBuilder_ExtractMetadata_ReleaseIdentityFromLabels(t *testing.T) 
 	// Verify module identity is extracted from metadata.identity
 	assert.Equal(t, "abc123-module-identity", release.Metadata.Identity)
 
-	// Verify release identity is extracted from labels
-	assert.Equal(t, "550e8400-e29b-41d4-a716-446655440000", release.Metadata.ReleaseIdentity)
+	// ReleaseIdentity is NOT populated in legacy path — only computed by CUE overlay
+	assert.Empty(t, release.Metadata.ReleaseIdentity)
 
-	// Verify the label is also in the Labels map
+	// But the label is still present in the Labels map
 	assert.Equal(t, "550e8400-e29b-41d4-a716-446655440000", release.Metadata.Labels["module-release.opmodel.dev/uuid"])
 }
 
@@ -184,7 +186,7 @@ func TestReleaseBuilder_ExtractMetadata_NoReleaseIdentity(t *testing.T) {
 	}`)
 	require.NoError(t, moduleValue.Err())
 
-	release, err := builder.Build(moduleValue, ReleaseOptions{
+	release, err := builder.BuildFromValue(moduleValue, ReleaseOptions{
 		Name:      "my-release",
 		Namespace: "production",
 	})
