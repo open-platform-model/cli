@@ -18,17 +18,19 @@
 
 ## Bugfix
 
-- [ ] Running "opm mod apply" on an already applied resource should showcase that, not just outputting the same.
+- [ ] Running "opm mod apply" on an already applied resource should not reply "✔ Module applied" it should reply something more approriate that there was NO change made.
   - Example:
 
     ```bash
-    2026/02/10 10:14:49 INFO <output/log.go:38> applying 5 resources
-    2026/02/10 10:14:49 INFO <output/log.go:38>   PersistentVolumeClaim/config applied
-    2026/02/10 10:14:49 INFO <output/log.go:38>   PersistentVolumeClaim/tvshows applied
-    2026/02/10 10:14:49 INFO <output/log.go:38>   PersistentVolumeClaim/movies applied
-    2026/02/10 10:14:49 INFO <output/log.go:38>   Service/jellyfin applied
-    2026/02/10 10:14:49 INFO <output/log.go:38>   StatefulSet/jellyfin applied
-    2026/02/10 10:14:49 INFO <output/log.go:38> apply complete: 5 resources applied
+    ❯ opm mod apply . --name jellyfin --namespace default
+    10:56:47 INFO m:jellyfin >: applying 5 resources
+    r:PersistentVolumeClaim/default/config            unchanged
+    r:PersistentVolumeClaim/default/tvshows           unchanged
+    r:PersistentVolumeClaim/default/movies            unchanged
+    r:Service/default/jellyfin                        unchanged
+    r:StatefulSet/default/jellyfin                    unchanged
+    10:56:47 INFO m:jellyfin >: applied 5 resources successfully
+    ✔ Module applied
     ```
 
 - [ ] Update the CLI kubernetes SDK to 1.34+
