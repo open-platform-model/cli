@@ -18,6 +18,19 @@
 
 ## Bugfix
 
+- [ ] Running "opm mod apply" on an already applied resource should showcase that, not just outputting the same.
+  - Example:
+
+    ```bash
+    2026/02/10 10:14:49 INFO <output/log.go:38> applying 5 resources
+    2026/02/10 10:14:49 INFO <output/log.go:38>   PersistentVolumeClaim/config applied
+    2026/02/10 10:14:49 INFO <output/log.go:38>   PersistentVolumeClaim/tvshows applied
+    2026/02/10 10:14:49 INFO <output/log.go:38>   PersistentVolumeClaim/movies applied
+    2026/02/10 10:14:49 INFO <output/log.go:38>   Service/jellyfin applied
+    2026/02/10 10:14:49 INFO <output/log.go:38>   StatefulSet/jellyfin applied
+    2026/02/10 10:14:49 INFO <output/log.go:38> apply complete: 5 resources applied
+    ```
+
 - [ ] Update the CLI kubernetes SDK to 1.34+
   - Fix warnings like "Warning: v1 ComponentStatus is deprecated in v1.19+" and "Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice" while we are at it. This is caused by the transformers output is of an older k8s version.
 
