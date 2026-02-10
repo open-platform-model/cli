@@ -196,3 +196,112 @@ func TestExtractConfig_Empty(t *testing.T) {
 	// This test verifies default values are returned for empty CUE value
 	// In practice, extractConfig is called with loaded CUE values
 }
+
+func TestExtractConfig_LogTimestampsFalse(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "log-config-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Create a minimal CUE module
+	modDir := filepath.Join(tmpDir, "cue.mod")
+	require.NoError(t, os.MkdirAll(modDir, 0o755))
+	modCue := `module: "test.local/config@v0"
+
+language: {
+	version: "v0.15.0"
+}
+`
+	require.NoError(t, os.WriteFile(filepath.Join(modDir, "module.cue"), []byte(modCue), 0o644))
+
+	configPath := filepath.Join(tmpDir, "config.cue")
+	content := `package config
+
+config: {
+	log: {
+		timestamps: false
+	}
+	kubernetes: {
+		kubeconfig: "~/.kube/config"
+		namespace: "default"
+	}
+}
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
+
+	cfg, _, _, err := loadFullConfig(configPath, "")
+	require.NoError(t, err)
+	require.NotNil(t, cfg.Log.Timestamps, "Log.Timestamps should not be nil")
+	assert.False(t, *cfg.Log.Timestamps, "Log.Timestamps should be false")
+}
+
+func TestExtractConfig_NoLogSection(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "log-config-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Create a minimal CUE module
+	modDir := filepath.Join(tmpDir, "cue.mod")
+	require.NoError(t, os.MkdirAll(modDir, 0o755))
+	modCue := `module: "test.local/config@v0"
+
+language: {
+	version: "v0.15.0"
+}
+`
+	require.NoError(t, os.WriteFile(filepath.Join(modDir, "module.cue"), []byte(modCue), 0o644))
+
+	configPath := filepath.Join(tmpDir, "config.cue")
+	content := `package config
+
+config: {
+	kubernetes: {
+		kubeconfig: "~/.kube/config"
+		namespace: "default"
+	}
+}
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
+
+	cfg, _, _, err := loadFullConfig(configPath, "")
+	require.NoError(t, err)
+	assert.Nil(t, cfg.Log.Timestamps, "Log.Timestamps should be nil when not configured (defaults handled by caller)")
+}
+
+func TestExtractConfig_LogTimestampsInvalidType(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "log-config-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Create a minimal CUE module
+	modDir := filepath.Join(tmpDir, "cue.mod")
+	require.NoError(t, os.MkdirAll(modDir, 0o755))
+	modCue := `module: "test.local/config@v0"
+
+language: {
+	version: "v0.15.0"
+}
+`
+	require.NoError(t, os.WriteFile(filepath.Join(modDir, "module.cue"), []byte(modCue), 0o644))
+
+	configPath := filepath.Join(tmpDir, "config.cue")
+	content := `package config
+
+config: {
+	log: {
+		timestamps: "yes"
+	}
+	kubernetes: {
+		kubeconfig: "~/.kube/config"
+		namespace: "default"
+	}
+}
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
+
+	cfg, _, _, err := loadFullConfig(configPath, "")
+	// CUE itself won't fail on "yes" as a string (it's valid CUE), but our
+	// extractor uses Bool() which will fail for a string value, so timestamps
+	// will remain nil (treated as default true by the caller).
+	require.NoError(t, err)
+	assert.Nil(t, cfg.Log.Timestamps, "Log.Timestamps should be nil when value is not a bool")
+}

@@ -144,3 +144,88 @@ func TestGvrFromObject_CoreGroup(t *testing.T) {
 	assert.Equal(t, "v1", gvr.Version)
 	assert.Equal(t, "services", gvr.Resource)
 }
+
+func TestInjectLabels_WithIdentity(t *testing.T) {
+	obj := &unstructured.Unstructured{}
+	obj.SetAPIVersion("apps/v1")
+	obj.SetKind("Deployment")
+	obj.SetName("test-deploy")
+	obj.SetNamespace("default")
+
+	res := &build.Resource{
+		Object:      obj,
+		Component:   "web-server",
+		Transformer: "opmodel.dev/transformers/kubernetes@v0#DeploymentTransformer",
+	}
+
+	meta := build.ModuleMetadata{
+		Name:            "my-app",
+		Namespace:       "production",
+		Version:         "1.0.0",
+		Identity:        "module-uuid-1234",
+		ReleaseIdentity: "release-uuid-5678",
+	}
+
+	injectLabels(res, meta)
+
+	labels := obj.GetLabels()
+	assert.Equal(t, "module-uuid-1234", labels[LabelModuleID])
+	assert.Equal(t, "release-uuid-5678", labels[LabelReleaseID])
+}
+
+func TestInjectLabels_WithoutIdentity(t *testing.T) {
+	obj := &unstructured.Unstructured{}
+	obj.SetAPIVersion("apps/v1")
+	obj.SetKind("Deployment")
+	obj.SetName("test-deploy")
+
+	res := &build.Resource{Object: obj}
+
+	meta := build.ModuleMetadata{
+		Name:            "my-app",
+		Namespace:       "production",
+		Identity:        "", // Empty identity
+		ReleaseIdentity: "", // Empty release identity
+	}
+
+	injectLabels(res, meta)
+
+	labels := obj.GetLabels()
+	_, hasModuleID := labels[LabelModuleID]
+	_, hasReleaseID := labels[LabelReleaseID]
+	assert.False(t, hasModuleID, "should not have module-id label when identity is empty")
+	assert.False(t, hasReleaseID, "should not have release-id label when release identity is empty")
+}
+
+func TestInjectLabels_PreservesExistingWithIdentity(t *testing.T) {
+	obj := &unstructured.Unstructured{}
+	obj.SetLabels(map[string]string{
+		"existing-label": "existing-value",
+		"user-label":     "user-value",
+	})
+
+	res := &build.Resource{
+		Object:    obj,
+		Component: "api",
+	}
+
+	meta := build.ModuleMetadata{
+		Name:            "svc",
+		Namespace:       "ns",
+		Identity:        "mod-id",
+		ReleaseIdentity: "rel-id",
+	}
+
+	injectLabels(res, meta)
+
+	labels := obj.GetLabels()
+	// User labels preserved
+	assert.Equal(t, "existing-value", labels["existing-label"])
+	assert.Equal(t, "user-value", labels["user-label"])
+	// OPM labels added
+	assert.Equal(t, "open-platform-model", labels[LabelManagedBy])
+	assert.Equal(t, "svc", labels[LabelModuleName])
+	// Identity labels added
+	assert.Equal(t, "mod-id", labels[LabelModuleID])
+	assert.Equal(t, "rel-id", labels[LabelReleaseID])
+}

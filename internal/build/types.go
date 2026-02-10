@@ -164,6 +164,15 @@ type ModuleMetadata struct {
 	// Components lists the component names in the module.
 	// Useful for understanding scope of render.
 	Components []string
+
+	// Identity is the module identity UUID (from #Module.metadata.identity).
+	// Empty string if the module was built from an older catalog without identity support.
+	Identity string
+
+	// ReleaseIdentity is the release identity UUID.
+	// Computed from the module FQN, release name, and namespace.
+	// Empty string if identity computation was skipped (e.g., missing FQN).
+	ReleaseIdentity string
 }
 
 // MatchPlan describes the transformer-component matching results.

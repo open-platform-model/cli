@@ -52,3 +52,35 @@ func TestRenderOptionsValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestPipeline_IdentityFieldsPropagated(t *testing.T) {
+	// This test verifies that Identity and ReleaseIdentity fields
+	// are properly propagated from ReleaseMetadata to ModuleMetadata
+	// through the releaseToModuleMetadata function.
+
+	release := &BuiltRelease{
+		Components: map[string]*LoadedComponent{
+			"web": {Name: "web"},
+		},
+		Metadata: ReleaseMetadata{
+			Name:            "my-app",
+			Namespace:       "production",
+			Version:         "1.0.0",
+			FQN:             "example.com/modules/app@v1",
+			Labels:          map[string]string{"env": "prod"},
+			Identity:        "module-uuid-1234",
+			ReleaseIdentity: "release-uuid-5678",
+		},
+	}
+
+	p := &pipeline{}
+	meta := p.releaseToModuleMetadata(release)
+
+	assert.Equal(t, "my-app", meta.Name)
+	assert.Equal(t, "production", meta.Namespace)
+	assert.Equal(t, "1.0.0", meta.Version)
+	assert.Equal(t, "module-uuid-1234", meta.Identity, "Identity should be propagated")
+	assert.Equal(t, "release-uuid-5678", meta.ReleaseIdentity, "ReleaseIdentity should be propagated")
+	assert.Equal(t, map[string]string{"env": "prod"}, meta.Labels)
+	assert.Contains(t, meta.Components, "web")
+}

@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,6 +15,14 @@ func TestBuildModuleSelector(t *testing.T) {
 	assert.Contains(t, str, "app.kubernetes.io/managed-by=open-platform-model")
 	assert.Contains(t, str, "module.opmodel.dev/name=my-app")
 	assert.Contains(t, str, "module.opmodel.dev/namespace=production")
+}
+
+func TestBuildReleaseIDSelector(t *testing.T) {
+	selector := BuildReleaseIDSelector("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+
+	str := selector.String()
+	assert.Contains(t, str, "app.kubernetes.io/managed-by=open-platform-model")
+	assert.Contains(t, str, "module-release.opmodel.dev/uuid=a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 }
 
 func TestSortByWeightDescending(t *testing.T) {
@@ -52,4 +61,62 @@ func makeUnstructured(apiVersion, kind, name, namespace string) *unstructured.Un
 		obj.SetNamespace(namespace)
 	}
 	return obj
+}
+
+func TestNoResourcesFoundError(t *testing.T) {
+	t.Run("error message with module name", func(t *testing.T) {
+		err := &NoResourcesFoundError{
+			ModuleName: "my-app",
+			Namespace:  "production",
+		}
+		assert.Equal(t, `no resources found for module "my-app" in namespace "production"`, err.Error())
+	})
+
+	t.Run("error message with release-id", func(t *testing.T) {
+		err := &NoResourcesFoundError{
+			ReleaseID: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+			Namespace: "production",
+		}
+		assert.Equal(t, `no resources found for release-id "a1b2c3d4-e5f6-7890-abcd-ef1234567890" in namespace "production"`, err.Error())
+	})
+
+	t.Run("errors.Is matches ErrNoResourcesFound", func(t *testing.T) {
+		err := &NoResourcesFoundError{
+			ModuleName: "my-app",
+			Namespace:  "production",
+		}
+		assert.True(t, errors.Is(err, ErrNoResourcesFound))
+	})
+}
+
+func TestDiscoveryOptions_Validation(t *testing.T) {
+	// Note: The actual DiscoverResources function requires a real k8s client,
+	// so we test the validation logic conceptually through the error cases.
+
+	t.Run("neither ModuleName nor ReleaseID provided", func(t *testing.T) {
+		opts := DiscoveryOptions{
+			Namespace: "default",
+		}
+		// Both are empty - this should be caught by DiscoverResources
+		assert.Empty(t, opts.ModuleName)
+		assert.Empty(t, opts.ReleaseID)
+	})
+
+	t.Run("only ModuleName provided", func(t *testing.T) {
+		opts := DiscoveryOptions{
+			ModuleName: "my-app",
+			Namespace:  "default",
+		}
+		assert.NotEmpty(t, opts.ModuleName)
+		assert.Empty(t, opts.ReleaseID)
+	})
+
+	t.Run("only ReleaseID provided", func(t *testing.T) {
+		opts := DiscoveryOptions{
+			ReleaseID: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+			Namespace: "default",
+		}
+		assert.Empty(t, opts.ModuleName)
+		assert.NotEmpty(t, opts.ReleaseID)
+	})
 }

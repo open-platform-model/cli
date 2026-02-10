@@ -25,8 +25,8 @@ type TableStyle struct {
 func DefaultTableStyle() TableStyle {
 	return TableStyle{
 		Border:      lipgloss.NormalBorder(),
-		BorderColor: lipgloss.Color("240"),
-		HeaderStyle: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12")),
+		BorderColor: ColorDimGray,
+		HeaderStyle: lipgloss.NewStyle().Bold(true).Foreground(ColorCyan),
 		CellStyle:   lipgloss.NewStyle(),
 	}
 }

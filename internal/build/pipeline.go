@@ -156,11 +156,13 @@ func (p *pipeline) releaseToModuleMetadata(release *BuiltRelease) ModuleMetadata
 		names = append(names, name)
 	}
 	return ModuleMetadata{
-		Name:       release.Metadata.Name,
-		Namespace:  release.Metadata.Namespace,
-		Version:    release.Metadata.Version,
-		Labels:     release.Metadata.Labels,
-		Components: names,
+		Name:            release.Metadata.Name,
+		Namespace:       release.Metadata.Namespace,
+		Version:         release.Metadata.Version,
+		Labels:          release.Metadata.Labels,
+		Components:      names,
+		Identity:        release.Metadata.Identity,
+		ReleaseIdentity: release.Metadata.ReleaseIdentity,
 	}
 }
 

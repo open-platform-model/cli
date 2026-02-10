@@ -20,6 +20,13 @@ type KubernetesConfig struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
+// LogConfig contains logging-related settings.
+type LogConfig struct {
+	// Timestamps controls whether timestamps are shown in log output.
+	// Default: true. Override with --timestamps flag.
+	Timestamps *bool `json:"timestamps,omitempty"`
+}
+
 // Config represents the OPM CLI configuration.
 // Loaded from ~/.opm/config.cue, validated against embedded CUE schema.
 type Config struct {
@@ -30,6 +37,9 @@ type Config struct {
 
 	// Kubernetes contains Kubernetes-specific settings.
 	Kubernetes KubernetesConfig `json:"kubernetes,omitempty"`
+
+	// Log contains logging-related settings.
+	Log LogConfig `json:"log,omitempty"`
 }
 
 // DefaultConfig returns a Config with all default values populated.

@@ -73,8 +73,10 @@ A developer wants to delete a deployed module after deleting the source files.
 | FR-D-022 | `mod delete` MUST delete in descending weight order. |
 | FR-D-023 | `mod delete` MUST support `--force` to skip confirmation. |
 | FR-D-024 | `mod delete` MUST support `--dry-run` to preview. |
-| FR-D-025 | `mod delete` MUST require `--name` and `-n` for identification. |
+| FR-D-025 | `mod delete` MUST require at least one of `--name` or `--release-id` for identification. The `--namespace` / `-n` flag remains required in all cases. |
 | FR-D-026 | `mod delete` MUST prompt for confirmation (unless --force). |
+| FR-D-027 | `mod delete` MUST support `--release-id` flag for discovery by release identity UUID. |
+| FR-D-028 | `mod delete` MUST use dual-strategy discovery (both release-id and name+namespace selectors) when both are available, returning the union of results deduplicated by resource UID. |
 
 ### Kubernetes Integration
 
@@ -94,6 +96,8 @@ A developer wants to delete a deployed module after deleting the source files.
 | FR-D-062 | All resources MUST have `module.opmodel.dev/namespace: <ns>`. |
 | FR-D-063 | All resources MUST have `module.opmodel.dev/version: <version>`. |
 | FR-D-064 | All resources MUST have `component.opmodel.dev/name: <component>`. |
+| FR-D-065 | All resources MUST have `module-release.opmodel.dev/uuid: <release-uuid>` when the release identity is available. |
+| FR-D-066 | All resources MUST have `module.opmodel.dev/uuid: <module-uuid>` when the module identity is available. |
 
 ---
 
@@ -125,6 +129,8 @@ A developer wants to delete a deployed module after deleting the source files.
 | Field conflict | Log warning, take ownership |
 | Module source deleted | `mod delete` works via labels |
 | Empty RenderResult | Success (nothing to apply) |
+| Delete with neither --name nor --release-id | Return validation error: "either --name or --release-id is required" |
+| Catalog without identity support | Identity labels omitted; existing labeling unchanged |
 
 ---
 
@@ -157,7 +163,8 @@ opm mod delete [flags]
 
 Flags:
   -n, --namespace string    Target namespace (required)
-      --name string         Module name (required)
+      --name string         Module name (required if --release-id not provided)
+      --release-id string   Release identity UUID (required if --name not provided)
       --force               Skip confirmation prompt
       --dry-run             Preview without deleting
       --wait                Wait for resources to be deleted

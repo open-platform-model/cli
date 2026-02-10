@@ -14,10 +14,15 @@ import (
 // DeleteOptions configures a delete operation.
 type DeleteOptions struct {
 	// ModuleName is the module name to delete.
+	// Mutually exclusive with ReleaseID.
 	ModuleName string
 
 	// Namespace is the namespace to search for resources.
 	Namespace string
+
+	// ReleaseID is the release identity UUID for discovery.
+	// Mutually exclusive with ModuleName.
+	ReleaseID string
 
 	// DryRun previews resources to delete without removing them.
 	DryRun bool
@@ -40,20 +45,36 @@ type DeleteResult struct {
 
 // Delete removes all resources belonging to a module deployment.
 // Resources are discovered via OPM labels and deleted in reverse weight order.
+// Returns NoResourcesFoundError when no resources match the selector.
 func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteResult, error) {
 	result := &DeleteResult{}
 
+	// Use module name for logging if available, otherwise use ReleaseID
+	logName := opts.ModuleName
+	if logName == "" {
+		logName = fmt.Sprintf("release-id:%s", opts.ReleaseID)
+	}
+	modLog := output.ModuleLogger(logName)
+
 	// Discover resources via labels
-	resources, err := DiscoverResources(ctx, client, opts.ModuleName, opts.Namespace)
+	resources, err := DiscoverResources(ctx, client, DiscoveryOptions{
+		ModuleName: opts.ModuleName,
+		Namespace:  opts.Namespace,
+		ReleaseID:  opts.ReleaseID,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("discovering module resources: %w", err)
 	}
 
 	result.Resources = resources
 
+	// Return error when no resources found
 	if len(resources) == 0 {
-		output.Info("no resources found for module")
-		return result, nil
+		return nil, &NoResourcesFoundError{
+			ModuleName: opts.ModuleName,
+			ReleaseID:  opts.ReleaseID,
+			Namespace:  opts.Namespace,
+		}
 	}
 
 	// Sort in reverse weight order (highest weight first = delete webhooks before deployments)
@@ -66,17 +87,13 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 		ns := res.GetNamespace()
 
 		if opts.DryRun {
-			if ns != "" {
-				output.Info(fmt.Sprintf("  %s/%s in %s (would delete)", kind, name, ns))
-			} else {
-				output.Info(fmt.Sprintf("  %s/%s (would delete)", kind, name))
-			}
+			output.Println(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
 			result.Deleted++
 			continue
 		}
 
 		if err := deleteResource(ctx, client, res); err != nil {
-			output.Warn(fmt.Sprintf("deleting %s/%s: %v", kind, name, err))
+			modLog.Warn(fmt.Sprintf("deleting %s/%s: %v", kind, name, err))
 			result.Errors = append(result.Errors, ResourceError{
 				Kind:      kind,
 				Name:      name,
@@ -86,11 +103,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 			continue
 		}
 
-		if ns != "" {
-			output.Info(fmt.Sprintf("  %s/%s in %s deleted", kind, name, ns))
-		} else {
-			output.Info(fmt.Sprintf("  %s/%s deleted", kind, name))
-		}
+		output.Println(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
 		result.Deleted++
 	}
 

@@ -18,6 +18,7 @@ var (
 	verboseFlag      bool
 	registryFlag     string
 	providerFlag     string
+	timestampsFlag   bool
 
 	// Resolved configuration (loaded during PersistentPreRunE)
 	resolvedRegistry string
@@ -45,6 +46,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.PersistentFlags().BoolVarP(&verboseFlag, "verbose", "v", false, "Enable verbose output")
 	rootCmd.PersistentFlags().StringVar(&registryFlag, "registry", "", "CUE registry URL (env: OPM_REGISTRY)")
 	rootCmd.PersistentFlags().StringVar(&providerFlag, "provider", "", "Provider to use for operations")
+	rootCmd.PersistentFlags().BoolVar(&timestampsFlag, "timestamps", true, "Show timestamps in log output")
 
 	// Add subcommands
 	rootCmd.AddCommand(NewModCmd())
@@ -55,11 +57,8 @@ func NewRootCmd() *cobra.Command {
 }
 
 // initializeGlobals sets up logging and loads configuration.
-func initializeGlobals(_ *cobra.Command) error {
-	// Setup logging based on verbose flag
-	output.SetupLogging(verboseFlag)
-
-	// Load configuration with registry resolution
+func initializeGlobals(cmd *cobra.Command) error {
+	// Load configuration first so we can use config values for logging setup
 	opmConfig, err := config.LoadOPMConfig(config.LoaderOptions{
 		RegistryFlag: registryFlag,
 		ConfigFlag:   configFlag,
@@ -67,13 +66,29 @@ func initializeGlobals(_ *cobra.Command) error {
 	if err != nil {
 		output.Debug("config load error", "error", err)
 		// Don't fail here - allow commands that don't need config to work
-		// Individual commands will fail if they need config but it's missing
 	}
 
 	// Store resolved registry
 	if opmConfig != nil {
 		resolvedRegistry = opmConfig.Registry
 	}
+
+	// Build LogConfig with precedence: flag > config > default(true)
+	logCfg := output.LogConfig{
+		Verbose: verboseFlag,
+	}
+
+	// Resolve timestamps: flag (if explicitly set) > config > default (nil = true)
+	if cmd.Flags().Changed("timestamps") {
+		// Flag was explicitly set by user
+		logCfg.Timestamps = output.BoolPtr(timestampsFlag)
+	} else if opmConfig != nil && opmConfig.Config != nil && opmConfig.Config.Log.Timestamps != nil {
+		// Config has a value
+		logCfg.Timestamps = opmConfig.Config.Log.Timestamps
+	}
+	// else: nil means SetupLogging defaults to true
+
+	output.SetupLogging(logCfg)
 
 	// Log config resolution at DEBUG level
 	if verboseFlag {

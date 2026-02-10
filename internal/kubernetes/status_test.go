@@ -58,11 +58,6 @@ func TestFormatStatus_YAML(t *testing.T) {
 	assert.Contains(t, formatted, "status: Ready")
 }
 
-func TestNoResourcesMessage(t *testing.T) {
-	msg := NoResourcesMessage("my-app", "production")
-	assert.Equal(t, `No resources found for module "my-app" in namespace "production"`, msg)
-}
-
 func TestFormatDuration(t *testing.T) {
 	tests := []struct {
 		name     string

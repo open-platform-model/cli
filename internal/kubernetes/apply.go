@@ -59,14 +59,16 @@ func (e *ResourceError) Error() string {
 // Resources are assumed to be already ordered by weight (from RenderResult).
 func Apply(ctx context.Context, client *Client, resources []*build.Resource, meta build.ModuleMetadata, opts ApplyOptions) (*ApplyResult, error) {
 	result := &ApplyResult{}
+	modLog := output.ModuleLogger(meta.Name)
 
 	for _, res := range resources {
 		// Inject OPM labels
 		injectLabels(res, meta)
 
 		// Apply the resource
-		if err := applyResource(ctx, client, res.Object, opts); err != nil {
-			output.Warn(fmt.Sprintf("applying %s/%s: %v", res.Kind(), res.Name(), err))
+		status, err := applyResource(ctx, client, res.Object, opts)
+		if err != nil {
+			modLog.Warn(fmt.Sprintf("applying %s/%s: %v", res.Kind(), res.Name(), err))
 			result.Errors = append(result.Errors, ResourceError{
 				Kind:      res.Kind(),
 				Name:      res.Name(),
@@ -77,11 +79,7 @@ func Apply(ctx context.Context, client *Client, resources []*build.Resource, met
 		}
 
 		result.Applied++
-		if opts.DryRun {
-			output.Info(fmt.Sprintf("  %s/%s (dry run)", res.Kind(), res.Name()))
-		} else {
-			output.Info(fmt.Sprintf("  %s/%s applied", res.Kind(), res.Name()))
-		}
+		output.Println(output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), status))
 	}
 
 	return result, nil
@@ -107,40 +105,76 @@ func injectLabels(res *build.Resource, meta build.ModuleMetadata) {
 		labels[LabelComponentName] = res.Component
 	}
 
+	// Set identity labels if available
+	if meta.Identity != "" {
+		labels[LabelModuleID] = meta.Identity
+	}
+	if meta.ReleaseIdentity != "" {
+		labels[LabelReleaseID] = meta.ReleaseIdentity
+	}
+
 	res.Object.SetLabels(labels)
 }
 
 // applyResource performs server-side apply for a single resource.
-func applyResource(ctx context.Context, client *Client, obj *unstructured.Unstructured, opts ApplyOptions) error {
+// Returns the status of the operation (created, configured, or unchanged).
+func applyResource(ctx context.Context, client *Client, obj *unstructured.Unstructured, opts ApplyOptions) (string, error) {
 	gvr := gvrFromObject(obj)
+	ns := obj.GetNamespace()
+
+	// Check if resource already exists to determine status after apply.
+	var existingVersion string
+	if ns != "" {
+		existing, err := client.Dynamic.Resource(gvr).Namespace(ns).Get(ctx, obj.GetName(), metav1.GetOptions{})
+		if err == nil {
+			existingVersion = existing.GetResourceVersion()
+		}
+	} else {
+		existing, err := client.Dynamic.Resource(gvr).Get(ctx, obj.GetName(), metav1.GetOptions{})
+		if err == nil {
+			existingVersion = existing.GetResourceVersion()
+		}
+	}
+	// If GET fails (NotFound or other), existingVersion stays empty -> "created"
 
 	data, err := json.Marshal(obj)
 	if err != nil {
-		return fmt.Errorf("marshaling resource: %w", err)
+		return "", fmt.Errorf("marshaling resource: %w", err)
 	}
 
 	patchOpts := metav1.PatchOptions{
 		FieldManager: FieldManagerName,
-		Force:        boolPtr(true), // Take ownership on conflicts
+		Force:        boolPtr(true),
 	}
 
 	if opts.DryRun {
 		patchOpts.DryRun = []string{metav1.DryRunAll}
 	}
 
+	var result *unstructured.Unstructured
 	var patchErr error
-	ns := obj.GetNamespace()
 	if ns != "" {
-		_, patchErr = client.Dynamic.Resource(gvr).Namespace(ns).Patch(
+		result, patchErr = client.Dynamic.Resource(gvr).Namespace(ns).Patch(
 			ctx, obj.GetName(), types.ApplyPatchType, data, patchOpts,
 		)
 	} else {
-		_, patchErr = client.Dynamic.Resource(gvr).Patch(
+		result, patchErr = client.Dynamic.Resource(gvr).Patch(
 			ctx, obj.GetName(), types.ApplyPatchType, data, patchOpts,
 		)
 	}
 
-	return patchErr
+	if patchErr != nil {
+		return "", patchErr
+	}
+
+	// Determine status from before/after comparison.
+	if existingVersion == "" {
+		return output.StatusCreated, nil
+	}
+	if result != nil && result.GetResourceVersion() == existingVersion {
+		return output.StatusUnchanged, nil
+	}
+	return output.StatusConfigured, nil
 }
 
 // gvrFromObject derives GroupVersionResource from an unstructured object.

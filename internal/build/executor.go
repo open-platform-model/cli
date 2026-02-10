@@ -472,7 +472,6 @@ func mapToVolumeMountsArray(volumeMounts map[string]any) []any {
 	return result
 }
 
-
 // mapToVolumesArray converts a map of volume definitions to a Kubernetes volumes array.
 // Input:  {"config": {"name": "config", "persistentVolumeClaim": {"claimName": "config"}}}
 // Output: [{"name": "config", "persistentVolumeClaim": {"claimName": "config"}}]

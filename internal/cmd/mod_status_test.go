@@ -6,14 +6,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// --- 7.5: Tests for required flag validation on mod status ---
+// --- Tests for flag validation on mod status ---
 
-func TestModStatusCmd_RequiresName(t *testing.T) {
+func TestModStatusCmd_RequiresNameOrReleaseID(t *testing.T) {
 	cmd := NewModStatusCmd()
 	cmd.SetArgs([]string{"-n", "default"})
 	err := cmd.Execute()
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "required flag")
+	assert.Contains(t, err.Error(), "either --name or --release-id is required")
+}
+
+func TestModStatusCmd_MutuallyExclusive(t *testing.T) {
+	cmd := NewModStatusCmd()
+	cmd.SetArgs([]string{"-n", "default", "--name", "my-app", "--release-id", "abc123"})
+	err := cmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "--name and --release-id are mutually exclusive")
 }
 
 func TestModStatusCmd_RequiresNamespace(t *testing.T) {
@@ -24,10 +32,7 @@ func TestModStatusCmd_RequiresNamespace(t *testing.T) {
 	assert.Contains(t, err.Error(), "required flag")
 }
 
-func TestModStatusCmd_InvalidOutputFormat(t *testing.T) {
-	// This test verifies the output format validation in the command.
-	// We can't fully execute since it needs a cluster, but we can verify
-	// the command structure.
+func TestModStatusCmd_FlagsExist(t *testing.T) {
 	cmd := NewModStatusCmd()
 	assert.Equal(t, "status", cmd.Use)
 
@@ -35,6 +40,7 @@ func TestModStatusCmd_InvalidOutputFormat(t *testing.T) {
 	f := cmd.Flags()
 	assert.NotNil(t, f.Lookup("namespace"))
 	assert.NotNil(t, f.Lookup("name"))
+	assert.NotNil(t, f.Lookup("release-id"))
 	assert.NotNil(t, f.Lookup("output"))
 	assert.NotNil(t, f.Lookup("watch"))
 	assert.NotNil(t, f.Lookup("kubeconfig"))

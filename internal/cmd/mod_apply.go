@@ -145,15 +145,18 @@ func runApply(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Create scoped module logger
+	modLog := output.ModuleLogger(result.Module.Name)
+
 	// Print warnings
 	if result.HasWarnings() {
 		for _, w := range result.Warnings {
-			output.Warn(w)
+			modLog.Warn(w)
 		}
 	}
 
 	if len(result.Resources) == 0 {
-		output.Info("no resources to apply")
+		modLog.Info("no resources to apply")
 		return nil
 	}
 
@@ -163,15 +166,15 @@ func runApply(cmd *cobra.Command, args []string) error {
 		Context:    kubeContext,
 	})
 	if err != nil {
-		output.Error("connecting to cluster", "error", err)
+		modLog.Error("connecting to cluster", "error", err)
 		return &ExitError{Code: ExitConnectivityError, Err: err}
 	}
 
 	// Apply resources
 	if applyDryRunFlag {
-		output.Info("dry run - no changes will be made")
+		modLog.Info("dry run - no changes will be made")
 	}
-	output.Info(fmt.Sprintf("applying %d resources", len(result.Resources)))
+	modLog.Info(fmt.Sprintf("applying %d resources", len(result.Resources)))
 
 	applyResult, err := kubernetes.Apply(ctx, k8sClient, result.Resources, result.Module, kubernetes.ApplyOptions{
 		DryRun:  applyDryRunFlag,
@@ -179,22 +182,26 @@ func runApply(cmd *cobra.Command, args []string) error {
 		Timeout: applyTimeoutFlag,
 	})
 	if err != nil {
-		output.Error("apply failed", "error", err)
+		modLog.Error("apply failed", "error", err)
 		return &ExitError{Code: ExitGeneralError, Err: err}
 	}
 
 	// Report results
 	if len(applyResult.Errors) > 0 {
-		output.Warn(fmt.Sprintf("%d resource(s) had errors", len(applyResult.Errors)))
+		modLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(applyResult.Errors)))
 		for _, e := range applyResult.Errors {
-			output.Error(e.Error())
+			modLog.Error(e.Error())
 		}
 	}
 
 	if applyDryRunFlag {
-		output.Info(fmt.Sprintf("dry run complete: %d resources would be applied", applyResult.Applied))
+		modLog.Info(fmt.Sprintf("dry run complete: %d resources would be applied", applyResult.Applied))
 	} else {
-		output.Info(fmt.Sprintf("apply complete: %d resources applied", applyResult.Applied))
+		modLog.Info(fmt.Sprintf("applied %d resources successfully", applyResult.Applied))
+	}
+
+	if len(applyResult.Errors) == 0 && !applyDryRunFlag {
+		output.Println(output.FormatCheckmark("Module applied"))
 	}
 
 	if len(applyResult.Errors) > 0 {

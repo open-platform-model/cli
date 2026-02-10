@@ -8,6 +8,10 @@ import (
 	"github.com/opmodel/cli/internal/output"
 )
 
+// LabelReleaseID is the label key for release identity.
+// Duplicated here to avoid circular dependency with kubernetes package.
+const LabelReleaseID = "module-release.opmodel.dev/uuid"
+
 // ReleaseBuilder creates a concrete release from a #Module
 type ReleaseBuilder struct {
 	cueCtx   *cue.Context
@@ -42,6 +46,11 @@ type ReleaseMetadata struct {
 	Version   string
 	FQN       string
 	Labels    map[string]string
+	// Identity is the module identity UUID (from #Module.metadata.identity).
+	Identity string
+	// ReleaseIdentity is the release identity UUID, extracted from metadata.labels.
+	// This is computed by the CUE catalog schemas and injected as a label.
+	ReleaseIdentity string
 }
 
 // Build creates a concrete release from a loaded #Module
@@ -51,7 +60,7 @@ type ReleaseMetadata struct {
 //  2. Inject values into #config via FillPath (makes #config concrete)
 //  3. Extract components from #components (now concrete due to #config references)
 //  4. Validate all components are fully concrete
-//  5. Extract metadata from the module
+//  5. Extract metadata from the module (including identity)
 func (b *ReleaseBuilder) Build(moduleValue cue.Value, opts ReleaseOptions) (*BuiltRelease, error) {
 	output.Debug("building release", "name", opts.Name, "namespace", opts.Namespace)
 
@@ -89,7 +98,7 @@ func (b *ReleaseBuilder) Build(moduleValue cue.Value, opts ReleaseOptions) (*Bui
 		}
 	}
 
-	// Step 5: Extract metadata from the module
+	// Step 5: Extract metadata from the module (including identity)
 	metadata := b.extractMetadata(concreteModule, opts)
 
 	output.Debug("release built successfully",
@@ -240,9 +249,25 @@ func (b *ReleaseBuilder) extractMetadata(concreteModule cue.Value, opts ReleaseO
 	}
 
 	// Extract FQN from module.metadata.fqn (computed field)
+	// Fallback to apiVersion if fqn is not available
 	if v := concreteModule.LookupPath(cue.ParsePath("metadata.fqn")); v.Exists() {
 		if str, err := v.String(); err == nil {
 			metadata.FQN = str
+		}
+	}
+	if metadata.FQN == "" {
+		// Fallback: use apiVersion as FQN if fqn field is not present
+		if v := concreteModule.LookupPath(cue.ParsePath("metadata.apiVersion")); v.Exists() {
+			if str, err := v.String(); err == nil {
+				metadata.FQN = str
+			}
+		}
+	}
+
+	// Extract identity from module.metadata.identity (computed field from catalog)
+	if v := concreteModule.LookupPath(cue.ParsePath("metadata.identity")); v.Exists() {
+		if str, err := v.String(); err == nil {
+			metadata.Identity = str
 		}
 	}
 
@@ -256,6 +281,12 @@ func (b *ReleaseBuilder) extractMetadata(concreteModule cue.Value, opts ReleaseO
 				}
 			}
 		}
+	}
+
+	// Extract release identity from labels (computed by CUE catalog schemas)
+	// The release-id label is set by the catalog schema transformer
+	if rid, ok := metadata.Labels[LabelReleaseID]; ok {
+		metadata.ReleaseIdentity = rid
 	}
 
 	return metadata

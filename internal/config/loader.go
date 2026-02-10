@@ -302,6 +302,16 @@ func extractConfig(value cue.Value) (*Config, error) {
 		}
 	}
 
+	// Extract log config
+	logValue := configValue.LookupPath(cue.ParsePath("log"))
+	if logValue.Exists() {
+		if tsVal := logValue.LookupPath(cue.ParsePath("timestamps")); tsVal.Exists() {
+			if b, err := tsVal.Bool(); err == nil {
+				cfg.Log.Timestamps = &b
+			}
+		}
+	}
+
 	return cfg, nil
 }
 

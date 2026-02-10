@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -22,10 +23,52 @@ const (
 	LabelModuleNamespace = "module.opmodel.dev/namespace"
 	LabelModuleVersion   = "module.opmodel.dev/version"
 	LabelComponentName   = "component.opmodel.dev/name"
+	// LabelReleaseID is the release identity UUID label for resource discovery.
+	LabelReleaseID = "module-release.opmodel.dev/uuid"
+	// LabelModuleID is the module identity UUID label for resource discovery.
+	LabelModuleID = "module.opmodel.dev/uuid"
 )
 
 // FieldManagerName is the field manager used for server-side apply.
 const FieldManagerName = "opm"
+
+// ErrNoResourcesFound is returned when no resources match the selector.
+var ErrNoResourcesFound = errors.New("no resources found")
+
+// NoResourcesFoundError contains details about a failed resource discovery.
+type NoResourcesFoundError struct {
+	// ModuleName is the module name that was searched (empty if using release-id).
+	ModuleName string
+	// ReleaseID is the release-id that was searched (empty if using name).
+	ReleaseID string
+	// Namespace is the namespace that was searched.
+	Namespace string
+}
+
+// Error implements the error interface.
+func (e *NoResourcesFoundError) Error() string {
+	if e.ModuleName != "" {
+		return fmt.Sprintf("no resources found for module %q in namespace %q", e.ModuleName, e.Namespace)
+	}
+	return fmt.Sprintf("no resources found for release-id %q in namespace %q", e.ReleaseID, e.Namespace)
+}
+
+// Is implements errors.Is for NoResourcesFoundError.
+func (e *NoResourcesFoundError) Is(target error) bool {
+	return target == ErrNoResourcesFound
+}
+
+// DiscoveryOptions configures resource discovery.
+type DiscoveryOptions struct {
+	// ModuleName is the module name to search for (used with name+namespace selector).
+	// Mutually exclusive with ReleaseID.
+	ModuleName string
+	// Namespace is the target namespace for resource lookup.
+	Namespace string
+	// ReleaseID is the release identity UUID (used with release-id selector).
+	// Mutually exclusive with ModuleName.
+	ReleaseID string
+}
 
 // BuildModuleSelector creates a label selector that matches all resources
 // belonging to a specific module deployment.
@@ -37,10 +80,31 @@ func BuildModuleSelector(moduleName, namespace string) labels.Selector {
 	})
 }
 
+// BuildReleaseIDSelector creates a label selector that matches all resources
+// with a specific release identity UUID.
+func BuildReleaseIDSelector(releaseID string) labels.Selector {
+	return labels.SelectorFromSet(labels.Set{
+		LabelManagedBy: LabelManagedByValue,
+		LabelReleaseID: releaseID,
+	})
+}
+
 // DiscoverResources finds all resources belonging to a module deployment
-// by querying all API resources with the OPM label selector.
-func DiscoverResources(ctx context.Context, client *Client, moduleName, namespace string) ([]*unstructured.Unstructured, error) {
-	selector := BuildModuleSelector(moduleName, namespace)
+// by querying all API resources with an OPM label selector.
+//
+// Exactly one of ModuleName or ReleaseID must be provided (mutually exclusive).
+// Validation of mutual exclusivity should happen at the command layer.
+func DiscoverResources(ctx context.Context, client *Client, opts DiscoveryOptions) ([]*unstructured.Unstructured, error) {
+	// Build selector based on what's provided
+	var selector labels.Selector
+
+	if opts.ReleaseID != "" {
+		selector = BuildReleaseIDSelector(opts.ReleaseID)
+	} else if opts.ModuleName != "" {
+		selector = BuildModuleSelector(opts.ModuleName, opts.Namespace)
+	} else {
+		return nil, fmt.Errorf("either ModuleName or ReleaseID must be provided")
+	}
 
 	// Get all API resources from the server
 	apiResources, err := discoverAPIResources(client)
@@ -48,9 +112,18 @@ func DiscoverResources(ctx context.Context, client *Client, moduleName, namespac
 		return nil, fmt.Errorf("discovering API resources: %w", err)
 	}
 
+	// Discover resources with the selector
+	resources := discoverWithSelector(ctx, client, apiResources, selector, opts.Namespace)
+
+	return resources, nil
+}
+
+// discoverWithSelector finds resources matching a single label selector.
+func discoverWithSelector(ctx context.Context, client *Client, apiResources []apiResourceInfo, selector labels.Selector, namespace string) []*unstructured.Unstructured {
 	var allResources []*unstructured.Unstructured
 
-	for _, apiResource := range apiResources {
+	for i := range apiResources {
+		apiResource := &apiResources[i]
 		// Skip resources that don't support list
 		if !supportsVerb(apiResource.resource, "list") {
 			continue
@@ -63,6 +136,7 @@ func DiscoverResources(ctx context.Context, client *Client, moduleName, namespac
 		}
 
 		var items *unstructured.UnstructuredList
+		var err error
 		listOpts := metav1.ListOptions{
 			LabelSelector: selector.String(),
 		}
@@ -80,13 +154,13 @@ func DiscoverResources(ctx context.Context, client *Client, moduleName, namespac
 			continue
 		}
 
-		for i := range items.Items {
-			item := items.Items[i]
+		for j := range items.Items {
+			item := items.Items[j]
 			allResources = append(allResources, &item)
 		}
 	}
 
-	return allResources, nil
+	return allResources
 }
 
 // SortByWeightDescending sorts resources by weight in descending order (for deletion).
@@ -121,7 +195,8 @@ func discoverAPIResources(client *Client) ([]apiResourceInfo, error) {
 		if parseErr != nil {
 			continue
 		}
-		for _, r := range list.APIResources {
+		for i := range list.APIResources {
+			r := &list.APIResources[i]
 			// Skip subresources (e.g., pods/log)
 			if containsSlash(r.Name) {
 				continue
@@ -129,7 +204,7 @@ func discoverAPIResources(client *Client) ([]apiResourceInfo, error) {
 			result = append(result, apiResourceInfo{
 				group:    gv.Group,
 				version:  gv.Version,
-				resource: r,
+				resource: *r,
 			})
 		}
 	}

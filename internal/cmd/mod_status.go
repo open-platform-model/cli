@@ -18,6 +18,7 @@ import (
 var (
 	statusNamespaceFlag  string
 	statusNameFlag       string
+	statusReleaseIDFlag  string
 	statusOutputFlag     string
 	statusWatchFlag      bool
 	statusKubeconfigFlag string
@@ -40,11 +41,15 @@ not required. Health is evaluated per resource category:
   - Passive (ConfigMap, Secret, Service, PVC): healthy on creation
   - Custom (CRDs): Ready condition if present, else passive
 
-Both --name and --namespace are required to identify the module deployment.
+Exactly one of --name or --release-id is required to identify the module deployment.
+The --namespace flag is always required.
 
 Examples:
-  # Show status of deployed module
+  # Show status by module name
   opm mod status --name my-app -n production
+
+  # Show status by release ID
+  opm mod status --release-id a1b2c3d4-e5f6-7890-abcd-ef1234567890 -n production
 
   # Show status in JSON format
   opm mod status --name my-app -n production -o json
@@ -58,7 +63,9 @@ Examples:
 	cmd.Flags().StringVarP(&statusNamespaceFlag, "namespace", "n", "",
 		"Target namespace (required)")
 	cmd.Flags().StringVar(&statusNameFlag, "name", "",
-		"Module name (required)")
+		"Module name (mutually exclusive with --release-id)")
+	cmd.Flags().StringVar(&statusReleaseIDFlag, "release-id", "",
+		"Release identity UUID (mutually exclusive with --name)")
 	cmd.Flags().StringVarP(&statusOutputFlag, "output", "o", "table",
 		"Output format (table, yaml, json)")
 	cmd.Flags().BoolVar(&statusWatchFlag, "watch", false,
@@ -68,7 +75,7 @@ Examples:
 	cmd.Flags().StringVar(&statusContextFlag, "context", "",
 		"Kubernetes context to use")
 
-	_ = cmd.MarkFlagRequired("name")
+	// Namespace is always required
 	_ = cmd.MarkFlagRequired("namespace")
 
 	return cmd
@@ -78,9 +85,30 @@ Examples:
 func runStatus(cmd *cobra.Command, _ []string) error {
 	ctx := context.Background()
 
+	// Manual validation: require exactly one of --name or --release-id (mutually exclusive)
+	if statusNameFlag != "" && statusReleaseIDFlag != "" {
+		return &ExitError{
+			Code: ExitGeneralError,
+			Err:  fmt.Errorf("--name and --release-id are mutually exclusive"),
+		}
+	}
+	if statusNameFlag == "" && statusReleaseIDFlag == "" {
+		return &ExitError{
+			Code: ExitGeneralError,
+			Err:  fmt.Errorf("either --name or --release-id is required"),
+		}
+	}
+
 	// Resolve flags with global fallback
 	kubeconfig := resolveFlag(statusKubeconfigFlag, GetKubeconfig())
 	kubeContext := resolveFlag(statusContextFlag, GetContext())
+
+	// Create scoped module logger - prefer name, fall back to release-id
+	logName := statusNameFlag
+	if logName == "" {
+		logName = fmt.Sprintf("release:%s", statusReleaseIDFlag[:8])
+	}
+	modLog := output.ModuleLogger(logName)
 
 	// Validate output format
 	switch statusOutputFlag {
@@ -99,13 +127,14 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 		Context:    kubeContext,
 	})
 	if err != nil {
-		output.Error("connecting to cluster", "error", err)
+		modLog.Error("connecting to cluster", "error", err)
 		return &ExitError{Code: ExitConnectivityError, Err: err}
 	}
 
 	statusOpts := kubernetes.StatusOptions{
 		Namespace:    statusNamespaceFlag,
 		Name:         statusNameFlag,
+		ReleaseID:    statusReleaseIDFlag,
 		OutputFormat: statusOutputFlag,
 		Watch:        statusWatchFlag,
 	}
@@ -121,20 +150,21 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 
 // runStatusOnce executes a single status check.
 func runStatusOnce(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions) error {
+	logName := opts.Name
+	if logName == "" {
+		logName = fmt.Sprintf("release:%s", opts.ReleaseID[:8])
+	}
+	modLog := output.ModuleLogger(logName)
+
 	result, err := kubernetes.GetModuleStatus(ctx, client, opts)
 	if err != nil {
-		output.Error("getting status", "error", err)
+		modLog.Error("getting status", "error", err)
 		return &ExitError{Code: ExitGeneralError, Err: err}
-	}
-
-	if len(result.Resources) == 0 {
-		output.Println(kubernetes.NoResourcesMessage(opts.Name, opts.Namespace))
-		return nil
 	}
 
 	formatted, err := kubernetes.FormatStatus(result, opts.OutputFormat)
 	if err != nil {
-		output.Error("formatting status", "error", err)
+		modLog.Error("formatting status", "error", err)
 		return &ExitError{Code: ExitGeneralError, Err: err}
 	}
 
@@ -179,15 +209,16 @@ func runStatusWatch(ctx context.Context, client *kubernetes.Client, opts kuberne
 
 // displayStatus fetches and displays the current status.
 func displayStatus(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions) error {
+	logName := opts.Name
+	if logName == "" {
+		logName = fmt.Sprintf("release:%s", opts.ReleaseID[:8])
+	}
+	modLog := output.ModuleLogger(logName)
+
 	result, err := kubernetes.GetModuleStatus(ctx, client, opts)
 	if err != nil {
-		output.Error("getting status", "error", err)
+		modLog.Error("getting status", "error", err)
 		return &ExitError{Code: ExitGeneralError, Err: err}
-	}
-
-	if len(result.Resources) == 0 {
-		output.Println(kubernetes.NoResourcesMessage(opts.Name, opts.Namespace))
-		return nil
 	}
 
 	// In watch mode, always use table format

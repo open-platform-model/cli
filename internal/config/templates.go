@@ -36,6 +36,13 @@ config: {
 		// Override with --namespace flag or OPM_NAMESPACE env var.
 		namespace: "default"
 	}
+
+	// log controls logging behavior.
+	log?: {
+		// timestamps controls whether timestamps are shown in log output.
+		// Override with --timestamps flag.
+		timestamps: bool | *true
+	}
 }
 `
 

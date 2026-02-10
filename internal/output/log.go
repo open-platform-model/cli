@@ -2,30 +2,67 @@
 package output
 
 import (
+	"fmt"
 	"os"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 )
+
+// LogConfig holds configuration for the logger.
+type LogConfig struct {
+	// Verbose enables debug-level logging, timestamps, and caller info.
+	Verbose bool
+
+	// Timestamps controls timestamp display. Nil means use default (true).
+	// When Verbose is true, timestamps are forced on regardless.
+	Timestamps *bool
+}
 
 // Logger is the global logger instance.
 // Initialized with default options; call SetupLogging to configure.
 var Logger = log.NewWithOptions(os.Stderr, log.Options{
-	ReportTimestamp: false,
+	ReportTimestamp: true,
 	ReportCaller:    false,
+	TimeFormat:      "15:04:05",
 })
 
-// SetupLogging configures the logger based on verbosity.
-func SetupLogging(verbose bool) {
+// SetupLogging configures the global logger based on the provided config.
+func SetupLogging(cfg LogConfig) {
 	level := log.InfoLevel
-	if verbose {
+	if cfg.Verbose {
 		level = log.DebugLevel
+	}
+
+	// Resolve timestamps: verbose forces on, otherwise flag/config/default(true).
+	showTimestamps := true
+	if cfg.Timestamps != nil {
+		showTimestamps = *cfg.Timestamps
+	}
+	if cfg.Verbose {
+		showTimestamps = true
 	}
 
 	Logger = log.NewWithOptions(os.Stderr, log.Options{
 		Level:           level,
-		ReportTimestamp: verbose,
-		ReportCaller:    verbose,
+		ReportTimestamp: showTimestamps,
+		ReportCaller:    cfg.Verbose,
+		TimeFormat:      "15:04:05",
 	})
+}
+
+// ModuleLogger returns a child logger scoped to a module name.
+// The prefix renders as: m:<name> >
+// with dim "m:" and ">" and cyan module name.
+func ModuleLogger(name string) *log.Logger {
+	// Build the styled prefix: dim "m:" + cyan name + dim " >"
+	prefix := fmt.Sprintf("%s%s %s",
+		StyleDim.Render("m:"),
+		lipgloss.NewStyle().Foreground(ColorCyan).Render(name),
+		StyleDim.Render(">"),
+	)
+
+	return Logger.WithPrefix(prefix)
 }
 
 // Debug logs a debug message.
@@ -61,4 +98,9 @@ func Print(msg string) {
 // Println prints a message to stdout with a newline.
 func Println(msg string) {
 	os.Stdout.WriteString(msg + "\n")
+}
+
+// BoolPtr returns a pointer to a bool value. Convenience for LogConfig.Timestamps.
+func BoolPtr(b bool) *bool {
+	return &b
 }

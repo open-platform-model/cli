@@ -25,6 +25,10 @@ type DiffOptions struct {
 	// Name is the module release name.
 	Name string
 
+	// ReleaseID is the release identity UUID for discovery.
+	// When provided, resources are discovered via the release-id label.
+	ReleaseID string
+
 	// Kubeconfig is the path to the kubeconfig file.
 	Kubeconfig string
 
@@ -304,7 +308,12 @@ func DiffPartial(ctx context.Context, client *Client, resources []*build.Resourc
 // but are not in the rendered resource set.
 func findOrphans(ctx context.Context, client *Client, meta build.ModuleMetadata, renderedKeys map[string]bool) ([]*unstructured.Unstructured, error) {
 	// Discover all resources on the cluster with OPM labels for this module
-	liveResources, err := DiscoverResources(ctx, client, meta.Name, meta.Namespace)
+	// Use module name selector for orphan detection.
+	// Diff always has a module name from the build pipeline.
+	liveResources, err := DiscoverResources(ctx, client, DiscoveryOptions{
+		ModuleName: meta.Name,
+		Namespace:  meta.Namespace,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("discovering live resources: %w", err)
 	}

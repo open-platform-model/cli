@@ -176,10 +176,13 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Create scoped module logger
+	modLog := output.ModuleLogger(result.Module.Name)
+
 	// Print warnings
 	if result.HasWarnings() {
 		for _, w := range result.Warnings {
-			output.Warn(w)
+			modLog.Warn(w)
 		}
 	}
 
@@ -199,7 +202,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		if err := output.WriteSplitManifests(resourceInfos, splitOpts); err != nil {
 			return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("writing split manifests: %w", err)}
 		}
-		output.Info(fmt.Sprintf("wrote %d resources to %s", len(result.Resources), buildOutDirFlag))
+		modLog.Info(fmt.Sprintf("wrote %d resources to %s", len(result.Resources), buildOutDirFlag))
 	} else {
 		// Output to stdout
 		manifestOpts := output.ManifestOptions{

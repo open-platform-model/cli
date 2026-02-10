@@ -119,15 +119,18 @@ func runDiff(cmd *cobra.Command, args []string) error {
 		return &ExitError{Code: ExitValidationError, Err: err}
 	}
 
+	// Create scoped module logger
+	modLog := output.ModuleLogger(result.Module.Name)
+
 	// Print warnings
 	if result.HasWarnings() {
 		for _, w := range result.Warnings {
-			output.Warn(w)
+			modLog.Warn(w)
 		}
 	}
 
 	if len(result.Resources) == 0 && !result.HasErrors() {
-		output.Info("no resources to diff")
+		modLog.Info("no resources to diff")
 		return nil
 	}
 
@@ -137,7 +140,7 @@ func runDiff(cmd *cobra.Command, args []string) error {
 		Context:    kubeContext,
 	})
 	if err != nil {
-		output.Error("connecting to cluster", "error", err)
+		modLog.Error("connecting to cluster", "error", err)
 		return &ExitError{Code: ExitConnectivityError, Err: err}
 	}
 
@@ -152,13 +155,13 @@ func runDiff(cmd *cobra.Command, args []string) error {
 		diffResult, err = kubernetes.Diff(ctx, k8sClient, result.Resources, result.Module, comparer)
 	}
 	if err != nil {
-		output.Error("diff failed", "error", err)
+		modLog.Error("diff failed", "error", err)
 		return &ExitError{Code: ExitGeneralError, Err: err}
 	}
 
 	// Print warnings from diff
 	for _, w := range diffResult.Warnings {
-		output.Warn(w)
+		modLog.Warn(w)
 	}
 
 	// Print summary
