@@ -2,6 +2,7 @@
 
 ## Feature
 
+- [ ] Rework "opm mod delete" to allow "name" and "namespace" as possitional arguments instead of flags. Keep "--release-id" as flag (overrides both arguments).
 - [ ] Find a way top create something similar like "timoni vendor crd" but fully in CUE. I MUST utilize "cue import openapi".
   - Example found here: <https://github.com/cue-lang/cue/issues/2691>
 - [ ] Add #ModuleRelease.values to #Module.#config validation during processing. Meaning it should take the schema (#Module.#config) and validate it against the values (unified #ModuleRelease.values).
@@ -13,10 +14,19 @@
   - This is a helper command so that users can "upgrade" their configuration more easily.
 - [ ] During "opm mod init" the module.cue in cue.mod should initialize as a blank slate, allowing opm to grab the latest versions of all OPM modules. Either by running "opm mod tidy" (internally) or by running something similar to "cue mod get" on each dependency.
 - [ ] Add "opm mod list". It should list all modules in the defined namespace (default ns is, default). "-A" should list in all namespaces.
+  - Note: Can now leverage `release-id` labels for discovery (see deterministic-release-identity).
 - [ ] Add check during processing: Check if a module author has referenced "values" and not "#config" in a component. This will not work and should warn the user.
-- [ ] "opm mod delete --name blog --namespace default --verbose" proceeds but with no change, 0 resources deleted. We should add validtion to first look for the module and inform the caller if not found. Look into more validation steps as well.
+  - This can be utilized with the future "opm mod publish" command, so that an author cannot publish a module that is not valid.
+- [ ] "opm mod delete --name blog --namespace default --verbose" proceeds but with no change, 0 resources deleted. We should add validtion to first look for the module and inform the caller if not found.
 
 ## Bugfix
+
+- [ ] Fix the "initializing CLI" output. Even if environment variables or flags are not set it should show what value is being used. The default values will always be found in .opm/config.cue.
+  - Also what is the point of 'registry_flag=""', this seems redundant.
+
+  ```bash
+  12:33:38 DEBU <output/log.go:70> initializing CLI kubeconfig="" context="" namespace="" config="" output=yaml registry_flag="" resolved_registry=localhost:5000
+  ```
 
 - [ ] Running "opm mod apply" on an already applied resource should not reply "✔ Module applied" it should reply something more approriate that there was NO change made.
   - Example:
@@ -93,9 +103,12 @@
 
 ## Investigation
 
-- [ ] Investigate how to redesigh the "opm mod delete" workflow to be smarter. It should find ALL resources, even if the user has changed the module (and didn't apply the changes) before running "delete".
-  - It should not rely on the output of the module, only the identifiers of the module.
-  - Might have to improve the identification, using a hash of the metadata (name, namespace, version, etc).
+- [ ] When running "opm mod delete" is the build pipeline really required? Do we need to build the whole module to delete?
+- [x] ~~Investigate how to redesign the "opm mod delete" workflow to be smarter. It should find ALL resources, even if the user has changed the module (and didn't apply the changes) before running "delete".~~
+  - **Resolved:** Implemented in `deterministic-release-identity` change. Each release now gets a deterministic UUID v5 identity (`module-release.opmodel.dev/uuid` label) computed from `{fqn}:{name}:{namespace}`. The `opm mod delete` command now supports:
+    - `--release-id <uuid>` flag for direct UUID-based deletion
+    - Dual-strategy discovery: queries by both `release-id` and `name+namespace` labels, returning the union
+    - Resources can be found even if module name changed, as long as release-id is known
 - [ ] Test if the CLI has staged apply and delete. If not we must design a staged apply and delete sytem.
   - For resources that we MUST wait for status we need the CLI to wait for that resource to be reporting ok before moving on to the next.
   - Investigate if this should be configurable in the model. Either in the module as a Policy or in each component.
