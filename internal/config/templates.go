@@ -14,7 +14,7 @@ import (
 config: {
 	// registry is the default registry for CUE module resolution.
 	// Override with --registry flag or OPM_REGISTRY env var.
-	registry: "registry.opmodel.dev"
+	registry: "opmodel.dev=localhost:5000+insecure,registry.cue.works"
 
 	// providers maps provider aliases to their definitions.
 	// Providers are loaded from the registry via CUE imports.
