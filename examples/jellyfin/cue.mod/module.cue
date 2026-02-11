@@ -1,6 +1,6 @@
-module: "example.com/jellyfin@v0"
+module: "opmodel.dev/modules/jellyfin@v0"
 language: {
-	version: "v0.15.0"
+	version: "v0.11.1"
 }
 deps: {
 	"opmodel.dev/core@v0": {

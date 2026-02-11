@@ -100,10 +100,12 @@ import (
 						name:      "config"
 						mountPath: "/config"
 					}
-					for name, lib in #config.media {
-						(name): {
-							"name":    name
-							mountPath: lib.mountPath
+					if #config.media != _|_ {
+						for vName, lib in #config.media {
+							(vName): {
+								"name":    vName
+								mountPath: lib.mountPath
+							}
 						}
 					}
 				}
@@ -123,10 +125,17 @@ import (
 					name: "config"
 					persistentClaim: size: #config.configStorageSize
 				}
-				for name, lib in #config.media {
-					(name): {
-						"name": name
-						persistentClaim: size: lib.size
+				if #config.media != _|_ {
+					for name, lib in #config.media {
+						(name): {
+							"name": name
+							if lib.type == "pvc" {
+								persistentClaim: size: lib.size
+							}
+							if lib.type == "emptyDir" {
+								emptyDir: {}
+							}
+						}
 					}
 				}
 			}

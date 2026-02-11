@@ -45,6 +45,7 @@ metadata: {
 	// Media library mount points with persistent storage
 	media: [Name=string]: {
 		mountPath: string
+		type: "pvc" | *"emptyDir"
 		size:      string
 	}
 }
