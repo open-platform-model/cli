@@ -20,11 +20,25 @@ type KubernetesConfig struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
+// LogKubernetesConfig contains Kubernetes-related logging settings.
+type LogKubernetesConfig struct {
+	// APIWarnings controls how Kubernetes API deprecation warnings are displayed.
+	// Valid values: "warn" (default), "debug", "suppress"
+	// - "warn": Show as WARN level in log output
+	// - "debug": Only show with --verbose flag
+	// - "suppress": Drop entirely
+	APIWarnings string `json:"apiWarnings,omitempty"`
+}
+
 // LogConfig contains logging-related settings.
 type LogConfig struct {
 	// Timestamps controls whether timestamps are shown in log output.
 	// Default: true. Override with --timestamps flag.
 	Timestamps *bool `json:"timestamps,omitempty"`
+
+	// Kubernetes contains Kubernetes-related logging settings.
+	// Non-optional because APIWarnings has a default value.
+	Kubernetes LogKubernetesConfig `json:"kubernetes"`
 }
 
 // Config represents the OPM CLI configuration.

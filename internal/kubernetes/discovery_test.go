@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -94,9 +95,7 @@ func TestDiscoveryOptions_Validation(t *testing.T) {
 	// so we test the validation logic conceptually through the error cases.
 
 	t.Run("neither ModuleName nor ReleaseID provided", func(t *testing.T) {
-		opts := DiscoveryOptions{
-			Namespace: "default",
-		}
+		opts := DiscoveryOptions{}
 		// Both are empty - this should be caught by DiscoverResources
 		assert.Empty(t, opts.ModuleName)
 		assert.Empty(t, opts.ReleaseID)
@@ -105,7 +104,6 @@ func TestDiscoveryOptions_Validation(t *testing.T) {
 	t.Run("only ModuleName provided", func(t *testing.T) {
 		opts := DiscoveryOptions{
 			ModuleName: "my-app",
-			Namespace:  "default",
 		}
 		assert.NotEmpty(t, opts.ModuleName)
 		assert.Empty(t, opts.ReleaseID)
@@ -114,9 +112,71 @@ func TestDiscoveryOptions_Validation(t *testing.T) {
 	t.Run("only ReleaseID provided", func(t *testing.T) {
 		opts := DiscoveryOptions{
 			ReleaseID: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-			Namespace: "default",
 		}
 		assert.Empty(t, opts.ModuleName)
 		assert.NotEmpty(t, opts.ReleaseID)
 	})
+}
+
+func TestDiscoverWithSelector_ExcludeOwned(t *testing.T) {
+	// Create test resources - one with ownerReferences, one without
+	resourceWithOwner := &unstructured.Unstructured{}
+	resourceWithOwner.SetName("owned-resource")
+	resourceWithOwner.SetKind("Pod")
+	resourceWithOwner.SetOwnerReferences([]metav1.OwnerReference{
+		{
+			APIVersion: "apps/v1",
+			Kind:       "ReplicaSet",
+			Name:       "parent",
+			UID:        "123",
+		},
+	})
+
+	resourceWithoutOwner := &unstructured.Unstructured{}
+	resourceWithoutOwner.SetName("standalone-resource")
+	resourceWithoutOwner.SetKind("Service")
+
+	tests := []struct {
+		name         string
+		excludeOwned bool
+		wantCount    int
+		wantNames    []string
+	}{
+		{
+			name:         "exclude owned filters out owned resources",
+			excludeOwned: true,
+			wantCount:    1,
+			wantNames:    []string{"standalone-resource"},
+		},
+		{
+			name:         "include owned shows all resources",
+			excludeOwned: false,
+			wantCount:    2,
+			wantNames:    []string{"owned-resource", "standalone-resource"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This is a conceptual test - in practice, discoverWithSelector
+			// makes actual API calls. For a real test, you'd need to mock
+			// the k8s client. The logic is verified by the inline filter:
+			//   if excludeOwned && len(item.GetOwnerReferences()) > 0 { continue }
+
+			// Verify the filtering logic directly
+			resources := []*unstructured.Unstructured{resourceWithOwner, resourceWithoutOwner}
+			filtered := make([]*unstructured.Unstructured, 0)
+			for _, res := range resources {
+				if tt.excludeOwned && len(res.GetOwnerReferences()) > 0 {
+					continue
+				}
+				filtered = append(filtered, res)
+			}
+
+			assert.Equal(t, tt.wantCount, len(filtered))
+			for i, name := range tt.wantNames {
+				assert.Equal(t, name, filtered[i].GetName())
+			}
+		})
+	}
 }

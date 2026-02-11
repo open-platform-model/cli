@@ -48,37 +48,12 @@
     ✔ Module applied
     ```
 
-- [ ] Update the CLI kubernetes SDK to 1.34+
-  - Fix warnings like "Warning: v1 ComponentStatus is deprecated in v1.19+" and "Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice" while we are at it. This is caused by the transformers output is of an older k8s version.
-
-    ```bash
-    ❯ opm mod delete --name Blog -n default --verbose
-    2026/02/06 11:43:01 DEBU <output/log.go:33> resolved config path path=/var/home/emil/.opm/config.cue source=default
-    2026/02/06 11:43:01 DEBU <output/log.go:33> bootstrap: extracted registry from config registry=localhost:5000 path=/var/home/emil/.opm/config.cue
-    2026/02/06 11:43:01 DEBU <output/log.go:33> resolved registry registry=localhost:5000 source=env
-    2026/02/06 11:43:01 DEBU <output/log.go:33> setting CUE_REGISTRY for config load registry=localhost:5000
-    2026/02/06 11:43:01 DEBU <output/log.go:33> extracted provider from config name=kubernetes
-    2026/02/06 11:43:01 DEBU <output/log.go:33> extracted providers from config count=1
-    2026/02/06 11:43:01 DEBU <output/log.go:33> initializing CLI kubeconfig="" context="" namespace="" config="" output=yaml registry_flag="" resolved_registry=localhost:5000
-    Delete all resources for module "Blog" in namespace "default"? [y/N]: y
-    2026/02/06 11:43:03 INFO <output/log.go:38> deleting resources for module "Blog" in namespace "default"
-    I0206 11:43:03.107650 1902817 warnings.go:107] "Warning: v1 ComponentStatus is deprecated in v1.19+"
-    I0206 11:43:03.110144 1902817 warnings.go:107] "Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice"
-    2026/02/06 11:43:13 WARN <output/log.go:43> deleting Endpoints/web: the server could not find the requested resource
-    2026/02/06 11:43:13 INFO <output/log.go:38>   EndpointSlice/web-n5gh4 in default deleted
-    2026/02/06 11:43:13 INFO <output/log.go:38>   DaemonSet/api in default deleted
-    2026/02/06 11:43:13 INFO <output/log.go:38>   DaemonSet/web in default deleted
-    2026/02/06 11:43:13 INFO <output/log.go:38>   Deployment/api in default deleted
-    2026/02/06 11:43:14 INFO <output/log.go:38>   Deployment/web in default deleted
-    2026/02/06 11:43:14 INFO <output/log.go:38>   StatefulSet/api in default deleted
-    2026/02/06 11:43:14 INFO <output/log.go:38>   StatefulSet/web in default deleted
-    2026/02/06 11:43:14 INFO <output/log.go:38>   Service/web in default deleted
-    2026/02/06 11:43:14 WARN <output/log.go:43> 1 resource(s) had errors
-    2026/02/06 11:43:14 ERRO <output/log.go:48> Endpoints/web in default: the server could not find the requested resource
-    2026/02/06 11:43:14 INFO <output/log.go:38> delete complete: 8 resources deleted
-    1 resource(s) failed to delete
-    ```
-
+- [x] ~~Update the CLI kubernetes SDK to 1.34+~~
+  - **Resolved:** SDK already at v0.35.0 (Kubernetes 1.35). Implemented in `improve-k8s-api-warnings-and-discovery` change:
+    - Custom `rest.WarningHandler` routes K8s API warnings through charmbracelet/log (formatted consistently)
+    - Config option `log.kubernetes.apiWarnings` with values `"warn"` (default), `"debug"`, or `"suppress"`
+    - Switched discovery to `ServerPreferredResources()` to reduce API calls and avoid deprecated versions
+    - Added `ExcludeOwned` option to skip controller-managed resources (prevents 404 errors on auto-managed Endpoints/EndpointSlice)
 - [x] Missing values in fields during log:
   - [x] Missing values during config loading "initializing CLI kubeconfig="" context="" namespace="" config="" output=yaml registry_flag="" resolved_registry=localhost:5000". Should show at least default values (from .opm/config.cue). Example "initializing CLI kubeconfig="~/.kube/config" context="kind-opm-dev" namespace="default" config="~/.opm/config.cue" output=yaml registry_flag="" resolved_registry=localhost:5000"
     - The log "initializing CLI" should display the final config values that was choosen.

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -299,4 +300,80 @@ config: {
 	// will remain nil (treated as default true by the caller).
 	require.NoError(t, err)
 	assert.Nil(t, cfg.Log.Timestamps, "Log.Timestamps should be nil when value is not a bool")
+}
+
+func TestExtractConfig_LogKubernetesAPIWarnings(t *testing.T) {
+	tests := []struct {
+		name     string
+		cueInput string
+		want     string
+	}{
+		{
+			name: "default warn when not specified",
+			cueInput: `
+package config
+config: {
+	registry: "test.example.com"
+}
+`,
+			want: "warn",
+		},
+		{
+			name: "explicit warn value",
+			cueInput: `
+package config
+config: {
+	registry: "test.example.com"
+	log: {
+		kubernetes: {
+			apiWarnings: "warn"
+		}
+	}
+}
+`,
+			want: "warn",
+		},
+		{
+			name: "debug value",
+			cueInput: `
+package config
+config: {
+	registry: "test.example.com"
+	log: {
+		kubernetes: {
+			apiWarnings: "debug"
+		}
+	}
+}
+`,
+			want: "debug",
+		},
+		{
+			name: "suppress value",
+			cueInput: `
+package config
+config: {
+	registry: "test.example.com"
+	log: {
+		kubernetes: {
+			apiWarnings: "suppress"
+		}
+	}
+}
+`,
+			want: "suppress",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := cuecontext.New()
+			value := ctx.CompileString(tt.cueInput)
+			assert.NoError(t, value.Err())
+
+			cfg, err := extractConfig(value)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, cfg.Log.Kubernetes.APIWarnings)
+		})
+	}
 }

@@ -131,8 +131,9 @@ func runDiff(cmd *cobra.Command, args []string) error {
 
 	// Create Kubernetes client
 	k8sClient, err := kubernetes.NewClient(kubernetes.ClientOptions{
-		Kubeconfig: kubeconfig,
-		Context:    kubeContext,
+		Kubeconfig:  kubeconfig,
+		Context:     kubeContext,
+		APIWarnings: opmConfig.Config.Log.Kubernetes.APIWarnings,
 	})
 	if err != nil {
 		modLog.Error("connecting to cluster", "error", err)

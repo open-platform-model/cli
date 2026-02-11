@@ -58,9 +58,10 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*deleteRes
 
 	// Discover resources via labels
 	resources, err := DiscoverResources(ctx, client, DiscoveryOptions{
-		ModuleName: opts.ModuleName,
-		Namespace:  opts.Namespace,
-		ReleaseID:  opts.ReleaseID,
+		ModuleName:   opts.ModuleName,
+		Namespace:    opts.Namespace,
+		ReleaseID:    opts.ReleaseID,
+		ExcludeOwned: true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("discovering module resources: %w", err)

@@ -108,7 +108,7 @@ func TestResolveKubeconfigExpandsTilde(t *testing.T) {
 			} else {
 				os.Unsetenv("OPM_KUBECONFIG")
 			}
-			
+
 			if tt.kubeconfig != "" {
 				os.Setenv("KUBECONFIG", tt.kubeconfig)
 			} else {

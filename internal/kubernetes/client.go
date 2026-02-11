@@ -25,6 +25,10 @@ type ClientOptions struct {
 	// Context is the Kubernetes context to use.
 	// If empty, uses the current-context from kubeconfig.
 	Context string
+
+	// APIWarnings controls how K8s API warnings are handled.
+	// Valid values: "warn", "debug", "suppress". Default: "warn"
+	APIWarnings string
 }
 
 // Client wraps Kubernetes API clients for OPM operations.
@@ -60,6 +64,13 @@ func NewClient(opts ClientOptions) (*Client, error) {
 		return nil, fmt.Errorf("building kubernetes config: %w",
 			oerrors.Wrap(oerrors.ErrConnectivity, err.Error()))
 	}
+
+	// Set custom warning handler based on config
+	warningLevel := opts.APIWarnings
+	if warningLevel == "" {
+		warningLevel = "warn" // default
+	}
+	restConfig.WarningHandler = &opmWarningHandler{level: warningLevel}
 
 	dynamicClient, err := dynamic.NewForConfig(restConfig)
 	if err != nil {
@@ -115,7 +126,7 @@ func buildRestConfig(opts ClientOptions) (*rest.Config, error) {
 // flag > OPM_KUBECONFIG > KUBECONFIG > ~/.kube/config
 func resolveKubeconfig(flagValue string) string {
 	var path string
-	
+
 	if flagValue != "" {
 		path = flagValue
 	} else if v := os.Getenv("OPM_KUBECONFIG"); v != "" {
@@ -129,7 +140,7 @@ func resolveKubeconfig(flagValue string) string {
 		}
 		return filepath.Join(home, ".kube", "config")
 	}
-	
+
 	// Expand tilde in all paths (defensive, in case config resolver didn't)
 	return expandTilde(path)
 }

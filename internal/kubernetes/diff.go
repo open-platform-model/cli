@@ -292,8 +292,9 @@ func findOrphans(ctx context.Context, client *Client, meta build.ModuleMetadata,
 	// Use module name selector for orphan detection.
 	// Diff always has a module name from the build pipeline.
 	liveResources, err := DiscoverResources(ctx, client, DiscoveryOptions{
-		ModuleName: meta.Name,
-		Namespace:  meta.Namespace,
+		ModuleName:   meta.Name,
+		Namespace:    meta.Namespace,
+		ExcludeOwned: true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("discovering live resources: %w", err)

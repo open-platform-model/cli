@@ -109,8 +109,9 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 
 	// Create Kubernetes client
 	k8sClient, err := kubernetes.NewClient(kubernetes.ClientOptions{
-		Kubeconfig: kubeconfig,
-		Context:    kubeContext,
+		Kubeconfig:  kubeconfig,
+		Context:     kubeContext,
+		APIWarnings: opmConfig.Config.Log.Kubernetes.APIWarnings,
 	})
 	if err != nil {
 		modLog.Error("connecting to cluster", "error", err)

@@ -301,6 +301,21 @@ func extractConfig(value cue.Value) (*Config, error) {
 				cfg.Log.Timestamps = &b
 			}
 		}
+
+		// Extract log.kubernetes.apiWarnings
+		logK8sValue := logValue.LookupPath(cue.ParsePath("kubernetes"))
+		if logK8sValue.Exists() {
+			if apiWarningsVal := logK8sValue.LookupPath(cue.ParsePath("apiWarnings")); apiWarningsVal.Exists() {
+				if str, err := apiWarningsVal.String(); err == nil {
+					cfg.Log.Kubernetes.APIWarnings = str
+				}
+			}
+		}
+	}
+
+	// Set default for APIWarnings if not specified
+	if cfg.Log.Kubernetes.APIWarnings == "" {
+		cfg.Log.Kubernetes.APIWarnings = "warn"
 	}
 
 	return cfg, nil

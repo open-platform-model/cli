@@ -42,20 +42,24 @@ config: {
 		// timestamps controls whether timestamps are shown in log output.
 		// Override with --timestamps flag.
 		timestamps: bool | *true
+
+		// kubernetes controls Kubernetes-related log behavior.
+		kubernetes: {
+			// apiWarnings controls how K8s API deprecation warnings are displayed.
+			// "warn"     - Show as WARN in log output (default)
+			// "debug"    - Only show with --verbose
+			// "suppress" - Drop entirely
+			apiWarnings: "warn" | "debug" | "suppress" | *"warn"
+		}
 	}
 }
 `
 
 // DefaultModuleTemplate is the embedded template for cue.mod/module.cue.
+// Deps
 const DefaultModuleTemplate = `module: "opmodel.dev/config@v0"
 
 language: {
 	version: "v0.15.0"
-}
-
-deps: {
-	"opmodel.dev/providers@v0": {
-		v: "v0.1.0"
-	}
 }
 `

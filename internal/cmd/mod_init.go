@@ -58,11 +58,14 @@ func runModInit(cmd *cobra.Command, args []string) error {
 
 	// Validate template name
 	if !templates.IsValidTemplate(modInitTemplate) {
-		return &oerrors.DetailError{
-			Type:    "validation failed",
-			Message: fmt.Sprintf("unknown template: %s", modInitTemplate),
-			Hint:    fmt.Sprintf("Valid templates: %s", strings.Join(templates.ValidTemplates(), ", ")),
-			Cause:   oerrors.ErrValidation,
+		return &ExitError{
+			Code: ExitValidationError,
+			Err: &oerrors.DetailError{
+				Type:    "validation failed",
+				Message: fmt.Sprintf("unknown template: %s", modInitTemplate),
+				Hint:    fmt.Sprintf("Valid templates: %s", strings.Join(templates.ValidTemplates(), ", ")),
+				Cause:   oerrors.ErrValidation,
+			},
 		}
 	}
 
@@ -74,12 +77,15 @@ func runModInit(cmd *cobra.Command, args []string) error {
 
 	// Check if directory already exists
 	if _, err := os.Stat(targetDir); err == nil {
-		return &oerrors.DetailError{
-			Type:     "validation failed",
-			Message:  fmt.Sprintf("directory already exists: %s", targetDir),
-			Location: targetDir,
-			Hint:     "Choose a different directory or remove the existing one.",
-			Cause:    oerrors.ErrValidation,
+		return &ExitError{
+			Code: ExitValidationError,
+			Err: &oerrors.DetailError{
+				Type:     "validation failed",
+				Message:  fmt.Sprintf("directory already exists: %s", targetDir),
+				Location: targetDir,
+				Hint:     "Choose a different directory or remove the existing one.",
+				Cause:    oerrors.ErrValidation,
+			},
 		}
 	}
 

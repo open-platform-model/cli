@@ -38,8 +38,8 @@ All agents MUST read and adhere to `openspec/config.yaml`.
 Use these environment variables during development and validation. Commands like "cue mod tidy" or "cue vet ./..."
 
 ```bash
-export CUE_REGISTRY=localhost:5000
-export OPM_REGISTRY=localhost:5000
+export OPM_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
+export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 export CUE_CACHE_DIR=/var/home/emil/Dev/open-platform-model/.cue-cache
 ```
 

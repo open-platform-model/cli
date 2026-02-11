@@ -68,6 +68,9 @@ type DiscoveryOptions struct {
 	// ReleaseID is the release identity UUID (used with release-id selector).
 	// Mutually exclusive with ModuleName.
 	ReleaseID string
+	// ExcludeOwned excludes resources with ownerReferences from discovery results.
+	// Used by delete and diff to prevent attempting to manage controller-managed children.
+	ExcludeOwned bool
 }
 
 // BuildModuleSelector creates a label selector that matches all resources
@@ -113,13 +116,13 @@ func DiscoverResources(ctx context.Context, client *Client, opts DiscoveryOption
 	}
 
 	// Discover resources with the selector
-	resources := discoverWithSelector(ctx, client, apiResources, selector, opts.Namespace)
+	resources := discoverWithSelector(ctx, client, apiResources, selector, opts.Namespace, opts.ExcludeOwned)
 
 	return resources, nil
 }
 
 // discoverWithSelector finds resources matching a single label selector.
-func discoverWithSelector(ctx context.Context, client *Client, apiResources []apiResourceInfo, selector labels.Selector, namespace string) []*unstructured.Unstructured {
+func discoverWithSelector(ctx context.Context, client *Client, apiResources []apiResourceInfo, selector labels.Selector, namespace string, excludeOwned bool) []*unstructured.Unstructured {
 	var allResources []*unstructured.Unstructured
 
 	for i := range apiResources {
@@ -156,6 +159,12 @@ func discoverWithSelector(ctx context.Context, client *Client, apiResources []ap
 
 		for j := range items.Items {
 			item := items.Items[j]
+
+			// Filter out resources with ownerReferences if ExcludeOwned is true
+			if excludeOwned && len(item.GetOwnerReferences()) > 0 {
+				continue
+			}
+
 			allResources = append(allResources, &item)
 		}
 	}
@@ -179,9 +188,11 @@ type apiResourceInfo struct {
 	resource metav1.APIResource
 }
 
-// discoverAPIResources lists all available API resources from the server.
+// discoverAPIResources lists all preferred API resources from the server.
 func discoverAPIResources(client *Client) ([]apiResourceInfo, error) {
-	_, apiResourceLists, err := client.Clientset.Discovery().ServerGroupsAndResources()
+	// Use ServerPreferredResources instead of ServerGroupsAndResources
+	// to get only the preferred version of each resource type
+	apiResourceLists, err := client.Clientset.Discovery().ServerPreferredResources()
 	if err != nil {
 		// discovery.ErrGroupDiscoveryFailed is non-fatal - some groups may be unavailable
 		if !discovery.IsGroupDiscoveryFailedError(err) {
