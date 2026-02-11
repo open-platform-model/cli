@@ -48,13 +48,6 @@
   1 resource(s) failed to apply
   ```
 
-- [x] Fix the "initializing CLI" output. Even if environment variables or flags are not set it should show what value is being used. The default values will always be found in .opm/config.cue.
-  - Also what is the point of 'registry_flag=""', this seems redundant.
-
-  ```bash
-  12:33:38 DEBU <output/log.go:70> initializing CLI kubeconfig="" context="" namespace="" config="" output=yaml registry_flag="" resolved_registry=localhost:5000
-  ```
-
 - [ ] Running "opm mod apply" on an already applied resource should not reply "✔ Module applied" it should reply something more approriate that there was NO change made.
   - Example:
 
@@ -69,73 +62,6 @@
     10:56:47 INFO m:jellyfin >: applied 5 resources successfully
     ✔ Module applied
     ```
-
-- [x] ~~Update the CLI kubernetes SDK to 1.34+~~
-  - **Resolved:** SDK already at v0.35.0 (Kubernetes 1.35). Implemented in `improve-k8s-api-warnings-and-discovery` change:
-    - Custom `rest.WarningHandler` routes K8s API warnings through charmbracelet/log (formatted consistently)
-    - Config option `log.kubernetes.apiWarnings` with values `"warn"` (default), `"debug"`, or `"suppress"`
-    - Switched discovery to `ServerPreferredResources()` to reduce API calls and avoid deprecated versions
-    - Added `ExcludeOwned` option to skip controller-managed resources (prevents 404 errors on auto-managed Endpoints/EndpointSlice)
-- [x] Missing values in fields during log:
-  - [x] Missing values during config loading "initializing CLI kubeconfig="" context="" namespace="" config="" output=yaml registry_flag="" resolved_registry=localhost:5000". Should show at least default values (from .opm/config.cue). Example "initializing CLI kubeconfig="~/.kube/config" context="kind-opm-dev" namespace="default" config="~/.opm/config.cue" output=yaml registry_flag="" resolved_registry=localhost:5000"
-    - The log "initializing CLI" should display the final config values that was choosen.
-  - [x] Keep this "resolved config path path=/var/home/emil/.opm/config.cue source=default"
-  - [x] Keep this "resolved registry registry=localhost:5000 source=env"
-  - [x] This becomes redundant "bootstrap: extracted registry from config registry=localhost:5000 path=/var/home/emil/.opm/config.cue"
-  - [x] This becomes redundant "setting CUE_REGISTRY for config load registry=localhost:5000"
-  - [x] This becomes redundant "extracted provider from config name=kubernetes"
-  - [x] This becomes redundant "extracted providers from config count=1"
-  - [x] This becomes redundant "loading provider name=kubernetes"
-  - [x] This needs to display provider "rendering module module=. namespace=default provider="""
-  - [x] We only need one of these "release built successfully name=jellyfin namespace=default components=1", "release built name=jellyfin namespace=default components=1"
-
-    ```bash
-    ❯ opm mod apply . --name jellyfin --namespace default --verbose
-    10:49:46 DEBU <output/log.go:70> initializing CLI kubeconfig="" context="" namespace="" config="" output=yaml registry_flag="" resolved_registry=localhost:5000
-    10:49:46 DEBU <output/log.go:70> resolved config path path=/var/home/emil/.opm/config.cue source=default
-    10:49:46 DEBU <output/log.go:70> bootstrap: extracted registry from config registry=localhost:5000 path=/var/home/emil/.opm/config.cue
-    10:49:46 DEBU <output/log.go:70> resolved registry registry=localhost:5000 source=env
-    10:49:46 DEBU <output/log.go:70> setting CUE_REGISTRY for config load registry=localhost:5000
-    10:49:46 DEBU <output/log.go:70> extracted provider from config name=kubernetes
-    10:49:46 DEBU <output/log.go:70> extracted providers from config count=1
-    10:49:46 DEBU <output/log.go:70> rendering module module=. namespace=default provider=""
-    10:49:46 DEBU <output/log.go:70> inspected module via AST pkgName=main name=jellyfin defaultNamespace=jellyfin
-    10:49:46 DEBU <output/log.go:70> building release path=/var/home/emil/Dev/open-platform-model/cli/examples/jellyfin name=jellyfin namespace=default
-    10:49:46 DEBU <output/log.go:70> release built successfully name=jellyfin namespace=default components=1
-    10:49:46 DEBU <output/log.go:70> release built name=jellyfin namespace=default components=1
-    10:49:46 DEBU <output/log.go:70> loading provider name=kubernetes
-    10:49:46 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#DeploymentTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#DeploymentTransformer requiredResources=[opmodel.dev/resources/workload@v0#Container] requiredTraits=[]
-    10:49:46 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#StatefulsetTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#StatefulsetTransformer requiredResources=[opmodel.dev/resources/workload@v0#Container] requiredTraits=[]
-    10:49:46 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#DaemonsetTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#DaemonsetTransformer requiredResources=[opmodel.dev/resources/workload@v0#Container] requiredTraits=[]
-    10:49:46 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#JobTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#JobTransformer requiredResources=[opmodel.dev/resources/workload@v0#Container] requiredTraits=[opmodel.dev/traits/workload@v0#JobConfig]
-    10:49:46 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#CronjobTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#CronjobTransformer requiredResources=[opmodel.dev/resources/workload@v0#Container] requiredTraits=[opmodel.dev/traits/workload@v0#CronJobConfig]
-    10:49:46 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#ServiceTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#ServiceTransformer requiredResources=[opmodel.dev/resources/workload@v0#Container] requiredTraits=[opmodel.dev/traits/network@v0#Expose]
-    10:49:46 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#PvcTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#PvcTransformer requiredResources=[opmodel.dev/resources/storage@v0#Volumes] requiredTraits=[]
-    10:49:46 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#ConfigmapTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#ConfigmapTransformer requiredResources=[opmodel.dev/resources/config@v0#ConfigMaps] requiredTraits=[]
-    10:49:46 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#SecretTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#SecretTransformer requiredResources=[opmodel.dev/resources/config@v0#Secrets] requiredTraits=[]
-    10:49:46 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#ServiceaccountTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#ServiceaccountTransformer requiredResources=[] requiredTraits=[opmodel.dev/traits/security@v0#WorkloadIdentity]
-    10:49:46 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#HpaTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#HpaTransformer requiredResources=[] requiredTraits=[opmodel.dev/traits/workload@v0#Scaling]
-    10:49:46 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#IngressTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#IngressTransformer requiredResources=[] requiredTraits=[opmodel.dev/traits/network@v0#HttpRoute]
-    10:49:46 DEBU <output/log.go:70> loaded provider name=kubernetes version="" transformers=12
-    10:49:46 DEBU <output/log.go:70> executing jobs count=4
-    10:49:46 DEBU <output/log.go:70> execution complete resources=5 errors=0
-    10:49:46 INFO <cmd/mod_apply.go:177> m:jellyfin >: applying 5 resources
-    10:49:46 INFO <kubernetes/apply.go:82> m:jellyfin >: r:PersistentVolumeClaim/default/config            unchanged
-    10:49:46 INFO <kubernetes/apply.go:82> m:jellyfin >: r:PersistentVolumeClaim/default/tvshows           unchanged
-    10:49:46 INFO <kubernetes/apply.go:82> m:jellyfin >: r:PersistentVolumeClaim/default/movies            unchanged
-    10:49:46 INFO <kubernetes/apply.go:82> m:jellyfin >: r:Service/default/jellyfin                        unchanged
-    10:49:46 INFO <kubernetes/apply.go:82> m:jellyfin >: r:StatefulSet/default/jellyfin                    unchanged
-    10:49:46 INFO <cmd/mod_apply.go:200> m:jellyfin >: applied 5 resources successfully
-    ✔ Module applied
-    ```
-
-- [x] Remove "fqn=" from transformer output and use the fqn in "name=" instead. This will make the line entry shorter.
-
-  ```bash
-  09:54:17 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#DeploymentTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#DeploymentTransformer requiredResources=[opmodel.dev/resources/workload@v0#Container] requiredTraits=[]
-  09:54:17 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#StatefulsetTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#StatefulsetTransformer requiredResources=[opmodel.dev/resources/workload@v0#Container] requiredTraits=[]
-  09:54:17 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#DaemonsetTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#DaemonsetTransformer requiredResources=[opmodel.dev/resources/workload@v0#Container] requiredTraits=[]
-  ```
 
 ## Investigation
 
