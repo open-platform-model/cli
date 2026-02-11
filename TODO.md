@@ -2,6 +2,7 @@
 
 ## Feature
 
+- [ ] Rework the "opm mod init" to use cue.AST() instead of string template.
 - [ ] Rework all tests to use cue.AST() instead of strings for test data and comparison.
   - Use pure CUE files, packages and modules for testadata
   - Look into using pure CUE files for comparison data as well.
@@ -25,7 +26,7 @@
 
 ## Bugfix
 
-- [ ] Fix the "initializing CLI" output. Even if environment variables or flags are not set it should show what value is being used. The default values will always be found in .opm/config.cue.
+- [x] Fix the "initializing CLI" output. Even if environment variables or flags are not set it should show what value is being used. The default values will always be found in .opm/config.cue.
   - Also what is the point of 'registry_flag=""', this seems redundant.
 
   ```bash
@@ -78,18 +79,18 @@
     1 resource(s) failed to delete
     ```
 
-- [ ] Missing values in fields during log:
-  - [ ] Missing values during config loading "initializing CLI kubeconfig="" context="" namespace="" config="" output=yaml registry_flag="" resolved_registry=localhost:5000". Should show at least default values (from .opm/config.cue). Example "initializing CLI kubeconfig="~/.kube/config" context="kind-opm-dev" namespace="default" config="~/.opm/config.cue" output=yaml registry_flag="" resolved_registry=localhost:5000"
+- [x] Missing values in fields during log:
+  - [x] Missing values during config loading "initializing CLI kubeconfig="" context="" namespace="" config="" output=yaml registry_flag="" resolved_registry=localhost:5000". Should show at least default values (from .opm/config.cue). Example "initializing CLI kubeconfig="~/.kube/config" context="kind-opm-dev" namespace="default" config="~/.opm/config.cue" output=yaml registry_flag="" resolved_registry=localhost:5000"
     - The log "initializing CLI" should display the final config values that was choosen.
-  - [ ] Keep this "resolved config path path=/var/home/emil/.opm/config.cue source=default"
-  - [ ] Keep this "resolved registry registry=localhost:5000 source=env"
-  - [ ] This becomes redundant "bootstrap: extracted registry from config registry=localhost:5000 path=/var/home/emil/.opm/config.cue"
-  - [ ] This becomes redundant "setting CUE_REGISTRY for config load registry=localhost:5000"
-  - [ ] This becomes redundant "extracted provider from config name=kubernetes"
-  - [ ] This becomes redundant "extracted providers from config count=1"
-  - [ ] This becomes redundant "loading provider name=kubernetes"
-  - [ ] This needs to display provider "rendering module module=. namespace=default provider="""
-  - [ ] We only need one of these "release built successfully name=jellyfin namespace=default components=1", "release built name=jellyfin namespace=default components=1"
+  - [x] Keep this "resolved config path path=/var/home/emil/.opm/config.cue source=default"
+  - [x] Keep this "resolved registry registry=localhost:5000 source=env"
+  - [x] This becomes redundant "bootstrap: extracted registry from config registry=localhost:5000 path=/var/home/emil/.opm/config.cue"
+  - [x] This becomes redundant "setting CUE_REGISTRY for config load registry=localhost:5000"
+  - [x] This becomes redundant "extracted provider from config name=kubernetes"
+  - [x] This becomes redundant "extracted providers from config count=1"
+  - [x] This becomes redundant "loading provider name=kubernetes"
+  - [x] This needs to display provider "rendering module module=. namespace=default provider="""
+  - [x] We only need one of these "release built successfully name=jellyfin namespace=default components=1", "release built name=jellyfin namespace=default components=1"
 
     ```bash
     ❯ opm mod apply . --name jellyfin --namespace default --verbose
@@ -131,7 +132,7 @@
     ✔ Module applied
     ```
 
-- [ ] Remove "fqn=" from transformer output and use the fqn in "name=" instead. This will make the line entry shorter.
+- [x] Remove "fqn=" from transformer output and use the fqn in "name=" instead. This will make the line entry shorter.
 
   ```bash
   09:54:17 DEBU <output/log.go:70> extracted transformer name=opmodel.dev/providers/kubernetes/transformers@v0#DeploymentTransformer fqn=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#DeploymentTransformer requiredResources=[opmodel.dev/resources/workload@v0#Container] requiredTraits=[]
