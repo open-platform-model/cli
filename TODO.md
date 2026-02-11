@@ -2,6 +2,9 @@
 
 ## Feature
 
+- [ ] Rework "opm mod diff" to ignore fields not "owned" by the OPM cli. For example the "managedFields"
+  - This cannot be hardcoded, we need to somehow keep track of the OPM "owned" fields. Maybe secret (like helm) or a Custom Resource.
+- [ ] Ensure "opm config init" also run "cue mod tidy" or similar to discover and download all dependencies.
 - [ ] Rework the "opm mod init" to use cue.AST() instead of string template.
 - [ ] Rework all tests to use cue.AST() instead of strings for test data and comparison.
   - Use pure CUE files, packages and modules for testadata
@@ -23,8 +26,23 @@
   - This can be utilized with the future "opm mod publish" command, so that an author cannot publish a module that is not valid.
 - [x] ~~"opm mod delete --name blog --namespace default --verbose" proceeds but with no change, 0 resources deleted. We should add validation to first look for the module and inform the caller if not found.~~
   - **Resolved:** Implemented in `refine-resource-discovery` change. Commands now return `NoResourcesFoundError` when no resources match the selector.
+- [ ] Add a flag to "opm mod apply" that will create the namespace if missing.
 
 ## Bugfix
+
+- [ ] An incorrectly configured module should not be able to pass validation and apply only some of the resources. Only when all resources are valid should it apply the whole module
+
+  ```bash
+  ❯ opm mod apply . --name jellyfin --namespace default
+  14:50:39 INFO m:jellyfin >: applying 3 resources
+  14:50:39 INFO m:jellyfin >: r:PersistentVolumeClaim/default/config            created
+  14:50:39 INFO m:jellyfin >: r:Service/default/jellyfin                        created
+  14:50:39 WARN m:jellyfin >: applying StatefulSet/jellyfin: StatefulSet.apps "jellyfin" is invalid: [spec.template.spec.containers[0].volumeMounts[1].name: Not found: "tvshows", spec.template.spec.containers[0].volumeMounts[2].name: Not found: "movies"]
+  14:50:39 WARN m:jellyfin >: 1 resource(s) had errors
+  14:50:39 ERRO m:jellyfin >: StatefulSet/jellyfin in default: StatefulSet.apps "jellyfin" is invalid: [spec.template.spec.containers[0].volumeMounts[1].name: Not found: "tvshows", spec.template.spec.containers[0].volumeMounts[2].name: Not found: "movies"]
+  14:50:39 INFO m:jellyfin >: applied 2 resources successfully
+  1 resource(s) failed to apply
+  ```
 
 - [x] Fix the "initializing CLI" output. Even if environment variables or flags are not set it should show what value is being used. The default values will always be found in .opm/config.cue.
   - Also what is the point of 'registry_flag=""', this seems redundant.
