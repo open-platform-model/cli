@@ -2,6 +2,10 @@
 
 ## Feature
 
+- [ ] Add "opm mod tidy" to tidy up CUE module dependencies in an OPM module. Investigate how to implement tidy without access to the CUE binary.
+- [ ] Add "opm mod vet" to validate an OPM module. Take inspiration from how Timoni solved it.
+  - Include a "-c or --concrete" flag to force concreteness during validation
+- [ ] Add "opm mod eval" to evaluate the module printing the raw CUE code of the module.
 - [ ] Rework "opm mod diff" to ignore fields not "owned" by the OPM cli. For example the "managedFields"
   - This cannot be hardcoded, we need to somehow keep track of the OPM "owned" fields. Maybe secret (like helm) or a Custom Resource.
 - [ ] Ensure "opm config init" also run "cue mod tidy" or similar to discover and download all dependencies.
