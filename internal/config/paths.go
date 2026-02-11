@@ -28,3 +28,28 @@ func DefaultPaths() (*Paths, error) {
 		HomeDir:    opmHome,
 	}, nil
 }
+
+// ExpandTilde expands ~ or ~/ prefix in a path to the user's home directory.
+// If the path doesn't start with ~, it's returned unchanged.
+// If os.UserHomeDir fails, returns the original path.
+func ExpandTilde(path string) string {
+	if path == "" || path[0] != '~' {
+		return path
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+
+	if path == "~" {
+		return homeDir
+	}
+
+	if len(path) > 1 && path[1] == '/' {
+		return filepath.Join(homeDir, path[2:])
+	}
+
+	// Don't expand ~username patterns
+	return path
+}

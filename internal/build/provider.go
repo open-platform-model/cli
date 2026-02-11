@@ -59,8 +59,6 @@ func (pl *ProviderLoader) Load(ctx context.Context, name string) (*LoadedProvide
 		return nil, fmt.Errorf("provider %q not found (available: %v)", name, available)
 	}
 
-	output.Debug("loading provider", "name", name)
-
 	provider := &LoadedProvider{
 		Name:  name,
 		byFQN: make(map[string]*LoadedTransformer),
@@ -139,8 +137,7 @@ func (pl *ProviderLoader) extractTransformer(providerName, name string, value cu
 	transformer.OptionalTraits = pl.extractMapKeys(value, "optionalTraits")
 
 	output.Debug("extracted transformer",
-		"name", name,
-		"fqn", transformer.FQN,
+		"name", transformer.FQN,
 		"requiredResources", transformer.RequiredResources,
 		"requiredTraits", transformer.RequiredTraits,
 	)

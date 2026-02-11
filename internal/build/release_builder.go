@@ -188,12 +188,6 @@ func (b *ReleaseBuilder) Build(modulePath string, opts ReleaseOptions, valuesFil
 	// Step 8: Extract release metadata from overlay-computed #opmReleaseMeta
 	metadata := b.extractReleaseMetadata(concreteModule, opts)
 
-	output.Debug("release built successfully",
-		"name", metadata.Name,
-		"namespace", metadata.Namespace,
-		"components", len(components),
-	)
-
 	return &BuiltRelease{
 		Value:      concreteModule,
 		Components: components,
@@ -249,12 +243,6 @@ func (b *ReleaseBuilder) BuildFromValue(moduleValue cue.Value, opts ReleaseOptio
 
 	// Step 5: Extract metadata from the module
 	metadata := b.extractMetadataFromModule(concreteModule, opts)
-
-	output.Debug("release built successfully",
-		"name", metadata.Name,
-		"namespace", metadata.Namespace,
-		"components", len(components),
-	)
 
 	return &BuiltRelease{
 		Value:      concreteModule,

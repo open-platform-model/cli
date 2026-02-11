@@ -58,10 +58,6 @@ func BootstrapRegistry(configPath string) (string, error) {
 	}
 
 	registry := string(matches[1])
-	output.Debug("bootstrap: extracted registry from config",
-		"registry", registry,
-		"path", configPath,
-	)
 	return registry, nil
 }
 
@@ -168,9 +164,6 @@ func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value,
 
 	// Set CUE_REGISTRY if registry is provided
 	if registry != "" {
-		output.Debug("setting CUE_REGISTRY for config load",
-			"registry", registry,
-		)
 		os.Setenv("CUE_REGISTRY", registry)
 		defer os.Unsetenv("CUE_REGISTRY") // Clean up after loading
 	}
@@ -251,14 +244,12 @@ func extractProviders(value cue.Value) map[string]cue.Value {
 	for iter.Next() {
 		name := iter.Selector().Unquoted()
 		providers[name] = iter.Value()
-		output.Debug("extracted provider from config", "name", name)
 	}
 
 	if len(providers) == 0 {
 		return nil
 	}
 
-	output.Debug("extracted providers from config", "count", len(providers))
 	return providers
 }
 

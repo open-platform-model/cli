@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/build"
-	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -97,14 +96,10 @@ func runApply(cmd *cobra.Command, args []string) error {
 	namespace := resolveFlag(applyNamespaceFlag, GetNamespace())
 	provider := resolveFlag(applyProviderFlag, GetProvider())
 
-	// Load configuration
-	opmConfig, err := config.LoadOPMConfig(config.LoaderOptions{
-		RegistryFlag: GetRegistryFlag(),
-		ConfigFlag:   GetConfigPath(),
-	})
-	if err != nil {
-		output.Error("loading configuration", "error", err)
-		return &ExitError{Code: ExitGeneralError, Err: err}
+	// Get pre-loaded configuration
+	opmConfig := GetOPMConfig()
+	if opmConfig == nil {
+		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
 	}
 
 	// Build render options
@@ -214,12 +209,10 @@ func runApply(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// resolveFlag returns the first non-empty value.
-func resolveFlag(values ...string) string {
-	for _, v := range values {
-		if v != "" {
-			return v
-		}
+// resolveFlag returns the local flag if set, otherwise falls back to resolved global value.
+func resolveFlag(localFlag string, resolvedGlobal string) string {
+	if localFlag != "" {
+		return localFlag
 	}
-	return ""
+	return resolvedGlobal
 }

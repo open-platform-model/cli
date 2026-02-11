@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/build"
-	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -82,14 +81,10 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	kubeContext := resolveFlag(diffContextFlag, GetContext())
 	namespace := resolveFlag(diffNamespaceFlag, GetNamespace())
 
-	// Load configuration
-	opmConfig, err := config.LoadOPMConfig(config.LoaderOptions{
-		RegistryFlag: GetRegistryFlag(),
-		ConfigFlag:   GetConfigPath(),
-	})
-	if err != nil {
-		output.Error("loading configuration", "error", err)
-		return &ExitError{Code: ExitGeneralError, Err: err}
+	// Get pre-loaded configuration
+	opmConfig := GetOPMConfig()
+	if opmConfig == nil {
+		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
 	}
 
 	// Build render options

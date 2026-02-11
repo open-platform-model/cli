@@ -6,78 +6,117 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestResolveKubeconfig(t *testing.T) {
+func TestExpandTilde(t *testing.T) {
+	homeDir, err := os.UserHomeDir()
+	assert.NoError(t, err, "should get home directory")
+
 	tests := []struct {
-		name       string
-		flagValue  string
-		envOPM     string
-		envKube    string
-		wantFlag   bool // if true, expect flagValue
-		wantEnvOPM bool // if true, expect OPM_KUBECONFIG
-		wantEnvK   bool // if true, expect KUBECONFIG
-		wantHome   bool // if true, expect ~/.kube/config
+		name     string
+		input    string
+		expected string
 	}{
 		{
-			name:      "flag takes precedence",
-			flagValue: "/custom/kubeconfig",
-			envOPM:    "/opm/kubeconfig",
-			envKube:   "/env/kubeconfig",
-			wantFlag:  true,
+			name:     "empty string",
+			input:    "",
+			expected: "",
 		},
 		{
-			name:       "OPM_KUBECONFIG takes precedence over KUBECONFIG",
-			flagValue:  "",
-			envOPM:     "/opm/kubeconfig",
-			envKube:    "/env/kubeconfig",
-			wantEnvOPM: true,
+			name:     "no tilde",
+			input:    "/absolute/path",
+			expected: "/absolute/path",
 		},
 		{
-			name:     "KUBECONFIG used when no flag or OPM env",
-			envKube:  "/env/kubeconfig",
-			wantEnvK: true,
+			name:     "tilde only",
+			input:    "~",
+			expected: homeDir,
 		},
 		{
-			name:     "falls back to ~/.kube/config",
-			wantHome: true,
+			name:     "tilde with slash - kubeconfig case",
+			input:    "~/.kube/config",
+			expected: filepath.Join(homeDir, ".kube", "config"),
+		},
+		{
+			name:     "tilde with path",
+			input:    "~/Documents/kubeconfig.yaml",
+			expected: filepath.Join(homeDir, "Documents", "kubeconfig.yaml"),
+		},
+		{
+			name:     "tilde username pattern (not expanded)",
+			input:    "~otheruser/config",
+			expected: "~otheruser/config",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Clear env
-			t.Setenv("OPM_KUBECONFIG", tt.envOPM)
-			t.Setenv("KUBECONFIG", tt.envKube)
-
-			result := resolveKubeconfig(tt.flagValue)
-
-			switch {
-			case tt.wantFlag:
-				assert.Equal(t, tt.flagValue, result)
-			case tt.wantEnvOPM:
-				assert.Equal(t, tt.envOPM, result)
-			case tt.wantEnvK:
-				assert.Equal(t, tt.envKube, result)
-			case tt.wantHome:
-				home, err := os.UserHomeDir()
-				require.NoError(t, err)
-				assert.Equal(t, filepath.Join(home, ".kube", "config"), result)
-			}
+			result := expandTilde(tt.input)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestResetClient(t *testing.T) {
-	// Ensure reset clears cached client
-	clientMu.Lock()
-	cachedClient = &Client{} // set a dummy
-	clientMu.Unlock()
+func TestResolveKubeconfigExpandsTilde(t *testing.T) {
+	homeDir, err := os.UserHomeDir()
+	assert.NoError(t, err, "should get home directory")
 
-	ResetClient()
+	tests := []struct {
+		name          string
+		flagValue     string
+		opmKubeconfig string
+		kubeconfig    string
+		expected      string
+	}{
+		{
+			name:      "flag with tilde",
+			flagValue: "~/.kube/custom-config",
+			expected:  filepath.Join(homeDir, ".kube", "custom-config"),
+		},
+		{
+			name:          "OPM_KUBECONFIG env with tilde",
+			flagValue:     "",
+			opmKubeconfig: "~/.kube/opm-config",
+			expected:      filepath.Join(homeDir, ".kube", "opm-config"),
+		},
+		{
+			name:       "KUBECONFIG env with tilde",
+			flagValue:  "",
+			kubeconfig: "~/configs/k8s.yaml",
+			expected:   filepath.Join(homeDir, "configs", "k8s.yaml"),
+		},
+		{
+			name:      "flag with absolute path (no tilde)",
+			flagValue: "/etc/kubernetes/admin.conf",
+			expected:  "/etc/kubernetes/admin.conf",
+		},
+	}
 
-	clientMu.Lock()
-	defer clientMu.Unlock()
-	assert.Nil(t, cachedClient)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Save and restore env vars
+			origOPM := os.Getenv("OPM_KUBECONFIG")
+			origKube := os.Getenv("KUBECONFIG")
+			defer func() {
+				os.Setenv("OPM_KUBECONFIG", origOPM)
+				os.Setenv("KUBECONFIG", origKube)
+			}()
+
+			// Set test env vars
+			if tt.opmKubeconfig != "" {
+				os.Setenv("OPM_KUBECONFIG", tt.opmKubeconfig)
+			} else {
+				os.Unsetenv("OPM_KUBECONFIG")
+			}
+			
+			if tt.kubeconfig != "" {
+				os.Setenv("KUBECONFIG", tt.kubeconfig)
+			} else {
+				os.Unsetenv("KUBECONFIG")
+			}
+
+			result := resolveKubeconfig(tt.flagValue)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

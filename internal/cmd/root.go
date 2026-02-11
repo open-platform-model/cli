@@ -21,7 +21,8 @@ var (
 	timestampsFlag   bool
 
 	// Resolved configuration (loaded during PersistentPreRunE)
-	resolvedRegistry string
+	opmConfig      *config.OPMConfig
+	resolvedConfig *config.ResolvedConfig
 )
 
 // NewRootCmd creates the root command for the OPM CLI.
@@ -59,7 +60,7 @@ func NewRootCmd() *cobra.Command {
 // initializeGlobals sets up logging and loads configuration.
 func initializeGlobals(cmd *cobra.Command) error {
 	// Load configuration first so we can use config values for logging setup
-	opmConfig, err := config.LoadOPMConfig(config.LoaderOptions{
+	loadedConfig, err := config.LoadOPMConfig(config.LoaderOptions{
 		RegistryFlag: registryFlag,
 		ConfigFlag:   configFlag,
 	})
@@ -68,10 +69,39 @@ func initializeGlobals(cmd *cobra.Command) error {
 		// Don't fail here - allow commands that don't need config to work
 	}
 
-	// Store resolved registry
-	if opmConfig != nil {
-		resolvedRegistry = opmConfig.Registry
+	// Store loaded config in package-level var
+	opmConfig = loadedConfig
+
+	// Resolve all configuration values
+	var providerNames []string
+	if opmConfig != nil && opmConfig.Providers != nil {
+		for name := range opmConfig.Providers {
+			providerNames = append(providerNames, name)
+		}
 	}
+
+	var cfg *config.Config
+	if opmConfig != nil {
+		cfg = opmConfig.Config
+	}
+
+	resolved, err := config.ResolveAll(config.ResolveAllOptions{
+		ConfigFlag:     configFlag,
+		RegistryFlag:   registryFlag,
+		KubeconfigFlag: kubeconfigFlag,
+		ContextFlag:    contextFlag,
+		NamespaceFlag:  namespaceFlag,
+		ProviderFlag:   providerFlag,
+		OutputFlag:     outputFormatFlag,
+		Config:         cfg,
+		ProviderNames:  providerNames,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Store resolved config in package-level var
+	resolvedConfig = resolved
 
 	// Build LogConfig with precedence: flag > config > default(true)
 	logCfg := output.LogConfig{
@@ -93,42 +123,67 @@ func initializeGlobals(cmd *cobra.Command) error {
 	// Log config resolution at DEBUG level
 	if verboseFlag {
 		output.Debug("initializing CLI",
-			"kubeconfig", kubeconfigFlag,
-			"context", contextFlag,
-			"namespace", namespaceFlag,
-			"config", configFlag,
-			"output", outputFormatFlag,
-			"registry_flag", registryFlag,
-			"resolved_registry", resolvedRegistry,
+			"kubeconfig", resolvedConfig.Kubeconfig.Value,
+			"context", resolvedConfig.Context.Value,
+			"namespace", resolvedConfig.Namespace.Value,
+			"config", resolvedConfig.ConfigPath.Value,
+			"output", resolvedConfig.Output,
+			"registry", resolvedConfig.Registry.Value,
+			"provider", resolvedConfig.Provider.Value,
 		)
 	}
 
 	return nil
 }
 
-// GetKubeconfig returns the kubeconfig flag value.
+// GetOPMConfig returns the loaded OPM configuration.
+func GetOPMConfig() *config.OPMConfig {
+	return opmConfig
+}
+
+// GetResolvedConfig returns the resolved configuration.
+func GetResolvedConfig() *config.ResolvedConfig {
+	return resolvedConfig
+}
+
+// GetKubeconfig returns the resolved kubeconfig value.
 func GetKubeconfig() string {
+	if resolvedConfig != nil {
+		return resolvedConfig.Kubeconfig.Value
+	}
 	return kubeconfigFlag
 }
 
-// GetContext returns the context flag value.
+// GetContext returns the resolved context value.
 func GetContext() string {
+	if resolvedConfig != nil {
+		return resolvedConfig.Context.Value
+	}
 	return contextFlag
 }
 
-// GetNamespace returns the namespace flag value.
+// GetNamespace returns the resolved namespace value.
 func GetNamespace() string {
+	if resolvedConfig != nil {
+		return resolvedConfig.Namespace.Value
+	}
 	return namespaceFlag
 }
 
-// GetConfigPath returns the config flag value.
+// GetConfigPath returns the resolved config path value.
 func GetConfigPath() string {
+	if resolvedConfig != nil {
+		return resolvedConfig.ConfigPath.Value
+	}
 	return configFlag
 }
 
-// GetRegistry returns the resolved registry URL (flag > env > config).
+// GetRegistry returns the resolved registry URL.
 func GetRegistry() string {
-	return resolvedRegistry
+	if resolvedConfig != nil {
+		return resolvedConfig.Registry.Value
+	}
+	return ""
 }
 
 // GetRegistryFlag returns the raw --registry flag value.
@@ -136,7 +191,10 @@ func GetRegistryFlag() string {
 	return registryFlag
 }
 
-// GetProvider returns the provider flag value.
+// GetProvider returns the resolved provider value.
 func GetProvider() string {
+	if resolvedConfig != nil {
+		return resolvedConfig.Provider.Value
+	}
 	return providerFlag
 }

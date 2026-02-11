@@ -17,7 +17,6 @@ import (
 	"github.com/opmodel/cli/internal/build"
 )
 
-
 // resourceState represents the state of a resource in a diff comparison.
 type resourceState string
 
