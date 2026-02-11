@@ -13,8 +13,8 @@ import (
 func captureLog(cfg LogConfig) *bytes.Buffer {
 	var buf bytes.Buffer
 	SetupLogging(cfg)
-	Logger = log.NewWithOptions(&buf, log.Options{
-		Level:           Logger.GetLevel(),
+	logger = log.NewWithOptions(&buf, log.Options{
+		Level:           logger.GetLevel(),
 		ReportTimestamp: cfg.resolveTimestamps(),
 		ReportCaller:    cfg.Verbose,
 		TimeFormat:      "15:04:05",
@@ -35,14 +35,14 @@ func (c LogConfig) resolveTimestamps() bool {
 
 func TestSetupLogging_TimestampDefaultOn(t *testing.T) {
 	buf := captureLog(LogConfig{})
-	Logger.Info("test")
+	logger.Info("test")
 	// Default timestamps on: output should contain time-like pattern
 	assert.Contains(t, buf.String(), ":", "default output should contain timestamp separator")
 }
 
 func TestSetupLogging_TimestampExplicitlyDisabled(t *testing.T) {
 	buf := captureLog(LogConfig{Timestamps: BoolPtr(false)})
-	Logger.Info("hello")
+	logger.Info("hello")
 	out := buf.String()
 	// When timestamps off, the line should start with level, not a time pattern
 	assert.NotRegexp(t, `^\d{1,2}:\d{2}:\d{2}`, strings.TrimSpace(out),
@@ -51,7 +51,7 @@ func TestSetupLogging_TimestampExplicitlyDisabled(t *testing.T) {
 
 func TestSetupLogging_VerboseForcesTimestampsOn(t *testing.T) {
 	buf := captureLog(LogConfig{Verbose: true, Timestamps: BoolPtr(false)})
-	Logger.Debug("verbose-msg")
+	logger.Debug("verbose-msg")
 	out := buf.String()
 	assert.Contains(t, out, "verbose-msg", "debug message should appear in verbose mode")
 	assert.Contains(t, out, ":", "verbose should force timestamps on")
@@ -59,12 +59,12 @@ func TestSetupLogging_VerboseForcesTimestampsOn(t *testing.T) {
 
 func TestSetupLogging_VerboseEnablesDebugLevel(t *testing.T) {
 	SetupLogging(LogConfig{Verbose: true})
-	assert.Equal(t, log.DebugLevel, Logger.GetLevel(), "verbose should set debug level")
+	assert.Equal(t, log.DebugLevel, logger.GetLevel(), "verbose should set debug level")
 }
 
 func TestSetupLogging_DefaultInfoLevel(t *testing.T) {
 	SetupLogging(LogConfig{})
-	assert.Equal(t, log.InfoLevel, Logger.GetLevel(), "default should be info level")
+	assert.Equal(t, log.InfoLevel, logger.GetLevel(), "default should be info level")
 }
 
 func TestModuleLogger_HasPrefix(t *testing.T) {

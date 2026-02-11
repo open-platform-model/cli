@@ -55,39 +55,6 @@ func WriteManifests(resources []ResourceInfo, opts ManifestOptions) error {
 	return writeYAML(resources, opts.Writer) // Default to YAML
 }
 
-// WriteUnstructuredManifests writes unstructured resources directly.
-// This is a convenience function when you only have the raw objects.
-func WriteUnstructuredManifests(objects []*unstructured.Unstructured, opts ManifestOptions) error {
-	if len(objects) == 0 {
-		return nil
-	}
-
-	// Sort by weight then by name
-	sort.Slice(objects, func(i, j int) bool {
-		wi := weights.GetWeight(objects[i].GroupVersionKind())
-		wj := weights.GetWeight(objects[j].GroupVersionKind())
-		if wi != wj {
-			return wi < wj
-		}
-		nsi := objects[i].GetNamespace()
-		nsj := objects[j].GetNamespace()
-		if nsi != nsj {
-			return nsi < nsj
-		}
-		return objects[i].GetName() < objects[j].GetName()
-	})
-
-	switch opts.Format {
-	case FormatJSON:
-		return writeJSONObjects(objects, opts.Writer)
-	case FormatYAML:
-		return writeYAMLObjects(objects, opts.Writer)
-	case FormatTable, FormatDir:
-		return fmt.Errorf("format %s not supported for manifest output", opts.Format)
-	}
-	return writeYAMLObjects(objects, opts.Writer) // Default to YAML
-}
-
 // sortResourceInfos sorts resources by weight, then by namespace, then by name.
 func sortResourceInfos(resources []ResourceInfo) {
 	sort.Slice(resources, func(i, j int) bool {
@@ -128,19 +95,6 @@ func writeYAML(resources []ResourceInfo, w io.Writer) error {
 
 // writeYAMLObjects writes unstructured objects as YAML documents.
 // The yaml.v3 encoder automatically adds document separators between documents.
-func writeYAMLObjects(objects []*unstructured.Unstructured, w io.Writer) error {
-	encoder := yaml.NewEncoder(w)
-	encoder.SetIndent(2)
-
-	for _, obj := range objects {
-		if err := encoder.Encode(obj.Object); err != nil {
-			return fmt.Errorf("encoding resource %s/%s: %w",
-				obj.GetKind(), obj.GetName(), err)
-		}
-	}
-
-	return encoder.Close()
-}
 
 // writeJSON writes resources as a JSON array.
 func writeJSON(resources []ResourceInfo, w io.Writer) error {
@@ -160,24 +114,9 @@ func writeJSON(resources []ResourceInfo, w io.Writer) error {
 }
 
 // writeJSONObjects writes unstructured objects as JSON array.
-func writeJSONObjects(objects []*unstructured.Unstructured, w io.Writer) error {
-	arr := make([]map[string]any, len(objects))
-	for i, obj := range objects {
-		arr[i] = obj.Object
-	}
 
-	encoder := json.NewEncoder(w)
-	encoder.SetIndent("", "  ")
-
-	if err := encoder.Encode(arr); err != nil {
-		return fmt.Errorf("encoding JSON: %w", err)
-	}
-
-	return nil
-}
-
-// WriteResource writes a single resource to the writer.
-func WriteResource(resource *unstructured.Unstructured, format Format, w io.Writer) error {
+// writeResource writes a single resource to the writer.
+func writeResource(resource *unstructured.Unstructured, format Format, w io.Writer) error {
 	switch format {
 	case FormatJSON:
 		encoder := json.NewEncoder(w)

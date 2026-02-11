@@ -187,11 +187,6 @@ func TestLoadOPMConfig_RegistryFlagPrecedence(t *testing.T) {
 	assert.Equal(t, "flag", cfg.RegistrySource)
 }
 
-func TestCheckRegistryConnectivity_EmptyRegistry(t *testing.T) {
-	err := CheckRegistryConnectivity("")
-	assert.NoError(t, err)
-}
-
 func TestExtractConfig_Empty(t *testing.T) {
 	// This test verifies default values are returned for empty CUE value
 	// In practice, extractConfig is called with loaded CUE values

@@ -67,48 +67,6 @@ func TestNewValidationError(t *testing.T) {
 	assert.Equal(t, "Use semver format", detail.Hint)
 }
 
-func TestNewConnectivityError(t *testing.T) {
-	err := NewConnectivityError(
-		"connection refused",
-		map[string]string{"Registry": "localhost:5000"},
-		"Check registry is running",
-	)
-
-	require.NotNil(t, err)
-	assert.True(t, errors.Is(err, ErrConnectivity))
-
-	var detail *DetailError
-	require.True(t, errors.As(err, &detail))
-	assert.Equal(t, "connectivity failed", detail.Type)
-	assert.Equal(t, "localhost:5000", detail.Context["Registry"])
-}
-
-func TestNewNotFoundError(t *testing.T) {
-	err := NewNotFoundError(
-		"file does not exist",
-		"~/.opm/config.cue",
-		"Run 'opm config init'",
-	)
-
-	require.NotNil(t, err)
-	assert.True(t, errors.Is(err, ErrNotFound))
-
-	var detail *DetailError
-	require.True(t, errors.As(err, &detail))
-	assert.Equal(t, "not found", detail.Type)
-}
-
-func TestNewPermissionError(t *testing.T) {
-	err := NewPermissionError(
-		"cannot create deployments",
-		map[string]string{"Namespace": "production"},
-		"Contact admin",
-	)
-
-	require.NotNil(t, err)
-	assert.True(t, errors.Is(err, ErrPermission))
-}
-
 func TestWrap(t *testing.T) {
 	wrapped := Wrap(ErrValidation, "schema check failed")
 

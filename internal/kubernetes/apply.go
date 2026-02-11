@@ -28,17 +28,17 @@ type ApplyOptions struct {
 	Timeout time.Duration
 }
 
-// ApplyResult contains the outcome of an apply operation.
-type ApplyResult struct {
+// applyResult contains the outcome of an apply operation.
+type applyResult struct {
 	// Applied is the number of resources successfully applied.
 	Applied int
 
 	// Errors contains per-resource errors (non-fatal).
-	Errors []ResourceError
+	Errors []resourceError
 }
 
-// ResourceError captures an error for a specific resource.
-type ResourceError struct {
+// resourceError captures an error for a specific resource.
+type resourceError struct {
 	// Resource identifies the resource.
 	Kind      string
 	Name      string
@@ -48,7 +48,7 @@ type ResourceError struct {
 	Err error
 }
 
-func (e *ResourceError) Error() string {
+func (e *resourceError) Error() string {
 	if e.Namespace != "" {
 		return fmt.Sprintf("%s/%s in %s: %v", e.Kind, e.Name, e.Namespace, e.Err)
 	}
@@ -57,8 +57,8 @@ func (e *ResourceError) Error() string {
 
 // Apply performs server-side apply for a set of rendered resources.
 // Resources are assumed to be already ordered by weight (from RenderResult).
-func Apply(ctx context.Context, client *Client, resources []*build.Resource, meta build.ModuleMetadata, opts ApplyOptions) (*ApplyResult, error) {
-	result := &ApplyResult{}
+func Apply(ctx context.Context, client *Client, resources []*build.Resource, meta build.ModuleMetadata, opts ApplyOptions) (*applyResult, error) {
+	result := &applyResult{}
 	modLog := output.ModuleLogger(meta.Name)
 
 	for _, res := range resources {
@@ -69,7 +69,7 @@ func Apply(ctx context.Context, client *Client, resources []*build.Resource, met
 		status, err := applyResource(ctx, client, res.Object, opts)
 		if err != nil {
 			modLog.Warn(fmt.Sprintf("applying %s/%s: %v", res.Kind(), res.Name(), err))
-			result.Errors = append(result.Errors, ResourceError{
+			result.Errors = append(result.Errors, resourceError{
 				Kind:      res.Kind(),
 				Name:      res.Name(),
 				Namespace: res.Namespace(),
@@ -79,7 +79,7 @@ func Apply(ctx context.Context, client *Client, resources []*build.Resource, met
 		}
 
 		result.Applied++
-		output.Println(output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), status))
+		modLog.Info(output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), status))
 	}
 
 	return result, nil
@@ -93,11 +93,11 @@ func injectLabels(res *build.Resource, meta build.ModuleMetadata) {
 	}
 
 	// Always set managed-by and module labels
-	labels[LabelManagedBy] = LabelManagedByValue
+	labels[LabelManagedBy] = labelManagedByValue
 	labels[LabelModuleName] = meta.Name
-	labels[LabelModuleNamespace] = meta.Namespace
+	labels[labelModuleNamespace] = meta.Namespace
 	if meta.Version != "" {
-		labels[LabelModuleVersion] = meta.Version
+		labels[labelModuleVersion] = meta.Version
 	}
 
 	// Set component label from resource metadata
@@ -107,10 +107,10 @@ func injectLabels(res *build.Resource, meta build.ModuleMetadata) {
 
 	// Set identity labels if available
 	if meta.Identity != "" {
-		labels[LabelModuleID] = meta.Identity
+		labels[labelModuleID] = meta.Identity
 	}
 	if meta.ReleaseIdentity != "" {
-		labels[LabelReleaseID] = meta.ReleaseIdentity
+		labels[labelReleaseID] = meta.ReleaseIdentity
 	}
 
 	res.Object.SetLabels(labels)
@@ -143,7 +143,7 @@ func applyResource(ctx context.Context, client *Client, obj *unstructured.Unstru
 	}
 
 	patchOpts := metav1.PatchOptions{
-		FieldManager: FieldManagerName,
+		FieldManager: fieldManagerName,
 		Force:        boolPtr(true),
 	}
 

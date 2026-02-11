@@ -314,21 +314,3 @@ func extractConfig(value cue.Value) (*Config, error) {
 
 	return cfg, nil
 }
-
-// CheckRegistryConnectivity checks if the registry is reachable.
-// Per FR-010 and FR-014: Fail fast with clear error if registry unreachable.
-func CheckRegistryConnectivity(registry string) error {
-	if registry == "" {
-		return nil // No registry to check
-	}
-
-	// Use a simple HEAD request to check connectivity
-	// For OCI registries, we check the /v2/ endpoint
-	url := fmt.Sprintf("https://%s/v2/", registry)
-
-	// Note: We're just checking connectivity, not authentication
-	// For now, we'll skip the actual HTTP check since it requires more setup.
-	// The CUE binary will fail with a clear error if registry is unreachable.
-	output.Debug("checking registry connectivity", "url", url)
-	return nil
-}

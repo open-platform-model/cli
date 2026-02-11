@@ -126,16 +126,6 @@ func GetConfigPath() string {
 	return configFlag
 }
 
-// GetOutputFormat returns the output format flag value.
-func GetOutputFormat() string {
-	return outputFormatFlag
-}
-
-// IsVerbose returns true if verbose mode is enabled.
-func IsVerbose() bool {
-	return verboseFlag
-}
-
 // GetRegistry returns the resolved registry URL (flag > env > config).
 func GetRegistry() string {
 	return resolvedRegistry

@@ -39,7 +39,7 @@ func TestEvaluateHealth_Workloads(t *testing.T) {
 		name       string
 		kind       string
 		conditions []map[string]interface{}
-		expected   HealthStatus
+		expected   healthStatus
 	}{
 		{
 			name: "Deployment with Available=True",
@@ -47,7 +47,7 @@ func TestEvaluateHealth_Workloads(t *testing.T) {
 			conditions: []map[string]interface{}{
 				{"type": "Available", "status": "True"},
 			},
-			expected: HealthReady,
+			expected: healthReady,
 		},
 		{
 			name: "Deployment with Available=False",
@@ -55,13 +55,13 @@ func TestEvaluateHealth_Workloads(t *testing.T) {
 			conditions: []map[string]interface{}{
 				{"type": "Available", "status": "False"},
 			},
-			expected: HealthNotReady,
+			expected: healthNotReady,
 		},
 		{
 			name:       "Deployment with no conditions",
 			kind:       "Deployment",
 			conditions: nil,
-			expected:   HealthNotReady,
+			expected:   healthNotReady,
 		},
 		{
 			name: "StatefulSet with Ready=True",
@@ -69,7 +69,7 @@ func TestEvaluateHealth_Workloads(t *testing.T) {
 			conditions: []map[string]interface{}{
 				{"type": "Ready", "status": "True"},
 			},
-			expected: HealthReady,
+			expected: healthReady,
 		},
 		{
 			name: "DaemonSet with Available=False",
@@ -77,14 +77,14 @@ func TestEvaluateHealth_Workloads(t *testing.T) {
 			conditions: []map[string]interface{}{
 				{"type": "Available", "status": "False"},
 			},
-			expected: HealthNotReady,
+			expected: healthNotReady,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			resource := makeResource(tc.kind, tc.conditions)
-			assert.Equal(t, tc.expected, EvaluateHealth(resource))
+			assert.Equal(t, tc.expected, evaluateHealth(resource))
 		})
 	}
 }
@@ -93,40 +93,40 @@ func TestEvaluateHealth_Job(t *testing.T) {
 	tests := []struct {
 		name       string
 		conditions []map[string]interface{}
-		expected   HealthStatus
+		expected   healthStatus
 	}{
 		{
 			name: "Job completed",
 			conditions: []map[string]interface{}{
 				{"type": "Complete", "status": "True"},
 			},
-			expected: HealthComplete,
+			expected: healthComplete,
 		},
 		{
 			name: "Job failed",
 			conditions: []map[string]interface{}{
 				{"type": "Failed", "status": "True"},
 			},
-			expected: HealthNotReady,
+			expected: healthNotReady,
 		},
 		{
 			name:       "Job in progress",
 			conditions: nil,
-			expected:   HealthNotReady,
+			expected:   healthNotReady,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			resource := makeResource("Job", tc.conditions)
-			assert.Equal(t, tc.expected, EvaluateHealth(resource))
+			assert.Equal(t, tc.expected, evaluateHealth(resource))
 		})
 	}
 }
 
 func TestEvaluateHealth_CronJob(t *testing.T) {
 	resource := makeResource("CronJob", nil)
-	assert.Equal(t, HealthReady, EvaluateHealth(resource))
+	assert.Equal(t, healthReady, evaluateHealth(resource))
 }
 
 func TestEvaluateHealth_Passive(t *testing.T) {
@@ -139,7 +139,7 @@ func TestEvaluateHealth_Passive(t *testing.T) {
 	for _, kind := range passiveResources {
 		t.Run(kind, func(t *testing.T) {
 			resource := makeResource(kind, nil)
-			assert.Equal(t, HealthReady, EvaluateHealth(resource))
+			assert.Equal(t, healthReady, evaluateHealth(resource))
 		})
 	}
 }
@@ -148,40 +148,40 @@ func TestEvaluateHealth_Custom(t *testing.T) {
 	tests := []struct {
 		name       string
 		conditions []map[string]interface{}
-		expected   HealthStatus
+		expected   healthStatus
 	}{
 		{
 			name: "Custom with Ready=True",
 			conditions: []map[string]interface{}{
 				{"type": "Ready", "status": "True"},
 			},
-			expected: HealthReady,
+			expected: healthReady,
 		},
 		{
 			name: "Custom with Ready=False",
 			conditions: []map[string]interface{}{
 				{"type": "Ready", "status": "False"},
 			},
-			expected: HealthNotReady,
+			expected: healthNotReady,
 		},
 		{
 			name:       "Custom without Ready condition (passive fallback)",
 			conditions: nil,
-			expected:   HealthReady,
+			expected:   healthReady,
 		},
 		{
 			name: "Custom with other conditions but no Ready",
 			conditions: []map[string]interface{}{
 				{"type": "Synced", "status": "True"},
 			},
-			expected: HealthReady,
+			expected: healthReady,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			resource := makeResource("MyCustomResource", tc.conditions)
-			assert.Equal(t, tc.expected, EvaluateHealth(resource))
+			assert.Equal(t, tc.expected, evaluateHealth(resource))
 		})
 	}
 }

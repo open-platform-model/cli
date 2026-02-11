@@ -31,8 +31,8 @@ type DeleteOptions struct {
 	Wait bool
 }
 
-// DeleteResult contains the outcome of a delete operation.
-type DeleteResult struct {
+// deleteResult contains the outcome of a delete operation.
+type deleteResult struct {
 	// Deleted is the number of resources successfully deleted.
 	Deleted int
 
@@ -40,14 +40,14 @@ type DeleteResult struct {
 	Resources []*unstructured.Unstructured
 
 	// Errors contains per-resource errors (non-fatal).
-	Errors []ResourceError
+	Errors []resourceError
 }
 
 // Delete removes all resources belonging to a module deployment.
 // Resources are discovered via OPM labels and deleted in reverse weight order.
-// Returns NoResourcesFoundError when no resources match the selector.
-func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteResult, error) {
-	result := &DeleteResult{}
+// Returns noResourcesFoundError when no resources match the selector.
+func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*deleteResult, error) {
+	result := &deleteResult{}
 
 	// Use module name for logging if available, otherwise use ReleaseID
 	logName := opts.ModuleName
@@ -70,7 +70,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 
 	// Return error when no resources found
 	if len(resources) == 0 {
-		return nil, &NoResourcesFoundError{
+		return nil, &noResourcesFoundError{
 			ModuleName: opts.ModuleName,
 			ReleaseID:  opts.ReleaseID,
 			Namespace:  opts.Namespace,
@@ -78,7 +78,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 	}
 
 	// Sort in reverse weight order (highest weight first = delete webhooks before deployments)
-	SortByWeightDescending(resources)
+	sortByWeightDescending(resources)
 
 	// Delete each resource
 	for _, res := range resources {
@@ -87,14 +87,14 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 		ns := res.GetNamespace()
 
 		if opts.DryRun {
-			output.Println(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
+			modLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
 			result.Deleted++
 			continue
 		}
 
 		if err := deleteResource(ctx, client, res); err != nil {
 			modLog.Warn(fmt.Sprintf("deleting %s/%s: %v", kind, name, err))
-			result.Errors = append(result.Errors, ResourceError{
+			result.Errors = append(result.Errors, resourceError{
 				Kind:      kind,
 				Name:      name,
 				Namespace: ns,
@@ -103,7 +103,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 			continue
 		}
 
-		output.Println(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
+		modLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
 		result.Deleted++
 	}
 

@@ -18,25 +18,25 @@ import (
 // OPM labels applied to all managed resources.
 const (
 	LabelManagedBy       = "app.kubernetes.io/managed-by"
-	LabelManagedByValue  = "open-platform-model"
+	labelManagedByValue  = "open-platform-model"
 	LabelModuleName      = "module.opmodel.dev/name"
-	LabelModuleNamespace = "module.opmodel.dev/namespace"
-	LabelModuleVersion   = "module.opmodel.dev/version"
+	labelModuleNamespace = "module.opmodel.dev/namespace"
+	labelModuleVersion   = "module.opmodel.dev/version"
 	LabelComponentName   = "component.opmodel.dev/name"
-	// LabelReleaseID is the release identity UUID label for resource discovery.
-	LabelReleaseID = "module-release.opmodel.dev/uuid"
-	// LabelModuleID is the module identity UUID label for resource discovery.
-	LabelModuleID = "module.opmodel.dev/uuid"
+	// labelReleaseID is the release identity UUID label for resource discovery.
+	labelReleaseID = "module-release.opmodel.dev/uuid"
+	// labelModuleID is the module identity UUID label for resource discovery.
+	labelModuleID = "module.opmodel.dev/uuid"
 )
 
-// FieldManagerName is the field manager used for server-side apply.
-const FieldManagerName = "opm"
+// fieldManagerName is the field manager used for server-side apply.
+const fieldManagerName = "opm"
 
-// ErrNoResourcesFound is returned when no resources match the selector.
-var ErrNoResourcesFound = errors.New("no resources found")
+// errNoResourcesFound is returned when no resources match the selector.
+var errNoResourcesFound = errors.New("no resources found")
 
-// NoResourcesFoundError contains details about a failed resource discovery.
-type NoResourcesFoundError struct {
+// noResourcesFoundError contains details about a failed resource discovery.
+type noResourcesFoundError struct {
 	// ModuleName is the module name that was searched (empty if using release-id).
 	ModuleName string
 	// ReleaseID is the release-id that was searched (empty if using name).
@@ -46,19 +46,19 @@ type NoResourcesFoundError struct {
 }
 
 // Error implements the error interface.
-func (e *NoResourcesFoundError) Error() string {
+func (e *noResourcesFoundError) Error() string {
 	if e.ModuleName != "" {
 		return fmt.Sprintf("no resources found for module %q in namespace %q", e.ModuleName, e.Namespace)
 	}
 	return fmt.Sprintf("no resources found for release-id %q in namespace %q", e.ReleaseID, e.Namespace)
 }
 
-// Is implements errors.Is for NoResourcesFoundError.
-func (e *NoResourcesFoundError) Is(target error) bool {
-	return target == ErrNoResourcesFound
+// Is implements errors.Is for noResourcesFoundError.
+func (e *noResourcesFoundError) Is(target error) bool {
+	return target == errNoResourcesFound
 }
 
-// DiscoveryOptions configures resource discovery.
+// discoveryOptions configures resource discovery.
 type DiscoveryOptions struct {
 	// ModuleName is the module name to search for (used with name+namespace selector).
 	// Mutually exclusive with ReleaseID.
@@ -72,20 +72,20 @@ type DiscoveryOptions struct {
 
 // BuildModuleSelector creates a label selector that matches all resources
 // belonging to a specific module deployment.
-func BuildModuleSelector(moduleName, namespace string) labels.Selector {
+func buildModuleSelector(moduleName, namespace string) labels.Selector {
 	return labels.SelectorFromSet(labels.Set{
-		LabelManagedBy:       LabelManagedByValue,
+		LabelManagedBy:       labelManagedByValue,
 		LabelModuleName:      moduleName,
-		LabelModuleNamespace: namespace,
+		labelModuleNamespace: namespace,
 	})
 }
 
 // BuildReleaseIDSelector creates a label selector that matches all resources
 // with a specific release identity UUID.
-func BuildReleaseIDSelector(releaseID string) labels.Selector {
+func buildReleaseIDSelector(releaseID string) labels.Selector {
 	return labels.SelectorFromSet(labels.Set{
-		LabelManagedBy: LabelManagedByValue,
-		LabelReleaseID: releaseID,
+		LabelManagedBy: labelManagedByValue,
+		labelReleaseID: releaseID,
 	})
 }
 
@@ -99,9 +99,9 @@ func DiscoverResources(ctx context.Context, client *Client, opts DiscoveryOption
 	var selector labels.Selector
 
 	if opts.ReleaseID != "" {
-		selector = BuildReleaseIDSelector(opts.ReleaseID)
+		selector = buildReleaseIDSelector(opts.ReleaseID)
 	} else if opts.ModuleName != "" {
-		selector = BuildModuleSelector(opts.ModuleName, opts.Namespace)
+		selector = buildModuleSelector(opts.ModuleName, opts.Namespace)
 	} else {
 		return nil, fmt.Errorf("either ModuleName or ReleaseID must be provided")
 	}
@@ -164,7 +164,7 @@ func discoverWithSelector(ctx context.Context, client *Client, apiResources []ap
 }
 
 // SortByWeightDescending sorts resources by weight in descending order (for deletion).
-func SortByWeightDescending(resources []*unstructured.Unstructured) {
+func sortByWeightDescending(resources []*unstructured.Unstructured) {
 	sort.SliceStable(resources, func(i, j int) bool {
 		wi := weights.GetWeight(resources[i].GroupVersionKind())
 		wj := weights.GetWeight(resources[j].GroupVersionKind())

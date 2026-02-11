@@ -118,7 +118,7 @@ func main() {
 	// 5. Verify labels by discovering
 	fmt.Println()
 	fmt.Println("5. Discovering resources via OPM labels...")
-	discovered, err := kubernetes.DiscoverResources(ctx, client, moduleName, namespace)
+	discovered, err := kubernetes.DiscoverResources(ctx, client, kubernetes.DiscoveryOptions{ModuleName: moduleName, Namespace: namespace})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: discover: %v\n", err)
 		os.Exit(1)
@@ -197,7 +197,7 @@ func main() {
 	fmt.Println("9. Verifying cleanup (discover after delete)...")
 	kubernetes.ResetClient()
 	client, _ = kubernetes.NewClient(kubernetes.ClientOptions{Context: "kind-opm-dev"})
-	remaining, err := kubernetes.DiscoverResources(ctx, client, moduleName, namespace)
+	remaining, err := kubernetes.DiscoverResources(ctx, client, kubernetes.DiscoveryOptions{ModuleName: moduleName, Namespace: namespace})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: post-delete discover: %v\n", err)
 		os.Exit(1)

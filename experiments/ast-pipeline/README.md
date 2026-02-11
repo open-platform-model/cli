@@ -9,6 +9,7 @@ Prove that loading a CUE module as AST first, then building `cue.Value` on deman
 1. **AST Overlay** — Build the release overlay as `*ast.File` instead of `fmt.Sprintf`, format it, confirm it loads correctly
 2. **Single Load** — Load once, get `inst.Files` + package name, inject overlay, build to Value — eliminating the double-load in the current pipeline
 3. **Parallel Evaluation** — From the same AST files, spin up independent `cue.Context` per goroutine and run FillPath concurrently without panics
+4. **Cross-Context FillPath** — Validate whether transformer values from one context can be used with module values from another context (the production pattern), and identify race-free parallel execution strategies
 
 ## Background
 
@@ -32,6 +33,7 @@ experiments/ast-pipeline/
 ├── overlay_test.go              # Hypothesis 1: AST-based overlay generation
 ├── loader_test.go               # Hypothesis 2: Single-load with AST inspection
 ├── parallel_test.go             # Hypothesis 3: Parallel eval from shared AST
+├── cross_context_test.go        # Hypothesis 4: Cross-context FillPath & parallel strategies
 └── testdata/
     └── test-module/             # Self-contained CUE module for testing
         ├── cue.mod/
@@ -183,6 +185,18 @@ Proves concurrent transformer execution is possible via AST sharing.
 
 ---
 
+## Hypothesis 4: Cross-Context FillPath (`cross_context_test.go`)
+
+Tests whether the production parallelization pattern is viable: transformer values from one `*cue.Context` used with module values from another. Also validates race-free parallel execution strategies.
+
+| Test | What it proves |
+|------|----------------|
+| `TestCrossContext_FillPathPanics` | CUE **rejects** `FillPath` across different contexts — panics with "values are not from the same runtime". Each goroutine must build both transformer and module in the same context. |
+| `TestCrossContext_SharedBuildInstanceRace` | Documents that the shared `build.Instance` approach (Hypothesis 3) has data races detectable with `-race`. The tests produce correct results but are not race-free. |
+| `TestCrossContext_Strategy_FormatAndReparse` | **Race-free** parallel approach: serialize `inst.Files` to bytes once, each goroutine re-parses from bytes + compiles transformer in its own context. Full production-like FillPath sequence. |
+| `TestCrossContext_Strategy_ReloadPerGoroutine` | Most robust approach: each goroutine does its own `load.Instances` + `BuildInstance`. Works with external CUE imports. No shared state whatsoever. |
+| `TestCrossContext_Strategy_SequentialVsParallelEquivalence` | Verifies parallel (reload) and sequential strategies produce byte-identical output for the same inputs. |
+
 ## What we're NOT testing
 
 - Replacing the entire pipeline (proof-of-concept only)
@@ -203,11 +217,14 @@ Proves concurrent transformer execution is possible via AST sharing.
 | Can we eliminate the double-load? | `loader_test.go` |
 | Can we parallelize transformer execution via AST sharing? | `parallel_test.go` |
 | Can `build.Instance` be reused across contexts, or do we need to re-parse? | `parallel_test.go` |
+| Can FillPath work across different CUE contexts? | `cross_context_test.go` |
+| Is shared `build.Instance` actually race-free? | `cross_context_test.go` |
+| What parallel execution strategies are viable and race-free? | `cross_context_test.go` |
 | What are the gotchas and limitations? | All — documented as found |
 
 ## Findings
 
-All 45 tests pass (13 basics + 12 manipulation + 7 inspection + 4 overlay + 4 loader + 5 parallel).
+All 50 tests pass (13 basics + 12 manipulation + 7 inspection + 4 overlay + 4 loader + 5 parallel + 5 cross-context).
 
 ### AST Fundamentals — All Confirmed
 
@@ -257,18 +274,38 @@ The `generateOverlayAST` function produces byte-identical CUE output compared to
 
 **This eliminates the double-load.** The current pipeline loads once for metadata, builds the overlay, then loads again. With AST inspection, we load once, inspect the AST for metadata, construct the overlay AST, and inject it via `load.Config.Overlay` for a single `BuildInstance` call.
 
-### Hypothesis 3: Parallel Evaluation — CONFIRMED
+### Hypothesis 3: Parallel Evaluation — PARTIALLY CONFIRMED ⚠️
 
-The `build.Instance` returned by `load.Instances` can be safely shared across goroutines. Each goroutine creates its own `cuecontext.New()` and calls `ctx.BuildInstance(inst)` independently — **no panics, no data races**.
+The `build.Instance` returned by `load.Instances` produces correct results when shared across goroutines — each goroutine creates its own `cuecontext.New()` and calls `ctx.BuildInstance(inst)` independently. **No panics, correct output.** However, **the race detector reveals data races** in CUE's `resolveFile` (`runtime/resolve.go:59,151,154`) during concurrent `BuildInstance` calls on the same `*build.Instance`.
 
 **Key findings:**
 
-- `BuildInstance` from the same `inst` works in N goroutines simultaneously
+- `BuildInstance` from the same `inst` produces correct results in N goroutines simultaneously
 - `FillPath` on independently-built Values works concurrently
 - Transformer simulation (3 goroutines building → filling → extracting) produces results identical to sequential execution
-- Fallback path (re-parse from `inst.Files` via `format.Node` + `load` per goroutine) also works but is unnecessary
+- **⚠️ `-race` detector reports data races** — `resolveFile` mutates fields on the shared `*build.Instance` during `BuildInstance`. The tests pass without `-race` but fail with it.
+- The fallback path (re-parse from `inst.Files` via `format.Node` + `load` per goroutine) is **race-free and necessary** for correct parallel execution
 
-**This enables parallel transformer execution.** The current executor runs jobs sequentially because `cue.Context` isn't thread-safe. With this approach, each transformer job gets its own `cue.Context` + `BuildInstance` from the shared `inst`, enabling true parallelism.
+**Implication:** The shared `build.Instance` approach is not safe for production use with `-race`. Use format+reparse or reload-per-goroutine strategies instead (see Hypothesis 4).
+
+### Hypothesis 4: Cross-Context FillPath — REJECTED; Viable Strategies Identified
+
+Three critical findings for the production parallelization story:
+
+**Finding 1: Cross-context FillPath is rejected.** CUE explicitly checks and panics with `"values are not from the same runtime"` when `FillPath` is called with values from different `*cue.Context` instances. This means you cannot pre-load transformers in a shared provider context and inject module values from per-goroutine contexts. Each goroutine must build BOTH transformer and module in the same context.
+
+**Finding 2: Shared `build.Instance` has data races.** See Hypothesis 3 correction above.
+
+**Finding 3: Two viable race-free strategies exist:**
+
+| Strategy | How it works | Pro | Con |
+|----------|-------------|-----|-----|
+| **Format + Reparse** | Serialize `inst.Files` to `[]byte` once (single-threaded). Each goroutine re-parses from bytes, `BuildFile` + `Unify`, compiles transformer in same context. | Fast (no disk I/O per goroutine). Shares only immutable bytes. | Doesn't handle external CUE imports (BuildFile doesn't resolve imports). |
+| **Reload per goroutine** | Each goroutine does its own `load.Instances` + `BuildInstance`. Fully independent. | Works with any module including external imports. Trivially correct. | Re-reads from disk and re-resolves CUE deps per goroutine. |
+
+Both strategies produce output identical to sequential execution (verified by `TestCrossContext_Strategy_SequentialVsParallelEquivalence`).
+
+**For production OPM modules** (which import `opmodel.dev/core@v0`), the **reload-per-goroutine** strategy is required because `BuildFile` cannot resolve external imports. The format+reparse strategy works only for self-contained modules without registry imports.
 
 ### `Value.Default()` API
 
@@ -278,7 +315,7 @@ The `build.Instance` returned by `load.Instances` can be safely shared across go
 
 ### Proceed with AST-based refactor
 
-All three hypotheses are confirmed. The AST approach is viable and addresses the three pain points in the current pipeline.
+Hypotheses 1 and 2 are fully confirmed. Hypothesis 3 is partially confirmed (correct results, but shared `build.Instance` has races). Hypothesis 4 reveals cross-context FillPath is rejected and identifies two viable race-free parallel strategies.
 
 ### Recommended refactor sequence
 
@@ -286,7 +323,7 @@ All three hypotheses are confirmed. The AST approach is viable and addresses the
 
 2. **Single load** (medium risk, eliminates redundant work): Refactor the load path to call `load.Instances` once, inspect `inst.PkgName` and AST for metadata, then build with overlay. Removes `extractModuleMetadata` as a separate load.
 
-3. **Parallel execution** (highest impact, most design work): Refactor executor to spawn goroutines per transformer job, each with its own `cuecontext.New()` + `BuildInstance(inst)`. Requires care with result collection and error handling but the CUE mechanics are proven safe.
+3. **Parallel execution** (highest impact, most design work): Each goroutine must do its own `load.Instances` + `cuecontext.New()` + `BuildInstance` AND compile transformers in the same context (cross-context FillPath is rejected). The reload-per-goroutine strategy is required for modules with external CUE imports. Transformer CUE source must be serialized at provider-load time (the render-pipeline-v2 design notes that `Syntax()` panics on complex transformer values — this remains an open risk that needs a spike on production transformers).
 
 ### Rules for AST construction
 

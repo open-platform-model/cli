@@ -48,7 +48,9 @@ tasks:
   test:
     desc: Run all tests
     cmds:
-      - go test ./...
+      - task: test:unit
+      - task: test:integration
+      - task: test:e2e
 
   test:unit:
     desc: Run unit tests only
@@ -56,17 +58,20 @@ tasks:
       - go test ./internal/... ./pkg/...
 
   test:integration:
-    desc: Run integration tests (requires cluster or envtest)
+    desc: Run integration tests (requires cluster)
     summary: |
-      Run integration tests against a live Kubernetes cluster or envtest.
+      Run integration tests against a live Kubernetes cluster.
 
       A running cluster is required. To create one:
         task cluster:create
 
       To check if a cluster is running:
         task cluster:status
+    preconditions:
+      - sh: kubectl cluster-info --context kind-opm-dev &>/dev/null
+        msg: "Cluster 'kind-opm-dev' is not running. Run: task cluster:create"
     cmds:
-      - go test ./tests/integration/... -v
+      - go run tests/integration/deploy/main.go
 
   test:e2e:
     desc: Run end-to-end tests

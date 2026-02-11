@@ -9,7 +9,7 @@ import (
 )
 
 func TestBuildModuleSelector(t *testing.T) {
-	selector := BuildModuleSelector("my-app", "production")
+	selector := buildModuleSelector("my-app", "production")
 
 	str := selector.String()
 	assert.Contains(t, str, "app.kubernetes.io/managed-by=open-platform-model")
@@ -18,7 +18,7 @@ func TestBuildModuleSelector(t *testing.T) {
 }
 
 func TestBuildReleaseIDSelector(t *testing.T) {
-	selector := BuildReleaseIDSelector("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+	selector := buildReleaseIDSelector("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 
 	str := selector.String()
 	assert.Contains(t, str, "app.kubernetes.io/managed-by=open-platform-model")
@@ -35,7 +35,7 @@ func TestSortByWeightDescending(t *testing.T) {
 		makeUnstructured("v1", "Service", "my-svc", "default"),
 	}
 
-	SortByWeightDescending(resources)
+	sortByWeightDescending(resources)
 
 	// Expected order: Webhook(500) > Deployment(100) > Service(50) > ConfigMap(15) > Namespace(0)
 	assert.Equal(t, "ValidatingWebhookConfiguration", resources[0].GetKind())
@@ -65,7 +65,7 @@ func makeUnstructured(apiVersion, kind, name, namespace string) *unstructured.Un
 
 func TestNoResourcesFoundError(t *testing.T) {
 	t.Run("error message with module name", func(t *testing.T) {
-		err := &NoResourcesFoundError{
+		err := &noResourcesFoundError{
 			ModuleName: "my-app",
 			Namespace:  "production",
 		}
@@ -73,19 +73,19 @@ func TestNoResourcesFoundError(t *testing.T) {
 	})
 
 	t.Run("error message with release-id", func(t *testing.T) {
-		err := &NoResourcesFoundError{
+		err := &noResourcesFoundError{
 			ReleaseID: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 			Namespace: "production",
 		}
 		assert.Equal(t, `no resources found for release-id "a1b2c3d4-e5f6-7890-abcd-ef1234567890" in namespace "production"`, err.Error())
 	})
 
-	t.Run("errors.Is matches ErrNoResourcesFound", func(t *testing.T) {
-		err := &NoResourcesFoundError{
+	t.Run("errors.Is matches errNoResourcesFound", func(t *testing.T) {
+		err := &noResourcesFoundError{
 			ModuleName: "my-app",
 			Namespace:  "production",
 		}
-		assert.True(t, errors.Is(err, ErrNoResourcesFound))
+		assert.True(t, errors.Is(err, errNoResourcesFound))
 	})
 }
 

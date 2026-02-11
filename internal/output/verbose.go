@@ -15,17 +15,17 @@ type VerboseOptions struct {
 	Writer io.Writer
 }
 
-// VerboseResult is the structured verbose output.
-type VerboseResult struct {
-	Module    VerboseModule     `json:"module"`
-	MatchPlan VerboseMatchPlan  `json:"matchPlan"`
-	Resources []VerboseResource `json:"resources"`
+// verboseResult is the structured verbose output.
+type verboseResult struct {
+	Module    verboseModule     `json:"module"`
+	MatchPlan verboseMatchPlan  `json:"matchPlan"`
+	Resources []verboseResource `json:"resources"`
 	Errors    []string          `json:"errors,omitempty"`
 	Warnings  []string          `json:"warnings,omitempty"`
 }
 
-// VerboseModule contains module metadata for verbose output.
-type VerboseModule struct {
+// verboseModule contains module metadata for verbose output.
+type verboseModule struct {
 	Name       string            `json:"name"`
 	Namespace  string            `json:"namespace"`
 	Version    string            `json:"version"`
@@ -33,21 +33,21 @@ type VerboseModule struct {
 	Labels     map[string]string `json:"labels,omitempty"`
 }
 
-// VerboseMatchPlan contains matching details for verbose output.
-type VerboseMatchPlan struct {
-	Matches   map[string][]VerboseMatch `json:"matches"`
+// verboseMatchPlan contains matching details for verbose output.
+type verboseMatchPlan struct {
+	Matches   map[string][]verboseMatch `json:"matches"`
 	Unmatched []string                  `json:"unmatched,omitempty"`
-	Details   []VerboseMatchDetail      `json:"details,omitempty"`
+	Details   []verboseMatchDetail      `json:"details,omitempty"`
 }
 
-// VerboseMatch describes a transformer match.
-type VerboseMatch struct {
+// verboseMatch describes a transformer match.
+type verboseMatch struct {
 	Transformer string `json:"transformer"`
 	Reason      string `json:"reason"`
 }
 
-// VerboseMatchDetail provides detailed matching information.
-type VerboseMatchDetail struct {
+// verboseMatchDetail provides detailed matching information.
+type verboseMatchDetail struct {
 	Component        string   `json:"component"`
 	Transformer      string   `json:"transformer"`
 	Matched          bool     `json:"matched"`
@@ -57,8 +57,8 @@ type VerboseMatchDetail struct {
 	Reason           string   `json:"reason"`
 }
 
-// VerboseResource describes a rendered resource.
-type VerboseResource struct {
+// verboseResource describes a rendered resource.
+type verboseResource struct {
 	Kind        string `json:"kind"`
 	Name        string `json:"name"`
 	Namespace   string `json:"namespace,omitempty"`
@@ -86,8 +86,8 @@ type TransformerMatchInfo struct {
 	Reason         string
 }
 
-// MatchDetailInfo provides match detail data.
-type MatchDetailInfo struct {
+// matchDetailInfo provides match detail data.
+type matchDetailInfo struct {
 	ComponentName    string
 	TransformerFQN   string
 	Matched          bool
@@ -98,7 +98,7 @@ type MatchDetailInfo struct {
 }
 
 // WriteVerboseResult writes verbose output from a RenderResultInfo.
-func WriteVerboseResult(result *RenderResultInfo, details []MatchDetailInfo, opts VerboseOptions) error {
+func WriteVerboseResult(result *RenderResultInfo, details []matchDetailInfo, opts VerboseOptions) error {
 	verboseResult := buildVerboseResultFromInfo(result, details)
 
 	if opts.JSON {
@@ -108,27 +108,27 @@ func WriteVerboseResult(result *RenderResultInfo, details []MatchDetailInfo, opt
 }
 
 // buildVerboseResultFromInfo constructs verbose result from info.
-func buildVerboseResultFromInfo(result *RenderResultInfo, details []MatchDetailInfo) *VerboseResult {
-	vr := &VerboseResult{
-		Module: VerboseModule{
+func buildVerboseResultFromInfo(result *RenderResultInfo, details []matchDetailInfo) *verboseResult {
+	vr := &verboseResult{
+		Module: verboseModule{
 			Name:       result.ModuleName,
 			Namespace:  result.ModuleNamespace,
 			Version:    result.ModuleVersion,
 			Components: result.ModuleComponents,
 			Labels:     result.ModuleLabels,
 		},
-		MatchPlan: VerboseMatchPlan{
-			Matches:   make(map[string][]VerboseMatch),
+		MatchPlan: verboseMatchPlan{
+			Matches:   make(map[string][]verboseMatch),
 			Unmatched: result.Unmatched,
 		},
-		Resources: make([]VerboseResource, 0, len(result.Resources)),
+		Resources: make([]verboseResource, 0, len(result.Resources)),
 		Warnings:  result.Warnings,
 	}
 
 	// Convert matches
 	for compName, matches := range result.Matches {
 		for _, m := range matches {
-			vr.MatchPlan.Matches[compName] = append(vr.MatchPlan.Matches[compName], VerboseMatch{
+			vr.MatchPlan.Matches[compName] = append(vr.MatchPlan.Matches[compName], verboseMatch{
 				Transformer: m.TransformerFQN,
 				Reason:      m.Reason,
 			})
@@ -138,7 +138,7 @@ func buildVerboseResultFromInfo(result *RenderResultInfo, details []MatchDetailI
 	// Convert match details
 	for i := range details {
 		d := &details[i]
-		vr.MatchPlan.Details = append(vr.MatchPlan.Details, VerboseMatchDetail{
+		vr.MatchPlan.Details = append(vr.MatchPlan.Details, verboseMatchDetail{
 			Component:        d.ComponentName,
 			Transformer:      d.TransformerFQN,
 			Matched:          d.Matched,
@@ -151,7 +151,7 @@ func buildVerboseResultFromInfo(result *RenderResultInfo, details []MatchDetailI
 
 	// Convert resources
 	for _, res := range result.Resources {
-		vr.Resources = append(vr.Resources, VerboseResource{
+		vr.Resources = append(vr.Resources, verboseResource{
 			Kind:        res.GetKind(),
 			Name:        res.GetName(),
 			Namespace:   res.GetNamespace(),
@@ -169,14 +169,14 @@ func buildVerboseResultFromInfo(result *RenderResultInfo, details []MatchDetailI
 }
 
 // writeVerboseJSON writes verbose output as JSON.
-func writeVerboseJSON(result *VerboseResult, w io.Writer) error {
+func writeVerboseJSON(result *verboseResult, w io.Writer) error {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
 }
 
 // writeVerboseHuman writes verbose output in human-readable format.
-func writeVerboseHuman(result *VerboseResult, w io.Writer) error {
+func writeVerboseHuman(result *verboseResult, w io.Writer) error {
 	var sb strings.Builder
 
 	// Module info

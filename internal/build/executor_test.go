@@ -11,7 +11,7 @@ import (
 
 func TestExecuteJob_SingleResource(t *testing.T) {
 	ctx := cuecontext.New()
-	executor := NewExecutor(1)
+	executor := NewExecutor()
 
 	// A minimal transformer that produces a single Deployment
 	transformerCUE := ctx.CompileString(`{
@@ -75,7 +75,7 @@ func TestExecuteJob_SingleResource(t *testing.T) {
 
 func TestExecuteJob_MapOutput(t *testing.T) {
 	ctx := cuecontext.New()
-	executor := NewExecutor(1)
+	executor := NewExecutor()
 
 	// A transformer that produces a map of resources (like PVC/ConfigMap/Secret transformers)
 	transformerCUE := ctx.CompileString(`{

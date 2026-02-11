@@ -11,22 +11,11 @@ import (
 	"github.com/opmodel/cli/internal/output"
 )
 
-// Executor runs transformer jobs sequentially.
-//
-// CUE's *cue.Context is not safe for concurrent use — multiple goroutines
-// calling FillPath on values from the same context causes adt.Vertex panics.
-// Since transformer and component values share a context (from config/module loading),
-// all CUE operations (FillPath, Decode, LookupPath) must run single-threaded.
-//
-// Sequential execution is the correct approach because:
-//   - CUE evaluation (FillPath + Decode) dominates job runtime
-//   - True parallelism requires isolated *cue.Context per worker, which requires
-//     re-loading entire CUE module graphs (expensive, complex)
-//   - For typical modules (5-15 jobs), sequential execution is fast enough
+// Executor runs transformer jobs sequentially (CUE's *cue.Context is not safe for concurrent use).
 type Executor struct{}
 
 // NewExecutor creates a new Executor.
-func NewExecutor(_ int) *Executor {
+func NewExecutor() *Executor {
 	return &Executor{}
 }
 
@@ -88,7 +77,7 @@ func (e *Executor) ExecuteWithTransformers(
 
 	output.Debug("executing jobs", "count", len(jobs))
 
-	// Execute sequentially — CUE context is not safe for concurrent use
+	// Execute jobs
 	for _, job := range jobs {
 		// Check for context cancellation between jobs
 		select {
@@ -156,26 +145,23 @@ func (e *Executor) executeJob(job Job) JobResult {
 	unified = unified.FillPath(cue.ParsePath("#context.name"), cueCtx.Encode(tfCtx.Name))
 	unified = unified.FillPath(cue.ParsePath("#context.namespace"), cueCtx.Encode(tfCtx.Namespace))
 
-	moduleMetaMap := map[string]any{
-		"name":    tfCtx.ModuleMetadata.Name,
-		"version": tfCtx.ModuleMetadata.Version,
+	moduleReleaseMetaMap := map[string]any{
+		"name":      tfCtx.ModuleReleaseMetadata.Name,
+		"namespace": tfCtx.ModuleReleaseMetadata.Namespace,
+		"fqn":       tfCtx.ModuleReleaseMetadata.FQN,
+		"version":   tfCtx.ModuleReleaseMetadata.Version,
+		"identity":  tfCtx.ModuleReleaseMetadata.Identity,
 	}
-	if len(tfCtx.ModuleMetadata.Labels) > 0 {
-		moduleMetaMap["labels"] = tfCtx.ModuleMetadata.Labels
+	if len(tfCtx.ModuleReleaseMetadata.Labels) > 0 {
+		moduleReleaseMetaMap["labels"] = tfCtx.ModuleReleaseMetadata.Labels
 	}
-	unified = unified.FillPath(cue.MakePath(cue.Def("context"), cue.Def("moduleMetadata")), cueCtx.Encode(moduleMetaMap))
+	unified = unified.FillPath(cue.MakePath(cue.Def("context"), cue.Def("moduleReleaseMetadata")), cueCtx.Encode(moduleReleaseMetaMap))
 
 	compMetaMap := map[string]any{
 		"name": tfCtx.ComponentMetadata.Name,
 	}
 	if len(tfCtx.ComponentMetadata.Labels) > 0 {
 		compMetaMap["labels"] = tfCtx.ComponentMetadata.Labels
-	}
-	if len(tfCtx.ComponentMetadata.Resources) > 0 {
-		compMetaMap["resources"] = tfCtx.ComponentMetadata.Resources
-	}
-	if len(tfCtx.ComponentMetadata.Traits) > 0 {
-		compMetaMap["traits"] = tfCtx.ComponentMetadata.Traits
 	}
 	if len(tfCtx.ComponentMetadata.Annotations) > 0 {
 		compMetaMap["annotations"] = tfCtx.ComponentMetadata.Annotations

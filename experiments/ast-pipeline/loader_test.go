@@ -152,8 +152,8 @@ func TestSingleLoad_InspectThenBuild(t *testing.T) {
 //
 // Extracts name and version two ways:
 //
-//	1. AST walk: Field("metadata") → StructLit → Field("name"/"version") → BasicLit
-//	2. Value:    val.LookupPath(cue.ParsePath("metadata.name")).String()
+//  1. AST walk: Field("metadata") → StructLit → Field("name"/"version") → BasicLit
+//  2. Value:    val.LookupPath(cue.ParsePath("metadata.name")).String()
 //
 // Verifies both methods return identical results
 func TestSingleLoad_ASTInspectVsValueLookup(t *testing.T) {

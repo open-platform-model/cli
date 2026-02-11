@@ -17,41 +17,23 @@ import (
 	"github.com/opmodel/cli/internal/build"
 )
 
-// DiffOptions configures a diff operation.
-type DiffOptions struct {
-	// Namespace is the target namespace for resource lookup.
-	Namespace string
 
-	// Name is the module release name.
-	Name string
-
-	// ReleaseID is the release identity UUID for discovery.
-	// When provided, resources are discovered via the release-id label.
-	ReleaseID string
-
-	// Kubeconfig is the path to the kubeconfig file.
-	Kubeconfig string
-
-	// Context is the Kubernetes context to use.
-	Context string
-}
-
-// ResourceState represents the state of a resource in a diff comparison.
-type ResourceState string
+// resourceState represents the state of a resource in a diff comparison.
+type resourceState string
 
 const (
 	// ResourceModified means the resource exists both locally and on the cluster with differences.
-	ResourceModified ResourceState = "modified"
+	ResourceModified resourceState = "modified"
 	// ResourceAdded means the resource exists locally but not on the cluster.
-	ResourceAdded ResourceState = "added"
+	ResourceAdded resourceState = "added"
 	// ResourceOrphaned means the resource exists on the cluster but not in the local render.
-	ResourceOrphaned ResourceState = "orphaned"
-	// ResourceUnchanged means the resource exists both locally and on the cluster with no differences.
-	ResourceUnchanged ResourceState = "unchanged"
+	ResourceOrphaned resourceState = "orphaned"
+	// resourceUnchanged means the resource exists both locally and on the cluster with no differences.
+	resourceUnchanged resourceState = "unchanged"
 )
 
-// ResourceDiff contains the diff details for a single resource.
-type ResourceDiff struct {
+// resourceDiff contains the diff details for a single resource.
+type resourceDiff struct {
 	// Kind is the Kubernetes resource kind.
 	Kind string
 	// Name is the resource name.
@@ -59,7 +41,7 @@ type ResourceDiff struct {
 	// Namespace is the resource namespace.
 	Namespace string
 	// State indicates whether the resource is modified, added, or orphaned.
-	State ResourceState
+	State resourceState
 	// Diff is the human-readable diff output (only for modified resources).
 	Diff string
 }
@@ -67,7 +49,7 @@ type ResourceDiff struct {
 // DiffResult contains the full diff output.
 type DiffResult struct {
 	// Resources is the list of resource diffs.
-	Resources []ResourceDiff
+	Resources []resourceDiff
 	// Modified is the count of modified resources.
 	Modified int
 	// Added is the count of added resources.
@@ -104,19 +86,19 @@ func (r *DiffResult) SummaryLine() string {
 	return strings.Join(parts, ", ")
 }
 
-// Comparer wraps the diff comparison logic. It uses dyff by default but
+// comparer wraps the diff comparison logic. It uses dyff by default but
 // can be replaced with a different implementation.
-type Comparer interface {
+type comparer interface {
 	// Compare compares two YAML documents and returns a human-readable diff.
 	// Returns empty string if there are no differences.
 	Compare(rendered, live *unstructured.Unstructured) (string, error)
 }
 
-// dyffComparer is the default Comparer implementation using homeport/dyff.
+// dyffComparer is the default comparer implementation using homeport/dyff.
 type dyffComparer struct{}
 
-// NewComparer creates a new Comparer using dyff.
-func NewComparer() Comparer {
+// NewComparer creates a new comparer using dyff.
+func NewComparer() comparer {
 	return &dyffComparer{}
 }
 
@@ -179,7 +161,7 @@ func (c *dyffComparer) Compare(rendered, live *unstructured.Unstructured) (strin
 }
 
 // FetchLiveState fetches a single resource from the cluster.
-func FetchLiveState(ctx context.Context, client *Client, resource *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func fetchLiveState(ctx context.Context, client *Client, resource *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	gvr := gvrFromUnstructured(resource)
 	ns := resource.GetNamespace()
 	name := resource.GetName()
@@ -206,7 +188,7 @@ func resourceKey(gvk schema.GroupVersionKind, namespace, name string) string {
 }
 
 // Diff compares rendered resources against the live cluster state and returns categorized results.
-func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta build.ModuleMetadata, comparer Comparer) (*DiffResult, error) {
+func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta build.ModuleMetadata, comparer comparer) (*DiffResult, error) {
 	result := &DiffResult{}
 
 	// Build a set of rendered resource keys for orphan detection
@@ -223,11 +205,11 @@ func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta
 		name := obj.GetName()
 		ns := obj.GetNamespace()
 
-		live, err := FetchLiveState(ctx, client, obj)
+		live, err := fetchLiveState(ctx, client, obj)
 		if err != nil {
 			// Resource not found on cluster -> added
 			if apierrors.IsNotFound(err) {
-				result.Resources = append(result.Resources, ResourceDiff{
+				result.Resources = append(result.Resources, resourceDiff{
 					Kind:      kind,
 					Name:      name,
 					Namespace: ns,
@@ -250,15 +232,15 @@ func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta
 
 		if diffOutput == "" {
 			// No differences
-			result.Resources = append(result.Resources, ResourceDiff{
+			result.Resources = append(result.Resources, resourceDiff{
 				Kind:      kind,
 				Name:      name,
 				Namespace: ns,
-				State:     ResourceUnchanged,
+				State:     resourceUnchanged,
 			})
 			result.Unchanged++
 		} else {
-			result.Resources = append(result.Resources, ResourceDiff{
+			result.Resources = append(result.Resources, resourceDiff{
 				Kind:      kind,
 				Name:      name,
 				Namespace: ns,
@@ -275,7 +257,7 @@ func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta
 		result.Warnings = append(result.Warnings, fmt.Sprintf("detecting orphans: %v", err))
 	} else {
 		for _, orphan := range orphans {
-			result.Resources = append(result.Resources, ResourceDiff{
+			result.Resources = append(result.Resources, resourceDiff{
 				Kind:      orphan.GetKind(),
 				Name:      orphan.GetName(),
 				Namespace: orphan.GetNamespace(),
@@ -290,7 +272,7 @@ func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta
 
 // DiffPartial compares rendered resources against live state, handling partial render results.
 // Successfully rendered resources are compared; render errors produce warnings.
-func DiffPartial(ctx context.Context, client *Client, resources []*build.Resource, renderErrors []error, meta build.ModuleMetadata, comparer Comparer) (*DiffResult, error) {
+func DiffPartial(ctx context.Context, client *Client, resources []*build.Resource, renderErrors []error, meta build.ModuleMetadata, comparer comparer) (*DiffResult, error) {
 	result, err := Diff(ctx, client, resources, meta, comparer)
 	if err != nil {
 		return nil, err

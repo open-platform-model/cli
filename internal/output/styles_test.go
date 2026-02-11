@@ -19,12 +19,12 @@ func TestStatusStyle(t *testing.T) {
 		{
 			name:   "created returns green",
 			status: StatusCreated,
-			wantFG: ColorGreen,
+			wantFG: colorGreen,
 		},
 		{
 			name:   "configured returns yellow",
 			status: StatusConfigured,
-			wantFG: ColorYellow,
+			wantFG: colorYellow,
 		},
 		{
 			name:    "unchanged returns faint",
@@ -34,13 +34,13 @@ func TestStatusStyle(t *testing.T) {
 		{
 			name:   "deleted returns red",
 			status: StatusDeleted,
-			wantFG: ColorRed,
+			wantFG: colorRed,
 		},
 		{
 			name:     "failed returns bold red",
-			status:   StatusFailed,
+			status:   statusFailed,
 			wantBold: true,
-			wantFG:   ColorBoldRed,
+			wantFG:   colorBoldRed,
 		},
 		{
 			name:   "unknown returns default unstyled",
@@ -50,7 +50,7 @@ func TestStatusStyle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			style := StatusStyle(tt.status)
+			style := statusStyle(tt.status)
 			if tt.wantBold {
 				assert.True(t, style.GetBold(), "expected bold")
 			}

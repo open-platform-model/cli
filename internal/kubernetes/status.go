@@ -39,8 +39,8 @@ type StatusOptions struct {
 	Context string
 }
 
-// ResourceHealth contains health information for a single resource.
-type ResourceHealth struct {
+// resourceHealth contains health information for a single resource.
+type resourceHealth struct {
 	// Kind is the Kubernetes resource kind.
 	Kind string `json:"kind" yaml:"kind"`
 	// Name is the resource name.
@@ -48,17 +48,17 @@ type ResourceHealth struct {
 	// Namespace is the resource namespace.
 	Namespace string `json:"namespace" yaml:"namespace"`
 	// Status is the evaluated health status.
-	Status HealthStatus `json:"status" yaml:"status"`
+	Status healthStatus `json:"status" yaml:"status"`
 	// Age is the human-readable age of the resource.
 	Age string `json:"age" yaml:"age"`
 }
 
-// StatusResult contains the full status output.
-type StatusResult struct {
+// statusResult contains the full status output.
+type statusResult struct {
 	// Resources is the list of resource health statuses.
-	Resources []ResourceHealth `json:"resources" yaml:"resources"`
+	Resources []resourceHealth `json:"resources" yaml:"resources"`
 	// AggregateStatus is the overall module health.
-	AggregateStatus HealthStatus `json:"aggregateStatus" yaml:"aggregateStatus"`
+	AggregateStatus healthStatus `json:"aggregateStatus" yaml:"aggregateStatus"`
 	// ModuleID is the module identity UUID (if present on resources).
 	ModuleID string `json:"moduleId,omitempty" yaml:"moduleId,omitempty"`
 	// ReleaseID is the release identity UUID (if present on resources).
@@ -66,8 +66,8 @@ type StatusResult struct {
 }
 
 // GetModuleStatus discovers resources by OPM labels and evaluates health per resource.
-// Returns NoResourcesFoundError when no resources match the selector.
-func GetModuleStatus(ctx context.Context, client *Client, opts StatusOptions) (*StatusResult, error) {
+// Returns noResourcesFoundError when no resources match the selector.
+func GetModuleStatus(ctx context.Context, client *Client, opts StatusOptions) (*statusResult, error) {
 	// Discover resources via labels
 	resources, err := DiscoverResources(ctx, client, DiscoveryOptions{
 		ModuleName: opts.Name,
@@ -80,30 +80,30 @@ func GetModuleStatus(ctx context.Context, client *Client, opts StatusOptions) (*
 
 	// Return error when no resources found
 	if len(resources) == 0 {
-		return nil, &NoResourcesFoundError{
+		return nil, &noResourcesFoundError{
 			ModuleName: opts.Name,
 			ReleaseID:  opts.ReleaseID,
 			Namespace:  opts.Namespace,
 		}
 	}
 
-	result := &StatusResult{}
+	result := &statusResult{}
 	allReady := true
 
 	// Extract identity labels from first resource (if available)
 	if len(resources) > 0 {
 		labels := resources[0].GetLabels()
 		if labels != nil {
-			result.ModuleID = labels[LabelModuleID]
-			result.ReleaseID = labels[LabelReleaseID]
+			result.ModuleID = labels[labelModuleID]
+			result.ReleaseID = labels[labelReleaseID]
 		}
 	}
 
 	for _, res := range resources {
-		health := EvaluateHealth(res)
+		health := evaluateHealth(res)
 		age := computeAge(res)
 
-		result.Resources = append(result.Resources, ResourceHealth{
+		result.Resources = append(result.Resources, resourceHealth{
 			Kind:      res.GetKind(),
 			Name:      res.GetName(),
 			Namespace: res.GetNamespace(),
@@ -111,25 +111,25 @@ func GetModuleStatus(ctx context.Context, client *Client, opts StatusOptions) (*
 			Age:       age,
 		})
 
-		if health != HealthReady && health != HealthComplete {
+		if health != healthReady && health != healthComplete {
 			allReady = false
 		}
 	}
 
 	// Compute aggregate status
 	if len(result.Resources) == 0 {
-		result.AggregateStatus = HealthUnknown
+		result.AggregateStatus = healthUnknown
 	} else if allReady {
-		result.AggregateStatus = HealthReady
+		result.AggregateStatus = healthReady
 	} else {
-		result.AggregateStatus = HealthNotReady
+		result.AggregateStatus = healthNotReady
 	}
 
 	return result, nil
 }
 
 // FormatStatusTable renders the status result as a formatted table.
-func FormatStatusTable(result *StatusResult) string {
+func FormatStatusTable(result *statusResult) string {
 	var sb strings.Builder
 
 	// Show identity information if present
@@ -156,7 +156,7 @@ func FormatStatusTable(result *StatusResult) string {
 }
 
 // FormatStatusJSON renders the status result as JSON.
-func FormatStatusJSON(result *StatusResult) (string, error) {
+func formatStatusJSON(result *statusResult) (string, error) {
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("marshaling status to JSON: %w", err)
@@ -165,7 +165,7 @@ func FormatStatusJSON(result *StatusResult) (string, error) {
 }
 
 // FormatStatusYAML renders the status result as YAML.
-func FormatStatusYAML(result *StatusResult) (string, error) {
+func formatStatusYAML(result *statusResult) (string, error) {
 	data, err := yaml.Marshal(result)
 	if err != nil {
 		return "", fmt.Errorf("marshaling status to YAML: %w", err)
@@ -209,12 +209,12 @@ func formatDuration(d time.Duration) string {
 }
 
 // FormatStatus formats the status result based on the output format.
-func FormatStatus(result *StatusResult, format string) (string, error) {
+func FormatStatus(result *statusResult, format string) (string, error) {
 	switch strings.ToLower(format) {
 	case "json":
-		return FormatStatusJSON(result)
+		return formatStatusJSON(result)
 	case "yaml":
-		return FormatStatusYAML(result)
+		return formatStatusYAML(result)
 	default:
 		return FormatStatusTable(result), nil
 	}

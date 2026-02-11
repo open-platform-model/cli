@@ -35,18 +35,18 @@ func NewPipeline(cfg *config.OPMConfig) Pipeline {
 		releaseBuilder: NewReleaseBuilder(cfg.CueContext, cfg.Registry),
 		provider:       NewProviderLoader(cfg),
 		matcher:        NewMatcher(),
-		executor:       NewExecutor(0),
+		executor:       NewExecutor(),
 	}
 }
 
 // Render executes the pipeline and returns results.
 //
 // The render process follows these phases:
-//  1. Resolve module path and extract metadata (name, namespace)
-//  2. Build #ModuleRelease via CUE overlay (loads module with overlay + values)
+//  1. Resolve module path and inspect metadata via AST (InspectModule — no CUE evaluation)
+//  2. Build #ModuleRelease via AST overlay (loads module with overlay + values)
 //  3. Load provider and transformers (ProviderLoader)
 //  4. Match components to transformers (Matcher)
-//  5. Execute transformers in parallel (Executor)
+//  5. Execute transformers (Executor)
 //  6. Build and return RenderResult
 //
 // Fatal errors (module not found, provider missing, incomplete values) return error.
@@ -57,18 +57,32 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		return nil, err
 	}
 
-	// Phase 1: Resolve module path and extract metadata
+	// Phase 1: Resolve module path and inspect module metadata via AST
 	modulePath, err := p.resolveModulePath(opts.ModulePath)
 	if err != nil {
 		return nil, err
 	}
 
-	moduleMeta, err := p.extractModuleMetadata(modulePath, opts)
+	inspection, err := p.releaseBuilder.InspectModule(modulePath)
 	if err != nil {
 		return nil, err
 	}
 
-	// Phase 2: Build #ModuleRelease (loads module with overlay, unifies values)
+	// If AST inspection returned empty name, fall back to BuildInstance + LookupPath
+	// to handle computed metadata expressions.
+	moduleMeta := &moduleMetadataPreview{
+		name:             inspection.Name,
+		defaultNamespace: inspection.DefaultNamespace,
+	}
+	if moduleMeta.name == "" {
+		fallbackMeta, err := p.extractModuleMetadata(modulePath, opts)
+		if err != nil {
+			return nil, err
+		}
+		moduleMeta = fallbackMeta
+	}
+
+	// Phase 2: Build #ModuleRelease (loads module with AST overlay, unifies values)
 	releaseName := opts.Name
 	if releaseName == "" {
 		releaseName = moduleMeta.name
@@ -81,6 +95,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	release, err := p.releaseBuilder.Build(modulePath, ReleaseOptions{
 		Name:      releaseName,
 		Namespace: namespace,
+		PkgName:   inspection.PkgName,
 	}, opts.Values)
 	if err != nil {
 		return nil, err // Fatal: release building failed (likely incomplete values)
@@ -120,7 +135,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		})
 	}
 
-	// Phase 5: Execute transformers in parallel (only for matched components)
+	// Phase 5: Execute transformers (only for matched components)
 	var resources []*Resource
 	if len(matchResult.ByTransformer) > 0 {
 		// Build transformer map for executor

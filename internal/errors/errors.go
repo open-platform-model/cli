@@ -102,39 +102,6 @@ func NewValidationError(message, location, field, hint string) error {
 	}
 }
 
-// NewConnectivityError creates a connectivity error with details.
-func NewConnectivityError(message string, context map[string]string, hint string) error {
-	return &DetailError{
-		Type:    "connectivity failed",
-		Message: message,
-		Context: context,
-		Hint:    hint,
-		Cause:   ErrConnectivity,
-	}
-}
-
-// NewNotFoundError creates a not found error with details.
-func NewNotFoundError(message, location, hint string) error {
-	return &DetailError{
-		Type:     "not found",
-		Message:  message,
-		Location: location,
-		Hint:     hint,
-		Cause:    ErrNotFound,
-	}
-}
-
-// NewPermissionError creates a permission denied error with details.
-func NewPermissionError(message string, context map[string]string, hint string) error {
-	return &DetailError{
-		Type:    "permission denied",
-		Message: message,
-		Context: context,
-		Hint:    hint,
-		Cause:   ErrPermission,
-	}
-}
-
 // Wrap wraps an error with a sentinel error type.
 func Wrap(sentinel error, message string) error {
 	return fmt.Errorf("%s: %w", message, sentinel)

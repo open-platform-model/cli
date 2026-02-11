@@ -269,8 +269,8 @@ func TestOverlayAST_LoadsWithModule(t *testing.T) {
 
 // Input CUE: testdata/test-module/ loaded with both overlay approaches:
 //
-//	1. String overlay via generateOverlayString (fmt.Sprintf)
-//	2. AST overlay via generateOverlayAST (typed construction)
+//  1. String overlay via generateOverlayString (fmt.Sprintf)
+//  2. AST overlay via generateOverlayAST (typed construction)
 //
 // Both evaluated in separate cue.Context instances.
 // Verifies: #opmReleaseMeta.identity UUID matches between both approaches.

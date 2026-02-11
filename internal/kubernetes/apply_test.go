@@ -33,8 +33,8 @@ func TestInjectLabels(t *testing.T) {
 	labels := obj.GetLabels()
 	assert.Equal(t, "open-platform-model", labels[LabelManagedBy])
 	assert.Equal(t, "my-app", labels[LabelModuleName])
-	assert.Equal(t, "production", labels[LabelModuleNamespace])
-	assert.Equal(t, "1.0.0", labels[LabelModuleVersion])
+	assert.Equal(t, "production", labels[labelModuleNamespace])
+	assert.Equal(t, "1.0.0", labels[labelModuleVersion])
 	assert.Equal(t, "web-server", labels[LabelComponentName])
 }
 
@@ -70,7 +70,7 @@ func TestInjectLabels_NoVersionIfEmpty(t *testing.T) {
 	injectLabels(res, meta)
 
 	labels := obj.GetLabels()
-	_, hasVersion := labels[LabelModuleVersion]
+	_, hasVersion := labels[labelModuleVersion]
 	assert.False(t, hasVersion, "should not have version label when version is empty")
 }
 
@@ -169,8 +169,8 @@ func TestInjectLabels_WithIdentity(t *testing.T) {
 	injectLabels(res, meta)
 
 	labels := obj.GetLabels()
-	assert.Equal(t, "module-uuid-1234", labels[LabelModuleID])
-	assert.Equal(t, "release-uuid-5678", labels[LabelReleaseID])
+	assert.Equal(t, "module-uuid-1234", labels[labelModuleID])
+	assert.Equal(t, "release-uuid-5678", labels[labelReleaseID])
 }
 
 func TestInjectLabels_WithoutIdentity(t *testing.T) {
@@ -191,8 +191,8 @@ func TestInjectLabels_WithoutIdentity(t *testing.T) {
 	injectLabels(res, meta)
 
 	labels := obj.GetLabels()
-	_, hasModuleID := labels[LabelModuleID]
-	_, hasReleaseID := labels[LabelReleaseID]
+	_, hasModuleID := labels[labelModuleID]
+	_, hasReleaseID := labels[labelReleaseID]
 	assert.False(t, hasModuleID, "should not have module-id label when identity is empty")
 	assert.False(t, hasReleaseID, "should not have release-id label when release identity is empty")
 }
@@ -226,6 +226,6 @@ func TestInjectLabels_PreservesExistingWithIdentity(t *testing.T) {
 	assert.Equal(t, "open-platform-model", labels[LabelManagedBy])
 	assert.Equal(t, "svc", labels[LabelModuleName])
 	// Identity labels added
-	assert.Equal(t, "mod-id", labels[LabelModuleID])
-	assert.Equal(t, "rel-id", labels[LabelReleaseID])
+	assert.Equal(t, "mod-id", labels[labelModuleID])
+	assert.Equal(t, "rel-id", labels[labelReleaseID])
 }

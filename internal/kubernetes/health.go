@@ -4,18 +4,18 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// HealthStatus represents the health state of a resource.
-type HealthStatus string
+// healthStatus represents the health state of a resource.
+type healthStatus string
 
 const (
-	// HealthReady means the resource is ready and healthy.
-	HealthReady HealthStatus = "Ready"
-	// HealthNotReady means the resource exists but is not yet ready.
-	HealthNotReady HealthStatus = "NotReady"
-	// HealthComplete means the resource has completed (e.g., a Job).
-	HealthComplete HealthStatus = "Complete"
-	// HealthUnknown means the health state could not be determined.
-	HealthUnknown HealthStatus = "Unknown"
+	// healthReady means the resource is ready and healthy.
+	healthReady healthStatus = "Ready"
+	// healthNotReady means the resource exists but is not yet ready.
+	healthNotReady healthStatus = "NotReady"
+	// healthComplete means the resource has completed (e.g., a Job).
+	healthComplete healthStatus = "Complete"
+	// healthUnknown means the health state could not be determined.
+	healthUnknown healthStatus = "Unknown"
 )
 
 // workloadKinds are resources that use the Ready condition for health.
@@ -48,7 +48,7 @@ var passiveKinds = map[string]bool{
 
 // EvaluateHealth determines the health status of a Kubernetes resource
 // based on its kind and status conditions.
-func EvaluateHealth(resource *unstructured.Unstructured) HealthStatus {
+func evaluateHealth(resource *unstructured.Unstructured) healthStatus {
 	kind := resource.GetKind()
 
 	// Workloads: Deployment, StatefulSet, DaemonSet — check Ready condition
@@ -63,12 +63,12 @@ func EvaluateHealth(resource *unstructured.Unstructured) HealthStatus {
 
 	// CronJobs: always healthy (scheduled)
 	if kind == "CronJob" {
-		return HealthReady
+		return healthReady
 	}
 
 	// Passive resources: healthy on creation
 	if passiveKinds[kind] {
-		return HealthReady
+		return healthReady
 	}
 
 	// Custom resources: check for Ready condition, fallback to passive
@@ -76,51 +76,51 @@ func EvaluateHealth(resource *unstructured.Unstructured) HealthStatus {
 }
 
 // evaluateWorkloadHealth checks the Ready condition on workload resources.
-func evaluateWorkloadHealth(resource *unstructured.Unstructured) HealthStatus {
+func evaluateWorkloadHealth(resource *unstructured.Unstructured) healthStatus {
 	conditions := getConditions(resource)
 	for _, c := range conditions {
 		if c.Type == "Available" || c.Type == "Ready" {
 			if c.Status == "True" {
-				return HealthReady
+				return healthReady
 			}
-			return HealthNotReady
+			return healthNotReady
 		}
 	}
-	return HealthNotReady
+	return healthNotReady
 }
 
 // evaluateJobHealth checks the Complete condition on Job resources.
-func evaluateJobHealth(resource *unstructured.Unstructured) HealthStatus {
+func evaluateJobHealth(resource *unstructured.Unstructured) healthStatus {
 	conditions := getConditions(resource)
 	for _, c := range conditions {
 		if c.Type == "Complete" {
 			if c.Status == "True" {
-				return HealthComplete
+				return healthComplete
 			}
 		}
 		if c.Type == "Failed" {
 			if c.Status == "True" {
-				return HealthNotReady
+				return healthNotReady
 			}
 		}
 	}
-	return HealthNotReady
+	return healthNotReady
 }
 
 // evaluateCustomHealth checks for a Ready condition on custom resources.
 // If no Ready condition exists, treats the resource as passive (healthy).
-func evaluateCustomHealth(resource *unstructured.Unstructured) HealthStatus {
+func evaluateCustomHealth(resource *unstructured.Unstructured) healthStatus {
 	conditions := getConditions(resource)
 	for _, c := range conditions {
 		if c.Type == "Ready" {
 			if c.Status == "True" {
-				return HealthReady
+				return healthReady
 			}
-			return HealthNotReady
+			return healthNotReady
 		}
 	}
 	// No Ready condition — treat as passive
-	return HealthReady
+	return healthReady
 }
 
 // condition represents a Kubernetes status condition.

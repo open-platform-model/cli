@@ -3,8 +3,6 @@ package config
 
 import (
 	"os"
-
-	"github.com/opmodel/cli/internal/output"
 )
 
 // Source indicates where a configuration value came from.
@@ -134,23 +132,4 @@ func ResolveConfigPath(opts ResolveConfigPathOptions) (ResolveConfigPathResult, 
 	}
 
 	return result, nil
-}
-
-// LogResolvedValues logs configuration resolution at DEBUG level when verbose.
-// Per FR-018: When --verbose is specified, log each configuration value's resolution.
-func LogResolvedValues(values []ResolvedValue) {
-	for _, v := range values {
-		output.Debug("config value resolved",
-			"key", v.Key,
-			"value", v.Value,
-			"source", v.Source,
-		)
-		for source, shadowed := range v.Shadowed {
-			output.Debug("  shadowed by higher precedence",
-				"key", v.Key,
-				"shadowed_source", source,
-				"shadowed_value", shadowed,
-			)
-		}
-	}
 }

@@ -1,66 +1,12 @@
 package cmd
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	oerrors "github.com/opmodel/cli/internal/errors"
 )
-
-func TestExitCodeFromError(t *testing.T) {
-	tests := []struct {
-		name     string
-		err      error
-		wantCode int
-	}{
-		{
-			name:     "nil error returns success",
-			err:      nil,
-			wantCode: ExitSuccess,
-		},
-		{
-			name:     "validation error",
-			err:      oerrors.ErrValidation,
-			wantCode: ExitValidationError,
-		},
-		{
-			name:     "wrapped validation error",
-			err:      oerrors.Wrap(oerrors.ErrValidation, "schema check failed"),
-			wantCode: ExitValidationError,
-		},
-		{
-			name:     "connectivity error",
-			err:      oerrors.ErrConnectivity,
-			wantCode: ExitConnectivityError,
-		},
-		{
-			name:     "permission error",
-			err:      oerrors.ErrPermission,
-			wantCode: ExitPermissionDenied,
-		},
-		{
-			name:     "not found error",
-			err:      oerrors.ErrNotFound,
-			wantCode: ExitNotFound,
-		},
-		{
-			name:     "unknown error returns general error",
-			err:      errors.New("unknown error"),
-			wantCode: ExitGeneralError,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := ExitCodeFromError(tt.err)
-			assert.Equal(t, tt.wantCode, got)
-		})
-	}
-}
 
 func TestExitCodeFromK8sError(t *testing.T) {
 	gvr := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}

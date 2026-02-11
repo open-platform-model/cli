@@ -11,12 +11,12 @@ import (
 // --- 7.6: Tests for output format selection ---
 
 func TestFormatStatus_Table(t *testing.T) {
-	result := &StatusResult{
-		Resources: []ResourceHealth{
-			{Kind: "Deployment", Name: "web", Namespace: "default", Status: HealthReady, Age: "5m"},
-			{Kind: "ConfigMap", Name: "config", Namespace: "default", Status: HealthReady, Age: "5m"},
+	result := &statusResult{
+		Resources: []resourceHealth{
+			{Kind: "Deployment", Name: "web", Namespace: "default", Status: healthReady, Age: "5m"},
+			{Kind: "ConfigMap", Name: "config", Namespace: "default", Status: healthReady, Age: "5m"},
 		},
-		AggregateStatus: HealthReady,
+		AggregateStatus: healthReady,
 	}
 
 	formatted, err := FormatStatus(result, "table")
@@ -29,11 +29,11 @@ func TestFormatStatus_Table(t *testing.T) {
 }
 
 func TestFormatStatus_JSON(t *testing.T) {
-	result := &StatusResult{
-		Resources: []ResourceHealth{
-			{Kind: "Deployment", Name: "web", Namespace: "default", Status: HealthReady, Age: "5m"},
+	result := &statusResult{
+		Resources: []resourceHealth{
+			{Kind: "Deployment", Name: "web", Namespace: "default", Status: healthReady, Age: "5m"},
 		},
-		AggregateStatus: HealthReady,
+		AggregateStatus: healthReady,
 	}
 
 	formatted, err := FormatStatus(result, "json")
@@ -44,11 +44,11 @@ func TestFormatStatus_JSON(t *testing.T) {
 }
 
 func TestFormatStatus_YAML(t *testing.T) {
-	result := &StatusResult{
-		Resources: []ResourceHealth{
-			{Kind: "Deployment", Name: "web", Namespace: "default", Status: HealthReady, Age: "5m"},
+	result := &statusResult{
+		Resources: []resourceHealth{
+			{Kind: "Deployment", Name: "web", Namespace: "default", Status: healthReady, Age: "5m"},
 		},
-		AggregateStatus: HealthReady,
+		AggregateStatus: healthReady,
 	}
 
 	formatted, err := FormatStatus(result, "yaml")

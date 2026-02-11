@@ -4,12 +4,22 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/ast"
+	"cuelang.org/go/cue/ast/astutil"
+	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/load"
+	"cuelang.org/go/cue/token"
 
 	"github.com/opmodel/cli/internal/output"
 )
+
+// opmNamespaceUUID is the UUID v5 namespace for computing deterministic identities.
+// Computed as: uuid.NewSHA1(uuid.NameSpaceDNS, []byte("opmodel.dev")).String()
+// Used by the CUE overlay to compute release identity via uuid.SHA1.
+const opmNamespaceUUID = "c1cbe76d-5687-5a47-bfe6-83b081b15413"
 
 // ReleaseBuilder creates a concrete release from a module directory.
 //
@@ -32,6 +42,15 @@ func NewReleaseBuilder(ctx *cue.Context, registry string) *ReleaseBuilder {
 type ReleaseOptions struct {
 	Name      string // Release name (defaults to module name)
 	Namespace string // Required: target namespace
+	PkgName   string // Internal: CUE package name (set by InspectModule, skip detectPackageName)
+}
+
+// ModuleInspection contains metadata extracted from a module directory
+// via AST inspection without CUE evaluation.
+type ModuleInspection struct {
+	Name             string // metadata.name (empty if not a string literal)
+	DefaultNamespace string // metadata.defaultNamespace (empty if not a string literal)
+	PkgName          string // CUE package name from inst.PkgName
 }
 
 // BuiltRelease is the result of building a release.
@@ -59,12 +78,14 @@ type ReleaseMetadata struct {
 // that computes release metadata (identity, labels) via the uuid package.
 //
 // The build process:
-//  1. Load the module directory with an overlay file that computes release metadata
-//  2. Unify with additional values files (--values)
-//  3. Inject values into #config via FillPath (makes #config concrete)
-//  4. Extract concrete components from #components
-//  5. Validate all components are fully concrete
-//  6. Extract release metadata from the overlay-computed #opmReleaseMeta
+//  1. Determine package name (from opts.PkgName or detectPackageName fallback)
+//  2. Generate AST overlay and format to bytes
+//  3. Load the module directory with the overlay file
+//  4. Unify with additional values files (--values)
+//  5. Inject values into #config via FillPath (makes #config concrete)
+//  6. Extract concrete components from #components
+//  7. Validate all components are fully concrete
+//  8. Extract release metadata from the overlay-computed #opmReleaseMeta
 func (b *ReleaseBuilder) Build(modulePath string, opts ReleaseOptions, valuesFiles []string) (*BuiltRelease, error) {
 	output.Debug("building release",
 		"path", modulePath,
@@ -78,14 +99,23 @@ func (b *ReleaseBuilder) Build(modulePath string, opts ReleaseOptions, valuesFil
 		defer os.Unsetenv("CUE_REGISTRY")
 	}
 
-	// Step 1: Detect the CUE package name from the module directory
-	pkgName, err := b.detectPackageName(modulePath)
-	if err != nil {
-		return nil, fmt.Errorf("detecting package name: %w", err)
+	// Step 1: Determine CUE package name
+	pkgName := opts.PkgName
+	if pkgName == "" {
+		// Fallback: detect package name via a minimal load (backward compatibility)
+		var err error
+		pkgName, err = b.detectPackageName(modulePath)
+		if err != nil {
+			return nil, fmt.Errorf("detecting package name: %w", err)
+		}
 	}
 
-	// Step 2: Generate the overlay CUE content
-	overlayCUE := b.generateOverlayCUE(pkgName, opts)
+	// Step 2: Generate the overlay via typed AST construction and format to bytes
+	overlayFile := b.generateOverlayAST(pkgName, opts)
+	overlayCUE, err := format.Node(overlayFile)
+	if err != nil {
+		return nil, fmt.Errorf("formatting overlay AST: %w", err)
+	}
 
 	// Step 3: Load the module with the overlay
 	overlayPath := filepath.Join(modulePath, "opm_release_overlay.cue")
@@ -234,6 +264,9 @@ func (b *ReleaseBuilder) BuildFromValue(moduleValue cue.Value, opts ReleaseOptio
 }
 
 // detectPackageName loads the module directory minimally to determine the CUE package name.
+// This is the backward-compatibility fallback when opts.PkgName is not set.
+// Retained for direct Build() callers that don't go through InspectModule.
+// Prefer using InspectModule which also extracts metadata without evaluation.
 func (b *ReleaseBuilder) detectPackageName(modulePath string) (string, error) {
 	cfg := &load.Config{Dir: modulePath}
 	instances := load.Instances([]string{"."}, cfg)
@@ -250,8 +283,106 @@ func (b *ReleaseBuilder) detectPackageName(modulePath string) (string, error) {
 	return inst.PkgName, nil
 }
 
-// generateOverlayCUE generates the virtual overlay CUE content that computes
-// release metadata (identity, labels) using the CUE uuid package.
+// InspectModule extracts module metadata from a module directory using AST
+// inspection without CUE evaluation. It performs a single load.Instances call,
+// reads inst.PkgName, and walks inst.Files to extract metadata.name and
+// metadata.defaultNamespace as string literals.
+//
+// If metadata fields are not string literals (e.g., computed expressions),
+// the corresponding fields in ModuleInspection will be empty.
+func (b *ReleaseBuilder) InspectModule(modulePath string) (*ModuleInspection, error) {
+	// Set CUE_REGISTRY if configured (needed for modules with registry imports)
+	if b.registry != "" {
+		os.Setenv("CUE_REGISTRY", b.registry)
+		defer os.Unsetenv("CUE_REGISTRY")
+	}
+
+	cfg := &load.Config{Dir: modulePath}
+	instances := load.Instances([]string{"."}, cfg)
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("no CUE instances found in %s", modulePath)
+	}
+
+	inst := instances[0]
+	if inst.Err != nil {
+		return nil, fmt.Errorf("loading module for inspection: %w", inst.Err)
+	}
+
+	name, defaultNamespace := extractMetadataFromAST(inst.Files)
+
+	output.Debug("inspected module via AST",
+		"pkgName", inst.PkgName,
+		"name", name,
+		"defaultNamespace", defaultNamespace,
+	)
+
+	return &ModuleInspection{
+		Name:             name,
+		DefaultNamespace: defaultNamespace,
+		PkgName:          inst.PkgName,
+	}, nil
+}
+
+// extractMetadataFromAST walks CUE AST files to extract metadata.name and
+// metadata.defaultNamespace as string literals without CUE evaluation.
+// Returns empty strings for fields that are not static string literals.
+func extractMetadataFromAST(files []*ast.File) (name, defaultNamespace string) {
+	for _, file := range files {
+		for _, decl := range file.Decls {
+			field, ok := decl.(*ast.Field)
+			if !ok {
+				continue
+			}
+			ident, ok := field.Label.(*ast.Ident)
+			if !ok || ident.Name != "metadata" {
+				continue
+			}
+			structLit, ok := field.Value.(*ast.StructLit)
+			if !ok {
+				continue
+			}
+			n, ns := extractFieldsFromMetadataStruct(structLit)
+			if n != "" && name == "" {
+				name = n
+			}
+			if ns != "" && defaultNamespace == "" {
+				defaultNamespace = ns
+			}
+		}
+		if name != "" && defaultNamespace != "" {
+			break
+		}
+	}
+	return name, defaultNamespace
+}
+
+// extractFieldsFromMetadataStruct scans a metadata struct literal for
+// name and defaultNamespace fields with string literal values.
+func extractFieldsFromMetadataStruct(s *ast.StructLit) (name, defaultNamespace string) {
+	for _, elt := range s.Elts {
+		innerField, ok := elt.(*ast.Field)
+		if !ok {
+			continue
+		}
+		innerIdent, ok := innerField.Label.(*ast.Ident)
+		if !ok {
+			continue
+		}
+		lit, ok := innerField.Value.(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			continue
+		}
+		switch innerIdent.Name {
+		case "name":
+			name = strings.Trim(lit.Value, `"`)
+		case "defaultNamespace":
+			defaultNamespace = strings.Trim(lit.Value, `"`)
+		}
+	}
+	return name, defaultNamespace
+}
+
+// generateOverlayAST builds the CUE overlay file as a typed AST.
 //
 // The overlay adds a #opmReleaseMeta definition to the module's CUE package.
 // This definition computes:
@@ -259,28 +390,104 @@ func (b *ReleaseBuilder) detectPackageName(modulePath string) (string, error) {
 //   - Standard release labels (module-release.opmodel.dev/*)
 //   - Module labels (inherited from module.metadata.labels)
 //
-// The overlay references top-level fields from the module (metadata)
-// which are in scope because the overlay shares the same CUE package.
-func (b *ReleaseBuilder) generateOverlayCUE(pkgName string, opts ReleaseOptions) []byte {
-	overlay := fmt.Sprintf(`package %s
+// Key rules:
+//   - Field labels referenced from nested scopes (name, namespace, fqn, version, identity)
+//     use ast.NewIdent (unquoted identifier labels) for CUE scope resolution.
+//   - Label keys with special characters use ast.NewString (quoted string labels).
+//   - astutil.Resolve is called after construction to wire up scope references.
+func (b *ReleaseBuilder) generateOverlayAST(pkgName string, opts ReleaseOptions) *ast.File {
+	// Build the uuid.SHA1(...) call expression
+	uuidCall := ast.NewCall(
+		&ast.SelectorExpr{
+			X:   ast.NewIdent("uuid"),
+			Sel: ast.NewIdent("SHA1"),
+		},
+		ast.NewString(opmNamespaceUUID),
+		// CUE string interpolation: "\(fqn):\(name):\(namespace)"
+		// Interpolation Elts are interleaved: string fragments include
+		// quote chars and \( / ) delimiters, matching parser output.
+		&ast.Interpolation{
+			Elts: []ast.Expr{
+				ast.NewLit(token.STRING, `"\(`),
+				ast.NewIdent("fqn"),
+				ast.NewLit(token.STRING, `):\(`),
+				ast.NewIdent("name"),
+				ast.NewLit(token.STRING, `):\(`),
+				ast.NewIdent("namespace"),
+				ast.NewLit(token.STRING, `)"`),
+			},
+		},
+	)
 
-import "uuid"
-
-#opmReleaseMeta: {
-	name:      %q
-	namespace: %q
-	fqn:       metadata.fqn
-	version:   metadata.version
-	identity:  string & uuid.SHA1("c1cbe76d-5687-5a47-bfe6-83b081b15413", "\(fqn):\(name):\(namespace)")
-	labels: metadata.labels & {
-		"module-release.opmodel.dev/name":    name
-		"module-release.opmodel.dev/version": version
-		"module-release.opmodel.dev/uuid":    identity
+	// identity: string & uuid.SHA1(...)
+	identityExpr := &ast.BinaryExpr{
+		X:  ast.NewIdent("string"),
+		Op: token.AND,
+		Y:  uuidCall,
 	}
-}
-`, pkgName, opts.Name, opts.Namespace)
 
-	return []byte(overlay)
+	// labels: metadata.labels & { ... }
+	// Label keys use ast.NewString (quoted) because they contain special chars.
+	// The values (name, version, identity) are ast.NewIdent references to sibling fields.
+	labelsExpr := &ast.BinaryExpr{
+		X: &ast.SelectorExpr{
+			X:   ast.NewIdent("metadata"),
+			Sel: ast.NewIdent("labels"),
+		},
+		Op: token.AND,
+		Y: ast.NewStruct(
+			ast.NewString("module-release.opmodel.dev/name"), ast.NewIdent("name"),
+			ast.NewString("module-release.opmodel.dev/version"), ast.NewIdent("version"),
+			ast.NewString("module-release.opmodel.dev/uuid"), ast.NewIdent("identity"),
+		),
+	}
+
+	// Build #opmReleaseMeta struct with *ast.Field entries using ast.NewIdent labels.
+	// Using ast.NewIdent for labels produces unquoted identifiers,
+	// which CUE can resolve as references from nested scopes.
+	releaseMetaStruct := ast.NewStruct(
+		&ast.Field{Label: ast.NewIdent("name"), Value: ast.NewString(opts.Name)},
+		&ast.Field{Label: ast.NewIdent("namespace"), Value: ast.NewString(opts.Namespace)},
+		&ast.Field{
+			Label: ast.NewIdent("fqn"),
+			Value: &ast.SelectorExpr{
+				X:   ast.NewIdent("metadata"),
+				Sel: ast.NewIdent("fqn"),
+			},
+		},
+		&ast.Field{
+			Label: ast.NewIdent("version"),
+			Value: &ast.SelectorExpr{
+				X:   ast.NewIdent("metadata"),
+				Sel: ast.NewIdent("version"),
+			},
+		},
+		&ast.Field{Label: ast.NewIdent("identity"), Value: identityExpr},
+		&ast.Field{Label: ast.NewIdent("labels"), Value: labelsExpr},
+	)
+
+	file := &ast.File{
+		Decls: []ast.Decl{
+			&ast.Package{Name: ast.NewIdent(pkgName)},
+			&ast.ImportDecl{
+				Specs: []*ast.ImportSpec{
+					ast.NewImport(nil, "uuid"),
+				},
+			},
+			&ast.Field{
+				Label: ast.NewIdent("#opmReleaseMeta"),
+				Value: releaseMetaStruct,
+			},
+		},
+	}
+
+	// Resolve scope references so that identifiers like `name` inside the
+	// labels struct can find the `name` field in the parent #opmReleaseMeta struct.
+	astutil.Resolve(file, func(_ token.Pos, msg string, args ...interface{}) {
+		// Ignore resolution errors — some references (like `metadata`) are external
+	})
+
+	return file
 }
 
 // loadValuesFile loads a single values file and compiles it.
@@ -518,7 +725,6 @@ func (b *ReleaseBuilder) extractMetadataFallback(concreteModule cue.Value, metad
 			}
 		}
 	}
-
 }
 
 // extractMetadataFromModule extracts metadata from a module value (legacy path).

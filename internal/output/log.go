@@ -21,7 +21,7 @@ type LogConfig struct {
 
 // Logger is the global logger instance.
 // Initialized with default options; call SetupLogging to configure.
-var Logger = log.NewWithOptions(os.Stderr, log.Options{
+var logger = log.NewWithOptions(os.Stderr, log.Options{
 	ReportTimestamp: true,
 	ReportCaller:    false,
 	TimeFormat:      "15:04:05",
@@ -43,7 +43,7 @@ func SetupLogging(cfg LogConfig) {
 		showTimestamps = true
 	}
 
-	Logger = log.NewWithOptions(os.Stderr, log.Options{
+	logger = log.NewWithOptions(os.Stderr, log.Options{
 		Level:           level,
 		ReportTimestamp: showTimestamps,
 		ReportCaller:    cfg.Verbose,
@@ -57,37 +57,32 @@ func SetupLogging(cfg LogConfig) {
 func ModuleLogger(name string) *log.Logger {
 	// Build the styled prefix: dim "m:" + cyan name + dim " >"
 	prefix := fmt.Sprintf("%s%s %s",
-		StyleDim.Render("m:"),
-		lipgloss.NewStyle().Foreground(ColorCyan).Render(name),
-		StyleDim.Render(">"),
+		styleDim.Render("m:"),
+		lipgloss.NewStyle().Foreground(colorCyan).Render(name),
+		styleDim.Render(">"),
 	)
 
-	return Logger.WithPrefix(prefix)
+	return logger.WithPrefix(prefix)
 }
 
 // Debug logs a debug message.
 func Debug(msg string, keyvals ...interface{}) {
-	Logger.Debug(msg, keyvals...)
+	logger.Debug(msg, keyvals...)
 }
 
 // Info logs an info message.
 func Info(msg string, keyvals ...interface{}) {
-	Logger.Info(msg, keyvals...)
+	logger.Info(msg, keyvals...)
 }
 
 // Warn logs a warning message.
 func Warn(msg string, keyvals ...interface{}) {
-	Logger.Warn(msg, keyvals...)
+	logger.Warn(msg, keyvals...)
 }
 
 // Error logs an error message.
 func Error(msg string, keyvals ...interface{}) {
-	Logger.Error(msg, keyvals...)
-}
-
-// Fatal logs a fatal message and exits.
-func Fatal(msg string, keyvals ...interface{}) {
-	Logger.Fatal(msg, keyvals...)
+	logger.Error(msg, keyvals...)
 }
 
 // Print prints a message to stdout without any formatting.

@@ -6,8 +6,8 @@ import (
 	"github.com/charmbracelet/lipgloss/table"
 )
 
-// TableStyle defines the style for table output.
-type TableStyle struct {
+// tableStyle defines the style for table output.
+type tableStyle struct {
 	// Border is the border style.
 	Border lipgloss.Border
 
@@ -21,12 +21,12 @@ type TableStyle struct {
 	CellStyle lipgloss.Style
 }
 
-// DefaultTableStyle returns the default table style.
-func DefaultTableStyle() TableStyle {
-	return TableStyle{
+// defaultTableStyle returns the default table style.
+func defaultTableStyle() tableStyle {
+	return tableStyle{
 		Border:      lipgloss.NormalBorder(),
-		BorderColor: ColorDimGray,
-		HeaderStyle: lipgloss.NewStyle().Bold(true).Foreground(ColorCyan),
+		BorderColor: colorDimGray,
+		HeaderStyle: lipgloss.NewStyle().Bold(true).Foreground(colorCyan),
 		CellStyle:   lipgloss.NewStyle(),
 	}
 }
@@ -35,7 +35,7 @@ func DefaultTableStyle() TableStyle {
 type Table struct {
 	headers []string
 	rows    [][]string
-	style   TableStyle
+	style   tableStyle
 }
 
 // NewTable creates a new table with the given headers.
@@ -43,19 +43,13 @@ func NewTable(headers ...string) *Table {
 	return &Table{
 		headers: headers,
 		rows:    make([][]string, 0),
-		style:   DefaultTableStyle(),
+		style:   defaultTableStyle(),
 	}
 }
 
 // Row adds a row to the table.
 func (t *Table) Row(cells ...string) *Table {
 	t.rows = append(t.rows, cells)
-	return t
-}
-
-// SetStyle sets the table style.
-func (t *Table) SetStyle(style TableStyle) *Table {
-	t.style = style
 	return t
 }
 
@@ -77,26 +71,6 @@ func (t *Table) String() string {
 	}
 
 	return tbl.String()
-}
-
-// RenderStatusTable renders a status table for resources.
-func RenderStatusTable(resources []ResourceStatus) string {
-	t := NewTable("KIND", "NAME", "STATUS", "AGE", "MESSAGE")
-
-	for _, r := range resources {
-		t.Row(r.Kind, r.Name, r.Status, r.Age, r.Message)
-	}
-
-	return t.String()
-}
-
-// ResourceStatus represents the status of a Kubernetes resource.
-type ResourceStatus struct {
-	Kind    string
-	Name    string
-	Status  string
-	Age     string
-	Message string
 }
 
 // RenderFileTree renders a file tree with aligned descriptions.
