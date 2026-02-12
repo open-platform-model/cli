@@ -140,3 +140,47 @@ See [full glossary](../opm/docs/glossary.md) for detailed definitions.
 - **Module Author** - Develops and maintains ModuleDefinitions with sane defaults
 - **Platform Operator** - Curates module catalog, bridges infrastructure and end-users
 - **End-user** - Consumes modules via ModuleRelease with concrete values
+
+## Documentation Style
+
+### Box-Drawing Diagrams and ASCII Art
+
+**Symbols for Yes/No in Tables and Diagrams**
+
+When creating box-drawing tables or ASCII art diagrams in markdown code blocks, use **monospace-safe** symbols that render consistently across all terminals, editors, and GitHub.
+
+**DO NOT USE** Unicode checkmarks (`✓` U+2713, `✗` U+2717) — these are ambiguous-width characters that break alignment in monospace fonts.
+
+**Recommended Replacements:**
+
+| Context | Yes | No | Example |
+|---------|-----|-----|---------|
+| **Box-drawing table cells** | `[x]` | `[ ]` | `│ No CRDs req. │  [x]   │  [ ]   │` |
+| **Bullet-style property lists** | `[x]` | `[ ]` | `│    [x] Same resources → same digest` |
+| **Inline after text** | `OK` | `FAIL` | `Apply: SS/jellyfin-media OK, Svc/jellyfin-media FAIL` |
+| **Section headings** | `[x]` | `[ ]` | `### Scenario A: Normal Rename [x]` |
+| **Parenthetical notes** | `ok` | `fail` | `Label check: "opm" (3 ok), name (≤63 ok)` |
+
+**Rationale:**
+
+1. **`[x]` / `[ ]`** - Checkbox-style brackets are exactly 3 ASCII characters wide, easy to align in tables
+2. **`OK` / `FAIL`** - More readable mid-sentence than brackets
+3. **`ok` / `fail`** - Lowercase variant for lightweight inline use
+
+**Table Alignment Example:**
+
+```text
+┌──────────────┬────────┬────────┬────────┐
+│ Feature      │ Secret │ CRD    │ DB     │
+├──────────────┼────────┼────────┼────────┤
+│ No CRDs req. │  [x]   │  [ ]   │  [x]   │  ← 3 chars each, properly aligned
+│ Inventory    │  [x]   │  [x]   │  [x]   │
+└──────────────┴────────┴────────┴────────┘
+```
+
+**Why This Matters:**
+
+- Unicode `✓` renders as 1 cell in some fonts, 2 cells in others (especially CJK locales)
+- Broken alignment makes diagrams unreadable in terminals
+- GitHub code blocks don't always match terminal rendering
+- ASCII/bracket combinations are universally safe
