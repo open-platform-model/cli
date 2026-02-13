@@ -70,7 +70,7 @@ func NewClient(opts ClientOptions) (*Client, error) {
 	if warningLevel == "" {
 		warningLevel = "warn" // default
 	}
-	restConfig.WarningHandler = &opmWarningHandler{level: warningLevel}
+	restConfig.WarningHandler = &opmWarningHandler{level: warningLevel, logger: outputWarningLogger{}}
 
 	dynamicClient, err := dynamic.NewForConfig(restConfig)
 	if err != nil {

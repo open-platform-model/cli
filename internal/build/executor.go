@@ -369,7 +369,6 @@ func mapToEnvArray(env map[string]any) []any {
 	return result
 }
 
-
 // mapToVolumeMountsArray converts a map of volume mount definitions to a Kubernetes volumeMounts array.
 func mapToVolumeMountsArray(volumeMounts map[string]any) []any {
 	result := make([]any, 0, len(volumeMounts))

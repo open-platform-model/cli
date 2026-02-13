@@ -6,49 +6,70 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// mockWarningLogger records which logging method was called and with what message.
+type mockWarningLogger struct {
+	warnCalled  bool
+	debugCalled bool
+	lastMsg     string
+}
+
+func (m *mockWarningLogger) Warn(msg string, keyvals ...interface{}) {
+	m.warnCalled = true
+	m.lastMsg = msg
+}
+
+func (m *mockWarningLogger) Debug(msg string, keyvals ...interface{}) {
+	m.debugCalled = true
+	m.lastMsg = msg
+}
+
 func TestOpmWarningHandler(t *testing.T) {
 	tests := []struct {
 		name      string
 		level     string
-		wantLevel string // "WARN", "DEBU", or "none"
+		wantWarn  bool
+		wantDebug bool
 	}{
 		{
-			name:      "warn level shows warnings",
-			level:     "warn",
-			wantLevel: "WARN",
+			name:     "warn level routes to Warn",
+			level:    "warn",
+			wantWarn: true,
 		},
 		{
-			name:      "debug level shows debug (only with --verbose)",
+			name:      "debug level routes to Debug",
 			level:     "debug",
-			wantLevel: "DEBU",
+			wantDebug: true,
 		},
 		{
-			name:      "suppress level drops warnings",
-			level:     "suppress",
-			wantLevel: "none",
+			name:  "suppress level drops warnings",
+			level: "suppress",
 		},
 		{
-			name:      "unknown level defaults to warn",
-			level:     "invalid",
-			wantLevel: "WARN",
+			name:     "unknown level defaults to Warn",
+			level:    "invalid",
+			wantWarn: true,
 		},
 		{
-			name:      "empty level defaults to warn",
-			level:     "",
-			wantLevel: "WARN",
+			name:     "empty level defaults to Warn",
+			level:    "",
+			wantWarn: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := &opmWarningHandler{level: tt.level}
+			mock := &mockWarningLogger{}
+			handler := &opmWarningHandler{level: tt.level, logger: mock}
 
-			// The handler doesn't return anything, it calls output.Warn/Debug
-			// which writes to stderr. For this test, we just verify the handler
-			// doesn't panic and accepts the expected signature.
-			assert.NotPanics(t, func() {
-				handler.HandleWarningHeader(299, "kubernetes", "test warning message")
-			})
+			handler.HandleWarningHeader(299, "kubernetes", "test warning message")
+
+			assert.Equal(t, tt.wantWarn, mock.warnCalled, "Warn() called")
+			assert.Equal(t, tt.wantDebug, mock.debugCalled, "Debug() called")
+
+			if tt.wantWarn || tt.wantDebug {
+				assert.Contains(t, mock.lastMsg, "test warning message")
+				assert.Contains(t, mock.lastMsg, "k8s API warning:")
+			}
 		})
 	}
 }

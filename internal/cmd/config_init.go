@@ -90,6 +90,7 @@ func runConfigInit(cmd *cobra.Command, args []string) error {
 	output.Println("  " + paths.ConfigFile)
 	output.Println("  " + moduleFile)
 	output.Println("")
+	output.Println("Next: run 'cue mod tidy' in " + paths.HomeDir + " to resolve dependencies")
 	output.Println("Validate with: opm config vet")
 
 	return nil

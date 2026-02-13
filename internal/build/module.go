@@ -19,7 +19,6 @@ type LoadedComponent struct {
 	Value       cue.Value            // Full component value
 }
 
-
 // extractMetadataFromAST walks CUE AST files to extract metadata.name and
 // metadata.defaultNamespace as string literals without CUE evaluation.
 // Returns empty strings for fields that are not static string literals.

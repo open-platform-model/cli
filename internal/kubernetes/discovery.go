@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 
+	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/pkg/weights"
 )
 
@@ -198,6 +199,7 @@ func discoverAPIResources(client *Client) ([]apiResourceInfo, error) {
 		if !discovery.IsGroupDiscoveryFailedError(err) {
 			return nil, err
 		}
+		output.Warn("some API groups unavailable during discovery, results may be incomplete", "err", err)
 	}
 
 	var result []apiResourceInfo
