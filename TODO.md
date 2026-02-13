@@ -2,6 +2,7 @@
 
 ## Feature
 
+- [ ] Redesign "opm mod status" to print the summary status of all components and its resources. Should make use of <0001-release-inventory.md> entries.
 - [ ] Add "opm mod tidy" to tidy up CUE module dependencies in an OPM module. Investigate how to implement tidy without access to the CUE binary.
 - [ ] Add "opm mod vet" to validate an OPM module. Take inspiration from how Timoni solved it.
   - Include a "-c or --concrete" flag to force concreteness during validation
@@ -31,6 +32,37 @@
 - [x] ~~"opm mod delete --name blog --namespace default --verbose" proceeds but with no change, 0 resources deleted. We should add validation to first look for the module and inform the caller if not found.~~
   - **Resolved:** Implemented in `refine-resource-discovery` change. Commands now return `NoResourcesFoundError` when no resources match the selector.
 - [ ] Add a flag to "opm mod apply" that will create the namespace if missing.
+- [ ] Refactor and align the log output of "opm mod build" with the one from "opm mod apply"
+
+  ```bash
+  ❯ opm mod build . --verbose
+  Module:
+    Name:      jellyfin
+    Namespace: jellyfin
+    Version:   0.1.0
+    Components: jellyfin
+
+  Transformer Matching:
+    jellyfin:
+      ✓ kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#StatefulsetTransformer
+        Matched: requiredLabels[core.opmodel.dev/workload-type=stateful], requiredResources[opmodel.dev/resources/workload@v0#Container]
+      ✓ kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#ServiceTransformer
+        Matched: requiredResources[opmodel.dev/resources/workload@v0#Container], requiredTraits[opmodel.dev/traits/network@v0#Expose]
+      ✓ kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#PvcTransformer
+        Matched: requiredResources[opmodel.dev/resources/storage@v0#Volumes]
+      ✓ kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#HpaTransformer
+        Matched: requiredTraits[opmodel.dev/traits/workload@v0#Scaling]
+
+  Generated Resources:
+    PersistentVolumeClaim/config [default] from jellyfin
+    Service/jellyfin [default] from jellyfin
+    StatefulSet/jellyfin [default] from jellyfin
+  ```
+
+## Chore
+
+- [ ] Remove injectLabels(). It is redundant as we MUST rely on the transformers to properly apply all labels and annotations.
+  - Update <docs/rfc/0001-release-inventory.md> when this change has been made.
 
 ## Bugfix
 
@@ -65,6 +97,8 @@
 
 ## Investigation
 
+- [ ] Investigate how to build a competent and reusable module validation pipeline. Something that can be used to validate the ModuleRelease in the finishing steps of the build pipeline but also can be used for "opm mod vet".
+  - It should output the errors similar to how CUE does. Pointing to which file, line and row the error occured.
 - [ ] When running "opm mod delete" is the build pipeline really required? Do we need to build the whole module to delete?
 - [x] ~~Investigate how to redesign the "opm mod delete" workflow to be smarter. It should find ALL resources, even if the user has changed the module (and didn't apply the changes) before running "delete".~~
   - **Resolved:** Implemented across `deterministic-release-identity` and `refine-resource-discovery` changes. Each release now gets a deterministic UUID v5 identity (`module-release.opmodel.dev/uuid` label) computed by the CUE catalog schemas. The `opm mod delete` command now supports:
@@ -79,3 +113,10 @@
 
 - [ ] Add a smart delete workflow to "opm mod delete". **This is and advanced feature so will will pin it for now**
   - Should look for a Custom Resource called ModuleRelease in the namespace (or all namespaces), this CR contains all the information required and owns all the child resources.
+
+env: {
+ PUID: {
+  name:  "PUID"
+  value: "\(#config.puid)"
+ }
+}
