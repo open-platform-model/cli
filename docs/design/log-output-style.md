@@ -28,20 +28,20 @@ domain model (modules and resources rather than bundles and instances).
 
 Every log line follows a strict format:
 
-```
+```text
 TIMESTAMP  LEVEL  SCOPE > MESSAGE
 ```
 
 ### Segments
 
-| Segment       | Example                              | Notes                                    |
-|---------------|--------------------------------------|------------------------------------------|
+| Segment       | Example                              | Notes                                                                           |
+|---------------|--------------------------------------|---------------------------------------------------------------------------------|
 | **Timestamp** | `15:04:05`                           | RFC 3339 time-only, 24h format (Go layout `15:04:05`). Always shown by default. |
 | **Level**     | `INFO`, `WARN`, `ERRO`, `DEBU`       | 4-char uppercase (charmbracelet/log default `MaxWidth(4)`). Fixed-width column. |
-| **Scope**     | `m:my-app`                           | Module-scoped context, prefixed `m:`.     |
-| **Sub-scope** | `r:Deployment/production/my-app`     | Resource-scoped context, prefixed `r:`. Optional — not all lines have it. |
-| **Separator** | `>`                                  | Literal `>` in dim text. Separates each scope level and the message. |
-| **Message**   | `applying module opm.dev/my-app ...` | Human-readable action/status text.        |
+| **Scope**     | `m:my-app`                           | Module-scoped context, prefixed `m:`.                                           |
+| **Sub-scope** | `r:Deployment/production/my-app`     | Resource-scoped context, prefixed `r:`. Optional — not all lines have it.       |
+| **Separator** | `>`                                  | Literal `>` in dim text. Separates each scope level and the message.            |
+| **Message**   | `applying module opm.dev/my-app ...` | Human-readable action/status text.                                              |
 
 ### Level Labels: Human vs JSON
 
@@ -61,7 +61,7 @@ override needed — this is what the library produces out of the box.
 Hierarchy is conveyed through the structured prefix fields, not indentation.
 Output stays left-aligned and grep-friendly.
 
-```
+```text
 TIMESTAMP  LEVEL  m:<module> > <message>
 TIMESTAMP  LEVEL  m:<module> > r:<Kind/ns/name>           <status>
 ```
@@ -80,30 +80,30 @@ TIMESTAMP  LEVEL  m:<module> > r:<Kind/ns/name>           <status>
 
 ### Semantic Colors
 
-| Element                           | Color              | ANSI Code     | Style     |
-|-----------------------------------|--------------------|---------------|-----------|
-| **Timestamp**                     | Dim gray           | Faint / `240` | —         |
-| **Scope prefix** (`m:`, `r:`)    | Dim gray           | Faint         | —         |
-| **Separator** (`>`)              | Dim gray           | Faint         | —         |
-| **Module/resource name**          | Cyan               | `14`          | —         |
-| **Namespace values**              | Cyan               | `14`          | —         |
-| **Action verbs** (`applying`, `installing`, `upgrading`, `deleting`) | White | Default fg | **Bold** |
-| **Version strings**               | White              | Default fg    | —         |
-| **Summary lines** (`resources are ready`, `applied successfully in Xs`) | White | Default fg | **Bold** |
-| **Checkmark** (`✔`)             | Green              | `10`          | —         |
+| Element                                                                 | Color              | ANSI Code     | Style     |
+|-------------------------------------------------------------------------|--------------------|---------------|-----------|
+| **Timestamp**                                                           | Dim gray           | Faint / `240` | —         |
+| **Scope prefix** (`m:`, `r:`)                                           | Dim gray           | Faint         | —         |
+| **Separator** (`>`)                                                     | Dim gray           | Faint         | —         |
+| **Module/resource name**                                                | Cyan               | `14`          | —         |
+| **Namespace values**                                                    | Cyan               | `14`          | —         |
+| **Action verbs** (`applying`, `installing`, `upgrading`, `deleting`)    | White              | Default fg    | **Bold**  |
+| **Version strings**                                                     | White              | Default fg    | —         |
+| **Summary lines** (`resources are ready`, `applied successfully in Xs`) | White              | Default fg    | **Bold**  |
+| **Checkmark** (`✔`)                                                     | Green              | `10`          | —         |
 
 ### Resource Status Suffixes
 
 These appear right-aligned at the end of resource lines. They are the primary
 visual signal for what happened.
 
-| Status        | Color          | ANSI Code     | Style     | Rationale                                  |
-|---------------|----------------|---------------|-----------|--------------------------------------------|
-| `created`     | **Bright green** | `82` or `10` | —         | Largest event — a new resource exists       |
-| `configured`  | **Yellow**     | `220`         | —         | Medium event — something changed            |
-| `unchanged`   | **Dim gray**   | Faint / `240` | —         | Non-event — fades into background           |
-| `deleted`     | **Red**        | `196` or `9`  | —         | Destructive action, always visible          |
-| `failed`      | **Bright red** | `204`         | **Bold**  | Error state, must not be missed             |
+| Status        | Color            | ANSI Code     | Style     | Rationale                                   |
+|---------------|------------------|---------------|-----------|---------------------------------------------|
+| `created`     | **Bright green** | `82` or `10`  | —         | Largest event — a new resource exists       |
+| `configured`  | **Yellow**       | `220`         | —         | Medium event — something changed            |
+| `unchanged`   | **Dim gray**     | Faint / `240` | —         | Non-event — fades into background           |
+| `deleted`     | **Red**          | `196` or `9`  | —         | Destructive action, always visible          |
+| `failed`      | **Bright red**   | `204`         | **Bold**  | Error state, must not be missed             |
 
 **Visibility hierarchy**: `created` > `deleted` > `configured` > `failed` > `unchanged`
 
@@ -114,7 +114,7 @@ actually changed are visually prominent.
 
 ### Section Flow (Apply)
 
-```
+```bash
 TIMESTAMP  INFO  m:<module> > applying module <module-path> version <version>
 TIMESTAMP  INFO  m:<module> > installing|upgrading <name> in namespace <namespace>
 TIMESTAMP  INFO  m:<module> > r:<Kind/ns/name>                         <status>
@@ -127,7 +127,7 @@ TIMESTAMP  INFO  m:<module> > applied successfully in <duration>
 
 ### Section Flow (Delete)
 
-```
+```bash
 TIMESTAMP  INFO  m:<module> > deleting <name> in namespace <namespace>
 TIMESTAMP  INFO  m:<module> > r:<Kind/ns/name>                         deleted
 TIMESTAMP  INFO  m:<module> > r:<Kind/ns/name>                         deleted
@@ -138,20 +138,20 @@ TIMESTAMP  INFO  m:<module> > all resources have been deleted
 
 ### Error Lines
 
-```
+```bash
 TIMESTAMP  ERRO  m:<module> > r:<Kind/ns/name>                        failed
 TIMESTAMP  ERRO  m:<module> > apply failed: <error message>
 ```
 
 ### Warning Lines
 
-```
+```bash
 TIMESTAMP  WARN  m:<module> > <warning message>
 ```
 
 ### Debug Lines (only with --verbose or config)
 
-```
+```bash
 TIMESTAMP  DEBU  m:<module> > rendering module module=<path> namespace=<ns>
 TIMESTAMP  DEBU  m:<module> > loaded provider name=<name>
 ```
@@ -172,6 +172,7 @@ TIMESTAMP  DEBU  m:<module> > loaded provider name=<name>
 Timestamps are **on by default**. They can be controlled via:
 
 1. **Config file** (`~/.opm/config.cue`):
+
    ```cue
    log: {
        timestamps: bool | *true
@@ -179,7 +180,8 @@ Timestamps are **on by default**. They can be controlled via:
    ```
 
 2. **CLI flag** (overrides config):
-   ```
+
+   ```bash
    --timestamps=false
    ```
 
@@ -228,7 +230,7 @@ bash docs/design/log-output-preview.sh
 
 ### Fresh Apply
 
-```
+```bash
 15:04:05  INFO  m:my-app > applying module opm.dev/my-app version 1.2.0
 15:04:05  INFO  m:my-app > installing my-app in namespace production
 15:04:05  INFO  m:my-app > r:Namespace/production                              created
@@ -243,7 +245,7 @@ bash docs/design/log-output-preview.sh
 
 ### Idempotent Re-run (partial change)
 
-```
+```bash
 15:05:12  INFO  m:my-app > applying module opm.dev/my-app version 1.2.0
 15:05:12  INFO  m:my-app > upgrading my-app in namespace production
 15:05:12  INFO  m:my-app > r:Namespace/production                              unchanged
@@ -258,7 +260,7 @@ bash docs/design/log-output-preview.sh
 
 ### Delete
 
-```
+```bash
 15:06:30  INFO  m:my-app > deleting my-app in namespace production
 15:06:30  INFO  m:my-app > r:Service/production/my-app                         deleted
 15:06:30  INFO  m:my-app > r:Deployment/production/my-app                      deleted
@@ -271,7 +273,7 @@ bash docs/design/log-output-preview.sh
 
 ### Error
 
-```
+```bash
 15:07:00  INFO  m:my-app > applying module opm.dev/my-app version 1.2.0
 15:07:00  INFO  m:my-app > upgrading my-app in namespace production
 15:07:00  INFO  m:my-app > r:Namespace/production                              unchanged
