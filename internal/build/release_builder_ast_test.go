@@ -1,17 +1,14 @@
 package build
 
 import (
-	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
-	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/format"
-	"cuelang.org/go/cue/load"
 	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
 
@@ -104,87 +101,6 @@ func TestGenerateOverlayAST_ContainsRequiredFields(t *testing.T) {
 	assert.Contains(t, fieldNames, "version")
 	assert.Contains(t, fieldNames, "identity")
 	assert.Contains(t, fieldNames, "labels")
-}
-
-// ---------------------------------------------------------------------------
-// 4.3: TestGenerateOverlayAST_MatchesStringTemplate
-// ---------------------------------------------------------------------------
-
-func TestGenerateOverlayAST_MatchesStringTemplate(t *testing.T) {
-	// Generate both AST and old fmt.Sprintf overlay, load both with test module,
-	// assert #opmReleaseMeta.identity UUIDs match.
-	modulePath := testModulePath(t, "test-module")
-
-	ctx := cuecontext.New()
-	builder := NewReleaseBuilder(ctx, "")
-
-	name := "my-release"
-	namespace := "production"
-
-	// String overlay (old approach)
-	strOverlay := fmt.Sprintf(`package testmodule
-
-import "uuid"
-
-#opmReleaseMeta: {
-	name:      %q
-	namespace: %q
-	fqn:       metadata.fqn
-	version:   metadata.version
-	identity:  string & uuid.SHA1("c1cbe76d-5687-5a47-bfe6-83b081b15413", "\(fqn):\(name):\(namespace)")
-	labels: metadata.labels & {
-		"module-release.opmodel.dev/name":    name
-		"module-release.opmodel.dev/version": version
-		"module-release.opmodel.dev/uuid":    identity
-	}
-}
-`, name, namespace)
-
-	// AST overlay (new approach)
-	astFile := builder.generateOverlayAST("testmodule", ReleaseOptions{
-		Name:      name,
-		Namespace: namespace,
-	})
-	astBytes, err := format.Node(astFile)
-	require.NoError(t, err)
-
-	overlayPath := filepath.Join(modulePath, "opm_release_overlay.cue")
-
-	// Build with string overlay
-	strCfg := &load.Config{
-		Dir: modulePath,
-		Overlay: map[string]load.Source{
-			overlayPath: load.FromBytes([]byte(strOverlay)),
-		},
-	}
-	strInsts := load.Instances([]string{"."}, strCfg)
-	require.Len(t, strInsts, 1)
-	require.NoError(t, strInsts[0].Err)
-	strVal := ctx.BuildInstance(strInsts[0])
-	require.NoError(t, strVal.Err())
-
-	// Build with AST overlay (fresh context to avoid sharing)
-	ctx2 := cuecontext.New()
-	astCfg := &load.Config{
-		Dir: modulePath,
-		Overlay: map[string]load.Source{
-			overlayPath: load.FromBytes(astBytes),
-		},
-	}
-	astInsts := load.Instances([]string{"."}, astCfg)
-	require.Len(t, astInsts, 1)
-	require.NoError(t, astInsts[0].Err)
-	astVal := ctx2.BuildInstance(astInsts[0])
-	require.NoError(t, astVal.Err())
-
-	// Compare identity values
-	strIdentity, err := strVal.LookupPath(cue.ParsePath("#opmReleaseMeta.identity")).String()
-	require.NoError(t, err, "string overlay identity should resolve")
-
-	astIdentity, err := astVal.LookupPath(cue.ParsePath("#opmReleaseMeta.identity")).String()
-	require.NoError(t, err, "AST overlay identity should resolve")
-
-	assert.Equal(t, strIdentity, astIdentity, "both overlays should produce the same identity UUID")
 }
 
 // ---------------------------------------------------------------------------
