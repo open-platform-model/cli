@@ -926,6 +926,16 @@ In this example:
 │  └──────────────┬───────────────────────────────────────────────┘   │
 │                 ▼                                                   │
 │  ┌──────────────────────────────────────────────────────────────┐   │
+│  │ 5c. PRE-APPLY EXISTENCE CHECK (first-time apply only)        │   │
+│  │    If no previous inventory exists:                          │   │
+│  │      For each resource in current_inventory:                 │   │
+│  │        GET resource from cluster                             │   │
+│  │        If exists with deletionTimestamp → FAIL (terminating) │   │
+│  │        If exists without OPM labels    → FAIL (untracked)   │   │
+│  │    Skip this step if previous inventory exists               │   │
+│  └──────────────┬───────────────────────────────────────────────┘   │
+│                 ▼                                                   │
+│  ┌──────────────────────────────────────────────────────────────┐   │
 │  │ 6. APPLY RESOURCES (create/update first)                     │   │
 │  │    Server-side apply all rendered resources                  │   │
 │  │    Track: any errors?                                        │   │
@@ -1222,6 +1232,65 @@ recreated — causing pod restarts, potential PVC orphaning, and unnecessary
 downtime. The safety check recognizes that the Kubernetes resources are the same
 and only the OPM-level provenance changed.
 
+### Scenario K: Pre-existing Untracked Resources
+
+First-time apply (no inventory Secret) where resources with matching
+GVK + namespace + name already exist on the cluster.
+
+```text
+Inventory: none (first-time apply)
+Rendered:  {SS/minecraft@app, Svc/minecraft@app, PVC/config@app}
+
+Pre-apply existence check (step 5c) queries cluster:
+  SS/minecraft   → does not exist    OK
+  Svc/minecraft  → does not exist    OK
+  PVC/config     → EXISTS            CONFLICT
+
+Apply FAILS before any resource is touched:
+  "Resource PersistentVolumeClaim/config in namespace default already exists
+   but is not tracked by this release. Delete it manually or use --adopt
+   to take ownership."
+
+Result: Fail-safe. No silent adoption of untracked resources. [ ]
+```
+
+This prevents OPM from accidentally patching resources created by `kubectl`,
+Helm, or another OPM release. Without this check, SSA apply would merge into
+the existing resource and add it to the inventory — potentially corrupting
+configuration managed by another tool.
+
+The `--adopt` flag is a future escape hatch for intentional adoption (see Open
+Questions).
+
+### Scenario L: Resource in Terminating State
+
+User runs delete, then immediately re-applies before deletion completes.
+
+```text
+Timeline:
+  t0: opm mod delete → all resources enter Terminating
+  t1: opm mod apply  → user didn't wait for deletion to finish
+
+Pre-apply existence check (step 5c) queries cluster:
+  SS/minecraft  → EXISTS with deletionTimestamp set  TERMINATING
+  Svc/minecraft → does not exist                     OK
+  PVC/config    → EXISTS with deletionTimestamp set  TERMINATING
+
+Apply FAILS before any resource is touched:
+  "Resource StatefulSet/minecraft in namespace default is being deleted.
+   Wait for deletion to complete before applying."
+
+Result: Fail-safe. No race condition with pending deletion. [ ]
+```
+
+Kubernetes accepts patches on terminating resources (SSA apply returns success)
+until finalizers complete. Without this check, the apply would "succeed" but
+the resource would be garbage-collected shortly after when finalizers finish —
+leaving the inventory pointing to resources that no longer exist.
+
+This check applies to ALL resources, not just PVCs. Any resource in a
+terminating state should block the apply.
+
 ## Deferred Work
 
 The following are explicitly out of scope for this RFC and deferred to future
@@ -1371,6 +1440,52 @@ recreation before they run apply.
 
 This question is deferred to implementation. The inventory format does not need
 to change to support any of these approaches.
+
+### Pre-Apply Resource Existence Checks
+
+When no inventory Secret exists (first-time apply), OPM must verify that the
+resources it intends to create do not already exist on the cluster. This prevents
+two failure modes:
+
+1. **Untracked resource adoption**: A resource with the same GVK + namespace +
+   name exists but was created by another tool (kubectl, Helm, another OPM
+   release). Applying over it would silently adopt it into this release's
+   inventory.
+
+2. **Terminating resource race**: A resource is being deleted (has
+   `deletionTimestamp` set). SSA apply "succeeds" on terminating resources, but
+   the resource will be garbage-collected when finalizers complete.
+
+Both cases should fail the apply with a clear error message.
+
+#### Design Considerations
+
+**Performance**: The check requires one GET per resource in the rendered set. For
+a typical module (3-10 resources), this adds 3-10 API calls before apply begins.
+This is acceptable for first-time applies only. Subsequent applies (where an
+inventory exists) can skip this check — the inventory already tracks what OPM
+owns.
+
+**Terminating detection on subsequent applies**: The first-time-only scope means
+a re-apply after `opm mod delete` could still hit the terminating race if the
+inventory Secret is deleted before the resources finish terminating. The
+terminating check should also run when the inventory exists but the previous
+inventory is empty (e.g., the Secret was just created). This needs further
+design.
+
+**TOCTOU race**: A resource could be created between the existence check and the
+apply. This is inherent to any check-then-act pattern. The risk is low for
+CLI-driven workflows (no concurrent controllers creating the same resources).
+SSA's conflict detection provides a secondary safety net.
+
+**`--adopt` flag**: A future escape hatch that allows intentional adoption of
+existing untracked resources. When set, the pre-apply check would skip the
+"untracked resource" failure and instead add the resource to the inventory.
+Terminating resources should still fail even with `--adopt`.
+
+**`--wait-for-deletion` flag**: An alternative to failing on terminating
+resources — wait for deletion to complete, then proceed. This is a convenience
+for the common "delete then re-apply" workflow. Deferred to implementation.
 
 ## References
 
