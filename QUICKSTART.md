@@ -89,6 +89,16 @@ task build && task install
 
 This builds the `opm` binary to `./bin/opm` and installs it to `$GOPATH/bin/opm`.
 
+## Initialize Configuration
+
+Initialize the OPM configuration for first-time use:
+
+```bash
+opm config init
+```
+
+This creates `~/.opm/config.cue` with default settings.
+
 ## Create a Dev Cluster
 
 ```bash
@@ -125,6 +135,8 @@ opm mod diff ./examples/jellyfin -n default
 
 Shows semantic differences between your local definition and what's running in the cluster.
 
+> **Note:** The diff command is currently broken and shows excessive differences.
+
 ### Status (check resource health)
 
 ```bash
@@ -132,6 +144,8 @@ opm mod status --name jellyfin -n default
 ```
 
 Displays health and readiness of all module resources.
+
+> **Note:** The status command is not particularly useful at the moment.
 
 ### Delete (remove from cluster)
 
