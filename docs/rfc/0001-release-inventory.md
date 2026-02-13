@@ -1,0 +1,1221 @@
+# RFC-0001: Release Inventory
+
+| Field       | Value                              |
+|-------------|------------------------------------|
+| **Status**  | Draft                              |
+| **Created** | 2026-02-11                         |
+| **Authors** | OPM Contributors                   |
+
+## Summary
+
+Introduce a lightweight release inventory stored as a Kubernetes Secret that
+tracks which resources belong to a ModuleRelease. This enables automatic pruning
+of stale resources during `opm mod apply` and provides a precise source of truth
+for `diff`, `delete`, and `status` commands. The Secret also maintains a history
+of changes, enabling future rollback capabilities.
+
+## Motivation
+
+### Current State: OPM is Stateless
+
+Today, OPM uses **label-based discovery only**. When resources are applied, OPM
+labels are injected, but no record of the applied set is stored anywhere. All
+subsequent operations (`delete`, `status`, `diff`) rediscover resources by
+querying the Kubernetes API with label selectors.
+
+```text
+┌───────────────────────────────────────────────────────┐
+│                 OPM Today                             │
+│                                                       │
+│   opm mod apply                                       │
+│       │                                               │
+│       ▼                                               │
+│   ┌──────────┐     Server-Side      ┌──────────────┐  │
+│   │ Rendered │────  Apply  ───────▶│  K8s API     │  │
+│   │ manifests│     (+ labels)       │  (resources) │  │
+│   └──────────┘                      └──────────────┘  │
+│                                          │            │
+│   opm mod status / delete / diff         │            │
+│       │                                  │            │
+│       └──── label selector query ────────┘            │
+│                                                       │
+│   NO STATE STORED. Labels are the only record.        │
+└───────────────────────────────────────────────────────┘
+```
+
+This works for simple cases but has known gaps:
+
+1. **No orphan cleanup**: If a value change causes a resource to be renamed, the
+   old resource becomes an orphan. `apply` does not clean it up.
+2. **No stored values**: Unlike Helm, OPM does not record what values were used
+   for a deployment. You cannot reconstruct "what was applied" without the
+   original module source and values.
+3. **Noisy diff**: `opm mod diff` scans ALL API types with label selectors,
+   which is slow and can produce false positives from label overlap.
+4. **No automatic pruning**: Orphaned resources are detected by `diff` but not
+   cleaned up by `apply`.
+
+### The Rename Problem
+
+The core motivating scenario. Consider an application "Jellyfin":
+
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│                    THE RENAME SCENARIO                               │
+│                                                                      │
+│  Apply v1:                        Apply v2 (value change):           │
+│                                                                      │
+│  values:                          values:                            │
+│    name: "minecraft"                 name: "minecraft-server"        │
+│                                                                      │
+│  Produces:                        Produces:                          │
+│  ┌───────────────────────┐         ┌──────────────────────────────┐  │
+│  │ StatefulSet/minecraft │         │ StatefulSet/minecraft-server │  │
+│  │ Service/minecraft     │         │ Service/minecraft-server     │  │
+│  │ PVC/config            │         │ PVC/config                   │  │
+│  └───────────────────────┘         └──────────────────────────────┘  │
+│                                                                      │
+│  What SHOULD happen:                                                 │
+│  1. Create StatefulSet/minecraft-server                              │
+│  2. Create Service/minecraft-server                                  │
+│  3. DELETE StatefulSet/minecraft    ← orphaned from v1               │
+│  4. DELETE Service/minecraft        ← orphaned from v1               │
+│                                                                      │
+│  What happens WITHOUT inventory:                                     │
+│  1. Create StatefulSet/minecraft-server  OK                          │
+│  2. Create Service/minecraft-server      OK                          │
+│  3. StatefulSet/minecraft still exists  FAIL ORPHAN                  │
+│  4. Service/minecraft still exists      FAIL ORPHAN                  │
+│                                                                      │
+│  Result: TWO instances of Jellyfin running.                          │
+│  Nobody told the old one to go away.                                 │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+Tools like bare `kubectl apply` and `kustomize` cannot handle this. The resource
+is lost and will not be removed or recreated. A release inventory solves this by
+tracking the previous set and computing the diff.
+
+## Prior Art
+
+### Industry Approaches
+
+Research was conducted across all major Kubernetes deployment tools to understand
+the landscape of release state storage:
+
+#### Helm (Secrets — heavy)
+
+Helm stores the **entire** release state in a Secret per revision:
+
+```text
+Secret: sh.helm.release.v1.<name>.v<revision>
+  type: helm.sh/release.v1
+  data:
+    release: <base64-gzipped blob containing:>
+      - chart metadata
+      - user-supplied values
+      - computed values
+      - rendered manifests (the full YAML!)
+      - hooks
+      - status, timestamps, version
+```
+
+Multiple revisions are kept for rollback (default: 10). This enables full
+rollback from stored manifests but can hit the 1MB etcd size limit with large
+charts.
+
+#### Timoni (Secrets — lightweight, single typed object)
+
+Timoni stores a **lightweight** inventory in a Secret. Unlike Helm, it does NOT
+store full rendered manifests. All state is wrapped in a single `data.instance`
+field containing a typed JSON blob:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: timoni.<instance-name>
+  namespace: <instance-namespace>
+  labels:
+    app.kubernetes.io/component: instance
+    app.kubernetes.io/created-by: timoni
+    app.kubernetes.io/name: <name>
+type: timoni.sh/instance
+data:
+  instance: <single JSON blob>
+```
+
+The JSON blob is a typed object with `kind`/`apiVersion`, structured like a
+Kubernetes resource:
+
+```json
+{
+  "kind": "Instance",
+  "apiVersion": "timoni.sh/v1alpha1",
+  "metadata": {
+    "name": "cert-manager",
+    "namespace": "cert-manager",
+    "labels": { "bundle.timoni.sh/name": "core" }
+  },
+  "module": {
+    "name": "timoni.sh/flux-helm-release",
+    "repository": "oci://ghcr.io/stefanprodan/modules/flux-helm-release",
+    "version": "2.7.3-1",
+    "digest": "sha256:39b1153f..."
+  },
+  "values": "{\n\trepository: {\n\t\turl: \"https://charts.jetstack.io\"\n\t}\n}",
+  "lastTransitionTime": "2026-01-19T08:34:38Z",
+  "inventory": {
+    "entries": [
+      { "id": "cert-manager_cert-manager_helm.toolkit.fluxcd.io_HelmRelease", "v": "v2" },
+      { "id": "cert-manager_cert-manager_source.toolkit.fluxcd.io_HelmRepository", "v": "v1" }
+    ]
+  }
+}
+```
+
+Key characteristics:
+
+- **Single blob**: All state in one `data.instance` field, not multiple data keys.
+- **Typed with `kind`/`apiVersion`**: Enables schema versioning and future CRD migration.
+- **Compact inventory IDs**: `<namespace>_<name>_<group>_<Kind>` with version as
+  a separate `"v"` field — version is NOT part of the identity.
+- **Values as CUE string**: Stored in native CUE format, not converted to JSON.
+- **Module digest**: OCI content-addressable digest for reproducibility.
+- **lastTransitionTime**: Timestamp of the last apply operation.
+- **No rendered manifests**: Since module source + values are known, manifests
+  can always be re-rendered. This keeps the Secret small (~2-5KB per instance
+  vs ~100KB+ per revision for Helm).
+
+#### Carvel kapp (ConfigMaps)
+
+kapp uses ConfigMaps for both inventory and change history:
+
+```text
+ConfigMap: {app-name}-ctrl           # Current inventory
+ConfigMap: {app-name}-ctrl-change-*  # Change history (up to 200)
+```
+
+Resources are tracked via labels (`kapp.k14s.io/app`, `kapp.k14s.io/association`).
+
+#### Flux Kustomize Controller (CRD status)
+
+Flux records inventory in `.status.inventory` of the `Kustomization` CRD:
+
+```yaml
+status:
+  inventory:
+    entries:
+      - id: default_my-deploy_apps_Deployment_v1
+```
+
+#### ArgoCD (CRD + annotations/labels)
+
+ArgoCD uses an `Application` CRD as the source of truth. Resources are tracked
+via configurable methods: labels, annotations, or both. The annotation format
+encodes `name:namespace:group/kind`.
+
+#### Crossplane (CRD + ownerReferences)
+
+Crossplane uses Composite resources with `ownerReferences` on all composed
+resources, enabling native Kubernetes garbage collection.
+
+#### Server-Side Apply managedFields (Kubernetes native)
+
+SSA with a named field manager tracks which **fields** are owned, but not which
+**resources** belong to a release. Solves field ownership, not inventory.
+
+#### External Storage (Helm SQL driver, Pulumi)
+
+Helm supports a SQL driver. Pulumi stores state in cloud backends. These have
+no cluster size limits but introduce external dependencies.
+
+### Comparison Matrix
+
+```text
+┌──────────────┬────────┬────────┬────────┬─────────┬────────┬───────────────┐
+│              │Secret  │ CM     │ CRD    │ Annot.  │ SSA    │ External DB   │
+│              │        │        │        │ /Labels │ mgdFld │               │
+├──────────────┼────────┼────────┼────────┼─────────┼────────┼───────────────┤
+│ No CRDs req. │  [x]   │  [x]   │  [ ]   │  [x]    │  [x]   │  [x]          │
+│ Native GC    │  [ ]   │  [ ]   │  [x]*  │  [ ]    │  [ ]   │  [ ]          │
+│ Inventory    │  [x]   │  [x]   │  [x]   │  [ ]    │  [ ]   │  [x]          │
+│ Values store │  [x]   │  [x]   │  [x]   │  [ ]    │  [ ]   │  [x]          │
+│ Rollback     │  [x]** │  [x]** │  [x]   │  [ ]    │  [ ]   │  [x]          │
+│ Field owner. │  [ ]   │  [ ]   │  [ ]   │  [ ]    │  [x]   │  [ ]          │
+│ Size limits  │ 1MB    │ 1MB    │ 1MB    │ 256KB   │  N/A   │  ∞            │
+│ Cluster-free │  [ ]   │  [ ]   │  [ ]   │  [ ]    │  [ ]   │  [x]          │
+│ CLI-only     │  [x]   │  [x]   │  [x]   │  [x]    │  [x]   │  [x]          │
+│ Controller   │  [ ]   │  [ ]   │  [x]   │  [ ]    │  [x]   │  [ ]          │
+│ Complexity   │  Low   │ Low    │ Med    │ Lowest  │ Lowest │  High         │
+├──────────────┴────────┴────────┴────────┴─────────┴────────┴───────────────┤
+│ * CRD with ownerReferences    ** If multiple revisions stored              │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Why Timoni-Style
+
+OPM and Timoni are sibling projects in spirit — both CUE-based, both
+CLI-driven, both module-oriented. Timoni's lightweight inventory approach is the
+best fit because:
+
+1. **You already have the module source + values** — you can re-render anytime,
+   so storing full manifests (like Helm) is wasteful.
+2. **Object IDs are sufficient** for the core use case: knowing what to prune.
+3. **No CRDs required** — works on any cluster, no chicken-and-egg bootstrap.
+4. **Small footprint** — ~2-5KB vs 100KB+ per Helm revision.
+5. **Closest architectural analog** to OPM's existing patterns.
+
+```text
+┌─────────────────────────────────────────────────────┐
+│           Helm vs Timoni Secret Storage             │
+│                                                     │
+│  Helm:     ████████████████████████  (heavy)        │
+│            Full manifests + values + metadata       │
+│            ~100KB+ per revision × N revisions       │
+│                                                     │
+│  Timoni:   ████                      (light)        │
+│            Object IDs + values + module ref         │
+│            ~2-5KB per instance                      │
+│                                                     │
+│  OPM:      ████                      (light)        │
+│            Follow Timoni's approach                 │
+│            + change history in single Secret        │
+└─────────────────────────────────────────────────────┘
+```
+
+### Learnings from Timoni
+
+After studying Timoni's actual implementation (not just its documentation), we
+identified specific design patterns worth adopting:
+
+1. **Single typed object, not multiple data fields.** Timoni wraps all state in
+   one JSON blob with `kind`/`apiVersion`. This allows the entire format to
+   evolve — bump `apiVersion` and handle old + new formats during migration.
+   With separate `data` fields, versioning each independently becomes messy.
+   The typed blob also maps directly to a future CRD: the JSON blob IS the CRD
+   spec, just stored in a Secret for now.
+
+2. **Version separated from identity.** Timoni's inventory entries use a compact
+   ID for identity and a separate `"v"` field for API version. This prevents
+   false orphans during Kubernetes API version migrations (e.g., Ingress moving
+   from `v1beta1` to `v1`). If version were part of the identity, an API upgrade
+   would make the old entry look stale and trigger a spurious delete.
+
+3. **Values in native format.** Timoni stores CUE values as a CUE-formatted
+   string, not converted to JSON. This preserves the source language and keeps
+   values human-readable when inspecting the Secret.
+
+4. **Module digest for reproducibility.** Timoni records the OCI digest
+   alongside version. Version tags are mutable (someone can push to the same
+   tag), but digests are immutable — they prove exactly which module bits were
+   applied. OPM defers this: CUE modules are resolved by the CUE SDK, not a
+   custom OCI artifact, so module digests are not directly accessible. OPM uses
+   a `manifestDigest` (hash of rendered output) instead to achieve comparable
+   change detection.
+
+5. **lastTransitionTime.** A simple timestamp of when the last apply happened.
+   Cheap to add, useful for debugging and status reporting.
+
+6. **Distinguishing label.** Timoni labels its inventory Secret with
+   `app.kubernetes.io/component: instance` to distinguish it from application
+   resources. This prevents the inventory Secret from appearing alongside
+   workload resources in label-based queries.
+
+OPM adopts these patterns, adapted to its own domain model and naming
+conventions. Key divergences: OPM uses CUE module paths instead of OCI
+references for module identification (since OPM uses CUE modules directly,
+not custom OCI artifacts), and explicit JSON fields instead of Timoni's compact
+underscore-separated string IDs for inventory entries (to avoid parsing
+ambiguity when names contain underscores).
+
+## Design
+
+### Secret Structure Overview
+
+A single Kubernetes Secret per release contains all state: release metadata, a
+change history index, and individual change entries. This keeps all release state
+co-located and atomically updatable.
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  Secret: opm.<release-name>.<release-id-uuid>                   │
+│  type: opmodel.dev/release                                      │
+│                                                                 │
+│  data:                                                          │
+│    metadata:          Release-level metadata (typed JSON blob)  │
+│    index:             Ordered list of change IDs (newest first) │
+│    change-sha1-<id>:  Per-change state (inventory, values, etc) │
+│    change-sha1-<id>:  ...                                       │
+│    change-sha1-<id>:  ...                                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Metadata Field
+
+The `data.metadata` field contains release-level information as a typed JSON
+object with `kind`/`apiVersion`, following Timoni's pattern. This enables schema
+versioning and maps directly to a future CRD.
+
+```json
+{
+  "kind": "ModuleRelease",
+  "apiVersion": "core.opmodel.dev/v1alpha1",
+  "name": "minecraft",
+  "namespace": "default",
+  "releaseId": "a3b8f2e1-7c4d-5a9e-b6f0-1234567890ab",
+  "lastTransitionTime": "2026-02-11T14:30:00Z"
+}
+```
+
+| Field                 | Content                                         | Purpose                            |
+|-----------------------|-------------------------------------------------|------------------------------------|
+| `kind`                | `"ModuleRelease"`                                     | Schema identification              |
+| `apiVersion`          | `"core.opmodel.dev/v1alpha1"`                        | Schema versioning, CRD migration   |
+| `name`                | Release name                                    | Human identification               |
+| `namespace`           | Release namespace                               | Scoping                            |
+| `releaseId`           | Deterministic UUIDv5                            | Unique release identity            |
+| `lastTransitionTime`  | RFC 3339 timestamp of last apply                | Debugging, status reporting        |
+
+### Index Field
+
+The `data.index` field is a JSON array of change IDs, ordered newest first:
+
+```json
+["change-sha1-7f2c9d01", "change-sha1-a3b8f2e1"]
+```
+
+The first entry is always the current (latest) change. The CLI is responsible
+for maintaining this ordering.
+
+### Change Entries
+
+Each `data.change-sha1-<id>` field contains the full state for a single change:
+
+```json
+{
+  "module": {
+    "path": "opmodel.dev/modules/minecraft@v0",
+    "version": "0.1.0",
+    "name": "minecraft"
+  },
+  "values": "{\n\tname: \"minecraft\"\n\tdataPath: \"/mnt/server\"\n}",
+  "manifestDigest": "sha256:e5b7a3f...",
+  "timestamp": "2026-02-11T14:30:00Z",
+  "inventory": {
+    "entries": [
+      { "group": "apps", "kind": "StatefulSet", "namespace": "default", "name": "minecraft", "v": "v1" },
+      { "group": "", "kind": "Service", "namespace": "default", "name": "minecraft", "v": "v1" },
+      { "group": "", "kind": "PersistentVolumeClaim", "namespace": "default", "name": "config", "v": "v1" }
+    ]
+  }
+}
+```
+
+| Field                         | Content                                          | Purpose                            |
+|-------------------------------|--------------------------------------------------|------------------------------------|
+| `module.path`                 | CUE module path (e.g., `opmodel.dev/m@v0`)       | Module identity, re-render         |
+| `module.version`              | Module version string (semver)                   | Audit trail                        |
+| `module.name`                 | Module declared name                             | Human identification               |
+| `values`                      | Resolved andunified CUE values as CUE string     | Audit trail, future rollback       |
+| `manifestDigest`              | SHA256 of deterministically serialized manifests | Change detection, change ID input  |
+| `timestamp`                   | RFC 3339 timestamp of this change                | Audit trail                        |
+| `inventory.entries[]`         | Array of resource identity objects               | Pruning, diff, delete, status      |
+
+**Values**: Stored as a CUE-formatted string (native format), not converted to
+JSON. File paths are not stored — they are meaningless on a different machine or
+CI runner. The resolved values are the actual input that produced the rendered
+resources.
+
+**Module path**: The CUE module path from `cue.mod/module.cue` (e.g.,
+`opmodel.dev/modules/minecraft@v0`). This is the canonical module identity in
+the CUE ecosystem — the CUE SDK maps it to an OCI registry lookup automatically
+via the `CUE_REGISTRY` environment variable. OPM uses CUE modules directly
+rather than publishing custom OCI artifacts, so this path (not an OCI reference)
+is the correct identifier. The path is always present since CUE requires a
+`module:` declaration in every module.
+
+**Module version**: For published modules, this is the semver version from
+`metadata.version`. For local development modules that have not been versioned,
+the `version` field is replaced with `"local": true` to indicate the module was
+applied from a local filesystem path without a published version.
+
+**Manifest digest**: A SHA256 hash of the deterministically serialized rendered
+manifests. This captures any change to the module output — including template
+changes in local modules where `module.version` may not change between edits.
+This field is always present regardless of whether the module is published or
+local.
+
+**Inventory entry identity**: Each entry has fields `group`, `kind`,
+`namespace`, `name` (the identity) and `v` (the API version, stored separately).
+Set operations for pruning use only the identity fields. The `v` field is used
+when fetching or deleting the resource from the cluster. Separating version from
+identity prevents false orphans when Kubernetes API versions change (e.g.,
+Ingress migrating from `networking.k8s.io/v1beta1` to `networking.k8s.io/v1`).
+
+**What gets tracked**: The inventory contains **only resources that OPM directly
+renders** — the output of the build pipeline. Derived resources that Kubernetes
+automatically creates (Endpoints for Services, ReplicaSets for Deployments, Pods
+for StatefulSets/Deployments, etc.) are NOT tracked. When OPM deletes a release,
+it deletes only the parent resources in the inventory. Kubernetes garbage
+collection handles cleanup of derived child resources automatically. This keeps
+the inventory precise, avoids unnecessary API calls, and respects Kubernetes
+ownership semantics — OPM owns what it renders, not what controllers create in
+response.
+
+### Change ID
+
+Each change is identified by a deterministic SHA1 hash, truncated to 8 hex
+characters. The data key format is `change-sha1-<8chars>`.
+
+**Hash inputs:**
+
+```text
+change ID = SHA1(
+  module.path +
+  module.version +
+  values (resolved CUE string) +
+  manifestDigest (SHA256 of rendered manifests)
+)
+```
+
+The `manifestDigest` is computed first as a SHA256 of the deterministically
+serialized rendered manifests, then included as an input to the change ID hash.
+This means the change ID captures all four dimensions of what defines a change:
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  CHANGE IDENTITY — FOUR DIMENSIONS                              │
+│                                                                 │
+│  1. module.path        → Which module (CUE module identity)     │
+│  2. module.version     → Which version of that module           │
+│  3. values             → What configuration the user provided   │
+│  4. manifestDigest     → What output was actually produced      │
+│                                                                 │
+│  Same inputs → same change ID (idempotent)                      │
+│  Any dimension changes → different change ID                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Why all four inputs?**
+
+The `manifestDigest` alone would be sufficient for local modules, but including
+`path` and `version` ensures that module upgrades are always recorded as distinct
+changes — even if the rendered output happens to be identical.
+Including `values` ensures that a value change that produces the same output
+(e.g., setting a default explicitly) is also recorded.
+
+**Deterministic manifest serialization:** The `manifestDigest` requires
+that identical resources always produce identical bytes when serialized. This is
+achievable with Go's standard library (see [Deterministic Manifest
+Serialization](#deterministic-manifest-serialization) for the full algorithm and
+analysis of existing codebase support).
+
+**Idempotent re-applies:**
+
+With a deterministic hash, reapplying the exact same configuration produces the
+same change ID. This means the existing change entry is overwritten (with an
+updated timestamp) rather than creating a duplicate entry:
+
+```text
+Apply #1: module=1.0.0, values=X, output=Y → change-sha1-a3b8f2e1 (created)
+Apply #2: module=1.0.0, values=X, output=Y → change-sha1-a3b8f2e1 (overwritten)
+Apply #3: module=1.1.0, values=X, output=Z → change-sha1-7f2c9d01 (new entry)
+Apply #4: module=1.1.0, values=X, output=Z → change-sha1-7f2c9d01 (overwritten)
+
+Index after: ["change-sha1-7f2c9d01", "change-sha1-a3b8f2e1"]
+```
+
+History only grows when the inputs **actually change**. Idempotent re-applies
+update the existing entry's timestamp and inventory, then bump it to the front
+of the index. This keeps the change history meaningful — it tracks state
+transitions, not CLI invocations.
+
+### Deterministic Manifest Serialization
+
+The `manifestDigest` is a SHA256 hash of the rendered manifests, serialized
+deterministically so that identical resource content always produces the same
+digest. This section documents the algorithm and the codebase properties that
+make it reliable.
+
+#### Algorithm
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  DETERMINISTIC MANIFEST DIGEST                                  │
+│                                                                 │
+│  Input: []*build.Resource (rendered resources from pipeline)    │
+│                                                                 │
+│  Step 1: Sort resources with total ordering                     │
+│    Primary:    GVK weight (ascending)                           │
+│    Secondary:  API group (alphabetical)                         │
+│    Tertiary:   Kind (alphabetical)                              │
+│    Quaternary: Namespace (alphabetical)                         │
+│    Quinary:    Name (alphabetical)                              │
+│                                                                 │
+│    No two resources can share GVK + namespace + name in a       │
+│    valid deployment, so this guarantees a unique position.      │
+│                                                                 │
+│  Step 2: Serialize each resource independently                  │
+│    json.Marshal(resource.Object)                                │
+│    → Go's encoding/json sorts map keys alphabetically           │
+│    → Each individual serialization is deterministic             │
+│                                                                 │
+│  Step 3: Concatenate serialized bytes                           │
+│    Append each resource's JSON bytes in sorted order            │
+│    Use a newline separator between resources                    │
+│                                                                 │
+│  Step 4: Hash                                                   │
+│    SHA256(concatenated bytes)                                   │
+│    → manifestDigest = "sha256:<hex>"                            │
+│                                                                 │
+│  Properties:                                                    │
+│    [x] Same resources in any input order → same digest          │
+│    [x] Any content change → different digest                    │
+│    [x] Any resource added/removed → different digest            │
+│    [x] No external dependencies (Go stdlib only)                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Why This Works: Codebase Analysis
+
+Investigation of the OPM codebase and Go standard library confirms that
+deterministic serialization is achievable with minimal changes.
+
+**JSON key ordering is guaranteed.** Go's `encoding/json.Marshal` sorts map keys
+alphabetically for `map[string]interface{}`. This is documented Go behavior
+(since Go 1). Since `unstructured.Unstructured` is backed by
+`map[string]interface{}`, and its `MarshalJSON()` method delegates to
+`json.Encode(t.Object)`, serializing any individual resource with `json.Marshal`
+already produces deterministic output. No custom serializer is needed.
+
+**CUE evaluation is deterministic.** CUE structs have deterministic field
+ordering. When decoded into Go maps via `cue.Value.Decode()`, the CUE field
+ordering is lost (Go maps do not preserve insertion order), but this does not
+matter because `json.Marshal` sorts keys independently.
+
+**Resource normalization already sorts.** The `normalizeK8sResource()` functions
+in `internal/build/executor.go` already sort map keys alphabetically when
+converting OPM-style maps to Kubernetes arrays (`mapToPortsArray`,
+`mapToEnvArray`, `mapToVolumeMountsArray`, `mapToVolumesArray`).
+
+#### What Requires Attention
+
+**Resource list ordering needs a total ordering.** The current pipeline sort in
+`internal/build/pipeline.go:153-157` uses `sort.Slice` with weight-only
+comparison. Resources with the same weight (e.g., two Services) can appear in
+either order depending on Go map iteration in the executor. For the digest to be
+deterministic, the sort must have tiebreakers that produce a total ordering.
+
+The existing `sortResourceInfos` in `internal/output/manifest.go:58-77` already
+implements the correct pattern — sorting by weight, then namespace, then name.
+The digest sort extends this with API group and kind as additional tiebreakers
+to handle resources of different types that share the same weight:
+
+```text
+Current (pipeline.go — insufficient):
+  sort by: weight
+  → Two Services in arbitrary order. Non-deterministic.
+
+Required (for digest):
+  sort by: weight → group → kind → namespace → name
+  → Total ordering. Every resource has a unique position.
+
+Existing model (manifest.go — close):
+  sort by: weight → namespace → name
+  → Good but doesn't distinguish different GVKs at same weight.
+```
+
+**Executor job ordering is non-deterministic.** The `Executor.ExecuteWithTransformers()`
+in `internal/build/executor.go:58-72` iterates `match.ByTransformer`, which is a
+Go `map[string][]*LoadedComponent`. Go map iteration is non-deterministic, so the
+order resources are produced varies between runs. This does NOT affect the digest
+because the digest sort (Step 1) re-orders resources after execution. The
+executor ordering only affects the input to the sort, not the output.
+
+**Server-generated fields are not present.** Since the digest is computed from
+rendered output (before apply, not after), server-generated fields like
+`metadata.resourceVersion`, `metadata.uid`, `metadata.creationTimestamp`,
+`metadata.managedFields`, and `status` are not present in the serialized data.
+If a CUE template were to explicitly set any of these fields, they would be
+included in the digest — this is correct behavior (the template output changed).
+
+#### Fields Included and Excluded
+
+The digest is computed from the rendered resource as-is. Since rendering happens
+before apply, the resource contains only user-defined fields:
+
+```text
+Included (present in rendered output):
+  [x] apiVersion, kind                (identity)
+  [x] metadata.name, namespace        (identity)
+  [x] metadata.labels                 (module-defined labels only)
+  [x] metadata.annotations            (user-defined)
+  [x] spec                            (user-defined)
+  [x] data, stringData                (for ConfigMaps/Secrets)
+
+Not present (server-generated, only exist after apply):
+  [ ] metadata.resourceVersion
+  [ ] metadata.uid
+  [ ] metadata.creationTimestamp
+  [ ] metadata.generation
+  [ ] metadata.managedFields
+  [ ] status
+```
+
+Note: OPM labels are injected during `apply` (in `injectLabels()` at
+`internal/kubernetes/apply.go:88-117`), which is AFTER the digest is computed.
+This means label injection does not affect the digest. The digest captures the
+rendered output before any OPM-specific labels are added, which is the correct
+behavior — the labels are an apply-time concern, not a module output concern.
+
+### Change History Pruning
+
+The Secret accumulates change entries up to a configurable maximum:
+
+- **Default**: Keep last 10 changes (same as Helm's default).
+- **Configurable**: `--max-history=N` flag on `opm mod apply`.
+
+On each successful apply:
+
+1. Write/overwrite the change entry for the current change ID.
+2. Prepend the change ID to the index (or move to front if already present).
+3. If `len(index) > max_history`: remove oldest entries from both the index and
+   the corresponding `data.change-*` keys.
+
+**Size estimation**: 10 changes × ~2-5KB each = ~20-50KB. Well within etcd's
+1MB Secret size limit.
+
+### Secret Update Semantics
+
+The inventory Secret is always updated with a **full PUT** (replace the entire
+Secret). Read the Secret, modify the in-memory representation (add/update change
+entry, update index, update metadata, prune old changes), then write the whole
+thing back.
+
+This is atomic, simple, and safe. Since OPM is a CLI tool (not a controller),
+concurrent writers to the same release are not a realistic concern. If two
+humans run `opm mod apply` against the same release simultaneously, they already
+have bigger problems than Secret contention.
+
+### Naming Convention
+
+The inventory Secret name follows the pattern:
+
+```text
+opm.<release-name>.<release-id-uuid>
+```
+
+Example:
+
+```text
+opm.minecraft.a3b8f2e1-7c4d-5a9e-b6f0-1234567890ab
+```
+
+**Rationale:**
+
+- The release name is there for humans (`kubectl get secrets` is scannable).
+- The release-id UUID ensures uniqueness (no collisions if two modules share a
+  name in the same namespace).
+- The `opm.` prefix identifies it as an OPM-managed resource.
+
+**Kubernetes naming constraints (RFC 1123 DNS subdomain):**
+
+```text
+Total max:      253 characters
+Label max:      63 characters (each dot-separated segment)
+Allowed chars:  lowercase alphanumeric, '-', '.'
+Must start/end: alphanumeric
+
+Fixed overhead:  "opm." (4) + "." (1) + UUID (36) = 41 chars
+Remaining:       253 - 41 = 212 chars for release name
+Label check:     "opm" (3 ok), release-name (≤63 ok), UUID (36 ok)
+```
+
+Release names are already constrained to ≤63 characters (they are used as
+Kubernetes label values), so this fits cleanly.
+
+### Inventory Lookup
+
+The inventory Secret is found by **name convention** (direct GET) with a
+**label-based fallback**:
+
+1. **Primary**: Construct the Secret name from render metadata
+   (`opm.<name>.<release-id>`) and perform a direct `GET`. This is fast (single
+   API call). The release-id is deterministic (UUIDv5 computed from module name +
+   namespace), so it can always be reconstructed from the render output.
+
+2. **Fallback**: If the direct GET fails (e.g., naming convention changed), list
+   Secrets with label `module-release.opmodel.dev/uuid=<release-id>`.
+
+### Labels on the Inventory Secret
+
+The inventory Secret carries OPM labels plus a distinguishing component label:
+
+```yaml
+labels:
+  app.kubernetes.io/managed-by: open-platform-model
+  module.opmodel.dev/name: <name>
+  module.opmodel.dev/namespace: <namespace>
+  module-release.opmodel.dev/uuid: <release-id>
+  opmodel.dev/component: inventory
+```
+
+The `opmodel.dev/component: inventory` label distinguishes the inventory Secret
+from application resources. This prevents it from appearing in label-based
+workload queries while still being discoverable by OPM tooling.
+
+This ensures:
+
+- `opm mod delete` can discover the inventory Secret via labels as a fallback.
+- The inventory Secret does NOT pollute application resource queries.
+- Standard Kubernetes tooling can identify it as OPM-managed.
+- The component label can be used to filter: `kubectl get secrets -l opmodel.dev/component=inventory`.
+
+### Full Example Secret
+
+The following is a complete example of an inventory Secret after three applies:
+an initial install, a value change (rename), and a module version upgrade.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: opm.minecraft.a3b8f2e1-7c4d-5a9e-b6f0-1234567890ab
+  namespace: default
+  labels:
+    app.kubernetes.io/managed-by: open-platform-model
+    module.opmodel.dev/name: minecraft
+    module.opmodel.dev/namespace: default
+    module-release.opmodel.dev/uuid: a3b8f2e1-7c4d-5a9e-b6f0-1234567890ab
+    opmodel.dev/component: inventory
+type: opmodel.dev/release
+stringData:
+  metadata: |
+    {
+      "kind": "ModuleRelease",
+      "apiVersion": "core.opmodel.dev/v1alpha1",
+      "name": "minecraft",
+      "namespace": "default",
+      "releaseId": "a3b8f2e1-7c4d-5a9e-b6f0-1234567890ab",
+      "lastTransitionTime": "2026-02-11T16:45:00Z"
+    }
+  index: |
+    ["change-sha1-e92f4c01", "change-sha1-7f2c9d01", "change-sha1-a3b8f2e1"]
+  change-sha1-a3b8f2e1: |
+    {
+      "module": {
+        "path": "opmodel.dev/modules/minecraft@v0",
+        "version": "0.1.0",
+        "name": "minecraft"
+      },
+      "values": "{\n\tname: \"minecraft\"\n\tdataPath: \"/mnt/server\"\n}",
+      "manifestDigest": "sha256:b5d4a7e2f1c8936d0e5a2b7c4f8d1e3a6b9c2d5e8f1a4b7c0d3e6f9a2b5c8d1e",
+      "timestamp": "2026-02-11T14:00:00Z",
+      "inventory": {
+        "entries": [
+          { "group": "apps", "kind": "StatefulSet", "namespace": "default", "name": "minecraft", "v": "v1" },
+          { "group": "", "kind": "Service", "namespace": "default", "name": "minecraft", "v": "v1" },
+          { "group": "", "kind": "PersistentVolumeClaim", "namespace": "default", "name": "config", "v": "v1" }
+        ]
+      }
+    }
+  change-sha1-7f2c9d01: |
+    {
+      "module": {
+        "path": "opmodel.dev/modules/minecraft@v0",
+        "version": "0.1.0",
+        "name": "minecraft"
+      },
+      "values": "{\n\tname: \"minecraft-server\"\n\tdataPath: \"/mnt/server\"\n}",
+      "manifestDigest": "sha256:c8e2a1f4b7d5093e6a2c8f1d4b7e0a3c6d9f2b5e8a1c4d7f0b3e6a9c2d5f8b1a",
+      "timestamp": "2026-02-11T15:30:00Z",
+      "inventory": {
+        "entries": [
+          { "group": "apps", "kind": "StatefulSet", "namespace": "default", "name": "minecraft-server", "v": "v1" },
+          { "group": "", "kind": "Service", "namespace": "default", "name": "minecraft-server", "v": "v1" },
+          { "group": "", "kind": "PersistentVolumeClaim", "namespace": "default", "name": "config", "v": "v1" }
+        ]
+      }
+    }
+  change-sha1-e92f4c01: |
+    {
+      "module": {
+        "path": "opmodel.dev/modules/minecraft@v0",
+        "version": "0.2.0",
+        "name": "minecraft"
+      },
+      "values": "{\n\tname: \"minecraft-server\"\n\tdataPath: \"/mnt/server\"\n}",
+      "manifestDigest": "sha256:d9f3b2e5a8c1d4f7b0e3a6c9d2f5b8e1a4c7d0f3b6e9a2c5d8f1b4e7a0c3d6f9",
+      "timestamp": "2026-02-11T16:45:00Z",
+      "inventory": {
+        "entries": [
+          { "group": "apps", "kind": "StatefulSet", "namespace": "default", "name": "minecraft-server", "v": "v1" },
+          { "group": "", "kind": "Service", "namespace": "default", "name": "minecraft-server", "v": "v1" },
+          { "group": "", "kind": "PersistentVolumeClaim", "namespace": "default", "name": "config", "v": "v1" },
+          { "group": "", "kind": "ConfigMap", "namespace": "default", "name": "minecraft-server-config", "v": "v1" }
+        ]
+      }
+    }
+```
+
+In this example:
+
+- **change-sha1-a3b8f2e1**: Initial install. Module v1.0.0 with name "minecraft".
+  Three resources created.
+- **change-sha1-7f2c9d01**: Value change. Same module version, but name changed
+  to "minecraft-server". Resource names changed — the old StatefulSet/minecraft and
+  Service/minecraft were pruned automatically.
+- **change-sha1-e92f4c01**: Module upgrade to v1.1.0. Same values, but the new
+  version added a ConfigMap resource. The index shows this as the latest change.
+
+## Apply Flow
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│                    opm mod apply — WITH INVENTORY                   │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │ 1. RENDER                                                    │   │
+│  │    Build pipeline → resources[] + metadata                   │   │
+│  └──────────────┬───────────────────────────────────────────────┘   │
+│                 ▼                                                   │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │ 2. COMPUTE MANIFEST DIGEST                                   │   │
+│  │    manifestDigest = SHA256(sorted serialized manifests)      │   │
+│  └──────────────┬───────────────────────────────────────────────┘   │
+│                 ▼                                                   │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │ 3. COMPUTE CHANGE ID                                         │   │
+│  │    changeID = SHA1(repo + version + values + manifestDigest) │   │
+│  │    key = "change-sha1-<first 8 hex chars>"                   │   │
+│  └──────────────┬───────────────────────────────────────────────┘   │
+│                 ▼                                                   │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │ 4. READ PREVIOUS INVENTORY                                   │   │
+│  │    GET Secret/opm.<name>.<release-id> in <namespace>         │   │
+│  │    → Read index → latest change = index[0]                   │   │
+│  │    → previous_inventory = latest change's inventory entries  │   │
+│  │    → if not found: previous_inventory = ∅ (first install)   │   │
+│  └──────────────┬───────────────────────────────────────────────┘   │
+│                 ▼                                                   │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │ 5. COMPUTE STALE SET                                         │   │
+│  │    current_inventory = set of IDs from rendered resources    │   │
+│  │    stale = previous_inventory - current_inventory            │   │
+│  └──────────────┬───────────────────────────────────────────────┘   │
+│                 ▼                                                   │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │ 6. APPLY RESOURCES (create/update first)                     │   │
+│  │    Server-side apply all rendered resources                  │   │
+│  │    Track: any errors?                                        │   │
+│  └──────────────┬───────────────────────────────────────────────┘   │
+│                 ▼                                                   │
+│          ┌──────────────┐                                           │
+│          │ ALL APPLIED  │                                           │
+│          │ SUCCESSFULLY?│                                           │
+│          └──────┬───────┘                                           │
+│            YES  │    NO                                             │
+│           ┌─────┘    └──────────────────────────────┐               │
+│           ▼                                         ▼               │
+│  ┌──────────────────────┐              ┌──────────────────────────┐ │
+│  │ 7a. PRUNE STALE      │              │ 7b. SKIP PRUNE + WRITE   │ │
+│  │   (unless --no-prune)│              │   Report partial failure │ │
+│  │   Delete each stale  │              │   Inventory NOT updated  │ │
+│  │   resource           │              │   Old resources remain   │ │
+│  └──────────┬───────────┘              └──────────────────────────┘ │
+│             ▼                                                       │
+│  ┌──────────────────────────────────────────────┐                   │
+│  │ 8. WRITE INVENTORY SECRET (full PUT)         │                   │
+│  │   a. Create/overwrite change-sha1-<id> entry │                   │
+│  │   b. Prepend change ID to index              │                   │
+│  │      (or move to front if already present)   │                   │
+│  │   c. Update metadata.lastTransitionTime      │                   │
+│  │   d. Prune old changes if over max_history   │                   │
+│  │   e. PUT the entire Secret                   │                   │
+│  └──────────────────────────────────────────────┘                   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Design Decisions
+
+**Create first, then prune.** New resources are applied before stale ones are
+deleted. This is safer — the new Service exists before the old one is removed —
+but briefly doubles the resource count. This is acceptable.
+
+**Write nothing on partial failure.** If any resource fails to apply, the
+inventory is NOT updated and stale resources are NOT pruned. This means:
+
+- Old resources remain running (safe — nothing is torn down prematurely).
+- Retrying the apply converges naturally (same previous inventory, same stale
+  computation).
+- Ghost resources from partially successful applies are possible (see Scenario
+  F below) but are caught by label-based discovery.
+
+**Automatic pruning with opt-out.** Pruning is the default behavior. A
+`--no-prune` flag allows users to skip pruning when desired.
+
+## Command Impact
+
+```text
+┌───────────┬──────────────────────────┬────────────────────────────────────┐
+│ Command   │ Today (labels only)      │ With inventory                     │
+├───────────┼──────────────────────────┼────────────────────────────────────┤
+│ apply     │ Apply, no prune          │ Apply + prune stale + write inv.   │
+│ diff      │ Full API scan, noisy     │ Targeted fetch from inv., precise  │
+│ delete    │ Full API scan            │ Read inventory, precise delete     │
+│ status    │ Full API scan            │ Read inventory, targeted fetch     │
+├───────────┼──────────────────────────┼────────────────────────────────────┤
+│ ALL       │ —                        │ Fall back to label-based discovery │
+│           │                          │ if no inventory Secret found       │
+└───────────┴──────────────────────────┴────────────────────────────────────┘
+```
+
+### Labels Complement the Inventory
+
+Labels remain on all managed resources. They serve as:
+
+- **Fallback** when inventory is missing (graceful degradation).
+- **Human-readable identification** (`kubectl get ... -l module.opmodel.dev/name=minecraft`).
+- **Input for future Layer 2 orphan detection** (see Deferred Work).
+
+## Scenarios
+
+### Scenario A: Normal Rename (the Jellyfin Case) [x]
+
+```text
+previous = {SS/minecraft, Svc/minecraft, PVC/config}
+current  = {SS/minecraft-server, Svc/minecraft-server, PVC/config}
+stale    = {SS/minecraft, Svc/minecraft}
+
+Apply: SS/minecraft-server OK, Svc/minecraft-server OK, PVC/config OK
+All succeeded → prune SS/minecraft, Svc/minecraft → write inventory
+Result: Clean. [x]
+```
+
+### Scenario B: Partial Failure — No Inventory Write [x]
+
+```text
+previous = {SS/minecraft, Svc/minecraft, PVC/config}
+current  = {SS/minecraft-server, Svc/minecraft-server, PVC/config}
+stale    = {SS/minecraft, Svc/minecraft}
+
+Apply: SS/minecraft-server OK, Svc/minecraft-server FAIL FAILS, PVC/config OK
+Failure → skip prune, skip inventory write
+
+Cluster state:
+  SS/minecraft        still running (not pruned — correct!)
+  Svc/minecraft       still running (not pruned — correct!)
+  SS/minecraft-server  created (but Svc missing → incomplete)
+  PVC/config         unchanged
+
+User fixes and re-runs apply:
+  previous still = {SS/minecraft, Svc/minecraft, PVC/config}  (not updated)
+  current        = {SS/minecraft-server, Svc/minecraft-server, PVC/config}
+  stale          = {SS/minecraft, Svc/minecraft}
+
+  All apply OK this time → prune stale → write inventory
+  Result: Clean on retry. [x]
+```
+
+### Scenario C: Component Removed Entirely [x]
+
+```text
+v1: Module with 3 components (app, cache, worker)
+previous = {Deploy/app, Deploy/cache, Deploy/worker, Svc/app, Svc/cache}
+
+v2: Module removes "cache" component
+current  = {Deploy/app, Deploy/worker, Svc/app}
+stale    = {Deploy/cache, Svc/cache}
+
+Apply all OK → prune Deploy/cache, Svc/cache → write inventory
+Result: Clean. [x]
+```
+
+### Scenario D: First-Time Apply (No Existing Inventory) [x]
+
+```text
+previous = ∅  (no Secret found)
+current  = {SS/minecraft, Svc/minecraft, PVC/config}
+stale    = ∅
+
+Apply all OK → nothing to prune → write inventory (creates Secret)
+Result: Clean. [x]
+```
+
+### Scenario E: Someone Deletes the Inventory Secret [x]
+
+```text
+previous = ∅  (Secret was deleted by someone)
+current  = {SS/minecraft-server, Svc/minecraft-server, PVC/config}
+stale    = ∅
+
+Apply all OK → nothing to prune → write inventory (recreates Secret)
+
+Old resources (SS/minecraft, Svc/minecraft) are ORPHANS.
+BUT: they still have OPM labels, so label-based discovery
+(`opm mod diff`, `opm mod status`) can find them.
+
+Result: Graceful degradation. Inventory loss = no pruning,
+        but not catastrophic. [x]
+```
+
+### Scenario F: Ghost Resource from Failed Apply
+
+This is the known trade-off of the "write nothing on failure" policy.
+
+```text
+After Scenario B, we have:
+  SS/minecraft        ← in inventory (previous)
+  SS/minecraft-server  ← NOT in inventory (created but inventory not written)
+
+User decides to revert value back to original name "minecraft":
+  previous = {SS/minecraft, Svc/minecraft, PVC/config}  (unchanged from v1)
+  current  = {SS/minecraft, Svc/minecraft, PVC/config}   (reverted)
+  stale    = ∅
+
+  Apply all OK → nothing to prune → write inventory
+
+  BUT: SS/minecraft-server is STILL on the cluster!
+  It was created during the failed attempt but never tracked.
+```
+
+This ghost resource:
+
+- **Is NOT in the inventory** — inventory was never written for the failed apply.
+- **HAS OPM labels** — labels are injected before apply, so the resource is
+  labeled.
+- **Is detectable** by `opm mod diff` and `opm mod status` (label-based
+  discovery can find it as an orphan).
+- **Is NOT auto-pruned** — inventory-based pruning cannot catch it.
+
+```text
+┌──────────────────────────────────────────────────────────────────┐
+│  GHOST RESOURCE: SS/minecraft-server                             │
+│                                                                  │
+│  In inventory?  NO  (inventory was never written)                │
+│  Has OPM labels? YES (labels are injected before apply)          │
+│                                                                  │
+│  Detectable by:                                                  │
+│    [x] opm mod diff   (label-based orphan detection)             │
+│    [x] opm mod status (label-based discovery)                    │
+│    [ ] Inventory pruning (not in previous inventory)             │
+│                                                                  │
+│  This is exactly why labels complement the inventory.            │
+│  The inventory handles the happy path (rename → prune).          │
+│  Labels catch the edge cases (ghosts from failed applies).       │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+This is acceptable. Ghost resources are a rare edge case (partial failure
+followed by a revert). Label-based discovery handles them. A future "Layer 2"
+enhancement can add automatic ghost cleanup (see Deferred Work).
+
+### Scenario G: Resource Kind Changes [x]
+
+```text
+v1 inventory: {Deployment/minecraft, Svc/minecraft}
+v2 render:    {StatefulSet/minecraft, Svc/minecraft}
+
+stale = {Deployment/minecraft}  ← correctly identified (GVK is part of identity)
+
+Apply StatefulSet/minecraft OK → prune Deployment/minecraft → write inventory
+Result: Clean. [x]
+```
+
+### Scenario H: Idempotent Re-Apply [x]
+
+```text
+Apply #1: module=1.0.0, values=X → change-sha1-a3b8f2e1 (created)
+  Index: ["change-sha1-a3b8f2e1"]
+
+Apply #2: module=1.0.0, values=X → change-sha1-a3b8f2e1 (same hash!)
+  Entry overwritten with updated timestamp
+  Index: ["change-sha1-a3b8f2e1"]  (no growth)
+
+Apply #3: module=1.1.0, values=X → change-sha1-7f2c9d01 (new hash)
+  New entry created
+  Index: ["change-sha1-7f2c9d01", "change-sha1-a3b8f2e1"]
+
+Result: History tracks state transitions, not CLI invocations. [x]
+```
+
+### Scenario I: Local Module Template Change [x]
+
+```text
+Apply #1: local module, values=X, manifests produce digest D1
+  changeID = SHA1("" + "" + X + D1) → change-sha1-abc12345
+
+Developer modifies a component template (adds a port, changes nothing else).
+
+Apply #2: local module, values=X, manifests produce digest D2 (≠ D1)
+  changeID = SHA1("" + "" + X + D2) → change-sha1-def67890 (different!)
+
+  New change entry created. Previous inventory available for pruning.
+  Result: Template changes in local modules are correctly tracked. [x]
+```
+
+Without `manifestDigest` in the hash inputs, both applies would produce the same
+change ID (repository and version are both empty, values are the same). The
+`manifestDigest` captures what actually changed — the rendered output.
+
+## Deferred Work
+
+The following are explicitly out of scope for this RFC and deferred to future
+enhancements:
+
+### Layer 2 Label-Based Orphan Detection in Apply
+
+A second pruning pass during `apply` that uses label-based discovery
+(full API scan) to find ghost resources not tracked by the inventory. This
+catches edge cases like Scenario F.
+
+```text
+Layer 1: Inventory-based (fast, precise)
+  stale = previous_inventory - current_inventory
+  → Handles renames, component removal
+  → Only works if inventory exists and is up-to-date
+
+Layer 2: Label-based (broad, catches ghosts)
+  orphans = label_discovered - current_render
+  → Handles ghosts from failed applies
+  → Handles lost inventory
+  → More expensive (full API resource scan)
+  → Already implemented in findOrphans() in diff.go
+```
+
+### Rollback Support
+
+The change history model in this RFC provides the foundation for rollback. A
+future `opm mod rollback --revision <change-id>` command could:
+
+1. Read the target change entry from the Secret.
+2. Re-render the module using the stored values and module reference.
+3. Apply normally (which creates a new change entry — rollback is just another
+   change).
+
+This is deferred because it requires the module OCI reference to be resolvable
+at rollback time, and the interaction with local modules needs further design.
+
+### ModuleRelease CRD with ownerReferences
+
+The long-term vision: a `ModuleRelease` Custom Resource Definition with
+`ownerReferences` on all child resources. This enables:
+
+- Native Kubernetes garbage collection (delete parent → children auto-delete).
+- Controller-based reconciliation.
+- First-class `kubectl get modulereleases` experience.
+
+The `data.metadata` blob uses `kind: Release` and `apiVersion: core.opmodel.dev/v1alpha1`
+specifically so that the schema can migrate to a CRD with minimal changes. The
+inventory Secret is a stepping stone that may become permanent for CLI-only
+users while the CRD serves the controller path.
+
+## References
+
+- [Helm Storage System](https://helm.sh/docs/topics/advanced/) — Helm's Secret/ConfigMap/SQL storage drivers
+- [Timoni Module Specification](https://timoni.sh/module/) — Timoni's lightweight inventory Secret
+- [Carvel kapp Resource Management](https://carvel.dev/kapp/) — kapp's ConfigMap-based tracking
+- [Flux Kustomization Inventory](https://fluxcd.io/flux/components/kustomize/kustomizations/) — Flux's `.status.inventory`
+- [ArgoCD Resource Tracking](https://argo-cd.readthedocs.io/en/latest/user-guide/resource_tracking/) — ArgoCD's label/annotation tracking methods
+- [Kubernetes Server-Side Apply](https://kubernetes.io/docs/reference/using-api/server-side-apply/) — SSA managedFields documentation
