@@ -8,9 +8,8 @@
   - Include a "-c or --concrete" flag to force concreteness during validation
 - [ ] Add "opm mod eval" to evaluate the module printing the raw CUE code of the module.
 - [ ] Rework "opm mod diff" to ignore fields not "owned" by the OPM cli. For example the "managedFields"
-  - This cannot be hardcoded, we need to somehow keep track of the OPM "owned" fields. Maybe secret (like helm) or a Custom Resource.
+  - This filtering has to be done on both manifests before comparing.
 - [ ] Ensure "opm config init" also run "cue mod tidy" or similar to discover and download all dependencies.
-- [ ] Rework the "opm mod init" to use cue.AST() instead of string template.
 - [ ] Rework all tests to use cue.AST() instead of strings for test data and comparison.
   - Use pure CUE files, packages and modules for testadata
   - Look into using pure CUE files for comparison data as well.
