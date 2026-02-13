@@ -2,7 +2,6 @@ package build
 
 import (
 	"context"
-	"fmt"
 	"sort"
 
 	"cuelang.org/go/cue"
@@ -258,8 +257,6 @@ func (e *Executor) decodeResource(value cue.Value) (*unstructured.Unstructured, 
 // normalizeK8sResource converts OPM-style maps to Kubernetes-style arrays
 // for container ports and env variables throughout the resource tree.
 func normalizeK8sResource(obj map[string]any) {
-	// Coerce annotation values to strings (Kubernetes requires map[string]string)
-	normalizeAnnotations(obj)
 
 	// Process spec.template.spec.containers (Deployment, StatefulSet, DaemonSet, Job)
 	if spec, ok := obj["spec"].(map[string]any); ok {
@@ -372,31 +369,6 @@ func mapToEnvArray(env map[string]any) []any {
 	return result
 }
 
-// normalizeAnnotations coerces all annotation values to strings.
-func normalizeAnnotations(obj map[string]any) {
-	metadata, ok := obj["metadata"].(map[string]any)
-	if !ok {
-		return
-	}
-	annotations, ok := metadata["annotations"].(map[string]any)
-	if !ok {
-		return
-	}
-	for k, v := range annotations {
-		switch val := v.(type) {
-		case string:
-			// already correct
-		case bool:
-			if val {
-				annotations[k] = "true"
-			} else {
-				annotations[k] = "false"
-			}
-		default:
-			annotations[k] = fmt.Sprintf("%v", v)
-		}
-	}
-}
 
 // mapToVolumeMountsArray converts a map of volume mount definitions to a Kubernetes volumeMounts array.
 func mapToVolumeMountsArray(volumeMounts map[string]any) []any {

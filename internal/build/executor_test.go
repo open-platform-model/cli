@@ -155,43 +155,6 @@ func TestExecuteJob_MapOutput(t *testing.T) {
 	}
 }
 
-func TestNormalizeAnnotations_BoolToString(t *testing.T) {
-	obj := map[string]any{
-		"apiVersion": "v1",
-		"kind":       "ConfigMap",
-		"metadata": map[string]any{
-			"name": "test",
-			"annotations": map[string]any{
-				"string-annotation":                   "hello",
-				"transformer.opmodel.dev/list-output": true,
-				"transformer.opmodel.dev/disabled":    false,
-				"some.annotation/count":               42,
-			},
-		},
-	}
-
-	normalizeAnnotations(obj)
-
-	annotations := obj["metadata"].(map[string]any)["annotations"].(map[string]any)
-	assert.Equal(t, "hello", annotations["string-annotation"])
-	assert.Equal(t, "true", annotations["transformer.opmodel.dev/list-output"])
-	assert.Equal(t, "false", annotations["transformer.opmodel.dev/disabled"])
-	assert.Equal(t, "42", annotations["some.annotation/count"])
-}
-
-func TestNormalizeAnnotations_NoAnnotations(t *testing.T) {
-	obj := map[string]any{
-		"apiVersion": "v1",
-		"kind":       "ConfigMap",
-		"metadata": map[string]any{
-			"name": "test",
-		},
-	}
-
-	// Should not panic
-	normalizeAnnotations(obj)
-}
-
 func TestMapToVolumeMountsArray(t *testing.T) {
 	volumeMounts := map[string]any{
 		"config": map[string]any{

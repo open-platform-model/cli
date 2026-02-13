@@ -23,7 +23,7 @@ func TestExtractComponent_WithAnnotations(t *testing.T) {
 				metadata: {
 					name: "volumes-component"
 					annotations: {
-						"transformer.opmodel.dev/list-output": true
+						"transformer.opmodel.dev/list-output": "true"
 					}
 				}
 			}`,
@@ -46,7 +46,7 @@ func TestExtractComponent_WithAnnotations(t *testing.T) {
 				metadata: {
 					name: "single-output-component"
 					annotations: {
-						"transformer.opmodel.dev/list-output": false
+						"transformer.opmodel.dev/list-output": "false"
 					}
 				}
 			}`,
@@ -74,7 +74,7 @@ func TestExtractComponent_WithAnnotations(t *testing.T) {
 				metadata: {
 					name: "multi-annotated"
 					annotations: {
-						"transformer.opmodel.dev/list-output": true
+						"transformer.opmodel.dev/list-output": "true"
 						"example.com/owner": "platform-team"
 					}
 				}

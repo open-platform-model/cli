@@ -530,7 +530,6 @@ func (b *ReleaseBuilder) extractComponent(name string, value cue.Value) *LoadedC
 }
 
 // extractAnnotations extracts annotations from component metadata into the target map.
-// CUE annotation values (bool, string) are converted to strings.
 func (b *ReleaseBuilder) extractAnnotations(value cue.Value, annotations map[string]string) {
 	annotationsValue := value.LookupPath(cue.ParsePath("metadata.annotations"))
 	if !annotationsValue.Exists() {
@@ -541,21 +540,8 @@ func (b *ReleaseBuilder) extractAnnotations(value cue.Value, annotations map[str
 		return
 	}
 	for iter.Next() {
-		key := iter.Selector().Unquoted()
-		v := iter.Value()
-		switch v.Kind() {
-		case cue.BoolKind:
-			if b, err := v.Bool(); err == nil {
-				if b {
-					annotations[key] = "true"
-				} else {
-					annotations[key] = "false"
-				}
-			}
-		default:
-			if str, err := v.String(); err == nil {
-				annotations[key] = str
-			}
+		if str, err := iter.Value().String(); err == nil {
+			annotations[iter.Selector().Unquoted()] = str
 		}
 	}
 }
