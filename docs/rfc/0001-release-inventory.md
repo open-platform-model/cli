@@ -404,9 +404,9 @@ Each `data.change-sha1-<id>` field contains the full state for a single change:
   "timestamp": "2026-02-11T14:30:00Z",
   "inventory": {
     "entries": [
-      { "group": "apps", "kind": "StatefulSet", "namespace": "default", "name": "minecraft", "v": "v1" },
-      { "group": "", "kind": "Service", "namespace": "default", "name": "minecraft", "v": "v1" },
-      { "group": "", "kind": "PersistentVolumeClaim", "namespace": "default", "name": "config", "v": "v1" }
+      { "group": "apps", "kind": "StatefulSet", "namespace": "default", "name": "minecraft", "v": "v1", "component": "app" },
+      { "group": "", "kind": "Service", "namespace": "default", "name": "minecraft", "v": "v1", "component": "app" },
+      { "group": "", "kind": "PersistentVolumeClaim", "namespace": "default", "name": "config", "v": "v1", "component": "app" }
     ]
   }
 }
@@ -447,11 +447,21 @@ This field is always present regardless of whether the module is published or
 local.
 
 **Inventory entry identity**: Each entry has fields `group`, `kind`,
-`namespace`, `name` (the identity) and `v` (the API version, stored separately).
-Set operations for pruning use only the identity fields. The `v` field is used
-when fetching or deleting the resource from the cluster. Separating version from
-identity prevents false orphans when Kubernetes API versions change (e.g.,
+`namespace`, `name`, `component` (the identity) and `v` (the API version, stored
+separately). Set operations for pruning use the identity fields. The `v` field is
+used when fetching or deleting the resource from the cluster. Separating version
+from identity prevents false orphans when Kubernetes API versions change (e.g.,
 Ingress migrating from `networking.k8s.io/v1beta1` to `networking.k8s.io/v1`).
+
+The `component` field records which module component produced the resource (e.g.,
+`"app"`, `"cache"`, `"worker"`). This enables `opm mod status` to group resources
+by component when displaying release health, using only the inventory — no need
+to read labels back from the cluster. Including component in identity means the
+inventory can precisely track which component owns which resource. However,
+because Kubernetes itself identifies resources by GVK + namespace + name (without
+component), a **component rename safety check** is required during pruning to
+prevent a component rename from triggering a spurious delete (see Apply Flow,
+Step 5b).
 
 **What gets tracked**: The inventory contains **only resources that OPM directly
 renders** — the output of the build pipeline. Derived resources that Kubernetes
@@ -814,9 +824,9 @@ stringData:
       "timestamp": "2026-02-11T14:00:00Z",
       "inventory": {
         "entries": [
-          { "group": "apps", "kind": "StatefulSet", "namespace": "default", "name": "minecraft", "v": "v1" },
-          { "group": "", "kind": "Service", "namespace": "default", "name": "minecraft", "v": "v1" },
-          { "group": "", "kind": "PersistentVolumeClaim", "namespace": "default", "name": "config", "v": "v1" }
+          { "group": "apps", "kind": "StatefulSet", "namespace": "default", "name": "minecraft", "v": "v1", "component": "app" },
+          { "group": "", "kind": "Service", "namespace": "default", "name": "minecraft", "v": "v1", "component": "app" },
+          { "group": "", "kind": "PersistentVolumeClaim", "namespace": "default", "name": "config", "v": "v1", "component": "app" }
         ]
       }
     }
@@ -832,9 +842,9 @@ stringData:
       "timestamp": "2026-02-11T15:30:00Z",
       "inventory": {
         "entries": [
-          { "group": "apps", "kind": "StatefulSet", "namespace": "default", "name": "minecraft-server", "v": "v1" },
-          { "group": "", "kind": "Service", "namespace": "default", "name": "minecraft-server", "v": "v1" },
-          { "group": "", "kind": "PersistentVolumeClaim", "namespace": "default", "name": "config", "v": "v1" }
+          { "group": "apps", "kind": "StatefulSet", "namespace": "default", "name": "minecraft-server", "v": "v1", "component": "app" },
+          { "group": "", "kind": "Service", "namespace": "default", "name": "minecraft-server", "v": "v1", "component": "app" },
+          { "group": "", "kind": "PersistentVolumeClaim", "namespace": "default", "name": "config", "v": "v1", "component": "app" }
         ]
       }
     }
@@ -850,10 +860,10 @@ stringData:
       "timestamp": "2026-02-11T16:45:00Z",
       "inventory": {
         "entries": [
-          { "group": "apps", "kind": "StatefulSet", "namespace": "default", "name": "minecraft-server", "v": "v1" },
-          { "group": "", "kind": "Service", "namespace": "default", "name": "minecraft-server", "v": "v1" },
-          { "group": "", "kind": "PersistentVolumeClaim", "namespace": "default", "name": "config", "v": "v1" },
-          { "group": "", "kind": "ConfigMap", "namespace": "default", "name": "minecraft-server-config", "v": "v1" }
+          { "group": "apps", "kind": "StatefulSet", "namespace": "default", "name": "minecraft-server", "v": "v1", "component": "app" },
+          { "group": "", "kind": "Service", "namespace": "default", "name": "minecraft-server", "v": "v1", "component": "app" },
+          { "group": "", "kind": "PersistentVolumeClaim", "namespace": "default", "name": "config", "v": "v1", "component": "app" },
+          { "group": "", "kind": "ConfigMap", "namespace": "default", "name": "minecraft-server-config", "v": "v1", "component": "app" }
         ]
       }
     }
@@ -900,9 +910,19 @@ In this example:
 │  └──────────────┬───────────────────────────────────────────────┘   │
 │                 ▼                                                   │
 │  ┌──────────────────────────────────────────────────────────────┐   │
-│  │ 5. COMPUTE STALE SET                                         │   │
+│  │ 5a. COMPUTE STALE SET                                        │   │
 │  │    current_inventory = set of IDs from rendered resources    │   │
 │  │    stale = previous_inventory - current_inventory            │   │
+│  │    (identity = group + kind + namespace + name + component)  │   │
+│  └──────────────┬───────────────────────────────────────────────┘   │
+│                 ▼                                                   │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │ 5b. COMPONENT RENAME SAFETY CHECK                            │   │
+│  │    For each entry in stale:                                  │   │
+│  │      If current_inventory contains same group+kind+ns+name  │   │
+│  │      (differing only in component):                          │   │
+│  │        → Component rename, NOT an orphan                     │   │
+│  │        → Remove from stale set                               │   │
 │  └──────────────┬───────────────────────────────────────────────┘   │
 │                 ▼                                                   │
 │  ┌──────────────────────────────────────────────────────────────┐   │
@@ -954,6 +974,16 @@ inventory is NOT updated and stale resources are NOT pruned. This means:
 
 **Automatic pruning with opt-out.** Pruning is the default behavior. A
 `--no-prune` flag allows users to skip pruning when desired.
+
+**Component rename safety check.** Because `component` is part of the inventory
+entry identity, a component rename (e.g., `"app"` → `"server"`) makes the old
+entry look stale — it appears in `previous - current`. However, Kubernetes
+identifies resources by GVK + namespace + name only (without component), so
+deleting the "stale" entry would destroy the live resource that the "new" entry
+refers to. Step 5b prevents this: before pruning, each stale entry is checked
+against the current set using only `group + kind + namespace + name`. If a match
+is found (differing only in component), the entry is removed from the stale set.
+This ensures component renames never trigger destructive deletes.
 
 ## Command Impact
 
@@ -1022,11 +1052,12 @@ User fixes and re-runs apply:
 
 ```text
 v1: Module with 3 components (app, cache, worker)
-previous = {Deploy/app, Deploy/cache, Deploy/worker, Svc/app, Svc/cache}
+previous = {Deploy/app@app, Deploy/cache@cache, Deploy/worker@worker,
+            Svc/app@app, Svc/cache@cache}
 
 v2: Module removes "cache" component
-current  = {Deploy/app, Deploy/worker, Svc/app}
-stale    = {Deploy/cache, Svc/cache}
+current  = {Deploy/app@app, Deploy/worker@worker, Svc/app@app}
+stale    = {Deploy/cache@cache, Svc/cache@cache}
 
 Apply all OK → prune Deploy/cache, Svc/cache → write inventory
 Result: Clean. [x]
@@ -1114,10 +1145,10 @@ enhancement can add automatic ghost cleanup (see Deferred Work).
 ### Scenario G: Resource Kind Changes [x]
 
 ```text
-v1 inventory: {Deployment/minecraft, Svc/minecraft}
-v2 render:    {StatefulSet/minecraft, Svc/minecraft}
+v1 inventory: {Deployment/minecraft@app, Svc/minecraft@app}
+v2 render:    {StatefulSet/minecraft@app, Svc/minecraft@app}
 
-stale = {Deployment/minecraft}  ← correctly identified (GVK is part of identity)
+stale = {Deployment/minecraft@app}  ← correctly identified (GVK is part of identity)
 
 Apply StatefulSet/minecraft OK → prune Deployment/minecraft → write inventory
 Result: Clean. [x]
@@ -1158,6 +1189,38 @@ Apply #2: local module, values=X, manifests produce digest D2 (≠ D1)
 Without `manifestDigest` in the hash inputs, both applies would produce the same
 change ID (repository and version are both empty, values are the same). The
 `manifestDigest` captures what actually changed — the rendered output.
+
+### Scenario J: Component Rename (Safety Check) [x]
+
+A module author renames a component from `"app"` to `"server"`. The resources
+it produces are identical — same GVK, same namespace, same name. Only the
+component provenance changes.
+
+```text
+v1: Component "app" produces StatefulSet and Service
+  previous = {SS/minecraft@app, Svc/minecraft@app, PVC/config@app}
+
+v2: Component renamed to "server" (same resources, same spec)
+  current  = {SS/minecraft@server, Svc/minecraft@server, PVC/config@server}
+
+  Raw stale (identity includes component):
+    stale = {SS/minecraft@app, Svc/minecraft@app, PVC/config@app}
+
+  Step 5b — Component rename safety check:
+    SS/minecraft@app  → current has SS/minecraft@server  (same K8s resource) → REMOVE
+    Svc/minecraft@app → current has Svc/minecraft@server (same K8s resource) → REMOVE
+    PVC/config@app    → current has PVC/config@server    (same K8s resource) → REMOVE
+
+  Final stale = ∅
+
+Apply all OK → nothing to prune → write inventory
+Result: Clean. No destructive delete from a component rename. [x]
+```
+
+Without the safety check, all three resources would be deleted and immediately
+recreated — causing pod restarts, potential PVC orphaning, and unnecessary
+downtime. The safety check recognizes that the Kubernetes resources are the same
+and only the OPM-level provenance changed.
 
 ## Deferred Work
 
@@ -1210,6 +1273,104 @@ The `data.metadata` blob uses `kind: Release` and `apiVersion: core.opmodel.dev/
 specifically so that the schema can migrate to a CRD with minimal changes. The
 inventory Secret is a stepping stone that may become permanent for CLI-only
 users while the CRD serves the controller path.
+
+## Open Questions
+
+### Immutable Field Handling During Apply
+
+Kubernetes enforces field immutability via hardcoded `ValidateUpdate()` functions
+in per-resource API server strategies. When Server-Side Apply attempts to change
+an immutable field, the API server returns:
+
+```text
+HTTP 422 Unprocessable Entity
+reason: "Invalid"
+causes[].message: "field is immutable"
+causes[].field:   "<field path>"   (e.g., "spec.clusterIP", "spec.selector")
+```
+
+This is an apply-time behavior question, not an inventory format question. The
+inventory does not need to change to support immutable field handling. However,
+the apply flow must account for it.
+
+#### The Problem
+
+Certain spec fields cannot be updated in place. A change to these fields requires
+deleting the resource and recreating it, which is destructive — it can cause pod
+restarts, PVC orphaning, and service interruption. Common immutable fields:
+
+```text
+┌──────────────────┬──────────────────────────────────────────────────────┐
+│ Resource         │ Immutable Fields                                     │
+├──────────────────┼──────────────────────────────────────────────────────┤
+│ All              │ metadata.name, metadata.namespace, metadata.uid      │
+│ Deployment       │ spec.selector                                        │
+│ StatefulSet      │ spec.selector, spec.volumeClaimTemplates,            │
+│                  │ spec.podManagementPolicy, spec.serviceName            │
+│ DaemonSet        │ spec.selector                                        │
+│ Job              │ spec.selector, spec.template, spec.completions       │
+│ Service          │ spec.clusterIP, spec.clusterIPs,                     │
+│                  │ spec.ipFamilyPolicy, spec.ipFamilies                  │
+│ PVC              │ spec.storageClassName, spec.accessModes,             │
+│                  │ spec.volumeMode, spec.volumeName (after binding)      │
+│ Secret/ConfigMap │ All data fields (if immutable: true)                 │
+└──────────────────┴──────────────────────────────────────────────────────┘
+```
+
+There is **no machine-readable immutability metadata** in the Kubernetes OpenAPI
+schema. KEP-1101 proposed adding `x-kubernetes-immutable` as an OpenAPI extension
+for built-in resources but was never implemented. For CRDs, Kubernetes 1.25+
+supports CEL validation rules (`self == oldSelf`), but this is opt-in per CRD
+and not available for built-in types.
+
+#### Industry Approaches
+
+```text
+┌──────────────────────┬─────────────────────────────────────────────────┐
+│ Approach             │ Used By                                         │
+├──────────────────────┼─────────────────────────────────────────────────┤
+│ Try-and-detect       │ Flux, kapp (fallback-on-replace)                │
+│                      │ SSA apply → catch 422 "field is immutable"      │
+│                      │ → fall back to delete+recreate                  │
+│                      │ Pro: works for any resource including CRDs      │
+│                      │ Con: reactive, not proactive; cannot distinguish│
+│                      │   immutability from other Invalid errors        │
+├──────────────────────┼─────────────────────────────────────────────────┤
+│ Hardcoded field list │ Pulumi                                          │
+│                      │ Maintain table of {GVK, fieldPath} pairs        │
+│                      │ Pro: proactive warnings before applying         │
+│                      │ Con: manual maintenance, version-dependent      │
+├──────────────────────┼─────────────────────────────────────────────────┤
+│ User annotation      │ kapp, Flux, ArgoCD                              │
+│                      │ Per-resource opt-in to force recreate           │
+│                      │ Pro: user declares intent explicitly            │
+│                      │ Con: requires user knowledge per resource       │
+├──────────────────────┼─────────────────────────────────────────────────┤
+│ Blunt --force        │ Helm                                            │
+│                      │ Delete+recreate ALL resources in release        │
+│                      │ Pro: simple, always works                       │
+│                      │ Con: destructive, causes downtime for all       │
+└──────────────────────┴─────────────────────────────────────────────────┘
+```
+
+#### Likely Direction for OPM
+
+The **try-and-detect** pattern (kapp's `fallback-on-replace`) is the most
+pragmatic approach:
+
+1. SSA apply the resource.
+2. If the API server returns 422 with `"field is immutable"` in
+   `causes[].message`, detect this as an immutable field conflict.
+3. In interactive mode: warn the user and offer delete+recreate.
+4. In non-interactive mode (CI): fail with a clear message.
+5. With an explicit `--force` flag: automatically delete+recreate.
+
+This could be augmented with a known-immutable-fields table for **proactive
+warnings** in `opm mod diff` — showing the user which fields would require
+recreation before they run apply.
+
+This question is deferred to implementation. The inventory format does not need
+to change to support any of these approaches.
 
 ## References
 
