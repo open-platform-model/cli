@@ -62,6 +62,13 @@
 
 - [ ] Remove injectLabels(). It is redundant as we MUST rely on the transformers to properly apply all labels and annotations.
   - Update <docs/rfc/0001-release-inventory.md> when this change has been made.
+- [ ] Remove `BuildFromValue()` from `internal/build/release_builder.go:197-251`. It is a legacy path for modules that don't import `opmodel.dev/core@v0`. No production code calls it — only tests.
+  - Also remove `extractMetadataFromModule()` at `release_builder.go:644-764` (sole caller is `BuildFromValue`).
+  - Remove accompanying tests in `release_builder_test.go` (`TestReleaseBuilder_BuildFromValue` and related).
+- [ ] Remove `normalizeK8sResource()` and all helper functions from `internal/build/executor.go:257-443`. Transformers now output correct Kubernetes resources directly — this post-processing normalization layer is redundant.
+  - Functions to remove: `normalizeK8sResource`, `normalizeContainers`, `mapToPortsArray`, `mapToEnvArray`, `mapToVolumeMountsArray`, `mapToVolumesArray`, `normalizeAnnotations` (~190 lines).
+  - Remove the call site in `decodeResource()` at `executor.go:253`.
+  - Remove accompanying tests in `executor_test.go`.
 
 ## Bugfix
 
@@ -93,6 +100,23 @@
     10:56:47 INFO m:jellyfin >: applied 5 resources successfully
     ✔ Module applied
     ```
+
+- [ ] `opm mod build`/`opm mod apply` unconditionally requires `values.cue` in the module directory, even when `--values` (`-f`) flags are provided.
+  - **Root cause:** `resolveModulePath()` in `internal/build/pipeline.go:194-197` checks for `values.cue` existence before the render pipeline considers `--values` flags.
+  - **Expected behavior:** When `--values` flags are provided, `values.cue` on disk should be completely ignored. The external values files are unified (CUE merge) with `#config` from the Module, producing a concrete `values` struct for the ModuleRelease. When no `--values` flags are provided, `values.cue` remains required.
+  - **Required changes:**
+    1. `internal/build/pipeline.go:resolveModulePath()` — Remove `values.cue` existence check; move it into `Render()` conditioned on `len(opts.Values) == 0`.
+    2. `internal/build/release_builder.go:Build()` — When `valuesFiles` is non-empty and `values.cue` exists on disk, overlay it with a minimal stub (`package <pkgName>`) to prevent default values from conflicting with provided values via CUE unification.
+    3. `internal/build/release_builder.go:Build()` step 5 — Improve error message: "module missing 'values' field — provide values via values.cue or --values flag".
+  - **Reproduction:**
+
+    ```bash
+    opm mod build . -f val.cue
+    # ERROR: values.cue required but not found in ...
+    ```
+
+- [ ] `#config` injection in `release_builder.go:163-169` only surfaces the first CUE error when values have extra or invalid fields. CUE natively produces multi-error output with file, line, and row for each issue, but `concreteModule.Err()` is wrapped into a single `ReleaseValidationError` with a generic message. The same single-error pattern applies at the concreteness validation step (`release_builder.go:179-186`).
+  - **Expected behavior:** All CUE validation errors should be collected and printed, each with file/line/row context, matching how `cue vet` reports errors.
 
 ## Investigation
 
