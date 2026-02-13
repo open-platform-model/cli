@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
@@ -40,7 +39,7 @@ func NewReleaseBuilder(ctx *cue.Context, registry string) *ReleaseBuilder {
 
 // ReleaseOptions configures release building.
 type ReleaseOptions struct {
-	Name      string // Release name (defaults to module name)
+	Name      string // Required: release name
 	Namespace string // Required: target namespace
 	PkgName   string // Internal: CUE package name (set by InspectModule, skip detectPackageName)
 }
@@ -309,65 +308,6 @@ func (b *ReleaseBuilder) InspectModule(modulePath string) (*ModuleInspection, er
 		DefaultNamespace: defaultNamespace,
 		PkgName:          inst.PkgName,
 	}, nil
-}
-
-// extractMetadataFromAST walks CUE AST files to extract metadata.name and
-// metadata.defaultNamespace as string literals without CUE evaluation.
-// Returns empty strings for fields that are not static string literals.
-func extractMetadataFromAST(files []*ast.File) (name, defaultNamespace string) {
-	for _, file := range files {
-		for _, decl := range file.Decls {
-			field, ok := decl.(*ast.Field)
-			if !ok {
-				continue
-			}
-			ident, ok := field.Label.(*ast.Ident)
-			if !ok || ident.Name != "metadata" {
-				continue
-			}
-			structLit, ok := field.Value.(*ast.StructLit)
-			if !ok {
-				continue
-			}
-			n, ns := extractFieldsFromMetadataStruct(structLit)
-			if n != "" && name == "" {
-				name = n
-			}
-			if ns != "" && defaultNamespace == "" {
-				defaultNamespace = ns
-			}
-		}
-		if name != "" && defaultNamespace != "" {
-			break
-		}
-	}
-	return name, defaultNamespace
-}
-
-// extractFieldsFromMetadataStruct scans a metadata struct literal for
-// name and defaultNamespace fields with string literal values.
-func extractFieldsFromMetadataStruct(s *ast.StructLit) (name, defaultNamespace string) {
-	for _, elt := range s.Elts {
-		innerField, ok := elt.(*ast.Field)
-		if !ok {
-			continue
-		}
-		innerIdent, ok := innerField.Label.(*ast.Ident)
-		if !ok {
-			continue
-		}
-		lit, ok := innerField.Value.(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING {
-			continue
-		}
-		switch innerIdent.Name {
-		case "name":
-			name = strings.Trim(lit.Value, `"`)
-		case "defaultNamespace":
-			defaultNamespace = strings.Trim(lit.Value, `"`)
-		}
-	}
-	return name, defaultNamespace
 }
 
 // generateOverlayAST builds the CUE overlay file as a typed AST.
