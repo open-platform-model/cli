@@ -40,7 +40,6 @@ Use these environment variables during development and validation. Commands like
 ```bash
 export OPM_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
-export CUE_CACHE_DIR=/var/home/emil/Dev/open-platform-model/.cue-cache
 ```
 
 ## Technology Standards
