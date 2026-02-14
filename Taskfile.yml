@@ -25,6 +25,7 @@ tasks:
     cmds:
       - task --list
 
+  ## Build tasks
   build:
     desc: Build the CLI binary
     cmds:
@@ -45,6 +46,7 @@ tasks:
       - GOOS=darwin GOARCH=arm64 go build -ldflags "{{.LDFLAGS}}" -o {{.BUILD_DIR}}/{{.BINARY_NAME}}-darwin-arm64 ./cmd/opm
       - GOOS=windows GOARCH=amd64 go build -ldflags "{{.LDFLAGS}}" -o {{.BUILD_DIR}}/{{.BINARY_NAME}}-windows-amd64.exe ./cmd/opm
 
+  ## Testing tasks
   test:
     desc: Run all tests
     cmds:
@@ -108,6 +110,7 @@ tasks:
       - coverage.out
       - coverage.html
 
+  ## Cluster management tasks
   cluster:create:
     desc: Create a local kind cluster for development
     preconditions:
@@ -144,6 +147,7 @@ tasks:
       - task: cluster:delete
       - task: cluster:create
 
+  ## Code quality tasks
   lint:
     desc: Run linters
     cmds:

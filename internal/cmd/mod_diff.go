@@ -110,7 +110,7 @@ func runDiff(cmd *cobra.Command, args []string) error {
 
 	result, err := pipeline.Render(ctx, renderOpts)
 	if err != nil {
-		output.Error("render failed", "error", err)
+		printValidationError("render failed", err)
 		return &ExitError{Code: ExitValidationError, Err: err}
 	}
 

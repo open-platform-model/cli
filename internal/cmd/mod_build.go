@@ -153,7 +153,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 
 	result, err := pipeline.Render(ctx, opts)
 	if err != nil {
-		output.Error("render failed", "error", err)
+		printValidationError("render failed", err)
 		return &ExitError{Code: ExitValidationError, Err: err}
 	}
 
@@ -252,6 +252,22 @@ func writeVerboseOutput(result *build.RenderResult, jsonOutput bool) {
 	if err := output.WriteVerboseResult(info, nil, verboseOpts); err != nil {
 		output.Warn("writing verbose output", "error", err)
 	}
+}
+
+// printValidationError prints a render/validation error in a user-friendly format.
+// When the error is a ReleaseValidationError with CUE details, it prints a short
+// summary line followed by the structured CUE error output (matching `cue vet` style).
+// For other errors, it falls back to the standard key-value log format.
+func printValidationError(msg string, err error) {
+	var releaseErr *build.ReleaseValidationError
+	if errors.As(err, &releaseErr) && releaseErr.Details != "" {
+		output.Error(fmt.Sprintf("%s: %s", msg, releaseErr.Message))
+		// Print CUE details as plain text to stderr for readable multi-line output
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, releaseErr.Details)
+		return
+	}
+	output.Error(msg, "error", err)
 }
 
 // printRenderErrors prints render errors in a user-friendly format.
