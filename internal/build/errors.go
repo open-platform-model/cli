@@ -1,6 +1,13 @@
 package build
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"cuelang.org/go/cue"
+	cueerrors "cuelang.org/go/cue/errors"
+)
 
 // RenderError is a base interface for render errors.
 // All render-specific errors implement this interface.
@@ -145,6 +152,12 @@ type ReleaseValidationError struct {
 
 	// Cause is the underlying error.
 	Cause error
+
+	// Details contains the formatted CUE error output with all individual
+	// errors, their CUE paths, and source positions. Formatted using the
+	// same style as `cue vet` (via cuelang.org/go/cue/errors.Details).
+	// Empty when the error is not a CUE validation error.
+	Details string
 }
 
 func (e *ReleaseValidationError) Error() string {
@@ -156,4 +169,85 @@ func (e *ReleaseValidationError) Error() string {
 
 func (e *ReleaseValidationError) Unwrap() error {
 	return e.Cause
+}
+
+// formatCUEDetails formats a CUE error into a multi-line string matching
+// the output style of `cue vet`. Each error includes its CUE path, message,
+// and source positions (file:line:col). Errors are deduplicated and sorted.
+//
+// Example output:
+//
+//	values.media.test: conflicting values "test" and {mountPath:string,...}:
+//	    ./values.cue:12:5
+//	    ./module.cue:15:10
+func formatCUEDetails(err error) string {
+	cwd, cwdErr := os.Getwd()
+	if cwdErr != nil {
+		cwd = ""
+	}
+	return strings.TrimSpace(cueerrors.Details(err, &cueerrors.Config{
+		Cwd: cwd,
+	}))
+}
+
+// collectAllCUEErrors runs Validate() on the full value tree.
+// Returns a combined error containing all discovered errors, or nil if clean.
+func collectAllCUEErrors(v cue.Value) error {
+	return v.Validate()
+}
+
+// validateValuesAgainstConfig validates each top-level field of the values
+// struct against the #config definition independently.
+//
+// This works around a CUE engine limitation where closedness errors
+// ("field not allowed") are suppressed when other error types (e.g., type
+// mismatches) exist in the same struct. CUE's evaluator skips close-checking
+// on structs that already have a child error (typocheck.go early return).
+//
+// By validating each field in its own isolated unification, both type errors
+// and closedness errors are detected regardless of each other.
+//
+// Returns a combined error with all validation errors, or nil if clean.
+func validateValuesAgainstConfig(cueCtx *cue.Context, configDef, valuesVal cue.Value) error {
+	var combined cueerrors.Error
+
+	// Only iterate regular fields (not optional, hidden, or definitions).
+	// These are the concrete values provided by the user.
+	iter, err := valuesVal.Fields()
+	if err != nil {
+		// If we can't iterate fields, the value itself may be an error.
+		return err
+	}
+
+	for iter.Next() {
+		sel := iter.Selector()
+		fieldVal := iter.Value()
+
+		// Build a single-field struct and unify with #config independently.
+		// This isolates each field's validation so errors don't suppress each other.
+		// Use cue.Path with the selector directly to avoid string-parsing issues.
+		fieldPath := cue.MakePath(sel)
+		singleField := cueCtx.CompileString("{}")
+		singleField = singleField.FillPath(fieldPath, fieldVal)
+		result := configDef.Unify(singleField)
+
+		if err := result.Validate(); err != nil {
+			combined = appendCUEError(combined, err)
+		}
+	}
+
+	if combined == nil {
+		return nil
+	}
+	return combined
+}
+
+// appendCUEError appends a Go error to a CUE error list, handling type
+// promotion from plain errors to cueerrors.Error.
+func appendCUEError(list cueerrors.Error, err error) cueerrors.Error {
+	var cueErr cueerrors.Error
+	if ok := cueerrors.As(err, &cueErr); ok {
+		return cueerrors.Append(list, cueErr)
+	}
+	return cueerrors.Append(list, cueerrors.Promote(err, ""))
 }

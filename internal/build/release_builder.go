@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
@@ -136,9 +137,6 @@ func (b *ReleaseBuilder) Build(modulePath string, opts ReleaseOptions, valuesFil
 	}
 
 	value := b.cueCtx.BuildInstance(inst)
-	if value.Err() != nil {
-		return nil, fmt.Errorf("building module with overlay: %w", value.Err())
-	}
 
 	// Step 4: Unify with additional values files
 	for _, valuesFile := range valuesFiles {
@@ -147,8 +145,33 @@ func (b *ReleaseBuilder) Build(modulePath string, opts ReleaseOptions, valuesFil
 			return nil, fmt.Errorf("loading values file %s: %w", valuesFile, err)
 		}
 		value = value.Unify(valuesValue)
-		if value.Err() != nil {
-			return nil, fmt.Errorf("unifying values from %s: %w", valuesFile, value.Err())
+	}
+
+	// Step 4b: Validate values against #config using per-field isolation.
+	//
+	// CUE's evaluator suppresses closedness errors ("field not allowed") when
+	// other errors (e.g., type mismatches) exist in the same struct. By
+	// validating each top-level values field against #config independently,
+	// we catch both categories of errors regardless of each other.
+	configDef := value.LookupPath(cue.ParsePath("#config"))
+	valuesVal := value.LookupPath(cue.ParsePath("values"))
+	if configDef.Exists() && valuesVal.Exists() {
+		if allErrs := validateValuesAgainstConfig(b.cueCtx, configDef, valuesVal); allErrs != nil {
+			return nil, &ReleaseValidationError{
+				Message: "values do not satisfy #config schema",
+				Cause:   allErrs,
+				Details: formatCUEDetails(allErrs),
+			}
+		}
+	}
+
+	// Step 4c: Validate the full module tree for any remaining errors
+	// (catches errors outside values, e.g., in metadata or component definitions).
+	if allErrs := collectAllCUEErrors(value); allErrs != nil {
+		return nil, &ReleaseValidationError{
+			Message: "module validation failed",
+			Cause:   allErrs,
+			Details: formatCUEDetails(allErrs),
 		}
 	}
 
@@ -161,10 +184,11 @@ func (b *ReleaseBuilder) Build(modulePath string, opts ReleaseOptions, valuesFil
 	}
 
 	concreteModule := value.FillPath(cue.ParsePath("#config"), values)
-	if concreteModule.Err() != nil {
+	if allErrs := collectAllCUEErrors(concreteModule); allErrs != nil {
 		return nil, &ReleaseValidationError{
 			Message: "failed to inject values into #config",
-			Cause:   concreteModule.Err(),
+			Cause:   allErrs,
+			Details: formatCUEDetails(allErrs),
 		}
 	}
 
@@ -174,13 +198,24 @@ func (b *ReleaseBuilder) Build(modulePath string, opts ReleaseOptions, valuesFil
 		return nil, err
 	}
 
-	// Step 7: Validate components are concrete
+	// Step 7: Validate all components are concrete (collect all errors)
+	var concreteErrors []error
 	for name, comp := range components {
 		if err := comp.Value.Validate(cue.Concrete(true)); err != nil {
-			return nil, &ReleaseValidationError{
-				Message: fmt.Sprintf("component %q has non-concrete values - check that all required values are provided", name),
-				Cause:   err,
-			}
+			concreteErrors = append(concreteErrors, fmt.Errorf("component %q: %w", name, err))
+		}
+	}
+	if len(concreteErrors) > 0 {
+		// Build combined details from all component validation errors
+		var details strings.Builder
+		for _, cerr := range concreteErrors {
+			details.WriteString(formatCUEDetails(cerr))
+			details.WriteByte('\n')
+		}
+		return nil, &ReleaseValidationError{
+			Message: fmt.Sprintf("%d component(s) have non-concrete values - check that all required values are provided", len(concreteErrors)),
+			Cause:   concreteErrors[0],
+			Details: strings.TrimSpace(details.String()),
 		}
 	}
 
@@ -584,4 +619,3 @@ func (b *ReleaseBuilder) extractMetadataFallback(concreteModule cue.Value, metad
 		}
 	}
 }
-
