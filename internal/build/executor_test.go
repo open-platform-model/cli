@@ -154,4 +154,3 @@ func TestExecuteJob_MapOutput(t *testing.T) {
 		assert.Equal(t, "PersistentVolumeClaim", res.GetKind())
 	}
 }
-
