@@ -7,6 +7,7 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
+	cueerrors "cuelang.org/go/cue/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -181,10 +182,11 @@ func TestFormatCUEDetails(t *testing.T) {
 
 		details := formatCUEDetails(v.Err())
 		assert.NotEmpty(t, details)
-		// Should contain the CUE path and error message
+		// Should contain the CUE path and error message.
 		assert.Contains(t, details, "conflicting values")
-		// Should contain position info
+		// Should contain position info with arrow prefix.
 		assert.Contains(t, details, "test.cue")
+		assert.Contains(t, details, "→")
 	})
 
 	t.Run("multiple CUE errors", func(t *testing.T) {
@@ -194,18 +196,87 @@ func TestFormatCUEDetails(t *testing.T) {
 
 		details := formatCUEDetails(v.Err())
 		assert.NotEmpty(t, details)
-		// Should contain both errors, not just the first
-		lines := strings.Split(details, "\n")
-		// At minimum we should see error text for both fields
-		combined := strings.Join(lines, " ")
+		// Should contain both errors, not just the first.
+		combined := details
 		assert.Contains(t, combined, "conflicting values")
 		assert.Contains(t, combined, "multi.cue")
+		// Each position line should have an arrow prefix.
+		for _, line := range strings.Split(details, "\n") {
+			if strings.Contains(line, "multi.cue") {
+				assert.Contains(t, line, "→", "position lines should have arrow prefix")
+			}
+		}
 	})
 
 	t.Run("plain Go error passthrough", func(t *testing.T) {
 		err := errors.New("not a CUE error")
 		details := formatCUEDetails(err)
 		assert.Contains(t, details, "not a CUE error")
+	})
+}
+
+func TestCueRelPath(t *testing.T) {
+	t.Run("relative path from cwd", func(t *testing.T) {
+		result := cueRelPath("/home/user/project/values.cue", "/home/user/project")
+		// CUE convention: always prefix with "./" for IDE compatibility.
+		assert.Equal(t, "./values.cue", result)
+	})
+
+	t.Run("adds dot prefix when needed", func(t *testing.T) {
+		// filepath.Rel of a subdirectory doesn't start with "."
+		result := cueRelPath("/home/user/project/sub/values.cue", "/home/user/project")
+		assert.True(t, strings.HasPrefix(result, "."), "should start with dot: %s", result)
+		assert.Contains(t, result, "sub")
+		assert.Contains(t, result, "values.cue")
+	})
+
+	t.Run("empty cwd returns original", func(t *testing.T) {
+		result := cueRelPath("/absolute/path.cue", "")
+		assert.Equal(t, "/absolute/path.cue", result)
+	})
+
+	t.Run("empty path returns empty", func(t *testing.T) {
+		result := cueRelPath("", "/home/user")
+		assert.Equal(t, "", result)
+	})
+}
+
+func TestDeduplicateCUEErrors(t *testing.T) {
+	t.Run("deduplicates identical errors", func(t *testing.T) {
+		ctx := cuecontext.New()
+		v := ctx.CompileString(`{a: string & 123}`, cue.Filename("test.cue"))
+		require.Error(t, v.Err())
+
+		errs := cueerrors.Errors(v.Err())
+		// Duplicate the list.
+		doubled := append(errs, errs...)
+		deduped := deduplicateCUEErrors(doubled)
+		assert.Equal(t, len(errs), len(deduped), "should remove duplicates")
+	})
+
+	t.Run("preserves distinct errors", func(t *testing.T) {
+		ctx := cuecontext.New()
+		v := ctx.CompileString(`{a: string & 123, b: int & "foo"}`, cue.Filename("test.cue"))
+		require.Error(t, v.Err())
+
+		errs := cueerrors.Errors(v.Err())
+		deduped := deduplicateCUEErrors(errs)
+		assert.Equal(t, len(errs), len(deduped), "should preserve distinct errors")
+	})
+
+	t.Run("handles single error", func(t *testing.T) {
+		ctx := cuecontext.New()
+		v := ctx.CompileString(`{a: string & 123}`, cue.Filename("test.cue"))
+		require.Error(t, v.Err())
+
+		errs := cueerrors.Errors(v.Err())
+		deduped := deduplicateCUEErrors(errs)
+		assert.Equal(t, len(errs), len(deduped))
+	})
+
+	t.Run("handles empty slice", func(t *testing.T) {
+		deduped := deduplicateCUEErrors(nil)
+		assert.Nil(t, deduped)
 	})
 }
 
