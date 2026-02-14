@@ -62,7 +62,7 @@
 
 - [ ] Remove injectLabels(). It is redundant as we MUST rely on the transformers to properly apply all labels and annotations.
   - Update <docs/rfc/0001-release-inventory.md> when this change has been made.
-- [ ] Remove `BuildFromValue()` from `internal/build/release_builder.go:197-251`. It is a legacy path for modules that don't import `opmodel.dev/core@v0`. No production code calls it — only tests.
+- [x] Remove `BuildFromValue()` from `internal/build/release_builder.go:197-251`. It is a legacy path for modules that don't import `opmodel.dev/core@v0`. No production code calls it — only tests.
   - Also remove `extractMetadataFromModule()` at `release_builder.go:644-764` (sole caller is `BuildFromValue`).
   - Remove accompanying tests in `release_builder_test.go` (`TestReleaseBuilder_BuildFromValue` and related).
 - [ ] Remove `normalizeK8sResource()` and all helper functions from `internal/build/executor.go:257-443`. Transformers now output correct Kubernetes resources directly — this post-processing normalization layer is redundant.
