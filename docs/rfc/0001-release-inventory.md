@@ -1290,6 +1290,176 @@ leaving the inventory pointing to resources that no longer exist.
 This check applies to ALL resources, not just PVCs. Any resource in a
 terminating state should block the apply.
 
+### Scenario M: Cross-Namespace Resource Migration
+
+A value change moves resources from one namespace to another. The inventory
+tracks per-entry namespaces, so the stale set is correct. But pruning requires
+DELETE permission in the **old** namespace.
+
+```text
+v1: Module produces resources in namespace "games"
+  previous = {SS/minecraft@app (ns:games), Svc/minecraft@app (ns:games)}
+
+v2: User changes target namespace to "production"
+  current  = {SS/minecraft@app (ns:production), Svc/minecraft@app (ns:production)}
+  stale    = {SS/minecraft@app (ns:games), Svc/minecraft@app (ns:games)}
+
+Apply to "production" OK → prune from "games" namespace → write inventory
+
+Pruning requires DELETE permission in the OLD namespace ("games").
+If RBAC denies it: prune fails, but resources in "production" were applied.
+
+Result: Requires cross-namespace RBAC for pruning. [ ]
+        Should warn user if prune fails due to permissions.
+        Stale resources in "games" become orphans if RBAC is insufficient.
+```
+
+This also applies to modules that produce resources in multiple namespaces
+simultaneously (e.g., `ConfigMap` in `kube-system` and `Deployment` in
+`default`). The prune operation must handle each resource's actual namespace
+from the inventory entry, not a single `--namespace` flag.
+
+### Scenario N: CRD and Custom Resource in Same Module
+
+A module bundles a CRD and instances of that CRD. The weight system applies
+CRDs first (weight -100) and custom resources last (weight 1000). But there is
+no wait for CRD establishment between weight groups.
+
+```text
+Module produces a CRD and an instance of that CRD:
+  current = {CRD/foos.example.com (weight:-100), Foo/my-foo (weight:1000)}
+
+Apply CRD/foos.example.com → OK (weight -100, applied first)
+Apply Foo/my-foo            → FAIL "the server could not find the
+                                     requested resource" (API not ready)
+
+Partial failure → skip prune, skip inventory write (Scenario B applies)
+
+User retries:
+  CRD is now established → Foo/my-foo applies OK → write inventory
+  Result: Clean on second attempt. [x]
+
+BUT: First-time users will be confused by the deterministic failure.
+     Future mitigation: poll for CRD readiness between weight groups.
+```
+
+The inventory design handles this correctly — partial failure means no
+inventory write, and retry converges. This is a known first-apply pain point
+for CRD-producing modules, not an inventory format problem.
+
+### Scenario O: Namespace as Module Output + Pruning
+
+A module produces a Namespace resource alongside application resources. When
+the module is deleted or the Namespace becomes stale, pruning the Namespace
+triggers Kubernetes cascading deletion of **everything inside it** — including
+resources from other modules or tools.
+
+```text
+v1: Module produces a Namespace and resources within it
+  current = {Namespace/games@infra, SS/minecraft@app (ns:games),
+             Svc/minecraft@app (ns:games)}
+  Apply all OK → write inventory
+
+v2: Module removes the Namespace component (or module is deleted)
+  stale = {Namespace/games@infra, SS/minecraft@app, Svc/minecraft@app}
+
+  Prune Namespace/games:
+    → K8s cascading delete destroys ALL resources in "games"
+    → Including resources from OTHER modules/tools in that namespace
+    → Data loss potential is high
+
+Result: Namespace pruning is destructive beyond OPM's scope. [ ]
+```
+
+Recommendation: Exclude `kind: Namespace` from inventory-based pruning by
+default. Require an explicit `--prune-namespaces` flag to override. This
+mirrors Helm's approach of protecting namespaces from release-scoped deletion.
+Alternative: warn during prune if the stale set contains a Namespace and
+require interactive confirmation.
+
+### Scenario P: Empty Render Wipes All Resources
+
+A misconfiguration or conditional in CUE causes the module to render zero
+resources. The stale set becomes the entire previous inventory.
+
+```text
+v1: Module renders 5 resources normally
+  previous = {SS/minecraft@app, Svc/minecraft@app, PVC/config@app,
+              CM/settings@app, Secret/creds@app}
+
+v2: CUE conditional evaluates to false, producing zero resources
+    (e.g., user sets enabled: false, or a typo excludes the component)
+  current = (empty set)
+  stale   = {SS/minecraft@app, Svc/minecraft@app, PVC/config@app,
+             CM/settings@app, Secret/creds@app}
+
+Apply (nothing to apply) → prune ALL 5 resources → write inventory
+
+Result: Complete wipe from an accidental empty render. [ ]
+```
+
+This is a dangerous failure mode because the empty render is silent — no apply
+errors occur, and the prune logic is technically correct. Recommendation: add a
+safety threshold. If the current render is empty and the previous inventory is
+non-empty (100% pruning), require `--force` or interactive confirmation. This
+protects against accidental misconfiguration without affecting intentional
+module removal (which uses `opm mod delete`).
+
+### Additional Known Edge Cases
+
+The following edge cases are acknowledged but do not require dedicated
+scenarios. They are tracked here for implementors:
+
+1. **Labels not guaranteed on resources.** Label injection is the CUE
+   transformer's responsibility. Go code does not validate label presence on
+   rendered resources. A resource without OPM labels is tracked by the
+   inventory but invisible to label-based fallback discovery. The inventory is
+   the authoritative record; labels are best-effort.
+
+2. **Change ID collision.** SHA1 truncated to 8 hex chars = 32 bits of
+   entropy. With `max_history=10`, collision is negligible (~65,000 entries
+   for 50% birthday-paradox probability). On collision, the old entry is
+   silently overwritten. Acceptable.
+
+3. **Inventory Secret in label queries.** The inventory Secret carries OPM
+   labels and would appear in `DiscoverResources()` results. The existing
+   discovery code must be updated to exclude resources with
+   `opmodel.dev/component: inventory` from workload queries.
+
+4. **Partial delete leaving stale inventory.** If `opm mod delete` removes
+   cluster resources but crashes before deleting the inventory Secret,
+   subsequent applies find the stale inventory. Pruning already-deleted
+   resources should no-op (treat 404 on delete as success, not an error).
+
+5. **Concurrent applies (CI/CD).** Two simultaneous `opm mod apply` calls
+   can overwrite each other's inventory. Mitigation: include
+   `resourceVersion` in the PUT for Kubernetes optimistic concurrency. Fail
+   on conflict with a clear error message.
+
+6. **API version migration.** A stale entry stored with `v: "v1beta1"` may
+   need deletion after the API version is removed from the cluster. The
+   delete call should use the current preferred version from API discovery,
+   not the stored version.
+
+7. **Finalizers blocking pruning.** Stale resources with finalizers enter
+   Terminating state on delete. The prune operation should use a non-blocking
+   delete (no wait) to avoid hanging the apply flow indefinitely.
+
+8. **Multiple modules sharing resource names.** Two modules in the same
+   namespace producing the same GVK + namespace + name is undefined behavior.
+   The pre-apply existence check (Step 5c) catches this on first apply but
+   not on subsequent applies where the inventory already exists.
+
+9. **Simultaneous component rename + resource rename.** Both the component
+   and resource name change at once. The safety check (Step 5b) correctly
+   does NOT fire — names differ, so these are genuinely different resources.
+   Old resources are pruned correctly. This is expected behavior.
+
+10. **Secret size under large values.** Modules with large CUE values
+    (embedded certificates, large config blocks) could push the Secret toward
+    the 1MB etcd limit. Consider truncating or omitting the `values` field in
+    change entries if the Secret exceeds a size threshold (~800KB).
+
 ## Deferred Work
 
 The following are explicitly out of scope for this RFC and deferred to future
