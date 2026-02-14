@@ -53,7 +53,7 @@ Commands MUST fail with non-zero exit code when no resources match the selector.
 #### Scenario: No resources match --name selector
 
 - **WHEN** user runs `delete` or `status` with `--name foo --namespace bar`
-- **AND** no resources have labels `module.opmodel.dev/name=foo` and `module.opmodel.dev/namespace=bar`
+- **AND** no resources have label `module.opmodel.dev/name=foo` in namespace `bar`
 - **THEN** command exits with error: `"no resources found for module \"foo\" in namespace \"bar\""`
 
 #### Scenario: No resources match --release-id selector
@@ -74,7 +74,7 @@ Each selector type MUST query with specific labels.
 - **THEN** query includes labels:
   - `app.kubernetes.io/managed-by=open-platform-model`
   - `module.opmodel.dev/name=<name>`
-  - `module.opmodel.dev/namespace=<namespace>`
+- **AND** namespace scoping is handled by the Kubernetes API (namespaced list calls)
 
 #### Scenario: Release-id selector labels
 

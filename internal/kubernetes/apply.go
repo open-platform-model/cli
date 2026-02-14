@@ -28,10 +28,19 @@ type ApplyOptions struct {
 	Timeout time.Duration
 }
 
-// applyResult contains the outcome of an apply operation.
-type applyResult struct {
+// ApplyResult contains the outcome of an apply operation.
+type ApplyResult struct {
 	// Applied is the number of resources successfully applied.
 	Applied int
+
+	// Created is the number of resources that were newly created.
+	Created int
+
+	// Configured is the number of resources that were modified.
+	Configured int
+
+	// Unchanged is the number of resources that had no changes.
+	Unchanged int
 
 	// Errors contains per-resource errors (non-fatal).
 	Errors []resourceError
@@ -57,14 +66,11 @@ func (e *resourceError) Error() string {
 
 // Apply performs server-side apply for a set of rendered resources.
 // Resources are assumed to be already ordered by weight (from RenderResult).
-func Apply(ctx context.Context, client *Client, resources []*build.Resource, meta build.ModuleMetadata, opts ApplyOptions) (*applyResult, error) {
-	result := &applyResult{}
+func Apply(ctx context.Context, client *Client, resources []*build.Resource, meta build.ModuleMetadata, opts ApplyOptions) (*ApplyResult, error) {
+	result := &ApplyResult{}
 	modLog := output.ModuleLogger(meta.Name)
 
 	for _, res := range resources {
-		// Inject OPM labels
-		injectLabels(res, meta)
-
 		// Apply the resource
 		status, err := applyResource(ctx, client, res.Object, opts)
 		if err != nil {
@@ -79,41 +85,18 @@ func Apply(ctx context.Context, client *Client, resources []*build.Resource, met
 		}
 
 		result.Applied++
+		switch status {
+		case output.StatusCreated:
+			result.Created++
+		case output.StatusConfigured:
+			result.Configured++
+		case output.StatusUnchanged:
+			result.Unchanged++
+		}
 		modLog.Info(output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), status))
 	}
 
 	return result, nil
-}
-
-// injectLabels adds OPM labels to a resource if not already present.
-func injectLabels(res *build.Resource, meta build.ModuleMetadata) {
-	labels := res.Object.GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-
-	// Always set managed-by and module labels
-	labels[LabelManagedBy] = labelManagedByValue
-	labels[LabelModuleName] = meta.Name
-	labels[labelModuleNamespace] = meta.Namespace
-	if meta.Version != "" {
-		labels[labelModuleVersion] = meta.Version
-	}
-
-	// Set component label from resource metadata
-	if res.Component != "" {
-		labels[LabelComponentName] = res.Component
-	}
-
-	// Set identity labels if available
-	if meta.Identity != "" {
-		labels[labelModuleID] = meta.Identity
-	}
-	if meta.ReleaseIdentity != "" {
-		labels[labelReleaseID] = meta.ReleaseIdentity
-	}
-
-	res.Object.SetLabels(labels)
 }
 
 // applyResource performs server-side apply for a single resource.

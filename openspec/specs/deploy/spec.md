@@ -93,7 +93,7 @@ A developer wants to delete a deployed module after deleting the source files.
 |----|-------------|
 | FR-D-060 | All resources MUST have `app.kubernetes.io/managed-by: open-platform-model`. |
 | FR-D-061 | All resources MUST have `module.opmodel.dev/name: <name>`. |
-| FR-D-062 | All resources MUST have `module.opmodel.dev/namespace: <ns>`. |
+| FR-D-062 | ~~All resources MUST have `module.opmodel.dev/namespace: <ns>`.~~ Removed — namespace scoping is handled by K8s API calls, not labels. |
 | FR-D-063 | All resources MUST have `module.opmodel.dev/version: <version>`. |
 | FR-D-064 | All resources MUST have `component.opmodel.dev/name: <component>`. |
 | FR-D-065 | All resources MUST have `module-release.opmodel.dev/uuid: <release-uuid>` when the release identity is available. |

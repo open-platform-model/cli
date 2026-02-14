@@ -13,7 +13,7 @@
 - [ ] Rework all tests to use cue.AST() instead of strings for test data and comparison.
   - Use pure CUE files, packages and modules for testadata
   - Look into using pure CUE files for comparison data as well.
-- [ ] Add `--ignore-not-found` flag to `opm mod delete` and `opm mod status` for idempotent operations. Currently these commands fail with an error when no resources match the selector. The flag would suppress this error and exit 0 instead.
+- [x] ~~Add `--ignore-not-found` flag to `opm mod delete` and `opm mod status` for idempotent operations. Currently these commands fail with an error when no resources match the selector. The flag would suppress this error and exit 0 instead.~~
 - [ ] Find a way top create something similar like "timoni vendor crd" but fully in CUE. I MUST utilize "cue import openapi".
   - Example found here: <https://github.com/cue-lang/cue/issues/2691>
 - [ ] Add #ModuleRelease.values to #Module.#config validation during processing. Meaning it should take the schema (#Module.#config) and validate it against the values (unified #ModuleRelease.values).
@@ -30,7 +30,7 @@
   - This can be utilized with the future "opm mod publish" command, so that an author cannot publish a module that is not valid.
 - [x] ~~"opm mod delete --name blog --namespace default --verbose" proceeds but with no change, 0 resources deleted. We should add validation to first look for the module and inform the caller if not found.~~
   - **Resolved:** Implemented in `refine-resource-discovery` change. Commands now return `NoResourcesFoundError` when no resources match the selector.
-- [ ] Add a flag to "opm mod apply" that will create the namespace if missing.
+- [x] ~~Add a flag to "opm mod apply" that will create the namespace if missing.~~
 - [ ] Refactor and align the log output of "opm mod build" with the one from "opm mod apply"
 
   ```bash
@@ -60,8 +60,8 @@
 
 ## Chore
 
-- [ ] Remove injectLabels(). It is redundant as we MUST rely on the transformers to properly apply all labels and annotations.
-  - Update <docs/rfc/0001-release-inventory.md> when this change has been made.
+- [x] ~~Remove injectLabels(). It is redundant as we MUST rely on the transformers to properly apply all labels and annotations.~~
+  - ~~Update <docs/rfc/0001-release-inventory.md> when this change has been made.~~
 - [x] Remove `BuildFromValue()` from `internal/build/release_builder.go:197-251`. It is a legacy path for modules that don't import `opmodel.dev/core@v0`. No production code calls it — only tests.
   - Also remove `extractMetadataFromModule()` at `release_builder.go:644-764` (sole caller is `BuildFromValue`).
   - Remove accompanying tests in `release_builder_test.go` (`TestReleaseBuilder_BuildFromValue` and related).
@@ -71,6 +71,22 @@
   - Remove accompanying tests in `executor_test.go`.
 
 ## Bugfix
+
+- [ ] "opm mod delete" should only delete the resources owned by OPM. Now it deletes related resources like Endpoints.
+  - **Root cause**: The `ExcludeOwned` filter (`discovery.go:170-173`) checks `ownerReferences` to skip auto-managed resources. This works for EndpointSlice, ReplicaSet, Pods, etc. — but `v1/Endpoints` does NOT have `ownerReferences`. The legacy Endpoints controller manages them by name-matching convention (same name as Service), not ownership. Since Endpoints inherit labels from the parent Service, they match OPM's label selector and pass the ownerReferences filter.
+  - **Resolution**: Will be fixed by the inventory-based delete implementation — only resources tracked in the release inventory (i.e., resources OPM actually rendered) will be deleted. Endpoints won't be in the inventory.
+
+  ```bash
+  ❯ opm mod delete --name jellyfin --namespace default
+  Delete all resources for module "jellyfin" in namespace "default"? [y/N]: y
+  09:35:38 INFO m:jellyfin >: deleting resources in namespace "default"
+  09:35:48 INFO m:jellyfin >: r:Endpoints/default/jellyfin                      deleted
+  09:35:48 INFO m:jellyfin >: r:StatefulSet/default/jellyfin                    deleted
+  09:35:48 INFO m:jellyfin >: r:Service/default/jellyfin                        deleted
+  09:35:49 INFO m:jellyfin >: r:PersistentVolumeClaim/default/config            deleted
+  09:35:49 INFO m:jellyfin >: all resources have been deleted
+  ✔ Module deleted
+  ```
 
 - [ ] An incorrectly configured module should not be able to pass validation and apply only some of the resources. Only when all resources are valid should it apply the whole module
 
@@ -86,7 +102,7 @@
   1 resource(s) failed to apply
   ```
 
-- [ ] Running "opm mod apply" on an already applied resource should not reply "✔ Module applied" it should reply something more approriate that there was NO change made.
+- [x] ~~Running "opm mod apply" on an already applied resource should not reply "✔ Module applied" it should reply something more approriate that there was NO change made.~~
   - Example:
 
     ```bash
@@ -122,7 +138,6 @@
 
 - [ ] Investigate how to build a competent and reusable module validation pipeline. Something that can be used to validate the ModuleRelease in the finishing steps of the build pipeline but also can be used for "opm mod vet".
   - It should output the errors similar to how CUE does. Pointing to which file, line and row the error occured.
-- [ ] When running "opm mod delete" is the build pipeline really required? Do we need to build the whole module to delete?
 - [x] ~~Investigate how to redesign the "opm mod delete" workflow to be smarter. It should find ALL resources, even if the user has changed the module (and didn't apply the changes) before running "delete".~~
   - **Resolved:** Implemented across `deterministic-release-identity` and `refine-resource-discovery` changes. Each release now gets a deterministic UUID v5 identity (`module-release.opmodel.dev/uuid` label) computed by the CUE catalog schemas. The `opm mod delete` command now supports:
     - `--release-id <uuid>` flag for direct UUID-based deletion (mutually exclusive with `--name`)

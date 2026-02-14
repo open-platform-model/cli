@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -21,6 +22,7 @@ var (
 	applyDryRunFlag     bool
 	applyWaitFlag       bool
 	applyTimeoutFlag    time.Duration
+	applyCreateNSFlag   bool
 	applyKubeconfigFlag string
 	applyContextFlag    string
 )
@@ -72,6 +74,8 @@ Examples:
 		"Wait for resources to be ready")
 	cmd.Flags().DurationVar(&applyTimeoutFlag, "timeout", 5*time.Minute,
 		"Wait timeout")
+	cmd.Flags().BoolVar(&applyCreateNSFlag, "create-namespace", false,
+		"Create target namespace if it does not exist")
 	cmd.Flags().StringVar(&applyKubeconfigFlag, "kubeconfig", "",
 		"Path to kubeconfig file")
 	cmd.Flags().StringVar(&applyContextFlag, "context", "",
@@ -166,6 +170,22 @@ func runApply(cmd *cobra.Command, args []string) error {
 		return &ExitError{Code: ExitConnectivityError, Err: err}
 	}
 
+	// Create namespace if requested
+	if applyCreateNSFlag && namespace != "" {
+		created, nsErr := k8sClient.EnsureNamespace(ctx, namespace, applyDryRunFlag)
+		if nsErr != nil {
+			modLog.Error("ensuring namespace", "error", nsErr)
+			return &ExitError{Code: ExitGeneralError, Err: nsErr}
+		}
+		if created {
+			if applyDryRunFlag {
+				modLog.Info(fmt.Sprintf("namespace %q would be created", namespace))
+			} else {
+				modLog.Info(fmt.Sprintf("namespace %q created", namespace))
+			}
+		}
+	}
+
 	// Apply resources
 	if applyDryRunFlag {
 		modLog.Info("dry run - no changes will be made")
@@ -193,11 +213,15 @@ func runApply(cmd *cobra.Command, args []string) error {
 	if applyDryRunFlag {
 		modLog.Info(fmt.Sprintf("dry run complete: %d resources would be applied", applyResult.Applied))
 	} else {
-		modLog.Info(fmt.Sprintf("applied %d resources successfully", applyResult.Applied))
+		modLog.Info(formatApplySummary(applyResult))
 	}
 
 	if len(applyResult.Errors) == 0 && !applyDryRunFlag {
-		output.Println(output.FormatCheckmark("Module applied"))
+		if applyResult.Unchanged == applyResult.Applied {
+			output.Println(output.FormatCheckmark("Module up to date"))
+		} else {
+			output.Println(output.FormatCheckmark("Module applied"))
+		}
 	}
 
 	if len(applyResult.Errors) > 0 {
@@ -208,6 +232,27 @@ func runApply(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// formatApplySummary builds a human-readable summary of apply results with
+// per-status breakdown (e.g., "applied 5 resources (2 created, 1 configured, 2 unchanged)").
+func formatApplySummary(r *kubernetes.ApplyResult) string {
+	var parts []string
+	if r.Created > 0 {
+		parts = append(parts, fmt.Sprintf("%d created", r.Created))
+	}
+	if r.Configured > 0 {
+		parts = append(parts, fmt.Sprintf("%d configured", r.Configured))
+	}
+	if r.Unchanged > 0 {
+		parts = append(parts, fmt.Sprintf("%d unchanged", r.Unchanged))
+	}
+
+	summary := fmt.Sprintf("applied %d resources successfully", r.Applied)
+	if len(parts) > 0 {
+		summary += fmt.Sprintf(" (%s)", strings.Join(parts, ", "))
+	}
+	return summary
 }
 
 // resolveFlag returns the local flag if set, otherwise falls back to resolved global value.

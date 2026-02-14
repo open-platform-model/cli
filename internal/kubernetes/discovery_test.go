@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,12 +11,11 @@ import (
 )
 
 func TestBuildModuleSelector(t *testing.T) {
-	selector := buildModuleSelector("my-app", "production")
+	selector := buildModuleSelector("my-app")
 
 	str := selector.String()
 	assert.Contains(t, str, "app.kubernetes.io/managed-by=open-platform-model")
 	assert.Contains(t, str, "module.opmodel.dev/name=my-app")
-	assert.Contains(t, str, "module.opmodel.dev/namespace=production")
 }
 
 func TestBuildReleaseIDSelector(t *testing.T) {
@@ -87,6 +87,28 @@ func TestNoResourcesFoundError(t *testing.T) {
 			Namespace:  "production",
 		}
 		assert.True(t, errors.Is(err, errNoResourcesFound))
+	})
+
+	t.Run("IsNoResourcesFound matches direct error", func(t *testing.T) {
+		err := &noResourcesFoundError{
+			ModuleName: "my-app",
+			Namespace:  "production",
+		}
+		assert.True(t, IsNoResourcesFound(err))
+	})
+
+	t.Run("IsNoResourcesFound matches wrapped error", func(t *testing.T) {
+		inner := &noResourcesFoundError{
+			ModuleName: "my-app",
+			Namespace:  "production",
+		}
+		wrapped := fmt.Errorf("discovering module resources: %w", inner)
+		assert.True(t, IsNoResourcesFound(wrapped))
+	})
+
+	t.Run("IsNoResourcesFound rejects unrelated error", func(t *testing.T) {
+		err := fmt.Errorf("connection refused")
+		assert.False(t, IsNoResourcesFound(err))
 	})
 }
 

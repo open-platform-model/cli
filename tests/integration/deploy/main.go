@@ -37,12 +37,21 @@ func main() {
 	fmt.Println()
 	fmt.Println("2. Building test resources...")
 
+	// OPM labels that the CUE transformers normally inject via #context.labels.
+	// Since this integration test bypasses the render pipeline, we add them manually.
+	opmLabels := map[string]interface{}{
+		"app.kubernetes.io/managed-by": "open-platform-model",
+		"module.opmodel.dev/name":      moduleName,
+		"module.opmodel.dev/version":   "0.1.0",
+	}
+
 	cm := &unstructured.Unstructured{Object: map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
 		"metadata": map[string]interface{}{
 			"name":      "opm-deploy-test-config",
 			"namespace": namespace,
+			"labels":    opmLabels,
 		},
 		"data": map[string]interface{}{
 			"app.conf": "setting=value",
@@ -55,6 +64,7 @@ func main() {
 		"metadata": map[string]interface{}{
 			"name":      "opm-deploy-test-svc",
 			"namespace": namespace,
+			"labels":    opmLabels,
 		},
 		"spec": map[string]interface{}{
 			"selector": map[string]interface{}{

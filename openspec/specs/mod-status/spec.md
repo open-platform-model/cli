@@ -3,7 +3,7 @@
 
 ### Requirement: Status discovers resources via OPM labels
 
-The `opm mod status` command SHALL discover deployed resources by querying the cluster using OPM label selectors (`module.opmodel.dev/name` and `module.opmodel.dev/namespace`). It MUST NOT require module source or re-rendering.
+The `opm mod status` command SHALL discover deployed resources by querying the cluster using the OPM label selector (`module.opmodel.dev/name`) within the target namespace. It MUST NOT require module source or re-rendering.
 
 #### Scenario: Status shows deployed resources
 

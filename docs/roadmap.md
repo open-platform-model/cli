@@ -132,10 +132,10 @@ gaps in the existing command surface.
 - `opm mod eval` — print the raw CUE evaluation of a module
 - `opm mod list` — list deployed modules in a namespace (`-A` for all namespaces),
   leveraging `release-id` labels for discovery
-- `--ignore-not-found` flag for `opm mod delete` and `opm mod status` for
-  idempotent operations (exit 0 when no resources match)
-- `--create-namespace` flag for `opm mod apply`
-- Remove `injectLabels()` — redundant with transformer-based label injection
+- ~~`--ignore-not-found` flag for `opm mod delete` and `opm mod status` for
+  idempotent operations (exit 0 when no resources match)~~ (done)
+- ~~`--create-namespace` flag for `opm mod apply`~~ (done)
+- ~~Remove `injectLabels()` — redundant with transformer-based label injection~~ (done)
 - Archive completed openspec changes: diff-status-v1, improve-k8s-api-warnings
 
 ### M2: Secrets and Config Lifecycle

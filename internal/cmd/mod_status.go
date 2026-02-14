@@ -16,13 +16,14 @@ import (
 
 // Status command flags.
 var (
-	statusNamespaceFlag  string
-	statusNameFlag       string
-	statusReleaseIDFlag  string
-	statusOutputFlag     string
-	statusWatchFlag      bool
-	statusKubeconfigFlag string
-	statusContextFlag    string
+	statusNamespaceFlag      string
+	statusNameFlag           string
+	statusReleaseIDFlag      string
+	statusOutputFlag         string
+	statusWatchFlag          bool
+	statusIgnoreNotFoundFlag bool
+	statusKubeconfigFlag     string
+	statusContextFlag        string
 )
 
 // NewModStatusCmd creates the mod status command.
@@ -70,6 +71,8 @@ Examples:
 		"Output format (table, yaml, json)")
 	cmd.Flags().BoolVar(&statusWatchFlag, "watch", false,
 		"Watch status continuously (poll every 2s)")
+	cmd.Flags().BoolVar(&statusIgnoreNotFoundFlag, "ignore-not-found", false,
+		"Exit 0 when no resources match the selector")
 	cmd.Flags().StringVar(&statusKubeconfigFlag, "kubeconfig", "",
 		"Path to kubeconfig file")
 	cmd.Flags().StringVar(&statusContextFlag, "context", "",
@@ -159,6 +162,10 @@ func runStatusOnce(ctx context.Context, client *kubernetes.Client, opts kubernet
 
 	result, err := kubernetes.GetModuleStatus(ctx, client, opts)
 	if err != nil {
+		if statusIgnoreNotFoundFlag && kubernetes.IsNoResourcesFound(err) {
+			modLog.Info("no resources found (ignored)")
+			return nil
+		}
 		modLog.Error("getting status", "error", err)
 		return &ExitError{Code: ExitGeneralError, Err: err}
 	}
@@ -218,6 +225,10 @@ func displayStatus(ctx context.Context, client *kubernetes.Client, opts kubernet
 
 	result, err := kubernetes.GetModuleStatus(ctx, client, opts)
 	if err != nil {
+		if statusIgnoreNotFoundFlag && kubernetes.IsNoResourcesFound(err) {
+			modLog.Info("no resources found (ignored)")
+			return nil
+		}
 		modLog.Error("getting status", "error", err)
 		return &ExitError{Code: ExitGeneralError, Err: err}
 	}

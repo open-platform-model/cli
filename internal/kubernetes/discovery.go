@@ -18,12 +18,11 @@ import (
 
 // OPM labels applied to all managed resources.
 const (
-	LabelManagedBy       = "app.kubernetes.io/managed-by"
-	labelManagedByValue  = "open-platform-model"
-	LabelModuleName      = "module.opmodel.dev/name"
-	labelModuleNamespace = "module.opmodel.dev/namespace"
-	labelModuleVersion   = "module.opmodel.dev/version"
-	LabelComponentName   = "component.opmodel.dev/name"
+	LabelManagedBy      = "app.kubernetes.io/managed-by"
+	labelManagedByValue = "open-platform-model"
+	LabelModuleName     = "module.opmodel.dev/name"
+	labelModuleVersion  = "module.opmodel.dev/version"
+	LabelComponentName  = "component.opmodel.dev/name"
 	// labelReleaseID is the release identity UUID label for resource discovery.
 	labelReleaseID = "module-release.opmodel.dev/uuid"
 	// labelModuleID is the module identity UUID label for resource discovery.
@@ -59,6 +58,12 @@ func (e *noResourcesFoundError) Is(target error) bool {
 	return target == errNoResourcesFound
 }
 
+// IsNoResourcesFound reports whether err (or any error in its chain)
+// indicates that no resources matched the discovery selector.
+func IsNoResourcesFound(err error) bool {
+	return errors.Is(err, errNoResourcesFound)
+}
+
 // discoveryOptions configures resource discovery.
 type DiscoveryOptions struct {
 	// ModuleName is the module name to search for (used with name+namespace selector).
@@ -74,13 +79,14 @@ type DiscoveryOptions struct {
 	ExcludeOwned bool
 }
 
-// BuildModuleSelector creates a label selector that matches all resources
+// buildModuleSelector creates a label selector that matches all resources
 // belonging to a specific module deployment.
-func buildModuleSelector(moduleName, namespace string) labels.Selector {
+// Namespace scoping is handled by the Kubernetes API call (Namespace().List()),
+// so the selector only needs managed-by + module name.
+func buildModuleSelector(moduleName string) labels.Selector {
 	return labels.SelectorFromSet(labels.Set{
-		LabelManagedBy:       labelManagedByValue,
-		LabelModuleName:      moduleName,
-		labelModuleNamespace: namespace,
+		LabelManagedBy:  labelManagedByValue,
+		LabelModuleName: moduleName,
 	})
 }
 
@@ -105,7 +111,7 @@ func DiscoverResources(ctx context.Context, client *Client, opts DiscoveryOption
 	if opts.ReleaseID != "" {
 		selector = buildReleaseIDSelector(opts.ReleaseID)
 	} else if opts.ModuleName != "" {
-		selector = buildModuleSelector(opts.ModuleName, opts.Namespace)
+		selector = buildModuleSelector(opts.ModuleName)
 	} else {
 		return nil, fmt.Errorf("either ModuleName or ReleaseID must be provided")
 	}

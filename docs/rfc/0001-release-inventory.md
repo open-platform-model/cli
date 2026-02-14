@@ -673,11 +673,10 @@ Not present (server-generated, only exist after apply):
   [ ] status
 ```
 
-Note: OPM labels are injected during `apply` (in `injectLabels()` at
-`internal/kubernetes/apply.go:88-117`), which is AFTER the digest is computed.
-This means label injection does not affect the digest. The digest captures the
-rendered output before any OPM-specific labels are added, which is the correct
-behavior — the labels are an apply-time concern, not a module output concern.
+Note: OPM labels are injected by CUE transformers during the render pipeline,
+which is BEFORE the digest is computed. The digest therefore includes OPM labels
+as part of the rendered output. This is the correct behavior — labels are part
+of the module's declared intent, not a post-processing concern.
 
 ### Change History Pruning
 

@@ -15,14 +15,15 @@ import (
 
 // Delete command flags.
 var (
-	deleteNamespaceFlag  string
-	deleteNameFlag       string
-	deleteReleaseIDFlag  string
-	deleteForceFlag      bool
-	deleteDryRunFlag     bool
-	deleteWaitFlag       bool
-	deleteKubeconfigFlag string
-	deleteContextFlag    string
+	deleteNamespaceFlag      string
+	deleteNameFlag           string
+	deleteReleaseIDFlag      string
+	deleteForceFlag          bool
+	deleteDryRunFlag         bool
+	deleteWaitFlag           bool
+	deleteIgnoreNotFoundFlag bool
+	deleteKubeconfigFlag     string
+	deleteContextFlag        string
 )
 
 // NewModDeleteCmd creates the mod delete command.
@@ -67,6 +68,8 @@ Examples:
 		"Preview without deleting")
 	cmd.Flags().BoolVar(&deleteWaitFlag, "wait", false,
 		"Wait for resources to be deleted")
+	cmd.Flags().BoolVar(&deleteIgnoreNotFoundFlag, "ignore-not-found", false,
+		"Exit 0 when no resources match the selector")
 	cmd.Flags().StringVar(&deleteKubeconfigFlag, "kubeconfig", "",
 		"Path to kubeconfig file")
 	cmd.Flags().StringVar(&deleteContextFlag, "context", "",
@@ -140,6 +143,10 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 		Wait:       deleteWaitFlag,
 	})
 	if err != nil {
+		if deleteIgnoreNotFoundFlag && kubernetes.IsNoResourcesFound(err) {
+			modLog.Info("no resources found (ignored)")
+			return nil
+		}
 		modLog.Error("delete failed", "error", err)
 		return &ExitError{Code: ExitGeneralError, Err: err}
 	}

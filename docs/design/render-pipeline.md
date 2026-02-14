@@ -596,16 +596,7 @@ flowchart TD
 
     K8S --> LOOP["For each resource<br/>(weight-sorted order)"]
 
-    LOOP --> INJ["injectLabels()<br/><code>apply.go:89-117</code>"]
-    INJ --> INJ1["app.kubernetes.io/managed-by: opm"]
-    INJ --> INJ2["module-release.opmodel.dev/name"]
-    INJ --> INJ3["module-release.opmodel.dev/namespace"]
-    INJ --> INJ4["module-release.opmodel.dev/version"]
-    INJ --> INJ5["module-release.opmodel.dev/component"]
-    INJ --> INJ6["module-release.opmodel.dev/module-id"]
-    INJ --> INJ7["module-release.opmodel.dev/release-id"]
-
-    INJ1 & INJ2 & INJ3 & INJ4 & INJ5 & INJ6 & INJ7 --> GET["GET existing resource<br/>(check if exists)"]
+    LOOP --> GET["GET existing resource<br/>(check if exists)"]
 
     GET --> MARSHAL["JSON marshal"]
     MARSHAL --> PATCH["PATCH (server-side apply)<br/>fieldManager: opm<br/>force: true"]
@@ -636,22 +627,26 @@ The client is a cached singleton per CLI invocation. It creates:
 
 ### 7.2 Label Injection
 
-**`injectLabels()`** — `internal/kubernetes/apply.go:89-117`
+OPM labels are now injected by CUE transformers during the render pipeline
+(Phase 5), not at apply time. This means labels are part of the rendered output
+and included in digest computation.
 
-Before applying each resource, OPM labels are injected:
+The transformers inject the following labels:
 
 | Label | Value | Purpose |
 |-------|-------|---------|
-| `app.kubernetes.io/managed-by` | `opm` | Standard K8s managed-by label |
-| `module-release.opmodel.dev/name` | Release name | Module identification |
-| `module-release.opmodel.dev/namespace` | Target namespace | Module identification |
-| `module-release.opmodel.dev/version` | Module version | Version tracking |
-| `module-release.opmodel.dev/component` | Component name | Component identification |
-| `module-release.opmodel.dev/module-id` | Module identity UUID | Stable identity |
-| `module-release.opmodel.dev/release-id` | Release identity UUID | Stable release identity |
+| `app.kubernetes.io/managed-by` | `open-platform-model` | Standard K8s managed-by label |
+| `module.opmodel.dev/name` | Module name | Module identification |
+| `module.opmodel.dev/version` | Module version | Version tracking |
+| `component.opmodel.dev/name` | Component name | Component identification |
+| `module.opmodel.dev/uuid` | Module identity UUID | Stable identity |
+| `module-release.opmodel.dev/name` | Release name | Release identification |
+| `module-release.opmodel.dev/version` | Release version | Release version tracking |
+| `module-release.opmodel.dev/uuid` | Release identity UUID | Stable release identity |
 
 These labels are used by `opm mod delete` and `opm mod status` for resource
-discovery.
+discovery. Namespace scoping is handled by the Kubernetes API (namespaced
+list calls), not by a label.
 
 ### 7.3 Server-Side Apply
 
