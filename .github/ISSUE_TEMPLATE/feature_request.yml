@@ -1,0 +1,61 @@
+name: Feature Request
+description: Propose a new feature or enhancement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What feature do you want?
+      placeholder: A clear description of the proposed feature.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the CLI does this affect?
+      options:
+        - mod apply
+        - mod build
+        - mod delete
+        - mod diff
+        - mod init
+        - mod status
+        - mod template
+        - config
+        - loader
+        - kubernetes
+        - output / UX
+        - CUE integration
+        - OCI / distribution
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why is this needed? What problem does it solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How might this be implemented? Include CLI examples if applicable.
+      placeholder: |
+        opm mod vet . --concrete
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Other approaches you considered and why they were dismissed.
+    validations:
+      required: false

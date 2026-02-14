@@ -1,0 +1,62 @@
+name: Investigation
+description: Research task that needs exploration before implementation
+labels: ["investigation"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What needs to be investigated?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the CLI is this related to?
+      options:
+        - mod apply
+        - mod build
+        - mod delete
+        - mod diff
+        - mod init
+        - mod status
+        - mod template
+        - config
+        - loader
+        - kubernetes
+        - output / UX
+        - CUE integration
+        - OCI / distribution
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Background information, links, related issues.
+    validations:
+      required: true
+
+  - type: textarea
+    id: questions
+    attributes:
+      label: Questions to Answer
+      description: Specific questions this investigation should answer.
+      placeholder: |
+        - Is it feasible to do X without Y?
+        - How does project Z solve this?
+    validations:
+      required: false
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Expected Outcome
+      description: What deliverable is expected from this investigation?
+      placeholder: RFC, design doc, proof of concept, decision record, etc.
+    validations:
+      required: false

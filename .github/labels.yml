@@ -1,0 +1,118 @@
+# =============================================================================
+# GitHub Labels — managed by crazy-max/ghaction-github-labeler
+#
+# Edit this file and open a PR to preview changes (dry-run).
+# Labels are synced on merge to main.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Issue type (auto-assigned by issue templates)
+# ---------------------------------------------------------------------------
+- name: "bug"
+  color: "d73a4a"
+  description: "Something isn't working"
+
+- name: "enhancement"
+  color: "a2eeef"
+  description: "New feature or request"
+
+- name: "chore"
+  color: "fef2c0"
+  description: "Cleanup, refactoring, or maintenance"
+
+- name: "investigation"
+  color: "d4c5f9"
+  description: "Research task needing exploration"
+
+# ---------------------------------------------------------------------------
+# Priority
+# ---------------------------------------------------------------------------
+- name: "priority: critical"
+  color: "b60205"
+  description: "Must be resolved immediately"
+
+- name: "priority: high"
+  color: "d93f0b"
+  description: "Should be resolved soon"
+
+- name: "priority: low"
+  color: "0e8a16"
+  description: "Nice to have, no rush"
+
+# ---------------------------------------------------------------------------
+# Component (matches issue template dropdown)
+# ---------------------------------------------------------------------------
+- name: "component: mod apply"
+  color: "1d76db"
+  description: "opm mod apply command"
+
+- name: "component: mod build"
+  color: "1d76db"
+  description: "opm mod build command"
+
+- name: "component: mod delete"
+  color: "1d76db"
+  description: "opm mod delete command"
+
+- name: "component: mod diff"
+  color: "1d76db"
+  description: "opm mod diff command"
+
+- name: "component: mod init"
+  color: "1d76db"
+  description: "opm mod init command"
+
+- name: "component: mod status"
+  color: "1d76db"
+  description: "opm mod status command"
+
+- name: "component: config"
+  color: "1d76db"
+  description: "Configuration system"
+
+- name: "component: loader"
+  color: "1d76db"
+  description: "CUE module loader"
+
+- name: "component: kubernetes"
+  color: "1d76db"
+  description: "Kubernetes client and operations"
+
+- name: "component: CUE"
+  color: "1d76db"
+  description: "CUE integration and evaluation"
+
+- name: "component: OCI"
+  color: "1d76db"
+  description: "OCI distribution and registry"
+
+- name: "component: UX"
+  color: "1d76db"
+  description: "CLI output, styling, and user experience"
+
+# ---------------------------------------------------------------------------
+# Status / workflow
+# ---------------------------------------------------------------------------
+- name: "blocked"
+  color: "b60205"
+  description: "Blocked by another issue or external dependency"
+
+- name: "needs triage"
+  color: "ededed"
+  description: "Awaiting initial review and classification"
+
+- name: "help wanted"
+  color: "008672"
+  description: "Open for contributions"
+
+- name: "good first issue"
+  color: "7057ff"
+  description: "Suitable for newcomers"
+
+- name: "duplicate"
+  color: "cfd3d7"
+  description: "Already tracked by another issue"
+
+- name: "wontfix"
+  color: "ffffff"
+  description: "Intentionally not addressing this"

@@ -1,0 +1,76 @@
+name: Bug Report
+description: Report broken or unexpected behavior
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear description of the bug.
+      placeholder: What went wrong?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the CLI is affected?
+      options:
+        - mod apply
+        - mod build
+        - mod delete
+        - mod diff
+        - mod init
+        - mod status
+        - mod template
+        - config
+        - loader
+        - kubernetes
+        - output / UX
+        - CUE integration
+        - OCI / distribution
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Exact steps to reproduce the bug, including commands run.
+      placeholder: |
+        1. Run `opm mod apply . --name foo --namespace default`
+        2. Observe error output
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened? Include terminal output if possible.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Relevant version and platform info.
+      placeholder: |
+        - OPM version: v0.x.x (or commit SHA)
+        - Go version: 1.21
+        - OS: Linux / macOS / Windows
+        - Kubernetes version: 1.28 (if applicable)
+    validations:
+      required: false
