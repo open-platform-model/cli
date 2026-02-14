@@ -65,7 +65,7 @@
 - [x] Remove `BuildFromValue()` from `internal/build/release_builder.go:197-251`. It is a legacy path for modules that don't import `opmodel.dev/core@v0`. No production code calls it — only tests.
   - Also remove `extractMetadataFromModule()` at `release_builder.go:644-764` (sole caller is `BuildFromValue`).
   - Remove accompanying tests in `release_builder_test.go` (`TestReleaseBuilder_BuildFromValue` and related).
-- [ ] Remove `normalizeK8sResource()` and all helper functions from `internal/build/executor.go:257-443`. Transformers now output correct Kubernetes resources directly — this post-processing normalization layer is redundant.
+- [x] Remove `normalizeK8sResource()` and all helper functions from `internal/build/executor.go:257-443`. Transformers now output correct Kubernetes resources directly — this post-processing normalization layer is redundant.
   - Functions to remove: `normalizeK8sResource`, `normalizeContainers`, `mapToPortsArray`, `mapToEnvArray`, `mapToVolumeMountsArray`, `mapToVolumesArray`, `normalizeAnnotations` (~190 lines).
   - Remove the call site in `decodeResource()` at `executor.go:253`.
   - Remove accompanying tests in `executor_test.go`.
