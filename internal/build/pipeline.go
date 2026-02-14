@@ -63,6 +63,16 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		return nil, err
 	}
 
+	// When no --values flags are provided, values.cue must exist on disk.
+	// When --values flags ARE provided, values.cue on disk is ignored (stubbed
+	// out during Build) so the external values take full precedence.
+	if len(opts.Values) == 0 {
+		valuesPath := filepath.Join(modulePath, "values.cue")
+		if _, err := os.Stat(valuesPath); os.IsNotExist(err) {
+			return nil, fmt.Errorf("values.cue not found in %s — provide values via values.cue or --values flag", modulePath)
+		}
+	}
+
 	inspection, err := p.releaseBuilder.InspectModule(modulePath)
 	if err != nil {
 		return nil, err
@@ -189,11 +199,6 @@ func (p *pipeline) resolveModulePath(modulePath string) (string, error) {
 	cueModPath := filepath.Join(absPath, "cue.mod")
 	if _, err := os.Stat(cueModPath); os.IsNotExist(err) {
 		return "", fmt.Errorf("not a CUE module: missing cue.mod/ directory in %s", absPath)
-	}
-
-	valuesPath := filepath.Join(absPath, "values.cue")
-	if _, err := os.Stat(valuesPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("values.cue required but not found in %s", absPath)
 	}
 
 	return absPath, nil

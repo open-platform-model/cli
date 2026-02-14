@@ -126,6 +126,20 @@ func (b *ReleaseBuilder) Build(modulePath string, opts ReleaseOptions, valuesFil
 		},
 	}
 
+	// When --values flags are provided, stub out any on-disk values.cue with
+	// a minimal package declaration. This prevents the on-disk defaults from
+	// being loaded and unified with the user-provided values, which could
+	// cause conflicts. The external values files take full precedence.
+	if len(valuesFiles) > 0 {
+		valuesOnDisk := filepath.Join(modulePath, "values.cue")
+		if _, err := os.Stat(valuesOnDisk); err == nil {
+			output.Debug("overriding on-disk values.cue with --values flags")
+			cfg.Overlay[valuesOnDisk] = load.FromBytes(
+				[]byte(fmt.Sprintf("package %s\n", pkgName)),
+			)
+		}
+	}
+
 	instances := load.Instances([]string{"."}, cfg)
 	if len(instances) == 0 {
 		return nil, fmt.Errorf("no CUE instances found in %s", modulePath)
@@ -179,7 +193,7 @@ func (b *ReleaseBuilder) Build(modulePath string, opts ReleaseOptions, valuesFil
 	values := value.LookupPath(cue.ParsePath("values"))
 	if !values.Exists() {
 		return nil, &ReleaseValidationError{
-			Message: "module missing 'values' field - ensure module uses #config pattern",
+			Message: "module missing 'values' field — provide values via values.cue or --values flag",
 		}
 	}
 
