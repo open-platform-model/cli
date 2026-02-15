@@ -16,6 +16,7 @@ func NewModCmd() *cobra.Command {
 	// Add subcommands
 	cmd.AddCommand(NewModInitCmd())
 	cmd.AddCommand(NewModBuildCmd())
+	cmd.AddCommand(NewModVetCmd())
 
 	// Implemented commands
 	cmd.AddCommand(NewModApplyCmd())

@@ -49,6 +49,7 @@ const (
 	StatusConfigured = "configured"
 	StatusUnchanged  = "unchanged"
 	StatusDeleted    = "deleted"
+	StatusValid      = "valid"
 	statusFailed     = "failed"
 )
 
@@ -57,6 +58,8 @@ const (
 func statusStyle(status string) lipgloss.Style {
 	switch status {
 	case StatusCreated:
+		return lipgloss.NewStyle().Foreground(colorGreen)
+	case StatusValid:
 		return lipgloss.NewStyle().Foreground(colorGreen)
 	case StatusConfigured:
 		return lipgloss.NewStyle().Foreground(ColorYellow)
@@ -116,4 +119,32 @@ func FormatCheckmark(msg string) string {
 func FormatNotice(msg string) string {
 	arrow := lipgloss.NewStyle().Foreground(ColorYellow).Render("▶")
 	return arrow + " " + msg
+}
+
+// vetCheckColumnWidth is the alignment column for detail text in FormatVetCheck.
+const vetCheckColumnWidth = 34
+
+// FormatVetCheck renders a validation check result with a green checkmark, label,
+// and optional right-aligned detail text.
+//
+// Format: ✔ <label>                      <detail>
+//
+// The checkmark is green. The detail text (if provided) is dim/faint and
+// right-aligned at column 34 from the start of the label. If detail is empty,
+// no trailing whitespace is added.
+func FormatVetCheck(label, detail string) string {
+	check := lipgloss.NewStyle().Foreground(colorGreenCheck).Render("✔")
+	result := check + " " + label
+
+	if detail != "" {
+		// Calculate padding for right-alignment
+		padding := vetCheckColumnWidth - len(label)
+		if padding < 2 {
+			padding = 2
+		}
+		styledDetail := styleDim.Render(detail)
+		result += strings.Repeat(" ", padding) + styledDetail
+	}
+
+	return result
 }
