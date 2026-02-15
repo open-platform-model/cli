@@ -161,12 +161,13 @@ func (b *ReleaseBuilder) Build(modulePath string, opts ReleaseOptions, valuesFil
 		value = value.Unify(valuesValue)
 	}
 
-	// Step 4b: Validate values against #config using per-field isolation.
+	// Step 4b: Validate values against #config using recursive field walking.
 	//
-	// CUE's evaluator suppresses closedness errors ("field not allowed") when
-	// other errors (e.g., type mismatches) exist in the same struct. By
-	// validating each top-level values field against #config independently,
-	// we catch both categories of errors regardless of each other.
+	// Rather than relying on CUE's internal closedness checker (which suppresses
+	// "field not allowed" errors when type mismatches exist), we walk the values
+	// struct recursively, checking closedness via Value.Allows() and type
+	// constraints via per-field unification. This produces errors with
+	// values-rooted paths and source file positions.
 	configDef := value.LookupPath(cue.ParsePath("#config"))
 	valuesVal := value.LookupPath(cue.ParsePath("values"))
 	if configDef.Exists() && valuesVal.Exists() {

@@ -22,11 +22,11 @@ type testCUEError struct {
 	msg  string
 }
 
-func (e *testCUEError) Error() string                { return e.msg }
-func (e *testCUEError) Position() token.Pos          { return e.pos }
-func (e *testCUEError) InputPositions() []token.Pos  { return nil }
-func (e *testCUEError) Path() []string               { return e.path }
-func (e *testCUEError) Msg() (string, []interface{}) { return "%s", []interface{}{e.msg} }
+func (e *testCUEError) Error() string                            { return e.msg }
+func (e *testCUEError) Position() token.Pos                      { return e.pos }
+func (e *testCUEError) InputPositions() []token.Pos              { return nil }
+func (e *testCUEError) Path() []string                           { return e.path }
+func (e *testCUEError) Msg() (format string, args []interface{}) { return "%s", []interface{}{e.msg} }
 
 // testPos creates a valid token.Pos for testing with a synthetic file/line/col.
 func testPos(filename string, line, col int) token.Pos {
@@ -942,5 +942,36 @@ func TestValidateValuesAgainstConfig(t *testing.T) {
 		assert.Contains(t, details, "field not allowed")
 		// Should have a source position from the overrides file.
 		assert.Contains(t, details, "overrides.cue")
+	})
+
+	t.Run("split values across files validates correctly", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`#config: { name: string, port: int }`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		a := ctx.CompileString(`{name: "test"}`, cue.Filename("base.cue"))
+		b := ctx.CompileString(`{port: 8080}`, cue.Filename("env.cue"))
+		unified := a.Unify(b)
+
+		err := validateValuesAgainstConfig(configDef, unified)
+		assert.NoError(t, err, "split values that together satisfy schema should pass")
+	})
+
+	t.Run("conflicting values between files uses CUE native error", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`#config: { port: int }`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		a := ctx.CompileString(`{port: 8080}`, cue.Filename("a.cue"))
+		b := ctx.CompileString(`{port: 9090}`, cue.Filename("b.cue"))
+		unified := a.Unify(b)
+
+		err := validateValuesAgainstConfig(configDef, unified)
+		require.Error(t, err)
+
+		details := formatCUEDetails(err)
+		assert.Contains(t, details, "conflicting values")
+		assert.Contains(t, details, "a.cue")
+		assert.Contains(t, details, "b.cue")
 	})
 }
