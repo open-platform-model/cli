@@ -27,7 +27,7 @@ type StatusOptions struct {
 	ReleaseID string
 
 	// OutputFormat is the desired output format (table, yaml, json).
-	OutputFormat string
+	OutputFormat output.Format
 
 	// Watch enables continuous monitoring mode.
 	Watch bool
@@ -209,12 +209,17 @@ func formatDuration(d time.Duration) string {
 }
 
 // FormatStatus formats the status result based on the output format.
-func FormatStatus(result *statusResult, format string) (string, error) {
-	switch strings.ToLower(format) {
-	case "json":
+func FormatStatus(result *statusResult, format output.Format) (string, error) {
+	switch format {
+	case output.FormatJSON:
 		return formatStatusJSON(result)
-	case "yaml":
+	case output.FormatYAML:
 		return formatStatusYAML(result)
+	case output.FormatTable:
+		return FormatStatusTable(result), nil
+	case output.FormatDir:
+		// Dir format not supported for status - fall through to table
+		return FormatStatusTable(result), nil
 	default:
 		return FormatStatusTable(result), nil
 	}

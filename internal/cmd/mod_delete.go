@@ -148,7 +148,7 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 			return nil
 		}
 		modLog.Error("delete failed", "error", err)
-		return &ExitError{Code: ExitGeneralError, Err: err, Printed: true}
+		return &ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
 	// Report results

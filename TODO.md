@@ -9,7 +9,8 @@
 - [ ] Add "opm mod eval" to evaluate the module printing the raw CUE code of the module.
 - [ ] Rework "opm mod diff" to ignore fields not "owned" by the OPM cli. For example the "managedFields"
   - This filtering has to be done on both manifests before comparing.
-- [ ] Ensure "opm config init" also run "cue mod tidy" or similar to discover and download all dependencies.
+- [x] ~~Ensure "opm config init" also run "cue mod tidy" or similar to discover and download all dependencies.~~
+  - **Resolved:** Added prominent yellow-arrow notice reminding users to run `cue mod tidy` after init. Auto-running was rejected to maintain explicit user control (no shell-outs to `cue` binary).
 - [ ] Rework all tests to use cue.AST() instead of strings for test data and comparison.
   - Use pure CUE files, packages and modules for testadata
   - Look into using pure CUE files for comparison data as well.

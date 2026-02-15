@@ -26,7 +26,7 @@ func defaultTableStyle() tableStyle {
 	return tableStyle{
 		Border:      lipgloss.NormalBorder(),
 		BorderColor: colorDimGray,
-		HeaderStyle: lipgloss.NewStyle().Bold(true).Foreground(colorCyan),
+		HeaderStyle: lipgloss.NewStyle().Bold(true).Foreground(ColorCyan),
 		CellStyle:   lipgloss.NewStyle(),
 	}
 }

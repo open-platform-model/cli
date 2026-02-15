@@ -24,7 +24,7 @@ func TestStatusStyle(t *testing.T) {
 		{
 			name:   "configured returns yellow",
 			status: StatusConfigured,
-			wantFG: colorYellow,
+			wantFG: ColorYellow,
 		},
 		{
 			name:    "unchanged returns faint",

@@ -10,14 +10,16 @@ import (
 // Color palette — named constants for all ANSI 256 colors used in the CLI.
 // These are the single source of truth; never use inline lipgloss.Color literals.
 var (
-	// colorCyan is used for identifiable nouns: module paths, resource names, namespaces.
-	colorCyan = lipgloss.Color("14")
+	// ColorCyan is used for identifiable nouns: module paths, resource names, namespaces.
+	// Exported for use in build package error formatting.
+	ColorCyan = lipgloss.Color("14")
 
 	// colorGreen is used for the "created" resource status (bright, high-visibility).
 	colorGreen = lipgloss.Color("82")
 
-	// colorYellow is used for the "configured" resource status (medium visibility).
-	colorYellow = lipgloss.Color("220")
+	// ColorYellow is used for the "configured" resource status and position markers (line:col).
+	// Exported for use in build package error formatting.
+	ColorYellow = lipgloss.Color("220")
 
 	// colorRed is used for the "deleted" resource status.
 	colorRed = lipgloss.Color("196")
@@ -35,16 +37,10 @@ var (
 // Semantic styles — map domain concepts to visual presentation.
 var (
 	// styleNoun styles identifiable nouns (module paths, resource names, namespaces).
-	styleNoun = lipgloss.NewStyle().Foreground(colorCyan)
-
-	// styleAction styles action verbs (applying, installing, upgrading, deleting).
-	styleAction = lipgloss.NewStyle().Bold(true)
+	styleNoun = lipgloss.NewStyle().Foreground(ColorCyan)
 
 	// styleDim styles structural chrome (scope prefixes, separators, timestamps).
 	styleDim = lipgloss.NewStyle().Faint(true)
-
-	// styleSummary styles completion and summary lines.
-	styleSummary = lipgloss.NewStyle().Bold(true)
 )
 
 // Resource status constants.
@@ -63,7 +59,7 @@ func statusStyle(status string) lipgloss.Style {
 	case StatusCreated:
 		return lipgloss.NewStyle().Foreground(colorGreen)
 	case StatusConfigured:
-		return lipgloss.NewStyle().Foreground(colorYellow)
+		return lipgloss.NewStyle().Foreground(ColorYellow)
 	case StatusUnchanged:
 		return lipgloss.NewStyle().Faint(true)
 	case StatusDeleted:
@@ -113,4 +109,11 @@ func FormatResourceLine(kind, namespace, name, status string) string {
 func FormatCheckmark(msg string) string {
 	check := lipgloss.NewStyle().Foreground(colorGreenCheck).Render("✔")
 	return check + " " + msg
+}
+
+// FormatNotice renders a yellow arrow with a message for action-required output.
+// Use this for "next steps" guidance where user action is needed.
+func FormatNotice(msg string) string {
+	arrow := lipgloss.NewStyle().Foreground(ColorYellow).Render("▶")
+	return arrow + " " + msg
 }

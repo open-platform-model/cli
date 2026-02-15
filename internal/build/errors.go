@@ -10,6 +10,8 @@ import (
 	cueerrors "cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/token"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/opmodel/cli/internal/output"
 )
 
 // RenderError is a base interface for render errors.
@@ -175,18 +177,15 @@ func (e *ReleaseValidationError) Unwrap() error {
 }
 
 // Lipgloss styles for CUE error output.
-// These are local to the build package; they mirror the color constants from
-// internal/output/styles.go but are defined here to avoid a dependency on the
-// output package from the build package.
 var (
 	// errStylePath styles CUE paths (e.g. "values.media.test") — cyan.
-	errStylePath = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
+	errStylePath = lipgloss.NewStyle().Foreground(output.ColorCyan)
 
 	// errStyleDim styles structural chrome (arrows, file paths) — faint.
 	errStyleDim = lipgloss.NewStyle().Faint(true)
 
 	// errStylePosition styles line:col numbers — yellow.
-	errStylePosition = lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
+	errStylePosition = lipgloss.NewStyle().Foreground(output.ColorYellow)
 )
 
 // formatCUEDetails formats a CUE error into a multi-line, lipgloss-colorized

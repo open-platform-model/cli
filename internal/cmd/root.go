@@ -10,15 +10,14 @@ import (
 
 var (
 	// Global flags
-	kubeconfigFlag   string
-	contextFlag      string
-	namespaceFlag    string
-	configFlag       string
-	outputFormatFlag string
-	verboseFlag      bool
-	registryFlag     string
-	providerFlag     string
-	timestampsFlag   bool
+	kubeconfigFlag string
+	contextFlag    string
+	namespaceFlag  string
+	configFlag     string
+	verboseFlag    bool
+	registryFlag   string
+	providerFlag   string
+	timestampsFlag bool
 
 	// Resolved configuration (loaded during PersistentPreRunE)
 	opmConfig      *config.OPMConfig
@@ -43,7 +42,6 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.PersistentFlags().StringVar(&contextFlag, "context", "", "Kubernetes context to use (env: OPM_CONTEXT)")
 	rootCmd.PersistentFlags().StringVarP(&namespaceFlag, "namespace", "n", "", "Kubernetes namespace (env: OPM_NAMESPACE)")
 	rootCmd.PersistentFlags().StringVar(&configFlag, "config", "", "Path to config file (env: OPM_CONFIG)")
-	rootCmd.PersistentFlags().StringVarP(&outputFormatFlag, "output", "o", "yaml", "Output format: yaml, json, table, dir")
 	rootCmd.PersistentFlags().BoolVarP(&verboseFlag, "verbose", "v", false, "Enable verbose output")
 	rootCmd.PersistentFlags().StringVar(&registryFlag, "registry", "", "CUE registry URL (env: OPM_REGISTRY)")
 	rootCmd.PersistentFlags().StringVar(&providerFlag, "provider", "", "Provider to use for operations")
@@ -92,7 +90,6 @@ func initializeGlobals(cmd *cobra.Command) error {
 		ContextFlag:    contextFlag,
 		NamespaceFlag:  namespaceFlag,
 		ProviderFlag:   providerFlag,
-		OutputFlag:     outputFormatFlag,
 		Config:         cfg,
 		ProviderNames:  providerNames,
 	})
@@ -127,7 +124,6 @@ func initializeGlobals(cmd *cobra.Command) error {
 			"context", resolvedConfig.Context.Value,
 			"namespace", resolvedConfig.Namespace.Value,
 			"config", resolvedConfig.ConfigPath.Value,
-			"output", resolvedConfig.Output,
 			"registry", resolvedConfig.Registry.Value,
 			"provider", resolvedConfig.Provider.Value,
 		)

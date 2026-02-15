@@ -155,7 +155,6 @@ type ResolvedConfig struct {
 	Context    ResolvedField
 	Namespace  ResolvedField
 	Provider   ResolvedField
-	Output     string // from flag only (no env/config source)
 }
 
 // ResolveAllOptions contains options for resolving all configuration values.
@@ -167,7 +166,6 @@ type ResolveAllOptions struct {
 	ContextFlag    string
 	NamespaceFlag  string
 	ProviderFlag   string
-	OutputFlag     string
 
 	// Config values (from loaded config file)
 	Config *Config
@@ -251,9 +249,6 @@ func ResolveAll(opts ResolveAllOptions) (*ResolvedConfig, error) {
 
 	// Resolve provider with auto-resolution
 	result.Provider = resolveProvider(opts.ProviderFlag, opts.ProviderNames)
-
-	// Output is flag-only (no env/config)
-	result.Output = opts.OutputFlag
 
 	return result, nil
 }

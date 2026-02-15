@@ -131,7 +131,6 @@ func TestResolveAll_FlagOverridesAll(t *testing.T) {
 		ContextFlag:    "flag-context",
 		NamespaceFlag:  "flag-namespace",
 		ProviderFlag:   "flag-provider",
-		OutputFlag:     "json",
 		Config: &Config{
 			Kubernetes: KubernetesConfig{
 				Kubeconfig: "/config/kubeconfig",
@@ -151,7 +150,6 @@ func TestResolveAll_FlagOverridesAll(t *testing.T) {
 	assert.Equal(t, SourceFlag, result.Namespace.Source)
 	assert.Equal(t, "flag-provider", result.Provider.Value)
 	assert.Equal(t, SourceFlag, result.Provider.Source)
-	assert.Equal(t, "json", result.Output)
 }
 
 func TestResolveAll_EnvOverridesConfig(t *testing.T) {

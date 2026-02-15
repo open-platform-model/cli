@@ -91,13 +91,19 @@ func runModInit(cmd *cobra.Command, args []string) error {
 
 	// Create the target directory
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
-		return fmt.Errorf("creating directory %s: %w", targetDir, err)
+		return &ExitError{
+			Code: ExitGeneralError,
+			Err:  fmt.Errorf("creating directory %s: %w", targetDir, err),
+		}
 	}
 
 	// Prepare template data
 	absDir, err := filepath.Abs(targetDir)
 	if err != nil {
-		return fmt.Errorf("getting absolute path: %w", err)
+		return &ExitError{
+			Code: ExitGeneralError,
+			Err:  fmt.Errorf("getting absolute path: %w", err),
+		}
 	}
 
 	data := templates.TemplateData{
@@ -112,7 +118,10 @@ func runModInit(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		// Clean up on failure
 		_ = os.RemoveAll(targetDir)
-		return fmt.Errorf("rendering template: %w", err)
+		return &ExitError{
+			Code: ExitGeneralError,
+			Err:  fmt.Errorf("rendering template: %w", err),
+		}
 	}
 
 	// Print success output with aligned file tree

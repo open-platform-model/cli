@@ -176,7 +176,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 		created, nsErr := k8sClient.EnsureNamespace(ctx, namespace, applyDryRunFlag)
 		if nsErr != nil {
 			modLog.Error("ensuring namespace", "error", nsErr)
-			return &ExitError{Code: ExitGeneralError, Err: nsErr, Printed: true}
+			return &ExitError{Code: exitCodeFromK8sError(nsErr), Err: nsErr, Printed: true}
 		}
 		if created {
 			if applyDryRunFlag {
@@ -200,7 +200,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 	})
 	if err != nil {
 		modLog.Error("apply failed", "error", err)
-		return &ExitError{Code: ExitGeneralError, Err: err, Printed: true}
+		return &ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
 	// Report results

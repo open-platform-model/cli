@@ -46,7 +46,10 @@ func runConfigVet(cmd *cobra.Command, args []string) error {
 		FlagValue: GetConfigPath(),
 	})
 	if err != nil {
-		return oerrors.Wrap(oerrors.ErrNotFound, "could not resolve config path")
+		return &ExitError{
+			Code: ExitNotFound,
+			Err:  oerrors.Wrap(oerrors.ErrNotFound, "could not resolve config path"),
+		}
 	}
 
 	configPath := pathResult.ConfigPath
@@ -58,12 +61,15 @@ func runConfigVet(cmd *cobra.Command, args []string) error {
 
 	// Check 1: Config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return &oerrors.DetailError{
-			Type:     "not found",
-			Message:  "configuration file not found",
-			Location: configPath,
-			Hint:     "Run 'opm config init' to create default configuration",
-			Cause:    oerrors.ErrNotFound,
+		return &ExitError{
+			Code: ExitNotFound,
+			Err: &oerrors.DetailError{
+				Type:     "not found",
+				Message:  "configuration file not found",
+				Location: configPath,
+				Hint:     "Run 'opm config init' to create default configuration",
+				Cause:    oerrors.ErrNotFound,
+			},
 		}
 	}
 
@@ -73,12 +79,15 @@ func runConfigVet(cmd *cobra.Command, args []string) error {
 	moduleFile := filepath.Join(configDir, "cue.mod", "module.cue")
 
 	if _, err := os.Stat(moduleFile); os.IsNotExist(err) {
-		return &oerrors.DetailError{
-			Type:     "not found",
-			Message:  "cue.mod/module.cue not found",
-			Location: moduleFile,
-			Hint:     "Run 'opm config init' to create configuration",
-			Cause:    oerrors.ErrNotFound,
+		return &ExitError{
+			Code: ExitNotFound,
+			Err: &oerrors.DetailError{
+				Type:     "not found",
+				Message:  "cue.mod/module.cue not found",
+				Location: moduleFile,
+				Hint:     "Run 'opm config init' to create configuration",
+				Cause:    oerrors.ErrNotFound,
+			},
 		}
 	}
 
@@ -90,7 +99,10 @@ func runConfigVet(cmd *cobra.Command, args []string) error {
 	})
 	if err != nil {
 		// The error from LoadOPMConfig already includes hints
-		return err
+		return &ExitError{
+			Code: ExitValidationError,
+			Err:  err,
+		}
 	}
 
 	output.Println("Configuration is valid: " + configPath)

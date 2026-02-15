@@ -58,7 +58,7 @@ func ModuleLogger(name string) *log.Logger {
 	// Build the styled prefix: dim "m:" + cyan name + dim " >"
 	prefix := fmt.Sprintf("%s%s %s",
 		styleDim.Render("m:"),
-		lipgloss.NewStyle().Foreground(colorCyan).Render(name),
+		lipgloss.NewStyle().Foreground(ColorCyan).Render(name),
 		styleDim.Render(">"),
 	)
 

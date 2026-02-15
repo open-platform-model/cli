@@ -114,13 +114,11 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	modLog := output.ModuleLogger(logName)
 
 	// Validate output format
-	switch statusOutputFlag {
-	case "table", "yaml", "json":
-		// valid
-	default:
+	outputFormat, valid := output.ParseFormat(statusOutputFlag)
+	if !valid || outputFormat == output.FormatDir {
 		return &ExitError{
 			Code: ExitGeneralError,
-			Err:  fmt.Errorf("invalid output format %q: must be table, yaml, or json", statusOutputFlag),
+			Err:  fmt.Errorf("invalid output format %q (valid: table, yaml, json)", statusOutputFlag),
 		}
 	}
 
@@ -139,7 +137,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 		Namespace:    statusNamespaceFlag,
 		Name:         statusNameFlag,
 		ReleaseID:    statusReleaseIDFlag,
-		OutputFormat: statusOutputFlag,
+		OutputFormat: outputFormat,
 		Watch:        statusWatchFlag,
 	}
 
@@ -230,7 +228,7 @@ func displayStatus(ctx context.Context, client *kubernetes.Client, opts kubernet
 			return nil
 		}
 		modLog.Error("getting status", "error", err)
-		return &ExitError{Code: ExitGeneralError, Err: err, Printed: true}
+		return &ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
 	// In watch mode, always use table format
