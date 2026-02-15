@@ -48,9 +48,9 @@ type noResourcesFoundError struct {
 // Error implements the error interface.
 func (e *noResourcesFoundError) Error() string {
 	if e.ModuleName != "" {
-		return fmt.Sprintf("no resources found for module %q in namespace %q", e.ModuleName, e.Namespace)
+		return fmt.Sprintf("no resources found for module %s in namespace %s", e.ModuleName, e.Namespace)
 	}
-	return fmt.Sprintf("no resources found for release-id %q in namespace %q", e.ReleaseID, e.Namespace)
+	return fmt.Sprintf("no resources found for release-id %s in namespace %s", e.ReleaseID, e.Namespace)
 }
 
 // Is implements errors.Is for noResourcesFoundError.

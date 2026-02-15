@@ -95,6 +95,26 @@ func Println(msg string) {
 	os.Stdout.WriteString(msg + "\n")
 }
 
+// Details prints supplementary multi-line content to stderr.
+// Use for structured error details (e.g. CUE validation output)
+// that don't fit the key-value log format.
+func Details(msg string) {
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, msg)
+}
+
+// Prompt prints an interactive prompt to stderr (no newline).
+// Use for user input prompts like confirmation dialogs.
+func Prompt(msg string) {
+	os.Stderr.WriteString(msg)
+}
+
+// ClearScreen clears the terminal screen and moves cursor to top-left.
+// Use for watch/refresh mode interfaces.
+func ClearScreen() {
+	os.Stdout.WriteString("\033[2J\033[H")
+}
+
 // BoolPtr returns a pointer to a bool value. Convenience for LogConfig.Timestamps.
 func BoolPtr(b bool) *bool {
 	return &b

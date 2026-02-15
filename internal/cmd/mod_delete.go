@@ -118,7 +118,7 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 	})
 	if err != nil {
 		modLog.Error("connecting to cluster", "error", err)
-		return &ExitError{Code: ExitConnectivityError, Err: err}
+		return &ExitError{Code: ExitConnectivityError, Err: err, Printed: true}
 	}
 
 	// If dry-run, skip confirmation
@@ -148,7 +148,7 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 			return nil
 		}
 		modLog.Error("delete failed", "error", err)
-		return &ExitError{Code: ExitGeneralError, Err: err}
+		return &ExitError{Code: ExitGeneralError, Err: err, Printed: true}
 	}
 
 	// Report results
@@ -168,8 +168,9 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 
 	if len(deleteResult.Errors) > 0 {
 		return &ExitError{
-			Code: ExitGeneralError,
-			Err:  fmt.Errorf("%d resource(s) failed to delete", len(deleteResult.Errors)),
+			Code:    ExitGeneralError,
+			Err:     fmt.Errorf("%d resource(s) failed to delete", len(deleteResult.Errors)),
+			Printed: true,
 		}
 	}
 
@@ -185,7 +186,7 @@ func confirmDelete(name, releaseID, namespace string) bool {
 		prompt = fmt.Sprintf("Delete all resources for release-id %q in namespace %q? [y/N]: ", releaseID, namespace)
 	}
 
-	fmt.Fprint(os.Stderr, prompt)
+	output.Prompt(prompt)
 	scanner := bufio.NewScanner(os.Stdin)
 	if scanner.Scan() {
 		answer := strings.TrimSpace(strings.ToLower(scanner.Text()))

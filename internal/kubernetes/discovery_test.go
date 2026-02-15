@@ -70,7 +70,7 @@ func TestNoResourcesFoundError(t *testing.T) {
 			ModuleName: "my-app",
 			Namespace:  "production",
 		}
-		assert.Equal(t, `no resources found for module "my-app" in namespace "production"`, err.Error())
+		assert.Equal(t, `no resources found for module my-app in namespace production`, err.Error())
 	})
 
 	t.Run("error message with release-id", func(t *testing.T) {
@@ -78,7 +78,7 @@ func TestNoResourcesFoundError(t *testing.T) {
 			ReleaseID: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 			Namespace: "production",
 		}
-		assert.Equal(t, `no resources found for release-id "a1b2c3d4-e5f6-7890-abcd-ef1234567890" in namespace "production"`, err.Error())
+		assert.Equal(t, `no resources found for release-id a1b2c3d4-e5f6-7890-abcd-ef1234567890 in namespace production`, err.Error())
 	})
 
 	t.Run("errors.Is matches errNoResourcesFound", func(t *testing.T) {

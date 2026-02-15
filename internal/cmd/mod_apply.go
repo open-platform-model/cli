@@ -132,15 +132,16 @@ func runApply(cmd *cobra.Command, args []string) error {
 	result, err := pipeline.Render(ctx, renderOpts)
 	if err != nil {
 		printValidationError("render failed", err)
-		return &ExitError{Code: ExitValidationError, Err: err}
+		return &ExitError{Code: ExitValidationError, Err: err, Printed: true}
 	}
 
 	// Check for render errors before touching the cluster
 	if result.HasErrors() {
 		printRenderErrors(result.Errors)
 		return &ExitError{
-			Code: ExitValidationError,
-			Err:  fmt.Errorf("%d render error(s)", len(result.Errors)),
+			Code:    ExitValidationError,
+			Err:     fmt.Errorf("%d render error(s)", len(result.Errors)),
+			Printed: true,
 		}
 	}
 
@@ -167,7 +168,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 	})
 	if err != nil {
 		modLog.Error("connecting to cluster", "error", err)
-		return &ExitError{Code: ExitConnectivityError, Err: err}
+		return &ExitError{Code: ExitConnectivityError, Err: err, Printed: true}
 	}
 
 	// Create namespace if requested
@@ -175,7 +176,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 		created, nsErr := k8sClient.EnsureNamespace(ctx, namespace, applyDryRunFlag)
 		if nsErr != nil {
 			modLog.Error("ensuring namespace", "error", nsErr)
-			return &ExitError{Code: ExitGeneralError, Err: nsErr}
+			return &ExitError{Code: ExitGeneralError, Err: nsErr, Printed: true}
 		}
 		if created {
 			if applyDryRunFlag {
@@ -199,7 +200,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 	})
 	if err != nil {
 		modLog.Error("apply failed", "error", err)
-		return &ExitError{Code: ExitGeneralError, Err: err}
+		return &ExitError{Code: ExitGeneralError, Err: err, Printed: true}
 	}
 
 	// Report results
@@ -226,8 +227,9 @@ func runApply(cmd *cobra.Command, args []string) error {
 
 	if len(applyResult.Errors) > 0 {
 		return &ExitError{
-			Code: ExitGeneralError,
-			Err:  fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)),
+			Code:    ExitGeneralError,
+			Err:     fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)),
+			Printed: true,
 		}
 	}
 

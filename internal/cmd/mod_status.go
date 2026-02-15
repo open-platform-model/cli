@@ -132,7 +132,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	})
 	if err != nil {
 		modLog.Error("connecting to cluster", "error", err)
-		return &ExitError{Code: ExitConnectivityError, Err: err}
+		return &ExitError{Code: ExitConnectivityError, Err: err, Printed: true}
 	}
 
 	statusOpts := kubernetes.StatusOptions{
@@ -167,13 +167,13 @@ func runStatusOnce(ctx context.Context, client *kubernetes.Client, opts kubernet
 			return nil
 		}
 		modLog.Error("getting status", "error", err)
-		return &ExitError{Code: ExitGeneralError, Err: err}
+		return &ExitError{Code: ExitGeneralError, Err: err, Printed: true}
 	}
 
 	formatted, err := kubernetes.FormatStatus(result, opts.OutputFormat)
 	if err != nil {
 		modLog.Error("formatting status", "error", err)
-		return &ExitError{Code: ExitGeneralError, Err: err}
+		return &ExitError{Code: ExitGeneralError, Err: err, Printed: true}
 	}
 
 	output.Println(formatted)
@@ -207,7 +207,7 @@ func runStatusWatch(ctx context.Context, client *kubernetes.Client, opts kuberne
 			return nil
 		case <-ticker.C:
 			// Clear screen
-			fmt.Fprint(os.Stdout, "\033[2J\033[H")
+			output.ClearScreen()
 			if err := displayStatus(ctx, client, opts); err != nil {
 				return err
 			}
@@ -230,7 +230,7 @@ func displayStatus(ctx context.Context, client *kubernetes.Client, opts kubernet
 			return nil
 		}
 		modLog.Error("getting status", "error", err)
-		return &ExitError{Code: ExitGeneralError, Err: err}
+		return &ExitError{Code: ExitGeneralError, Err: err, Printed: true}
 	}
 
 	// In watch mode, always use table format

@@ -111,7 +111,7 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	result, err := pipeline.Render(ctx, renderOpts)
 	if err != nil {
 		printValidationError("render failed", err)
-		return &ExitError{Code: ExitValidationError, Err: err}
+		return &ExitError{Code: ExitValidationError, Err: err, Printed: true}
 	}
 
 	// Create scoped module logger
@@ -137,7 +137,7 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	})
 	if err != nil {
 		modLog.Error("connecting to cluster", "error", err)
-		return &ExitError{Code: ExitConnectivityError, Err: err}
+		return &ExitError{Code: ExitConnectivityError, Err: err, Printed: true}
 	}
 
 	// Create comparer
@@ -152,7 +152,7 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	}
 	if err != nil {
 		modLog.Error("diff failed", "error", err)
-		return &ExitError{Code: ExitGeneralError, Err: err}
+		return &ExitError{Code: ExitGeneralError, Err: err, Printed: true}
 	}
 
 	// Print warnings from diff

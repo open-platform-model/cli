@@ -28,8 +28,9 @@ var (
 
 // ExitError wraps an error with an exit code.
 type ExitError struct {
-	Code int
-	Err  error
+	Code    int
+	Err     error
+	Printed bool // error was already printed by the command layer
 }
 
 func (e *ExitError) Error() string {
@@ -154,7 +155,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	result, err := pipeline.Render(ctx, opts)
 	if err != nil {
 		printValidationError("render failed", err)
-		return &ExitError{Code: ExitValidationError, Err: err}
+		return &ExitError{Code: ExitValidationError, Err: err, Printed: true}
 	}
 
 	// Handle verbose output
@@ -166,8 +167,9 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	if result.HasErrors() {
 		printRenderErrors(result.Errors)
 		return &ExitError{
-			Code: ExitValidationError,
-			Err:  fmt.Errorf("%d render error(s)", len(result.Errors)),
+			Code:    ExitValidationError,
+			Err:     fmt.Errorf("%d render error(s)", len(result.Errors)),
+			Printed: true,
 		}
 	}
 
@@ -263,8 +265,7 @@ func printValidationError(msg string, err error) {
 	if errors.As(err, &releaseErr) && releaseErr.Details != "" {
 		output.Error(fmt.Sprintf("%s: %s", msg, releaseErr.Message))
 		// Print CUE details as plain text to stderr for readable multi-line output
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, releaseErr.Details)
+		output.Details(releaseErr.Details)
 		return
 	}
 	output.Error(msg, "error", err)
