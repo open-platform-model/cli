@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -121,7 +120,7 @@ func runVet(cmd *cobra.Command, args []string) error {
 
 	// Handle verbose output (before checking for errors)
 	if vetVerboseFlag {
-		writeVetVerboseOutput(result)
+		writeBuildVerboseLog(result)
 	}
 
 	// Check for render errors
@@ -160,10 +159,12 @@ func runVet(cmd *cobra.Command, args []string) error {
 	}
 	output.Println(output.FormatVetCheck("Values satisfy #config", valuesDetail))
 
-	// Print per-resource validation lines
-	for _, res := range result.Resources {
-		line := output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), output.StatusValid)
-		output.Println(line)
+	// Print per-resource validation lines (skip when --verbose already showed them)
+	if !vetVerboseFlag {
+		for _, res := range result.Resources {
+			line := output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), output.StatusValid)
+			output.Println(line)
+		}
 	}
 
 	// Print final summary
@@ -171,47 +172,4 @@ func runVet(cmd *cobra.Command, args []string) error {
 	output.Println(output.FormatCheckmark(summary))
 
 	return nil
-}
-
-// writeVetVerboseOutput writes verbose output for mod vet.
-// Reuses the same writeVerboseOutput function from mod build.
-func writeVetVerboseOutput(result *build.RenderResult) {
-	// Convert to RenderResultInfo
-	matches := make(map[string][]output.TransformerMatchInfo)
-	for compName, matchList := range result.MatchPlan.Matches {
-		for _, m := range matchList {
-			matches[compName] = append(matches[compName], output.TransformerMatchInfo{
-				TransformerFQN: m.TransformerFQN,
-				Reason:         m.Reason,
-			})
-		}
-	}
-
-	// Convert resources to ResourceInfo
-	resourceInfos := make([]output.ResourceInfo, len(result.Resources))
-	for i, r := range result.Resources {
-		resourceInfos[i] = r
-	}
-
-	info := &output.RenderResultInfo{
-		ModuleName:       result.Module.Name,
-		ModuleNamespace:  result.Module.Namespace,
-		ModuleVersion:    result.Module.Version,
-		ModuleComponents: result.Module.Components,
-		ModuleLabels:     result.Module.Labels,
-		Matches:          matches,
-		Unmatched:        result.MatchPlan.Unmatched,
-		Resources:        resourceInfos,
-		Errors:           result.Errors,
-		Warnings:         result.Warnings,
-	}
-
-	verboseOpts := output.VerboseOptions{
-		JSON:   false,
-		Writer: os.Stderr,
-	}
-
-	if err := output.WriteVerboseResult(info, nil, verboseOpts); err != nil {
-		output.Warn("writing verbose output", "error", err)
-	}
 }

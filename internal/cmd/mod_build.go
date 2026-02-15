@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -215,7 +216,50 @@ func runBuild(cmd *cobra.Command, args []string) error {
 }
 
 // writeVerboseOutput writes verbose output to stderr.
+// JSON output uses the structured WriteVerboseResult path (shared with mod vet).
+// Human output uses scoped logger lines consistent with mod apply.
 func writeVerboseOutput(result *build.RenderResult, jsonOutput bool) {
+	if jsonOutput {
+		writeBuildVerboseJSON(result)
+		return
+	}
+	writeBuildVerboseLog(result)
+}
+
+// writeBuildVerboseLog writes human-readable verbose output as logger lines.
+// Each line is prefixed with the module-scoped logger (m:<name> >), matching
+// the output style of mod apply.
+func writeBuildVerboseLog(result *build.RenderResult) {
+	modLog := output.ModuleLogger(result.Module.Name)
+
+	// Module info — single line with key-value pairs
+	modLog.Info("module",
+		"namespace", result.Module.Namespace,
+		"version", result.Module.Version,
+		"components", strings.Join(result.Module.Components, ", "),
+	)
+
+	// Transformer matching — one line per match
+	for compName, matches := range result.MatchPlan.Matches {
+		for _, m := range matches {
+			modLog.Info(output.FormatTransformerMatch(compName, m.TransformerFQN))
+		}
+	}
+
+	// Unmatched components
+	for _, comp := range result.MatchPlan.Unmatched {
+		modLog.Warn(output.FormatTransformerUnmatched(comp))
+	}
+
+	// Generated resources
+	for _, res := range result.Resources {
+		modLog.Info(output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), output.StatusValid))
+	}
+}
+
+// writeBuildVerboseJSON writes structured JSON verbose output to stderr.
+// Delegates to the shared WriteVerboseResult path used by mod vet.
+func writeBuildVerboseJSON(result *build.RenderResult) {
 	// Convert to RenderResultInfo
 	matches := make(map[string][]output.TransformerMatchInfo)
 	for compName, matchList := range result.MatchPlan.Matches {
@@ -247,7 +291,7 @@ func writeVerboseOutput(result *build.RenderResult, jsonOutput bool) {
 	}
 
 	verboseOpts := output.VerboseOptions{
-		JSON:   jsonOutput,
+		JSON:   true,
 		Writer: os.Stderr,
 	}
 
