@@ -405,58 +405,178 @@ func collectAllCUEErrors(v cue.Value) error {
 	return v.Validate()
 }
 
-// validateValuesAgainstConfig validates each top-level field of the values
-// struct against the #config definition independently.
+// pathRewrittenError wraps a cueerrors.Error and overrides Path() to return
+// a custom path. All other methods delegate to the inner error.
 //
-// This works around a CUE engine limitation where closedness errors
-// ("field not allowed") are suppressed when other error types (e.g., type
-// mismatches) exist in the same struct. CUE's evaluator skips close-checking
-// on structs that already have a child error (typocheck.go early return).
-//
-// By validating each field in its own isolated unification, both type errors
-// and closedness errors are detected regardless of each other.
-//
-// Returns a combined error with all validation errors, or nil if clean.
-func validateValuesAgainstConfig(cueCtx *cue.Context, configDef, valuesVal cue.Value) error {
-	var combined cueerrors.Error
+// This is used to rewrite CUE error paths from #config-rooted (e.g.,
+// #config.media.test) to values-rooted (e.g., values.media.test) so that
+// error messages reflect the user's input, not CUE internals.
+type pathRewrittenError struct {
+	inner   cueerrors.Error
+	newPath []string
+}
 
-	// Only iterate regular fields (not optional, hidden, or definitions).
-	// These are the concrete values provided by the user.
-	iter, err := valuesVal.Fields()
-	if err != nil {
-		// If we can't iterate fields, the value itself may be an error.
-		return err
+func (e *pathRewrittenError) Error() string {
+	return e.inner.Error()
+}
+
+func (e *pathRewrittenError) Position() token.Pos {
+	return e.inner.Position()
+}
+
+func (e *pathRewrittenError) InputPositions() []token.Pos {
+	return e.inner.InputPositions()
+}
+
+func (e *pathRewrittenError) Path() []string {
+	return e.newPath
+}
+
+func (e *pathRewrittenError) Msg() (format string, args []interface{}) {
+	return e.inner.Msg()
+}
+
+// rewriteErrorPath wraps a CUE error with a new path that prepends basePath
+// to the error's existing relative path segments.
+func rewriteErrorPath(e cueerrors.Error, basePath []string) cueerrors.Error {
+	errPath := e.Path()
+	newPath := make([]string, 0, len(basePath)+len(errPath))
+	newPath = append(newPath, basePath...)
+	newPath = append(newPath, errPath...)
+
+	return &pathRewrittenError{
+		inner:   e,
+		newPath: newPath,
+	}
+}
+
+// findSourcePosition extracts a source file position from a CUE value.
+//
+// For single-source values, v.Pos() returns the position directly.
+// For unified values (multiple sources), Pos() returns the last conjunct's
+// position which may not be useful. In that case, Expr() decomposes the value
+// into its constituent conjuncts, each retaining its original source position.
+//
+// Returns token.NoPos if no valid position can be found.
+func findSourcePosition(v cue.Value) token.Pos {
+	// Try direct position first (works for single-source values).
+	if pos := v.Pos(); pos.IsValid() {
+		return pos
 	}
 
-	for iter.Next() {
-		sel := iter.Selector()
-		fieldVal := iter.Value()
-
-		// Build a single-field struct and unify with #config independently.
-		// This isolates each field's validation so errors don't suppress each other.
-		// Use cue.Path with the selector directly to avoid string-parsing issues.
-		fieldPath := cue.MakePath(sel)
-		singleField := cueCtx.CompileString("{}")
-		singleField = singleField.FillPath(fieldPath, fieldVal)
-		result := configDef.Unify(singleField)
-
-		if err := result.Validate(); err != nil {
-			combined = appendCUEError(combined, err)
+	// Decompose unified values via Expr() to find a valid position.
+	op, parts := v.Expr()
+	if op == cue.AndOp {
+		for _, part := range parts {
+			if pos := part.Pos(); pos.IsValid() {
+				return pos
+			}
 		}
 	}
 
+	return token.NoPos
+}
+
+// validateValuesAgainstConfig validates user-provided values against the #config
+// definition by recursively walking every field and checking each against the
+// corresponding schema node.
+//
+// This replaces the previous per-field isolation approach. Instead of relying on
+// CUE's internal closedness checker (which produces sparse position info and has
+// a suppression bug), we:
+//
+//   - Check closedness manually via Value.Allows() — giving us full control over
+//     the error message, path, and source position.
+//   - Validate type constraints by unifying each allowed field with its resolved
+//     schema counterpart — CUE's type errors naturally include positions from both sides.
+//   - Handle pattern constraints ([Name=string]: {...}) via Str(key).Optional()
+//     resolution for recursive descent into pattern-matched fields.
+//   - Build error paths rooted at "values" (the user's perspective), not "#config".
+//
+// Returns a combined error with all validation errors, or nil if clean.
+func validateValuesAgainstConfig(configDef, valuesVal cue.Value) error {
+	combined := validateFieldsRecursive(configDef, valuesVal, []string{"values"}, nil)
 	if combined == nil {
 		return nil
 	}
 	return combined
 }
 
-// appendCUEError appends a Go error to a CUE error list, handling type
-// promotion from plain errors to cueerrors.Error.
-func appendCUEError(list cueerrors.Error, err error) cueerrors.Error {
-	var cueErr cueerrors.Error
-	if ok := cueerrors.As(err, &cueErr); ok {
-		return cueerrors.Append(list, cueErr)
+// validateFieldsRecursive walks every field in data recursively and validates
+// each against the corresponding schema node.
+//
+// At each level:
+//  1. Check if the field is allowed by the schema via Value.Allows().
+//     If not → emit "field not allowed" with source position, don't recurse.
+//  2. Resolve the schema field: try literal lookup first, then pattern constraint
+//     resolution via Str(key).Optional().
+//  3. Unify the data field with the resolved schema field and check for errors.
+//     If errors → emit with rewritten path, don't recurse.
+//  4. If the field is a struct and passes validation → recurse into children.
+func validateFieldsRecursive(schema, data cue.Value, path []string, errs cueerrors.Error) cueerrors.Error {
+	iter, err := data.Fields()
+	if err != nil {
+		return errs
 	}
-	return cueerrors.Append(list, cueerrors.Promote(err, ""))
+
+	for iter.Next() {
+		sel := iter.Selector()
+		fieldVal := iter.Value()
+		fieldName := sel.Unquoted()
+
+		// Build the full path for this field using Selector.String() which
+		// handles quoting for non-identifier names (e.g., "test-field").
+		fieldPath := make([]string, len(path), len(path)+1)
+		copy(fieldPath, path)
+		fieldPath = append(fieldPath, sel.String())
+
+		// Phase 1: Closedness check — is this field allowed by the schema?
+		if !schema.Allows(cue.Str(fieldName)) {
+			pos := findSourcePosition(fieldVal)
+			fieldNotAllowed := cueerrors.Newf(pos, "field not allowed")
+			errs = cueerrors.Append(errs, &pathRewrittenError{
+				inner:   fieldNotAllowed,
+				newPath: fieldPath,
+			})
+			continue // Don't recurse into disallowed fields.
+		}
+
+		// Phase 2: Resolve the schema field for this data field.
+		// Try literal field first, then pattern constraint resolution.
+		schemaField := schema.LookupPath(cue.MakePath(sel))
+		if !schemaField.Exists() {
+			// Try pattern constraint resolution (e.g., [Name=string]: {...}).
+			schemaField = schema.LookupPath(cue.MakePath(cue.Str(fieldName).Optional()))
+		}
+		if !schemaField.Exists() {
+			// Schema allows it (Allows() returned true) but no constraint
+			// to validate against — skip validation for this field.
+			continue
+		}
+
+		// Phase 3: For struct-kind values, recurse into children rather than
+		// unifying at this level. This prevents nested errors from being reported
+		// at the parent level and ensures each error is attributed to its exact
+		// field with the correct path.
+		if fieldVal.IncompleteKind() == cue.StructKind {
+			errs = validateFieldsRecursive(schemaField, fieldVal, fieldPath, errs)
+			continue
+		}
+
+		// Phase 4: Type validation for leaf values — unify data with schema.
+		unified := schemaField.Unify(fieldVal)
+		if fieldErr := unified.Validate(); fieldErr != nil {
+			// Replace each CUE error's path with our values-rooted path.
+			// CUE errors from unification carry #config-rooted paths which
+			// we discard entirely — fieldPath already captures the correct
+			// location from the user's perspective.
+			for _, e := range cueerrors.Errors(fieldErr) {
+				errs = cueerrors.Append(errs, &pathRewrittenError{
+					inner:   e,
+					newPath: fieldPath,
+				})
+			}
+		}
+	}
+	return errs
 }

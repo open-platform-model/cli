@@ -170,7 +170,7 @@ func (b *ReleaseBuilder) Build(modulePath string, opts ReleaseOptions, valuesFil
 	configDef := value.LookupPath(cue.ParsePath("#config"))
 	valuesVal := value.LookupPath(cue.ParsePath("values"))
 	if configDef.Exists() && valuesVal.Exists() {
-		if allErrs := validateValuesAgainstConfig(b.cueCtx, configDef, valuesVal); allErrs != nil {
+		if allErrs := validateValuesAgainstConfig(configDef, valuesVal); allErrs != nil {
 			return nil, &ReleaseValidationError{
 				Message: "values do not satisfy #config schema",
 				Cause:   allErrs,

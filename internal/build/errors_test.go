@@ -468,6 +468,102 @@ func TestDeduplicateCUEErrors(t *testing.T) {
 	})
 }
 
+func TestPathRewrittenError(t *testing.T) {
+	t.Run("Path returns rewritten path", func(t *testing.T) {
+		inner := cueerrors.Newf(testPos("values.cue", 5, 3), "field not allowed")
+		rewritten := &pathRewrittenError{
+			inner:   inner,
+			newPath: []string{"values", "extra"},
+		}
+		assert.Equal(t, []string{"values", "extra"}, rewritten.Path())
+	})
+
+	t.Run("delegates Position to inner", func(t *testing.T) {
+		pos := testPos("values.cue", 10, 5)
+		inner := cueerrors.Newf(pos, "some error")
+		rewritten := &pathRewrittenError{inner: inner, newPath: []string{"a"}}
+
+		assert.Equal(t, inner.Position(), rewritten.Position())
+	})
+
+	t.Run("delegates Msg to inner", func(t *testing.T) {
+		inner := cueerrors.Newf(token.NoPos, "test message %d", 42)
+		rewritten := &pathRewrittenError{inner: inner, newPath: []string{"a"}}
+
+		format, args := rewritten.Msg()
+		innerFormat, innerArgs := inner.Msg()
+		assert.Equal(t, innerFormat, format)
+		assert.Equal(t, innerArgs, args)
+	})
+
+	t.Run("formatCUEDetails renders rewritten paths", func(t *testing.T) {
+		pos := testPos("values.cue", 5, 3)
+		inner := cueerrors.Newf(pos, "field not allowed")
+		rewritten := &pathRewrittenError{
+			inner:   inner,
+			newPath: []string{"values", `"extra-field"`},
+		}
+
+		details := formatCUEDetails(rewritten)
+		assert.Contains(t, details, `values."extra-field"`)
+		assert.Contains(t, details, "field not allowed")
+		assert.Contains(t, details, "→")
+	})
+}
+
+func TestRewriteErrorPath(t *testing.T) {
+	t.Run("prepends base path to error path", func(t *testing.T) {
+		inner := &testCUEError{
+			pos:  testPos("test.cue", 1, 1),
+			path: []string{"host"},
+			msg:  "conflicting values",
+		}
+		rewritten := rewriteErrorPath(inner, []string{"values", "db"})
+		assert.Equal(t, []string{"values", "db", "host"}, rewritten.Path())
+	})
+
+	t.Run("handles empty inner path", func(t *testing.T) {
+		inner := &testCUEError{
+			pos:  testPos("test.cue", 1, 1),
+			path: nil,
+			msg:  "error",
+		}
+		rewritten := rewriteErrorPath(inner, []string{"values", "field"})
+		assert.Equal(t, []string{"values", "field"}, rewritten.Path())
+	})
+}
+
+func TestFindSourcePosition(t *testing.T) {
+	t.Run("single-source value returns Pos directly", func(t *testing.T) {
+		ctx := cuecontext.New()
+		v := ctx.CompileString(`x: 42`, cue.Filename("single.cue"))
+		field := v.LookupPath(cue.ParsePath("x"))
+		pos := findSourcePosition(field)
+		assert.True(t, pos.IsValid())
+		assert.Contains(t, pos.Filename(), "single.cue")
+	})
+
+	t.Run("unified value returns valid position", func(t *testing.T) {
+		ctx := cuecontext.New()
+		a := ctx.CompileString(`x: int`, cue.Filename("a.cue"))
+		b := ctx.CompileString(`x: 42`, cue.Filename("b.cue"))
+		unified := a.Unify(b)
+		field := unified.LookupPath(cue.ParsePath("x"))
+		pos := findSourcePosition(field)
+		assert.True(t, pos.IsValid())
+		// Should be from one of the source files.
+		filename := pos.Filename()
+		assert.True(t, strings.Contains(filename, "a.cue") || strings.Contains(filename, "b.cue"),
+			"position should be from a.cue or b.cue, got: %s", filename)
+	})
+
+	t.Run("returns NoPos for empty value", func(t *testing.T) {
+		var v cue.Value
+		pos := findSourcePosition(v)
+		assert.False(t, pos.IsValid())
+	})
+}
+
 func TestValidateValuesAgainstConfig(t *testing.T) {
 	t.Run("catches both type mismatch and disallowed field", func(t *testing.T) {
 		ctx := cuecontext.New()
@@ -492,11 +588,11 @@ func TestValidateValuesAgainstConfig(t *testing.T) {
 	extra: "not-allowed"
 }`, cue.Filename("values.cue"))
 
-		err := validateValuesAgainstConfig(ctx, configDef, vals)
+		err := validateValuesAgainstConfig(configDef, vals)
 		require.Error(t, err)
 
 		details := formatCUEDetails(err)
-		// Should contain both the type mismatch AND the field-not-allowed error
+		// Should contain both the type mismatch AND the field-not-allowed error.
 		assert.Contains(t, details, "conflicting values")
 		assert.Contains(t, details, "field not allowed")
 	})
@@ -518,7 +614,7 @@ func TestValidateValuesAgainstConfig(t *testing.T) {
 	port: 8080
 }`, cue.Filename("values.cue"))
 
-		err := validateValuesAgainstConfig(ctx, configDef, vals)
+		err := validateValuesAgainstConfig(configDef, vals)
 		assert.NoError(t, err)
 	})
 
@@ -538,12 +634,14 @@ func TestValidateValuesAgainstConfig(t *testing.T) {
 	extra: "not-allowed"
 }`, cue.Filename("values.cue"))
 
-		err := validateValuesAgainstConfig(ctx, configDef, vals)
+		err := validateValuesAgainstConfig(configDef, vals)
 		require.Error(t, err)
 
 		details := formatCUEDetails(err)
 		assert.Contains(t, details, "field not allowed")
-		// Should NOT contain type mismatch since name is valid
+		// Path should be values-rooted.
+		assert.Contains(t, details, "values.extra")
+		// Should NOT contain type mismatch since name is valid.
 		assert.NotContains(t, details, "conflicting values")
 	})
 
@@ -560,8 +658,8 @@ func TestValidateValuesAgainstConfig(t *testing.T) {
 
 		vals := ctx.CompileString(`{}`, cue.Filename("values.cue"))
 
-		err := validateValuesAgainstConfig(ctx, configDef, vals)
-		// Empty values are valid - no fields means nothing to validate.
+		err := validateValuesAgainstConfig(configDef, vals)
+		// Empty values are valid — no fields means nothing to validate.
 		assert.NoError(t, err)
 	})
 
@@ -576,11 +674,12 @@ func TestValidateValuesAgainstConfig(t *testing.T) {
 
 		vals := ctx.CompileString(`{extra: "nope"}`, cue.Filename("values.cue"))
 
-		err := validateValuesAgainstConfig(ctx, configDef, vals)
+		err := validateValuesAgainstConfig(configDef, vals)
 		require.Error(t, err)
 
 		details := formatCUEDetails(err)
 		assert.Contains(t, details, "field not allowed")
+		assert.Contains(t, details, "values.extra")
 	})
 
 	t.Run("nested type mismatch", func(t *testing.T) {
@@ -604,12 +703,13 @@ func TestValidateValuesAgainstConfig(t *testing.T) {
 	}
 }`, cue.Filename("values.cue"))
 
-		err := validateValuesAgainstConfig(ctx, configDef, vals)
+		err := validateValuesAgainstConfig(configDef, vals)
 		require.Error(t, err)
 
 		details := formatCUEDetails(err)
-		// Should catch errors deep inside nested structs.
+		// Should catch errors deep inside nested structs with values-rooted paths.
 		assert.Contains(t, details, "conflicting values")
+		assert.Contains(t, details, "values.db")
 	})
 
 	t.Run("multiple disallowed fields", func(t *testing.T) {
@@ -630,18 +730,217 @@ func TestValidateValuesAgainstConfig(t *testing.T) {
 	z: 3
 }`, cue.Filename("values.cue"))
 
-		err := validateValuesAgainstConfig(ctx, configDef, vals)
+		err := validateValuesAgainstConfig(configDef, vals)
 		require.Error(t, err)
 
 		details := formatCUEDetails(err)
-		// Should contain "field not allowed" for the disallowed fields.
+		// Should contain "field not allowed" for the disallowed fields with values-rooted paths.
 		assert.Contains(t, details, "field not allowed")
-		// Check that we caught multiple fields (at least x, y, z appear).
-		combined := strings.ToLower(details)
-		// The error messages might mention the field names.
-		hasMultiple := (strings.Contains(combined, "x") ||
-			strings.Contains(combined, "y") ||
-			strings.Contains(combined, "z"))
-		assert.True(t, hasMultiple, "should mention at least one of the disallowed fields")
+		assert.Contains(t, details, "values.x")
+		assert.Contains(t, details, "values.y")
+		assert.Contains(t, details, "values.z")
+	})
+
+	t.Run("top-level disallowed field has source position", func(t *testing.T) {
+		ctx := cuecontext.New()
+
+		schema := ctx.CompileString(`
+#config: {
+	name: string
+}
+`, cue.Filename("schema.cue"))
+
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{
+	name: "ok"
+	extra: "not-allowed"
+}`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		require.Error(t, err)
+
+		details := formatCUEDetails(err)
+		// Should have values-rooted path.
+		assert.Contains(t, details, "values.extra")
+		// Should have source position from values file.
+		assert.Contains(t, details, "values.cue")
+		assert.Contains(t, details, "→")
+	})
+
+	t.Run("nested disallowed field inside pattern-constrained struct", func(t *testing.T) {
+		ctx := cuecontext.New()
+
+		schema := ctx.CompileString(`
+#config: {
+	media: [string]: {
+		mountPath: string
+		size:      string
+	}
+}
+`, cue.Filename("schema.cue"))
+
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{
+	media: {
+		tvshows: {
+			mountPath: "/data/tv"
+			size:      "100Gi"
+			badField:  "oops"
+		}
+	}
+}`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		require.Error(t, err)
+
+		details := formatCUEDetails(err)
+		// Should have full nested path with values root.
+		assert.Contains(t, details, "values.media.tvshows.badField")
+		assert.Contains(t, details, "field not allowed")
+		assert.Contains(t, details, "values.cue")
+	})
+
+	t.Run("pattern constraint fields are accepted", func(t *testing.T) {
+		ctx := cuecontext.New()
+
+		schema := ctx.CompileString(`
+#config: {
+	media: [string]: {
+		mountPath: string
+		size:      string
+	}
+}
+`, cue.Filename("schema.cue"))
+
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{
+	media: {
+		tvshows: {
+			mountPath: "/data/tvshows"
+			size:      "100Gi"
+		}
+		movies: {
+			mountPath: "/data/movies"
+			size:      "200Gi"
+		}
+	}
+}`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		assert.NoError(t, err, "pattern-matched fields should be accepted")
+	})
+
+	t.Run("type mismatch at nested level does not recurse", func(t *testing.T) {
+		ctx := cuecontext.New()
+
+		schema := ctx.CompileString(`
+#config: {
+	media: [string]: {
+		mountPath: string
+		size:      string
+	}
+}
+`, cue.Filename("schema.cue"))
+
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{
+	media: {
+		movies: "not-a-struct"
+	}
+}`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		require.Error(t, err)
+
+		details := formatCUEDetails(err)
+		assert.Contains(t, details, "values.media.movies")
+		assert.Contains(t, details, "conflicting values")
+	})
+
+	t.Run("optional fields in schema are accepted", func(t *testing.T) {
+		ctx := cuecontext.New()
+
+		schema := ctx.CompileString(`
+#config: {
+	name: string
+	url?: string
+}
+`, cue.Filename("schema.cue"))
+
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{
+	name: "test"
+	url:  "https://example.com"
+}`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		assert.NoError(t, err, "optional fields should be accepted")
+	})
+
+	t.Run("deeply nested struct validates with full path", func(t *testing.T) {
+		ctx := cuecontext.New()
+
+		schema := ctx.CompileString(`
+#config: {
+	level1: {
+		level2: {
+			level3: {
+				value: string
+			}
+		}
+	}
+}
+`, cue.Filename("schema.cue"))
+
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{
+	level1: {
+		level2: {
+			level3: {
+				value: "ok"
+				bad:   "not-allowed"
+			}
+		}
+	}
+}`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		require.Error(t, err)
+
+		details := formatCUEDetails(err)
+		assert.Contains(t, details, "values.level1.level2.level3.bad")
+		assert.Contains(t, details, "field not allowed")
+	})
+
+	t.Run("multi-source unified value attributes position to source file", func(t *testing.T) {
+		ctx := cuecontext.New()
+
+		schema := ctx.CompileString(`
+#config: {
+	name: string
+}
+`, cue.Filename("schema.cue"))
+
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		// Simulate two values files unified together.
+		a := ctx.CompileString(`{name: "test"}`, cue.Filename("base.cue"))
+		b := ctx.CompileString(`{extra: "bad"}`, cue.Filename("overrides.cue"))
+		unified := a.Unify(b)
+
+		err := validateValuesAgainstConfig(configDef, unified)
+		require.Error(t, err)
+
+		details := formatCUEDetails(err)
+		assert.Contains(t, details, "values.extra")
+		assert.Contains(t, details, "field not allowed")
+		// Should have a source position from the overrides file.
+		assert.Contains(t, details, "overrides.cue")
 	})
 }
