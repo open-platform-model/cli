@@ -121,21 +121,25 @@ func FormatNotice(msg string) string {
 	return arrow + " " + msg
 }
 
+// FormatFQN formats a fully qualified name for display by replacing the
+// first "#" (provider#path separator) with " - " for readability.
+// Any "#" inside the path (e.g. @v0#TransformerName) is preserved.
+//
+// Example: "kubernetes#opmodel.dev/...@v0#Name" → "kubernetes - opmodel.dev/...@v0#Name"
+func FormatFQN(fqn string) string {
+	return strings.Replace(fqn, "#", " - ", 1)
+}
+
 // FormatTransformerMatch renders a matched transformer line.
 //
 // Format: ▸ <component> ← <provider> - <fqn>
 //
-// The bullet and component name are cyan. The arrow, provider, dash, and FQN are dim.
-// The internal FQN separator "#" between provider and transformer path is replaced
-// with " - " for readability (e.g. "kubernetes - opmodel.dev/.../transformers@v0#Name").
+// The bullet and component name are cyan. The arrow and FQN are dim.
 func FormatTransformerMatch(component, fqn string) string {
 	bullet := styleNoun.Render("▸")
 	comp := styleNoun.Render(component)
 	arrow := styleDim.Render("←")
-	// Replace only the first "#" (provider#path) with " - " for display.
-	// Any "#" inside the path (e.g. @v0#TransformerName) is preserved.
-	displayFQN := strings.Replace(fqn, "#", " - ", 1)
-	styledFQN := styleDim.Render(displayFQN)
+	styledFQN := styleDim.Render(FormatFQN(fqn))
 	return bullet + " " + comp + " " + arrow + " " + styledFQN
 }
 

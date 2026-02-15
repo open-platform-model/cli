@@ -329,7 +329,7 @@ func printRenderErrors(errs []error) {
 			if len(unmatchedErr.Available) > 0 {
 				output.Info("Available transformers:")
 				for _, t := range unmatchedErr.Available {
-					output.Info(fmt.Sprintf("  %s", t.FQN))
+					output.Info(fmt.Sprintf("  %s", output.FormatFQN(t.FQN)))
 					if len(t.RequiredLabels) > 0 {
 						output.Info(fmt.Sprintf("    requiredLabels: %v", t.RequiredLabels))
 					}
@@ -343,7 +343,7 @@ func printRenderErrors(errs []error) {
 			}
 		case errors.As(err, &transformErr):
 			output.Error(fmt.Sprintf("component %q: transform failed with %s: %v",
-				transformErr.ComponentName, transformErr.TransformerFQN, transformErr.Cause))
+				transformErr.ComponentName, output.FormatFQN(transformErr.TransformerFQN), transformErr.Cause))
 		case errors.As(err, &unhandledTraitErr):
 			output.Error(fmt.Sprintf("component %q: unhandled trait %q", unhandledTraitErr.ComponentName, unhandledTraitErr.TraitFQN))
 		default:

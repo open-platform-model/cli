@@ -52,14 +52,13 @@ func SetupLogging(cfg LogConfig) {
 }
 
 // ModuleLogger returns a child logger scoped to a module name.
-// The prefix renders as: m:<name> >
-// with dim "m:" and ">" and cyan module name.
+// The prefix renders as: m:<name>:
+// with dim "m:" and cyan module name. The trailing ":" is appended
+// automatically by charmbracelet/log's prefix renderer.
 func ModuleLogger(name string) *log.Logger {
-	// Build the styled prefix: dim "m:" + cyan name + dim " >"
-	prefix := fmt.Sprintf("%s%s %s",
+	prefix := fmt.Sprintf("%s%s",
 		styleDim.Render("m:"),
 		lipgloss.NewStyle().Foreground(ColorCyan).Render(name),
-		styleDim.Render(">"),
 	)
 
 	return logger.WithPrefix(prefix)
