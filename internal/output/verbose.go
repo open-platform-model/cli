@@ -213,12 +213,8 @@ func writeVerboseHuman(result *verboseResult, w io.Writer) error {
 	if len(result.Resources) > 0 {
 		sb.WriteString("Generated Resources:\n")
 		for _, res := range result.Resources {
-			ns := res.Namespace
-			if ns == "" {
-				ns = "(cluster-scoped)"
-			}
-			sb.WriteString(fmt.Sprintf("  %s/%s [%s] from %s\n",
-				res.Kind, res.Name, ns, res.Component))
+			line := FormatResourceLine(res.Kind, res.Namespace, res.Name, StatusValid)
+			sb.WriteString("  " + line + "\n")
 		}
 		sb.WriteString("\n")
 	}

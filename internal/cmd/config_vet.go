@@ -72,6 +72,7 @@ func runConfigVet(cmd *cobra.Command, args []string) error {
 			},
 		}
 	}
+	output.Println(output.FormatVetCheck("Config file found", configPath))
 
 	// Check 2: cue.mod/module.cue exists
 	// Determine the home directory from config path
@@ -90,6 +91,7 @@ func runConfigVet(cmd *cobra.Command, args []string) error {
 			},
 		}
 	}
+	output.Println(output.FormatVetCheck("Module metadata found", moduleFile))
 
 	// Check 3 & 4: Validate CUE syntax and evaluation
 	// Use LoadOPMConfig which handles registry resolution and CUE evaluation
@@ -105,6 +107,6 @@ func runConfigVet(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	output.Println("Configuration is valid: " + configPath)
+	output.Println(output.FormatVetCheck("CUE evaluation passed", ""))
 	return nil
 }

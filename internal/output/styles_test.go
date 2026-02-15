@@ -37,6 +37,11 @@ func TestStatusStyle(t *testing.T) {
 			wantFG: colorRed,
 		},
 		{
+			name:   "valid returns green",
+			status: StatusValid,
+			wantFG: colorGreen,
+		},
+		{
 			name:     "failed returns bold red",
 			status:   statusFailed,
 			wantBold: true,
@@ -128,6 +133,78 @@ func TestFormatCheckmark(t *testing.T) {
 	result := FormatCheckmark("Module applied")
 	assert.Contains(t, result, "✔", "should contain checkmark")
 	assert.Contains(t, result, "Module applied", "should contain message")
+}
+
+func TestStatusValidSameColorAsCreated(t *testing.T) {
+	validStyle := statusStyle(StatusValid)
+	createdStyle := statusStyle(StatusCreated)
+	assert.Equal(t, createdStyle.GetForeground(), validStyle.GetForeground(),
+		"valid and created should have the same color")
+}
+
+func TestFormatVetCheck(t *testing.T) {
+	tests := []struct {
+		name       string
+		label      string
+		detail     string
+		wantLabel  string
+		wantDetail string
+	}{
+		{
+			name:       "with detail",
+			label:      "Config file found",
+			detail:     "~/.opm/config.cue",
+			wantLabel:  "Config file found",
+			wantDetail: "~/.opm/config.cue",
+		},
+		{
+			name:      "without detail",
+			label:     "CUE evaluation passed",
+			detail:    "",
+			wantLabel: "CUE evaluation passed",
+		},
+		{
+			name:       "short label with detail",
+			label:      "File exists",
+			detail:     "/path/to/file",
+			wantLabel:  "File exists",
+			wantDetail: "/path/to/file",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatVetCheck(tt.label, tt.detail)
+
+			// The rendered string contains ANSI codes. Strip them for content checks.
+			assert.Contains(t, result, "✔", "should contain checkmark")
+			assert.Contains(t, result, tt.wantLabel, "should contain label")
+
+			if tt.detail != "" {
+				assert.Contains(t, result, tt.wantDetail, "should contain detail")
+			} else {
+				// No detail means no trailing whitespace beyond the label
+				stripped := stripAnsi(result)
+				assert.False(t, strings.HasSuffix(stripped, " "), "should not have trailing whitespace when detail is empty")
+			}
+		})
+	}
+
+	t.Run("alignment consistency", func(t *testing.T) {
+		// Multiple check lines with different label lengths should have
+		// detail text starting at the same column position.
+		line1 := FormatVetCheck("Config file found", "~/.opm/config.cue")
+		line2 := FormatVetCheck("Module metadata found", "~/.opm/cue.mod/module.cue")
+
+		stripped1 := stripAnsi(line1)
+		stripped2 := stripAnsi(line2)
+
+		// Find the position of the detail text in stripped output.
+		idx1 := strings.Index(stripped1, "~/.opm/config.cue")
+		idx2 := strings.Index(stripped2, "~/.opm/cue.mod/module.cue")
+
+		assert.Equal(t, idx1, idx2, "detail text should align to same column")
+	})
 }
 
 // stripAnsi removes ANSI escape sequences for content assertions.
