@@ -974,4 +974,278 @@ func TestValidateValuesAgainstConfig(t *testing.T) {
 		assert.Contains(t, details, "a.cue")
 		assert.Contains(t, details, "b.cue")
 	})
+
+	// Edge Case Tests (from edge-case-tests.md)
+
+	t.Run("non-identifier field names accepted by pattern", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`#config: { [Name=string]: string }`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{
+			"my-app": "test"
+			"test.key": "val"
+		}`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		assert.NoError(t, err, "non-identifier fields should be accepted by [string] pattern")
+	})
+
+	t.Run("non-identifier disallowed field shows quoted path", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`#config: { name: string }`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{
+			name: "ok"
+			"extra-field": "bad"
+			"test.key": "also-bad"
+		}`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		require.Error(t, err)
+
+		details := formatCUEDetails(err)
+		assert.Contains(t, details, `values."extra-field"`, "hyphenated field should be quoted")
+		assert.Contains(t, details, `values."test.key"`, "dotted field should be quoted")
+		assert.Contains(t, details, "field not allowed")
+	})
+
+	t.Run("open struct allows arbitrary fields", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`#config: { name: string, ... }`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{
+			name: "ok"
+			anything: "goes"
+			nested: {
+				deep: true
+				values: [1, 2, 3]
+			}
+		}`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		assert.NoError(t, err, "open struct should allow extra fields")
+	})
+
+	t.Run("disjunction type flexibility", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`#config: { port: int | string }`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		valsStr := ctx.CompileString(`{ port: "8080" }`, cue.Filename("values.cue"))
+		err := validateValuesAgainstConfig(configDef, valsStr)
+		assert.NoError(t, err, "string should satisfy int|string disjunction")
+
+		valsInt := ctx.CompileString(`{ port: 8080 }`, cue.Filename("values.cue"))
+		err = validateValuesAgainstConfig(configDef, valsInt)
+		assert.NoError(t, err, "int should satisfy int|string disjunction")
+
+		valsBool := ctx.CompileString(`{ port: true }`, cue.Filename("values.cue"))
+		err = validateValuesAgainstConfig(configDef, valsBool)
+		require.Error(t, err, "bool should NOT satisfy int|string disjunction")
+
+		details := formatCUEDetails(err)
+		assert.Contains(t, details, "values.port")
+	})
+
+	t.Run("empty struct at leaf - matching empty", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`#config: { metadata: {} }`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{ metadata: {} }`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		assert.NoError(t, err, "empty struct should match empty schema struct")
+	})
+
+	t.Run("empty struct at leaf - disallowed field", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`#config: { metadata: {} }`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{ metadata: { extra: "bad" } }`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		require.Error(t, err)
+
+		details := formatCUEDetails(err)
+		assert.Contains(t, details, "values.metadata.extra")
+		assert.Contains(t, details, "field not allowed")
+	})
+
+	t.Run("list values validated as leaves - valid", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`#config: { tags: [...string] }`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{ tags: ["a", "b", "c"] }`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		assert.NoError(t, err, "list of correct type should pass")
+	})
+
+	t.Run("list values validated as leaves - type mismatch", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`#config: { tags: [...string] }`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{ tags: [1, 2, 3] }`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		require.Error(t, err)
+
+		details := formatCUEDetails(err)
+		assert.Contains(t, details, "values.tags")
+		assert.Contains(t, details, "conflicting values")
+	})
+
+	t.Run("list with mixed element types", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`#config: { items: [...string] }`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{ items: ["ok", 42, "also-ok"] }`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		require.Error(t, err)
+
+		details := formatCUEDetails(err)
+		// Error should be at the list level, not per-element
+		assert.Contains(t, details, "values.items")
+		assert.Contains(t, details, "conflicting values")
+	})
+
+	t.Run("numeric constraint violation", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`#config: { port: >0 & <65536 & int }`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		valsNeg := ctx.CompileString(`{ port: -999 }`, cue.Filename("values.cue"))
+		err := validateValuesAgainstConfig(configDef, valsNeg)
+		require.Error(t, err)
+
+		details := formatCUEDetails(err)
+		assert.Contains(t, details, "values.port")
+		assert.Contains(t, details, "invalid value", "should mention constraint violation")
+
+		valsValid := ctx.CompileString(`{ port: 8080 }`, cue.Filename("values.cue"))
+		err = validateValuesAgainstConfig(configDef, valsValid)
+		assert.NoError(t, err, "value within bounds should pass")
+	})
+
+	t.Run("enum disjunction constraint", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`#config: { level: "debug" | "info" | "warn" | "error" }`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		valsValid := ctx.CompileString(`{ level: "info" }`, cue.Filename("values.cue"))
+		err := validateValuesAgainstConfig(configDef, valsValid)
+		assert.NoError(t, err, "value in enum should pass")
+
+		valsInvalid := ctx.CompileString(`{ level: "trace" }`, cue.Filename("values.cue"))
+		err = validateValuesAgainstConfig(configDef, valsInvalid)
+		require.Error(t, err)
+
+		details := formatCUEDetails(err)
+		assert.Contains(t, details, "values.level")
+		assert.Contains(t, details, "disjunction", "should mention disjunction failure")
+	})
+
+	t.Run("errors at every recursion level", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`
+#config: {
+	db: {
+		host: string
+		port: int
+	}
+}
+`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{
+	topBad: "x"
+	db: {
+		host: 123
+		port: 8080
+		extra: "y"
+	}
+}`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		require.Error(t, err)
+
+		details := formatCUEDetails(err)
+
+		// Should have all 3 errors:
+		assert.Contains(t, details, "values.topBad", "should catch top-level disallowed field")
+		assert.Contains(t, details, "values.db.host", "should catch nested type mismatch")
+		assert.Contains(t, details, "values.db.extra", "should catch nested disallowed field")
+
+		// Count occurrences of "field not allowed" (should be 2: topBad + extra)
+		assert.Equal(t, 2, strings.Count(details, "field not allowed"))
+		// Count type mismatches (should be 1: host)
+		assert.Contains(t, details, "conflicting values")
+	})
+
+	t.Run("nested pattern constraints - valid", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`
+#config: {
+	[Name=string]: {
+		[Name=string]: {
+			size: string
+		}
+	}
+}
+`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{
+	media: {
+		tvshows: {
+			size: "10Gi"
+		}
+		movies: {
+			size: "20Gi"
+		}
+	}
+}`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		assert.NoError(t, err, "nested pattern-matched fields should pass")
+	})
+
+	t.Run("nested pattern constraints - disallowed at depth 2", func(t *testing.T) {
+		ctx := cuecontext.New()
+		schema := ctx.CompileString(`
+#config: {
+	[Name=string]: {
+		[Name=string]: {
+			size: string
+		}
+	}
+}
+`, cue.Filename("schema.cue"))
+		configDef := schema.LookupPath(cue.ParsePath("#config"))
+
+		vals := ctx.CompileString(`{
+	media: {
+		tvshows: {
+			size: "10Gi"
+			bad: "oops"
+		}
+	}
+}`, cue.Filename("values.cue"))
+
+		err := validateValuesAgainstConfig(configDef, vals)
+		require.Error(t, err)
+
+		details := formatCUEDetails(err)
+		assert.Contains(t, details, "values.media.tvshows.bad")
+		assert.Contains(t, details, "field not allowed")
+	})
 }
