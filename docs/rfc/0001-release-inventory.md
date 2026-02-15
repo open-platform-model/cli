@@ -1460,6 +1460,220 @@ scenarios. They are tracked here for implementors:
     the 1MB etcd limit. Consider truncating or omitting the `values` field in
     change entries if the Secret exceeds a size threshold (~800KB).
 
+## Architectural Limitations
+
+The following scenarios represent fundamental limitations of the per-release,
+Secret-based inventory design. Some may be addressable within the current
+architecture; others may require controller-based coordination or be declared
+out of scope. These are documented for transparency — decisions on which to
+address will be made during implementation.
+
+### Cross-Release Resource Conflicts
+
+The inventory is per-release with no awareness of other releases in the same
+namespace.
+
+**Shared resource collision.** If Release A and Release B both produce
+`ConfigMap/shared-config`, each tracks it independently. When Release A removes
+it and prunes, Release B's resource is destroyed. Release B's inventory still
+references it. Next `status` sees a missing resource with no explanation.
+
+The pre-apply existence check (Step 5c) catches this on **first apply only**.
+On subsequent applies where both inventories exist, there is no cross-release
+coordination.
+
+**Resource transfer between releases.** Moving a resource from Release A to
+Release B requires A to prune (removed from template) and B to create (added
+to template). Delete-then-create causes downtime. No "transfer ownership"
+mechanism exists.
+
+**Scope:** May be out of scope. Requires cluster-wide coordination (controller
+or CRD). Similar to Helm releases sharing resources — undefined behavior.
+
+### Cluster-Scoped Resource Ownership
+
+The inventory Secret is namespace-scoped. Modules can produce cluster-scoped
+resources (CRDs, ClusterRoles, ClusterRoleBindings, Namespaces).
+
+**Conflict across namespaces.** Release A in `team-a` namespace and Release B
+in `team-b` namespace both produce `ClusterRole/app-reader`. Each inventory
+considers it "theirs." If Release A is deleted, the ClusterRole is pruned,
+breaking Release B silently.
+
+**Scope:** Likely out of scope for Secret-based inventory. Full solution
+requires cluster-wide registry or ModuleRelease CRD (see Deferred Work).
+Mitigation: lint rule warning when modules produce cluster-scoped resources.
+
+### Controller-Created Side-Effect Resources
+
+The inventory tracks only resources OPM directly renders. Resources created as
+side effects by Kubernetes controllers are invisible.
+
+**Examples:**
+- OPM creates `Certificate/my-app-tls` (cert-manager) → cert-manager creates
+  `Secret/my-app-tls`. OPM does not track that Secret.
+- OPM deletes `Certificate/my-app-tls` during prune → TLS Secret orphaned if
+  cert-manager does not use ownerReferences.
+- OPM creates `HelmRelease` CR (Flux) → Flux creates chart resources. OPM has
+  no visibility.
+
+**Scope:** By design. OPM respects Kubernetes ownership semantics. Cleanup
+responsibility falls on operators' ownerReference behavior. Not solvable
+without wrapping all resources in a ModuleRelease CRD parent.
+
+### State Reconstruction After Inventory Loss
+
+Scenario E acknowledges this: if the inventory Secret is deleted, previous
+state is lost. Next apply starts with `previous = ∅`.
+
+**Consequences:**
+- All previously tracked resources become permanent orphans (no pruning).
+- Label-based discovery can find them (they carry OPM labels), but
+  inventory-based pruning cannot act.
+- No automated recovery path in current design.
+
+**Root cause:** Inventory Secret is single point of truth with no redundancy.
+Unlike Helm (stores full manifests), OPM stores only resource IDs and values.
+Cannot automatically determine previous render without inventory.
+
+**Scope:** Partially addressable via Layer 2 label-based orphan detection (see
+Deferred Work). Full solution requires external state store or CRD.
+
+### Concurrent Apply Races (CI/CD Pipelines)
+
+Edge case #5 mentions `resourceVersion` for optimistic concurrency, but this is
+noted as mitigation, not a complete solution.
+
+**Read-modify-write cycle:**
+```
+Pipeline A: READ inventory → compute stale → apply → WRITE inventory
+Pipeline B: READ inventory → compute stale → apply → WRITE inventory
+```
+
+If A and B overlap, B's WRITE overwrites A's inventory state. B's stale
+computation was based on stale data. Even with `resourceVersion`, the failure
+mode is "retry entire apply" (expensive).
+
+**Scope:** For GitOps/CI pipelines triggering on every commit, this is a
+realistic scenario. `resourceVersion` + retry is acceptable for CLI use.
+Full solution requires distributed lock or controller serialization.
+
+### Prune Ordering and Dependent Teardown
+
+The RFC specifies "create first, then prune" but does not define **prune
+ordering**. When stale set contains dependent resources:
+
+- Stale `Ingress/app` routes to stale `Service/app`
+- Stale `Service/app` references stale `Deployment/app`
+- Stale `PVC/data` bound to stale `StatefulSet/app`
+
+**Current state:** No ordering guarantee within the stale set.
+
+**Proposed:** Reverse weight order (custom resources pruned first, CRDs last).
+This matches "tear down instances before definitions" and aligns with apply
+ordering semantics.
+
+**Gaps in reverse weight order:**
+- Resources at same weight have no ordering guarantee. Usually fine (K8s
+  handles Service-before-Deployment gracefully), but not guaranteed safe for
+  all types.
+- Cross-resource finalizers not weight-aware. If CR with finalizer referencing
+  a Service is pruned first, finalizer controller may race with Service prune.
+
+**Recommendation:** Use reverse weight order with one addition — **Namespaces
+always pruned last** (or excluded by default per Scenario O). This handles the
+one case where ordering truly matters.
+
+**Scope:** Addressable within current design. Should be specified in
+implementation.
+
+### Data-Bearing Resource Lifecycle
+
+The inventory treats all resources equally. No concept of "this resource
+carries persistent data."
+
+**PVC rename = data loss.** Value change causes `PVC/minecraft-data` to become
+`PVC/minecraft-server-data`. Inventory correctly identifies old PVC as stale
+and prunes it. Data is gone. Cannot distinguish "rename reference" from
+"replace with new empty resource."
+
+**Rollback with data loss.** Change history enables future rollback, but
+rolling back to a change with `PVC/minecraft-data` when current has
+`PVC/minecraft-server-data` means: create new PVC (empty), prune old PVC (with
+data). No data migration.
+
+**Compounded by RFC-0003.** Immutable config hash-suffixes names. If a module
+makes a PVC-related ConfigMap immutable and uses hashed name in PVC name
+template, every config change creates new PVC.
+
+**Scope:** Requires resource-class awareness (PVC ≠ ConfigMap). Possible
+mitigations:
+- Detect PVC in stale set, require `--force-prune-pvcs` flag
+- Lint rule: warn on PVC name templates using dynamic values
+- Future: PVC migration operator pattern
+
+Fundamental issue: no way to encode "this is stateful" in resource identity.
+
+### Apply-Time Resource Conflicts (Immutable Fields)
+
+Open Questions section (line 1519) acknowledges Kubernetes enforces field
+immutability (`spec.selector` on Deployments, `spec.clusterIP` on Services,
+`spec.volumeClaimTemplates` on StatefulSets).
+
+**Current state:** Inventory knows what was previously applied but has no
+mechanism to detect or resolve immutable field changes proactively.
+
+**Only approach:** Try-and-detect at apply time (catch 422 "field is
+immutable," fall back to delete+recreate). For StatefulSet
+`spec.volumeClaimTemplates` changes, required delete+recreate destroys all
+associated PVCs.
+
+**Gap:** Inventory can track state change but cannot orchestrate safe migration
+path (drain pods, backup PVCs, delete, recreate, restore).
+
+**Scope:** Partially addressable. Try-and-detect works. Safe migration for
+stateful resources requires higher-level orchestration beyond inventory's
+responsibility.
+
+### Multi-Namespace Atomic Operations
+
+Scenario M covers cross-namespace migration: RBAC may block pruning in old
+namespace. Deeper problem is **atomicity**.
+
+**Apply-then-prune flow:** Apply to namespace A, then prune from namespace B.
+If prune fails (RBAC, network, API server error), apply already succeeded.
+Resources now in both namespaces; inventory points at new namespace. Stale
+resources in old namespace orphaned with no automatic retry.
+
+**Modules producing resources in multiple namespaces simultaneously** (e.g.,
+RBAC in `kube-system`, workloads in `default`) have no transactional guarantee.
+Partial failure leaves resources scattered with inconsistent state.
+
+**Scope:** Fundamental Kubernetes limitation (no cross-namespace transactions).
+Best effort: fail entire apply if any namespace is unreachable. Cannot fully
+solve without distributed transaction coordinator.
+
+### Runtime Drift Detection (Live State vs Desired State)
+
+The inventory records what OPM **rendered and applied**. Does not detect
+**runtime drift** — changes made by external actors after apply.
+
+**Examples:**
+- `kubectl edit deployment/minecraft` changes replica count. Inventory shows
+  OPM-declared state. `opm mod diff` (if comparing inventory to live) can
+  detect, but inventory itself is oblivious.
+- Admission webhook mutates resources during apply (adds annotations, changes
+  labels). Inventory records pre-mutation state, not what landed in etcd.
+
+**SSA's `managedFields`** partially addresses field-level ownership, but
+inventory does not interact with it. No mechanism to "enforce" inventory state
+or detect when live diverges.
+
+**Scope:** May be out of scope. Drift detection is typically controller
+responsibility. CLI tool records intent; controllers enforce. For CLI-only use,
+drift detection would require `opm mod status` to compare inventory to live
+(already planned).
+
 ## Deferred Work
 
 The following are explicitly out of scope for this RFC and deferred to future
