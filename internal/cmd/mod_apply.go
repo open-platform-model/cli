@@ -25,6 +25,7 @@ var (
 	applyCreateNSFlag    bool
 	applyKubeconfigFlag  string
 	applyContextFlag     string
+	applyVerboseFlag     bool
 )
 
 // NewModApplyCmd creates the mod apply command.
@@ -54,7 +55,10 @@ Examples:
   opm mod apply --dry-run
 
   # Apply and wait for resources to be ready
-  opm mod apply --wait --timeout 10m`,
+  opm mod apply --wait --timeout 10m
+
+  # Apply with verbose output showing transformer matches
+  opm mod apply --verbose`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runApply,
 	}
@@ -80,6 +84,8 @@ Examples:
 		"Path to kubeconfig file")
 	cmd.Flags().StringVar(&applyContextFlag, "context", "",
 		"Kubernetes context to use")
+	cmd.Flags().BoolVarP(&applyVerboseFlag, "verbose", "v", false,
+		"Show matching decisions and module metadata")
 
 	return cmd
 }
@@ -161,6 +167,11 @@ func runApply(cmd *cobra.Command, args []string) error {
 			Err:     fmt.Errorf("%d render error(s)", len(result.Errors)),
 			Printed: true,
 		}
+	}
+
+	// Handle verbose output
+	if applyVerboseFlag {
+		writeBuildVerboseLog(result)
 	}
 
 	// Create scoped module logger
