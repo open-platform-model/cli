@@ -143,6 +143,25 @@ func FormatTransformerMatch(component, fqn string) string {
 	return bullet + " " + comp + " " + arrow + " " + styledFQN
 }
 
+// FormatTransformerMatchVerbose renders a matched transformer line with reason.
+//
+// Format:
+//
+//	▸ <component> ← <provider> - <fqn>
+//	     <reason>
+//
+// The first line is identical to FormatTransformerMatch. The reason is indented
+// and dim-styled on the second line.
+func FormatTransformerMatchVerbose(component, fqn, reason string) string {
+	firstLine := FormatTransformerMatch(component, fqn)
+	if reason == "" {
+		return firstLine
+	}
+	indent := "     "
+	styledReason := styleDim.Render(reason)
+	return firstLine + "\n" + indent + styledReason
+}
+
 // FormatTransformerUnmatched renders an unmatched component line.
 //
 // Format: ▸ <component> (no matching transformer)

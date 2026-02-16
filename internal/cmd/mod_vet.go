@@ -18,7 +18,6 @@ var (
 	vetNamespaceFlag   string
 	vetReleaseNameFlag string
 	vetProviderFlag    string
-	vetVerboseFlag     bool
 )
 
 // NewModVetCmd creates the mod vet command.
@@ -57,8 +56,6 @@ Examples:
 		"Release name (default: module name)")
 	cmd.Flags().StringVar(&vetProviderFlag, "provider", "",
 		"Provider to use (default: from config)")
-	cmd.Flags().BoolVarP(&vetVerboseFlag, "verbose", "v", false,
-		"Show matching decisions and module metadata")
 
 	return cmd
 }
@@ -131,11 +128,6 @@ func runVet(cmd *cobra.Command, args []string) error {
 		return &ExitError{Code: ExitValidationError, Err: err, Printed: true}
 	}
 
-	// Handle verbose output (before checking for errors)
-	if vetVerboseFlag {
-		writeBuildVerboseLog(result)
-	}
-
 	// Check for render errors
 	if result.HasErrors() {
 		printRenderErrors(result.Errors)
@@ -144,6 +136,13 @@ func runVet(cmd *cobra.Command, args []string) error {
 			Err:     fmt.Errorf("%d render error(s)", len(result.Errors)),
 			Printed: true,
 		}
+	}
+
+	// Show transformer matches (always in default mode, verbose adds details)
+	if verboseFlag {
+		writeVerboseMatchLog(result)
+	} else {
+		writeTransformerMatches(result)
 	}
 
 	// Create scoped module logger for warnings
@@ -173,7 +172,7 @@ func runVet(cmd *cobra.Command, args []string) error {
 	output.Println(output.FormatVetCheck("Values satisfy #config", valuesDetail))
 
 	// Print per-resource validation lines (skip when --verbose already showed them)
-	if !vetVerboseFlag {
+	if !verboseFlag {
 		for _, res := range result.Resources {
 			line := output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), output.StatusValid)
 			output.Println(line)

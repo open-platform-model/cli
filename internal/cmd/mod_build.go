@@ -22,7 +22,6 @@ var (
 	buildOutputFlag      string
 	buildSplitFlag       bool
 	buildOutDirFlag      string
-	buildVerboseFlag     bool
 	buildVerboseJSONFlag bool
 )
 
@@ -91,8 +90,6 @@ Examples:
 		"Write separate files per resource")
 	cmd.Flags().StringVar(&buildOutDirFlag, "out-dir", "./manifests",
 		"Directory for split output")
-	cmd.Flags().BoolVarP(&buildVerboseFlag, "verbose", "v", false,
-		"Show matching decisions")
 	cmd.Flags().BoolVar(&buildVerboseJSONFlag, "verbose-json", false,
 		"Structured JSON verbose output")
 
@@ -175,11 +172,6 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		return &ExitError{Code: ExitValidationError, Err: err, Printed: true}
 	}
 
-	// Handle verbose output
-	if buildVerboseFlag || buildVerboseJSONFlag {
-		writeVerboseOutput(result, buildVerboseJSONFlag)
-	}
-
 	// Check for render errors
 	if result.HasErrors() {
 		printRenderErrors(result.Errors)
@@ -188,6 +180,18 @@ func runBuild(cmd *cobra.Command, args []string) error {
 			Err:     fmt.Errorf("%d render error(s)", len(result.Errors)),
 			Printed: true,
 		}
+	}
+
+	// Show transformer matches (always)
+	if buildVerboseJSONFlag {
+		// JSON output takes precedence
+		writeBuildVerboseJSON(result)
+	} else if verboseFlag {
+		// Verbose: show module metadata, matches with reasons, resources
+		writeVerboseMatchLog(result)
+	} else {
+		// Default: show compact matches only
+		writeTransformerMatches(result)
 	}
 
 	// Create scoped module logger
@@ -239,13 +243,30 @@ func writeVerboseOutput(result *build.RenderResult, jsonOutput bool) {
 		writeBuildVerboseJSON(result)
 		return
 	}
-	writeBuildVerboseLog(result)
+	writeVerboseMatchLog(result)
 }
 
-// writeBuildVerboseLog writes human-readable verbose output as logger lines.
-// Each line is prefixed with the module-scoped logger (m:<name> >), matching
-// the output style of mod apply.
-func writeBuildVerboseLog(result *build.RenderResult) {
+// writeTransformerMatches writes compact transformer match output (always shown).
+// Format: ▸ <component> ← <provider> - <transformer>
+func writeTransformerMatches(result *build.RenderResult) {
+	modLog := output.ModuleLogger(result.Module.Name)
+
+	// Transformer matching — one line per match
+	for compName, matches := range result.MatchPlan.Matches {
+		for _, m := range matches {
+			modLog.Info(output.FormatTransformerMatch(compName, m.TransformerFQN))
+		}
+	}
+
+	// Unmatched components
+	for _, comp := range result.MatchPlan.Unmatched {
+		modLog.Warn(output.FormatTransformerUnmatched(comp))
+	}
+}
+
+// writeVerboseMatchLog writes detailed verbose output with module metadata,
+// match reasons, and per-resource validation lines (--verbose only).
+func writeVerboseMatchLog(result *build.RenderResult) {
 	modLog := output.ModuleLogger(result.Module.Name)
 
 	// Module info — single line with key-value pairs
@@ -255,10 +276,10 @@ func writeBuildVerboseLog(result *build.RenderResult) {
 		"components", strings.Join(result.Module.Components, ", "),
 	)
 
-	// Transformer matching — one line per match
+	// Transformer matching — one line per match with reason
 	for compName, matches := range result.MatchPlan.Matches {
 		for _, m := range matches {
-			modLog.Info(output.FormatTransformerMatch(compName, m.TransformerFQN))
+			modLog.Info(output.FormatTransformerMatchVerbose(compName, m.TransformerFQN, m.Reason))
 		}
 	}
 
