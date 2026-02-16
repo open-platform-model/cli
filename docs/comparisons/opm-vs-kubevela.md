@@ -879,7 +879,7 @@ In OPM, a Blueprint bundles Resources + Traits into a reusable pattern. Here's t
 
 #StatelessWorkloadBlueprint: close(core.#Blueprint & {
     metadata: {
-        apiVersion:  "opmodel.dev/blueprints/core@v0"
+        apiVersion:  "opmodel.dev/blueprints@v0"
         name:        "stateless-workload"
         description: "A stateless workload with no requirement for stable identity or storage"
         labels: {

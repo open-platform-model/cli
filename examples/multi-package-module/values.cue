@@ -4,17 +4,20 @@ package main
 
 // Concrete default values
 values: {
-	// Web frontend configuration
-	web: {
-		image:    "nginx:latest"
-		replicas: 4
+	frontend: {
+		image:    "nginx:1.25-alpine"
+		replicas: 3
 		port:     8080
 	}
 
-	// API backend configuration
-	api: {
+	backend: {
 		image:    "node:20-alpine"
-		replicas: 4
+		replicas: 3
 		port:     3000
+	}
+
+	worker: {
+		image:    "python:3.11-slim"
+		replicas: 2
 	}
 }

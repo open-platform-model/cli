@@ -1,8 +1,11 @@
-module: "example.com/multi-tier-module@v0"
+module: "example.com/blueprint-module@v0"
 language: {
 	version: "v0.15.0"
 }
 deps: {
+	"opmodel.dev/blueprints@v0": {
+		v: "v0.1.36"
+	}
 	"opmodel.dev/core@v0": {
 		v: "v0.1.22"
 	}

@@ -15,7 +15,7 @@ core.#Module
 // Module metadata
 metadata: {
 	apiVersion:       "example.com/blog@v0"
-	name:             "Blog"
+	name:             "blog"
 	version:          "0.1.0"
 	description:      string | *"A standard OPM module"
 	defaultNamespace: "default"

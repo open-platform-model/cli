@@ -1,4 +1,4 @@
-module: "example.com/multi-tier-module@v0"
+module: "example.com/values-layering@v0"
 language: {
 	version: "v0.15.0"
 }

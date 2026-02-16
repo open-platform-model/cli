@@ -1,0 +1,27 @@
+version: "3"
+
+silent: true
+
+env:
+  CUE_REGISTRY: "opmodel.dev=localhost:5000+insecure,registry.cue.works"
+
+tasks:
+  update-deps:
+    desc: Update all CUE dependencies to latest versions across example modules
+    cmds:
+      - |
+        for dir in */; do
+          if [ -d "${dir}cue.mod" ]; then
+            echo "==> Updating deps in ${dir%/}"
+            cd "$dir"
+            deps=$(sed -n '/^deps: {$/,/^}$/p' cue.mod/module.cue | grep -oP '"opmodel\.dev/[^"]+@v[^"]*"' | tr -d '"')
+            for dep in $deps; do
+              echo "    cue mod get $dep"
+              cue mod get "$dep"
+            done
+            echo "    cue mod tidy"
+            cue mod tidy
+            cd ..
+          fi
+        done
+        echo "Done."

@@ -4,15 +4,15 @@ language: {
 }
 deps: {
 	"opmodel.dev/core@v0": {
-		v: "v0.1.21"
+		v: "v0.1.22"
 	}
 	"opmodel.dev/resources@v0": {
-		v: "v0.2.15"
+		v: "v0.2.20"
 	}
 	"opmodel.dev/schemas@v0": {
-		v: "v0.1.5"
+		v: "v0.1.10"
 	}
 	"opmodel.dev/traits@v0": {
-		v: "v0.1.27"
+		v: "v0.1.32"
 	}
 }
