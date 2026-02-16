@@ -19,9 +19,17 @@ transformer output — enabling the toolchain to redact, encrypt, and dispatch
 secrets to platform-appropriate resources (K8s Secrets, ExternalSecrets, CSI
 volumes) without the module author managing any of that machinery.
 
-The design supports two input paths (literal values, external references) plus
-CLI `@` tag injection, and two output targets (environment variables and volume
-mounts), while remaining backward compatible with existing modules.
+`#Secret` is a three-variant disjunction (`#SecretLiteral | #SecretK8sRef |
+#SecretEsoRef`). Each variant carries a `$opm: "secret"` discriminator that
+enables **auto-discovery** — CUE comprehensions walk resolved `#config` values,
+detect `#Secret` fields via a negation test, and group them by `$secretName` to
+generate the K8s Secret resource layout automatically. Module authors declare
+secrets once in `#config` and wire them in env vars — no manual bridging layer
+required.
+
+The design supports three input paths (literal values, K8s Secret references,
+ESO external references) plus CLI `@` tag injection, while remaining backward
+compatible with existing modules.
 
 ## Motivation
 
@@ -100,52 +108,109 @@ what changed.
 │ configSources as a separate        │ #Secret as a type in #config.          │
 │ component resource.                │ Secrets belong at the schema level.    │
 │                                    │                                        │
-│ env.from: { source: "app-settings" │ env.from: #config.db.password           │
+│ env.from: { source: "app-settings" │ env.from: values.db.password             │
 │            key: "LOG_LEVEL" }      │ Direct CUE refs. Secrets only.         │
 │                                    │                                        │
-│ data + externalRef mutual          │ #SecretLiteral | #SecretRef union.     │
-│ exclusivity.                       │ Cleaner CUE.                           │
+│ data + externalRef mutual          │ #SecretLiteral | #SecretK8sRef |       │
+│ exclusivity.                       │ #SecretEsoRef union. Cleaner CUE.      │
 │                                    │                                        │
 │ Config and secrets unified in      │ Config is string, secrets are #Secret. │
 │ configSources.                     │ value: for config, from: for secrets.  │
 └────────────────────────────────────┴────────────────────────────────────────┘
 ```
 
-### What Carries Forward
+### What Carries Forward From Experiment 001
 
 - Transformer dispatch pattern (literal -> K8s Secret, external -> nothing)
 - Consistent env var output (`valueFrom.secretKeyRef` for all secret variants)
 - Provider handler interface concept
 - Naming convention for generated K8s resources
 
+### Experiment 002: Secret Discovery & Auto-Grouping
+
+The `secret-discovery` experiment (`experiments/002-secret-discovery/`) built on
+this RFC's `#Secret` type to prototype auto-discovery and auto-grouping of
+secrets from resolved `#config` values. This section documents what was validated
+and what changed.
+
+#### What Experiment 002 Validated
+
+| Experiment Feature | Finding |
+|---|---|
+| `$opm: "secret"` discriminator on all variants | Negation test `(v & {$opm: !="secret", ...}) == _|_` reliably detects secrets |
+| Three-level traversal (unrolled comprehensions) | Covers practical nesting: flat, nested, deeply nested |
+| Auto-grouping by `$secretName` / `$dataKey` | Produces K8s Secret resource layout without manual bridging |
+| Mixed variants in same group (literal + ref) | Transformer dispatches per-entry within a group |
+| False-positive rejection | Anonymous open structs and scalars correctly skipped |
+| Three-variant `#Secret` disjunction | `#SecretLiteral \| #SecretK8sRef \| #SecretEsoRef` — type is the discriminator |
+| Env wiring: `from:` for secrets, `value:` for config | Clean separation without type ambiguity |
+
+#### What This RFC Incorporates From Experiment 002
+
+```text
+┌────────────────────────────────────┬────────────────────────────────────────┐
+│ Before (RFC-0002 + RFC-0005)       │ After (this RFC)                       │
+├────────────────────────────────────┼────────────────────────────────────────┤
+│ Single #SecretRef with             │ Split into #SecretK8sRef and           │
+│ source: "k8s" | "k8s-eso"         │ #SecretEsoRef. Type is discriminator.  │
+│ discriminator field.               │                                        │
+│                                    │                                        │
+│ Manual spec.secrets bridging       │ Auto-discovery via negation test.      │
+│ layer (RFC-0005 Layer 2).          │ No bridging layer needed.              │
+│ Three steps per secret.            │ One declaration per secret.            │
+│                                    │                                        │
+│ path field (dual-purpose:          │ secretName on #SecretK8sRef,           │
+│ K8s Secret name or external path). │ externalPath on #SecretEsoRef.         │
+│                                    │                                        │
+│ description?: string               │ $description?: string                  │
+│ (no $ prefix).                     │ ($-prefix for author-set metadata).    │
+└────────────────────────────────────┴────────────────────────────────────────┘
+```
+
+#### What Carries Forward From Experiment 002
+
+- `$opm: "secret"` discriminator on every variant — enables CUE-native discovery
+- `$secretName` / `$dataKey` as author-set routing fields propagated by CUE unification
+- Negation test pattern for secret detection
+- Auto-grouping comprehension pattern
+- `from:` / `value:` env var wiring distinction
+
 ## Design
 
 ### The #Secret Type
 
-`#Secret` is a struct-only union type with two variants. Every `#Secret` value
+`#Secret` is a struct-only union type with three variants. Every `#Secret` value
 is always a struct — plain `string` is not accepted. This ensures the
 transformer can always distinguish sensitive fields by shape, and CUE error
 messages remain clear (no `string | struct` disjunction ambiguity):
 
 ```cue
-#Secret: #SecretLiteral | #SecretRef
+#Secret: #SecretLiteral | #SecretK8sRef | #SecretEsoRef
 
 #SecretLiteral: {
-    $opm:         "secret"
-    $secretName!: #NameType    // K8s Secret resource name (grouping key)
-    $dataKey!:    string       // data key within that K8s Secret
-    description?: string
-    value!:       string
+    $opm:          "secret"
+    $secretName!:  #NameType    // K8s Secret resource name (grouping key)
+    $dataKey!:     string       // data key within that K8s Secret
+    $description?: string
+    value!:        string
 }
 
-#SecretRef: {
-    $opm:         "secret"
-    $secretName!: #NameType
-    $dataKey!:    string
-    description?: string
-    source!:      *"k8s" | "k8s-eso"
-    path!:        string       // K8s Secret name (k8s) or external path (eso)
-    remoteKey!:   string       // key within the referenced secret
+#SecretK8sRef: {
+    $opm:          "secret"
+    $secretName!:  #NameType
+    $dataKey!:     string
+    $description?: string
+    secretName!:   string       // pre-existing K8s Secret name
+    remoteKey!:    string       // key within that K8s Secret
+}
+
+#SecretEsoRef: {
+    $opm:          "secret"
+    $secretName!:  #NameType
+    $dataKey!:     string
+    $description?: string
+    externalPath:  string       // path in the external secret store
+    remoteKey:     string       // key within the external secret
 }
 ```
 
@@ -154,27 +219,41 @@ with how OPM works today. Flows through the system into a K8s Secret resource.
 
 ```cue
 #SecretLiteral: {
-    $opm:         "secret"
-    $secretName!: #NameType
-    $dataKey!:    string
-    description?: string
-    value!:       string
+    $opm:          "secret"
+    $secretName!:  #NameType
+    $dataKey!:     string
+    $description?: string
+    value!:        string
 }
 ```
 
-**Variant 2: Reference.** Points to an external secret source or pre-existing
-K8s Secret. The value never enters OPM — the platform resolves it at deploy
-time.
+**Variant 2: K8s Secret Reference.** Points to a pre-existing K8s Secret in the
+cluster. The value never enters OPM — the Secret already exists. OPM emits no
+resource, only wires the `secretKeyRef`.
 
 ```cue
-#SecretRef: {
-    $opm:         "secret"
-    $secretName!: #NameType
-    $dataKey!:    string
-    description?: string
-    source!:      *"k8s" | "k8s-eso"
-    path!:        string       // K8s Secret name (k8s) or external path (eso)
-    remoteKey!:   string       // key within the referenced secret
+#SecretK8sRef: {
+    $opm:          "secret"
+    $secretName!:  #NameType
+    $dataKey!:     string
+    $description?: string
+    secretName!:   string       // pre-existing K8s Secret name
+    remoteKey!:    string       // key within that K8s Secret
+}
+```
+
+**Variant 3: ESO Reference.** Points to an external secret store via External
+Secrets Operator. OPM emits an `ExternalSecret` CR that creates a K8s Secret
+at deploy time.
+
+```cue
+#SecretEsoRef: {
+    $opm:          "secret"
+    $secretName!:  #NameType
+    $dataKey!:     string
+    $description?: string
+    externalPath:  string       // path in the external secret store
+    remoteKey:     string       // key within the external secret
 }
 ```
 
@@ -182,8 +261,14 @@ Design rationale:
 
 - **`$opm: "secret"` discriminator.** A concrete value present on every
   `#Secret` variant. Enables CUE-native auto-discovery via the negation test
-  (see [RFC-0005](0005-env-config-wiring.md)). No tags or external tooling
-  needed.
+  (see [Discovery & Auto-Grouping](#discovery--auto-grouping)). No tags or
+  external tooling needed.
+
+- **Three separate variants instead of `source` discriminator.** The previous
+  design used a single `#SecretRef` with `source: *"k8s" | "k8s-eso"`. Splitting
+  into `#SecretK8sRef` and `#SecretEsoRef` makes the type itself the
+  discriminator. Each variant carries only the fields relevant to its source —
+  no overloaded `path` field, no dead fields. CUE disjunction handles dispatch.
 
 - **`$secretName` replaces the old `owner` concept.** Clearer: it IS the K8s
   Secret resource name. The `$` prefix distinguishes author-set routing fields
@@ -195,35 +280,45 @@ Design rationale:
   references). Now `$dataKey` is always the output data key; `remoteKey` is the
   external lookup key.
 
-- **`remoteKey` on `#SecretRef`.** Separate from `$dataKey`. The external
-  secret's key (in Vault/ESO/another K8s Secret) may differ from the logical
-  data key that the module uses.
+- **`secretName` on `#SecretK8sRef`.** The name of the pre-existing K8s Secret
+  to reference. Replaces the overloaded `path` field from the previous design.
+  Distinct from `$secretName` — `$secretName` is the author's logical grouping
+  key (ignored for K8s refs since OPM does not manage the resource);
+  `secretName` is the actual K8s Secret name in the cluster.
 
-- **`source: *"k8s" | "k8s-eso"`.** Simplified from individual provider
-  enumeration. ESO (External Secrets Operator) abstracts over external
-  providers (Vault, AWS SM, GCP SM, etc.), so `"k8s-eso"` covers all external
-  sources.
+- **`externalPath` on `#SecretEsoRef`.** The path in the external secret store
+  (Vault, AWS SM, GCP SM, etc.). Replaces the overloaded `path` field.
+
+- **`remoteKey` on both ref variants.** Separate from `$dataKey`. The external
+  secret's key (in another K8s Secret or in an external store) may differ from
+  the logical data key that the module uses.
+
+- **`$description` with `$` prefix.** Follows the convention that author-set
+  metadata fields use the `$` prefix to distinguish them from user-set
+  fulfillment fields. Human-readable description of the secret's purpose.
 
 - **No `#SecretDeferred`.** Unfulfilled `#Secret` fields are CUE incompleteness
   errors, caught at evaluation time. If a user omits a required secret value,
   CUE itself reports the error — no special deferred variant needed.
 
-- **No `#SecretBase`.** Each variant carries its own fields inline. With only
-  two variants and the `$opm` discriminator on both, a shared base adds no
-  value.
+- **No `#SecretBase`.** Each variant carries its own fields inline. With three
+  variants and the `$opm` discriminator on all, a shared base adds no value.
 
 - **`$`-prefixed fields.** Regular CUE fields (visible in iteration), not
   hidden. The `$` prefix is a naming convention to visually distinguish
   author-set routing fields from user-set fulfillment fields.
 
-- **Users never set `$secretName`/`$dataKey`.** CUE unification propagates the
-  author's values through. Users only provide `value` (for literals) or
-  `source`/`path`/`remoteKey` (for refs).
+- **Users never set `$secretName`/`$dataKey`/`$description`.** CUE unification
+  propagates the author's values through. Users only provide `value` (for
+  literals), `secretName`/`remoteKey` (for K8s refs), or
+  `externalPath`/`remoteKey` (for ESO refs).
 
 Both `$secretName` and `$dataKey` are set by the module author in the `#config`
-schema. See [RFC-0005](0005-env-config-wiring.md) for the three-layer model
-that connects `#config` declarations to `spec.secrets` resource creation and
-container wiring.
+schema. The auto-discovery mechanism (see
+[Discovery & Auto-Grouping](#discovery--auto-grouping)) walks resolved values,
+detects `#Secret` fields, and groups them by `$secretName`/`$dataKey` to produce
+the K8s Secret resource layout — eliminating the manual bridging layer that
+previously connected `#config` declarations to `spec.secrets`.
 
 The critical property is not which variant is used — it is that **the field is
 typed as `#Secret` at all**:
@@ -251,8 +346,9 @@ using standard CUE expressions. No OPM-specific mechanism needed — this is CUE
 unification.
 
 Constraints fire when the resolved `#Secret` is a `#SecretLiteral` (written
-directly or injected via `@` tag). For `#SecretRef`, the `value` field is
-absent, so constraints are inert — they serve as machine-readable documentation.
+directly or injected via `@` tag). For `#SecretK8sRef` and `#SecretEsoRef`, the
+`value` field is absent, so constraints are inert — they serve as
+machine-readable documentation.
 
 ```cue
 // Minimum length
@@ -305,67 +401,74 @@ Authors can define reusable constraint patterns:
 ├───────────────────────────────────────┼──────────┼────────────────────────────┤
 │ #SecretLiteral { value: "..." }       │  [x]     │ value set, CUE evaluates   │
 │ @ tag (CLI resolves to literal)       │  [x]     │ CLI injects { value: ... } │
-│ #SecretRef                            │  [ ]     │ value not set, inert       │
+│ #SecretK8sRef / #SecretEsoRef         │  [ ]     │ value not set, inert       │
 └───────────────────────────────────────┴──────────┴────────────────────────────┘
 ```
 
-For `#SecretRef`, constraints remain in the schema as machine-readable
-declarations. While the CLI cannot validate these at eval time (the value is
-not yet resolved), a future OPM controller that fetches secrets at
+For `#SecretK8sRef` and `#SecretEsoRef`, constraints remain in the schema as
+machine-readable declarations. While the CLI cannot validate these at eval time
+(the value is not yet resolved), a future OPM controller that fetches secrets at
 reconciliation time can evaluate constraints post-fetch and surface violations
 as status conditions. See [Deferred Work](#deferred-work).
 
 ### Input Paths
 
-Two input paths for providing secret values, plus CLI `@` tag injection. All
-three can coexist within a single module release.
+Three input paths for providing secret values, plus CLI `@` tag injection. All
+can coexist within a single module release.
 
 ```text
-┌────────────────────────────────────────────────────────────────────────┐
-│                     HOW SECRETS ENTER OPM                              │
-│                                                                        │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────┐  │
-│  │  Path 1: Literal │  │  Path 2: Ref     │  │  Path 3: @ Tag       │  │
-│  │                  │  │                  │  │                      │  │
-│  │  { value: "..." }│  │  { source: ".."  │  │  @secret(eso,...)    │  │
-│  │                  │  │    path: "..."   │  │                      │  │
-│  │  User provides   │  │    remoteKey:    │  │  CLI resolves to     │  │
-│  │  the value.      │  │    "..." }       │  │  { value: "..." }    │  │
-│  │                  │  │                  │  │  before CUE eval.    │  │
-│  │                  │  │  Platform        │  │                      │  │
-│  │                  │  │  resolves at     │  │                      │  │
-│  │                  │  │  deploy time.    │  │                      │  │
-│  └────────┬─────────┘  └────────┬─────────┘  └──────────┬───────────┘  │
-│           └─────────────────────┼───────────────────────┘              │
-│                                 ▼                                      │
-│                     ┌───────────────────┐                              │
-│                     │  #Secret field    │                              │
-│                     │  in #config       │                              │
-│                     └───────────────────┘                              │
-└────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                          HOW SECRETS ENTER OPM                                       │
+│                                                                                      │
+│  ┌───────────────┐  ┌────────────────┐  ┌────────────────┐  ┌────────────────────┐  │
+│  │ Path 1:       │  │ Path 2:        │  │ Path 3:        │  │ Path 4:            │  │
+│  │ Literal       │  │ K8s Ref        │  │ ESO Ref        │  │ @ Tag              │  │
+│  │               │  │                │  │                │  │                    │  │
+│  │ { value: ..}  │  │ { secretName:  │  │ { externalPath │  │ @secret(eso,...)   │  │
+│  │               │  │   remoteKey: } │  │   remoteKey: } │  │                    │  │
+│  │ User provides │  │ Pre-existing   │  │ ESO resolves   │  │ CLI resolves to    │  │
+│  │ the value.    │  │ K8s Secret.    │  │ at deploy.     │  │ { value: "..." }   │  │
+│  └──────┬────────┘  └──────┬─────────┘  └──────┬─────────┘  └──────┬─────────────┘  │
+│         └──────────────────┼──────────────────┼──────────────────┘                   │
+│                            ▼                  ▼                                       │
+│                  ┌───────────────────┐                                                │
+│                  │  #Secret field    │                                                │
+│                  │  in #config       │                                                │
+│                  └───────────────────┘                                                │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Path 1: Literal.** User writes the value directly in `values`:
 
 ```cue
 // Module definition
-#config: db: password: #Secret
+#config: db: password: #Secret & { $secretName: "db-creds", $dataKey: "password" }
 
-// Module release
+// Module release — resolves to #SecretLiteral
 values: db: password: { value: "my-secret-password" }
 ```
 
-**Path 2: External Reference.** User points to a secret store:
+**Path 2: K8s Secret Reference.** User points to a pre-existing K8s Secret:
 
 ```cue
+// Resolves to #SecretK8sRef
 values: db: password: {
-    source:    "k8s-eso"
-    path:      "secret/data/prod/db"
-    remoteKey: "password"
+    secretName: "existing-db-secret"
+    remoteKey:  "password"
 }
 ```
 
-**Path 3: `@` Tag Injection.** CUE attributes resolved by the CLI before
+**Path 3: ESO Reference.** User points to an external secret store via ESO:
+
+```cue
+// Resolves to #SecretEsoRef
+values: db: password: {
+    externalPath: "secret/data/prod/db"
+    remoteKey:    "password"
+}
+```
+
+**Path 4: `@` Tag Injection.** CUE attributes resolved by the CLI before
 evaluation:
 
 ```cue
@@ -377,25 +480,175 @@ The `@secret(...)` tag is CLI sugar — not part of the OPM schema. Module
 authors do not need to know about it. Future tags (e.g., `@env("DB_PASSWORD")`,
 `@file("/run/secrets/db")`) can be added without schema changes.
 
+### Discovery & Auto-Grouping
+
+The `$opm: "secret"` discriminator on every `#Secret` variant enables
+**automatic discovery** of secret fields from resolved `#config` values. This
+eliminates the manual bridging layer that previously required module authors to
+declare each secret in `#config`, repeat the grouping in `spec.secrets`, and
+wire it in env vars — three steps per secret.
+
+With auto-discovery, module authors declare secrets once in `#config` and wire
+them in env vars. The system discovers and groups secrets automatically.
+
+#### Negation-Based Detection
+
+To detect whether a resolved value is a `#Secret`, the system uses a CUE
+negation test:
+
+```cue
+(v & {$opm: !="secret", ...}) == _|_
+```
+
+This expression produces bottom (true) **only** when `$opm` is already
+`"secret"` on the value. For any other value:
+
+```text
+┌──────────────────────────────────────┬────────────┬────────────────────────────────┐
+│ Value Shape                          │ Result     │ Reason                         │
+├──────────────────────────────────────┼────────────┼────────────────────────────────┤
+│ #Secret variant ($opm: "secret")     │ _|_ (true) │ "secret" != "secret" conflicts │
+│ Scalar (string, int, bool)           │ not _|_    │ Fails struct unification       │
+│ Anonymous open struct (no $opm)      │ not _|_    │ $opm added without conflict    │
+│ Closed definition struct             │ not _|_    │ $opm rejected as disallowed    │
+└──────────────────────────────────────┴────────────┴────────────────────────────────┘
+```
+
+No false positives regardless of struct closedness. The second guard
+`(v & {...}) != _|_` filters out scalars before the negation test runs.
+
+#### Three-Level Traversal
+
+CUE has no recursion. The discovery comprehension manually traverses up to
+three levels deep, which covers the practical nesting patterns in module
+configs:
+
+```cue
+_#discoverSecrets: {
+    #in: {...}
+    out: {
+        // Level 1: direct fields (e.g., #config.dbPassword)
+        for k1, v1 in #in
+        if ((v1 & {$opm: !="secret", ...}) == _|_)
+        if ((v1 & {...}) != _|_) {
+            (k1): v1
+        }
+
+        // Level 2: one level of nesting (e.g., #config.cache.password)
+        for k1, v1 in #in
+        if ((v1 & {$opm: !="secret", ...}) != _|_)
+        if ((v1 & {...}) != _|_) {
+            for k2, v2 in v1
+            if ((v2 & {$opm: !="secret", ...}) == _|_)
+            if ((v2 & {...}) != _|_) {
+                ("\(k1)/\(k2)"): v2
+            }
+        }
+
+        // Level 3: two levels of nesting (e.g., #config.integrations.payments.stripeKey)
+        for k1, v1 in #in
+        if ((v1 & {$opm: !="secret", ...}) != _|_)
+        if ((v1 & {...}) != _|_) {
+            for k2, v2 in v1
+            if ((v2 & {$opm: !="secret", ...}) != _|_)
+            if ((v2 & {...}) != _|_) {
+                for k3, v3 in v2
+                if ((v3 & {$opm: !="secret", ...}) == _|_)
+                if ((v3 & {...}) != _|_) {
+                    ("\(k1)/\(k2)/\(k3)"): v3
+                }
+            }
+        }
+    }
+}
+```
+
+The result is a flat map of all discovered secrets keyed by their config path
+(e.g., `"dbUser"`, `"cache/password"`, `"integrations/payments/stripeKey"`).
+The path keys are internal identifiers — grouping uses `$secretName`/`$dataKey`.
+
+#### Auto-Grouping
+
+Discovered secrets are grouped by `$secretName`, keyed by `$dataKey`. This
+produces the K8s Secret resource layout automatically:
+
+```cue
+_#groupSecrets: {
+    #in: {...}
+    out: {
+        for _k, v in #in {
+            (v.$secretName): (v.$dataKey): v
+        }
+    }
+}
+```
+
+Multiple `#config` fields sharing the same `$secretName` are grouped into one
+K8s Secret with multiple data keys:
+
+```text
+#config: {
+    dbUser:     #Secret & { $secretName: "db-credentials", $dataKey: "username" }
+    dbPassword: #Secret & { $secretName: "db-credentials", $dataKey: "password" }
+}
+
+// Auto-grouped result:
+spec: secrets: {
+    "db-credentials": {
+        "username": { ... }    // from dbUser
+        "password": { ... }    // from dbPassword
+    }
+}
+```
+
+Mixed variants (literal + ref) within the same group are handled per-entry by
+the transformer. The auto-discovery and auto-grouping run as part of CUE
+evaluation — no Go code or external tooling required at this stage.
+
+#### Complete Flow
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│  1. Author declares #Secret fields in #config                │
+│     dbUser: #Secret & { $secretName: "db-creds", ... }       │
+│                                                              │
+│  2. User fulfills with a variant in values                   │
+│     values: dbUser: { value: "admin" }                       │
+│                                                              │
+│  3. Auto-discovery walks resolved values                     │
+│     _discovered: { dbUser: { $opm: "secret", ... } }        │
+│                                                              │
+│  4. Auto-grouping produces spec.secrets                      │
+│     spec: secrets: { "db-creds": { "username": ... } }       │
+│                                                              │
+│  5. Transformer emits K8s resources from spec.secrets        │
+│     Secret/db-creds, ExternalSecret/..., or nothing          │
+│                                                              │
+│  6. Author wires env vars with from:/value:                  │
+│     env: DB_USER: { from: values.dbUser }                    │
+└──────────────────────────────────────────────────────────────┘
+```
+
 ### Output Dispatch
 
 The transformer inspects the resolved `#Secret` variant and produces different
-K8s resources:
+K8s resources. With three separate types, dispatch is based on variant type —
+no `source` field inspection needed:
 
 ```text
 ┌───────────────────────────────────────┬──────────────────────────┬──────────────────────────────────┐
 │ Input Variant                         │ K8s Resource Emitted     │ Env Var Wiring                   │
 ├───────────────────────────────────────┼──────────────────────────┼──────────────────────────────────┤
 │ #SecretLiteral { value: "..." }       │ Secret (base64 data)     │ secretKeyRef -> $secretName      │
-│ #SecretRef source: "k8s"              │ Nothing (already exists) │ secretKeyRef -> path             │
-│ #SecretRef source: "k8s-eso"          │ ExternalSecret CR        │ secretKeyRef -> $secretName      │
+│ #SecretK8sRef                         │ Nothing (already exists) │ secretKeyRef -> secretName       │
+│ #SecretEsoRef                         │ ExternalSecret CR        │ secretKeyRef -> $secretName      │
 └───────────────────────────────────────┴──────────────────────────┴──────────────────────────────────┘
 ```
 
 **Resource naming.** The K8s Secret name is the `$secretName` field. The module
-author sets `$secretName` in the `#config` schema. For `source: "k8s"`, the
-`path` field IS the K8s Secret name — `$secretName` is irrelevant because OPM
-does not manage the resource.
+author sets `$secretName` in the `#config` schema. For `#SecretK8sRef`, the
+`secretName` field IS the pre-existing K8s Secret name — `$secretName` is
+irrelevant because OPM does not manage the resource.
 
 ```text
 #config: db: password: #Secret & { $secretName: "db-creds", $dataKey: "password" }
@@ -409,8 +662,8 @@ always `valueFrom.secretKeyRef`. Only the `name` and `key` change:
 ```text
 ┌─────────────────────┐      ┌──────────────────────────────────┐
 │  #SecretLiteral     │---->>│  name: "db-creds"                │  ($secretName)
-│  #SecretRef (eso)   │---->>│  name: "db-creds"                │  ($secretName, ESO target)
-│  #SecretRef (k8s)   │---->>│  name: "existing-db-secret"      │  (path)
+│  #SecretEsoRef      │---->>│  name: "db-creds"                │  ($secretName, ESO target)
+│  #SecretK8sRef      │---->>│  name: "existing-db-secret"      │  (secretName)
 └─────────────────────┘      └──────────────────────────────────┘
                                         │
                                         ▼
@@ -418,7 +671,7 @@ always `valueFrom.secretKeyRef`. Only the `name` and `key` change:
                                - name: DB_PASSWORD
                                  valueFrom:
                                    secretKeyRef:
-                                     name: <$secretName or path>
+                                     name: <$secretName or secretName>
                                      key: <$dataKey or remoteKey>
 ```
 
@@ -427,7 +680,8 @@ always `valueFrom.secretKeyRef`. Only the `name` and `key` change:
 Developers wire config and secrets to container env vars using two fields:
 `value` for non-sensitive data (plain strings) and `from` for sensitive data
 (`#Secret` references). The `from` field accepts only `#Secret` — non-sensitive
-config always uses `value`:
+config always uses `value`. Both reference resolved `values` (the unified
+result of `#config` schema + user fulfillment):
 
 ```cue
 #config: {
@@ -438,29 +692,42 @@ config always uses `value`:
     }
 }
 
+values: #config & {
+    log_level: "info"
+    db: {
+        host:     "db.prod.internal"
+        password: { value: "my-secret" }
+    }
+}
+
 spec: container: env: {
-    LOG_LEVEL:   { value: #config.log_level }
-    DB_HOST:     { value: #config.db.host }
-    DB_PASSWORD: { from:  #config.db.password }
+    LOG_LEVEL:   { value: values.log_level }
+    DB_HOST:     { value: values.db.host }
+    DB_PASSWORD: { from:  values.db.password }
 }
 ```
 
 The two fields have distinct semantics:
 
 ```text
-value: #config.log_level
+value: values.log_level
   -> resolves to string "info"
   -> emit: { value: "info" }
 
-from: #config.db.password
-  -> resolves to #Secret
-  -> emit: { valueFrom: { secretKeyRef: { ... } } }
+from: values.db.password
+  -> resolves to #Secret (carries $opm, $secretName, $dataKey, ...)
+  -> transformer dispatches by variant type:
+     #SecretLiteral → { valueFrom: { secretKeyRef: { name: $secretName, key: $dataKey } } }
+     #SecretK8sRef  → { valueFrom: { secretKeyRef: { name: secretName, key: remoteKey } } }
+     #SecretEsoRef  → { valueFrom: { secretKeyRef: { name: $secretName, key: $dataKey } } }
 ```
 
 `value` handles non-sensitive config via direct CUE references that resolve to
 strings. `from` handles secrets via direct CUE references that resolve to
 `#Secret`. Both are type-safe (CUE validates at definition time) and
-self-documenting.
+self-documenting. The `from` field carries the full resolved `#Secret` struct
+including routing info — the transformer reads `$secretName`, `$dataKey`, and
+the variant-specific fields to produce the correct `secretKeyRef`.
 
 **EnvVar schema:**
 
@@ -468,7 +735,7 @@ self-documenting.
 #EnvVarSchema: {
     name!:  string
     value?: string    // inline literal (non-sensitive config)
-    from?:  #Secret   // reference to a #Secret in #config
+    from?:  #Secret   // reference to a #Secret in values
 }
 ```
 
@@ -489,13 +756,13 @@ logic straightforward — `value` is always a plain string, `from` is always a
 
 ### Provider Handlers
 
-The K8s provider registers handlers for each secret source type. A handler
-takes a `#SecretRef` and produces K8s resources plus a `secretKeyRef`:
+The K8s provider dispatches on variant type. Each variant type has a
+corresponding handler that produces K8s resources and a `secretKeyRef`:
 
 ```cue
 #SecretSourceHandler: {
     #resolve: {
-        #ref:       #SecretRef
+        #secret:    #Secret
         #component: _
         #context:   #TransformerContext
 
@@ -505,26 +772,35 @@ takes a `#SecretRef` and produces K8s resources plus a `secretKeyRef`:
 }
 ```
 
-**Registered handlers:**
+**Dispatch by variant type:**
 
-```cue
-#SecretSourceHandlers: {
-    "k8s": #K8sSecretHandler
-    "k8s-eso": #ExternalSecretHandler
-}
+```text
+┌─────────────────┬─────────────────────────────────────────────────────┐
+│ Variant Type     │ Handler Behavior                                    │
+├─────────────────┼─────────────────────────────────────────────────────┤
+│ #SecretLiteral   │ Emit K8s Secret with base64 data entry.             │
+│                  │ secretKeyRef: { name: $secretName, key: $dataKey }  │
+│                  │                                                     │
+│ #SecretK8sRef    │ Emit nothing (Secret already exists in cluster).    │
+│                  │ secretKeyRef: { name: secretName, key: remoteKey }  │
+│                  │                                                     │
+│ #SecretEsoRef    │ Emit ExternalSecret CR (ESO creates target Secret). │
+│                  │ secretKeyRef: { name: $secretName, key: $dataKey }  │
+└─────────────────┴─────────────────────────────────────────────────────┘
 ```
 
-Since providers are simplified to `"k8s"` and `"k8s-eso"`, the handler map is
-minimal. ESO (External Secrets Operator) abstracts over external providers
-(Vault, AWS SM, GCP SM, etc.), so backend `ClusterSecretStore` configuration
-is a platform-level concern — deployed and configured outside OPM module scope.
+Since variant types are separate CUE definitions, dispatch is type-based — no
+`source` field inspection needed. ESO (External Secrets Operator) abstracts
+over external providers (Vault, AWS SM, GCP SM, etc.), so backend
+`ClusterSecretStore` configuration is a platform-level concern — deployed and
+configured outside OPM module scope.
 
 **ExternalSecret handler (ESO)** — emits an `ExternalSecret` CR:
 
 ```cue
 #ExternalSecretHandler: #SecretSourceHandler & {
     #resolve: {
-        let _name = #ref.$secretName
+        let _name = #secret.$secretName
 
         resources: "\(_name)": {
             apiVersion: "external-secrets.io/v1beta1"
@@ -534,10 +810,16 @@ is a platform-level concern — deployed and configured outside OPM module scope
                 refreshInterval: "1h"
                 secretStoreRef: { kind: "ClusterSecretStore" }
                 target: name: _name
-                data: [{ secretKey: #ref.$dataKey, remoteRef: { key: #ref.path, property: #ref.remoteKey } }]
+                data: [{
+                    secretKey: #secret.$dataKey
+                    remoteRef: {
+                        key:      #secret.externalPath
+                        property: #secret.remoteKey
+                    }
+                }]
             }
         }
-        secretKeyRef: { name: _name, key: #ref.$dataKey }
+        secretKeyRef: { name: _name, key: #secret.$dataKey }
     }
 }
 ```
@@ -553,10 +835,10 @@ handles both — what differs is the wiring target.
 
 ```cue
 // Env var wiring
-env: DB_PASSWORD: { name: "DB_PASSWORD", from: #config.db.password }
+env: DB_PASSWORD: { name: "DB_PASSWORD", from: values.db.password }
 
 // Volume mount wiring
-volumeMounts: "tls-cert": { mountPath: "/etc/tls", from: #config.tls }
+volumeMounts: "tls-cert": { mountPath: "/etc/tls", from: values.tls }
 ```
 
 When `from` resolves to a `#Secret` in a volume mount context, the transformer
@@ -570,7 +852,7 @@ Multi-key secrets become multiple files in the mounted volume:
 
 volumeMounts: "tls": {
     mountPath: "/etc/tls"
-    from:      #config.tls
+    from:      values.tls
     // -> /etc/tls/tls.crt
     // -> /etc/tls/tls.key
 }
@@ -579,7 +861,7 @@ volumeMounts: "tls": {
 ### Unified Config Pattern
 
 Config (non-sensitive) and secrets (sensitive) use different fields but the same
-referencing pattern — direct CUE references to `#config`:
+referencing pattern — direct CUE references to resolved `values`:
 
 ```cue
 #config: {
@@ -590,21 +872,23 @@ referencing pattern — direct CUE references to `#config`:
     tls:         #Secret & { $secretName: "tls-cert", $dataKey: "tls.crt" }   // sensitive (volume target)
 }
 
+values: #config & { /* user fulfillment */ }
+
 spec: container: {
     env: {
-        LOG_LEVEL:   { value: #config.log_level }
-        APP_PORT:    { value: "\(#config.app_port)" }
-        DB_PASSWORD: { from:  #config.db_password }
-        API_KEY:     { from:  #config.api_key }
+        LOG_LEVEL:   { value: values.log_level }
+        APP_PORT:    { value: "\(values.app_port)" }
+        DB_PASSWORD: { from:  values.db_password }
+        API_KEY:     { from:  values.api_key }
     }
-    volumeMounts: "tls": { mountPath: "/etc/tls", from: #config.tls }
+    volumeMounts: "tls": { mountPath: "/etc/tls", from: values.tls }
 }
 ```
 
 ```text
-value: #config.log_level   type: string   -> { value: "info" }
-from:  #config.db_password type: #Secret  -> K8s Secret + secretKeyRef
-from:  #config.tls         type: #Secret  -> K8s Secret + volume + volumeMount
+value: values.log_level   type: string   -> { value: "info" }
+from:  values.db_password type: #Secret  -> K8s Secret + secretKeyRef
+from:  values.tls         type: #Secret  -> K8s Secret + volume + volumeMount
 ```
 
 Non-sensitive fields resolve to plain strings via `value:`. The transformer
@@ -612,6 +896,10 @@ emits inline `{ value: "..." }` on the env var. No ConfigMap is generated from
 `value:` references — if ConfigMap-backed config is needed, use `spec.configMaps`
 directly. See [RFC-0005](0005-env-config-wiring.md) for the full env wiring
 model.
+
+Secret fields are auto-discovered from `values` and auto-grouped into
+`spec.secrets` (see [Discovery & Auto-Grouping](#discovery--auto-grouping)).
+The module author does not need to manually declare `spec.secrets`.
 
 ## Interface Integration
 
@@ -656,7 +944,7 @@ spec: container: env: {
 ```
 
 The module author does not know or care whether `password` was fulfilled with a
-literal, an ESO ref, or a K8s Secret ref.
+`#SecretLiteral`, a `#SecretK8sRef`, or a `#SecretEsoRef`.
 
 ## Backward Compatibility
 
@@ -684,7 +972,7 @@ contexts:
 
 ```text
 WARNING: db.password is a #Secret field with a literal value.
-  Consider using a #SecretRef or @secret() tag for production.
+  Consider using a #SecretK8sRef, #SecretEsoRef, or @secret() tag for production.
 ```
 
 This is a CLI behavior, not a CUE validation error.
@@ -720,7 +1008,9 @@ Result: Works like today, but value is in a K8s Secret instead of plaintext. [x]
 
 ```text
 #config: db: password: #Secret & { $secretName: "db-creds", $dataKey: "password" }
-values:  db: password: { source: "k8s-eso", path: "secret/data/prod/db", remoteKey: "password" }
+values:  db: password: { externalPath: "secret/data/prod/db", remoteKey: "password" }
+
+Resolves to: #SecretEsoRef
 
 Transformer emits:
   ExternalSecret/db-creds  (references ClusterSecretStore)
@@ -733,13 +1023,15 @@ No plaintext value in CUE files or rendered manifests. [x]
 
 ```text
 #config: db: password: #Secret & { $secretName: "db-creds", $dataKey: "password" }
-values:  db: password: { source: "k8s", path: "existing-db-secret", remoteKey: "password" }
+values:  db: password: { secretName: "existing-db-secret", remoteKey: "password" }
+
+Resolves to: #SecretK8sRef
 
 Transformer emits:
   Nothing (Secret already exists in cluster)
   env: DB_PASSWORD -> secretKeyRef -> existing-db-secret / password
 
-Zero new resources. $secretName is ignored for source: "k8s". [x]
+Zero new resources. $secretName is ignored for #SecretK8sRef. [x]
 ```
 
 ### Scenario D: Unfulfilled Secret (CUE Incompleteness Error) [x]
@@ -773,14 +1065,56 @@ From module's perspective, identical to Scenario A. [x]
 Module:   requires: "db": #Postgres   (password!: #Secret)
 Platform: bindings: "user-api": requires: "db": {
               host: "db.prod.internal"
-              password: { source: "k8s-eso", path: "secret/data/prod/db", remoteKey: "password" }
+              password: { externalPath: "secret/data/prod/db", remoteKey: "password" }
           }
 
 Module author wiring:
   env: DB_PASSWORD: { from: requires.db.password }
 
 Result: Module author wrote no secret-handling code.
-        Platform provided ESO ref. Transformer emits ExternalSecret. [x]
+        Platform provided #SecretEsoRef. Transformer emits ExternalSecret. [x]
+```
+
+### Scenario G: Auto-Discovery with Mixed Variants [x]
+
+```text
+#config: {
+    dbUser:     #Secret & { $secretName: "db-credentials", $dataKey: "username" }
+    dbPassword: #Secret & { $secretName: "db-credentials", $dataKey: "password" }
+    apiKey:     #Secret & { $secretName: "api-credentials", $dataKey: "api-key" }
+    logLevel:   string | *"info"
+    cache: {
+        password: #Secret & { $secretName: "cache-credentials", $dataKey: "password" }
+        host:     string
+    }
+}
+
+values: #config & {
+    dbUser:     { value: "admin" }                                            // #SecretLiteral
+    dbPassword: { secretName: "myapp-db-secrets", remoteKey: "db-password" }  // #SecretK8sRef
+    apiKey:     { value: "sk_live_abc123" }                                   // #SecretLiteral
+    logLevel:   "debug"
+    cache: {
+        password: { externalPath: "secret/cache", remoteKey: "password" }     // #SecretEsoRef
+        host:     "redis://cache.prod.internal"
+    }
+}
+
+Auto-discovery finds: dbUser, dbPassword, apiKey, cache/password
+  (logLevel: string -- skipped. cache/host: string -- skipped.)
+
+Auto-grouping produces:
+  "db-credentials":    { username: #SecretLiteral, password: #SecretK8sRef }
+  "api-credentials":   { api-key: #SecretLiteral }
+  "cache-credentials": { password: #SecretEsoRef }
+
+Transformer emits:
+  Secret/db-credentials     { data: { username: base64("admin") } }
+  Secret/api-credentials    { data: { api-key: base64("sk_live_abc123") } }
+  ExternalSecret/cache-credentials
+  Nothing for dbPassword    (pre-existing K8s Secret)
+
+Mixed variants in "db-credentials" group handled per-entry. [x]
 ```
 
 ## Trade-offs
@@ -788,25 +1122,41 @@ Result: Module author wrote no secret-handling code.
 **Advantages:**
 
 - Type-safe sensitivity — `#Secret` is checked by CUE at definition time.
-- Developer simplicity — declare `#Secret`, wire with `from:`, done.
-- User flexibility — two input paths plus `@` tag cover dev through production.
+- Developer simplicity — declare `#Secret`, wire with `from:`, done. No manual
+  bridging layer.
+- Auto-discovery — secrets are detected from resolved values via CUE-native
+  negation test. No external tooling or Go code needed at the CUE evaluation
+  stage.
+- Auto-grouping — discovered secrets are grouped by `$secretName`/`$dataKey`
+  into the K8s Secret resource layout automatically. One declaration per secret
+  instead of three.
+- User flexibility — three input paths (`#SecretLiteral`, `#SecretK8sRef`,
+  `#SecretEsoRef`) plus `@` tag cover dev through production.
 - Toolchain awareness — every tool in the pipeline can distinguish sensitive
   from non-sensitive.
-- Platform portability — `#Secret` dispatches to K8s Secrets, ExternalSecrets,
+- Platform portability — variant types dispatch to K8s Secrets, ExternalSecrets,
   or future provider equivalents.
-- Clear wiring — `value:` for config, `from:` for secrets. Same CUE reference pattern.
+- Clear wiring — `value:` for config, `from:` for secrets. Same CUE reference
+  pattern.
 - CUE-native validation — unfulfilled secrets produce CUE incompleteness errors
   with no custom deferred variant needed.
+- No overloaded fields — each variant carries only the fields relevant to its
+  source. No dual-purpose `path` or `source` discriminator field.
 
 **Disadvantages:**
 
 - New core type — developers must learn `#Secret` alongside Resource, Trait,
   Blueprint, Interface.
-- Provider handler implementation — `"k8s"` and `"k8s-eso"` handlers must be
-  implemented and maintained.
+- Three variant types — more types to understand than a single `#SecretRef`
+  with a `source` discriminator. However, each type is simpler and
+  self-documenting.
+- Provider handler implementation — `#SecretK8sRef` and `#SecretEsoRef`
+  handlers must be implemented and maintained.
 - `@` tag requires CLI support — useless without OPM CLI implementation.
 - Migration cost — existing modules must wrap literal values in
   `{ value: "..." }` when upgrading fields from `string` to `#Secret`.
+- Three-level depth limit — the auto-discovery traversal covers up to three
+  levels of nesting. Deeper nesting requires extending the comprehension.
 
 **Risks:**
 
@@ -822,6 +1172,9 @@ Result: Module author wrote no secret-handling code.
 │                                          │          │            │                                │
 │ Developers ignore #Secret and use        │ Medium   │ Medium     │ Lint rules in CI. Policy       │
 │ string everywhere                        │          │            │ rules for production.          │
+│                                          │          │            │                                │
+│ Three-level depth limit insufficient     │ Low      │ Low        │ 3 levels covers practical      │
+│ for deeply nested configs               │          │            │ patterns. Extend if needed.    │
 └──────────────────────────────────────────┴──────────┴────────────┴────────────────────────────────┘
 ```
 
@@ -830,9 +1183,12 @@ Result: Module author wrote no secret-handling code.
 ### ~~Q1: CUE Representation of #Secret~~ (Decided)
 
 **Decision:** Option C — always-struct. `#Secret` does not accept bare `string`.
-Both variants (`#SecretLiteral`, `#SecretRef`) are structs. This eliminates the
-`string | struct` disjunction problem in CUE, produces clear error messages,
-and ensures the transformer can always distinguish sensitive fields by shape.
+All three variants (`#SecretLiteral`, `#SecretK8sRef`, `#SecretEsoRef`) are
+structs. This eliminates the `string | struct` disjunction problem in CUE,
+produces clear error messages, and ensures the transformer can always
+distinguish sensitive fields by shape. Additionally, experiment 002 validated
+that the struct-based approach enables CUE-native auto-discovery via the
+`$opm: "secret"` discriminator and negation test.
 
 ### Q2: @ Tag Syntax
 
@@ -855,12 +1211,12 @@ use `spec.configMaps` and `envFrom` directly. See [RFC-0005](0005-env-config-wir
 ### Q4: SecretStore Configuration
 
 Where does the user specify which `ClusterSecretStore` to use for a given
-`source` type? Options: (A) Provider-level. (B) Release-level. (C) Policy-level.
+`#SecretEsoRef`? Options: (A) Provider-level. (B) Release-level. (C) Policy-level.
 
 **Recommendation:** Option C. Secret store config is an environment concern.
 Aligns with the Interface RFC's platform fulfillment model. ESO simplifies this
 further — the platform operator configures `ClusterSecretStore` resources once
-and all `source: "k8s-eso"` refs resolve through them.
+and all `#SecretEsoRef` variants resolve through them.
 
 ### Q5: Interaction with Volume Resources
 
@@ -929,11 +1285,12 @@ routing metadata in a single annotation.
 - **No CUE-native type safety.** The field is still `string`, so CUE evaluation
   alone cannot distinguish sensitive from non-sensitive fields. All sensitivity
   detection moves to the Go SDK via the attribute API.
-- **Breaks negation test discovery.** The CUE-native secret discovery pattern
-  `(v & {$opm: !="secret", ...}) == _|_` (used in
-  [RFC-0005](0005-env-config-wiring.md)) relies on `$opm` being a concrete
-  field in the value graph. Attributes are not part of the value graph, so
-  discovery must be entirely Go-side.
+- **Breaks auto-discovery.** The CUE-native secret discovery pattern
+  `(v & {$opm: !="secret", ...}) == _|_` — validated in experiment 002 and
+  adopted in this RFC (see [Discovery & Auto-Grouping](#discovery--auto-grouping))
+  — relies on `$opm` being a concrete field in the value graph. Attributes are
+  not part of the value graph, so discovery and auto-grouping would move entirely
+  to Go code, losing the CUE-native evaluation advantage.
 - **Tooling dependency.** Every tool that needs to know about sensitivity must
   use the Go SDK attribute API. Pure CUE evaluation (e.g., `cue export`) cannot
   distinguish `password: string` from `password: string` with `@opm(secret)`.
@@ -942,19 +1299,19 @@ routing metadata in a single annotation.
   `strings.MinRunes(12)` would still need to be expressed separately on the
   field.
 
-**Open sub-questions:**
+**Assessment after experiment 002:** The auto-discovery mechanism validated in
+experiment 002 is a strong argument against the decorator approach. The negation
+test and auto-grouping are pure CUE — no Go code needed. Moving to attributes
+would sacrifice this property. The `$opm: "secret"` discriminator, while visible
+in the value graph, is what makes auto-discovery possible.
 
-1. Can `@opm()` and `#Secret` coexist? Could `@opm(secret)` be syntactic sugar
-   that the CLI expands into the `#Secret` struct before CUE evaluation — giving
-   authors the clean decorator syntax while preserving CUE-native type safety
-   internally?
-2. Should the scope expand beyond secrets? If `@opm()` works as a general
-   decorator, it could carry other annotations too (e.g.,
-   `@opm(immutable)`, `@opm(deprecated)`).
-3. How does this interact with Interface shapes
-   ([RFC-0004](0004-interface-architecture.md))? Interface `#shape` fields typed
-   as `#Secret` enforce sensitivity at the type level. An attribute-only
-   approach would lose that enforcement.
+**Remaining sub-questions:**
+
+1. Could `@opm(secret)` be syntactic sugar that the CLI expands into the
+   `#Secret` struct before CUE evaluation — preserving auto-discovery while
+   giving authors cleaner syntax?
+2. Should `@opm()` be explored for non-secret annotations (e.g.,
+   `@opm(immutable)`, `@opm(deprecated)`) where auto-discovery is not needed?
 
 This question expands the scope of the existing
 [Deferred Work: @opm() Attribute](#opm-attribute) from "replace the `$opm`
@@ -981,35 +1338,44 @@ Design deferred until the policy system is specified.
 
 ### Controller-Time Secret Constraint Validation
 
-When OPM implements a controller, `#SecretRef` values can be validated against
-schema constraints after the controller fetches the actual secret from the
-external store. An externally-sourced password that fails a `MinRunes(12)`
-constraint would surface as a status condition on the ModuleRelease resource,
-rather than silently deploying a non-conforming value. This closes the
-validation gap for externally-resolved secrets that the CLI cannot check at
-eval time.
+When OPM implements a controller, `#SecretK8sRef` and `#SecretEsoRef` values can
+be validated against schema constraints after the controller fetches the actual
+secret from the external store. An externally-sourced password that fails a
+`MinRunes(12)` constraint would surface as a status condition on the
+ModuleRelease resource, rather than silently deploying a non-conforming value.
+This closes the validation gap for externally-resolved secrets that the CLI
+cannot check at eval time.
 
 ### CSI Volume Driver Support
 
-The current design covers K8s Secrets and ExternalSecrets. CSI secret store
-drivers (e.g., `secrets-store.csi.k8s.io`) could be added as an additional
-provider handler.
+The current design covers K8s Secrets and ExternalSecrets via three variant
+types. CSI secret store drivers (e.g., `secrets-store.csi.k8s.io`) could be
+added as an additional variant type (e.g., `#SecretCsiRef`).
+
+### Recursive Discovery
+
+The current auto-discovery traversal is limited to three levels of nesting
+(unrolled comprehensions). If CUE gains recursion support in the future, the
+traversal could be generalized to arbitrary depth. For now, three levels covers
+the practical nesting patterns observed in module configs.
 
 ### @opm() Attribute
 
 A potential future replacement for the `$opm` discriminator field. CUE
 attributes (e.g., `@opm(secret)`) are metadata that don't affect the value
-graph. This could provide a cleaner discovery mechanism via the Go SDK's
-attribute API, avoiding the `$opm` field visibility question entirely.
-See [Q6](#q6-opm-attribute-as-field-decorator) for the broader question of
-whether `@opm()` could replace the entire `#Secret` struct pattern with a
-decorator-based approach. Deferred to RFC-0005's analysis of the `$opm` field
-visibility trade-offs.
+graph. However, experiment 002 validated that the `$opm: "secret"` discriminator
+in the value graph is what enables CUE-native auto-discovery and auto-grouping.
+Replacing it with an attribute would move discovery entirely to Go code.
+See [Q6](#q6-opm-attribute-as-field-decorator) for the full analysis. A
+potential middle ground: `@opm(secret)` as CLI sugar that expands into the
+`#Secret` struct before CUE evaluation.
 
 ## References
 
 - [RFC-0004: Interface Architecture](0004-interface-architecture.md) — `provides`/`requires` typed shapes
 - [RFC-0005: Environment & Config Wiring](0005-env-config-wiring.md) — Env var wiring, envFrom, volume mounts
+- [Experiment 001: Config Sources](../../../catalog/experiments/001-config-sources/) — Initial config/secret prototyping
+- [Experiment 002: Secret Discovery](../../../catalog/experiments/002-secret-discovery/) — Auto-discovery and auto-grouping validation
 - [External Secrets Operator](https://external-secrets.io/) — ExternalSecret CRD and ClusterSecretStore
 - [Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/) — Native K8s Secret resources
 - [CUE Attributes](https://cuelang.org/docs/reference/spec/#attributes) — `@attr(...)` syntax specification
