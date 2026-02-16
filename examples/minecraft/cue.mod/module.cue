@@ -1,11 +1,8 @@
-module: "example.com/blueprint-module@v0"
+module: "example.com/minecraft@v0"
 language: {
-	version: "v0.15.0"
+	version: "v0.11.1"
 }
 deps: {
-	"opmodel.dev/blueprints@v0": {
-		v: "v0.1.39"
-	}
 	"opmodel.dev/core@v0": {
 		v: "v0.1.24"
 	}

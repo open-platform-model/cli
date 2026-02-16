@@ -14,6 +14,8 @@ values: {
 		// Staging scales up for load testing
 		replicas: 3
 
+		port: 8080
+
 		// Higher resource requests for realistic load
 		resources: {
 			requests: {

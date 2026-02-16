@@ -79,9 +79,24 @@ opm mod apply ./examples/blog
 
 ---
 
+### 4. [minecraft/](minecraft/) — **Advanced: Stateful with Backup Sidecar**
+
+**What it demonstrates:**
+- Stateful workload with persistent game data
+- `#SidecarContainers` trait → Backup container coordinated via RCON
+- Flexible storage: PVC (cloud), hostPath (bare-metal), emptyDir (testing)
+- Multiple backup methods: tar, rsync, restic (cloud), rclone (remote)
+- Conditional trait attachment (`if #config.backup.enabled`)
+- Advanced health probes with custom commands
+- Production-ready defaults with override examples
+
+**Kubernetes output:** 1 StatefulSet (server + backup sidecar), 1 Service (LoadBalancer), 2 PersistentVolumeClaims
+
+**Start here if:** You need stateful applications with automated backups or want to see advanced sidecar patterns.
+
 ---
 
-### 4. [webapp-ingress/](webapp-ingress/) — **Advanced: Production Web App**
+### 5. [webapp-ingress/](webapp-ingress/) — **Advanced: Production Web App**
 
 **What it demonstrates:**
 - `#HttpRoute` trait → Ingress with hostname routing and TLS
@@ -96,7 +111,7 @@ opm mod apply ./examples/blog
 
 ---
 
-### 5. [app-config/](app-config/) — **Intermediate: Configuration Management**
+### 6. [app-config/](app-config/) — **Intermediate: Configuration Management**
 
 **What it demonstrates:**
 - `#ConfigMaps` resource → ConfigMap generation
@@ -110,7 +125,7 @@ opm mod apply ./examples/blog
 
 ---
 
-### 6. [values-layering/](values-layering/) — **Intermediate: Environment-Specific Config**
+### 7. [values-layering/](values-layering/) — **Intermediate: Environment-Specific Config**
 
 **What it demonstrates:**
 - Base `values.cue` with dev defaults
@@ -125,7 +140,7 @@ opm mod apply ./examples/blog
 
 ---
 
-### 7. [blueprint-module/](blueprint-module/) — **Intermediate: Simplified Authoring**
+### 8. [blueprint-module/](blueprint-module/) — **Intermediate: Simplified Authoring**
 
 **What it demonstrates:**
 - `#StatelessWorkload` blueprint → Single field replaces multiple resources/traits
@@ -139,7 +154,7 @@ opm mod apply ./examples/blog
 
 ---
 
-### 8. [multi-package-module/](multi-package-module/) — **Advanced: Large Module Organization**
+### 9. [multi-package-module/](multi-package-module/) — **Advanced: Large Module Organization**
 
 **What it demonstrates:**
 - Multi-package CUE architecture → Separate `main` and `components` packages

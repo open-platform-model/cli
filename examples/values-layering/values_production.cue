@@ -14,6 +14,8 @@ values: {
 		// Production requires high availability (enforced by schema constraint)
 		replicas: 5
 
+		port: 8080
+
 		// Production-grade resource allocation
 		resources: {
 			requests: {
