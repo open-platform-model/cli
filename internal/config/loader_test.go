@@ -294,12 +294,10 @@ config: {
 `
 	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
 
-	cfg, _, _, err := loadFullConfig(configPath, "")
-	// CUE itself won't fail on "yes" as a string (it's valid CUE), but our
-	// extractor uses Bool() which will fail for a string value, so timestamps
-	// will remain nil (treated as default true by the caller).
-	require.NoError(t, err)
-	assert.Nil(t, cfg.Log.Timestamps, "Log.Timestamps should be nil when value is not a bool")
+	_, _, _, err = loadFullConfig(configPath, "")
+	// Schema validation should catch the type error (string instead of bool)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "schema validation")
 }
 
 func TestExtractConfig_LogKubernetesAPIWarnings(t *testing.T) {
@@ -376,4 +374,130 @@ config: {
 			assert.Equal(t, tt.want, cfg.Log.Kubernetes.APIWarnings)
 		})
 	}
+}
+
+func TestValidateConfigSchema_ValidMinimal(t *testing.T) {
+	ctx := cuecontext.New()
+	configCUE := `package config
+
+config: {
+	kubernetes: {
+		namespace: "default"
+	}
+}
+`
+	value := ctx.CompileString(configCUE)
+	require.NoError(t, value.Err())
+
+	err := validateConfigSchema(ctx, value, "test-config.cue")
+	assert.NoError(t, err)
+}
+
+func TestValidateConfigSchema_ValidFull(t *testing.T) {
+	ctx := cuecontext.New()
+	configCUE := `package config
+
+config: {
+	registry: "opmodel.dev=localhost:5000+insecure,registry.cue.works"
+	cacheDir: "/tmp/cache"
+	
+	providers: {
+		kubernetes: {}
+	}
+	
+	kubernetes: {
+		kubeconfig: "~/.kube/config"
+		context: "prod"
+		namespace: "my-app"
+	}
+	
+	log: {
+		timestamps: true
+		kubernetes: {
+			apiWarnings: "debug"
+		}
+	}
+}
+`
+	value := ctx.CompileString(configCUE)
+	require.NoError(t, value.Err())
+
+	err := validateConfigSchema(ctx, value, "test-config.cue")
+	assert.NoError(t, err)
+}
+
+func TestValidateConfigSchema_UnknownField(t *testing.T) {
+	ctx := cuecontext.New()
+	configCUE := `package config
+
+config: {
+	registry: "localhost:5000"
+	unknownField: "this should fail"
+	kubernetes: {
+		namespace: "default"
+	}
+}
+`
+	value := ctx.CompileString(configCUE)
+	require.NoError(t, value.Err())
+
+	err := validateConfigSchema(ctx, value, "test-config.cue")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "schema validation failed")
+}
+
+func TestValidateConfigSchema_InvalidNamespace(t *testing.T) {
+	ctx := cuecontext.New()
+	configCUE := `package config
+
+config: {
+	kubernetes: {
+		namespace: "UPPERCASE-not-allowed"
+	}
+}
+`
+	value := ctx.CompileString(configCUE)
+	require.NoError(t, value.Err())
+
+	err := validateConfigSchema(ctx, value, "test-config.cue")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "schema validation failed")
+}
+
+func TestValidateConfigSchema_InvalidAPIWarnings(t *testing.T) {
+	ctx := cuecontext.New()
+	configCUE := `package config
+
+config: {
+	log: {
+		kubernetes: {
+			apiWarnings: "invalid-value"
+		}
+	}
+}
+`
+	value := ctx.CompileString(configCUE)
+	require.NoError(t, value.Err())
+
+	err := validateConfigSchema(ctx, value, "test-config.cue")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "schema validation failed")
+}
+
+func TestValidateConfigSchema_InvalidTimestampsType(t *testing.T) {
+	ctx := cuecontext.New()
+	configCUE := `package config
+
+config: {
+	log: {
+		timestamps: "should-be-bool"
+	}
+}
+`
+	value := ctx.CompileString(configCUE)
+	require.NoError(t, value.Err())
+
+	err := validateConfigSchema(ctx, value, "test-config.cue")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "schema validation failed")
 }

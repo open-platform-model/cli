@@ -163,6 +163,157 @@ language: {
 	assert.Error(t, err)
 }
 
+func TestConfigVet_SchemaViolation_UnknownField(t *testing.T) {
+	tmpHome, err := os.MkdirTemp("", "config-vet-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpHome)
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", origHome)
+
+	os.Unsetenv("OPM_CONFIG")
+	os.Unsetenv("OPM_REGISTRY")
+
+	// Create config structure with schema violation
+	opmDir := filepath.Join(tmpHome, ".opm")
+	require.NoError(t, os.MkdirAll(opmDir, 0o700))
+
+	cueModDir := filepath.Join(opmDir, "cue.mod")
+	require.NoError(t, os.MkdirAll(cueModDir, 0o700))
+
+	// Config with unknown field
+	invalidConfig := `package config
+
+config: {
+	registry: "localhost:5000"
+	unknownField: "this should fail schema validation"
+	kubernetes: {
+		namespace: "default"
+	}
+}
+`
+	configFile := filepath.Join(opmDir, "config.cue")
+	require.NoError(t, os.WriteFile(configFile, []byte(invalidConfig), 0o600))
+
+	moduleContent := `module: "test.local/config@v0"
+
+language: {
+	version: "v0.15.0"
+}
+`
+	moduleFile := filepath.Join(cueModDir, "module.cue")
+	require.NoError(t, os.WriteFile(moduleFile, []byte(moduleContent), 0o600))
+
+	cmd := NewConfigVetCmd()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "schema validation")
+}
+
+func TestConfigVet_SchemaViolation_InvalidNamespace(t *testing.T) {
+	tmpHome, err := os.MkdirTemp("", "config-vet-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpHome)
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", origHome)
+
+	os.Unsetenv("OPM_CONFIG")
+	os.Unsetenv("OPM_REGISTRY")
+
+	// Create config structure with invalid namespace
+	opmDir := filepath.Join(tmpHome, ".opm")
+	require.NoError(t, os.MkdirAll(opmDir, 0o700))
+
+	cueModDir := filepath.Join(opmDir, "cue.mod")
+	require.NoError(t, os.MkdirAll(cueModDir, 0o700))
+
+	// Namespace with uppercase (violates RFC-1123)
+	invalidConfig := `package config
+
+config: {
+	kubernetes: {
+		namespace: "UPPERCASE-Not-Allowed"
+	}
+}
+`
+	configFile := filepath.Join(opmDir, "config.cue")
+	require.NoError(t, os.WriteFile(configFile, []byte(invalidConfig), 0o600))
+
+	moduleContent := `module: "test.local/config@v0"
+
+language: {
+	version: "v0.15.0"
+}
+`
+	moduleFile := filepath.Join(cueModDir, "module.cue")
+	require.NoError(t, os.WriteFile(moduleFile, []byte(moduleContent), 0o600))
+
+	cmd := NewConfigVetCmd()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "schema validation")
+}
+
+func TestConfigVet_SchemaViolation_InvalidAPIWarnings(t *testing.T) {
+	tmpHome, err := os.MkdirTemp("", "config-vet-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpHome)
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", origHome)
+
+	os.Unsetenv("OPM_CONFIG")
+	os.Unsetenv("OPM_REGISTRY")
+
+	// Create config structure with invalid apiWarnings value
+	opmDir := filepath.Join(tmpHome, ".opm")
+	require.NoError(t, os.MkdirAll(opmDir, 0o700))
+
+	cueModDir := filepath.Join(opmDir, "cue.mod")
+	require.NoError(t, os.MkdirAll(cueModDir, 0o700))
+
+	// Invalid enum value for apiWarnings
+	invalidConfig := `package config
+
+config: {
+	log: {
+		kubernetes: {
+			apiWarnings: "invalid-not-an-enum-value"
+		}
+	}
+}
+`
+	configFile := filepath.Join(opmDir, "config.cue")
+	require.NoError(t, os.WriteFile(configFile, []byte(invalidConfig), 0o600))
+
+	moduleContent := `module: "test.local/config@v0"
+
+language: {
+	version: "v0.15.0"
+}
+`
+	moduleFile := filepath.Join(cueModDir, "module.cue")
+	require.NoError(t, os.WriteFile(moduleFile, []byte(moduleContent), 0o600))
+
+	cmd := NewConfigVetCmd()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "schema validation")
+}
+
 func TestConfigVet_CustomConfigPath(t *testing.T) {
 	tmpHome, err := os.MkdirTemp("", "config-vet-test-*")
 	require.NoError(t, err)

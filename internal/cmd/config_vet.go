@@ -24,6 +24,7 @@ Checks performed:
   2. cue.mod/module.cue exists
   3. Config file is syntactically valid CUE
   4. Config evaluates without errors (imports resolve, constraints pass)
+  5. Config matches embedded schema (no unknown fields, types correct)
 
 The config path is resolved using precedence:
   --config flag > OPM_CONFIG env > ~/.opm/config.cue
@@ -93,8 +94,8 @@ func runConfigVet(cmd *cobra.Command, args []string) error {
 	}
 	output.Println(output.FormatVetCheck("Module metadata found", moduleFile))
 
-	// Check 3 & 4: Validate CUE syntax and evaluation
-	// Use LoadOPMConfig which handles registry resolution and CUE evaluation
+	// Check 3, 4, 5: Validate CUE syntax, evaluation, and schema
+	// Use LoadOPMConfig which handles registry resolution, CUE evaluation, and schema validation
 	_, err = config.LoadOPMConfig(config.LoaderOptions{
 		RegistryFlag: GetRegistryFlag(),
 		ConfigFlag:   configPath,
@@ -107,6 +108,7 @@ func runConfigVet(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	output.Println(output.FormatVetCheck("CUE evaluation passed", ""))
+	output.Println(output.FormatVetCheck("CUE syntax and evaluation passed", ""))
+	output.Println(output.FormatVetCheck("Schema validation passed", ""))
 	return nil
 }

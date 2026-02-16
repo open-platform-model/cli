@@ -207,6 +207,11 @@ func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value,
 		}
 	}
 
+	// Validate against embedded schema
+	if err := validateConfigSchema(ctx, value, configPath); err != nil {
+		return nil, nil, nil, err
+	}
+
 	// Extract config values
 	config, err := extractConfig(value)
 	if err != nil {
@@ -217,6 +222,36 @@ func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value,
 	providers := extractProviders(value)
 
 	return config, providers, ctx, nil
+}
+
+// validateConfigSchema validates the loaded CUE value against the embedded schema.
+func validateConfigSchema(ctx *cue.Context, value cue.Value, configPath string) error {
+	// Compile the embedded schema
+	schema := ctx.CompileBytes(configSchemaCUE, cue.Filename("schema/config.cue"))
+	if schema.Err() != nil {
+		return fmt.Errorf("compiling embedded config schema: %w", schema.Err())
+	}
+
+	// Look up #CLIConfig definition
+	def := schema.LookupPath(cue.ParsePath("#CLIConfig"))
+	if !def.Exists() {
+		return fmt.Errorf("embedded schema missing #CLIConfig definition")
+	}
+
+	// Unify user config with schema
+	unified := def.Unify(value)
+	if err := unified.Validate(cue.Concrete(true)); err != nil {
+		// CUE validation error - extract meaningful parts
+		return &oerrors.DetailError{
+			Type:     "schema validation failed",
+			Message:  err.Error(),
+			Location: configPath,
+			Hint:     "Check your config.cue against the expected schema. Run 'opm config vet' for validation.",
+			Cause:    oerrors.ErrValidation,
+		}
+	}
+
+	return nil
 }
 
 // extractProviders extracts provider definitions from the CUE config value.

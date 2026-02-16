@@ -2,6 +2,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/config"
@@ -55,8 +57,9 @@ func initializeGlobals(cmd *cobra.Command) error {
 		ConfigFlag:   configFlag,
 	})
 	if err != nil {
-		output.Debug("config load error", "error", err)
-		// Don't fail here - allow commands that don't need config to work
+		// Config file exists but is invalid - fail immediately
+		// If config doesn't exist, LoadOPMConfig returns defaults (no error)
+		return fmt.Errorf("configuration error: %w", err)
 	}
 
 	// Store loaded config in package-level var
