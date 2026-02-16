@@ -96,10 +96,27 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	// Resolve flags with global fallback
-	kubeconfig := resolveFlag(deleteKubeconfigFlag, GetKubeconfig())
-	kubeContext := resolveFlag(deleteContextFlag, GetContext())
-	namespace := resolveFlag(deleteNamespaceFlag, GetNamespace())
+	// Resolve Kubernetes configuration with local flags
+	k8sConfig, err := resolveCommandKubernetes(
+		deleteKubeconfigFlag,
+		deleteContextFlag,
+		deleteNamespaceFlag,
+		"", // no provider flag for delete
+	)
+	if err != nil {
+		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+	}
+
+	kubeconfig := k8sConfig.Kubeconfig.Value
+	kubeContext := k8sConfig.Context.Value
+	namespace := k8sConfig.Namespace.Value
+
+	// Log resolved k8s config at DEBUG level
+	output.Debug("resolved kubernetes config",
+		"kubeconfig", kubeconfig,
+		"context", kubeContext,
+		"namespace", namespace,
+	)
 
 	// Create scoped module logger - prefer release name, fall back to release-id
 	logName := deleteReleaseNameFlag

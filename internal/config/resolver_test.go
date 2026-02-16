@@ -246,3 +246,103 @@ func TestResolveAll_ProviderFlagOverridesAutoResolve(t *testing.T) {
 	assert.Equal(t, "nomad", result.Provider.Value)
 	assert.Equal(t, SourceFlag, result.Provider.Source)
 }
+
+func TestResolveBase_ConfigPathAndRegistry(t *testing.T) {
+	os.Setenv("OPM_CONFIG", "/env/config.cue")
+	os.Setenv("OPM_REGISTRY", "env-registry.example.com")
+	defer func() {
+		os.Unsetenv("OPM_CONFIG")
+		os.Unsetenv("OPM_REGISTRY")
+	}()
+
+	result, err := ResolveBase(ResolveBaseOptions{
+		ConfigFlag:   "/flag/config.cue",
+		RegistryFlag: "flag-registry.example.com",
+		Config: &Config{
+			Registry: "config-registry.example.com",
+		},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "/flag/config.cue", result.ConfigPath.Value)
+	assert.Equal(t, SourceFlag, result.ConfigPath.Source)
+	assert.Equal(t, "flag-registry.example.com", result.Registry.Value)
+	assert.Equal(t, SourceFlag, result.Registry.Source)
+}
+
+func TestResolveBase_DefaultsUsed(t *testing.T) {
+	os.Unsetenv("OPM_CONFIG")
+	os.Unsetenv("OPM_REGISTRY")
+
+	result, err := ResolveBase(ResolveBaseOptions{})
+	require.NoError(t, err)
+
+	assert.Contains(t, result.ConfigPath.Value, ".opm")
+	assert.Equal(t, SourceDefault, result.ConfigPath.Source)
+	assert.Equal(t, "", result.Registry.Value)
+}
+
+func TestResolveKubernetes_AllFlags(t *testing.T) {
+	os.Setenv("OPM_KUBECONFIG", "/env/kubeconfig")
+	os.Setenv("OPM_CONTEXT", "env-context")
+	os.Setenv("OPM_NAMESPACE", "env-namespace")
+	defer func() {
+		os.Unsetenv("OPM_KUBECONFIG")
+		os.Unsetenv("OPM_CONTEXT")
+		os.Unsetenv("OPM_NAMESPACE")
+	}()
+
+	result, err := ResolveKubernetes(ResolveKubernetesOptions{
+		KubeconfigFlag: "/flag/kubeconfig",
+		ContextFlag:    "flag-context",
+		NamespaceFlag:  "flag-namespace",
+		ProviderFlag:   "flag-provider",
+		Config: &Config{
+			Kubernetes: KubernetesConfig{
+				Kubeconfig: "/config/kubeconfig",
+				Context:    "config-context",
+				Namespace:  "config-namespace",
+			},
+		},
+		ProviderNames: []string{"kubernetes"},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "/flag/kubeconfig", result.Kubeconfig.Value)
+	assert.Equal(t, SourceFlag, result.Kubeconfig.Source)
+	assert.Equal(t, "flag-context", result.Context.Value)
+	assert.Equal(t, SourceFlag, result.Context.Source)
+	assert.Equal(t, "flag-namespace", result.Namespace.Value)
+	assert.Equal(t, SourceFlag, result.Namespace.Source)
+	assert.Equal(t, "flag-provider", result.Provider.Value)
+	assert.Equal(t, SourceFlag, result.Provider.Source)
+}
+
+func TestResolveKubernetes_Defaults(t *testing.T) {
+	os.Unsetenv("OPM_KUBECONFIG")
+	os.Unsetenv("OPM_CONTEXT")
+	os.Unsetenv("OPM_NAMESPACE")
+
+	homeDir, err := os.UserHomeDir()
+	require.NoError(t, err)
+	expectedKubeconfig := filepath.Join(homeDir, ".kube", "config")
+
+	result, err := ResolveKubernetes(ResolveKubernetesOptions{})
+	require.NoError(t, err)
+
+	assert.Equal(t, expectedKubeconfig, result.Kubeconfig.Value)
+	assert.Equal(t, SourceDefault, result.Kubeconfig.Source)
+	assert.Equal(t, "", result.Context.Value)
+	assert.Equal(t, "default", result.Namespace.Value)
+	assert.Equal(t, SourceDefault, result.Namespace.Source)
+}
+
+func TestResolveKubernetes_ProviderAutoResolve(t *testing.T) {
+	result, err := ResolveKubernetes(ResolveKubernetesOptions{
+		ProviderNames: []string{"kubernetes"},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "kubernetes", result.Provider.Value)
+	assert.Equal(t, SourceConfigAuto, result.Provider.Source)
+}

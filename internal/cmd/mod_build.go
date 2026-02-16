@@ -124,9 +124,25 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
 	}
 
-	// Resolve flags with global fallback
-	namespace := resolveFlag(buildNamespaceFlag, GetNamespace())
-	provider := resolveFlag(buildProviderFlag, GetProvider())
+	// Resolve Kubernetes configuration with local flags (namespace and provider only)
+	k8sConfig, err := resolveCommandKubernetes(
+		"", // no kubeconfig flag for build
+		"", // no context flag for build
+		buildNamespaceFlag,
+		buildProviderFlag,
+	)
+	if err != nil {
+		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+	}
+
+	namespace := k8sConfig.Namespace.Value
+	provider := k8sConfig.Provider.Value
+
+	// Log resolved config at DEBUG level
+	output.Debug("resolved config",
+		"namespace", namespace,
+		"provider", provider,
+	)
 
 	// Build render options
 	opts := build.RenderOptions{

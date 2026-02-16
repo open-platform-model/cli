@@ -76,10 +76,27 @@ func runDiff(cmd *cobra.Command, args []string) error {
 		modulePath = args[0]
 	}
 
-	// Resolve flags with global fallback
-	kubeconfig := resolveFlag(diffKubeconfigFlag, GetKubeconfig())
-	kubeContext := resolveFlag(diffContextFlag, GetContext())
-	namespace := resolveFlag(diffNamespaceFlag, GetNamespace())
+	// Resolve Kubernetes configuration with local flags
+	k8sConfig, err := resolveCommandKubernetes(
+		diffKubeconfigFlag,
+		diffContextFlag,
+		diffNamespaceFlag,
+		"", // no provider flag for diff
+	)
+	if err != nil {
+		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+	}
+
+	kubeconfig := k8sConfig.Kubeconfig.Value
+	kubeContext := k8sConfig.Context.Value
+	namespace := k8sConfig.Namespace.Value
+
+	// Log resolved k8s config at DEBUG level
+	output.Debug("resolved kubernetes config",
+		"kubeconfig", kubeconfig,
+		"context", kubeContext,
+		"namespace", namespace,
+	)
 
 	// Get pre-loaded configuration
 	opmConfig := GetOPMConfig()

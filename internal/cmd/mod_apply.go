@@ -94,11 +94,29 @@ func runApply(cmd *cobra.Command, args []string) error {
 		modulePath = args[0]
 	}
 
-	// Resolve flags with global fallback
-	kubeconfig := resolveFlag(applyKubeconfigFlag, GetKubeconfig())
-	kubeContext := resolveFlag(applyContextFlag, GetContext())
-	namespace := resolveFlag(applyNamespaceFlag, GetNamespace())
-	provider := resolveFlag(applyProviderFlag, GetProvider())
+	// Resolve Kubernetes configuration with local flags
+	k8sConfig, err := resolveCommandKubernetes(
+		applyKubeconfigFlag,
+		applyContextFlag,
+		applyNamespaceFlag,
+		applyProviderFlag,
+	)
+	if err != nil {
+		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+	}
+
+	kubeconfig := k8sConfig.Kubeconfig.Value
+	kubeContext := k8sConfig.Context.Value
+	namespace := k8sConfig.Namespace.Value
+	provider := k8sConfig.Provider.Value
+
+	// Log resolved k8s config at DEBUG level
+	output.Debug("resolved kubernetes config",
+		"kubeconfig", kubeconfig,
+		"context", kubeContext,
+		"namespace", namespace,
+		"provider", provider,
+	)
 
 	// Get pre-loaded configuration
 	opmConfig := GetOPMConfig()
@@ -255,12 +273,4 @@ func formatApplySummary(r *kubernetes.ApplyResult) string {
 		summary += fmt.Sprintf(" (%s)", strings.Join(parts, ", "))
 	}
 	return summary
-}
-
-// resolveFlag returns the local flag if set, otherwise falls back to resolved global value.
-func resolveFlag(localFlag string, resolvedGlobal string) string {
-	if localFlag != "" {
-		return localFlag
-	}
-	return resolvedGlobal
 }

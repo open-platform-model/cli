@@ -99,10 +99,27 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	// Resolve flags with global fallback
-	kubeconfig := resolveFlag(statusKubeconfigFlag, GetKubeconfig())
-	kubeContext := resolveFlag(statusContextFlag, GetContext())
-	namespace := resolveFlag(statusNamespaceFlag, GetNamespace())
+	// Resolve Kubernetes configuration with local flags
+	k8sConfig, err := resolveCommandKubernetes(
+		statusKubeconfigFlag,
+		statusContextFlag,
+		statusNamespaceFlag,
+		"", // no provider flag for status
+	)
+	if err != nil {
+		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+	}
+
+	kubeconfig := k8sConfig.Kubeconfig.Value
+	kubeContext := k8sConfig.Context.Value
+	namespace := k8sConfig.Namespace.Value
+
+	// Log resolved k8s config at DEBUG level
+	output.Debug("resolved kubernetes config",
+		"kubeconfig", kubeconfig,
+		"context", kubeContext,
+		"namespace", namespace,
+	)
 
 	// Create scoped module logger - prefer release name, fall back to release-id
 	logName := statusReleaseNameFlag
