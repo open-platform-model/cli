@@ -18,7 +18,6 @@ var (
 	vetNamespaceFlag string
 	vetNameFlag      string
 	vetProviderFlag  string
-	vetStrictFlag    bool
 	vetVerboseFlag   bool
 )
 
@@ -44,10 +43,7 @@ Examples:
   opm mod vet ./my-module -f prod-values.cue -n production
 
   # Validate with verbose output (show matching decisions)
-  opm mod vet ./my-module --verbose
-
-  # Strict mode (error on unhandled traits)
-  opm mod vet ./my-module --strict`,
+  opm mod vet ./my-module --verbose`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runVet,
 	}
@@ -61,8 +57,6 @@ Examples:
 		"Release name (default: module name)")
 	cmd.Flags().StringVar(&vetProviderFlag, "provider", "",
 		"Provider to use (default: from config)")
-	cmd.Flags().BoolVar(&vetStrictFlag, "strict", false,
-		"Error on unhandled traits")
 	cmd.Flags().BoolVarP(&vetVerboseFlag, "verbose", "v", false,
 		"Show matching decisions and module metadata")
 
@@ -92,7 +86,6 @@ func runVet(cmd *cobra.Command, args []string) error {
 		Name:       vetNameFlag,
 		Namespace:  vetNamespaceFlag,
 		Provider:   vetProviderFlag,
-		Strict:     vetStrictFlag,
 		Registry:   GetRegistry(),
 	}
 

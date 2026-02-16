@@ -157,7 +157,7 @@ the config, it is selected automatically without requiring a `--provider` flag.
 1. Determine module path (default: `.`)
 2. Validate output format (`yaml` / `json`)
 3. Get pre-loaded `opmConfig` from package-level var
-4. Build `RenderOptions` — `build.RenderOptions{ModulePath, Values, Name, Namespace, Provider, Strict, Registry}`
+4. Build `RenderOptions` — `build.RenderOptions{ModulePath, Values, Name, Namespace, Provider, Registry}`
 5. Validate options (`RenderOptions.Validate()`)
 6. Create pipeline — `build.NewPipeline(opmConfig)`
 7. Call `pipeline.Render(ctx, opts)` — enters the shared render core
@@ -549,8 +549,7 @@ resource structures.
    | 500 | Webhooks |
    | 1000 | Unknown resources |
 
-2. **Collect warnings** — unhandled traits (in non-strict mode) are warnings.
-   In strict mode (`--strict`), they become errors.
+2. **Collect warnings** — unhandled traits are collected as warnings.
 
 3. **Return `RenderResult`** containing:
    - `Resources` — weight-sorted `[]*Resource` with `Unstructured` objects

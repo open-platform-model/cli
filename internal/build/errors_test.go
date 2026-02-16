@@ -72,51 +72,6 @@ func TestUnmatchedComponentError(t *testing.T) {
 	})
 }
 
-func TestUnhandledTraitError(t *testing.T) {
-	tests := []struct {
-		name     string
-		err      *UnhandledTraitError
-		wantMsg  string
-		wantComp string
-	}{
-		{
-			name: "basic unhandled trait",
-			err: &UnhandledTraitError{
-				ComponentName: "api-service",
-				TraitFQN:      "opmodel.dev/traits@v0#AutoScaling",
-				Strict:        false,
-			},
-			wantMsg:  `component "api-service": unhandled trait "opmodel.dev/traits@v0#AutoScaling"`,
-			wantComp: "api-service",
-		},
-		{
-			name: "strict mode",
-			err: &UnhandledTraitError{
-				ComponentName: "worker",
-				TraitFQN:      "opmodel.dev/traits@v0#Monitoring",
-				Strict:        true,
-			},
-			wantMsg:  `component "worker": unhandled trait "opmodel.dev/traits@v0#Monitoring"`,
-			wantComp: "worker",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.wantMsg, tt.err.Error())
-			assert.Equal(t, tt.wantComp, tt.err.Component())
-		})
-	}
-
-	t.Run("implements RenderError", func(t *testing.T) {
-		var renderErr RenderError = &UnhandledTraitError{
-			ComponentName: "test",
-			TraitFQN:      "test-trait",
-		}
-		assert.NotNil(t, renderErr)
-	})
-}
-
 func TestTransformError(t *testing.T) {
 	cause := errors.New("CUE evaluation failed: field not found")
 	err := &TransformError{
@@ -149,12 +104,10 @@ func TestTransformError(t *testing.T) {
 func TestRenderErrorInterface(t *testing.T) {
 	// Verify all error types implement RenderError at compile time
 	var _ RenderError = (*UnmatchedComponentError)(nil)
-	var _ RenderError = (*UnhandledTraitError)(nil)
 	var _ RenderError = (*TransformError)(nil)
 
 	// Also verify they implement the standard error interface
 	var _ error = (*UnmatchedComponentError)(nil)
-	var _ error = (*UnhandledTraitError)(nil)
 	var _ error = (*TransformError)(nil)
 }
 

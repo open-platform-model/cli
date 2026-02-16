@@ -22,7 +22,6 @@ var (
 	buildOutputFlag      string
 	buildSplitFlag       bool
 	buildOutDirFlag      string
-	buildStrictFlag      bool
 	buildVerboseFlag     bool
 	buildVerboseJSONFlag bool
 )
@@ -92,8 +91,6 @@ Examples:
 		"Write separate files per resource")
 	cmd.Flags().StringVar(&buildOutDirFlag, "out-dir", "./manifests",
 		"Directory for split output")
-	cmd.Flags().BoolVar(&buildStrictFlag, "strict", false,
-		"Error on unhandled traits")
 	cmd.Flags().BoolVarP(&buildVerboseFlag, "verbose", "v", false,
 		"Show matching decisions")
 	cmd.Flags().BoolVar(&buildVerboseJSONFlag, "verbose-json", false,
@@ -134,7 +131,6 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		Name:       buildNameFlag,
 		Namespace:  buildNamespaceFlag,
 		Provider:   buildProviderFlag,
-		Strict:     buildStrictFlag,
 		Registry:   GetRegistry(),
 	}
 
@@ -321,7 +317,6 @@ func printRenderErrors(errs []error) {
 	for _, err := range errs {
 		var unmatchedErr *build.UnmatchedComponentError
 		var transformErr *build.TransformError
-		var unhandledTraitErr *build.UnhandledTraitError
 
 		switch {
 		case errors.As(err, &unmatchedErr):
@@ -344,8 +339,6 @@ func printRenderErrors(errs []error) {
 		case errors.As(err, &transformErr):
 			output.Error(fmt.Sprintf("component %q: transform failed with %s: %v",
 				transformErr.ComponentName, output.FormatFQN(transformErr.TransformerFQN), transformErr.Cause))
-		case errors.As(err, &unhandledTraitErr):
-			output.Error(fmt.Sprintf("component %q: unhandled trait %q", unhandledTraitErr.ComponentName, unhandledTraitErr.TraitFQN))
 		default:
 			output.Error(err.Error())
 		}

@@ -166,8 +166,8 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		return wi < wj
 	})
 
-	// Collect warnings (e.g., unhandled traits in non-strict mode)
-	warnings := collectWarnings(matchResult, opts.Strict)
+	// Collect warnings (e.g., unhandled traits)
+	warnings := collectWarnings(matchResult)
 
 	return &RenderResult{
 		Resources: resources,
@@ -296,48 +296,45 @@ func (p *pipeline) releaseToModuleMetadata(release *BuiltRelease) ModuleMetadata
 }
 
 // collectWarnings gathers non-fatal warnings from the match result.
-// In strict mode, unhandled traits are errors, not warnings.
 //
 // A trait is considered "unhandled" only if NO matched transformer handles it.
 // This means if ServiceTransformer requires Expose trait and DeploymentTransformer
 // doesn't, the Expose trait is still considered handled (by ServiceTransformer).
-func collectWarnings(result *MatchResult, strict bool) []string {
+func collectWarnings(result *MatchResult) []string {
 	var warnings []string
 
-	if !strict {
-		// Step 1: Count how many transformers matched each component
-		componentMatchCount := make(map[string]int)
-		for i := range result.Details {
-			detail := &result.Details[i]
-			if detail.Matched {
-				componentMatchCount[detail.ComponentName]++
+	// Step 1: Count how many transformers matched each component
+	componentMatchCount := make(map[string]int)
+	for i := range result.Details {
+		detail := &result.Details[i]
+		if detail.Matched {
+			componentMatchCount[detail.ComponentName]++
+		}
+	}
+
+	// Step 2: Count how many matched transformers consider each trait unhandled
+	// Key: component name, Value: map of trait -> count of transformers that don't handle it
+	traitUnhandledCount := make(map[string]map[string]int)
+	for i := range result.Details {
+		detail := &result.Details[i]
+		if detail.Matched {
+			if traitUnhandledCount[detail.ComponentName] == nil {
+				traitUnhandledCount[detail.ComponentName] = make(map[string]int)
+			}
+			for _, trait := range detail.UnhandledTraits {
+				traitUnhandledCount[detail.ComponentName][trait]++
 			}
 		}
+	}
 
-		// Step 2: Count how many matched transformers consider each trait unhandled
-		// Key: component name, Value: map of trait -> count of transformers that don't handle it
-		traitUnhandledCount := make(map[string]map[string]int)
-		for i := range result.Details {
-			detail := &result.Details[i]
-			if detail.Matched {
-				if traitUnhandledCount[detail.ComponentName] == nil {
-					traitUnhandledCount[detail.ComponentName] = make(map[string]int)
-				}
-				for _, trait := range detail.UnhandledTraits {
-					traitUnhandledCount[detail.ComponentName][trait]++
-				}
-			}
-		}
-
-		// Step 3: A trait is truly unhandled only if ALL matched transformers
-		// consider it unhandled (i.e., no transformer handles it)
-		for componentName, traitCounts := range traitUnhandledCount {
-			matchCount := componentMatchCount[componentName]
-			for trait, unhandledCount := range traitCounts {
-				if unhandledCount == matchCount {
-					warnings = append(warnings,
-						"component "+componentName+": unhandled trait "+trait)
-				}
+	// Step 3: A trait is truly unhandled only if ALL matched transformers
+	// consider it unhandled (i.e., no transformer handles it)
+	for componentName, traitCounts := range traitUnhandledCount {
+		matchCount := componentMatchCount[componentName]
+		for trait, unhandledCount := range traitCounts {
+			if unhandledCount == matchCount {
+				warnings = append(warnings,
+					"component "+componentName+": unhandled trait "+trait)
 			}
 		}
 	}

@@ -41,27 +41,6 @@ func (e *UnmatchedComponentError) Component() string {
 	return e.ComponentName
 }
 
-// UnhandledTraitError indicates a trait was not handled by any transformer.
-type UnhandledTraitError struct {
-	// ComponentName is the component with the unhandled trait.
-	ComponentName string
-
-	// TraitFQN is the fully qualified trait name.
-	TraitFQN string
-
-	// Strict indicates if this was treated as an error (strict mode)
-	// or warning (normal mode).
-	Strict bool
-}
-
-func (e *UnhandledTraitError) Error() string {
-	return fmt.Sprintf("component %q: unhandled trait %q", e.ComponentName, e.TraitFQN)
-}
-
-func (e *UnhandledTraitError) Component() string {
-	return e.ComponentName
-}
-
 // TransformError indicates transformer execution failed.
 type TransformError struct {
 	// ComponentName is the component being transformed.

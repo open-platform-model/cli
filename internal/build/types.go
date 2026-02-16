@@ -46,10 +46,6 @@ type RenderOptions struct {
 	// Optional. If empty, uses default provider from config.
 	Provider string
 
-	// Strict enables strict trait handling.
-	// When true, unhandled traits cause errors instead of warnings.
-	Strict bool
-
 	// Registry overrides the CUE registry URL.
 	// Optional. If empty, uses resolved registry from config.
 	Registry string

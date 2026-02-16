@@ -60,12 +60,6 @@ func TestModVet_UnmatchedComponent(t *testing.T) {
 	// any transformers in the provider, which requires a more complex test fixture.
 }
 
-func TestModVet_StrictMode(t *testing.T) {
-	t.Skip("Requires fixture with unhandled traits — skipping for now")
-	// This test would verify that --strict causes exit code 2 when there are
-	// unhandled traits. Requires a fixture module with traits that no transformer handles.
-}
-
 func TestModVet_ValuesDetailLogic(t *testing.T) {
 	tests := []struct {
 		name           string

@@ -30,7 +30,6 @@ func TestRenderOptions_Validate(t *testing.T) {
 				Name:       "my-release",
 				Namespace:  "production",
 				Provider:   "kubernetes",
-				Strict:     true,
 				Registry:   "https://registry.example.com",
 			},
 			wantErr: false,
