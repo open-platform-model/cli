@@ -13,11 +13,11 @@ import (
 
 // Diff command flags.
 var (
-	diffValuesFlags    []string
-	diffNamespaceFlag  string
-	diffNameFlag       string
-	diffKubeconfigFlag string
-	diffContextFlag    string
+	diffValuesFlags     []string
+	diffNamespaceFlag   string
+	diffReleaseNameFlag string
+	diffKubeconfigFlag  string
+	diffContextFlag     string
 )
 
 // NewModDiffCmd creates the mod diff command.
@@ -56,7 +56,7 @@ Examples:
 		"Additional values files (can be repeated)")
 	cmd.Flags().StringVarP(&diffNamespaceFlag, "namespace", "n", "",
 		"Target namespace")
-	cmd.Flags().StringVar(&diffNameFlag, "name", "",
+	cmd.Flags().StringVar(&diffReleaseNameFlag, "release-name", "",
 		"Release name (default: module name)")
 	cmd.Flags().StringVar(&diffKubeconfigFlag, "kubeconfig", "",
 		"Path to kubeconfig file")
@@ -91,7 +91,7 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	renderOpts := build.RenderOptions{
 		ModulePath: modulePath,
 		Values:     diffValuesFlags,
-		Name:       diffNameFlag,
+		Name:       diffReleaseNameFlag,
 		Namespace:  namespace,
 		Registry:   GetRegistry(),
 	}

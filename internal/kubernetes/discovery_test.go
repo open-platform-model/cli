@@ -10,12 +10,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func TestBuildModuleSelector(t *testing.T) {
-	selector := buildModuleSelector("my-app")
+func TestBuildReleaseNameSelector(t *testing.T) {
+	selector := buildReleaseNameSelector("my-app")
 
 	str := selector.String()
 	assert.Contains(t, str, "app.kubernetes.io/managed-by=open-platform-model")
-	assert.Contains(t, str, "module.opmodel.dev/name=my-app")
+	assert.Contains(t, str, "module-release.opmodel.dev/name=my-app")
 }
 
 func TestBuildReleaseIDSelector(t *testing.T) {
@@ -65,12 +65,12 @@ func makeUnstructured(apiVersion, kind, name, namespace string) *unstructured.Un
 }
 
 func TestNoResourcesFoundError(t *testing.T) {
-	t.Run("error message with module name", func(t *testing.T) {
+	t.Run("error message with release name", func(t *testing.T) {
 		err := &noResourcesFoundError{
-			ModuleName: "my-app",
-			Namespace:  "production",
+			ReleaseName: "my-app",
+			Namespace:   "production",
 		}
-		assert.Equal(t, `no resources found for module my-app in namespace production`, err.Error())
+		assert.Equal(t, `no resources found for release my-app in namespace production`, err.Error())
 	})
 
 	t.Run("error message with release-id", func(t *testing.T) {
@@ -83,26 +83,26 @@ func TestNoResourcesFoundError(t *testing.T) {
 
 	t.Run("errors.Is matches errNoResourcesFound", func(t *testing.T) {
 		err := &noResourcesFoundError{
-			ModuleName: "my-app",
-			Namespace:  "production",
+			ReleaseName: "my-app",
+			Namespace:   "production",
 		}
 		assert.True(t, errors.Is(err, errNoResourcesFound))
 	})
 
 	t.Run("IsNoResourcesFound matches direct error", func(t *testing.T) {
 		err := &noResourcesFoundError{
-			ModuleName: "my-app",
-			Namespace:  "production",
+			ReleaseName: "my-app",
+			Namespace:   "production",
 		}
 		assert.True(t, IsNoResourcesFound(err))
 	})
 
 	t.Run("IsNoResourcesFound matches wrapped error", func(t *testing.T) {
 		inner := &noResourcesFoundError{
-			ModuleName: "my-app",
-			Namespace:  "production",
+			ReleaseName: "my-app",
+			Namespace:   "production",
 		}
-		wrapped := fmt.Errorf("discovering module resources: %w", inner)
+		wrapped := fmt.Errorf("discovering release resources: %w", inner)
 		assert.True(t, IsNoResourcesFound(wrapped))
 	})
 
@@ -116,18 +116,18 @@ func TestDiscoveryOptions_Validation(t *testing.T) {
 	// Note: The actual DiscoverResources function requires a real k8s client,
 	// so we test the validation logic conceptually through the error cases.
 
-	t.Run("neither ModuleName nor ReleaseID provided", func(t *testing.T) {
+	t.Run("neither ReleaseName nor ReleaseID provided", func(t *testing.T) {
 		opts := DiscoveryOptions{}
 		// Both are empty - this should be caught by DiscoverResources
-		assert.Empty(t, opts.ModuleName)
+		assert.Empty(t, opts.ReleaseName)
 		assert.Empty(t, opts.ReleaseID)
 	})
 
-	t.Run("only ModuleName provided", func(t *testing.T) {
+	t.Run("only ReleaseName provided", func(t *testing.T) {
 		opts := DiscoveryOptions{
-			ModuleName: "my-app",
+			ReleaseName: "my-app",
 		}
-		assert.NotEmpty(t, opts.ModuleName)
+		assert.NotEmpty(t, opts.ReleaseName)
 		assert.Empty(t, opts.ReleaseID)
 	})
 
@@ -135,7 +135,7 @@ func TestDiscoveryOptions_Validation(t *testing.T) {
 		opts := DiscoveryOptions{
 			ReleaseID: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		}
-		assert.Empty(t, opts.ModuleName)
+		assert.Empty(t, opts.ReleaseName)
 		assert.NotEmpty(t, opts.ReleaseID)
 	})
 }

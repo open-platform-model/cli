@@ -126,17 +126,29 @@ func (b *ReleaseBuilder) Build(modulePath string, opts ReleaseOptions, valuesFil
 		},
 	}
 
-	// When --values flags are provided, stub out any on-disk values.cue with
-	// a minimal package declaration. This prevents the on-disk defaults from
-	// being loaded and unified with the user-provided values, which could
-	// cause conflicts. The external values files take full precedence.
-	if len(valuesFiles) > 0 {
-		valuesOnDisk := filepath.Join(modulePath, "values.cue")
-		if _, err := os.Stat(valuesOnDisk); err == nil {
-			output.Debug("overriding on-disk values.cue with --values flags")
-			cfg.Overlay[valuesOnDisk] = load.FromBytes(
-				[]byte(fmt.Sprintf("package %s\n", pkgName)),
-			)
+	// Stub out values files that should not participate in CUE module loading.
+	//
+	// CUE's load.Instances loads ALL .cue files in the directory that share
+	// the same package declaration. When multiple values*.cue files exist
+	// (e.g., values.cue, values_staging.cue, values_production.cue), they
+	// would all be unified — causing conflicts since they define competing
+	// concrete values for the same fields.
+	//
+	// With --values/-f: stub ALL values*.cue files; only the explicitly
+	//   specified files contribute values (loaded externally via CompileBytes).
+	// Without --values/-f: stub all values*.cue EXCEPT values.cue, so only
+	//   the base values.cue participates in the module.
+	stubPkg := []byte(fmt.Sprintf("package %s\n", pkgName))
+	valuesOnDisk, _ := filepath.Glob(filepath.Join(modulePath, "values*.cue"))
+	for _, vf := range valuesOnDisk {
+		if len(valuesFiles) > 0 {
+			// With -f: stub every values file — external files take full precedence
+			output.Debug("stubbing %s (--values flag overrides all values files)", filepath.Base(vf))
+			cfg.Overlay[vf] = load.FromBytes(stubPkg)
+		} else if filepath.Base(vf) != "values.cue" {
+			// Without -f: stub environment-specific overrides, keep only values.cue
+			output.Debug("stubbing %s (only values.cue is used without --values flag)", filepath.Base(vf))
+			cfg.Overlay[vf] = load.FromBytes(stubPkg)
 		}
 	}
 

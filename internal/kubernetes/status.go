@@ -18,12 +18,12 @@ type StatusOptions struct {
 	// Namespace is the target namespace for resource lookup.
 	Namespace string
 
-	// Name is the module release name.
+	// ReleaseName is the release name.
 	// Mutually exclusive with ReleaseID.
-	Name string
+	ReleaseName string
 
 	// ReleaseID is the release identity UUID for discovery.
-	// Mutually exclusive with Name.
+	// Mutually exclusive with ReleaseName.
 	ReleaseID string
 
 	// OutputFormat is the desired output format (table, yaml, json).
@@ -70,20 +70,20 @@ type statusResult struct {
 func GetModuleStatus(ctx context.Context, client *Client, opts StatusOptions) (*statusResult, error) {
 	// Discover resources via labels
 	resources, err := DiscoverResources(ctx, client, DiscoveryOptions{
-		ModuleName: opts.Name,
-		Namespace:  opts.Namespace,
-		ReleaseID:  opts.ReleaseID,
+		ReleaseName: opts.ReleaseName,
+		Namespace:   opts.Namespace,
+		ReleaseID:   opts.ReleaseID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("discovering module resources: %w", err)
+		return nil, fmt.Errorf("discovering release resources: %w", err)
 	}
 
 	// Return error when no resources found
 	if len(resources) == 0 {
 		return nil, &noResourcesFoundError{
-			ModuleName: opts.Name,
-			ReleaseID:  opts.ReleaseID,
-			Namespace:  opts.Namespace,
+			ReleaseName: opts.ReleaseName,
+			ReleaseID:   opts.ReleaseID,
+			Namespace:   opts.Namespace,
 		}
 	}
 

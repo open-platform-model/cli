@@ -17,7 +17,7 @@ import (
 var (
 	buildValuesFlags     []string
 	buildNamespaceFlag   string
-	buildNameFlag        string
+	buildReleaseNameFlag string
 	buildProviderFlag    string
 	buildOutputFlag      string
 	buildSplitFlag       bool
@@ -81,7 +81,7 @@ Examples:
 		"Additional values files (can be repeated)")
 	cmd.Flags().StringVarP(&buildNamespaceFlag, "namespace", "n", "",
 		"Target namespace (required if not in module)")
-	cmd.Flags().StringVar(&buildNameFlag, "name", "",
+	cmd.Flags().StringVar(&buildReleaseNameFlag, "release-name", "",
 		"Release name (default: module name)")
 	cmd.Flags().StringVar(&buildProviderFlag, "provider", "",
 		"Provider to use (default: from config)")
@@ -128,7 +128,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	opts := build.RenderOptions{
 		ModulePath: modulePath,
 		Values:     buildValuesFlags,
-		Name:       buildNameFlag,
+		Name:       buildReleaseNameFlag,
 		Namespace:  buildNamespaceFlag,
 		Provider:   buildProviderFlag,
 		Registry:   GetRegistry(),

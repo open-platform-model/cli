@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/load"
@@ -71,6 +72,17 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		if _, err := os.Stat(valuesPath); os.IsNotExist(err) {
 			return nil, fmt.Errorf("values.cue not found in %s — provide values via values.cue or --values flag", modulePath)
 		}
+	}
+
+	// Log which values files are being used
+	if len(opts.Values) > 0 {
+		valuesFileNames := make([]string, len(opts.Values))
+		for i, vf := range opts.Values {
+			valuesFileNames[i] = filepath.Base(vf)
+		}
+		output.Debug("using values files", "files", strings.Join(valuesFileNames, ", "))
+	} else {
+		output.Debug("using default values.cue")
 	}
 
 	inspection, err := p.releaseBuilder.InspectModule(modulePath)

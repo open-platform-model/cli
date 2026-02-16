@@ -13,15 +13,15 @@ import (
 
 // DeleteOptions configures a delete operation.
 type DeleteOptions struct {
-	// ModuleName is the module name to delete.
+	// ReleaseName is the release name to delete.
 	// Mutually exclusive with ReleaseID.
-	ModuleName string
+	ReleaseName string
 
 	// Namespace is the namespace to search for resources.
 	Namespace string
 
 	// ReleaseID is the release identity UUID for discovery.
-	// Mutually exclusive with ModuleName.
+	// Mutually exclusive with ReleaseName.
 	ReleaseID string
 
 	// DryRun previews resources to delete without removing them.
@@ -43,14 +43,14 @@ type deleteResult struct {
 	Errors []resourceError
 }
 
-// Delete removes all resources belonging to a module deployment.
+// Delete removes all resources belonging to a release deployment.
 // Resources are discovered via OPM labels and deleted in reverse weight order.
 // Returns noResourcesFoundError when no resources match the selector.
 func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*deleteResult, error) {
 	result := &deleteResult{}
 
-	// Use module name for logging if available, otherwise use ReleaseID
-	logName := opts.ModuleName
+	// Use release name for logging if available, otherwise use ReleaseID
+	logName := opts.ReleaseName
 	if logName == "" {
 		logName = fmt.Sprintf("release-id:%s", opts.ReleaseID)
 	}
@@ -58,13 +58,13 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*deleteRes
 
 	// Discover resources via labels
 	resources, err := DiscoverResources(ctx, client, DiscoveryOptions{
-		ModuleName:   opts.ModuleName,
+		ReleaseName:  opts.ReleaseName,
 		Namespace:    opts.Namespace,
 		ReleaseID:    opts.ReleaseID,
 		ExcludeOwned: true,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("discovering module resources: %w", err)
+		return nil, fmt.Errorf("discovering release resources: %w", err)
 	}
 
 	result.Resources = resources
@@ -72,9 +72,9 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*deleteRes
 	// Return error when no resources found
 	if len(resources) == 0 {
 		return nil, &noResourcesFoundError{
-			ModuleName: opts.ModuleName,
-			ReleaseID:  opts.ReleaseID,
-			Namespace:  opts.Namespace,
+			ReleaseName: opts.ReleaseName,
+			ReleaseID:   opts.ReleaseID,
+			Namespace:   opts.Namespace,
 		}
 	}
 

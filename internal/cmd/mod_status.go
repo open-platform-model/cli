@@ -17,7 +17,7 @@ import (
 // Status command flags.
 var (
 	statusNamespaceFlag      string
-	statusNameFlag           string
+	statusReleaseNameFlag    string
 	statusReleaseIDFlag      string
 	statusOutputFlag         string
 	statusWatchFlag          bool
@@ -31,7 +31,7 @@ func NewModStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show resource status",
-		Long: `Show status of resources deployed by an OPM module.
+		Long: `Show status of resources deployed by an OPM release.
 
 Resources are discovered via OPM labels, so the original module source is
 not required. Health is evaluated per resource category:
@@ -42,31 +42,31 @@ not required. Health is evaluated per resource category:
   - Passive (ConfigMap, Secret, Service, PVC): healthy on creation
   - Custom (CRDs): Ready condition if present, else passive
 
-Exactly one of --name or --release-id is required to identify the module deployment.
+Exactly one of --release-name or --release-id is required to identify the release deployment.
 The --namespace flag is always required.
 
 Examples:
-  # Show status by module name
-  opm mod status --name my-app -n production
+  # Show status by release name
+  opm mod status --release-name my-app -n production
 
   # Show status by release ID
   opm mod status --release-id a1b2c3d4-e5f6-7890-abcd-ef1234567890 -n production
 
   # Show status in JSON format
-  opm mod status --name my-app -n production -o json
+  opm mod status --release-name my-app -n production -o json
 
   # Watch status continuously
-  opm mod status --name my-app -n production --watch`,
+  opm mod status --release-name my-app -n production --watch`,
 		RunE: runStatus,
 	}
 
 	// Add flags
 	cmd.Flags().StringVarP(&statusNamespaceFlag, "namespace", "n", "",
 		"Target namespace (required)")
-	cmd.Flags().StringVar(&statusNameFlag, "name", "",
-		"Module name (mutually exclusive with --release-id)")
+	cmd.Flags().StringVar(&statusReleaseNameFlag, "release-name", "",
+		"Release name (mutually exclusive with --release-id)")
 	cmd.Flags().StringVar(&statusReleaseIDFlag, "release-id", "",
-		"Release identity UUID (mutually exclusive with --name)")
+		"Release identity UUID (mutually exclusive with --release-name)")
 	cmd.Flags().StringVarP(&statusOutputFlag, "output", "o", "table",
 		"Output format (table, yaml, json)")
 	cmd.Flags().BoolVar(&statusWatchFlag, "watch", false,
@@ -88,17 +88,17 @@ Examples:
 func runStatus(cmd *cobra.Command, _ []string) error {
 	ctx := context.Background()
 
-	// Manual validation: require exactly one of --name or --release-id (mutually exclusive)
-	if statusNameFlag != "" && statusReleaseIDFlag != "" {
+	// Manual validation: require exactly one of --release-name or --release-id (mutually exclusive)
+	if statusReleaseNameFlag != "" && statusReleaseIDFlag != "" {
 		return &ExitError{
 			Code: ExitGeneralError,
-			Err:  fmt.Errorf("--name and --release-id are mutually exclusive"),
+			Err:  fmt.Errorf("--release-name and --release-id are mutually exclusive"),
 		}
 	}
-	if statusNameFlag == "" && statusReleaseIDFlag == "" {
+	if statusReleaseNameFlag == "" && statusReleaseIDFlag == "" {
 		return &ExitError{
 			Code: ExitGeneralError,
-			Err:  fmt.Errorf("either --name or --release-id is required"),
+			Err:  fmt.Errorf("either --release-name or --release-id is required"),
 		}
 	}
 
@@ -106,8 +106,8 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	kubeconfig := resolveFlag(statusKubeconfigFlag, GetKubeconfig())
 	kubeContext := resolveFlag(statusContextFlag, GetContext())
 
-	// Create scoped module logger - prefer name, fall back to release-id
-	logName := statusNameFlag
+	// Create scoped module logger - prefer release name, fall back to release-id
+	logName := statusReleaseNameFlag
 	if logName == "" {
 		logName = fmt.Sprintf("release:%s", statusReleaseIDFlag[:8])
 	}
@@ -135,7 +135,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 
 	statusOpts := kubernetes.StatusOptions{
 		Namespace:    statusNamespaceFlag,
-		Name:         statusNameFlag,
+		ReleaseName:  statusReleaseNameFlag,
 		ReleaseID:    statusReleaseIDFlag,
 		OutputFormat: outputFormat,
 		Watch:        statusWatchFlag,
@@ -152,7 +152,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 
 // runStatusOnce executes a single status check.
 func runStatusOnce(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions) error {
-	logName := opts.Name
+	logName := opts.ReleaseName
 	if logName == "" {
 		logName = fmt.Sprintf("release:%s", opts.ReleaseID[:8])
 	}
@@ -215,7 +215,7 @@ func runStatusWatch(ctx context.Context, client *kubernetes.Client, opts kuberne
 
 // displayStatus fetches and displays the current status.
 func displayStatus(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions) error {
-	logName := opts.Name
+	logName := opts.ReleaseName
 	if logName == "" {
 		logName = fmt.Sprintf("release:%s", opts.ReleaseID[:8])
 	}

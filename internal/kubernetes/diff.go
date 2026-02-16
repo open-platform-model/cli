@@ -285,14 +285,14 @@ func DiffPartial(ctx context.Context, client *Client, resources []*build.Resourc
 	return result, nil
 }
 
-// findOrphans discovers resources on the cluster that are labeled for this module
+// findOrphans discovers resources on the cluster that are labeled for this release
 // but are not in the rendered resource set.
 func findOrphans(ctx context.Context, client *Client, meta build.ModuleMetadata, renderedKeys map[string]bool) ([]*unstructured.Unstructured, error) {
-	// Discover all resources on the cluster with OPM labels for this module
-	// Use module name selector for orphan detection.
-	// Diff always has a module name from the build pipeline.
+	// Discover all resources on the cluster with OPM labels for this release
+	// Use release name selector for orphan detection.
+	// Diff always has a release name from the build pipeline.
 	liveResources, err := DiscoverResources(ctx, client, DiscoveryOptions{
-		ModuleName:   meta.Name,
+		ReleaseName:  meta.Name,
 		Namespace:    meta.Namespace,
 		ExcludeOwned: true,
 	})

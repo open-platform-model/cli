@@ -34,8 +34,9 @@ type RenderOptions struct {
 	// Optional. Files are unified after values.cue from module root.
 	Values []string
 
-	// Name overrides module.metadata.name for the release.
-	// Optional. If empty, uses module.metadata.name.
+	// Name is the release name.
+	// Optional. If empty, uses module.metadata.name as the release name.
+	// This value becomes the module-release.opmodel.dev/name label on resources.
 	Name string
 
 	// Namespace overrides module.metadata.defaultNamespace.
@@ -142,8 +143,8 @@ func (r *Resource) Labels() map[string]string {
 // ModuleMetadata contains information about the source module.
 // This metadata is used for labeling resources and verbose output.
 type ModuleMetadata struct {
-	// Name is the module name.
-	// May be overridden by RenderOptions.Name.
+	// Name is the release name (resolved from RenderOptions.Name or module.metadata.name).
+	// This is the value used for discovery and labeling (module-release.opmodel.dev/name).
 	Name string
 
 	// Namespace is the target namespace.

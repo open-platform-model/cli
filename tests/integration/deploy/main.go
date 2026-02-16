@@ -40,9 +40,11 @@ func main() {
 	// OPM labels that the CUE transformers normally inject via #context.labels.
 	// Since this integration test bypasses the render pipeline, we add them manually.
 	opmLabels := map[string]interface{}{
-		"app.kubernetes.io/managed-by": "open-platform-model",
-		"module.opmodel.dev/name":      moduleName,
-		"module.opmodel.dev/version":   "0.1.0",
+		"app.kubernetes.io/managed-by":       "open-platform-model",
+		"module-release.opmodel.dev/name":    moduleName,
+		"module-release.opmodel.dev/version": "0.1.0",
+		"module.opmodel.dev/name":            moduleName,
+		"module.opmodel.dev/version":         "0.1.0",
 	}
 
 	cm := &unstructured.Unstructured{Object: map[string]interface{}{
@@ -128,7 +130,7 @@ func main() {
 	// 5. Verify labels by discovering
 	fmt.Println()
 	fmt.Println("5. Discovering resources via OPM labels...")
-	discovered, err := kubernetes.DiscoverResources(ctx, client, kubernetes.DiscoveryOptions{ModuleName: moduleName, Namespace: namespace})
+	discovered, err := kubernetes.DiscoverResources(ctx, client, kubernetes.DiscoveryOptions{ReleaseName: moduleName, Namespace: namespace})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: discover: %v\n", err)
 		os.Exit(1)
@@ -136,10 +138,10 @@ func main() {
 	fmt.Printf("   OK: found %d resources\n", len(discovered))
 	for _, r := range discovered {
 		labels := r.GetLabels()
-		fmt.Printf("   - %s/%s (managed-by=%s, module=%s, component=%s)\n",
+		fmt.Printf("   - %s/%s (managed-by=%s, release=%s, component=%s)\n",
 			r.GetKind(), r.GetName(),
 			labels[kubernetes.LabelManagedBy],
-			labels[kubernetes.LabelModuleName],
+			labels[kubernetes.LabelReleaseName],
 			labels[kubernetes.LabelComponentName],
 		)
 	}
@@ -168,9 +170,9 @@ func main() {
 	fmt.Println()
 	fmt.Println("7. Testing dry-run delete...")
 	dryDeleteResult, err := kubernetes.Delete(ctx, client, kubernetes.DeleteOptions{
-		ModuleName: moduleName,
-		Namespace:  namespace,
-		DryRun:     true,
+		ReleaseName: moduleName,
+		Namespace:   namespace,
+		DryRun:      true,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: dry-run delete: %v\n", err)
@@ -184,8 +186,8 @@ func main() {
 	kubernetes.ResetClient()
 	client, _ = kubernetes.NewClient(kubernetes.ClientOptions{Context: "kind-opm-dev"})
 	deleteResult, err := kubernetes.Delete(ctx, client, kubernetes.DeleteOptions{
-		ModuleName: moduleName,
-		Namespace:  namespace,
+		ReleaseName: moduleName,
+		Namespace:   namespace,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: delete: %v\n", err)
@@ -207,7 +209,7 @@ func main() {
 	fmt.Println("9. Verifying cleanup (discover after delete)...")
 	kubernetes.ResetClient()
 	client, _ = kubernetes.NewClient(kubernetes.ClientOptions{Context: "kind-opm-dev"})
-	remaining, err := kubernetes.DiscoverResources(ctx, client, kubernetes.DiscoveryOptions{ModuleName: moduleName, Namespace: namespace})
+	remaining, err := kubernetes.DiscoverResources(ctx, client, kubernetes.DiscoveryOptions{ReleaseName: moduleName, Namespace: namespace})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: post-delete discover: %v\n", err)
 		os.Exit(1)

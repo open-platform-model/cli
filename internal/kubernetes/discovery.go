@@ -20,7 +20,7 @@ import (
 const (
 	LabelManagedBy      = "app.kubernetes.io/managed-by"
 	labelManagedByValue = "open-platform-model"
-	LabelModuleName     = "module.opmodel.dev/name"
+	LabelReleaseName    = "module-release.opmodel.dev/name"
 	labelModuleVersion  = "module.opmodel.dev/version"
 	LabelComponentName  = "component.opmodel.dev/name"
 	// labelReleaseID is the release identity UUID label for resource discovery.
@@ -37,9 +37,9 @@ var errNoResourcesFound = errors.New("no resources found")
 
 // noResourcesFoundError contains details about a failed resource discovery.
 type noResourcesFoundError struct {
-	// ModuleName is the module name that was searched (empty if using release-id).
-	ModuleName string
-	// ReleaseID is the release-id that was searched (empty if using name).
+	// ReleaseName is the release name that was searched (empty if using release-id).
+	ReleaseName string
+	// ReleaseID is the release-id that was searched (empty if using release-name).
 	ReleaseID string
 	// Namespace is the namespace that was searched.
 	Namespace string
@@ -47,8 +47,8 @@ type noResourcesFoundError struct {
 
 // Error implements the error interface.
 func (e *noResourcesFoundError) Error() string {
-	if e.ModuleName != "" {
-		return fmt.Sprintf("no resources found for module %s in namespace %s", e.ModuleName, e.Namespace)
+	if e.ReleaseName != "" {
+		return fmt.Sprintf("no resources found for release %s in namespace %s", e.ReleaseName, e.Namespace)
 	}
 	return fmt.Sprintf("no resources found for release-id %s in namespace %s", e.ReleaseID, e.Namespace)
 }
@@ -66,27 +66,27 @@ func IsNoResourcesFound(err error) bool {
 
 // discoveryOptions configures resource discovery.
 type DiscoveryOptions struct {
-	// ModuleName is the module name to search for (used with name+namespace selector).
+	// ReleaseName is the release name to search for (used with name+namespace selector).
 	// Mutually exclusive with ReleaseID.
-	ModuleName string
+	ReleaseName string
 	// Namespace is the target namespace for resource lookup.
 	Namespace string
 	// ReleaseID is the release identity UUID (used with release-id selector).
-	// Mutually exclusive with ModuleName.
+	// Mutually exclusive with ReleaseName.
 	ReleaseID string
 	// ExcludeOwned excludes resources with ownerReferences from discovery results.
 	// Used by delete and diff to prevent attempting to manage controller-managed children.
 	ExcludeOwned bool
 }
 
-// buildModuleSelector creates a label selector that matches all resources
-// belonging to a specific module deployment.
+// buildReleaseNameSelector creates a label selector that matches all resources
+// belonging to a specific release deployment.
 // Namespace scoping is handled by the Kubernetes API call (Namespace().List()),
-// so the selector only needs managed-by + module name.
-func buildModuleSelector(moduleName string) labels.Selector {
+// so the selector only needs managed-by + release name.
+func buildReleaseNameSelector(releaseName string) labels.Selector {
 	return labels.SelectorFromSet(labels.Set{
-		LabelManagedBy:  labelManagedByValue,
-		LabelModuleName: moduleName,
+		LabelManagedBy:   labelManagedByValue,
+		LabelReleaseName: releaseName,
 	})
 }
 
@@ -99,10 +99,10 @@ func buildReleaseIDSelector(releaseID string) labels.Selector {
 	})
 }
 
-// DiscoverResources finds all resources belonging to a module deployment
+// DiscoverResources finds all resources belonging to a release deployment
 // by querying all API resources with an OPM label selector.
 //
-// Exactly one of ModuleName or ReleaseID must be provided (mutually exclusive).
+// Exactly one of ReleaseName or ReleaseID must be provided (mutually exclusive).
 // Validation of mutual exclusivity should happen at the command layer.
 func DiscoverResources(ctx context.Context, client *Client, opts DiscoveryOptions) ([]*unstructured.Unstructured, error) {
 	// Build selector based on what's provided
@@ -110,10 +110,10 @@ func DiscoverResources(ctx context.Context, client *Client, opts DiscoveryOption
 
 	if opts.ReleaseID != "" {
 		selector = buildReleaseIDSelector(opts.ReleaseID)
-	} else if opts.ModuleName != "" {
-		selector = buildModuleSelector(opts.ModuleName)
+	} else if opts.ReleaseName != "" {
+		selector = buildReleaseNameSelector(opts.ReleaseName)
 	} else {
-		return nil, fmt.Errorf("either ModuleName or ReleaseID must be provided")
+		return nil, fmt.Errorf("either ReleaseName or ReleaseID must be provided")
 	}
 
 	// Get all API resources from the server

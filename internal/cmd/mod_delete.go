@@ -16,7 +16,7 @@ import (
 // Delete command flags.
 var (
 	deleteNamespaceFlag      string
-	deleteNameFlag           string
+	deleteReleaseNameFlag    string
 	deleteReleaseIDFlag      string
 	deleteForceFlag          bool
 	deleteDryRunFlag         bool
@@ -30,38 +30,38 @@ var (
 func NewModDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete",
-		Short: "Delete module resources from cluster",
-		Long: `Delete all resources belonging to an OPM module from a Kubernetes cluster.
+		Short: "Delete release resources from cluster",
+		Long: `Delete all resources belonging to an OPM release from a Kubernetes cluster.
 
 Resources are discovered via OPM labels, so the original module source is
 not required. Resources are deleted in reverse weight order (webhooks first,
 CRDs last).
 
-Exactly one of --name or --release-id is required to identify the module deployment.
+Exactly one of --release-name or --release-id is required to identify the release deployment.
 The --namespace flag is always required.
 
 Examples:
-  # Delete module by name
-  opm mod delete --name my-app -n production
+  # Delete release by name
+  opm mod delete --release-name my-app -n production
 
-  # Delete module by release ID
+  # Delete release by release ID
   opm mod delete --release-id a1b2c3d4-e5f6-7890-abcd-ef1234567890 -n production
 
   # Preview what would be deleted
-  opm mod delete --name my-app -n production --dry-run
+  opm mod delete --release-name my-app -n production --dry-run
 
   # Skip confirmation prompt
-  opm mod delete --name my-app -n production --force`,
+  opm mod delete --release-name my-app -n production --force`,
 		RunE: runDelete,
 	}
 
 	// Add flags
 	cmd.Flags().StringVarP(&deleteNamespaceFlag, "namespace", "n", "",
 		"Target namespace (required)")
-	cmd.Flags().StringVar(&deleteNameFlag, "name", "",
-		"Module name (mutually exclusive with --release-id)")
+	cmd.Flags().StringVar(&deleteReleaseNameFlag, "release-name", "",
+		"Release name (mutually exclusive with --release-id)")
 	cmd.Flags().StringVar(&deleteReleaseIDFlag, "release-id", "",
-		"Release identity UUID (mutually exclusive with --name)")
+		"Release identity UUID (mutually exclusive with --release-name)")
 	cmd.Flags().BoolVar(&deleteForceFlag, "force", false,
 		"Skip confirmation prompt")
 	cmd.Flags().BoolVar(&deleteDryRunFlag, "dry-run", false,
@@ -85,17 +85,17 @@ Examples:
 func runDelete(cmd *cobra.Command, _ []string) error {
 	ctx := context.Background()
 
-	// Manual validation: require exactly one of --name or --release-id (mutually exclusive)
-	if deleteNameFlag != "" && deleteReleaseIDFlag != "" {
+	// Manual validation: require exactly one of --release-name or --release-id (mutually exclusive)
+	if deleteReleaseNameFlag != "" && deleteReleaseIDFlag != "" {
 		return &ExitError{
 			Code: ExitGeneralError,
-			Err:  fmt.Errorf("--name and --release-id are mutually exclusive"),
+			Err:  fmt.Errorf("--release-name and --release-id are mutually exclusive"),
 		}
 	}
-	if deleteNameFlag == "" && deleteReleaseIDFlag == "" {
+	if deleteReleaseNameFlag == "" && deleteReleaseIDFlag == "" {
 		return &ExitError{
 			Code: ExitGeneralError,
-			Err:  fmt.Errorf("either --name or --release-id is required"),
+			Err:  fmt.Errorf("either --release-name or --release-id is required"),
 		}
 	}
 
@@ -103,8 +103,8 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 	kubeconfig := resolveFlag(deleteKubeconfigFlag, GetKubeconfig())
 	kubeContext := resolveFlag(deleteContextFlag, GetContext())
 
-	// Create scoped module logger - prefer name, fall back to release-id
-	logName := deleteNameFlag
+	// Create scoped module logger - prefer release name, fall back to release-id
+	logName := deleteReleaseNameFlag
 	if logName == "" {
 		logName = fmt.Sprintf("release:%s", deleteReleaseIDFlag[:8])
 	}
@@ -126,7 +126,7 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 		modLog.Info("dry run - no changes will be made")
 	} else if !deleteForceFlag {
 		// Prompt for confirmation
-		if !confirmDelete(deleteNameFlag, deleteReleaseIDFlag, deleteNamespaceFlag) {
+		if !confirmDelete(deleteReleaseNameFlag, deleteReleaseIDFlag, deleteNamespaceFlag) {
 			modLog.Info("deletion canceled")
 			return nil
 		}
@@ -136,11 +136,11 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 	modLog.Info(fmt.Sprintf("deleting resources in namespace %q", deleteNamespaceFlag))
 
 	deleteResult, err := kubernetes.Delete(ctx, k8sClient, kubernetes.DeleteOptions{
-		ModuleName: deleteNameFlag,
-		Namespace:  deleteNamespaceFlag,
-		ReleaseID:  deleteReleaseIDFlag,
-		DryRun:     deleteDryRunFlag,
-		Wait:       deleteWaitFlag,
+		ReleaseName: deleteReleaseNameFlag,
+		Namespace:   deleteNamespaceFlag,
+		ReleaseID:   deleteReleaseIDFlag,
+		DryRun:      deleteDryRunFlag,
+		Wait:        deleteWaitFlag,
 	})
 	if err != nil {
 		if deleteIgnoreNotFoundFlag && kubernetes.IsNoResourcesFound(err) {
@@ -163,7 +163,7 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 		modLog.Info(fmt.Sprintf("dry run complete: %d resources would be deleted", deleteResult.Deleted))
 	} else {
 		modLog.Info("all resources have been deleted")
-		output.Println(output.FormatCheckmark("Module deleted"))
+		output.Println(output.FormatCheckmark("Release deleted"))
 	}
 
 	if len(deleteResult.Errors) > 0 {
@@ -178,10 +178,10 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 }
 
 // confirmDelete prompts the user for confirmation.
-func confirmDelete(name, releaseID, namespace string) bool {
+func confirmDelete(releaseName, releaseID, namespace string) bool {
 	var prompt string
-	if name != "" {
-		prompt = fmt.Sprintf("Delete all resources for module %q in namespace %q? [y/N]: ", name, namespace)
+	if releaseName != "" {
+		prompt = fmt.Sprintf("Delete all resources for release %q in namespace %q? [y/N]: ", releaseName, namespace)
 	} else {
 		prompt = fmt.Sprintf("Delete all resources for release-id %q in namespace %q? [y/N]: ", releaseID, namespace)
 	}

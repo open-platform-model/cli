@@ -15,16 +15,16 @@ import (
 
 // Apply command flags.
 var (
-	applyValuesFlags    []string
-	applyNamespaceFlag  string
-	applyNameFlag       string
-	applyProviderFlag   string
-	applyDryRunFlag     bool
-	applyWaitFlag       bool
-	applyTimeoutFlag    time.Duration
-	applyCreateNSFlag   bool
-	applyKubeconfigFlag string
-	applyContextFlag    string
+	applyValuesFlags     []string
+	applyNamespaceFlag   string
+	applyReleaseNameFlag string
+	applyProviderFlag    string
+	applyDryRunFlag      bool
+	applyWaitFlag        bool
+	applyTimeoutFlag     time.Duration
+	applyCreateNSFlag    bool
+	applyKubeconfigFlag  string
+	applyContextFlag     string
 )
 
 // NewModApplyCmd creates the mod apply command.
@@ -64,7 +64,7 @@ Examples:
 		"Additional values files (can be repeated)")
 	cmd.Flags().StringVarP(&applyNamespaceFlag, "namespace", "n", "",
 		"Target namespace")
-	cmd.Flags().StringVar(&applyNameFlag, "name", "",
+	cmd.Flags().StringVar(&applyReleaseNameFlag, "release-name", "",
 		"Release name (default: module name)")
 	cmd.Flags().StringVar(&applyProviderFlag, "provider", "",
 		"Provider to use (default: from config)")
@@ -110,7 +110,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 	renderOpts := build.RenderOptions{
 		ModulePath: modulePath,
 		Values:     applyValuesFlags,
-		Name:       applyNameFlag,
+		Name:       applyReleaseNameFlag,
 		Namespace:  namespace,
 		Provider:   provider,
 		Registry:   GetRegistry(),

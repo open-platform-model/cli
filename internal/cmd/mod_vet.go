@@ -14,11 +14,11 @@ import (
 
 // Vet command flags
 var (
-	vetValuesFlags   []string
-	vetNamespaceFlag string
-	vetNameFlag      string
-	vetProviderFlag  string
-	vetVerboseFlag   bool
+	vetValuesFlags     []string
+	vetNamespaceFlag   string
+	vetReleaseNameFlag string
+	vetProviderFlag    string
+	vetVerboseFlag     bool
 )
 
 // NewModVetCmd creates the mod vet command.
@@ -53,7 +53,7 @@ Examples:
 		"Additional values files (can be repeated)")
 	cmd.Flags().StringVarP(&vetNamespaceFlag, "namespace", "n", "",
 		"Target namespace (required if not in module)")
-	cmd.Flags().StringVar(&vetNameFlag, "name", "",
+	cmd.Flags().StringVar(&vetReleaseNameFlag, "release-name", "",
 		"Release name (default: module name)")
 	cmd.Flags().StringVar(&vetProviderFlag, "provider", "",
 		"Provider to use (default: from config)")
@@ -83,7 +83,7 @@ func runVet(cmd *cobra.Command, args []string) error {
 	opts := build.RenderOptions{
 		ModulePath: modulePath,
 		Values:     vetValuesFlags,
-		Name:       vetNameFlag,
+		Name:       vetReleaseNameFlag,
 		Namespace:  vetNamespaceFlag,
 		Provider:   vetProviderFlag,
 		Registry:   GetRegistry(),
