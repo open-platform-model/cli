@@ -24,12 +24,18 @@ func TestModStatusCmd_MutuallyExclusive(t *testing.T) {
 	assert.Contains(t, err.Error(), "--release-name and --release-id are mutually exclusive")
 }
 
-func TestModStatusCmd_RequiresNamespace(t *testing.T) {
+func TestModStatusCmd_NamespaceOptional(t *testing.T) {
+	// Namespace is now optional - falls back to config or default "default"
+	// Verify the flag exists
 	cmd := NewModStatusCmd()
-	cmd.SetArgs([]string{"--release-name", "my-app"})
-	err := cmd.Execute()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "required flag")
+	f := cmd.Flags().Lookup("namespace")
+	assert.NotNil(t, f)
+
+	// Check that namespace is not in the required annotations
+	// Cobra uses the "cobra_annotation_required" annotation to track required flags
+	annotations := f.Annotations
+	_, isRequired := annotations["cobra_annotation_required"]
+	assert.False(t, isRequired, "namespace flag should not be required")
 }
 
 func TestModStatusCmd_FlagsExist(t *testing.T) {

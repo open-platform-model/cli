@@ -78,9 +78,6 @@ Examples:
 	cmd.Flags().StringVar(&statusContextFlag, "context", "",
 		"Kubernetes context to use")
 
-	// Namespace is always required
-	_ = cmd.MarkFlagRequired("namespace")
-
 	return cmd
 }
 
@@ -105,6 +102,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	// Resolve flags with global fallback
 	kubeconfig := resolveFlag(statusKubeconfigFlag, GetKubeconfig())
 	kubeContext := resolveFlag(statusContextFlag, GetContext())
+	namespace := resolveFlag(statusNamespaceFlag, GetNamespace())
 
 	// Create scoped module logger - prefer release name, fall back to release-id
 	logName := statusReleaseNameFlag
@@ -134,7 +132,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	}
 
 	statusOpts := kubernetes.StatusOptions{
-		Namespace:    statusNamespaceFlag,
+		Namespace:    namespace,
 		ReleaseName:  statusReleaseNameFlag,
 		ReleaseID:    statusReleaseIDFlag,
 		OutputFormat: outputFormat,

@@ -75,9 +75,6 @@ Examples:
 	cmd.Flags().StringVar(&deleteContextFlag, "context", "",
 		"Kubernetes context to use")
 
-	// Namespace is always required
-	_ = cmd.MarkFlagRequired("namespace")
-
 	return cmd
 }
 
@@ -102,6 +99,7 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 	// Resolve flags with global fallback
 	kubeconfig := resolveFlag(deleteKubeconfigFlag, GetKubeconfig())
 	kubeContext := resolveFlag(deleteContextFlag, GetContext())
+	namespace := resolveFlag(deleteNamespaceFlag, GetNamespace())
 
 	// Create scoped module logger - prefer release name, fall back to release-id
 	logName := deleteReleaseNameFlag
@@ -126,18 +124,18 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 		modLog.Info("dry run - no changes will be made")
 	} else if !deleteForceFlag {
 		// Prompt for confirmation
-		if !confirmDelete(deleteReleaseNameFlag, deleteReleaseIDFlag, deleteNamespaceFlag) {
+		if !confirmDelete(deleteReleaseNameFlag, deleteReleaseIDFlag, namespace) {
 			modLog.Info("deletion canceled")
 			return nil
 		}
 	}
 
 	// Delete resources
-	modLog.Info(fmt.Sprintf("deleting resources in namespace %q", deleteNamespaceFlag))
+	modLog.Info(fmt.Sprintf("deleting resources in namespace %q", namespace))
 
 	deleteResult, err := kubernetes.Delete(ctx, k8sClient, kubernetes.DeleteOptions{
 		ReleaseName: deleteReleaseNameFlag,
-		Namespace:   deleteNamespaceFlag,
+		Namespace:   namespace,
 		ReleaseID:   deleteReleaseIDFlag,
 		DryRun:      deleteDryRunFlag,
 		Wait:        deleteWaitFlag,

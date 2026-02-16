@@ -124,13 +124,17 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
 	}
 
+	// Resolve flags with global fallback
+	namespace := resolveFlag(buildNamespaceFlag, GetNamespace())
+	provider := resolveFlag(buildProviderFlag, GetProvider())
+
 	// Build render options
 	opts := build.RenderOptions{
 		ModulePath: modulePath,
 		Values:     buildValuesFlags,
 		Name:       buildReleaseNameFlag,
-		Namespace:  buildNamespaceFlag,
-		Provider:   buildProviderFlag,
+		Namespace:  namespace,
+		Provider:   provider,
 		Registry:   GetRegistry(),
 	}
 

@@ -79,13 +79,17 @@ func runVet(cmd *cobra.Command, args []string) error {
 		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
 	}
 
+	// Resolve flags with global fallback
+	namespace := resolveFlag(vetNamespaceFlag, GetNamespace())
+	provider := resolveFlag(vetProviderFlag, GetProvider())
+
 	// Build render options
 	opts := build.RenderOptions{
 		ModulePath: modulePath,
 		Values:     vetValuesFlags,
 		Name:       vetReleaseNameFlag,
-		Namespace:  vetNamespaceFlag,
-		Provider:   vetProviderFlag,
+		Namespace:  namespace,
+		Provider:   provider,
 		Registry:   GetRegistry(),
 	}
 
