@@ -83,9 +83,7 @@ M1: CLI Stability & Validation
  │
  ├──► M3: Distribution
  │     │
- │     ├── config-registries-v1 (MAJOR)
  │     ├── distribution-v1
- │     │     └──► config-registries-v1
  │     └── templates-v2
  │           └──► distribution-v1
  │
