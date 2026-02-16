@@ -38,7 +38,7 @@ config: {
 	}
 
 	// log controls logging behavior.
-	log?: {
+	log: {
 		// timestamps controls whether timestamps are shown in log output.
 		// Override with --timestamps flag.
 		timestamps: true
@@ -46,10 +46,10 @@ config: {
 		// kubernetes controls Kubernetes-related log behavior.
 		kubernetes: {
 			// apiWarnings controls how K8s API deprecation warnings are displayed.
-			// "warn"     - Show as WARN in log output (default)
-			// "debug"    - Only show with --verbose
+			// "warn"     - Show as WARN in log output
+			// "debug"    - Only show with --verbose (default)
 			// "suppress" - Drop entirely
-			apiWarnings: "warn"
+			apiWarnings: "debug"
 		}
 	}
 }
