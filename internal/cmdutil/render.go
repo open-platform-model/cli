@@ -6,35 +6,9 @@ import (
 
 	"github.com/opmodel/cli/internal/build"
 	"github.com/opmodel/cli/internal/config"
+	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
 )
-
-// Exit codes — mirrors internal/cmd exit codes.
-// Duplicated here to avoid importing cmd from cmdutil.
-const (
-	exitGeneralError    = 1
-	exitValidationError = 2
-)
-
-// ExitError wraps an error with an exit code.
-// This is the same type as cmd.ExitError — cmdutil returns plain errors
-// that cmd can type-assert or wrap as needed.
-type ExitError struct {
-	Code    int
-	Err     error
-	Printed bool
-}
-
-func (e *ExitError) Error() string {
-	if e.Err != nil {
-		return e.Err.Error()
-	}
-	return fmt.Sprintf("exit code %d", e.Code)
-}
-
-func (e *ExitError) Unwrap() error {
-	return e.Err
-}
 
 // RenderModuleOpts holds the inputs for RenderModule.
 type RenderModuleOpts struct {
@@ -62,7 +36,7 @@ func RenderModule(ctx context.Context, opts RenderModuleOpts) (*build.RenderResu
 
 	// Validate OPM config is loaded
 	if opts.OPMConfig == nil {
-		return nil, &ExitError{Code: exitGeneralError, Err: fmt.Errorf("configuration not loaded")}
+		return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
 	}
 
 	// Resolve Kubernetes configuration
@@ -80,9 +54,9 @@ func RenderModule(ctx context.Context, opts RenderModuleOpts) (*build.RenderResu
 		providerFlag = opts.Render.Provider
 	}
 
-	k8sConfig, err := resolveKubernetes(opts.OPMConfig, kubeconfigFlag, contextFlag, namespaceFlag, providerFlag)
+	k8sConfig, err := ResolveKubernetes(opts.OPMConfig, kubeconfigFlag, contextFlag, namespaceFlag, providerFlag)
 	if err != nil {
-		return nil, &ExitError{Code: exitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
 	namespace := k8sConfig.Namespace.Value
@@ -121,7 +95,7 @@ func RenderModule(ctx context.Context, opts RenderModuleOpts) (*build.RenderResu
 	}
 
 	if err := renderOpts.Validate(); err != nil {
-		return nil, &ExitError{Code: exitGeneralError, Err: err}
+		return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
 	}
 
 	// Create and execute pipeline
@@ -136,7 +110,7 @@ func RenderModule(ctx context.Context, opts RenderModuleOpts) (*build.RenderResu
 	result, err := pipeline.Render(ctx, renderOpts)
 	if err != nil {
 		PrintValidationError("render failed", err)
-		return nil, &ExitError{Code: exitValidationError, Err: err, Printed: true}
+		return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: err, Printed: true}
 	}
 
 	return result, nil
@@ -154,8 +128,8 @@ func ShowRenderOutput(result *build.RenderResult, opts ShowOutputOpts) error {
 	// Check for render errors
 	if result.HasErrors() {
 		PrintRenderErrors(result.Errors)
-		return &ExitError{
-			Code:    exitValidationError,
+		return &oerrors.ExitError{
+			Code:    oerrors.ExitValidationError,
 			Err:     fmt.Errorf("%d render error(s)", len(result.Errors)),
 			Printed: true,
 		}
@@ -182,9 +156,10 @@ func ShowRenderOutput(result *build.RenderResult, opts ShowOutputOpts) error {
 	return nil
 }
 
-// resolveKubernetes resolves Kubernetes configuration values.
-// This mirrors cmd.resolveCommandKubernetes but accepts OPMConfig directly.
-func resolveKubernetes(opmConfig *config.OPMConfig, kubeconfigFlag, contextFlag, namespaceFlag, providerFlag string) (*config.ResolvedKubernetesConfig, error) {
+// ResolveKubernetes resolves Kubernetes configuration values from flags,
+// environment, and config. It accepts an OPMConfig and individual flag values
+// (which may be empty strings) and returns resolved K8s config.
+func ResolveKubernetes(opmConfig *config.OPMConfig, kubeconfigFlag, contextFlag, namespaceFlag, providerFlag string) (*config.ResolvedKubernetesConfig, error) {
 	var cfg *config.Config
 	var providerNames []string
 

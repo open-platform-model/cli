@@ -85,7 +85,8 @@ func runStatus(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 	}
 
 	// Resolve Kubernetes configuration with local flags
-	k8sConfig, err := resolveCommandKubernetes(
+	k8sConfig, err := cmdutil.ResolveKubernetes(
+		GetOPMConfig(),
 		kf.Kubeconfig,
 		kf.Context,
 		rsf.Namespace,

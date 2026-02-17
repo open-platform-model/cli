@@ -1,12 +1,8 @@
 package cmdutil
 
 import (
+	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/kubernetes"
-)
-
-// K8s exit codes — mirrors internal/cmd constants.
-const (
-	exitConnectivityError = 3
 )
 
 // K8sClientOpts holds options for creating a Kubernetes client.
@@ -25,7 +21,7 @@ func NewK8sClient(opts K8sClientOpts) (*kubernetes.Client, error) {
 		APIWarnings: opts.APIWarnings,
 	})
 	if err != nil {
-		return nil, &ExitError{Code: exitConnectivityError, Err: err}
+		return nil, &oerrors.ExitError{Code: oerrors.ExitConnectivityError, Err: err}
 	}
 	return client, nil
 }
