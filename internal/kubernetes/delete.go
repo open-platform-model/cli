@@ -57,6 +57,11 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*deleteRes
 	modLog := output.ModuleLogger(logName)
 
 	// Discover resources via labels
+	output.Debug("discovering release resources",
+		"release", logName,
+		"namespace", opts.Namespace,
+	)
+
 	resources, err := DiscoverResources(ctx, client, DiscoveryOptions{
 		ReleaseName:  opts.ReleaseName,
 		Namespace:    opts.Namespace,
@@ -77,6 +82,8 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*deleteRes
 			Namespace:   opts.Namespace,
 		}
 	}
+
+	output.Debug("discovered resources", "count", len(resources))
 
 	// Sort in reverse weight order (highest weight first = delete webhooks before deployments)
 	sortByWeightDescending(resources)

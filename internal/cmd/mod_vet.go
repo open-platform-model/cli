@@ -72,6 +72,9 @@ func runVet(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags) error {
 
 	// --- Vet-specific logic below ---
 
+	// Create scoped module logger for vet output
+	modLog := output.ModuleLogger(result.Module.Name)
+
 	// Print values validation check line
 	var valuesDetail string
 	if len(rf.Values) > 0 {
@@ -83,19 +86,19 @@ func runVet(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags) error {
 	} else {
 		valuesDetail = "values.cue"
 	}
-	output.Println(output.FormatVetCheck("Values satisfy #config", valuesDetail))
+	modLog.Info(output.FormatVetCheck("Values satisfy #config", valuesDetail))
 
 	// Print per-resource validation lines (skip when --verbose already showed them)
 	if !verboseFlag {
 		for _, res := range result.Resources {
 			line := output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), output.StatusValid)
-			output.Println(line)
+			modLog.Info(line)
 		}
 	}
 
 	// Print final summary
 	summary := fmt.Sprintf("Module valid (%d resources)", result.ResourceCount())
-	output.Println(output.FormatCheckmark(summary))
+	modLog.Info(output.FormatCheckmark(summary))
 
 	return nil
 }

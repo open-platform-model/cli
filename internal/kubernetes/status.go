@@ -69,6 +69,11 @@ type statusResult struct {
 // Returns noResourcesFoundError when no resources match the selector.
 func GetModuleStatus(ctx context.Context, client *Client, opts StatusOptions) (*statusResult, error) {
 	// Discover resources via labels
+	output.Debug("discovering release resources",
+		"release", opts.ReleaseName,
+		"namespace", opts.Namespace,
+	)
+
 	resources, err := DiscoverResources(ctx, client, DiscoveryOptions{
 		ReleaseName: opts.ReleaseName,
 		Namespace:   opts.Namespace,
@@ -77,6 +82,8 @@ func GetModuleStatus(ctx context.Context, client *Client, opts StatusOptions) (*
 	if err != nil {
 		return nil, fmt.Errorf("discovering release resources: %w", err)
 	}
+
+	output.Debug("discovered resources", "count", len(resources))
 
 	// Return error when no resources found
 	if len(resources) == 0 {

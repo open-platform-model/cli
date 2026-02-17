@@ -122,6 +122,11 @@ func DiscoverResources(ctx context.Context, client *Client, opts DiscoveryOption
 		return nil, fmt.Errorf("discovering API resources: %w", err)
 	}
 
+	output.Debug("scanning API resources",
+		"apiResources", len(apiResources),
+		"selector", selector.String(),
+	)
+
 	// Discover resources with the selector
 	resources := discoverWithSelector(ctx, client, apiResources, selector, opts.Namespace, opts.ExcludeOwned)
 
