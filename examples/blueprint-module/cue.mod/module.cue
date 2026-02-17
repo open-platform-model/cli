@@ -4,18 +4,18 @@ language: {
 }
 deps: {
 	"opmodel.dev/blueprints@v0": {
-		v: "v0.1.42"
+		v: "v0.1.43"
 	}
 	"opmodel.dev/core@v0": {
 		v: "v0.1.26"
 	}
 	"opmodel.dev/resources@v0": {
-		v: "v0.2.26"
+		v: "v0.2.27"
 	}
 	"opmodel.dev/schemas@v0": {
-		v: "v0.1.14"
+		v: "v0.1.15"
 	}
 	"opmodel.dev/traits@v0": {
-		v: "v0.1.38"
+		v: "v0.1.39"
 	}
 }
