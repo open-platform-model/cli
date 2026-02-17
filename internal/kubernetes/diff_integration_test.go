@@ -73,6 +73,58 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// --- Integration test: apply then diff with no changes shows no differences ---
+
+func TestDiffIntegration_ApplyThenDiffShowsNoDifferences(t *testing.T) {
+	ctx := context.Background()
+
+	client, err := NewClient(ClientOptions{})
+	require.NoError(t, err, "need a valid kubeconfig for integration tests")
+
+	moduleName := "diff-no-change-test"
+	namespace := "default"
+	comparer := NewComparer()
+
+	// Create and apply a ConfigMap
+	cm := &unstructured.Unstructured{}
+	cm.SetAPIVersion("v1")
+	cm.SetKind("ConfigMap")
+	cm.SetName("opm-diff-no-change-test")
+	cm.SetNamespace(namespace)
+	cm.Object["data"] = map[string]interface{}{
+		"key": "value",
+	}
+
+	resources := []*build.Resource{
+		{Object: cm, Component: "test-component"},
+	}
+	meta := build.ModuleMetadata{
+		Name:      moduleName,
+		Namespace: namespace,
+		Version:   "0.1.0",
+	}
+
+	// Apply
+	applyResult, err := Apply(ctx, client, resources, meta, ApplyOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 1, applyResult.Applied)
+
+	// Diff immediately — with field projection, should show "No differences found"
+	diffResult, err := Diff(ctx, client, resources, meta, comparer)
+	require.NoError(t, err)
+	assert.Equal(t, 0, diffResult.Modified, "apply-then-diff with no changes should report 0 modified")
+	assert.Equal(t, 0, diffResult.Added, "apply-then-diff with no changes should report 0 added")
+	assert.True(t, diffResult.IsEmpty(), "diff result should be empty")
+	assert.Equal(t, "No differences found", diffResult.SummaryLine())
+
+	// Cleanup
+	_, err = Delete(ctx, client, DeleteOptions{
+		ReleaseName: moduleName,
+		Namespace:   namespace,
+	})
+	require.NoError(t, err)
+}
+
 // --- 8.3: Integration test for status reporting health ---
 
 func TestStatusIntegration_ReportsHealth(t *testing.T) {

@@ -159,6 +159,138 @@ func (c *dyffComparer) Compare(rendered, live *unstructured.Unstructured) (strin
 	return buf.String(), nil
 }
 
+// stripServerManagedFields removes well-known server-only fields from a
+// Kubernetes object map. These fields are never present in rendered output
+// and are always noise in diff comparisons.
+func stripServerManagedFields(obj map[string]interface{}) {
+	// Remove top-level status block
+	delete(obj, "status")
+
+	// Remove server-managed metadata fields
+	meta, ok := obj["metadata"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	delete(meta, "managedFields")
+	delete(meta, "uid")
+	delete(meta, "resourceVersion")
+	delete(meta, "creationTimestamp")
+	delete(meta, "generation")
+}
+
+// projectLiveToRendered recursively walks the rendered object and retains
+// only matching paths in a deep copy of the live object. Fields present in
+// live but absent from rendered are server-managed noise and get stripped.
+func projectLiveToRendered(rendered, live map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	for key, renderedVal := range rendered {
+		liveVal, exists := live[key]
+		if !exists {
+			// Key exists in rendered but not in live — keep rendered value
+			// so dyff can show it as a diff (addition).
+			result[key] = renderedVal
+			continue
+		}
+
+		renderedMap, renderedIsMap := renderedVal.(map[string]interface{})
+		liveMap, liveIsMap := liveVal.(map[string]interface{})
+
+		if renderedIsMap && liveIsMap {
+			// Both are maps — recurse
+			projected := projectLiveToRendered(renderedMap, liveMap)
+			// Keep the projected map if it has content, or if the rendered
+			// map was empty (author explicitly declared an empty map — preserve
+			// it so both sides match and dyff sees no spurious diff).
+			if len(projected) > 0 || len(renderedMap) == 0 {
+				result[key] = projected
+			}
+			continue
+		}
+
+		renderedSlice, renderedIsSlice := renderedVal.([]interface{})
+		liveSlice, liveIsSlice := liveVal.([]interface{})
+
+		if renderedIsSlice && liveIsSlice {
+			result[key] = projectSlice(renderedSlice, liveSlice)
+			continue
+		}
+
+		// Scalar or type mismatch — keep the live value
+		result[key] = liveVal
+	}
+
+	return result
+}
+
+// projectSlice projects a live slice to match the structure of a rendered
+// slice. For lists of maps, elements are matched by the "name" field;
+// if no "name" field exists, index-based matching is used.
+// For scalar lists, the live list is kept as-is.
+func projectSlice(rendered, live []interface{}) []interface{} {
+	if len(rendered) == 0 {
+		return live
+	}
+
+	// Check if this is a list of maps
+	if _, ok := rendered[0].(map[string]interface{}); !ok {
+		// Scalar list — keep the live list as-is
+		return live
+	}
+
+	// Build a lookup of live elements by name (if available)
+	liveByName := make(map[string]map[string]interface{})
+	for _, item := range live {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, ok := m["name"].(string)
+		if ok {
+			liveByName[name] = m
+		}
+	}
+
+	result := make([]interface{}, 0, len(rendered))
+	for i, renderedItem := range rendered {
+		renderedMap, ok := renderedItem.(map[string]interface{})
+		if !ok {
+			// Non-map element in a mixed list — keep as-is from live by index
+			if i < len(live) {
+				result = append(result, live[i])
+			} else {
+				result = append(result, renderedItem)
+			}
+			continue
+		}
+
+		// Try matching by name first
+		var liveMap map[string]interface{}
+		if name, ok := renderedMap["name"].(string); ok {
+			liveMap = liveByName[name]
+		}
+
+		// Fall back to index-based matching
+		if liveMap == nil && i < len(live) {
+			if m, ok := live[i].(map[string]interface{}); ok {
+				liveMap = m
+			}
+		}
+
+		if liveMap != nil {
+			projected := projectLiveToRendered(renderedMap, liveMap)
+			if len(projected) > 0 {
+				result = append(result, projected)
+			}
+		} else {
+			// No matching live element — keep rendered (will show as addition)
+			result = append(result, renderedItem)
+		}
+	}
+
+	return result
+}
+
 // FetchLiveState fetches a single resource from the cluster.
 func fetchLiveState(ctx context.Context, client *Client, resource *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	gvr := gvrFromUnstructured(resource)
@@ -208,6 +340,11 @@ func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta
 			result.Warnings = append(result.Warnings, fmt.Sprintf("fetching %s/%s: %v", kind, name, err))
 			continue
 		}
+
+		// Filter live object to only contain fields present in rendered output.
+		// Two-layer filtering: strip server metadata, then project to rendered paths.
+		stripServerManagedFields(live.Object)
+		live.Object = projectLiveToRendered(obj.Object, live.Object)
 
 		// Resource exists on both sides — compare
 		diffOutput, err := comparer.Compare(obj, live)
