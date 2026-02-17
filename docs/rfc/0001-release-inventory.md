@@ -8,20 +8,13 @@
 
 ## Summary
 
-Introduce a lightweight release inventory stored as a Kubernetes Secret that
-tracks which resources belong to a ModuleRelease. This enables automatic pruning
-of stale resources during `opm mod apply` and provides a precise source of truth
-for `diff`, `delete`, and `status` commands. The Secret also maintains a history
-of changes, enabling future rollback capabilities.
+Introduce a lightweight release inventory stored as a Kubernetes Secret that tracks which resources belong to a ModuleRelease. This enables automatic pruning of stale resources during `opm mod apply` and provides a precise source of truth for `diff`, `delete`, and `status` commands. The Secret also maintains a history of changes, enabling future rollback capabilities.
 
 ## Motivation
 
 ### Current State: OPM is Stateless
 
-Today, OPM uses **label-based discovery only**. When resources are applied, OPM
-labels are injected, but no record of the applied set is stored anywhere. All
-subsequent operations (`delete`, `status`, `diff`) rediscover resources by
-querying the Kubernetes API with label selectors.
+Today, OPM uses **label-based discovery only**. When resources are applied, OPM labels are injected, but no record of the applied set is stored anywhere. All subsequent operations (`delete`, `status`, `diff`) rediscover resources by querying the Kubernetes API with label selectors.
 
 ```text
 ┌───────────────────────────────────────────────────────┐
@@ -48,8 +41,7 @@ This works for simple cases but has known gaps:
 1. **No orphan cleanup**: If a value change causes a resource to be renamed, the
    old resource becomes an orphan. `apply` does not clean it up.
 2. **No stored values**: Unlike Helm, OPM does not record what values were used
-   for a deployment. You cannot reconstruct "what was applied" without the
-   original module source and values.
+   for a deployment. You cannot reconstruct "what was applied" without the    original module source and values.
 3. **Noisy diff**: `opm mod diff` scans ALL API types with label selectors,
    which is slow and can produce false positives from label overlap.
 4. **No automatic pruning**: Orphaned resources are detected by `diff` but not
@@ -92,16 +84,13 @@ The core motivating scenario. Consider an application "Jellyfin":
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-Tools like bare `kubectl apply` and `kustomize` cannot handle this. The resource
-is lost and will not be removed or recreated. A release inventory solves this by
-tracking the previous set and computing the diff.
+Tools like bare `kubectl apply` and `kustomize` cannot handle this. The resource is lost and will not be removed or recreated. A release inventory solves this by tracking the previous set and computing the diff.
 
 ## Prior Art
 
 ### Industry Approaches
 
-Research was conducted across all major Kubernetes deployment tools to understand
-the landscape of release state storage:
+Research was conducted across all major Kubernetes deployment tools to understand the landscape of release state storage:
 
 #### Helm (Secrets — heavy)
 
@@ -120,15 +109,11 @@ Secret: sh.helm.release.v1.<name>.v<revision>
       - status, timestamps, version
 ```
 
-Multiple revisions are kept for rollback (default: 10). This enables full
-rollback from stored manifests but can hit the 1MB etcd size limit with large
-charts.
+Multiple revisions are kept for rollback (default: 10). This enables full rollback from stored manifests but can hit the 1MB etcd size limit with large charts.
 
 #### Timoni (Secrets — lightweight, single typed object)
 
-Timoni stores a **lightweight** inventory in a Secret. Unlike Helm, it does NOT
-store full rendered manifests. All state is wrapped in a single `data.instance`
-field containing a typed JSON blob:
+Timoni stores a **lightweight** inventory in a Secret. Unlike Helm, it does NOT store full rendered manifests. All state is wrapped in a single `data.instance` field containing a typed JSON blob:
 
 ```yaml
 apiVersion: v1
@@ -145,8 +130,7 @@ data:
   instance: <single JSON blob>
 ```
 
-The JSON blob is a typed object with `kind`/`apiVersion`, structured like a
-Kubernetes resource:
+The JSON blob is a typed object with `kind`/`apiVersion`, structured like a Kubernetes resource:
 
 ```json
 {
@@ -184,8 +168,7 @@ Key characteristics:
 - **Module digest**: OCI content-addressable digest for reproducibility.
 - **lastTransitionTime**: Timestamp of the last apply operation.
 - **No rendered manifests**: Since module source + values are known, manifests
-  can always be re-rendered. This keeps the Secret small (~2-5KB per instance
-  vs ~100KB+ per revision for Helm).
+  can always be re-rendered. This keeps the Secret small (~2-5KB per instance   vs ~100KB+ per revision for Helm).
 
 #### Carvel kapp (ConfigMaps)
 
@@ -211,14 +194,11 @@ status:
 
 #### ArgoCD (CRD + annotations/labels)
 
-ArgoCD uses an `Application` CRD as the source of truth. Resources are tracked
-via configurable methods: labels, annotations, or both. The annotation format
-encodes `name:namespace:group/kind`.
+ArgoCD uses an `Application` CRD as the source of truth. Resources are tracked via configurable methods: labels, annotations, or both. The annotation format encodes `name:namespace:group/kind`.
 
 #### Crossplane (CRD + ownerReferences)
 
-Crossplane uses Composite resources with `ownerReferences` on all composed
-resources, enabling native Kubernetes garbage collection.
+Crossplane uses Composite resources with `ownerReferences` on all composed resources, enabling native Kubernetes garbage collection.
 
 #### Server-Side Apply managedFields (Kubernetes native)
 
@@ -227,8 +207,7 @@ SSA with a named field manager tracks which **fields** are owned, but not which
 
 #### External Storage (Helm SQL driver, Pulumi)
 
-Helm supports a SQL driver. Pulumi stores state in cloud backends. These have
-no cluster size limits but introduce external dependencies.
+Helm supports a SQL driver. Pulumi stores state in cloud backends. These have no cluster size limits but introduce external dependencies.
 
 ### Comparison Matrix
 
@@ -255,9 +234,7 @@ no cluster size limits but introduce external dependencies.
 
 ### Why Timoni-Style
 
-OPM and Timoni are sibling projects in spirit — both CUE-based, both
-CLI-driven, both module-oriented. Timoni's lightweight inventory approach is the
-best fit because:
+OPM and Timoni are sibling projects in spirit — both CUE-based, both CLI-driven, both module-oriented. Timoni's lightweight inventory approach is the best fit because:
 
 1. **You already have the module source + values** — you can re-render anytime,
    so storing full manifests (like Helm) is wasteful.
@@ -286,56 +263,33 @@ best fit because:
 
 ### Learnings from Timoni
 
-After studying Timoni's actual implementation (not just its documentation), we
-identified specific design patterns worth adopting:
+After studying Timoni's actual implementation (not just its documentation), we identified specific design patterns worth adopting:
 
 1. **Single typed object, not multiple data fields.** Timoni wraps all state in
-   one JSON blob with `kind`/`apiVersion`. This allows the entire format to
-   evolve — bump `apiVersion` and handle old + new formats during migration.
-   With separate `data` fields, versioning each independently becomes messy.
-   The typed blob also maps directly to a future CRD: the JSON blob IS the CRD
-   spec, just stored in a Secret for now.
+   one JSON blob with `kind`/`apiVersion`. This allows the entire format to    evolve — bump `apiVersion` and handle old + new formats during migration.    With separate `data` fields, versioning each independently becomes messy.    The typed blob also maps directly to a future CRD: the JSON blob IS the CRD    spec, just stored in a Secret for now.
 
 2. **Version separated from identity.** Timoni's inventory entries use a compact
-   ID for identity and a separate `"v"` field for API version. This prevents
-   false orphans during Kubernetes API version migrations (e.g., Ingress moving
-   from `v1beta1` to `v1`). If version were part of the identity, an API upgrade
-   would make the old entry look stale and trigger a spurious delete.
+   ID for identity and a separate `"v"` field for API version. This prevents    false orphans during Kubernetes API version migrations (e.g., Ingress moving    from `v1beta1` to `v1`). If version were part of the identity, an API upgrade    would make the old entry look stale and trigger a spurious delete.
 
 3. **Values in native format.** Timoni stores CUE values as a CUE-formatted
-   string, not converted to JSON. This preserves the source language and keeps
-   values human-readable when inspecting the Secret.
+   string, not converted to JSON. This preserves the source language and keeps    values human-readable when inspecting the Secret.
 
 4. **Module digest for reproducibility.** Timoni records the OCI digest
-   alongside version. Version tags are mutable (someone can push to the same
-   tag), but digests are immutable — they prove exactly which module bits were
-   applied. OPM defers this: CUE modules are resolved by the CUE SDK, not a
-   custom OCI artifact, so module digests are not directly accessible. OPM uses
-   a `manifestDigest` (hash of rendered output) instead to achieve comparable
-   change detection.
+   alongside version. Version tags are mutable (someone can push to the same    tag), but digests are immutable — they prove exactly which module bits were    applied. OPM defers this: CUE modules are resolved by the CUE SDK, not a    custom OCI artifact, so module digests are not directly accessible. OPM uses    a `manifestDigest` (hash of rendered output) instead to achieve comparable    change detection.
 
 5. **lastTransitionTime.** A simple timestamp of when the last apply happened.
    Cheap to add, useful for debugging and status reporting.
 
 6. **Distinguishing label.** Timoni labels its inventory Secret with
-   `app.kubernetes.io/component: instance` to distinguish it from application
-   resources. This prevents the inventory Secret from appearing alongside
-   workload resources in label-based queries.
+   `app.kubernetes.io/component: instance` to distinguish it from application    resources. This prevents the inventory Secret from appearing alongside    workload resources in label-based queries.
 
-OPM adopts these patterns, adapted to its own domain model and naming
-conventions. Key divergences: OPM uses CUE module paths instead of OCI
-references for module identification (since OPM uses CUE modules directly,
-not custom OCI artifacts), and explicit JSON fields instead of Timoni's compact
-underscore-separated string IDs for inventory entries (to avoid parsing
-ambiguity when names contain underscores).
+OPM adopts these patterns, adapted to its own domain model and naming conventions. Key divergences: OPM uses CUE module paths instead of OCI references for module identification (since OPM uses CUE modules directly, not custom OCI artifacts), and explicit JSON fields instead of Timoni's compact underscore-separated string IDs for inventory entries (to avoid parsing ambiguity when names contain underscores).
 
 ## Design
 
 ### Secret Structure Overview
 
-A single Kubernetes Secret per release contains all state: release metadata, a
-change history index, and individual change entries. This keeps all release state
-co-located and atomically updatable.
+A single Kubernetes Secret per release contains all state: release metadata, a change history index, and individual change entries. This keeps all release state co-located and atomically updatable.
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
@@ -353,9 +307,7 @@ co-located and atomically updatable.
 
 ### Metadata Field
 
-The `data.metadata` field contains release-level information as a typed JSON
-object with `kind`/`apiVersion`, following Timoni's pattern. This enables schema
-versioning and maps directly to a future CRD.
+The `data.metadata` field contains release-level information as a typed JSON object with `kind`/`apiVersion`, following Timoni's pattern. This enables schema versioning and maps directly to a future CRD.
 
 ```json
 {
@@ -385,8 +337,7 @@ The `data.index` field is a JSON array of change IDs, ordered newest first:
 ["change-sha1-7f2c9d01", "change-sha1-a3b8f2e1"]
 ```
 
-The first entry is always the current (latest) change. The CLI is responsible
-for maintaining this ordering.
+The first entry is always the current (latest) change. The CLI is responsible for maintaining this ordering.
 
 ### Change Entries
 
@@ -423,60 +374,28 @@ Each `data.change-sha1-<id>` field contains the full state for a single change:
 | `inventory.entries[]`         | Array of resource identity objects               | Pruning, diff, delete, status      |
 
 **Values**: Stored as a CUE-formatted string (native format), not converted to
-JSON. File paths are not stored — they are meaningless on a different machine or
-CI runner. The resolved values are the actual input that produced the rendered
-resources.
+JSON. File paths are not stored — they are meaningless on a different machine or CI runner. The resolved values are the actual input that produced the rendered resources.
 
 **Module path**: The CUE module path from `cue.mod/module.cue` (e.g.,
-`opmodel.dev/modules/minecraft@v0`). This is the canonical module identity in
-the CUE ecosystem — the CUE SDK maps it to an OCI registry lookup automatically
-via the `CUE_REGISTRY` environment variable. OPM uses CUE modules directly
-rather than publishing custom OCI artifacts, so this path (not an OCI reference)
-is the correct identifier. The path is always present since CUE requires a
-`module:` declaration in every module.
+`opmodel.dev/modules/minecraft@v0`). This is the canonical module identity in the CUE ecosystem — the CUE SDK maps it to an OCI registry lookup automatically via the `CUE_REGISTRY` environment variable. OPM uses CUE modules directly rather than publishing custom OCI artifacts, so this path (not an OCI reference) is the correct identifier. The path is always present since CUE requires a `module:` declaration in every module.
 
 **Module version**: For published modules, this is the semver version from
-`metadata.version`. For local development modules that have not been versioned,
-the `version` field is replaced with `"local": true` to indicate the module was
-applied from a local filesystem path without a published version.
+`metadata.version`. For local development modules that have not been versioned, the `version` field is replaced with `"local": true` to indicate the module was applied from a local filesystem path without a published version.
 
 **Manifest digest**: A SHA256 hash of the deterministically serialized rendered
-manifests. This captures any change to the module output — including template
-changes in local modules where `module.version` may not change between edits.
-This field is always present regardless of whether the module is published or
-local.
+manifests. This captures any change to the module output — including template changes in local modules where `module.version` may not change between edits. This field is always present regardless of whether the module is published or local.
 
 **Inventory entry identity**: Each entry has fields `group`, `kind`,
-`namespace`, `name`, `component` (the identity) and `v` (the API version, stored
-separately). Set operations for pruning use the identity fields. The `v` field is
-used when fetching or deleting the resource from the cluster. Separating version
-from identity prevents false orphans when Kubernetes API versions change (e.g.,
-Ingress migrating from `networking.k8s.io/v1beta1` to `networking.k8s.io/v1`).
+`namespace`, `name`, `component` (the identity) and `v` (the API version, stored separately). Set operations for pruning use the identity fields. The `v` field is used when fetching or deleting the resource from the cluster. Separating version from identity prevents false orphans when Kubernetes API versions change (e.g., Ingress migrating from `networking.k8s.io/v1beta1` to `networking.k8s.io/v1`).
 
-The `component` field records which module component produced the resource (e.g.,
-`"app"`, `"cache"`, `"worker"`). This enables `opm mod status` to group resources
-by component when displaying release health, using only the inventory — no need
-to read labels back from the cluster. Including component in identity means the
-inventory can precisely track which component owns which resource. However,
-because Kubernetes itself identifies resources by GVK + namespace + name (without
-component), a **component rename safety check** is required during pruning to
-prevent a component rename from triggering a spurious delete (see Apply Flow,
-Step 5b).
+The `component` field records which module component produced the resource (e.g., `"app"`, `"cache"`, `"worker"`). This enables `opm mod status` to group resources by component when displaying release health, using only the inventory — no need to read labels back from the cluster. Including component in identity means the inventory can precisely track which component owns which resource. However, because Kubernetes itself identifies resources by GVK + namespace + name (without component), a **component rename safety check** is required during pruning to prevent a component rename from triggering a spurious delete (see Apply Flow, Step 5b).
 
 **What gets tracked**: The inventory contains **only resources that OPM directly
-renders** — the output of the build pipeline. Derived resources that Kubernetes
-automatically creates (Endpoints for Services, ReplicaSets for Deployments, Pods
-for StatefulSets/Deployments, etc.) are NOT tracked. When OPM deletes a release,
-it deletes only the parent resources in the inventory. Kubernetes garbage
-collection handles cleanup of derived child resources automatically. This keeps
-the inventory precise, avoids unnecessary API calls, and respects Kubernetes
-ownership semantics — OPM owns what it renders, not what controllers create in
-response.
+renders** — the output of the build pipeline. Derived resources that Kubernetes automatically creates (Endpoints for Services, ReplicaSets for Deployments, Pods for StatefulSets/Deployments, etc.) are NOT tracked. When OPM deletes a release, it deletes only the parent resources in the inventory. Kubernetes garbage collection handles cleanup of derived child resources automatically. This keeps the inventory precise, avoids unnecessary API calls, and respects Kubernetes ownership semantics — OPM owns what it renders, not what controllers create in response.
 
 ### Change ID
 
-Each change is identified by a deterministic SHA1 hash, truncated to 8 hex
-characters. The data key format is `change-sha1-<8chars>`.
+Each change is identified by a deterministic SHA1 hash, truncated to 8 hex characters. The data key format is `change-sha1-<8chars>`.
 
 **Hash inputs:**
 
@@ -489,9 +408,7 @@ change ID = SHA1(
 )
 ```
 
-The `manifestDigest` is computed first as a SHA256 of the deterministically
-serialized rendered manifests, then included as an input to the change ID hash.
-This means the change ID captures all four dimensions of what defines a change:
+The `manifestDigest` is computed first as a SHA256 of the deterministically serialized rendered manifests, then included as an input to the change ID hash. This means the change ID captures all four dimensions of what defines a change:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
@@ -509,23 +426,14 @@ This means the change ID captures all four dimensions of what defines a change:
 
 **Why all four inputs?**
 
-The `manifestDigest` alone would be sufficient for local modules, but including
-`path` and `version` ensures that module upgrades are always recorded as distinct
-changes — even if the rendered output happens to be identical.
-Including `values` ensures that a value change that produces the same output
-(e.g., setting a default explicitly) is also recorded.
+The `manifestDigest` alone would be sufficient for local modules, but including `path` and `version` ensures that module upgrades are always recorded as distinct changes — even if the rendered output happens to be identical. Including `values` ensures that a value change that produces the same output (e.g., setting a default explicitly) is also recorded.
 
 **Deterministic manifest serialization:** The `manifestDigest` requires
-that identical resources always produce identical bytes when serialized. This is
-achievable with Go's standard library (see [Deterministic Manifest
-Serialization](#deterministic-manifest-serialization) for the full algorithm and
-analysis of existing codebase support).
+that identical resources always produce identical bytes when serialized. This is achievable with Go's standard library (see [Deterministic Manifest Serialization](#deterministic-manifest-serialization) for the full algorithm and analysis of existing codebase support).
 
 **Idempotent re-applies:**
 
-With a deterministic hash, reapplying the exact same configuration produces the
-same change ID. This means the existing change entry is overwritten (with an
-updated timestamp) rather than creating a duplicate entry:
+With a deterministic hash, reapplying the exact same configuration produces the same change ID. This means the existing change entry is overwritten (with an updated timestamp) rather than creating a duplicate entry:
 
 ```text
 Apply #1: module=1.0.0, values=X, output=Y → change-sha1-a3b8f2e1 (created)
@@ -536,17 +444,11 @@ Apply #4: module=1.1.0, values=X, output=Z → change-sha1-7f2c9d01 (overwritten
 Index after: ["change-sha1-7f2c9d01", "change-sha1-a3b8f2e1"]
 ```
 
-History only grows when the inputs **actually change**. Idempotent re-applies
-update the existing entry's timestamp and inventory, then bump it to the front
-of the index. This keeps the change history meaningful — it tracks state
-transitions, not CLI invocations.
+History only grows when the inputs **actually change**. Idempotent re-applies update the existing entry's timestamp and inventory, then bump it to the front of the index. This keeps the change history meaningful — it tracks state transitions, not CLI invocations.
 
 ### Deterministic Manifest Serialization
 
-The `manifestDigest` is a SHA256 hash of the rendered manifests, serialized
-deterministically so that identical resource content always produces the same
-digest. This section documents the algorithm and the codebase properties that
-make it reliable.
+The `manifestDigest` is a SHA256 hash of the rendered manifests, serialized deterministically so that identical resource content always produces the same digest. This section documents the algorithm and the codebase properties that make it reliable.
 
 #### Algorithm
 
@@ -589,38 +491,23 @@ make it reliable.
 
 #### Why This Works: Codebase Analysis
 
-Investigation of the OPM codebase and Go standard library confirms that
-deterministic serialization is achievable with minimal changes.
+Investigation of the OPM codebase and Go standard library confirms that deterministic serialization is achievable with minimal changes.
 
 **JSON key ordering is guaranteed.** Go's `encoding/json.Marshal` sorts map keys
-alphabetically for `map[string]interface{}`. This is documented Go behavior
-(since Go 1). Since `unstructured.Unstructured` is backed by
-`map[string]interface{}`, and its `MarshalJSON()` method delegates to
-`json.Encode(t.Object)`, serializing any individual resource with `json.Marshal`
-already produces deterministic output. No custom serializer is needed.
+alphabetically for `map[string]interface{}`. This is documented Go behavior (since Go 1). Since `unstructured.Unstructured` is backed by `map[string]interface{}`, and its `MarshalJSON()` method delegates to `json.Encode(t.Object)`, serializing any individual resource with `json.Marshal` already produces deterministic output. No custom serializer is needed.
 
 **CUE evaluation is deterministic.** CUE structs have deterministic field
-ordering. When decoded into Go maps via `cue.Value.Decode()`, the CUE field
-ordering is lost (Go maps do not preserve insertion order), but this does not
-matter because `json.Marshal` sorts keys independently.
+ordering. When decoded into Go maps via `cue.Value.Decode()`, the CUE field ordering is lost (Go maps do not preserve insertion order), but this does not matter because `json.Marshal` sorts keys independently.
 
 **Resource normalization already sorts.** The `normalizeK8sResource()` functions
-in `internal/build/executor.go` already sort map keys alphabetically when
-converting OPM-style maps to Kubernetes arrays (`mapToPortsArray`,
-`mapToEnvArray`, `mapToVolumeMountsArray`, `mapToVolumesArray`).
+in `internal/build/executor.go` already sort map keys alphabetically when converting OPM-style maps to Kubernetes arrays (`mapToPortsArray`, `mapToEnvArray`, `mapToVolumeMountsArray`, `mapToVolumesArray`).
 
 #### What Requires Attention
 
 **Resource list ordering needs a total ordering.** The current pipeline sort in
-`internal/build/pipeline.go:153-157` uses `sort.Slice` with weight-only
-comparison. Resources with the same weight (e.g., two Services) can appear in
-either order depending on Go map iteration in the executor. For the digest to be
-deterministic, the sort must have tiebreakers that produce a total ordering.
+`internal/build/pipeline.go:153-157` uses `sort.Slice` with weight-only comparison. Resources with the same weight (e.g., two Services) can appear in either order depending on Go map iteration in the executor. For the digest to be deterministic, the sort must have tiebreakers that produce a total ordering.
 
-The existing `sortResourceInfos` in `internal/output/manifest.go:58-77` already
-implements the correct pattern — sorting by weight, then namespace, then name.
-The digest sort extends this with API group and kind as additional tiebreakers
-to handle resources of different types that share the same weight:
+The existing `sortResourceInfos` in `internal/output/manifest.go:58-77` already implements the correct pattern — sorting by weight, then namespace, then name. The digest sort extends this with API group and kind as additional tiebreakers to handle resources of different types that share the same weight:
 
 ```text
 Current (pipeline.go — insufficient):
@@ -637,23 +524,14 @@ Existing model (manifest.go — close):
 ```
 
 **Executor job ordering is non-deterministic.** The `Executor.ExecuteWithTransformers()`
-in `internal/build/executor.go:58-72` iterates `match.ByTransformer`, which is a
-Go `map[string][]*LoadedComponent`. Go map iteration is non-deterministic, so the
-order resources are produced varies between runs. This does NOT affect the digest
-because the digest sort (Step 1) re-orders resources after execution. The
-executor ordering only affects the input to the sort, not the output.
+in `internal/build/executor.go:58-72` iterates `match.ByTransformer`, which is a Go `map[string][]*LoadedComponent`. Go map iteration is non-deterministic, so the order resources are produced varies between runs. This does NOT affect the digest because the digest sort (Step 1) re-orders resources after execution. The executor ordering only affects the input to the sort, not the output.
 
 **Server-generated fields are not present.** Since the digest is computed from
-rendered output (before apply, not after), server-generated fields like
-`metadata.resourceVersion`, `metadata.uid`, `metadata.creationTimestamp`,
-`metadata.managedFields`, and `status` are not present in the serialized data.
-If a CUE template were to explicitly set any of these fields, they would be
-included in the digest — this is correct behavior (the template output changed).
+rendered output (before apply, not after), server-generated fields like `metadata.resourceVersion`, `metadata.uid`, `metadata.creationTimestamp`, `metadata.managedFields`, and `status` are not present in the serialized data. If a CUE template were to explicitly set any of these fields, they would be included in the digest — this is correct behavior (the template output changed).
 
 #### Fields Included and Excluded
 
-The digest is computed from the rendered resource as-is. Since rendering happens
-before apply, the resource contains only user-defined fields:
+The digest is computed from the rendered resource as-is. Since rendering happens before apply, the resource contains only user-defined fields:
 
 ```text
 Included (present in rendered output):
@@ -673,10 +551,7 @@ Not present (server-generated, only exist after apply):
   [ ] status
 ```
 
-Note: OPM labels are injected by CUE transformers during the render pipeline,
-which is BEFORE the digest is computed. The digest therefore includes OPM labels
-as part of the rendered output. This is the correct behavior — labels are part
-of the module's declared intent, not a post-processing concern.
+Note: OPM labels are injected by CUE transformers during the render pipeline, which is BEFORE the digest is computed. The digest therefore includes OPM labels as part of the rendered output. This is the correct behavior — labels are part of the module's declared intent, not a post-processing concern.
 
 ### Change History Pruning
 
@@ -697,15 +572,9 @@ On each successful apply:
 
 ### Secret Update Semantics
 
-The inventory Secret is always updated with a **full PUT** (replace the entire
-Secret). Read the Secret, modify the in-memory representation (add/update change
-entry, update index, update metadata, prune old changes), then write the whole
-thing back.
+The inventory Secret is always updated with a **full PUT** (replace the entire Secret). Read the Secret, modify the in-memory representation (add/update change entry, update index, update metadata, prune old changes), then write the whole thing back.
 
-This is atomic, simple, and safe. Since OPM is a CLI tool (not a controller),
-concurrent writers to the same release are not a realistic concern. If two
-humans run `opm mod apply` against the same release simultaneously, they already
-have bigger problems than Secret contention.
+This is atomic, simple, and safe. Since OPM is a CLI tool (not a controller), concurrent writers to the same release are not a realistic concern. If two humans run `opm mod apply` against the same release simultaneously, they already have bigger problems than Secret contention.
 
 ### Naming Convention
 
@@ -741,8 +610,7 @@ Remaining:       253 - 41 = 212 chars for release name
 Label check:     "opm" (3 ok), release-name (≤63 ok), UUID (36 ok)
 ```
 
-Release names are already constrained to ≤63 characters (they are used as
-Kubernetes label values), so this fits cleanly.
+Release names are already constrained to ≤63 characters (they are used as Kubernetes label values), so this fits cleanly.
 
 ### Inventory Lookup
 
@@ -750,9 +618,7 @@ The inventory Secret is found by **name convention** (direct GET) with a
 **label-based fallback**:
 
 1. **Primary**: Construct the Secret name from render metadata
-   (`opm.<name>.<release-id>`) and perform a direct `GET`. This is fast (single
-   API call). The release-id is deterministic (UUIDv5 computed from module name +
-   namespace), so it can always be reconstructed from the render output.
+   (`opm.<name>.<release-id>`) and perform a direct `GET`. This is fast (single    API call). The release-id is deterministic (UUIDv5 computed from module name +    namespace), so it can always be reconstructed from the render output.
 
 2. **Fallback**: If the direct GET fails (e.g., naming convention changed), list
    Secrets with label `module-release.opmodel.dev/uuid=<release-id>`.
@@ -770,9 +636,7 @@ labels:
   opmodel.dev/component: inventory
 ```
 
-The `opmodel.dev/component: inventory` label distinguishes the inventory Secret
-from application resources. This prevents it from appearing in label-based
-workload queries while still being discoverable by OPM tooling.
+The `opmodel.dev/component: inventory` label distinguishes the inventory Secret from application resources. This prevents it from appearing in label-based workload queries while still being discoverable by OPM tooling.
 
 This ensures:
 
@@ -783,8 +647,7 @@ This ensures:
 
 ### Full Example Secret
 
-The following is a complete example of an inventory Secret after three applies:
-an initial install, a value change (rename), and a module version upgrade.
+The following is a complete example of an inventory Secret after three applies: an initial install, a value change (rename), and a module version upgrade.
 
 ```yaml
 apiVersion: v1
@@ -873,8 +736,7 @@ In this example:
 - **change-sha1-a3b8f2e1**: Initial install. Module v1.0.0 with name "minecraft".
   Three resources created.
 - **change-sha1-7f2c9d01**: Value change. Same module version, but name changed
-  to "minecraft-server". Resource names changed — the old StatefulSet/minecraft and
-  Service/minecraft were pruned automatically.
+  to "minecraft-server". Resource names changed — the old StatefulSet/minecraft and   Service/minecraft were pruned automatically.
 - **change-sha1-e92f4c01**: Module upgrade to v1.1.0. Same values, but the new
   version added a ConfigMap resource. The index shows this as the latest change.
 
@@ -969,8 +831,7 @@ In this example:
 ### Key Design Decisions
 
 **Create first, then prune.** New resources are applied before stale ones are
-deleted. This is safer — the new Service exists before the old one is removed —
-but briefly doubles the resource count. This is acceptable.
+deleted. This is safer — the new Service exists before the old one is removed — but briefly doubles the resource count. This is acceptable.
 
 **Write nothing on partial failure.** If any resource fails to apply, the
 inventory is NOT updated and stale resources are NOT pruned. This means:
@@ -985,14 +846,7 @@ inventory is NOT updated and stale resources are NOT pruned. This means:
 `--no-prune` flag allows users to skip pruning when desired.
 
 **Component rename safety check.** Because `component` is part of the inventory
-entry identity, a component rename (e.g., `"app"` → `"server"`) makes the old
-entry look stale — it appears in `previous - current`. However, Kubernetes
-identifies resources by GVK + namespace + name only (without component), so
-deleting the "stale" entry would destroy the live resource that the "new" entry
-refers to. Step 5b prevents this: before pruning, each stale entry is checked
-against the current set using only `group + kind + namespace + name`. If a match
-is found (differing only in component), the entry is removed from the stale set.
-This ensures component renames never trigger destructive deletes.
+entry identity, a component rename (e.g., `"app"` → `"server"`) makes the old entry look stale — it appears in `previous - current`. However, Kubernetes identifies resources by GVK + namespace + name only (without component), so deleting the "stale" entry would destroy the live resource that the "new" entry refers to. Step 5b prevents this: before pruning, each stale entry is checked against the current set using only `group + kind + namespace + name`. If a match is found (differing only in component), the entry is removed from the stale set. This ensures component renames never trigger destructive deletes.
 
 ## Command Impact
 
@@ -1147,9 +1001,7 @@ This ghost resource:
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-This is acceptable. Ghost resources are a rare edge case (partial failure
-followed by a revert). Label-based discovery handles them. A future "Layer 2"
-enhancement can add automatic ghost cleanup (see Deferred Work).
+This is acceptable. Ghost resources are a rare edge case (partial failure followed by a revert). Label-based discovery handles them. A future "Layer 2" enhancement can add automatic ghost cleanup (see Deferred Work).
 
 ### Scenario G: Resource Kind Changes [x]
 
@@ -1195,15 +1047,11 @@ Apply #2: local module, values=X, manifests produce digest D2 (≠ D1)
   Result: Template changes in local modules are correctly tracked. [x]
 ```
 
-Without `manifestDigest` in the hash inputs, both applies would produce the same
-change ID (repository and version are both empty, values are the same). The
-`manifestDigest` captures what actually changed — the rendered output.
+Without `manifestDigest` in the hash inputs, both applies would produce the same change ID (repository and version are both empty, values are the same). The `manifestDigest` captures what actually changed — the rendered output.
 
 ### Scenario J: Component Rename (Safety Check) [x]
 
-A module author renames a component from `"app"` to `"server"`. The resources
-it produces are identical — same GVK, same namespace, same name. Only the
-component provenance changes.
+A module author renames a component from `"app"` to `"server"`. The resources it produces are identical — same GVK, same namespace, same name. Only the component provenance changes.
 
 ```text
 v1: Component "app" produces StatefulSet and Service
@@ -1226,15 +1074,11 @@ Apply all OK → nothing to prune → write inventory
 Result: Clean. No destructive delete from a component rename. [x]
 ```
 
-Without the safety check, all three resources would be deleted and immediately
-recreated — causing pod restarts, potential PVC orphaning, and unnecessary
-downtime. The safety check recognizes that the Kubernetes resources are the same
-and only the OPM-level provenance changed.
+Without the safety check, all three resources would be deleted and immediately recreated — causing pod restarts, potential PVC orphaning, and unnecessary downtime. The safety check recognizes that the Kubernetes resources are the same and only the OPM-level provenance changed.
 
 ### Scenario K: Pre-existing Untracked Resources
 
-First-time apply (no inventory Secret) where resources with matching
-GVK + namespace + name already exist on the cluster.
+First-time apply (no inventory Secret) where resources with matching GVK + namespace + name already exist on the cluster.
 
 ```text
 Inventory: none (first-time apply)
@@ -1253,13 +1097,9 @@ Apply FAILS before any resource is touched:
 Result: Fail-safe. No silent adoption of untracked resources. [ ]
 ```
 
-This prevents OPM from accidentally patching resources created by `kubectl`,
-Helm, or another OPM release. Without this check, SSA apply would merge into
-the existing resource and add it to the inventory — potentially corrupting
-configuration managed by another tool.
+This prevents OPM from accidentally patching resources created by `kubectl`, Helm, or another OPM release. Without this check, SSA apply would merge into the existing resource and add it to the inventory — potentially corrupting configuration managed by another tool.
 
-The `--adopt` flag is a future escape hatch for intentional adoption (see Open
-Questions).
+The `--adopt` flag is a future escape hatch for intentional adoption (see Open Questions).
 
 ### Scenario L: Resource in Terminating State
 
@@ -1282,19 +1122,13 @@ Apply FAILS before any resource is touched:
 Result: Fail-safe. No race condition with pending deletion. [ ]
 ```
 
-Kubernetes accepts patches on terminating resources (SSA apply returns success)
-until finalizers complete. Without this check, the apply would "succeed" but
-the resource would be garbage-collected shortly after when finalizers finish —
-leaving the inventory pointing to resources that no longer exist.
+Kubernetes accepts patches on terminating resources (SSA apply returns success) until finalizers complete. Without this check, the apply would "succeed" but the resource would be garbage-collected shortly after when finalizers finish — leaving the inventory pointing to resources that no longer exist.
 
-This check applies to ALL resources, not just PVCs. Any resource in a
-terminating state should block the apply.
+This check applies to ALL resources, not just PVCs. Any resource in a terminating state should block the apply.
 
 ### Scenario M: Cross-Namespace Resource Migration
 
-A value change moves resources from one namespace to another. The inventory
-tracks per-entry namespaces, so the stale set is correct. But pruning requires
-DELETE permission in the **old** namespace.
+A value change moves resources from one namespace to another. The inventory tracks per-entry namespaces, so the stale set is correct. But pruning requires DELETE permission in the **old** namespace.
 
 ```text
 v1: Module produces resources in namespace "games"
@@ -1314,16 +1148,11 @@ Result: Requires cross-namespace RBAC for pruning. [ ]
         Stale resources in "games" become orphans if RBAC is insufficient.
 ```
 
-This also applies to modules that produce resources in multiple namespaces
-simultaneously (e.g., `ConfigMap` in `kube-system` and `Deployment` in
-`default`). The prune operation must handle each resource's actual namespace
-from the inventory entry, not a single `--namespace` flag.
+This also applies to modules that produce resources in multiple namespaces simultaneously (e.g., `ConfigMap` in `kube-system` and `Deployment` in `default`). The prune operation must handle each resource's actual namespace from the inventory entry, not a single `--namespace` flag.
 
 ### Scenario N: CRD and Custom Resource in Same Module
 
-A module bundles a CRD and instances of that CRD. The weight system applies
-CRDs first (weight -100) and custom resources last (weight 1000). But there is
-no wait for CRD establishment between weight groups.
+A module bundles a CRD and instances of that CRD. The weight system applies CRDs first (weight -100) and custom resources last (weight 1000). But there is no wait for CRD establishment between weight groups.
 
 ```text
 Module produces a CRD and an instance of that CRD:
@@ -1343,16 +1172,11 @@ BUT: First-time users will be confused by the deterministic failure.
      Future mitigation: poll for CRD readiness between weight groups.
 ```
 
-The inventory design handles this correctly — partial failure means no
-inventory write, and retry converges. This is a known first-apply pain point
-for CRD-producing modules, not an inventory format problem.
+The inventory design handles this correctly — partial failure means no inventory write, and retry converges. This is a known first-apply pain point for CRD-producing modules, not an inventory format problem.
 
 ### Scenario O: Namespace as Module Output + Pruning
 
-A module produces a Namespace resource alongside application resources. When
-the module is deleted or the Namespace becomes stale, pruning the Namespace
-triggers Kubernetes cascading deletion of **everything inside it** — including
-resources from other modules or tools.
+A module produces a Namespace resource alongside application resources. When the module is deleted or the Namespace becomes stale, pruning the Namespace triggers Kubernetes cascading deletion of **everything inside it** — including resources from other modules or tools.
 
 ```text
 v1: Module produces a Namespace and resources within it
@@ -1371,16 +1195,11 @@ v2: Module removes the Namespace component (or module is deleted)
 Result: Namespace pruning is destructive beyond OPM's scope. [ ]
 ```
 
-Recommendation: Exclude `kind: Namespace` from inventory-based pruning by
-default. Require an explicit `--prune-namespaces` flag to override. This
-mirrors Helm's approach of protecting namespaces from release-scoped deletion.
-Alternative: warn during prune if the stale set contains a Namespace and
-require interactive confirmation.
+Recommendation: Exclude `kind: Namespace` from inventory-based pruning by default. Require an explicit `--prune-namespaces` flag to override. This mirrors Helm's approach of protecting namespaces from release-scoped deletion. Alternative: warn during prune if the stale set contains a Namespace and require interactive confirmation.
 
 ### Scenario P: Empty Render Wipes All Resources
 
-A misconfiguration or conditional in CUE causes the module to render zero
-resources. The stale set becomes the entire previous inventory.
+A misconfiguration or conditional in CUE causes the module to render zero resources. The stale set becomes the entire previous inventory.
 
 ```text
 v1: Module renders 5 resources normally
@@ -1398,116 +1217,74 @@ Apply (nothing to apply) → prune ALL 5 resources → write inventory
 Result: Complete wipe from an accidental empty render. [ ]
 ```
 
-This is a dangerous failure mode because the empty render is silent — no apply
-errors occur, and the prune logic is technically correct. Recommendation: add a
-safety threshold. If the current render is empty and the previous inventory is
-non-empty (100% pruning), require `--force` or interactive confirmation. This
-protects against accidental misconfiguration without affecting intentional
-module removal (which uses `opm mod delete`).
+This is a dangerous failure mode because the empty render is silent — no apply errors occur, and the prune logic is technically correct. Recommendation: add a safety threshold. If the current render is empty and the previous inventory is non-empty (100% pruning), require `--force` or interactive confirmation. This protects against accidental misconfiguration without affecting intentional module removal (which uses `opm mod delete`).
 
 ### Additional Known Edge Cases
 
-The following edge cases are acknowledged but do not require dedicated
-scenarios. They are tracked here for implementors:
+The following edge cases are acknowledged but do not require dedicated scenarios. They are tracked here for implementors:
 
 1. **Labels not guaranteed on resources.** Label injection is the CUE
-   transformer's responsibility. Go code does not validate label presence on
-   rendered resources. A resource without OPM labels is tracked by the
-   inventory but invisible to label-based fallback discovery. The inventory is
-   the authoritative record; labels are best-effort.
+   transformer's responsibility. Go code does not validate label presence on    rendered resources. A resource without OPM labels is tracked by the    inventory but invisible to label-based fallback discovery. The inventory is    the authoritative record; labels are best-effort.
 
 2. **Change ID collision.** SHA1 truncated to 8 hex chars = 32 bits of
-   entropy. With `max_history=10`, collision is negligible (~65,000 entries
-   for 50% birthday-paradox probability). On collision, the old entry is
-   silently overwritten. Acceptable.
+   entropy. With `max_history=10`, collision is negligible (~65,000 entries    for 50% birthday-paradox probability). On collision, the old entry is    silently overwritten. Acceptable.
 
 3. **Inventory Secret in label queries.** The inventory Secret carries OPM
-   labels and would appear in `DiscoverResources()` results. The existing
-   discovery code must be updated to exclude resources with
-   `opmodel.dev/component: inventory` from workload queries.
+   labels and would appear in `DiscoverResources()` results. The existing    discovery code must be updated to exclude resources with    `opmodel.dev/component: inventory` from workload queries.
 
 4. **Partial delete leaving stale inventory.** If `opm mod delete` removes
-   cluster resources but crashes before deleting the inventory Secret,
-   subsequent applies find the stale inventory. Pruning already-deleted
-   resources should no-op (treat 404 on delete as success, not an error).
+   cluster resources but crashes before deleting the inventory Secret,    subsequent applies find the stale inventory. Pruning already-deleted    resources should no-op (treat 404 on delete as success, not an error).
 
 5. **Concurrent applies (CI/CD).** Two simultaneous `opm mod apply` calls
-   can overwrite each other's inventory. Mitigation: include
-   `resourceVersion` in the PUT for Kubernetes optimistic concurrency. Fail
-   on conflict with a clear error message.
+   can overwrite each other's inventory. Mitigation: include    `resourceVersion` in the PUT for Kubernetes optimistic concurrency. Fail    on conflict with a clear error message.
 
 6. **API version migration.** A stale entry stored with `v: "v1beta1"` may
-   need deletion after the API version is removed from the cluster. The
-   delete call should use the current preferred version from API discovery,
-   not the stored version.
+   need deletion after the API version is removed from the cluster. The    delete call should use the current preferred version from API discovery,    not the stored version.
 
 7. **Finalizers blocking pruning.** Stale resources with finalizers enter
-   Terminating state on delete. The prune operation should use a non-blocking
-   delete (no wait) to avoid hanging the apply flow indefinitely.
+   Terminating state on delete. The prune operation should use a non-blocking    delete (no wait) to avoid hanging the apply flow indefinitely.
 
 8. **Multiple modules sharing resource names.** Two modules in the same
-   namespace producing the same GVK + namespace + name is undefined behavior.
-   The pre-apply existence check (Step 5c) catches this on first apply but
-   not on subsequent applies where the inventory already exists.
+   namespace producing the same GVK + namespace + name is undefined behavior.    The pre-apply existence check (Step 5c) catches this on first apply but    not on subsequent applies where the inventory already exists.
 
 9. **Simultaneous component rename + resource rename.** Both the component
-   and resource name change at once. The safety check (Step 5b) correctly
-   does NOT fire — names differ, so these are genuinely different resources.
-   Old resources are pruned correctly. This is expected behavior.
+   and resource name change at once. The safety check (Step 5b) correctly    does NOT fire — names differ, so these are genuinely different resources.    Old resources are pruned correctly. This is expected behavior.
 
 10. **Secret size under large values.** Modules with large CUE values
-    (embedded certificates, large config blocks) could push the Secret toward
-    the 1MB etcd limit. Consider truncating or omitting the `values` field in
-    change entries if the Secret exceeds a size threshold (~800KB).
+    (embedded certificates, large config blocks) could push the Secret toward     the 1MB etcd limit. Consider truncating or omitting the `values` field in     change entries if the Secret exceeds a size threshold (~800KB).
 
 ## Architectural Limitations
 
-The following scenarios represent fundamental limitations of the per-release,
-Secret-based inventory design. Some may be addressable within the current
-architecture; others may require controller-based coordination or be declared
-out of scope. These are documented for transparency — decisions on which to
-address will be made during implementation.
+The following scenarios represent fundamental limitations of the per-release, Secret-based inventory design. Some may be addressable within the current architecture; others may require controller-based coordination or be declared out of scope. These are documented for transparency — decisions on which to address will be made during implementation.
 
 ### Cross-Release Resource Conflicts
 
-The inventory is per-release with no awareness of other releases in the same
-namespace.
+The inventory is per-release with no awareness of other releases in the same namespace.
 
 **Shared resource collision.** If Release A and Release B both produce
-`ConfigMap/shared-config`, each tracks it independently. When Release A removes
-it and prunes, Release B's resource is destroyed. Release B's inventory still
-references it. Next `status` sees a missing resource with no explanation.
+`ConfigMap/shared-config`, each tracks it independently. When Release A removes it and prunes, Release B's resource is destroyed. Release B's inventory still references it. Next `status` sees a missing resource with no explanation.
 
-The pre-apply existence check (Step 5c) catches this on **first apply only**.
-On subsequent applies where both inventories exist, there is no cross-release
-coordination.
+The pre-apply existence check (Step 5c) catches this on **first apply only**. On subsequent applies where both inventories exist, there is no cross-release coordination.
 
 **Resource transfer between releases.** Moving a resource from Release A to
-Release B requires A to prune (removed from template) and B to create (added
-to template). Delete-then-create causes downtime. No "transfer ownership"
-mechanism exists.
+Release B requires A to prune (removed from template) and B to create (added to template). Delete-then-create causes downtime. No "transfer ownership" mechanism exists.
 
 **Scope:** May be out of scope. Requires cluster-wide coordination (controller
 or CRD). Similar to Helm releases sharing resources — undefined behavior.
 
 ### Cluster-Scoped Resource Ownership
 
-The inventory Secret is namespace-scoped. Modules can produce cluster-scoped
-resources (CRDs, ClusterRoles, ClusterRoleBindings, Namespaces).
+The inventory Secret is namespace-scoped. Modules can produce cluster-scoped resources (CRDs, ClusterRoles, ClusterRoleBindings, Namespaces).
 
 **Conflict across namespaces.** Release A in `team-a` namespace and Release B
-in `team-b` namespace both produce `ClusterRole/app-reader`. Each inventory
-considers it "theirs." If Release A is deleted, the ClusterRole is pruned,
-breaking Release B silently.
+in `team-b` namespace both produce `ClusterRole/app-reader`. Each inventory considers it "theirs." If Release A is deleted, the ClusterRole is pruned, breaking Release B silently.
 
 **Scope:** Likely out of scope for Secret-based inventory. Full solution
-requires cluster-wide registry or ModuleRelease CRD (see Deferred Work).
-Mitigation: lint rule warning when modules produce cluster-scoped resources.
+requires cluster-wide registry or ModuleRelease CRD (see Deferred Work). Mitigation: lint rule warning when modules produce cluster-scoped resources.
 
 ### Controller-Created Side-Effect Resources
 
-The inventory tracks only resources OPM directly renders. Resources created as
-side effects by Kubernetes controllers are invisible.
+The inventory tracks only resources OPM directly renders. Resources created as side effects by Kubernetes controllers are invisible.
 
 **Examples:**
 - OPM creates `Certificate/my-app-tls` (cert-manager) → cert-manager creates
@@ -1518,13 +1295,11 @@ side effects by Kubernetes controllers are invisible.
   no visibility.
 
 **Scope:** By design. OPM respects Kubernetes ownership semantics. Cleanup
-responsibility falls on operators' ownerReference behavior. Not solvable
-without wrapping all resources in a ModuleRelease CRD parent.
+responsibility falls on operators' ownerReference behavior. Not solvable without wrapping all resources in a ModuleRelease CRD parent.
 
 ### State Reconstruction After Inventory Loss
 
-Scenario E acknowledges this: if the inventory Secret is deleted, previous
-state is lost. Next apply starts with `previous = ∅`.
+Scenario E acknowledges this: if the inventory Secret is deleted, previous state is lost. Next apply starts with `previous = ∅`.
 
 **Consequences:**
 - All previously tracked resources become permanent orphans (no pruning).
@@ -1533,16 +1308,14 @@ state is lost. Next apply starts with `previous = ∅`.
 - No automated recovery path in current design.
 
 **Root cause:** Inventory Secret is single point of truth with no redundancy.
-Unlike Helm (stores full manifests), OPM stores only resource IDs and values.
-Cannot automatically determine previous render without inventory.
+Unlike Helm (stores full manifests), OPM stores only resource IDs and values. Cannot automatically determine previous render without inventory.
 
 **Scope:** Partially addressable via Layer 2 label-based orphan detection (see
 Deferred Work). Full solution requires external state store or CRD.
 
 ### Concurrent Apply Races (CI/CD Pipelines)
 
-Edge case #5 mentions `resourceVersion` for optimistic concurrency, but this is
-noted as mitigation, not a complete solution.
+Edge case #5 mentions `resourceVersion` for optimistic concurrency, but this is noted as mitigation, not a complete solution.
 
 **Read-modify-write cycle:**
 ```
@@ -1550,18 +1323,14 @@ Pipeline A: READ inventory → compute stale → apply → WRITE inventory
 Pipeline B: READ inventory → compute stale → apply → WRITE inventory
 ```
 
-If A and B overlap, B's WRITE overwrites A's inventory state. B's stale
-computation was based on stale data. Even with `resourceVersion`, the failure
-mode is "retry entire apply" (expensive).
+If A and B overlap, B's WRITE overwrites A's inventory state. B's stale computation was based on stale data. Even with `resourceVersion`, the failure mode is "retry entire apply" (expensive).
 
 **Scope:** For GitOps/CI pipelines triggering on every commit, this is a
-realistic scenario. `resourceVersion` + retry is acceptable for CLI use.
-Full solution requires distributed lock or controller serialization.
+realistic scenario. `resourceVersion` + retry is acceptable for CLI use. Full solution requires distributed lock or controller serialization.
 
 ### Prune Ordering and Dependent Teardown
 
-The RFC specifies "create first, then prune" but does not define **prune
-ordering**. When stale set contains dependent resources:
+The RFC specifies "create first, then prune" but does not define **prune ordering**. When stale set contains dependent resources:
 
 - Stale `Ingress/app` routes to stale `Service/app`
 - Stale `Service/app` references stale `Deployment/app`
@@ -1570,41 +1339,32 @@ ordering**. When stale set contains dependent resources:
 **Current state:** No ordering guarantee within the stale set.
 
 **Proposed:** Reverse weight order (custom resources pruned first, CRDs last).
-This matches "tear down instances before definitions" and aligns with apply
-ordering semantics.
+This matches "tear down instances before definitions" and aligns with apply ordering semantics.
 
 **Gaps in reverse weight order:**
 - Resources at same weight have no ordering guarantee. Usually fine (K8s
-  handles Service-before-Deployment gracefully), but not guaranteed safe for
-  all types.
+  handles Service-before-Deployment gracefully), but not guaranteed safe for   all types.
 - Cross-resource finalizers not weight-aware. If CR with finalizer referencing
   a Service is pruned first, finalizer controller may race with Service prune.
 
 **Recommendation:** Use reverse weight order with one addition — **Namespaces
-always pruned last** (or excluded by default per Scenario O). This handles the
-one case where ordering truly matters.
+always pruned last** (or excluded by default per Scenario O). This handles the one case where ordering truly matters.
 
 **Scope:** Addressable within current design. Should be specified in
 implementation.
 
 ### Data-Bearing Resource Lifecycle
 
-The inventory treats all resources equally. No concept of "this resource
-carries persistent data."
+The inventory treats all resources equally. No concept of "this resource carries persistent data."
 
 **PVC rename = data loss.** Value change causes `PVC/minecraft-data` to become
-`PVC/minecraft-server-data`. Inventory correctly identifies old PVC as stale
-and prunes it. Data is gone. Cannot distinguish "rename reference" from
-"replace with new empty resource."
+`PVC/minecraft-server-data`. Inventory correctly identifies old PVC as stale and prunes it. Data is gone. Cannot distinguish "rename reference" from "replace with new empty resource."
 
 **Rollback with data loss.** Change history enables future rollback, but
-rolling back to a change with `PVC/minecraft-data` when current has
-`PVC/minecraft-server-data` means: create new PVC (empty), prune old PVC (with
-data). No data migration.
+rolling back to a change with `PVC/minecraft-data` when current has `PVC/minecraft-server-data` means: create new PVC (empty), prune old PVC (with data). No data migration.
 
 **Compounded by RFC-0003.** Immutable config hash-suffixes names. If a module
-makes a PVC-related ConfigMap immutable and uses hashed name in PVC name
-template, every config change creates new PVC.
+makes a PVC-related ConfigMap immutable and uses hashed name in PVC name template, every config change creates new PVC.
 
 **Scope:** Requires resource-class awareness (PVC ≠ ConfigMap). Possible
 mitigations:
@@ -1616,42 +1376,32 @@ Fundamental issue: no way to encode "this is stateful" in resource identity.
 
 ### Apply-Time Resource Conflicts (Immutable Fields)
 
-Open Questions section (line 1519) acknowledges Kubernetes enforces field
-immutability (`spec.selector` on Deployments, `spec.clusterIP` on Services,
-`spec.volumeClaimTemplates` on StatefulSets).
+Open Questions section (line 1519) acknowledges Kubernetes enforces field immutability (`spec.selector` on Deployments, `spec.clusterIP` on Services, `spec.volumeClaimTemplates` on StatefulSets).
 
 **Current state:** Inventory knows what was previously applied but has no
 mechanism to detect or resolve immutable field changes proactively.
 
 **Only approach:** Try-and-detect at apply time (catch 422 "field is
-immutable," fall back to delete+recreate). For StatefulSet
-`spec.volumeClaimTemplates` changes, required delete+recreate destroys all
-associated PVCs.
+immutable," fall back to delete+recreate). For StatefulSet `spec.volumeClaimTemplates` changes, required delete+recreate destroys all associated PVCs.
 
 **Gap:** Inventory can track state change but cannot orchestrate safe migration
 path (drain pods, backup PVCs, delete, recreate, restore).
 
 **Scope:** Partially addressable. Try-and-detect works. Safe migration for
-stateful resources requires higher-level orchestration beyond inventory's
-responsibility.
+stateful resources requires higher-level orchestration beyond inventory's responsibility.
 
 ### Multi-Namespace Atomic Operations
 
-Scenario M covers cross-namespace migration: RBAC may block pruning in old
-namespace. Deeper problem is **atomicity**.
+Scenario M covers cross-namespace migration: RBAC may block pruning in old namespace. Deeper problem is **atomicity**.
 
 **Apply-then-prune flow:** Apply to namespace A, then prune from namespace B.
-If prune fails (RBAC, network, API server error), apply already succeeded.
-Resources now in both namespaces; inventory points at new namespace. Stale
-resources in old namespace orphaned with no automatic retry.
+If prune fails (RBAC, network, API server error), apply already succeeded. Resources now in both namespaces; inventory points at new namespace. Stale resources in old namespace orphaned with no automatic retry.
 
 **Modules producing resources in multiple namespaces simultaneously** (e.g.,
-RBAC in `kube-system`, workloads in `default`) have no transactional guarantee.
-Partial failure leaves resources scattered with inconsistent state.
+RBAC in `kube-system`, workloads in `default`) have no transactional guarantee. Partial failure leaves resources scattered with inconsistent state.
 
 **Scope:** Fundamental Kubernetes limitation (no cross-namespace transactions).
-Best effort: fail entire apply if any namespace is unreachable. Cannot fully
-solve without distributed transaction coordinator.
+Best effort: fail entire apply if any namespace is unreachable. Cannot fully solve without distributed transaction coordinator.
 
 ### Runtime Drift Detection (Live State vs Desired State)
 
@@ -1660,30 +1410,23 @@ The inventory records what OPM **rendered and applied**. Does not detect
 
 **Examples:**
 - `kubectl edit deployment/minecraft` changes replica count. Inventory shows
-  OPM-declared state. `opm mod diff` (if comparing inventory to live) can
-  detect, but inventory itself is oblivious.
+  OPM-declared state. `opm mod diff` (if comparing inventory to live) can   detect, but inventory itself is oblivious.
 - Admission webhook mutates resources during apply (adds annotations, changes
   labels). Inventory records pre-mutation state, not what landed in etcd.
 
 **SSA's `managedFields`** partially addresses field-level ownership, but
-inventory does not interact with it. No mechanism to "enforce" inventory state
-or detect when live diverges.
+inventory does not interact with it. No mechanism to "enforce" inventory state or detect when live diverges.
 
 **Scope:** May be out of scope. Drift detection is typically controller
-responsibility. CLI tool records intent; controllers enforce. For CLI-only use,
-drift detection would require `opm mod status` to compare inventory to live
-(already planned).
+responsibility. CLI tool records intent; controllers enforce. For CLI-only use, drift detection would require `opm mod status` to compare inventory to live (already planned).
 
 ## Deferred Work
 
-The following are explicitly out of scope for this RFC and deferred to future
-enhancements:
+The following are explicitly out of scope for this RFC and deferred to future enhancements:
 
 ### Layer 2 Label-Based Orphan Detection in Apply
 
-A second pruning pass during `apply` that uses label-based discovery
-(full API scan) to find ghost resources not tracked by the inventory. This
-catches edge cases like Scenario F.
+A second pruning pass during `apply` that uses label-based discovery (full API scan) to find ghost resources not tracked by the inventory. This catches edge cases like Scenario F.
 
 ```text
 Layer 1: Inventory-based (fast, precise)
@@ -1701,38 +1444,30 @@ Layer 2: Label-based (broad, catches ghosts)
 
 ### Rollback Support
 
-The change history model in this RFC provides the foundation for rollback. A
-future `opm mod rollback --revision <change-id>` command could:
+The change history model in this RFC provides the foundation for rollback. A future `opm mod rollback --revision <change-id>` command could:
 
 1. Read the target change entry from the Secret.
 2. Re-render the module using the stored values and module reference.
 3. Apply normally (which creates a new change entry — rollback is just another
    change).
 
-This is deferred because it requires the module OCI reference to be resolvable
-at rollback time, and the interaction with local modules needs further design.
+This is deferred because it requires the module OCI reference to be resolvable at rollback time, and the interaction with local modules needs further design.
 
 ### ModuleRelease CRD with ownerReferences
 
-The long-term vision: a `ModuleRelease` Custom Resource Definition with
-`ownerReferences` on all child resources. This enables:
+The long-term vision: a `ModuleRelease` Custom Resource Definition with `ownerReferences` on all child resources. This enables:
 
 - Native Kubernetes garbage collection (delete parent → children auto-delete).
 - Controller-based reconciliation.
 - First-class `kubectl get modulereleases` experience.
 
-The `data.metadata` blob uses `kind: Release` and `apiVersion: core.opmodel.dev/v1alpha1`
-specifically so that the schema can migrate to a CRD with minimal changes. The
-inventory Secret is a stepping stone that may become permanent for CLI-only
-users while the CRD serves the controller path.
+The `data.metadata` blob uses `kind: Release` and `apiVersion: core.opmodel.dev/v1alpha1` specifically so that the schema can migrate to a CRD with minimal changes. The inventory Secret is a stepping stone that may become permanent for CLI-only users while the CRD serves the controller path.
 
 ## Open Questions
 
 ### Immutable Field Handling During Apply
 
-Kubernetes enforces field immutability via hardcoded `ValidateUpdate()` functions
-in per-resource API server strategies. When Server-Side Apply attempts to change
-an immutable field, the API server returns:
+Kubernetes enforces field immutability via hardcoded `ValidateUpdate()` functions in per-resource API server strategies. When Server-Side Apply attempts to change an immutable field, the API server returns:
 
 ```text
 HTTP 422 Unprocessable Entity
@@ -1741,15 +1476,11 @@ causes[].message: "field is immutable"
 causes[].field:   "<field path>"   (e.g., "spec.clusterIP", "spec.selector")
 ```
 
-This is an apply-time behavior question, not an inventory format question. The
-inventory does not need to change to support immutable field handling. However,
-the apply flow must account for it.
+This is an apply-time behavior question, not an inventory format question. The inventory does not need to change to support immutable field handling. However, the apply flow must account for it.
 
 #### The Problem
 
-Certain spec fields cannot be updated in place. A change to these fields requires
-deleting the resource and recreating it, which is destructive — it can cause pod
-restarts, PVC orphaning, and service interruption. Common immutable fields:
+Certain spec fields cannot be updated in place. A change to these fields requires deleting the resource and recreating it, which is destructive — it can cause pod restarts, PVC orphaning, and service interruption. Common immutable fields:
 
 ```text
 ┌──────────────────┬──────────────────────────────────────────────────────┐
@@ -1769,11 +1500,7 @@ restarts, PVC orphaning, and service interruption. Common immutable fields:
 └──────────────────┴──────────────────────────────────────────────────────┘
 ```
 
-There is **no machine-readable immutability metadata** in the Kubernetes OpenAPI
-schema. KEP-1101 proposed adding `x-kubernetes-immutable` as an OpenAPI extension
-for built-in resources but was never implemented. For CRDs, Kubernetes 1.25+
-supports CEL validation rules (`self == oldSelf`), but this is opt-in per CRD
-and not available for built-in types.
+There is **no machine-readable immutability metadata** in the Kubernetes OpenAPI schema. KEP-1101 proposed adding `x-kubernetes-immutable` as an OpenAPI extension for built-in resources but was never implemented. For CRDs, Kubernetes 1.25+ supports CEL validation rules (`self == oldSelf`), but this is opt-in per CRD and not available for built-in types.
 
 #### Industry Approaches
 
@@ -1807,8 +1534,7 @@ and not available for built-in types.
 
 #### Likely Direction for OPM
 
-The **try-and-detect** pattern (kapp's `fallback-on-replace`) is the most
-pragmatic approach:
+The **try-and-detect** pattern (kapp's `fallback-on-replace`) is the most pragmatic approach:
 
 1. SSA apply the resource.
 2. If the API server returns 422 with `"field is immutable"` in
@@ -1817,58 +1543,38 @@ pragmatic approach:
 4. In non-interactive mode (CI): fail with a clear message.
 5. With an explicit `--force` flag: automatically delete+recreate.
 
-This could be augmented with a known-immutable-fields table for **proactive
-warnings** in `opm mod diff` — showing the user which fields would require
-recreation before they run apply.
+This could be augmented with a known-immutable-fields table for **proactive warnings** in `opm mod diff` — showing the user which fields would require recreation before they run apply.
 
-This question is deferred to implementation. The inventory format does not need
-to change to support any of these approaches.
+This question is deferred to implementation. The inventory format does not need to change to support any of these approaches.
 
 ### Pre-Apply Resource Existence Checks
 
-When no inventory Secret exists (first-time apply), OPM must verify that the
-resources it intends to create do not already exist on the cluster. This prevents
-two failure modes:
+When no inventory Secret exists (first-time apply), OPM must verify that the resources it intends to create do not already exist on the cluster. This prevents two failure modes:
 
 1. **Untracked resource adoption**: A resource with the same GVK + namespace +
-   name exists but was created by another tool (kubectl, Helm, another OPM
-   release). Applying over it would silently adopt it into this release's
-   inventory.
+   name exists but was created by another tool (kubectl, Helm, another OPM    release). Applying over it would silently adopt it into this release's    inventory.
 
 2. **Terminating resource race**: A resource is being deleted (has
-   `deletionTimestamp` set). SSA apply "succeeds" on terminating resources, but
-   the resource will be garbage-collected when finalizers complete.
+   `deletionTimestamp` set). SSA apply "succeeds" on terminating resources, but    the resource will be garbage-collected when finalizers complete.
 
 Both cases should fail the apply with a clear error message.
 
 #### Design Considerations
 
 **Performance**: The check requires one GET per resource in the rendered set. For
-a typical module (3-10 resources), this adds 3-10 API calls before apply begins.
-This is acceptable for first-time applies only. Subsequent applies (where an
-inventory exists) can skip this check — the inventory already tracks what OPM
-owns.
+a typical module (3-10 resources), this adds 3-10 API calls before apply begins. This is acceptable for first-time applies only. Subsequent applies (where an inventory exists) can skip this check — the inventory already tracks what OPM owns.
 
 **Terminating detection on subsequent applies**: The first-time-only scope means
-a re-apply after `opm mod delete` could still hit the terminating race if the
-inventory Secret is deleted before the resources finish terminating. The
-terminating check should also run when the inventory exists but the previous
-inventory is empty (e.g., the Secret was just created). This needs further
-design.
+a re-apply after `opm mod delete` could still hit the terminating race if the inventory Secret is deleted before the resources finish terminating. The terminating check should also run when the inventory exists but the previous inventory is empty (e.g., the Secret was just created). This needs further design.
 
 **TOCTOU race**: A resource could be created between the existence check and the
-apply. This is inherent to any check-then-act pattern. The risk is low for
-CLI-driven workflows (no concurrent controllers creating the same resources).
-SSA's conflict detection provides a secondary safety net.
+apply. This is inherent to any check-then-act pattern. The risk is low for CLI-driven workflows (no concurrent controllers creating the same resources). SSA's conflict detection provides a secondary safety net.
 
 **`--adopt` flag**: A future escape hatch that allows intentional adoption of
-existing untracked resources. When set, the pre-apply check would skip the
-"untracked resource" failure and instead add the resource to the inventory.
-Terminating resources should still fail even with `--adopt`.
+existing untracked resources. When set, the pre-apply check would skip the "untracked resource" failure and instead add the resource to the inventory. Terminating resources should still fail even with `--adopt`.
 
 **`--wait-for-deletion` flag**: An alternative to failing on terminating
-resources — wait for deletion to complete, then proceed. This is a convenience
-for the common "delete then re-apply" workflow. Deferred to implementation.
+resources — wait for deletion to complete, then proceed. This is a convenience for the common "delete then re-apply" workflow. Deferred to implementation.
 
 ## References
 
