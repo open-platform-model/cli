@@ -11,7 +11,7 @@ import (
 // --- 7.6: Tests for output format selection ---
 
 func TestFormatStatus_Table(t *testing.T) {
-	result := &statusResult{
+	result := &StatusResult{
 		Resources: []resourceHealth{
 			{Kind: "Deployment", Name: "web", Namespace: "default", Status: healthReady, Age: "5m"},
 			{Kind: "ConfigMap", Name: "config", Namespace: "default", Status: healthReady, Age: "5m"},
@@ -29,7 +29,7 @@ func TestFormatStatus_Table(t *testing.T) {
 }
 
 func TestFormatStatus_JSON(t *testing.T) {
-	result := &statusResult{
+	result := &StatusResult{
 		Resources: []resourceHealth{
 			{Kind: "Deployment", Name: "web", Namespace: "default", Status: healthReady, Age: "5m"},
 		},
@@ -44,7 +44,7 @@ func TestFormatStatus_JSON(t *testing.T) {
 }
 
 func TestFormatStatus_YAML(t *testing.T) {
-	result := &statusResult{
+	result := &StatusResult{
 		Resources: []resourceHealth{
 			{Kind: "Deployment", Name: "web", Namespace: "default", Status: healthReady, Age: "5m"},
 		},

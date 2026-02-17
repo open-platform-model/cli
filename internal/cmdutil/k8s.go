@@ -5,21 +5,10 @@ import (
 	"github.com/opmodel/cli/internal/kubernetes"
 )
 
-// K8sClientOpts holds options for creating a Kubernetes client.
-type K8sClientOpts struct {
-	Kubeconfig  string
-	Context     string
-	APIWarnings string
-}
-
 // NewK8sClient creates a Kubernetes client or returns an *ExitError
 // with ExitConnectivityError on failure.
-func NewK8sClient(opts K8sClientOpts) (*kubernetes.Client, error) {
-	client, err := kubernetes.NewClient(kubernetes.ClientOptions{
-		Kubeconfig:  opts.Kubeconfig,
-		Context:     opts.Context,
-		APIWarnings: opts.APIWarnings,
-	})
+func NewK8sClient(opts kubernetes.ClientOptions) (*kubernetes.Client, error) {
+	client, err := kubernetes.NewClient(opts)
 	if err != nil {
 		return nil, &oerrors.ExitError{Code: oerrors.ExitConnectivityError, Err: err}
 	}

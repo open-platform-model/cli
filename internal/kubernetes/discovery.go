@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -21,7 +22,6 @@ const (
 	LabelManagedBy      = "app.kubernetes.io/managed-by"
 	labelManagedByValue = "open-platform-model"
 	LabelReleaseName    = "module-release.opmodel.dev/name"
-	labelModuleVersion  = "module.opmodel.dev/version"
 	LabelComponentName  = "component.opmodel.dev/name"
 	// labelReleaseID is the release identity UUID label for resource discovery.
 	labelReleaseID = "module-release.opmodel.dev/uuid"
@@ -222,7 +222,7 @@ func discoverAPIResources(client *Client) ([]apiResourceInfo, error) {
 		for i := range list.APIResources {
 			r := &list.APIResources[i]
 			// Skip subresources (e.g., pods/log)
-			if containsSlash(r.Name) {
+			if strings.Contains(r.Name, "/") {
 				continue
 			}
 			result = append(result, apiResourceInfo{
@@ -240,16 +240,6 @@ func discoverAPIResources(client *Client) ([]apiResourceInfo, error) {
 func supportsVerb(r metav1.APIResource, verb string) bool {
 	for _, v := range r.Verbs {
 		if v == verb {
-			return true
-		}
-	}
-	return false
-}
-
-// containsSlash checks if a string contains a slash (for subresource detection).
-func containsSlash(s string) bool {
-	for _, c := range s {
-		if c == '/' {
 			return true
 		}
 	}

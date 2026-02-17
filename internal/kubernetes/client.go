@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/opmodel/cli/internal/config"
 	oerrors "github.com/opmodel/cli/internal/errors"
 )
 
@@ -152,12 +153,12 @@ func buildRestConfig(opts ClientOptions) (*rest.Config, error) {
 		overrides.CurrentContext = opts.Context
 	}
 
-	config := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		loadingRules,
 		overrides,
 	)
 
-	return config.ClientConfig()
+	return clientConfig.ClientConfig()
 }
 
 // resolveKubeconfig resolves kubeconfig path with precedence:
@@ -180,30 +181,5 @@ func resolveKubeconfig(flagValue string) string {
 	}
 
 	// Expand tilde in all paths (defensive, in case config resolver didn't)
-	return expandTilde(path)
-}
-
-// expandTilde expands ~ or ~/ prefix in a path to the user's home directory.
-// If the path doesn't start with ~, it's returned unchanged.
-// If os.UserHomeDir fails, returns the original path.
-func expandTilde(path string) string {
-	if path == "" || path[0] != '~' {
-		return path
-	}
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return path
-	}
-
-	if path == "~" {
-		return homeDir
-	}
-
-	if len(path) > 1 && path[1] == '/' {
-		return filepath.Join(homeDir, path[2:])
-	}
-
-	// Don't expand ~username patterns
-	return path
+	return config.ExpandTilde(path)
 }

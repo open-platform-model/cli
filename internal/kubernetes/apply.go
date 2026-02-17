@@ -4,12 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/opmodel/cli/internal/build"
@@ -20,12 +17,6 @@ import (
 type ApplyOptions struct {
 	// DryRun performs a server-side dry run without persisting changes.
 	DryRun bool
-
-	// Wait waits for resources to be ready after apply.
-	Wait bool
-
-	// Timeout is the maximum time to wait for resources.
-	Timeout time.Duration
 }
 
 // ApplyResult contains the outcome of an apply operation.
@@ -102,21 +93,14 @@ func Apply(ctx context.Context, client *Client, resources []*build.Resource, met
 // applyResource performs server-side apply for a single resource.
 // Returns the status of the operation (created, configured, or unchanged).
 func applyResource(ctx context.Context, client *Client, obj *unstructured.Unstructured, opts ApplyOptions) (string, error) {
-	gvr := gvrFromObject(obj)
+	gvr := gvrFromUnstructured(obj)
 	ns := obj.GetNamespace()
 
 	// Check if resource already exists to determine status after apply.
 	var existingVersion string
-	if ns != "" {
-		existing, err := client.Dynamic.Resource(gvr).Namespace(ns).Get(ctx, obj.GetName(), metav1.GetOptions{})
-		if err == nil {
-			existingVersion = existing.GetResourceVersion()
-		}
-	} else {
-		existing, err := client.Dynamic.Resource(gvr).Get(ctx, obj.GetName(), metav1.GetOptions{})
-		if err == nil {
-			existingVersion = existing.GetResourceVersion()
-		}
+	existing, err := client.ResourceClient(gvr, ns).Get(ctx, obj.GetName(), metav1.GetOptions{})
+	if err == nil {
+		existingVersion = existing.GetResourceVersion()
 	}
 	// If GET fails (NotFound or other), existingVersion stays empty -> "created"
 
@@ -134,17 +118,9 @@ func applyResource(ctx context.Context, client *Client, obj *unstructured.Unstru
 		patchOpts.DryRun = []string{metav1.DryRunAll}
 	}
 
-	var result *unstructured.Unstructured
-	var patchErr error
-	if ns != "" {
-		result, patchErr = client.Dynamic.Resource(gvr).Namespace(ns).Patch(
-			ctx, obj.GetName(), types.ApplyPatchType, data, patchOpts,
-		)
-	} else {
-		result, patchErr = client.Dynamic.Resource(gvr).Patch(
-			ctx, obj.GetName(), types.ApplyPatchType, data, patchOpts,
-		)
-	}
+	result, patchErr := client.ResourceClient(gvr, ns).Patch(
+		ctx, obj.GetName(), types.ApplyPatchType, data, patchOpts,
+	)
 
 	if patchErr != nil {
 		return "", patchErr
@@ -158,87 +134,6 @@ func applyResource(ctx context.Context, client *Client, obj *unstructured.Unstru
 		return output.StatusUnchanged, nil
 	}
 	return output.StatusConfigured, nil
-}
-
-// gvrFromObject derives GroupVersionResource from an unstructured object.
-func gvrFromObject(obj *unstructured.Unstructured) schema.GroupVersionResource {
-	gvk := obj.GroupVersionKind()
-	return schema.GroupVersionResource{
-		Group:    gvk.Group,
-		Version:  gvk.Version,
-		Resource: kindToResource(gvk.Kind),
-	}
-}
-
-// knownKindResources maps Kind to its plural resource name for well-known types.
-// This avoids incorrect heuristic pluralization (e.g., Endpoints -> endpointses).
-var knownKindResources = map[string]string{
-	"Namespace":                        "namespaces",
-	"ServiceAccount":                   "serviceaccounts",
-	"Secret":                           "secrets",
-	"ConfigMap":                        "configmaps",
-	"PersistentVolume":                 "persistentvolumes",
-	"PersistentVolumeClaim":            "persistentvolumeclaims",
-	"Service":                          "services",
-	"Endpoints":                        "endpoints",
-	"EndpointSlice":                    "endpointslices",
-	"ClusterRole":                      "clusterroles",
-	"ClusterRoleBinding":               "clusterrolebindings",
-	"Role":                             "roles",
-	"RoleBinding":                      "rolebindings",
-	"StorageClass":                     "storageclasses",
-	"Deployment":                       "deployments",
-	"StatefulSet":                      "statefulsets",
-	"DaemonSet":                        "daemonsets",
-	"ReplicaSet":                       "replicasets",
-	"Job":                              "jobs",
-	"CronJob":                          "cronjobs",
-	"Ingress":                          "ingresses",
-	"IngressClass":                     "ingressclasses",
-	"NetworkPolicy":                    "networkpolicies",
-	"HorizontalPodAutoscaler":          "horizontalpodautoscalers",
-	"VerticalPodAutoscaler":            "verticalpodautoscalers",
-	"PodDisruptionBudget":              "poddisruptionbudgets",
-	"ValidatingWebhookConfiguration":   "validatingwebhookconfigurations",
-	"MutatingWebhookConfiguration":     "mutatingwebhookconfigurations",
-	"CustomResourceDefinition":         "customresourcedefinitions",
-	"ResourceQuota":                    "resourcequotas",
-	"LimitRange":                       "limitranges",
-	"Pod":                              "pods",
-	"Node":                             "nodes",
-	"Event":                            "events",
-	"PriorityClass":                    "priorityclasses",
-	"ValidatingAdmissionPolicy":        "validatingadmissionpolicies",
-	"ValidatingAdmissionPolicyBinding": "validatingadmissionpolicybindings",
-}
-
-// kindToResource converts a Kind to its plural resource name.
-// Uses a known lookup table for common types, falls back to heuristic.
-func kindToResource(kind string) string {
-	if resource, ok := knownKindResources[kind]; ok {
-		return resource
-	}
-	return heuristicPluralize(kind)
-}
-
-// heuristicPluralize applies simple English pluralization rules.
-func heuristicPluralize(kind string) string {
-	lower := strings.ToLower(kind)
-	switch {
-	case strings.HasSuffix(lower, "ss") || strings.HasSuffix(lower, "sh") || strings.HasSuffix(lower, "ch") || strings.HasSuffix(lower, "x"):
-		return lower + "es"
-	case strings.HasSuffix(lower, "s"):
-		// Already plural (e.g., Endpoints)
-		return lower
-	case strings.HasSuffix(lower, "y") && !isVowel(lower[len(lower)-2]):
-		return lower[:len(lower)-1] + "ies"
-	default:
-		return lower + "s"
-	}
-}
-
-func isVowel(b byte) bool {
-	return b == 'a' || b == 'e' || b == 'i' || b == 'o' || b == 'u'
 }
 
 func boolPtr(b bool) *bool {

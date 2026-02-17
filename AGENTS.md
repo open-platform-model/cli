@@ -28,7 +28,7 @@ All agents MUST read and adhere to `openspec/config.yaml`.
 - Build: `task build` (output: ./bin/opm)
 - Test all: `task test`
 - Test verbose: `task test:verbose`
-- Single test: `go test ./pkg/loader -v -run TestName`
+- Single test: `go test ./internal/build -v -run TestName`
 - Coverage: `task test:coverage`
 - All checks: `task check` (fmt + vet + test)
 - Run: `task run -- mod init ./my-module`
@@ -120,8 +120,8 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 ## Key Packages
 
 - `cmd/opm/` - Entry point
-- `pkg/loader/` - CUE module loading
-- `pkg/version/` - Version info
+- `internal/build/` - CUE module loading and render pipeline
+- `internal/version/` - Version info
 - `internal/cmd/` - Command implementations (root, mod/, config/)
 - `internal/cmdutil/` - Shared command utilities (flag groups, render pipeline, K8s client, output)
 

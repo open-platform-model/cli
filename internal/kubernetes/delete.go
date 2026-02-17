@@ -6,7 +6,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/opmodel/cli/internal/output"
 )
@@ -26,13 +25,10 @@ type DeleteOptions struct {
 
 	// DryRun previews resources to delete without removing them.
 	DryRun bool
-
-	// Wait waits for resources to be fully deleted.
-	Wait bool
 }
 
-// deleteResult contains the outcome of a delete operation.
-type deleteResult struct {
+// DeleteResult contains the outcome of a delete operation.
+type DeleteResult struct {
 	// Deleted is the number of resources successfully deleted.
 	Deleted int
 
@@ -46,8 +42,8 @@ type deleteResult struct {
 // Delete removes all resources belonging to a release deployment.
 // Resources are discovered via OPM labels and deleted in reverse weight order.
 // Returns noResourcesFoundError when no resources match the selector.
-func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*deleteResult, error) {
-	result := &deleteResult{}
+func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteResult, error) {
+	result := &DeleteResult{}
 
 	// Use release name for logging if available, otherwise use ReleaseID
 	logName := opts.ReleaseName
@@ -121,25 +117,12 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*deleteRes
 // deleteResource deletes a single resource with foreground propagation.
 func deleteResource(ctx context.Context, client *Client, obj *unstructured.Unstructured) error {
 	gvr := gvrFromUnstructured(obj)
+	ns := obj.GetNamespace()
 	propagation := metav1.DeletePropagationForeground
 
 	deleteOpts := metav1.DeleteOptions{
 		PropagationPolicy: &propagation,
 	}
 
-	ns := obj.GetNamespace()
-	if ns != "" {
-		return client.Dynamic.Resource(gvr).Namespace(ns).Delete(ctx, obj.GetName(), deleteOpts)
-	}
-	return client.Dynamic.Resource(gvr).Delete(ctx, obj.GetName(), deleteOpts)
-}
-
-// gvrFromUnstructured derives GroupVersionResource from an unstructured object.
-func gvrFromUnstructured(obj *unstructured.Unstructured) schema.GroupVersionResource {
-	gvk := obj.GroupVersionKind()
-	return schema.GroupVersionResource{
-		Group:    gvk.Group,
-		Version:  gvk.Version,
-		Resource: kindToResource(gvk.Kind),
-	}
+	return client.ResourceClient(gvr, ns).Delete(ctx, obj.GetName(), deleteOpts)
 }

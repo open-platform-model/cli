@@ -38,24 +38,6 @@ func TestConfig_Fields(t *testing.T) {
 	assert.Equal(t, "my-namespace", cfg.Kubernetes.Namespace)
 }
 
-func TestResolvedValue(t *testing.T) {
-	rv := ResolvedValue{
-		Key:    "registry",
-		Value:  "registry.example.com",
-		Source: "env",
-		Shadowed: map[string]any{
-			"config":  "config-registry.example.com",
-			"default": "",
-		},
-	}
-
-	assert.Equal(t, "registry", rv.Key)
-	assert.Equal(t, "registry.example.com", rv.Value)
-	assert.Equal(t, "env", rv.Source)
-	assert.Len(t, rv.Shadowed, 2)
-	assert.Equal(t, "config-registry.example.com", rv.Shadowed["config"])
-}
-
 func TestOPMConfig(t *testing.T) {
 	cfg := DefaultConfig()
 	opmCfg := &OPMConfig{

@@ -113,7 +113,7 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 	}
 
 	// Create Kubernetes client via shared factory
-	k8sClient, err := cmdutil.NewK8sClient(cmdutil.K8sClientOpts{
+	k8sClient, err := cmdutil.NewK8sClient(kubernetes.ClientOptions{
 		Kubeconfig:  kf.Kubeconfig,
 		Context:     kf.Context,
 		APIWarnings: opmConfig.Config.Log.Kubernetes.APIWarnings,
@@ -149,9 +149,7 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 	modLog.Info(fmt.Sprintf("applying %d resources", len(result.Resources)))
 
 	applyResult, err := kubernetes.Apply(ctx, k8sClient, result.Resources, result.Module, kubernetes.ApplyOptions{
-		DryRun:  dryRun,
-		Wait:    wait,
-		Timeout: timeout,
+		DryRun: dryRun,
 	})
 	if err != nil {
 		modLog.Error("apply failed", "error", err)

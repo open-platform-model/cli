@@ -67,8 +67,8 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 
 	// Cleanup
 	_, err = Delete(ctx, client, DeleteOptions{
-		ModuleName: moduleName,
-		Namespace:  namespace,
+		ReleaseName: moduleName,
+		Namespace:   namespace,
 	})
 	require.NoError(t, err)
 }
@@ -110,17 +110,17 @@ func TestStatusIntegration_ReportsHealth(t *testing.T) {
 
 	// Check status
 	statusResult, err := GetModuleStatus(ctx, client, StatusOptions{
-		Name:      moduleName,
-		Namespace: namespace,
+		ReleaseName: moduleName,
+		Namespace:   namespace,
 	})
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(statusResult.Resources), 1)
-	assert.Equal(t, HealthReady, statusResult.AggregateStatus)
+	assert.Equal(t, healthReady, statusResult.AggregateStatus)
 
 	// Cleanup
 	_, err = Delete(ctx, client, DeleteOptions{
-		ModuleName: moduleName,
-		Namespace:  namespace,
+		ReleaseName: moduleName,
+		Namespace:   namespace,
 	})
 	require.NoError(t, err)
 }
@@ -173,11 +173,12 @@ func TestStatusIntegration_NoResources(t *testing.T) {
 	require.NoError(t, err, "need a valid kubeconfig for integration tests")
 
 	// Query for a module that doesn't exist
-	statusResult, err := GetModuleStatus(ctx, client, StatusOptions{
-		Name:      "nonexistent-module",
-		Namespace: "default",
+	_, err = GetModuleStatus(ctx, client, StatusOptions{
+		ReleaseName: "nonexistent-module",
+		Namespace:   "default",
 	})
-	require.NoError(t, err)
-	assert.Empty(t, statusResult.Resources, "should find no resources")
-	assert.Equal(t, HealthUnknown, statusResult.AggregateStatus)
+	// After YAGNI removal, GetModuleStatus returns noResourcesFoundError
+	// when no resources match the selector.
+	require.Error(t, err)
+	assert.True(t, IsNoResourcesFound(err))
 }

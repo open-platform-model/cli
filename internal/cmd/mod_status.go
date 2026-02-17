@@ -121,7 +121,7 @@ func runStatus(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 	opmConfig := GetOPMConfig()
 
 	// Create Kubernetes client via shared factory
-	k8sClient, err := cmdutil.NewK8sClient(cmdutil.K8sClientOpts{
+	k8sClient, err := cmdutil.NewK8sClient(kubernetes.ClientOptions{
 		Kubeconfig:  kf.Kubeconfig,
 		Context:     kf.Context,
 		APIWarnings: opmConfig.Config.Log.Kubernetes.APIWarnings,
@@ -136,7 +136,6 @@ func runStatus(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 		ReleaseName:  rsf.ReleaseName,
 		ReleaseID:    rsf.ReleaseID,
 		OutputFormat: outputFormat,
-		Watch:        watch,
 	}
 
 	// If watch mode, run in loop

@@ -28,15 +28,6 @@ type StatusOptions struct {
 
 	// OutputFormat is the desired output format (table, yaml, json).
 	OutputFormat output.Format
-
-	// Watch enables continuous monitoring mode.
-	Watch bool
-
-	// Kubeconfig is the path to the kubeconfig file.
-	Kubeconfig string
-
-	// Context is the Kubernetes context to use.
-	Context string
 }
 
 // resourceHealth contains health information for a single resource.
@@ -53,8 +44,8 @@ type resourceHealth struct {
 	Age string `json:"age" yaml:"age"`
 }
 
-// statusResult contains the full status output.
-type statusResult struct {
+// StatusResult contains the full status output.
+type StatusResult struct {
 	// Resources is the list of resource health statuses.
 	Resources []resourceHealth `json:"resources" yaml:"resources"`
 	// AggregateStatus is the overall module health.
@@ -67,7 +58,7 @@ type statusResult struct {
 
 // GetModuleStatus discovers resources by OPM labels and evaluates health per resource.
 // Returns noResourcesFoundError when no resources match the selector.
-func GetModuleStatus(ctx context.Context, client *Client, opts StatusOptions) (*statusResult, error) {
+func GetModuleStatus(ctx context.Context, client *Client, opts StatusOptions) (*StatusResult, error) {
 	// Discover resources via labels
 	output.Debug("discovering release resources",
 		"release", opts.ReleaseName,
@@ -94,7 +85,7 @@ func GetModuleStatus(ctx context.Context, client *Client, opts StatusOptions) (*
 		}
 	}
 
-	result := &statusResult{}
+	result := &StatusResult{}
 	allReady := true
 
 	// Extract identity labels from first resource (if available)
@@ -136,7 +127,7 @@ func GetModuleStatus(ctx context.Context, client *Client, opts StatusOptions) (*
 }
 
 // FormatStatusTable renders the status result as a formatted table.
-func FormatStatusTable(result *statusResult) string {
+func FormatStatusTable(result *StatusResult) string {
 	var sb strings.Builder
 
 	// Show identity information if present
@@ -163,7 +154,7 @@ func FormatStatusTable(result *statusResult) string {
 }
 
 // FormatStatusJSON renders the status result as JSON.
-func formatStatusJSON(result *statusResult) (string, error) {
+func formatStatusJSON(result *StatusResult) (string, error) {
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("marshaling status to JSON: %w", err)
@@ -172,7 +163,7 @@ func formatStatusJSON(result *statusResult) (string, error) {
 }
 
 // FormatStatusYAML renders the status result as YAML.
-func formatStatusYAML(result *statusResult) (string, error) {
+func formatStatusYAML(result *StatusResult) (string, error) {
 	data, err := yaml.Marshal(result)
 	if err != nil {
 		return "", fmt.Errorf("marshaling status to YAML: %w", err)
@@ -216,7 +207,7 @@ func formatDuration(d time.Duration) string {
 }
 
 // FormatStatus formats the status result based on the output format.
-func FormatStatus(result *statusResult, format output.Format) (string, error) {
+func FormatStatus(result *StatusResult, format output.Format) (string, error) {
 	switch format {
 	case output.FormatJSON:
 		return formatStatusJSON(result)

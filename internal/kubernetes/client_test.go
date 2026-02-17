@@ -12,55 +12,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestExpandTilde(t *testing.T) {
-	homeDir, err := os.UserHomeDir()
-	assert.NoError(t, err, "should get home directory")
-
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "empty string",
-			input:    "",
-			expected: "",
-		},
-		{
-			name:     "no tilde",
-			input:    "/absolute/path",
-			expected: "/absolute/path",
-		},
-		{
-			name:     "tilde only",
-			input:    "~",
-			expected: homeDir,
-		},
-		{
-			name:     "tilde with slash - kubeconfig case",
-			input:    "~/.kube/config",
-			expected: filepath.Join(homeDir, ".kube", "config"),
-		},
-		{
-			name:     "tilde with path",
-			input:    "~/Documents/kubeconfig.yaml",
-			expected: filepath.Join(homeDir, "Documents", "kubeconfig.yaml"),
-		},
-		{
-			name:     "tilde username pattern (not expanded)",
-			input:    "~otheruser/config",
-			expected: "~otheruser/config",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := expandTilde(tt.input)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestEnsureNamespace(t *testing.T) {
 	ctx := context.Background()
 

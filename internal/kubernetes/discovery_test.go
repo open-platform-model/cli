@@ -46,13 +46,6 @@ func TestSortByWeightDescending(t *testing.T) {
 	assert.Equal(t, "Namespace", resources[4].GetKind())
 }
 
-func TestContainsSlash(t *testing.T) {
-	assert.True(t, containsSlash("pods/log"))
-	assert.True(t, containsSlash("deployments/scale"))
-	assert.False(t, containsSlash("pods"))
-	assert.False(t, containsSlash(""))
-}
-
 func makeUnstructured(apiVersion, kind, name, namespace string) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{}
 	obj.SetAPIVersion(apiVersion)

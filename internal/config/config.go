@@ -67,22 +67,6 @@ func DefaultConfig() *Config {
 	}
 }
 
-// ResolvedValue tracks a configuration value and its resolution chain.
-// Used for logging config resolution with --verbose (FR-019).
-type ResolvedValue struct {
-	// Key is the configuration key (e.g., "namespace").
-	Key string
-
-	// Value is the resolved value.
-	Value any
-
-	// Source indicates where the value came from: "flag", "env", "config", "default".
-	Source string
-
-	// Shadowed contains lower-precedence sources that were overridden.
-	Shadowed map[string]any
-}
-
 // OPMConfig represents the fully-loaded CUE configuration.
 // This includes provider definitions loaded from imports.
 type OPMConfig struct {

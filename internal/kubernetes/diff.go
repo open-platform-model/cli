@@ -17,18 +17,18 @@ import (
 	"github.com/opmodel/cli/internal/build"
 )
 
-// resourceState represents the state of a resource in a diff comparison.
-type resourceState string
+// ResourceState represents the state of a resource in a diff comparison.
+type ResourceState string
 
 const (
 	// ResourceModified means the resource exists both locally and on the cluster with differences.
-	ResourceModified resourceState = "modified"
+	ResourceModified ResourceState = "modified"
 	// ResourceAdded means the resource exists locally but not on the cluster.
-	ResourceAdded resourceState = "added"
+	ResourceAdded ResourceState = "added"
 	// ResourceOrphaned means the resource exists on the cluster but not in the local render.
-	ResourceOrphaned resourceState = "orphaned"
-	// resourceUnchanged means the resource exists both locally and on the cluster with no differences.
-	resourceUnchanged resourceState = "unchanged"
+	ResourceOrphaned ResourceState = "orphaned"
+	// ResourceUnchanged means the resource exists both locally and on the cluster with no differences.
+	ResourceUnchanged ResourceState = "unchanged"
 )
 
 // resourceDiff contains the diff details for a single resource.
@@ -40,7 +40,7 @@ type resourceDiff struct {
 	// Namespace is the resource namespace.
 	Namespace string
 	// State indicates whether the resource is modified, added, or orphaned.
-	State resourceState
+	State ResourceState
 	// Diff is the human-readable diff output (only for modified resources).
 	Diff string
 }
@@ -165,20 +165,7 @@ func fetchLiveState(ctx context.Context, client *Client, resource *unstructured.
 	ns := resource.GetNamespace()
 	name := resource.GetName()
 
-	var live *unstructured.Unstructured
-	var err error
-
-	if ns != "" {
-		live, err = client.Dynamic.Resource(gvr).Namespace(ns).Get(ctx, name, metav1.GetOptions{})
-	} else {
-		live, err = client.Dynamic.Resource(gvr).Get(ctx, name, metav1.GetOptions{})
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return live, nil
+	return client.ResourceClient(gvr, ns).Get(ctx, name, metav1.GetOptions{})
 }
 
 // resourceKey generates a unique key for a resource based on GVK, namespace, and name.
@@ -235,7 +222,7 @@ func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta
 				Kind:      kind,
 				Name:      name,
 				Namespace: ns,
-				State:     resourceUnchanged,
+				State:     ResourceUnchanged,
 			})
 			result.Unchanged++
 		} else {

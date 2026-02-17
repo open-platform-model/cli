@@ -73,7 +73,7 @@ Examples:
 }
 
 // runDelete executes the delete command.
-func runDelete(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, force, dryRun, wait, ignoreNotFound bool) error {
+func runDelete(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, force, dryRun, _ /* wait */, ignoreNotFound bool) error {
 	ctx := context.Background()
 
 	// Validate release selector flags
@@ -108,7 +108,7 @@ func runDelete(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 	opmConfig := GetOPMConfig()
 
 	// Create Kubernetes client via shared factory
-	k8sClient, err := cmdutil.NewK8sClient(cmdutil.K8sClientOpts{
+	k8sClient, err := cmdutil.NewK8sClient(kubernetes.ClientOptions{
 		Kubeconfig:  kf.Kubeconfig,
 		Context:     kf.Context,
 		APIWarnings: opmConfig.Config.Log.Kubernetes.APIWarnings,
@@ -137,7 +137,6 @@ func runDelete(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 		Namespace:   namespace,
 		ReleaseID:   rsf.ReleaseID,
 		DryRun:      dryRun,
-		Wait:        wait,
 	})
 	if err != nil {
 		if ignoreNotFound && kubernetes.IsNoResourcesFound(err) {

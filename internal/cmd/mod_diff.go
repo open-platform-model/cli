@@ -88,7 +88,7 @@ func runDiff(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdut
 	}
 
 	// Create Kubernetes client via shared factory
-	k8sClient, err := cmdutil.NewK8sClient(cmdutil.K8sClientOpts{
+	k8sClient, err := cmdutil.NewK8sClient(kubernetes.ClientOptions{
 		Kubeconfig:  kf.Kubeconfig,
 		Context:     kf.Context,
 		APIWarnings: opmConfig.Config.Log.Kubernetes.APIWarnings,
@@ -151,6 +151,9 @@ func runDiff(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdut
 			} else {
 				output.Println(fmt.Sprintf("~~~ %s/%s [orphaned - will be removed on next apply]", rd.Kind, rd.Name))
 			}
+
+		case kubernetes.ResourceUnchanged:
+			// No output for unchanged resources in diff view
 		}
 	}
 
