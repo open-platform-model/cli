@@ -226,3 +226,106 @@ func stripAnsi(s string) string {
 	}
 	return result.String()
 }
+
+func TestFormatFQN(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "provider separator replaced",
+			input: "kubernetes#opmodel.dev/transformers@v0#Foo",
+			want:  "kubernetes - opmodel.dev/transformers@v0#Foo",
+		},
+		{
+			name:  "no hash unchanged",
+			input: "nohash",
+			want:  "nohash",
+		},
+		{
+			name:  "only one hash",
+			input: "prov#name",
+			want:  "prov - name",
+		},
+		{
+			name:  "multiple hashes only first replaced",
+			input: "prov#path@v0#Name",
+			want:  "prov - path@v0#Name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatFQN(tt.input)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestFormatTransformerMatch(t *testing.T) {
+	tests := []struct {
+		name      string
+		component string
+		fqn       string
+	}{
+		{
+			name:      "basic match",
+			component: "web",
+			fqn:       "kubernetes#opmodel.dev/transformers@v0#DeploymentTransformer",
+		},
+		{
+			name:      "short names",
+			component: "db",
+			fqn:       "test#Foo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatTransformerMatch(tt.component, tt.fqn)
+			stripped := stripAnsi(result)
+
+			assert.Contains(t, stripped, "▸", "should contain bullet")
+			assert.Contains(t, stripped, tt.component, "should contain component name")
+			assert.Contains(t, stripped, "←", "should contain arrow")
+			assert.Contains(t, stripped, FormatFQN(tt.fqn), "should contain formatted FQN")
+		})
+	}
+}
+
+func TestFormatTransformerMatchVerbose(t *testing.T) {
+	t.Run("with reason", func(t *testing.T) {
+		result := FormatTransformerMatchVerbose("web", "kubernetes#opmodel.dev/t@v0#Foo", "Matched: requiredResources[Container]")
+		stripped := stripAnsi(result)
+
+		assert.Contains(t, result, "\n", "should contain newline")
+		assert.Contains(t, stripped, "▸", "should contain bullet")
+		assert.Contains(t, stripped, "web", "should contain component")
+		assert.Contains(t, stripped, "Matched: requiredResources[Container]", "should contain reason")
+
+		lines := strings.Split(stripped, "\n")
+		assert.Len(t, lines, 2, "should have exactly 2 lines")
+		assert.True(t, strings.HasPrefix(lines[1], "     "), "reason line should be indented")
+	})
+
+	t.Run("empty reason", func(t *testing.T) {
+		component := "web"
+		fqn := "kubernetes#opmodel.dev/t@v0#Foo"
+
+		resultVerbose := FormatTransformerMatchVerbose(component, fqn, "")
+		resultBasic := FormatTransformerMatch(component, fqn)
+
+		assert.Equal(t, resultBasic, resultVerbose, "empty reason should return same as basic format")
+		assert.NotContains(t, resultVerbose, "\n", "should not contain newline when reason is empty")
+	})
+}
+
+func TestFormatTransformerUnmatched(t *testing.T) {
+	result := FormatTransformerUnmatched("orphan-component")
+	stripped := stripAnsi(result)
+
+	assert.Contains(t, stripped, "▸", "should contain bullet")
+	assert.Contains(t, stripped, "orphan-component", "should contain component name")
+	assert.Contains(t, stripped, "(no matching transformer)", "should contain unmatched message")
+}

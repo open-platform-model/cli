@@ -10,24 +10,23 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 )
 
-// Status command flags.
-var (
-	statusNamespaceFlag      string
-	statusReleaseNameFlag    string
-	statusReleaseIDFlag      string
-	statusOutputFlag         string
-	statusWatchFlag          bool
-	statusIgnoreNotFoundFlag bool
-	statusKubeconfigFlag     string
-	statusContextFlag        string
-)
-
 // NewModStatusCmd creates the mod status command.
 func NewModStatusCmd() *cobra.Command {
+	var rsf cmdutil.ReleaseSelectorFlags
+	var kf cmdutil.K8sFlags
+
+	// Status-specific flags (local to this command)
+	var (
+		outputFlag         string
+		watchFlag          bool
+		ignoreNotFoundFlag bool
+	)
+
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show resource status",
@@ -57,125 +56,105 @@ Examples:
 
   # Watch status continuously
   opm mod status --release-name my-app -n production --watch`,
-		RunE: runStatus,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runStatus(cmd, args, &rsf, &kf, outputFlag, watchFlag, ignoreNotFoundFlag)
+		},
 	}
 
-	// Add flags
-	cmd.Flags().StringVarP(&statusNamespaceFlag, "namespace", "n", "",
-		"Target namespace (required)")
-	cmd.Flags().StringVar(&statusReleaseNameFlag, "release-name", "",
-		"Release name (mutually exclusive with --release-id)")
-	cmd.Flags().StringVar(&statusReleaseIDFlag, "release-id", "",
-		"Release identity UUID (mutually exclusive with --release-name)")
-	cmd.Flags().StringVarP(&statusOutputFlag, "output", "o", "table",
+	rsf.AddTo(cmd)
+	kf.AddTo(cmd)
+
+	// Status-specific flags
+	cmd.Flags().StringVarP(&outputFlag, "output", "o", "table",
 		"Output format (table, yaml, json)")
-	cmd.Flags().BoolVar(&statusWatchFlag, "watch", false,
+	cmd.Flags().BoolVar(&watchFlag, "watch", false,
 		"Watch status continuously (poll every 2s)")
-	cmd.Flags().BoolVar(&statusIgnoreNotFoundFlag, "ignore-not-found", false,
+	cmd.Flags().BoolVar(&ignoreNotFoundFlag, "ignore-not-found", false,
 		"Exit 0 when no resources match the selector")
-	cmd.Flags().StringVar(&statusKubeconfigFlag, "kubeconfig", "",
-		"Path to kubeconfig file")
-	cmd.Flags().StringVar(&statusContextFlag, "context", "",
-		"Kubernetes context to use")
 
 	return cmd
 }
 
 // runStatus executes the status command.
-func runStatus(cmd *cobra.Command, _ []string) error {
+func runStatus(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, outputFmt string, watch, ignoreNotFound bool) error {
 	ctx := context.Background()
 
-	// Manual validation: require exactly one of --release-name or --release-id (mutually exclusive)
-	if statusReleaseNameFlag != "" && statusReleaseIDFlag != "" {
-		return &ExitError{
-			Code: ExitGeneralError,
-			Err:  fmt.Errorf("--release-name and --release-id are mutually exclusive"),
-		}
-	}
-	if statusReleaseNameFlag == "" && statusReleaseIDFlag == "" {
-		return &ExitError{
-			Code: ExitGeneralError,
-			Err:  fmt.Errorf("either --release-name or --release-id is required"),
-		}
+	// Validate release selector flags
+	if err := rsf.Validate(); err != nil {
+		return &ExitError{Code: ExitGeneralError, Err: err}
 	}
 
 	// Resolve Kubernetes configuration with local flags
-	k8sConfig, err := resolveCommandKubernetes(
-		statusKubeconfigFlag,
-		statusContextFlag,
-		statusNamespaceFlag,
+	k8sConfig, err := cmdutil.ResolveKubernetes(
+		GetOPMConfig(),
+		kf.Kubeconfig,
+		kf.Context,
+		rsf.Namespace,
 		"", // no provider flag for status
 	)
 	if err != nil {
 		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
-	kubeconfig := k8sConfig.Kubeconfig.Value
-	kubeContext := k8sConfig.Context.Value
 	namespace := k8sConfig.Namespace.Value
 
 	// Log resolved k8s config at DEBUG level
 	output.Debug("resolved kubernetes config",
-		"kubeconfig", kubeconfig,
-		"context", kubeContext,
+		"kubeconfig", k8sConfig.Kubeconfig.Value,
+		"context", k8sConfig.Context.Value,
 		"namespace", namespace,
 	)
 
-	// Create scoped module logger - prefer release name, fall back to release-id
-	logName := statusReleaseNameFlag
-	if logName == "" {
-		logName = fmt.Sprintf("release:%s", statusReleaseIDFlag[:8])
-	}
+	// Create scoped module logger using shared LogName helper
+	logName := rsf.LogName()
 	modLog := output.ModuleLogger(logName)
 
 	// Validate output format
-	outputFormat, valid := output.ParseFormat(statusOutputFlag)
+	outputFormat, valid := output.ParseFormat(outputFmt)
 	if !valid || outputFormat == output.FormatDir {
 		return &ExitError{
 			Code: ExitGeneralError,
-			Err:  fmt.Errorf("invalid output format %q (valid: table, yaml, json)", statusOutputFlag),
+			Err:  fmt.Errorf("invalid output format %q (valid: table, yaml, json)", outputFmt),
 		}
 	}
 
-	// Create Kubernetes client
-	k8sClient, err := kubernetes.NewClient(kubernetes.ClientOptions{
-		Kubeconfig:  kubeconfig,
-		Context:     kubeContext,
+	opmConfig := GetOPMConfig()
+
+	// Create Kubernetes client via shared factory
+	k8sClient, err := cmdutil.NewK8sClient(cmdutil.K8sClientOpts{
+		Kubeconfig:  kf.Kubeconfig,
+		Context:     kf.Context,
 		APIWarnings: opmConfig.Config.Log.Kubernetes.APIWarnings,
 	})
 	if err != nil {
 		modLog.Error("connecting to cluster", "error", err)
-		return &ExitError{Code: ExitConnectivityError, Err: err, Printed: true}
+		return err
 	}
 
 	statusOpts := kubernetes.StatusOptions{
 		Namespace:    namespace,
-		ReleaseName:  statusReleaseNameFlag,
-		ReleaseID:    statusReleaseIDFlag,
+		ReleaseName:  rsf.ReleaseName,
+		ReleaseID:    rsf.ReleaseID,
 		OutputFormat: outputFormat,
-		Watch:        statusWatchFlag,
+		Watch:        watch,
 	}
 
 	// If watch mode, run in loop
-	if statusWatchFlag {
-		return runStatusWatch(ctx, k8sClient, statusOpts)
+	if watch {
+		return runStatusWatch(ctx, k8sClient, statusOpts, logName, ignoreNotFound)
 	}
 
 	// Single run
-	return runStatusOnce(ctx, k8sClient, statusOpts)
+	return runStatusOnce(ctx, k8sClient, statusOpts, logName, ignoreNotFound)
 }
 
 // runStatusOnce executes a single status check.
-func runStatusOnce(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions) error {
-	logName := opts.ReleaseName
-	if logName == "" {
-		logName = fmt.Sprintf("release:%s", opts.ReleaseID[:8])
-	}
+func runStatusOnce(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string, ignoreNotFound bool) error {
 	modLog := output.ModuleLogger(logName)
 
 	result, err := kubernetes.GetModuleStatus(ctx, client, opts)
 	if err != nil {
-		if statusIgnoreNotFoundFlag && kubernetes.IsNoResourcesFound(err) {
+		if ignoreNotFound && kubernetes.IsNoResourcesFound(err) {
 			modLog.Info("no resources found (ignored)")
 			return nil
 		}
@@ -194,7 +173,7 @@ func runStatusOnce(ctx context.Context, client *kubernetes.Client, opts kubernet
 }
 
 // runStatusWatch runs status in continuous watch mode, polling every 2 seconds.
-func runStatusWatch(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions) error {
+func runStatusWatch(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string, ignoreNotFound bool) error {
 	// Set up signal handling for clean exit
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -210,7 +189,7 @@ func runStatusWatch(ctx context.Context, client *kubernetes.Client, opts kuberne
 	defer ticker.Stop()
 
 	// Initial display
-	if err := displayStatus(ctx, client, opts); err != nil {
+	if err := displayStatus(ctx, client, opts, logName, ignoreNotFound); err != nil {
 		return err
 	}
 
@@ -221,7 +200,7 @@ func runStatusWatch(ctx context.Context, client *kubernetes.Client, opts kuberne
 		case <-ticker.C:
 			// Clear screen
 			output.ClearScreen()
-			if err := displayStatus(ctx, client, opts); err != nil {
+			if err := displayStatus(ctx, client, opts, logName, ignoreNotFound); err != nil {
 				return err
 			}
 		}
@@ -229,16 +208,12 @@ func runStatusWatch(ctx context.Context, client *kubernetes.Client, opts kuberne
 }
 
 // displayStatus fetches and displays the current status.
-func displayStatus(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions) error {
-	logName := opts.ReleaseName
-	if logName == "" {
-		logName = fmt.Sprintf("release:%s", opts.ReleaseID[:8])
-	}
+func displayStatus(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string, ignoreNotFound bool) error {
 	modLog := output.ModuleLogger(logName)
 
 	result, err := kubernetes.GetModuleStatus(ctx, client, opts)
 	if err != nil {
-		if statusIgnoreNotFoundFlag && kubernetes.IsNoResourcesFound(err) {
+		if ignoreNotFound && kubernetes.IsNoResourcesFound(err) {
 			modLog.Info("no resources found (ignored)")
 			return nil
 		}

@@ -132,12 +132,3 @@ func GetWeight(gvk schema.GroupVersionKind) int {
 	// Default weight for unknown resources
 	return WeightDefault
 }
-
-// GetWeightByKind returns the weight for a resource kind.
-// Useful when only the kind is known.
-func GetWeightByKind(kind string) int {
-	if weight, ok := kindWeights[kind]; ok {
-		return weight
-	}
-	return WeightDefault
-}

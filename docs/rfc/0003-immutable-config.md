@@ -9,42 +9,28 @@
 
 ## Summary
 
-Add an `immutable` field to `#SecretSchema` and `#ConfigMapSchema`. When set to
-`true`, the transformer appends a content-hash suffix to the Kubernetes resource
-name and sets the native `spec.immutable: true` field on the emitted resource.
-Content changes produce a new name, which triggers workload rolling updates (once
-env wiring is implemented) and causes the old resource to be garbage collected
-via the Release Inventory (RFC-0001).
+Add an `immutable` field to `#SecretSchema` and `#ConfigMapSchema`. When set to `true`, the transformer appends a content-hash suffix to the Kubernetes resource name and sets the native `spec.immutable: true` field on the emitted resource. Content changes produce a new name, which triggers workload rolling updates (once env wiring is implemented) and causes the old resource to be garbage collected via the Release Inventory (RFC-0001).
 
-This is the OPM equivalent of Kustomize's `configMapGenerator`/`secretGenerator`
-and Timoni's `#ImmutableConfig`.
+This is the OPM equivalent of Kustomize's `configMapGenerator`/`secretGenerator` and Timoni's `#ImmutableConfig`.
 
 ## Motivation
 
 ### The Problem
 
-OPM currently treats ConfigMaps and Secrets as mutable resources updated in-place
-via Server-Side Apply. This has three consequences:
+OPM currently treats ConfigMaps and Secrets as mutable resources updated in-place via Server-Side Apply. This has three consequences:
 
 1. **No rolling updates on config change.** When a ConfigMap or Secret's data
-   changes, the resource is updated but workloads consuming it are not restarted.
-   Running pods continue using stale configuration until they are manually cycled
-   or happen to restart.
+   changes, the resource is updated but workloads consuming it are not restarted.    Running pods continue using stale configuration until they are manually cycled    or happen to restart.
 
 2. **No protection against accidental edits.** A `kubectl edit` on a Secret can
-   silently break a running application. There is no guard against drift between
-   the OPM-defined state and the live state.
+   silently break a running application. There is no guard against drift between    the OPM-defined state and the live state.
 
 3. **Performance cost.** The kubelet watches every Secret and ConfigMap that a
-   pod references, polling for changes. For clusters with many Secrets, this is a
-   measurable overhead. Kubernetes' native `spec.immutable: true` disables this
-   watch, but OPM never sets it.
+   pod references, polling for changes. For clusters with many Secrets, this is a    measurable overhead. Kubernetes' native `spec.immutable: true` disables this    watch, but OPM never sets it.
 
 ### The Industry Pattern: Rename-as-Update
 
-The established solution across the Kubernetes ecosystem is to treat config
-resources as immutable, append a content hash to the name, and let the name
-change propagate through the system:
+The established solution across the Kubernetes ecosystem is to treat config resources as immutable, append a content hash to the name, and let the name change propagate through the system:
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -78,20 +64,16 @@ change propagate through the system:
 Two concurrent developments make this the right time:
 
 1. **RFC-0001 (Release Inventory)** provides the garbage collection mechanism.
-   Without inventory-based pruning, old hash-suffixed resources would accumulate
-   indefinitely. With it, they are automatically cleaned up as stale resources.
+   Without inventory-based pruning, old hash-suffixed resources would accumulate    indefinitely. With it, they are automatically cleaned up as stale resources.
 
 2. **The env valueFrom gap** (K8s Coverage Gap Analysis, item 1.1) is the next
-   major schema change. Designing immutable now ensures that when env wiring is
-   implemented, the hash-suffixed names flow naturally into workload references,
-   completing the rolling update story.
+   major schema change. Designing immutable now ensures that when env wiring is    implemented, the hash-suffixed names flow naturally into workload references,    completing the rolling update story.
 
 ## Prior Art
 
 ### Timoni `#ImmutableConfig`
 
-Timoni is the closest architectural analog to OPM — both are CUE-based,
-CLI-driven, and module-oriented. Timoni's approach:
+Timoni is the closest architectural analog to OPM — both are CUE-based, CLI-driven, and module-oriented. Timoni's approach:
 
 - Module author wraps config in `#ImmutableConfig`, specifying `#Kind`
   (Secret or ConfigMap), `#Meta`, and `#Data`.
@@ -104,8 +86,7 @@ CLI-driven, and module-oriented. Timoni's approach:
 - A `#Suffix` field is available to disambiguate multiple configs per component.
 
 **Key takeaway**: The module author is responsible for wiring the computed name
-into workload references. This maps directly to OPM's duplicate hash computation
-pattern.
+into workload references. This maps directly to OPM's duplicate hash computation pattern.
 
 ### Kustomize `configMapGenerator` / `secretGenerator`
 
@@ -117,9 +98,7 @@ pattern.
   tooling.
 
 **Key takeaway**: Kustomize's automatic reference rewriting is powerful but
-requires a global post-processing pass. OPM's transformer architecture does not
-support cross-resource rewriting, making duplicate hash computation the better
-fit.
+requires a global post-processing pass. OPM's transformer architecture does not support cross-resource rewriting, making duplicate hash computation the better fit.
 
 ### Helm Checksum Annotations
 
@@ -133,16 +112,14 @@ spec:
         checksum/config: {{ include "mychart/configmap.yaml" . | sha256sum }}
 ```
 
-The ConfigMap is updated in-place. The annotation on the pod template changes,
-triggering a rolling update. This is simpler but has downsides:
+The ConfigMap is updated in-place. The annotation on the pod template changes, triggering a rolling update. This is simpler but has downsides:
 
 - Running pods can see partial config updates (if mounted as volumes).
 - No kubelet watch optimization (resource is mutable).
 - No protection against manual edits.
 
 **Key takeaway**: OPM should prefer true immutability over annotation-based
-tricks. The rename-as-update pattern is strictly better when inventory-based
-GC is available.
+tricks. The rename-as-update pattern is strictly better when inventory-based GC is available.
 
 ### Kubernetes Native `spec.immutable`
 
@@ -155,15 +132,13 @@ Kubernetes ConfigMaps and Secrets have an `immutable` field (stable since v1.21)
 - The field does not trigger rolling updates or manage resource naming.
 
 **Key takeaway**: The native field is a performance and safety optimization.
-OPM should set it on immutable resources for defense in depth, but the
-rename-as-update pattern is what actually drives the lifecycle.
+OPM should set it on immutable resources for defense in depth, but the rename-as-update pattern is what actually drives the lifecycle.
 
 ## Design
 
 ### Schema Changes
 
-Add `immutable?: bool | *false` to both `#SecretSchema` and `#ConfigMapSchema`
-in `schemas/config.cue`:
+Add `immutable?: bool | *false` to both `#SecretSchema` and `#ConfigMapSchema` in `schemas/config.cue`:
 
 ```cue
 #SecretSchema: {
@@ -178,8 +153,7 @@ in `schemas/config.cue`:
 }
 ```
 
-The field is **per-entry** — each secret or configmap in the map can
-independently be immutable or mutable:
+The field is **per-entry** — each secret or configmap in the map can independently be immutable or mutable:
 
 ```cue
 spec: secrets: {
@@ -209,9 +183,7 @@ spec: configMaps: {
 
 ### Content Hash Computation
 
-A shared CUE definition computes the content hash. It lives in
-`schemas/config.cue` alongside the schema definitions, since both the config
-schemas and the transformers need access to it.
+A shared CUE definition computes the content hash. It lives in `schemas/config.cue` alongside the schema definitions, since both the config schemas and the transformers need access to it.
 
 ```cue
 import (
@@ -298,28 +270,17 @@ import (
 **Algorithm details:**
 
 - **Input**: For ConfigMaps, only the `data` field string values. For Secrets,
-  the `#Secret` entries are normalized: `#SecretLiteral` hashes the `value`
-  field, `#SecretRef` hashes `source:path:remoteKey` as a composite string.
-  The `type` field (for Secrets) and `immutable` flag itself are excluded.
-  Changing `type` from `Opaque` to `kubernetes.io/tls` without changing data
-  does not create a new resource. For `#SecretRef`, the hash captures the
-  reference metadata — changes to the external path trigger recreation, while
-  runtime secret rotation by the external store does not.
+  the `#Secret` entries are normalized: `#SecretLiteral` hashes the `value`   field, `#SecretRef` hashes `source:path:remoteKey` as a composite string.   The `type` field (for Secrets) and `immutable` flag itself are excluded.   Changing `type` from `Opaque` to `kubernetes.io/tls` without changing data   does not create a new resource. For `#SecretRef`, the hash captures the   reference metadata — changes to the external path trigger recreation, while   runtime secret rotation by the external store does not.
 - **Determinism**: Keys are explicitly sorted with `list.SortStrings` before
-  concatenation. CUE struct field ordering is deterministic, but explicit
-  sorting removes any dependency on declaration order.
+  concatenation. CUE struct field ordering is deterministic, but explicit   sorting removes any dependency on declaration order.
 - **Length**: 10 hex characters (5 bytes of SHA256). This matches Kustomize's
-  suffix length and provides 2^40 (~1 trillion) possible values — collision
-  probability is negligible for any realistic number of config resources per
-  module.
+  suffix length and provides 2^40 (~1 trillion) possible values — collision   probability is negligible for any realistic number of config resources per   module.
 - **Separator**: Newline between key=value pairs, preventing ambiguity when
   values contain `=` characters.
 
 ### Transformer Changes
 
-Both `SecretTransformer` and `ConfigMapTransformer` are updated to use
-`#SecretImmutableName` / `#ImmutableName` for resource naming and to set
-`spec.immutable` when applicable.
+Both `SecretTransformer` and `ConfigMapTransformer` are updated to use `#SecretImmutableName` / `#ImmutableName` for resource naming and to set `spec.immutable` when applicable.
 
 #### SecretTransformer (updated)
 
@@ -370,12 +331,7 @@ Both `SecretTransformer` and `ConfigMapTransformer` are updated to use
 }
 ```
 
-> **Note**: The transformer above shows the `#SecretLiteral` path for clarity.
-> The full variant dispatch (ExternalSecret for esc, skip for k8s)
-> is specified in
-> [RFC-0005](0005-env-config-wiring.md). The `#SecretImmutableName` hash
-> computation applies to all variants — for `#SecretRef`, it hashes the
-> reference metadata rather than the secret value.
+> **Note**: The transformer above shows the `#SecretLiteral` path for clarity. > The full variant dispatch (ExternalSecret for esc, skip for k8s) > is specified in > [RFC-0005](0005-env-config-wiring.md). The `#SecretImmutableName` hash > computation applies to all variants — for `#SecretRef`, it hashes the > reference metadata rather than the secret value.
 
 #### ConfigMapTransformer (updated)
 
@@ -412,22 +368,14 @@ Both `SecretTransformer` and `ConfigMapTransformer` are updated to use
 }
 ```
 
-When `immutable` is `false` (the default), `#ImmutableName` /
-`#SecretImmutableName` returns the base name unchanged and no `immutable`
-field is set on the K8s resource. The output is identical to today's
-behavior — fully backward compatible.
+When `immutable` is `false` (the default), `#ImmutableName` / `#SecretImmutableName` returns the base name unchanged and no `immutable` field is set on the K8s resource. The output is identical to today's behavior — fully backward compatible.
 
 ### Cross-Transformer Reference Pattern
 
-The critical design question: how does a workload transformer (e.g.,
-DeploymentTransformer) know the hashed name of an immutable Secret when
-generating `envFrom` or `volumeMount` references?
+The critical design question: how does a workload transformer (e.g., DeploymentTransformer) know the hashed name of an immutable Secret when generating `envFrom` or `volumeMount` references?
 
 **Answer: Duplicate hash computation.** Both the config transformer and the
-workload transformer independently compute the same hash from the same
-`#component.spec` data. Since CUE evaluation is deterministic and both
-transformers receive the same `#component` value, they produce identical
-output.
+workload transformer independently compute the same hash from the same `#component.spec` data. Since CUE evaluation is deterministic and both transformers receive the same `#component` value, they produce identical output.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -465,22 +413,14 @@ output.
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-This pattern requires no pipeline architecture changes, no multi-pass
-rendering, and no shared mutable state between transformers. It relies on a
-property CUE already guarantees: pure functions over the same input produce the
-same output.
+This pattern requires no pipeline architecture changes, no multi-pass rendering, and no shared mutable state between transformers. It relies on a property CUE already guarantees: pure functions over the same input produce the same output.
 
 **Note**: The workload transformer side of this pattern is deferred to the env
-valueFrom implementation (K8s Coverage Gap Analysis, item 1.1). This RFC only
-defines the schema, hash computation, and config transformer behavior. The
-workload transformer integration is designed here but implemented separately.
+valueFrom implementation (K8s Coverage Gap Analysis, item 1.1). This RFC only defines the schema, hash computation, and config transformer behavior. The workload transformer integration is designed here but implemented separately.
 
 ### Garbage Collection
 
-Immutable resources rely on the Release Inventory (RFC-0001) for lifecycle
-management. When data changes, the content hash changes, which changes the
-resource name. From the inventory's perspective, this is identical to a resource
-rename — the core scenario that motivated RFC-0001.
+Immutable resources rely on the Release Inventory (RFC-0001) for lifecycle management. When data changes, the content hash changes, which changes the resource name. From the inventory's perspective, this is identical to a resource rename — the core scenario that motivated RFC-0001.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -506,19 +446,13 @@ rename — the core scenario that motivated RFC-0001.
 ```
 
 **Dependency**: This RFC ships alongside RFC-0001. Without inventory-based
-pruning, old immutable resources would accumulate as orphans. While label-based
-discovery can detect them, only inventory pruning can automatically clean them
-up.
+pruning, old immutable resources would accumulate as orphans. While label-based discovery can detect them, only inventory pruning can automatically clean them up.
 
 ## Interaction with Other RFCs
 
 ### RFC-0002: Sensitive Data Model
 
-[RFC-0002](0002-sensitive-data-model.md) introduces `#Secret` as a type in
-`#config` that tags fields as sensitive. This RFC adds `immutable` as a field
-on `#SecretSchema` that controls K8s resource lifecycle. The `#SecretSchema.data`
-field now holds `#Secret` entries (per RFC-0005), and the hash computation is
-variant-aware:
+[RFC-0002](0002-sensitive-data-model.md) introduces `#Secret` as a type in `#config` that tags fields as sensitive. This RFC adds `immutable` as a field on `#SecretSchema` that controls K8s resource lifecycle. The `#SecretSchema.data` field now holds `#Secret` entries (per RFC-0005), and the hash computation is variant-aware:
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
@@ -540,16 +474,11 @@ They compose as follows:
 | `#SecretRef` (esc)   | Yes                   | source + path + remoteKey | Hash the reference, not the runtime value. OPM doesn't know the actual secret. ESC handles rotation. |
 | `#SecretRef` (k8s)   | No                    | N/A                      | OPM doesn't own the resource. Immutable is inapplicable. |
 
-The hash input varies by source type because OPM's visibility into the data
-varies. For `#SecretLiteral`, OPM has the actual values. For `#SecretRef`, OPM
-only has the reference metadata. The hash captures what OPM knows — changes to
-the reference trigger recreation, while runtime rotation by the external store
-does not.
+The hash input varies by source type because OPM's visibility into the data varies. For `#SecretLiteral`, OPM has the actual values. For `#SecretRef`, OPM only has the reference metadata. The hash captures what OPM knows — changes to the reference trigger recreation, while runtime rotation by the external store does not.
 
 ### Release Inventory (RFC-0001)
 
-Required dependency. Immutable config is a special case of the rename problem
-that motivated RFC-0001. Both should ship together as a cohesive feature:
+Required dependency. Immutable config is a special case of the rename problem that motivated RFC-0001. Both should ship together as a cohesive feature:
 
 - Inventory provides the GC mechanism for old hash-suffixed resources.
 - Immutable config is a major use case that validates the inventory design.
@@ -558,9 +487,7 @@ that motivated RFC-0001. Both should ship together as a cohesive feature:
 
 ### K8s Coverage Gap Analysis (env valueFrom)
 
-The env valueFrom gap (item 1.1) is the key enabler for the full rolling update
-story. This RFC is designed to work with future env wiring but does not require
-it:
+The env valueFrom gap (item 1.1) is the key enabler for the full rolling update story. This RFC is designed to work with future env wiring but does not require it:
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -586,12 +513,7 @@ it:
 
 ### Experiment 001-config-sources
 
-This RFC supersedes the `001-config-sources` experiment. The experiment
-validated the need for sensitivity tagging, env wiring, and transformer
-dispatch. This RFC takes a different approach (per-entry `immutable` field
-vs. unified `#ConfigSourceSchema`), but the experiment's learnings informed the
-design — particularly around naming conventions and transformer output
-structure.
+This RFC supersedes the `001-config-sources` experiment. The experiment validated the need for sensitivity tagging, env wiring, and transformer dispatch. This RFC takes a different approach (per-entry `immutable` field vs. unified `#ConfigSourceSchema`), but the experiment's learnings informed the design — particularly around naming conventions and transformer output structure.
 
 ## Scenarios
 
@@ -797,38 +719,25 @@ Result: Clean. [x]
 identical across CUE SDK versions?
 
 **Assessment**: SHA256 is a standardized algorithm (FIPS 180-4). CUE delegates
-to Go's `crypto/sha256` package. The output will not change across versions.
-The risk is in the *input* string construction, not the hash function. The
-design mitigates this by using explicit key sorting (`list.SortStrings`) and a
-simple `key=value\n` concatenation format with no CUE-version-dependent
-behavior.
+to Go's `crypto/sha256` package. The output will not change across versions. The risk is in the *input* string construction, not the hash function. The design mitigates this by using explicit key sorting (`list.SortStrings`) and a simple `key=value\n` concatenation format with no CUE-version-dependent behavior.
 
 **Risk**: Low.
 
 ### Q2: Binary Data in Secrets
 
 **Question**: `#SecretSchema` data now holds `#Secret` entries. If `binaryData`
-support is needed (for certificates, etc.), it could be added as an additional
-field on `#SecretLiteral` (e.g., `binaryValue?: bytes`) or as a separate
-`#SecretBinaryLiteral` variant.
+support is needed (for certificates, etc.), it could be added as an additional field on `#SecretLiteral` (e.g., `binaryValue?: bytes`) or as a separate `#SecretBinaryLiteral` variant.
 
 **Mitigation**: The `#SecretContentHash` normalizes `#Secret` entries to strings
-for hashing. A `binaryValue` field would be included via its base64 encoding.
-The hash interface (`#SecretContentHash`) would need a normalization rule for
-the new variant, but `#ContentHash` itself remains unchanged.
+for hashing. A `binaryValue` field would be included via its base64 encoding. The hash interface (`#SecretContentHash`) would need a normalization rule for the new variant, but `#ContentHash` itself remains unchanged.
 
 ### Q3: Maximum Resource Name Length
 
 **Question**: Kubernetes resource names are limited to 253 characters (DNS
-subdomain). Adding a 10-character hash suffix plus a `-` separator adds 11
-characters. Could this exceed the limit?
+subdomain). Adding a 10-character hash suffix plus a `-` separator adds 11 characters. Could this exceed the limit?
 
 **Assessment**: OPM resource names are constrained by `#NameType` to 63
-characters. The component name is also constrained to 63 characters. The
-transformer combines them as `<entry-name>-<hash>` (max 63 + 1 + 10 = 74
-characters) or as `<component-name>-<entry-name>-<hash>` depending on the
-naming convention. All are well within the 253-character limit and the
-63-character label value limit.
+characters. The component name is also constrained to 63 characters. The transformer combines them as `<entry-name>-<hash>` (max 63 + 1 + 10 = 74 characters) or as `<component-name>-<entry-name>-<hash>` depending on the naming convention. All are well within the 253-character limit and the 63-character label value limit.
 
 **Risk**: Negligible.
 
@@ -836,18 +745,11 @@ naming convention. All are well within the 253-character limit and the
 
 ### Workload Env Wiring (env valueFrom / envFrom)
 
-The workload transformer side of the cross-transformer reference pattern.
-When implemented, workload transformers will use `#ImmutableName` /
-`#SecretImmutableName` to resolve Secret and ConfigMap references in `envFrom`,
-`env.valueFrom.secretKeyRef`, `env.valueFrom.configMapKeyRef`, and
-`volumes[].secret`/`volumes[].configMap`.
-See [RFC-0005](0005-env-config-wiring.md) for the full env wiring design.
+The workload transformer side of the cross-transformer reference pattern. When implemented, workload transformers will use `#ImmutableName` / `#SecretImmutableName` to resolve Secret and ConfigMap references in `envFrom`, `env.valueFrom.secretKeyRef`, `env.valueFrom.configMapKeyRef`, and `volumes[].secret`/`volumes[].configMap`. See [RFC-0005](0005-env-config-wiring.md) for the full env wiring design.
 
 ### ExternalSecret Immutability
 
-For `#SecretRef` sources that produce ExternalSecret CRs (esc), the
-`immutable` field could be propagated to the ExternalSecret's `target` spec.
-This is a provider-level concern deferred to the ESC handler implementation.
+For `#SecretRef` sources that produce ExternalSecret CRs (esc), the `immutable` field could be propagated to the ExternalSecret's `target` spec. This is a provider-level concern deferred to the ESC handler implementation.
 
 ## References
 

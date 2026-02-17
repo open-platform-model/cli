@@ -3,6 +3,7 @@ package output
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/charmbracelet/lipgloss"
@@ -117,4 +118,15 @@ func ClearScreen() {
 // BoolPtr returns a pointer to a bool value. Convenience for LogConfig.Timestamps.
 func BoolPtr(b bool) *bool {
 	return &b
+}
+
+// SetLogWriter redirects the logger output to the specified writer.
+// Preserves the current log level. Intended for testing.
+func SetLogWriter(w io.Writer) {
+	logger = log.NewWithOptions(w, log.Options{
+		Level:           logger.GetLevel(),
+		ReportTimestamp: false,
+		ReportCaller:    false,
+		TimeFormat:      "15:04:05",
+	})
 }

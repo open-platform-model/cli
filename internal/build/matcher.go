@@ -216,16 +216,3 @@ func (r *MatchResult) ToMatchPlan() MatchPlan {
 		Unmatched: unmatched,
 	}
 }
-
-// GetUnmatchedDetails returns details for unmatched components.
-// Useful for error messages showing why nothing matched.
-func (r *MatchResult) GetUnmatchedDetails(componentName string) []MatchDetail {
-	var details []MatchDetail
-	for i := range r.Details {
-		detail := &r.Details[i]
-		if detail.ComponentName == componentName && !detail.Matched {
-			details = append(details, *detail)
-		}
-	}
-	return details
-}

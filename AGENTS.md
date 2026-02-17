@@ -98,6 +98,7 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 │   ├── cmd/           # Command implementations
 │   │   ├── config/    # config init command
 │   │   └── mod/       # mod apply, build, delete, init, status, template
+│   ├── cmdutil/       # Shared command utilities (flag groups, render pipeline, K8s client, output)
 │   ├── config/        # Config loading, validation, paths
 │   ├── errors/        # Error types and handling
 │   ├── kubernetes/    # K8s client, apply, delete, discovery, health, status
@@ -121,7 +122,8 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 - `cmd/opm/` - Entry point
 - `pkg/loader/` - CUE module loading
 - `pkg/version/` - Version info
-- `internal/commands/` - Command implementations (root, mod/, config/)
+- `internal/cmd/` - Command implementations (root, mod/, config/)
+- `internal/cmdutil/` - Shared command utilities (flag groups, render pipeline, K8s client, output)
 
 ## Patterns
 

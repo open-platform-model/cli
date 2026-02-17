@@ -68,26 +68,6 @@ func TestGetWeight(t *testing.T) {
 	}
 }
 
-func TestGetWeightByKind(t *testing.T) {
-	tests := []struct {
-		kind string
-		want int
-	}{
-		{"Namespace", WeightNamespace},
-		{"ConfigMap", WeightConfigMap},
-		{"Deployment", WeightDeployment},
-		{"Service", WeightService},
-		{"UnknownKind", WeightDefault},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.kind, func(t *testing.T) {
-			got := GetWeightByKind(tt.kind)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestWeightOrder(t *testing.T) {
 	// Verify that weights are in the correct order for apply
 	assert.Less(t, WeightCRD, WeightNamespace, "CRDs should come before Namespaces")

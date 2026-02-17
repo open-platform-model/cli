@@ -9,21 +9,11 @@
 
 ## Summary
 
-Define the transformation rules that connect `#config` fields to Kubernetes
-container environment variables, bulk injection, downward API references, and
-volume-mounted secrets. This RFC is the **output side** of the data flow whose
-input side is defined by [RFC-0002 (Sensitive Data Model)](0002-sensitive-data-model.md).
+Define the transformation rules that connect `#config` fields to Kubernetes container environment variables, bulk injection, downward API references, and volume-mounted secrets. This RFC is the **output side** of the data flow whose input side is defined by [RFC-0002 (Sensitive Data Model)](0002-sensitive-data-model.md).
 
-Today, `#ContainerSchema.env` supports only literal `name`/`value` pairs. This
-RFC introduces the full `#EnvVarSchema` with four source types (`value`, `from`,
-`fieldRef`, `resourceFieldRef`), bulk injection via `envFrom`, volume-mounted
-secrets, the `#Secret` contract type with `$secretName`/`$dataKey` routing
-fields, auto-discovery of secrets from `#config` via CUE comprehensions, and
-the auto-generated `spec.secrets` schema that eliminates the manual bridging
-layer.
+Today, `#ContainerSchema.env` supports only literal `name`/`value` pairs. This RFC introduces the full `#EnvVarSchema` with four source types (`value`, `from`, `fieldRef`, `resourceFieldRef`), bulk injection via `envFrom`, volume-mounted secrets, the `#Secret` contract type with `$secretName`/`$dataKey` routing fields, auto-discovery of secrets from `#config` via CUE comprehensions, and the auto-generated `spec.secrets` schema that eliminates the manual bridging layer.
 
-The design was validated in
-[Experiment 002: Secret Discovery](../../../catalog/experiments/002-secret-discovery/).
+The design was validated in [Experiment 002: Secret Discovery](../../../catalog/experiments/002-secret-discovery/).
 
 ## Motivation
 
@@ -38,9 +28,7 @@ env?: [string]: {
 }
 ```
 
-This is the single highest-impact gap identified in the
-[K8s Coverage Gap Analysis](../../../catalog/docs/k8s-coverage-gap-analysis.md)
-(item 1.1). Missing capabilities:
+This is the single highest-impact gap identified in the [K8s Coverage Gap Analysis](../../../catalog/docs/k8s-coverage-gap-analysis.md) (item 1.1). Missing capabilities:
 
 1. **`valueFrom.secretKeyRef`** — reference a key in a Secret.
 2. **`valueFrom.configMapKeyRef`** — reference a key in a ConfigMap.
@@ -50,15 +38,11 @@ This is the single highest-impact gap identified in the
 6. **Volume-mounted secrets** — TLS certs, credential files, service account
    keys mounted as files rather than env vars.
 
-Without these, module authors must hardcode sensitive values, cannot reference
-pre-existing cluster resources, and have no access to pod metadata.
+Without these, module authors must hardcode sensitive values, cannot reference pre-existing cluster resources, and have no access to pod metadata.
 
 ### Why Now
 
-RFC-0002 defines how secrets enter OPM (`#Secret` type, input paths, provider
-handlers). RFC-0003 defines immutable config with content-hash naming. Both
-depend on workload transformers knowing the Kubernetes resource name for
-`secretKeyRef` and `configMapKeyRef`. This RFC closes the loop by defining:
+RFC-0002 defines how secrets enter OPM (`#Secret` type, input paths, provider handlers). RFC-0003 defines immutable config with content-hash naming. Both depend on workload transformers knowing the Kubernetes resource name for `secretKeyRef` and `configMapKeyRef`. This RFC closes the loop by defining:
 
 - How `#Secret` identity (`$secretName`, `$dataKey`) flows through to
   transformer output.
@@ -70,9 +54,7 @@ depend on workload transformers knowing the Kubernetes resource name for
 
 ### #Secret Type Definition
 
-`#Secret` is a **contract type** — a disjunction of fulfillment variants.
-Module authors annotate `#config` fields with `#Secret`; users provide values
-that resolve to one of the variants.
+`#Secret` is a **contract type** — a disjunction of fulfillment variants. Module authors annotate `#config` fields with `#Secret`; users provide values that resolve to one of the variants.
 
 ```cue
 #Secret: #SecretLiteral | #SecretRef
@@ -99,35 +81,25 @@ that resolve to one of the variants.
 Design rationale:
 
 - **`$opm: "secret"` discriminator.** A concrete value present on every
-  `#Secret` variant. Enables CUE-native auto-discovery via the negation test
-  (see [Auto-Discovery](#auto-discovery)). No external tooling or tags needed.
+  `#Secret` variant. Enables CUE-native auto-discovery via the negation test   (see [Auto-Discovery](#auto-discovery)). No external tooling or tags needed.
 
 - **`$secretName` and `$dataKey` are routing info.** The module author sets
-  these in the `#config` schema declaration. `$secretName` names the K8s Secret
-  resource (and acts as the grouping key). `$dataKey` names the data key within
-  that K8s Secret. Multiple `#config` fields sharing the same `$secretName` are
-  grouped into one K8s Secret.
+  these in the `#config` schema declaration. `$secretName` names the K8s Secret   resource (and acts as the grouping key). `$dataKey` names the data key within   that K8s Secret. Multiple `#config` fields sharing the same `$secretName` are   grouped into one K8s Secret.
 
 - **Users never set `$secretName`/`$dataKey`.** CUE unification propagates the
-  author's values through. Users only provide `value` (for literals) or
-  `source`/`path`/`remoteKey` (for refs).
+  author's values through. Users only provide `value` (for literals) or   `source`/`path`/`remoteKey` (for refs).
 
 - **`$`-prefixed fields.** These are regular CUE fields (visible in iteration),
-  not hidden. The `$` prefix is a naming convention to visually distinguish
-  author-set routing fields from user-set fulfillment fields.
+  not hidden. The `$` prefix is a naming convention to visually distinguish   author-set routing fields from user-set fulfillment fields.
 
 - **No `#SecretDeferred`.** Unfulfilled `#Secret` fields are CUE incompleteness
-  errors, caught at evaluation time. If a user omits a required secret value,
-  CUE itself reports the error — no special deferred variant needed.
+  errors, caught at evaluation time. If a user omits a required secret value,   CUE itself reports the error — no special deferred variant needed.
 
 - **`#SecretRef.remoteKey` is separate from `$dataKey`.** The external secret's
-  key (in Vault, ESO, or another K8s Secret) may differ from the logical data
-  key that the module uses. `$dataKey` is the output key; `remoteKey` is the
-  input key.
+  key (in Vault, ESO, or another K8s Secret) may differ from the logical data   key that the module uses. `$dataKey` is the output key; `remoteKey` is the   input key.
 
 - **`source: *"k8s" | "esc"`.** Simplified from the previous design's
-  `vault`/`aws-sm`/`gcp-sm`/`k8s` enumeration. ESO (External Secrets Operator)
-  abstracts over external providers, so `"esc"` covers all external sources.
+  `vault`/`aws-sm`/`gcp-sm`/`k8s` enumeration. ESO (External Secrets Operator)   abstracts over external providers, so `"esc"` covers all external sources.
 
 Example usage:
 
@@ -178,9 +150,7 @@ values: {
 
 ### Auto-Discovery
 
-The fundamental shift from the previous design: **`spec.secrets` is
-auto-generated from `#config`**, not hand-written by the module author. The
-old "Layer 2" bridging step is eliminated entirely.
+The fundamental shift from the previous design: **`spec.secrets` is auto-generated from `#config`**, not hand-written by the module author. The old "Layer 2" bridging step is eliminated entirely.
 
 #### The Negation Test
 
@@ -190,29 +160,23 @@ To discover `#Secret` fields in a resolved `#config`, we test each value:
 (v & {$opm: !="secret", ...}) == _|_
 ```
 
-This produces bottom (error) ONLY when `$opm` is already concretely set to
-`"secret"` on the value. For any other value:
+This produces bottom (error) ONLY when `$opm` is already concretely set to `"secret"` on the value. For any other value:
 
 - **Scalars** (`string`, `int`, `bool`): fail the struct unification —
   correctly skipped.
 - **Anonymous open structs** (e.g., `{host: "localhost", port: 5432}`): the
-  constraint `$opm: !="secret"` is added without conflict (the struct has no
-  `$opm` field, so the constraint is satisfied) — correctly skipped.
+  constraint `$opm: !="secret"` is added without conflict (the struct has no   `$opm` field, so the constraint is satisfied) — correctly skipped.
 - **Closed definition structs**: `$opm` is rejected as a disallowed field —
   correctly skipped.
 
-The `...` (open struct marker) in the test ensures it doesn't conflict with
-closed structs during the initial unification step.
+The `...` (open struct marker) in the test ensures it doesn't conflict with closed structs during the initial unification step.
 
 **Why other approaches fail.** A simpler test like `v.$opm == "secret"` gives
-false positives on anonymous open structs, because an open struct accepts any
-field — `v.$opm` would evaluate to an unconstrained string, not bottom. The
-negation test avoids this entirely.
+false positives on anonymous open structs, because an open struct accepts any field — `v.$opm` would evaluate to an unconstrained string, not bottom. The negation test avoids this entirely.
 
 #### Three-Level Traversal
 
-CUE has no recursion, so the discovery comprehension manually traverses up
-to 3 levels deep. This covers practical nesting patterns:
+CUE has no recursion, so the discovery comprehension manually traverses up to 3 levels deep. This covers practical nesting patterns:
 
 - Level 1: `#config.dbUser`
 - Level 2: `#config.cache.password`
@@ -275,8 +239,7 @@ _#groupSecrets: {
 }
 ```
 
-The result is the K8s Secret resource layout — ready for the
-SecretTransformer to consume:
+The result is the K8s Secret resource layout — ready for the SecretTransformer to consume:
 
 ```cue
 _discovered: (_#discoverSecrets & {#in: values}).out
@@ -315,9 +278,7 @@ spec: secrets: (_#groupSecrets & {#in: _discovered}).out
 
 ### SecretTransformer Variant Dispatch
 
-The SecretTransformer reads `spec.secrets` (auto-generated) and inspects the
-`#Secret` variant of each data entry. **Each entry is dispatched
-independently** — mixed variants within a group are supported.
+The SecretTransformer reads `spec.secrets` (auto-generated) and inspects the `#Secret` variant of each data entry. **Each entry is dispatched independently** — mixed variants within a group are supported.
 
 ```text
 ┌──────────────────────────────┬───────────────────────────────────────────┐
@@ -343,20 +304,14 @@ independently** — mixed variants within a group are supported.
 ```
 
 **Mixed variants are supported.** Unlike the previous design which rejected
-mixed variants, each entry within a `spec.secrets` group is dispatched on its
-own variant. A group like `"db-credentials"` can contain a `#SecretLiteral`
-for `username` and a `#SecretRef (k8s)` for `password`. The literal creates a
-K8s Secret data entry; the k8s ref is skipped. This was validated in
-experiment 002.
+mixed variants, each entry within a `spec.secrets` group is dispatched on its own variant. A group like `"db-credentials"` can contain a `#SecretLiteral` for `username` and a `#SecretRef (k8s)` for `password`. The literal creates a K8s Secret data entry; the k8s ref is skipped. This was validated in experiment 002.
 
 **Silent skip for `source: "k8s"`.** When an entry resolves to `#SecretRef`
-with `source: "k8s"`, the SecretTransformer emits nothing for that entry.
-The referenced Secret already exists in the cluster.
+with `source: "k8s"`, the SecretTransformer emits nothing for that entry. The referenced Secret already exists in the cluster.
 
 ### #EnvVarSchema
 
-The full environment variable schema replaces the current `{ name, value }`
-struct:
+The full environment variable schema replaces the current `{ name, value }` struct:
 
 ```cue
 #EnvVarSchema: {
@@ -383,20 +338,15 @@ struct:
 }
 ```
 
-Mutual exclusivity: exactly one of `value`, `from`, `fieldRef`, or
-`resourceFieldRef` should be set. The workload transformer validates this
-constraint — setting two sources on a single env var is an error.
+Mutual exclusivity: exactly one of `value`, `from`, `fieldRef`, or `resourceFieldRef` should be set. The workload transformer validates this constraint — setting two sources on a single env var is an error.
 
-The `name` field is auto-set from the map key, following the existing OPM
-pattern:
+The `name` field is auto-set from the map key, following the existing OPM pattern:
 
 ```cue
 env?: [envName=string]: #EnvVarSchema & {name: envName}
 ```
 
-The `from:` field carries the resolved `#Secret` value with all routing info
-(`$opm`, `$secretName`, `$dataKey`, and the variant-specific fields). The
-workload transformer reads the variant and dispatches accordingly.
+The `from:` field carries the resolved `#Secret` value with all routing info (`$opm`, `$secretName`, `$dataKey`, and the variant-specific fields). The workload transformer reads the variant and dispatches accordingly.
 
 ### Env Var Wiring
 
@@ -410,15 +360,11 @@ spec: container: env: {
 }
 ```
 
-For `value:` fields, the transformer emits an inline `value`. For `from:`
-fields, the transformer reads the `#Secret` variant and dispatches to the
-appropriate `valueFrom` structure. No manual `spec.secrets` wiring needed —
-the auto-discovery pipeline handles resource creation.
+For `value:` fields, the transformer emits an inline `value`. For `from:` fields, the transformer reads the `#Secret` variant and dispatches to the appropriate `valueFrom` structure. No manual `spec.secrets` wiring needed — the auto-discovery pipeline handles resource creation.
 
 ### Workload Transformer Behavior
 
-The workload transformer (DeploymentTransformer, StatefulSetTransformer, etc.)
-handles each env var source type:
+The workload transformer (DeploymentTransformer, StatefulSetTransformer, etc.) handles each env var source type:
 
 ```text
 ┌──────────────────────────┬──────────────────────────────────────────────┐
@@ -473,9 +419,7 @@ handles each env var source type:
 #SecretRef (k8s)     -> secretKeyRef: { name: path, key: remoteKey }
 ```
 
-The transformer converts env from OPM's struct-keyed map to Kubernetes' list
-format, applying the appropriate `valueFrom` structure based on which source
-field is set. The `envFrom` list passes through with minimal transformation.
+The transformer converts env from OPM's struct-keyed map to Kubernetes' list format, applying the appropriate `valueFrom` structure based on which source field is set. The `envFrom` list passes through with minimal transformation.
 
 ### envFrom — Bulk Injection
 
@@ -495,8 +439,7 @@ Inject all keys from a ConfigMap or Secret as environment variables:
 }
 ```
 
-`secretRef.name` and `configMapRef.name` use the **full Kubernetes resource
-name**. For secrets declared in `#config`, this is the `$secretName` value:
+`secretRef.name` and `configMapRef.name` use the **full Kubernetes resource name**. For secrets declared in `#config`, this is the `$secretName` value:
 
 ```cue
 spec: container: {
@@ -506,8 +449,7 @@ spec: container: {
 }
 ```
 
-When referencing a pre-existing Kubernetes resource (not managed by OPM), the
-raw name is used directly:
+When referencing a pre-existing Kubernetes resource (not managed by OPM), the raw name is used directly:
 
 ```cue
 spec: container: {
@@ -568,13 +510,11 @@ Supported `resource` values:
 | `requests.memory` | Memory request |
 | `requests.ephemeral-storage` | Ephemeral storage request |
 
-The `divisor` field controls the unit of the output value. Without a divisor,
-CPU is reported in cores and memory in bytes.
+The `divisor` field controls the unit of the output value. Without a divisor, CPU is reported in cores and memory in bytes.
 
 ### Volume-Mounted Secrets
 
-Secrets can be mounted as files via `from:` on volume mounts. The same
-`#Secret` type used for env vars drives the volume wiring:
+Secrets can be mounted as files via `from:` on volume mounts. The same `#Secret` type used for env vars drives the volume wiring:
 
 ```cue
 #config: tls: #Secret & {
@@ -590,15 +530,13 @@ spec: container: {
 }
 ```
 
-When the workload transformer encounters `from:` on a volume mount resolving
-to `#Secret`, it emits:
+When the workload transformer encounters `from:` on a volume mount resolving to `#Secret`, it emits:
 
 1. A `volumes[]` entry on the pod spec referencing the Secret by its
    `$secretName` (or `path` for `source: "k8s"`).
 2. A `volumeMount` on the container at the specified `mountPath`.
 
-The K8s Secret resource itself is emitted by the SecretTransformer from the
-auto-generated `spec.secrets`.
+The K8s Secret resource itself is emitted by the SecretTransformer from the auto-generated `spec.secrets`.
 
 ```text
 from: #config.tls  ($secretName: "tls-cert")
@@ -614,8 +552,7 @@ Workload transformer emits on pod spec:
       mountPath: /etc/tls
 ```
 
-For `#SecretRef` with `source: "k8s"`, the volume references the `path`
-(pre-existing Secret name) and uses `remoteKey` for item selection:
+For `#SecretRef` with `source: "k8s"`, the volume references the `path` (pre-existing Secret name) and uses `remoteKey` for item selection:
 
 ```text
 from: #config.tls  (source: "k8s", path: "wildcard-tls", remoteKey: "tls.crt")
@@ -636,24 +573,15 @@ Workload transformer emits on pod spec:
 
 ### #ConfigRef (Placeholder)
 
-This RFC focuses on `#Secret` wiring. A parallel `#ConfigRef` type for
-non-sensitive ConfigMap-backed values may be introduced in a future RFC. The
-design would mirror `#Secret` — a struct type with `$configMapName` and
-`$dataKey` fields that the ConfigMapTransformer and WorkloadTransformer both
-read.
+This RFC focuses on `#Secret` wiring. A parallel `#ConfigRef` type for non-sensitive ConfigMap-backed values may be introduced in a future RFC. The design would mirror `#Secret` — a struct type with `$configMapName` and `$dataKey` fields that the ConfigMapTransformer and WorkloadTransformer both read.
 
-For now, non-sensitive env vars use `value:` (inline strings). If
-ConfigMap-backed config is needed, use `spec.configMaps` directly combined
-with `envFrom` or the existing ConfigMapTransformer.
+For now, non-sensitive env vars use `value:` (inline strings). If ConfigMap-backed config is needed, use `spec.configMaps` directly combined with `envFrom` or the existing ConfigMapTransformer.
 
 ## Interaction with Other RFCs
 
 ### RFC-0001: Release Inventory
 
-The inventory tracks all resources emitted by transformers, including Secrets
-generated from `spec.secrets` entries. When a secret value changes (and the
-secret is immutable per RFC-0003), the old hash-suffixed resource appears in
-the stale set and is pruned automatically.
+The inventory tracks all resources emitted by transformers, including Secrets generated from `spec.secrets` entries. When a secret value changes (and the secret is immutable per RFC-0003), the old hash-suffixed resource appears in the stale set and is pruned automatically.
 
 ### RFC-0002: Sensitive Data Model
 
@@ -675,17 +603,11 @@ This RFC is the output counterpart to RFC-0002's input model:
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-RFC-0002 defines `#Secret` with `$secretName!` and `$dataKey!`, the `#Secret`
-variants, and the `from?: #Secret` field on `#EnvVarSchema`. This RFC extends
-the schema with `fieldRef` and `resourceFieldRef`, defines auto-discovery,
-and specifies how all source types transform to Kubernetes output.
+RFC-0002 defines `#Secret` with `$secretName!` and `$dataKey!`, the `#Secret` variants, and the `from?: #Secret` field on `#EnvVarSchema`. This RFC extends the schema with `fieldRef` and `resourceFieldRef`, defines auto-discovery, and specifies how all source types transform to Kubernetes output.
 
 ### RFC-0003: Immutable ConfigMaps and Secrets
 
-The `#Secret.$secretName` field introduced here is the base name that
-RFC-0003's `#ImmutableName` definition uses for hash-suffix computation. When
-a `spec.secrets` entry is marked immutable, the SecretTransformer and
-WorkloadTransformer both compute:
+The `#Secret.$secretName` field introduced here is the base name that RFC-0003's `#ImmutableName` definition uses for hash-suffix computation. When a `spec.secrets` entry is marked immutable, the SecretTransformer and WorkloadTransformer both compute:
 
 ```text
 #SecretImmutableName & {
@@ -696,13 +618,11 @@ WorkloadTransformer both compute:
 -> out: "{$secretName}-{content-hash}"
 ```
 
-Both transformers arrive at the same hashed name because they read the same
-`$secretName` and data from the same auto-generated `spec.secrets`.
+Both transformers arrive at the same hashed name because they read the same `$secretName` and data from the same auto-generated `spec.secrets`.
 
 ### RFC-0004: Interface Architecture
 
-Interface shapes include `#Secret` fields (e.g., `#Postgres.password`). The
-wiring pattern is identical — `from:` references the interface field:
+Interface shapes include `#Secret` fields (e.g., `#Postgres.password`). The wiring pattern is identical — `from:` references the interface field:
 
 ```cue
 requires: "db": #Postgres
@@ -713,9 +633,7 @@ spec: container: env: {
 }
 ```
 
-The platform fulfillment provides the `#Secret` value (with `$secretName`
-and `$dataKey` set by the interface definition). The module author's wiring
-is unchanged regardless of how the secret was fulfilled.
+The platform fulfillment provides the `#Secret` value (with `$secretName` and `$dataKey` set by the interface definition). The module author's wiring is unchanged regardless of how the secret was fulfilled.
 
 ## Scenarios
 
@@ -1067,8 +985,7 @@ Result:
 
 ### Q1: envFrom Shorthand for #config-Declared Secrets
 
-Should there be a shorthand for bulk-injecting all keys from a `#config`-
-declared secret without repeating the name? For example:
+Should there be a shorthand for bulk-injecting all keys from a `#config`- declared secret without repeating the name? For example:
 
 ```cue
 // Hypothetical shorthand
@@ -1080,59 +997,41 @@ envFrom: [{ secretRef: name: "db-credentials" }]
 
 ### Q2: $opm Field Visibility
 
-The `$opm: "secret"` discriminator field appears in the resolved output of
-`spec.secrets` entries. Should it?
+The `$opm: "secret"` discriminator field appears in the resolved output of `spec.secrets` entries. Should it?
 
 Options:
 1. **Accept it.** It is the discriminator — transformers need it to dispatch.
-   Strip it only in final K8s resource output (the transformer already
-   controls what goes into `data:`).
+   Strip it only in final K8s resource output (the transformer already    controls what goes into `data:`).
 2. **Strip in transformer output.** The transformer reads `$opm` for dispatch
    but excludes it from the emitted K8s Secret `data` map.
 3. **Hidden field approach.** Use `_$opm` (CUE hidden field) instead, which
-   would not appear in normal evaluation output. Downside: hidden fields
-   are not visible during iteration in comprehensions.
+   would not appear in normal evaluation output. Downside: hidden fields    are not visible during iteration in comprehensions.
 
-Current recommendation: option 2. The transformer uses `$opm` for dispatch
-but only emits `$dataKey: base64(value)` pairs into K8s Secret data.
+Current recommendation: option 2. The transformer uses `$opm` for dispatch but only emits `$dataKey: base64(value)` pairs into K8s Secret data.
 
 ### Q3: Deep Nesting Beyond 3 Levels
 
-The CUE-based discovery traverses 3 levels, which covers practical nesting
-patterns. If deeper nesting is needed, the Go SDK can handle arbitrary depth
-via programmatic traversal.
+The CUE-based discovery traverses 3 levels, which covers practical nesting patterns. If deeper nesting is needed, the Go SDK can handle arbitrary depth via programmatic traversal.
 
-Is 3 levels sufficient? Current evidence says yes — module configs rarely
-nest secrets deeper than `integrations.payments.stripeKey` (level 3).
+Is 3 levels sufficient? Current evidence says yes — module configs rarely nest secrets deeper than `integrations.payments.stripeKey` (level 3).
 
 ## Deferred Work
 
 ### #ConfigRef Full Design
 
-A `#ConfigRef` type parallel to `#Secret` for ConfigMap-backed non-sensitive
-values. Would enable `from:` syntax for ConfigMaps with the same
-transformer-independent name resolution. Deferred until demand is clear.
+A `#ConfigRef` type parallel to `#Secret` for ConfigMap-backed non-sensitive values. Would enable `from:` syntax for ConfigMaps with the same transformer-independent name resolution. Deferred until demand is clear.
 
 ### ConfigMap Aggregation
 
-When multiple non-sensitive config values exist, should they be aggregated
-into a single ConfigMap per component? This optimization is provider-specific
-and deferred to the `#ConfigRef` design.
+When multiple non-sensitive config values exist, should they be aggregated into a single ConfigMap per component? This optimization is provider-specific and deferred to the `#ConfigRef` design.
 
 ### @opm() Attribute
 
-A future alternative to the `$opm` discriminator field. CUE attributes
-(e.g., `@opm(secret)`) are metadata that don't affect the value graph.
-This could provide a cleaner discovery mechanism via the Go SDK's attribute
-API, avoiding the `$opm` field visibility question entirely. Deferred until
-the Go-side processing pipeline is more mature.
+A future alternative to the `$opm` discriminator field. CUE attributes (e.g., `@opm(secret)`) are metadata that don't affect the value graph. This could provide a cleaner discovery mechanism via the Go SDK's attribute API, avoiding the `$opm` field visibility question entirely. Deferred until the Go-side processing pipeline is more mature.
 
 ### Deep Traversal via Go SDK
 
-If the 3-level nesting limit in CUE comprehensions proves insufficient, the
-Go SDK can walk the CUE value tree to arbitrary depth. This would replace
-the `_#discoverSecrets` comprehension with programmatic traversal in the
-build pipeline. Deferred until a concrete use case demands deeper nesting.
+If the 3-level nesting limit in CUE comprehensions proves insufficient, the Go SDK can walk the CUE value tree to arbitrary depth. This would replace the `_#discoverSecrets` comprehension with programmatic traversal in the build pipeline. Deferred until a concrete use case demands deeper nesting.
 
 ## References
 

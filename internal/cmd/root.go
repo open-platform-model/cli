@@ -116,11 +116,6 @@ func GetOPMConfig() *config.OPMConfig {
 	return opmConfig
 }
 
-// GetResolvedBaseConfig returns the resolved base configuration.
-func GetResolvedBaseConfig() *config.ResolvedBaseConfig {
-	return resolvedBaseConfig
-}
-
 // GetConfigPath returns the resolved config path value.
 func GetConfigPath() string {
 	if resolvedBaseConfig != nil {

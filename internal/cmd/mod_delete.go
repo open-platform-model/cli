@@ -9,25 +9,24 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 )
 
-// Delete command flags.
-var (
-	deleteNamespaceFlag      string
-	deleteReleaseNameFlag    string
-	deleteReleaseIDFlag      string
-	deleteForceFlag          bool
-	deleteDryRunFlag         bool
-	deleteWaitFlag           bool
-	deleteIgnoreNotFoundFlag bool
-	deleteKubeconfigFlag     string
-	deleteContextFlag        string
-)
-
 // NewModDeleteCmd creates the mod delete command.
 func NewModDeleteCmd() *cobra.Command {
+	var rsf cmdutil.ReleaseSelectorFlags
+	var kf cmdutil.K8sFlags
+
+	// Delete-specific flags (local to this command)
+	var (
+		forceFlag          bool
+		dryRunFlag         bool
+		waitFlag           bool
+		ignoreNotFoundFlag bool
+	)
+
 	cmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete release resources from cluster",
@@ -52,96 +51,79 @@ Examples:
 
   # Skip confirmation prompt
   opm mod delete --release-name my-app -n production --force`,
-		RunE: runDelete,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runDelete(cmd, args, &rsf, &kf, forceFlag, dryRunFlag, waitFlag, ignoreNotFoundFlag)
+		},
 	}
 
-	// Add flags
-	cmd.Flags().StringVarP(&deleteNamespaceFlag, "namespace", "n", "",
-		"Target namespace (required)")
-	cmd.Flags().StringVar(&deleteReleaseNameFlag, "release-name", "",
-		"Release name (mutually exclusive with --release-id)")
-	cmd.Flags().StringVar(&deleteReleaseIDFlag, "release-id", "",
-		"Release identity UUID (mutually exclusive with --release-name)")
-	cmd.Flags().BoolVar(&deleteForceFlag, "force", false,
+	rsf.AddTo(cmd)
+	kf.AddTo(cmd)
+
+	// Delete-specific flags
+	cmd.Flags().BoolVar(&forceFlag, "force", false,
 		"Skip confirmation prompt")
-	cmd.Flags().BoolVar(&deleteDryRunFlag, "dry-run", false,
+	cmd.Flags().BoolVar(&dryRunFlag, "dry-run", false,
 		"Preview without deleting")
-	cmd.Flags().BoolVar(&deleteWaitFlag, "wait", false,
+	cmd.Flags().BoolVar(&waitFlag, "wait", false,
 		"Wait for resources to be deleted")
-	cmd.Flags().BoolVar(&deleteIgnoreNotFoundFlag, "ignore-not-found", false,
+	cmd.Flags().BoolVar(&ignoreNotFoundFlag, "ignore-not-found", false,
 		"Exit 0 when no resources match the selector")
-	cmd.Flags().StringVar(&deleteKubeconfigFlag, "kubeconfig", "",
-		"Path to kubeconfig file")
-	cmd.Flags().StringVar(&deleteContextFlag, "context", "",
-		"Kubernetes context to use")
 
 	return cmd
 }
 
 // runDelete executes the delete command.
-func runDelete(cmd *cobra.Command, _ []string) error {
+func runDelete(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, force, dryRun, wait, ignoreNotFound bool) error {
 	ctx := context.Background()
 
-	// Manual validation: require exactly one of --release-name or --release-id (mutually exclusive)
-	if deleteReleaseNameFlag != "" && deleteReleaseIDFlag != "" {
-		return &ExitError{
-			Code: ExitGeneralError,
-			Err:  fmt.Errorf("--release-name and --release-id are mutually exclusive"),
-		}
-	}
-	if deleteReleaseNameFlag == "" && deleteReleaseIDFlag == "" {
-		return &ExitError{
-			Code: ExitGeneralError,
-			Err:  fmt.Errorf("either --release-name or --release-id is required"),
-		}
+	// Validate release selector flags
+	if err := rsf.Validate(); err != nil {
+		return &ExitError{Code: ExitGeneralError, Err: err}
 	}
 
 	// Resolve Kubernetes configuration with local flags
-	k8sConfig, err := resolveCommandKubernetes(
-		deleteKubeconfigFlag,
-		deleteContextFlag,
-		deleteNamespaceFlag,
+	k8sConfig, err := cmdutil.ResolveKubernetes(
+		GetOPMConfig(),
+		kf.Kubeconfig,
+		kf.Context,
+		rsf.Namespace,
 		"", // no provider flag for delete
 	)
 	if err != nil {
 		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
-	kubeconfig := k8sConfig.Kubeconfig.Value
-	kubeContext := k8sConfig.Context.Value
 	namespace := k8sConfig.Namespace.Value
 
 	// Log resolved k8s config at DEBUG level
 	output.Debug("resolved kubernetes config",
-		"kubeconfig", kubeconfig,
-		"context", kubeContext,
+		"kubeconfig", k8sConfig.Kubeconfig.Value,
+		"context", k8sConfig.Context.Value,
 		"namespace", namespace,
 	)
 
-	// Create scoped module logger - prefer release name, fall back to release-id
-	logName := deleteReleaseNameFlag
-	if logName == "" {
-		logName = fmt.Sprintf("release:%s", deleteReleaseIDFlag[:8])
-	}
-	modLog := output.ModuleLogger(logName)
+	// Create scoped module logger using shared LogName helper
+	modLog := output.ModuleLogger(rsf.LogName())
 
-	// Create Kubernetes client
-	k8sClient, err := kubernetes.NewClient(kubernetes.ClientOptions{
-		Kubeconfig:  kubeconfig,
-		Context:     kubeContext,
+	opmConfig := GetOPMConfig()
+
+	// Create Kubernetes client via shared factory
+	k8sClient, err := cmdutil.NewK8sClient(cmdutil.K8sClientOpts{
+		Kubeconfig:  kf.Kubeconfig,
+		Context:     kf.Context,
 		APIWarnings: opmConfig.Config.Log.Kubernetes.APIWarnings,
 	})
 	if err != nil {
 		modLog.Error("connecting to cluster", "error", err)
-		return &ExitError{Code: ExitConnectivityError, Err: err, Printed: true}
+		return err
 	}
 
 	// If dry-run, skip confirmation
-	if deleteDryRunFlag {
+	if dryRun {
 		modLog.Info("dry run - no changes will be made")
-	} else if !deleteForceFlag {
+	} else if !force {
 		// Prompt for confirmation
-		if !confirmDelete(deleteReleaseNameFlag, deleteReleaseIDFlag, namespace) {
+		if !confirmDelete(rsf.ReleaseName, rsf.ReleaseID, namespace) {
 			modLog.Info("deletion canceled")
 			return nil
 		}
@@ -151,14 +133,14 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 	modLog.Info(fmt.Sprintf("deleting resources in namespace %q", namespace))
 
 	deleteResult, err := kubernetes.Delete(ctx, k8sClient, kubernetes.DeleteOptions{
-		ReleaseName: deleteReleaseNameFlag,
+		ReleaseName: rsf.ReleaseName,
 		Namespace:   namespace,
-		ReleaseID:   deleteReleaseIDFlag,
-		DryRun:      deleteDryRunFlag,
-		Wait:        deleteWaitFlag,
+		ReleaseID:   rsf.ReleaseID,
+		DryRun:      dryRun,
+		Wait:        wait,
 	})
 	if err != nil {
-		if deleteIgnoreNotFoundFlag && kubernetes.IsNoResourcesFound(err) {
+		if ignoreNotFound && kubernetes.IsNoResourcesFound(err) {
 			modLog.Info("no resources found (ignored)")
 			return nil
 		}
@@ -174,7 +156,7 @@ func runDelete(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	if deleteDryRunFlag {
+	if dryRun {
 		modLog.Info(fmt.Sprintf("dry run complete: %d resources would be deleted", deleteResult.Deleted))
 	} else {
 		modLog.Info("all resources have been deleted")

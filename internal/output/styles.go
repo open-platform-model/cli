@@ -74,6 +74,29 @@ func statusStyle(status string) lipgloss.Style {
 	}
 }
 
+// statusIcon returns the icon prefix for a resource status.
+// Validation and apply statuses use distinct icon vocabularies:
+//   - Validation: ✓ (checkmark — "validation passed")
+//   - Apply: diff-style symbols (+, ~, =, -, !)
+func statusIcon(status string) string {
+	switch status {
+	case StatusValid:
+		return "✓"
+	case StatusCreated:
+		return "+"
+	case StatusConfigured:
+		return "~"
+	case StatusUnchanged:
+		return "="
+	case StatusDeleted:
+		return "-"
+	case statusFailed:
+		return "!"
+	default:
+		return " "
+	}
+}
+
 // minResourceColumnWidth is the minimum width for the resource path column
 // before the status suffix. This ensures status words align consistently.
 const minResourceColumnWidth = 48
@@ -103,7 +126,7 @@ func FormatResourceLine(kind, namespace, name, status string) string {
 	// Render styled components
 	prefix := styleDim.Render("r:")
 	styledPath := styleNoun.Render(path)
-	styledStatus := statusStyle(status).Render(status)
+	styledStatus := statusStyle(status).Render(statusIcon(status) + " " + status)
 
 	return prefix + styledPath + strings.Repeat(" ", padding) + styledStatus
 }
@@ -141,6 +164,25 @@ func FormatTransformerMatch(component, fqn string) string {
 	arrow := styleDim.Render("←")
 	styledFQN := styleDim.Render(FormatFQN(fqn))
 	return bullet + " " + comp + " " + arrow + " " + styledFQN
+}
+
+// FormatTransformerMatchVerbose renders a matched transformer line with reason.
+//
+// Format:
+//
+//	▸ <component> ← <provider> - <fqn>
+//	     <reason>
+//
+// The first line is identical to FormatTransformerMatch. The reason is indented
+// and dim-styled on the second line.
+func FormatTransformerMatchVerbose(component, fqn, reason string) string {
+	firstLine := FormatTransformerMatch(component, fqn)
+	if reason == "" {
+		return firstLine
+	}
+	indent := "     "
+	styledReason := styleDim.Render(reason)
+	return firstLine + "\n" + indent + styledReason
 }
 
 // FormatTransformerUnmatched renders an unmatched component line.

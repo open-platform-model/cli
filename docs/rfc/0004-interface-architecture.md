@@ -9,24 +9,13 @@
 
 ## Summary
 
-Introduce **Interfaces** as a new first-class definition type in the Open
-Platform Model. Interfaces add a `provides`/`requires` model that allows module
-authors to declare what their components offer and depend on using well-known,
-typed contracts. The platform is responsible for fulfilling these contracts at
-deployment time. This transforms OPM from a deployment configuration system into
-an application description language — one where service communication, data
-dependencies, and infrastructure requirements are expressed as typed contracts
-rather than configuration details.
+Introduce **Interfaces** as a new first-class definition type in the Open Platform Model. Interfaces add a `provides`/`requires` model that allows module authors to declare what their components offer and depend on using well-known, typed contracts. The platform is responsible for fulfilling these contracts at deployment time. This transforms OPM from a deployment configuration system into an application description language — one where service communication, data dependencies, and infrastructure requirements are expressed as typed contracts rather than configuration details.
 
 ## Motivation
 
 ### The Problem
 
-Today, OPM components are isolated islands. A module author defines a web
-service with a container, some traits, and maybe an Expose/Route for networking.
-But the critical question — **what does this component talk to, and what talks to
-it?** — is answered outside OPM, in ad-hoc configuration, environment variables,
-and tribal knowledge.
+Today, OPM components are isolated islands. A module author defines a web service with a container, some traits, and maybe an Expose/Route for networking. But the critical question — **what does this component talk to, and what talks to it?** — is answered outside OPM, in ad-hoc configuration, environment variables, and tribal knowledge.
 
 Consider a typical microservice:
 
@@ -60,18 +49,11 @@ Without this information, the platform cannot:
 
 ### The Opportunity
 
-If OPM knows the **communication contracts** of every component, it becomes more
-than a deployment tool. It becomes a **language for describing applications** —
-their structure, their dependencies, their interfaces with the world.
+If OPM knows the **communication contracts** of every component, it becomes more than a deployment tool. It becomes a **language for describing applications** — their structure, their dependencies, their interfaces with the world.
 
 ### Why Now
 
-The OPM trait system already models some communication patterns (Expose, Route
-traits). But these are protocol-specific plumbing, not application-level
-contracts. As the catalog grows with more traits (HttpRoute, GrpcRoute,
-TcpRoute), the pattern is clear: what module authors actually want to express is
-not "create an HTTPRoute with these match rules" but "I provide an HTTP API" and
-"I need a database."
+The OPM trait system already models some communication patterns (Expose, Route traits). But these are protocol-specific plumbing, not application-level contracts. As the catalog grows with more traits (HttpRoute, GrpcRoute, TcpRoute), the pattern is clear: what module authors actually want to express is not "create an HTTPRoute with these match rules" but "I provide an HTTP API" and "I need a database."
 
 ## Prior Art
 
@@ -89,17 +71,11 @@ not "create an HTTPRoute with these match rules" but "I provide an HTTP API" and
 | **Acorn**              | Services + secrets linking                | Service discovery with secret injection. Closer to traditional injection than typed contracts. |
 | **Radius**             | Recipes + connections                     | Very similar philosophy. Recipes ≈ platform fulfillment. Connections ≈ requires. Radius is Azure-centric. |
 
-OPM's differentiator: **compile-time type safety via CUE + provider-agnostic
-fulfillment + well-known typed interface catalog**.
+OPM's differentiator: **compile-time type safety via CUE + provider-agnostic fulfillment + well-known typed interface catalog**.
 
 ### What OPM Already Models
 
-The trait system (Expose, HttpRoute, GrpcRoute, TcpRoute) covers protocol-level
-networking. These are explicit plumbing — the module author controls every rule
-and port. Interfaces operate at a higher level: the module author declares intent
-("I provide an HTTP API", "I need a database") and the platform decides how to
-fulfill it. The two systems are peers with independent rendering pipelines, not
-layers.
+The trait system (Expose, HttpRoute, GrpcRoute, TcpRoute) covers protocol-level networking. These are explicit plumbing — the module author controls every rule and port. Interfaces operate at a higher level: the module author declares intent ("I provide an HTTP API", "I need a database") and the platform decides how to fulfill it. The two systems are peers with independent rendering pipelines, not layers.
 
 ## Design
 
@@ -112,15 +88,13 @@ layers.
 - OPM publishes a catalog of **well-known interfaces** — standard types like
   `#HttpServer`, `#Postgres`, `#Redis`, `#KafkaTopic`.
 - Because interfaces are well-known, their **shape is known at author time**.
-  Module authors can reference interface fields directly in their definitions
-  (e.g., `requires.db.host`).
+  Module authors can reference interface fields directly in their definitions   (e.g., `requires.db.host`).
 - The **platform fulfills** `requires` at deployment time — by wiring to another
   component, provisioning a managed service, or binding to an external endpoint.
 - The **module definition is unchanged** regardless of how the platform fulfills
   the requirement.
 
-This model is analogous to interfaces in programming languages: you code against
-the interface, and the runtime provides the implementation.
+This model is analogous to interfaces in programming languages: you code against the interface, and the runtime provides the implementation.
 
 ### System Overview
 
@@ -245,10 +219,7 @@ Ask yourself:
 
 #### Key Design Decision: Shape as Contract
 
-The `#shape` field is what makes interfaces powerful. It defines a **typed
-contract** — a set of fields with types and constraints. For example, the
-Postgres interface shape includes `host`, `port`, `dbName`, `username`,
-`password`. These fields are:
+The `#shape` field is what makes interfaces powerful. It defines a **typed contract** — a set of fields with types and constraints. For example, the Postgres interface shape includes `host`, `port`, `dbName`, `username`, `password`. These fields are:
 
 - **Known at author time** — the module author can reference `requires.db.host`
   in their container env vars.
@@ -259,8 +230,7 @@ Postgres interface shape includes `host`, `port`, `dbName`, `username`,
 
 ### Well-Known Interface Library
 
-OPM provides a catalog of standard interface types. These are published as CUE
-definitions in the `interfaces` module, organized by category.
+OPM provides a catalog of standard interface types. These are published as CUE definitions in the `interfaces` module, organized by category.
 
 #### Network Interfaces
 
@@ -409,14 +379,11 @@ Platform operators can define custom interfaces for their organization:
 }
 ```
 
-Both are maps keyed by a **local name** — an alias the module author uses to
-reference the interface within the component (e.g., `"db"`, `"cache"`, `"api"`).
+Both are maps keyed by a **local name** — an alias the module author uses to reference the interface within the component (e.g., `"db"`, `"cache"`, `"api"`).
 
 #### Provides: What a Component Offers
 
-When a component declares `provides`, it makes an interface available for other
-components (or external consumers) to depend on. The module author fills in the
-shape with concrete configuration values:
+When a component declares `provides`, it makes an interface available for other components (or external consumers) to depend on. The module author fills in the shape with concrete configuration values:
 
 ```cue
 userService: #Component & {
@@ -436,9 +403,7 @@ userService: #Component & {
 
 #### Requires: What a Component Needs
 
-When a component declares `requires`, it states a dependency on an interface that
-the platform must fulfill. The module author references the shape's fields but
-does not provide values — those come from the platform:
+When a component declares `requires`, it states a dependency on an interface that the platform must fulfill. The module author references the shape's fields but does not provide values — those come from the platform:
 
 ```cue
 userService: #Component & {
@@ -459,14 +424,10 @@ userService: #Component & {
 
 #### The "No Injection" Model
 
-Traditional platforms inject connection details via opaque mechanisms
-(environment variables from Secrets, mounted config files). OPM takes a
-fundamentally different approach:
+Traditional platforms inject connection details via opaque mechanisms (environment variables from Secrets, mounted config files). OPM takes a fundamentally different approach:
 
 **Because interfaces are well-known, the module author references their fields
-directly in the definition.** The interface shape acts as a typed API between the
-module and the platform. The platform's job is to make those references resolve
-to concrete values.
+directly in the definition.** The interface shape acts as a typed API between the module and the platform. The platform's job is to make those references resolve to concrete values.
 
 ```text
 TRADITIONAL                           OPM
@@ -489,10 +450,7 @@ Problem:                              Advantage:
 
 #### When NOT to Use Interfaces: Direct Component References
 
-Interfaces solve a specific problem: communicating with something **the module
-author does not control**. When a module author brings their own database
-component, they already know its name and ports. Using a typed interface contract
-for this adds ceremony without benefit.
+Interfaces solve a specific problem: communicating with something **the module author does not control**. When a module author brings their own database component, they already know its name and ports. Using a typed interface contract for this adds ceremony without benefit.
 
 **The rule is simple: use interfaces for external dependencies, use direct
 references for internal ones.**
@@ -543,9 +501,7 @@ The decision matrix:
 
 ### The Three Paths
 
-OPM offers three independent design patterns for describing component
-communication and behavior. Each path has its own rendering pipeline and serves
-different use cases. They are peers, not layers — none compiles down to another.
+OPM offers three independent design patterns for describing component communication and behavior. Each path has its own rendering pipeline and serves different use cases. They are peers, not layers — none compiles down to another.
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -585,14 +541,12 @@ dependencies) but a single concern should not span multiple paths.
 
 #### Path Independence
 
-Each path has its **own rendering pipeline** that produces provider-specific
-resources directly:
+Each path has its **own rendering pipeline** that produces provider-specific resources directly:
 
 - **Path A (Traits)**: Trait transformers convert trait specs into K8s resources
   (Services, HTTPRoutes, Deployments, etc.) — the existing pipeline.
 - **Path B (Interfaces)**: Interface resolvers fulfill `requires` contracts,
-  resolve `provides` declarations, and generate provider resources directly. No
-  trait intermediary.
+  resolve `provides` declarations, and generate provider resources directly. No   trait intermediary.
 - **Path C (Capabilities)**: Capability resolvers provision or bind
   infrastructure and inject connection details.
 
@@ -618,8 +572,7 @@ This independence means:
 
 #### Choosing Between Traits and Interfaces
 
-Components should use the path that best fits their needs. Traits and interfaces
-address different concerns:
+Components should use the path that best fits their needs. Traits and interfaces address different concerns:
 
 ```cue
 // Path A: Traits — explicit protocol-level control
@@ -638,23 +591,15 @@ myService: #Component & {
 }
 ```
 
-These are **different approaches**, not equivalent representations. Path A gives
-direct control over the networking primitives. Path B declares intent and lets
-the platform decide how to fulfill it. The output may differ depending on the
-platform's interface resolver implementation.
+These are **different approaches**, not equivalent representations. Path A gives direct control over the networking primitives. Path B declares intent and lets the platform decide how to fulfill it. The output may differ depending on the platform's interface resolver implementation.
 
 ### Platform Fulfillment
 
-The platform is responsible for **fulfilling** all `requires` declarations.
-Fulfillment means providing concrete values for every field in the interface's
-`#shape`. The platform has multiple strategies:
+The platform is responsible for **fulfilling** all `requires` declarations. Fulfillment means providing concrete values for every field in the interface's `#shape`. The platform has multiple strategies:
 
 #### Strategy 1: Cross-Module Matching
 
-When a component in one module `requires` an interface that a component in
-another module `provides`, and both are deployed in the same Policy, the platform
-can auto-wire them. This is the primary use case for interfaces — connecting
-modules that don't know about each other.
+When a component in one module `requires` an interface that a component in another module `provides`, and both are deployed in the same Policy, the platform can auto-wire them. This is the primary use case for interfaces — connecting modules that don't know about each other.
 
 ```text
 ┌─ Policy: production ─────────────────────────────────────────────┐
@@ -676,18 +621,13 @@ modules that don't know about each other.
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-The platform sees that `user-service` requires `#Postgres` and
-`postgres-primary` provides `#Postgres`. It unifies the provider's concrete
-values into the consumer's `requires.db` field.
+The platform sees that `user-service` requires `#Postgres` and `postgres-primary` provides `#Postgres`. It unifies the provider's concrete values into the consumer's `requires.db` field.
 
-Note: this is specifically for **cross-module** dependencies. Within a single
-module, the author controls both components and should use direct references
-(component name + port) instead of interfaces.
+Note: this is specifically for **cross-module** dependencies. Within a single module, the author controls both components and should use direct references (component name + port) instead of interfaces.
 
 #### Strategy 2: Platform-Provisioned Service (DaaS, CaaS, etc.)
 
-When no in-scope component provides the required interface, the platform can
-provision infrastructure:
+When no in-scope component provides the required interface, the platform can provision infrastructure:
 
 ```text
 ┌─ Policy: production ──────────────────────────────────────────────┐
@@ -716,9 +656,7 @@ provision infrastructure:
 └───────────────────────────────────────────────────────────────────┘
 ```
 
-This is the **DaaS (Database as a Service)** model. The platform advertises
-which interfaces it can fulfill. The module author simply declares
-`requires: { "db": #Postgres }` and the platform handles the rest.
+This is the **DaaS (Database as a Service)** model. The platform advertises which interfaces it can fulfill. The module author simply declares `requires: { "db": #Postgres }` and the platform handles the rest.
 
 #### Strategy 3: External Service Binding
 
@@ -752,13 +690,11 @@ At deployment time, the platform MUST validate:
 3. **No dangling references**: Every `requires.X.field` reference in the
    component resolves.
 
-If any validation fails, deployment is blocked. This provides a safety net that
-catches misconfiguration before anything runs.
+If any validation fails, deployment is blocked. This provides a safety net that catches misconfiguration before anything runs.
 
 ### Type Safety and Validation
 
-The interface system provides type safety at three stages, each catching
-different classes of errors:
+The interface system provides type safety at three stages, each catching different classes of errors:
 
 ```text
 ┌───────────────┐     ┌───────────────┐     ┌───────────────┐
@@ -848,8 +784,7 @@ spec: container: env: {
 
 ### Scenario A: Module with Internal Database (Direct References) [x]
 
-When a module includes its own database, the author knows both components and
-references them directly. No interfaces are needed for within-module wiring.
+When a module includes its own database, the author knows both components and references them directly. No interfaces are needed for within-module wiring.
 
 ```cue
 #BlogModule: #Module & {
@@ -898,13 +833,11 @@ references them directly. No interfaces are needed for within-module wiring.
 }
 ```
 
-Result: Direct string references. Simple. Explicit. No platform involvement
-needed. [x]
+Result: Direct string references. Simple. Explicit. No platform involvement needed. [x]
 
 ### Scenario B: Module with External Dependencies (Interfaces) [x]
 
-When a module depends on services it does not control — databases managed by the
-platform, APIs from other teams, messaging infrastructure — it uses interfaces.
+When a module depends on services it does not control — databases managed by the platform, APIs from other teams, messaging infrastructure — it uses interfaces.
 
 ```cue
 import (
@@ -974,8 +907,7 @@ import (
 }
 ```
 
-Result: Typed interface references. Platform fills in the values. Could be RDS,
-Cloud SQL, or another module's component. [x]
+Result: Typed interface references. Platform fills in the values. Could be RDS, Cloud SQL, or another module's component. [x]
 
 ### Scenario C: The Contrast [x]
 
@@ -1036,8 +968,7 @@ policy: #Policy & {
 }
 ```
 
-Result: Module author wrote no infrastructure code. Platform provided concrete
-bindings. CUE validates that all shapes are satisfied. [x]
+Result: Module author wrote no infrastructure code. Platform provided concrete bindings. CUE validates that all shapes are satisfied. [x]
 
 ## Trade-offs
 
@@ -1067,17 +998,13 @@ bindings. CUE validates that all shapes are satisfied. [x]
 - New core concept — adds cognitive load. Developers must learn
   provides/requires in addition to resources/traits.
 - Resolution complexity — the platform binding/resolution logic is non-trivial.
-  Auto-wiring, DaaS provisioning, and external binding are three different code
-  paths.
+  Auto-wiring, DaaS provisioning, and external binding are three different code   paths.
 - CUE late-binding challenge — `requires` fields are types (not values) at
-  author time. Making CUE resolve these at deploy time requires careful design
-  of the unification pipeline.
+  author time. Making CUE resolve these at deploy time requires careful design   of the unification pipeline.
 - Interface versioning — as interfaces evolve (e.g., #Postgres adds
-  `connectionPoolSize`), backward compatibility must be managed. Breaking shape
-  changes affect all consumers.
+  `connectionPoolSize`), backward compatibility must be managed. Breaking shape   changes affect all consumers.
 - Over-abstraction risk — for simple services (one container, one port),
-  interfaces add ceremony over a simple Expose trait. Path A is the right choice
-  there.
+  interfaces add ceremony over a simple Expose trait. Path A is the right choice   there.
 - Platform burden — platforms must implement fulfillment logic: matching,
   provisioning, binding. This is significant engineering.
 - Standard library maintenance — OPM must maintain and evolve the well-known
@@ -1144,8 +1071,7 @@ architecture.
 - C. Additive-only changes (new optional fields never break existing consumers)
 
 **Recommendation**: Option C with Option A as the major version escape hatch.
-New fields are always optional with defaults, so existing consumers are
-unaffected.
+New fields are always optional with defaults, so existing consumers are unaffected.
 
 ### Q3: Multiple Providers for Same Interface
 
@@ -1167,15 +1093,12 @@ error, not silently resolved.
 provides, and B requires an interface that A provides?
 
 **Answer**: This is valid and common (mutual communication between services).
-The dependency graph must be a DAG for startup ordering, but not for
-communication. The platform must distinguish between "needs to exist" (startup
-dependency) and "needs to communicate with" (runtime dependency).
+The dependency graph must be a DAG for startup ordering, but not for communication. The platform must distinguish between "needs to exist" (startup dependency) and "needs to communicate with" (runtime dependency).
 
 ### Q5: Relationship Between provides and Container ports
 
 **Question**: When a component declares
-`provides: { "api": #HttpServer & { port: 8080 } }`, must the Container also
-declare `ports: { http: { targetPort: 8080 } }`?
+`provides: { "api": #HttpServer & { port: 8080 } }`, must the Container also declare `ports: { http: { targetPort: 8080 } }`?
 
 **Options**:
 
@@ -1236,12 +1159,7 @@ generation is surprising.
 
 ### Sensitive Data Integration
 
-[RFC-0002](0002-sensitive-data-model.md) introduces `#Secret` as a first-class
-type for sensitive data. Interface shapes include fields like `#Postgres.password`
-— currently typed as `string`. When RFC-0002 is implemented, sensitive shape
-fields will be upgraded to `#Secret`, enabling the toolchain to redact, encrypt,
-and dispatch secrets through platform-appropriate resources without the module
-author managing any of that machinery.
+[RFC-0002](0002-sensitive-data-model.md) introduces `#Secret` as a first-class type for sensitive data. Interface shapes include fields like `#Postgres.password` — currently typed as `string`. When RFC-0002 is implemented, sensitive shape fields will be upgraded to `#Secret`, enabling the toolchain to redact, encrypt, and dispatch secrets through platform-appropriate resources without the module author managing any of that machinery.
 
 ## References
 

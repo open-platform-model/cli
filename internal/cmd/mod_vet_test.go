@@ -20,6 +20,15 @@ func TestNewModVetCmd(t *testing.T) {
 	// Args validation is set to MaximumNArgs(1) but not directly testable
 }
 
+func TestNewModVetCmd_NoLocalVerboseFlag(t *testing.T) {
+	cmd := NewModVetCmd()
+
+	// Verify that --verbose is NOT a local flag on this command.
+	// It should come from the root persistent flag instead.
+	localFlag := cmd.Flags().Lookup("verbose")
+	assert.Nil(t, localFlag, "--verbose should not be a local flag (should use root persistent flag)")
+}
+
 func TestModVet_ValidModule(t *testing.T) {
 	// Use a test fixture — assumes tests/fixtures/simple-module exists
 	fixtureDir := filepath.Join("..", "..", "tests", "fixtures", "simple-module")

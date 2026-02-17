@@ -8,24 +8,13 @@
 
 ## Summary
 
-Introduce an automated documentation generation pipeline that produces a
-public-facing documentation site from CUE definitions in the catalog and CLI
-command definitions in the Go codebase. The pipeline lives in a dedicated docs
-repository containing a custom Go tool (`docgen`) for high-fidelity CUE schema
-extraction via the Go API, Cobra's built-in doc generation for CLI references,
-and Hugo with the Docsy theme as the static site generator.
+Introduce an automated documentation generation pipeline that produces a public-facing documentation site from CUE definitions in the catalog and CLI command definitions in the Go codebase. The pipeline lives in a dedicated docs repository containing a custom Go tool (`docgen`) for high-fidelity CUE schema extraction via the Go API, Cobra's built-in doc generation for CLI references, and Hugo with the Docsy theme as the static site generator.
 
 ## Motivation
 
 ### The Problem
 
-OPM has 93 CUE definition files across 9 modules (core, schemas, resources,
-traits, blueprints, policies, providers, examples, schemas\_kubernetes), plus a
-CLI with a growing number of commands. Today, all documentation is hand-written
-markdown scattered across two repositories. There is no automated reference
-documentation, no searchable site, and no way for users to discover available
-definition types, their fields, constraints, or defaults without reading raw CUE
-source.
+OPM has 93 CUE definition files across 9 modules (core, schemas, resources, traits, blueprints, policies, providers, examples, schemas\_kubernetes), plus a CLI with a growing number of commands. Today, all documentation is hand-written markdown scattered across two repositories. There is no automated reference documentation, no searchable site, and no way for users to discover available definition types, their fields, constraints, or defaults without reading raw CUE source.
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
@@ -54,9 +43,7 @@ source.
 ### Why Not Use Existing Tools?
 
 **CUE has no documentation generator.** This is a known ecosystem gap
-([cue-lang/cue#2794](https://github.com/cue-lang/cue/discussions/2794)). The
-community workaround is exporting to OpenAPI and using OpenAPI doc tools, but
-this loses CUE-specific semantics that are critical for OPM:
+([cue-lang/cue#2794](https://github.com/cue-lang/cue/discussions/2794)). The community workaround is exporting to OpenAPI and using OpenAPI doc tools, but this loses CUE-specific semantics that are critical for OPM:
 
 | CUE Feature                  | OpenAPI Equivalent         | Information Lost            |
 |------------------------------|----------------------------|-----------------------------|
@@ -70,9 +57,7 @@ this loses CUE-specific semantics that are critical for OPM:
 | Default values               | `default`                  | Preserved                   |
 | Nested structs with docs     | Flattened `$ref` chains    | Context lost                |
 
-For a project that uses CUE as its core language, flattening to OpenAPI strips
-too much information. A custom extractor that preserves CUE semantics is the
-right approach.
+For a project that uses CUE as its core language, flattening to OpenAPI strips too much information. A custom extractor that preserves CUE semantics is the right approach.
 
 ### Goals
 
@@ -81,8 +66,7 @@ right approach.
 2. **CLI reference** — Every `opm` command generates a reference page with
    synopsis, flags, examples, and cross-links.
 3. **Cross-references** — Traits link to their applicable Resources. Blueprints
-   link to their composed Resources and Traits. Components show available
-   options.
+   link to their composed Resources and Traits. Components show available    options.
 4. **Searchable** — Full-text search across all documentation.
 5. **Versioned** — Documentation can be versioned alongside catalog releases.
 6. **Composable** — Hand-written guides, tutorials, and conceptual docs coexist
@@ -94,10 +78,7 @@ right approach.
 
 ### Repository Structure
 
-The documentation pipeline lives in a dedicated repository. The Go docgen tool
-is co-located with the Hugo site source because its only consumer is the site
-build — it is not a user-facing CLI tool and has no reason to exist in the OPM
-CLI repository.
+The documentation pipeline lives in a dedicated repository. The Go docgen tool is co-located with the Hugo site source because its only consumer is the site build — it is not a user-facing CLI tool and has no reason to exist in the OPM CLI repository.
 
 ```text
 opmodel-docs/
@@ -178,9 +159,7 @@ opmodel-docs/
 
 ### Component 1: `docgen` — CUE Schema Extractor
 
-A Go tool that uses `cuelang.org/go/cue` to walk CUE definitions and produce
-structured JSON for Hugo consumption. This is the core of the pipeline and the
-only custom component. It lives at `cmd/docgen/` in the docs repository.
+A Go tool that uses `cuelang.org/go/cue` to walk CUE definitions and produce structured JSON for Hugo consumption. This is the core of the pipeline and the only custom component. It lives at `cmd/docgen/` in the docs repository.
 
 #### CUE Go API Surface Used
 
@@ -263,8 +242,7 @@ For Traits, the `related` field includes `appliesTo` references:
 
 #### Module Processing Order
 
-The tool processes modules in dependency order (matching the catalog's
-`versions.yml`):
+The tool processes modules in dependency order (matching the catalog's `versions.yml`):
 
 ```text
 core -> schemas -> schemas_kubernetes -> resources -> policies
@@ -288,8 +266,7 @@ docgen all --catalog-dir ../catalog --output ./site/
 
 ### Component 2: Cobra CLI Doc Generation
 
-Uses `github.com/spf13/cobra/doc.GenMarkdownTreeCustom()` with a Hugo front
-matter prepender — the same approach Hugo itself uses for its own CLI reference.
+Uses `github.com/spf13/cobra/doc.GenMarkdownTreeCustom()` with a Hugo front matter prepender — the same approach Hugo itself uses for its own CLI reference.
 
 ```go
 filePrepender := func(filename string) string {
@@ -315,9 +292,7 @@ Each command produces a markdown file with:
 - Examples
 - Cross-links to parent/child commands
 
-The docs repo imports the CLI's root command package as a Go dependency. This
-means CLI doc generation stays in sync with the actual command tree — no manual
-maintenance.
+The docs repo imports the CLI's root command package as a Go dependency. This means CLI doc generation stays in sync with the actual command tree — no manual maintenance.
 
 ### Component 3: Hugo Site with Docsy
 
@@ -335,8 +310,7 @@ maintenance.
 
 #### Content Adapters for Schema Pages
 
-Hugo's `_content.gotmpl` (v0.126.0+) generates reference pages from the JSON
-data produced by `docgen`:
+Hugo's `_content.gotmpl` (v0.126.0+) generates reference pages from the JSON data produced by `docgen`:
 
 ```text
 site/content/
@@ -350,8 +324,7 @@ site/content/
         └── opm_mod_apply.md    <- Generated by cobra/doc
 ```
 
-The content adapter reads `data/schema/*.json` and creates a page per
-definition:
+The content adapter reads `data/schema/*.json` and creates a page per definition:
 
 ```go-html-template
 {{ range $file := (resources.Match "data/schema/*.json") }}
@@ -382,18 +355,15 @@ definition:
 
 **Definition fields table** (`layouts/shortcodes/def-fields.html`):
 
-Renders the fields from page params into a styled table with type badges,
-required/optional indicators, constraint details, and default values.
+Renders the fields from page params into a styled table with type badges, required/optional indicators, constraint details, and default values.
 
 **Cross-reference links** (`layouts/shortcodes/def-ref.html`):
 
-Renders links to related definitions (e.g., Traits that apply to a Resource)
-with hover previews.
+Renders links to related definitions (e.g., Traits that apply to a Resource) with hover previews.
 
 **CUE source view** (`layouts/shortcodes/cue-source.html`):
 
-Optionally shows the original CUE source alongside the generated reference,
-linking back to the catalog repository.
+Optionally shows the original CUE source alongside the generated reference, linking back to the catalog repository.
 
 #### Site Structure
 
@@ -485,16 +455,13 @@ The pipeline runs in CI on:
   or scheduled rebuild)
 - Push to docs repo `main` branch (content, templates, or docgen tool changed)
 
-CLI doc generation stays in sync automatically because the docs repo imports the
-CLI's root command package as a Go dependency. Updating the CLI dependency
-version triggers a rebuild.
+CLI doc generation stays in sync automatically because the docs repo imports the CLI's root command package as a Go dependency. Updating the CLI dependency version triggers a rebuild.
 
 ## Alternatives Considered
 
 ### A: CUE -> OpenAPI -> Redoc/Swagger
 
-Export CUE as OpenAPI 3.0 using `cue export --out openapi`, then render with
-Redoc or Swagger UI.
+Export CUE as OpenAPI 3.0 using `cue export --out openapi`, then render with Redoc or Swagger UI.
 
 **Rejected because:**
 
@@ -526,8 +493,7 @@ Use `hof gen` with Go templates to generate docs directly from CUE definitions.
 
 ### D: Docusaurus Instead of Hugo
 
-Docusaurus has the best JSON Schema plugin ecosystem
-(`docusaurus-json-schema-plugin`, `docusaurus-openapi-docs`).
+Docusaurus has the best JSON Schema plugin ecosystem (`docusaurus-json-schema-plugin`, `docusaurus-openapi-docs`).
 
 **Rejected because:**
 
@@ -574,28 +540,19 @@ The docs repo needs access to the catalog's CUE source. Options:
 | Hugo module mount                | Hugo-native, version-controlled     | Only for Hugo content, not Go tool  |
 | OCI registry (published modules) | Uses the real distribution path     | Requires registry access, may lag   |
 
-Git submodule is likely the pragmatic choice for development; CI can clone at a
-pinned tag for reproducible builds.
+Git submodule is likely the pragmatic choice for development; CI can clone at a pinned tag for reproducible builds.
 
 ### Q2: Versioning Strategy
 
-Should docs be versioned per-catalog-release (e.g., docs for `v0.1.21` vs
-`v0.2.0`)? Docsy supports this but it adds build complexity. For an early-stage
-project, a single "latest" version with a changelog may suffice initially.
+Should docs be versioned per-catalog-release (e.g., docs for `v0.1.21` vs `v0.2.0`)? Docsy supports this but it adds build complexity. For an early-stage project, a single "latest" version with a changelog may suffice initially.
 
 ### Q3: Spec Field Rendering
 
-The `#spec` field in OPM definitions uses dynamic field names derived from
-`metadata.name` via `KebabToPascal`. The docgen tool needs to resolve these
-computed field names and render the actual spec schema from concrete definition
-implementations (e.g., `#ContainerResource`, not just `#Resource`).
+The `#spec` field in OPM definitions uses dynamic field names derived from `metadata.name` via `KebabToPascal`. The docgen tool needs to resolve these computed field names and render the actual spec schema from concrete definition implementations (e.g., `#ContainerResource`, not just `#Resource`).
 
 ### Q4: Constraint Rendering Depth
 
-How deeply should constraints be rendered? Options range from simple type
-annotations (`string`, `int`) to full CUE expression rendering
-(`int & >=0 & <=65535`). The initial implementation should aim for full
-constraint rendering since that is the primary value over OpenAPI-based tools.
+How deeply should constraints be rendered? Options range from simple type annotations (`string`, `int`) to full CUE expression rendering (`int & >=0 & <=65535`). The initial implementation should aim for full constraint rendering since that is the primary value over OpenAPI-based tools.
 
 ## Implementation Plan
 
