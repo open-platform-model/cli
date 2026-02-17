@@ -188,12 +188,6 @@ func (pl *ProviderLoader) extractMapKeys(value cue.Value, field string) []string
 	return result
 }
 
-// GetByFQN returns a transformer by its fully qualified name.
-func (p *LoadedProvider) GetByFQN(fqn string) (*LoadedTransformer, bool) {
-	t, ok := p.byFQN[fqn]
-	return t, ok
-}
-
 // ToSummaries converts transformers to summaries for error messages.
 func (p *LoadedProvider) ToSummaries() []TransformerSummary {
 	summaries := make([]TransformerSummary, len(p.Transformers))

@@ -235,17 +235,6 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// writeVerboseOutput writes verbose output to stderr.
-// JSON output uses the structured WriteVerboseResult path (shared with mod vet).
-// Human output uses scoped logger lines consistent with mod apply.
-func writeVerboseOutput(result *build.RenderResult, jsonOutput bool) {
-	if jsonOutput {
-		writeBuildVerboseJSON(result)
-		return
-	}
-	writeVerboseMatchLog(result)
-}
-
 // writeTransformerMatches writes compact transformer match output (always shown).
 // Format: ▸ <component> ← <provider> - <transformer>
 func writeTransformerMatches(result *build.RenderResult) {
