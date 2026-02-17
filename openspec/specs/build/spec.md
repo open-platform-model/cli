@@ -421,7 +421,6 @@ Flags:
       --out-dir string      Directory for split output (default: ./manifests)
       --strict              Error on unhandled traits
   -v, --verbose             Show matching decisions
-      --verbose-json        Structured JSON verbose output
   -h, --help                Help for build
 ```
 

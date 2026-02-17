@@ -118,8 +118,7 @@ func RenderModule(ctx context.Context, opts RenderModuleOpts) (*build.RenderResu
 
 // ShowOutputOpts controls how ShowRenderOutput displays results.
 type ShowOutputOpts struct {
-	Verbose     bool
-	VerboseJSON bool
+	Verbose bool
 }
 
 // ShowRenderOutput checks for render errors, shows transformer match output,
@@ -137,8 +136,6 @@ func ShowRenderOutput(result *build.RenderResult, opts ShowOutputOpts) error {
 
 	// Show transformer matches
 	switch {
-	case opts.VerboseJSON:
-		WriteBuildVerboseJSON(result)
 	case opts.Verbose:
 		WriteVerboseMatchLog(result)
 	default:

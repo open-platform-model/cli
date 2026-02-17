@@ -17,10 +17,9 @@ func NewModBuildCmd() *cobra.Command {
 
 	// Build-specific flags (local to this command)
 	var (
-		outputFlag      string
-		splitFlag       bool
-		outDirFlag      string
-		verboseJSONFlag bool
+		outputFlag string
+		splitFlag  bool
+		outDirFlag string
 	)
 
 	cmd := &cobra.Command{
@@ -51,7 +50,7 @@ Examples:
   opm mod build ./my-module -o json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runBuild(cmd, args, &rf, outputFlag, splitFlag, outDirFlag, verboseJSONFlag)
+			return runBuild(cmd, args, &rf, outputFlag, splitFlag, outDirFlag)
 		},
 	}
 
@@ -64,14 +63,11 @@ Examples:
 		"Write separate files per resource")
 	cmd.Flags().StringVar(&outDirFlag, "out-dir", "./manifests",
 		"Directory for split output")
-	cmd.Flags().BoolVar(&verboseJSONFlag, "verbose-json", false,
-		"Structured JSON verbose output")
-
 	return cmd
 }
 
 // runBuild executes the build command.
-func runBuild(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, outputFmt string, split bool, outDir string, verboseJSON bool) error {
+func runBuild(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, outputFmt string, split bool, outDir string) error {
 	ctx := context.Background()
 
 	// Validate output format
@@ -96,8 +92,7 @@ func runBuild(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, outputFm
 
 	// Post-render: check errors, show matches, log warnings
 	if err := cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{
-		Verbose:     verboseFlag,
-		VerboseJSON: verboseJSON,
+		Verbose: verboseFlag,
 	}); err != nil {
 		return err
 	}

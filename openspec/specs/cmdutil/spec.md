@@ -111,10 +111,10 @@ On success, it SHALL return the `*build.RenderResult`. On failure at any step, i
 
 ### Requirement: ShowRenderOutput checks for errors, shows transformer matches, and logs warnings
 
-The `ShowRenderOutput` function SHALL accept a `*build.RenderResult` and output options (verbose flag, verboseJSON flag). It SHALL:
+The `ShowRenderOutput` function SHALL accept a `*build.RenderResult` and output options (verbose flag). It SHALL:
 
 1. Check `result.HasErrors()` — if true, format and print render errors via `PrintRenderErrors`, then return an `*ExitError` with `ExitValidationError`.
-2. Show transformer match output — verbose mode shows module metadata and match reasons; default mode shows compact match lines; verboseJSON mode shows structured JSON.
+2. Show transformer match output — verbose mode shows module metadata and match reasons; default mode shows compact match lines.
 3. Log any warnings from the render result via the module-scoped logger.
 
 #### Scenario: ShowRenderOutput returns error when render has errors

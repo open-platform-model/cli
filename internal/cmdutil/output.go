@@ -3,7 +3,6 @@ package cmdutil
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/opmodel/cli/internal/build"
@@ -104,48 +103,5 @@ func WriteVerboseMatchLog(result *build.RenderResult) {
 	// Generated resources
 	for _, res := range result.Resources {
 		modLog.Info(output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), output.StatusValid))
-	}
-}
-
-// WriteBuildVerboseJSON writes structured JSON verbose output to stderr.
-// Delegates to the shared WriteVerboseResult path.
-func WriteBuildVerboseJSON(result *build.RenderResult) {
-	// Convert to RenderResultInfo
-	matches := make(map[string][]output.TransformerMatchInfo)
-	for compName, matchList := range result.MatchPlan.Matches {
-		for _, m := range matchList {
-			matches[compName] = append(matches[compName], output.TransformerMatchInfo{
-				TransformerFQN: m.TransformerFQN,
-				Reason:         m.Reason,
-			})
-		}
-	}
-
-	// Convert resources to ResourceInfo
-	resourceInfos := make([]output.ResourceInfo, len(result.Resources))
-	for i, r := range result.Resources {
-		resourceInfos[i] = r
-	}
-
-	info := &output.RenderResultInfo{
-		ModuleName:       result.Module.Name,
-		ModuleNamespace:  result.Module.Namespace,
-		ModuleVersion:    result.Module.Version,
-		ModuleComponents: result.Module.Components,
-		ModuleLabels:     result.Module.Labels,
-		Matches:          matches,
-		Unmatched:        result.MatchPlan.Unmatched,
-		Resources:        resourceInfos,
-		Errors:           result.Errors,
-		Warnings:         result.Warnings,
-	}
-
-	verboseOpts := output.VerboseOptions{
-		JSON:   true,
-		Writer: os.Stderr,
-	}
-
-	if err := output.WriteVerboseResult(info, nil, verboseOpts); err != nil {
-		output.Warn("writing verbose output", "error", err)
 	}
 }

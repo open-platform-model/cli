@@ -161,7 +161,7 @@ the config, it is selected automatically without requiring a `--provider` flag.
 5. Validate options (`RenderOptions.Validate()`)
 6. Create pipeline — `build.NewPipeline(opmConfig)`
 7. Call `pipeline.Render(ctx, opts)` — enters the shared render core
-8. Handle verbose output (`--verbose` or `--verbose-json`)
+8. Handle verbose output (`--verbose`)
 9. Check for render errors (unmatched components, transform failures)
 10. Output results: split to files or write to stdout
 
@@ -564,14 +564,13 @@ resource structures.
 
 ### Verbose Output
 
-If `--verbose` or `--verbose-json` is set, `writeVerboseOutput()` writes
-matching details to stderr (`internal/output/verbose.go:101-108`):
+If `--verbose` is set, `WriteVerboseMatchLog()` writes matching details to
+stderr (`internal/cmdutil/output.go`):
 
 - Module metadata (name, namespace, version, components)
 - Per-component transformer matches with reasons
 - Unmatched components
 - Generated resources (kind, name, namespace, source component)
-- Warnings and errors
 
 ### Manifest Output
 
