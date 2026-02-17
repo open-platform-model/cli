@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -93,19 +94,19 @@ func TestVerboseOutput_TransformerMatches(t *testing.T) {
 		output.SetLogWriter(&buf)
 
 		// Call the default match writer
-		writeTransformerMatches(result)
+		cmdutil.WriteTransformerMatches(result)
 
-		output := buf.String()
+		got := buf.String()
 
 		// Should contain the transformer match lines
-		assert.Contains(t, output, "▸", "should contain bullet character")
-		assert.Contains(t, output, "web", "should contain component name")
-		assert.Contains(t, output, "←", "should contain arrow")
-		assert.Contains(t, output, "Transformer", "should contain transformer name")
+		assert.Contains(t, got, "▸", "should contain bullet character")
+		assert.Contains(t, got, "web", "should contain component name")
+		assert.Contains(t, got, "←", "should contain arrow")
+		assert.Contains(t, got, "Transformer", "should contain transformer name")
 
 		// Should NOT contain the verbose details
-		assert.NotContains(t, output, "Matched:", "default output should not contain match reasons")
-		assert.NotContains(t, output, "module", "default output should not contain module metadata header")
+		assert.NotContains(t, got, "Matched:", "default output should not contain match reasons")
+		assert.NotContains(t, got, "module", "default output should not contain module metadata header")
 	})
 
 	t.Run("verbose output shows reasons and metadata", func(t *testing.T) {
@@ -115,7 +116,7 @@ func TestVerboseOutput_TransformerMatches(t *testing.T) {
 		output.SetLogWriter(&buf)
 
 		// Call the verbose match writer
-		writeVerboseMatchLog(result)
+		cmdutil.WriteVerboseMatchLog(result)
 
 		outputStr := buf.String()
 

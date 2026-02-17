@@ -8,27 +8,24 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 )
 
-// Apply command flags.
-var (
-	applyValuesFlags     []string
-	applyNamespaceFlag   string
-	applyReleaseNameFlag string
-	applyProviderFlag    string
-	applyDryRunFlag      bool
-	applyWaitFlag        bool
-	applyTimeoutFlag     time.Duration
-	applyCreateNSFlag    bool
-	applyKubeconfigFlag  string
-	applyContextFlag     string
-)
-
 // NewModApplyCmd creates the mod apply command.
 func NewModApplyCmd() *cobra.Command {
+	var rf cmdutil.RenderFlags
+	var kf cmdutil.K8sFlags
+
+	// Apply-specific flags (local to this command)
+	var (
+		dryRunFlag   bool
+		waitFlag     bool
+		timeoutFlag  time.Duration
+		createNSFlag bool
+	)
+
 	cmd := &cobra.Command{
 		Use:   "apply [path]",
 		Short: "Deploy module to cluster",
@@ -59,155 +56,85 @@ Examples:
   # Apply with verbose output showing transformer matches
   opm mod apply --verbose`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: runApply,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runApply(cmd, args, &rf, &kf, dryRunFlag, waitFlag, timeoutFlag, createNSFlag)
+		},
 	}
 
-	// Add flags
-	cmd.Flags().StringArrayVarP(&applyValuesFlags, "values", "f", nil,
-		"Additional values files (can be repeated)")
-	cmd.Flags().StringVarP(&applyNamespaceFlag, "namespace", "n", "",
-		"Target namespace")
-	cmd.Flags().StringVar(&applyReleaseNameFlag, "release-name", "",
-		"Release name (default: module name)")
-	cmd.Flags().StringVar(&applyProviderFlag, "provider", "",
-		"Provider to use (default: from config)")
-	cmd.Flags().BoolVar(&applyDryRunFlag, "dry-run", false,
+	rf.AddTo(cmd)
+	kf.AddTo(cmd)
+
+	// Apply-specific flags
+	cmd.Flags().BoolVar(&dryRunFlag, "dry-run", false,
 		"Server-side dry run (no changes made)")
-	cmd.Flags().BoolVar(&applyWaitFlag, "wait", false,
+	cmd.Flags().BoolVar(&waitFlag, "wait", false,
 		"Wait for resources to be ready")
-	cmd.Flags().DurationVar(&applyTimeoutFlag, "timeout", 5*time.Minute,
+	cmd.Flags().DurationVar(&timeoutFlag, "timeout", 5*time.Minute,
 		"Wait timeout")
-	cmd.Flags().BoolVar(&applyCreateNSFlag, "create-namespace", false,
+	cmd.Flags().BoolVar(&createNSFlag, "create-namespace", false,
 		"Create target namespace if it does not exist")
-	cmd.Flags().StringVar(&applyKubeconfigFlag, "kubeconfig", "",
-		"Path to kubeconfig file")
-	cmd.Flags().StringVar(&applyContextFlag, "context", "",
-		"Kubernetes context to use")
 
 	return cmd
 }
 
 // runApply executes the apply command.
-func runApply(cmd *cobra.Command, args []string) error {
+func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdutil.K8sFlags, dryRun, wait bool, timeout time.Duration, createNS bool) error {
 	ctx := context.Background()
 
-	// Determine module path
-	modulePath := "."
-	if len(args) > 0 {
-		modulePath = args[0]
-	}
-
-	// Resolve Kubernetes configuration with local flags
-	k8sConfig, err := resolveCommandKubernetes(
-		applyKubeconfigFlag,
-		applyContextFlag,
-		applyNamespaceFlag,
-		applyProviderFlag,
-	)
-	if err != nil {
-		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
-	}
-
-	kubeconfig := k8sConfig.Kubeconfig.Value
-	kubeContext := k8sConfig.Context.Value
-	namespace := k8sConfig.Namespace.Value
-	provider := k8sConfig.Provider.Value
-
-	// Log resolved k8s config at DEBUG level
-	output.Debug("resolved kubernetes config",
-		"kubeconfig", kubeconfig,
-		"context", kubeContext,
-		"namespace", namespace,
-		"provider", provider,
-	)
-
-	// Get pre-loaded configuration
 	opmConfig := GetOPMConfig()
-	if opmConfig == nil {
-		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
-	}
 
-	// Build render options
-	renderOpts := build.RenderOptions{
-		ModulePath: modulePath,
-		Values:     applyValuesFlags,
-		Name:       applyReleaseNameFlag,
-		Namespace:  namespace,
-		Provider:   provider,
-		Registry:   GetRegistry(),
-	}
-
-	if err := renderOpts.Validate(); err != nil {
-		return &ExitError{Code: ExitGeneralError, Err: err}
-	}
-
-	// Create and execute pipeline
-	pipeline := build.NewPipeline(opmConfig)
-
-	output.Debug("rendering module",
-		"module", modulePath,
-		"namespace", namespace,
-		"provider", provider,
-	)
-
-	result, err := pipeline.Render(ctx, renderOpts)
+	// Render module via shared pipeline
+	result, err := cmdutil.RenderModule(ctx, cmdutil.RenderModuleOpts{
+		Args:      args,
+		Render:    rf,
+		K8s:       kf,
+		OPMConfig: opmConfig,
+		Registry:  GetRegistry(),
+	})
 	if err != nil {
-		printValidationError("render failed", err)
-		return &ExitError{Code: ExitValidationError, Err: err, Printed: true}
+		return err
 	}
 
-	// Check for render errors before touching the cluster
-	if result.HasErrors() {
-		printRenderErrors(result.Errors)
-		return &ExitError{
-			Code:    ExitValidationError,
-			Err:     fmt.Errorf("%d render error(s)", len(result.Errors)),
-			Printed: true,
-		}
+	// Post-render: check errors, show matches, log warnings
+	if err := cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{
+		Verbose: verboseFlag,
+	}); err != nil {
+		return err
 	}
 
-	// Show transformer matches (always in default mode, verbose adds details)
-	if verboseFlag {
-		writeVerboseMatchLog(result)
-	} else {
-		writeTransformerMatches(result)
-	}
+	// --- Apply-specific logic below ---
 
 	// Create scoped module logger
 	modLog := output.ModuleLogger(result.Module.Name)
-
-	// Print warnings
-	if result.HasWarnings() {
-		for _, w := range result.Warnings {
-			modLog.Warn(w)
-		}
-	}
 
 	if len(result.Resources) == 0 {
 		modLog.Info("no resources to apply")
 		return nil
 	}
 
-	// Create Kubernetes client
-	k8sClient, err := kubernetes.NewClient(kubernetes.ClientOptions{
-		Kubeconfig:  kubeconfig,
-		Context:     kubeContext,
+	// Create Kubernetes client via shared factory
+	k8sClient, err := cmdutil.NewK8sClient(cmdutil.K8sClientOpts{
+		Kubeconfig:  kf.Kubeconfig,
+		Context:     kf.Context,
 		APIWarnings: opmConfig.Config.Log.Kubernetes.APIWarnings,
 	})
 	if err != nil {
 		modLog.Error("connecting to cluster", "error", err)
-		return &ExitError{Code: ExitConnectivityError, Err: err, Printed: true}
+		return err
 	}
 
+	// Use the resolved namespace from the render result
+	namespace := result.Module.Namespace
+
 	// Create namespace if requested
-	if applyCreateNSFlag && namespace != "" {
-		created, nsErr := k8sClient.EnsureNamespace(ctx, namespace, applyDryRunFlag)
+	if createNS && namespace != "" {
+		created, nsErr := k8sClient.EnsureNamespace(ctx, namespace, dryRun)
 		if nsErr != nil {
 			modLog.Error("ensuring namespace", "error", nsErr)
 			return &ExitError{Code: exitCodeFromK8sError(nsErr), Err: nsErr, Printed: true}
 		}
 		if created {
-			if applyDryRunFlag {
+			if dryRun {
 				modLog.Info(fmt.Sprintf("namespace %q would be created", namespace))
 			} else {
 				modLog.Info(fmt.Sprintf("namespace %q created", namespace))
@@ -216,15 +143,15 @@ func runApply(cmd *cobra.Command, args []string) error {
 	}
 
 	// Apply resources
-	if applyDryRunFlag {
+	if dryRun {
 		modLog.Info("dry run - no changes will be made")
 	}
 	modLog.Info(fmt.Sprintf("applying %d resources", len(result.Resources)))
 
 	applyResult, err := kubernetes.Apply(ctx, k8sClient, result.Resources, result.Module, kubernetes.ApplyOptions{
-		DryRun:  applyDryRunFlag,
-		Wait:    applyWaitFlag,
-		Timeout: applyTimeoutFlag,
+		DryRun:  dryRun,
+		Wait:    wait,
+		Timeout: timeout,
 	})
 	if err != nil {
 		modLog.Error("apply failed", "error", err)
@@ -239,13 +166,13 @@ func runApply(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if applyDryRunFlag {
+	if dryRun {
 		modLog.Info(fmt.Sprintf("dry run complete: %d resources would be applied", applyResult.Applied))
 	} else {
 		modLog.Info(formatApplySummary(applyResult))
 	}
 
-	if len(applyResult.Errors) == 0 && !applyDryRunFlag {
+	if len(applyResult.Errors) == 0 && !dryRun {
 		if applyResult.Unchanged == applyResult.Applied {
 			output.Println(output.FormatCheckmark("Module up to date"))
 		} else {

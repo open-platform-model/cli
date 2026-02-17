@@ -8,20 +8,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/output"
-)
-
-// Vet command flags
-var (
-	vetValuesFlags     []string
-	vetNamespaceFlag   string
-	vetReleaseNameFlag string
-	vetProviderFlag    string
 )
 
 // NewModVetCmd creates the mod vet command.
 func NewModVetCmd() *cobra.Command {
+	var rf cmdutil.RenderFlags
+
 	cmd := &cobra.Command{
 		Use:   "vet [path]",
 		Short: "Validate module without generating manifests",
@@ -44,129 +38,49 @@ Examples:
   # Validate with verbose output (show matching decisions)
   opm mod vet ./my-module --verbose`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: runVet,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runVet(cmd, args, &rf)
+		},
 	}
 
-	// Add flags
-	cmd.Flags().StringArrayVarP(&vetValuesFlags, "values", "f", nil,
-		"Additional values files (can be repeated)")
-	cmd.Flags().StringVarP(&vetNamespaceFlag, "namespace", "n", "",
-		"Target namespace (required if not in module)")
-	cmd.Flags().StringVar(&vetReleaseNameFlag, "release-name", "",
-		"Release name (default: module name)")
-	cmd.Flags().StringVar(&vetProviderFlag, "provider", "",
-		"Provider to use (default: from config)")
+	rf.AddTo(cmd)
 
 	return cmd
 }
 
 // runVet executes the vet command.
-func runVet(cmd *cobra.Command, args []string) error {
+func runVet(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags) error {
 	ctx := context.Background()
 
-	// Determine module path
-	modulePath := "."
-	if len(args) > 0 {
-		modulePath = args[0]
-	}
-
-	// Get pre-loaded configuration
-	opmConfig := GetOPMConfig()
-	if opmConfig == nil {
-		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
-	}
-
-	// Resolve Kubernetes configuration with local flags (namespace and provider only)
-	k8sConfig, err := resolveCommandKubernetes(
-		"", // no kubeconfig flag for vet
-		"", // no context flag for vet
-		vetNamespaceFlag,
-		vetProviderFlag,
-	)
+	// Render module via shared pipeline
+	result, err := cmdutil.RenderModule(ctx, cmdutil.RenderModuleOpts{
+		Args:      args,
+		Render:    rf,
+		OPMConfig: GetOPMConfig(),
+		Registry:  GetRegistry(),
+	})
 	if err != nil {
-		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return err
 	}
 
-	namespace := k8sConfig.Namespace.Value
-	provider := k8sConfig.Provider.Value
-
-	// Log resolved config at DEBUG level
-	output.Debug("resolved config",
-		"namespace", namespace,
-		"provider", provider,
-	)
-
-	// Build render options
-	opts := build.RenderOptions{
-		ModulePath: modulePath,
-		Values:     vetValuesFlags,
-		Name:       vetReleaseNameFlag,
-		Namespace:  namespace,
-		Provider:   provider,
-		Registry:   GetRegistry(),
+	// Post-render: check errors, show matches, log warnings
+	if err := cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{
+		Verbose: verboseFlag,
+	}); err != nil {
+		return err
 	}
 
-	// Validate options
-	if err := opts.Validate(); err != nil {
-		return &ExitError{Code: ExitGeneralError, Err: err}
-	}
-
-	// Create pipeline
-	pipeline := build.NewPipeline(opmConfig)
-
-	// Execute render
-	output.Debug("validating module",
-		"module", modulePath,
-		"namespace", opts.Namespace,
-		"provider", opts.Provider,
-	)
-
-	result, err := pipeline.Render(ctx, opts)
-	if err != nil {
-		// Fatal error from Render() — CUE validation errors, missing provider, etc.
-		printValidationError("validation failed", err)
-		return &ExitError{Code: ExitValidationError, Err: err, Printed: true}
-	}
-
-	// Check for render errors
-	if result.HasErrors() {
-		printRenderErrors(result.Errors)
-		return &ExitError{
-			Code:    ExitValidationError,
-			Err:     fmt.Errorf("%d render error(s)", len(result.Errors)),
-			Printed: true,
-		}
-	}
-
-	// Show transformer matches (always in default mode, verbose adds details)
-	if verboseFlag {
-		writeVerboseMatchLog(result)
-	} else {
-		writeTransformerMatches(result)
-	}
-
-	// Create scoped module logger for warnings
-	modLog := output.ModuleLogger(result.Module.Name)
-
-	// Print warnings
-	if result.HasWarnings() {
-		for _, w := range result.Warnings {
-			modLog.Warn(w)
-		}
-	}
+	// --- Vet-specific logic below ---
 
 	// Print values validation check line
-	// If Render() succeeded, we know validateValuesAgainstConfig passed (Step 4b in release_builder.go)
 	var valuesDetail string
-	if len(vetValuesFlags) > 0 {
-		// External values files — show comma-separated basenames
-		basenames := make([]string, len(vetValuesFlags))
-		for i, vf := range vetValuesFlags {
+	if len(rf.Values) > 0 {
+		basenames := make([]string, len(rf.Values))
+		for i, vf := range rf.Values {
 			basenames[i] = filepath.Base(vf)
 		}
 		valuesDetail = strings.Join(basenames, ", ")
 	} else {
-		// Module's own values.cue
 		valuesDetail = "values.cue"
 	}
 	output.Println(output.FormatVetCheck("Values satisfy #config", valuesDetail))

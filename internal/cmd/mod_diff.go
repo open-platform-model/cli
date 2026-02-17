@@ -6,22 +6,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 )
 
-// Diff command flags.
-var (
-	diffValuesFlags     []string
-	diffNamespaceFlag   string
-	diffReleaseNameFlag string
-	diffKubeconfigFlag  string
-	diffContextFlag     string
-)
-
 // NewModDiffCmd creates the mod diff command.
 func NewModDiffCmd() *cobra.Command {
+	var rf cmdutil.RenderFlags
+	var kf cmdutil.K8sFlags
+
 	cmd := &cobra.Command{
 		Use:   "diff [path]",
 		Short: "Show differences with cluster",
@@ -48,87 +42,34 @@ Examples:
   # Diff using specific kubeconfig
   opm mod diff --kubeconfig ~/.kube/staging --context staging-cluster`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: runDiff,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runDiff(cmd, args, &rf, &kf)
+		},
 	}
 
-	// Add flags
-	cmd.Flags().StringArrayVarP(&diffValuesFlags, "values", "f", nil,
-		"Additional values files (can be repeated)")
-	cmd.Flags().StringVarP(&diffNamespaceFlag, "namespace", "n", "",
-		"Target namespace")
-	cmd.Flags().StringVar(&diffReleaseNameFlag, "release-name", "",
-		"Release name (default: module name)")
-	cmd.Flags().StringVar(&diffKubeconfigFlag, "kubeconfig", "",
-		"Path to kubeconfig file")
-	cmd.Flags().StringVar(&diffContextFlag, "context", "",
-		"Kubernetes context to use")
+	rf.AddTo(cmd)
+	kf.AddTo(cmd)
 
 	return cmd
 }
 
 // runDiff executes the diff command.
-func runDiff(cmd *cobra.Command, args []string) error {
+func runDiff(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdutil.K8sFlags) error {
 	ctx := context.Background()
 
-	// Determine module path
-	modulePath := "."
-	if len(args) > 0 {
-		modulePath = args[0]
-	}
-
-	// Resolve Kubernetes configuration with local flags
-	k8sConfig, err := resolveCommandKubernetes(
-		diffKubeconfigFlag,
-		diffContextFlag,
-		diffNamespaceFlag,
-		"", // no provider flag for diff
-	)
-	if err != nil {
-		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
-	}
-
-	kubeconfig := k8sConfig.Kubeconfig.Value
-	kubeContext := k8sConfig.Context.Value
-	namespace := k8sConfig.Namespace.Value
-
-	// Log resolved k8s config at DEBUG level
-	output.Debug("resolved kubernetes config",
-		"kubeconfig", kubeconfig,
-		"context", kubeContext,
-		"namespace", namespace,
-	)
-
-	// Get pre-loaded configuration
 	opmConfig := GetOPMConfig()
-	if opmConfig == nil {
-		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
-	}
 
-	// Build render options
-	renderOpts := build.RenderOptions{
-		ModulePath: modulePath,
-		Values:     diffValuesFlags,
-		Name:       diffReleaseNameFlag,
-		Namespace:  namespace,
-		Registry:   GetRegistry(),
-	}
-
-	if err := renderOpts.Validate(); err != nil {
-		return &ExitError{Code: ExitGeneralError, Err: err}
-	}
-
-	// Create and execute pipeline
-	pipeline := build.NewPipeline(opmConfig)
-
-	output.Debug("rendering module for diff",
-		"module", modulePath,
-		"namespace", namespace,
-	)
-
-	result, err := pipeline.Render(ctx, renderOpts)
+	// Render module via shared pipeline (diff uses RenderModule only, NOT ShowRenderOutput,
+	// because diff handles HasErrors() specially via DiffPartial)
+	result, err := cmdutil.RenderModule(ctx, cmdutil.RenderModuleOpts{
+		Args:      args,
+		Render:    rf,
+		K8s:       kf,
+		OPMConfig: opmConfig,
+		Registry:  GetRegistry(),
+	})
 	if err != nil {
-		printValidationError("render failed", err)
-		return &ExitError{Code: ExitValidationError, Err: err, Printed: true}
+		return err
 	}
 
 	// Create scoped module logger
@@ -146,15 +87,15 @@ func runDiff(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Create Kubernetes client
-	k8sClient, err := kubernetes.NewClient(kubernetes.ClientOptions{
-		Kubeconfig:  kubeconfig,
-		Context:     kubeContext,
+	// Create Kubernetes client via shared factory
+	k8sClient, err := cmdutil.NewK8sClient(cmdutil.K8sClientOpts{
+		Kubeconfig:  kf.Kubeconfig,
+		Context:     kf.Context,
 		APIWarnings: opmConfig.Config.Log.Kubernetes.APIWarnings,
 	})
 	if err != nil {
 		modLog.Error("connecting to cluster", "error", err)
-		return &ExitError{Code: ExitConnectivityError, Err: err, Printed: true}
+		return err
 	}
 
 	// Create comparer

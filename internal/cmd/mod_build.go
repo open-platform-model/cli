@@ -2,49 +2,27 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/output"
 )
 
-// Build command flags
-var (
-	buildValuesFlags     []string
-	buildNamespaceFlag   string
-	buildReleaseNameFlag string
-	buildProviderFlag    string
-	buildOutputFlag      string
-	buildSplitFlag       bool
-	buildOutDirFlag      string
-	buildVerboseJSONFlag bool
-)
-
-// ExitError wraps an error with an exit code.
-type ExitError struct {
-	Code    int
-	Err     error
-	Printed bool // error was already printed by the command layer
-}
-
-func (e *ExitError) Error() string {
-	if e.Err != nil {
-		return e.Err.Error()
-	}
-	return fmt.Sprintf("exit code %d", e.Code)
-}
-
-func (e *ExitError) Unwrap() error {
-	return e.Err
-}
-
 // NewModBuildCmd creates the mod build command.
 func NewModBuildCmd() *cobra.Command {
+	var rf cmdutil.RenderFlags
+
+	// Build-specific flags (local to this command)
+	var (
+		outputFlag      string
+		splitFlag       bool
+		outDirFlag      string
+		verboseJSONFlag bool
+	)
+
 	cmd := &cobra.Command{
 		Use:   "build [path]",
 		Short: "Render module to manifests",
@@ -72,137 +50,59 @@ Examples:
   # Build as JSON
   opm mod build ./my-module -o json`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: runBuild,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runBuild(cmd, args, &rf, outputFlag, splitFlag, outDirFlag, verboseJSONFlag)
+		},
 	}
 
-	// Add flags
-	cmd.Flags().StringArrayVarP(&buildValuesFlags, "values", "f", nil,
-		"Additional values files (can be repeated)")
-	cmd.Flags().StringVarP(&buildNamespaceFlag, "namespace", "n", "",
-		"Target namespace (required if not in module)")
-	cmd.Flags().StringVar(&buildReleaseNameFlag, "release-name", "",
-		"Release name (default: module name)")
-	cmd.Flags().StringVar(&buildProviderFlag, "provider", "",
-		"Provider to use (default: from config)")
-	cmd.Flags().StringVarP(&buildOutputFlag, "output", "o", "yaml",
+	rf.AddTo(cmd)
+
+	// Build-specific flags
+	cmd.Flags().StringVarP(&outputFlag, "output", "o", "yaml",
 		"Output format: yaml, json")
-	cmd.Flags().BoolVar(&buildSplitFlag, "split", false,
+	cmd.Flags().BoolVar(&splitFlag, "split", false,
 		"Write separate files per resource")
-	cmd.Flags().StringVar(&buildOutDirFlag, "out-dir", "./manifests",
+	cmd.Flags().StringVar(&outDirFlag, "out-dir", "./manifests",
 		"Directory for split output")
-	cmd.Flags().BoolVar(&buildVerboseJSONFlag, "verbose-json", false,
+	cmd.Flags().BoolVar(&verboseJSONFlag, "verbose-json", false,
 		"Structured JSON verbose output")
 
 	return cmd
 }
 
 // runBuild executes the build command.
-func runBuild(cmd *cobra.Command, args []string) error {
+func runBuild(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, outputFmt string, split bool, outDir string, verboseJSON bool) error {
 	ctx := context.Background()
 
-	// Determine module path
-	modulePath := "."
-	if len(args) > 0 {
-		modulePath = args[0]
-	}
-
 	// Validate output format
-	outputFormat, valid := output.ParseFormat(buildOutputFlag)
+	outputFormat, valid := output.ParseFormat(outputFmt)
 	if !valid {
 		return &ExitError{
 			Code: ExitGeneralError,
-			Err:  fmt.Errorf("invalid output format %q (valid: yaml, json)", buildOutputFlag),
+			Err:  fmt.Errorf("invalid output format %q (valid: yaml, json)", outputFmt),
 		}
 	}
 
-	// Get pre-loaded configuration
-	opmConfig := GetOPMConfig()
-	if opmConfig == nil {
-		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
-	}
-
-	// Resolve Kubernetes configuration with local flags (namespace and provider only)
-	k8sConfig, err := resolveCommandKubernetes(
-		"", // no kubeconfig flag for build
-		"", // no context flag for build
-		buildNamespaceFlag,
-		buildProviderFlag,
-	)
+	// Render module via shared pipeline
+	result, err := cmdutil.RenderModule(ctx, cmdutil.RenderModuleOpts{
+		Args:      args,
+		Render:    rf,
+		OPMConfig: GetOPMConfig(),
+		Registry:  GetRegistry(),
+	})
 	if err != nil {
-		return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return err
 	}
 
-	namespace := k8sConfig.Namespace.Value
-	provider := k8sConfig.Provider.Value
-
-	// Log resolved config at DEBUG level
-	output.Debug("resolved config",
-		"namespace", namespace,
-		"provider", provider,
-	)
-
-	// Build render options
-	opts := build.RenderOptions{
-		ModulePath: modulePath,
-		Values:     buildValuesFlags,
-		Name:       buildReleaseNameFlag,
-		Namespace:  namespace,
-		Provider:   provider,
-		Registry:   GetRegistry(),
+	// Post-render: check errors, show matches, log warnings
+	if err := cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{
+		Verbose:     verboseFlag,
+		VerboseJSON: verboseJSON,
+	}); err != nil {
+		return err
 	}
 
-	// Validate options
-	if err := opts.Validate(); err != nil {
-		return &ExitError{Code: ExitGeneralError, Err: err}
-	}
-
-	// Create pipeline
-	pipeline := build.NewPipeline(opmConfig)
-
-	// Execute render
-	output.Debug("starting render",
-		"module", modulePath,
-		"namespace", opts.Namespace,
-		"provider", opts.Provider,
-	)
-
-	result, err := pipeline.Render(ctx, opts)
-	if err != nil {
-		printValidationError("render failed", err)
-		return &ExitError{Code: ExitValidationError, Err: err, Printed: true}
-	}
-
-	// Check for render errors
-	if result.HasErrors() {
-		printRenderErrors(result.Errors)
-		return &ExitError{
-			Code:    ExitValidationError,
-			Err:     fmt.Errorf("%d render error(s)", len(result.Errors)),
-			Printed: true,
-		}
-	}
-
-	// Show transformer matches (always)
-	if buildVerboseJSONFlag {
-		// JSON output takes precedence
-		writeBuildVerboseJSON(result)
-	} else if verboseFlag {
-		// Verbose: show module metadata, matches with reasons, resources
-		writeVerboseMatchLog(result)
-	} else {
-		// Default: show compact matches only
-		writeTransformerMatches(result)
-	}
-
-	// Create scoped module logger
-	modLog := output.ModuleLogger(result.Module.Name)
-
-	// Print warnings
-	if result.HasWarnings() {
-		for _, w := range result.Warnings {
-			modLog.Warn(w)
-		}
-	}
+	// --- Build-specific output logic below ---
 
 	// Convert resources to ResourceInfo interface
 	resourceInfos := make([]output.ResourceInfo, len(result.Resources))
@@ -210,17 +110,20 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		resourceInfos[i] = r
 	}
 
+	// Create scoped module logger
+	modLog := output.ModuleLogger(result.Module.Name)
+
 	// Output results
-	if buildSplitFlag {
+	if split {
 		// Split output to files
 		splitOpts := output.SplitOptions{
-			OutDir: buildOutDirFlag,
+			OutDir: outDir,
 			Format: outputFormat,
 		}
 		if err := output.WriteSplitManifests(resourceInfos, splitOpts); err != nil {
 			return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("writing split manifests: %w", err)}
 		}
-		modLog.Info(fmt.Sprintf("wrote %d resources to %s", len(result.Resources), buildOutDirFlag))
+		modLog.Info(fmt.Sprintf("wrote %d resources to %s", len(result.Resources), outDir))
 	} else {
 		// Output to stdout
 		manifestOpts := output.ManifestOptions{
@@ -233,144 +136,4 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-// writeTransformerMatches writes compact transformer match output (always shown).
-// Format: ▸ <component> ← <provider> - <transformer>
-func writeTransformerMatches(result *build.RenderResult) {
-	modLog := output.ModuleLogger(result.Module.Name)
-
-	// Transformer matching — one line per match
-	for compName, matches := range result.MatchPlan.Matches {
-		for _, m := range matches {
-			modLog.Info(output.FormatTransformerMatch(compName, m.TransformerFQN))
-		}
-	}
-
-	// Unmatched components
-	for _, comp := range result.MatchPlan.Unmatched {
-		modLog.Warn(output.FormatTransformerUnmatched(comp))
-	}
-}
-
-// writeVerboseMatchLog writes detailed verbose output with module metadata,
-// match reasons, and per-resource validation lines (--verbose only).
-func writeVerboseMatchLog(result *build.RenderResult) {
-	modLog := output.ModuleLogger(result.Module.Name)
-
-	// Module info — single line with key-value pairs
-	modLog.Info("module",
-		"namespace", result.Module.Namespace,
-		"version", result.Module.Version,
-		"components", strings.Join(result.Module.Components, ", "),
-	)
-
-	// Transformer matching — one line per match with reason
-	for compName, matches := range result.MatchPlan.Matches {
-		for _, m := range matches {
-			modLog.Info(output.FormatTransformerMatchVerbose(compName, m.TransformerFQN, m.Reason))
-		}
-	}
-
-	// Unmatched components
-	for _, comp := range result.MatchPlan.Unmatched {
-		modLog.Warn(output.FormatTransformerUnmatched(comp))
-	}
-
-	// Generated resources
-	for _, res := range result.Resources {
-		modLog.Info(output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), output.StatusValid))
-	}
-}
-
-// writeBuildVerboseJSON writes structured JSON verbose output to stderr.
-// Delegates to the shared WriteVerboseResult path used by mod vet.
-func writeBuildVerboseJSON(result *build.RenderResult) {
-	// Convert to RenderResultInfo
-	matches := make(map[string][]output.TransformerMatchInfo)
-	for compName, matchList := range result.MatchPlan.Matches {
-		for _, m := range matchList {
-			matches[compName] = append(matches[compName], output.TransformerMatchInfo{
-				TransformerFQN: m.TransformerFQN,
-				Reason:         m.Reason,
-			})
-		}
-	}
-
-	// Convert resources to ResourceInfo
-	resourceInfos := make([]output.ResourceInfo, len(result.Resources))
-	for i, r := range result.Resources {
-		resourceInfos[i] = r
-	}
-
-	info := &output.RenderResultInfo{
-		ModuleName:       result.Module.Name,
-		ModuleNamespace:  result.Module.Namespace,
-		ModuleVersion:    result.Module.Version,
-		ModuleComponents: result.Module.Components,
-		ModuleLabels:     result.Module.Labels,
-		Matches:          matches,
-		Unmatched:        result.MatchPlan.Unmatched,
-		Resources:        resourceInfos,
-		Errors:           result.Errors,
-		Warnings:         result.Warnings,
-	}
-
-	verboseOpts := output.VerboseOptions{
-		JSON:   true,
-		Writer: os.Stderr,
-	}
-
-	if err := output.WriteVerboseResult(info, nil, verboseOpts); err != nil {
-		output.Warn("writing verbose output", "error", err)
-	}
-}
-
-// printValidationError prints a render/validation error in a user-friendly format.
-// When the error is a ReleaseValidationError with CUE details, it prints a short
-// summary line followed by the structured CUE error output (matching `cue vet` style).
-// For other errors, it falls back to the standard key-value log format.
-func printValidationError(msg string, err error) {
-	var releaseErr *build.ReleaseValidationError
-	if errors.As(err, &releaseErr) && releaseErr.Details != "" {
-		output.Error(fmt.Sprintf("%s: %s", msg, releaseErr.Message))
-		// Print CUE details as plain text to stderr for readable multi-line output
-		output.Details(releaseErr.Details)
-		return
-	}
-	output.Error(msg, "error", err)
-}
-
-// printRenderErrors prints render errors in a user-friendly format.
-func printRenderErrors(errs []error) {
-	output.Error("render completed with errors")
-	for _, err := range errs {
-		var unmatchedErr *build.UnmatchedComponentError
-		var transformErr *build.TransformError
-
-		switch {
-		case errors.As(err, &unmatchedErr):
-			output.Error(fmt.Sprintf("component %q: no matching transformer", unmatchedErr.ComponentName))
-			if len(unmatchedErr.Available) > 0 {
-				output.Info("Available transformers:")
-				for _, t := range unmatchedErr.Available {
-					output.Info(fmt.Sprintf("  %s", output.FormatFQN(t.FQN)))
-					if len(t.RequiredLabels) > 0 {
-						output.Info(fmt.Sprintf("    requiredLabels: %v", t.RequiredLabels))
-					}
-					if len(t.RequiredResources) > 0 {
-						output.Info(fmt.Sprintf("    requiredResources: %v", t.RequiredResources))
-					}
-					if len(t.RequiredTraits) > 0 {
-						output.Info(fmt.Sprintf("    requiredTraits: %v", t.RequiredTraits))
-					}
-				}
-			}
-		case errors.As(err, &transformErr):
-			output.Error(fmt.Sprintf("component %q: transform failed with %s: %v",
-				transformErr.ComponentName, output.FormatFQN(transformErr.TransformerFQN), transformErr.Cause))
-		default:
-			output.Error(err.Error())
-		}
-	}
 }
