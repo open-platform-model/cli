@@ -36,7 +36,7 @@ func TestResolveModulePath_Arg(t *testing.T) {
 func TestShowRenderOutput_WithErrors(t *testing.T) {
 	// Create a RenderResult with errors
 	result := &build.RenderResult{
-		Module: build.ModuleMetadata{
+		Release: build.ModuleReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",
 		},
@@ -60,7 +60,7 @@ func TestShowRenderOutput_WithErrors(t *testing.T) {
 func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 	// Create a RenderResult with no errors
 	result := &build.RenderResult{
-		Module: build.ModuleMetadata{
+		Release: build.ModuleReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",
 		},
@@ -87,7 +87,7 @@ func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 func TestShowRenderOutput_Warnings(t *testing.T) {
 	// Create a RenderResult with warnings
 	result := &build.RenderResult{
-		Module: build.ModuleMetadata{
+		Release: build.ModuleReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",
 		},

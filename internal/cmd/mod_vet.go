@@ -73,7 +73,7 @@ func runVet(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags) error {
 	// --- Vet-specific logic below ---
 
 	// Create scoped module logger for vet output
-	modLog := output.ModuleLogger(result.Module.Name)
+	modLog := output.ModuleLogger(result.Release.Name)
 
 	// Print values validation check line
 	var valuesDetail string

@@ -43,7 +43,7 @@ func TestApplyDeleteRoundTrip(t *testing.T) {
 		},
 	}
 
-	meta := build.ModuleMetadata{
+	meta := build.ModuleReleaseMetadata{
 		Name:      moduleName,
 		Namespace: namespace,
 		Version:   "0.1.0",
@@ -92,7 +92,7 @@ func TestApplyIdempotency(t *testing.T) {
 	resources := []*build.Resource{
 		{Object: cm, Component: "test"},
 	}
-	meta := build.ModuleMetadata{
+	meta := build.ModuleReleaseMetadata{
 		Name:      moduleName,
 		Namespace: namespace,
 		Version:   "0.1.0",

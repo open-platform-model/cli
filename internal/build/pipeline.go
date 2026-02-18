@@ -202,7 +202,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 
 	return &RenderResult{
 		Resources: resources,
-		Module:    p.releaseToModuleMetadata(release, moduleMeta.name),
+		Release:   p.releaseToModuleMetadata(release, moduleMeta.name),
 		MatchPlan: matchPlan,
 		Errors:    errors,
 		Warnings:  warnings,
@@ -309,15 +309,15 @@ func (p *pipeline) componentsToSlice(m map[string]*LoadedComponent) []*LoadedCom
 	return result
 }
 
-// releaseToModuleMetadata converts release metadata to ModuleMetadata for API compatibility.
+// releaseToModuleMetadata converts release metadata to ModuleReleaseMetadata for API compatibility.
 // moduleName is the canonical module name from module.metadata.name (e.g. "minecraft"),
 // which may differ from release.Metadata.Name when --release-name overrides the default.
-func (p *pipeline) releaseToModuleMetadata(release *BuiltRelease, moduleName string) ModuleMetadata {
+func (p *pipeline) releaseToModuleMetadata(release *BuiltRelease, moduleName string) ModuleReleaseMetadata {
 	names := make([]string, 0, len(release.Components))
 	for name := range release.Components {
 		names = append(names, name)
 	}
-	return ModuleMetadata{
+	return ModuleReleaseMetadata{
 		Name:            release.Metadata.Name,
 		ModuleName:      moduleName,
 		Namespace:       release.Metadata.Namespace,

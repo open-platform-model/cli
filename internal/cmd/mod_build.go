@@ -106,7 +106,7 @@ func runBuild(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, outputFm
 	}
 
 	// Create scoped module logger
-	modLog := output.ModuleLogger(result.Module.Name)
+	modLog := output.ModuleLogger(result.Release.Name)
 
 	// Output results
 	if split {

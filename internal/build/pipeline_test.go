@@ -55,7 +55,7 @@ func TestRenderOptionsValidate(t *testing.T) {
 
 func TestPipeline_IdentityFieldsPropagated(t *testing.T) {
 	// This test verifies that Identity and ReleaseIdentity fields
-	// are properly propagated from ReleaseMetadata to ModuleMetadata
+	// are properly propagated from ReleaseMetadata to ModuleReleaseMetadata
 	// through the releaseToModuleMetadata function.
 
 	release := &BuiltRelease{

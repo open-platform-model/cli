@@ -133,7 +133,7 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 	}
 
 	// Create scoped module logger
-	modLog := output.ModuleLogger(result.Module.Name)
+	modLog := output.ModuleLogger(result.Release.Name)
 
 	// Create Kubernetes client via shared factory
 	k8sClient, err := cmdutil.NewK8sClient(kubernetes.ClientOptions{
@@ -146,7 +146,7 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 		return err
 	}
 
-	namespace := result.Module.Namespace
+	namespace := result.Release.Namespace
 
 	// Create namespace if requested
 	if createNS && namespace != "" {
@@ -175,14 +175,14 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 	}
 	// Build a values string from the render options for change ID computation
 	valuesStr := strings.Join(rf.Values, ",")
-	changeID := inventory.ComputeChangeID(modulePath, result.Module.Version, valuesStr, manifestDigest)
+	changeID := inventory.ComputeChangeID(modulePath, result.Release.Version, valuesStr, manifestDigest)
 	output.Debug("change ID computed", "changeID", changeID)
 
 	// Step 4: Read previous inventory (nil = first-time apply)
-	releaseID := result.Module.ReleaseIdentity
+	releaseID := result.Release.ReleaseIdentity
 	var prevInventory *inventory.InventorySecret
 	if releaseID != "" && !dryRun {
-		prevInventory, err = inventory.GetInventory(ctx, k8sClient, result.Module.Name, namespace, releaseID)
+		prevInventory, err = inventory.GetInventory(ctx, k8sClient, result.Release.Name, namespace, releaseID)
 		if err != nil {
 			modLog.Warn("could not read inventory, proceeding without it", "error", err)
 		}
@@ -240,7 +240,7 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 
 	var applyResult *kubernetes.ApplyResult
 	if len(result.Resources) > 0 {
-		applyResult, err = kubernetes.Apply(ctx, k8sClient, result.Resources, result.Module, kubernetes.ApplyOptions{
+		applyResult, err = kubernetes.Apply(ctx, k8sClient, result.Resources, result.Release, kubernetes.ApplyOptions{
 			DryRun: dryRun,
 		})
 		if err != nil {
@@ -305,8 +305,8 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 					Metadata: inventory.InventoryMetadata{
 						Kind:        "ModuleRelease",
 						APIVersion:  "core.opmodel.dev/v1alpha1",
-						Name:        result.Module.ModuleName, // canonical module name, e.g. "minecraft"
-						ReleaseName: result.Module.Name,       // release name, e.g. "mc"
+						Name:        result.Release.ModuleName, // canonical module name, e.g. "minecraft"
+						ReleaseName: result.Release.Name,       // release name, e.g. "mc"
 						Namespace:   namespace,
 						ReleaseID:   releaseID,
 					},
@@ -317,9 +317,9 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 
 			module := inventory.ModuleRef{
 				Path:    modulePath,
-				Version: result.Module.Version,
-				Name:    result.Module.Name,
-				Local:   result.Module.Version == "",
+				Version: result.Release.Version,
+				Name:    result.Release.Name,
+				Local:   result.Release.Version == "",
 			}
 
 			computedChangeID, changeEntry := inventory.PrepareChange(module, valuesStr, manifestDigest, currentEntries)

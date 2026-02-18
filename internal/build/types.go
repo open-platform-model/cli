@@ -68,8 +68,8 @@ type RenderResult struct {
 	// Empty slice (not nil) if no resources were rendered.
 	Resources []*Resource
 
-	// Module contains metadata about the source module.
-	Module ModuleMetadata
+	// Release contains metadata about the source module and the release being deployed.
+	Release ModuleReleaseMetadata
 
 	// MatchPlan describes which transformers matched which components.
 	// Used for verbose output and debugging.
@@ -140,9 +140,9 @@ func (r *Resource) Labels() map[string]string {
 	return r.Object.GetLabels()
 }
 
-// ModuleMetadata contains information about the source module.
+// ModuleReleaseMetadata contains information about the source module and the release being deployed.
 // This metadata is used for labeling resources and verbose output.
-type ModuleMetadata struct {
+type ModuleReleaseMetadata struct {
 	// Name is the release name (resolved from RenderOptions.Name or module.metadata.name).
 	// This is the value used for discovery and labeling (module-release.opmodel.dev/name).
 	// Example: "mc" when --release-name mc is used.

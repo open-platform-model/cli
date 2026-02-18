@@ -316,7 +316,7 @@ type DiffOptions struct {
 }
 
 // Diff compares rendered resources against the live cluster state and returns categorized results.
-func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta build.ModuleMetadata, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
+func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta build.ModuleReleaseMetadata, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
 	var diffOpts DiffOptions
 	if len(opts) > 0 {
 		diffOpts = opts[0]
@@ -410,7 +410,7 @@ func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta
 
 // DiffPartial compares rendered resources against live state, handling partial render results.
 // Successfully rendered resources are compared; render errors produce warnings.
-func DiffPartial(ctx context.Context, client *Client, resources []*build.Resource, renderErrors []error, meta build.ModuleMetadata, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
+func DiffPartial(ctx context.Context, client *Client, resources []*build.Resource, renderErrors []error, meta build.ModuleReleaseMetadata, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
 	result, err := Diff(ctx, client, resources, meta, comparer, opts...)
 	if err != nil {
 		return nil, err
@@ -430,7 +430,7 @@ func DiffPartial(ctx context.Context, client *Client, resources []*build.Resourc
 // When inventoryLive is non-nil, it uses set-difference against those resources
 // (inventory-first path: N targeted GETs already done). When nil, falls back to a
 // full label-scan for backward compatibility with releases that have no inventory.
-func findOrphans(ctx context.Context, client *Client, meta build.ModuleMetadata, renderedKeys map[string]bool, inventoryLive []*unstructured.Unstructured) ([]*unstructured.Unstructured, error) {
+func findOrphans(ctx context.Context, client *Client, meta build.ModuleReleaseMetadata, renderedKeys map[string]bool, inventoryLive []*unstructured.Unstructured) ([]*unstructured.Unstructured, error) {
 	var liveResources []*unstructured.Unstructured
 
 	if inventoryLive != nil {

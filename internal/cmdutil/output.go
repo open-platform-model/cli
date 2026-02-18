@@ -61,7 +61,7 @@ func PrintRenderErrors(errs []error) {
 // WriteTransformerMatches writes compact transformer match output (always shown).
 // Format: component <- provider - transformer
 func WriteTransformerMatches(result *build.RenderResult) {
-	modLog := output.ModuleLogger(result.Module.Name)
+	modLog := output.ModuleLogger(result.Release.Name)
 
 	// Transformer matching — one line per match
 	for compName, matches := range result.MatchPlan.Matches {
@@ -79,13 +79,13 @@ func WriteTransformerMatches(result *build.RenderResult) {
 // WriteVerboseMatchLog writes detailed verbose output with module metadata,
 // match reasons, and per-resource validation lines (--verbose only).
 func WriteVerboseMatchLog(result *build.RenderResult) {
-	modLog := output.ModuleLogger(result.Module.Name)
+	modLog := output.ModuleLogger(result.Release.Name)
 
 	// Module info — single line with key-value pairs
 	modLog.Info("module",
-		"namespace", result.Module.Namespace,
-		"version", result.Module.Version,
-		"components", strings.Join(result.Module.Components, ", "),
+		"namespace", result.Release.Namespace,
+		"version", result.Release.Version,
+		"components", strings.Join(result.Release.Components, ", "),
 	)
 
 	// Transformer matching — one line per match with reason

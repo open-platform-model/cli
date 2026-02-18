@@ -143,7 +143,7 @@ func ShowRenderOutput(result *build.RenderResult, opts ShowOutputOpts) error {
 	}
 
 	// Log warnings
-	modLog := output.ModuleLogger(result.Module.Name)
+	modLog := output.ModuleLogger(result.Release.Name)
 	if result.HasWarnings() {
 		for _, w := range result.Warnings {
 			modLog.Warn(w)

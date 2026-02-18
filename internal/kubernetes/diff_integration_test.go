@@ -38,7 +38,7 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 	resources := []*build.Resource{
 		{Object: cm, Component: "test-component"},
 	}
-	meta := build.ModuleMetadata{
+	meta := build.ModuleReleaseMetadata{
 		Name:      moduleName,
 		Namespace: namespace,
 		Version:   "0.1.0",
@@ -98,7 +98,7 @@ func TestDiffIntegration_ApplyThenDiffShowsNoDifferences(t *testing.T) {
 	resources := []*build.Resource{
 		{Object: cm, Component: "test-component"},
 	}
-	meta := build.ModuleMetadata{
+	meta := build.ModuleReleaseMetadata{
 		Name:      moduleName,
 		Namespace: namespace,
 		Version:   "0.1.0",
@@ -149,7 +149,7 @@ func TestStatusIntegration_ReportsHealth(t *testing.T) {
 	resources := []*build.Resource{
 		{Object: cm, Component: "test-component"},
 	}
-	meta := build.ModuleMetadata{
+	meta := build.ModuleReleaseMetadata{
 		Name:      moduleName,
 		Namespace: namespace,
 		Version:   "0.1.0",
@@ -202,7 +202,7 @@ func TestDiffIntegration_AllAdditions(t *testing.T) {
 	resources := []*build.Resource{
 		{Object: cm, Component: "test-component"},
 	}
-	meta := build.ModuleMetadata{
+	meta := build.ModuleReleaseMetadata{
 		Name:      moduleName,
 		Namespace: namespace,
 		Version:   "0.1.0",

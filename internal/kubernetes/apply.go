@@ -57,7 +57,7 @@ func (e *resourceError) Error() string {
 
 // Apply performs server-side apply for a set of rendered resources.
 // Resources are assumed to be already ordered by weight (from RenderResult).
-func Apply(ctx context.Context, client *Client, resources []*build.Resource, meta build.ModuleMetadata, opts ApplyOptions) (*ApplyResult, error) {
+func Apply(ctx context.Context, client *Client, resources []*build.Resource, meta build.ModuleReleaseMetadata, opts ApplyOptions) (*ApplyResult, error) {
 	result := &ApplyResult{}
 	modLog := output.ModuleLogger(meta.Name)
 
