@@ -23,10 +23,22 @@ const (
 	labelManagedByValue = "open-platform-model"
 	LabelReleaseName    = "module-release.opmodel.dev/name"
 	LabelComponentName  = "component.opmodel.dev/name"
+	// LabelComponent is the OPM infrastructure label that categorizes the type
+	// of OPM-managed object (e.g., "inventory"). Distinct from LabelComponentName
+	// which is set by CUE transformers on application resources.
+	LabelComponent = "opmodel.dev/component"
+	// labelComponentInventory is the value used for the inventory Secret.
+	labelComponentInventory = "inventory"
 	// labelReleaseID is the release identity UUID label for resource discovery.
 	labelReleaseID = "module-release.opmodel.dev/uuid"
 	// labelModuleID is the module identity UUID label for resource discovery.
 	labelModuleID = "module.opmodel.dev/uuid"
+	// LabelModuleName is the module name label used on inventory Secrets.
+	LabelModuleName = "module.opmodel.dev/name"
+	// LabelModuleNamespace is the module namespace label used on inventory Secrets.
+	LabelModuleNamespace = "module.opmodel.dev/namespace"
+	// LabelReleaseUUID is the exported release UUID label constant.
+	LabelReleaseUUID = labelReleaseID
 )
 
 // fieldManagerName is the field manager used for server-side apply.
@@ -174,6 +186,13 @@ func discoverWithSelector(ctx context.Context, client *Client, apiResources []ap
 
 			// Filter out resources with ownerReferences if ExcludeOwned is true
 			if excludeOwned && len(item.GetOwnerReferences()) > 0 {
+				continue
+			}
+
+			// Exclude inventory Secrets from workload resource queries.
+			// The inventory Secret carries opmodel.dev/component: inventory to distinguish
+			// it from application resources.
+			if item.GetLabels()[LabelComponent] == labelComponentInventory {
 				continue
 			}
 

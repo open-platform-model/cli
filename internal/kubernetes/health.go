@@ -16,6 +16,9 @@ const (
 	healthComplete healthStatus = "Complete"
 	// healthUnknown means the health state could not be determined.
 	healthUnknown healthStatus = "Unknown"
+	// healthMissing means the resource is tracked in the inventory but no longer
+	// exists on the cluster (deleted outside of OPM).
+	healthMissing healthStatus = "Missing"
 )
 
 // workloadKinds are resources that use the Ready condition for health.

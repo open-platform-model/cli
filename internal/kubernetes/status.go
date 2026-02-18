@@ -13,6 +13,15 @@ import (
 	"github.com/opmodel/cli/internal/output"
 )
 
+// MissingResource identifies a resource that is tracked in the inventory but
+// no longer exists on the cluster. Passed from the command layer (which fetches
+// the inventory) into GetModuleStatus so that "Missing" entries appear in the output.
+type MissingResource struct {
+	Kind      string
+	Namespace string
+	Name      string
+}
+
 // StatusOptions configures a status operation.
 type StatusOptions struct {
 	// Namespace is the target namespace for resource lookup.
@@ -28,6 +37,15 @@ type StatusOptions struct {
 
 	// OutputFormat is the desired output format (table, yaml, json).
 	OutputFormat output.Format
+
+	// InventoryLive is the list of live resources pre-fetched from the inventory
+	// Secret. When non-nil, resource discovery uses this list instead of a
+	// full label-scan (inventory-first path). Pass nil to fall back to label-scan.
+	InventoryLive []*unstructured.Unstructured
+
+	// MissingResources is the list of resources tracked in the inventory that
+	// no longer exist on the cluster. These are shown with "Missing" status.
+	MissingResources []MissingResource
 }
 
 // resourceHealth contains health information for a single resource.
@@ -58,26 +76,41 @@ type StatusResult struct {
 
 // GetModuleStatus discovers resources by OPM labels and evaluates health per resource.
 // Returns noResourcesFoundError when no resources match the selector.
+//
+// When opts.InventoryLive is non-nil, the inventory-first path is used: those live
+// resources are evaluated directly instead of performing a label-scan. Any resources in
+// opts.MissingResources are appended with "Missing" status.
 func GetModuleStatus(ctx context.Context, client *Client, opts StatusOptions) (*StatusResult, error) {
-	// Discover resources via labels
-	output.Debug("discovering release resources",
-		"release", opts.ReleaseName,
-		"namespace", opts.Namespace,
-	)
+	var resources []*unstructured.Unstructured
 
-	resources, err := DiscoverResources(ctx, client, DiscoveryOptions{
-		ReleaseName: opts.ReleaseName,
-		Namespace:   opts.Namespace,
-		ReleaseID:   opts.ReleaseID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("discovering release resources: %w", err)
+	if opts.InventoryLive != nil {
+		// Inventory-first: use pre-fetched live resources.
+		output.Debug("using inventory-first status discovery",
+			"release", opts.ReleaseName,
+			"liveCount", len(opts.InventoryLive),
+			"missingCount", len(opts.MissingResources),
+		)
+		resources = opts.InventoryLive
+	} else {
+		// Fallback: discover resources via label-scan.
+		output.Debug("discovering release resources via label-scan",
+			"release", opts.ReleaseName,
+			"namespace", opts.Namespace,
+		)
+		var err error
+		resources, err = DiscoverResources(ctx, client, DiscoveryOptions{
+			ReleaseName: opts.ReleaseName,
+			Namespace:   opts.Namespace,
+			ReleaseID:   opts.ReleaseID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("discovering release resources: %w", err)
+		}
+		output.Debug("discovered resources", "count", len(resources))
 	}
 
-	output.Debug("discovered resources", "count", len(resources))
-
-	// Return error when no resources found
-	if len(resources) == 0 {
+	// Return error when no resources found (and no missing resources to show)
+	if len(resources) == 0 && len(opts.MissingResources) == 0 {
 		return nil, &noResourcesFoundError{
 			ReleaseName: opts.ReleaseName,
 			ReleaseID:   opts.ReleaseID,
@@ -112,6 +145,18 @@ func GetModuleStatus(ctx context.Context, client *Client, opts StatusOptions) (*
 		if health != healthReady && health != healthComplete {
 			allReady = false
 		}
+	}
+
+	// Append missing resources (tracked in inventory but not on cluster)
+	for _, m := range opts.MissingResources {
+		result.Resources = append(result.Resources, resourceHealth{
+			Kind:      m.Kind,
+			Name:      m.Name,
+			Namespace: m.Namespace,
+			Status:    healthMissing,
+			Age:       "<unknown>",
+		})
+		allReady = false
 	}
 
 	// Compute aggregate status

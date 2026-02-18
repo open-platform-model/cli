@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
+	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -101,12 +102,30 @@ func runDiff(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdut
 	// Create comparer
 	comparer := kubernetes.NewComparer()
 
+	// Attempt inventory-first discovery for orphan detection.
+	// Falls back to label-scan when no inventory exists (backward compatibility).
+	var diffOpts kubernetes.DiffOptions
+	releaseID := result.Module.ReleaseIdentity
+	if releaseID != "" {
+		inv, invErr := inventory.GetInventory(ctx, k8sClient, result.Module.Name, result.Module.Namespace, releaseID)
+		if invErr != nil {
+			modLog.Debug("could not read inventory for diff, using label-scan", "error", invErr)
+		} else if inv != nil {
+			liveResources, _, invDiscoverErr := inventory.DiscoverResourcesFromInventory(ctx, k8sClient, inv)
+			if invDiscoverErr != nil {
+				modLog.Debug("inventory discovery failed, falling back to label-scan", "error", invDiscoverErr)
+			} else {
+				diffOpts.InventoryLive = liveResources
+			}
+		}
+	}
+
 	// Run diff — handle partial render results
 	var diffResult *kubernetes.DiffResult
 	if result.HasErrors() {
-		diffResult, err = kubernetes.DiffPartial(ctx, k8sClient, result.Resources, result.Errors, result.Module, comparer)
+		diffResult, err = kubernetes.DiffPartial(ctx, k8sClient, result.Resources, result.Errors, result.Module, comparer, diffOpts)
 	} else {
-		diffResult, err = kubernetes.Diff(ctx, k8sClient, result.Resources, result.Module, comparer)
+		diffResult, err = kubernetes.Diff(ctx, k8sClient, result.Resources, result.Module, comparer, diffOpts)
 	}
 	if err != nil {
 		modLog.Error("diff failed", "error", err)

@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
+	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -136,6 +137,33 @@ func runStatus(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 		ReleaseName:  rsf.ReleaseName,
 		ReleaseID:    rsf.ReleaseID,
 		OutputFormat: outputFormat,
+	}
+
+	// Attempt inventory-first discovery when a release-id is provided.
+	// Falls back to label-scan when no inventory exists (backward compatibility).
+	if rsf.ReleaseID != "" {
+		relName := rsf.ReleaseName
+		if relName == "" {
+			relName = rsf.ReleaseID
+		}
+		inv, invErr := inventory.GetInventory(ctx, k8sClient, relName, namespace, rsf.ReleaseID)
+		if invErr != nil {
+			output.Debug("could not read inventory for status, using label-scan", "error", invErr)
+		} else if inv != nil {
+			liveResources, missingEntries, invDiscoverErr := inventory.DiscoverResourcesFromInventory(ctx, k8sClient, inv)
+			if invDiscoverErr != nil {
+				output.Debug("inventory discovery failed, falling back to label-scan", "error", invDiscoverErr)
+			} else {
+				statusOpts.InventoryLive = liveResources
+				for _, m := range missingEntries {
+					statusOpts.MissingResources = append(statusOpts.MissingResources, kubernetes.MissingResource{
+						Kind:      m.Kind,
+						Namespace: m.Namespace,
+						Name:      m.Name,
+					})
+				}
+			}
+		}
 	}
 
 	// If watch mode, run in loop

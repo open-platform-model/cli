@@ -145,7 +145,13 @@ func (r *Resource) Labels() map[string]string {
 type ModuleMetadata struct {
 	// Name is the release name (resolved from RenderOptions.Name or module.metadata.name).
 	// This is the value used for discovery and labeling (module-release.opmodel.dev/name).
+	// Example: "mc" when --release-name mc is used.
 	Name string
+
+	// ModuleName is the canonical module name from module.metadata.name.
+	// Distinct from Name when --release-name overrides the default.
+	// Example: "minecraft" (always the module definition name, regardless of release name).
+	ModuleName string
 
 	// Namespace is the target namespace.
 	// May be overridden by RenderOptions.Namespace.

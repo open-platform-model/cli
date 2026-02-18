@@ -171,11 +171,30 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	}
 
 	// Phase 6: Build result
-	// Sort resources by weight
-	sort.Slice(resources, func(i, j int) bool {
-		wi := weights.GetWeight(resources[i].GVK())
-		wj := weights.GetWeight(resources[j].GVK())
-		return wi < wj
+	// Sort resources with deterministic 5-key total ordering:
+	// weight → group → kind → namespace → name
+	// This matches the digest sort in internal/inventory, making opm mod build
+	// output deterministic for equal-weight resources.
+	sort.SliceStable(resources, func(i, j int) bool {
+		ri, rj := resources[i], resources[j]
+		wi := weights.GetWeight(ri.GVK())
+		wj := weights.GetWeight(rj.GVK())
+		if wi != wj {
+			return wi < wj
+		}
+		gi, gj := ri.GVK().Group, rj.GVK().Group
+		if gi != gj {
+			return gi < gj
+		}
+		ki, kj := ri.GVK().Kind, rj.GVK().Kind
+		if ki != kj {
+			return ki < kj
+		}
+		nsi, nsj := ri.Namespace(), rj.Namespace()
+		if nsi != nsj {
+			return nsi < nsj
+		}
+		return ri.Name() < rj.Name()
 	})
 
 	// Collect warnings (e.g., unhandled traits)
@@ -183,7 +202,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 
 	return &RenderResult{
 		Resources: resources,
-		Module:    p.releaseToModuleMetadata(release),
+		Module:    p.releaseToModuleMetadata(release, moduleMeta.name),
 		MatchPlan: matchPlan,
 		Errors:    errors,
 		Warnings:  warnings,
@@ -290,14 +309,17 @@ func (p *pipeline) componentsToSlice(m map[string]*LoadedComponent) []*LoadedCom
 	return result
 }
 
-// releaseToModuleMetadata converts release metadata to ModuleMetadata for API compatibility
-func (p *pipeline) releaseToModuleMetadata(release *BuiltRelease) ModuleMetadata {
+// releaseToModuleMetadata converts release metadata to ModuleMetadata for API compatibility.
+// moduleName is the canonical module name from module.metadata.name (e.g. "minecraft"),
+// which may differ from release.Metadata.Name when --release-name overrides the default.
+func (p *pipeline) releaseToModuleMetadata(release *BuiltRelease, moduleName string) ModuleMetadata {
 	names := make([]string, 0, len(release.Components))
 	for name := range release.Components {
 		names = append(names, name)
 	}
 	return ModuleMetadata{
 		Name:            release.Metadata.Name,
+		ModuleName:      moduleName,
 		Namespace:       release.Metadata.Namespace,
 		Version:         release.Metadata.Version,
 		Labels:          release.Metadata.Labels,

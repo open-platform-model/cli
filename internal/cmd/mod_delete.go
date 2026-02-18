@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
+	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -73,7 +74,7 @@ Examples:
 }
 
 // runDelete executes the delete command.
-func runDelete(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, force, dryRun, _ /* wait */, ignoreNotFound bool) error {
+func runDelete(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, force, dryRun, _ /* wait */, ignoreNotFound bool) error { //nolint:gocyclo // orchestration function; complexity is inherent
 	ctx := context.Background()
 
 	// Validate release selector flags
@@ -132,12 +133,50 @@ func runDelete(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 	// Delete resources
 	modLog.Info(fmt.Sprintf("deleting resources in namespace %q", namespace))
 
-	deleteResult, err := kubernetes.Delete(ctx, k8sClient, kubernetes.DeleteOptions{
+	// Attempt inventory-first discovery.
+	// Works with either --release-name or --release-id (or both).
+	// Falls back to label-scan when no inventory exists (backward compatibility).
+	deleteOpts := kubernetes.DeleteOptions{
 		ReleaseName: rsf.ReleaseName,
 		Namespace:   namespace,
 		ReleaseID:   rsf.ReleaseID,
 		DryRun:      dryRun,
-	})
+	}
+
+	var inv *inventory.InventorySecret
+	var invErr error
+
+	switch {
+	case rsf.ReleaseID != "":
+		// Primary path: direct GET by name+UUID, with UUID label fallback.
+		relName := rsf.ReleaseName
+		if relName == "" {
+			relName = rsf.ReleaseID // best-effort name for Secret name construction
+		}
+		inv, invErr = inventory.GetInventory(ctx, k8sClient, relName, namespace, rsf.ReleaseID)
+		if invErr != nil {
+			modLog.Debug("could not read inventory by release-id, using label-scan", "error", invErr)
+		}
+	case rsf.ReleaseName != "":
+		// Name-only path: label scan by module-release.opmodel.dev/name.
+		inv, invErr = inventory.FindInventoryByReleaseName(ctx, k8sClient, rsf.ReleaseName, namespace)
+		if invErr != nil {
+			modLog.Debug("could not read inventory by release-name, using label-scan", "error", invErr)
+		}
+	}
+
+	if inv != nil {
+		liveResources, _, invDiscoverErr := inventory.DiscoverResourcesFromInventory(ctx, k8sClient, inv)
+		if invDiscoverErr != nil {
+			modLog.Debug("inventory discovery failed, falling back to label-scan", "error", invDiscoverErr)
+		} else {
+			deleteOpts.InventoryLive = liveResources
+			deleteOpts.InventorySecretName = inventory.SecretName(inv.Metadata.ReleaseName, inv.Metadata.ReleaseID)
+			deleteOpts.InventorySecretNamespace = namespace
+		}
+	}
+
+	deleteResult, err := kubernetes.Delete(ctx, k8sClient, deleteOpts)
 	if err != nil {
 		if ignoreNotFound && kubernetes.IsNoResourcesFound(err) {
 			modLog.Info("no resources found (ignored)")
