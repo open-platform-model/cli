@@ -117,6 +117,8 @@ func runDiff(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdut
 			} else {
 				diffOpts.InventoryLive = liveResources
 			}
+		} else {
+			modLog.Debug("No inventory found, falling back to label-based discovery")
 		}
 	}
 

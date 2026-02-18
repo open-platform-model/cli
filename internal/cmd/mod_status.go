@@ -163,6 +163,8 @@ func runStatus(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 					})
 				}
 			}
+		} else {
+			output.Debug("No inventory found, falling back to label-based discovery")
 		}
 	}
 

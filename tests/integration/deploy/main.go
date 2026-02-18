@@ -86,7 +86,7 @@ func main() {
 		{Object: cm, Component: "config"},
 		{Object: svc, Component: "web"},
 	}
-	meta := build.ModuleMetadata{
+	meta := build.ModuleReleaseMetadata{
 		Name:      moduleName,
 		Namespace: namespace,
 		Version:   "0.1.0",

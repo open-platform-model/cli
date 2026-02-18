@@ -367,9 +367,9 @@ func buildServiceResources(names []string) []*build.Resource {
 	return res
 }
 
-// moduleMeta returns the ModuleMetadata for the test release.
-func moduleMeta() build.ModuleMetadata {
-	return build.ModuleMetadata{
+// moduleMeta returns the ModuleReleaseMetadata for the test release.
+func moduleMeta() build.ModuleReleaseMetadata {
+	return build.ModuleReleaseMetadata{
 		Name:            releaseName,
 		Namespace:       namespace,
 		Version:         moduleVersion,
@@ -389,11 +389,12 @@ func buildInventory(resources []*build.Resource) *inventory.InventorySecret {
 
 	inv := &inventory.InventorySecret{
 		Metadata: inventory.InventoryMetadata{
-			Kind:       "ModuleRelease",
-			APIVersion: "core.opmodel.dev/v1alpha1",
-			Name:       releaseName,
-			Namespace:  namespace,
-			ReleaseID:  releaseID,
+			Kind:        "ModuleRelease",
+			APIVersion:  "core.opmodel.dev/v1alpha1",
+			Name:        releaseName, // module name (same as release name in this test)
+			ReleaseName: releaseName,
+			Namespace:   namespace,
+			ReleaseID:   releaseID,
 		},
 		Index:   []string{},
 		Changes: map[string]*inventory.ChangeEntry{},

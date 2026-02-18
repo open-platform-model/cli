@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+Defines the release inventory data model, serialization format, and CRUD semantics. The inventory is a Kubernetes Secret that records the exact set of resources applied per release, enabling automatic pruning, fast resource discovery, and change history.
+
+## Requirements
 
 ### Requirement: Inventory entry identity
 
@@ -53,12 +57,29 @@ The inventory Secret name SHALL follow the pattern `opm.<release-name>.<release-
 
 ### Requirement: Inventory Secret labels
 
-The inventory Secret SHALL carry the following labels: `app.kubernetes.io/managed-by: open-platform-model`, `module.opmodel.dev/name: <name>`, `module.opmodel.dev/namespace: <namespace>`, `module-release.opmodel.dev/uuid: <release-id>`, and `opmodel.dev/component: inventory`. The `opmodel.dev/component` label is a new label key distinct from `component.opmodel.dev/name` and is used to distinguish the inventory Secret from application resources.
+The inventory Secret SHALL carry the following six labels:
+
+| Label key | Value | Description |
+|---|---|---|
+| `app.kubernetes.io/managed-by` | `open-platform-model` | Standard managed-by label |
+| `module.opmodel.dev/name` | canonical module name (e.g. `minecraft`) | The module definition name, not the release name |
+| `module-release.opmodel.dev/name` | release name (e.g. `mc`) | The user-supplied release name (`--release-name`) |
+| `module.opmodel.dev/namespace` | release namespace | Namespace the release is deployed into |
+| `module-release.opmodel.dev/uuid` | release UUID | Deterministic UUID v5 release identity |
+| `opmodel.dev/component` | `inventory` | Distinguishes the inventory Secret from application resources |
+
+The `module.opmodel.dev/name` and `module-release.opmodel.dev/name` labels are distinct: the former is the canonical module name from the module definition, the latter is the user-supplied name used to identify a specific deployment of that module. Both are required to enable discovery by either identifier. The `opmodel.dev/component` label is a new key distinct from `component.opmodel.dev/name`.
 
 #### Scenario: Inventory Secret has correct labels
 
-- **WHEN** creating an inventory Secret for release `jellyfin` in namespace `media` with release ID `abc123`
-- **THEN** the Secret SHALL have all five labels with correct values
+- **WHEN** creating an inventory Secret for module `minecraft` deployed as release name `mc` in namespace `games` with release ID `abc123`
+- **THEN** the Secret SHALL have all six labels:
+  - `app.kubernetes.io/managed-by: open-platform-model`
+  - `module.opmodel.dev/name: minecraft`
+  - `module-release.opmodel.dev/name: mc`
+  - `module.opmodel.dev/namespace: games`
+  - `module-release.opmodel.dev/uuid: abc123`
+  - `opmodel.dev/component: inventory`
 - **AND** the Secret type SHALL be `opmodel.dev/release`
 
 ### Requirement: Inventory Secret serialization roundtrip
@@ -138,7 +159,7 @@ The system SHALL compute a change ID as `change-sha1-<8hex>` where the hash inpu
 
 ### Requirement: Change history management
 
-The index SHALL be an ordered list of change IDs with newest first. When a change ID already exists in the index (idempotent re-apply), it SHALL be moved to the front and its entry overwritten with an updated timestamp. The index SHALL NOT grow when the same inputs are re-applied.
+The index SHALL be an ordered list of change IDs with newest first. When a change ID already exists in the index (idempotent re-apply), it SHALL be moved to the front. The index SHALL NOT grow when the same inputs are re-applied.
 
 #### Scenario: New change appended to front
 
@@ -151,7 +172,14 @@ The index SHALL be an ordered list of change IDs with newest first. When a chang
 - **WHEN** re-applying with the same inputs producing `change-sha1-bbb22222`
 - **AND** the current index is `[change-sha1-aaa11111, change-sha1-bbb22222]`
 - **THEN** the index SHALL become `[change-sha1-bbb22222, change-sha1-aaa11111]`
-- **AND** the entry's timestamp SHALL be updated
+
+#### Scenario: Identical re-apply at head skips inventory write and preserves original timestamp
+
+- **WHEN** re-applying with inputs that produce `change-sha1-bbb22222`
+- **AND** the current index is already `[change-sha1-bbb22222, ...]` (the computed change ID is already at the front)
+- **THEN** the inventory Secret write SHALL be skipped entirely
+- **AND** the original timestamp of the first apply SHALL be preserved
+- **AND** the index SHALL remain unchanged
 
 ### Requirement: History pruning
 
@@ -166,7 +194,7 @@ When the index exceeds the maximum history size, the oldest entries (at the tail
 
 ### Requirement: Inventory Secret CRUD operations
 
-`GetInventory` SHALL first attempt a direct GET by constructed Secret name (`opm.<name>.<releaseID>`). If the Secret is not found, it SHALL fall back to listing Secrets with label `module-release.opmodel.dev/uuid=<releaseID>`. If no inventory is found (first-time apply), it SHALL return `nil, nil`. `WriteInventory` SHALL use full PUT semantics (create or replace) with optimistic concurrency via `resourceVersion`. `DeleteInventory` SHALL delete the inventory Secret and treat 404 as success (idempotent).
+`GetInventory` SHALL first attempt a direct GET by constructed Secret name (`opm.<releaseName>.<releaseID>`). If the Secret is not found, it SHALL fall back to listing Secrets with label `module-release.opmodel.dev/uuid=<releaseID>`. If no inventory is found (first-time apply), it SHALL return `nil, nil`. `WriteInventory` SHALL use full PUT semantics (create or replace) with optimistic concurrency via `resourceVersion`. `DeleteInventory` SHALL delete the inventory Secret and treat 404 as success (idempotent).
 
 #### Scenario: First-time apply returns nil inventory
 
