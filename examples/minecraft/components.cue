@@ -121,7 +121,8 @@ import (
 					if #config.server.ops != _|_ {
 						OPS: {
 							name: "OPS"
-							let opsList = [ for op in #config.server.ops {op}]
+							let opsList = [for op in #config.server.ops {op}]
+
 							value: "\(opsList[0])" // CUE will join with commas in actual implementation
 						}
 					}
@@ -130,7 +131,8 @@ import (
 					if #config.server.whitelist != _|_ {
 						WHITELIST: {
 							name: "WHITELIST"
-							let whitelistList = [ for user in #config.server.whitelist {user}]
+							let whitelistList = [for user in #config.server.whitelist {user}]
+
 							value: "\(whitelistList[0])" // CUE will join with commas
 						}
 					}
@@ -167,9 +169,8 @@ import (
 					}
 				}
 
-				resources: {
-					requests: #config.resources.requests
-					limits:   #config.resources.limits
+				if #config.resources != _|_ {
+					resources: #config.resources
 				}
 			}
 
@@ -307,13 +308,13 @@ import (
 					}
 
 					resources: {
-						requests: {
-							cpu:    "100m"
-							memory: "256Mi"
+						cpu: {
+							request: "100m"
+							limit:   "1000m"
 						}
-						limits: {
-							cpu:    "1000m"
-							memory: "1Gi"
+						memory: {
+							request: "256Mi"
+							limit:   "1Gi"
 						}
 					}
 				}]

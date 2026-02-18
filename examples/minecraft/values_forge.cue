@@ -61,13 +61,13 @@ values: {
 
 	// Modded servers need more memory
 	resources: {
-		requests: {
-			cpu:    "2000m"
-			memory: "4Gi"
+		cpu: {
+			request: "2000m"
+			limit:   "6000m"
 		}
-		limits: {
-			cpu:    "6000m"
-			memory: "12Gi" // Mods can be very memory-intensive
+		memory: {
+			request: "4Gi"
+			limit:   "12Gi" // Mods can be very memory-intensive
 		}
 	}
 

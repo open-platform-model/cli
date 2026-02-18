@@ -94,13 +94,13 @@ values: {
 	// === Resource Limits ===
 	// Minecraft is Java-based and can be memory-intensive
 	resources: {
-		requests: {
-			cpu:    "1000m" // 1 CPU core minimum
-			memory: "2Gi"   // 2GB RAM minimum for smooth gameplay
+		cpu: {
+			request: "1000m" // 1 CPU core minimum
+			limit:   "4000m" // Allow bursting to 4 cores during world generation
 		}
-		limits: {
-			cpu:    "4000m" // Allow bursting to 4 cores during world generation
-			memory: "8Gi"   // 8GB max - prevents OOM on busy servers
+		memory: {
+			request: "2Gi" // 2GB RAM minimum for smooth gameplay
+			limit:   "8Gi" // 8GB max - prevents OOM on busy servers
 		}
 	}
 

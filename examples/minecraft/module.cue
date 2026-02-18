@@ -7,6 +7,7 @@ package main
 
 import (
 	"opmodel.dev/core@v0"
+	schemas "opmodel.dev/schemas@v0"
 )
 
 // Module definition
@@ -159,16 +160,7 @@ metadata: {
 	}
 
 	// === Resource Limits ===
-	resources: {
-		requests: {
-			cpu:    string
-			memory: string
-		}
-		limits: {
-			cpu:    string
-			memory: string
-		}
-	}
+	resources?: schemas.#ResourceRequirementsSchema
 
 	// === Networking ===
 	// Minecraft server port

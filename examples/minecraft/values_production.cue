@@ -82,13 +82,13 @@ values: {
 
 	// Production-grade resources
 	resources: {
-		requests: {
-			cpu:    "2000m"
-			memory: "4Gi"
+		cpu: {
+			request: "2000m"
+			limit:   "8000m"
 		}
-		limits: {
-			cpu:    "8000m"
-			memory: "16Gi"
+		memory: {
+			request: "4Gi"
+			limit:   "16Gi"
 		}
 	}
 
