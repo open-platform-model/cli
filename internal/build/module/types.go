@@ -40,6 +40,9 @@ type ModuleMetadata struct {
 	Name string `json:"name"`
 
 	// DefaultNamespace is the default namespace from the module definition.
+	// TODO: not yet consumed after extraction. Currently the pipeline reads namespace from
+	// MetadataPreview.DefaultNamespace (internal/build/pipeline.go) instead of this field.
+	// Either remove this duplicate or wire it up as the canonical source and drop MetadataPreview.DefaultNamespace.
 	DefaultNamespace string `json:"defaultNamespace"`
 
 	// FQN is the fully qualified module name.
@@ -52,12 +55,20 @@ type ModuleMetadata struct {
 	UUID string `json:"uuid"`
 
 	// Labels from the module definition.
+	// TODO: not yet consumed after extraction. TransformerContext.ToMap (internal/build/transform/context.go)
+	// currently injects ReleaseMetadata.Labels into CUE instead of these module-level labels.
+	// Decide whether module-level labels should be passed separately to transformers and implement accordingly.
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Annotations from the module definition.
-	// Currently populated from CUE extraction; may be empty.
+	// TODO: not yet implemented. Neither set in extractModuleMetadata (internal/build/release/metadata.go)
+	// nor consumed anywhere. Populate from CUE metadata.annotations, then wire into
+	// TransformerContext.ToMap (internal/build/transform/context.go) alongside module Labels.
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Components lists the component names in the module.
+	// TODO: not yet consumed after extraction. Verbose output reads ReleaseMetadata.Components
+	// (internal/cmdutil/output.go) instead of this field. Decide whether module-level components
+	// should be surfaced separately and implement accordingly.
 	Components []string `json:"components,omitempty"`
 }

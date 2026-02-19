@@ -5,8 +5,6 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
@@ -17,18 +15,19 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/opmodel/cli/internal/config"
 	oerrors "github.com/opmodel/cli/internal/errors"
 )
 
 // ClientOptions configures Kubernetes client creation.
+// All fields must be pre-resolved by the caller (via config.ResolveKubernetes).
+// No further precedence resolution is performed inside the client.
 type ClientOptions struct {
-	// Kubeconfig is the path to the kubeconfig file.
-	// Precedence: this field > OPM_KUBECONFIG env > KUBECONFIG env > ~/.kube/config
+	// Kubeconfig is the pre-resolved path to the kubeconfig file.
+	// Empty string means use the default kubeconfig discovery (KUBECONFIG env / ~/.kube/config).
 	Kubeconfig string
 
-	// Context is the Kubernetes context to use.
-	// If empty, uses the current-context from kubeconfig.
+	// Context is the pre-resolved Kubernetes context name.
+	// Empty string means use the current-context from kubeconfig.
 	Context string
 
 	// APIWarnings controls how K8s API warnings are handled.

@@ -42,7 +42,9 @@ type ReleaseMetadata struct {
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Annotations from the module release.
-	// Currently empty; populated when CUE annotation extraction is added.
+	// TODO: not yet implemented. Populate this in extractReleaseMetadata (internal/build/release/metadata.go)
+	// once CUE annotation extraction is added, then wire it into TransformerContext.ToMap
+	// (internal/build/transform/context.go) alongside Labels.
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Components lists the component names rendered in this release.
