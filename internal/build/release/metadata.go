@@ -5,17 +5,18 @@ import (
 
 	"cuelang.org/go/cue"
 
+	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/build/module"
 )
 
 // extractComponentsFromDefinition extracts components from #components (definition).
-func extractComponentsFromDefinition(concreteRelease cue.Value) (map[string]*module.LoadedComponent, error) {
+func extractComponentsFromDefinition(concreteRelease cue.Value) (map[string]*component.Component, error) {
 	componentsValue := concreteRelease.LookupPath(cue.ParsePath("#components"))
 	if !componentsValue.Exists() {
 		return nil, fmt.Errorf("module missing '#components' field")
 	}
 
-	components := make(map[string]*module.LoadedComponent)
+	components := make(map[string]*component.Component)
 
 	iter, err := componentsValue.Fields()
 	if err != nil {
@@ -34,8 +35,8 @@ func extractComponentsFromDefinition(concreteRelease cue.Value) (map[string]*mod
 }
 
 // extractComponent extracts a single component with its metadata.
-func extractComponent(name string, value cue.Value) *module.LoadedComponent {
-	comp := &module.LoadedComponent{
+func extractComponent(name string, value cue.Value) *component.Component {
+	comp := &component.Component{
 		Name:        name,
 		Labels:      make(map[string]string),
 		Annotations: make(map[string]string),

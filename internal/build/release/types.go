@@ -4,6 +4,7 @@ package release
 import (
 	"cuelang.org/go/cue"
 
+	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/build/module"
 )
 
@@ -16,8 +17,8 @@ type Options struct {
 
 // BuiltRelease is the result of building a release.
 type BuiltRelease struct {
-	Value           cue.Value                          // The concrete module value (with #config injected)
-	Components      map[string]*module.LoadedComponent // Concrete components by name
+	Value           cue.Value                       // The concrete module value (with #config injected)
+	Components      map[string]*component.Component // Concrete components by name
 	ReleaseMetadata ReleaseMetadata
 	ModuleMetadata  module.ModuleMetadata
 }

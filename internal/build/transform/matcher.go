@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/opmodel/cli/internal/build/module"
+	"github.com/opmodel/cli/internal/build/component"
 )
 
 // Matcher evaluates transformer-component matching.
@@ -23,10 +23,10 @@ func NewMatcher() *Matcher {
 //   - Required traits: All FQNs must exist in component.#traits
 //   - Multiple transformers CAN match one component
 //   - Zero matches causes component to be unmatched
-func (m *Matcher) Match(components []*module.LoadedComponent, transformers []*LoadedTransformer) *MatchResult {
+func (m *Matcher) Match(components []*component.Component, transformers []*LoadedTransformer) *MatchResult {
 	result := &MatchResult{
-		ByTransformer: make(map[string][]*module.LoadedComponent),
-		Unmatched:     make([]*module.LoadedComponent, 0),
+		ByTransformer: make(map[string][]*component.Component),
+		Unmatched:     make([]*component.Component, 0),
 		Details:       make([]MatchDetail, 0),
 	}
 
@@ -52,7 +52,7 @@ func (m *Matcher) Match(components []*module.LoadedComponent, transformers []*Lo
 }
 
 // evaluateMatch checks if a transformer matches a component.
-func (m *Matcher) evaluateMatch(comp *module.LoadedComponent, tf *LoadedTransformer) MatchDetail {
+func (m *Matcher) evaluateMatch(comp *component.Component, tf *LoadedTransformer) MatchDetail {
 	detail := MatchDetail{
 		ComponentName:  comp.Name,
 		TransformerFQN: tf.FQN,

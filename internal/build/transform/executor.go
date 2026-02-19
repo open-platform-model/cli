@@ -7,7 +7,7 @@ import (
 	"cuelang.org/go/cue"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/opmodel/cli/internal/build/module"
+	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/build/release"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -225,7 +225,7 @@ func (e *Executor) decodeResource(value cue.Value) (*unstructured.Unstructured, 
 
 // NewTransformerContextForComponent is a helper that creates a context from a release and component.
 // It exists to avoid import cycles — callers use it instead of NewTransformerContext directly.
-func NewTransformerContextForComponent(rel *release.BuiltRelease, comp *module.LoadedComponent) *TransformerContext {
+func NewTransformerContextForComponent(rel *release.BuiltRelease, comp *component.Component) *TransformerContext {
 	return NewTransformerContext(rel, comp)
 }
 

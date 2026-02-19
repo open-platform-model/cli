@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/build/module"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
@@ -219,8 +220,8 @@ func (p *pipeline) resolveNamespace(flagValue, defaultNamespace string) string {
 }
 
 // componentsToSlice converts component map to slice for matcher
-func (p *pipeline) componentsToSlice(m map[string]*LoadedComponent) []*LoadedComponent {
-	result := make([]*LoadedComponent, 0, len(m))
+func (p *pipeline) componentsToSlice(m map[string]*component.Component) []*component.Component {
+	result := make([]*component.Component, 0, len(m))
 	for _, comp := range m {
 		result = append(result, comp)
 	}

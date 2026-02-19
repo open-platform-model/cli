@@ -5,14 +5,14 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/build/module"
+	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/build/release"
 )
 
 // Job is a unit of work: one transformer applied to one component.
 type Job struct {
 	Transformer *LoadedTransformer
-	Component   *module.LoadedComponent
+	Component   *component.Component
 	Release     *release.BuiltRelease
 }
 
@@ -101,10 +101,10 @@ func (r *Resource) GetTransformer() string {
 // MatchResult is the internal result of matching.
 type MatchResult struct {
 	// ByTransformer groups components by transformer FQN.
-	ByTransformer map[string][]*module.LoadedComponent
+	ByTransformer map[string][]*component.Component
 
 	// Unmatched contains components with no matching transformers.
-	Unmatched []*module.LoadedComponent
+	Unmatched []*component.Component
 
 	// Details records matching decisions for verbose output.
 	Details []MatchDetail

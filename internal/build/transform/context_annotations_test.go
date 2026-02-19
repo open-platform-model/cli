@@ -6,6 +6,7 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/build/module"
 	"github.com/opmodel/cli/internal/build/release"
 )
@@ -24,7 +25,7 @@ func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
 		},
 	}
 
-	component := &module.LoadedComponent{
+	comp := &component.Component{
 		Name:   "volumes-component",
 		Labels: map[string]string{},
 		Annotations: map[string]string{
@@ -34,7 +35,7 @@ func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
 		Traits:    map[string]cue.Value{},
 	}
 
-	ctx := NewTransformerContext(rel, component)
+	ctx := NewTransformerContext(rel, comp)
 
 	assert.Equal(t, "true", ctx.ComponentMetadata.Annotations["transformer.opmodel.dev/list-output"])
 }
@@ -53,7 +54,7 @@ func TestNewTransformerContext_EmptyAnnotations(t *testing.T) {
 		},
 	}
 
-	component := &module.LoadedComponent{
+	comp := &component.Component{
 		Name:        "simple-component",
 		Labels:      map[string]string{},
 		Annotations: map[string]string{},
@@ -61,7 +62,7 @@ func TestNewTransformerContext_EmptyAnnotations(t *testing.T) {
 		Traits:      map[string]cue.Value{},
 	}
 
-	ctx := NewTransformerContext(rel, component)
+	ctx := NewTransformerContext(rel, comp)
 
 	assert.Empty(t, ctx.ComponentMetadata.Annotations)
 }

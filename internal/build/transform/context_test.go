@@ -6,6 +6,7 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/build/module"
 	"github.com/opmodel/cli/internal/build/release"
 )
@@ -27,7 +28,7 @@ func TestNewTransformerContext(t *testing.T) {
 		},
 	}
 
-	component := &module.LoadedComponent{
+	comp := &component.Component{
 		Name:   "webapp",
 		Labels: map[string]string{"workload-type": "stateless"},
 		Resources: map[string]cue.Value{
@@ -38,7 +39,7 @@ func TestNewTransformerContext(t *testing.T) {
 		},
 	}
 
-	ctx := NewTransformerContext(rel, component)
+	ctx := NewTransformerContext(rel, comp)
 
 	assert.Equal(t, "my-module", ctx.Name)
 	assert.Equal(t, "default", ctx.Namespace)
@@ -71,7 +72,7 @@ func TestNewTransformerContext_NameOverride(t *testing.T) {
 		},
 	}
 
-	component := &module.LoadedComponent{
+	comp := &component.Component{
 		Name:        "api",
 		Labels:      map[string]string{},
 		Annotations: map[string]string{},
@@ -79,7 +80,7 @@ func TestNewTransformerContext_NameOverride(t *testing.T) {
 		Traits:      map[string]cue.Value{},
 	}
 
-	ctx := NewTransformerContext(rel, component)
+	ctx := NewTransformerContext(rel, comp)
 
 	assert.Equal(t, "my-app-staging", ctx.Name, "top-level Name should be the release name")
 	assert.Equal(t, "my-app-staging", ctx.ReleaseMetadata.Name, "ReleaseMetadata.Name should be the release name")

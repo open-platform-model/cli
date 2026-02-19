@@ -6,7 +6,7 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/opmodel/cli/internal/build/module"
+	"github.com/opmodel/cli/internal/build/component"
 )
 
 func TestMatcher_Match(t *testing.T) {
@@ -14,7 +14,7 @@ func TestMatcher_Match(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		components    []*module.LoadedComponent
+		components    []*component.Component
 		transformers  []*LoadedTransformer
 		wantMatched   int
 		wantUnmatched int
@@ -28,7 +28,7 @@ func TestMatcher_Match(t *testing.T) {
 		},
 		{
 			name: "no transformers - all unmatched",
-			components: []*module.LoadedComponent{
+			components: []*component.Component{
 				{Name: "comp1", Labels: map[string]string{}, Resources: make(map[string]cue.Value), Traits: make(map[string]cue.Value)},
 			},
 			transformers:  nil,
@@ -37,7 +37,7 @@ func TestMatcher_Match(t *testing.T) {
 		},
 		{
 			name: "matching by required labels",
-			components: []*module.LoadedComponent{
+			components: []*component.Component{
 				{
 					Name:      "webapp",
 					Labels:    map[string]string{"workload-type": "stateless"},
@@ -57,7 +57,7 @@ func TestMatcher_Match(t *testing.T) {
 		},
 		{
 			name: "not matching - missing required label",
-			components: []*module.LoadedComponent{
+			components: []*component.Component{
 				{
 					Name:      "webapp",
 					Labels:    map[string]string{},
@@ -77,7 +77,7 @@ func TestMatcher_Match(t *testing.T) {
 		},
 		{
 			name: "not matching - wrong label value",
-			components: []*module.LoadedComponent{
+			components: []*component.Component{
 				{
 					Name:      "webapp",
 					Labels:    map[string]string{"workload-type": "stateful"},
@@ -115,12 +115,12 @@ func TestMatcher_Match(t *testing.T) {
 
 func TestMatchResult_ToMatchPlan(t *testing.T) {
 	result := &MatchResult{
-		ByTransformer: map[string][]*module.LoadedComponent{
+		ByTransformer: map[string][]*component.Component{
 			"test#DeploymentTransformer": {
 				{Name: "webapp"},
 			},
 		},
-		Unmatched: []*module.LoadedComponent{
+		Unmatched: []*component.Component{
 			{Name: "unmatched-comp"},
 		},
 		Details: []MatchDetail{
