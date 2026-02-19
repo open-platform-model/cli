@@ -59,7 +59,7 @@ func TestPipeline_IdentityFieldsPropagated(t *testing.T) {
 	// This test verifies that Identity (module UUID) and ReleaseIdentity (release UUID) fields
 	// are properly set on the two typed fields of BuiltRelease.
 
-	rel := &BuiltRelease{
+	rel := &release.BuiltRelease{
 		ReleaseMetadata: release.ReleaseMetadata{
 			Name:       "my-app",
 			Namespace:  "production",

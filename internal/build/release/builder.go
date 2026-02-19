@@ -216,37 +216,9 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 }
 
 // InspectModule extracts module metadata from a module directory using AST
-// inspection without CUE evaluation.
+// inspection without CUE evaluation. Delegates to module.InspectModule.
 func (b *Builder) InspectModule(modulePath string) (*module.Inspection, error) {
-	if b.registry != "" {
-		os.Setenv("CUE_REGISTRY", b.registry)
-		defer os.Unsetenv("CUE_REGISTRY")
-	}
-
-	cfg := &load.Config{Dir: modulePath}
-	instances := load.Instances([]string{"."}, cfg)
-	if len(instances) == 0 {
-		return nil, fmt.Errorf("no CUE instances found in %s", modulePath)
-	}
-
-	inst := instances[0]
-	if inst.Err != nil {
-		return nil, fmt.Errorf("loading module for inspection: %w", inst.Err)
-	}
-
-	name, defaultNamespace := module.ExtractMetadataFromAST(inst.Files)
-
-	output.Debug("inspected module via AST",
-		"pkgName", inst.PkgName,
-		"name", name,
-		"defaultNamespace", defaultNamespace,
-	)
-
-	return &module.Inspection{
-		Name:             name,
-		DefaultNamespace: defaultNamespace,
-		PkgName:          inst.PkgName,
-	}, nil
+	return module.InspectModule(modulePath, b.registry)
 }
 
 // detectPackageName loads the module directory minimally to determine the CUE package name.

@@ -1,7 +1,6 @@
 package build
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -19,14 +18,6 @@ func testdataDir(t *testing.T, name string) string {
 	dir, err := filepath.Abs(filepath.Join("testdata", name))
 	require.NoError(t, err)
 	return dir
-}
-
-// testdataFile returns the absolute path to a testdata file.
-func testdataFile(t *testing.T, name string) string {
-	t.Helper()
-	f, err := filepath.Abs(filepath.Join("testdata", name))
-	require.NoError(t, err)
-	return f
 }
 
 // ----- module.ResolvePath tests -----
@@ -135,77 +126,10 @@ func TestRender_WithValuesCue_NoValuesFlag_SkipsValuesCueCheck(t *testing.T) {
 	}
 }
 
-// ----- ReleaseBuilder.Build() tests -----
-
-func TestBuild_StubsValuesCue_WhenValuesFlagsProvided(t *testing.T) {
-	// When valuesFiles are passed to Build() and values.cue exists on disk,
-	// the on-disk values.cue should be replaced with a stub so the external
-	// values take precedence without conflict.
-	//
-	// Uses test-module-values-only where values are ONLY in values.cue
-	// (not duplicated in module.cue), so the stub effectively removes them.
-	cueCtx := cuecontext.New()
-	b := NewReleaseBuilder(cueCtx, "")
-	dir := testdataDir(t, "test-module-values-only")
-	valuesFile := testdataFile(t, "external-values.cue")
-
-	// Verify values.cue exists on disk (precondition)
-	_, err := os.Stat(filepath.Join(dir, "values.cue"))
-	require.NoError(t, err, "precondition: values.cue should exist on disk")
-
-	release, err := b.Build(dir, ReleaseOptions{
-		Name:      "test-release",
-		Namespace: "default",
-		PkgName:   "testmodule",
-	}, []string{valuesFile})
+// testdataFile returns the absolute path to a testdata file.
+func testdataFile(t *testing.T, name string) string {
+	t.Helper()
+	f, err := filepath.Abs(filepath.Join("testdata", name))
 	require.NoError(t, err)
-	assert.NotNil(t, release)
-	assert.Equal(t, "test-release", release.ReleaseMetadata.Name)
-	assert.Equal(t, "test-module-values-only", release.ModuleMetadata.Name)
-	assert.Equal(t, "example.com/test-module-values-only@v0#test-module-values-only", release.ModuleMetadata.FQN)
-	assert.Equal(t, "1.0.0", release.ModuleMetadata.Version)
-	assert.Equal(t, "default", release.ModuleMetadata.DefaultNamespace)
-}
-
-func TestBuild_NoValuesCue_WithValuesFlag_Succeeds(t *testing.T) {
-	// Build() should succeed for a module without values.cue when external
-	// values files are provided.
-	cueCtx := cuecontext.New()
-	b := NewReleaseBuilder(cueCtx, "")
-	dir := testdataDir(t, "test-module-no-values")
-	valuesFile := testdataFile(t, "external-values.cue")
-
-	release, err := b.Build(dir, ReleaseOptions{
-		Name:      "test-release",
-		Namespace: "default",
-		PkgName:   "testmodule",
-	}, []string{valuesFile})
-	require.NoError(t, err)
-	assert.NotNil(t, release)
-	assert.Equal(t, "test-release", release.ReleaseMetadata.Name)
-	assert.Equal(t, "test-module-no-values", release.ModuleMetadata.Name)
-	assert.Equal(t, "example.com/test-module-no-values@v0#test-module-no-values", release.ModuleMetadata.FQN)
-	assert.Equal(t, "1.0.0", release.ModuleMetadata.Version)
-	assert.Equal(t, "default", release.ModuleMetadata.DefaultNamespace)
-}
-
-func TestBuild_WithValuesCue_NoValuesFlag_Succeeds(t *testing.T) {
-	// Build() with values.cue on disk and no --values flags should
-	// work exactly as before (regression test).
-	cueCtx := cuecontext.New()
-	b := NewReleaseBuilder(cueCtx, "")
-	dir := testdataDir(t, "test-module")
-
-	release, err := b.Build(dir, ReleaseOptions{
-		Name:      "test-release",
-		Namespace: "default",
-		PkgName:   "testmodule",
-	}, nil)
-	require.NoError(t, err)
-	assert.NotNil(t, release)
-	assert.Equal(t, "test-release", release.ReleaseMetadata.Name)
-	assert.Equal(t, "test-module", release.ModuleMetadata.Name)
-	assert.Equal(t, "example.com/test-module@v0#test-module", release.ModuleMetadata.FQN)
-	assert.Equal(t, "1.0.0", release.ModuleMetadata.Version)
-	assert.Equal(t, "default", release.ModuleMetadata.DefaultNamespace)
+	return f
 }

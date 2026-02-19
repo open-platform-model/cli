@@ -11,6 +11,8 @@ import (
 
 	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/build/module"
+	"github.com/opmodel/cli/internal/build/release"
+	"github.com/opmodel/cli/internal/build/transform"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/pkg/weights"
@@ -21,10 +23,10 @@ import (
 // component matching, and transformer execution.
 type pipeline struct {
 	config         *config.GlobalConfig
-	releaseBuilder *ReleaseBuilder
-	provider       *ProviderLoader
-	matcher        *Matcher
-	executor       *Executor
+	releaseBuilder *release.Builder
+	provider       *transform.ProviderLoader
+	matcher        *transform.Matcher
+	executor       *transform.Executor
 }
 
 // NewPipeline creates a new Pipeline implementation.
@@ -32,10 +34,10 @@ type pipeline struct {
 func NewPipeline(cfg *config.GlobalConfig) Pipeline {
 	return &pipeline{
 		config:         cfg,
-		releaseBuilder: NewReleaseBuilder(cfg.CueContext, cfg.Registry),
-		provider:       NewProviderLoader(cfg),
-		matcher:        NewMatcher(),
-		executor:       NewExecutor(),
+		releaseBuilder: release.NewBuilder(cfg.CueContext, cfg.Registry),
+		provider:       transform.NewProviderLoader(cfg),
+		matcher:        transform.NewMatcher(),
+		executor:       transform.NewExecutor(),
 	}
 }
 
@@ -113,7 +115,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		return nil, &NamespaceRequiredError{ModuleName: moduleMeta.Name}
 	}
 
-	release, err := p.releaseBuilder.Build(modulePath, ReleaseOptions{
+	release, err := p.releaseBuilder.Build(modulePath, release.Options{
 		Name:      releaseName,
 		Namespace: namespace,
 		PkgName:   inspection.PkgName,
@@ -160,7 +162,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	var resources []*Resource
 	if len(matchResult.ByTransformer) > 0 {
 		// Build transformer map for executor
-		transformerMap := make(map[string]*LoadedTransformer)
+		transformerMap := make(map[string]*transform.LoadedTransformer)
 		for _, tf := range provider.Transformers {
 			transformerMap[tf.FQN] = tf
 		}
@@ -233,7 +235,7 @@ func (p *pipeline) componentsToSlice(m map[string]*component.Component) []*compo
 // A trait is considered "unhandled" only if NO matched transformer handles it.
 // This means if ServiceTransformer requires Expose trait and DeploymentTransformer
 // doesn't, the Expose trait is still considered handled (by ServiceTransformer).
-func collectWarnings(result *MatchResult) []string {
+func collectWarnings(result *transform.MatchResult) []string {
 	var warnings []string
 
 	// Step 1: Count how many transformers matched each component
