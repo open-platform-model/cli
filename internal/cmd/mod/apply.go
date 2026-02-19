@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
+	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
@@ -124,7 +124,7 @@ func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 		ProviderFlag:   rf.Provider,
 	})
 	if err != nil {
-		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
 	// Step 1: Render module via shared pipeline
@@ -163,7 +163,7 @@ func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 		created, nsErr := k8sClient.EnsureNamespace(ctx, namespace, dryRun)
 		if nsErr != nil {
 			releaseLog.Error("ensuring namespace", "error", nsErr)
-			return &cmdtypes.ExitError{Code: cmdtypes.ExitCodeFromK8sError(nsErr), Err: nsErr, Printed: true}
+			return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(nsErr), Err: nsErr, Printed: true}
 		}
 		if created {
 			if dryRun {
@@ -255,7 +255,7 @@ func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 		})
 		if err != nil {
 			releaseLog.Error("apply failed", "error", err)
-			return &cmdtypes.ExitError{Code: cmdtypes.ExitCodeFromK8sError(err), Err: err, Printed: true}
+			return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 		}
 
 		// Report results
@@ -280,8 +280,8 @@ func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 		if applyHadErrors {
 			// Step 7b: skip prune and inventory write on partial failure
 			releaseLog.Warn("apply had errors — skipping pruning and inventory write")
-			return &cmdtypes.ExitError{
-				Code:    cmdtypes.ExitGeneralError,
+			return &oerrors.ExitError{
+				Code:    oerrors.ExitGeneralError,
 				Err:     fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)),
 				Printed: true,
 			}
@@ -356,8 +356,8 @@ func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 	}
 
 	if applyResult != nil && len(applyResult.Errors) > 0 {
-		return &cmdtypes.ExitError{
-			Code:    cmdtypes.ExitGeneralError,
+		return &oerrors.ExitError{
+			Code:    oerrors.ExitGeneralError,
 			Err:     fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)),
 			Printed: true,
 		}

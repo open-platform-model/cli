@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
 	"github.com/opmodel/cli/internal/config"
 	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
@@ -49,8 +48,8 @@ func runConfigVet(_ []string, cfg *config.GlobalConfig) error {
 		FlagValue: cfg.Flags.Config,
 	})
 	if err != nil {
-		return &cmdtypes.ExitError{
-			Code: cmdtypes.ExitNotFound,
+		return &oerrors.ExitError{
+			Code: oerrors.ExitNotFound,
 			Err:  oerrors.Wrap(oerrors.ErrNotFound, "could not resolve config path"),
 		}
 	}
@@ -64,8 +63,8 @@ func runConfigVet(_ []string, cfg *config.GlobalConfig) error {
 
 	// Check 1: Config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return &cmdtypes.ExitError{
-			Code: cmdtypes.ExitNotFound,
+		return &oerrors.ExitError{
+			Code: oerrors.ExitNotFound,
 			Err: &oerrors.DetailError{
 				Type:     "not found",
 				Message:  "configuration file not found",
@@ -83,8 +82,8 @@ func runConfigVet(_ []string, cfg *config.GlobalConfig) error {
 	moduleFile := filepath.Join(configDir, "cue.mod", "module.cue")
 
 	if _, err := os.Stat(moduleFile); os.IsNotExist(err) {
-		return &cmdtypes.ExitError{
-			Code: cmdtypes.ExitNotFound,
+		return &oerrors.ExitError{
+			Code: oerrors.ExitNotFound,
 			Err: &oerrors.DetailError{
 				Type:     "not found",
 				Message:  "cue.mod/module.cue not found",
@@ -105,8 +104,8 @@ func runConfigVet(_ []string, cfg *config.GlobalConfig) error {
 	})
 	if err != nil {
 		// The error from Load already includes hints
-		return &cmdtypes.ExitError{
-			Code: cmdtypes.ExitValidationError,
+		return &oerrors.ExitError{
+			Code: oerrors.ExitValidationError,
 			Err:  err,
 		}
 	}

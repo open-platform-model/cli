@@ -7,9 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
+	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -75,8 +75,8 @@ func runBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 	// Validate output format
 	outputFormat, valid := output.ParseFormat(outputFmt)
 	if !valid {
-		return &cmdtypes.ExitError{
-			Code: cmdtypes.ExitGeneralError,
+		return &oerrors.ExitError{
+			Code: oerrors.ExitGeneralError,
 			Err:  fmt.Errorf("invalid output format %q (valid: yaml, json)", outputFmt),
 		}
 	}
@@ -90,7 +90,7 @@ func runBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 		ProviderFlag:  rf.Provider,
 	})
 	if err != nil {
-		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("resolving config: %w", err)}
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving config: %w", err)}
 	}
 
 	// Render module via shared pipeline
@@ -131,7 +131,7 @@ func runBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 			Format: outputFormat,
 		}
 		if err := output.WriteSplitManifests(resourceInfos, splitOpts); err != nil {
-			return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("writing split manifests: %w", err)}
+			return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("writing split manifests: %w", err)}
 		}
 		releaseLog.Info(fmt.Sprintf("wrote %d resources to %s", len(result.Resources), outDir))
 	} else {
@@ -141,7 +141,7 @@ func runBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 			Writer: os.Stdout,
 		}
 		if err := output.WriteManifests(resourceInfos, manifestOpts); err != nil {
-			return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("writing manifests: %w", err)}
+			return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("writing manifests: %w", err)}
 		}
 	}
 

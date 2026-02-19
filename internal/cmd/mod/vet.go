@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
+	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -63,7 +63,7 @@ func runVet(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags) er
 		ProviderFlag:  rf.Provider,
 	})
 	if err != nil {
-		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("resolving config: %w", err)}
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving config: %w", err)}
 	}
 
 	// Render module via shared pipeline

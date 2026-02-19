@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
+	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
@@ -84,7 +84,7 @@ func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 
 	// Validate release selector flags
 	if err := rsf.Validate(); err != nil {
-		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: err}
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
 	}
 
 	// Resolve Kubernetes configuration with local flags
@@ -95,7 +95,7 @@ func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 		NamespaceFlag:  rsf.Namespace,
 	})
 	if err != nil {
-		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
 	namespace := k8sConfig.Namespace.Value
@@ -114,8 +114,8 @@ func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 	// Validate output format
 	outputFormat, valid := output.ParseFormat(outputFmt)
 	if !valid || outputFormat == output.FormatDir {
-		return &cmdtypes.ExitError{
-			Code: cmdtypes.ExitGeneralError,
+		return &oerrors.ExitError{
+			Code: oerrors.ExitGeneralError,
 			Err:  fmt.Errorf("invalid output format %q (valid: table, yaml, json)", outputFmt),
 		}
 	}
@@ -144,7 +144,7 @@ func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 	}
 	if invErr != nil {
 		releaseLog.Error("reading inventory", "error", invErr)
-		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("reading inventory: %w", invErr)}
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("reading inventory: %w", invErr)}
 	}
 	if inv == nil {
 		name := rsf.ReleaseName
@@ -157,13 +157,13 @@ func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 			return nil
 		}
 		releaseLog.Error("release not found", "name", name, "namespace", namespace)
-		return &cmdtypes.ExitError{Code: cmdtypes.ExitNotFound, Err: notFound, Printed: true}
+		return &oerrors.ExitError{Code: oerrors.ExitNotFound, Err: notFound, Printed: true}
 	}
 
 	liveResources, missingEntries, discoverErr := inventory.DiscoverResourcesFromInventory(ctx, k8sClient, inv)
 	if discoverErr != nil {
 		releaseLog.Error("discovering resources from inventory", "error", discoverErr)
-		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("discovering resources: %w", discoverErr)}
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("discovering resources: %w", discoverErr)}
 	}
 
 	statusOpts := kubernetes.StatusOptions{
@@ -202,7 +202,7 @@ func fetchAndPrintStatus(ctx context.Context, client *kubernetes.Client, opts ku
 			return nil
 		}
 		releaseLog.Error("getting status", "error", err)
-		return &cmdtypes.ExitError{Code: cmdtypes.ExitCodeFromK8sError(err), Err: err, Printed: true}
+		return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
 	var formatted string
@@ -213,7 +213,7 @@ func fetchAndPrintStatus(ctx context.Context, client *kubernetes.Client, opts ku
 		formatted, err = kubernetes.FormatStatus(result, opts.OutputFormat)
 		if err != nil {
 			releaseLog.Error("formatting status", "error", err)
-			return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: err, Printed: true}
+			return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err, Printed: true}
 		}
 	}
 

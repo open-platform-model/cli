@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
 	"github.com/opmodel/cli/internal/config"
 	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
@@ -59,8 +58,8 @@ func runModInit(args []string, templateName, dir string) error {
 
 	// Validate template name
 	if !templates.IsValidTemplate(templateName) {
-		return &cmdtypes.ExitError{
-			Code: cmdtypes.ExitValidationError,
+		return &oerrors.ExitError{
+			Code: oerrors.ExitValidationError,
 			Err: &oerrors.DetailError{
 				Type:    "validation failed",
 				Message: fmt.Sprintf("unknown template: %s", templateName),
@@ -78,8 +77,8 @@ func runModInit(args []string, templateName, dir string) error {
 
 	// Check if directory already exists
 	if _, err := os.Stat(targetDir); err == nil {
-		return &cmdtypes.ExitError{
-			Code: cmdtypes.ExitValidationError,
+		return &oerrors.ExitError{
+			Code: oerrors.ExitValidationError,
 			Err: &oerrors.DetailError{
 				Type:     "validation failed",
 				Message:  fmt.Sprintf("directory already exists: %s", targetDir),
@@ -92,8 +91,8 @@ func runModInit(args []string, templateName, dir string) error {
 
 	// Create the target directory
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
-		return &cmdtypes.ExitError{
-			Code: cmdtypes.ExitGeneralError,
+		return &oerrors.ExitError{
+			Code: oerrors.ExitGeneralError,
 			Err:  fmt.Errorf("creating directory %s: %w", targetDir, err),
 		}
 	}
@@ -101,8 +100,8 @@ func runModInit(args []string, templateName, dir string) error {
 	// Prepare template data
 	absDir, err := filepath.Abs(targetDir)
 	if err != nil {
-		return &cmdtypes.ExitError{
-			Code: cmdtypes.ExitGeneralError,
+		return &oerrors.ExitError{
+			Code: oerrors.ExitGeneralError,
 			Err:  fmt.Errorf("getting absolute path: %w", err),
 		}
 	}
@@ -119,8 +118,8 @@ func runModInit(args []string, templateName, dir string) error {
 	if err != nil {
 		// Clean up on failure
 		_ = os.RemoveAll(targetDir)
-		return &cmdtypes.ExitError{
-			Code: cmdtypes.ExitGeneralError,
+		return &oerrors.ExitError{
+			Code: oerrors.ExitGeneralError,
 			Err:  fmt.Errorf("rendering template: %w", err),
 		}
 	}

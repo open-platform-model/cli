@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
+	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
@@ -71,7 +71,7 @@ func runDiff(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, k
 		ProviderFlag:   rf.Provider,
 	})
 	if err != nil {
-		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
 	// Render module via shared pipeline (diff uses RenderRelease only, NOT ShowRenderOutput,
@@ -141,7 +141,7 @@ func runDiff(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, k
 	}
 	if err != nil {
 		releaseLog.Error("diff failed", "error", err)
-		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: err, Printed: true}
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err, Printed: true}
 	}
 
 	// Print warnings from diff

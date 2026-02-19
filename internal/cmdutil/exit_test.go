@@ -1,4 +1,4 @@
-package cmd
+package cmdutil
 
 import (
 	"testing"
@@ -6,6 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	oerrors "github.com/opmodel/cli/internal/errors"
 )
 
 func TestExitCodeFromK8sError(t *testing.T) {
@@ -19,27 +21,27 @@ func TestExitCodeFromK8sError(t *testing.T) {
 		{
 			name:     "not found",
 			err:      apierrors.NewNotFound(gvr.GroupResource(), "test"),
-			wantCode: ExitNotFound,
+			wantCode: oerrors.ExitNotFound,
 		},
 		{
 			name:     "forbidden",
 			err:      apierrors.NewForbidden(gvr.GroupResource(), "test", nil),
-			wantCode: ExitPermissionDenied,
+			wantCode: oerrors.ExitPermissionDenied,
 		},
 		{
 			name:     "unauthorized",
 			err:      apierrors.NewUnauthorized("test"),
-			wantCode: ExitPermissionDenied,
+			wantCode: oerrors.ExitPermissionDenied,
 		},
 		{
 			name:     "service unavailable",
 			err:      apierrors.NewServiceUnavailable("test"),
-			wantCode: ExitConnectivityError,
+			wantCode: oerrors.ExitConnectivityError,
 		},
 		{
 			name:     "other k8s error",
 			err:      apierrors.NewBadRequest("test"),
-			wantCode: ExitGeneralError,
+			wantCode: oerrors.ExitGeneralError,
 		},
 	}
 
@@ -53,10 +55,10 @@ func TestExitCodeFromK8sError(t *testing.T) {
 
 func TestExitCodeConstants(t *testing.T) {
 	// Verify constants match contracts/exit-codes.md
-	assert.Equal(t, 0, ExitSuccess)
-	assert.Equal(t, 1, ExitGeneralError)
-	assert.Equal(t, 2, ExitValidationError)
-	assert.Equal(t, 3, ExitConnectivityError)
-	assert.Equal(t, 4, ExitPermissionDenied)
-	assert.Equal(t, 5, ExitNotFound)
+	assert.Equal(t, 0, oerrors.ExitSuccess)
+	assert.Equal(t, 1, oerrors.ExitGeneralError)
+	assert.Equal(t, 2, oerrors.ExitValidationError)
+	assert.Equal(t, 3, oerrors.ExitConnectivityError)
+	assert.Equal(t, 4, oerrors.ExitPermissionDenied)
+	assert.Equal(t, 5, oerrors.ExitNotFound)
 }
