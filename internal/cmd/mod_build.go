@@ -80,7 +80,7 @@ func runBuild(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, outputFm
 	}
 
 	// Render module via shared pipeline
-	result, err := cmdutil.RenderModule(ctx, cmdutil.RenderModuleOpts{
+	result, err := cmdutil.RenderRelease(ctx, cmdutil.RenderReleaseOpts{
 		Args:      args,
 		Render:    rf,
 		OPMConfig: GetOPMConfig(),
@@ -105,8 +105,8 @@ func runBuild(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, outputFm
 		resourceInfos[i] = r
 	}
 
-	// Create scoped module logger
-	modLog := output.ModuleLogger(result.Release.Name)
+	// Create scoped release logger
+	releaseLog := output.ReleaseLogger(result.Release.Name)
 
 	// Output results
 	if split {
@@ -118,7 +118,7 @@ func runBuild(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, outputFm
 		if err := output.WriteSplitManifests(resourceInfos, splitOpts); err != nil {
 			return &ExitError{Code: ExitGeneralError, Err: fmt.Errorf("writing split manifests: %w", err)}
 		}
-		modLog.Info(fmt.Sprintf("wrote %d resources to %s", len(result.Resources), outDir))
+		releaseLog.Info(fmt.Sprintf("wrote %d resources to %s", len(result.Resources), outDir))
 	} else {
 		// Output to stdout
 		manifestOpts := output.ManifestOptions{

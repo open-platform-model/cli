@@ -61,28 +61,28 @@ func PrintRenderErrors(errs []error) {
 // WriteTransformerMatches writes compact transformer match output (always shown).
 // Format: component <- provider - transformer
 func WriteTransformerMatches(result *build.RenderResult) {
-	modLog := output.ModuleLogger(result.Release.Name)
+	releaseLog := output.ReleaseLogger(result.Release.Name)
 
 	// Transformer matching — one line per match
 	for compName, matches := range result.MatchPlan.Matches {
 		for _, m := range matches {
-			modLog.Info(output.FormatTransformerMatch(compName, m.TransformerFQN))
+			releaseLog.Info(output.FormatTransformerMatch(compName, m.TransformerFQN))
 		}
 	}
 
 	// Unmatched components
 	for _, comp := range result.MatchPlan.Unmatched {
-		modLog.Warn(output.FormatTransformerUnmatched(comp))
+		releaseLog.Warn(output.FormatTransformerUnmatched(comp))
 	}
 }
 
-// WriteVerboseMatchLog writes detailed verbose output with module metadata,
+// WriteVerboseMatchLog writes detailed verbose output with release metadata,
 // match reasons, and per-resource validation lines (--verbose only).
 func WriteVerboseMatchLog(result *build.RenderResult) {
-	modLog := output.ModuleLogger(result.Release.Name)
+	releaseLog := output.ReleaseLogger(result.Release.Name)
 
-	// Module info — single line with key-value pairs
-	modLog.Info("module",
+	// Release info — single line with key-value pairs
+	releaseLog.Info("release",
 		"namespace", result.Release.Namespace,
 		"version", result.Release.Version,
 		"components", strings.Join(result.Release.Components, ", "),
@@ -91,17 +91,17 @@ func WriteVerboseMatchLog(result *build.RenderResult) {
 	// Transformer matching — one line per match with reason
 	for compName, matches := range result.MatchPlan.Matches {
 		for _, m := range matches {
-			modLog.Info(output.FormatTransformerMatchVerbose(compName, m.TransformerFQN, m.Reason))
+			releaseLog.Info(output.FormatTransformerMatchVerbose(compName, m.TransformerFQN, m.Reason))
 		}
 	}
 
 	// Unmatched components
 	for _, comp := range result.MatchPlan.Unmatched {
-		modLog.Warn(output.FormatTransformerUnmatched(comp))
+		releaseLog.Warn(output.FormatTransformerUnmatched(comp))
 	}
 
 	// Generated resources
 	for _, res := range result.Resources {
-		modLog.Info(output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), output.StatusValid))
+		releaseLog.Info(output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), output.StatusValid))
 	}
 }

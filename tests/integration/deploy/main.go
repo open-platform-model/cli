@@ -30,7 +30,7 @@ func main() {
 	}
 	fmt.Println("   OK: client created")
 
-	moduleName := "opm-deploy-test"
+	releaseName := "opm-deploy-test"
 	namespace := "default"
 
 	// 2. Build test resources (a ConfigMap and a Service)
@@ -41,9 +41,9 @@ func main() {
 	// Since this integration test bypasses the render pipeline, we add them manually.
 	opmLabels := map[string]interface{}{
 		"app.kubernetes.io/managed-by":       "open-platform-model",
-		"module-release.opmodel.dev/name":    moduleName,
+		"module-release.opmodel.dev/name":    releaseName,
 		"module-release.opmodel.dev/version": "0.1.0",
-		"module.opmodel.dev/name":            moduleName,
+		"module.opmodel.dev/name":            releaseName,
 		"module.opmodel.dev/version":         "0.1.0",
 	}
 
@@ -87,7 +87,7 @@ func main() {
 		{Object: svc, Component: "web"},
 	}
 	meta := build.ModuleReleaseMetadata{
-		Name:      moduleName,
+		Name:      releaseName,
 		Namespace: namespace,
 		Version:   "0.1.0",
 	}
@@ -130,7 +130,7 @@ func main() {
 	// 5. Verify labels by discovering
 	fmt.Println()
 	fmt.Println("5. Discovering resources via OPM labels...")
-	discovered, err := kubernetes.DiscoverResources(ctx, client, kubernetes.DiscoveryOptions{ReleaseName: moduleName, Namespace: namespace})
+	discovered, err := kubernetes.DiscoverResources(ctx, client, kubernetes.DiscoveryOptions{ReleaseName: releaseName, Namespace: namespace})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: discover: %v\n", err)
 		os.Exit(1)
@@ -170,7 +170,7 @@ func main() {
 	fmt.Println()
 	fmt.Println("7. Testing dry-run delete...")
 	dryDeleteResult, err := kubernetes.Delete(ctx, client, kubernetes.DeleteOptions{
-		ReleaseName: moduleName,
+		ReleaseName: releaseName,
 		Namespace:   namespace,
 		DryRun:      true,
 	})
@@ -186,7 +186,7 @@ func main() {
 	kubernetes.ResetClient()
 	client, _ = kubernetes.NewClient(kubernetes.ClientOptions{Context: "kind-opm-dev"})
 	deleteResult, err := kubernetes.Delete(ctx, client, kubernetes.DeleteOptions{
-		ReleaseName: moduleName,
+		ReleaseName: releaseName,
 		Namespace:   namespace,
 	})
 	if err != nil {
@@ -209,7 +209,7 @@ func main() {
 	fmt.Println("9. Verifying cleanup (discover after delete)...")
 	kubernetes.ResetClient()
 	client, _ = kubernetes.NewClient(kubernetes.ClientOptions{Context: "kind-opm-dev"})
-	remaining, err := kubernetes.DiscoverResources(ctx, client, kubernetes.DiscoveryOptions{ReleaseName: moduleName, Namespace: namespace})
+	remaining, err := kubernetes.DiscoverResources(ctx, client, kubernetes.DiscoveryOptions{ReleaseName: releaseName, Namespace: namespace})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: post-delete discover: %v\n", err)
 		os.Exit(1)

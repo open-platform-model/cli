@@ -60,9 +60,9 @@ func runDiff(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdut
 
 	opmConfig := GetOPMConfig()
 
-	// Render module via shared pipeline (diff uses RenderModule only, NOT ShowRenderOutput,
+	// Render module via shared pipeline (diff uses RenderRelease only, NOT ShowRenderOutput,
 	// because diff handles HasErrors() specially via DiffPartial)
-	result, err := cmdutil.RenderModule(ctx, cmdutil.RenderModuleOpts{
+	result, err := cmdutil.RenderRelease(ctx, cmdutil.RenderReleaseOpts{
 		Args:      args,
 		Render:    rf,
 		K8s:       kf,
@@ -73,18 +73,18 @@ func runDiff(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdut
 		return err
 	}
 
-	// Create scoped module logger
-	modLog := output.ModuleLogger(result.Release.Name)
+	// Create scoped release logger
+	releaseLog := output.ReleaseLogger(result.Release.Name)
 
 	// Print warnings
 	if result.HasWarnings() {
 		for _, w := range result.Warnings {
-			modLog.Warn(w)
+			releaseLog.Warn(w)
 		}
 	}
 
 	if len(result.Resources) == 0 && !result.HasErrors() {
-		modLog.Info("no resources to diff")
+		releaseLog.Info("no resources to diff")
 		return nil
 	}
 
@@ -95,7 +95,7 @@ func runDiff(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdut
 		APIWarnings: opmConfig.Config.Log.Kubernetes.APIWarnings,
 	})
 	if err != nil {
-		modLog.Error("connecting to cluster", "error", err)
+		releaseLog.Error("connecting to cluster", "error", err)
 		return err
 	}
 
@@ -109,16 +109,16 @@ func runDiff(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdut
 	if releaseID != "" {
 		inv, invErr := inventory.GetInventory(ctx, k8sClient, result.Release.Name, result.Release.Namespace, releaseID)
 		if invErr != nil {
-			modLog.Debug("could not read inventory for diff, using label-scan", "error", invErr)
+			releaseLog.Debug("could not read inventory for diff, using label-scan", "error", invErr)
 		} else if inv != nil {
 			liveResources, _, invDiscoverErr := inventory.DiscoverResourcesFromInventory(ctx, k8sClient, inv)
 			if invDiscoverErr != nil {
-				modLog.Debug("inventory discovery failed, falling back to label-scan", "error", invDiscoverErr)
+				releaseLog.Debug("inventory discovery failed, falling back to label-scan", "error", invDiscoverErr)
 			} else {
 				diffOpts.InventoryLive = liveResources
 			}
 		} else {
-			modLog.Debug("No inventory found, falling back to label-based discovery")
+			releaseLog.Debug("No inventory found, falling back to label-based discovery")
 		}
 	}
 
@@ -130,13 +130,13 @@ func runDiff(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdut
 		diffResult, err = kubernetes.Diff(ctx, k8sClient, result.Resources, result.Release, comparer, diffOpts)
 	}
 	if err != nil {
-		modLog.Error("diff failed", "error", err)
+		releaseLog.Error("diff failed", "error", err)
 		return &ExitError{Code: ExitGeneralError, Err: err, Printed: true}
 	}
 
 	// Print warnings from diff
 	for _, w := range diffResult.Warnings {
-		modLog.Warn(w)
+		releaseLog.Warn(w)
 	}
 
 	// Print summary

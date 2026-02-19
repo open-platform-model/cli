@@ -74,13 +74,13 @@ type StatusResult struct {
 	ReleaseID string `json:"releaseId,omitempty" yaml:"releaseId,omitempty"`
 }
 
-// GetModuleStatus discovers resources by OPM labels and evaluates health per resource.
+// GetReleaseStatus discovers resources by OPM labels and evaluates health per resource.
 // Returns noResourcesFoundError when no resources match the selector.
 //
 // When opts.InventoryLive is non-nil, the inventory-first path is used: those live
 // resources are evaluated directly instead of performing a label-scan. Any resources in
 // opts.MissingResources are appended with "Missing" status.
-func GetModuleStatus(ctx context.Context, client *Client, opts StatusOptions) (*StatusResult, error) {
+func GetReleaseStatus(ctx context.Context, client *Client, opts StatusOptions) (*StatusResult, error) {
 	var resources []*unstructured.Unstructured
 
 	if opts.InventoryLive != nil {

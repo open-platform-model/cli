@@ -78,18 +78,18 @@ func main() {
 
 	inv := &inventory.InventorySecret{
 		Metadata: inventory.InventoryMetadata{
-			Kind:        "ModuleRelease",
-			APIVersion:  "core.opmodel.dev/v1alpha1",
-			Name:        releaseName, // module name (same as release name in this test)
-			ReleaseName: releaseName,
-			Namespace:   namespace,
-			ReleaseID:   releaseID,
+			Kind:             "ModuleRelease",
+			APIVersion:       "core.opmodel.dev/v1alpha1",
+			ModuleName:       releaseName, // module name (same as release name in this test)
+			ReleaseName:      releaseName,
+			ReleaseNamespace: namespace,
+			ReleaseID:        releaseID,
 		},
 		Index:   []string{},
 		Changes: map[string]*inventory.ChangeEntry{},
 	}
-	module := inventory.ModuleRef{Path: modulePath, Version: moduleVersion, Name: releaseName}
-	computedID, changeEntry := inventory.PrepareChange(module, "", digest, currentEntries)
+	source := inventory.ChangeSource{Path: modulePath, Version: moduleVersion, ReleaseName: releaseName}
+	computedID, changeEntry := inventory.PrepareChange(source, "", digest, currentEntries)
 	inv.Changes[computedID] = changeEntry
 	inv.Index = inventory.UpdateIndex(inv.Index, computedID)
 
@@ -158,7 +158,7 @@ func main() {
 	// Update inventory — index should remain length 1 (move-to-front idempotency).
 	readInv2, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
 	check("reading inventory before re-apply write", err)
-	_, changeEntry2 := inventory.PrepareChange(module, "", digest, currentEntries)
+	_, changeEntry2 := inventory.PrepareChange(source, "", digest, currentEntries)
 	readInv2.Changes[computedID] = changeEntry2
 	readInv2.Index = inventory.UpdateIndex(readInv2.Index, computedID)
 	err = inventory.WriteInventory(ctx, client, readInv2)
@@ -214,7 +214,7 @@ func main() {
 	readInv4, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
 	check("reading inventory before rename write", err)
 	newDigest := inventory.ComputeManifestDigest(newResources)
-	newID, newChange := inventory.PrepareChange(module, "", newDigest, newEntries)
+	newID, newChange := inventory.PrepareChange(source, "", newDigest, newEntries)
 	readInv4.Changes[newID] = newChange
 	readInv4.Index = inventory.UpdateIndex(readInv4.Index, newID)
 	err = inventory.WriteInventory(ctx, client, readInv4)

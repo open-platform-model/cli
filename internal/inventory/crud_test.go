@@ -37,9 +37,9 @@ func makeTestInventoryWithReleaseName(moduleName, releaseName, namespace, releas
 		Metadata: inventory.InventoryMetadata{
 			Kind:               "ModuleRelease",
 			APIVersion:         "core.opmodel.dev/v1alpha1",
-			Name:               moduleName,
+			ModuleName:         moduleName,
 			ReleaseName:        releaseName,
-			Namespace:          namespace,
+			ReleaseNamespace:   namespace,
 			ReleaseID:          releaseID,
 			LastTransitionTime: "2026-01-01T00:00:00Z",
 		},
@@ -73,7 +73,7 @@ func TestGetInventory_ByName_Success(t *testing.T) {
 	result, err := inventory.GetInventory(ctx, client, "jellyfin", "media", "uuid-abc")
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Equal(t, "jellyfin", result.Metadata.Name)
+	assert.Equal(t, "jellyfin", result.Metadata.ModuleName)
 	assert.Equal(t, "uuid-abc", result.Metadata.ReleaseID)
 	assert.Equal(t, "100", result.ResourceVersion())
 }
@@ -253,7 +253,7 @@ func TestFindInventoryByReleaseName_Found(t *testing.T) {
 	found, err := inventory.FindInventoryByReleaseName(ctx, client, "mc", "default")
 	require.NoError(t, err)
 	require.NotNil(t, found)
-	assert.Equal(t, "minecraft", found.Metadata.Name, "module name should be preserved")
+	assert.Equal(t, "minecraft", found.Metadata.ModuleName, "module name should be preserved")
 	assert.Equal(t, "mc", found.Metadata.ReleaseName, "release name should be preserved")
 	assert.Equal(t, "uuid-mc-001", found.Metadata.ReleaseID)
 }

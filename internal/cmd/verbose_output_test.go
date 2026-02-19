@@ -120,8 +120,8 @@ func TestVerboseOutput_TransformerMatches(t *testing.T) {
 
 		outputStr := buf.String()
 
-		// Should contain module metadata
-		assert.Contains(t, outputStr, "module", "verbose should contain module metadata")
+		// Should contain release metadata
+		assert.Contains(t, outputStr, "release", "verbose should contain release metadata")
 		assert.Contains(t, outputStr, "namespace=default", "verbose should show namespace")
 		assert.Contains(t, outputStr, "version=1.0.0", "verbose should show version")
 		assert.Contains(t, outputStr, "components=web", "verbose should show component list")

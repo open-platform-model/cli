@@ -53,7 +53,7 @@ func runVet(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags) error {
 	ctx := context.Background()
 
 	// Render module via shared pipeline
-	result, err := cmdutil.RenderModule(ctx, cmdutil.RenderModuleOpts{
+	result, err := cmdutil.RenderRelease(ctx, cmdutil.RenderReleaseOpts{
 		Args:      args,
 		Render:    rf,
 		OPMConfig: GetOPMConfig(),
@@ -72,8 +72,8 @@ func runVet(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags) error {
 
 	// --- Vet-specific logic below ---
 
-	// Create scoped module logger for vet output
-	modLog := output.ModuleLogger(result.Release.Name)
+	// Create scoped release logger for vet output
+	releaseLog := output.ReleaseLogger(result.Release.Name)
 
 	// Print values validation check line
 	var valuesDetail string
@@ -86,19 +86,19 @@ func runVet(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags) error {
 	} else {
 		valuesDetail = "values.cue"
 	}
-	modLog.Info(output.FormatVetCheck("Values satisfy #config", valuesDetail))
+	releaseLog.Info(output.FormatVetCheck("Values satisfy #config", valuesDetail))
 
 	// Print per-resource validation lines (skip when --verbose already showed them)
 	if !verboseFlag {
 		for _, res := range result.Resources {
 			line := output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), output.StatusValid)
-			modLog.Info(line)
+			releaseLog.Info(line)
 		}
 	}
 
 	// Print final summary
 	summary := fmt.Sprintf("Module valid (%d resources)", result.ResourceCount())
-	modLog.Info(output.FormatCheckmark(summary))
+	releaseLog.Info(output.FormatCheckmark(summary))
 
 	return nil
 }

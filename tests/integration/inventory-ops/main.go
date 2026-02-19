@@ -235,8 +235,8 @@ func main() {
 		}
 	}
 
-	// Call GetModuleStatus with inventory-first path.
-	statusResult, err := kubernetes.GetModuleStatus(ctx, client, kubernetes.StatusOptions{
+	// Call GetReleaseStatus with inventory-first path.
+	statusResult, err := kubernetes.GetReleaseStatus(ctx, client, kubernetes.StatusOptions{
 		ReleaseName:      releaseName,
 		Namespace:        namespace,
 		InventoryLive:    liveResources68,
@@ -385,22 +385,22 @@ func buildInventory(resources []*build.Resource) *inventory.InventorySecret {
 	}
 
 	digest := inventory.ComputeManifestDigest(resources)
-	module := inventory.ModuleRef{Path: modulePath, Version: moduleVersion, Name: releaseName}
+	source := inventory.ChangeSource{Path: modulePath, Version: moduleVersion, ReleaseName: releaseName}
 
 	inv := &inventory.InventorySecret{
 		Metadata: inventory.InventoryMetadata{
-			Kind:        "ModuleRelease",
-			APIVersion:  "core.opmodel.dev/v1alpha1",
-			Name:        releaseName, // module name (same as release name in this test)
-			ReleaseName: releaseName,
-			Namespace:   namespace,
-			ReleaseID:   releaseID,
+			Kind:             "ModuleRelease",
+			APIVersion:       "core.opmodel.dev/v1alpha1",
+			ModuleName:       releaseName, // module name (same as release name in this test)
+			ReleaseName:      releaseName,
+			ReleaseNamespace: namespace,
+			ReleaseID:        releaseID,
 		},
 		Index:   []string{},
 		Changes: map[string]*inventory.ChangeEntry{},
 	}
 
-	changeID, changeEntry := inventory.PrepareChange(module, "", digest, entries)
+	changeID, changeEntry := inventory.PrepareChange(source, "", digest, entries)
 	inv.Changes[changeID] = changeEntry
 	inv.Index = inventory.UpdateIndex(inv.Index, changeID)
 	return inv

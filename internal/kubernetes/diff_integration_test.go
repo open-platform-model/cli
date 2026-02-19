@@ -21,7 +21,7 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 	client, err := NewClient(ClientOptions{})
 	require.NoError(t, err, "need a valid kubeconfig for integration tests")
 
-	moduleName := "diff-integration-test"
+	releaseName := "diff-integration-test"
 	namespace := "default"
 	comparer := NewComparer()
 
@@ -39,7 +39,7 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 		{Object: cm, Component: "test-component"},
 	}
 	meta := build.ModuleReleaseMetadata{
-		Name:      moduleName,
+		Name:      releaseName,
 		Namespace: namespace,
 		Version:   "0.1.0",
 	}
@@ -67,7 +67,7 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 
 	// Cleanup
 	_, err = Delete(ctx, client, DeleteOptions{
-		ReleaseName: moduleName,
+		ReleaseName: releaseName,
 		Namespace:   namespace,
 	})
 	require.NoError(t, err)
@@ -81,7 +81,7 @@ func TestDiffIntegration_ApplyThenDiffShowsNoDifferences(t *testing.T) {
 	client, err := NewClient(ClientOptions{})
 	require.NoError(t, err, "need a valid kubeconfig for integration tests")
 
-	moduleName := "diff-no-change-test"
+	releaseName := "diff-no-change-test"
 	namespace := "default"
 	comparer := NewComparer()
 
@@ -99,7 +99,7 @@ func TestDiffIntegration_ApplyThenDiffShowsNoDifferences(t *testing.T) {
 		{Object: cm, Component: "test-component"},
 	}
 	meta := build.ModuleReleaseMetadata{
-		Name:      moduleName,
+		Name:      releaseName,
 		Namespace: namespace,
 		Version:   "0.1.0",
 	}
@@ -119,7 +119,7 @@ func TestDiffIntegration_ApplyThenDiffShowsNoDifferences(t *testing.T) {
 
 	// Cleanup
 	_, err = Delete(ctx, client, DeleteOptions{
-		ReleaseName: moduleName,
+		ReleaseName: releaseName,
 		Namespace:   namespace,
 	})
 	require.NoError(t, err)
@@ -133,7 +133,7 @@ func TestStatusIntegration_ReportsHealth(t *testing.T) {
 	client, err := NewClient(ClientOptions{})
 	require.NoError(t, err, "need a valid kubeconfig for integration tests")
 
-	moduleName := "status-integration-test"
+	releaseName := "status-integration-test"
 	namespace := "default"
 
 	// Create and apply a ConfigMap (passive resource = always healthy)
@@ -150,7 +150,7 @@ func TestStatusIntegration_ReportsHealth(t *testing.T) {
 		{Object: cm, Component: "test-component"},
 	}
 	meta := build.ModuleReleaseMetadata{
-		Name:      moduleName,
+		Name:      releaseName,
 		Namespace: namespace,
 		Version:   "0.1.0",
 	}
@@ -161,8 +161,8 @@ func TestStatusIntegration_ReportsHealth(t *testing.T) {
 	assert.Equal(t, 1, applyResult.Applied)
 
 	// Check status
-	statusResult, err := GetModuleStatus(ctx, client, StatusOptions{
-		ReleaseName: moduleName,
+	statusResult, err := GetReleaseStatus(ctx, client, StatusOptions{
+		ReleaseName: releaseName,
 		Namespace:   namespace,
 	})
 	require.NoError(t, err)
@@ -171,7 +171,7 @@ func TestStatusIntegration_ReportsHealth(t *testing.T) {
 
 	// Cleanup
 	_, err = Delete(ctx, client, DeleteOptions{
-		ReleaseName: moduleName,
+		ReleaseName: releaseName,
 		Namespace:   namespace,
 	})
 	require.NoError(t, err)
@@ -185,7 +185,7 @@ func TestDiffIntegration_AllAdditions(t *testing.T) {
 	client, err := NewClient(ClientOptions{})
 	require.NoError(t, err, "need a valid kubeconfig for integration tests")
 
-	moduleName := "diff-additions-test"
+	releaseName := "diff-additions-test"
 	namespace := "default"
 	comparer := NewComparer()
 
@@ -203,7 +203,7 @@ func TestDiffIntegration_AllAdditions(t *testing.T) {
 		{Object: cm, Component: "test-component"},
 	}
 	meta := build.ModuleReleaseMetadata{
-		Name:      moduleName,
+		Name:      releaseName,
 		Namespace: namespace,
 		Version:   "0.1.0",
 	}
@@ -224,12 +224,12 @@ func TestStatusIntegration_NoResources(t *testing.T) {
 	client, err := NewClient(ClientOptions{})
 	require.NoError(t, err, "need a valid kubeconfig for integration tests")
 
-	// Query for a module that doesn't exist
-	_, err = GetModuleStatus(ctx, client, StatusOptions{
+	// Query for a release that doesn't exist
+	_, err = GetReleaseStatus(ctx, client, StatusOptions{
 		ReleaseName: "nonexistent-module",
 		Namespace:   "default",
 	})
-	// After YAGNI removal, GetModuleStatus returns noResourcesFoundError
+	// After YAGNI removal, GetReleaseStatus returns noResourcesFoundError
 	// when no resources match the selector.
 	require.Error(t, err)
 	assert.True(t, IsNoResourcesFound(err))

@@ -59,13 +59,13 @@ func (e *resourceError) Error() string {
 // Resources are assumed to be already ordered by weight (from RenderResult).
 func Apply(ctx context.Context, client *Client, resources []*build.Resource, meta build.ModuleReleaseMetadata, opts ApplyOptions) (*ApplyResult, error) {
 	result := &ApplyResult{}
-	modLog := output.ModuleLogger(meta.Name)
+	releaseLog := output.ReleaseLogger(meta.Name)
 
 	for _, res := range resources {
 		// Apply the resource
 		status, err := applyResource(ctx, client, res.Object, opts)
 		if err != nil {
-			modLog.Warn(fmt.Sprintf("applying %s/%s: %v", res.Kind(), res.Name(), err))
+			releaseLog.Warn(fmt.Sprintf("applying %s/%s: %v", res.Kind(), res.Name(), err))
 			result.Errors = append(result.Errors, resourceError{
 				Kind:      res.Kind(),
 				Name:      res.Name(),
@@ -84,7 +84,7 @@ func Apply(ctx context.Context, client *Client, resources []*build.Resource, met
 		case output.StatusUnchanged:
 			result.Unchanged++
 		}
-		modLog.Info(output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), status))
+		releaseLog.Info(output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), status))
 	}
 
 	return result, nil

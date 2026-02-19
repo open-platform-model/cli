@@ -103,8 +103,8 @@ func runDelete(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 		"namespace", namespace,
 	)
 
-	// Create scoped module logger using shared LogName helper
-	modLog := output.ModuleLogger(rsf.LogName())
+	// Create scoped release logger using shared LogName helper
+	releaseLog := output.ReleaseLogger(rsf.LogName())
 
 	opmConfig := GetOPMConfig()
 
@@ -115,23 +115,23 @@ func runDelete(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 		APIWarnings: opmConfig.Config.Log.Kubernetes.APIWarnings,
 	})
 	if err != nil {
-		modLog.Error("connecting to cluster", "error", err)
+		releaseLog.Error("connecting to cluster", "error", err)
 		return err
 	}
 
 	// If dry-run, skip confirmation
 	if dryRun {
-		modLog.Info("dry run - no changes will be made")
+		releaseLog.Info("dry run - no changes will be made")
 	} else if !force {
 		// Prompt for confirmation
 		if !confirmDelete(rsf.ReleaseName, rsf.ReleaseID, namespace) {
-			modLog.Info("deletion canceled")
+			releaseLog.Info("deletion canceled")
 			return nil
 		}
 	}
 
 	// Delete resources
-	modLog.Info(fmt.Sprintf("deleting resources in namespace %q", namespace))
+	releaseLog.Info(fmt.Sprintf("deleting resources in namespace %q", namespace))
 
 	// Attempt inventory-first discovery.
 	// Works with either --release-name or --release-id (or both).
@@ -155,20 +155,20 @@ func runDelete(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 		}
 		inv, invErr = inventory.GetInventory(ctx, k8sClient, relName, namespace, rsf.ReleaseID)
 		if invErr != nil {
-			modLog.Debug("could not read inventory by release-id, using label-scan", "error", invErr)
+			releaseLog.Debug("could not read inventory by release-id, using label-scan", "error", invErr)
 		}
 	case rsf.ReleaseName != "":
 		// Name-only path: label scan by module-release.opmodel.dev/name.
 		inv, invErr = inventory.FindInventoryByReleaseName(ctx, k8sClient, rsf.ReleaseName, namespace)
 		if invErr != nil {
-			modLog.Debug("could not read inventory by release-name, using label-scan", "error", invErr)
+			releaseLog.Debug("could not read inventory by release-name, using label-scan", "error", invErr)
 		}
 	}
 
 	if inv != nil {
 		liveResources, _, invDiscoverErr := inventory.DiscoverResourcesFromInventory(ctx, k8sClient, inv)
 		if invDiscoverErr != nil {
-			modLog.Debug("inventory discovery failed, falling back to label-scan", "error", invDiscoverErr)
+			releaseLog.Debug("inventory discovery failed, falling back to label-scan", "error", invDiscoverErr)
 		} else {
 			deleteOpts.InventoryLive = liveResources
 			deleteOpts.InventorySecretName = inventory.SecretName(inv.Metadata.ReleaseName, inv.Metadata.ReleaseID)
@@ -179,25 +179,25 @@ func runDelete(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 	deleteResult, err := kubernetes.Delete(ctx, k8sClient, deleteOpts)
 	if err != nil {
 		if ignoreNotFound && kubernetes.IsNoResourcesFound(err) {
-			modLog.Info("no resources found (ignored)")
+			releaseLog.Info("no resources found (ignored)")
 			return nil
 		}
-		modLog.Error("delete failed", "error", err)
+		releaseLog.Error("delete failed", "error", err)
 		return &ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
 	// Report results
 	if len(deleteResult.Errors) > 0 {
-		modLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(deleteResult.Errors)))
+		releaseLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(deleteResult.Errors)))
 		for _, e := range deleteResult.Errors {
-			modLog.Error(e.Error())
+			releaseLog.Error(e.Error())
 		}
 	}
 
 	if dryRun {
-		modLog.Info(fmt.Sprintf("dry run complete: %d resources would be deleted", deleteResult.Deleted))
+		releaseLog.Info(fmt.Sprintf("dry run complete: %d resources would be deleted", deleteResult.Deleted))
 	} else {
-		modLog.Info("all resources have been deleted")
+		releaseLog.Info("all resources have been deleted")
 		output.Println(output.FormatCheckmark("Release deleted"))
 	}
 

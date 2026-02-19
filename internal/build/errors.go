@@ -47,34 +47,3 @@ func (e *NamespaceRequiredError) Error() string {
 func (e *NamespaceRequiredError) Component() string {
 	return ""
 }
-
-// ModuleValidationError indicates the module failed CUE validation.
-// This typically happens when required fields are missing or constraints are violated.
-type ModuleValidationError struct {
-	// Message describes what validation failed.
-	Message string
-
-	// ComponentName is the component with the error (if applicable).
-	ComponentName string
-
-	// FieldPath is the path to the field with the error (if known).
-	FieldPath string
-
-	// Cause is the underlying CUE error.
-	Cause error
-}
-
-func (e *ModuleValidationError) Error() string {
-	if e.ComponentName != "" {
-		return fmt.Sprintf("module validation failed for component %q: %s", e.ComponentName, e.Message)
-	}
-	return fmt.Sprintf("module validation failed: %s", e.Message)
-}
-
-func (e *ModuleValidationError) Component() string {
-	return e.ComponentName
-}
-
-func (e *ModuleValidationError) Unwrap() error {
-	return e.Cause
-}

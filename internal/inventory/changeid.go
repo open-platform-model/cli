@@ -62,11 +62,11 @@ func PruneHistory(secret *InventorySecret, maxHistory int) {
 // PrepareChange computes a change ID and builds a ChangeEntry for the current apply.
 // The timestamp is set to the current UTC time in RFC 3339 format.
 // Returns (changeID, changeEntry).
-func PrepareChange(module ModuleRef, values, manifestDigest string, entries []InventoryEntry) (string, *ChangeEntry) {
-	changeID := ComputeChangeID(module.Path, module.Version, values, manifestDigest)
+func PrepareChange(source ChangeSource, values, manifestDigest string, entries []InventoryEntry) (string, *ChangeEntry) {
+	changeID := ComputeChangeID(source.Path, source.Version, values, manifestDigest)
 
 	entry := &ChangeEntry{
-		Module:         module,
+		Source:         source,
 		Values:         values,
 		ManifestDigest: manifestDigest,
 		Timestamp:      time.Now().UTC().Format(time.RFC3339),

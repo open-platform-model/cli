@@ -146,7 +146,7 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 	// Step 4c: Validate the full module tree for any remaining errors
 	if allErrs := collectAllCUEErrors(value); allErrs != nil {
 		return nil, &ValidationError{
-			Message: "module validation failed",
+			Message: "release validation failed",
 			Cause:   allErrs,
 			Details: formatCUEDetails(allErrs),
 		}
@@ -160,8 +160,8 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 		}
 	}
 
-	concreteModule := value.FillPath(cue.ParsePath("#config"), values)
-	if allErrs := collectAllCUEErrors(concreteModule); allErrs != nil {
+	concreteRelease := value.FillPath(cue.ParsePath("#config"), values)
+	if allErrs := collectAllCUEErrors(concreteRelease); allErrs != nil {
 		return nil, &ValidationError{
 			Message: "failed to inject values into #config",
 			Cause:   allErrs,
@@ -170,7 +170,7 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 	}
 
 	// Step 6: Extract concrete components from #components
-	components, err := extractComponentsFromDefinition(concreteModule)
+	components, err := extractComponentsFromDefinition(concreteRelease)
 	if err != nil {
 		return nil, err
 	}
@@ -196,10 +196,10 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 	}
 
 	// Step 8: Extract release metadata from overlay-computed #opmReleaseMeta
-	metadata := extractReleaseMetadata(concreteModule, opts)
+	metadata := extractReleaseMetadata(concreteRelease, opts)
 
 	return &BuiltRelease{
-		Value:      concreteModule,
+		Value:      concreteRelease,
 		Components: components,
 		Metadata:   metadata,
 	}, nil

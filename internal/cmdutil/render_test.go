@@ -12,7 +12,7 @@ import (
 )
 
 func TestRenderModule_NilConfig(t *testing.T) {
-	_, err := RenderModule(context.Background(), RenderModuleOpts{
+	_, err := RenderRelease(context.Background(), RenderReleaseOpts{
 		OPMConfig: nil,
 		Render:    &RenderFlags{},
 	})

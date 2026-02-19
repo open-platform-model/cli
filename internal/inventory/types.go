@@ -21,22 +21,22 @@ type InventoryEntry struct {
 
 // ChangeEntry represents the full state for a single change (one apply operation).
 type ChangeEntry struct {
-	Module         ModuleRef     `json:"module"`
+	Source         ChangeSource  `json:"module"`         // JSON tag "module" preserved for backward compat
 	Values         string        `json:"values"`         // resolved CUE values as CUE string
 	ManifestDigest string        `json:"manifestDigest"` // SHA256 of rendered manifests
 	Timestamp      string        `json:"timestamp"`      // RFC 3339
 	Inventory      InventoryList `json:"inventory"`
 }
 
-// ModuleRef identifies the source module for a change.
-type ModuleRef struct {
+// ChangeSource records the source context for a change entry: the module that
+// was rendered and the release under which it was deployed.
+type ChangeSource struct {
 	Path    string `json:"path"`
 	Version string `json:"version,omitempty"`
-	// Name is the module release name (the user-supplied --release-name value, e.g. "mc"),
-	// not the canonical module definition name (e.g. "minecraft"). It records which
-	// deployment of the module produced this change entry.
-	Name  string `json:"name"`
-	Local bool   `json:"local,omitempty"` // true for local modules (no version)
+	// ReleaseName is the release name (the user-supplied --release-name value, e.g. "mc").
+	// JSON tag "name" is preserved for backward compat with existing inventory Secrets.
+	ReleaseName string `json:"name"`
+	Local       bool   `json:"local,omitempty"` // true for local modules (no version)
 }
 
 // InventoryList is the list of tracked resources in a change.
@@ -52,11 +52,15 @@ type InventoryList struct {
 //
 //nolint:revive // Inventory prefix is intentional for cross-package clarity
 type InventoryMetadata struct {
-	Kind               string `json:"kind"`        // "ModuleRelease"
-	APIVersion         string `json:"apiVersion"`  // "core.opmodel.dev/v1alpha1"
-	Name               string `json:"name"`        // canonical module name, e.g. "minecraft"
-	ReleaseName        string `json:"releaseName"` // release name (from --release-name), e.g. "mc"
-	Namespace          string `json:"namespace"`
+	Kind       string `json:"kind"`       // "ModuleRelease"
+	APIVersion string `json:"apiVersion"` // "core.opmodel.dev/v1alpha1"
+	// ModuleName is the canonical module name (e.g. "minecraft").
+	// JSON tag "name" is preserved for backward compat with existing inventory Secrets.
+	ModuleName  string `json:"name"`
+	ReleaseName string `json:"releaseName"` // release name (from --release-name), e.g. "mc"
+	// ReleaseNamespace is the Kubernetes namespace where the release is deployed.
+	// JSON tag "namespace" is preserved for backward compat with existing inventory Secrets.
+	ReleaseNamespace   string `json:"namespace"`
 	ReleaseID          string `json:"releaseId"`
 	LastTransitionTime string `json:"lastTransitionTime"` // RFC 3339
 }

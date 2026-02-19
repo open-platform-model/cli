@@ -86,8 +86,8 @@ func MarshalToSecret(inv *InventorySecret) (*corev1.Secret, error) {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: inv.Metadata.Namespace,
-			Labels:    InventoryLabels(inv.Metadata.Name, inv.Metadata.ReleaseName, inv.Metadata.Namespace, inv.Metadata.ReleaseID),
+			Namespace: inv.Metadata.ReleaseNamespace,
+			Labels:    InventoryLabels(inv.Metadata.ModuleName, inv.Metadata.ReleaseName, inv.Metadata.ReleaseNamespace, inv.Metadata.ReleaseID),
 		},
 		Type:       secretType,
 		StringData: stringData,

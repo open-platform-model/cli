@@ -114,7 +114,7 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 	opmConfig := GetOPMConfig()
 
 	// Step 1: Render module via shared pipeline
-	result, err := cmdutil.RenderModule(ctx, cmdutil.RenderModuleOpts{
+	result, err := cmdutil.RenderRelease(ctx, cmdutil.RenderReleaseOpts{
 		Args:      args,
 		Render:    rf,
 		K8s:       kf,
@@ -132,8 +132,8 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 		return err
 	}
 
-	// Create scoped module logger
-	modLog := output.ModuleLogger(result.Release.Name)
+	// Create scoped release logger
+	releaseLog := output.ReleaseLogger(result.Release.Name)
 
 	// Create Kubernetes client via shared factory
 	k8sClient, err := cmdutil.NewK8sClient(kubernetes.ClientOptions{
@@ -142,7 +142,7 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 		APIWarnings: opmConfig.Config.Log.Kubernetes.APIWarnings,
 	})
 	if err != nil {
-		modLog.Error("connecting to cluster", "error", err)
+		releaseLog.Error("connecting to cluster", "error", err)
 		return err
 	}
 
@@ -152,14 +152,14 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 	if createNS && namespace != "" {
 		created, nsErr := k8sClient.EnsureNamespace(ctx, namespace, dryRun)
 		if nsErr != nil {
-			modLog.Error("ensuring namespace", "error", nsErr)
+			releaseLog.Error("ensuring namespace", "error", nsErr)
 			return &ExitError{Code: exitCodeFromK8sError(nsErr), Err: nsErr, Printed: true}
 		}
 		if created {
 			if dryRun {
-				modLog.Info(fmt.Sprintf("namespace %q would be created", namespace))
+				releaseLog.Info(fmt.Sprintf("namespace %q would be created", namespace))
 			} else {
-				modLog.Info(fmt.Sprintf("namespace %q created", namespace))
+				releaseLog.Info(fmt.Sprintf("namespace %q created", namespace))
 			}
 		}
 	}
@@ -184,7 +184,7 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 	if releaseID != "" && !dryRun {
 		prevInventory, err = inventory.GetInventory(ctx, k8sClient, result.Release.Name, namespace, releaseID)
 		if err != nil {
-			modLog.Warn("could not read inventory, proceeding without it", "error", err)
+			releaseLog.Warn("could not read inventory, proceeding without it", "error", err)
 		}
 	}
 
@@ -218,7 +218,7 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 				len(prevEntries))
 		}
 		if len(prevEntries) == 0 {
-			modLog.Info("no resources to apply")
+			releaseLog.Info("no resources to apply")
 			return nil
 		}
 	}
@@ -232,10 +232,10 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 
 	// Step 6: Apply resources via SSA
 	if dryRun {
-		modLog.Info("dry run - no changes will be made")
+		releaseLog.Info("dry run - no changes will be made")
 	}
 	if len(result.Resources) > 0 {
-		modLog.Info(fmt.Sprintf("applying %d resources", len(result.Resources)))
+		releaseLog.Info(fmt.Sprintf("applying %d resources", len(result.Resources)))
 	}
 
 	var applyResult *kubernetes.ApplyResult
@@ -244,22 +244,22 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 			DryRun: dryRun,
 		})
 		if err != nil {
-			modLog.Error("apply failed", "error", err)
+			releaseLog.Error("apply failed", "error", err)
 			return &ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 		}
 
 		// Report results
 		if len(applyResult.Errors) > 0 {
-			modLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(applyResult.Errors)))
+			releaseLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(applyResult.Errors)))
 			for _, e := range applyResult.Errors {
-				modLog.Error(e.Error())
+				releaseLog.Error(e.Error())
 			}
 		}
 
 		if dryRun {
-			modLog.Info(fmt.Sprintf("dry run complete: %d resources would be applied", applyResult.Applied))
+			releaseLog.Info(fmt.Sprintf("dry run complete: %d resources would be applied", applyResult.Applied))
 		} else {
-			modLog.Info(formatApplySummary(applyResult))
+			releaseLog.Info(formatApplySummary(applyResult))
 		}
 	}
 
@@ -269,7 +269,7 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 
 		if applyHadErrors {
 			// Step 7b: skip prune and inventory write on partial failure
-			modLog.Warn("apply had errors — skipping pruning and inventory write")
+			releaseLog.Warn("apply had errors — skipping pruning and inventory write")
 			return &ExitError{
 				Code:    ExitGeneralError,
 				Err:     fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)),
@@ -279,9 +279,9 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 
 		// Step 7a: Prune stale resources (unless --no-prune)
 		if len(staleSet) > 0 && !noProbe {
-			modLog.Info(fmt.Sprintf("pruning %d stale resource(s)", len(staleSet)))
+			releaseLog.Info(fmt.Sprintf("pruning %d stale resource(s)", len(staleSet)))
 			if err := inventory.PruneStaleResources(ctx, k8sClient, staleSet); err != nil {
-				modLog.Warn("pruning stale resources failed", "error", err)
+				releaseLog.Warn("pruning stale resources failed", "error", err)
 				// Non-fatal: inventory still gets written
 			}
 		}
@@ -303,33 +303,33 @@ func runApply(_ *cobra.Command, args []string, rf *cmdutil.RenderFlags, kf *cmdu
 			if newOrUpdatedInventory == nil {
 				newOrUpdatedInventory = &inventory.InventorySecret{
 					Metadata: inventory.InventoryMetadata{
-						Kind:        "ModuleRelease",
-						APIVersion:  "core.opmodel.dev/v1alpha1",
-						Name:        result.Release.ModuleName, // canonical module name, e.g. "minecraft"
-						ReleaseName: result.Release.Name,       // release name, e.g. "mc"
-						Namespace:   namespace,
-						ReleaseID:   releaseID,
+						Kind:             "ModuleRelease",
+						APIVersion:       "core.opmodel.dev/v1alpha1",
+						ModuleName:       result.Release.ModuleName, // canonical module name, e.g. "minecraft"
+						ReleaseName:      result.Release.Name,       // release name, e.g. "mc"
+						ReleaseNamespace: namespace,
+						ReleaseID:        releaseID,
 					},
 					Index:   []string{},
 					Changes: map[string]*inventory.ChangeEntry{},
 				}
 			}
 
-			module := inventory.ModuleRef{
-				Path:    modulePath,
-				Version: result.Release.Version,
-				Name:    result.Release.Name,
-				Local:   result.Release.Version == "",
+			source := inventory.ChangeSource{
+				Path:        modulePath,
+				Version:     result.Release.Version,
+				ReleaseName: result.Release.Name,
+				Local:       result.Release.Version == "",
 			}
 
-			computedChangeID, changeEntry := inventory.PrepareChange(module, valuesStr, manifestDigest, currentEntries)
+			computedChangeID, changeEntry := inventory.PrepareChange(source, valuesStr, manifestDigest, currentEntries)
 			newOrUpdatedInventory.Changes[computedChangeID] = changeEntry
 			newOrUpdatedInventory.Index = inventory.UpdateIndex(newOrUpdatedInventory.Index, computedChangeID)
 			newOrUpdatedInventory.Metadata.LastTransitionTime = changeEntry.Timestamp
 			inventory.PruneHistory(newOrUpdatedInventory, maxHistory)
 
 			if err := inventory.WriteInventory(ctx, k8sClient, newOrUpdatedInventory); err != nil {
-				modLog.Warn("failed to write inventory Secret", "error", err)
+				releaseLog.Warn("failed to write inventory Secret", "error", err)
 				// Non-fatal: the resources were applied successfully; warn but don't fail
 			} else {
 				output.Debug("inventory written", "changeID", changeID)

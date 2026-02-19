@@ -106,9 +106,9 @@ func runStatus(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 		"namespace", namespace,
 	)
 
-	// Create scoped module logger using shared LogName helper
+	// Create scoped release logger using shared LogName helper
 	logName := rsf.LogName()
-	modLog := output.ModuleLogger(logName)
+	releaseLog := output.ReleaseLogger(logName)
 
 	// Validate output format
 	outputFormat, valid := output.ParseFormat(outputFmt)
@@ -128,7 +128,7 @@ func runStatus(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 		APIWarnings: opmConfig.Config.Log.Kubernetes.APIWarnings,
 	})
 	if err != nil {
-		modLog.Error("connecting to cluster", "error", err)
+		releaseLog.Error("connecting to cluster", "error", err)
 		return err
 	}
 
@@ -179,21 +179,21 @@ func runStatus(_ *cobra.Command, _ []string, rsf *cmdutil.ReleaseSelectorFlags, 
 
 // runStatusOnce executes a single status check.
 func runStatusOnce(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string, ignoreNotFound bool) error {
-	modLog := output.ModuleLogger(logName)
+	releaseLog := output.ReleaseLogger(logName)
 
-	result, err := kubernetes.GetModuleStatus(ctx, client, opts)
+	result, err := kubernetes.GetReleaseStatus(ctx, client, opts)
 	if err != nil {
 		if ignoreNotFound && kubernetes.IsNoResourcesFound(err) {
-			modLog.Info("no resources found (ignored)")
+			releaseLog.Info("no resources found (ignored)")
 			return nil
 		}
-		modLog.Error("getting status", "error", err)
+		releaseLog.Error("getting status", "error", err)
 		return &ExitError{Code: ExitGeneralError, Err: err, Printed: true}
 	}
 
 	formatted, err := kubernetes.FormatStatus(result, opts.OutputFormat)
 	if err != nil {
-		modLog.Error("formatting status", "error", err)
+		releaseLog.Error("formatting status", "error", err)
 		return &ExitError{Code: ExitGeneralError, Err: err, Printed: true}
 	}
 
@@ -238,15 +238,15 @@ func runStatusWatch(ctx context.Context, client *kubernetes.Client, opts kuberne
 
 // displayStatus fetches and displays the current status.
 func displayStatus(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string, ignoreNotFound bool) error {
-	modLog := output.ModuleLogger(logName)
+	releaseLog := output.ReleaseLogger(logName)
 
-	result, err := kubernetes.GetModuleStatus(ctx, client, opts)
+	result, err := kubernetes.GetReleaseStatus(ctx, client, opts)
 	if err != nil {
 		if ignoreNotFound && kubernetes.IsNoResourcesFound(err) {
-			modLog.Info("no resources found (ignored)")
+			releaseLog.Info("no resources found (ignored)")
 			return nil
 		}
-		modLog.Error("getting status", "error", err)
+		releaseLog.Error("getting status", "error", err)
 		return &ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 

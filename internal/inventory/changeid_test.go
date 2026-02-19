@@ -147,20 +147,20 @@ func TestPruneHistory_ZeroMaxHistoryNoOp(t *testing.T) {
 // --- PrepareChange ---
 
 func TestPrepareChange_ProducesValidEntry(t *testing.T) {
-	module := ModuleRef{
-		Path:    "opmodel.dev/modules/jellyfin",
-		Version: "1.0.0",
-		Name:    "jellyfin",
+	source := ChangeSource{
+		Path:        "opmodel.dev/modules/jellyfin",
+		Version:     "1.0.0",
+		ReleaseName: "jellyfin",
 	}
 	entries := []InventoryEntry{
 		{Group: "apps", Kind: "Deployment", Namespace: "media", Name: "jellyfin", Version: "v1", Component: "app"},
 	}
 
-	changeID, entry := PrepareChange(module, `{port: 8096}`, "sha256:abc123", entries)
+	changeID, entry := PrepareChange(source, `{port: 8096}`, "sha256:abc123", entries)
 
 	require.NotEmpty(t, changeID)
 	assert.True(t, strings.HasPrefix(changeID, "change-sha1-"))
-	assert.Equal(t, module, entry.Module)
+	assert.Equal(t, source, entry.Source)
 	assert.Equal(t, `{port: 8096}`, entry.Values)
 	assert.Equal(t, "sha256:abc123", entry.ManifestDigest)
 	assert.NotEmpty(t, entry.Timestamp)
@@ -168,27 +168,27 @@ func TestPrepareChange_ProducesValidEntry(t *testing.T) {
 }
 
 func TestPrepareChange_LocalModule(t *testing.T) {
-	module := ModuleRef{
-		Path:  "./my-module",
-		Name:  "my-module",
-		Local: true,
+	source := ChangeSource{
+		Path:        "./my-module",
+		ReleaseName: "my-module",
+		Local:       true,
 		// Version intentionally empty for local modules
 	}
 
-	changeID, entry := PrepareChange(module, `{}`, "sha256:digest", nil)
+	changeID, entry := PrepareChange(source, `{}`, "sha256:digest", nil)
 
 	assert.True(t, strings.HasPrefix(changeID, "change-sha1-"))
-	assert.True(t, entry.Module.Local)
-	assert.Empty(t, entry.Module.Version)
+	assert.True(t, entry.Source.Local)
+	assert.Empty(t, entry.Source.Version)
 }
 
 func TestPrepareChange_IDMatchesComputeChangeID(t *testing.T) {
-	module := ModuleRef{Path: "path", Version: "v1", Name: "test"}
+	source := ChangeSource{Path: "path", Version: "v1", ReleaseName: "test"}
 	values := `{replicas: 3}`
 	digest := "sha256:abc"
 
-	changeID, _ := PrepareChange(module, values, digest, nil)
-	expectedID := ComputeChangeID(module.Path, module.Version, values, digest)
+	changeID, _ := PrepareChange(source, values, digest, nil)
+	expectedID := ComputeChangeID(source.Path, source.Version, values, digest)
 
 	assert.Equal(t, expectedID, changeID)
 }

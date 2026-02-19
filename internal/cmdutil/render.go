@@ -10,8 +10,8 @@ import (
 	"github.com/opmodel/cli/internal/output"
 )
 
-// RenderModuleOpts holds the inputs for RenderModule.
-type RenderModuleOpts struct {
+// RenderReleaseOpts holds the inputs for RenderRelease.
+type RenderReleaseOpts struct {
 	// Args from the cobra command (first arg is module path).
 	Args []string
 	// Render flags (values, namespace, release-name, provider).
@@ -24,14 +24,14 @@ type RenderModuleOpts struct {
 	Registry string
 }
 
-// RenderModule executes the common render pipeline preamble shared by
+// RenderRelease executes the common render pipeline preamble shared by
 // build, vet, apply, and diff commands. It resolves the module path,
 // validates config, resolves K8s settings, builds RenderOptions,
 // creates the pipeline, and executes Render.
 //
 // On success it returns the RenderResult. On failure it returns an
 // *ExitError with the appropriate exit code and Printed flag.
-func RenderModule(ctx context.Context, opts RenderModuleOpts) (*build.RenderResult, error) {
+func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*build.RenderResult, error) {
 	modulePath := ResolveModulePath(opts.Args)
 
 	// Validate OPM config is loaded
@@ -101,8 +101,8 @@ func RenderModule(ctx context.Context, opts RenderModuleOpts) (*build.RenderResu
 	// Create and execute pipeline
 	pipeline := build.NewPipeline(opts.OPMConfig)
 
-	output.Debug("rendering module",
-		"module", modulePath,
+	output.Debug("rendering release",
+		"module-path", modulePath,
 		"namespace", namespace,
 		"provider", provider,
 	)
@@ -143,10 +143,10 @@ func ShowRenderOutput(result *build.RenderResult, opts ShowOutputOpts) error {
 	}
 
 	// Log warnings
-	modLog := output.ModuleLogger(result.Release.Name)
+	releaseLog := output.ReleaseLogger(result.Release.Name)
 	if result.HasWarnings() {
 		for _, w := range result.Warnings {
-			modLog.Warn(w)
+			releaseLog.Warn(w)
 		}
 	}
 

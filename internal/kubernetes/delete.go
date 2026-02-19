@@ -68,7 +68,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 	if logName == "" {
 		logName = fmt.Sprintf("release-id:%s", opts.ReleaseID)
 	}
-	modLog := output.ModuleLogger(logName)
+	releaseLog := output.ReleaseLogger(logName)
 
 	var resources []*unstructured.Unstructured
 
@@ -122,13 +122,13 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 		ns := res.GetNamespace()
 
 		if opts.DryRun {
-			modLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
+			releaseLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
 			result.Deleted++
 			continue
 		}
 
 		if err := deleteResource(ctx, client, res); err != nil {
-			modLog.Warn(fmt.Sprintf("deleting %s/%s: %v", kind, name, err))
+			releaseLog.Warn(fmt.Sprintf("deleting %s/%s: %v", kind, name, err))
 			result.Errors = append(result.Errors, resourceError{
 				Kind:      kind,
 				Name:      name,
@@ -138,7 +138,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 			continue
 		}
 
-		modLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
+		releaseLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
 		result.Deleted++
 	}
 

@@ -37,19 +37,19 @@ func makeInventorySecret() *InventorySecret {
 		Metadata: InventoryMetadata{
 			Kind:               "ModuleRelease",
 			APIVersion:         "core.opmodel.dev/v1alpha1",
-			Name:               "jellyfin",      // canonical module name
+			ModuleName:         "jellyfin",      // canonical module name
 			ReleaseName:        "jellyfin-prod", // release name (from --release-name)
-			Namespace:          "media",
+			ReleaseNamespace:   "media",
 			ReleaseID:          "a3b8f2e1-1234-5678-9abc-def012345678",
 			LastTransitionTime: "2026-01-01T00:00:00Z",
 		},
 		Index: []string{"change-sha1-aabbccdd", "change-sha1-11223344"},
 		Changes: map[string]*ChangeEntry{
 			"change-sha1-aabbccdd": {
-				Module: ModuleRef{
-					Path:    "opmodel.dev/modules/jellyfin",
-					Version: "1.0.0",
-					Name:    "jellyfin",
+				Source: ChangeSource{
+					Path:        "opmodel.dev/modules/jellyfin",
+					Version:     "1.0.0",
+					ReleaseName: "jellyfin",
 				},
 				Values:         `{port: 8096}`,
 				ManifestDigest: "sha256:abc123def456",
@@ -62,10 +62,10 @@ func makeInventorySecret() *InventorySecret {
 				},
 			},
 			"change-sha1-11223344": {
-				Module: ModuleRef{
-					Path:    "opmodel.dev/modules/jellyfin",
-					Version: "0.9.0",
-					Name:    "jellyfin",
+				Source: ChangeSource{
+					Path:        "opmodel.dev/modules/jellyfin",
+					Version:     "0.9.0",
+					ReleaseName: "jellyfin",
 				},
 				Values:         `{port: 8096}`,
 				ManifestDigest: "sha256:olddigest",
@@ -198,7 +198,7 @@ func TestMarshalUnmarshalRoundtrip(t *testing.T) {
 	for id, origEntry := range original.Changes {
 		restoredEntry, ok := restored.Changes[id]
 		require.True(t, ok, "change entry %q missing after roundtrip", id)
-		assert.Equal(t, origEntry.Module, restoredEntry.Module)
+		assert.Equal(t, origEntry.Source, restoredEntry.Source)
 		assert.Equal(t, origEntry.Values, restoredEntry.Values)
 		assert.Equal(t, origEntry.ManifestDigest, restoredEntry.ManifestDigest)
 		assert.Equal(t, origEntry.Timestamp, restoredEntry.Timestamp)
@@ -259,12 +259,12 @@ func TestUnmarshalFromSecret_Base64EncodedData(t *testing.T) {
 func TestMarshalToSecret_EmptyInventory(t *testing.T) {
 	inv := &InventorySecret{
 		Metadata: InventoryMetadata{
-			Kind:        "ModuleRelease",
-			APIVersion:  "core.opmodel.dev/v1alpha1",
-			Name:        "test",
-			ReleaseName: "test",
-			Namespace:   "default",
-			ReleaseID:   "00000000-0000-0000-0000-000000000001",
+			Kind:             "ModuleRelease",
+			APIVersion:       "core.opmodel.dev/v1alpha1",
+			ModuleName:       "test",
+			ReleaseName:      "test",
+			ReleaseNamespace: "default",
+			ReleaseID:        "00000000-0000-0000-0000-000000000001",
 		},
 		Index:   []string{},
 		Changes: map[string]*ChangeEntry{},
