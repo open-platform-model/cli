@@ -45,7 +45,9 @@ Types shared across multiple subpackages SHALL be defined at root `internal/buil
 #### Scenario: LoadedComponent shared type
 
 - **WHEN** LoadedComponent is needed by module and release packages
-- **THEN** it SHALL be defined in `internal/build/component.go` at root level
+- **THEN** it SHALL be accessible via `internal/build/component.go` at root level
+
+> **Amendment**: `LoadedComponent` is defined in `internal/build/module/types.go` (the package that owns it) and re-exported at root via a type alias in `component.go`. This achieves the same goal — all callers import `build.LoadedComponent` — while keeping the struct definition close to its owning package.
 
 #### Scenario: LoadedTransformer shared type
 
@@ -241,21 +243,23 @@ The CLI binary SHALL build successfully after reorganization.
 - **WHEN** binary is built
 - **THEN** `./bin/opm mod apply` SHALL work on test fixtures
 
-### Requirement: Root pipeline as facade
+### Requirement: Root pipeline contains orchestration logic
 
-The root pipeline.go SHALL act as a thin facade delegating to orchestration.
+> **Amendment**: The original requirement for a thin facade delegating to a separate `orchestration/` package was superseded during implementation. Creating an `orchestration/` subpackage introduced import cycles (orchestration would need to import module, release, and transform, while those packages already import build types). The accepted design keeps full orchestration logic in `pipeline.go`.
 
-#### Scenario: Facade size
+The root `pipeline.go` SHALL contain the full pipeline orchestration logic, directly calling into `module/`, `release/`, and `transform/` subpackages.
 
-- **WHEN** root pipeline.go is implemented
-- **THEN** it SHALL be approximately 20-30 lines total
+#### Scenario: Pipeline orchestration in root
 
-#### Scenario: Facade exports
+- **WHEN** a module is rendered
+- **THEN** `pipeline.go` in the root `build` package SHALL orchestrate all phases (module loading, release building, transformation)
 
-- **WHEN** root pipeline.go is implemented
-- **THEN** it SHALL export only Pipeline interface and NewPipeline factory function
+#### Scenario: Public API entry point
 
-#### Scenario: Delegation to orchestration
+- **WHEN** commands create a pipeline
+- **THEN** `build.NewPipeline(cfg)` SHALL remain the sole public entry point
 
-- **WHEN** NewPipeline is called
-- **THEN** it SHALL delegate to orchestration.NewPipeline and return the Pipeline interface
+#### Scenario: File size
+
+- **WHEN** pipeline.go is implemented
+- **THEN** it SHALL not exceed 300 lines
