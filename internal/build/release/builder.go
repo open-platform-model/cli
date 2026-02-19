@@ -195,13 +195,23 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 		}
 	}
 
-	// Step 8: Extract release metadata from overlay-computed #opmReleaseMeta
-	metadata := extractReleaseMetadata(concreteRelease, opts)
+	// Step 8: Extract release and module metadata from the CUE value
+	relMeta := extractReleaseMetadata(concreteRelease, opts)
+	modMeta := extractModuleMetadata(concreteRelease)
+
+	// Collect component names and set on both metadata types
+	componentNames := make([]string, 0, len(components))
+	for name := range components {
+		componentNames = append(componentNames, name)
+	}
+	relMeta.Components = componentNames
+	modMeta.Components = componentNames
 
 	return &BuiltRelease{
-		Value:      concreteRelease,
-		Components: components,
-		Metadata:   metadata,
+		Value:           concreteRelease,
+		Components:      components,
+		ReleaseMetadata: relMeta,
+		ModuleMetadata:  modMeta,
 	}, nil
 }
 

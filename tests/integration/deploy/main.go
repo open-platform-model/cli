@@ -43,11 +43,11 @@ func main() {
 	// OPM labels that the CUE transformers normally inject via #context.labels.
 	// Since this integration test bypasses the render pipeline, we add them manually.
 	opmLabels := map[string]interface{}{
-		"app.kubernetes.io/managed-by":       "open-platform-model",
-		"module-release.opmodel.dev/name":    releaseName,
-		"module-release.opmodel.dev/uuid":    releaseID,
-		"module.opmodel.dev/name":            releaseName,
-		"module.opmodel.dev/version":         "0.1.0",
+		"app.kubernetes.io/managed-by":    "open-platform-model",
+		"module-release.opmodel.dev/name": releaseName,
+		"module-release.opmodel.dev/uuid": releaseID,
+		"module.opmodel.dev/name":         releaseName,
+		"module.opmodel.dev/version":      "0.1.0",
 	}
 
 	cm := &unstructured.Unstructured{Object: map[string]interface{}{

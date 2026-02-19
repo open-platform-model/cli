@@ -12,14 +12,18 @@ import (
 
 func TestNewTransformerContext(t *testing.T) {
 	rel := &release.BuiltRelease{
-		Metadata: release.Metadata{
-			Name:            "my-module",
-			Namespace:       "default",
-			Version:         "1.0.0",
-			FQN:             "example.com/modules@v0#MyModule",
-			Identity:        "module-uuid",
-			ReleaseIdentity: "release-uuid",
-			Labels:          map[string]string{"env": "prod"},
+		ReleaseMetadata: release.ReleaseMetadata{
+			Name:      "my-module",
+			Namespace: "default",
+			UUID:      "release-uuid",
+			Labels:    map[string]string{"env": "prod"},
+		},
+		ModuleMetadata: module.ModuleMetadata{
+			Name:    "my-module",
+			Version: "1.0.0",
+			FQN:     "example.com/modules@v0#MyModule",
+			UUID:    "module-uuid",
+			Labels:  map[string]string{"env": "prod"},
 		},
 	}
 

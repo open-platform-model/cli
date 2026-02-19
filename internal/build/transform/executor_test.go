@@ -59,11 +59,15 @@ func TestExecuteJob_SingleResource(t *testing.T) {
 			Value:       componentCUE,
 		},
 		Release: &release.BuiltRelease{
-			Metadata: release.Metadata{
+			ReleaseMetadata: release.ReleaseMetadata{
 				Name:      "test",
 				Namespace: "default",
-				Version:   "1.0.0",
 				Labels:    map[string]string{},
+			},
+			ModuleMetadata: module.ModuleMetadata{
+				Name:    "test",
+				Version: "1.0.0",
+				Labels:  map[string]string{},
 			},
 		},
 	}
@@ -138,11 +142,15 @@ func TestExecuteJob_MapOutput(t *testing.T) {
 			Value:       componentCUE,
 		},
 		Release: &release.BuiltRelease{
-			Metadata: release.Metadata{
+			ReleaseMetadata: release.ReleaseMetadata{
 				Name:      "test",
 				Namespace: "default",
-				Version:   "1.0.0",
 				Labels:    map[string]string{},
+			},
+			ModuleMetadata: module.ModuleMetadata{
+				Name:    "test",
+				Version: "1.0.0",
+				Labels:  map[string]string{},
 			},
 		},
 	}

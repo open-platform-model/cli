@@ -122,8 +122,8 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	}
 
 	output.Debug("release built",
-		"name", release.Metadata.Name,
-		"namespace", release.Metadata.Namespace,
+		"name", release.ReleaseMetadata.Name,
+		"namespace", release.ReleaseMetadata.Namespace,
 		"components", len(release.Components),
 	)
 
@@ -200,8 +200,8 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 
 	return &RenderResult{
 		Resources: resources,
-		Release:   release.ToReleaseMetadata(),
-		Module:    release.ToModuleMetadata(moduleMeta.Name, moduleMeta.DefaultNamespace),
+		Release:   release.ReleaseMetadata,
+		Module:    release.ModuleMetadata,
 		MatchPlan: matchPlan,
 		Errors:    errors,
 		Warnings:  warnings,

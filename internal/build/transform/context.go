@@ -33,14 +33,11 @@ type TransformerComponentMetadata struct {
 
 // NewTransformerContext constructs the context for a transformer execution.
 func NewTransformerContext(rel *release.BuiltRelease, component *module.LoadedComponent) *TransformerContext {
-	relMeta := rel.ToReleaseMetadata()
-	// ModuleMetadata in transformer context: use release name as module name since
-	// we only have the release-level name here. DefaultNamespace is not available
-	// at this point; callers that need the canonical module name use the pipeline.
-	modMeta := rel.ToModuleMetadata(rel.Metadata.Name, "")
+	relMeta := rel.ReleaseMetadata
+	modMeta := rel.ModuleMetadata
 	return &TransformerContext{
-		Name:            rel.Metadata.Name,
-		Namespace:       rel.Metadata.Namespace,
+		Name:            rel.ReleaseMetadata.Name,
+		Namespace:       rel.ReleaseMetadata.Namespace,
 		ModuleMetadata:  &modMeta,
 		ReleaseMetadata: &relMeta,
 		ComponentMetadata: &TransformerComponentMetadata{

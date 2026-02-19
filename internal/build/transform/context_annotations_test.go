@@ -12,11 +12,15 @@ import (
 
 func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
 	rel := &release.BuiltRelease{
-		Metadata: release.Metadata{
+		ReleaseMetadata: release.ReleaseMetadata{
 			Name:      "my-module",
 			Namespace: "default",
-			Version:   "1.0.0",
 			Labels:    map[string]string{},
+		},
+		ModuleMetadata: module.ModuleMetadata{
+			Name:    "my-module",
+			Version: "1.0.0",
+			Labels:  map[string]string{},
 		},
 	}
 
@@ -37,11 +41,15 @@ func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
 
 func TestNewTransformerContext_EmptyAnnotations(t *testing.T) {
 	rel := &release.BuiltRelease{
-		Metadata: release.Metadata{
+		ReleaseMetadata: release.ReleaseMetadata{
 			Name:      "my-module",
 			Namespace: "default",
-			Version:   "1.0.0",
 			Labels:    map[string]string{},
+		},
+		ModuleMetadata: module.ModuleMetadata{
+			Name:    "my-module",
+			Version: "1.0.0",
+			Labels:  map[string]string{},
 		},
 	}
 

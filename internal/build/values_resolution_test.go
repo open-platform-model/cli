@@ -162,7 +162,11 @@ func TestBuild_StubsValuesCue_WhenValuesFlagsProvided(t *testing.T) {
 	}, []string{valuesFile})
 	require.NoError(t, err)
 	assert.NotNil(t, release)
-	assert.Equal(t, "test-release", release.Metadata.Name)
+	assert.Equal(t, "test-release", release.ReleaseMetadata.Name)
+	assert.Equal(t, "test-module-values-only", release.ModuleMetadata.Name)
+	assert.Equal(t, "example.com/test-module-values-only@v0#test-module-values-only", release.ModuleMetadata.FQN)
+	assert.Equal(t, "1.0.0", release.ModuleMetadata.Version)
+	assert.Equal(t, "default", release.ModuleMetadata.DefaultNamespace)
 }
 
 func TestBuild_NoValuesCue_WithValuesFlag_Succeeds(t *testing.T) {
@@ -180,7 +184,11 @@ func TestBuild_NoValuesCue_WithValuesFlag_Succeeds(t *testing.T) {
 	}, []string{valuesFile})
 	require.NoError(t, err)
 	assert.NotNil(t, release)
-	assert.Equal(t, "test-release", release.Metadata.Name)
+	assert.Equal(t, "test-release", release.ReleaseMetadata.Name)
+	assert.Equal(t, "test-module-no-values", release.ModuleMetadata.Name)
+	assert.Equal(t, "example.com/test-module-no-values@v0#test-module-no-values", release.ModuleMetadata.FQN)
+	assert.Equal(t, "1.0.0", release.ModuleMetadata.Version)
+	assert.Equal(t, "default", release.ModuleMetadata.DefaultNamespace)
 }
 
 func TestBuild_WithValuesCue_NoValuesFlag_Succeeds(t *testing.T) {
@@ -197,5 +205,9 @@ func TestBuild_WithValuesCue_NoValuesFlag_Succeeds(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, release)
-	assert.Equal(t, "test-release", release.Metadata.Name)
+	assert.Equal(t, "test-release", release.ReleaseMetadata.Name)
+	assert.Equal(t, "test-module", release.ModuleMetadata.Name)
+	assert.Equal(t, "example.com/test-module@v0#test-module", release.ModuleMetadata.FQN)
+	assert.Equal(t, "1.0.0", release.ModuleMetadata.Version)
+	assert.Equal(t, "default", release.ModuleMetadata.DefaultNamespace)
 }

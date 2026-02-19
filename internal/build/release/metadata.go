@@ -112,85 +112,158 @@ func extractAnnotations(value cue.Value, annotations map[string]string) {
 	}
 }
 
-// extractReleaseMetadata extracts release metadata from the overlay-computed
-// #opmReleaseMeta definition and module metadata.
+// extractReleaseMetadata extracts release-level metadata from the overlay-computed
+// #opmReleaseMeta definition.
 //
-// The overlay computes identity, labels, fqn, and version via CUE.
-// Module identity comes from metadata.identity (computed by #Module).
-func extractReleaseMetadata(concreteRelease cue.Value, opts Options) Metadata {
-	metadata := Metadata{
+// Fields extracted: Name (from opts), Namespace (from opts), UUID (from
+// #opmReleaseMeta.identity), Labels (from #opmReleaseMeta.labels with fallback
+// to metadata.labels).
+func extractReleaseMetadata(concreteRelease cue.Value, opts Options) ReleaseMetadata {
+	relMeta := ReleaseMetadata{
 		Name:      opts.Name,
 		Namespace: opts.Namespace,
 		Labels:    make(map[string]string),
 	}
 
 	// Extract from overlay-computed #opmReleaseMeta
-	relMeta := concreteRelease.LookupPath(cue.ParsePath("#opmReleaseMeta"))
-	if relMeta.Exists() && relMeta.Err() == nil {
-		// Version
-		if v := relMeta.LookupPath(cue.ParsePath("version")); v.Exists() {
-			if str, err := v.String(); err == nil {
-				metadata.Version = str
-			}
-		}
-
-		// FQN
-		if v := relMeta.LookupPath(cue.ParsePath("fqn")); v.Exists() {
-			if str, err := v.String(); err == nil {
-				metadata.FQN = str
-			}
-		}
-
+	opmRelMeta := concreteRelease.LookupPath(cue.ParsePath("#opmReleaseMeta"))
+	if opmRelMeta.Exists() && opmRelMeta.Err() == nil {
 		// Release identity (computed by CUE uuid.SHA1)
-		if v := relMeta.LookupPath(cue.ParsePath("identity")); v.Exists() {
+		if v := opmRelMeta.LookupPath(cue.ParsePath("identity")); v.Exists() {
 			if str, err := v.String(); err == nil {
-				metadata.ReleaseIdentity = str
+				relMeta.UUID = str
 			}
 		}
 
 		// Labels (includes module labels + standard release labels)
-		if labelsVal := relMeta.LookupPath(cue.ParsePath("labels")); labelsVal.Exists() {
+		if labelsVal := opmRelMeta.LookupPath(cue.ParsePath("labels")); labelsVal.Exists() {
 			iter, err := labelsVal.Fields()
 			if err == nil {
 				for iter.Next() {
 					if str, err := iter.Value().String(); err == nil {
-						metadata.Labels[iter.Selector().Unquoted()] = str
+						relMeta.Labels[iter.Selector().Unquoted()] = str
 					}
 				}
 			}
 		}
 	} else {
 		// Fallback: extract from module metadata directly (no overlay)
-		extractMetadataFallback(concreteRelease, &metadata)
+		extractReleaseMetadataFallback(concreteRelease, &relMeta)
 	}
 
-	// Extract module identity from metadata.identity (always from module, not release)
-	if v := concreteRelease.LookupPath(cue.ParsePath("metadata.identity")); v.Exists() {
-		if str, err := v.String(); err == nil {
-			metadata.Identity = str
+	return relMeta
+}
+
+// extractModuleMetadata extracts module-level metadata from the CUE value.
+//
+// Fields extracted:
+//   - Name: from metadata.name
+//   - DefaultNamespace: from metadata.defaultNamespace
+//   - FQN: from #opmReleaseMeta.fqn, fallback metadata.fqn, fallback metadata.apiVersion
+//   - Version: from #opmReleaseMeta.version, fallback metadata.version
+//   - UUID: from metadata.identity
+//   - Labels: same source as release labels (behavioral parity)
+func extractModuleMetadata(concreteRelease cue.Value) module.ModuleMetadata {
+	modMeta := module.ModuleMetadata{
+		Labels: make(map[string]string),
+	}
+
+	extractModuleMetadataFromCUE(concreteRelease, &modMeta)
+
+	opmRelMeta := concreteRelease.LookupPath(cue.ParsePath("#opmReleaseMeta"))
+	if opmRelMeta.Exists() && opmRelMeta.Err() == nil {
+		extractModuleMetadataFromOpmRelMeta(opmRelMeta, &modMeta)
+	} else {
+		// Fallback: extract from module metadata directly (no overlay)
+		extractModuleMetadataFallback(concreteRelease, &modMeta)
+	}
+
+	return modMeta
+}
+
+// extractModuleMetadataFromCUE extracts module metadata fields directly from the CUE value.
+// These fields are always read from module metadata, regardless of overlay presence.
+func extractModuleMetadataFromCUE(v cue.Value, modMeta *module.ModuleMetadata) {
+	if f := v.LookupPath(cue.ParsePath("metadata.name")); f.Exists() {
+		if str, err := f.String(); err == nil {
+			modMeta.Name = str
 		}
 	}
 
-	return metadata
+	if f := v.LookupPath(cue.ParsePath("metadata.defaultNamespace")); f.Exists() {
+		if str, err := f.String(); err == nil {
+			modMeta.DefaultNamespace = str
+		}
+	}
+
+	if f := v.LookupPath(cue.ParsePath("metadata.identity")); f.Exists() {
+		if str, err := f.String(); err == nil {
+			modMeta.UUID = str
+		}
+	}
 }
 
-// extractMetadataFallback extracts metadata from module fields when overlay is not available.
-func extractMetadataFallback(concreteRelease cue.Value, metadata *Metadata) {
+// extractModuleMetadataFromOpmRelMeta extracts FQN, Version, and Labels from the
+// overlay-computed #opmReleaseMeta definition.
+func extractModuleMetadataFromOpmRelMeta(opmRelMeta cue.Value, modMeta *module.ModuleMetadata) {
+	if v := opmRelMeta.LookupPath(cue.ParsePath("fqn")); v.Exists() {
+		if str, err := v.String(); err == nil {
+			modMeta.FQN = str
+		}
+	}
+
+	if v := opmRelMeta.LookupPath(cue.ParsePath("version")); v.Exists() {
+		if str, err := v.String(); err == nil {
+			modMeta.Version = str
+		}
+	}
+
+	// Labels (same source as release for behavioral parity)
+	if labelsVal := opmRelMeta.LookupPath(cue.ParsePath("labels")); labelsVal.Exists() {
+		iter, err := labelsVal.Fields()
+		if err == nil {
+			for iter.Next() {
+				if str, err := iter.Value().String(); err == nil {
+					modMeta.Labels[iter.Selector().Unquoted()] = str
+				}
+			}
+		}
+	}
+}
+
+// extractReleaseMetadataFallback extracts release metadata from module fields
+// when overlay is not available.
+func extractReleaseMetadataFallback(concreteRelease cue.Value, relMeta *ReleaseMetadata) {
+	if labelsVal := concreteRelease.LookupPath(cue.ParsePath("metadata.labels")); labelsVal.Exists() {
+		iter, err := labelsVal.Fields()
+		if err == nil {
+			for iter.Next() {
+				if str, err := iter.Value().String(); err == nil {
+					relMeta.Labels[iter.Selector().Unquoted()] = str
+				}
+			}
+		}
+	}
+}
+
+// extractModuleMetadataFallback extracts module metadata from module fields
+// when overlay is not available.
+func extractModuleMetadataFallback(concreteRelease cue.Value, modMeta *module.ModuleMetadata) {
 	if v := concreteRelease.LookupPath(cue.ParsePath("metadata.version")); v.Exists() {
 		if str, err := v.String(); err == nil {
-			metadata.Version = str
+			modMeta.Version = str
 		}
 	}
 
 	if v := concreteRelease.LookupPath(cue.ParsePath("metadata.fqn")); v.Exists() {
 		if str, err := v.String(); err == nil {
-			metadata.FQN = str
+			modMeta.FQN = str
 		}
 	}
-	if metadata.FQN == "" {
+	if modMeta.FQN == "" {
 		if v := concreteRelease.LookupPath(cue.ParsePath("metadata.apiVersion")); v.Exists() {
 			if str, err := v.String(); err == nil {
-				metadata.FQN = str
+				modMeta.FQN = str
 			}
 		}
 	}
@@ -200,7 +273,7 @@ func extractMetadataFallback(concreteRelease cue.Value, metadata *Metadata) {
 		if err == nil {
 			for iter.Next() {
 				if str, err := iter.Value().String(); err == nil {
-					metadata.Labels[iter.Selector().Unquoted()] = str
+					modMeta.Labels[iter.Selector().Unquoted()] = str
 				}
 			}
 		}

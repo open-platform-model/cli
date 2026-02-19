@@ -262,11 +262,11 @@ func main() {
 // opmLabels returns the standard OPM labels for test resources.
 func opmLabels() map[string]interface{} {
 	return map[string]interface{}{
-		"app.kubernetes.io/managed-by":       "open-platform-model",
-		"module-release.opmodel.dev/name":    releaseName,
-		"module-release.opmodel.dev/uuid":    releaseID,
-		"module.opmodel.dev/name":            releaseName,
-		"module.opmodel.dev/version":         moduleVersion,
+		"app.kubernetes.io/managed-by":    "open-platform-model",
+		"module-release.opmodel.dev/name": releaseName,
+		"module-release.opmodel.dev/uuid": releaseID,
+		"module.opmodel.dev/name":         releaseName,
+		"module.opmodel.dev/version":      moduleVersion,
 	}
 }
 

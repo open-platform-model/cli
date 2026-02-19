@@ -16,23 +16,10 @@ type Options struct {
 
 // BuiltRelease is the result of building a release.
 type BuiltRelease struct {
-	Value      cue.Value                          // The concrete module value (with #config injected)
-	Components map[string]*module.LoadedComponent // Concrete components by name
-	Metadata   Metadata
-}
-
-// Metadata contains release-level metadata.
-type Metadata struct {
-	Name      string
-	Namespace string
-	Version   string
-	FQN       string
-	Labels    map[string]string
-	// Identity is the module identity UUID (from #Module.metadata.identity).
-	Identity string
-	// ReleaseIdentity is the release identity UUID.
-	// Computed by the CUE overlay via uuid.SHA1(OPMNamespace, "fqn:name:namespace").
-	ReleaseIdentity string
+	Value           cue.Value                          // The concrete module value (with #config injected)
+	Components      map[string]*module.LoadedComponent // Concrete components by name
+	ReleaseMetadata ReleaseMetadata
+	ModuleMetadata  module.ModuleMetadata
 }
 
 // ReleaseMetadata contains release-level identity information for a deployed module.
@@ -60,41 +47,6 @@ type ReleaseMetadata struct {
 
 	// Components lists the component names rendered in this release.
 	Components []string `json:"components,omitempty"`
-}
-
-// ToReleaseMetadata projects a BuiltRelease into a ReleaseMetadata value.
-func (r *BuiltRelease) ToReleaseMetadata() ReleaseMetadata {
-	names := make([]string, 0, len(r.Components))
-	for name := range r.Components {
-		names = append(names, name)
-	}
-	return ReleaseMetadata{
-		Name:       r.Metadata.Name,
-		Namespace:  r.Metadata.Namespace,
-		UUID:       r.Metadata.ReleaseIdentity,
-		Labels:     r.Metadata.Labels,
-		Components: names,
-	}
-}
-
-// ToModuleMetadata projects a BuiltRelease into a module.ModuleMetadata value.
-// moduleName is the canonical module name from module.metadata.name, which may
-// differ from r.Metadata.Name when --name overrides the default.
-// defaultNamespace is the module's default namespace from module.metadata.defaultNamespace.
-func (r *BuiltRelease) ToModuleMetadata(moduleName, defaultNamespace string) module.ModuleMetadata {
-	names := make([]string, 0, len(r.Components))
-	for name := range r.Components {
-		names = append(names, name)
-	}
-	return module.ModuleMetadata{
-		Name:             moduleName,
-		DefaultNamespace: defaultNamespace,
-		FQN:              r.Metadata.FQN,
-		Version:          r.Metadata.Version,
-		UUID:             r.Metadata.Identity,
-		Labels:           r.Metadata.Labels,
-		Components:       names,
-	}
 }
 
 // ValidationError indicates the release failed validation.
