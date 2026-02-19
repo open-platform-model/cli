@@ -13,7 +13,7 @@ import (
 )
 
 // NewConfigVetCmd creates the config vet command.
-func NewConfigVetCmd(cfg *cmdtypes.GlobalConfig) *cobra.Command {
+func NewConfigVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "vet",
 		Short: "Validate configuration",
@@ -43,10 +43,10 @@ Examples:
 	return c
 }
 
-func runConfigVet(_ []string, cfg *cmdtypes.GlobalConfig) error {
-	// Resolve config path using precedence
+func runConfigVet(_ []string, cfg *config.GlobalConfig) error {
+	// Resolve config path using precedence: cfg.Flags.Config > env > default
 	pathResult, err := config.ResolveConfigPath(config.ResolveConfigPathOptions{
-		FlagValue: cfg.ConfigPath,
+		FlagValue: cfg.Flags.Config,
 	})
 	if err != nil {
 		return &cmdtypes.ExitError{
@@ -97,13 +97,14 @@ func runConfigVet(_ []string, cfg *cmdtypes.GlobalConfig) error {
 	output.Println(output.FormatVetCheck("Module metadata found", moduleFile))
 
 	// Check 3, 4, 5: Validate CUE syntax, evaluation, and schema
-	// Use LoadOPMConfig which handles registry resolution, CUE evaluation, and schema validation
-	_, err = config.LoadOPMConfig(config.LoaderOptions{
-		RegistryFlag: cfg.RegistryFlag,
+	// Use Load into a throwaway GlobalConfig to validate the config file.
+	var temp config.GlobalConfig
+	err = config.Load(&temp, config.LoaderOptions{
+		RegistryFlag: cfg.Flags.Registry,
 		ConfigFlag:   configPath,
 	})
 	if err != nil {
-		// The error from LoadOPMConfig already includes hints
+		// The error from Load already includes hints
 		return &cmdtypes.ExitError{
 			Code: cmdtypes.ExitValidationError,
 			Err:  err,

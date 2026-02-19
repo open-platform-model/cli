@@ -5,51 +5,47 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestDefaultConfig(t *testing.T) {
-	cfg := DefaultConfig()
-
-	require.NotNil(t, cfg)
-
-	// Check Kubernetes defaults
-	assert.Equal(t, "~/.kube/config", cfg.Kubernetes.Kubeconfig)
-	assert.Equal(t, "default", cfg.Kubernetes.Namespace)
-	assert.Empty(t, cfg.Kubernetes.Context) // No default context
-
-	// Registry should be empty by default
-	assert.Empty(t, cfg.Registry)
-}
-
-func TestConfig_Fields(t *testing.T) {
-	cfg := &Config{
-		Registry: "registry.example.com",
+func TestGlobalConfig_Fields(t *testing.T) {
+	cfg := &GlobalConfig{
+		Registry:   "registry.example.com",
+		ConfigPath: "/home/user/.opm/config.cue",
 		Kubernetes: KubernetesConfig{
 			Kubeconfig: "/custom/kubeconfig",
 			Context:    "my-cluster",
 			Namespace:  "my-namespace",
 		},
+		Log: LogConfig{
+			Kubernetes: LogKubernetesConfig{
+				APIWarnings: "debug",
+			},
+		},
+		Flags: GlobalFlags{
+			Config:   "/custom/config.cue",
+			Registry: "flag-registry.example.com",
+			Verbose:  true,
+		},
 	}
 
 	assert.Equal(t, "registry.example.com", cfg.Registry)
+	assert.Equal(t, "/home/user/.opm/config.cue", cfg.ConfigPath)
 	assert.Equal(t, "/custom/kubeconfig", cfg.Kubernetes.Kubeconfig)
 	assert.Equal(t, "my-cluster", cfg.Kubernetes.Context)
 	assert.Equal(t, "my-namespace", cfg.Kubernetes.Namespace)
+	assert.Equal(t, "debug", cfg.Log.Kubernetes.APIWarnings)
+	assert.Equal(t, "/custom/config.cue", cfg.Flags.Config)
+	assert.Equal(t, "flag-registry.example.com", cfg.Flags.Registry)
+	assert.True(t, cfg.Flags.Verbose)
 }
 
-func TestOPMConfig(t *testing.T) {
-	cfg := DefaultConfig()
-	opmCfg := &OPMConfig{
-		Config:         cfg,
-		Registry:       "resolved-registry.example.com",
-		RegistrySource: "env",
-		// Note: Providers field is a CUE value, tested separately
-	}
+func TestGlobalFlags_ZeroValue(t *testing.T) {
+	var flags GlobalFlags
 
-	assert.NotNil(t, opmCfg.Config)
-	assert.Equal(t, "resolved-registry.example.com", opmCfg.Registry)
-	assert.Equal(t, "env", opmCfg.RegistrySource)
+	assert.Empty(t, flags.Config)
+	assert.Empty(t, flags.Registry)
+	assert.False(t, flags.Verbose)
+	assert.False(t, flags.Timestamps)
 }
 
 func TestKubernetesConfig_ZeroValue(t *testing.T) {

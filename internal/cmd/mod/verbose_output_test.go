@@ -56,9 +56,8 @@ func TestVerboseOutput_TransformerMatches(t *testing.T) {
 	}`)
 	require.NoError(t, providerCUE.Err())
 
-	cfg := &config.OPMConfig{
+	cfg := &config.GlobalConfig{
 		CueContext: cueCtx,
-		Registry:   "",
 		Providers:  map[string]cue.Value{"test": providerCUE},
 	}
 

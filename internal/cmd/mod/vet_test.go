@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
+	"github.com/opmodel/cli/internal/config"
 )
 
 func TestNewModVetCmd(t *testing.T) {
-	cmd := NewModVetCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModVetCmd(&config.GlobalConfig{})
 
 	assert.Equal(t, "vet [path]", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
@@ -23,7 +23,7 @@ func TestNewModVetCmd(t *testing.T) {
 }
 
 func TestNewModVetCmd_NoLocalVerboseFlag(t *testing.T) {
-	cmd := NewModVetCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModVetCmd(&config.GlobalConfig{})
 
 	// Verify that --verbose is NOT a local flag on this command.
 	// It should come from the root persistent flag instead.
@@ -49,7 +49,7 @@ func TestModVet_ValidModule(t *testing.T) {
 	// Clear registry override for test
 	os.Unsetenv("OPM_REGISTRY")
 
-	cmd := NewModVetCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModVetCmd(&config.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{fixtureDir})

@@ -20,12 +20,10 @@ type RenderReleaseOpts struct {
 	ReleaseName string
 	// K8sConfig is the pre-resolved Kubernetes configuration.
 	// All fields (namespace, provider, kubeconfig, context) must already be resolved
-	// via cmdutil.ResolveKubernetes before calling RenderRelease.
+	// via config.ResolveKubernetes before calling RenderRelease.
 	K8sConfig *config.ResolvedKubernetesConfig
-	// OPMConfig loaded by the root command.
-	OPMConfig *config.OPMConfig
-	// Registry URL resolved by the root command.
-	Registry string
+	// Config is the fully loaded global configuration.
+	Config *config.GlobalConfig
 }
 
 // RenderRelease executes the common render pipeline preamble shared by
@@ -38,8 +36,8 @@ type RenderReleaseOpts struct {
 func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*build.RenderResult, error) {
 	modulePath := ResolveModulePath(opts.Args)
 
-	// Validate OPM config is loaded
-	if opts.OPMConfig == nil {
+	// Validate config is loaded
+	if opts.Config == nil {
 		return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
 	}
 
@@ -73,7 +71,7 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*build.RenderRe
 		Name:       opts.ReleaseName,
 		Namespace:  namespace,
 		Provider:   provider,
-		Registry:   opts.Registry,
+		Registry:   opts.Config.Registry,
 	}
 
 	if err := renderOpts.Validate(); err != nil {
@@ -81,7 +79,7 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*build.RenderRe
 	}
 
 	// Create and execute pipeline
-	pipeline := build.NewPipeline(opts.OPMConfig)
+	pipeline := build.NewPipeline(opts.Config)
 
 	output.Debug("rendering release",
 		"module-path", modulePath,
@@ -133,30 +131,4 @@ func ShowRenderOutput(result *build.RenderResult, opts ShowOutputOpts) error {
 	}
 
 	return nil
-}
-
-// ResolveKubernetes resolves Kubernetes configuration values from flags,
-// environment, and config. It accepts an OPMConfig and individual flag values
-// (which may be empty strings) and returns resolved K8s config.
-func ResolveKubernetes(opmConfig *config.OPMConfig, kubeconfigFlag, contextFlag, namespaceFlag, providerFlag string) (*config.ResolvedKubernetesConfig, error) {
-	var cfg *config.Config
-	var providerNames []string
-
-	if opmConfig != nil {
-		cfg = opmConfig.Config
-		if opmConfig.Providers != nil {
-			for name := range opmConfig.Providers {
-				providerNames = append(providerNames, name)
-			}
-		}
-	}
-
-	return config.ResolveKubernetes(config.ResolveKubernetesOptions{
-		KubeconfigFlag: kubeconfigFlag,
-		ContextFlag:    contextFlag,
-		NamespaceFlag:  namespaceFlag,
-		ProviderFlag:   providerFlag,
-		Config:         cfg,
-		ProviderNames:  providerNames,
-	})
 }

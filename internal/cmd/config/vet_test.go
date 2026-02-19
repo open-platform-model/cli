@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
+	opmconfig "github.com/opmodel/cli/internal/config"
 )
 
 func TestNewConfigVetCmd(t *testing.T) {
-	cmd := NewConfigVetCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 
 	assert.Equal(t, "vet", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
@@ -34,7 +34,7 @@ func TestConfigVet_MissingConfigFile(t *testing.T) {
 	// Clear any config override
 	os.Unsetenv("OPM_CONFIG")
 
-	cmd := NewConfigVetCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -60,7 +60,7 @@ func TestConfigVet_MissingModuleFile(t *testing.T) {
 	configFile := filepath.Join(opmDir, "config.cue")
 	require.NoError(t, os.WriteFile(configFile, []byte("package config\n"), 0o600))
 
-	cmd := NewConfigVetCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -111,7 +111,7 @@ language: {
 	moduleFile := filepath.Join(cueModDir, "module.cue")
 	require.NoError(t, os.WriteFile(moduleFile, []byte(moduleContent), 0o600))
 
-	cmd := NewConfigVetCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -157,7 +157,7 @@ language: {
 	moduleFile := filepath.Join(cueModDir, "module.cue")
 	require.NoError(t, os.WriteFile(moduleFile, []byte(moduleContent), 0o600))
 
-	cmd := NewConfigVetCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -207,7 +207,7 @@ language: {
 	moduleFile := filepath.Join(cueModDir, "module.cue")
 	require.NoError(t, os.WriteFile(moduleFile, []byte(moduleContent), 0o600))
 
-	cmd := NewConfigVetCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -256,7 +256,7 @@ language: {
 	moduleFile := filepath.Join(cueModDir, "module.cue")
 	require.NoError(t, os.WriteFile(moduleFile, []byte(moduleContent), 0o600))
 
-	cmd := NewConfigVetCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -307,7 +307,7 @@ language: {
 	moduleFile := filepath.Join(cueModDir, "module.cue")
 	require.NoError(t, os.WriteFile(moduleFile, []byte(moduleContent), 0o600))
 
-	cmd := NewConfigVetCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -357,7 +357,7 @@ language: {
 	defer os.Unsetenv("OPM_CONFIG")
 	os.Unsetenv("OPM_REGISTRY")
 
-	cmd := NewConfigVetCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 

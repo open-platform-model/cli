@@ -6,20 +6,7 @@ package cmdtypes
 import (
 	oerrors "github.com/opmodel/cli/internal/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
-	"github.com/opmodel/cli/internal/config"
 )
-
-// GlobalConfig holds CLI-wide configuration resolved during PersistentPreRunE.
-// It is populated once at startup and passed explicitly into every sub-command
-// constructor, replacing the former package-level mutable globals.
-type GlobalConfig struct {
-	OPMConfig    *config.OPMConfig
-	ConfigPath   string // resolved --config path
-	Registry     string // resolved --registry URL
-	RegistryFlag string // raw --registry flag value (needed by config vet)
-	Verbose      bool
-}
 
 // Exit codes — type aliases to internal/errors constants.
 const (

@@ -10,11 +10,12 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdtypes"
 	"github.com/opmodel/cli/internal/cmdutil"
+	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 )
 
 // NewModVetCmd creates the mod vet command.
-func NewModVetCmd(cfg *cmdtypes.GlobalConfig) *cobra.Command {
+func NewModVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var rf cmdutil.RenderFlags
 
 	c := &cobra.Command{
@@ -50,13 +51,17 @@ Examples:
 }
 
 // runVet executes the vet command.
-func runVet(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags) error {
+func runVet(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags) error {
 	ctx := context.Background()
 
 	// Resolve Kubernetes configuration (namespace, provider) for the render pipeline.
 	// vet does not connect to a cluster, but namespace and provider still need to flow
 	// through the same resolver (flag > env > config > default).
-	k8sConfig, err := cmdutil.ResolveKubernetes(cfg.OPMConfig, "", "", rf.Namespace, rf.Provider)
+	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
+		Config:        cfg,
+		NamespaceFlag: rf.Namespace,
+		ProviderFlag:  rf.Provider,
+	})
 	if err != nil {
 		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("resolving config: %w", err)}
 	}
@@ -67,8 +72,7 @@ func runVet(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags) 
 		Values:      rf.Values,
 		ReleaseName: rf.ReleaseName,
 		K8sConfig:   k8sConfig,
-		OPMConfig:   cfg.OPMConfig,
-		Registry:    cfg.Registry,
+		Config:      cfg,
 	})
 	if err != nil {
 		return err
@@ -76,7 +80,7 @@ func runVet(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags) 
 
 	// Post-render: check errors, show matches, log warnings
 	if err := cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{
-		Verbose: cfg.Verbose,
+		Verbose: cfg.Flags.Verbose,
 	}); err != nil {
 		return err
 	}
@@ -100,7 +104,7 @@ func runVet(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags) 
 	releaseLog.Info(output.FormatVetCheck("Values satisfy #config", valuesDetail))
 
 	// Print per-resource validation lines (skip when --verbose already showed them)
-	if !cfg.Verbose {
+	if !cfg.Flags.Verbose {
 		for _, res := range result.Resources {
 			line := output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), output.StatusValid)
 			releaseLog.Info(line)

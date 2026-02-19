@@ -5,11 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
+	"github.com/opmodel/cli/internal/config"
 )
 
 func TestNewModBuildCmd(t *testing.T) {
-	cmd := NewModBuildCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModBuildCmd(&config.GlobalConfig{})
 
 	assert.Equal(t, "build [path]", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
@@ -17,7 +17,7 @@ func TestNewModBuildCmd(t *testing.T) {
 }
 
 func TestNewModBuildCmd_NoLocalVerboseFlag(t *testing.T) {
-	cmd := NewModBuildCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModBuildCmd(&config.GlobalConfig{})
 
 	// Verify that --verbose is NOT a local flag on this command.
 	// It should come from the root persistent flag instead.

@@ -61,19 +61,24 @@ func BootstrapRegistry(configPath string) (string, error) {
 	return registry, nil
 }
 
-// LoadOPMConfig loads the full OPM configuration with resolved registry.
+// Load loads the full OPM configuration into cfg, applying precedence rules.
 // This implements the two-phase loading process per FR-013.
 //
 // Phase 1: Extract config.registry via simple parsing (BootstrapRegistry)
 // Phase 2: Load config.cue with CUE_REGISTRY set to resolved registry
-func LoadOPMConfig(opts LoaderOptions) (*OPMConfig, error) {
+//
+// Load sets: cfg.ConfigPath, cfg.Registry, cfg.Kubernetes, cfg.Log, cfg.Providers, cfg.CueContext.
+// The caller sets cfg.Flags before or after calling Load.
+func Load(cfg *GlobalConfig, opts LoaderOptions) error {
 	// Step 1: Resolve config path
 	configPathResult, err := ResolveConfigPath(ResolveConfigPathOptions{
 		FlagValue: opts.ConfigFlag,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("resolving config path: %w", err)
+		return fmt.Errorf("resolving config path: %w", err)
 	}
+
+	cfg.ConfigPath = configPathResult.ConfigPath
 
 	output.Debug("resolved config path",
 		"path", configPathResult.ConfigPath,
@@ -83,7 +88,7 @@ func LoadOPMConfig(opts LoaderOptions) (*OPMConfig, error) {
 	// Step 2: Bootstrap - extract registry from config without full parsing
 	configRegistry, err := BootstrapRegistry(configPathResult.ConfigPath)
 	if err != nil {
-		return nil, fmt.Errorf("bootstrap registry extraction: %w", err)
+		return fmt.Errorf("bootstrap registry extraction: %w", err)
 	}
 
 	// Step 3: Resolve registry using precedence
@@ -91,6 +96,8 @@ func LoadOPMConfig(opts LoaderOptions) (*OPMConfig, error) {
 		FlagValue:   opts.RegistryFlag,
 		ConfigValue: configRegistry,
 	})
+
+	cfg.Registry = registryResult.Registry
 
 	output.Debug("resolved registry",
 		"registry", registryResult.Registry,
@@ -106,7 +113,7 @@ func LoadOPMConfig(opts LoaderOptions) (*OPMConfig, error) {
 			output.Debug("could not check for providers", "error", err)
 		}
 		if hasProviders {
-			return nil, oerrors.NewValidationError(
+			return oerrors.NewValidationError(
 				"providers configured but no registry resolvable",
 				configPathResult.ConfigPath,
 				"providers", // field
@@ -116,18 +123,12 @@ func LoadOPMConfig(opts LoaderOptions) (*OPMConfig, error) {
 	}
 
 	// Step 5: Phase 2 - Load full config with registry set
-	cfg, providers, cueCtx, err := loadFullConfig(configPathResult.ConfigPath, registryResult.Registry)
+	err = loadFullConfig(cfg, configPathResult.ConfigPath, registryResult.Registry)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &OPMConfig{
-		Config:         cfg,
-		Registry:       registryResult.Registry,
-		RegistrySource: string(registryResult.Source),
-		Providers:      providers,
-		CueContext:     cueCtx,
-	}, nil
+	return nil
 }
 
 // configHasProviders checks if the config file references providers.
@@ -146,16 +147,23 @@ func configHasProviders(configPath string) (bool, error) {
 	return providerRegex.Match(content), nil
 }
 
-// loadFullConfig loads the config.cue file with full CUE evaluation.
+// loadFullConfig loads the config.cue file with full CUE evaluation,
+// populating cfg fields directly.
 // This is Phase 2 of the two-phase loading process.
-// Returns the config, providers map, CUE context, and any error.
-func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value, *cue.Context, error) {
+func loadFullConfig(cfg *GlobalConfig, configPath, registry string) error {
 	// Check if config exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		output.Debug("config file not found, using defaults",
 			"path", configPath,
 		)
-		return DefaultConfig(), nil, cuecontext.New(), nil
+		// Apply defaults inline
+		cfg.Kubernetes = KubernetesConfig{
+			Kubeconfig: "~/.kube/config",
+			Namespace:  "default",
+		}
+		cfg.Log.Kubernetes.APIWarnings = "warn"
+		cfg.CueContext = cuecontext.New()
+		return nil
 	}
 
 	// Use the directory containing the config file for CUE loading.
@@ -171,13 +179,13 @@ func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value,
 	// Load CUE configuration
 	ctx := cuecontext.New()
 
-	cfg := &load.Config{
+	cueLoadCfg := &load.Config{
 		Dir: configDir,
 	}
 
-	instances := load.Instances([]string{"."}, cfg)
+	instances := load.Instances([]string{"."}, cueLoadCfg)
 	if len(instances) == 0 {
-		return nil, nil, nil, oerrors.NewValidationError(
+		return oerrors.NewValidationError(
 			"no CUE instances found",
 			configDir,
 			"", // no specific field
@@ -187,7 +195,7 @@ func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value,
 
 	inst := instances[0]
 	if inst.Err != nil {
-		return nil, nil, nil, &oerrors.DetailError{
+		return &oerrors.DetailError{
 			Type:     "configuration error",
 			Message:  inst.Err.Error(),
 			Location: configPath,
@@ -198,7 +206,7 @@ func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value,
 
 	value := ctx.BuildInstance(inst)
 	if value.Err() != nil {
-		return nil, nil, nil, &oerrors.DetailError{
+		return &oerrors.DetailError{
 			Type:     "configuration error",
 			Message:  value.Err().Error(),
 			Location: configPath,
@@ -209,19 +217,22 @@ func loadFullConfig(configPath, registry string) (*Config, map[string]cue.Value,
 
 	// Validate against embedded schema
 	if err := validateConfigSchema(ctx, value, configPath); err != nil {
-		return nil, nil, nil, err
+		return err
 	}
 
-	// Extract config values
-	config, err := extractConfig(value)
-	if err != nil {
-		return nil, nil, nil, err
+	// Extract config values into cfg
+	extractConfigInto(cfg, value)
+
+	// Set default for APIWarnings if not specified
+	if cfg.Log.Kubernetes.APIWarnings == "" {
+		cfg.Log.Kubernetes.APIWarnings = "warn"
 	}
 
 	// Extract providers
-	providers := extractProviders(value)
+	cfg.Providers = extractProviders(value)
+	cfg.CueContext = ctx
 
-	return config, providers, ctx, nil
+	return nil
 }
 
 // validateConfigSchema validates the loaded CUE value against the embedded schema.
@@ -288,11 +299,15 @@ func extractProviders(value cue.Value) map[string]cue.Value {
 	return providers
 }
 
-// extractConfig extracts Go config struct from CUE value.
+// extractConfigInto populates cfg fields from the CUE value.
 //
 //nolint:unparam // error return allows for future validation
-func extractConfig(value cue.Value) (*Config, error) {
-	cfg := DefaultConfig()
+func extractConfigInto(cfg *GlobalConfig, value cue.Value) {
+	// Apply defaults first
+	cfg.Kubernetes = KubernetesConfig{
+		Kubeconfig: "~/.kube/config",
+		Namespace:  "default",
+	}
 
 	// Look for config struct or top-level fields
 	configValue := value.LookupPath(cue.ParsePath("config"))
@@ -301,12 +316,8 @@ func extractConfig(value cue.Value) (*Config, error) {
 		configValue = value
 	}
 
-	// Extract registry
-	if registryVal := configValue.LookupPath(cue.ParsePath("registry")); registryVal.Exists() {
-		if str, err := registryVal.String(); err == nil {
-			cfg.Registry = str
-		}
-	}
+	// Extract registry (already resolved separately, but keep for completeness)
+	// Note: cfg.Registry is already set by the caller via ResolveRegistry
 
 	// Extract kubernetes config
 	k8sValue := configValue.LookupPath(cue.ParsePath("kubernetes"))
@@ -347,11 +358,4 @@ func extractConfig(value cue.Value) (*Config, error) {
 			}
 		}
 	}
-
-	// Set default for APIWarnings if not specified
-	if cfg.Log.Kubernetes.APIWarnings == "" {
-		cfg.Log.Kubernetes.APIWarnings = "warn"
-	}
-
-	return cfg, nil
 }

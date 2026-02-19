@@ -14,7 +14,7 @@ import (
 
 func TestNewPipeline(t *testing.T) {
 	// Test that NewPipeline creates a valid pipeline
-	cfg := &config.OPMConfig{
+	cfg := &config.GlobalConfig{
 		CueContext: cuecontext.New(),
 		Registry:   "",
 		Providers:  make(map[string]cue.Value),

@@ -7,7 +7,7 @@ import (
 )
 
 // NewK8sClient creates a Kubernetes client from pre-resolved Kubernetes configuration.
-// All values in k8sConfig must already be resolved via cmdutil.ResolveKubernetes —
+// All values in k8sConfig must already be resolved via config.ResolveKubernetes —
 // no further precedence resolution is performed here or inside the client.
 // Returns an *ExitError with ExitConnectivityError on failure.
 func NewK8sClient(k8sConfig *config.ResolvedKubernetesConfig, apiWarnings string) (*kubernetes.Client, error) {

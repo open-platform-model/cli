@@ -123,7 +123,7 @@ providers: {
 	assert.True(t, has)
 }
 
-func TestLoadOPMConfig_NoConfigFile(t *testing.T) {
+func TestLoad_NoConfigFile(t *testing.T) {
 	// Use a temp home dir that doesn't have .opm
 	tmpHome, err := os.MkdirTemp("", "opm-load-test-*")
 	require.NoError(t, err)
@@ -137,16 +137,15 @@ func TestLoadOPMConfig_NoConfigFile(t *testing.T) {
 	os.Unsetenv("OPM_REGISTRY")
 	os.Unsetenv("OPM_CONFIG")
 
-	cfg, err := LoadOPMConfig(LoaderOptions{})
+	var cfg GlobalConfig
+	err = Load(&cfg, LoaderOptions{})
 	require.NoError(t, err)
 
-	// Should return default config
-	assert.NotNil(t, cfg)
-	assert.NotNil(t, cfg.Config)
+	// Should populate with defaults (empty registry when no config or env)
 	assert.Empty(t, cfg.Registry)
 }
 
-func TestLoadOPMConfig_WithRegistryEnv(t *testing.T) {
+func TestLoad_WithRegistryEnv(t *testing.T) {
 	tmpHome, err := os.MkdirTemp("", "opm-load-test-*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpHome)
@@ -159,14 +158,14 @@ func TestLoadOPMConfig_WithRegistryEnv(t *testing.T) {
 	defer os.Unsetenv("OPM_REGISTRY")
 	os.Unsetenv("OPM_CONFIG")
 
-	cfg, err := LoadOPMConfig(LoaderOptions{})
+	var cfg GlobalConfig
+	err = Load(&cfg, LoaderOptions{})
 	require.NoError(t, err)
 
 	assert.Equal(t, "env-registry.example.com", cfg.Registry)
-	assert.Equal(t, "env", cfg.RegistrySource)
 }
 
-func TestLoadOPMConfig_RegistryFlagPrecedence(t *testing.T) {
+func TestLoad_RegistryFlagPrecedence(t *testing.T) {
 	tmpHome, err := os.MkdirTemp("", "opm-load-test-*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpHome)
@@ -179,13 +178,14 @@ func TestLoadOPMConfig_RegistryFlagPrecedence(t *testing.T) {
 	defer os.Unsetenv("OPM_REGISTRY")
 	os.Unsetenv("OPM_CONFIG")
 
-	cfg, err := LoadOPMConfig(LoaderOptions{
+	var cfg GlobalConfig
+	err = Load(&cfg, LoaderOptions{
 		RegistryFlag: "flag-registry.example.com",
 	})
 	require.NoError(t, err)
 
+	// Flag takes precedence over env
 	assert.Equal(t, "flag-registry.example.com", cfg.Registry)
-	assert.Equal(t, "flag", cfg.RegistrySource)
 }
 
 func TestExtractConfig_Empty(t *testing.T) {
@@ -224,7 +224,8 @@ config: {
 `
 	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
 
-	cfg, _, _, err := loadFullConfig(configPath, "")
+	var cfg GlobalConfig
+	err = loadFullConfig(&cfg, configPath, "")
 	require.NoError(t, err)
 	require.NotNil(t, cfg.Log.Timestamps, "Log.Timestamps should not be nil")
 	assert.False(t, *cfg.Log.Timestamps, "Log.Timestamps should be false")
@@ -258,7 +259,8 @@ config: {
 `
 	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
 
-	cfg, _, _, err := loadFullConfig(configPath, "")
+	var cfg GlobalConfig
+	err = loadFullConfig(&cfg, configPath, "")
 	require.NoError(t, err)
 	assert.Nil(t, cfg.Log.Timestamps, "Log.Timestamps should be nil when not configured (defaults handled by caller)")
 }
@@ -294,7 +296,8 @@ config: {
 `
 	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
 
-	_, _, _, err = loadFullConfig(configPath, "")
+	var cfg2 GlobalConfig
+	err = loadFullConfig(&cfg2, configPath, "")
 	// Schema validation should catch the type error (string instead of bool)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "schema validation")
@@ -369,8 +372,12 @@ config: {
 			value := ctx.CompileString(tt.cueInput)
 			assert.NoError(t, value.Err())
 
-			cfg, err := extractConfig(value)
-			assert.NoError(t, err)
+			var cfg GlobalConfig
+			extractConfigInto(&cfg, value)
+			// Apply the same default as loadFullConfig does
+			if cfg.Log.Kubernetes.APIWarnings == "" {
+				cfg.Log.Kubernetes.APIWarnings = "warn"
+			}
 			assert.Equal(t, tt.want, cfg.Log.Kubernetes.APIWarnings)
 		})
 	}

@@ -4,11 +4,11 @@ package mod
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
+	"github.com/opmodel/cli/internal/config"
 )
 
 // NewModCmd creates the mod command group.
-func NewModCmd(cfg *cmdtypes.GlobalConfig) *cobra.Command {
+func NewModCmd(cfg *config.GlobalConfig) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "mod",
 		Short: "Module operations",

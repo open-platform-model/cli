@@ -5,13 +5,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
+	"github.com/opmodel/cli/internal/config"
 )
 
 // --- Tests for flag validation on mod status ---
 
 func TestModStatusCmd_RequiresNameOrReleaseID(t *testing.T) {
-	cmd := NewModStatusCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModStatusCmd(&config.GlobalConfig{})
 	cmd.SetArgs([]string{"-n", "default"})
 	err := cmd.Execute()
 	assert.Error(t, err)
@@ -19,7 +19,7 @@ func TestModStatusCmd_RequiresNameOrReleaseID(t *testing.T) {
 }
 
 func TestModStatusCmd_MutuallyExclusive(t *testing.T) {
-	cmd := NewModStatusCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModStatusCmd(&config.GlobalConfig{})
 	cmd.SetArgs([]string{"-n", "default", "--release-name", "my-app", "--release-id", "abc123"})
 	err := cmd.Execute()
 	assert.Error(t, err)
@@ -29,7 +29,7 @@ func TestModStatusCmd_MutuallyExclusive(t *testing.T) {
 func TestModStatusCmd_NamespaceOptional(t *testing.T) {
 	// Namespace is now optional - falls back to config or default "default"
 	// Verify the flag exists
-	cmd := NewModStatusCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModStatusCmd(&config.GlobalConfig{})
 	f := cmd.Flags().Lookup("namespace")
 	assert.NotNil(t, f)
 
@@ -41,7 +41,7 @@ func TestModStatusCmd_NamespaceOptional(t *testing.T) {
 }
 
 func TestModStatusCmd_FlagsExist(t *testing.T) {
-	cmd := NewModStatusCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModStatusCmd(&config.GlobalConfig{})
 	assert.Equal(t, "status", cmd.Use)
 
 	// Check flags exist
@@ -56,7 +56,7 @@ func TestModStatusCmd_FlagsExist(t *testing.T) {
 }
 
 func TestModDiffCmd_FlagsExist(t *testing.T) {
-	cmd := NewModDiffCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModDiffCmd(&config.GlobalConfig{})
 	assert.Equal(t, "diff [path]", cmd.Use)
 
 	f := cmd.Flags()

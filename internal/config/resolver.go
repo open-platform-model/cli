@@ -147,73 +147,12 @@ type ResolvedField struct {
 	Shadowed map[Source]string
 }
 
-// ResolvedBaseConfig contains resolved base configuration values (config path, registry).
-type ResolvedBaseConfig struct {
-	ConfigPath ResolvedField
-	Registry   ResolvedField
-}
-
 // ResolvedKubernetesConfig contains resolved Kubernetes configuration values.
 type ResolvedKubernetesConfig struct {
 	Kubeconfig ResolvedField
 	Context    ResolvedField
 	Namespace  ResolvedField
 	Provider   ResolvedField
-}
-
-// ResolvedConfig contains all resolved configuration values.
-type ResolvedConfig struct {
-	ConfigPath ResolvedField
-	Registry   ResolvedField
-	Kubeconfig ResolvedField
-	Context    ResolvedField
-	Namespace  ResolvedField
-	Provider   ResolvedField
-}
-
-// ResolveBaseOptions contains options for resolving base configuration values.
-type ResolveBaseOptions struct {
-	// Flag values
-	ConfigFlag   string
-	RegistryFlag string
-
-	// Config values (from loaded config file)
-	Config *Config
-}
-
-// ResolveBase resolves base configuration values (config path, registry).
-func ResolveBase(opts ResolveBaseOptions) (*ResolvedBaseConfig, error) {
-	result := &ResolvedBaseConfig{}
-
-	// Resolve config path
-	configPathResult, err := ResolveConfigPath(ResolveConfigPathOptions{
-		FlagValue: opts.ConfigFlag,
-	})
-	if err != nil {
-		return nil, err
-	}
-	result.ConfigPath = ResolvedField{
-		Value:    configPathResult.ConfigPath,
-		Source:   configPathResult.Source,
-		Shadowed: configPathResult.Shadowed,
-	}
-
-	// Resolve registry
-	var configRegistry string
-	if opts.Config != nil {
-		configRegistry = opts.Config.Registry
-	}
-	registryResult := ResolveRegistry(ResolveRegistryOptions{
-		FlagValue:   opts.RegistryFlag,
-		ConfigValue: configRegistry,
-	})
-	result.Registry = ResolvedField{
-		Value:    registryResult.Registry,
-		Source:   registryResult.Source,
-		Shadowed: registryResult.Shadowed,
-	}
-
-	return result, nil
 }
 
 // ResolveKubernetesOptions contains options for resolving Kubernetes configuration values.
@@ -224,11 +163,9 @@ type ResolveKubernetesOptions struct {
 	NamespaceFlag  string
 	ProviderFlag   string
 
-	// Config values (from loaded config file)
-	Config *Config
-
-	// Provider names (keys from loaded providers map)
-	ProviderNames []string
+	// Config is the loaded global configuration. Provides kubernetes config values
+	// and provider names for auto-resolution.
+	Config *GlobalConfig
 }
 
 // ResolveKubernetes resolves Kubernetes configuration values using precedence: Flag > Env > Config > Default.
@@ -276,64 +213,16 @@ func ResolveKubernetes(opts ResolveKubernetesOptions) (*ResolvedKubernetesConfig
 		"default",
 	)
 
+	// Extract provider names from config
+	var providerNames []string
+	if opts.Config != nil {
+		for name := range opts.Config.Providers {
+			providerNames = append(providerNames, name)
+		}
+	}
+
 	// Resolve provider with auto-resolution
-	result.Provider = resolveProvider(opts.ProviderFlag, opts.ProviderNames)
-
-	return result, nil
-}
-
-// ResolveAllOptions contains options for resolving all configuration values.
-type ResolveAllOptions struct {
-	// Flag values
-	ConfigFlag     string
-	RegistryFlag   string
-	KubeconfigFlag string
-	ContextFlag    string
-	NamespaceFlag  string
-	ProviderFlag   string
-
-	// Config values (from loaded config file)
-	Config *Config
-
-	// Provider names (keys from loaded providers map)
-	ProviderNames []string
-}
-
-// ResolveAll resolves all configuration values using precedence: Flag > Env > Config > Default.
-// This is a convenience wrapper around ResolveBase and ResolveKubernetes.
-func ResolveAll(opts ResolveAllOptions) (*ResolvedConfig, error) {
-	// Resolve base config
-	baseResult, err := ResolveBase(ResolveBaseOptions{
-		ConfigFlag:   opts.ConfigFlag,
-		RegistryFlag: opts.RegistryFlag,
-		Config:       opts.Config,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Resolve kubernetes config
-	k8sResult, err := ResolveKubernetes(ResolveKubernetesOptions{
-		KubeconfigFlag: opts.KubeconfigFlag,
-		ContextFlag:    opts.ContextFlag,
-		NamespaceFlag:  opts.NamespaceFlag,
-		ProviderFlag:   opts.ProviderFlag,
-		Config:         opts.Config,
-		ProviderNames:  opts.ProviderNames,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Merge results
-	result := &ResolvedConfig{
-		ConfigPath: baseResult.ConfigPath,
-		Registry:   baseResult.Registry,
-		Kubeconfig: k8sResult.Kubeconfig,
-		Context:    k8sResult.Context,
-		Namespace:  k8sResult.Namespace,
-		Provider:   k8sResult.Provider,
-	}
+	result.Provider = resolveProvider(opts.ProviderFlag, providerNames)
 
 	return result, nil
 }

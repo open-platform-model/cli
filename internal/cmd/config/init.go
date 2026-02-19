@@ -13,7 +13,7 @@ import (
 )
 
 // NewConfigInitCmd creates the config init command.
-func NewConfigInitCmd(_ *cmdtypes.GlobalConfig) *cobra.Command {
+func NewConfigInitCmd(_ *config.GlobalConfig) *cobra.Command {
 	// Init-specific flag (local to this command)
 	var forceFlag bool
 

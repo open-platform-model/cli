@@ -13,7 +13,7 @@ import (
 
 func TestRenderModule_NilConfig(t *testing.T) {
 	_, err := RenderRelease(context.Background(), RenderReleaseOpts{
-		OPMConfig: nil,
+		Config:    nil,
 		K8sConfig: nil,
 	})
 

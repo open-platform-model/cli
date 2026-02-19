@@ -12,11 +12,11 @@ import (
 
 // ProviderLoader loads providers from configuration.
 type ProviderLoader struct {
-	config *config.OPMConfig
+	config *config.GlobalConfig
 }
 
 // NewProviderLoader creates a new ProviderLoader.
-func NewProviderLoader(cfg *config.OPMConfig) *ProviderLoader {
+func NewProviderLoader(cfg *config.GlobalConfig) *ProviderLoader {
 	return &ProviderLoader{config: cfg}
 }
 

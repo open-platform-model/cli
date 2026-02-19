@@ -77,21 +77,23 @@ The `ReleaseSelectorFlags` struct SHALL provide a `LogName()` method that return
 
 ### Requirement: RenderModule executes the common render pipeline and returns a result or ExitError
 
-The `RenderModule` function SHALL accept a context, a `RenderModuleOpts` struct (containing args, RenderFlags, optional K8sFlags, OPMConfig, registry string, and verbose flag), and SHALL execute the full render pipeline preamble: resolve module path from args, validate OPM config is loaded, resolve Kubernetes config (namespace/provider) via `config.ResolveKubernetes`, build `build.RenderOptions`, validate options, create `build.NewPipeline`, and call `pipeline.Render()`.
+The `RenderModule` function SHALL accept a context, a `RenderModuleOpts` struct (containing args, RenderFlags, optional K8sFlags, `*config.GlobalConfig`, and verbose flag), and SHALL execute the full render pipeline preamble: resolve module path from args, validate config is loaded, resolve Kubernetes config (namespace/provider) via `config.ResolveKubernetes`, build `build.RenderOptions`, validate options, create `build.NewPipeline`, and call `pipeline.Render()`.
+
+The `RenderModuleOpts` struct SHALL contain a `Config *config.GlobalConfig` field. It SHALL NOT contain separate `OPMConfig` and `Registry` fields. The pipeline SHALL read the registry from `Config.Registry`.
 
 On success, it SHALL return the `*build.RenderResult`. On failure at any step, it SHALL return an `*ExitError` with the appropriate exit code.
 
 #### Scenario: RenderModule succeeds with valid module
 
-- **WHEN** `RenderModule` is called with a valid module path, loaded OPMConfig, and valid RenderFlags
+- **WHEN** `RenderModule` is called with a valid module path, loaded GlobalConfig, and valid RenderFlags
 - **THEN** it SHALL return a non-nil `*build.RenderResult`
 - **AND** the error SHALL be `nil`
 
-#### Scenario: RenderModule fails when OPMConfig is nil
+#### Scenario: RenderModule fails when Config is nil
 
-- **WHEN** `RenderModule` is called with a nil OPMConfig
+- **WHEN** `RenderModule` is called with a nil Config
 - **THEN** it SHALL return an `*ExitError` with `Code` equal to `ExitGeneralError`
-- **AND** the error message SHALL contain `"configuration not loaded"`
+- **THEN** the error message SHALL contain `"configuration not loaded"`
 
 #### Scenario: RenderModule fails on render validation error
 
@@ -143,7 +145,7 @@ The `ShowRenderOutput` function SHALL accept a `*build.RenderResult` and output 
 
 ### Requirement: NewK8sClient creates a Kubernetes client or returns a connectivity ExitError
 
-The `NewK8sClient` function SHALL accept kubeconfig path, context name, and API warnings setting. It SHALL create a `kubernetes.Client` using `kubernetes.NewClient`. On failure, it SHALL return an `*ExitError` with `Code` equal to `ExitConnectivityError`.
+The `NewK8sClient` function SHALL accept a `*config.ResolvedKubernetesConfig` and an API warnings string. It SHALL create a `kubernetes.Client` using `kubernetes.NewClient`. On failure, it SHALL return an `*ExitError` with `Code` equal to `ExitConnectivityError`.
 
 #### Scenario: NewK8sClient succeeds with valid kubeconfig
 

@@ -9,11 +9,12 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdtypes"
 	"github.com/opmodel/cli/internal/cmdutil"
+	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 )
 
 // NewModBuildCmd creates the mod build command.
-func NewModBuildCmd(cfg *cmdtypes.GlobalConfig) *cobra.Command {
+func NewModBuildCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var rf cmdutil.RenderFlags
 
 	// Build-specific flags (local to this command)
@@ -68,7 +69,7 @@ Examples:
 }
 
 // runBuild executes the build command.
-func runBuild(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags, outputFmt string, split bool, outDir string) error {
+func runBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, outputFmt string, split bool, outDir string) error {
 	ctx := context.Background()
 
 	// Validate output format
@@ -83,7 +84,11 @@ func runBuild(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags
 	// Resolve Kubernetes configuration (namespace, provider) for the render pipeline.
 	// build does not connect to a cluster, but namespace and provider still need to flow
 	// through the same resolver (flag > env > config > default).
-	k8sConfig, err := cmdutil.ResolveKubernetes(cfg.OPMConfig, "", "", rf.Namespace, rf.Provider)
+	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
+		Config:        cfg,
+		NamespaceFlag: rf.Namespace,
+		ProviderFlag:  rf.Provider,
+	})
 	if err != nil {
 		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("resolving config: %w", err)}
 	}
@@ -94,8 +99,7 @@ func runBuild(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags
 		Values:      rf.Values,
 		ReleaseName: rf.ReleaseName,
 		K8sConfig:   k8sConfig,
-		OPMConfig:   cfg.OPMConfig,
-		Registry:    cfg.Registry,
+		Config:      cfg,
 	})
 	if err != nil {
 		return err
@@ -103,7 +107,7 @@ func runBuild(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags
 
 	// Post-render: check errors, show matches, log warnings
 	if err := cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{
-		Verbose: cfg.Verbose,
+		Verbose: cfg.Flags.Verbose,
 	}); err != nil {
 		return err
 	}

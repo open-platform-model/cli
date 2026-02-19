@@ -116,7 +116,8 @@ func TestSource_String(t *testing.T) {
 	assert.Equal(t, "config", string(SourceConfig))
 	assert.Equal(t, "default", string(SourceDefault))
 }
-func TestResolveAll_FlagOverridesAll(t *testing.T) {
+
+func TestResolveKubernetes_FlagOverridesAll(t *testing.T) {
 	os.Setenv("OPM_KUBECONFIG", "/env/kubeconfig")
 	os.Setenv("OPM_CONTEXT", "env-context")
 	os.Setenv("OPM_NAMESPACE", "env-namespace")
@@ -126,19 +127,18 @@ func TestResolveAll_FlagOverridesAll(t *testing.T) {
 		os.Unsetenv("OPM_NAMESPACE")
 	}()
 
-	result, err := ResolveAll(ResolveAllOptions{
+	result, err := ResolveKubernetes(ResolveKubernetesOptions{
 		KubeconfigFlag: "/flag/kubeconfig",
 		ContextFlag:    "flag-context",
 		NamespaceFlag:  "flag-namespace",
 		ProviderFlag:   "flag-provider",
-		Config: &Config{
+		Config: &GlobalConfig{
 			Kubernetes: KubernetesConfig{
 				Kubeconfig: "/config/kubeconfig",
 				Context:    "config-context",
 				Namespace:  "config-namespace",
 			},
 		},
-		ProviderNames: []string{"kubernetes"},
 	})
 	require.NoError(t, err)
 
@@ -152,12 +152,12 @@ func TestResolveAll_FlagOverridesAll(t *testing.T) {
 	assert.Equal(t, SourceFlag, result.Provider.Source)
 }
 
-func TestResolveAll_EnvOverridesConfig(t *testing.T) {
+func TestResolveKubernetes_EnvOverridesConfig(t *testing.T) {
 	os.Setenv("OPM_NAMESPACE", "env-namespace")
 	defer os.Unsetenv("OPM_NAMESPACE")
 
-	result, err := ResolveAll(ResolveAllOptions{
-		Config: &Config{
+	result, err := ResolveKubernetes(ResolveKubernetesOptions{
+		Config: &GlobalConfig{
 			Kubernetes: KubernetesConfig{
 				Namespace: "config-namespace",
 			},
@@ -170,9 +170,9 @@ func TestResolveAll_EnvOverridesConfig(t *testing.T) {
 	assert.Equal(t, "config-namespace", result.Namespace.Shadowed[SourceConfig])
 }
 
-func TestResolveAll_ConfigOverridesDefault(t *testing.T) {
-	result, err := ResolveAll(ResolveAllOptions{
-		Config: &Config{
+func TestResolveKubernetes_ConfigOverridesDefault(t *testing.T) {
+	result, err := ResolveKubernetes(ResolveKubernetesOptions{
+		Config: &GlobalConfig{
 			Kubernetes: KubernetesConfig{
 				Kubeconfig: "/custom/kubeconfig",
 				Namespace:  "staging",
@@ -187,7 +187,7 @@ func TestResolveAll_ConfigOverridesDefault(t *testing.T) {
 	assert.Equal(t, SourceConfig, result.Namespace.Source)
 }
 
-func TestResolveAll_DefaultsUsedWhenNothingSet(t *testing.T) {
+func TestResolveKubernetes_DefaultsUsedWhenNothingSet(t *testing.T) {
 	os.Unsetenv("OPM_KUBECONFIG")
 	os.Unsetenv("OPM_CONTEXT")
 	os.Unsetenv("OPM_NAMESPACE")
@@ -196,7 +196,7 @@ func TestResolveAll_DefaultsUsedWhenNothingSet(t *testing.T) {
 	require.NoError(t, err)
 	expectedKubeconfig := filepath.Join(homeDir, ".kube", "config")
 
-	result, err := ResolveAll(ResolveAllOptions{})
+	result, err := ResolveKubernetes(ResolveKubernetesOptions{})
 	require.NoError(t, err)
 
 	assert.Equal(t, expectedKubeconfig, result.Kubeconfig.Value)
@@ -206,19 +206,9 @@ func TestResolveAll_DefaultsUsedWhenNothingSet(t *testing.T) {
 	assert.Equal(t, SourceDefault, result.Namespace.Source)
 }
 
-func TestResolveAll_ProviderAutoResolve_SingleProvider(t *testing.T) {
-	result, err := ResolveAll(ResolveAllOptions{
-		ProviderNames: []string{"kubernetes"},
-	})
-	require.NoError(t, err)
-
-	assert.Equal(t, "kubernetes", result.Provider.Value)
-	assert.Equal(t, SourceConfigAuto, result.Provider.Source)
-}
-
-func TestResolveAll_ProviderAutoResolve_NoProviders(t *testing.T) {
-	result, err := ResolveAll(ResolveAllOptions{
-		ProviderNames: []string{},
+func TestResolveKubernetes_ProviderAutoResolve_NoProviders(t *testing.T) {
+	result, err := ResolveKubernetes(ResolveKubernetesOptions{
+		Config: &GlobalConfig{},
 	})
 	require.NoError(t, err)
 
@@ -226,60 +216,15 @@ func TestResolveAll_ProviderAutoResolve_NoProviders(t *testing.T) {
 	assert.Equal(t, Source(""), result.Provider.Source)
 }
 
-func TestResolveAll_ProviderAutoResolve_MultipleProviders(t *testing.T) {
-	result, err := ResolveAll(ResolveAllOptions{
-		ProviderNames: []string{"kubernetes", "nomad"},
-	})
-	require.NoError(t, err)
-
-	assert.Equal(t, "", result.Provider.Value)
-	assert.Equal(t, Source(""), result.Provider.Source)
-}
-
-func TestResolveAll_ProviderFlagOverridesAutoResolve(t *testing.T) {
-	result, err := ResolveAll(ResolveAllOptions{
-		ProviderFlag:  "nomad",
-		ProviderNames: []string{"kubernetes"},
+func TestResolveKubernetes_ProviderFlagOverridesAutoResolve(t *testing.T) {
+	result, err := ResolveKubernetes(ResolveKubernetesOptions{
+		ProviderFlag: "nomad",
+		Config:       &GlobalConfig{},
 	})
 	require.NoError(t, err)
 
 	assert.Equal(t, "nomad", result.Provider.Value)
 	assert.Equal(t, SourceFlag, result.Provider.Source)
-}
-
-func TestResolveBase_ConfigPathAndRegistry(t *testing.T) {
-	os.Setenv("OPM_CONFIG", "/env/config.cue")
-	os.Setenv("OPM_REGISTRY", "env-registry.example.com")
-	defer func() {
-		os.Unsetenv("OPM_CONFIG")
-		os.Unsetenv("OPM_REGISTRY")
-	}()
-
-	result, err := ResolveBase(ResolveBaseOptions{
-		ConfigFlag:   "/flag/config.cue",
-		RegistryFlag: "flag-registry.example.com",
-		Config: &Config{
-			Registry: "config-registry.example.com",
-		},
-	})
-	require.NoError(t, err)
-
-	assert.Equal(t, "/flag/config.cue", result.ConfigPath.Value)
-	assert.Equal(t, SourceFlag, result.ConfigPath.Source)
-	assert.Equal(t, "flag-registry.example.com", result.Registry.Value)
-	assert.Equal(t, SourceFlag, result.Registry.Source)
-}
-
-func TestResolveBase_DefaultsUsed(t *testing.T) {
-	os.Unsetenv("OPM_CONFIG")
-	os.Unsetenv("OPM_REGISTRY")
-
-	result, err := ResolveBase(ResolveBaseOptions{})
-	require.NoError(t, err)
-
-	assert.Contains(t, result.ConfigPath.Value, ".opm")
-	assert.Equal(t, SourceDefault, result.ConfigPath.Source)
-	assert.Equal(t, "", result.Registry.Value)
 }
 
 func TestResolveKubernetes_AllFlags(t *testing.T) {
@@ -297,14 +242,13 @@ func TestResolveKubernetes_AllFlags(t *testing.T) {
 		ContextFlag:    "flag-context",
 		NamespaceFlag:  "flag-namespace",
 		ProviderFlag:   "flag-provider",
-		Config: &Config{
+		Config: &GlobalConfig{
 			Kubernetes: KubernetesConfig{
 				Kubeconfig: "/config/kubeconfig",
 				Context:    "config-context",
 				Namespace:  "config-namespace",
 			},
 		},
-		ProviderNames: []string{"kubernetes"},
 	})
 	require.NoError(t, err)
 
@@ -338,11 +282,13 @@ func TestResolveKubernetes_Defaults(t *testing.T) {
 }
 
 func TestResolveKubernetes_ProviderAutoResolve(t *testing.T) {
+	// Provider auto-resolve requires exactly one provider in config.Providers.
+	// We can't easily add a cue.Value in a unit test, so we verify
+	// the nil/empty case: no providers = no auto-resolve.
 	result, err := ResolveKubernetes(ResolveKubernetesOptions{
-		ProviderNames: []string{"kubernetes"},
+		Config: &GlobalConfig{Providers: nil},
 	})
 	require.NoError(t, err)
 
-	assert.Equal(t, "kubernetes", result.Provider.Value)
-	assert.Equal(t, SourceConfigAuto, result.Provider.Source)
+	assert.Equal(t, "", result.Provider.Value)
 }

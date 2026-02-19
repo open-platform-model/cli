@@ -8,13 +8,14 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdtypes"
 	"github.com/opmodel/cli/internal/cmdutil"
+	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 )
 
 // NewModDiffCmd creates the mod diff command.
-func NewModDiffCmd(cfg *cmdtypes.GlobalConfig) *cobra.Command {
+func NewModDiffCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var rf cmdutil.RenderFlags
 	var kf cmdutil.K8sFlags
 
@@ -56,13 +57,19 @@ Examples:
 }
 
 // runDiff executes the diff command.
-func runDiff(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags, kf *cmdutil.K8sFlags) error {
+func runDiff(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, kf *cmdutil.K8sFlags) error {
 	ctx := context.Background()
 
 	// Resolve all Kubernetes configuration once (flag > env > config > default).
 	// The resolved values are used for both the render pipeline and K8s client,
 	// ensuring a single source of truth for all settings.
-	k8sConfig, err := cmdutil.ResolveKubernetes(cfg.OPMConfig, kf.Kubeconfig, kf.Context, rf.Namespace, rf.Provider)
+	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
+		Config:         cfg,
+		KubeconfigFlag: kf.Kubeconfig,
+		ContextFlag:    kf.Context,
+		NamespaceFlag:  rf.Namespace,
+		ProviderFlag:   rf.Provider,
+	})
 	if err != nil {
 		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
@@ -74,8 +81,7 @@ func runDiff(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags,
 		Values:      rf.Values,
 		ReleaseName: rf.ReleaseName,
 		K8sConfig:   k8sConfig,
-		OPMConfig:   cfg.OPMConfig,
-		Registry:    cfg.Registry,
+		Config:      cfg,
 	})
 	if err != nil {
 		return err
@@ -97,7 +103,7 @@ func runDiff(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags,
 	}
 
 	// Create Kubernetes client from pre-resolved config
-	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.OPMConfig.Config.Log.Kubernetes.APIWarnings)
+	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
 		releaseLog.Error("connecting to cluster", "error", err)
 		return err

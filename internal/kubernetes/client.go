@@ -142,8 +142,14 @@ func ResetClient() {
 // Kubeconfig and Context must already be resolved by the caller (via config.ResolveKubernetes).
 // When Kubeconfig is empty, client-go's default discovery applies (KUBECONFIG env / ~/.kube/config).
 func buildRestConfig(opts ClientOptions) (*rest.Config, error) {
-	loadingRules := &clientcmd.ClientConfigLoadingRules{
-		ExplicitPath: opts.Kubeconfig,
+	var loadingRules *clientcmd.ClientConfigLoadingRules
+	if opts.Kubeconfig != "" {
+		loadingRules = &clientcmd.ClientConfigLoadingRules{
+			ExplicitPath: opts.Kubeconfig,
+		}
+	} else {
+		// Use default discovery: KUBECONFIG env var and ~/.kube/config
+		loadingRules = clientcmd.NewDefaultClientConfigLoadingRules()
 	}
 
 	overrides := &clientcmd.ConfigOverrides{}

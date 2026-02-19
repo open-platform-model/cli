@@ -4,11 +4,11 @@ package config
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
+	"github.com/opmodel/cli/internal/config"
 )
 
 // NewConfigCmd creates the config command group.
-func NewConfigCmd(cfg *cmdtypes.GlobalConfig) *cobra.Command {
+func NewConfigCmd(cfg *config.GlobalConfig) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "config",
 		Short: "Configuration management",

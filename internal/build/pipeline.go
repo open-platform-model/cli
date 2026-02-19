@@ -20,7 +20,7 @@ import (
 // It orchestrates module loading, release building, provider loading,
 // component matching, and transformer execution.
 type pipeline struct {
-	config         *config.OPMConfig
+	config         *config.GlobalConfig
 	releaseBuilder *ReleaseBuilder
 	provider       *ProviderLoader
 	matcher        *Matcher
@@ -29,7 +29,7 @@ type pipeline struct {
 
 // NewPipeline creates a new Pipeline implementation.
 // The pipeline uses the provided configuration for provider resolution.
-func NewPipeline(cfg *config.OPMConfig) Pipeline {
+func NewPipeline(cfg *config.GlobalConfig) Pipeline {
 	return &pipeline{
 		config:         cfg,
 		releaseBuilder: NewReleaseBuilder(cfg.CueContext, cfg.Registry),
@@ -132,7 +132,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	providerName := opts.Provider
 	// Default to the only configured provider if not specified
 	if providerName == "" && p.config != nil && len(p.config.Providers) == 1 {
-		for name := range p.config.Providers {
+		for name := range p.config.Providers { //nolint:revive // single iteration for auto-select
 			providerName = name
 			break
 		}

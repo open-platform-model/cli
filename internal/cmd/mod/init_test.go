@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
+	"github.com/opmodel/cli/internal/config"
 )
 
 func TestNewModInitCmd(t *testing.T) {
-	cmd := NewModInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModInitCmd(&config.GlobalConfig{})
 
 	assert.Equal(t, "init <module-name>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
@@ -26,7 +26,7 @@ func TestNewModInitCmd(t *testing.T) {
 }
 
 func TestModInit_RequiresArgs(t *testing.T) {
-	cmd := NewModInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModInitCmd(&config.GlobalConfig{})
 	cmd.SetArgs([]string{})
 
 	cmd.SetOut(&bytes.Buffer{})
@@ -43,7 +43,7 @@ func TestModInit_InvalidTemplate(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	cmd := NewModInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModInitCmd(&config.GlobalConfig{})
 	cmd.SetArgs([]string{"test-app", "--template", "invalid", "--dir", filepath.Join(tmpDir, "out")})
 
 	// Capture output
@@ -65,7 +65,7 @@ func TestModInit_DirectoryExists(t *testing.T) {
 	targetDir := filepath.Join(tmpDir, "existing-dir")
 	require.NoError(t, os.MkdirAll(targetDir, 0o755))
 
-	cmd := NewModInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModInitCmd(&config.GlobalConfig{})
 	cmd.SetArgs([]string{"test-app", "--dir", targetDir})
 
 	err = cmd.Execute()
@@ -80,7 +80,7 @@ func TestModInit_Simple(t *testing.T) {
 
 	targetDir := filepath.Join(tmpDir, "my-app")
 
-	cmd := NewModInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModInitCmd(&config.GlobalConfig{})
 	cmd.SetArgs([]string{"my-app", "--template", "simple", "--dir", targetDir})
 
 	// Silence output
@@ -103,7 +103,7 @@ func TestModInit_Standard(t *testing.T) {
 
 	targetDir := filepath.Join(tmpDir, "my-app")
 
-	cmd := NewModInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModInitCmd(&config.GlobalConfig{})
 	cmd.SetArgs([]string{"my-app", "--template", "standard", "--dir", targetDir})
 
 	cmd.SetOut(&bytes.Buffer{})
@@ -126,7 +126,7 @@ func TestModInit_Advanced(t *testing.T) {
 
 	targetDir := filepath.Join(tmpDir, "my-app")
 
-	cmd := NewModInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModInitCmd(&config.GlobalConfig{})
 	cmd.SetArgs([]string{"my-app", "--template", "advanced", "--dir", targetDir})
 
 	cmd.SetOut(&bytes.Buffer{})
@@ -154,7 +154,7 @@ func TestModInit_DefaultDir(t *testing.T) {
 	require.NoError(t, os.Chdir(tmpDir))
 	defer os.Chdir(origWd)
 
-	cmd := NewModInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModInitCmd(&config.GlobalConfig{})
 	cmd.SetArgs([]string{"test-module", "--template", "simple"})
 
 	cmd.SetOut(&bytes.Buffer{})
@@ -175,7 +175,7 @@ func TestModInit_ContentSubstitution(t *testing.T) {
 
 	targetDir := filepath.Join(tmpDir, "my-special-app")
 
-	cmd := NewModInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewModInitCmd(&config.GlobalConfig{})
 	cmd.SetArgs([]string{"my-special-app", "--template", "simple", "--dir", targetDir})
 
 	cmd.SetOut(&bytes.Buffer{})

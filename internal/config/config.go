@@ -41,43 +41,35 @@ type LogConfig struct {
 	Kubernetes LogKubernetesConfig `json:"kubernetes"`
 }
 
-// Config represents the OPM CLI configuration.
-// Loaded from ~/.opm/config.cue, validated against embedded CUE schema.
-type Config struct {
-	// Registry is the default registry for all CUE module resolution.
-	// When set, all CUE imports resolve from this registry (passed to CUE via CUE_REGISTRY).
-	// Env: OPM_REGISTRY
-	Registry string `json:"registry,omitempty"`
-
-	// Kubernetes contains Kubernetes-specific settings.
-	Kubernetes KubernetesConfig `json:"kubernetes,omitempty"`
-
-	// Log contains logging-related settings.
-	Log LogConfig `json:"log,omitempty"`
+// GlobalFlags holds raw CLI flag values set by the user.
+// These are populated by the root command before calling config.Load.
+type GlobalFlags struct {
+	// Config is the --config flag value (path to config file).
+	Config string
+	// Registry is the --registry flag value.
+	Registry string
+	// Verbose is the --verbose flag value.
+	Verbose bool
+	// Timestamps is the --timestamps flag value.
+	Timestamps bool
 }
 
-// DefaultConfig returns a Config with all default values populated.
-// Used by `opm config init` to generate initial config file.
-func DefaultConfig() *Config {
-	return &Config{
-		Kubernetes: KubernetesConfig{
-			Kubeconfig: "~/.kube/config",
-			Namespace:  "default",
-		},
-	}
-}
+// GlobalConfig is the single consolidated runtime configuration type.
+// It is populated by config.Load and holds all configuration the CLI needs.
+type GlobalConfig struct {
+	// Kubernetes contains resolved Kubernetes-specific settings from config file.
+	Kubernetes KubernetesConfig
 
-// OPMConfig represents the fully-loaded CUE configuration.
-// This includes provider definitions loaded from imports.
-type OPMConfig struct {
-	// Config contains the basic configuration fields.
-	Config *Config
+	// Log contains logging-related settings from config file.
+	Log LogConfig
 
 	// Registry is the resolved registry URL after applying precedence.
+	// Set by config.Load using flag > env > config precedence.
 	Registry string
 
-	// RegistrySource indicates where the registry URL came from.
-	RegistrySource string // "flag", "env", "config"
+	// ConfigPath is the resolved config file path.
+	// Set by config.Load.
+	ConfigPath string
 
 	// Providers maps provider names to their loaded CUE definitions.
 	// Key: provider alias (e.g., "kubernetes")
@@ -87,4 +79,7 @@ type OPMConfig struct {
 	// CueContext is the CUE context used to load providers.
 	// Shared with module loader to ensure all values are from the same runtime.
 	CueContext *cue.Context
+
+	// Flags holds the raw CLI flag values as set by the user.
+	Flags GlobalFlags
 }

@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/cmdtypes"
+	opmconfig "github.com/opmodel/cli/internal/config"
 )
 
 func TestNewConfigInitCmd(t *testing.T) {
-	cmd := NewConfigInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
 
 	assert.Equal(t, "init", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
@@ -35,7 +35,7 @@ func TestConfigInit_CreatesFiles(t *testing.T) {
 	os.Setenv("HOME", tmpHome)
 	defer os.Setenv("HOME", origHome)
 
-	cmd := NewConfigInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
 
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -59,7 +59,7 @@ func TestConfigInit_SecurePermissions(t *testing.T) {
 	os.Setenv("HOME", tmpHome)
 	defer os.Setenv("HOME", origHome)
 
-	cmd := NewConfigInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -94,7 +94,7 @@ func TestConfigInit_ExistingConfig(t *testing.T) {
 	configFile := filepath.Join(opmDir, "config.cue")
 	require.NoError(t, os.WriteFile(configFile, []byte("// existing config"), 0o600))
 
-	cmd := NewConfigInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -118,7 +118,7 @@ func TestConfigInit_ForceOverwrite(t *testing.T) {
 	configFile := filepath.Join(opmDir, "config.cue")
 	require.NoError(t, os.WriteFile(configFile, []byte("// old config"), 0o600))
 
-	cmd := NewConfigInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
 	cmd.SetArgs([]string{"--force"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -141,7 +141,7 @@ func TestConfigInit_ConfigContent(t *testing.T) {
 	os.Setenv("HOME", tmpHome)
 	defer os.Setenv("HOME", origHome)
 
-	cmd := NewConfigInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -175,7 +175,7 @@ func TestConfigInit_OutputMessage(t *testing.T) {
 	os.Setenv("HOME", tmpHome)
 	defer os.Setenv("HOME", origHome)
 
-	cmd := NewConfigInitCmd(&cmdtypes.GlobalConfig{})
+	cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 

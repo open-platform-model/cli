@@ -71,7 +71,7 @@ func TestRender_NoValuesCue_NoValuesFlag_ReturnsError(t *testing.T) {
 	// When no --values flags are provided AND values.cue is missing on disk,
 	// Render should fail with a clear error message.
 	cueCtx := cuecontext.New()
-	cfg := &config.OPMConfig{
+	cfg := &config.GlobalConfig{
 		CueContext: cueCtx,
 		Registry:   "",
 	}
@@ -93,9 +93,8 @@ func TestRender_NoValuesCue_WithValuesFlag_SkipsValuesCueCheck(t *testing.T) {
 	// should be skipped. The pipeline may fail later (e.g., no providers),
 	// but it must NOT fail with "values.cue not found".
 	cueCtx := cuecontext.New()
-	cfg := &config.OPMConfig{
+	cfg := &config.GlobalConfig{
 		CueContext: cueCtx,
-		Registry:   "",
 	}
 	p := NewPipeline(cfg).(*pipeline)
 	dir := testdataDir(t, "test-module-no-values")
@@ -119,9 +118,8 @@ func TestRender_WithValuesCue_NoValuesFlag_SkipsValuesCueCheck(t *testing.T) {
 	// When values.cue exists and no --values flags: should pass the values
 	// check and proceed. May fail later (e.g., no providers).
 	cueCtx := cuecontext.New()
-	cfg := &config.OPMConfig{
+	cfg := &config.GlobalConfig{
 		CueContext: cueCtx,
-		Registry:   "",
 	}
 	p := NewPipeline(cfg).(*pipeline)
 	dir := testdataDir(t, "test-module")

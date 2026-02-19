@@ -10,13 +10,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdtypes"
+	"github.com/opmodel/cli/internal/config"
 	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/templates"
 )
 
 // NewModInitCmd creates the mod init command.
-func NewModInitCmd(_ *cmdtypes.GlobalConfig) *cobra.Command {
+func NewModInitCmd(_ *config.GlobalConfig) *cobra.Command {
 	var templateFlag string
 	var dirFlag string
 

@@ -12,13 +12,14 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdtypes"
 	"github.com/opmodel/cli/internal/cmdutil"
+	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 )
 
 // NewModStatusCmd creates the mod status command.
-func NewModStatusCmd(cfg *cmdtypes.GlobalConfig) *cobra.Command {
+func NewModStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var rsf cmdutil.ReleaseSelectorFlags
 	var kf cmdutil.K8sFlags
 
@@ -78,7 +79,7 @@ Examples:
 }
 
 // runStatus executes the status command.
-func runStatus(_ []string, cfg *cmdtypes.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, outputFmt string, watch, ignoreNotFound bool) error {
+func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, outputFmt string, watch, ignoreNotFound bool) error {
 	ctx := context.Background()
 
 	// Validate release selector flags
@@ -87,13 +88,12 @@ func runStatus(_ []string, cfg *cmdtypes.GlobalConfig, rsf *cmdutil.ReleaseSelec
 	}
 
 	// Resolve Kubernetes configuration with local flags
-	k8sConfig, err := cmdutil.ResolveKubernetes(
-		cfg.OPMConfig,
-		kf.Kubeconfig,
-		kf.Context,
-		rsf.Namespace,
-		"", // no provider flag for status
-	)
+	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
+		Config:         cfg,
+		KubeconfigFlag: kf.Kubeconfig,
+		ContextFlag:    kf.Context,
+		NamespaceFlag:  rsf.Namespace,
+	})
 	if err != nil {
 		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
@@ -121,7 +121,7 @@ func runStatus(_ []string, cfg *cmdtypes.GlobalConfig, rsf *cmdutil.ReleaseSelec
 	}
 
 	// Create Kubernetes client from pre-resolved config
-	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.OPMConfig.Config.Log.Kubernetes.APIWarnings)
+	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
 		releaseLog.Error("connecting to cluster", "error", err)
 		return err
