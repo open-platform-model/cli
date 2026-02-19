@@ -68,7 +68,22 @@ func GetInventory(ctx context.Context, client *kubernetes.Client, releaseName, n
 // If the Secret has no resourceVersion (new inventory), it is created.
 // If the Secret has a resourceVersion (from a previous GetInventory), it is updated
 // with optimistic concurrency — a concurrent write will cause a conflict error.
-func WriteInventory(ctx context.Context, client *kubernetes.Client, inv *InventorySecret) error {
+//
+// moduleName and moduleUUID are the canonical module name and identity UUID.
+// They are only used when constructing a new InventorySecret (inv.ReleaseMetadata is zero),
+// and are ignored on updates where metadata is preserved from the previous Secret.
+func WriteInventory(ctx context.Context, client *kubernetes.Client, inv *InventorySecret, moduleName, moduleUUID string) error {
+	// On first write (no resourceVersion), populate ModuleMetadata from caller-supplied values.
+	// On updates, ModuleMetadata is already populated from UnmarshalFromSecret — preserve it.
+	if inv.ResourceVersion() == "" && inv.ModuleMetadata.Name == "" {
+		inv.ModuleMetadata = ModuleMetadata{
+			Kind:       "Module",
+			APIVersion: "core.opmodel.dev/v1alpha1",
+			Name:       moduleName,
+			UUID:       moduleUUID,
+		}
+	}
+
 	secret, err := MarshalToSecret(inv)
 	if err != nil {
 		return fmt.Errorf("serializing inventory: %w", err)

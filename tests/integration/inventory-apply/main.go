@@ -77,13 +77,17 @@ func main() {
 	digest := inventory.ComputeManifestDigest(resources)
 
 	inv := &inventory.InventorySecret{
-		Metadata: inventory.InventoryMetadata{
+		ReleaseMetadata: inventory.ReleaseMetadata{
 			Kind:             "ModuleRelease",
 			APIVersion:       "core.opmodel.dev/v1alpha1",
-			ModuleName:       releaseName, // module name (same as release name in this test)
 			ReleaseName:      releaseName,
 			ReleaseNamespace: namespace,
 			ReleaseID:        releaseID,
+		},
+		ModuleMetadata: inventory.ModuleMetadata{
+			Kind:       "Module",
+			APIVersion: "core.opmodel.dev/v1alpha1",
+			Name:       releaseName, // module name (same as release name in this test)
 		},
 		Index:   []string{},
 		Changes: map[string]*inventory.ChangeEntry{},
@@ -93,7 +97,7 @@ func main() {
 	inv.Changes[computedID] = changeEntry
 	inv.Index = inventory.UpdateIndex(inv.Index, computedID)
 
-	err = inventory.WriteInventory(ctx, client, inv)
+	err = inventory.WriteInventory(ctx, client, inv, "", "")
 	check("writing inventory", err)
 	fmt.Println("   OK: inventory written")
 
@@ -114,18 +118,33 @@ func main() {
 		failf("expected 2 inventory entries, got %d", len(latestChange.Inventory.Entries))
 	}
 
-	// Verify inventory Secret labels.
+	// Verify inventory Secret labels — exactly 5, all release-scoped (no module.opmodel.dev/* labels).
 	secretName := inventory.SecretName(releaseName, releaseID)
 	secret, err := client.Clientset.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
 	check("fetching inventory Secret", err)
 	labels := secret.GetLabels()
-	if labels["opmodel.dev/component"] != "inventory" {
-		failf("inventory Secret missing opmodel.dev/component: inventory label (got %q)", labels["opmodel.dev/component"])
+	if len(labels) != 5 {
+		failf("inventory Secret must have exactly 5 labels, got %d: %v", len(labels), labels)
 	}
 	if labels["app.kubernetes.io/managed-by"] != "open-platform-model" {
 		failf("inventory Secret missing app.kubernetes.io/managed-by label")
 	}
-	fmt.Println("   OK: inventory has 2 entries, correct labels")
+	if labels["module-release.opmodel.dev/name"] != releaseName {
+		failf("inventory Secret module-release.opmodel.dev/name: want %q, got %q", releaseName, labels["module-release.opmodel.dev/name"])
+	}
+	if labels["module-release.opmodel.dev/namespace"] != namespace {
+		failf("inventory Secret module-release.opmodel.dev/namespace: want %q, got %q", namespace, labels["module-release.opmodel.dev/namespace"])
+	}
+	if labels["module-release.opmodel.dev/uuid"] != releaseID {
+		failf("inventory Secret module-release.opmodel.dev/uuid: want %q, got %q", releaseID, labels["module-release.opmodel.dev/uuid"])
+	}
+	if labels["opmodel.dev/component"] != "inventory" {
+		failf("inventory Secret opmodel.dev/component: want \"inventory\", got %q", labels["opmodel.dev/component"])
+	}
+	if _, hasModuleName := labels["module.opmodel.dev/name"]; hasModuleName {
+		failf("inventory Secret must not have module.opmodel.dev/name label")
+	}
+	fmt.Println("   OK: inventory has 2 entries, correct labels (exactly 5, no module.opmodel.dev/name)")
 
 	// ----------------------------------------------------------------
 	// Scenario 5.11: Idempotent re-apply — same change ID, empty stale set
@@ -161,7 +180,7 @@ func main() {
 	_, changeEntry2 := inventory.PrepareChange(source, "", digest, currentEntries)
 	readInv2.Changes[computedID] = changeEntry2
 	readInv2.Index = inventory.UpdateIndex(readInv2.Index, computedID)
-	err = inventory.WriteInventory(ctx, client, readInv2)
+	err = inventory.WriteInventory(ctx, client, readInv2, "", "")
 	check("writing inventory on re-apply", err)
 
 	readInv3, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
@@ -217,7 +236,7 @@ func main() {
 	newID, newChange := inventory.PrepareChange(source, "", newDigest, newEntries)
 	readInv4.Changes[newID] = newChange
 	readInv4.Index = inventory.UpdateIndex(readInv4.Index, newID)
-	err = inventory.WriteInventory(ctx, client, readInv4)
+	err = inventory.WriteInventory(ctx, client, readInv4, "", "")
 	check("writing inventory after rename", err)
 
 	// Verify inventory now tracks [cm-a, cm-c].

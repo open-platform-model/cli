@@ -1,6 +1,6 @@
 ## Purpose
 
-Defines how OPM CLI commands discover and select resources in a Kubernetes cluster using label selectors. This covers the `delete` and `status` commands that operate on existing deployed resources.
+Defines how OPM CLI commands discover and select resources in a Kubernetes cluster. Primary discovery uses the inventory Secret (targeted GET calls per tracked resource). Label-based discovery via `DiscoverResources()` is retained for commands that still require it (e.g., delete fallback). This covers the `delete` and `status` commands that operate on existing deployed resources.
 
 ## Requirements
 
@@ -30,39 +30,24 @@ Commands that discover resources (`delete`, `status`) MUST accept exactly one se
 
 ---
 
-### Requirement: Namespace always required
+### Requirement: Namespace defaults to config
 
-The `--namespace` flag MUST be required regardless of selector type.
+The `--namespace`/`-n` flag SHALL be optional for commands that discover resources (`delete`, `status`). When omitted, namespace SHALL be resolved using the precedence: `--namespace` flag → `OPM_NAMESPACE` environment variable → `kubernetes.namespace` in `~/.opm/config.cue` → `"default"`.
 
-#### Scenario: Missing namespace with --name
+#### Scenario: Namespace omitted uses config default
 
-- **WHEN** user provides `--name` without `--namespace`
-- **THEN** command exits with error indicating namespace is required
+- **WHEN** the user runs `opm mod delete --release-name my-app` without `-n`
+- **AND** the config file sets `kubernetes: namespace: "staging"`
+- **THEN** the command SHALL operate in the `staging` namespace
 
-#### Scenario: Missing namespace with --release-id
+#### Scenario: Namespace omitted falls back to default
 
-- **WHEN** user provides `--release-id` without `--namespace`
-- **THEN** command exits with error indicating namespace is required
-
----
-
-### Requirement: Fail on no resources found
-
-Commands MUST fail with non-zero exit code when no resources match the selector.
-
-#### Scenario: No resources match --name selector
-
-- **WHEN** user runs `delete` or `status` with `--name foo --namespace bar`
-- **AND** no resources have label `module.opmodel.dev/name=foo` in namespace `bar`
-- **THEN** command exits with error: `"no resources found for module \"foo\" in namespace \"bar\""`
-
-#### Scenario: No resources match --release-id selector
-
-- **WHEN** user runs `delete` or `status` with `--release-id <uuid> --namespace bar`
-- **AND** no resources have label `module.opmodel.dev/release-id=<uuid>`
-- **THEN** command exits with error: `"no resources found for release-id \"<uuid>\" in namespace \"bar\""`
+- **WHEN** the user runs `opm mod status --release-name my-app` without `-n`
+- **AND** no config or env sets a namespace
+- **THEN** the command SHALL operate in the `default` namespace
 
 ---
+
 
 ### Requirement: Label selector construction
 

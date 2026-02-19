@@ -56,7 +56,7 @@ type ReleaseSelectorFlags struct {
 // AddTo registers the release selector flags on the given cobra command.
 func (f *ReleaseSelectorFlags) AddTo(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&f.Namespace, "namespace", "n", "",
-		"Target namespace (required)")
+		"Target namespace (default: from config)")
 	cmd.Flags().StringVar(&f.ReleaseName, "release-name", "",
 		"Release name (mutually exclusive with --release-id)")
 	cmd.Flags().StringVar(&f.ReleaseID, "release-id", "",

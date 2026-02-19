@@ -6,12 +6,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/opmodel/cli/internal/cmdtypes"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/version"
 )
 
 // NewVersionCmd creates the version command.
-func NewVersionCmd() *cobra.Command {
+func NewVersionCmd(_ *cmdtypes.GlobalConfig) *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Show version information",

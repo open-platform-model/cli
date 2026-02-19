@@ -1,7 +1,6 @@
 package inventory
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"testing"
 
@@ -34,14 +33,19 @@ func makeResource(group, version, kind, namespace, name, component string) *buil
 // makeInventorySecret builds a minimal InventorySecret for testing.
 func makeInventorySecret() *InventorySecret {
 	return &InventorySecret{
-		Metadata: InventoryMetadata{
+		ReleaseMetadata: ReleaseMetadata{
 			Kind:               "ModuleRelease",
 			APIVersion:         "core.opmodel.dev/v1alpha1",
-			ModuleName:         "jellyfin",      // canonical module name
 			ReleaseName:        "jellyfin-prod", // release name (from --release-name)
 			ReleaseNamespace:   "media",
 			ReleaseID:          "a3b8f2e1-1234-5678-9abc-def012345678",
 			LastTransitionTime: "2026-01-01T00:00:00Z",
+		},
+		ModuleMetadata: ModuleMetadata{
+			Kind:       "Module",
+			APIVersion: "core.opmodel.dev/v1alpha1",
+			Name:       "jellyfin", // canonical module name
+			UUID:       "b1c2d3e4-5678-90ab-cdef-012345678901",
 		},
 		Index: []string{"change-sha1-aabbccdd", "change-sha1-11223344"},
 		Changes: map[string]*ChangeEntry{
@@ -49,7 +53,7 @@ func makeInventorySecret() *InventorySecret {
 				Source: ChangeSource{
 					Path:        "opmodel.dev/modules/jellyfin",
 					Version:     "1.0.0",
-					ReleaseName: "jellyfin",
+					ReleaseName: "jellyfin-prod",
 				},
 				Values:         `{port: 8096}`,
 				ManifestDigest: "sha256:abc123def456",
@@ -65,7 +69,7 @@ func makeInventorySecret() *InventorySecret {
 				Source: ChangeSource{
 					Path:        "opmodel.dev/modules/jellyfin",
 					Version:     "0.9.0",
-					ReleaseName: "jellyfin",
+					ReleaseName: "jellyfin-prod",
 				},
 				Values:         `{port: 8096}`,
 				ManifestDigest: "sha256:olddigest",
@@ -163,14 +167,17 @@ func TestSecretName(t *testing.T) {
 // --- InventoryLabels ---
 
 func TestInventoryLabels(t *testing.T) {
-	// moduleName="jellyfin", releaseName="jf-prod", namespace="media", releaseID="abc123"
-	labels := InventoryLabels("jellyfin", "jf-prod", "media", "abc123")
+	labels := InventoryLabels("jf-prod", "media", "abc123")
 	assert.Equal(t, "open-platform-model", labels["app.kubernetes.io/managed-by"])
-	assert.Equal(t, "jellyfin", labels["module.opmodel.dev/name"])
 	assert.Equal(t, "jf-prod", labels["module-release.opmodel.dev/name"])
-	assert.Equal(t, "media", labels["module.opmodel.dev/namespace"])
+	assert.Equal(t, "media", labels["module-release.opmodel.dev/namespace"])
 	assert.Equal(t, "abc123", labels["module-release.opmodel.dev/uuid"])
 	assert.Equal(t, "inventory", labels["opmodel.dev/component"])
+	assert.Len(t, labels, 5, "inventory Secret must have exactly five labels")
+	_, hasModuleName := labels["module.opmodel.dev/name"]
+	assert.False(t, hasModuleName, "module.opmodel.dev/name label must not be present on inventory Secret")
+	_, hasOldModuleNs := labels["module.opmodel.dev/namespace"]
+	assert.False(t, hasOldModuleNs, "old module.opmodel.dev/namespace label must not be present")
 }
 
 // --- MarshalToSecret / UnmarshalFromSecret roundtrip ---
@@ -181,17 +188,29 @@ func TestMarshalUnmarshalRoundtrip(t *testing.T) {
 	secret, err := MarshalToSecret(original)
 	require.NoError(t, err)
 
-	// Verify secret metadata — Secret name uses ReleaseName, not module Name
+	// Verify Secret name uses ReleaseName (not module name)
 	assert.Equal(t, "opm.jellyfin-prod.a3b8f2e1-1234-5678-9abc-def012345678", secret.Name)
 	assert.Equal(t, "media", secret.Namespace)
 	assert.Equal(t, corev1.SecretType("opmodel.dev/release"), secret.Type)
 	assert.Equal(t, "inventory", secret.Labels["opmodel.dev/component"])
+	assert.Len(t, secret.Labels, 5, "inventory Secret must have exactly five labels")
+	// module.opmodel.dev/name must NOT appear on labels — it lives in moduleMetadata data key
+	_, hasModuleName := secret.Labels["module.opmodel.dev/name"]
+	assert.False(t, hasModuleName, "module.opmodel.dev/name must not be a Secret label")
+	// No old module.opmodel.dev/namespace label
+	_, hasOldNs := secret.Labels["module.opmodel.dev/namespace"]
+	assert.False(t, hasOldNs)
+
+	// Verify data keys
+	assert.Contains(t, secret.StringData, secretKeyReleaseMetadata)
+	assert.Contains(t, secret.StringData, secretKeyModuleMetadata)
 
 	// Unmarshal and compare
 	restored, err := UnmarshalFromSecret(secret)
 	require.NoError(t, err)
 
-	assert.Equal(t, original.Metadata, restored.Metadata)
+	assert.Equal(t, original.ReleaseMetadata, restored.ReleaseMetadata)
+	assert.Equal(t, original.ModuleMetadata, restored.ModuleMetadata)
 	assert.Equal(t, original.Index, restored.Index)
 	assert.Equal(t, len(original.Changes), len(restored.Changes))
 
@@ -234,37 +253,24 @@ func TestUnmarshalFromSecret_Base64Data(t *testing.T) {
 	restored, err := UnmarshalFromSecret(kubeSecret)
 	require.NoError(t, err)
 
-	assert.Equal(t, original.Metadata, restored.Metadata)
+	assert.Equal(t, original.ReleaseMetadata, restored.ReleaseMetadata)
+	assert.Equal(t, original.ModuleMetadata, restored.ModuleMetadata)
 	assert.Equal(t, "12345", restored.ResourceVersion(), "resourceVersion should be preserved")
-}
-
-func TestUnmarshalFromSecret_Base64EncodedData(t *testing.T) {
-	// Simulate Kubernetes encoding base64 at the transport layer
-	original := makeInventorySecret()
-
-	metaBytes, _ := json.Marshal(original.Metadata)
-	indexBytes, _ := json.Marshal(original.Index)
-
-	data := map[string][]byte{
-		"metadata": []byte(base64.StdEncoding.EncodeToString(metaBytes)),
-		"index":    []byte(base64.StdEncoding.EncodeToString(indexBytes)),
-	}
-
-	// Note: This test verifies that the data field bytes are used directly.
-	// In practice, Kubernetes stores raw bytes in data (not base64-of-base64).
-	// The above simulates what comes back from the API server in data[] field.
-	_ = data // already tested in TestUnmarshalFromSecret_Base64Data
 }
 
 func TestMarshalToSecret_EmptyInventory(t *testing.T) {
 	inv := &InventorySecret{
-		Metadata: InventoryMetadata{
+		ReleaseMetadata: ReleaseMetadata{
 			Kind:             "ModuleRelease",
 			APIVersion:       "core.opmodel.dev/v1alpha1",
-			ModuleName:       "test",
 			ReleaseName:      "test",
 			ReleaseNamespace: "default",
 			ReleaseID:        "00000000-0000-0000-0000-000000000001",
+		},
+		ModuleMetadata: ModuleMetadata{
+			Kind:       "Module",
+			APIVersion: "core.opmodel.dev/v1alpha1",
+			Name:       "test-module",
 		},
 		Index:   []string{},
 		Changes: map[string]*ChangeEntry{},
@@ -280,10 +286,16 @@ func TestMarshalToSecret_EmptyInventory(t *testing.T) {
 	assert.Empty(t, restored.Changes)
 }
 
-func TestInventoryMetadata_KindAndAPIVersion(t *testing.T) {
+func TestReleaseMetadata_KindAndAPIVersion(t *testing.T) {
 	inv := makeInventorySecret()
-	assert.Equal(t, "ModuleRelease", inv.Metadata.Kind)
-	assert.Equal(t, "core.opmodel.dev/v1alpha1", inv.Metadata.APIVersion)
+	assert.Equal(t, "ModuleRelease", inv.ReleaseMetadata.Kind)
+	assert.Equal(t, "core.opmodel.dev/v1alpha1", inv.ReleaseMetadata.APIVersion)
+}
+
+func TestModuleMetadata_KindAndAPIVersion(t *testing.T) {
+	inv := makeInventorySecret()
+	assert.Equal(t, "Module", inv.ModuleMetadata.Kind)
+	assert.Equal(t, "core.opmodel.dev/v1alpha1", inv.ModuleMetadata.APIVersion)
 }
 
 func TestMarshalToSecret_ResourceVersionPreserved(t *testing.T) {
@@ -293,4 +305,81 @@ func TestMarshalToSecret_ResourceVersionPreserved(t *testing.T) {
 	secret, err := MarshalToSecret(inv)
 	require.NoError(t, err)
 	assert.Equal(t, "99999", secret.ResourceVersion)
+}
+
+// --- ReleaseMetadata JSON field names ---
+
+func TestReleaseMetadata_JSONFieldNames(t *testing.T) {
+	rel := ReleaseMetadata{
+		Kind:               "ModuleRelease",
+		APIVersion:         "core.opmodel.dev/v1alpha1",
+		ReleaseName:        "mc",
+		ReleaseNamespace:   "default",
+		ReleaseID:          "abc-123",
+		LastTransitionTime: "2026-01-01T00:00:00Z",
+	}
+	data, err := json.Marshal(rel)
+	require.NoError(t, err)
+
+	var raw map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &raw))
+
+	assert.Equal(t, "mc", raw["name"], `"name" must be the release name`)
+	assert.Equal(t, "abc-123", raw["uuid"], `"uuid" must be the release ID`)
+	assert.Equal(t, "default", raw["namespace"])
+	_, hasReleaseName := raw["releaseName"]
+	assert.False(t, hasReleaseName, `"releaseName" field must not be present`)
+	_, hasReleaseId := raw["releaseId"]
+	assert.False(t, hasReleaseId, `"releaseId" field must not be present`)
+}
+
+// --- ModuleMetadata JSON field names ---
+
+func TestModuleMetadata_JSONFieldNames(t *testing.T) {
+	mod := ModuleMetadata{
+		Kind:       "Module",
+		APIVersion: "core.opmodel.dev/v1alpha1",
+		Name:       "minecraft",
+		UUID:       "a1b2c3d4-...",
+	}
+	data, err := json.Marshal(mod)
+	require.NoError(t, err)
+
+	var raw map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &raw))
+
+	assert.Equal(t, "minecraft", raw["name"])
+	assert.Equal(t, "a1b2c3d4-...", raw["uuid"])
+}
+
+func TestModuleMetadata_UUIDOmittedWhenEmpty(t *testing.T) {
+	mod := ModuleMetadata{
+		Kind:       "Module",
+		APIVersion: "core.opmodel.dev/v1alpha1",
+		Name:       "minecraft",
+	}
+	data, err := json.Marshal(mod)
+	require.NoError(t, err)
+
+	var raw map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &raw))
+
+	_, hasUUID := raw["uuid"]
+	assert.False(t, hasUUID, "uuid must be omitted when empty")
+}
+
+// --- UnmarshalFromSecret: missing moduleMetadata is not an error ---
+
+func TestUnmarshalFromSecret_MissingModuleMetadata_NotAnError(t *testing.T) {
+	inv := makeInventorySecret()
+
+	secret, err := MarshalToSecret(inv)
+	require.NoError(t, err)
+
+	// Remove moduleMetadata key to simulate a Secret written without it
+	delete(secret.StringData, secretKeyModuleMetadata)
+
+	restored, err := UnmarshalFromSecret(secret)
+	require.NoError(t, err, "missing moduleMetadata key must not return an error")
+	assert.Equal(t, ModuleMetadata{}, restored.ModuleMetadata, "ModuleMetadata must be zero value when key is absent")
 }

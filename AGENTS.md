@@ -99,9 +99,10 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 │   │   ├── module/    # Module inspection: path resolution, AST metadata extraction
 │   │   ├── release/   # Release building: CUE overlay, values, metadata, validation
 │   │   └── transform/ # Transformer logic: provider loading, matching, execution
-│   ├── cmd/           # Command implementations
-│   │   ├── config/    # config init command
-│   │   └── mod/       # mod apply, build, delete, init, status, template
+│   ├── cmd/           # Command implementations (root, version, exit)
+│   │   ├── config/    # config init, vet commands
+│   │   └── mod/       # mod apply, build, delete, diff, init, status, vet commands
+│   ├── cmdtypes/      # Shared types: GlobalConfig, ExitError, exit code helpers
 │   ├── cmdutil/       # Shared command utilities (flag groups, render pipeline, K8s client, output)
 │   ├── config/        # Config loading, validation, paths
 │   ├── errors/        # Error types and handling

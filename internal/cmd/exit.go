@@ -21,8 +21,8 @@ const (
 // while using the same underlying type across all packages.
 type ExitError = oerrors.ExitError
 
-// exitCodeFromK8sError maps Kubernetes API errors to exit codes.
-func exitCodeFromK8sError(err error) int {
+// ExitCodeFromK8sError maps Kubernetes API errors to exit codes.
+func ExitCodeFromK8sError(err error) int {
 	switch {
 	case apierrors.IsNotFound(err):
 		return ExitNotFound

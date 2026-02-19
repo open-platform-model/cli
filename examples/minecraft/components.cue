@@ -17,7 +17,7 @@ import (
 	//// Minecraft - Stateful Game Server with Backup Sidecar
 	/////////////////////////////////////////////////////////////////
 
-	minecraft: {
+	server: {
 		resources_workload.#Container
 		resources_storage.#Volumes
 		if #config.backup != _|_ && #config.backup.enabled {
@@ -28,7 +28,6 @@ import (
 		traits_workload.#RestartPolicy
 		traits_network.#Expose
 
-		metadata: name: "minecraft"
 		metadata: labels: "core.opmodel.dev/workload-type": "stateful"
 
 		spec: {
@@ -39,13 +38,12 @@ import (
 
 			// === Main Container: Minecraft Server ===
 			container: {
-				name:            "minecraft"
+				name:            "server"
 				image:           #config.server.image
 				imagePullPolicy: "IfNotPresent"
 
 				ports: {
 					minecraft: {
-						name:       "minecraft"
 						targetPort: 25565
 						protocol:   "TCP"
 					}

@@ -33,10 +33,8 @@ const (
 	labelReleaseID = "module-release.opmodel.dev/uuid"
 	// labelModuleID is the module identity UUID label for resource discovery.
 	labelModuleID = "module.opmodel.dev/uuid"
-	// LabelModuleName is the module name label used on inventory Secrets.
-	LabelModuleName = "module.opmodel.dev/name"
-	// LabelModuleNamespace is the module namespace label used on inventory Secrets.
-	LabelModuleNamespace = "module.opmodel.dev/namespace"
+	// LabelModuleNamespace is the release namespace label used on inventory Secrets.
+	LabelModuleNamespace = "module-release.opmodel.dev/namespace"
 	// LabelReleaseUUID is the exported release UUID label constant.
 	LabelReleaseUUID = labelReleaseID
 )
@@ -71,9 +69,31 @@ func (e *noResourcesFoundError) Is(target error) bool {
 }
 
 // IsNoResourcesFound reports whether err (or any error in its chain)
-// indicates that no resources matched the discovery selector.
+// indicates that no resources matched the discovery selector, or that
+// no inventory was found for the given release.
 func IsNoResourcesFound(err error) bool {
 	return errors.Is(err, errNoResourcesFound)
+}
+
+// ReleaseNotFoundError is returned when no inventory Secret exists for the
+// given release name/namespace. It is used by commands that require an
+// inventory to operate (status, delete).
+type ReleaseNotFoundError struct {
+	// Name is the release name or release-id that was searched.
+	Name string
+	// Namespace is the namespace that was searched.
+	Namespace string
+}
+
+// Error implements the error interface.
+func (e *ReleaseNotFoundError) Error() string {
+	return fmt.Sprintf("release %q not found in namespace %q", e.Name, e.Namespace)
+}
+
+// Is implements errors.Is so that IsNoResourcesFound matches ReleaseNotFoundError,
+// allowing --ignore-not-found to suppress both error types uniformly.
+func (e *ReleaseNotFoundError) Is(target error) bool {
+	return target == errNoResourcesFound
 }
 
 // discoveryOptions configures resource discovery.

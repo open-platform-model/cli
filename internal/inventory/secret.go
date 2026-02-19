@@ -14,8 +14,11 @@ const (
 	// This is not a credential — it is a K8s Secret type identifier string.
 	secretType = "opmodel.dev/release" //nolint:gosec // not a credential
 
-	// secretKeyMetadata is the stringData key for InventoryMetadata JSON.
-	secretKeyMetadata = "metadata"
+	// secretKeyReleaseMetadata is the stringData key for ReleaseMetadata JSON.
+	secretKeyReleaseMetadata = "releaseMetadata"
+
+	// secretKeyModuleMetadata is the stringData key for ModuleMetadata JSON.
+	secretKeyModuleMetadata = "moduleMetadata"
 
 	// secretKeyIndex is the stringData key for the ordered change ID list.
 	secretKeyIndex = "index"
@@ -35,19 +38,17 @@ func SecretName(releaseName, releaseID string) string {
 // These labels enable discovery, filtering, and inventory exclusion from
 // workload resource queries.
 //
-// moduleName is the canonical module name (e.g. "minecraft").
 // releaseName is the release name supplied by the user (e.g. "mc").
-// Both are stored so that inventory Secrets can be found by either.
+// Module identity is carried in data.moduleMetadata instead of labels.
 //
 //nolint:revive // Inventory prefix is intentional for cross-package clarity
-func InventoryLabels(moduleName, releaseName, releaseNamespace, releaseID string) map[string]string {
+func InventoryLabels(releaseName, releaseNamespace, releaseID string) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/managed-by":    "open-platform-model",
-		"module.opmodel.dev/name":         moduleName,
-		"module-release.opmodel.dev/name": releaseName,
-		"module.opmodel.dev/namespace":    releaseNamespace,
-		"module-release.opmodel.dev/uuid": releaseID,
-		"opmodel.dev/component":           "inventory",
+		"app.kubernetes.io/managed-by":         "open-platform-model",
+		"module-release.opmodel.dev/name":      releaseName,
+		"module-release.opmodel.dev/namespace": releaseNamespace,
+		"module-release.opmodel.dev/uuid":      releaseID,
+		"opmodel.dev/component":                "inventory",
 	}
 }
 
@@ -55,12 +56,18 @@ func InventoryLabels(moduleName, releaseName, releaseNamespace, releaseID string
 // The Secret uses stringData for writing (Kubernetes will base64-encode it).
 // Existing resourceVersion is included to support updates.
 func MarshalToSecret(inv *InventorySecret) (*corev1.Secret, error) {
-	secretName := SecretName(inv.Metadata.ReleaseName, inv.Metadata.ReleaseID)
+	secretName := SecretName(inv.ReleaseMetadata.ReleaseName, inv.ReleaseMetadata.ReleaseID)
 
-	// Serialize metadata
-	metaBytes, err := json.Marshal(inv.Metadata)
+	// Serialize release metadata
+	releaseMetaBytes, err := json.Marshal(inv.ReleaseMetadata)
 	if err != nil {
-		return nil, fmt.Errorf("marshaling inventory metadata: %w", err)
+		return nil, fmt.Errorf("marshaling release metadata: %w", err)
+	}
+
+	// Serialize module metadata
+	moduleMetaBytes, err := json.Marshal(inv.ModuleMetadata)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling module metadata: %w", err)
 	}
 
 	// Serialize index
@@ -70,8 +77,9 @@ func MarshalToSecret(inv *InventorySecret) (*corev1.Secret, error) {
 	}
 
 	stringData := map[string]string{
-		secretKeyMetadata: string(metaBytes),
-		secretKeyIndex:    string(indexBytes),
+		secretKeyReleaseMetadata: string(releaseMetaBytes),
+		secretKeyModuleMetadata:  string(moduleMetaBytes),
+		secretKeyIndex:           string(indexBytes),
 	}
 
 	// Serialize each change entry
@@ -86,8 +94,8 @@ func MarshalToSecret(inv *InventorySecret) (*corev1.Secret, error) {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: inv.Metadata.ReleaseNamespace,
-			Labels:    InventoryLabels(inv.Metadata.ModuleName, inv.Metadata.ReleaseName, inv.Metadata.ReleaseNamespace, inv.Metadata.ReleaseID),
+			Namespace: inv.ReleaseMetadata.ReleaseNamespace,
+			Labels:    InventoryLabels(inv.ReleaseMetadata.ReleaseName, inv.ReleaseMetadata.ReleaseNamespace, inv.ReleaseMetadata.ReleaseID),
 		},
 		Type:       secretType,
 		StringData: stringData,
@@ -104,6 +112,7 @@ func MarshalToSecret(inv *InventorySecret) (*corev1.Secret, error) {
 // UnmarshalFromSecret deserializes a corev1.Secret into an InventorySecret.
 // Handles both stringData (write path) and data (base64-encoded, Kubernetes GET response).
 // The resourceVersion from the Secret metadata is preserved for optimistic concurrency.
+// The moduleMetadata key is optional — if absent, ModuleMetadata is left as zero value.
 func UnmarshalFromSecret(secret *corev1.Secret) (*InventorySecret, error) {
 	// Build a unified string map from both data and stringData.
 	// data (base64) is what Kubernetes returns on GET; stringData is our write path.
@@ -117,14 +126,22 @@ func UnmarshalFromSecret(secret *corev1.Secret) (*InventorySecret, error) {
 		values[k] = v
 	}
 
-	// Parse metadata
-	metaJSON, ok := values[secretKeyMetadata]
+	// Parse release metadata (required)
+	releaseMetaJSON, ok := values[secretKeyReleaseMetadata]
 	if !ok {
-		return nil, fmt.Errorf("inventory Secret missing %q key", secretKeyMetadata)
+		return nil, fmt.Errorf("inventory Secret missing %q key", secretKeyReleaseMetadata)
 	}
-	var metadata InventoryMetadata
-	if err := json.Unmarshal([]byte(metaJSON), &metadata); err != nil {
-		return nil, fmt.Errorf("parsing inventory metadata: %w", err)
+	var releaseMeta ReleaseMetadata
+	if err := json.Unmarshal([]byte(releaseMetaJSON), &releaseMeta); err != nil {
+		return nil, fmt.Errorf("parsing release metadata: %w", err)
+	}
+
+	// Parse module metadata (optional — zero value if absent)
+	var moduleMeta ModuleMetadata
+	if moduleMetaJSON, exists := values[secretKeyModuleMetadata]; exists {
+		if err := json.Unmarshal([]byte(moduleMetaJSON), &moduleMeta); err != nil {
+			return nil, fmt.Errorf("parsing module metadata: %w", err)
+		}
 	}
 
 	// Parse index
@@ -154,7 +171,8 @@ func UnmarshalFromSecret(secret *corev1.Secret) (*InventorySecret, error) {
 	}
 
 	inv := &InventorySecret{
-		Metadata:        metadata,
+		ReleaseMetadata: releaseMeta,
+		ModuleMetadata:  moduleMeta,
 		Index:           index,
 		Changes:         changes,
 		resourceVersion: secret.ResourceVersion,

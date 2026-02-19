@@ -28,12 +28,12 @@ type DeleteOptions struct {
 	DryRun bool
 
 	// InventoryLive is the list of live resources pre-fetched from the inventory
-	// Secret. When non-nil, resource enumeration uses this list instead of a
-	// full label-scan (inventory-first path). Pass nil to fall back to label-scan.
+	// Secret by the caller. Resources are deleted from this list. When nil or
+	// empty (and InventorySecretName is also empty), Delete returns noResourcesFoundError.
 	InventoryLive []*unstructured.Unstructured
 
 	// InventorySecretName is the name of the inventory Secret to delete last.
-	// Only used when InventoryLive is non-nil. Empty means no inventory Secret to delete.
+	// Empty means no inventory Secret to delete.
 	InventorySecretName string
 
 	// InventorySecretNamespace is the namespace of the inventory Secret.
@@ -53,13 +53,9 @@ type DeleteResult struct {
 }
 
 // Delete removes all resources belonging to a release deployment.
-// Resources are discovered via OPM labels (or via inventory when InventoryLive is set)
-// and deleted in reverse weight order. Returns noResourcesFoundError when no resources match.
-//
-// When opts.InventoryLive is non-nil, the inventory-first path is used: the provided
-// live resources are deleted, then the inventory Secret is deleted last. This avoids
-// derived resources (e.g., Endpoints) that were never applied by OPM being incorrectly
-// discovered and deleted via label-scan.
+// opts.InventoryLive must be pre-fetched from the inventory Secret by the caller.
+// Resources are deleted in reverse weight order. After all workload resources are
+// deleted, the inventory Secret itself is deleted last.
 func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteResult, error) {
 	result := &DeleteResult{}
 
@@ -68,36 +64,14 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 	if logName == "" {
 		logName = fmt.Sprintf("release-id:%s", opts.ReleaseID)
 	}
-	releaseLog := output.ReleaseLogger(logName)
 
-	var resources []*unstructured.Unstructured
+	resources := opts.InventoryLive
 
-	if opts.InventoryLive != nil {
-		// Inventory-first: use pre-fetched live resources from the inventory.
-		// Avoids label-scanning all API types and excludes derived resources.
-		output.Debug("using inventory-first deletion",
-			"release", logName,
-			"namespace", opts.Namespace,
-			"count", len(opts.InventoryLive),
-		)
-		resources = opts.InventoryLive
-	} else {
-		// Fallback: discover resources via label-scan for backward compatibility.
-		output.Debug("discovering release resources via label-scan",
-			"release", logName,
-			"namespace", opts.Namespace,
-		)
-		var err error
-		resources, err = DiscoverResources(ctx, client, DiscoveryOptions{
-			ReleaseName:  opts.ReleaseName,
-			Namespace:    opts.Namespace,
-			ReleaseID:    opts.ReleaseID,
-			ExcludeOwned: true,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("discovering release resources: %w", err)
-		}
-	}
+	output.Debug("deleting release resources from inventory",
+		"release", logName,
+		"namespace", opts.Namespace,
+		"count", len(resources),
+	)
 
 	result.Resources = resources
 
@@ -122,13 +96,13 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 		ns := res.GetNamespace()
 
 		if opts.DryRun {
-			releaseLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
+			output.Info(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
 			result.Deleted++
 			continue
 		}
 
 		if err := deleteResource(ctx, client, res); err != nil {
-			releaseLog.Warn(fmt.Sprintf("deleting %s/%s: %v", kind, name, err))
+			output.Warn(fmt.Sprintf("deleting %s/%s: %v", kind, name, err))
 			result.Errors = append(result.Errors, resourceError{
 				Kind:      kind,
 				Name:      name,
@@ -138,7 +112,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 			continue
 		}
 
-		releaseLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
+		output.Info(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
 		result.Deleted++
 	}
 

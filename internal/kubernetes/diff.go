@@ -308,10 +308,9 @@ func resourceKey(gvk schema.GroupVersionKind, namespace, name string) string {
 
 // DiffOptions configures a Diff operation.
 type DiffOptions struct {
-	// InventoryLive is the list of live resources discovered from the inventory
-	// Secret. When non-nil, orphan detection uses set-difference against this
-	// list instead of performing a full label-scan. Pass nil to fall back to
-	// the label-scan path (backward-compatible behavior).
+	// InventoryLive is the list of live resources pre-fetched from the inventory
+	// Secret by the caller. Orphan detection uses set-difference against this list.
+	// When nil, no live resources are known and no orphans are reported.
 	InventoryLive []*unstructured.Unstructured
 }
 
@@ -390,19 +389,15 @@ func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta
 	}
 
 	// Detect orphaned resources (on cluster but not in local render)
-	orphans, err := findOrphans(ctx, client, meta, renderedKeys, diffOpts.InventoryLive)
-	if err != nil {
-		result.Warnings = append(result.Warnings, fmt.Sprintf("detecting orphans: %v", err))
-	} else {
-		for _, orphan := range orphans {
-			result.Resources = append(result.Resources, resourceDiff{
-				Kind:      orphan.GetKind(),
-				Name:      orphan.GetName(),
-				Namespace: orphan.GetNamespace(),
-				State:     ResourceOrphaned,
-			})
-			result.Orphaned++
-		}
+	orphans := findOrphans(renderedKeys, diffOpts.InventoryLive)
+	for _, orphan := range orphans {
+		result.Resources = append(result.Resources, resourceDiff{
+			Kind:      orphan.GetKind(),
+			Name:      orphan.GetName(),
+			Namespace: orphan.GetNamespace(),
+			State:     ResourceOrphaned,
+		})
+		result.Orphaned++
 	}
 
 	return result, nil
@@ -424,42 +419,19 @@ func DiffPartial(ctx context.Context, client *Client, resources []*build.Resourc
 	return result, nil
 }
 
-// findOrphans discovers resources on the cluster that are labeled for this release
-// but are not in the rendered resource set.
-//
-// When inventoryLive is non-nil, it uses set-difference against those resources
-// (inventory-first path: N targeted GETs already done). When nil, falls back to a
-// full label-scan for backward compatibility with releases that have no inventory.
-func findOrphans(ctx context.Context, client *Client, meta build.ModuleReleaseMetadata, renderedKeys map[string]bool, inventoryLive []*unstructured.Unstructured) ([]*unstructured.Unstructured, error) {
-	var liveResources []*unstructured.Unstructured
-
-	if inventoryLive != nil {
-		// Inventory-first: use the pre-fetched live resources from the inventory.
-		// This avoids a full label-scan across all API types.
-		output.Debug("using inventory-first orphan detection", "liveCount", len(inventoryLive))
-		liveResources = inventoryLive
-	} else {
-		// Fallback: label-scan across all API types for backward compatibility.
-		output.Debug("no inventory found, falling back to label-scan for orphan detection",
-			"release", meta.Name, "namespace", meta.Namespace)
-		var err error
-		liveResources, err = DiscoverResources(ctx, client, DiscoveryOptions{
-			ReleaseName:  meta.Name,
-			Namespace:    meta.Namespace,
-			ExcludeOwned: true,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("discovering live resources: %w", err)
-		}
-	}
+// findOrphans returns resources that exist in inventoryLive but are not present
+// in the rendered resource set. When inventoryLive is nil the set is empty and
+// no orphans are reported (first-time diff where no release has been deployed yet).
+func findOrphans(renderedKeys map[string]bool, inventoryLive []*unstructured.Unstructured) []*unstructured.Unstructured {
+	output.Debug("orphan detection from inventory", "liveCount", len(inventoryLive))
 
 	var orphans []*unstructured.Unstructured
-	for _, live := range liveResources {
+	for _, live := range inventoryLive {
 		key := resourceKey(live.GroupVersionKind(), live.GetNamespace(), live.GetName())
 		if !renderedKeys[key] {
 			orphans = append(orphans, live)
 		}
 	}
 
-	return orphans, nil
+	return orphans
 }

@@ -39,8 +39,8 @@ type StatusOptions struct {
 	OutputFormat output.Format
 
 	// InventoryLive is the list of live resources pre-fetched from the inventory
-	// Secret. When non-nil, resource discovery uses this list instead of a
-	// full label-scan (inventory-first path). Pass nil to fall back to label-scan.
+	// Secret by the caller. When empty or nil, GetReleaseStatus returns
+	// noResourcesFoundError (unless MissingResources is also non-empty).
 	InventoryLive []*unstructured.Unstructured
 
 	// MissingResources is the list of resources tracked in the inventory that
@@ -74,40 +74,20 @@ type StatusResult struct {
 	ReleaseID string `json:"releaseId,omitempty" yaml:"releaseId,omitempty"`
 }
 
-// GetReleaseStatus discovers resources by OPM labels and evaluates health per resource.
-// Returns noResourcesFoundError when no resources match the selector.
+// GetReleaseStatus evaluates health for all resources tracked in opts.InventoryLive.
+// Returns noResourcesFoundError when no resources are present and no missing entries exist.
 //
-// When opts.InventoryLive is non-nil, the inventory-first path is used: those live
-// resources are evaluated directly instead of performing a label-scan. Any resources in
-// opts.MissingResources are appended with "Missing" status.
+// opts.InventoryLive contains the live resources fetched from the inventory Secret by the
+// caller. opts.MissingResources contains entries tracked in inventory that no longer exist
+// on the cluster; these are appended with "Missing" status.
 func GetReleaseStatus(ctx context.Context, client *Client, opts StatusOptions) (*StatusResult, error) {
-	var resources []*unstructured.Unstructured
+	resources := opts.InventoryLive
 
-	if opts.InventoryLive != nil {
-		// Inventory-first: use pre-fetched live resources.
-		output.Debug("using inventory-first status discovery",
-			"release", opts.ReleaseName,
-			"liveCount", len(opts.InventoryLive),
-			"missingCount", len(opts.MissingResources),
-		)
-		resources = opts.InventoryLive
-	} else {
-		// Fallback: discover resources via label-scan.
-		output.Debug("discovering release resources via label-scan",
-			"release", opts.ReleaseName,
-			"namespace", opts.Namespace,
-		)
-		var err error
-		resources, err = DiscoverResources(ctx, client, DiscoveryOptions{
-			ReleaseName: opts.ReleaseName,
-			Namespace:   opts.Namespace,
-			ReleaseID:   opts.ReleaseID,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("discovering release resources: %w", err)
-		}
-		output.Debug("discovered resources", "count", len(resources))
-	}
+	output.Debug("evaluating release status from inventory",
+		"release", opts.ReleaseName,
+		"liveCount", len(resources),
+		"missingCount", len(opts.MissingResources),
+	)
 
 	// Return error when no resources found (and no missing resources to show)
 	if len(resources) == 0 && len(opts.MissingResources) == 0 {

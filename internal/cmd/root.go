@@ -6,24 +6,25 @@ import (
 
 	"github.com/spf13/cobra"
 
+	cmdconfig "github.com/opmodel/cli/internal/cmd/config"
+	cmdmod "github.com/opmodel/cli/internal/cmd/mod"
+	"github.com/opmodel/cli/internal/cmdtypes"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 )
 
-var (
-	// Global flags
-	configFlag     string
-	verboseFlag    bool
-	registryFlag   string
-	timestampsFlag bool
-
-	// Resolved configuration (loaded during PersistentPreRunE)
-	opmConfig          *config.OPMConfig
-	resolvedBaseConfig *config.ResolvedBaseConfig
-)
-
 // NewRootCmd creates the root command for the OPM CLI.
 func NewRootCmd() *cobra.Command {
+	var cfg cmdtypes.GlobalConfig
+
+	// Raw flag values — bound to cobra flags, then folded into cfg by PersistentPreRunE.
+	var (
+		configFlag     string
+		registryFlag   string
+		verboseFlag    bool
+		timestampsFlag bool
+	)
+
 	rootCmd := &cobra.Command{
 		Use:           "opm",
 		Short:         "Open Platform Model CLI",
@@ -31,7 +32,7 @@ func NewRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return initializeGlobals(cmd)
+			return initializeConfig(cmd, &cfg, configFlag, registryFlag, verboseFlag, timestampsFlag)
 		},
 	}
 
@@ -41,16 +42,16 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.PersistentFlags().StringVar(&registryFlag, "registry", "", "CUE registry URL (env: OPM_REGISTRY)")
 	rootCmd.PersistentFlags().BoolVar(&timestampsFlag, "timestamps", true, "Show timestamps in log output")
 
-	// Add subcommands
-	rootCmd.AddCommand(NewModCmd())
-	rootCmd.AddCommand(NewConfigCmd())
-	rootCmd.AddCommand(NewVersionCmd())
+	// Add subcommands — sub-packages receive *cmdtypes.GlobalConfig for dependency injection.
+	rootCmd.AddCommand(NewVersionCmd(&cfg))
+	rootCmd.AddCommand(cmdmod.NewModCmd(&cfg))
+	rootCmd.AddCommand(cmdconfig.NewConfigCmd(&cfg))
 
 	return rootCmd
 }
 
-// initializeGlobals sets up logging and loads configuration.
-func initializeGlobals(cmd *cobra.Command) error {
+// initializeConfig sets up logging and loads configuration into cfg.
+func initializeConfig(cmd *cobra.Command, cfg *cmdtypes.GlobalConfig, configFlag, registryFlag string, verboseFlag, timestampsFlag bool) error {
 	// Load configuration first so we can use config values for logging setup
 	loadedConfig, err := config.LoadOPMConfig(config.LoaderOptions{
 		RegistryFlag: registryFlag,
@@ -62,26 +63,27 @@ func initializeGlobals(cmd *cobra.Command) error {
 		return fmt.Errorf("configuration error: %w", err)
 	}
 
-	// Store loaded config in package-level var
-	opmConfig = loadedConfig
+	cfg.OPMConfig = loadedConfig
+	cfg.RegistryFlag = registryFlag
+	cfg.Verbose = verboseFlag
 
 	// Resolve base configuration values (config path, registry)
-	var cfg *config.Config
-	if opmConfig != nil {
-		cfg = opmConfig.Config
+	var rawCfg *config.Config
+	if loadedConfig != nil {
+		rawCfg = loadedConfig.Config
 	}
 
 	resolved, err := config.ResolveBase(config.ResolveBaseOptions{
 		ConfigFlag:   configFlag,
 		RegistryFlag: registryFlag,
-		Config:       cfg,
+		Config:       rawCfg,
 	})
 	if err != nil {
 		return err
 	}
 
-	// Store resolved base config in package-level var
-	resolvedBaseConfig = resolved
+	cfg.ConfigPath = resolved.ConfigPath.Value
+	cfg.Registry = resolved.Registry.Value
 
 	// Build LogConfig with precedence: flag > config > default(true)
 	logCfg := output.LogConfig{
@@ -90,11 +92,9 @@ func initializeGlobals(cmd *cobra.Command) error {
 
 	// Resolve timestamps: flag (if explicitly set) > config > default (nil = true)
 	if cmd.Flags().Changed("timestamps") {
-		// Flag was explicitly set by user
 		logCfg.Timestamps = output.BoolPtr(timestampsFlag)
-	} else if opmConfig != nil && opmConfig.Config != nil && opmConfig.Config.Log.Timestamps != nil {
-		// Config has a value
-		logCfg.Timestamps = opmConfig.Config.Log.Timestamps
+	} else if loadedConfig != nil && loadedConfig.Config != nil && loadedConfig.Config.Log.Timestamps != nil {
+		logCfg.Timestamps = loadedConfig.Config.Log.Timestamps
 	}
 	// else: nil means SetupLogging defaults to true
 
@@ -103,36 +103,10 @@ func initializeGlobals(cmd *cobra.Command) error {
 	// Log base config resolution at DEBUG level
 	if verboseFlag {
 		output.Debug("initializing CLI",
-			"config", resolvedBaseConfig.ConfigPath.Value,
-			"registry", resolvedBaseConfig.Registry.Value,
+			"config", cfg.ConfigPath,
+			"registry", cfg.Registry,
 		)
 	}
 
 	return nil
-}
-
-// GetOPMConfig returns the loaded OPM configuration.
-func GetOPMConfig() *config.OPMConfig {
-	return opmConfig
-}
-
-// GetConfigPath returns the resolved config path value.
-func GetConfigPath() string {
-	if resolvedBaseConfig != nil {
-		return resolvedBaseConfig.ConfigPath.Value
-	}
-	return configFlag
-}
-
-// GetRegistry returns the resolved registry URL.
-func GetRegistry() string {
-	if resolvedBaseConfig != nil {
-		return resolvedBaseConfig.Registry.Value
-	}
-	return ""
-}
-
-// GetRegistryFlag returns the raw --registry flag value.
-func GetRegistryFlag() string {
-	return registryFlag
 }

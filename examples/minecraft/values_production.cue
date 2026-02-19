@@ -10,7 +10,7 @@ values: {
 		eula:    true
 		motd:    "Production SMP Server - Powered by OPM"
 
-		maxPlayers: 100
+		maxPlayers: 10
 		difficulty: "normal"
 		mode:       "survival"
 		pvp:        true

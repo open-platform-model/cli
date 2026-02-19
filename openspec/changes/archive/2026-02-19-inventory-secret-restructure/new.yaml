@@ -1,0 +1,18 @@
+apiVersion: v1
+data:
+  change-sha1-6f70e1f2: '{"module":{"path":".","version":"0.1.0","name":"mc"},"values":"values_production.cue","manifestDigest":"sha256:a77aa0bd57038aa03ba56aa1531aee2c3524acdd08b512b9b0f671dc03241332","timestamp":"2026-02-19T13:37:08Z","inventory":{"entries":[{"group":"","kind":"PersistentVolumeClaim","namespace":"default","name":"data","v":"v1","component":"server"},{"group":"","kind":"Service","namespace":"default","name":"server","v":"v1","component":"server"},{"group":"apps","kind":"StatefulSet","namespace":"default","name":"server","v":"v1","component":"server"}]}}'
+  change-sha1-b7593eaa: '{"module":{"path":".","version":"0.1.0","name":"mc"},"values":"values_production.cue","manifestDigest":"sha256:6f12a04bc17cbe3d18cadb3c471356f6f21360b4aa77a06aa3ba47407feefc24","timestamp":"2026-02-19T13:45:46Z","inventory":{"entries":[{"group":"","kind":"PersistentVolumeClaim","namespace":"default","name":"data","v":"v1","component":"server"},{"group":"","kind":"Service","namespace":"default","name":"server","v":"v1","component":"server"},{"group":"apps","kind":"StatefulSet","namespace":"default","name":"server","v":"v1","component":"server"}]}}'
+  index: '["change-sha1-b7593eaa","change-sha1-6f70e1f2"]'
+  releaseMetadata: '{"kind":"ModuleRelease","apiVersion":"core.opmodel.dev/v1alpha1","name":"mc","namespace":"default","uuid":"348c37ae-bf7b-5962-8abc-1055485c3292","lastTransitionTime":"2026-02-19T13:45:46Z"}'
+  moduleMetadata: '{"kind":"Module","apiVersion":"core.opmodel.dev/v1alpha1","name":"minecraft","uuid":"a1b2c3d4-e5f6-7890-abcd-ef1234567890"}'
+kind: Secret
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: open-platform-model
+    module-release.opmodel.dev/name: mc
+    module-release.opmodel.dev/uuid: 348c37ae-bf7b-5962-8abc-1055485c3292
+    module-release.opmodel.dev/namespace: default
+    opmodel.dev/component: inventory
+  name: opm.mc.348c37ae-bf7b-5962-8abc-1055485c3292
+  namespace: default
+type: opmodel.dev/release

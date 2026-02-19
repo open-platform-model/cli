@@ -24,24 +24,28 @@ func makeTestClient(objects ...runtime.Object) *kubernetes.Client {
 }
 
 // makeTestInventory builds a minimal InventorySecret for testing.
-// name is the canonical module name; releaseName is the release name (--release-name value).
-// When releaseName is empty it defaults to name (the common case where no override is given).
-func makeTestInventory(name, namespace, releaseID string) *inventory.InventorySecret {
-	return makeTestInventoryWithReleaseName(name, name, namespace, releaseID)
+// releaseName is used for both the release name and (via WriteInventory) the module name
+// in the common case where no override is given.
+func makeTestInventory(releaseName, namespace, releaseID string) *inventory.InventorySecret {
+	return makeTestInventoryWithModuleName(releaseName, releaseName, namespace, releaseID)
 }
 
-// makeTestInventoryWithReleaseName is like makeTestInventory but allows specifying a distinct
-// release name (e.g. module="minecraft", release="mc").
-func makeTestInventoryWithReleaseName(moduleName, releaseName, namespace, releaseID string) *inventory.InventorySecret {
+// makeTestInventoryWithModuleName is like makeTestInventory but allows specifying a distinct
+// module name (e.g. module="minecraft", release="mc").
+func makeTestInventoryWithModuleName(moduleName, releaseName, namespace, releaseID string) *inventory.InventorySecret {
 	return &inventory.InventorySecret{
-		Metadata: inventory.InventoryMetadata{
+		ReleaseMetadata: inventory.ReleaseMetadata{
 			Kind:               "ModuleRelease",
 			APIVersion:         "core.opmodel.dev/v1alpha1",
-			ModuleName:         moduleName,
 			ReleaseName:        releaseName,
 			ReleaseNamespace:   namespace,
 			ReleaseID:          releaseID,
 			LastTransitionTime: "2026-01-01T00:00:00Z",
+		},
+		ModuleMetadata: inventory.ModuleMetadata{
+			Kind:       "Module",
+			APIVersion: "core.opmodel.dev/v1alpha1",
+			Name:       moduleName,
 		},
 		Index:   []string{},
 		Changes: map[string]*inventory.ChangeEntry{},
@@ -73,8 +77,8 @@ func TestGetInventory_ByName_Success(t *testing.T) {
 	result, err := inventory.GetInventory(ctx, client, "jellyfin", "media", "uuid-abc")
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Equal(t, "jellyfin", result.Metadata.ModuleName)
-	assert.Equal(t, "uuid-abc", result.Metadata.ReleaseID)
+	assert.Equal(t, "jellyfin", result.ModuleMetadata.Name)
+	assert.Equal(t, "uuid-abc", result.ReleaseMetadata.ReleaseID)
 	assert.Equal(t, "100", result.ResourceVersion())
 }
 
@@ -95,7 +99,7 @@ func TestGetInventory_FallbackToLabelLookup(t *testing.T) {
 	result, err := inventory.GetInventory(ctx, client, "jellyfin", "media", "uuid-xyz")
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Equal(t, "uuid-xyz", result.Metadata.ReleaseID)
+	assert.Equal(t, "uuid-xyz", result.ReleaseMetadata.ReleaseID)
 }
 
 func TestGetInventory_NotFound_ReturnsNil(t *testing.T) {
@@ -115,7 +119,7 @@ func TestWriteInventory_Create_NewSecret(t *testing.T) {
 
 	testInv := makeTestInventory("myapp", "default", "uuid-new")
 	// No resourceVersion = this is a Create
-	err := inventory.WriteInventory(ctx, client, testInv)
+	err := inventory.WriteInventory(ctx, client, testInv, "myapp-module", "")
 	require.NoError(t, err)
 
 	// Verify the Secret was created
@@ -148,7 +152,7 @@ func TestWriteInventory_Update_ExistingSecret(t *testing.T) {
 		Timestamp: "2026-01-02T00:00:00Z",
 	}
 
-	err = inventory.WriteInventory(ctx, client, inv)
+	err = inventory.WriteInventory(ctx, client, inv, "", "")
 	require.NoError(t, err)
 
 	// Verify the update was applied
@@ -242,7 +246,7 @@ func TestDiscoverResources_ExcludesInventorySecret(t *testing.T) {
 
 func TestFindInventoryByReleaseName_Found(t *testing.T) {
 	// Create inventory with distinct module name and release name
-	testInv := makeTestInventoryWithReleaseName("minecraft", "mc", "default", "uuid-mc-001")
+	testInv := makeTestInventoryWithModuleName("minecraft", "mc", "default", "uuid-mc-001")
 	secret, err := inventory.MarshalToSecret(testInv)
 	require.NoError(t, err)
 	secret.ResourceVersion = "1"
@@ -253,9 +257,9 @@ func TestFindInventoryByReleaseName_Found(t *testing.T) {
 	found, err := inventory.FindInventoryByReleaseName(ctx, client, "mc", "default")
 	require.NoError(t, err)
 	require.NotNil(t, found)
-	assert.Equal(t, "minecraft", found.Metadata.ModuleName, "module name should be preserved")
-	assert.Equal(t, "mc", found.Metadata.ReleaseName, "release name should be preserved")
-	assert.Equal(t, "uuid-mc-001", found.Metadata.ReleaseID)
+	assert.Equal(t, "minecraft", found.ModuleMetadata.Name, "module name should be preserved")
+	assert.Equal(t, "mc", found.ReleaseMetadata.ReleaseName, "release name should be preserved")
+	assert.Equal(t, "uuid-mc-001", found.ReleaseMetadata.ReleaseID)
 }
 
 func TestFindInventoryByReleaseName_NotFound_ReturnsNil(t *testing.T) {
@@ -268,7 +272,7 @@ func TestFindInventoryByReleaseName_NotFound_ReturnsNil(t *testing.T) {
 }
 
 func TestFindInventoryByReleaseName_WrongNamespace_ReturnsNil(t *testing.T) {
-	testInv := makeTestInventoryWithReleaseName("minecraft", "mc", "production", "uuid-mc-002")
+	testInv := makeTestInventoryWithModuleName("minecraft", "mc", "production", "uuid-mc-002")
 	secret, err := inventory.MarshalToSecret(testInv)
 	require.NoError(t, err)
 	secret.ResourceVersion = "1"
@@ -280,4 +284,81 @@ func TestFindInventoryByReleaseName_WrongNamespace_ReturnsNil(t *testing.T) {
 	found, err := inventory.FindInventoryByReleaseName(ctx, client, "mc", "staging")
 	require.NoError(t, err)
 	assert.Nil(t, found, "should not find inventory in a different namespace")
+}
+
+// --- WriteInventory: ModuleMetadata populated at create, preserved on update ---
+
+func TestWriteInventory_ModuleMetadata_SetAtCreate(t *testing.T) {
+	client := makeTestClient()
+	ctx := context.Background()
+
+	inv := &inventory.InventorySecret{
+		ReleaseMetadata: inventory.ReleaseMetadata{
+			Kind:             "ModuleRelease",
+			APIVersion:       "core.opmodel.dev/v1alpha1",
+			ReleaseName:      "mc",
+			ReleaseNamespace: "default",
+			ReleaseID:        "uuid-create-test",
+		},
+		Index:   []string{},
+		Changes: map[string]*inventory.ChangeEntry{},
+	}
+
+	err := inventory.WriteInventory(ctx, client, inv, "minecraft", "mod-uuid-abc")
+	require.NoError(t, err)
+
+	// Read back and verify ModuleMetadata was populated
+	result, err := inventory.GetInventory(ctx, client, "mc", "default", "uuid-create-test")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "minecraft", result.ModuleMetadata.Name)
+	assert.Equal(t, "Module", result.ModuleMetadata.Kind)
+	assert.Equal(t, "mod-uuid-abc", result.ModuleMetadata.UUID)
+}
+
+func TestWriteInventory_ModuleMetadata_PreservedOnUpdate(t *testing.T) {
+	ctx := context.Background()
+
+	// Pre-create the secret in the fake client with module metadata already set
+	existingInv := &inventory.InventorySecret{
+		ReleaseMetadata: inventory.ReleaseMetadata{
+			Kind:             "ModuleRelease",
+			APIVersion:       "core.opmodel.dev/v1alpha1",
+			ReleaseName:      "mc",
+			ReleaseNamespace: "default",
+			ReleaseID:        "uuid-update-test",
+		},
+		ModuleMetadata: inventory.ModuleMetadata{
+			Kind:       "Module",
+			APIVersion: "core.opmodel.dev/v1alpha1",
+			Name:       "minecraft",
+			UUID:       "mod-uuid-abc",
+		},
+		Index:   []string{},
+		Changes: map[string]*inventory.ChangeEntry{},
+	}
+	preCreated, err := inventory.MarshalToSecret(existingInv)
+	require.NoError(t, err)
+	preCreated.ResourceVersion = "1"
+
+	client := makeTestClient(preCreated)
+
+	// Read back (gets resourceVersion set)
+	existing, err := inventory.GetInventory(ctx, client, "mc", "default", "uuid-update-test")
+	require.NoError(t, err)
+	require.NotNil(t, existing)
+
+	// Update with empty moduleName/moduleUUID — should preserve existing ModuleMetadata
+	existing.Index = []string{"change-sha1-aabbccdd"}
+	existing.Changes["change-sha1-aabbccdd"] = &inventory.ChangeEntry{Timestamp: "2026-02-01T00:00:00Z"}
+
+	err = inventory.WriteInventory(ctx, client, existing, "", "")
+	require.NoError(t, err)
+
+	// Verify ModuleMetadata is still intact
+	updated, err := inventory.GetInventory(ctx, client, "mc", "default", "uuid-update-test")
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	assert.Equal(t, "minecraft", updated.ModuleMetadata.Name, "module name must be preserved on update")
+	assert.Equal(t, "mod-uuid-abc", updated.ModuleMetadata.UUID, "module UUID must be preserved on update")
 }

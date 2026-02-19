@@ -26,7 +26,14 @@ The diff output SHALL use `homeport/dyff` for semantic YAML comparison. Field re
 
 ### Requirement: Diff categorizes resources into three states
 
-The command SHALL categorize each resource into one of three states: modified (exists both locally and on cluster with differences), added (exists locally but not on cluster), or orphaned (exists on cluster with OPM labels but not in local render). When an inventory Secret exists, orphan detection SHALL use inventory set-difference (entries in previous inventory not in current render) with targeted GETs to verify live state. When no inventory exists, orphan detection SHALL fall back to label-based discovery via `DiscoverResources()`.
+The command SHALL categorize each resource into one of three states: modified (exists both locally and on cluster with differences), added (exists locally but not on cluster), or orphaned (exists on cluster per inventory but not in local render). When an inventory Secret exists, orphan detection SHALL use inventory set-difference: entries in the previous inventory not present in the current render, verified with targeted GETs. When no inventory exists, orphan detection SHALL return an empty set — all rendered resources SHALL be shown as additions. The command MUST NOT fall back to a cluster-wide label-scan at any point.
+
+#### Scenario: Module not yet deployed shows all as additions
+
+- **WHEN** a module has never been applied to the cluster
+- **AND** therefore no inventory Secret exists
+- **THEN** `opm mod diff` SHALL show every rendered resource as an addition (`[new resource]`)
+- **AND** no orphans SHALL be reported
 
 #### Scenario: Resource exists on cluster but not in local render
 
@@ -42,13 +49,7 @@ The command SHALL categorize each resource into one of three states: modified (e
 
 - **WHEN** an inventory Secret exists for the release
 - **THEN** orphans SHALL be computed as inventory entries not present in the current rendered set
-- **AND** each orphan SHALL be verified via a targeted GET (missing resources are excluded)
-
-#### Scenario: Orphan detection without inventory (fallback)
-
-- **WHEN** no inventory Secret exists for the release
-- **THEN** orphan detection SHALL fall back to `DiscoverResources()` label-scan
-- **AND** a debug log message SHALL indicate "No inventory found, falling back to label-based discovery"
+- **AND** each orphan candidate SHALL be verified via a targeted GET (missing resources on cluster are excluded from orphan list)
 
 ### Requirement: Diff displays a summary line
 

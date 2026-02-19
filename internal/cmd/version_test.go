@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewVersionCmd(t *testing.T) {
-	cmd := NewVersionCmd()
+	cmd := NewVersionCmd(nil)
 
 	assert.Equal(t, "version", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
@@ -17,7 +17,7 @@ func TestNewVersionCmd(t *testing.T) {
 }
 
 func TestVersionCmd_Execute(t *testing.T) {
-	cmd := NewVersionCmd()
+	cmd := NewVersionCmd(nil)
 
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})

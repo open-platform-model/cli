@@ -3,7 +3,6 @@
 // Integration test for inventory-first diff, delete, and status operations (RFC-0001).
 //
 // Tests covered:
-//   - 6.6: Diff without inventory — falls back to label-scan, orphans detected correctly
 //   - 6.5: Diff with inventory — orphan computed via set-difference
 //   - 6.7: Delete with inventory — no Endpoints deleted, inventory Secret deleted last
 //   - 6.8: Status with inventory — missing resource shown with "Missing" status
@@ -57,37 +56,13 @@ func main() {
 	fmt.Println()
 
 	// ----------------------------------------------------------------
-	// Scenario 6.6: Diff without inventory — label-scan fallback
-	// ----------------------------------------------------------------
-	step(1, "6.6: Diff without inventory — label-scan fallback")
-
-	cleanup(ctx, client)
-
-	// Apply resources without writing an inventory Secret.
-	res66 := buildResources([]string{"cm-a"})
-	_, err = kubernetes.Apply(ctx, client, res66, moduleMeta(), kubernetes.ApplyOptions{})
-	check("applying resources for 6.6", err)
-	fmt.Println("   OK: resources applied (no inventory)")
-
-	// Diff with same render set — no DiffOptions (nil InventoryLive = label-scan path).
-	comparer := kubernetes.NewComparer()
-	diffResult66, err := kubernetes.Diff(ctx, client, res66, moduleMeta(), comparer)
-	check("diffing without inventory", err)
-	if diffResult66.Orphaned != 0 {
-		failf("6.6: expected 0 orphans on label-scan fallback, got %d", diffResult66.Orphaned)
-	}
-	if diffResult66.Unchanged != 1 {
-		failf("6.6: expected 1 unchanged resource, got %d", diffResult66.Unchanged)
-	}
-	fmt.Printf("   OK: diff result: %d unchanged, %d orphaned (label-scan fallback)\n",
-		diffResult66.Unchanged, diffResult66.Orphaned)
-
-	cleanup(ctx, client)
-
-	// ----------------------------------------------------------------
 	// Scenario 6.5: Diff with inventory — orphan from set-difference
 	// ----------------------------------------------------------------
-	step(2, "6.5: Diff with inventory — orphan from set-difference")
+	step(1, "6.5: Diff with inventory — orphan from set-difference")
+
+	cleanup(ctx, client)
+
+	comparer := kubernetes.NewComparer()
 
 	// Apply both cm-a and svc-a; write inventory tracking both.
 	res65cm := buildResources([]string{"cm-a"})
@@ -99,7 +74,7 @@ func main() {
 	fmt.Println("   OK: cm-a and svc-a applied")
 
 	inv65 := buildInventory(res65all)
-	err = inventory.WriteInventory(ctx, client, inv65)
+	err = inventory.WriteInventory(ctx, client, inv65, "", "")
 	check("writing inventory for 6.5", err)
 	fmt.Println("   OK: inventory written tracking [cm-a, svc-a]")
 
@@ -134,7 +109,7 @@ func main() {
 	// ----------------------------------------------------------------
 	// Scenario 6.7: Delete with inventory — no Endpoints, inventory Secret deleted last
 	// ----------------------------------------------------------------
-	step(3, "6.7: Delete with inventory — no Endpoints deleted, inventory Secret deleted last")
+	step(2, "6.7: Delete with inventory — no Endpoints deleted, inventory Secret deleted last")
 
 	// Apply cm-a and svc-a; write inventory.
 	res67cm := buildResources([]string{"cm-a"})
@@ -146,7 +121,7 @@ func main() {
 	fmt.Println("   OK: cm-a and svc-a applied")
 
 	inv67 := buildInventory(res67all)
-	err = inventory.WriteInventory(ctx, client, inv67)
+	err = inventory.WriteInventory(ctx, client, inv67, "", "")
 	check("writing inventory for 6.7", err)
 	fmt.Println("   OK: inventory written")
 
@@ -187,7 +162,7 @@ func main() {
 	// ----------------------------------------------------------------
 	// Scenario 6.8: Status with inventory — missing resource shown
 	// ----------------------------------------------------------------
-	step(4, "6.8: Status with inventory — missing resource shown with Missing status")
+	step(3, "6.8: Status with inventory — missing resource shown with Missing status")
 
 	// Apply cm-a and svc-a; write inventory.
 	res68cm := buildResources([]string{"cm-a"})
@@ -199,7 +174,7 @@ func main() {
 	fmt.Println("   OK: cm-a and svc-a applied")
 
 	inv68 := buildInventory(res68all)
-	err = inventory.WriteInventory(ctx, client, inv68)
+	err = inventory.WriteInventory(ctx, client, inv68, "", "")
 	check("writing inventory for 6.8", err)
 	fmt.Println("   OK: inventory written")
 
@@ -388,13 +363,17 @@ func buildInventory(resources []*build.Resource) *inventory.InventorySecret {
 	source := inventory.ChangeSource{Path: modulePath, Version: moduleVersion, ReleaseName: releaseName}
 
 	inv := &inventory.InventorySecret{
-		Metadata: inventory.InventoryMetadata{
+		ReleaseMetadata: inventory.ReleaseMetadata{
 			Kind:             "ModuleRelease",
 			APIVersion:       "core.opmodel.dev/v1alpha1",
-			ModuleName:       releaseName, // module name (same as release name in this test)
 			ReleaseName:      releaseName,
 			ReleaseNamespace: namespace,
 			ReleaseID:        releaseID,
+		},
+		ModuleMetadata: inventory.ModuleMetadata{
+			Kind:       "Module",
+			APIVersion: "core.opmodel.dev/v1alpha1",
+			Name:       releaseName, // module name (same as release name in this test)
 		},
 		Index:   []string{},
 		Changes: map[string]*inventory.ChangeEntry{},

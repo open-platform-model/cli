@@ -1,27 +1,34 @@
 
 ## Requirements
 
-### Requirement: Status discovers resources via OPM labels
+### Requirement: Status discovers resources via inventory
 
-The `opm mod status` command SHALL first attempt to read the inventory Secret for the release. If an inventory exists, it SHALL use targeted GET calls for each tracked resource instead of scanning all API types. If no inventory exists, it SHALL fall back to discovering deployed resources by querying the cluster using the OPM label selector (`module.opmodel.dev/name`) within the target namespace. It MUST NOT require module source or re-rendering.
+The `opm mod status` command SHALL read the inventory Secret for the release to discover its resources. If `--release-id` is provided, it SHALL use `inventory.GetInventory` (direct GET by name, with UUID label fallback). If only `--release-name` is provided, it SHALL use `inventory.FindInventoryByReleaseName` (label scan on inventory Secrets only). Once the inventory is found, it SHALL perform one targeted GET per tracked entry via `inventory.DiscoverResourcesFromInventory`. It MUST NOT require module source or re-rendering. It MUST NOT use a cluster-wide label-scan to discover workload resources.
 
-#### Scenario: Status shows deployed resources via inventory
+#### Scenario: Status shows deployed resources via inventory (release-name path)
 
-- **WHEN** the user runs `opm mod status -n my-namespace --name my-module`
-- **AND** an inventory Secret exists for the release
+- **WHEN** the user runs `opm mod status --release-name my-app -n production`
+- **AND** an inventory Secret exists labeled `module-release.opmodel.dev/name=my-app`
+- **THEN** the command SHALL fetch each tracked resource via targeted GET
+- **AND** only resources explicitly tracked in the inventory SHALL appear in the output
+
+#### Scenario: Status shows deployed resources via inventory (release-id path)
+
+- **WHEN** the user runs `opm mod status --release-id <uuid> -n production`
+- **AND** an inventory Secret exists with that UUID
 - **THEN** the command SHALL fetch each tracked resource via targeted GET
 
-#### Scenario: Status falls back to label scan
+#### Scenario: Release not found
 
-- **WHEN** the user runs `opm mod status -n my-namespace --name my-module`
-- **AND** no inventory Secret exists for the release
-- **THEN** the command SHALL discover resources via label-scan
-- **AND** a debug log message SHALL indicate "No inventory found, falling back to label-based discovery"
+- **WHEN** the user runs `opm mod status --release-name my-app -n production`
+- **AND** no inventory Secret exists for that release name in that namespace
+- **THEN** the command SHALL exit with error: `"release 'my-app' not found in namespace 'production'"`
 
-#### Scenario: No resources found
+#### Scenario: Kubernetes-generated children not shown
 
-- **WHEN** no resources match the given name and namespace labels
-- **THEN** the command SHALL print "No resources found for module <name> in namespace <namespace>" and exit with code 0
+- **WHEN** a release includes a Service that caused Kubernetes to create Endpoints and EndpointSlice resources
+- **AND** those child resources were not tracked by the inventory
+- **THEN** `opm mod status` SHALL NOT include Endpoints or EndpointSlice in the output
 
 ### Requirement: Status evaluates health per resource category
 
@@ -94,19 +101,21 @@ The command SHALL support `--watch` for continuous monitoring. In watch mode, th
 - **WHEN** the user presses Ctrl+C during watch mode
 - **THEN** the command SHALL exit with code 0 and restore the terminal state
 
-### Requirement: Status requires name and namespace flags
+### Requirement: Namespace defaults to config
 
-The `--name` and `--namespace`/`-n` flags SHALL be required. The command SHALL reject execution and display a usage error if either is missing.
+The `--namespace`/`-n` flag SHALL be optional for `opm mod status`. When omitted, the namespace SHALL be resolved using the precedence: flag → `OPM_NAMESPACE` environment variable → `~/.opm/config.cue` kubernetes.namespace → `"default"`.
 
-#### Scenario: Missing namespace flag
+#### Scenario: Namespace omitted uses config default
 
-- **WHEN** the user runs `opm mod status --name my-module` without `-n`
-- **THEN** the command SHALL exit with code 1 and display a usage error indicating `-n` is required
+- **WHEN** the user runs `opm mod status --release-name my-app` without `-n`
+- **AND** the config file sets `kubernetes: namespace: "production"`
+- **THEN** the command SHALL operate in the `production` namespace
 
-#### Scenario: Missing name flag
+#### Scenario: Namespace omitted uses hardcoded default
 
-- **WHEN** the user runs `opm mod status -n my-namespace` without `--name`
-- **THEN** the command SHALL exit with code 1 and display a usage error indicating `--name` is required
+- **WHEN** the user runs `opm mod status --release-name my-app` without `-n`
+- **AND** no config or env sets a namespace
+- **THEN** the command SHALL operate in the `default` namespace
 
 ### Requirement: Status accepts kubernetes connection flags
 

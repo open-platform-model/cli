@@ -46,23 +46,30 @@ type InventoryList struct {
 	Entries []InventoryEntry `json:"entries"`
 }
 
-// InventoryMetadata is the release-level metadata stored in the inventory Secret.
-// Using kind/apiVersion matching a future CRD schema enables migration from
-// Secret to CRD without changing the data model.
+// ReleaseMetadata is the release-level metadata stored in the inventory Secret
+// under the "releaseMetadata" key. Using kind/apiVersion matching a future CRD
+// schema enables migration from Secret to CRD without changing the data model.
 //
 //nolint:revive // Inventory prefix is intentional for cross-package clarity
-type InventoryMetadata struct {
-	Kind       string `json:"kind"`       // "ModuleRelease"
-	APIVersion string `json:"apiVersion"` // "core.opmodel.dev/v1alpha1"
-	// ModuleName is the canonical module name (e.g. "minecraft").
-	// JSON tag "name" is preserved for backward compat with existing inventory Secrets.
-	ModuleName  string `json:"name"`
-	ReleaseName string `json:"releaseName"` // release name (from --release-name), e.g. "mc"
-	// ReleaseNamespace is the Kubernetes namespace where the release is deployed.
-	// JSON tag "namespace" is preserved for backward compat with existing inventory Secrets.
-	ReleaseNamespace   string `json:"namespace"`
-	ReleaseID          string `json:"releaseId"`
+type ReleaseMetadata struct {
+	Kind               string `json:"kind"`               // "ModuleRelease"
+	APIVersion         string `json:"apiVersion"`         // "core.opmodel.dev/v1alpha1"
+	ReleaseName        string `json:"name"`               // release name (from --release-name), e.g. "mc"
+	ReleaseNamespace   string `json:"namespace"`          // Kubernetes namespace of the release
+	ReleaseID          string `json:"uuid"`               // deterministic UUID v5 release identity
 	LastTransitionTime string `json:"lastTransitionTime"` // RFC 3339
+}
+
+// ModuleMetadata is the module-level metadata stored in the inventory Secret
+// under the "moduleMetadata" key. Using kind/apiVersion matching a future CRD
+// schema enables migration from Secret to CRD without changing the data model.
+//
+//nolint:revive // Inventory prefix is intentional for cross-package clarity
+type ModuleMetadata struct {
+	Kind       string `json:"kind"`           // "Module"
+	APIVersion string `json:"apiVersion"`     // "core.opmodel.dev/v1alpha1"
+	Name       string `json:"name"`           // canonical module name, e.g. "minecraft"
+	UUID       string `json:"uuid,omitempty"` // module identity UUID (omitted if empty)
 }
 
 // InventorySecret is the full in-memory representation of an inventory Secret.
@@ -70,9 +77,10 @@ type InventoryMetadata struct {
 //
 //nolint:revive // Inventory prefix is intentional for cross-package clarity
 type InventorySecret struct {
-	Metadata InventoryMetadata
-	Index    []string                // ordered change IDs (newest first)
-	Changes  map[string]*ChangeEntry // keyed by "change-sha1-<8chars>"
+	ReleaseMetadata ReleaseMetadata
+	ModuleMetadata  ModuleMetadata
+	Index           []string                // ordered change IDs (newest first)
+	Changes         map[string]*ChangeEntry // keyed by "change-sha1-<8chars>"
 
 	// resourceVersion holds the K8s resourceVersion from the last read,
 	// used for optimistic concurrency on writes. Only set by UnmarshalFromSecret.

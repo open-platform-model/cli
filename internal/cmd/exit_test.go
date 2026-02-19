@@ -45,7 +45,7 @@ func TestExitCodeFromK8sError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := exitCodeFromK8sError(tt.err)
+			got := ExitCodeFromK8sError(tt.err)
 			assert.Equal(t, tt.wantCode, got)
 		})
 	}
