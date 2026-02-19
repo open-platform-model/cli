@@ -67,8 +67,11 @@ type RenderResult struct {
 	// Empty slice (not nil) if no resources were rendered.
 	Resources []*Resource
 
-	// Release contains metadata about the source module and the release being deployed.
-	Release ModuleReleaseMetadata
+	// Release contains release-level metadata (name, namespace, release UUID, labels).
+	Release ReleaseMetadata
+
+	// Module contains module-level metadata (canonical name, FQN, version, module UUID, labels).
+	Module ModuleMetadata
 
 	// MatchPlan describes which transformers matched which components.
 	// Used for verbose output and debugging.

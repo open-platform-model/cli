@@ -34,7 +34,6 @@ import "uuid"
 	identity:  string & uuid.SHA1("c1cbe76d-5687-5a47-bfe6-83b081b15413", "\(fqn):\(name):\(namespace)")
 	labels: metadata.labels & {
 		"module-release.opmodel.dev/name":    name
-		"module-release.opmodel.dev/version": version
 		"module-release.opmodel.dev/uuid":    identity
 	}
 }
@@ -87,7 +86,6 @@ func generateOverlayAST(pkgName string, name, namespace string) *ast.File {
 		Op: token.AND,
 		Y: ast.NewStruct(
 			ast.NewString("module-release.opmodel.dev/name"), ast.NewIdent("name"),
-			ast.NewString("module-release.opmodel.dev/version"), ast.NewIdent("version"),
 			ast.NewString("module-release.opmodel.dev/uuid"), ast.NewIdent("identity"),
 		),
 	}
@@ -154,7 +152,6 @@ func generateOverlayAST(pkgName string, name, namespace string) *ast.File {
 //	    identity:  string & uuid.SHA1("...", "\(fqn):\(name):\(namespace)")
 //	    labels: metadata.labels & {
 //	        "module-release.opmodel.dev/name":    name
-//	        "module-release.opmodel.dev/version": version
 //	        "module-release.opmodel.dev/uuid":    identity
 //	    }
 //	}

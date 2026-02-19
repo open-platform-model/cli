@@ -36,9 +36,12 @@ func TestResolveModulePath_Arg(t *testing.T) {
 func TestShowRenderOutput_WithErrors(t *testing.T) {
 	// Create a RenderResult with errors
 	result := &build.RenderResult{
-		Release: build.ModuleReleaseMetadata{
+		Release: build.ReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",
+		},
+		Module: build.ModuleMetadata{
+			Name: "test-module",
 		},
 		Errors: []error{
 			&build.UnmatchedComponentError{
@@ -60,9 +63,12 @@ func TestShowRenderOutput_WithErrors(t *testing.T) {
 func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 	// Create a RenderResult with no errors
 	result := &build.RenderResult{
-		Release: build.ModuleReleaseMetadata{
+		Release: build.ReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",
+		},
+		Module: build.ModuleMetadata{
+			Name: "test-module",
 		},
 		MatchPlan: build.MatchPlan{
 			Matches: map[string][]build.TransformerMatch{
@@ -87,9 +93,12 @@ func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 func TestShowRenderOutput_Warnings(t *testing.T) {
 	// Create a RenderResult with warnings
 	result := &build.RenderResult{
-		Release: build.ModuleReleaseMetadata{
+		Release: build.ReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",
+		},
+		Module: build.ModuleMetadata{
+			Name: "test-module",
 		},
 		MatchPlan: build.MatchPlan{
 			Matches: map[string][]build.TransformerMatch{},

@@ -200,7 +200,8 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 
 	return &RenderResult{
 		Resources: resources,
-		Release:   release.ToModuleReleaseMetadata(moduleMeta.Name),
+		Release:   release.ToReleaseMetadata(),
+		Module:    release.ToModuleMetadata(moduleMeta.Name, moduleMeta.DefaultNamespace),
 		MatchPlan: matchPlan,
 		Errors:    errors,
 		Warnings:  warnings,

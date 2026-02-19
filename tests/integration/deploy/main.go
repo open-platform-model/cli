@@ -45,7 +45,6 @@ func main() {
 	opmLabels := map[string]interface{}{
 		"app.kubernetes.io/managed-by":       "open-platform-model",
 		"module-release.opmodel.dev/name":    releaseName,
-		"module-release.opmodel.dev/version": "0.1.0",
 		"module-release.opmodel.dev/uuid":    releaseID,
 		"module.opmodel.dev/name":            releaseName,
 		"module.opmodel.dev/version":         "0.1.0",
@@ -90,11 +89,10 @@ func main() {
 		{Object: cm, Component: "config"},
 		{Object: svc, Component: "web"},
 	}
-	meta := build.ModuleReleaseMetadata{
-		Name:            releaseName,
-		Namespace:       namespace,
-		Version:         "0.1.0",
-		ReleaseIdentity: releaseID,
+	meta := build.ReleaseMetadata{
+		Name:      releaseName,
+		Namespace: namespace,
+		UUID:      releaseID,
 	}
 	fmt.Printf("   OK: %d resources built (ConfigMap, Service)\n", len(resources))
 

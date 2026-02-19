@@ -174,11 +174,11 @@ func runApply(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags
 	}
 	// Build a values string from the render options for change ID computation
 	valuesStr := strings.Join(rf.Values, ",")
-	changeID := inventory.ComputeChangeID(modulePath, result.Release.Version, valuesStr, manifestDigest)
+	changeID := inventory.ComputeChangeID(modulePath, result.Module.Version, valuesStr, manifestDigest)
 	output.Debug("change ID computed", "changeID", changeID)
 
 	// Step 4: Read previous inventory (nil = first-time apply)
-	releaseID := result.Release.ReleaseIdentity
+	releaseID := result.Release.UUID
 	var prevInventory *inventory.InventorySecret
 	if releaseID != "" && !dryRun {
 		prevInventory, err = inventory.GetInventory(ctx, k8sClient, result.Release.Name, namespace, releaseID)
@@ -315,9 +315,9 @@ func runApply(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags
 
 			source := inventory.ChangeSource{
 				Path:        modulePath,
-				Version:     result.Release.Version,
+				Version:     result.Module.Version,
 				ReleaseName: result.Release.Name,
-				Local:       result.Release.Version == "",
+				Local:       result.Module.Version == "",
 			}
 
 			computedChangeID, changeEntry := inventory.PrepareChange(source, valuesStr, manifestDigest, currentEntries)
@@ -326,7 +326,7 @@ func runApply(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags
 			newOrUpdatedInventory.ReleaseMetadata.LastTransitionTime = changeEntry.Timestamp
 			inventory.PruneHistory(newOrUpdatedInventory, maxHistory)
 
-			if err := inventory.WriteInventory(ctx, k8sClient, newOrUpdatedInventory, result.Release.ModuleName, result.Release.Identity); err != nil {
+			if err := inventory.WriteInventory(ctx, k8sClient, newOrUpdatedInventory, result.Module.Name, result.Module.UUID); err != nil {
 				releaseLog.Warn("failed to write inventory Secret", "error", err)
 				// Non-fatal: the resources were applied successfully; warn but don't fail
 			} else {

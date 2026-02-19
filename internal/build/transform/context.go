@@ -14,17 +14,15 @@ type TransformerContext struct {
 	// Namespace is the target namespace (from --namespace or defaultNamespace)
 	Namespace string `json:"namespace"`
 
-	// ModuleReleaseMetadata contains module release metadata.
-	ModuleReleaseMetadata *TransformerModuleReleaseMetadata `json:"#moduleReleaseMetadata"`
+	// ModuleMetadata contains module-level identity metadata.
+	ModuleMetadata *module.ModuleMetadata `json:"#moduleMetadata"`
+
+	// ReleaseMetadata contains release-level identity metadata.
+	ReleaseMetadata *release.ReleaseMetadata `json:"#releaseMetadata"`
 
 	// ComponentMetadata contains component-level metadata
 	ComponentMetadata *TransformerComponentMetadata `json:"#componentMetadata"`
 }
-
-// TransformerModuleReleaseMetadata is an alias for release.TransformerMetadata.
-// The type is defined in the release package, which owns the field projection
-// (including the ReleaseIdentity → Identity rename).
-type TransformerModuleReleaseMetadata = release.TransformerMetadata
 
 // TransformerComponentMetadata contains component metadata for transformers.
 type TransformerComponentMetadata struct {
@@ -35,11 +33,16 @@ type TransformerComponentMetadata struct {
 
 // NewTransformerContext constructs the context for a transformer execution.
 func NewTransformerContext(rel *release.BuiltRelease, component *module.LoadedComponent) *TransformerContext {
-	relMeta := rel.Metadata.ReleaseMetadataForTransformer()
+	relMeta := rel.ToReleaseMetadata()
+	// ModuleMetadata in transformer context: use release name as module name since
+	// we only have the release-level name here. DefaultNamespace is not available
+	// at this point; callers that need the canonical module name use the pipeline.
+	modMeta := rel.ToModuleMetadata(rel.Metadata.Name, "")
 	return &TransformerContext{
-		Name:                  rel.Metadata.Name,
-		Namespace:             rel.Metadata.Namespace,
-		ModuleReleaseMetadata: &relMeta,
+		Name:            rel.Metadata.Name,
+		Namespace:       rel.Metadata.Namespace,
+		ModuleMetadata:  &modMeta,
+		ReleaseMetadata: &relMeta,
 		ComponentMetadata: &TransformerComponentMetadata{
 			Name:        component.Name,
 			Labels:      component.Labels,
@@ -49,16 +52,20 @@ func NewTransformerContext(rel *release.BuiltRelease, component *module.LoadedCo
 }
 
 // ToMap converts TransformerContext to a map for CUE encoding.
+// The output shape is identical to the previous implementation:
+// #moduleReleaseMetadata contains name, namespace, fqn, version, identity, labels.
+// The identity value is the release UUID (from ReleaseMetadata.UUID).
+// The fqn and version values come from ModuleMetadata.
 func (c *TransformerContext) ToMap() map[string]any {
 	moduleReleaseMetadata := map[string]any{
-		"name":      c.ModuleReleaseMetadata.Name,
-		"namespace": c.ModuleReleaseMetadata.Namespace,
-		"fqn":       c.ModuleReleaseMetadata.FQN,
-		"version":   c.ModuleReleaseMetadata.Version,
-		"identity":  c.ModuleReleaseMetadata.Identity,
+		"name":      c.ReleaseMetadata.Name,
+		"namespace": c.ReleaseMetadata.Namespace,
+		"fqn":       c.ModuleMetadata.FQN,
+		"version":   c.ModuleMetadata.Version,
+		"identity":  c.ReleaseMetadata.UUID,
 	}
-	if len(c.ModuleReleaseMetadata.Labels) > 0 {
-		moduleReleaseMetadata["labels"] = c.ModuleReleaseMetadata.Labels
+	if len(c.ReleaseMetadata.Labels) > 0 {
+		moduleReleaseMetadata["labels"] = c.ReleaseMetadata.Labels
 	}
 
 	componentMetadata := map[string]any{

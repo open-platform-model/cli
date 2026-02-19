@@ -84,7 +84,7 @@ func WriteVerboseMatchLog(result *build.RenderResult) {
 	// Release info — single line with key-value pairs
 	releaseLog.Info("release",
 		"namespace", result.Release.Namespace,
-		"version", result.Release.Version,
+		"version", result.Module.Version,
 		"components", strings.Join(result.Release.Components, ", "),
 	)
 

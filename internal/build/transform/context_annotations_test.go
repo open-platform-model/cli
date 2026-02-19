@@ -62,10 +62,13 @@ func TestTransformerContext_ToMap_WithAnnotations(t *testing.T) {
 	ctx := &TransformerContext{
 		Name:      "release-name",
 		Namespace: "production",
-		ModuleReleaseMetadata: &TransformerModuleReleaseMetadata{
-			Name:      "my-module",
+		ModuleMetadata: &module.ModuleMetadata{
+			Name:    "my-module",
+			Version: "2.0.0",
+		},
+		ReleaseMetadata: &release.ReleaseMetadata{
+			Name:      "release-name",
 			Namespace: "production",
-			Version:   "2.0.0",
 		},
 		ComponentMetadata: &TransformerComponentMetadata{
 			Name: "volumes-component",
@@ -88,10 +91,13 @@ func TestTransformerContext_ToMap_WithoutAnnotations(t *testing.T) {
 	ctx := &TransformerContext{
 		Name:      "release-name",
 		Namespace: "production",
-		ModuleReleaseMetadata: &TransformerModuleReleaseMetadata{
-			Name:      "my-module",
+		ModuleMetadata: &module.ModuleMetadata{
+			Name:    "my-module",
+			Version: "2.0.0",
+		},
+		ReleaseMetadata: &release.ReleaseMetadata{
+			Name:      "release-name",
 			Namespace: "production",
-			Version:   "2.0.0",
 		},
 		ComponentMetadata: &TransformerComponentMetadata{
 			Name:        "simple-component",

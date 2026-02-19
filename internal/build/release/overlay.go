@@ -66,7 +66,6 @@ func generateOverlayAST(pkgName string, opts Options) *ast.File {
 		Op: token.AND,
 		Y: ast.NewStruct(
 			ast.NewString("module-release.opmodel.dev/name"), ast.NewIdent("name"),
-			ast.NewString("module-release.opmodel.dev/version"), ast.NewIdent("version"),
 			ast.NewString("module-release.opmodel.dev/uuid"), ast.NewIdent("identity"),
 		),
 	}

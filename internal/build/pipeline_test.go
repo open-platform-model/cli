@@ -7,6 +7,7 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/opmodel/cli/internal/build/release"
 	"github.com/opmodel/cli/internal/config"
 )
 
@@ -54,15 +55,14 @@ func TestRenderOptionsValidate(t *testing.T) {
 }
 
 func TestPipeline_IdentityFieldsPropagated(t *testing.T) {
-	// This test verifies that Identity and ReleaseIdentity fields
-	// are properly propagated from ReleaseMetadata to ModuleReleaseMetadata
-	// through BuiltRelease.ToModuleReleaseMetadata.
+	// This test verifies that Identity (module UUID) and ReleaseIdentity (release UUID) fields
+	// are properly propagated from release.Metadata into the two projection types.
 
 	rel := &BuiltRelease{
 		Components: map[string]*LoadedComponent{
 			"web": {Name: "web"},
 		},
-		Metadata: ReleaseMetadata{
+		Metadata: release.Metadata{
 			Name:            "my-app",
 			Namespace:       "production",
 			Version:         "1.0.0",
@@ -73,14 +73,22 @@ func TestPipeline_IdentityFieldsPropagated(t *testing.T) {
 		},
 	}
 
-	meta := rel.ToModuleReleaseMetadata("app") // "app" = canonical module name
+	relMeta := rel.ToReleaseMetadata()
+	modMeta := rel.ToModuleMetadata("app", "staging") // "app" = canonical module name
 
-	assert.Equal(t, "my-app", meta.Name)
-	assert.Equal(t, "app", meta.ModuleName, "ModuleName should be the canonical module name, not the release name")
-	assert.Equal(t, "production", meta.Namespace)
-	assert.Equal(t, "1.0.0", meta.Version)
-	assert.Equal(t, "module-uuid-1234", meta.Identity, "Identity should be propagated")
-	assert.Equal(t, "release-uuid-5678", meta.ReleaseIdentity, "ReleaseIdentity should be propagated")
-	assert.Equal(t, map[string]string{"env": "prod"}, meta.Labels)
-	assert.Contains(t, meta.Components, "web")
+	// ReleaseMetadata assertions
+	assert.Equal(t, "my-app", relMeta.Name)
+	assert.Equal(t, "production", relMeta.Namespace)
+	assert.Equal(t, "release-uuid-5678", relMeta.UUID, "UUID should be the release identity UUID")
+	assert.Equal(t, map[string]string{"env": "prod"}, relMeta.Labels)
+	assert.Contains(t, relMeta.Components, "web")
+
+	// ModuleMetadata assertions
+	assert.Equal(t, "app", modMeta.Name, "Name should be the canonical module name, not the release name")
+	assert.Equal(t, "staging", modMeta.DefaultNamespace)
+	assert.Equal(t, "1.0.0", modMeta.Version)
+	assert.Equal(t, "example.com/modules/app@v1", modMeta.FQN)
+	assert.Equal(t, "module-uuid-1234", modMeta.UUID, "UUID should be the module identity UUID")
+	assert.Equal(t, map[string]string{"env": "prod"}, modMeta.Labels)
+	assert.Contains(t, modMeta.Components, "web")
 }

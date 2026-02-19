@@ -35,76 +35,65 @@ type Metadata struct {
 	ReleaseIdentity string
 }
 
-// TransformerMetadata is the release metadata projected into transformer context.
-// This is the single place where the ReleaseIdentity → Identity field rename occurs.
-type TransformerMetadata struct {
-	Name      string            `json:"name"`
-	Namespace string            `json:"namespace"`
-	FQN       string            `json:"fqn"`
-	Version   string            `json:"version"`
-	Identity  string            `json:"identity"`
-	Labels    map[string]string `json:"labels,omitempty"`
-}
-
-// ReleaseMetadataForTransformer projects release metadata into transformer context form.
-// This is the single authoritative location for the ReleaseIdentity → Identity rename.
-func (m Metadata) ReleaseMetadataForTransformer() TransformerMetadata {
-	return TransformerMetadata{
-		Name:      m.Name,
-		Namespace: m.Namespace,
-		FQN:       m.FQN,
-		Version:   m.Version,
-		Identity:  m.ReleaseIdentity, // rename: ReleaseIdentity → Identity
-		Labels:    m.Labels,
-	}
-}
-
-// ModuleReleaseMetadata contains information about the source module and the release being deployed.
-// This metadata is used for labeling resources and verbose output.
-type ModuleReleaseMetadata struct {
+// ReleaseMetadata contains release-level identity information for a deployed module.
+// This metadata is used for labeling resources, inventory tracking, and verbose output.
+//
+//nolint:revive // ReleaseMetadata is intentional: the type is re-exported as build.ReleaseMetadata without stutter.
+type ReleaseMetadata struct {
 	// Name is the release name (resolved from RenderOptions.Name or module.metadata.name).
-	Name string
-
-	// ModuleName is the canonical module name from module.metadata.name.
-	// Distinct from Name when --release-name overrides the default.
-	ModuleName string
+	Name string `json:"name"`
 
 	// Namespace is the target namespace.
-	Namespace string
+	// From default config.cue or --namespace flag.
+	Namespace string `json:"namespace"`
 
-	// Version is the module version (semver).
-	Version string
+	// UUID is the release identity UUID.
+	// Deterministic UUID5 computed from fqn+name+namespace.
+	UUID string `json:"uuid"`
 
-	// Labels from the module definition.
-	Labels map[string]string
+	// Labels from the module release.
+	Labels map[string]string `json:"labels,omitempty"`
 
-	// Components lists the component names in the module.
-	Components []string
+	// Annotations from the module release.
+	// Currently empty; populated when CUE annotation extraction is added.
+	Annotations map[string]string `json:"annotations,omitempty"`
 
-	// Identity is the module identity UUID (from #Module.metadata.identity).
-	Identity string
-
-	// ReleaseIdentity is the release identity UUID.
-	ReleaseIdentity string
+	// Components lists the component names rendered in this release.
+	Components []string `json:"components,omitempty"`
 }
 
-// ToModuleReleaseMetadata projects a BuiltRelease into a ModuleReleaseMetadata value.
-// moduleName is the canonical module name from module.metadata.name, which may
-// differ from r.Metadata.Name when --release-name overrides the default.
-func (r *BuiltRelease) ToModuleReleaseMetadata(moduleName string) ModuleReleaseMetadata {
+// ToReleaseMetadata projects a BuiltRelease into a ReleaseMetadata value.
+func (r *BuiltRelease) ToReleaseMetadata() ReleaseMetadata {
 	names := make([]string, 0, len(r.Components))
 	for name := range r.Components {
 		names = append(names, name)
 	}
-	return ModuleReleaseMetadata{
-		Name:            r.Metadata.Name,
-		ModuleName:      moduleName,
-		Namespace:       r.Metadata.Namespace,
-		Version:         r.Metadata.Version,
-		Labels:          r.Metadata.Labels,
-		Components:      names,
-		Identity:        r.Metadata.Identity,
-		ReleaseIdentity: r.Metadata.ReleaseIdentity,
+	return ReleaseMetadata{
+		Name:       r.Metadata.Name,
+		Namespace:  r.Metadata.Namespace,
+		UUID:       r.Metadata.ReleaseIdentity,
+		Labels:     r.Metadata.Labels,
+		Components: names,
+	}
+}
+
+// ToModuleMetadata projects a BuiltRelease into a module.ModuleMetadata value.
+// moduleName is the canonical module name from module.metadata.name, which may
+// differ from r.Metadata.Name when --name overrides the default.
+// defaultNamespace is the module's default namespace from module.metadata.defaultNamespace.
+func (r *BuiltRelease) ToModuleMetadata(moduleName, defaultNamespace string) module.ModuleMetadata {
+	names := make([]string, 0, len(r.Components))
+	for name := range r.Components {
+		names = append(names, name)
+	}
+	return module.ModuleMetadata{
+		Name:             moduleName,
+		DefaultNamespace: defaultNamespace,
+		FQN:              r.Metadata.FQN,
+		Version:          r.Metadata.Version,
+		UUID:             r.Metadata.Identity,
+		Labels:           r.Metadata.Labels,
+		Components:       names,
 	}
 }
 

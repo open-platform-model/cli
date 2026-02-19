@@ -105,8 +105,8 @@ func GetReleaseStatus(ctx context.Context, client *Client, opts StatusOptions) (
 	if len(resources) > 0 {
 		labels := resources[0].GetLabels()
 		if labels != nil {
-			result.ModuleID = labels[labelModuleID]
-			result.ReleaseID = labels[labelReleaseID]
+			result.ModuleID = labels[LabelModuleUUID]
+			result.ReleaseID = labels[LabelReleaseUUID]
 		}
 	}
 

@@ -29,3 +29,35 @@ type MetadataPreview struct {
 	Name             string
 	DefaultNamespace string
 }
+
+// ModuleMetadata contains module-level identity and version information.
+// This is the module's canonical metadata, distinct from the release it is deployed as.
+//
+//nolint:revive // ModuleMetadata is intentional: the type is re-exported as build.ModuleMetadata without stutter.
+type ModuleMetadata struct {
+	// Name is the canonical module name from module.metadata.name.
+	// Distinct from the release name when --name overrides the default.
+	Name string `json:"name"`
+
+	// DefaultNamespace is the default namespace from the module definition.
+	DefaultNamespace string `json:"defaultNamespace"`
+
+	// FQN is the fully qualified module name.
+	FQN string `json:"fqn"`
+
+	// Version is the module version (semver).
+	Version string `json:"version"`
+
+	// UUID is the module identity UUID (from #Module.metadata.identity).
+	UUID string `json:"uuid"`
+
+	// Labels from the module definition.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Annotations from the module definition.
+	// Currently populated from CUE extraction; may be empty.
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Components lists the component names in the module.
+	Components []string `json:"components,omitempty"`
+}

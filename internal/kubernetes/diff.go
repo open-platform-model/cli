@@ -315,7 +315,7 @@ type DiffOptions struct {
 }
 
 // Diff compares rendered resources against the live cluster state and returns categorized results.
-func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta build.ModuleReleaseMetadata, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
+func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta build.ReleaseMetadata, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
 	var diffOpts DiffOptions
 	if len(opts) > 0 {
 		diffOpts = opts[0]
@@ -405,7 +405,7 @@ func Diff(ctx context.Context, client *Client, resources []*build.Resource, meta
 
 // DiffPartial compares rendered resources against live state, handling partial render results.
 // Successfully rendered resources are compared; render errors produce warnings.
-func DiffPartial(ctx context.Context, client *Client, resources []*build.Resource, renderErrors []error, meta build.ModuleReleaseMetadata, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
+func DiffPartial(ctx context.Context, client *Client, resources []*build.Resource, renderErrors []error, meta build.ReleaseMetadata, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
 	result, err := Diff(ctx, client, resources, meta, comparer, opts...)
 	if err != nil {
 		return nil, err

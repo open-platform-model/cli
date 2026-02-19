@@ -105,7 +105,7 @@ func runDiff(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags,
 	// If no inventory exists, treat as "nothing previously deployed" — all rendered
 	// resources will appear as additions and no orphans will be reported.
 	var diffOpts kubernetes.DiffOptions
-	releaseID := result.Release.ReleaseIdentity
+	releaseID := result.Release.UUID
 	if releaseID != "" {
 		inv, invErr := inventory.GetInventory(ctx, k8sClient, result.Release.Name, result.Release.Namespace, releaseID)
 		if invErr != nil {

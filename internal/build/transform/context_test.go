@@ -38,26 +38,35 @@ func TestNewTransformerContext(t *testing.T) {
 
 	assert.Equal(t, "my-module", ctx.Name)
 	assert.Equal(t, "default", ctx.Namespace)
-	assert.Equal(t, "my-module", ctx.ModuleReleaseMetadata.Name)
-	assert.Equal(t, "default", ctx.ModuleReleaseMetadata.Namespace)
-	assert.Equal(t, "1.0.0", ctx.ModuleReleaseMetadata.Version)
-	assert.Equal(t, "example.com/modules@v0#MyModule", ctx.ModuleReleaseMetadata.FQN)
-	assert.Equal(t, "release-uuid", ctx.ModuleReleaseMetadata.Identity)
+	// ReleaseMetadata: release-level fields
+	assert.Equal(t, "my-module", ctx.ReleaseMetadata.Name)
+	assert.Equal(t, "default", ctx.ReleaseMetadata.Namespace)
+	assert.Equal(t, "release-uuid", ctx.ReleaseMetadata.UUID)
+	// ModuleMetadata: module-level fields
+	assert.Equal(t, "1.0.0", ctx.ModuleMetadata.Version)
+	assert.Equal(t, "example.com/modules@v0#MyModule", ctx.ModuleMetadata.FQN)
+	assert.Equal(t, "module-uuid", ctx.ModuleMetadata.UUID)
 	assert.Equal(t, "webapp", ctx.ComponentMetadata.Name)
 }
 
 func TestTransformerContext_ToMap(t *testing.T) {
-	ctx := &TransformerContext{
+	modMeta := &module.ModuleMetadata{
+		Name:    "my-module",
+		FQN:     "example.com/modules@v0#MyModule",
+		Version: "2.0.0",
+		Labels:  map[string]string{"team": "platform"},
+	}
+	relMeta := &release.ReleaseMetadata{
 		Name:      "release-name",
 		Namespace: "production",
-		ModuleReleaseMetadata: &TransformerModuleReleaseMetadata{
-			Name:      "my-module",
-			Namespace: "production",
-			FQN:       "example.com/modules@v0#MyModule",
-			Version:   "2.0.0",
-			Identity:  "release-uuid",
-			Labels:    map[string]string{"team": "platform"},
-		},
+		UUID:      "release-uuid",
+		Labels:    map[string]string{"team": "platform"},
+	}
+	ctx := &TransformerContext{
+		Name:            "release-name",
+		Namespace:       "production",
+		ModuleMetadata:  modMeta,
+		ReleaseMetadata: relMeta,
 		ComponentMetadata: &TransformerComponentMetadata{
 			Name:   "api",
 			Labels: map[string]string{"tier": "backend"},
@@ -69,12 +78,13 @@ func TestTransformerContext_ToMap(t *testing.T) {
 	assert.Equal(t, "release-name", m["name"])
 	assert.Equal(t, "production", m["namespace"])
 
+	// CUE output shape is unchanged: #moduleReleaseMetadata with same fields
 	moduleReleaseMetadata := m["#moduleReleaseMetadata"].(map[string]any)
-	assert.Equal(t, "my-module", moduleReleaseMetadata["name"])
-	assert.Equal(t, "production", moduleReleaseMetadata["namespace"])
-	assert.Equal(t, "2.0.0", moduleReleaseMetadata["version"])
-	assert.Equal(t, "example.com/modules@v0#MyModule", moduleReleaseMetadata["fqn"])
-	assert.Equal(t, "release-uuid", moduleReleaseMetadata["identity"])
+	assert.Equal(t, "release-name", moduleReleaseMetadata["name"])                   // release name
+	assert.Equal(t, "production", moduleReleaseMetadata["namespace"])                // release namespace
+	assert.Equal(t, "2.0.0", moduleReleaseMetadata["version"])                       // module version
+	assert.Equal(t, "example.com/modules@v0#MyModule", moduleReleaseMetadata["fqn"]) // module FQN
+	assert.Equal(t, "release-uuid", moduleReleaseMetadata["identity"])               // release UUID
 
 	componentMetadata := m["#componentMetadata"].(map[string]any)
 	assert.Equal(t, "api", componentMetadata["name"])

@@ -264,7 +264,6 @@ func opmLabels() map[string]interface{} {
 	return map[string]interface{}{
 		"app.kubernetes.io/managed-by":       "open-platform-model",
 		"module-release.opmodel.dev/name":    releaseName,
-		"module-release.opmodel.dev/version": moduleVersion,
 		"module-release.opmodel.dev/uuid":    releaseID,
 		"module.opmodel.dev/name":            releaseName,
 		"module.opmodel.dev/version":         moduleVersion,
@@ -342,13 +341,12 @@ func buildServiceResources(names []string) []*build.Resource {
 	return res
 }
 
-// moduleMeta returns the ModuleReleaseMetadata for the test release.
-func moduleMeta() build.ModuleReleaseMetadata {
-	return build.ModuleReleaseMetadata{
-		Name:            releaseName,
-		Namespace:       namespace,
-		Version:         moduleVersion,
-		ReleaseIdentity: releaseID,
+// moduleMeta returns the ReleaseMetadata for the test release.
+func moduleMeta() build.ReleaseMetadata {
+	return build.ReleaseMetadata{
+		Name:      releaseName,
+		Namespace: namespace,
+		UUID:      releaseID,
 	}
 }
 
