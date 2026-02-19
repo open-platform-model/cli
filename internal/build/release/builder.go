@@ -205,7 +205,7 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 		componentNames = append(componentNames, name)
 	}
 	relMeta.Components = componentNames
-	modMeta.Components = componentNames
+	modMeta.Components = append([]string{}, componentNames...)
 
 	return &BuiltRelease{
 		Value:           concreteRelease,

@@ -53,6 +53,39 @@ func TestNewTransformerContext(t *testing.T) {
 	assert.Equal(t, "webapp", ctx.ComponentMetadata.Name)
 }
 
+func TestNewTransformerContext_NameOverride(t *testing.T) {
+	// Verifies spec scenario: when --name overrides the module name, the
+	// TransformerContext carries the canonical module name in ModuleMetadata
+	// and the release name in ReleaseMetadata — independently.
+	rel := &release.BuiltRelease{
+		ReleaseMetadata: release.ReleaseMetadata{
+			Name:      "my-app-staging",
+			Namespace: "staging",
+			UUID:      "release-uuid",
+		},
+		ModuleMetadata: module.ModuleMetadata{
+			Name:    "my-app",
+			Version: "1.0.0",
+			FQN:     "example.com/modules@v0#MyApp",
+			UUID:    "module-uuid",
+		},
+	}
+
+	component := &module.LoadedComponent{
+		Name:        "api",
+		Labels:      map[string]string{},
+		Annotations: map[string]string{},
+		Resources:   map[string]cue.Value{},
+		Traits:      map[string]cue.Value{},
+	}
+
+	ctx := NewTransformerContext(rel, component)
+
+	assert.Equal(t, "my-app-staging", ctx.Name, "top-level Name should be the release name")
+	assert.Equal(t, "my-app-staging", ctx.ReleaseMetadata.Name, "ReleaseMetadata.Name should be the release name")
+	assert.Equal(t, "my-app", ctx.ModuleMetadata.Name, "ModuleMetadata.Name should be the canonical module name, not the release name")
+}
+
 func TestTransformerContext_ToMap(t *testing.T) {
 	modMeta := &module.ModuleMetadata{
 		Name:    "my-module",
