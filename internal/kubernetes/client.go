@@ -138,13 +138,12 @@ func ResetClient() {
 	cachedClient = nil
 }
 
-// buildRestConfig resolves kubeconfig with precedence:
-// flag > OPM_KUBECONFIG env > KUBECONFIG env > ~/.kube/config
+// buildRestConfig builds a REST config from pre-resolved options.
+// Kubeconfig and Context must already be resolved by the caller (via config.ResolveKubernetes).
+// When Kubeconfig is empty, client-go's default discovery applies (KUBECONFIG env / ~/.kube/config).
 func buildRestConfig(opts ClientOptions) (*rest.Config, error) {
-	kubeconfigPath := resolveKubeconfig(opts.Kubeconfig)
-
 	loadingRules := &clientcmd.ClientConfigLoadingRules{
-		ExplicitPath: kubeconfigPath,
+		ExplicitPath: opts.Kubeconfig,
 	}
 
 	overrides := &clientcmd.ConfigOverrides{}
@@ -158,27 +157,4 @@ func buildRestConfig(opts ClientOptions) (*rest.Config, error) {
 	)
 
 	return clientConfig.ClientConfig()
-}
-
-// resolveKubeconfig resolves kubeconfig path with precedence:
-// flag > OPM_KUBECONFIG > KUBECONFIG > ~/.kube/config
-func resolveKubeconfig(flagValue string) string {
-	var path string
-
-	if flagValue != "" {
-		path = flagValue
-	} else if v := os.Getenv("OPM_KUBECONFIG"); v != "" {
-		path = v
-	} else if v := os.Getenv("KUBECONFIG"); v != "" {
-		path = v
-	} else {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ""
-		}
-		return filepath.Join(home, ".kube", "config")
-	}
-
-	// Expand tilde in all paths (defensive, in case config resolver didn't)
-	return config.ExpandTilde(path)
 }

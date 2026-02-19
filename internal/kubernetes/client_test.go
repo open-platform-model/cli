@@ -2,8 +2,6 @@ package kubernetes
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -54,66 +52,12 @@ func TestEnsureNamespace(t *testing.T) {
 	})
 }
 
-func TestResolveKubeconfigExpandsTilde(t *testing.T) {
-	homeDir, err := os.UserHomeDir()
-	assert.NoError(t, err, "should get home directory")
-
-	tests := []struct {
-		name          string
-		flagValue     string
-		opmKubeconfig string
-		kubeconfig    string
-		expected      string
-	}{
-		{
-			name:      "flag with tilde",
-			flagValue: "~/.kube/custom-config",
-			expected:  filepath.Join(homeDir, ".kube", "custom-config"),
-		},
-		{
-			name:          "OPM_KUBECONFIG env with tilde",
-			flagValue:     "",
-			opmKubeconfig: "~/.kube/opm-config",
-			expected:      filepath.Join(homeDir, ".kube", "opm-config"),
-		},
-		{
-			name:       "KUBECONFIG env with tilde",
-			flagValue:  "",
-			kubeconfig: "~/configs/k8s.yaml",
-			expected:   filepath.Join(homeDir, "configs", "k8s.yaml"),
-		},
-		{
-			name:      "flag with absolute path (no tilde)",
-			flagValue: "/etc/kubernetes/admin.conf",
-			expected:  "/etc/kubernetes/admin.conf",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Save and restore env vars
-			origOPM := os.Getenv("OPM_KUBECONFIG")
-			origKube := os.Getenv("KUBECONFIG")
-			defer func() {
-				os.Setenv("OPM_KUBECONFIG", origOPM)
-				os.Setenv("KUBECONFIG", origKube)
-			}()
-
-			// Set test env vars
-			if tt.opmKubeconfig != "" {
-				os.Setenv("OPM_KUBECONFIG", tt.opmKubeconfig)
-			} else {
-				os.Unsetenv("OPM_KUBECONFIG")
-			}
-
-			if tt.kubeconfig != "" {
-				os.Setenv("KUBECONFIG", tt.kubeconfig)
-			} else {
-				os.Unsetenv("KUBECONFIG")
-			}
-
-			result := resolveKubeconfig(tt.flagValue)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
+func TestBuildRestConfig_InvalidPath(t *testing.T) {
+	// buildRestConfig with a nonexistent kubeconfig path should return an error.
+	// Values are treated as pre-resolved — no further env/precedence resolution occurs.
+	_, err := buildRestConfig(ClientOptions{
+		Kubeconfig: "/nonexistent/path/kubeconfig",
+		Context:    "nonexistent-context",
+	})
+	assert.Error(t, err, "expected error for nonexistent kubeconfig path")
 }

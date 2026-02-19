@@ -53,12 +53,22 @@ Examples:
 func runVet(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags) error {
 	ctx := context.Background()
 
+	// Resolve Kubernetes configuration (namespace, provider) for the render pipeline.
+	// vet does not connect to a cluster, but namespace and provider still need to flow
+	// through the same resolver (flag > env > config > default).
+	k8sConfig, err := cmdutil.ResolveKubernetes(cfg.OPMConfig, "", "", rf.Namespace, rf.Provider)
+	if err != nil {
+		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("resolving config: %w", err)}
+	}
+
 	// Render module via shared pipeline
 	result, err := cmdutil.RenderRelease(ctx, cmdutil.RenderReleaseOpts{
-		Args:      args,
-		Render:    rf,
-		OPMConfig: cfg.OPMConfig,
-		Registry:  cfg.Registry,
+		Args:        args,
+		Values:      rf.Values,
+		ReleaseName: rf.ReleaseName,
+		K8sConfig:   k8sConfig,
+		OPMConfig:   cfg.OPMConfig,
+		Registry:    cfg.Registry,
 	})
 	if err != nil {
 		return err

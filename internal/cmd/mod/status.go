@@ -120,12 +120,8 @@ func runStatus(_ []string, cfg *cmdtypes.GlobalConfig, rsf *cmdutil.ReleaseSelec
 		}
 	}
 
-	// Create Kubernetes client via shared factory
-	k8sClient, err := cmdutil.NewK8sClient(kubernetes.ClientOptions{
-		Kubeconfig:  kf.Kubeconfig,
-		Context:     kf.Context,
-		APIWarnings: cfg.OPMConfig.Config.Log.Kubernetes.APIWarnings,
-	})
+	// Create Kubernetes client from pre-resolved config
+	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.OPMConfig.Config.Log.Kubernetes.APIWarnings)
 	if err != nil {
 		releaseLog.Error("connecting to cluster", "error", err)
 		return err

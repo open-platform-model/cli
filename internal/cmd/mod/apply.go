@@ -112,13 +112,22 @@ func runApply(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags
 	dryRun, wait bool, timeout time.Duration, createNS, noProbe bool, maxHistory int, force bool) error {
 	ctx := context.Background()
 
+	// Resolve all Kubernetes configuration once (flag > env > config > default).
+	// The resolved values are used for both the render pipeline and K8s client,
+	// ensuring a single source of truth for all settings.
+	k8sConfig, err := cmdutil.ResolveKubernetes(cfg.OPMConfig, kf.Kubeconfig, kf.Context, rf.Namespace, rf.Provider)
+	if err != nil {
+		return &cmdtypes.ExitError{Code: cmdtypes.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+	}
+
 	// Step 1: Render module via shared pipeline
 	result, err := cmdutil.RenderRelease(ctx, cmdutil.RenderReleaseOpts{
-		Args:      args,
-		Render:    rf,
-		K8s:       kf,
-		OPMConfig: cfg.OPMConfig,
-		Registry:  cfg.Registry,
+		Args:        args,
+		Values:      rf.Values,
+		ReleaseName: rf.ReleaseName,
+		K8sConfig:   k8sConfig,
+		OPMConfig:   cfg.OPMConfig,
+		Registry:    cfg.Registry,
 	})
 	if err != nil {
 		return err
@@ -134,12 +143,8 @@ func runApply(args []string, cfg *cmdtypes.GlobalConfig, rf *cmdutil.RenderFlags
 	// Create scoped module logger
 	releaseLog := output.ReleaseLogger(result.Release.Name)
 
-	// Create Kubernetes client via shared factory
-	k8sClient, err := cmdutil.NewK8sClient(kubernetes.ClientOptions{
-		Kubeconfig:  kf.Kubeconfig,
-		Context:     kf.Context,
-		APIWarnings: cfg.OPMConfig.Config.Log.Kubernetes.APIWarnings,
-	})
+	// Create Kubernetes client from pre-resolved config
+	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.OPMConfig.Config.Log.Kubernetes.APIWarnings)
 	if err != nil {
 		releaseLog.Error("connecting to cluster", "error", err)
 		return err

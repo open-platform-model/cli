@@ -14,10 +14,14 @@ import (
 type RenderReleaseOpts struct {
 	// Args from the cobra command (first arg is module path).
 	Args []string
-	// Render flags (values, namespace, release-name, provider).
-	Render *RenderFlags
-	// K8s connection flags (optional — only needed for kubeconfig/context resolution).
-	K8s *K8sFlags
+	// Values files (-f flags).
+	Values []string
+	// ReleaseName overrides the default release name.
+	ReleaseName string
+	// K8sConfig is the pre-resolved Kubernetes configuration.
+	// All fields (namespace, provider, kubeconfig, context) must already be resolved
+	// via cmdutil.ResolveKubernetes before calling RenderRelease.
+	K8sConfig *config.ResolvedKubernetesConfig
 	// OPMConfig loaded by the root command.
 	OPMConfig *config.OPMConfig
 	// Registry URL resolved by the root command.
@@ -26,7 +30,7 @@ type RenderReleaseOpts struct {
 
 // RenderRelease executes the common render pipeline preamble shared by
 // build, vet, apply, and diff commands. It resolves the module path,
-// validates config, resolves K8s settings, builds RenderOptions,
+// validates config, builds RenderOptions from the pre-resolved K8s config,
 // creates the pipeline, and executes Render.
 //
 // On success it returns the RenderResult. On failure it returns an
@@ -39,34 +43,19 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*build.RenderRe
 		return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
 	}
 
-	// Resolve Kubernetes configuration
-	kubeconfigFlag := ""
-	contextFlag := ""
-	if opts.K8s != nil {
-		kubeconfigFlag = opts.K8s.Kubeconfig
-		contextFlag = opts.K8s.Context
+	// K8sConfig must be pre-resolved by the caller
+	if opts.K8sConfig == nil {
+		return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("kubernetes config not resolved")}
 	}
 
-	namespaceFlag := ""
-	providerFlag := ""
-	if opts.Render != nil {
-		namespaceFlag = opts.Render.Namespace
-		providerFlag = opts.Render.Provider
-	}
-
-	k8sConfig, err := ResolveKubernetes(opts.OPMConfig, kubeconfigFlag, contextFlag, namespaceFlag, providerFlag)
-	if err != nil {
-		return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
-	}
-
-	namespace := k8sConfig.Namespace.Value
-	provider := k8sConfig.Provider.Value
+	namespace := opts.K8sConfig.Namespace.Value
+	provider := opts.K8sConfig.Provider.Value
 
 	// Log resolved config at DEBUG level
-	if opts.K8s != nil {
+	if opts.K8sConfig.Kubeconfig.Value != "" || opts.K8sConfig.Context.Value != "" {
 		output.Debug("resolved kubernetes config",
-			"kubeconfig", k8sConfig.Kubeconfig.Value,
-			"context", k8sConfig.Context.Value,
+			"kubeconfig", opts.K8sConfig.Kubeconfig.Value,
+			"context", opts.K8sConfig.Context.Value,
 			"namespace", namespace,
 			"provider", provider,
 		)
@@ -78,17 +67,10 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*build.RenderRe
 	}
 
 	// Build render options
-	var values []string
-	var releaseName string
-	if opts.Render != nil {
-		values = opts.Render.Values
-		releaseName = opts.Render.ReleaseName
-	}
-
 	renderOpts := build.RenderOptions{
 		ModulePath: modulePath,
-		Values:     values,
-		Name:       releaseName,
+		Values:     opts.Values,
+		Name:       opts.ReleaseName,
 		Namespace:  namespace,
 		Provider:   provider,
 		Registry:   opts.Registry,

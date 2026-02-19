@@ -14,7 +14,7 @@ import (
 func TestRenderModule_NilConfig(t *testing.T) {
 	_, err := RenderRelease(context.Background(), RenderReleaseOpts{
 		OPMConfig: nil,
-		Render:    &RenderFlags{},
+		K8sConfig: nil,
 	})
 
 	require.Error(t, err)
