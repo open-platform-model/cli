@@ -37,15 +37,15 @@ func PrintRenderErrors(errs []error) {
 			if len(unmatchedErr.Available) > 0 {
 				output.Info("Available transformers:")
 				for _, t := range unmatchedErr.Available {
-					output.Info(fmt.Sprintf("  %s", output.FormatFQN(t.FQN)))
-					if len(t.RequiredLabels) > 0 {
-						output.Info(fmt.Sprintf("    requiredLabels: %v", t.RequiredLabels))
+					output.Info(fmt.Sprintf("  %s", output.FormatFQN(t.GetFQN())))
+					if len(t.GetRequiredLabels()) > 0 {
+						output.Info(fmt.Sprintf("    requiredLabels: %v", t.GetRequiredLabels()))
 					}
-					if len(t.RequiredResources) > 0 {
-						output.Info(fmt.Sprintf("    requiredResources: %v", t.RequiredResources))
+					if len(t.GetRequiredResources()) > 0 {
+						output.Info(fmt.Sprintf("    requiredResources: %v", t.GetRequiredResources()))
 					}
-					if len(t.RequiredTraits) > 0 {
-						output.Info(fmt.Sprintf("    requiredTraits: %v", t.RequiredTraits))
+					if len(t.GetRequiredTraits()) > 0 {
+						output.Info(fmt.Sprintf("    requiredTraits: %v", t.GetRequiredTraits()))
 					}
 				}
 			}

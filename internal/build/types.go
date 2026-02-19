@@ -7,8 +7,7 @@ import (
 	"context"
 	"errors"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"github.com/opmodel/cli/internal/build/transform"
 )
 
 // Pipeline defines the contract for render pipelines.
@@ -99,144 +98,12 @@ func (r *RenderResult) ResourceCount() int {
 	return len(r.Resources)
 }
 
-// Resource represents a single rendered platform resource.
-type Resource struct {
-	// Object is the rendered resource as unstructured data.
-	// Includes all metadata, labels, and spec fields.
-	Object *unstructured.Unstructured
+// Resource is a type alias for transform.Resource.
+// All methods are defined on transform.Resource and are accessible here transparently.
+type Resource = transform.Resource
 
-	// Component is the name of the source component.
-	// Matches a key in module.components.
-	Component string
+// MatchPlan is a type alias for transform.MatchPlan.
+type MatchPlan = transform.MatchPlan
 
-	// Transformer is the FQN of the transformer that produced this resource.
-	// Example: "opmodel.dev/transformers/kubernetes@v0#DeploymentTransformer"
-	Transformer string
-}
-
-// GVK returns the GroupVersionKind of the resource.
-func (r *Resource) GVK() schema.GroupVersionKind {
-	return r.Object.GroupVersionKind()
-}
-
-// Kind returns the resource kind (e.g., "Deployment").
-func (r *Resource) Kind() string {
-	return r.Object.GetKind()
-}
-
-// Name returns the resource name from metadata.
-func (r *Resource) Name() string {
-	return r.Object.GetName()
-}
-
-// Namespace returns the resource namespace from metadata.
-// Empty string for cluster-scoped resources.
-func (r *Resource) Namespace() string {
-	return r.Object.GetNamespace()
-}
-
-// Labels returns the resource labels.
-func (r *Resource) Labels() map[string]string {
-	return r.Object.GetLabels()
-}
-
-// ModuleReleaseMetadata contains information about the source module and the release being deployed.
-// This metadata is used for labeling resources and verbose output.
-type ModuleReleaseMetadata struct {
-	// Name is the release name (resolved from RenderOptions.Name or module.metadata.name).
-	// This is the value used for discovery and labeling (module-release.opmodel.dev/name).
-	// Example: "mc" when --release-name mc is used.
-	Name string
-
-	// ModuleName is the canonical module name from module.metadata.name.
-	// Distinct from Name when --release-name overrides the default.
-	// Example: "minecraft" (always the module definition name, regardless of release name).
-	ModuleName string
-
-	// Namespace is the target namespace.
-	// May be overridden by RenderOptions.Namespace.
-	Namespace string
-
-	// Version is the module version (semver).
-	Version string
-
-	// Labels from the module definition.
-	// These are propagated to resources via TransformerContext.
-	Labels map[string]string
-
-	// Components lists the component names in the module.
-	// Useful for understanding scope of render.
-	Components []string
-
-	// Identity is the module identity UUID (from #Module.metadata.identity).
-	// Empty string if the module was built from an older catalog without identity support.
-	Identity string
-
-	// ReleaseIdentity is the release identity UUID.
-	// Computed from the module FQN, release name, and namespace.
-	// Empty string if identity computation was skipped (e.g., missing FQN).
-	ReleaseIdentity string
-}
-
-// MatchPlan describes the transformer-component matching results.
-// Used for verbose output and debugging; not part of the core render contract.
-type MatchPlan struct {
-	// Matches maps component names to their matched transformers.
-	// Key: component name
-	// Value: list of transformers that matched (multiple allowed)
-	Matches map[string][]TransformerMatch
-
-	// Unmatched lists components with no matching transformers.
-	// These will appear in RenderResult.Errors as UnmatchedComponentError.
-	Unmatched []string
-}
-
-// TransformerMatch records a single transformer match.
-type TransformerMatch struct {
-	// TransformerFQN is the fully qualified transformer name.
-	// Example: "opmodel.dev/transformers/kubernetes@v0#DeploymentTransformer"
-	TransformerFQN string
-
-	// Reason explains why this transformer matched.
-	// Human-readable, for verbose output.
-	// Example: "Matched: requiredLabels[workload-type=stateless], requiredResources[Container]"
-	Reason string
-}
-
-// ResourceInfo interface implementation methods.
-// These methods allow Resource to be used with the output package.
-
-// GetObject returns the underlying unstructured object.
-func (r *Resource) GetObject() *unstructured.Unstructured {
-	return r.Object
-}
-
-// GetGVK returns the GroupVersionKind.
-func (r *Resource) GetGVK() schema.GroupVersionKind {
-	return r.GVK()
-}
-
-// GetKind returns the resource kind.
-func (r *Resource) GetKind() string {
-	return r.Kind()
-}
-
-// GetName returns the resource name.
-func (r *Resource) GetName() string {
-	return r.Name()
-}
-
-// GetNamespace returns the resource namespace.
-func (r *Resource) GetNamespace() string {
-	return r.Namespace()
-}
-
-// GetComponent returns the source component name.
-func (r *Resource) GetComponent() string {
-	return r.Component
-}
-
-// GetTransformer returns the transformer FQN.
-func (r *Resource) GetTransformer() string {
-	return r.Transformer
-}
+// TransformerMatch is a type alias for transform.TransformerMatch.
+type TransformerMatch = transform.TransformerMatch

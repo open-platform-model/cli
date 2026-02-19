@@ -21,15 +21,10 @@ type TransformerContext struct {
 	ComponentMetadata *TransformerComponentMetadata `json:"#componentMetadata"`
 }
 
-// TransformerModuleReleaseMetadata contains module release metadata for transformers.
-type TransformerModuleReleaseMetadata struct {
-	Name      string            `json:"name"`
-	Namespace string            `json:"namespace"`
-	FQN       string            `json:"fqn"`
-	Version   string            `json:"version"`
-	Identity  string            `json:"identity"`
-	Labels    map[string]string `json:"labels,omitempty"`
-}
+// TransformerModuleReleaseMetadata is an alias for release.TransformerMetadata.
+// The type is defined in the release package, which owns the field projection
+// (including the ReleaseIdentity → Identity rename).
+type TransformerModuleReleaseMetadata = release.TransformerMetadata
 
 // TransformerComponentMetadata contains component metadata for transformers.
 type TransformerComponentMetadata struct {
@@ -40,17 +35,11 @@ type TransformerComponentMetadata struct {
 
 // NewTransformerContext constructs the context for a transformer execution.
 func NewTransformerContext(rel *release.BuiltRelease, component *module.LoadedComponent) *TransformerContext {
+	relMeta := rel.Metadata.ReleaseMetadataForTransformer()
 	return &TransformerContext{
-		Name:      rel.Metadata.Name,
-		Namespace: rel.Metadata.Namespace,
-		ModuleReleaseMetadata: &TransformerModuleReleaseMetadata{
-			Name:      rel.Metadata.Name,
-			Namespace: rel.Metadata.Namespace,
-			FQN:       rel.Metadata.FQN,
-			Version:   rel.Metadata.Version,
-			Identity:  rel.Metadata.ReleaseIdentity,
-			Labels:    rel.Metadata.Labels,
-		},
+		Name:                  rel.Metadata.Name,
+		Namespace:             rel.Metadata.Namespace,
+		ModuleReleaseMetadata: &relMeta,
 		ComponentMetadata: &TransformerComponentMetadata{
 			Name:        component.Name,
 			Labels:      component.Labels,

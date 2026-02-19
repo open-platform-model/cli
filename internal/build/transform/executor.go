@@ -139,28 +139,9 @@ func (e *Executor) executeJob(job Job) JobResult {
 	unified = unified.FillPath(cue.ParsePath("#context.name"), cueCtx.Encode(tfCtx.Name))
 	unified = unified.FillPath(cue.ParsePath("#context.namespace"), cueCtx.Encode(tfCtx.Namespace))
 
-	moduleReleaseMetaMap := map[string]any{
-		"name":      tfCtx.ModuleReleaseMetadata.Name,
-		"namespace": tfCtx.ModuleReleaseMetadata.Namespace,
-		"fqn":       tfCtx.ModuleReleaseMetadata.FQN,
-		"version":   tfCtx.ModuleReleaseMetadata.Version,
-		"identity":  tfCtx.ModuleReleaseMetadata.Identity,
-	}
-	if len(tfCtx.ModuleReleaseMetadata.Labels) > 0 {
-		moduleReleaseMetaMap["labels"] = tfCtx.ModuleReleaseMetadata.Labels
-	}
-	unified = unified.FillPath(cue.MakePath(cue.Def("context"), cue.Def("moduleReleaseMetadata")), cueCtx.Encode(moduleReleaseMetaMap))
-
-	compMetaMap := map[string]any{
-		"name": tfCtx.ComponentMetadata.Name,
-	}
-	if len(tfCtx.ComponentMetadata.Labels) > 0 {
-		compMetaMap["labels"] = tfCtx.ComponentMetadata.Labels
-	}
-	if len(tfCtx.ComponentMetadata.Annotations) > 0 {
-		compMetaMap["annotations"] = tfCtx.ComponentMetadata.Annotations
-	}
-	unified = unified.FillPath(cue.MakePath(cue.Def("context"), cue.Def("componentMetadata")), cueCtx.Encode(compMetaMap))
+	ctxMap := tfCtx.ToMap()
+	unified = unified.FillPath(cue.MakePath(cue.Def("context"), cue.Def("moduleReleaseMetadata")), cueCtx.Encode(ctxMap["#moduleReleaseMetadata"]))
+	unified = unified.FillPath(cue.MakePath(cue.Def("context"), cue.Def("componentMetadata")), cueCtx.Encode(ctxMap["#componentMetadata"]))
 
 	if unified.Err() != nil {
 		result.Error = &TransformError{

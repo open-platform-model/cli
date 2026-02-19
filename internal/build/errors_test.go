@@ -5,13 +5,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/opmodel/cli/internal/build/transform"
 )
 
 func TestUnmatchedComponentError(t *testing.T) {
 	err := &UnmatchedComponentError{
 		ComponentName: "web-server",
-		Available: []TransformerSummary{
-			{
+		Available: []transform.TransformerRequirements{
+			&transform.LoadedTransformer{
 				FQN:            "opmodel.dev/transformers/kubernetes@v0#DeploymentTransformer",
 				RequiredLabels: map[string]string{"workload-type": "stateless"},
 			},
@@ -70,22 +72,6 @@ func TestRenderErrorInterface(t *testing.T) {
 	// Also verify they implement the standard error interface
 	var _ error = (*UnmatchedComponentError)(nil)
 	var _ error = (*TransformError)(nil)
-}
-
-func TestTransformerSummary(t *testing.T) {
-	summary := TransformerSummary{
-		FQN: "opmodel.dev/transformers/kubernetes@v0#DeploymentTransformer",
-		RequiredLabels: map[string]string{
-			"workload-type": "stateless",
-		},
-		RequiredResources: []string{"opmodel.dev/resources@v0#Container"},
-		RequiredTraits:    []string{},
-	}
-
-	assert.Equal(t, "opmodel.dev/transformers/kubernetes@v0#DeploymentTransformer", summary.FQN)
-	assert.Equal(t, "stateless", summary.RequiredLabels["workload-type"])
-	assert.Len(t, summary.RequiredResources, 1)
-	assert.Empty(t, summary.RequiredTraits)
 }
 
 func TestReleaseValidationError(t *testing.T) {

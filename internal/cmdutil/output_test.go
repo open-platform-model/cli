@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/build/transform"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -102,8 +103,8 @@ func TestPrintRenderErrors_UnmatchedWithAvailable(t *testing.T) {
 	errs := []error{
 		&build.UnmatchedComponentError{
 			ComponentName: "database",
-			Available: []build.TransformerSummary{
-				{
+			Available: []build.TransformerRequirements{
+				&transform.LoadedTransformer{
 					FQN:               "example.com/transformers@v1#PostgresTransformer",
 					RequiredLabels:    map[string]string{"db-type": "postgres"},
 					RequiredResources: []string{"opmodel.dev/resources/Database@v0"},

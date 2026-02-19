@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/opmodel/cli/internal/build/module"
-	"github.com/opmodel/cli/internal/build/transform"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/pkg/weights"
@@ -145,14 +144,14 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	// Phase 4: Match components to transformers
 	components := p.componentsToSlice(release.Components)
 	matchResult := p.matcher.Match(components, provider.Transformers)
-	matchPlan := convertMatchPlan(matchResult.ToMatchPlan())
+	matchPlan := matchResult.ToMatchPlan()
 
 	// Collect errors for unmatched components
 	var errors []error
 	for _, comp := range matchResult.Unmatched {
 		errors = append(errors, &UnmatchedComponentError{
 			ComponentName: comp.Name,
-			Available:     provider.ToSummaries(),
+			Available:     provider.Requirements(),
 		})
 	}
 
@@ -165,7 +164,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 			transformerMap[tf.FQN] = tf
 		}
 		execResult := p.executor.ExecuteWithTransformers(ctx, matchResult, release, transformerMap)
-		resources = convertResources(execResult.Resources)
+		resources = execResult.Resources
 		errors = append(errors, execResult.Errors...)
 	}
 
@@ -201,7 +200,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 
 	return &RenderResult{
 		Resources: resources,
-		Release:   p.releaseToModuleMetadata(release, moduleMeta.Name),
+		Release:   release.ToModuleReleaseMetadata(moduleMeta.Name),
 		MatchPlan: matchPlan,
 		Errors:    errors,
 		Warnings:  warnings,
@@ -225,26 +224,6 @@ func (p *pipeline) componentsToSlice(m map[string]*LoadedComponent) []*LoadedCom
 		result = append(result, comp)
 	}
 	return result
-}
-
-// releaseToModuleMetadata converts release metadata to ModuleReleaseMetadata for API compatibility.
-// moduleName is the canonical module name from module.metadata.name (e.g. "minecraft"),
-// which may differ from release.Metadata.Name when --release-name overrides the default.
-func (p *pipeline) releaseToModuleMetadata(release *BuiltRelease, moduleName string) ModuleReleaseMetadata {
-	names := make([]string, 0, len(release.Components))
-	for name := range release.Components {
-		names = append(names, name)
-	}
-	return ModuleReleaseMetadata{
-		Name:            release.Metadata.Name,
-		ModuleName:      moduleName,
-		Namespace:       release.Metadata.Namespace,
-		Version:         release.Metadata.Version,
-		Labels:          release.Metadata.Labels,
-		Components:      names,
-		Identity:        release.Metadata.Identity,
-		ReleaseIdentity: release.Metadata.ReleaseIdentity,
-	}
 }
 
 // collectWarnings gathers non-fatal warnings from the match result.
@@ -292,38 +271,4 @@ func collectWarnings(result *MatchResult) []string {
 	}
 
 	return warnings
-}
-
-// convertResources converts transform.Resource slice to build.Resource slice.
-// Both types have the same fields; this bridges the internal and public types.
-func convertResources(in []*transform.Resource) []*Resource {
-	out := make([]*Resource, len(in))
-	for i, r := range in {
-		out[i] = &Resource{
-			Object:      r.Object,
-			Component:   r.Component,
-			Transformer: r.Transformer,
-		}
-	}
-	return out
-}
-
-// convertMatchPlan converts transform.MatchPlan to build.MatchPlan.
-// Both types have the same fields; this bridges the internal and public types.
-func convertMatchPlan(in transform.MatchPlan) MatchPlan {
-	matches := make(map[string][]TransformerMatch, len(in.Matches))
-	for comp, tms := range in.Matches {
-		converted := make([]TransformerMatch, len(tms))
-		for i, tm := range tms {
-			converted[i] = TransformerMatch{
-				TransformerFQN: tm.TransformerFQN,
-				Reason:         tm.Reason,
-			}
-		}
-		matches[comp] = converted
-	}
-	return MatchPlan{
-		Matches:   matches,
-		Unmatched: in.Unmatched,
-	}
 }

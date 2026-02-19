@@ -173,19 +173,27 @@ func (pl *ProviderLoader) extractMapKeys(value cue.Value, field string) []string
 	return result
 }
 
-// ToSummaries converts transformers to summaries for error messages.
-func (p *LoadedProvider) ToSummaries() []TransformerSummary {
-	summaries := make([]TransformerSummary, len(p.Transformers))
+// Requirements returns the provider's transformers as a []TransformerRequirements slice.
+// This replaces ToSummaries — no data is copied; LoadedTransformer satisfies the interface directly.
+func (p *LoadedProvider) Requirements() []TransformerRequirements {
+	result := make([]TransformerRequirements, len(p.Transformers))
 	for i, t := range p.Transformers {
-		summaries[i] = TransformerSummary{
-			FQN:               t.FQN,
-			RequiredLabels:    t.RequiredLabels,
-			RequiredResources: t.RequiredResources,
-			RequiredTraits:    t.RequiredTraits,
-		}
+		result[i] = t
 	}
-	return summaries
+	return result
 }
+
+// GetFQN returns the transformer's fully qualified name.
+func (t *LoadedTransformer) GetFQN() string { return t.FQN }
+
+// GetRequiredLabels returns the transformer's required labels.
+func (t *LoadedTransformer) GetRequiredLabels() map[string]string { return t.RequiredLabels }
+
+// GetRequiredResources returns the transformer's required resources.
+func (t *LoadedTransformer) GetRequiredResources() []string { return t.RequiredResources }
+
+// GetRequiredTraits returns the transformer's required traits.
+func (t *LoadedTransformer) GetRequiredTraits() []string { return t.RequiredTraits }
 
 // BuildFQN builds a fully qualified transformer name.
 func BuildFQN(providerName, transformerName string) string {

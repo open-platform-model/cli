@@ -56,9 +56,9 @@ func TestRenderOptionsValidate(t *testing.T) {
 func TestPipeline_IdentityFieldsPropagated(t *testing.T) {
 	// This test verifies that Identity and ReleaseIdentity fields
 	// are properly propagated from ReleaseMetadata to ModuleReleaseMetadata
-	// through the releaseToModuleMetadata function.
+	// through BuiltRelease.ToModuleReleaseMetadata.
 
-	release := &BuiltRelease{
+	rel := &BuiltRelease{
 		Components: map[string]*LoadedComponent{
 			"web": {Name: "web"},
 		},
@@ -73,8 +73,7 @@ func TestPipeline_IdentityFieldsPropagated(t *testing.T) {
 		},
 	}
 
-	p := &pipeline{}
-	meta := p.releaseToModuleMetadata(release, "app") // "app" = canonical module name
+	meta := rel.ToModuleReleaseMetadata("app") // "app" = canonical module name
 
 	assert.Equal(t, "my-app", meta.Name)
 	assert.Equal(t, "app", meta.ModuleName, "ModuleName should be the canonical module name, not the release name")

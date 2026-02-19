@@ -24,9 +24,8 @@ type TransformerContext = transform.TransformerContext
 // Used by external packages (e.g., cmdutil) to detect transform failures.
 type TransformError = transform.TransformError
 
-// TransformerSummary re-exports transform.TransformerSummary for backward compatibility.
-// Used by UnmatchedComponentError to describe available transformers.
-type TransformerSummary = transform.TransformerSummary
+// TransformerRequirements re-exports transform.TransformerRequirements for backward compatibility.
+type TransformerRequirements = transform.TransformerRequirements
 
 // MatchResult re-exports transform.MatchResult for backward compatibility.
 // Used internally by pipeline.go and collectWarnings.

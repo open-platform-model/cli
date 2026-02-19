@@ -21,5 +21,9 @@ type ReleaseMetadata = release.Metadata
 // ReleaseValidationError re-exports release.ValidationError for backward compatibility.
 type ReleaseValidationError = release.ValidationError
 
+// ModuleReleaseMetadata re-exports release.ModuleReleaseMetadata for backward compatibility.
+// The type is defined in the release package which owns the projection logic.
+type ModuleReleaseMetadata = release.ModuleReleaseMetadata
+
 // NewReleaseBuilder re-exports release.NewBuilder for backward compatibility.
 var NewReleaseBuilder = release.NewBuilder

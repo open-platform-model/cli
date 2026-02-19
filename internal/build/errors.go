@@ -1,6 +1,10 @@
 package build
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/opmodel/cli/internal/build/transform"
+)
 
 // RenderError is a base interface for render errors.
 // All render-specific errors implement this interface.
@@ -18,7 +22,7 @@ type UnmatchedComponentError struct {
 
 	// Available lists transformers and their requirements.
 	// Helps users understand what's needed to match.
-	Available []TransformerSummary
+	Available []transform.TransformerRequirements
 }
 
 func (e *UnmatchedComponentError) Error() string {
