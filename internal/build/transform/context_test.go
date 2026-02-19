@@ -1,15 +1,18 @@
-package build
+package transform
 
 import (
 	"testing"
 
 	"cuelang.org/go/cue"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/opmodel/cli/internal/build/module"
+	"github.com/opmodel/cli/internal/build/release"
 )
 
 func TestNewTransformerContext(t *testing.T) {
-	release := &BuiltRelease{
-		Metadata: ReleaseMetadata{
+	rel := &release.BuiltRelease{
+		Metadata: release.Metadata{
 			Name:            "my-module",
 			Namespace:       "default",
 			Version:         "1.0.0",
@@ -20,7 +23,7 @@ func TestNewTransformerContext(t *testing.T) {
 		},
 	}
 
-	component := &LoadedComponent{
+	component := &module.LoadedComponent{
 		Name:   "webapp",
 		Labels: map[string]string{"workload-type": "stateless"},
 		Resources: map[string]cue.Value{
@@ -31,7 +34,7 @@ func TestNewTransformerContext(t *testing.T) {
 		},
 	}
 
-	ctx := NewTransformerContext(release, component)
+	ctx := NewTransformerContext(rel, component)
 
 	assert.Equal(t, "my-module", ctx.Name)
 	assert.Equal(t, "default", ctx.Namespace)

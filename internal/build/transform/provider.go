@@ -1,4 +1,4 @@
-package build
+package transform
 
 import (
 	"context"
@@ -26,7 +26,7 @@ type LoadedProvider struct {
 	Version      string
 	Transformers []*LoadedTransformer
 
-	// Index for fast lookup by FQN
+	// byFQN is an index for fast lookup.
 	byFQN map[string]*LoadedTransformer
 }
 
@@ -49,7 +49,6 @@ func (pl *ProviderLoader) Load(ctx context.Context, name string) (*LoadedProvide
 		return nil, fmt.Errorf("no providers configured")
 	}
 
-	// Find provider by name
 	providerValue, ok := pl.config.Providers[name]
 	if !ok {
 		available := make([]string, 0, len(pl.config.Providers))
@@ -78,7 +77,6 @@ func (pl *ProviderLoader) Load(ctx context.Context, name string) (*LoadedProvide
 		return provider, nil
 	}
 
-	// Iterate over transformers
 	iter, err := transformersValue.Fields()
 	if err != nil {
 		return nil, fmt.Errorf("iterating transformers: %w", err)
@@ -112,7 +110,7 @@ func (pl *ProviderLoader) Load(ctx context.Context, name string) (*LoadedProvide
 func (pl *ProviderLoader) extractTransformer(providerName, name string, value cue.Value) (*LoadedTransformer, error) {
 	transformer := &LoadedTransformer{
 		Name:              name,
-		FQN:               buildFQN(providerName, name),
+		FQN:               BuildFQN(providerName, name),
 		RequiredLabels:    make(map[string]string),
 		RequiredResources: make([]string, 0),
 		RequiredTraits:    make([]string, 0),
@@ -122,16 +120,10 @@ func (pl *ProviderLoader) extractTransformer(providerName, name string, value cu
 		Value:             value,
 	}
 
-	// Extract required fields
-	// Note: requiredLabels is a map of string -> string
 	pl.extractLabelsField(value, "requiredLabels", transformer.RequiredLabels)
-
-	// Note: requiredResources and requiredTraits are maps where keys are FQNs
-	// The values are the resource/trait definitions (not used for matching)
 	transformer.RequiredResources = pl.extractMapKeys(value, "requiredResources")
 	transformer.RequiredTraits = pl.extractMapKeys(value, "requiredTraits")
 
-	// Extract optional fields (same pattern)
 	pl.extractLabelsField(value, "optionalLabels", transformer.OptionalLabels)
 	transformer.OptionalResources = pl.extractMapKeys(value, "optionalResources")
 	transformer.OptionalTraits = pl.extractMapKeys(value, "optionalTraits")
@@ -163,11 +155,6 @@ func (pl *ProviderLoader) extractLabelsField(value cue.Value, field string, labe
 }
 
 // extractMapKeys extracts the keys from a map field as a string slice.
-// This is used for requiredResources, requiredTraits, etc. where the CUE structure is:
-//
-//	requiredResources: { "fqn1": definition1, "fqn2": definition2 }
-//
-// We only need the keys (FQNs) for matching.
 func (pl *ProviderLoader) extractMapKeys(value cue.Value, field string) []string {
 	result := make([]string, 0)
 	fieldVal := value.LookupPath(cue.ParsePath(field))
@@ -175,13 +162,11 @@ func (pl *ProviderLoader) extractMapKeys(value cue.Value, field string) []string
 		return result
 	}
 
-	// Iterate over struct fields to get keys
 	iter, err := fieldVal.Fields()
 	if err != nil {
 		return result
 	}
 	for iter.Next() {
-		// The selector is the FQN key
 		key := iter.Selector().Unquoted()
 		result = append(result, key)
 	}
@@ -202,7 +187,7 @@ func (p *LoadedProvider) ToSummaries() []TransformerSummary {
 	return summaries
 }
 
-// buildFQN builds a fully qualified transformer name.
-func buildFQN(providerName, transformerName string) string {
+// BuildFQN builds a fully qualified transformer name.
+func BuildFQN(providerName, transformerName string) string {
 	return providerName + "#" + transformerName
 }

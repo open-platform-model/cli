@@ -1,28 +1,16 @@
-package build
+package module
 
 import (
 	"strings"
 
-	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/token"
 )
 
-// LoadedComponent is a component with extracted metadata.
-// Components are extracted by ReleaseBuilder during the build phase.
-type LoadedComponent struct {
-	Name        string
-	Labels      map[string]string    // Effective labels (merged from resources/traits)
-	Annotations map[string]string    // Annotations from metadata.annotations
-	Resources   map[string]cue.Value // FQN -> resource value
-	Traits      map[string]cue.Value // FQN -> trait value
-	Value       cue.Value            // Full component value
-}
-
-// extractMetadataFromAST walks CUE AST files to extract metadata.name and
+// ExtractMetadataFromAST walks CUE AST files to extract metadata.name and
 // metadata.defaultNamespace as string literals without CUE evaluation.
 // Returns empty strings for fields that are not static string literals.
-func extractMetadataFromAST(files []*ast.File) (name, defaultNamespace string) {
+func ExtractMetadataFromAST(files []*ast.File) (name, defaultNamespace string) {
 	for _, file := range files {
 		for _, decl := range file.Decls {
 			field, ok := decl.(*ast.Field)

@@ -1,4 +1,4 @@
-package build
+package release
 
 import (
 	"testing"
@@ -10,7 +10,6 @@ import (
 
 func TestExtractComponent_WithAnnotations(t *testing.T) {
 	ctx := cuecontext.New()
-	builder := NewReleaseBuilder(ctx, "")
 
 	tests := []struct {
 		name                string
@@ -91,7 +90,7 @@ func TestExtractComponent_WithAnnotations(t *testing.T) {
 			value := ctx.CompileString(tt.cue)
 			require.NoError(t, value.Err())
 
-			comp := builder.extractComponent("test", value)
+			comp := extractComponent("test", value)
 
 			assert.NotNil(t, comp.Annotations, "Annotations should not be nil")
 			assert.Equal(t, tt.expectedAnnotations, comp.Annotations)

@@ -1,13 +1,40 @@
-package build
+package transform
 
 import (
 	"context"
+	"fmt"
 
 	"cuelang.org/go/cue"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/opmodel/cli/internal/build/module"
+	"github.com/opmodel/cli/internal/build/release"
 	"github.com/opmodel/cli/internal/output"
 )
+
+// TransformError indicates transformer execution failed.
+//
+//nolint:revive // stutter is intentional: this type is re-exported as build.TransformError
+type TransformError struct {
+	ComponentName  string
+	TransformerFQN string
+	Cause          error
+}
+
+func (e *TransformError) Error() string {
+	return fmt.Sprintf("component %q, transformer %q: %v",
+		e.ComponentName, e.TransformerFQN, e.Cause)
+}
+
+func (e *TransformError) Unwrap() error {
+	return e.Cause
+}
+
+// Component returns the component name where the error occurred.
+// Implements the build.RenderError interface.
+func (e *TransformError) Component() string {
+	return e.ComponentName
+}
 
 // Executor runs transformer jobs sequentially (CUE's *cue.Context is not safe for concurrent use).
 type Executor struct{}
@@ -17,37 +44,11 @@ func NewExecutor() *Executor {
 	return &Executor{}
 }
 
-// Job is a unit of work: one transformer applied to one component.
-type Job struct {
-	Transformer *LoadedTransformer
-	Component   *LoadedComponent
-	Release     *BuiltRelease
-}
-
-// JobResult is the result of executing a job.
-type JobResult struct {
-	Component   string
-	Transformer string
-	Resources   []*unstructured.Unstructured
-	Error       error
-}
-
-// ExecuteResult is the combined result of all jobs.
-type ExecuteResult struct {
-	Resources []*Resource
-	Errors    []error
-}
-
 // ExecuteWithTransformers runs transformations sequentially.
-//
-// For each (transformer, component) pair from the match result, it:
-//  1. Looks up the transformer's #transform definition
-//  2. Injects #component and #context via FillPath
-//  3. Extracts and decodes the output as Kubernetes resources
 func (e *Executor) ExecuteWithTransformers(
 	ctx context.Context,
 	match *MatchResult,
-	release *BuiltRelease,
+	rel *release.BuiltRelease,
 	transformers map[string]*LoadedTransformer,
 ) *ExecuteResult {
 	result := &ExecuteResult{Resources: make([]*Resource, 0), Errors: make([]error, 0)}
@@ -64,7 +65,7 @@ func (e *Executor) ExecuteWithTransformers(
 			jobs = append(jobs, Job{
 				Transformer: transformer,
 				Component:   comp,
-				Release:     release,
+				Release:     rel,
 			})
 		}
 	}
@@ -75,9 +76,7 @@ func (e *Executor) ExecuteWithTransformers(
 
 	output.Debug("executing jobs", "count", len(jobs))
 
-	// Execute jobs
 	for _, job := range jobs {
-		// Check for context cancellation between jobs
 		select {
 		case <-ctx.Done():
 			result.Errors = append(result.Errors, ctx.Err())
@@ -104,9 +103,6 @@ func (e *Executor) ExecuteWithTransformers(
 }
 
 // executeJob executes a single transformer job.
-//
-// It injects the component value and context metadata into the transformer's
-// #transform definition via CUE FillPath, then extracts and decodes the output.
 func (e *Executor) executeJob(job Job) JobResult {
 	result := JobResult{
 		Component:   job.Component.Name,
@@ -178,7 +174,6 @@ func (e *Executor) executeJob(job Job) JobResult {
 	// Extract output
 	outputValue := unified.LookupPath(cue.ParsePath("output"))
 	if !outputValue.Exists() {
-		// No output is valid — transformer doesn't produce resources for this component
 		return result
 	}
 
@@ -191,10 +186,8 @@ func (e *Executor) executeJob(job Job) JobResult {
 		return result
 	}
 
-	// Decode output — handles three cases:
-	// 1. List: iterate elements, decode each as a resource
-	// 2. Struct with apiVersion: single resource (e.g., Deployment)
-	// 3. Struct without apiVersion: map of resources keyed by name (e.g., PVC per volume)
+	// Decode output
+	//nolint:gocritic // ifElseChain: conditions are not comparable constants, switch is not applicable
 	if outputValue.Kind() == cue.ListKind {
 		iter, err := outputValue.List()
 		if err != nil {
@@ -217,7 +210,6 @@ func (e *Executor) executeJob(job Job) JobResult {
 		}
 		result.Resources = append(result.Resources, obj)
 	} else {
-		// Map of resources: iterate struct fields and decode each value
 		iter, err := outputValue.Fields()
 		if err != nil {
 			result.Error = &TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
@@ -236,8 +228,7 @@ func (e *Executor) executeJob(job Job) JobResult {
 	return result
 }
 
-// isSingleResource checks whether a CUE struct value represents a single Kubernetes
-// resource (has apiVersion at top level) vs a map of multiple resources keyed by name.
+// isSingleResource checks whether a CUE struct value represents a single Kubernetes resource.
 func (e *Executor) isSingleResource(value cue.Value) bool {
 	apiVersion := value.LookupPath(cue.ParsePath("apiVersion"))
 	return apiVersion.Exists()
@@ -249,6 +240,12 @@ func (e *Executor) decodeResource(value cue.Value) (*unstructured.Unstructured, 
 		return nil, err
 	}
 	return &unstructured.Unstructured{Object: obj}, nil
+}
+
+// NewTransformerContextForComponent is a helper that creates a context from a release and component.
+// It exists to avoid import cycles — callers use it instead of NewTransformerContext directly.
+func NewTransformerContextForComponent(rel *release.BuiltRelease, comp *module.LoadedComponent) *TransformerContext {
+	return NewTransformerContext(rel, comp)
 }
 
 var errMissingTransform = &transformMissingError{}

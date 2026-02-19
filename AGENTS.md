@@ -95,6 +95,10 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 ```text
 ├── cmd/opm/           # CLI entry point (main.go, root.go, version.go)
 ├── internal/
+│   ├── build/         # Render pipeline: public API + subpackages
+│   │   ├── module/    # Module inspection: path resolution, AST metadata extraction
+│   │   ├── release/   # Release building: CUE overlay, values, metadata, validation
+│   │   └── transform/ # Transformer logic: provider loading, matching, execution
 │   ├── cmd/           # Command implementations
 │   │   ├── config/    # config init command
 │   │   └── mod/       # mod apply, build, delete, init, status, template

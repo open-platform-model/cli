@@ -9,9 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/load"
-
+	"github.com/opmodel/cli/internal/build/module"
+	"github.com/opmodel/cli/internal/build/transform"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/pkg/weights"
@@ -59,7 +58,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	}
 
 	// Phase 1: Resolve module path and inspect module metadata via AST
-	modulePath, err := p.resolveModulePath(opts.ModulePath)
+	modulePath, err := module.ResolvePath(opts.ModulePath)
 	if err != nil {
 		return nil, err
 	}
@@ -92,12 +91,12 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 
 	// If AST inspection returned empty name, fall back to BuildInstance + LookupPath
 	// to handle computed metadata expressions.
-	moduleMeta := &moduleMetadataPreview{
-		name:             inspection.Name,
-		defaultNamespace: inspection.DefaultNamespace,
+	moduleMeta := &module.MetadataPreview{
+		Name:             inspection.Name,
+		DefaultNamespace: inspection.DefaultNamespace,
 	}
-	if moduleMeta.name == "" {
-		fallbackMeta, err := p.extractModuleMetadata(modulePath, opts)
+	if moduleMeta.Name == "" {
+		fallbackMeta, err := module.ExtractMetadata(p.releaseBuilder.CueContext(), modulePath, opts.Registry)
 		if err != nil {
 			return nil, err
 		}
@@ -107,11 +106,11 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	// Phase 2: Build #ModuleRelease (loads module with AST overlay, unifies values)
 	releaseName := opts.Name
 	if releaseName == "" {
-		releaseName = moduleMeta.name
+		releaseName = moduleMeta.Name
 	}
-	namespace := p.resolveNamespace(opts.Namespace, moduleMeta.defaultNamespace)
+	namespace := p.resolveNamespace(opts.Namespace, moduleMeta.DefaultNamespace)
 	if namespace == "" {
-		return nil, &NamespaceRequiredError{ModuleName: moduleMeta.name}
+		return nil, &NamespaceRequiredError{ModuleName: moduleMeta.Name}
 	}
 
 	release, err := p.releaseBuilder.Build(modulePath, ReleaseOptions{
@@ -146,7 +145,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	// Phase 4: Match components to transformers
 	components := p.componentsToSlice(release.Components)
 	matchResult := p.matcher.Match(components, provider.Transformers)
-	matchPlan := matchResult.ToMatchPlan()
+	matchPlan := convertMatchPlan(matchResult.ToMatchPlan())
 
 	// Collect errors for unmatched components
 	var errors []error
@@ -166,7 +165,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 			transformerMap[tf.FQN] = tf
 		}
 		execResult := p.executor.ExecuteWithTransformers(ctx, matchResult, release, transformerMap)
-		resources = execResult.Resources
+		resources = convertResources(execResult.Resources)
 		errors = append(errors, execResult.Errors...)
 	}
 
@@ -202,92 +201,11 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 
 	return &RenderResult{
 		Resources: resources,
-		Release:   p.releaseToModuleMetadata(release, moduleMeta.name),
+		Release:   p.releaseToModuleMetadata(release, moduleMeta.Name),
 		MatchPlan: matchPlan,
 		Errors:    errors,
 		Warnings:  warnings,
 	}, nil
-}
-
-// moduleMetadataPreview contains lightweight module metadata extracted
-// before the full overlay build. Used for name/namespace resolution.
-type moduleMetadataPreview struct {
-	name             string
-	defaultNamespace string
-}
-
-// resolveModulePath validates and resolves the module directory path.
-func (p *pipeline) resolveModulePath(modulePath string) (string, error) {
-	absPath, err := filepath.Abs(modulePath)
-	if err != nil {
-		return "", fmt.Errorf("resolving module path: %w", err)
-	}
-
-	if _, err := os.Stat(absPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("module directory not found: %s", absPath)
-	}
-
-	cueModPath := filepath.Join(absPath, "cue.mod")
-	if _, err := os.Stat(cueModPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("not a CUE module: missing cue.mod/ directory in %s", absPath)
-	}
-
-	return absPath, nil
-}
-
-// extractModuleMetadata does a lightweight CUE load to extract module name
-// and defaultNamespace without building the full module release.
-func (p *pipeline) extractModuleMetadata(modulePath string, opts RenderOptions) (*moduleMetadataPreview, error) {
-	// Set CUE_REGISTRY if provided
-	if opts.Registry != "" {
-		os.Setenv("CUE_REGISTRY", opts.Registry)
-		defer os.Unsetenv("CUE_REGISTRY")
-	}
-
-	cfg := &load.Config{Dir: modulePath}
-	instances := load.Instances([]string{"."}, cfg)
-	if len(instances) == 0 {
-		return nil, fmt.Errorf("no CUE instances found in %s", modulePath)
-	}
-
-	inst := instances[0]
-	if inst.Err != nil {
-		return nil, fmt.Errorf("loading module: %w", inst.Err)
-	}
-
-	value := p.releaseBuilder.cueCtx.BuildInstance(inst)
-	if value.Err() != nil {
-		return nil, fmt.Errorf("building module: %w", value.Err())
-	}
-
-	meta := &moduleMetadataPreview{}
-
-	// Extract name from metadata
-	for _, path := range []string{"metadata.name", "module.metadata.name"} {
-		if v := value.LookupPath(cue.ParsePath(path)); v.Exists() {
-			if str, err := v.String(); err == nil {
-				meta.name = str
-				break
-			}
-		}
-	}
-
-	// Extract defaultNamespace from metadata
-	for _, path := range []string{"metadata.defaultNamespace", "module.metadata.defaultNamespace"} {
-		if v := value.LookupPath(cue.ParsePath(path)); v.Exists() {
-			if str, err := v.String(); err == nil {
-				meta.defaultNamespace = str
-				break
-			}
-		}
-	}
-
-	output.Debug("extracted module metadata",
-		"name", meta.name,
-		"defaultNamespace", meta.defaultNamespace,
-	)
-
-	return meta, nil
 }
 
 // resolveNamespace resolves the target namespace using precedence:
@@ -374,4 +292,38 @@ func collectWarnings(result *MatchResult) []string {
 	}
 
 	return warnings
+}
+
+// convertResources converts transform.Resource slice to build.Resource slice.
+// Both types have the same fields; this bridges the internal and public types.
+func convertResources(in []*transform.Resource) []*Resource {
+	out := make([]*Resource, len(in))
+	for i, r := range in {
+		out[i] = &Resource{
+			Object:      r.Object,
+			Component:   r.Component,
+			Transformer: r.Transformer,
+		}
+	}
+	return out
+}
+
+// convertMatchPlan converts transform.MatchPlan to build.MatchPlan.
+// Both types have the same fields; this bridges the internal and public types.
+func convertMatchPlan(in transform.MatchPlan) MatchPlan {
+	matches := make(map[string][]TransformerMatch, len(in.Matches))
+	for comp, tms := range in.Matches {
+		converted := make([]TransformerMatch, len(tms))
+		for i, tm := range tms {
+			converted[i] = TransformerMatch{
+				TransformerFQN: tm.TransformerFQN,
+				Reason:         tm.Reason,
+			}
+		}
+		matches[comp] = converted
+	}
+	return MatchPlan{
+		Matches:   matches,
+		Unmatched: in.Unmatched,
+	}
 }

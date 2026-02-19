@@ -1,15 +1,18 @@
-package build
+package transform
 
 import (
 	"testing"
 
 	"cuelang.org/go/cue"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/opmodel/cli/internal/build/module"
+	"github.com/opmodel/cli/internal/build/release"
 )
 
 func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
-	release := &BuiltRelease{
-		Metadata: ReleaseMetadata{
+	rel := &release.BuiltRelease{
+		Metadata: release.Metadata{
 			Name:      "my-module",
 			Namespace: "default",
 			Version:   "1.0.0",
@@ -17,7 +20,7 @@ func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
 		},
 	}
 
-	component := &LoadedComponent{
+	component := &module.LoadedComponent{
 		Name:   "volumes-component",
 		Labels: map[string]string{},
 		Annotations: map[string]string{
@@ -27,14 +30,14 @@ func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
 		Traits:    map[string]cue.Value{},
 	}
 
-	ctx := NewTransformerContext(release, component)
+	ctx := NewTransformerContext(rel, component)
 
 	assert.Equal(t, "true", ctx.ComponentMetadata.Annotations["transformer.opmodel.dev/list-output"])
 }
 
 func TestNewTransformerContext_EmptyAnnotations(t *testing.T) {
-	release := &BuiltRelease{
-		Metadata: ReleaseMetadata{
+	rel := &release.BuiltRelease{
+		Metadata: release.Metadata{
 			Name:      "my-module",
 			Namespace: "default",
 			Version:   "1.0.0",
@@ -42,7 +45,7 @@ func TestNewTransformerContext_EmptyAnnotations(t *testing.T) {
 		},
 	}
 
-	component := &LoadedComponent{
+	component := &module.LoadedComponent{
 		Name:        "simple-component",
 		Labels:      map[string]string{},
 		Annotations: map[string]string{},
@@ -50,7 +53,7 @@ func TestNewTransformerContext_EmptyAnnotations(t *testing.T) {
 		Traits:      map[string]cue.Value{},
 	}
 
-	ctx := NewTransformerContext(release, component)
+	ctx := NewTransformerContext(rel, component)
 
 	assert.Empty(t, ctx.ComponentMetadata.Annotations)
 }

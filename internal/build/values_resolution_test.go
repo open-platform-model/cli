@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/opmodel/cli/internal/build/module"
 	"github.com/opmodel/cli/internal/config"
 )
 
@@ -28,32 +29,29 @@ func testdataFile(t *testing.T, name string) string {
 	return f
 }
 
-// ----- resolveModulePath tests -----
+// ----- module.ResolvePath tests -----
 
 func TestResolveModulePath_WithoutValuesCue(t *testing.T) {
 	// A module directory without values.cue should be accepted by
-	// resolveModulePath — values.cue existence is no longer its concern.
-	p := &pipeline{}
+	// ResolvePath — values.cue existence is no longer its concern.
 	dir := testdataDir(t, "test-module-no-values")
 
-	got, err := p.resolveModulePath(dir)
+	got, err := module.ResolvePath(dir)
 	require.NoError(t, err)
 	assert.Equal(t, dir, got)
 }
 
 func TestResolveModulePath_WithValuesCue(t *testing.T) {
 	// A module directory WITH values.cue should still work fine.
-	p := &pipeline{}
 	dir := testdataDir(t, "test-module")
 
-	got, err := p.resolveModulePath(dir)
+	got, err := module.ResolvePath(dir)
 	require.NoError(t, err)
 	assert.Equal(t, dir, got)
 }
 
 func TestResolveModulePath_MissingDirectory(t *testing.T) {
-	p := &pipeline{}
-	_, err := p.resolveModulePath("/nonexistent/path")
+	_, err := module.ResolvePath("/nonexistent/path")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "module directory not found")
 }
@@ -61,9 +59,8 @@ func TestResolveModulePath_MissingDirectory(t *testing.T) {
 func TestResolveModulePath_MissingCueMod(t *testing.T) {
 	// A directory that exists but has no cue.mod/
 	dir := t.TempDir()
-	p := &pipeline{}
 
-	_, err := p.resolveModulePath(dir)
+	_, err := module.ResolvePath(dir)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing cue.mod/")
 }

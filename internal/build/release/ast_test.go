@@ -1,4 +1,4 @@
-package build
+package release
 
 import (
 	"path/filepath"
@@ -14,27 +14,28 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/opmodel/cli/internal/build/module"
 )
 
 // testModulePath returns the absolute path to a test module fixture.
+// Points to the testdata directory in the parent build package.
 func testModulePath(t *testing.T, name string) string {
 	t.Helper()
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("unable to determine test file path")
 	}
-	return filepath.Join(filepath.Dir(filename), "testdata", name)
+	// Go up one level from release/ to build/ then into testdata/
+	return filepath.Join(filepath.Dir(filename), "..", "testdata", name)
 }
 
 // ---------------------------------------------------------------------------
-// 4.1: TestGenerateOverlayAST_ProducesValidCUE
+// TestGenerateOverlayAST_ProducesValidCUE
 // ---------------------------------------------------------------------------
 
 func TestGenerateOverlayAST_ProducesValidCUE(t *testing.T) {
-	ctx := cuecontext.New()
-	builder := NewReleaseBuilder(ctx, "")
-
-	overlay := builder.generateOverlayAST("testmodule", ReleaseOptions{
+	overlay := generateOverlayAST("testmodule", Options{
 		Name:      "my-release",
 		Namespace: "production",
 	})
@@ -48,14 +49,11 @@ func TestGenerateOverlayAST_ProducesValidCUE(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// 4.2: TestGenerateOverlayAST_ContainsRequiredFields
+// TestGenerateOverlayAST_ContainsRequiredFields
 // ---------------------------------------------------------------------------
 
 func TestGenerateOverlayAST_ContainsRequiredFields(t *testing.T) {
-	ctx := cuecontext.New()
-	builder := NewReleaseBuilder(ctx, "")
-
-	overlay := builder.generateOverlayAST("testmodule", ReleaseOptions{
+	overlay := generateOverlayAST("testmodule", Options{
 		Name:      "my-release",
 		Namespace: "production",
 	})
@@ -104,12 +102,12 @@ func TestGenerateOverlayAST_ContainsRequiredFields(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// 4.4: TestInspectModule_StaticMetadata
+// TestInspectModule_StaticMetadata
 // ---------------------------------------------------------------------------
 
 func TestInspectModule_StaticMetadata(t *testing.T) {
 	ctx := cuecontext.New()
-	builder := NewReleaseBuilder(ctx, "")
+	builder := NewBuilder(ctx, "")
 
 	modulePath := testModulePath(t, "test-module")
 	inspection, err := builder.InspectModule(modulePath)
@@ -121,12 +119,12 @@ func TestInspectModule_StaticMetadata(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// 4.5: TestInspectModule_MissingMetadata
+// TestInspectModule_MissingMetadata
 // ---------------------------------------------------------------------------
 
 func TestInspectModule_MissingMetadata(t *testing.T) {
 	ctx := cuecontext.New()
-	builder := NewReleaseBuilder(ctx, "")
+	builder := NewBuilder(ctx, "")
 
 	modulePath := testModulePath(t, "no-metadata-module")
 	inspection, err := builder.InspectModule(modulePath)
@@ -138,7 +136,7 @@ func TestInspectModule_MissingMetadata(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// 4.6: TestExtractMetadataFromAST
+// TestExtractMetadataFromAST
 // ---------------------------------------------------------------------------
 
 func TestExtractMetadataFromAST(t *testing.T) {
@@ -236,7 +234,7 @@ func TestExtractMetadataFromAST(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			name, ns := extractMetadataFromAST(tt.files)
+			name, ns := module.ExtractMetadataFromAST(tt.files)
 			assert.Equal(t, tt.expectedName, name)
 			assert.Equal(t, tt.expectedNamespace, ns)
 		})

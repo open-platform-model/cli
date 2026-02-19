@@ -1,4 +1,9 @@
-package build
+package transform
+
+import (
+	"github.com/opmodel/cli/internal/build/module"
+	"github.com/opmodel/cli/internal/build/release"
+)
 
 // TransformerContext holds the context data passed to transformers.
 // This matches the CUE #TransformerContext definition.
@@ -10,7 +15,6 @@ type TransformerContext struct {
 	Namespace string `json:"namespace"`
 
 	// ModuleReleaseMetadata contains module release metadata.
-	// Matches CUE #TransformerContext.#moduleReleaseMetadata (#ModuleRelease.metadata).
 	ModuleReleaseMetadata *TransformerModuleReleaseMetadata `json:"#moduleReleaseMetadata"`
 
 	// ComponentMetadata contains component-level metadata
@@ -18,7 +22,6 @@ type TransformerContext struct {
 }
 
 // TransformerModuleReleaseMetadata contains module release metadata for transformers.
-// Fields match #ModuleRelease.metadata (closed struct).
 type TransformerModuleReleaseMetadata struct {
 	Name      string            `json:"name"`
 	Namespace string            `json:"namespace"`
@@ -36,18 +39,17 @@ type TransformerComponentMetadata struct {
 }
 
 // NewTransformerContext constructs the context for a transformer execution.
-// This context is unified with the transformer's #transform function.
-func NewTransformerContext(release *BuiltRelease, component *LoadedComponent) *TransformerContext {
+func NewTransformerContext(rel *release.BuiltRelease, component *module.LoadedComponent) *TransformerContext {
 	return &TransformerContext{
-		Name:      release.Metadata.Name,
-		Namespace: release.Metadata.Namespace,
+		Name:      rel.Metadata.Name,
+		Namespace: rel.Metadata.Namespace,
 		ModuleReleaseMetadata: &TransformerModuleReleaseMetadata{
-			Name:      release.Metadata.Name,
-			Namespace: release.Metadata.Namespace,
-			FQN:       release.Metadata.FQN,
-			Version:   release.Metadata.Version,
-			Identity:  release.Metadata.ReleaseIdentity,
-			Labels:    release.Metadata.Labels,
+			Name:      rel.Metadata.Name,
+			Namespace: rel.Metadata.Namespace,
+			FQN:       rel.Metadata.FQN,
+			Version:   rel.Metadata.Version,
+			Identity:  rel.Metadata.ReleaseIdentity,
+			Labels:    rel.Metadata.Labels,
 		},
 		ComponentMetadata: &TransformerComponentMetadata{
 			Name:        component.Name,

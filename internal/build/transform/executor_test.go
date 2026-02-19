@@ -1,4 +1,4 @@
-package build
+package transform
 
 import (
 	"testing"
@@ -7,6 +7,9 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/opmodel/cli/internal/build/module"
+	"github.com/opmodel/cli/internal/build/release"
 )
 
 func TestExecuteJob_SingleResource(t *testing.T) {
@@ -47,7 +50,7 @@ func TestExecuteJob_SingleResource(t *testing.T) {
 			FQN:   "test/transformers#DeploymentTransformer",
 			Value: transformerCUE,
 		},
-		Component: &LoadedComponent{
+		Component: &module.LoadedComponent{
 			Name:        "web",
 			Labels:      map[string]string{},
 			Annotations: map[string]string{},
@@ -55,8 +58,8 @@ func TestExecuteJob_SingleResource(t *testing.T) {
 			Traits:      map[string]cue.Value{},
 			Value:       componentCUE,
 		},
-		Release: &BuiltRelease{
-			Metadata: ReleaseMetadata{
+		Release: &release.BuiltRelease{
+			Metadata: release.Metadata{
 				Name:      "test",
 				Namespace: "default",
 				Version:   "1.0.0",
@@ -126,7 +129,7 @@ func TestExecuteJob_MapOutput(t *testing.T) {
 			FQN:   "test/transformers#PVCTransformer",
 			Value: transformerCUE,
 		},
-		Component: &LoadedComponent{
+		Component: &module.LoadedComponent{
 			Name:        "storage",
 			Labels:      map[string]string{},
 			Annotations: map[string]string{"transformer.opmodel.dev/list-output": "true"},
@@ -134,8 +137,8 @@ func TestExecuteJob_MapOutput(t *testing.T) {
 			Traits:      map[string]cue.Value{},
 			Value:       componentCUE,
 		},
-		Release: &BuiltRelease{
-			Metadata: ReleaseMetadata{
+		Release: &release.BuiltRelease{
+			Metadata: release.Metadata{
 				Name:      "test",
 				Namespace: "default",
 				Version:   "1.0.0",

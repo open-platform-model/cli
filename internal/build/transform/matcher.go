@@ -1,8 +1,10 @@
-package build
+package transform
 
 import (
 	"fmt"
 	"strings"
+
+	"github.com/opmodel/cli/internal/build/module"
 )
 
 // Matcher evaluates transformer-component matching.
@@ -13,44 +15,18 @@ func NewMatcher() *Matcher {
 	return &Matcher{}
 }
 
-// MatchResult is the internal result of matching.
-type MatchResult struct {
-	// ByTransformer groups components by transformer FQN.
-	// Key: transformer FQN
-	// Value: list of components that matched
-	ByTransformer map[string][]*LoadedComponent
-
-	// Unmatched contains components with no matching transformers.
-	Unmatched []*LoadedComponent
-
-	// Details records matching decisions for verbose output.
-	Details []MatchDetail
-}
-
-// MatchDetail records why a transformer did/didn't match a component.
-type MatchDetail struct {
-	ComponentName    string
-	TransformerFQN   string
-	Matched          bool
-	MissingLabels    []string
-	MissingResources []string
-	MissingTraits    []string
-	UnhandledTraits  []string
-	Reason           string
-}
-
 // Match evaluates all transformers against all components.
 //
-// Matching rules (per FR-B-040 to FR-B-043):
+// Matching rules:
 //   - Required labels: All must exist with matching values
 //   - Required resources: All FQNs must exist in component.#resources
 //   - Required traits: All FQNs must exist in component.#traits
 //   - Multiple transformers CAN match one component
 //   - Zero matches causes component to be unmatched
-func (m *Matcher) Match(components []*LoadedComponent, transformers []*LoadedTransformer) *MatchResult {
+func (m *Matcher) Match(components []*module.LoadedComponent, transformers []*LoadedTransformer) *MatchResult {
 	result := &MatchResult{
-		ByTransformer: make(map[string][]*LoadedComponent),
-		Unmatched:     make([]*LoadedComponent, 0),
+		ByTransformer: make(map[string][]*module.LoadedComponent),
+		Unmatched:     make([]*module.LoadedComponent, 0),
 		Details:       make([]MatchDetail, 0),
 	}
 
@@ -76,7 +52,7 @@ func (m *Matcher) Match(components []*LoadedComponent, transformers []*LoadedTra
 }
 
 // evaluateMatch checks if a transformer matches a component.
-func (m *Matcher) evaluateMatch(comp *LoadedComponent, tf *LoadedTransformer) MatchDetail {
+func (m *Matcher) evaluateMatch(comp *module.LoadedComponent, tf *LoadedTransformer) MatchDetail {
 	detail := MatchDetail{
 		ComponentName:  comp.Name,
 		TransformerFQN: tf.FQN,
@@ -181,14 +157,12 @@ func (m *Matcher) buildReason(detail MatchDetail, tf *LoadedTransformer) string 
 	return "Not matched: " + strings.Join(reasons, "; ")
 }
 
-// ToMatchPlan converts MatchResult to the shared MatchPlan type.
+// ToMatchPlan converts MatchResult to the MatchPlan type.
 func (r *MatchResult) ToMatchPlan() MatchPlan {
 	matches := make(map[string][]TransformerMatch)
 
-	// Build matches by component name
 	for tfFQN, components := range r.ByTransformer {
 		for _, comp := range components {
-			// Find the detail for this match
 			reason := ""
 			for i := range r.Details {
 				detail := &r.Details[i]
@@ -205,7 +179,6 @@ func (r *MatchResult) ToMatchPlan() MatchPlan {
 		}
 	}
 
-	// Build unmatched list
 	unmatched := make([]string, len(r.Unmatched))
 	for i, comp := range r.Unmatched {
 		unmatched[i] = comp.Name

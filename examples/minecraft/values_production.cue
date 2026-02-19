@@ -37,7 +37,7 @@ values: {
 		// High-performance cloud storage
 		data: {
 			type:         "pvc"
-			size:         "50Gi"
+			size:         "10Gi"
 			storageClass: "standard" // Adjust based on your cloud provider
 		}
 		// Smaller backup storage - restic deduplicates
