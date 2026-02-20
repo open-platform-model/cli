@@ -77,16 +77,17 @@ func ExtractComponents(v cue.Value) (map[string]*Component, error) {
 }
 
 // extractComponent extracts a single component from a CUE value.
-func extractComponent(name string, value cue.Value) *Component {
+func extractComponent(name string, value cue.Value) *Component { //nolint:gocyclo // linear field extraction; each branch is a distinct component field
 	comp := &Component{
 		Metadata: &ComponentMetadata{
 			Name:        name,
 			Labels:      make(map[string]string),
 			Annotations: make(map[string]string),
 		},
-		Resources: make(map[string]cue.Value),
-		Traits:    make(map[string]cue.Value),
-		Value:     value,
+		Resources:  make(map[string]cue.Value),
+		Traits:     make(map[string]cue.Value),
+		Blueprints: make(map[string]cue.Value),
+		Value:      value,
 	}
 
 	// Override name from metadata.name if present
@@ -112,6 +113,20 @@ func extractComponent(name string, value cue.Value) *Component {
 				comp.Traits[iter.Selector().Unquoted()] = iter.Value()
 			}
 		}
+	}
+
+	// Extract #blueprints
+	if blueprintsValue := value.LookupPath(cue.ParsePath("#blueprints")); blueprintsValue.Exists() {
+		if iter, err := blueprintsValue.Fields(); err == nil {
+			for iter.Next() {
+				comp.Blueprints[iter.Selector().Unquoted()] = iter.Value()
+			}
+		}
+	}
+
+	// Extract spec
+	if specValue := value.LookupPath(cue.ParsePath("spec")); specValue.Exists() {
+		comp.Spec = specValue
 	}
 
 	// Extract metadata.labels

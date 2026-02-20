@@ -103,21 +103,26 @@ A developer wants to control how rendered manifests are output.
 
 #### Requirement: ModuleLoader extracts metadata from module
 
-The pipeline SHALL extract module metadata (`name`, `defaultNamespace`) using AST inspection of `inst.Files` from a single `load.Instances` call as the primary method. CUE evaluation via `BuildInstance` + `LookupPath` SHALL be used only as a fallback when AST inspection returns empty values.
+The pipeline SHALL extract all module metadata (`name`, `defaultNamespace`, `fqn`, `version`, `identity`, `labels`) from the fully evaluated `cue.Value` produced by `BuildInstance()`. All metadata fields SHALL be populated via `LookupPath` + `.String()` on the evaluated value. No AST inspection of `inst.Files` SHALL be used for metadata extraction.
 
-The pipeline SHALL NOT perform a separate `load.Instances` + `BuildInstance` call solely for metadata extraction when AST inspection succeeds.
+`inst.PkgName` SHALL still be read from the `*build.Instance` returned by `load.Instances()`, as it is not available from the evaluated value.
 
-##### Scenario: Metadata extracted without CUE evaluation
+##### Scenario: All metadata extracted from CUE evaluation
 
-- **WHEN** the pipeline renders a module with static string literals for `metadata.name` and `metadata.defaultNamespace`
-- **THEN** metadata SHALL be extracted from the AST without calling `BuildInstance`
-- **AND** the pipeline SHALL use at most two `load.Instances` calls total (inspection + overlay build), not three
+- **WHEN** the pipeline loads a module with static string literals for all metadata fields
+- **THEN** `name`, `defaultNamespace`, `fqn`, `version`, and `identity` SHALL each be populated from `LookupPath` on the evaluated `cue.Value`
+- **AND** no AST walk of `inst.Files` SHALL occur
 
-##### Scenario: Metadata extraction falls back to evaluation
+##### Scenario: Computed metadata name resolves correctly
 
-- **WHEN** the pipeline renders a module where `metadata.name` is a computed expression
-- **THEN** the pipeline SHALL fall back to `BuildInstance` + `LookupPath` for metadata extraction
-- **AND** the rendered output SHALL be identical to the output before this change
+- **WHEN** a module defines `metadata.name` as a computed CUE expression that evaluates to a concrete string
+- **THEN** `mod.Metadata.Name` SHALL be populated with the evaluated concrete string
+- **AND** the pipeline SHALL not treat computed names differently from literal names
+
+##### Scenario: Package name extracted from build instance
+
+- **WHEN** a module directory is loaded via `load.Instances()`
+- **THEN** `mod.PkgName()` SHALL be populated from `inst.PkgName`
 
 ### ReleaseBuilder
 
@@ -151,25 +156,22 @@ The generated overlay SHALL produce byte-identical CUE output compared to the pr
 - **WHEN** the ReleaseBuilder generates an overlay with any valid inputs
 - **THEN** loading the AST overlay with a module and evaluating `#opmReleaseMeta.identity` SHALL produce the same UUID as the previous `fmt.Sprintf`-based overlay
 
-#### Requirement: ReleaseBuilder provides module inspection without CUE evaluation
+#### Requirement: Build() gates on IsConcrete() per component
 
-The ReleaseBuilder SHALL expose a method to extract module metadata (`name`, `defaultNamespace`, `pkgName`) from a module directory using only CUE loader AST inspection — without calling `BuildInstance` or performing CUE evaluation.
+`Build()` SHALL return a non-nil error if any component extracted from `#components` after `FillPath("#config", values)` is not concrete. The check SHALL be performed immediately after `core.ExtractComponents()` returns, before constructing the `ModuleRelease`. The error SHALL identify the component name.
 
-##### Scenario: Metadata extracted from static string literals
+##### Scenario: All components concrete — Build() succeeds
 
-- **WHEN** a module defines `metadata: name: "my-module"` and `metadata: defaultNamespace: "default"` as string literals
-- **THEN** the inspection method SHALL return `name: "my-module"` and `defaultNamespace: "default"` without performing CUE evaluation
+- **WHEN** `Build()` is called with values that satisfy all `#config` constraints
+- **AND** all components in `#components` are concrete after `FillPath`
+- **THEN** `Build()` SHALL return a non-nil `*core.ModuleRelease` and a nil error
 
-##### Scenario: Package name extracted from loader instance
+##### Scenario: Non-concrete component — Build() returns error
 
-- **WHEN** a module directory is loaded via `load.Instances`
-- **THEN** the inspection method SHALL return the package name from `inst.PkgName`
-
-##### Scenario: Graceful fallback for computed metadata
-
-- **WHEN** a module defines `metadata.name` as an expression (not a string literal)
-- **THEN** the inspection method SHALL return an empty string for `name`
-- **AND** the pipeline SHALL fall back to extracting metadata via `BuildInstance` + `LookupPath`
+- **WHEN** after `FillPath("#config", values)` a component's `Value` is not concrete
+- **THEN** `Build()` SHALL return a non-nil error containing the component name
+- **AND** the error message SHALL indicate the component is not concrete after value injection
+- **AND** no `*core.ModuleRelease` SHALL be returned
 
 ### Module Configuration Pattern
 

@@ -98,6 +98,10 @@ func TestExtractComponents(t *testing.T) {
 				#traits: {
 					"opmodel.dev/core/v0#Ingress": {}
 				}
+				spec: {
+					replicas: 2
+					image: "nginx:latest"
+				}
 			}
 		}`)
 		require.NoError(t, v.Err())
@@ -113,6 +117,31 @@ func TestExtractComponents(t *testing.T) {
 		assert.Equal(t, "web component", comp.Metadata.Annotations["opm.dev/desc"])
 		assert.Len(t, comp.Resources, 1)
 		assert.Len(t, comp.Traits, 1)
+		// Spec must be extracted
+		assert.True(t, comp.Spec.Exists(), "Spec must be extracted from spec field")
+		// Blueprints must be initialized (non-nil) even when absent
+		assert.NotNil(t, comp.Blueprints, "Blueprints must be a non-nil map")
+	})
+
+	t.Run("extracts blueprints when present", func(t *testing.T) {
+		v := ctx.CompileString(`{
+			svc: {
+				#resources: {
+					"opmodel.dev/core/v0#Deployment": {}
+				}
+				#blueprints: {
+					"opmodel.dev/blueprints/v0#Standard": {}
+				}
+			}
+		}`)
+		require.NoError(t, v.Err())
+
+		components, err := core.ExtractComponents(v)
+		require.NoError(t, err)
+		comp := components["svc"]
+		require.NotNil(t, comp)
+		assert.Len(t, comp.Blueprints, 1)
+		assert.Contains(t, comp.Blueprints, "opmodel.dev/blueprints/v0#Standard")
 	})
 
 	t.Run("uses field name when metadata.name absent", func(t *testing.T) {

@@ -5,9 +5,7 @@ import (
 	"runtime"
 	"testing"
 
-	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/cuecontext"
-	"cuelang.org/go/cue/token"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,113 +52,7 @@ func TestLoad_MissingMetadata(t *testing.T) {
 	mod, err := buildmodule.Load(ctx, modulePath, "")
 	require.NoError(t, err)
 
-	// metadata.name is a computed expression, so AST walk returns empty
-	assert.Empty(t, mod.Metadata.Name, "computed metadata.name should return empty")
+	// metadata.name is a computed expression; CUE evaluation resolves it to "computed-module"
+	assert.Equal(t, "computed-module", mod.Metadata.Name)
 	assert.Equal(t, "nometadata", mod.PkgName())
-}
-
-// ---------------------------------------------------------------------------
-// TestExtractMetadataFromAST
-// ---------------------------------------------------------------------------
-
-func TestExtractMetadataFromAST(t *testing.T) {
-	tests := []struct {
-		name              string
-		files             []*ast.File
-		expectedName      string
-		expectedNamespace string
-	}{
-		{
-			name: "static string literals",
-			files: []*ast.File{
-				{
-					Decls: []ast.Decl{
-						&ast.Field{
-							Label: ast.NewIdent("metadata"),
-							Value: ast.NewStruct(
-								&ast.Field{Label: ast.NewIdent("name"), Value: ast.NewString("my-module")},
-								&ast.Field{Label: ast.NewIdent("defaultNamespace"), Value: ast.NewString("production")},
-							),
-						},
-					},
-				},
-			},
-			expectedName:      "my-module",
-			expectedNamespace: "production",
-		},
-		{
-			name: "missing fields",
-			files: []*ast.File{
-				{
-					Decls: []ast.Decl{
-						&ast.Field{
-							Label: ast.NewIdent("metadata"),
-							Value: ast.NewStruct(
-								&ast.Field{Label: ast.NewIdent("version"), Value: ast.NewString("1.0.0")},
-							),
-						},
-					},
-				},
-			},
-			expectedName:      "",
-			expectedNamespace: "",
-		},
-		{
-			name: "non-string expression for name",
-			files: []*ast.File{
-				{
-					Decls: []ast.Decl{
-						&ast.Field{
-							Label: ast.NewIdent("metadata"),
-							Value: ast.NewStruct(
-								&ast.Field{
-									Label: ast.NewIdent("name"),
-									Value: &ast.BinaryExpr{
-										X:  ast.NewString("prefix-"),
-										Op: token.ADD,
-										Y:  ast.NewIdent("_suffix"),
-									},
-								},
-								&ast.Field{Label: ast.NewIdent("defaultNamespace"), Value: ast.NewString("default")},
-							),
-						},
-					},
-				},
-			},
-			expectedName:      "",
-			expectedNamespace: "default",
-		},
-		{
-			name:              "no metadata field at all",
-			files:             []*ast.File{{Decls: []ast.Decl{}}},
-			expectedName:      "",
-			expectedNamespace: "",
-		},
-		{
-			name: "metadata in second file",
-			files: []*ast.File{
-				{Decls: []ast.Decl{
-					&ast.Field{Label: ast.NewIdent("values"), Value: ast.NewStruct()},
-				}},
-				{Decls: []ast.Decl{
-					&ast.Field{
-						Label: ast.NewIdent("metadata"),
-						Value: ast.NewStruct(
-							&ast.Field{Label: ast.NewIdent("name"), Value: ast.NewString("second-file-module")},
-						),
-					},
-				}},
-			},
-			expectedName:      "second-file-module",
-			expectedNamespace: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			name, ns := buildmodule.ExtractMetadataFromAST(tt.files)
-			assert.Equal(t, tt.expectedName, name)
-			assert.Equal(t, tt.expectedNamespace, ns)
-		})
-	}
 }

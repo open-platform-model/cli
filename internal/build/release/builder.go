@@ -102,7 +102,14 @@ func (b *Builder) Build(mod *core.Module, opts Options, valuesFiles []string) (*
 		return nil, err
 	}
 
-	// Step 7: Construct release metadata from Go values + ComputeReleaseUUID
+	// Step 7: Gate on concreteness — every component must be fully concrete after FillPath
+	for name, comp := range coreComponents {
+		if !comp.IsConcrete() {
+			return nil, fmt.Errorf("component %q is not concrete after value injection", name)
+		}
+	}
+
+	// Step 8: Construct release metadata from Go values + ComputeReleaseUUID
 	relMeta := extractReleaseMetadata(mod, opts)
 	modMeta := *mod.Metadata // copy
 

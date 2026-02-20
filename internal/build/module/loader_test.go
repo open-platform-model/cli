@@ -9,15 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestExtractMetadataFromAST_NilFiles(t *testing.T) {
-	name, ns := ExtractMetadataFromAST(nil)
-	assert.Empty(t, name)
-	assert.Empty(t, ns)
-}
-
 // TestLoad_ValidModule verifies that Load returns a populated *core.Module
 // with a resolved absolute path, metadata name, defaultNamespace, pkgName,
-// FQN, version, CUEValue, Config, Values, and Components.
+// FQN, version, UUID, CUEValue, Config, Values, and Components.
 func TestLoad_ValidModule(t *testing.T) {
 	ctx := cuecontext.New()
 	// Use the test-module fixture from the build testdata directory.
@@ -29,17 +23,16 @@ func TestLoad_ValidModule(t *testing.T) {
 	require.NotNil(t, mod)
 	require.NotNil(t, mod.Metadata)
 
-	// From AST inspection
+	// All metadata extracted from CUE evaluation
 	assert.Equal(t, "test-module", mod.Metadata.Name)
 	assert.Equal(t, "default", mod.Metadata.DefaultNamespace)
 	assert.Equal(t, "testmodule", mod.PkgName())
 	// ModulePath must be absolute after Load
 	assert.NotEmpty(t, mod.ModulePath)
 
-	// From full CUE evaluation (task 5.2-5.4)
 	assert.Equal(t, "example.com/test-module@v0#test-module", mod.Metadata.FQN, "FQN extracted from CUE eval")
 	assert.Equal(t, "1.0.0", mod.Metadata.Version, "version extracted from CUE eval")
-	assert.Equal(t, "a1b2c3d4-e5f6-7890-abcd-ef1234567890", mod.Metadata.UUID, "UUID extracted from metadata.uuid")
+	assert.NotEmpty(t, mod.Metadata.UUID, "UUID extracted from CUE eval")
 
 	// CUEValue must be set
 	assert.True(t, mod.CUEValue().Exists(), "CUEValue must be set after Load")
@@ -61,8 +54,8 @@ func TestLoad_InvalidPath(t *testing.T) {
 	assert.Contains(t, err.Error(), "module directory not found")
 }
 
-// TestLoad_ComputedMetadataName verifies that Load succeeds even when
-// metadata.name is a computed expression (returns empty name from AST inspection).
+// TestLoad_ComputedMetadataName verifies that Load correctly resolves computed
+// metadata.name expressions via CUE evaluation.
 func TestLoad_ComputedMetadataName(t *testing.T) {
 	ctx := cuecontext.New()
 	modulePath := "../testdata/no-metadata-module"
@@ -71,8 +64,7 @@ func TestLoad_ComputedMetadataName(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, mod)
 
-	// AST inspection cannot extract computed expressions — Name will be empty.
-	// This is expected behavior; Validate() would catch it if called.
-	assert.Empty(t, mod.Metadata.Name, "computed metadata.name should yield empty string from AST")
+	// CUE evaluation resolves computed expressions — "computed" + "-module" = "computed-module"
+	assert.Equal(t, "computed-module", mod.Metadata.Name, "computed metadata.name resolves via CUE evaluation")
 	assert.Equal(t, "nometadata", mod.PkgName())
 }

@@ -88,6 +88,27 @@ func TestBuild_WithValuesCue_NoValuesFlag_Succeeds(t *testing.T) {
 	assert.Equal(t, "default", rel.Module.Metadata.DefaultNamespace)
 }
 
+func TestBuild_NonConcreteComponent_ReturnsError(t *testing.T) {
+	// Build() must return an error if any component is not concrete after FillPath.
+	// Provide only partial values (missing 'replicas') so #config.replicas remains
+	// "int & >=1" and the web component is therefore not concrete.
+	cueCtx := cuecontext.New()
+	b := release.NewBuilder(cueCtx, "")
+	dir := testModulePath(t, "test-module-no-values")
+	partialValues := testModulePath(t, "partial-values.cue")
+
+	mod, err := buildmodule.Load(cueCtx, dir, "")
+	require.NoError(t, err)
+
+	_, err = b.Build(mod, release.Options{
+		Name:      "test-release",
+		Namespace: "default",
+	}, []string{partialValues})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not concrete after value injection")
+	assert.Contains(t, err.Error(), "web")
+}
+
 func TestBuild_DeterministicReleaseUUID(t *testing.T) {
 	// Build() should produce a deterministic release UUID based on
 	// (fqn, name, namespace) via core.ComputeReleaseUUID.

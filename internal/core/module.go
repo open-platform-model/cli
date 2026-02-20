@@ -95,7 +95,7 @@ func (m *Module) Validate() error {
 		return fmt.Errorf("module metadata is nil")
 	}
 	if m.Metadata.Name == "" {
-		return fmt.Errorf("module metadata.name is empty — ensure metadata.name is a string literal in the module definition")
+		return fmt.Errorf("module metadata.name is empty or not concrete — ensure metadata.name is defined in the module definition")
 	}
 	if m.Metadata.FQN == "" {
 		return fmt.Errorf("module metadata.fqn is empty — ensure the module was fully loaded via module.Load()")
