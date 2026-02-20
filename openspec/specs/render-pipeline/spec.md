@@ -290,6 +290,18 @@ The render pipeline SHALL produce byte-identical `RenderResult` output after the
 - **THEN** `RenderResult.Release.UUID` SHALL be the same UUID as before the refactor
 - **AND** all `module-release.opmodel.dev/*` labels SHALL have the same values
 
+##### Scenario: Path resolution error is a fatal error
+
+- **WHEN** `Pipeline.Render()` is called with a `ModulePath` that does not exist or is not a CUE module
+- **THEN** `Render()` SHALL return a non-nil `error` (fatal error, not a render error)
+- **AND** `RenderResult` SHALL be `nil`
+
+##### Scenario: Module structural validation error is a fatal error
+
+- **WHEN** the loaded `core.Module` fails `Validate()` (e.g., missing `Metadata.Name`)
+- **THEN** `Pipeline.Render()` SHALL return a non-nil `error` (fatal error)
+- **AND** `RenderResult` SHALL be `nil`
+
 ---
 
 ## Non-Functional Requirements

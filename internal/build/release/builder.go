@@ -10,7 +10,6 @@ import (
 	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/load"
 
-	"github.com/opmodel/cli/internal/build/module"
 	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -216,12 +215,6 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 	}, nil
 }
 
-// InspectModule extracts module metadata from a module directory using AST
-// inspection without CUE evaluation. Delegates to module.InspectModule.
-func (b *Builder) InspectModule(modulePath string) (*module.Inspection, error) {
-	return module.InspectModule(modulePath, b.registry)
-}
-
 // detectPackageName loads the module directory minimally to determine the CUE package name.
 func (b *Builder) detectPackageName(modulePath string) (string, error) {
 	cfg := &load.Config{Dir: modulePath}
@@ -261,9 +254,4 @@ func (b *Builder) loadValuesFile(path string) (cue.Value, error) {
 	}
 
 	return value, nil
-}
-
-// CueContext returns the CUE context (used by pipeline for fallback metadata extraction).
-func (b *Builder) CueContext() *cue.Context {
-	return b.cueCtx
 }

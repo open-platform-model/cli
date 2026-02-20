@@ -1,14 +1,25 @@
 package core
 
-import "cuelang.org/go/cue"
+import (
+	"cuelang.org/go/cue"
+)
 
 // Component is a component with extracted metadata.
 // Components are extracted by the release builder during the build phase.
 type Component struct {
-	Name        string
-	Labels      map[string]string    // Effective labels (merged from resources/traits)
-	Annotations map[string]string    // Annotations from metadata.annotations
-	Resources   map[string]cue.Value // FQN -> resource value
-	Traits      map[string]cue.Value // FQN -> trait value
-	Value       cue.Value            // Full component value
+	ApiVersion string               `json:"apiVersion"`
+	Kind       string               `json:"kind"`
+	Metadata   *ComponentMetadata   `json:"metadata"`
+
+	Resources  map[string]cue.Value `json:"#resources"`  // FQN -> resource value
+	Traits     map[string]cue.Value `json:"#traits"`     // FQN -> trait value
+	Blueprints map[string]cue.Value `json:"#blueprints"` // FQN -> blueprint value
+	Spec       cue.Value            `json:"spec"`        // OpenAPI schema for the component spec
+	Value      cue.Value            `json:"value"`       // Full component value
+}
+
+type ComponentMetadata struct {
+	Name        string            `json:"name"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
 }

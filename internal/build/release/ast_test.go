@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/build/module"
+	buildmodule "github.com/opmodel/cli/internal/build/module"
 )
 
 // testModulePath returns the absolute path to a test module fixture.
@@ -102,37 +102,35 @@ func TestGenerateOverlayAST_ContainsRequiredFields(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TestInspectModule_StaticMetadata
+// TestLoad_StaticMetadata
 // ---------------------------------------------------------------------------
 
-func TestInspectModule_StaticMetadata(t *testing.T) {
+func TestLoad_StaticMetadata(t *testing.T) {
 	ctx := cuecontext.New()
-	builder := NewBuilder(ctx, "")
 
 	modulePath := testModulePath(t, "test-module")
-	inspection, err := builder.InspectModule(modulePath)
+	mod, err := buildmodule.Load(ctx, modulePath, "")
 	require.NoError(t, err)
 
-	assert.Equal(t, "test-module", inspection.Name)
-	assert.Equal(t, "default", inspection.DefaultNamespace)
-	assert.Equal(t, "testmodule", inspection.PkgName)
+	assert.Equal(t, "test-module", mod.Metadata.Name)
+	assert.Equal(t, "default", mod.Metadata.DefaultNamespace)
+	assert.Equal(t, "testmodule", mod.PkgName())
 }
 
 // ---------------------------------------------------------------------------
-// TestInspectModule_MissingMetadata
+// TestLoad_MissingMetadata
 // ---------------------------------------------------------------------------
 
-func TestInspectModule_MissingMetadata(t *testing.T) {
+func TestLoad_MissingMetadata(t *testing.T) {
 	ctx := cuecontext.New()
-	builder := NewBuilder(ctx, "")
 
 	modulePath := testModulePath(t, "no-metadata-module")
-	inspection, err := builder.InspectModule(modulePath)
+	mod, err := buildmodule.Load(ctx, modulePath, "")
 	require.NoError(t, err)
 
 	// metadata.name is a computed expression, so AST walk returns empty
-	assert.Empty(t, inspection.Name, "computed metadata.name should return empty")
-	assert.Equal(t, "nometadata", inspection.PkgName)
+	assert.Empty(t, mod.Metadata.Name, "computed metadata.name should return empty")
+	assert.Equal(t, "nometadata", mod.PkgName())
 }
 
 // ---------------------------------------------------------------------------
@@ -234,7 +232,7 @@ func TestExtractMetadataFromAST(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			name, ns := module.ExtractMetadataFromAST(tt.files)
+			name, ns := buildmodule.ExtractMetadataFromAST(tt.files)
 			assert.Equal(t, tt.expectedName, name)
 			assert.Equal(t, tt.expectedNamespace, ns)
 		})

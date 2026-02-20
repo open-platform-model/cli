@@ -1,6 +1,12 @@
 package core
 
-import "cuelang.org/go/cue"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"cuelang.org/go/cue"
+)
 
 // Module represents the #Module type before it is built.
 type Module struct {
@@ -20,6 +26,65 @@ type Module struct {
 	Values cue.Value `json:"values,omitempty"`
 
 	ModulePath string `json:"modulePath,omitempty"`
+
+	// pkgName is the CUE package name from the module, set by module.Load().
+	// Accessed via PkgName().
+	pkgName string
+}
+
+// PkgName returns the CUE package name of the module.
+// Set by module.Load(); empty if the module was not constructed via Load().
+func (m *Module) PkgName() string {
+	return m.pkgName
+}
+
+// SetPkgName sets the CUE package name. Called by module.Load().
+// This is intentionally package-scoped via a friend-access pattern:
+// internal packages may call this; external packages should use module.Load().
+func (m *Module) SetPkgName(name string) {
+	m.pkgName = name
+}
+
+// ResolvePath resolves ModulePath to an absolute path, verifies the directory
+// exists, and verifies a cue.mod/ subdirectory is present.
+// On success, ModulePath is updated in-place to the resolved absolute path.
+func (m *Module) ResolvePath() error {
+	absPath, err := filepath.Abs(m.ModulePath)
+	if err != nil {
+		return fmt.Errorf("resolving module path: %w", err)
+	}
+
+	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+		return fmt.Errorf("module directory not found: %s", absPath)
+	}
+
+	cueModPath := filepath.Join(absPath, "cue.mod")
+	if _, err := os.Stat(cueModPath); os.IsNotExist(err) {
+		return fmt.Errorf("not a CUE module: missing cue.mod/ directory in %s", absPath)
+	}
+
+	m.ModulePath = absPath
+	return nil
+}
+
+// Validate checks that the Module has the required fields populated after
+// the PREPARATION phase (module.Load). This is a structural check only —
+// it does not perform CUE concreteness validation.
+//
+// Note: FQN is intentionally not checked here. FQN is computed by CUE
+// evaluation during Phase 2 (release.Build) and is not available after
+// AST inspection.
+func (m *Module) Validate() error {
+	if m.ModulePath == "" {
+		return fmt.Errorf("module path is empty")
+	}
+	if m.Metadata == nil {
+		return fmt.Errorf("module metadata is nil")
+	}
+	if m.Metadata.Name == "" {
+		return fmt.Errorf("module metadata.name is empty — ensure metadata.name is a string literal in the module definition")
+	}
+	return nil
 }
 
 // ModuleMetadata contains module-level identity and version information.
@@ -30,9 +95,6 @@ type ModuleMetadata struct {
 	Name string `json:"name"`
 
 	// DefaultNamespace is the default namespace from the module definition.
-	// TODO: not yet consumed after extraction. Currently the pipeline reads namespace from
-	// MetadataPreview.DefaultNamespace (internal/build/pipeline.go) instead of this field.
-	// Either remove this duplicate or wire it up as the canonical source and drop MetadataPreview.DefaultNamespace.
 	DefaultNamespace string `json:"defaultNamespace"`
 
 	// FQN is the fully qualified module name.

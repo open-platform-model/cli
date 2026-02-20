@@ -24,6 +24,7 @@ import (
 // It orchestrates module loading, release building, provider loading,
 // component matching, and transformer execution.
 type pipeline struct {
+	cueCtx         *cue.Context
 	providers      map[string]cue.Value
 	registry       string
 	releaseBuilder *release.Builder
@@ -43,6 +44,7 @@ func NewPipeline(cueCtx *cue.Context, providers map[string]cue.Value, registry s
 		cueCtx = cuecontext.New()
 	}
 	return &pipeline{
+		cueCtx:         cueCtx,
 		providers:      providers,
 		registry:       registry,
 		releaseBuilder: release.NewBuilder(cueCtx, registry),
@@ -55,7 +57,7 @@ func NewPipeline(cueCtx *cue.Context, providers map[string]cue.Value, registry s
 // Render executes the pipeline and returns results.
 //
 // The render process follows these phases:
-//  1. Resolve module path and inspect metadata via AST (InspectModule — no CUE evaluation)
+//  1. Load module: resolve path + AST inspection → *core.Module (module.Load + mod.Validate)
 //  2. Build #ModuleRelease via AST overlay (loads module with overlay + values)
 //  3. Load provider and transformers (ProviderLoader)
 //  4. Match components to transformers (Matcher)
@@ -70,9 +72,12 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		return nil, err
 	}
 
-	// Phase 1: Resolve module path and inspect module metadata via AST
-	modulePath, err := module.ResolvePath(opts.ModulePath)
+	// Phase 1: Load module — resolves path, inspects metadata via AST
+	mod, err := module.Load(p.cueCtx, opts.ModulePath, opts.Registry)
 	if err != nil {
+		return nil, err
+	}
+	if err := mod.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -80,9 +85,9 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	// When --values flags ARE provided, values.cue on disk is ignored (stubbed
 	// out during Build) so the external values take full precedence.
 	if len(opts.Values) == 0 {
-		valuesPath := filepath.Join(modulePath, "values.cue")
+		valuesPath := filepath.Join(mod.ModulePath, "values.cue")
 		if _, err := os.Stat(valuesPath); os.IsNotExist(err) {
-			return nil, fmt.Errorf("values.cue not found in %s — provide values via values.cue or --values flag", modulePath)
+			return nil, fmt.Errorf("values.cue not found in %s — provide values via values.cue or --values flag", mod.ModulePath)
 		}
 	}
 
@@ -97,39 +102,20 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		output.Debug("using default values.cue")
 	}
 
-	inspection, err := p.releaseBuilder.InspectModule(modulePath)
-	if err != nil {
-		return nil, err
-	}
-
-	// If AST inspection returned empty name, fall back to BuildInstance + LookupPath
-	// to handle computed metadata expressions.
-	moduleMeta := &module.MetadataPreview{
-		Name:             inspection.Name,
-		DefaultNamespace: inspection.DefaultNamespace,
-	}
-	if moduleMeta.Name == "" {
-		fallbackMeta, err := module.ExtractMetadata(p.releaseBuilder.CueContext(), modulePath, opts.Registry)
-		if err != nil {
-			return nil, err
-		}
-		moduleMeta = fallbackMeta
-	}
-
 	// Phase 2: Build #ModuleRelease (loads module with AST overlay, unifies values)
 	releaseName := opts.Name
 	if releaseName == "" {
-		releaseName = moduleMeta.Name
+		releaseName = mod.Metadata.Name
 	}
-	namespace := p.resolveNamespace(opts.Namespace, moduleMeta.DefaultNamespace)
+	namespace := p.resolveNamespace(opts.Namespace, mod.Metadata.DefaultNamespace)
 	if namespace == "" {
-		return nil, &NamespaceRequiredError{ModuleName: moduleMeta.Name}
+		return nil, &NamespaceRequiredError{ModuleName: mod.Metadata.Name}
 	}
 
-	rel, err := p.releaseBuilder.Build(modulePath, release.Options{
+	rel, err := p.releaseBuilder.Build(mod.ModulePath, release.Options{
 		Name:      releaseName,
 		Namespace: namespace,
-		PkgName:   inspection.PkgName,
+		PkgName:   mod.PkgName(),
 	}, opts.Values)
 	if err != nil {
 		return nil, err // Fatal: release building failed (likely incomplete values)

@@ -1,6 +1,15 @@
-## ADDED Requirements
+# Module Receiver Methods
+
+## Purpose
+
+This spec defines the behavior of receiver methods on `core.Module` and the `module.Load()` constructor in `internal/build/module/`. These make `core.Module` self-describing: it owns its own path resolution and structural validation, replacing the previous pattern of scattered standalone functions.
+
+---
+
+## Requirements
 
 ### Requirement: Module resolves and validates its own path
+
 `core.Module` SHALL expose a `ResolvePath() error` receiver method that validates and resolves the `ModulePath` field in-place. The method SHALL:
 - Convert `ModulePath` to an absolute path using `filepath.Abs`
 - Verify the directory exists on the filesystem
@@ -23,16 +32,18 @@ This method SHALL NOT perform CUE evaluation. It is a filesystem-only check.
 - **THEN** `ResolvePath()` SHALL return a non-nil error indicating the path is not a CUE module
 
 ### Requirement: Module validates its own structural integrity
+
 `core.Module` SHALL expose a `Validate() error` receiver method that checks the module is structurally complete enough to proceed with release building. The method SHALL verify:
 - `Module.ModulePath` is non-empty
 - `Module.Metadata` is non-nil
 - `Module.Metadata.Name` is non-empty
-- `Module.Metadata.FQN` is non-empty
+
+`Validate()` SHALL NOT check `Metadata.FQN`. FQN is computed by CUE evaluation during Phase 2 (`release.Build`) and is not available after AST inspection in Phase 1.
 
 `Validate()` SHALL NOT enforce CUE concreteness on `Config` or `Values` fields. It is a structural guard, not a CUE evaluation step.
 
 #### Scenario: Fully populated Module passes validation
-- **WHEN** `Validate()` is called on a `Module` with non-empty `ModulePath`, non-nil `Metadata`, and non-empty `Metadata.Name` and `Metadata.FQN`
+- **WHEN** `Validate()` is called on a `Module` with non-empty `ModulePath`, non-nil `Metadata`, and non-empty `Metadata.Name`
 - **THEN** `Validate()` SHALL return `nil`
 
 #### Scenario: Missing Metadata is rejected
@@ -43,15 +54,16 @@ This method SHALL NOT perform CUE evaluation. It is a filesystem-only check.
 - **WHEN** `Validate()` is called on a `Module` where `Metadata.Name` is an empty string
 - **THEN** `Validate()` SHALL return a non-nil error
 
-#### Scenario: Empty FQN is rejected
+#### Scenario: FQN is not checked by Validate
 - **WHEN** `Validate()` is called on a `Module` where `Metadata.FQN` is an empty string
-- **THEN** `Validate()` SHALL return a non-nil error
+- **THEN** `Validate()` SHALL return `nil` — FQN is populated in Phase 2, not Phase 1
 
 #### Scenario: Non-concrete CUE values do not cause validation failure
 - **WHEN** `Validate()` is called on a `Module` whose `Config` or `Values` CUE fields are not yet concrete
 - **THEN** `Validate()` SHALL return `nil` (structural fields are sufficient)
 
 ### Requirement: Module loader returns core.Module via AST inspection only
+
 The `internal/build/module` package SHALL expose a `Load(cueCtx *cue.Context, modulePath, registry string) (*core.Module, error)` function that constructs and returns a fully populated `*core.Module`. The function SHALL:
 - Construct a `core.Module{ModulePath: modulePath}`
 - Call `mod.ResolvePath()` and return its error if non-nil
@@ -60,7 +72,7 @@ The `internal/build/module` package SHALL expose a `Load(cueCtx *cue.Context, mo
 
 The function SHALL NOT fall back to CUE evaluation if AST inspection returns an empty `Metadata.Name`. Because `metadata.name!` is a mandatory required field in the CUE `#Module` schema, a module with a non-literal (computed) name is an unsupported authoring pattern. An empty name after AST inspection will be caught by `Validate()` as a fatal error.
 
-The following SHALL be removed from `internal/build/module/`:
+The following SHALL be absent from `internal/build/module/`:
 - The standalone `ResolvePath(modulePath string) (string, error)` function — superseded by `Module.ResolvePath()`
 - The `ExtractMetadata(cueCtx, modulePath, registry)` function — no longer needed
 - The `MetadataPreview` type — no longer needed
