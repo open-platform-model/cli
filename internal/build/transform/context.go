@@ -1,7 +1,6 @@
 package transform
 
 import (
-	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/core"
 )
 
@@ -32,16 +31,28 @@ type TransformerComponentMetadata struct {
 }
 
 // NewTransformerContext constructs the context for a transformer execution.
-func NewTransformerContext(rel *core.ModuleRelease, comp *component.Component) *TransformerContext {
+func NewTransformerContext(rel *core.ModuleRelease, comp *core.Component) *TransformerContext {
+	name := ""
+	labels := map[string]string{}
+	annotations := map[string]string{}
+	if comp.Metadata != nil {
+		name = comp.Metadata.Name
+		if comp.Metadata.Labels != nil {
+			labels = comp.Metadata.Labels
+		}
+		if comp.Metadata.Annotations != nil {
+			annotations = comp.Metadata.Annotations
+		}
+	}
 	return &TransformerContext{
 		Name:            rel.Metadata.Name,
 		Namespace:       rel.Metadata.Namespace,
 		ModuleMetadata:  rel.Module.Metadata,
 		ReleaseMetadata: rel.Metadata,
 		ComponentMetadata: &TransformerComponentMetadata{
-			Name:        comp.Name,
-			Labels:      comp.Labels,
-			Annotations: comp.Annotations,
+			Name:        name,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 	}
 }

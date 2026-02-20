@@ -33,62 +33,64 @@ This method SHALL NOT perform CUE evaluation. It is a filesystem-only check.
 
 ### Requirement: Module validates its own structural integrity
 
-`core.Module` SHALL expose a `Validate() error` receiver method that checks the module is structurally complete enough to proceed with release building. The method SHALL verify:
+`core.Module` SHALL expose a `Validate() error` receiver method that checks the module is structurally complete enough to proceed with release building. After this change, `Validate()` SHALL verify:
+
 - `Module.ModulePath` is non-empty
 - `Module.Metadata` is non-nil
 - `Module.Metadata.Name` is non-empty
+- `Module.Metadata.FQN` is non-empty (now available after CUE evaluation in `Load()`)
+- `mod.CUEValue().Exists()` returns `true`
 
-`Validate()` SHALL NOT check `Metadata.FQN`. FQN is computed by CUE evaluation during Phase 2 (`release.Build`) and is not available after AST inspection in Phase 1.
+`Validate()` SHALL NOT enforce CUE concreteness on `Config`, `Values`, or `Components`. It is a structural guard, not a CUE evaluation step.
 
-`Validate()` SHALL NOT enforce CUE concreteness on `Config` or `Values` fields. It is a structural guard, not a CUE evaluation step.
+> **Change from prior spec**: The prior requirement excluded FQN from `Validate()` because FQN was not available after Phase 1 (AST-only Load). With `Load()` now performing CUE evaluation, FQN is populated before `Validate()` is ever called, and the check is both safe and useful.
 
 #### Scenario: Fully populated Module passes validation
-- **WHEN** `Validate()` is called on a `Module` with non-empty `ModulePath`, non-nil `Metadata`, and non-empty `Metadata.Name`
+- **WHEN** `Validate()` is called on a `*core.Module` returned by `module.Load()` with a valid module
 - **THEN** `Validate()` SHALL return `nil`
 
-#### Scenario: Missing Metadata is rejected
-- **WHEN** `Validate()` is called on a `Module` with a `nil` `Metadata` field
+#### Scenario: Missing FQN is rejected
+- **WHEN** `Validate()` is called on a `Module` where `Metadata.FQN` is an empty string
 - **THEN** `Validate()` SHALL return a non-nil error
 
-#### Scenario: Empty Name is rejected
+#### Scenario: Zero CUEValue is rejected
+- **WHEN** `Validate()` is called on a `Module` where `mod.CUEValue().Exists()` returns `false`
+- **THEN** `Validate()` SHALL return a non-nil error indicating that `Load()` was not completed
+
+#### Scenario: Missing Metadata is rejected (unchanged)
+- **WHEN** `Validate()` is called on a `Module` with a nil `Metadata` field
+- **THEN** `Validate()` SHALL return a non-nil error
+
+#### Scenario: Empty Name is rejected (unchanged)
 - **WHEN** `Validate()` is called on a `Module` where `Metadata.Name` is an empty string
 - **THEN** `Validate()` SHALL return a non-nil error
 
-#### Scenario: FQN is not checked by Validate
-- **WHEN** `Validate()` is called on a `Module` where `Metadata.FQN` is an empty string
-- **THEN** `Validate()` SHALL return `nil` — FQN is populated in Phase 2, not Phase 1
+#### Scenario: Non-concrete CUE values do not cause validation failure (unchanged)
+- **WHEN** `Validate()` is called on a `Module` whose `Config` or `Values` CUE fields are not concrete
+- **THEN** `Validate()` SHALL return `nil`
 
-#### Scenario: Non-concrete CUE values do not cause validation failure
-- **WHEN** `Validate()` is called on a `Module` whose `Config` or `Values` CUE fields are not yet concrete
-- **THEN** `Validate()` SHALL return `nil` (structural fields are sufficient)
+### Requirement: Module loader performs AST inspection followed by CUE evaluation
 
-### Requirement: Module loader returns core.Module via AST inspection only
+`internal/build/module.Load()` SHALL perform two sequential phases and return a fully populated `*core.Module`:
 
-The `internal/build/module` package SHALL expose a `Load(cueCtx *cue.Context, modulePath, registry string) (*core.Module, error)` function that constructs and returns a fully populated `*core.Module`. The function SHALL:
-- Construct a `core.Module{ModulePath: modulePath}`
-- Call `mod.ResolvePath()` and return its error if non-nil
-- Perform AST inspection to populate `Metadata.Name`, `Metadata.DefaultNamespace`, and the internal package name field
-- Return the populated `*core.Module`
+1. **AST phase** (unchanged): call `mod.ResolvePath()`, run `load.Instances()`, walk `inst.Files` to extract `Metadata.Name`, `Metadata.DefaultNamespace`, and the internal package name field.
+2. **CUE evaluation phase** (new): call `cueCtx.BuildInstance(inst)` on the same instance from Phase 1 to obtain the base `cue.Value`; extract `Module.Config`, `Module.Values`, `Module.Components`, and the remaining `Module.Metadata` fields (`FQN`, `UUID`, `Version`, `Labels`) from the evaluated value.
 
-The function SHALL NOT fall back to CUE evaluation if AST inspection returns an empty `Metadata.Name`. Because `metadata.name!` is a mandatory required field in the CUE `#Module` schema, a module with a non-literal (computed) name is an unsupported authoring pattern. An empty name after AST inspection will be caught by `Validate()` as a fatal error.
+> **Change from prior spec**: The prior requirement was titled "Module loader returns core.Module via AST inspection only" and explicitly excluded CUE evaluation. That constraint is removed. `load.Instances()` is still called exactly once; its result is reused for both phases.
 
-The following SHALL be absent from `internal/build/module/`:
-- The standalone `ResolvePath(modulePath string) (string, error)` function — superseded by `Module.ResolvePath()`
-- The `ExtractMetadata(cueCtx, modulePath, registry)` function — no longer needed
-- The `MetadataPreview` type — no longer needed
+#### Scenario: Load returns Module with all Metadata fields populated
+- **WHEN** `module.Load()` is called with a valid module directory
+- **THEN** the returned `*core.Module` SHALL have `Metadata.Name` populated (from AST)
+- **AND** `Metadata.FQN` SHALL be populated (from CUE evaluation)
+- **AND** `Metadata.UUID` SHALL be populated (from CUE evaluation)
+- **AND** `Metadata.Version` SHALL be populated (from CUE evaluation)
 
-#### Scenario: Load returns populated Module with resolved path
-- **WHEN** `module.Load(cueCtx, "./my-module", registry)` is called with a valid module directory whose `metadata.name` is a string literal
-- **THEN** the returned `*core.Module` SHALL have `ModulePath` set to the absolute path of the module directory
-- **AND** `Metadata.Name` SHALL be populated from the module's `metadata.name` field
-- **AND** `Metadata.DefaultNamespace` SHALL be populated from `metadata.defaultNamespace` if present, or empty string if absent
-
-#### Scenario: Load propagates ResolvePath error
-- **WHEN** `module.Load(cueCtx, "/nonexistent", registry)` is called with an invalid path
-- **THEN** `Load()` SHALL return a non-nil error wrapping the resolution failure
+#### Scenario: Load propagates CUE evaluation error
+- **WHEN** `module.Load()` is called on a module with a CUE evaluation error
+- **THEN** `Load()` SHALL return a non-nil error
 - **AND** the returned `*core.Module` SHALL be `nil`
 
-#### Scenario: Module with computed name fails Validate after Load
-- **WHEN** `module.Load()` is called on a module where `metadata.name` is a computed CUE expression (not a string literal)
-- **THEN** `Load()` SHALL return a `*core.Module` with an empty `Metadata.Name`
-- **AND** the subsequent call to `mod.Validate()` SHALL return a non-nil error
+#### Scenario: Load propagates ResolvePath error (unchanged)
+- **WHEN** `module.Load()` is called with a non-existent or invalid module path
+- **THEN** `Load()` SHALL return a non-nil error wrapping the resolution failure
+- **AND** the returned `*core.Module` SHALL be `nil`

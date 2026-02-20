@@ -2,6 +2,20 @@
 // It depends only on stdlib and k8s.io/apimachinery — no CUE, no internal packages.
 package core
 
+import "github.com/google/uuid"
+
+// OPMNamespace is the UUID v5 namespace for computing deterministic release identities.
+// Derived as: uuid.NewSHA1(uuid.NameSpaceDNS, []byte("opmodel.dev")).String()
+// Matches the value in catalog/v0/core/common.cue.
+const OPMNamespace = "11bc6112-a6e8-4021-bec9-b3ad246f9466"
+
+// ComputeReleaseUUID computes a deterministic UUID v5 for a release using the OPM namespace.
+// The input string is fqn:name:namespace. Same inputs always produce the same UUID.
+func ComputeReleaseUUID(fqn, name, namespace string) string {
+	ns := uuid.MustParse(OPMNamespace)
+	return uuid.NewSHA1(ns, []byte(fqn+":"+name+":"+namespace)).String()
+}
+
 // OPM Kubernetes label keys applied to all managed resources.
 const (
 	// LabelManagedBy is the standard Kubernetes label indicating the manager.

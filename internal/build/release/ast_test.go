@@ -1,15 +1,12 @@
-package release
+package release_test
 
 import (
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/cuecontext"
-	"cuelang.org/go/cue/format"
-	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
 
 	"github.com/stretchr/testify/assert"
@@ -28,77 +25,6 @@ func testModulePath(t *testing.T, name string) string {
 	}
 	// Go up one level from release/ to build/ then into testdata/
 	return filepath.Join(filepath.Dir(filename), "..", "testdata", name)
-}
-
-// ---------------------------------------------------------------------------
-// TestGenerateOverlayAST_ProducesValidCUE
-// ---------------------------------------------------------------------------
-
-func TestGenerateOverlayAST_ProducesValidCUE(t *testing.T) {
-	overlay := generateOverlayAST("testmodule", Options{
-		Name:      "my-release",
-		Namespace: "production",
-	})
-
-	b, err := format.Node(overlay)
-	require.NoError(t, err, "format.Node should succeed")
-
-	// Should parse back without errors
-	_, err = parser.ParseFile("overlay.cue", b, parser.ParseComments)
-	require.NoError(t, err, "AST-generated overlay should produce parseable CUE")
-}
-
-// ---------------------------------------------------------------------------
-// TestGenerateOverlayAST_ContainsRequiredFields
-// ---------------------------------------------------------------------------
-
-func TestGenerateOverlayAST_ContainsRequiredFields(t *testing.T) {
-	overlay := generateOverlayAST("testmodule", Options{
-		Name:      "my-release",
-		Namespace: "production",
-	})
-
-	b, err := format.Node(overlay)
-	require.NoError(t, err)
-
-	file, err := parser.ParseFile("overlay.cue", b)
-	require.NoError(t, err)
-
-	// Find #opmReleaseMeta and collect its field names
-	var fieldNames []string
-	for _, decl := range file.Decls {
-		field, ok := decl.(*ast.Field)
-		if !ok {
-			continue
-		}
-		ident, ok := field.Label.(*ast.Ident)
-		if !ok || ident.Name != "#opmReleaseMeta" {
-			continue
-		}
-		structLit, ok := field.Value.(*ast.StructLit)
-		if !ok {
-			continue
-		}
-		for _, elt := range structLit.Elts {
-			innerField, ok := elt.(*ast.Field)
-			if !ok {
-				continue
-			}
-			switch label := innerField.Label.(type) {
-			case *ast.Ident:
-				fieldNames = append(fieldNames, label.Name)
-			case *ast.BasicLit:
-				fieldNames = append(fieldNames, strings.Trim(label.Value, `"`))
-			}
-		}
-	}
-
-	assert.Contains(t, fieldNames, "name")
-	assert.Contains(t, fieldNames, "namespace")
-	assert.Contains(t, fieldNames, "fqn")
-	assert.Contains(t, fieldNames, "version")
-	assert.Contains(t, fieldNames, "identity")
-	assert.Contains(t, fieldNames, "labels")
 }
 
 // ---------------------------------------------------------------------------

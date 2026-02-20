@@ -78,8 +78,12 @@ func (e *Executor) ExecuteWithTransformers(
 
 // executeJob executes a single transformer job.
 func (e *Executor) executeJob(job Job) JobResult {
+	compName := ""
+	if job.Component.Metadata != nil {
+		compName = job.Component.Metadata.Name
+	}
 	result := JobResult{
-		Component:   job.Component.Name,
+		Component:   compName,
 		Transformer: job.Transformer.FQN,
 		Resources:   make([]*unstructured.Unstructured, 0),
 	}
@@ -89,7 +93,7 @@ func (e *Executor) executeJob(job Job) JobResult {
 	transformValue := job.Transformer.Value.LookupPath(cue.ParsePath("#transform"))
 	if !transformValue.Exists() {
 		result.Error = &core.TransformError{
-			ComponentName:  job.Component.Name,
+			ComponentName:  compName,
 			TransformerFQN: job.Transformer.FQN,
 			Cause:          errMissingTransform,
 		}
@@ -100,7 +104,7 @@ func (e *Executor) executeJob(job Job) JobResult {
 	unified := transformValue.FillPath(cue.ParsePath("#component"), job.Component.Value)
 	if unified.Err() != nil {
 		result.Error = &core.TransformError{
-			ComponentName:  job.Component.Name,
+			ComponentName:  compName,
 			TransformerFQN: job.Transformer.FQN,
 			Cause:          unified.Err(),
 		}
@@ -119,7 +123,7 @@ func (e *Executor) executeJob(job Job) JobResult {
 
 	if unified.Err() != nil {
 		result.Error = &core.TransformError{
-			ComponentName:  job.Component.Name,
+			ComponentName:  compName,
 			TransformerFQN: job.Transformer.FQN,
 			Cause:          unified.Err(),
 		}
@@ -134,7 +138,7 @@ func (e *Executor) executeJob(job Job) JobResult {
 
 	if outputValue.Err() != nil {
 		result.Error = &core.TransformError{
-			ComponentName:  job.Component.Name,
+			ComponentName:  compName,
 			TransformerFQN: job.Transformer.FQN,
 			Cause:          outputValue.Err(),
 		}
@@ -146,13 +150,13 @@ func (e *Executor) executeJob(job Job) JobResult {
 	if outputValue.Kind() == cue.ListKind {
 		iter, err := outputValue.List()
 		if err != nil {
-			result.Error = &core.TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
+			result.Error = &core.TransformError{ComponentName: compName, TransformerFQN: job.Transformer.FQN, Cause: err}
 			return result
 		}
 		for iter.Next() {
 			obj, err := e.decodeResource(iter.Value())
 			if err != nil {
-				result.Error = &core.TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
+				result.Error = &core.TransformError{ComponentName: compName, TransformerFQN: job.Transformer.FQN, Cause: err}
 				return result
 			}
 			result.Resources = append(result.Resources, obj)
@@ -160,20 +164,20 @@ func (e *Executor) executeJob(job Job) JobResult {
 	} else if e.isSingleResource(outputValue) {
 		obj, err := e.decodeResource(outputValue)
 		if err != nil {
-			result.Error = &core.TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
+			result.Error = &core.TransformError{ComponentName: compName, TransformerFQN: job.Transformer.FQN, Cause: err}
 			return result
 		}
 		result.Resources = append(result.Resources, obj)
 	} else {
 		iter, err := outputValue.Fields()
 		if err != nil {
-			result.Error = &core.TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
+			result.Error = &core.TransformError{ComponentName: compName, TransformerFQN: job.Transformer.FQN, Cause: err}
 			return result
 		}
 		for iter.Next() {
 			obj, err := e.decodeResource(iter.Value())
 			if err != nil {
-				result.Error = &core.TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
+				result.Error = &core.TransformError{ComponentName: compName, TransformerFQN: job.Transformer.FQN, Cause: err}
 				return result
 			}
 			result.Resources = append(result.Resources, obj)

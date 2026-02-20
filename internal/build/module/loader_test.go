@@ -16,7 +16,8 @@ func TestExtractMetadataFromAST_NilFiles(t *testing.T) {
 }
 
 // TestLoad_ValidModule verifies that Load returns a populated *core.Module
-// with a resolved absolute path, metadata name, defaultNamespace, and pkgName.
+// with a resolved absolute path, metadata name, defaultNamespace, pkgName,
+// FQN, version, CUEValue, Config, Values, and Components.
 func TestLoad_ValidModule(t *testing.T) {
 	ctx := cuecontext.New()
 	// Use the test-module fixture from the build testdata directory.
@@ -28,11 +29,27 @@ func TestLoad_ValidModule(t *testing.T) {
 	require.NotNil(t, mod)
 	require.NotNil(t, mod.Metadata)
 
+	// From AST inspection
 	assert.Equal(t, "test-module", mod.Metadata.Name)
 	assert.Equal(t, "default", mod.Metadata.DefaultNamespace)
 	assert.Equal(t, "testmodule", mod.PkgName())
 	// ModulePath must be absolute after Load
 	assert.NotEmpty(t, mod.ModulePath)
+
+	// From full CUE evaluation (task 5.2-5.4)
+	assert.Equal(t, "example.com/test-module@v0#test-module", mod.Metadata.FQN, "FQN extracted from CUE eval")
+	assert.Equal(t, "1.0.0", mod.Metadata.Version, "version extracted from CUE eval")
+	assert.Equal(t, "a1b2c3d4-e5f6-7890-abcd-ef1234567890", mod.Metadata.UUID, "UUID extracted from metadata.uuid")
+
+	// CUEValue must be set
+	assert.True(t, mod.CUEValue().Exists(), "CUEValue must be set after Load")
+
+	// #config and values must be extracted
+	assert.True(t, mod.Config.Exists(), "#config must be extracted")
+	assert.True(t, mod.Values.Exists(), "values must be extracted")
+
+	// Components must be extracted (test-module has #components)
+	assert.NotEmpty(t, mod.Components, "#components must be extracted")
 }
 
 // TestLoad_InvalidPath verifies that Load returns an error for a non-existent directory.

@@ -93,6 +93,7 @@ type ComponentMetadata struct {
 ### Decision 7: release.Builder.Build() takes *core.Module, drops load.Instances()
 
 `Build(modulePath string, opts Options, valuesFiles []string)` becomes `Build(mod *core.Module, opts Options, valuesFiles []string)`. Inside `Build()`:
+
 - `mod.CUEValue()` provides the base `cue.Value` (already built by `Load()`)
 - User values files are loaded via `b.loadValuesFile()` and unified with the base value
 - Values are validated against `mod.Config` (already extracted by `Load()`)

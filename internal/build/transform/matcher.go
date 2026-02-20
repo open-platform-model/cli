@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/core"
 )
 
@@ -24,10 +23,10 @@ func NewMatcher() *Matcher {
 //   - Required traits: All FQNs must exist in component.#traits
 //   - Multiple transformers CAN match one component
 //   - Zero matches causes component to be unmatched
-func (m *Matcher) Match(components []*component.Component, transformers []*LoadedTransformer) *MatchResult {
+func (m *Matcher) Match(components []*core.Component, transformers []*LoadedTransformer) *MatchResult {
 	result := &MatchResult{
-		ByTransformer: make(map[string][]*component.Component),
-		Unmatched:     make([]*component.Component, 0),
+		ByTransformer: make(map[string][]*core.Component),
+		Unmatched:     make([]*core.Component, 0),
 		Details:       make([]MatchDetail, 0),
 	}
 
@@ -53,16 +52,25 @@ func (m *Matcher) Match(components []*component.Component, transformers []*Loade
 }
 
 // evaluateMatch checks if a transformer matches a component.
-func (m *Matcher) evaluateMatch(comp *component.Component, tf *LoadedTransformer) MatchDetail {
+func (m *Matcher) evaluateMatch(comp *core.Component, tf *LoadedTransformer) MatchDetail {
+	name := ""
+	if comp.Metadata != nil {
+		name = comp.Metadata.Name
+	}
+	labels := map[string]string{}
+	if comp.Metadata != nil && comp.Metadata.Labels != nil {
+		labels = comp.Metadata.Labels
+	}
+
 	detail := MatchDetail{
-		ComponentName:  comp.Name,
+		ComponentName:  name,
 		TransformerFQN: tf.FQN,
 		Matched:        true,
 	}
 
 	// Check required labels
 	for label, expectedValue := range tf.RequiredLabels {
-		actualValue, exists := comp.Labels[label]
+		actualValue, exists := labels[label]
 		if !exists || actualValue != expectedValue {
 			detail.Matched = false
 			if !exists {
@@ -164,16 +172,20 @@ func (r *MatchResult) ToMatchPlan() core.MatchPlan {
 
 	for tfFQN, components := range r.ByTransformer {
 		for _, comp := range components {
+			name := ""
+			if comp.Metadata != nil {
+				name = comp.Metadata.Name
+			}
 			reason := ""
 			for i := range r.Details {
 				detail := &r.Details[i]
-				if detail.ComponentName == comp.Name && detail.TransformerFQN == tfFQN && detail.Matched {
+				if detail.ComponentName == name && detail.TransformerFQN == tfFQN && detail.Matched {
 					reason = detail.Reason
 					break
 				}
 			}
 
-			matches[comp.Name] = append(matches[comp.Name], core.TransformerMatchOld{
+			matches[name] = append(matches[name], core.TransformerMatchOld{
 				TransformerFQN: tfFQN,
 				Reason:         reason,
 			})
@@ -182,7 +194,9 @@ func (r *MatchResult) ToMatchPlan() core.MatchPlan {
 
 	unmatched := make([]string, len(r.Unmatched))
 	for i, comp := range r.Unmatched {
-		unmatched[i] = comp.Name
+		if comp.Metadata != nil {
+			unmatched[i] = comp.Metadata.Name
+		}
 	}
 
 	return core.MatchPlan{

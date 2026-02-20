@@ -12,7 +12,6 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 
-	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/build/module"
 	"github.com/opmodel/cli/internal/build/release"
 	"github.com/opmodel/cli/internal/build/transform"
@@ -114,10 +113,9 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		return nil, &NamespaceRequiredError{ModuleName: mod.Metadata.Name}
 	}
 
-	rel, err := p.releaseBuilder.Build(mod.ModulePath, release.Options{
+	rel, err := p.releaseBuilder.Build(mod, release.Options{
 		Name:      releaseName,
 		Namespace: namespace,
-		PkgName:   mod.PkgName(),
 	}, opts.Values)
 	if err != nil {
 		return nil, err // Fatal: release building failed (likely incomplete values)
@@ -154,15 +152,19 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	}
 
 	// Phase 4: Match components to transformers
-	components := p.componentsToSlice(rel.Components)
+	components := componentsToSlice(rel.Components)
 	matchResult := p.matcher.Match(components, provider.Transformers)
 	matchPlan := matchResult.ToMatchPlan()
 
 	// Collect errors for unmatched components
 	var errs []error
 	for _, comp := range matchResult.Unmatched {
+		name := ""
+		if comp.Metadata != nil {
+			name = comp.Metadata.Name
+		}
 		errs = append(errs, &UnmatchedComponentError{
-			ComponentName: comp.Name,
+			ComponentName: name,
 			Available:     provider.Requirements(),
 		})
 	}
@@ -230,32 +232,11 @@ func (p *pipeline) resolveNamespace(flagValue, defaultNamespace string) string {
 	return defaultNamespace
 }
 
-// componentsToSlice converts a map of core.Component to a slice of build/component.Component
-// for use by the matcher and executor. This conversion is a temporary bridge until the
-// core-component consolidation change unifies these two types.
-func (p *pipeline) componentsToSlice(m map[string]*core.Component) []*component.Component {
-	result := make([]*component.Component, 0, len(m))
+// componentsToSlice converts a map of core.Component to a slice for use by the matcher and executor.
+func componentsToSlice(m map[string]*core.Component) []*core.Component {
+	result := make([]*core.Component, 0, len(m))
 	for _, comp := range m {
-		name := ""
-		labels := map[string]string{}
-		annotations := map[string]string{}
-		if comp.Metadata != nil {
-			name = comp.Metadata.Name
-			if comp.Metadata.Labels != nil {
-				labels = comp.Metadata.Labels
-			}
-			if comp.Metadata.Annotations != nil {
-				annotations = comp.Metadata.Annotations
-			}
-		}
-		result = append(result, &component.Component{
-			Name:        name,
-			Labels:      labels,
-			Annotations: annotations,
-			Resources:   comp.Resources,
-			Traits:      comp.Traits,
-			Value:       comp.Value,
-		})
+		result = append(result, comp)
 	}
 	return result
 }

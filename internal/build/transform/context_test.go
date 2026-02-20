@@ -6,7 +6,6 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/core"
 )
 
@@ -29,9 +28,11 @@ func TestNewTransformerContext(t *testing.T) {
 		},
 	}
 
-	comp := &component.Component{
-		Name:   "webapp",
-		Labels: map[string]string{"workload-type": "stateless"},
+	comp := &core.Component{
+		Metadata: &core.ComponentMetadata{
+			Name:   "webapp",
+			Labels: map[string]string{"workload-type": "stateless"},
+		},
 		Resources: map[string]cue.Value{
 			"Container": {},
 		},
@@ -75,12 +76,14 @@ func TestNewTransformerContext_NameOverride(t *testing.T) {
 		},
 	}
 
-	comp := &component.Component{
-		Name:        "api",
-		Labels:      map[string]string{},
-		Annotations: map[string]string{},
-		Resources:   map[string]cue.Value{},
-		Traits:      map[string]cue.Value{},
+	comp := &core.Component{
+		Metadata: &core.ComponentMetadata{
+			Name:        "api",
+			Labels:      map[string]string{},
+			Annotations: map[string]string{},
+		},
+		Resources: map[string]cue.Value{},
+		Traits:    map[string]cue.Value{},
 	}
 
 	ctx := NewTransformerContext(rel, comp)

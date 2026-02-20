@@ -5,6 +5,7 @@ metadata: {
 	name:             "test-module"
 	version:          "1.0.0"
 	fqn:              "example.com/test-module@v0#test-module"
+	uuid:             "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 	defaultNamespace: "default"
 	labels: {
 		"module.opmodel.dev/name":    metadata.name

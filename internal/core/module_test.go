@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -82,17 +84,23 @@ func TestModule_ResolvePath_MutatesModulePath(t *testing.T) {
 
 // --- Validate tests ---
 
-func validModule(modulePath string) *Module {
-	return &Module{
+func validModule(t *testing.T, modulePath string) *Module {
+	t.Helper()
+	ctx := cuecontext.New()
+	val := ctx.CompileString(`{}`)
+	mod := &Module{
 		ModulePath: modulePath,
 		Metadata: &ModuleMetadata{
 			Name: "my-module",
+			FQN:  "example.com/my-module@v0#my-module",
 		},
 	}
+	mod.SetCUEValue(val)
+	return mod
 }
 
 func TestModule_Validate_FullyPopulatedPasses(t *testing.T) {
-	mod := validModule("/some/path")
+	mod := validModule(t, "/some/path")
 	assert.NoError(t, mod.Validate())
 }
 
@@ -104,32 +112,34 @@ func TestModule_Validate_NilMetadataFails(t *testing.T) {
 }
 
 func TestModule_Validate_EmptyModulePathFails(t *testing.T) {
-	mod := validModule("")
+	mod := validModule(t, "")
 	err := mod.Validate()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "module path is empty")
 }
 
 func TestModule_Validate_EmptyNameFails(t *testing.T) {
-	mod := validModule("/some/path")
+	mod := validModule(t, "/some/path")
 	mod.Metadata.Name = ""
 	err := mod.Validate()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "metadata.name is empty")
 }
 
-func TestModule_Validate_FQNNotChecked(t *testing.T) {
-	// FQN is computed during Phase 2 (CUE evaluation) and is not available after
-	// AST inspection. Validate() must NOT check FQN.
-	mod := validModule("/some/path")
-	mod.Metadata.FQN = "" // explicitly empty — should still pass
-	assert.NoError(t, mod.Validate())
+func TestModule_Validate_EmptyFQNFails(t *testing.T) {
+	// FQN is now extracted during Load() (full CUE evaluation). Validate() checks it.
+	mod := validModule(t, "/some/path")
+	mod.Metadata.FQN = "" // explicitly empty — should fail
+	err := mod.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "fqn is empty")
 }
 
-func TestModule_Validate_NonConcreteCUEValuePasses(t *testing.T) {
-	// Validate() must NOT check CUE concreteness — Config/Values may be abstract
-	// at the end of PREPARATION phase. A zero-value cue.Value (not concrete) must pass.
-	mod := validModule("/some/path")
-	// Config and Values are zero-value cue.Value (not concrete) by default
-	assert.NoError(t, mod.Validate())
+func TestModule_Validate_ZeroCUEValueFails(t *testing.T) {
+	// CUEValue must be set by module.Load(). A zero value means Load() was not called.
+	mod := validModule(t, "/some/path")
+	mod.SetCUEValue(cue.Value{}) // reset to zero value
+	err := mod.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "CUE value is not set")
 }

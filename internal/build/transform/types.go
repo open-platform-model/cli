@@ -4,14 +4,13 @@ package transform
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/core"
 )
 
 // Job is a unit of work: one transformer applied to one component.
 type Job struct {
 	Transformer *LoadedTransformer
-	Component   *component.Component
+	Component   *core.Component
 	Release     *core.ModuleRelease
 }
 
@@ -32,10 +31,10 @@ type ExecuteResult struct {
 // MatchResult is the internal result of matching.
 type MatchResult struct {
 	// ByTransformer groups components by transformer FQN.
-	ByTransformer map[string][]*component.Component
+	ByTransformer map[string][]*core.Component
 
 	// Unmatched contains components with no matching transformers.
-	Unmatched []*component.Component
+	Unmatched []*core.Component
 
 	// Details records matching decisions for verbose output.
 	Details []MatchDetail

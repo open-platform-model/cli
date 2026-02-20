@@ -6,15 +6,23 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/opmodel/cli/internal/build/component"
+	"github.com/opmodel/cli/internal/core"
 )
+
+func newTestComponent(name string, labels map[string]string) *core.Component {
+	return &core.Component{
+		Metadata:  &core.ComponentMetadata{Name: name, Labels: labels, Annotations: map[string]string{}},
+		Resources: make(map[string]cue.Value),
+		Traits:    make(map[string]cue.Value),
+	}
+}
 
 func TestMatcher_Match(t *testing.T) {
 	matcher := NewMatcher()
 
 	tests := []struct {
 		name          string
-		components    []*component.Component
+		components    []*core.Component
 		transformers  []*LoadedTransformer
 		wantMatched   int
 		wantUnmatched int
@@ -28,8 +36,8 @@ func TestMatcher_Match(t *testing.T) {
 		},
 		{
 			name: "no transformers - all unmatched",
-			components: []*component.Component{
-				{Name: "comp1", Labels: map[string]string{}, Resources: make(map[string]cue.Value), Traits: make(map[string]cue.Value)},
+			components: []*core.Component{
+				newTestComponent("comp1", map[string]string{}),
 			},
 			transformers:  nil,
 			wantMatched:   0,
@@ -37,13 +45,8 @@ func TestMatcher_Match(t *testing.T) {
 		},
 		{
 			name: "matching by required labels",
-			components: []*component.Component{
-				{
-					Name:      "webapp",
-					Labels:    map[string]string{"workload-type": "stateless"},
-					Resources: make(map[string]cue.Value),
-					Traits:    make(map[string]cue.Value),
-				},
+			components: []*core.Component{
+				newTestComponent("webapp", map[string]string{"workload-type": "stateless"}),
 			},
 			transformers: []*LoadedTransformer{
 				{
@@ -57,13 +60,8 @@ func TestMatcher_Match(t *testing.T) {
 		},
 		{
 			name: "not matching - missing required label",
-			components: []*component.Component{
-				{
-					Name:      "webapp",
-					Labels:    map[string]string{},
-					Resources: make(map[string]cue.Value),
-					Traits:    make(map[string]cue.Value),
-				},
+			components: []*core.Component{
+				newTestComponent("webapp", map[string]string{}),
 			},
 			transformers: []*LoadedTransformer{
 				{
@@ -77,13 +75,8 @@ func TestMatcher_Match(t *testing.T) {
 		},
 		{
 			name: "not matching - wrong label value",
-			components: []*component.Component{
-				{
-					Name:      "webapp",
-					Labels:    map[string]string{"workload-type": "stateful"},
-					Resources: make(map[string]cue.Value),
-					Traits:    make(map[string]cue.Value),
-				},
+			components: []*core.Component{
+				newTestComponent("webapp", map[string]string{"workload-type": "stateful"}),
 			},
 			transformers: []*LoadedTransformer{
 				{
@@ -115,13 +108,13 @@ func TestMatcher_Match(t *testing.T) {
 
 func TestMatchResult_ToMatchPlan(t *testing.T) {
 	result := &MatchResult{
-		ByTransformer: map[string][]*component.Component{
+		ByTransformer: map[string][]*core.Component{
 			"test#DeploymentTransformer": {
-				{Name: "webapp"},
+				{Metadata: &core.ComponentMetadata{Name: "webapp"}},
 			},
 		},
-		Unmatched: []*component.Component{
-			{Name: "unmatched-comp"},
+		Unmatched: []*core.Component{
+			{Metadata: &core.ComponentMetadata{Name: "unmatched-comp"}},
 		},
 		Details: []MatchDetail{
 			{

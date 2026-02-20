@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/core"
 )
 
@@ -50,13 +49,15 @@ func TestExecuteJob_SingleResource(t *testing.T) {
 			FQN:   "test/transformers#DeploymentTransformer",
 			Value: transformerCUE,
 		},
-		Component: &component.Component{
-			Name:        "web",
-			Labels:      map[string]string{},
-			Annotations: map[string]string{},
-			Resources:   map[string]cue.Value{},
-			Traits:      map[string]cue.Value{},
-			Value:       componentCUE,
+		Component: &core.Component{
+			Metadata: &core.ComponentMetadata{
+				Name:        "web",
+				Labels:      map[string]string{},
+				Annotations: map[string]string{},
+			},
+			Resources: map[string]cue.Value{},
+			Traits:    map[string]cue.Value{},
+			Value:     componentCUE,
 		},
 		Release: &core.ModuleRelease{
 			Metadata: &core.ReleaseMetadata{
@@ -135,13 +136,15 @@ func TestExecuteJob_MapOutput(t *testing.T) {
 			FQN:   "test/transformers#PVCTransformer",
 			Value: transformerCUE,
 		},
-		Component: &component.Component{
-			Name:        "storage",
-			Labels:      map[string]string{},
-			Annotations: map[string]string{"transformer.opmodel.dev/list-output": "true"},
-			Resources:   map[string]cue.Value{},
-			Traits:      map[string]cue.Value{},
-			Value:       componentCUE,
+		Component: &core.Component{
+			Metadata: &core.ComponentMetadata{
+				Name:        "storage",
+				Labels:      map[string]string{},
+				Annotations: map[string]string{"transformer.opmodel.dev/list-output": "true"},
+			},
+			Resources: map[string]cue.Value{},
+			Traits:    map[string]cue.Value{},
+			Value:     componentCUE,
 		},
 		Release: &core.ModuleRelease{
 			Metadata: &core.ReleaseMetadata{

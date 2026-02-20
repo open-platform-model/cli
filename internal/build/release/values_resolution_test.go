@@ -1,51 +1,36 @@
-package release
+package release_test
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	buildmodule "github.com/opmodel/cli/internal/build/module"
+	"github.com/opmodel/cli/internal/build/release"
 )
-
-// testdataDir returns the absolute path to a testdata fixture directory.
-// Points to the testdata directory in the parent build package.
-func testdataDir(t *testing.T, name string) string {
-	t.Helper()
-	return testModulePath(t, name)
-}
-
-// testdataFile returns the absolute path to a testdata file.
-// Points to a file in the testdata directory of the parent build package.
-func testdataFile(t *testing.T, name string) string {
-	t.Helper()
-	return testModulePath(t, name)
-}
 
 // ----- Builder.Build() tests -----
 
 func TestBuild_StubsValuesCue_WhenValuesFlagsProvided(t *testing.T) {
 	// When valuesFiles are passed to Build() and values.cue exists on disk,
-	// the on-disk values.cue should be replaced with a stub so the external
-	// values take precedence without conflict.
+	// the external values take precedence (loaded via loadValuesFile).
 	//
 	// Uses test-module-values-only where values are ONLY in values.cue
-	// (not duplicated in module.cue), so the stub effectively removes them.
+	// (not duplicated in module.cue), so the module has no values.cue
+	// pre-loaded — external files take full precedence.
 	cueCtx := cuecontext.New()
-	b := NewBuilder(cueCtx, "")
-	dir := testdataDir(t, "test-module-values-only")
-	valuesFile := testdataFile(t, "external-values.cue")
+	b := release.NewBuilder(cueCtx, "")
+	dir := testModulePath(t, "test-module-values-only")
+	valuesFile := testModulePath(t, "external-values.cue")
 
-	// Verify values.cue exists on disk (precondition)
-	_, err := os.Stat(filepath.Join(dir, "values.cue"))
-	require.NoError(t, err, "precondition: values.cue should exist on disk")
+	mod, err := buildmodule.Load(cueCtx, dir, "")
+	require.NoError(t, err, "module.Load should succeed")
 
-	rel, err := b.Build(dir, Options{
+	rel, err := b.Build(mod, release.Options{
 		Name:      "test-release",
 		Namespace: "default",
-		PkgName:   "testmodule",
 	}, []string{valuesFile})
 	require.NoError(t, err)
 	assert.NotNil(t, rel)
@@ -60,14 +45,16 @@ func TestBuild_NoValuesCue_WithValuesFlag_Succeeds(t *testing.T) {
 	// Build() should succeed for a module without values.cue when external
 	// values files are provided.
 	cueCtx := cuecontext.New()
-	b := NewBuilder(cueCtx, "")
-	dir := testdataDir(t, "test-module-no-values")
-	valuesFile := testdataFile(t, "external-values.cue")
+	b := release.NewBuilder(cueCtx, "")
+	dir := testModulePath(t, "test-module-no-values")
+	valuesFile := testModulePath(t, "external-values.cue")
 
-	rel, err := b.Build(dir, Options{
+	mod, err := buildmodule.Load(cueCtx, dir, "")
+	require.NoError(t, err, "module.Load should succeed")
+
+	rel, err := b.Build(mod, release.Options{
 		Name:      "test-release",
 		Namespace: "default",
-		PkgName:   "testmodule",
 	}, []string{valuesFile})
 	require.NoError(t, err)
 	assert.NotNil(t, rel)
@@ -82,13 +69,15 @@ func TestBuild_WithValuesCue_NoValuesFlag_Succeeds(t *testing.T) {
 	// Build() with values.cue on disk and no --values flags should
 	// work exactly as before (regression test).
 	cueCtx := cuecontext.New()
-	b := NewBuilder(cueCtx, "")
-	dir := testdataDir(t, "test-module")
+	b := release.NewBuilder(cueCtx, "")
+	dir := testModulePath(t, "test-module")
 
-	rel, err := b.Build(dir, Options{
+	mod, err := buildmodule.Load(cueCtx, dir, "")
+	require.NoError(t, err, "module.Load should succeed")
+
+	rel, err := b.Build(mod, release.Options{
 		Name:      "test-release",
 		Namespace: "default",
-		PkgName:   "testmodule",
 	}, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, rel)
@@ -97,4 +86,24 @@ func TestBuild_WithValuesCue_NoValuesFlag_Succeeds(t *testing.T) {
 	assert.Equal(t, "example.com/test-module@v0#test-module", rel.Module.Metadata.FQN)
 	assert.Equal(t, "1.0.0", rel.Module.Metadata.Version)
 	assert.Equal(t, "default", rel.Module.Metadata.DefaultNamespace)
+}
+
+func TestBuild_DeterministicReleaseUUID(t *testing.T) {
+	// Build() should produce a deterministic release UUID based on
+	// (fqn, name, namespace) via core.ComputeReleaseUUID.
+	cueCtx := cuecontext.New()
+	b := release.NewBuilder(cueCtx, "")
+	dir := testModulePath(t, "test-module")
+
+	mod, err := buildmodule.Load(cueCtx, dir, "")
+	require.NoError(t, err)
+
+	rel1, err := b.Build(mod, release.Options{Name: "my-release", Namespace: "prod"}, nil)
+	require.NoError(t, err)
+
+	rel2, err := b.Build(mod, release.Options{Name: "my-release", Namespace: "prod"}, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, rel1.Metadata.UUID, rel2.Metadata.UUID, "same inputs should produce same UUID")
+	assert.NotEmpty(t, rel1.Metadata.UUID, "UUID should not be empty")
 }

@@ -1,4 +1,4 @@
-package release
+package release_test
 
 import (
 	"testing"
@@ -6,6 +6,8 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/opmodel/cli/internal/core"
 )
 
 func TestExtractComponent_WithAnnotations(t *testing.T) {
@@ -19,11 +21,14 @@ func TestExtractComponent_WithAnnotations(t *testing.T) {
 		{
 			name: "component with list-output annotation",
 			cue: `{
-				metadata: {
-					name: "volumes-component"
-					annotations: {
-						"transformer.opmodel.dev/list-output": "true"
+				comp: {
+					metadata: {
+						name: "volumes-component"
+						annotations: {
+							"transformer.opmodel.dev/list-output": "true"
+						}
 					}
+					#resources: { r: {} }
 				}
 			}`,
 			expectedAnnotations: map[string]string{
@@ -33,8 +38,11 @@ func TestExtractComponent_WithAnnotations(t *testing.T) {
 		{
 			name: "component without annotations",
 			cue: `{
-				metadata: {
-					name: "simple-component"
+				comp: {
+					metadata: {
+						name: "simple-component"
+					}
+					#resources: { r: {} }
 				}
 			}`,
 			expectedAnnotations: map[string]string{},
@@ -42,11 +50,14 @@ func TestExtractComponent_WithAnnotations(t *testing.T) {
 		{
 			name: "component with false annotation",
 			cue: `{
-				metadata: {
-					name: "single-output-component"
-					annotations: {
-						"transformer.opmodel.dev/list-output": "false"
+				comp: {
+					metadata: {
+						name: "single-output-component"
+						annotations: {
+							"transformer.opmodel.dev/list-output": "false"
+						}
 					}
+					#resources: { r: {} }
 				}
 			}`,
 			expectedAnnotations: map[string]string{
@@ -56,11 +67,14 @@ func TestExtractComponent_WithAnnotations(t *testing.T) {
 		{
 			name: "component with string annotation",
 			cue: `{
-				metadata: {
-					name: "annotated-component"
-					annotations: {
-						"example.com/owner": "platform-team"
+				comp: {
+					metadata: {
+						name: "annotated-component"
+						annotations: {
+							"example.com/owner": "platform-team"
+						}
 					}
+					#resources: { r: {} }
 				}
 			}`,
 			expectedAnnotations: map[string]string{
@@ -70,12 +84,15 @@ func TestExtractComponent_WithAnnotations(t *testing.T) {
 		{
 			name: "component with multiple annotations",
 			cue: `{
-				metadata: {
-					name: "multi-annotated"
-					annotations: {
-						"transformer.opmodel.dev/list-output": "true"
-						"example.com/owner": "platform-team"
+				comp: {
+					metadata: {
+						name: "multi-annotated"
+						annotations: {
+							"transformer.opmodel.dev/list-output": "true"
+							"example.com/owner": "platform-team"
+						}
 					}
+					#resources: { r: {} }
 				}
 			}`,
 			expectedAnnotations: map[string]string{
@@ -90,10 +107,15 @@ func TestExtractComponent_WithAnnotations(t *testing.T) {
 			value := ctx.CompileString(tt.cue)
 			require.NoError(t, value.Err())
 
-			comp := extractComponent("test", value)
+			components, err := core.ExtractComponents(value)
+			require.NoError(t, err)
+			require.Len(t, components, 1)
 
-			assert.NotNil(t, comp.Annotations, "Annotations should not be nil")
-			assert.Equal(t, tt.expectedAnnotations, comp.Annotations)
+			comp := components["comp"]
+			require.NotNil(t, comp)
+			require.NotNil(t, comp.Metadata)
+			assert.NotNil(t, comp.Metadata.Annotations, "Annotations should not be nil")
+			assert.Equal(t, tt.expectedAnnotations, comp.Metadata.Annotations)
 		})
 	}
 }
