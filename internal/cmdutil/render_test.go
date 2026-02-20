@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/core"
 	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,11 +37,11 @@ func TestResolveModulePath_Arg(t *testing.T) {
 func TestShowRenderOutput_WithErrors(t *testing.T) {
 	// Create a RenderResult with errors
 	result := &build.RenderResult{
-		Release: build.ReleaseMetadata{
+		Release: core.ReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",
 		},
-		Module: build.ModuleMetadata{
+		Module: core.ModuleMetadata{
 			Name: "test-module",
 		},
 		Errors: []error{
@@ -63,15 +64,15 @@ func TestShowRenderOutput_WithErrors(t *testing.T) {
 func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 	// Create a RenderResult with no errors
 	result := &build.RenderResult{
-		Release: build.ReleaseMetadata{
+		Release: core.ReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",
 		},
-		Module: build.ModuleMetadata{
+		Module: core.ModuleMetadata{
 			Name: "test-module",
 		},
-		MatchPlan: build.MatchPlan{
-			Matches: map[string][]build.TransformerMatch{
+		MatchPlan: core.MatchPlan{
+			Matches: map[string][]core.TransformerMatchOld{
 				"web": {
 					{
 						TransformerFQN: "example.com/transformers@v1#DeploymentTransformer",
@@ -80,7 +81,7 @@ func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 				},
 			},
 		},
-		Resources: []*build.Resource{},
+		Resources: []*core.Resource{},
 		Errors:    []error{},
 	}
 
@@ -93,17 +94,17 @@ func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 func TestShowRenderOutput_Warnings(t *testing.T) {
 	// Create a RenderResult with warnings
 	result := &build.RenderResult{
-		Release: build.ReleaseMetadata{
+		Release: core.ReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",
 		},
-		Module: build.ModuleMetadata{
+		Module: core.ModuleMetadata{
 			Name: "test-module",
 		},
-		MatchPlan: build.MatchPlan{
-			Matches: map[string][]build.TransformerMatch{},
+		MatchPlan: core.MatchPlan{
+			Matches: map[string][]core.TransformerMatchOld{},
 		},
-		Resources: []*build.Resource{},
+		Resources: []*core.Resource{},
 		Errors:    []error{},
 		Warnings:  []string{"deprecated transformer used", "unused values"},
 	}

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/core"
 )
 
 // --- 8.1 / 8.2: Integration test for diff showing modifications ---
@@ -35,10 +35,10 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 		"key": "original-value",
 	}
 
-	resources := []*build.Resource{
+	resources := []*core.Resource{
 		{Object: cm, Component: "test-component"},
 	}
-	meta := build.ReleaseMetadata{
+	meta := core.ReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 	}
@@ -53,7 +53,7 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 	modifiedCM.Object["data"] = map[string]interface{}{
 		"key": "modified-value",
 	}
-	modifiedResources := []*build.Resource{
+	modifiedResources := []*core.Resource{
 		{Object: modifiedCM, Component: "test-component"},
 	}
 
@@ -94,10 +94,10 @@ func TestDiffIntegration_ApplyThenDiffShowsNoDifferences(t *testing.T) {
 		"key": "value",
 	}
 
-	resources := []*build.Resource{
+	resources := []*core.Resource{
 		{Object: cm, Component: "test-component"},
 	}
-	meta := build.ReleaseMetadata{
+	meta := core.ReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 	}
@@ -144,10 +144,10 @@ func TestStatusIntegration_ReportsHealth(t *testing.T) {
 		"key": "value",
 	}
 
-	resources := []*build.Resource{
+	resources := []*core.Resource{
 		{Object: cm, Component: "test-component"},
 	}
-	meta := build.ReleaseMetadata{
+	meta := core.ReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 	}
@@ -196,10 +196,10 @@ func TestDiffIntegration_AllAdditions(t *testing.T) {
 		"key": "value",
 	}
 
-	resources := []*build.Resource{
+	resources := []*core.Resource{
 		{Object: cm, Component: "test-component"},
 	}
-	meta := build.ReleaseMetadata{
+	meta := core.ReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 	}

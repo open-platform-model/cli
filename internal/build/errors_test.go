@@ -7,12 +7,13 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/opmodel/cli/internal/build/transform"
+	"github.com/opmodel/cli/internal/core"
 )
 
 func TestUnmatchedComponentError(t *testing.T) {
 	err := &UnmatchedComponentError{
 		ComponentName: "web-server",
-		Available: []transform.TransformerRequirements{
+		Available: []core.TransformerRequirements{
 			&transform.LoadedTransformer{
 				FQN:            "opmodel.dev/transformers/kubernetes@v0#DeploymentTransformer",
 				RequiredLabels: map[string]string{"workload-type": "stateless"},
@@ -37,7 +38,7 @@ func TestUnmatchedComponentError(t *testing.T) {
 
 func TestTransformError(t *testing.T) {
 	cause := errors.New("CUE evaluation failed: field not found")
-	err := &TransformError{
+	err := &core.TransformError{
 		ComponentName:  "database",
 		TransformerFQN: "opmodel.dev/transformers/kubernetes@v0#StatefulsetTransformer",
 		Cause:          cause,
@@ -67,16 +68,16 @@ func TestTransformError(t *testing.T) {
 func TestRenderErrorInterface(t *testing.T) {
 	// Verify all error types implement RenderError at compile time
 	var _ RenderError = (*UnmatchedComponentError)(nil)
-	var _ RenderError = (*TransformError)(nil)
+	var _ RenderError = (*core.TransformError)(nil)
 
 	// Also verify they implement the standard error interface
 	var _ error = (*UnmatchedComponentError)(nil)
-	var _ error = (*TransformError)(nil)
+	var _ error = (*core.TransformError)(nil)
 }
 
 func TestReleaseValidationError(t *testing.T) {
 	t.Run("message only", func(t *testing.T) {
-		err := &ReleaseValidationError{
+		err := &core.ValidationError{
 			Message: "module missing 'values' field",
 		}
 		assert.Equal(t, "release validation failed: module missing 'values' field", err.Error())
@@ -85,7 +86,7 @@ func TestReleaseValidationError(t *testing.T) {
 
 	t.Run("with cause", func(t *testing.T) {
 		cause := errors.New("some underlying error")
-		err := &ReleaseValidationError{
+		err := &core.ValidationError{
 			Message: "failed to inject values",
 			Cause:   cause,
 		}
@@ -95,7 +96,7 @@ func TestReleaseValidationError(t *testing.T) {
 	})
 
 	t.Run("with details", func(t *testing.T) {
-		err := &ReleaseValidationError{
+		err := &core.ValidationError{
 			Message: "failed to inject values",
 			Cause:   errors.New("dummy"),
 			Details: "values.foo: conflicting values\n    ./test.cue:1:5",

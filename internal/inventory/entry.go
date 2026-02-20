@@ -1,13 +1,13 @@
 package inventory
 
 import (
-	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/core"
 )
 
-// NewEntryFromResource constructs an InventoryEntry from a rendered *build.Resource.
+// NewEntryFromResource constructs an InventoryEntry from a rendered *core.Resource.
 // Group and Kind come from the GVK, Version from the GVK's Version field,
-// Namespace and Name from the resource metadata, Component from build.Resource.Component.
-func NewEntryFromResource(r *build.Resource) InventoryEntry {
+// Namespace and Name from the resource metadata, Component from core.Resource.Component.
+func NewEntryFromResource(r *core.Resource) InventoryEntry {
 	gvk := r.GVK()
 	return InventoryEntry{
 		Group:     gvk.Group,

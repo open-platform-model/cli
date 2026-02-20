@@ -1,6 +1,6 @@
-// Package weights provides resource ordering weights for Kubernetes resources.
+// Resource ordering weights for Kubernetes resources.
 // Resources with lower weights are applied first.
-package weights
+package core
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"

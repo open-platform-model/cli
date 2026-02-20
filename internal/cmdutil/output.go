@@ -6,15 +6,16 @@ import (
 	"strings"
 
 	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/output"
 )
 
 // PrintValidationError prints a render/validation error in a user-friendly format.
-// When the error is a ReleaseValidationError with CUE details, it prints a short
+// When the error is a ValidationError with CUE details, it prints a short
 // summary line followed by the structured CUE error output (matching `cue vet` style).
 // For other errors, it falls back to the standard key-value log format.
 func PrintValidationError(msg string, err error) {
-	var releaseErr *build.ReleaseValidationError
+	var releaseErr *core.ValidationError
 	if errors.As(err, &releaseErr) && releaseErr.Details != "" {
 		output.Error(fmt.Sprintf("%s: %s", msg, releaseErr.Message))
 		// Print CUE details as plain text to stderr for readable multi-line output
@@ -29,7 +30,7 @@ func PrintRenderErrors(errs []error) {
 	output.Error("render completed with errors")
 	for _, err := range errs {
 		var unmatchedErr *build.UnmatchedComponentError
-		var transformErr *build.TransformError
+		var transformErr *core.TransformError
 
 		switch {
 		case errors.As(err, &unmatchedErr):

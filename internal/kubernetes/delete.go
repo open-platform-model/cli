@@ -9,8 +9,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/pkg/weights"
 )
 
 // DeleteOptions configures a delete operation.
@@ -153,8 +153,8 @@ func deleteResource(ctx context.Context, client *Client, obj *unstructured.Unstr
 // sortByWeightDescending sorts resources by weight in descending order (for deletion).
 func sortByWeightDescending(resources []*unstructured.Unstructured) {
 	sort.SliceStable(resources, func(i, j int) bool {
-		wi := weights.GetWeight(resources[i].GroupVersionKind())
-		wj := weights.GetWeight(resources[j].GroupVersionKind())
+		wi := core.GetWeight(resources[i].GroupVersionKind())
+		wj := core.GetWeight(resources[j].GroupVersionKind())
 		return wi > wj
 	})
 }

@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 )
@@ -268,7 +268,7 @@ func main() {
 	badNS := "nonexistent-ns-opm-test"
 	goodResource := buildCM("cm-a", namespace)
 	badResource := buildCM("cm-bad", badNS)
-	mixedResources := []*build.Resource{goodResource, badResource}
+	mixedResources := []*core.Resource{goodResource, badResource}
 
 	applyResult59, applyErr59 := kubernetes.Apply(ctx, client, mixedResources, meta, kubernetes.ApplyOptions{})
 	// Either the call itself errors or individual resources in Errors slice.
@@ -335,12 +335,12 @@ func opmLabels() map[string]interface{} {
 	}
 }
 
-// buildCM builds a single ConfigMap build.Resource.
-func buildCM(name, ns string) *build.Resource {
+// buildCM builds a single ConfigMap core.Resource.
+func buildCM(name, ns string) *core.Resource {
 	labels := opmLabels()
 	labels["component.opmodel.dev/name"] = "config"
 
-	return &build.Resource{
+	return &core.Resource{
 		Object: &unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
@@ -358,8 +358,8 @@ func buildCM(name, ns string) *build.Resource {
 }
 
 // buildResources builds a slice of ConfigMap resources in the test namespace.
-func buildResources(names []string) []*build.Resource {
-	res := make([]*build.Resource, len(names))
+func buildResources(names []string) []*core.Resource {
+	res := make([]*core.Resource, len(names))
 	for i, name := range names {
 		res[i] = buildCM(name, namespace)
 	}
@@ -367,16 +367,16 @@ func buildResources(names []string) []*build.Resource {
 }
 
 // moduleMeta returns the ReleaseMetadata for the test release.
-func moduleMeta() build.ReleaseMetadata {
-	return build.ReleaseMetadata{
+func moduleMeta() core.ReleaseMetadata {
+	return core.ReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 		UUID:      releaseID,
 	}
 }
 
-// entriesToWrite converts build.Resources to InventoryEntry slice.
-func entriesToWrite(resources []*build.Resource) []inventory.InventoryEntry {
+// entriesToWrite converts core.Resources to InventoryEntry slice.
+func entriesToWrite(resources []*core.Resource) []inventory.InventoryEntry {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)

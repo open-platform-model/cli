@@ -9,9 +9,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/pkg/weights"
 )
 
 // ComputeStaleSet computes the set of resources that were in the previous inventory
@@ -114,7 +114,7 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 
 		// Check for untracked resources (not managed by OPM)
 		labels := unstrObj.GetLabels()
-		if labels["app.kubernetes.io/managed-by"] != "open-platform-model" {
+		if labels[core.LabelManagedBy] != core.LabelManagedByValue {
 			return fmt.Errorf("resource %s/%s in namespace %q already exists and is not managed by OPM — use --force to proceed",
 				entry.Kind, entry.Name, entry.Namespace)
 		}
@@ -135,8 +135,8 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 	sorted := make([]InventoryEntry, len(stale))
 	copy(sorted, stale)
 	sort.SliceStable(sorted, func(i, j int) bool {
-		wi := weights.GetWeight(schema.GroupVersionKind{Group: sorted[i].Group, Version: sorted[i].Version, Kind: sorted[i].Kind})
-		wj := weights.GetWeight(schema.GroupVersionKind{Group: sorted[j].Group, Version: sorted[j].Version, Kind: sorted[j].Kind})
+		wi := core.GetWeight(schema.GroupVersionKind{Group: sorted[i].Group, Version: sorted[i].Version, Kind: sorted[i].Kind})
+		wj := core.GetWeight(schema.GroupVersionKind{Group: sorted[j].Group, Version: sorted[j].Version, Kind: sorted[j].Kind})
 		return wi > wj // descending
 	})
 

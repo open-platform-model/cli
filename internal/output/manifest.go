@@ -10,8 +10,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/pkg/weights"
+	"github.com/opmodel/cli/internal/core"
 )
+
+// Compile-time assertion: *core.Resource satisfies ResourceInfo.
+var _ ResourceInfo = (*core.Resource)(nil)
 
 // ManifestOptions controls manifest output formatting.
 type ManifestOptions struct {
@@ -59,8 +62,8 @@ func WriteManifests(resources []ResourceInfo, opts ManifestOptions) error {
 func sortResourceInfos(resources []ResourceInfo) {
 	sort.Slice(resources, func(i, j int) bool {
 		// Primary: sort by weight
-		wi := weights.GetWeight(resources[i].GetGVK())
-		wj := weights.GetWeight(resources[j].GetGVK())
+		wi := core.GetWeight(resources[i].GetGVK())
+		wj := core.GetWeight(resources[j].GetGVK())
 		if wi != wj {
 			return wi < wj
 		}

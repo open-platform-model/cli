@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -105,8 +106,8 @@ func GetReleaseStatus(ctx context.Context, client *Client, opts StatusOptions) (
 	if len(resources) > 0 {
 		labels := resources[0].GetLabels()
 		if labels != nil {
-			result.ModuleID = labels[LabelModuleUUID]
-			result.ReleaseID = labels[LabelReleaseUUID]
+			result.ModuleID = labels[core.LabelModuleUUID]
+			result.ReleaseID = labels[core.LabelReleaseUUID]
 		}
 	}
 

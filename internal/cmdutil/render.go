@@ -79,7 +79,7 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*build.RenderRe
 	}
 
 	// Create and execute pipeline
-	pipeline := build.NewPipeline(opts.Config)
+	pipeline := build.NewPipeline(opts.Config.CueContext, opts.Config.Providers, opts.Config.Registry)
 
 	output.Debug("rendering release",
 		"module-path", modulePath,

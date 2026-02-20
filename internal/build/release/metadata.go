@@ -6,7 +6,7 @@ import (
 	"cuelang.org/go/cue"
 
 	"github.com/opmodel/cli/internal/build/component"
-	"github.com/opmodel/cli/internal/build/module"
+	"github.com/opmodel/cli/internal/core"
 )
 
 // extractComponentsFromDefinition extracts components from #components (definition).
@@ -119,8 +119,8 @@ func extractAnnotations(value cue.Value, annotations map[string]string) {
 // Fields extracted: Name (from opts), Namespace (from opts), UUID (from
 // #opmReleaseMeta.identity), Labels (from #opmReleaseMeta.labels with fallback
 // to metadata.labels).
-func extractReleaseMetadata(concreteRelease cue.Value, opts Options) ReleaseMetadata {
-	relMeta := ReleaseMetadata{
+func extractReleaseMetadata(concreteRelease cue.Value, opts Options) core.ReleaseMetadata {
+	relMeta := core.ReleaseMetadata{
 		Name:      opts.Name,
 		Namespace: opts.Namespace,
 		Labels:    make(map[string]string),
@@ -164,8 +164,8 @@ func extractReleaseMetadata(concreteRelease cue.Value, opts Options) ReleaseMeta
 //   - Version: from #opmReleaseMeta.version, fallback metadata.version
 //   - UUID: from metadata.identity
 //   - Labels: same source as release labels (behavioral parity)
-func extractModuleMetadata(concreteRelease cue.Value) module.ModuleMetadata {
-	modMeta := module.ModuleMetadata{
+func extractModuleMetadata(concreteRelease cue.Value) core.ModuleMetadata {
+	modMeta := core.ModuleMetadata{
 		Labels: make(map[string]string),
 	}
 
@@ -184,7 +184,7 @@ func extractModuleMetadata(concreteRelease cue.Value) module.ModuleMetadata {
 
 // extractModuleMetadataFromCUE extracts module metadata fields directly from the CUE value.
 // These fields are always read from module metadata, regardless of overlay presence.
-func extractModuleMetadataFromCUE(v cue.Value, modMeta *module.ModuleMetadata) {
+func extractModuleMetadataFromCUE(v cue.Value, modMeta *core.ModuleMetadata) {
 	if f := v.LookupPath(cue.ParsePath("metadata.name")); f.Exists() {
 		if str, err := f.String(); err == nil {
 			modMeta.Name = str
@@ -206,7 +206,7 @@ func extractModuleMetadataFromCUE(v cue.Value, modMeta *module.ModuleMetadata) {
 
 // extractModuleMetadataFromOpmRelMeta extracts FQN, Version, and Labels from the
 // overlay-computed #opmReleaseMeta definition.
-func extractModuleMetadataFromOpmRelMeta(opmRelMeta cue.Value, modMeta *module.ModuleMetadata) {
+func extractModuleMetadataFromOpmRelMeta(opmRelMeta cue.Value, modMeta *core.ModuleMetadata) {
 	if v := opmRelMeta.LookupPath(cue.ParsePath("fqn")); v.Exists() {
 		if str, err := v.String(); err == nil {
 			modMeta.FQN = str
@@ -234,7 +234,7 @@ func extractModuleMetadataFromOpmRelMeta(opmRelMeta cue.Value, modMeta *module.M
 
 // extractReleaseMetadataFallback extracts release metadata from module fields
 // when overlay is not available.
-func extractReleaseMetadataFallback(concreteRelease cue.Value, relMeta *ReleaseMetadata) {
+func extractReleaseMetadataFallback(concreteRelease cue.Value, relMeta *core.ReleaseMetadata) {
 	if labelsVal := concreteRelease.LookupPath(cue.ParsePath("metadata.labels")); labelsVal.Exists() {
 		iter, err := labelsVal.Fields()
 		if err == nil {
@@ -249,7 +249,7 @@ func extractReleaseMetadataFallback(concreteRelease cue.Value, relMeta *ReleaseM
 
 // extractModuleMetadataFallback extracts module metadata from module fields
 // when overlay is not available.
-func extractModuleMetadataFallback(concreteRelease cue.Value, modMeta *module.ModuleMetadata) {
+func extractModuleMetadataFallback(concreteRelease cue.Value, modMeta *core.ModuleMetadata) {
 	if v := concreteRelease.LookupPath(cue.ParsePath("metadata.version")); v.Exists() {
 		if str, err := v.String(); err == nil {
 			modMeta.Version = str

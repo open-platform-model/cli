@@ -9,11 +9,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/core"
 )
 
-// makeResourceWithContent builds a *build.Resource with the given object fields.
-func makeResourceWithContent(group, version, kind, namespace, name, component string, extra map[string]interface{}) *build.Resource {
+// makeResourceWithContent builds a *core.Resource with the given object fields.
+func makeResourceWithContent(group, version, kind, namespace, name, component string, extra map[string]interface{}) *core.Resource {
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{
 		"apiVersion": group + "/" + version,
 		"kind":       kind,
@@ -31,12 +31,12 @@ func makeResourceWithContent(group, version, kind, namespace, name, component st
 	obj.SetGroupVersionKind(schema.GroupVersionKind{Group: group, Version: version, Kind: kind})
 	obj.SetNamespace(namespace)
 	obj.SetName(name)
-	return &build.Resource{Object: obj, Component: component}
+	return &core.Resource{Object: obj, Component: component}
 }
 
 // standardResources returns a typical 3-resource set.
-func standardResources() []*build.Resource {
-	return []*build.Resource{
+func standardResources() []*core.Resource {
+	return []*core.Resource{
 		makeResourceWithContent("apps", "v1", "Deployment", "ns", "app", "web", map[string]interface{}{
 			"spec": map[string]interface{}{"replicas": int64(2)},
 		}),
@@ -58,9 +58,9 @@ func TestComputeManifestDigest_Format(t *testing.T) {
 
 func TestComputeManifestDigest_Deterministic_InputOrder(t *testing.T) {
 	// Three orderings of the same resources should produce the same digest
-	r1 := standardResources()                    // Deployment, Service, ConfigMap
-	r2 := []*build.Resource{r1[2], r1[0], r1[1]} // ConfigMap, Deployment, Service
-	r3 := []*build.Resource{r1[1], r1[2], r1[0]} // Service, ConfigMap, Deployment
+	r1 := standardResources()                   // Deployment, Service, ConfigMap
+	r2 := []*core.Resource{r1[2], r1[0], r1[1]} // ConfigMap, Deployment, Service
+	r3 := []*core.Resource{r1[1], r1[2], r1[0]} // Service, ConfigMap, Deployment
 
 	d1 := ComputeManifestDigest(r1)
 	d2 := ComputeManifestDigest(r2)
@@ -101,7 +101,7 @@ func TestComputeManifestDigest_RemovedResource(t *testing.T) {
 }
 
 func TestComputeManifestDigest_EmptySet(t *testing.T) {
-	d := ComputeManifestDigest([]*build.Resource{})
+	d := ComputeManifestDigest([]*core.Resource{})
 	assert.True(t, strings.HasPrefix(d, "sha256:"), "empty set should still produce a valid digest")
 	// SHA256 of empty bytes
 	assert.Equal(t, "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", d)
@@ -112,15 +112,15 @@ func TestComputeManifestDigest_SameWeightTiebreaking(t *testing.T) {
 	deployment := makeResourceWithContent("apps", "v1", "Deployment", "ns", "app", "web", nil)
 	statefulSet := makeResourceWithContent("apps", "v1", "StatefulSet", "ns", "app", "db", nil)
 
-	d1 := ComputeManifestDigest([]*build.Resource{deployment, statefulSet})
-	d2 := ComputeManifestDigest([]*build.Resource{statefulSet, deployment})
+	d1 := ComputeManifestDigest([]*core.Resource{deployment, statefulSet})
+	d2 := ComputeManifestDigest([]*core.Resource{statefulSet, deployment})
 
 	assert.Equal(t, d1, d2, "same-weight resources should be tiebroken deterministically")
 }
 
 func TestComputeManifestDigest_DoesNotMutateInput(t *testing.T) {
 	resources := standardResources()
-	original := make([]*build.Resource, len(resources))
+	original := make([]*core.Resource, len(resources))
 	copy(original, resources)
 
 	ComputeManifestDigest(resources)
@@ -131,7 +131,7 @@ func TestComputeManifestDigest_DoesNotMutateInput(t *testing.T) {
 }
 
 func BenchmarkComputeManifestDigest_20Resources(b *testing.B) {
-	resources := make([]*build.Resource, 20)
+	resources := make([]*core.Resource, 20)
 	for i := range resources {
 		resources[i] = makeResourceWithContent("apps", "v1", "Deployment", "ns",
 			strings.Repeat("a", i+1), "web",

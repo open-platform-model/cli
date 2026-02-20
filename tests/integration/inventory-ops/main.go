@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 )
@@ -270,12 +270,12 @@ func opmLabels() map[string]interface{} {
 	}
 }
 
-// buildCM builds a single ConfigMap build.Resource.
-func buildCM(name string) *build.Resource {
+// buildCM builds a single ConfigMap core.Resource.
+func buildCM(name string) *core.Resource {
 	labels := opmLabels()
 	labels["component.opmodel.dev/name"] = "config"
 
-	return &build.Resource{
+	return &core.Resource{
 		Object: &unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
@@ -292,12 +292,12 @@ func buildCM(name string) *build.Resource {
 	}
 }
 
-// buildSvc builds a single Service build.Resource.
-func buildSvc(name string) *build.Resource {
+// buildSvc builds a single Service core.Resource.
+func buildSvc(name string) *core.Resource {
 	labels := opmLabels()
 	labels["component.opmodel.dev/name"] = "web"
 
-	return &build.Resource{
+	return &core.Resource{
 		Object: &unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Service",
@@ -324,8 +324,8 @@ func buildSvc(name string) *build.Resource {
 }
 
 // buildResources builds ConfigMap resources.
-func buildResources(names []string) []*build.Resource {
-	res := make([]*build.Resource, len(names))
+func buildResources(names []string) []*core.Resource {
+	res := make([]*core.Resource, len(names))
 	for i, name := range names {
 		res[i] = buildCM(name)
 	}
@@ -333,8 +333,8 @@ func buildResources(names []string) []*build.Resource {
 }
 
 // buildServiceResources builds Service resources.
-func buildServiceResources(names []string) []*build.Resource {
-	res := make([]*build.Resource, len(names))
+func buildServiceResources(names []string) []*core.Resource {
+	res := make([]*core.Resource, len(names))
 	for i, name := range names {
 		res[i] = buildSvc(name)
 	}
@@ -342,8 +342,8 @@ func buildServiceResources(names []string) []*build.Resource {
 }
 
 // moduleMeta returns the ReleaseMetadata for the test release.
-func moduleMeta() build.ReleaseMetadata {
-	return build.ReleaseMetadata{
+func moduleMeta() core.ReleaseMetadata {
+	return core.ReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 		UUID:      releaseID,
@@ -351,7 +351,7 @@ func moduleMeta() build.ReleaseMetadata {
 }
 
 // buildInventory creates a new InventorySecret from the given resources.
-func buildInventory(resources []*build.Resource) *inventory.InventorySecret {
+func buildInventory(resources []*core.Resource) *inventory.InventorySecret {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)

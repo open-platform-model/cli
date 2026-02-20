@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/opmodel/cli/internal/build/component"
-	"github.com/opmodel/cli/internal/build/module"
 	"github.com/opmodel/cli/internal/build/release"
+	"github.com/opmodel/cli/internal/core"
 )
 
 func TestExecuteJob_SingleResource(t *testing.T) {
@@ -60,12 +60,12 @@ func TestExecuteJob_SingleResource(t *testing.T) {
 			Value:       componentCUE,
 		},
 		Release: &release.BuiltRelease{
-			ReleaseMetadata: release.ReleaseMetadata{
+			ReleaseMetadata: core.ReleaseMetadata{
 				Name:      "test",
 				Namespace: "default",
 				Labels:    map[string]string{},
 			},
-			ModuleMetadata: module.ModuleMetadata{
+			ModuleMetadata: core.ModuleMetadata{
 				Name:    "test",
 				Version: "1.0.0",
 				Labels:  map[string]string{},
@@ -143,12 +143,12 @@ func TestExecuteJob_MapOutput(t *testing.T) {
 			Value:       componentCUE,
 		},
 		Release: &release.BuiltRelease{
-			ReleaseMetadata: release.ReleaseMetadata{
+			ReleaseMetadata: core.ReleaseMetadata{
 				Name:      "test",
 				Namespace: "default",
 				Labels:    map[string]string{},
 			},
-			ModuleMetadata: module.ModuleMetadata{
+			ModuleMetadata: core.ModuleMetadata{
 				Name:    "test",
 				Version: "1.0.0",
 				Labels:  map[string]string{},

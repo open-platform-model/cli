@@ -6,21 +6,20 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/opmodel/cli/internal/build"
-	"github.com/opmodel/cli/pkg/weights"
+	"github.com/opmodel/cli/internal/core"
 )
 
-// SortResources sorts a slice of *build.Resource with a deterministic 5-key total ordering:
+// SortResources sorts a slice of *core.Resource with a deterministic 5-key total ordering:
 // weight (ascending), group (alpha), kind (alpha), namespace (alpha), name (alpha).
 //
 // This sort is shared between ComputeManifestDigest and the pipeline output sort,
 // ensuring that opm mod build output and the inventory digest use the same ordering.
-func SortResources(resources []*build.Resource) {
+func SortResources(resources []*core.Resource) {
 	sort.SliceStable(resources, func(i, j int) bool {
 		ri, rj := resources[i], resources[j]
 
-		wi := weights.GetWeight(ri.GVK())
-		wj := weights.GetWeight(rj.GVK())
+		wi := core.GetWeight(ri.GVK())
+		wj := core.GetWeight(rj.GVK())
 		if wi != wj {
 			return wi < wj
 		}
@@ -55,9 +54,9 @@ func SortResources(resources []*build.Resource) {
 //
 // The digest is computed from the rendered output (pre-apply), so server-generated
 // fields are not included. OPM labels injected by CUE transformers ARE included.
-func ComputeManifestDigest(resources []*build.Resource) string {
+func ComputeManifestDigest(resources []*core.Resource) string {
 	// Work on a copy to avoid mutating the caller's slice
-	sorted := make([]*build.Resource, len(resources))
+	sorted := make([]*core.Resource, len(resources))
 	copy(sorted, resources)
 	SortResources(sorted)
 

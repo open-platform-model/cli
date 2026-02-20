@@ -4,6 +4,8 @@ import (
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/ast/astutil"
 	"cuelang.org/go/cue/token"
+
+	"github.com/opmodel/cli/internal/core"
 )
 
 // opmNamespaceUUID is the UUID v5 namespace for computing deterministic identities.
@@ -65,8 +67,8 @@ func generateOverlayAST(pkgName string, opts Options) *ast.File {
 		},
 		Op: token.AND,
 		Y: ast.NewStruct(
-			ast.NewString("module-release.opmodel.dev/name"), ast.NewIdent("name"),
-			ast.NewString("module-release.opmodel.dev/uuid"), ast.NewIdent("identity"),
+			ast.NewString(core.LabelReleaseName), ast.NewIdent("name"),
+			ast.NewString(core.LabelReleaseUUID), ast.NewIdent("identity"),
 		),
 	}
 

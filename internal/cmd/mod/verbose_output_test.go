@@ -66,7 +66,7 @@ func TestVerboseOutput_TransformerMatches(t *testing.T) {
 	require.NoError(t, err)
 
 	// Render the module
-	pipeline := build.NewPipeline(cfg)
+	pipeline := build.NewPipeline(cfg.CueContext, cfg.Providers, cfg.Registry)
 	result, err := pipeline.Render(ctx, build.RenderOptions{
 		ModulePath: modulePath,
 		Name:       "test-release",

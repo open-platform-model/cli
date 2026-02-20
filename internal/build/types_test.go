@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/opmodel/cli/internal/core"
 )
 
 func TestRenderOptions_Validate(t *testing.T) {
@@ -156,14 +158,14 @@ func TestRenderResult_ResourceCount(t *testing.T) {
 		{
 			name: "empty resources slice",
 			result: &RenderResult{
-				Resources: []*Resource{},
+				Resources: []*core.Resource{},
 			},
 			want: 0,
 		},
 		{
 			name: "with resources",
 			result: &RenderResult{
-				Resources: []*Resource{
+				Resources: []*core.Resource{
 					{Component: "web"},
 					{Component: "api"},
 					{Component: "db"},
@@ -196,7 +198,7 @@ func TestResource_Accessors(t *testing.T) {
 		},
 	}
 
-	resource := &Resource{
+	resource := &core.Resource{
 		Object:      obj,
 		Component:   "web",
 		Transformer: "opmodel.dev/transformers/kubernetes@v0#DeploymentTransformer",
@@ -240,7 +242,7 @@ func TestResource_ClusterScoped(t *testing.T) {
 		},
 	}
 
-	resource := &Resource{
+	resource := &core.Resource{
 		Object:      obj,
 		Component:   "rbac",
 		Transformer: "opmodel.dev/transformers/kubernetes@v0#ClusterRoleTransformer",

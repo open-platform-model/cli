@@ -3,7 +3,7 @@ package build
 import (
 	"fmt"
 
-	"github.com/opmodel/cli/internal/build/transform"
+	"github.com/opmodel/cli/internal/core"
 )
 
 // RenderError is a base interface for render errors.
@@ -22,7 +22,7 @@ type UnmatchedComponentError struct {
 
 	// Available lists transformers and their requirements.
 	// Helps users understand what's needed to match.
-	Available []transform.TransformerRequirements
+	Available []core.TransformerRequirements
 }
 
 func (e *UnmatchedComponentError) Error() string {

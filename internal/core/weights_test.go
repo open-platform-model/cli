@@ -1,4 +1,4 @@
-package weights
+package core
 
 import (
 	"testing"

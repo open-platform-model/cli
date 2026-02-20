@@ -12,6 +12,7 @@ import (
 
 	"github.com/opmodel/cli/internal/build"
 	"github.com/opmodel/cli/internal/build/transform"
+	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -27,8 +28,8 @@ func TestPrintValidationError_ReleaseValidationWithDetails(t *testing.T) {
 	require.NoError(t, err)
 	os.Stderr = w
 
-	// Create a ReleaseValidationError with CUE details
-	relErr := &build.ReleaseValidationError{
+	// Create a ValidationError with CUE details
+	relErr := &core.ValidationError{
 		Message: "value not concrete",
 		Details: "path.to.field:\n    conflicting values \"foo\" and \"bar\"",
 	}
@@ -59,8 +60,8 @@ func TestPrintValidationError_ReleaseValidationWithoutDetails(t *testing.T) {
 	output.SetupLogging(output.LogConfig{})
 	output.SetLogWriter(&buf)
 
-	// Create a ReleaseValidationError without CUE details
-	err := &build.ReleaseValidationError{
+	// Create a ValidationError without CUE details
+	err := &core.ValidationError{
 		Message: "value not concrete",
 		Details: "", // empty details
 	}
@@ -103,7 +104,7 @@ func TestPrintRenderErrors_UnmatchedWithAvailable(t *testing.T) {
 	errs := []error{
 		&build.UnmatchedComponentError{
 			ComponentName: "database",
-			Available: []build.TransformerRequirements{
+			Available: []core.TransformerRequirements{
 				&transform.LoadedTransformer{
 					FQN:               "example.com/transformers@v1#PostgresTransformer",
 					RequiredLabels:    map[string]string{"db-type": "postgres"},
@@ -167,7 +168,7 @@ func TestPrintRenderErrors_TransformError(t *testing.T) {
 
 	// Create a TransformError
 	errs := []error{
-		&build.TransformError{
+		&core.TransformError{
 			ComponentName:  "api",
 			TransformerFQN: "example.com/transformers@v1#APITransformer",
 			Cause:          fmt.Errorf("missing required field: port"),
@@ -216,7 +217,7 @@ func TestPrintRenderErrors_MultipleErrors(t *testing.T) {
 			ComponentName: "worker",
 			Available:     nil,
 		},
-		&build.TransformError{
+		&core.TransformError{
 			ComponentName:  "api",
 			TransformerFQN: "example.com/transformers@v1#APITransformer",
 			Cause:          fmt.Errorf("validation failed"),

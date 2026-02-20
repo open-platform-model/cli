@@ -4,12 +4,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/opmodel/cli/internal/build/module"
-	"github.com/opmodel/cli/internal/config"
 )
 
 // testdataDir returns the absolute path to a testdata fixture directory.
@@ -61,12 +59,7 @@ func TestResolveModulePath_MissingCueMod(t *testing.T) {
 func TestRender_NoValuesCue_NoValuesFlag_ReturnsError(t *testing.T) {
 	// When no --values flags are provided AND values.cue is missing on disk,
 	// Render should fail with a clear error message.
-	cueCtx := cuecontext.New()
-	cfg := &config.GlobalConfig{
-		CueContext: cueCtx,
-		Registry:   "",
-	}
-	p := NewPipeline(cfg).(*pipeline)
+	p := NewPipeline(nil, nil, "").(*pipeline)
 	dir := testdataDir(t, "test-module-no-values")
 
 	_, err := p.Render(t.Context(), RenderOptions{
@@ -83,11 +76,7 @@ func TestRender_NoValuesCue_WithValuesFlag_SkipsValuesCueCheck(t *testing.T) {
 	// When --values flags ARE provided, the values.cue existence check
 	// should be skipped. The pipeline may fail later (e.g., no providers),
 	// but it must NOT fail with "values.cue not found".
-	cueCtx := cuecontext.New()
-	cfg := &config.GlobalConfig{
-		CueContext: cueCtx,
-	}
-	p := NewPipeline(cfg).(*pipeline)
+	p := NewPipeline(nil, nil, "").(*pipeline)
 	dir := testdataDir(t, "test-module-no-values")
 	valuesFile := testdataFile(t, "external-values.cue")
 
@@ -108,11 +97,7 @@ func TestRender_NoValuesCue_WithValuesFlag_SkipsValuesCueCheck(t *testing.T) {
 func TestRender_WithValuesCue_NoValuesFlag_SkipsValuesCueCheck(t *testing.T) {
 	// When values.cue exists and no --values flags: should pass the values
 	// check and proceed. May fail later (e.g., no providers).
-	cueCtx := cuecontext.New()
-	cfg := &config.GlobalConfig{
-		CueContext: cueCtx,
-	}
-	p := NewPipeline(cfg).(*pipeline)
+	p := NewPipeline(nil, nil, "").(*pipeline)
 	dir := testdataDir(t, "test-module")
 
 	_, err := p.Render(t.Context(), RenderOptions{

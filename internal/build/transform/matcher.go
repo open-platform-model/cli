@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/opmodel/cli/internal/build/component"
+	"github.com/opmodel/cli/internal/core"
 )
 
 // Matcher evaluates transformer-component matching.
@@ -157,9 +158,9 @@ func (m *Matcher) buildReason(detail MatchDetail, tf *LoadedTransformer) string 
 	return "Not matched: " + strings.Join(reasons, "; ")
 }
 
-// ToMatchPlan converts MatchResult to the MatchPlan type.
-func (r *MatchResult) ToMatchPlan() MatchPlan {
-	matches := make(map[string][]TransformerMatch)
+// ToMatchPlan converts MatchResult to the core.MatchPlan type.
+func (r *MatchResult) ToMatchPlan() core.MatchPlan {
+	matches := make(map[string][]core.TransformerMatchOld)
 
 	for tfFQN, components := range r.ByTransformer {
 		for _, comp := range components {
@@ -172,7 +173,7 @@ func (r *MatchResult) ToMatchPlan() MatchPlan {
 				}
 			}
 
-			matches[comp.Name] = append(matches[comp.Name], TransformerMatch{
+			matches[comp.Name] = append(matches[comp.Name], core.TransformerMatchOld{
 				TransformerFQN: tfFQN,
 				Reason:         reason,
 			})
@@ -184,7 +185,7 @@ func (r *MatchResult) ToMatchPlan() MatchPlan {
 		unmatched[i] = comp.Name
 	}
 
-	return MatchPlan{
+	return core.MatchPlan{
 		Matches:   matches,
 		Unmatched: unmatched,
 	}

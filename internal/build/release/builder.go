@@ -11,6 +11,7 @@ import (
 	"cuelang.org/go/cue/load"
 
 	"github.com/opmodel/cli/internal/build/module"
+	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -135,7 +136,7 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 	valuesVal := value.LookupPath(cue.ParsePath("values"))
 	if configDef.Exists() && valuesVal.Exists() {
 		if allErrs := validateValuesAgainstConfig(configDef, valuesVal); allErrs != nil {
-			return nil, &ValidationError{
+			return nil, &core.ValidationError{
 				Message: "values do not satisfy #config schema",
 				Cause:   allErrs,
 				Details: formatCUEDetails(allErrs),
@@ -145,7 +146,7 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 
 	// Step 4c: Validate the full module tree for any remaining errors
 	if allErrs := collectAllCUEErrors(value); allErrs != nil {
-		return nil, &ValidationError{
+		return nil, &core.ValidationError{
 			Message: "release validation failed",
 			Cause:   allErrs,
 			Details: formatCUEDetails(allErrs),
@@ -155,14 +156,14 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 	// Step 5: Inject values into #config to make components concrete
 	values := value.LookupPath(cue.ParsePath("values"))
 	if !values.Exists() {
-		return nil, &ValidationError{
+		return nil, &core.ValidationError{
 			Message: "module missing 'values' field — provide values via values.cue or --values flag",
 		}
 	}
 
 	concreteRelease := value.FillPath(cue.ParsePath("#config"), values)
 	if allErrs := collectAllCUEErrors(concreteRelease); allErrs != nil {
-		return nil, &ValidationError{
+		return nil, &core.ValidationError{
 			Message: "failed to inject values into #config",
 			Cause:   allErrs,
 			Details: formatCUEDetails(allErrs),
@@ -188,7 +189,7 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 			details.WriteString(formatCUEDetails(cerr))
 			details.WriteByte('\n')
 		}
-		return nil, &ValidationError{
+		return nil, &core.ValidationError{
 			Message: fmt.Sprintf("%d component(s) have non-concrete values - check that all required values are provided", len(concreteErrors)),
 			Cause:   concreteErrors[0],
 			Details: strings.TrimSpace(details.String()),

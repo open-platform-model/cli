@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/opmodel/cli/internal/build/transform"
+	"github.com/opmodel/cli/internal/core"
 )
 
 // Pipeline defines the contract for render pipelines.
@@ -65,17 +65,17 @@ type RenderResult struct {
 	// Resources are the rendered platform resources.
 	// Ordered for sequential apply (respecting resource weights/dependencies).
 	// Empty slice (not nil) if no resources were rendered.
-	Resources []*Resource
+	Resources []*core.Resource
 
 	// Release contains release-level metadata (name, namespace, release UUID, labels).
-	Release ReleaseMetadata
+	Release core.ReleaseMetadata
 
 	// Module contains module-level metadata (canonical name, FQN, version, module UUID, labels).
-	Module ModuleMetadata
+	Module core.ModuleMetadata
 
 	// MatchPlan describes which transformers matched which components.
 	// Used for verbose output and debugging.
-	MatchPlan MatchPlan
+	MatchPlan core.MatchPlan
 
 	// Errors contains aggregated render errors (fail-on-end pattern).
 	// Empty slice if all components rendered successfully.
@@ -100,13 +100,3 @@ func (r *RenderResult) HasWarnings() bool {
 func (r *RenderResult) ResourceCount() int {
 	return len(r.Resources)
 }
-
-// Resource is a type alias for transform.Resource.
-// All methods are defined on transform.Resource and are accessible here transparently.
-type Resource = transform.Resource
-
-// MatchPlan is a type alias for transform.MatchPlan.
-type MatchPlan = transform.MatchPlan
-
-// TransformerMatch is a type alias for transform.TransformerMatch.
-type TransformerMatch = transform.TransformerMatch

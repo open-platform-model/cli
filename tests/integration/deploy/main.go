@@ -9,7 +9,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 )
@@ -85,11 +85,11 @@ func main() {
 		},
 	}}
 
-	resources := []*build.Resource{
+	resources := []*core.Resource{
 		{Object: cm, Component: "config"},
 		{Object: svc, Component: "web"},
 	}
-	meta := build.ReleaseMetadata{
+	meta := core.ReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 		UUID:      releaseID,
@@ -160,8 +160,8 @@ func main() {
 		labels := r.GetLabels()
 		fmt.Printf("   - %s/%s (managed-by=%s, release=%s)\n",
 			r.GetKind(), r.GetName(),
-			labels[kubernetes.LabelManagedBy],
-			labels[kubernetes.LabelReleaseName],
+			labels[core.LabelManagedBy],
+			labels[core.LabelReleaseName],
 		)
 	}
 	if len(discovered) < 2 {
@@ -275,7 +275,7 @@ func main() {
 }
 
 // buildInventory creates an InventorySecret from the given resources.
-func buildInventory(resources []*build.Resource, releaseName, namespace, releaseID string) *inventory.InventorySecret {
+func buildInventory(resources []*core.Resource, releaseName, namespace, releaseID string) *inventory.InventorySecret {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)

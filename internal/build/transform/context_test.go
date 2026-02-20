@@ -7,19 +7,19 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/opmodel/cli/internal/build/component"
-	"github.com/opmodel/cli/internal/build/module"
 	"github.com/opmodel/cli/internal/build/release"
+	"github.com/opmodel/cli/internal/core"
 )
 
 func TestNewTransformerContext(t *testing.T) {
 	rel := &release.BuiltRelease{
-		ReleaseMetadata: release.ReleaseMetadata{
+		ReleaseMetadata: core.ReleaseMetadata{
 			Name:      "my-module",
 			Namespace: "default",
 			UUID:      "release-uuid",
 			Labels:    map[string]string{"env": "prod"},
 		},
-		ModuleMetadata: module.ModuleMetadata{
+		ModuleMetadata: core.ModuleMetadata{
 			Name:    "my-module",
 			Version: "1.0.0",
 			FQN:     "example.com/modules@v0#MyModule",
@@ -59,12 +59,12 @@ func TestNewTransformerContext_NameOverride(t *testing.T) {
 	// TransformerContext carries the canonical module name in ModuleMetadata
 	// and the release name in ReleaseMetadata — independently.
 	rel := &release.BuiltRelease{
-		ReleaseMetadata: release.ReleaseMetadata{
+		ReleaseMetadata: core.ReleaseMetadata{
 			Name:      "my-app-staging",
 			Namespace: "staging",
 			UUID:      "release-uuid",
 		},
-		ModuleMetadata: module.ModuleMetadata{
+		ModuleMetadata: core.ModuleMetadata{
 			Name:    "my-app",
 			Version: "1.0.0",
 			FQN:     "example.com/modules@v0#MyApp",
@@ -88,13 +88,13 @@ func TestNewTransformerContext_NameOverride(t *testing.T) {
 }
 
 func TestTransformerContext_ToMap(t *testing.T) {
-	modMeta := &module.ModuleMetadata{
+	modMeta := &core.ModuleMetadata{
 		Name:    "my-module",
 		FQN:     "example.com/modules@v0#MyModule",
 		Version: "2.0.0",
 		Labels:  map[string]string{"team": "platform"},
 	}
-	relMeta := &release.ReleaseMetadata{
+	relMeta := &core.ReleaseMetadata{
 		Name:      "release-name",
 		Namespace: "production",
 		UUID:      "release-uuid",

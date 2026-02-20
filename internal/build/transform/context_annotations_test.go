@@ -7,18 +7,18 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/opmodel/cli/internal/build/component"
-	"github.com/opmodel/cli/internal/build/module"
 	"github.com/opmodel/cli/internal/build/release"
+	"github.com/opmodel/cli/internal/core"
 )
 
 func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
 	rel := &release.BuiltRelease{
-		ReleaseMetadata: release.ReleaseMetadata{
+		ReleaseMetadata: core.ReleaseMetadata{
 			Name:      "my-module",
 			Namespace: "default",
 			Labels:    map[string]string{},
 		},
-		ModuleMetadata: module.ModuleMetadata{
+		ModuleMetadata: core.ModuleMetadata{
 			Name:    "my-module",
 			Version: "1.0.0",
 			Labels:  map[string]string{},
@@ -42,12 +42,12 @@ func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
 
 func TestNewTransformerContext_EmptyAnnotations(t *testing.T) {
 	rel := &release.BuiltRelease{
-		ReleaseMetadata: release.ReleaseMetadata{
+		ReleaseMetadata: core.ReleaseMetadata{
 			Name:      "my-module",
 			Namespace: "default",
 			Labels:    map[string]string{},
 		},
-		ModuleMetadata: module.ModuleMetadata{
+		ModuleMetadata: core.ModuleMetadata{
 			Name:    "my-module",
 			Version: "1.0.0",
 			Labels:  map[string]string{},
@@ -71,11 +71,11 @@ func TestTransformerContext_ToMap_WithAnnotations(t *testing.T) {
 	ctx := &TransformerContext{
 		Name:      "release-name",
 		Namespace: "production",
-		ModuleMetadata: &module.ModuleMetadata{
+		ModuleMetadata: &core.ModuleMetadata{
 			Name:    "my-module",
 			Version: "2.0.0",
 		},
-		ReleaseMetadata: &release.ReleaseMetadata{
+		ReleaseMetadata: &core.ReleaseMetadata{
 			Name:      "release-name",
 			Namespace: "production",
 		},
@@ -100,11 +100,11 @@ func TestTransformerContext_ToMap_WithoutAnnotations(t *testing.T) {
 	ctx := &TransformerContext{
 		Name:      "release-name",
 		Namespace: "production",
-		ModuleMetadata: &module.ModuleMetadata{
+		ModuleMetadata: &core.ModuleMetadata{
 			Name:    "my-module",
 			Version: "2.0.0",
 		},
-		ReleaseMetadata: &release.ReleaseMetadata{
+		ReleaseMetadata: &core.ReleaseMetadata{
 			Name:      "release-name",
 			Namespace: "production",
 		},

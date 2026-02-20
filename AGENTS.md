@@ -102,15 +102,15 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 │   ├── cmd/           # Command implementations (root, version, exit)
 │   │   ├── config/    # config init, vet commands
 │   │   └── mod/       # mod apply, build, delete, diff, init, status, vet commands
-│   ├── cmdtypes/      # Shared types: GlobalConfig, ExitError, exit code helpers
 │   ├── cmdutil/       # Shared command utilities (flag groups, render pipeline, K8s client, output)
 │   ├── config/        # Config loading, validation, paths
+│   ├── core/          # Shared domain types: Resource, labels, metadata, errors, weights
 │   ├── errors/        # Error types and handling
+│   ├── inventory/     # Release inventory: secret CRUD, digest, stale detection
 │   ├── kubernetes/    # K8s client, apply, delete, discovery, health, status
 │   ├── output/        # Spinner, table, log, styles, format
 │   ├── templates/     # Module templates (simple, standard, advanced)
 │   └── version/       # Version handling
-├── pkg/weights/       # Resource weights
 ├── tests/
 │   ├── fixtures/      # Test module fixtures
 │   └── integration/   # Integration tests

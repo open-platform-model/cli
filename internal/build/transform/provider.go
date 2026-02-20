@@ -6,18 +6,19 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/internal/config"
+	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/output"
 )
 
-// ProviderLoader loads providers from configuration.
+// ProviderLoader loads providers from a map of CUE values.
 type ProviderLoader struct {
-	config *config.GlobalConfig
+	providers map[string]cue.Value
 }
 
 // NewProviderLoader creates a new ProviderLoader.
-func NewProviderLoader(cfg *config.GlobalConfig) *ProviderLoader {
-	return &ProviderLoader{config: cfg}
+// providers maps provider names to their CUE values.
+func NewProviderLoader(providers map[string]cue.Value) *ProviderLoader {
+	return &ProviderLoader{providers: providers}
 }
 
 // LoadedProvider is the result of loading a provider.
@@ -43,16 +44,16 @@ type LoadedTransformer struct {
 	Value             cue.Value // Full transformer value for execution
 }
 
-// Load loads a provider by name from configuration.
+// Load loads a provider by name from the configured providers map.
 func (pl *ProviderLoader) Load(ctx context.Context, name string) (*LoadedProvider, error) {
-	if pl.config == nil || pl.config.Providers == nil {
+	if pl.providers == nil {
 		return nil, fmt.Errorf("no providers configured")
 	}
 
-	providerValue, ok := pl.config.Providers[name]
+	providerValue, ok := pl.providers[name]
 	if !ok {
-		available := make([]string, 0, len(pl.config.Providers))
-		for k := range pl.config.Providers {
+		available := make([]string, 0, len(pl.providers))
+		for k := range pl.providers {
 			available = append(available, k)
 		}
 		return nil, fmt.Errorf("provider %q not found (available: %v)", name, available)
@@ -173,10 +174,10 @@ func (pl *ProviderLoader) extractMapKeys(value cue.Value, field string) []string
 	return result
 }
 
-// Requirements returns the provider's transformers as a []TransformerRequirements slice.
-// This replaces ToSummaries — no data is copied; LoadedTransformer satisfies the interface directly.
-func (p *LoadedProvider) Requirements() []TransformerRequirements {
-	result := make([]TransformerRequirements, len(p.Transformers))
+// Requirements returns the provider's transformers as a []core.TransformerRequirements slice.
+// No data is copied; LoadedTransformer satisfies the interface directly.
+func (p *LoadedProvider) Requirements() []core.TransformerRequirements {
+	result := make([]core.TransformerRequirements, len(p.Transformers))
 	for i, t := range p.Transformers {
 		result[i] = t
 	}

@@ -4,22 +4,15 @@ import (
 	"testing"
 
 	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/opmodel/cli/internal/build/module"
 	"github.com/opmodel/cli/internal/build/release"
-	"github.com/opmodel/cli/internal/config"
+	"github.com/opmodel/cli/internal/core"
 )
 
 func TestNewPipeline(t *testing.T) {
 	// Test that NewPipeline creates a valid pipeline
-	cfg := &config.GlobalConfig{
-		CueContext: cuecontext.New(),
-		Registry:   "",
-		Providers:  make(map[string]cue.Value),
-	}
-	p := NewPipeline(cfg)
+	p := NewPipeline(nil, make(map[string]cue.Value), "")
 	assert.NotNil(t, p)
 }
 
@@ -60,14 +53,14 @@ func TestPipeline_IdentityFieldsPropagated(t *testing.T) {
 	// are properly set on the two typed fields of BuiltRelease.
 
 	rel := &release.BuiltRelease{
-		ReleaseMetadata: release.ReleaseMetadata{
+		ReleaseMetadata: core.ReleaseMetadata{
 			Name:       "my-app",
 			Namespace:  "production",
 			UUID:       "release-uuid-5678",
 			Labels:     map[string]string{"env": "prod"},
 			Components: []string{"web"},
 		},
-		ModuleMetadata: module.ModuleMetadata{
+		ModuleMetadata: core.ModuleMetadata{
 			Name:             "app",
 			DefaultNamespace: "staging",
 			Version:          "1.0.0",

@@ -2,8 +2,8 @@ package transform
 
 import (
 	"github.com/opmodel/cli/internal/build/component"
-	"github.com/opmodel/cli/internal/build/module"
 	"github.com/opmodel/cli/internal/build/release"
+	"github.com/opmodel/cli/internal/core"
 )
 
 // TransformerContext holds the context data passed to transformers.
@@ -16,10 +16,10 @@ type TransformerContext struct {
 	Namespace string `json:"namespace"`
 
 	// ModuleMetadata contains module-level identity metadata.
-	ModuleMetadata *module.ModuleMetadata `json:"#moduleMetadata"`
+	ModuleMetadata *core.ModuleMetadata `json:"#moduleMetadata"`
 
 	// ReleaseMetadata contains release-level identity metadata.
-	ReleaseMetadata *release.ReleaseMetadata `json:"#releaseMetadata"`
+	ReleaseMetadata *core.ReleaseMetadata `json:"#releaseMetadata"`
 
 	// ComponentMetadata contains component-level metadata
 	ComponentMetadata *TransformerComponentMetadata `json:"#componentMetadata"`

@@ -2,39 +2,14 @@ package transform
 
 import (
 	"context"
-	"fmt"
 
 	"cuelang.org/go/cue"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/build/release"
+	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/output"
 )
-
-// TransformError indicates transformer execution failed.
-//
-//nolint:revive // stutter is intentional: this type is re-exported as build.TransformError
-type TransformError struct {
-	ComponentName  string
-	TransformerFQN string
-	Cause          error
-}
-
-func (e *TransformError) Error() string {
-	return fmt.Sprintf("component %q, transformer %q: %v",
-		e.ComponentName, e.TransformerFQN, e.Cause)
-}
-
-func (e *TransformError) Unwrap() error {
-	return e.Cause
-}
-
-// Component returns the component name where the error occurred.
-// Implements the build.RenderError interface.
-func (e *TransformError) Component() string {
-	return e.ComponentName
-}
 
 // Executor runs transformer jobs sequentially (CUE's *cue.Context is not safe for concurrent use).
 type Executor struct{}
@@ -51,7 +26,7 @@ func (e *Executor) ExecuteWithTransformers(
 	rel *release.BuiltRelease,
 	transformers map[string]*LoadedTransformer,
 ) *ExecuteResult {
-	result := &ExecuteResult{Resources: make([]*Resource, 0), Errors: make([]error, 0)}
+	result := &ExecuteResult{Resources: make([]*core.Resource, 0), Errors: make([]error, 0)}
 
 	// Build job list
 	var jobs []Job
@@ -90,7 +65,7 @@ func (e *Executor) ExecuteWithTransformers(
 			continue
 		}
 		for _, obj := range jobResult.Resources {
-			result.Resources = append(result.Resources, &Resource{
+			result.Resources = append(result.Resources, &core.Resource{
 				Object:      obj,
 				Component:   jobResult.Component,
 				Transformer: jobResult.Transformer,
@@ -114,7 +89,7 @@ func (e *Executor) executeJob(job Job) JobResult {
 
 	transformValue := job.Transformer.Value.LookupPath(cue.ParsePath("#transform"))
 	if !transformValue.Exists() {
-		result.Error = &TransformError{
+		result.Error = &core.TransformError{
 			ComponentName:  job.Component.Name,
 			TransformerFQN: job.Transformer.FQN,
 			Cause:          errMissingTransform,
@@ -125,7 +100,7 @@ func (e *Executor) executeJob(job Job) JobResult {
 	// Inject #component into the transformer
 	unified := transformValue.FillPath(cue.ParsePath("#component"), job.Component.Value)
 	if unified.Err() != nil {
-		result.Error = &TransformError{
+		result.Error = &core.TransformError{
 			ComponentName:  job.Component.Name,
 			TransformerFQN: job.Transformer.FQN,
 			Cause:          unified.Err(),
@@ -144,7 +119,7 @@ func (e *Executor) executeJob(job Job) JobResult {
 	unified = unified.FillPath(cue.MakePath(cue.Def("context"), cue.Def("componentMetadata")), cueCtx.Encode(ctxMap["#componentMetadata"]))
 
 	if unified.Err() != nil {
-		result.Error = &TransformError{
+		result.Error = &core.TransformError{
 			ComponentName:  job.Component.Name,
 			TransformerFQN: job.Transformer.FQN,
 			Cause:          unified.Err(),
@@ -159,7 +134,7 @@ func (e *Executor) executeJob(job Job) JobResult {
 	}
 
 	if outputValue.Err() != nil {
-		result.Error = &TransformError{
+		result.Error = &core.TransformError{
 			ComponentName:  job.Component.Name,
 			TransformerFQN: job.Transformer.FQN,
 			Cause:          outputValue.Err(),
@@ -172,13 +147,13 @@ func (e *Executor) executeJob(job Job) JobResult {
 	if outputValue.Kind() == cue.ListKind {
 		iter, err := outputValue.List()
 		if err != nil {
-			result.Error = &TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
+			result.Error = &core.TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
 			return result
 		}
 		for iter.Next() {
 			obj, err := e.decodeResource(iter.Value())
 			if err != nil {
-				result.Error = &TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
+				result.Error = &core.TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
 				return result
 			}
 			result.Resources = append(result.Resources, obj)
@@ -186,20 +161,20 @@ func (e *Executor) executeJob(job Job) JobResult {
 	} else if e.isSingleResource(outputValue) {
 		obj, err := e.decodeResource(outputValue)
 		if err != nil {
-			result.Error = &TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
+			result.Error = &core.TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
 			return result
 		}
 		result.Resources = append(result.Resources, obj)
 	} else {
 		iter, err := outputValue.Fields()
 		if err != nil {
-			result.Error = &TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
+			result.Error = &core.TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
 			return result
 		}
 		for iter.Next() {
 			obj, err := e.decodeResource(iter.Value())
 			if err != nil {
-				result.Error = &TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
+				result.Error = &core.TransformError{ComponentName: job.Component.Name, TransformerFQN: job.Transformer.FQN, Cause: err}
 				return result
 			}
 			result.Resources = append(result.Resources, obj)
@@ -221,12 +196,6 @@ func (e *Executor) decodeResource(value cue.Value) (*unstructured.Unstructured, 
 		return nil, err
 	}
 	return &unstructured.Unstructured{Object: obj}, nil
-}
-
-// NewTransformerContextForComponent is a helper that creates a context from a release and component.
-// It exists to avoid import cycles — callers use it instead of NewTransformerContext directly.
-func NewTransformerContextForComponent(rel *release.BuiltRelease, comp *component.Component) *TransformerContext {
-	return NewTransformerContext(rel, comp)
 }
 
 var errMissingTransform = &transformMissingError{}

@@ -9,20 +9,23 @@ import (
 	"sort"
 	"strings"
 
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
+
 	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/build/module"
 	"github.com/opmodel/cli/internal/build/release"
 	"github.com/opmodel/cli/internal/build/transform"
-	"github.com/opmodel/cli/internal/config"
+	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/pkg/weights"
 )
 
 // pipeline implements the Pipeline interface.
 // It orchestrates module loading, release building, provider loading,
 // component matching, and transformer execution.
 type pipeline struct {
-	config         *config.GlobalConfig
+	providers      map[string]cue.Value
+	registry       string
 	releaseBuilder *release.Builder
 	provider       *transform.ProviderLoader
 	matcher        *transform.Matcher
@@ -30,12 +33,20 @@ type pipeline struct {
 }
 
 // NewPipeline creates a new Pipeline implementation.
-// The pipeline uses the provided configuration for provider resolution.
-func NewPipeline(cfg *config.GlobalConfig) Pipeline {
+// cueCtx is the shared CUE evaluation context; must be the same context used to
+// compile the provider values to avoid cross-runtime panics. If nil, a fresh
+// context is created (suitable when no pre-compiled provider values are passed).
+// providers maps provider names to their CUE values (from config.Providers).
+// registry is the CUE registry URL (from config.Registry).
+func NewPipeline(cueCtx *cue.Context, providers map[string]cue.Value, registry string) Pipeline {
+	if cueCtx == nil {
+		cueCtx = cuecontext.New()
+	}
 	return &pipeline{
-		config:         cfg,
-		releaseBuilder: release.NewBuilder(cfg.CueContext, cfg.Registry),
-		provider:       transform.NewProviderLoader(cfg),
+		providers:      providers,
+		registry:       registry,
+		releaseBuilder: release.NewBuilder(cueCtx, registry),
+		provider:       transform.NewProviderLoader(providers),
 		matcher:        transform.NewMatcher(),
 		executor:       transform.NewExecutor(),
 	}
@@ -115,7 +126,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		return nil, &NamespaceRequiredError{ModuleName: moduleMeta.Name}
 	}
 
-	release, err := p.releaseBuilder.Build(modulePath, release.Options{
+	rel, err := p.releaseBuilder.Build(modulePath, release.Options{
 		Name:      releaseName,
 		Namespace: namespace,
 		PkgName:   inspection.PkgName,
@@ -125,16 +136,16 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	}
 
 	output.Debug("release built",
-		"name", release.ReleaseMetadata.Name,
-		"namespace", release.ReleaseMetadata.Namespace,
-		"components", len(release.Components),
+		"name", rel.ReleaseMetadata.Name,
+		"namespace", rel.ReleaseMetadata.Namespace,
+		"components", len(rel.Components),
 	)
 
 	// Phase 3: Load provider
 	providerName := opts.Provider
 	// Default to the only configured provider if not specified
-	if providerName == "" && p.config != nil && len(p.config.Providers) == 1 {
-		for name := range p.config.Providers { //nolint:revive // single iteration for auto-select
+	if providerName == "" && len(p.providers) == 1 {
+		for name := range p.providers { //nolint:revive // single iteration for auto-select
 			providerName = name
 			break
 		}
@@ -145,30 +156,30 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	}
 
 	// Phase 4: Match components to transformers
-	components := p.componentsToSlice(release.Components)
+	components := p.componentsToSlice(rel.Components)
 	matchResult := p.matcher.Match(components, provider.Transformers)
 	matchPlan := matchResult.ToMatchPlan()
 
 	// Collect errors for unmatched components
-	var errors []error
+	var errs []error
 	for _, comp := range matchResult.Unmatched {
-		errors = append(errors, &UnmatchedComponentError{
+		errs = append(errs, &UnmatchedComponentError{
 			ComponentName: comp.Name,
 			Available:     provider.Requirements(),
 		})
 	}
 
 	// Phase 5: Execute transformers (only for matched components)
-	var resources []*Resource
+	var resources []*core.Resource
 	if len(matchResult.ByTransformer) > 0 {
 		// Build transformer map for executor
 		transformerMap := make(map[string]*transform.LoadedTransformer)
 		for _, tf := range provider.Transformers {
 			transformerMap[tf.FQN] = tf
 		}
-		execResult := p.executor.ExecuteWithTransformers(ctx, matchResult, release, transformerMap)
+		execResult := p.executor.ExecuteWithTransformers(ctx, matchResult, rel, transformerMap)
 		resources = execResult.Resources
-		errors = append(errors, execResult.Errors...)
+		errs = append(errs, execResult.Errors...)
 	}
 
 	// Phase 6: Build result
@@ -178,8 +189,8 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	// output deterministic for equal-weight resources.
 	sort.SliceStable(resources, func(i, j int) bool {
 		ri, rj := resources[i], resources[j]
-		wi := weights.GetWeight(ri.GVK())
-		wj := weights.GetWeight(rj.GVK())
+		wi := core.GetWeight(ri.GVK())
+		wj := core.GetWeight(rj.GVK())
 		if wi != wj {
 			return wi < wj
 		}
@@ -203,10 +214,10 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 
 	return &RenderResult{
 		Resources: resources,
-		Release:   release.ReleaseMetadata,
-		Module:    release.ModuleMetadata,
+		Release:   rel.ReleaseMetadata,
+		Module:    rel.ModuleMetadata,
 		MatchPlan: matchPlan,
-		Errors:    errors,
+		Errors:    errs,
 		Warnings:  warnings,
 	}, nil
 }

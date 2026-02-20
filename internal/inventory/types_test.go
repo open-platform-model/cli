@@ -9,13 +9,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/opmodel/cli/internal/build"
+	"github.com/opmodel/cli/internal/core"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// makeResource is a test helper that builds a *build.Resource with the given GVK/metadata.
-func makeResource(group, version, kind, namespace, name, component string) *build.Resource {
+// makeResource is a test helper that builds a *core.Resource with the given GVK/metadata.
+func makeResource(group, version, kind, namespace, name, component string) *core.Resource {
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   group,
@@ -24,7 +24,7 @@ func makeResource(group, version, kind, namespace, name, component string) *buil
 	})
 	obj.SetNamespace(namespace)
 	obj.SetName(name)
-	return &build.Resource{
+	return &core.Resource{
 		Object:    obj,
 		Component: component,
 	}
