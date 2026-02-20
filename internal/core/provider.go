@@ -13,11 +13,6 @@ type Provider struct {
 	DeclaredResources   []cue.Value `json:"#declaredResources,omitempty"`
 	DeclaredTraits      []cue.Value `json:"#declaredTraits,omitempty"`
 	DeclaredDefinitions []cue.Value `json:"#declaredDefinitions,omitempty"`
-
-	// CueCtx is the CUE evaluation context used to compile this provider's values.
-	// Set by the loader (transform.LoadProvider) from GlobalConfig.CueContext.
-	// Required for transformer execution in TransformerMatchPlan.Execute().
-	CueCtx *cue.Context `json:"-"`
 }
 
 type ProviderMetadata struct {
