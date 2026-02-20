@@ -196,7 +196,7 @@ The `TransformerContext` SHALL hold references to both `ModuleMetadata` and `Rel
 
 ##### Scenario: TransformerContext populated from both metadata types
 
-- **WHEN** `NewTransformerContext()` is called with a `BuiltRelease` and `LoadedComponent`
+- **WHEN** `NewTransformerContext()` is called with a `*core.ModuleRelease` and `LoadedComponent`
 - **THEN** the resulting `TransformerContext` SHALL have `ModuleMetadata` populated with module-level fields (Name, FQN, Version, UUID, Labels)
 - **AND** `ReleaseMetadata` populated with release-level fields (Name, Namespace, UUID, Labels)
 
@@ -211,34 +211,59 @@ The `TransformerContext` SHALL hold references to both `ModuleMetadata` and `Rel
 
 #### Requirement: BuiltRelease carries typed metadata directly
 
-The internal `BuiltRelease` type (output of `Builder.Build()`) SHALL carry
-`ReleaseMetadata` and `ModuleMetadata` as direct struct fields, populated by the
-builder from the fully evaluated CUE value. No intermediate `Metadata` grab-bag
-struct SHALL exist. The builder is responsible for extracting both metadata types
-from the CUE value before returning `BuiltRelease`.
+`Builder.Build()` SHALL return `*core.ModuleRelease` instead of the build-internal
+`BuiltRelease` type. The `core.ModuleRelease` type SHALL carry the same typed
+metadata fields (`Module ModuleMetadata`, `Metadata *ReleaseMetadata`,
+`Components map[string]*Component`, `Values cue.Value`). The build-internal
+`BuiltRelease` type SHALL be removed.
 
-`TransformerContext` SHALL read module name from `BuiltRelease.ModuleMetadata.Name`
+`TransformerContext` SHALL read module name from `core.ModuleRelease.Module.Metadata.Name`
 (the canonical module name) rather than from the release name field.
 
 ##### Scenario: Builder populates ModuleMetadata with FQN and version
 
-- **WHEN** `Builder.Build()` is called on a module that defines `metadata.fqn` and `metadata.version`
-- **THEN** the returned `BuiltRelease.ModuleMetadata.FQN` SHALL equal the module's `metadata.fqn` value
-- **AND** `BuiltRelease.ModuleMetadata.Version` SHALL equal the module's `metadata.version` value
-- **AND** `BuiltRelease.ModuleMetadata.DefaultNamespace` SHALL equal the module's `metadata.defaultNamespace` value
+- **WHEN** `release.Build()` is called on a module that defines `metadata.fqn` and `metadata.version`
+- **THEN** the returned `core.ModuleRelease.Module.FQN` SHALL equal the module's `metadata.fqn` value
+- **AND** `core.ModuleRelease.Module.Version` SHALL equal the module's `metadata.version` value
+- **AND** `core.ModuleRelease.Module.DefaultNamespace` SHALL equal the module's `metadata.defaultNamespace` value
 
 ##### Scenario: Builder populates ReleaseMetadata with release-level fields
 
-- **WHEN** `Builder.Build()` is called with `Name: "my-release"` and `Namespace: "production"`
-- **THEN** `BuiltRelease.ReleaseMetadata.Name` SHALL equal `"my-release"`
-- **AND** `BuiltRelease.ReleaseMetadata.Namespace` SHALL equal `"production"`
-- **AND** `BuiltRelease.ReleaseMetadata.UUID` SHALL be the computed release UUID
+- **WHEN** `release.Build()` is called with `Name: "my-release"` and `Namespace: "production"`
+- **THEN** `core.ModuleRelease.Metadata.Name` SHALL equal `"my-release"`
+- **AND** `core.ModuleRelease.Metadata.Namespace` SHALL equal `"production"`
+- **AND** `core.ModuleRelease.Metadata.UUID` SHALL be the computed release UUID
 
 ##### Scenario: TransformerContext uses canonical module name
 
 - **WHEN** a module with `metadata.name: "my-app"` is rendered with `--name my-app-staging`
 - **THEN** `TransformerContext.ModuleMetadata.Name` SHALL equal `"my-app"` (canonical module name)
 - **AND** `TransformerContext.ReleaseMetadata.Name` SHALL equal `"my-app-staging"` (release name)
+
+#### Requirement: Pipeline BUILD phase delegates validation to ModuleRelease receiver methods
+
+The `pipeline.Render()` BUILD phase SHALL call `rel.ValidateValues()` and then
+`rel.Validate()` on the returned `*core.ModuleRelease` rather than calling
+standalone validation functions directly. The pipeline SHALL NOT call validation
+functions that bypass these receiver methods.
+
+##### Scenario: BUILD phase calls ValidateValues before Validate
+
+- **WHEN** `pipeline.Render()` executes the BUILD phase
+- **THEN** `rel.ValidateValues()` SHALL be called immediately after `release.Build()` returns
+- **AND** `rel.Validate()` SHALL be called immediately after `rel.ValidateValues()` returns `nil`
+
+##### Scenario: Validation errors surfaced identically to previous behavior
+
+- **WHEN** user-supplied values fail schema validation after this change
+- **THEN** the error returned from `pipeline.Render()` SHALL be the same type and contain the same message as before this change
+
+##### Scenario: Release output is identical before and after this change
+
+- **WHEN** a module that rendered successfully before this change is rendered after
+- **THEN** `RenderResult.Resources` SHALL contain the same resources with identical content
+- **AND** `RenderResult.Module` and `RenderResult.Release` SHALL contain the same metadata values
+- **AND** `RenderResult.Errors` and `RenderResult.Warnings` SHALL be identical
 
 ### Resource
 

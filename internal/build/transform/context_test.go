@@ -7,24 +7,25 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/opmodel/cli/internal/build/component"
-	"github.com/opmodel/cli/internal/build/release"
 	"github.com/opmodel/cli/internal/core"
 )
 
 func TestNewTransformerContext(t *testing.T) {
-	rel := &release.BuiltRelease{
-		ReleaseMetadata: core.ReleaseMetadata{
+	rel := &core.ModuleRelease{
+		Metadata: &core.ReleaseMetadata{
 			Name:      "my-module",
 			Namespace: "default",
 			UUID:      "release-uuid",
 			Labels:    map[string]string{"env": "prod"},
 		},
-		ModuleMetadata: core.ModuleMetadata{
-			Name:    "my-module",
-			Version: "1.0.0",
-			FQN:     "example.com/modules@v0#MyModule",
-			UUID:    "module-uuid",
-			Labels:  map[string]string{"env": "prod"},
+		Module: core.Module{
+			Metadata: &core.ModuleMetadata{
+				Name:    "my-module",
+				Version: "1.0.0",
+				FQN:     "example.com/modules@v0#MyModule",
+				UUID:    "module-uuid",
+				Labels:  map[string]string{"env": "prod"},
+			},
 		},
 	}
 
@@ -58,17 +59,19 @@ func TestNewTransformerContext_NameOverride(t *testing.T) {
 	// Verifies spec scenario: when --name overrides the module name, the
 	// TransformerContext carries the canonical module name in ModuleMetadata
 	// and the release name in ReleaseMetadata — independently.
-	rel := &release.BuiltRelease{
-		ReleaseMetadata: core.ReleaseMetadata{
+	rel := &core.ModuleRelease{
+		Metadata: &core.ReleaseMetadata{
 			Name:      "my-app-staging",
 			Namespace: "staging",
 			UUID:      "release-uuid",
 		},
-		ModuleMetadata: core.ModuleMetadata{
-			Name:    "my-app",
-			Version: "1.0.0",
-			FQN:     "example.com/modules@v0#MyApp",
-			UUID:    "module-uuid",
+		Module: core.Module{
+			Metadata: &core.ModuleMetadata{
+				Name:    "my-app",
+				Version: "1.0.0",
+				FQN:     "example.com/modules@v0#MyApp",
+				UUID:    "module-uuid",
+			},
 		},
 	}
 

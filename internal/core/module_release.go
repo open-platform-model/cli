@@ -1,6 +1,10 @@
 package core
 
-import "cuelang.org/go/cue"
+import (
+	"fmt"
+
+	"cuelang.org/go/cue"
+)
 
 // ModuleRelease represents the built module release after the build phase, before any transformations are applied.
 // Contains the fully concrete components with all metadata extracted and values merged, ready for matching and transformation.
@@ -21,6 +25,45 @@ type ModuleRelease struct {
 
 	// The values from the Module Release. End-user values.
 	Values cue.Value `json:"values,omitempty"`
+}
+
+// ValidateValues validates the user-supplied Values field against the Module.Config CUE schema.
+// Uses recursive CUE field walking on the already-populated cue.Value fields.
+// Returns nil if Module.Config or Values are not present (nothing to validate).
+// This is a pure read operation — it does not mutate any field on ModuleRelease.
+func (rel *ModuleRelease) ValidateValues() error {
+	if !rel.Module.Config.Exists() || !rel.Values.Exists() {
+		return nil
+	}
+	combined := validateFieldsRecursive(rel.Module.Config, rel.Values, []string{"values"}, nil)
+	if combined == nil {
+		return nil
+	}
+	return &ValidationError{
+		Message: "values do not satisfy #config schema",
+		Cause:   combined,
+	}
+}
+
+// Validate checks that all components in Components are concrete CUE values,
+// confirming the release is ready for transformer matching.
+// This is a readiness gate, not a schema check; it does not re-run ValidateValues.
+// Returns nil if Components is empty (a module with no components is valid).
+// This is a pure read operation — it does not mutate any field on ModuleRelease.
+func (rel *ModuleRelease) Validate() error {
+	var concreteErrors []error
+	for name, comp := range rel.Components {
+		if err := comp.Value.Validate(cue.Concrete(true)); err != nil {
+			concreteErrors = append(concreteErrors, fmt.Errorf("component %q: %w", name, err))
+		}
+	}
+	if len(concreteErrors) > 0 {
+		return &ValidationError{
+			Message: fmt.Sprintf("%d component(s) have non-concrete values - check that all required values are provided", len(concreteErrors)),
+			Cause:   concreteErrors[0],
+		}
+	}
+	return nil
 }
 
 // ReleaseMetadata contains release-level identity information for a deployed module.

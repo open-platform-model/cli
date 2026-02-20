@@ -5,7 +5,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/opmodel/cli/internal/build/component"
-	"github.com/opmodel/cli/internal/build/release"
 	"github.com/opmodel/cli/internal/core"
 )
 
@@ -13,7 +12,7 @@ import (
 type Job struct {
 	Transformer *LoadedTransformer
 	Component   *component.Component
-	Release     *release.BuiltRelease
+	Release     *core.ModuleRelease
 }
 
 // JobResult is the result of executing a job.

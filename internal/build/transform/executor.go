@@ -6,7 +6,6 @@ import (
 	"cuelang.org/go/cue"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/opmodel/cli/internal/build/release"
 	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -23,7 +22,7 @@ func NewExecutor() *Executor {
 func (e *Executor) ExecuteWithTransformers(
 	ctx context.Context,
 	match *MatchResult,
-	rel *release.BuiltRelease,
+	rel *core.ModuleRelease,
 	transformers map[string]*LoadedTransformer,
 ) *ExecuteResult {
 	result := &ExecuteResult{Resources: make([]*core.Resource, 0), Errors: make([]error, 0)}

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/load"
 
+	"github.com/opmodel/cli/internal/build/component"
 	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -39,11 +39,11 @@ func NewBuilder(ctx *cue.Context, registry string) *Builder {
 //  2. Generate AST overlay and format to bytes
 //  3. Load the module directory with the overlay file
 //  4. Unify with additional values files (--values)
+//     4c. Validate the full module tree for structural errors (fatal loading guard)
 //  5. Inject values into #config via FillPath (makes #config concrete)
 //  6. Extract concrete components from #components
-//  7. Validate all components are fully concrete
-//  8. Extract release metadata from the overlay-computed #opmReleaseMeta
-func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (*BuiltRelease, error) {
+//  7. Extract release metadata from the overlay-computed #opmReleaseMeta
+func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (*core.ModuleRelease, error) {
 	output.Debug("building release",
 		"path", modulePath,
 		"name", opts.Name,
@@ -130,20 +130,14 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 		value = value.Unify(valuesValue)
 	}
 
-	// Step 4b: Validate values against #config using recursive field walking.
+	// Extract #config for Module.Config (used by ValidateValues on the returned release).
+	// Step 4b (values-against-config validation) is removed — it is now called explicitly
+	// by the pipeline as rel.ValidateValues() after Build() returns.
 	configDef := value.LookupPath(cue.ParsePath("#config"))
-	valuesVal := value.LookupPath(cue.ParsePath("values"))
-	if configDef.Exists() && valuesVal.Exists() {
-		if allErrs := validateValuesAgainstConfig(configDef, valuesVal); allErrs != nil {
-			return nil, &core.ValidationError{
-				Message: "values do not satisfy #config schema",
-				Cause:   allErrs,
-				Details: formatCUEDetails(allErrs),
-			}
-		}
-	}
 
-	// Step 4c: Validate the full module tree for any remaining errors
+	// Step 4c: Validate the full module tree for any remaining errors.
+	// This stays in Build() as a fatal loading guard — a module that fails CUE
+	// structural validation cannot produce a usable release regardless.
 	if allErrs := collectAllCUEErrors(value); allErrs != nil {
 		return nil, &core.ValidationError{
 			Message: "release validation failed",
@@ -175,25 +169,8 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 		return nil, err
 	}
 
-	// Step 7: Validate all components are concrete (collect all errors)
-	var concreteErrors []error
-	for name, comp := range components {
-		if err := comp.Value.Validate(cue.Concrete(true)); err != nil {
-			concreteErrors = append(concreteErrors, fmt.Errorf("component %q: %w", name, err))
-		}
-	}
-	if len(concreteErrors) > 0 {
-		var details strings.Builder
-		for _, cerr := range concreteErrors {
-			details.WriteString(formatCUEDetails(cerr))
-			details.WriteByte('\n')
-		}
-		return nil, &core.ValidationError{
-			Message: fmt.Sprintf("%d component(s) have non-concrete values - check that all required values are provided", len(concreteErrors)),
-			Cause:   concreteErrors[0],
-			Details: strings.TrimSpace(details.String()),
-		}
-	}
+	// Step 7 (concrete component check) is removed from Build() — it is now called
+	// explicitly by the pipeline as rel.Validate() after Build() returns.
 
 	// Step 8: Extract release and module metadata from the CUE value
 	relMeta := extractReleaseMetadata(concreteRelease, opts)
@@ -207,12 +184,52 @@ func (b *Builder) Build(modulePath string, opts Options, valuesFiles []string) (
 	relMeta.Components = componentNames
 	modMeta.Components = append([]string{}, componentNames...)
 
-	return &BuiltRelease{
-		Value:           concreteRelease,
-		Components:      components,
-		ReleaseMetadata: relMeta,
-		ModuleMetadata:  modMeta,
+	// Convert build/component.Component → core.Component
+	coreComponents := make(map[string]*core.Component, len(components))
+	for name, comp := range components {
+		coreComponents[name] = convertComponent(comp)
+	}
+
+	// Build the core.Module embedding config and values for receiver method use
+	mod := core.Module{
+		Metadata:   &modMeta,
+		ModulePath: modulePath,
+		Config:     configDef,
+		Values:     values,
+	}
+	mod.SetPkgName(pkgName)
+
+	return &core.ModuleRelease{
+		Metadata:   &relMeta,
+		Module:     mod,
+		Components: coreComponents,
+		Values:     values,
 	}, nil
+}
+
+// convertComponent converts a build/component.Component to a core.Component.
+// Used when populating core.ModuleRelease.Components from the builder output.
+// ApiVersion, Kind, Blueprints, and Spec are left as zero values until the
+// component consolidation change unifies these two types.
+func convertComponent(comp *component.Component) *core.Component {
+	labels := comp.Labels
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	annotations := comp.Annotations
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	return &core.Component{
+		Metadata: &core.ComponentMetadata{
+			Name:        comp.Name,
+			Labels:      labels,
+			Annotations: annotations,
+		},
+		Resources: comp.Resources,
+		Traits:    comp.Traits,
+		Value:     comp.Value,
+	}
 }
 
 // detectPackageName loads the module directory minimally to determine the CUE package name.

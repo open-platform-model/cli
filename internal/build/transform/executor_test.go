@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/opmodel/cli/internal/build/component"
-	"github.com/opmodel/cli/internal/build/release"
 	"github.com/opmodel/cli/internal/core"
 )
 
@@ -59,16 +58,18 @@ func TestExecuteJob_SingleResource(t *testing.T) {
 			Traits:      map[string]cue.Value{},
 			Value:       componentCUE,
 		},
-		Release: &release.BuiltRelease{
-			ReleaseMetadata: core.ReleaseMetadata{
+		Release: &core.ModuleRelease{
+			Metadata: &core.ReleaseMetadata{
 				Name:      "test",
 				Namespace: "default",
 				Labels:    map[string]string{},
 			},
-			ModuleMetadata: core.ModuleMetadata{
-				Name:    "test",
-				Version: "1.0.0",
-				Labels:  map[string]string{},
+			Module: core.Module{
+				Metadata: &core.ModuleMetadata{
+					Name:    "test",
+					Version: "1.0.0",
+					Labels:  map[string]string{},
+				},
 			},
 		},
 	}
@@ -142,16 +143,18 @@ func TestExecuteJob_MapOutput(t *testing.T) {
 			Traits:      map[string]cue.Value{},
 			Value:       componentCUE,
 		},
-		Release: &release.BuiltRelease{
-			ReleaseMetadata: core.ReleaseMetadata{
+		Release: &core.ModuleRelease{
+			Metadata: &core.ReleaseMetadata{
 				Name:      "test",
 				Namespace: "default",
 				Labels:    map[string]string{},
 			},
-			ModuleMetadata: core.ModuleMetadata{
-				Name:    "test",
-				Version: "1.0.0",
-				Labels:  map[string]string{},
+			Module: core.Module{
+				Metadata: &core.ModuleMetadata{
+					Name:    "test",
+					Version: "1.0.0",
+					Labels:  map[string]string{},
+				},
 			},
 		},
 	}

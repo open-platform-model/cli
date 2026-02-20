@@ -7,9 +7,9 @@ import (
 // Component is a component with extracted metadata.
 // Components are extracted by the release builder during the build phase.
 type Component struct {
-	ApiVersion string               `json:"apiVersion"`
-	Kind       string               `json:"kind"`
-	Metadata   *ComponentMetadata   `json:"metadata"`
+	ApiVersion string             `json:"apiVersion"`
+	Kind       string             `json:"kind"`
+	Metadata   *ComponentMetadata `json:"metadata"`
 
 	Resources  map[string]cue.Value `json:"#resources"`  // FQN -> resource value
 	Traits     map[string]cue.Value `json:"#traits"`     // FQN -> trait value

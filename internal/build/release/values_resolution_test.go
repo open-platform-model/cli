@@ -49,11 +49,11 @@ func TestBuild_StubsValuesCue_WhenValuesFlagsProvided(t *testing.T) {
 	}, []string{valuesFile})
 	require.NoError(t, err)
 	assert.NotNil(t, rel)
-	assert.Equal(t, "test-release", rel.ReleaseMetadata.Name)
-	assert.Equal(t, "test-module-values-only", rel.ModuleMetadata.Name)
-	assert.Equal(t, "example.com/test-module-values-only@v0#test-module-values-only", rel.ModuleMetadata.FQN)
-	assert.Equal(t, "1.0.0", rel.ModuleMetadata.Version)
-	assert.Equal(t, "default", rel.ModuleMetadata.DefaultNamespace)
+	assert.Equal(t, "test-release", rel.Metadata.Name)
+	assert.Equal(t, "test-module-values-only", rel.Module.Metadata.Name)
+	assert.Equal(t, "example.com/test-module-values-only@v0#test-module-values-only", rel.Module.Metadata.FQN)
+	assert.Equal(t, "1.0.0", rel.Module.Metadata.Version)
+	assert.Equal(t, "default", rel.Module.Metadata.DefaultNamespace)
 }
 
 func TestBuild_NoValuesCue_WithValuesFlag_Succeeds(t *testing.T) {
@@ -71,11 +71,11 @@ func TestBuild_NoValuesCue_WithValuesFlag_Succeeds(t *testing.T) {
 	}, []string{valuesFile})
 	require.NoError(t, err)
 	assert.NotNil(t, rel)
-	assert.Equal(t, "test-release", rel.ReleaseMetadata.Name)
-	assert.Equal(t, "test-module-no-values", rel.ModuleMetadata.Name)
-	assert.Equal(t, "example.com/test-module-no-values@v0#test-module-no-values", rel.ModuleMetadata.FQN)
-	assert.Equal(t, "1.0.0", rel.ModuleMetadata.Version)
-	assert.Equal(t, "default", rel.ModuleMetadata.DefaultNamespace)
+	assert.Equal(t, "test-release", rel.Metadata.Name)
+	assert.Equal(t, "test-module-no-values", rel.Module.Metadata.Name)
+	assert.Equal(t, "example.com/test-module-no-values@v0#test-module-no-values", rel.Module.Metadata.FQN)
+	assert.Equal(t, "1.0.0", rel.Module.Metadata.Version)
+	assert.Equal(t, "default", rel.Module.Metadata.DefaultNamespace)
 }
 
 func TestBuild_WithValuesCue_NoValuesFlag_Succeeds(t *testing.T) {
@@ -92,9 +92,9 @@ func TestBuild_WithValuesCue_NoValuesFlag_Succeeds(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, rel)
-	assert.Equal(t, "test-release", rel.ReleaseMetadata.Name)
-	assert.Equal(t, "test-module", rel.ModuleMetadata.Name)
-	assert.Equal(t, "example.com/test-module@v0#test-module", rel.ModuleMetadata.FQN)
-	assert.Equal(t, "1.0.0", rel.ModuleMetadata.Version)
-	assert.Equal(t, "default", rel.ModuleMetadata.DefaultNamespace)
+	assert.Equal(t, "test-release", rel.Metadata.Name)
+	assert.Equal(t, "test-module", rel.Module.Metadata.Name)
+	assert.Equal(t, "example.com/test-module@v0#test-module", rel.Module.Metadata.FQN)
+	assert.Equal(t, "1.0.0", rel.Module.Metadata.Version)
+	assert.Equal(t, "default", rel.Module.Metadata.DefaultNamespace)
 }

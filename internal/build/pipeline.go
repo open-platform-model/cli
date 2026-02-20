@@ -59,6 +59,8 @@ func NewPipeline(cueCtx *cue.Context, providers map[string]cue.Value, registry s
 // The render process follows these phases:
 //  1. Load module: resolve path + AST inspection → *core.Module (module.Load + mod.Validate)
 //  2. Build #ModuleRelease via AST overlay (loads module with overlay + values)
+//     2a. ValidateValues: user values against #config schema
+//     2b. Validate: all components are concrete
 //  3. Load provider and transformers (ProviderLoader)
 //  4. Match components to transformers (Matcher)
 //  5. Execute transformers (Executor)
@@ -121,9 +123,19 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		return nil, err // Fatal: release building failed (likely incomplete values)
 	}
 
+	// Phase 2a: Validate user values against #config schema
+	if err := rel.ValidateValues(); err != nil {
+		return nil, err
+	}
+
+	// Phase 2b: Validate all components are concrete (ready for matching)
+	if err := rel.Validate(); err != nil {
+		return nil, err
+	}
+
 	output.Debug("release built",
-		"name", rel.ReleaseMetadata.Name,
-		"namespace", rel.ReleaseMetadata.Namespace,
+		"name", rel.Metadata.Name,
+		"namespace", rel.Metadata.Namespace,
 		"components", len(rel.Components),
 	)
 
@@ -200,8 +212,8 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 
 	return &RenderResult{
 		Resources: resources,
-		Release:   rel.ReleaseMetadata,
-		Module:    rel.ModuleMetadata,
+		Release:   *rel.Metadata,
+		Module:    *rel.Module.Metadata,
 		MatchPlan: matchPlan,
 		Errors:    errs,
 		Warnings:  warnings,
@@ -218,11 +230,32 @@ func (p *pipeline) resolveNamespace(flagValue, defaultNamespace string) string {
 	return defaultNamespace
 }
 
-// componentsToSlice converts component map to slice for matcher
-func (p *pipeline) componentsToSlice(m map[string]*component.Component) []*component.Component {
+// componentsToSlice converts a map of core.Component to a slice of build/component.Component
+// for use by the matcher and executor. This conversion is a temporary bridge until the
+// core-component consolidation change unifies these two types.
+func (p *pipeline) componentsToSlice(m map[string]*core.Component) []*component.Component {
 	result := make([]*component.Component, 0, len(m))
 	for _, comp := range m {
-		result = append(result, comp)
+		name := ""
+		labels := map[string]string{}
+		annotations := map[string]string{}
+		if comp.Metadata != nil {
+			name = comp.Metadata.Name
+			if comp.Metadata.Labels != nil {
+				labels = comp.Metadata.Labels
+			}
+			if comp.Metadata.Annotations != nil {
+				annotations = comp.Metadata.Annotations
+			}
+		}
+		result = append(result, &component.Component{
+			Name:        name,
+			Labels:      labels,
+			Annotations: annotations,
+			Resources:   comp.Resources,
+			Traits:      comp.Traits,
+			Value:       comp.Value,
+		})
 	}
 	return result
 }

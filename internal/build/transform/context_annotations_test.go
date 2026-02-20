@@ -7,21 +7,22 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/opmodel/cli/internal/build/component"
-	"github.com/opmodel/cli/internal/build/release"
 	"github.com/opmodel/cli/internal/core"
 )
 
 func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
-	rel := &release.BuiltRelease{
-		ReleaseMetadata: core.ReleaseMetadata{
+	rel := &core.ModuleRelease{
+		Metadata: &core.ReleaseMetadata{
 			Name:      "my-module",
 			Namespace: "default",
 			Labels:    map[string]string{},
 		},
-		ModuleMetadata: core.ModuleMetadata{
-			Name:    "my-module",
-			Version: "1.0.0",
-			Labels:  map[string]string{},
+		Module: core.Module{
+			Metadata: &core.ModuleMetadata{
+				Name:    "my-module",
+				Version: "1.0.0",
+				Labels:  map[string]string{},
+			},
 		},
 	}
 
@@ -41,16 +42,18 @@ func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
 }
 
 func TestNewTransformerContext_EmptyAnnotations(t *testing.T) {
-	rel := &release.BuiltRelease{
-		ReleaseMetadata: core.ReleaseMetadata{
+	rel := &core.ModuleRelease{
+		Metadata: &core.ReleaseMetadata{
 			Name:      "my-module",
 			Namespace: "default",
 			Labels:    map[string]string{},
 		},
-		ModuleMetadata: core.ModuleMetadata{
-			Name:    "my-module",
-			Version: "1.0.0",
-			Labels:  map[string]string{},
+		Module: core.Module{
+			Metadata: &core.ModuleMetadata{
+				Name:    "my-module",
+				Version: "1.0.0",
+				Labels:  map[string]string{},
+			},
 		},
 	}
 
