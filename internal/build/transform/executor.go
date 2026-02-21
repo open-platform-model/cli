@@ -19,9 +19,10 @@ func NewExecutor() *Executor {
 }
 
 // ExecuteWithTransformers runs transformations sequentially.
+// byTransformer maps transformer FQN to the components it matched.
 func (e *Executor) ExecuteWithTransformers(
 	ctx context.Context,
-	match *MatchResult,
+	byTransformer map[string][]*core.Component,
 	rel *core.ModuleRelease,
 	transformers map[string]*LoadedTransformer,
 ) *ExecuteResult {
@@ -29,7 +30,7 @@ func (e *Executor) ExecuteWithTransformers(
 
 	// Build job list
 	var jobs []Job
-	for tfFQN, components := range match.ByTransformer {
+	for tfFQN, components := range byTransformer {
 		transformer, ok := transformers[tfFQN]
 		if !ok {
 			output.Debug("transformer not found for FQN", "fqn", tfFQN)

@@ -6,7 +6,7 @@ The `Matcher` struct has no state — it is a bundle of functions attached to a 
 
 `core.Provider` already exists as a domain type in `internal/core/provider.go` but is unused by the pipeline today — the pipeline works entirely with `transform.LoadedProvider` and `transform.LoadedTransformer`. The goal is to collapse the matching responsibility into `core.Provider`, making the provider the domain owner of "which of my transformers handle this component?"
 
-The `GlobalConfig.CueContext` is the single CUE runtime for the entire process. All CUE values (`provider.Transformers[i].Value`, `component.Value`) are compiled against this context. The match plan needs to carry the context forward so `Execute()` (added in `core-transformer-match-plan-execute`) can use it for `cueCtx.Encode()` during transformer injection.
+The `GlobalConfig.CueContext` is the single CUE runtime for the entire process. All CUE values (`provider.Transformers[i].Value`, `component.Value`) are compiled against this context. The pipeline stores `p.cueCtx` and passes it explicitly to `Execute()` (added in `core-transformer-match-plan-execute`) for `cueCtx.Encode()` during transformer injection — neither `Provider` nor `TransformerMatchPlan` carry the context (see Decision 2).
 
 ## Goals / Non-Goals
 
@@ -14,8 +14,7 @@ The `GlobalConfig.CueContext` is the single CUE runtime for the entire process. 
 
 - Move matching logic from `transform/matcher.go` into `core.Provider.Match()`
 - Return `*core.TransformerMatchPlan` from `Match()` instead of `*transform.MatchResult`
-- Carry `*cue.Context` from loader through `Provider` into `TransformerMatchPlan`
-- Update `transform.LoadProvider()` (replacing `ProviderLoader.Load()`) to set the CUE context on the returned `*core.Provider`
+- Update `transform.LoadProvider()` (replacing `ProviderLoader.Load()`) to return `*core.Provider` with `Transformers` populated — no `cueCtx` parameter (see Decision 2)
 - Update `pipeline.Render()` MATCHING phase to call `provider.Match(rel.Components)` directly
 - Delete `transform/matcher.go` and the `Matcher` struct
 
@@ -73,14 +72,14 @@ The matching method on `core.Provider` will operate on the `core.Transformer` ty
 
 - **Map iteration order is non-deterministic** → `Match()` iterates `map[string]*Component`. The order components are evaluated does not affect correctness (each component is evaluated against all transformers independently), but the order of entries in `TransformerMatchPlan.Matches` may vary. Since the executor processes jobs sequentially by match plan order (next change), non-deterministic ordering could affect resource output ordering. Mitigation: sort component names before iterating, as the current `componentsToSlice` helper does not guarantee order either.
 
-- **Import cycle risk** → `core` currently imports `cuelang.org/go/cue` (for `cue.Value` fields). Adding `CueCtx *cue.Context` is the same package — no new import. `transform` imports `core` already. No cycle introduced.
+- **Import cycle risk** → `core` already imports `cuelang.org/go/cue` (for `cue.Value` fields on `Transformer`). No new imports are needed; `transform` already imports `core`. No cycle is introduced.
 
 ## Migration Plan
 
-1. Add `CueCtx *cue.Context` field to `core.Provider` (exported, set by loader)
+1. ~~Add `CueCtx *cue.Context` field to `core.Provider`~~ — not needed; `core.Provider` is a pure data type (see Decision 2)
 2. Implement `core.Provider.Match(components map[string]*Component) *TransformerMatchPlan` — port matching algorithm from `transform/matcher.go`
-3. Update `transform.LoadProvider()` to return `*core.Provider`; no `cueCtx` parameter needed
-4. Update `pipeline.Render()` MATCHING phase; pipeline stores `p.cueCtx` for use when calling `Execute()` in the next change
+3. Update `transform.LoadProvider()` to return `*core.Provider` with `Transformers` populated; no `cueCtx` parameter needed
+4. ~~Pipeline stores `p.cueCtx`~~ — already present in `pipeline.go:26`; no struct change needed
 5. Update `pipeline.Render()` MATCHING phase: replace `p.matcher.Match(...)` with `provider.Match(rel.Components)`
 6. Migrate `collectWarnings()` to use `core.TransformerMatchPlan` fields
 7. Delete `transform/matcher.go`

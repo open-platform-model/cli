@@ -315,6 +315,12 @@ The render pipeline SHALL produce byte-identical `RenderResult` output after the
 - **THEN** `RenderResult.Release.UUID` SHALL be the same UUID as before the refactor
 - **AND** all `module-release.opmodel.dev/*` labels SHALL have the same values
 
+##### Scenario: Matching phase produces identical results via Provider.Match
+
+- **WHEN** `provider.Match(components)` is called with the same components and transformers as the previous `Matcher.Match()` call
+- **THEN** the resulting `TransformerMatchPlan` SHALL contain the same matched pairs and unmatched components
+- **AND** `RenderResult.MatchPlan` SHALL reflect the same transformer-component assignments
+
 ##### Scenario: Path resolution error is a fatal error
 
 - **WHEN** `Pipeline.Render()` is called with a `ModulePath` that does not exist or is not a CUE module

@@ -27,27 +27,3 @@ type ExecuteResult struct {
 	Resources []*core.Resource
 	Errors    []error
 }
-
-// MatchResult is the internal result of matching.
-type MatchResult struct {
-	// ByTransformer groups components by transformer FQN.
-	ByTransformer map[string][]*core.Component
-
-	// Unmatched contains components with no matching transformers.
-	Unmatched []*core.Component
-
-	// Details records matching decisions for verbose output.
-	Details []MatchDetail
-}
-
-// MatchDetail records why a transformer did/didn't match a component.
-type MatchDetail struct {
-	ComponentName    string
-	TransformerFQN   string
-	Matched          bool
-	MissingLabels    []string
-	MissingResources []string
-	MissingTraits    []string
-	UnhandledTraits  []string
-	Reason           string
-}

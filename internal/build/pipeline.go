@@ -23,12 +23,11 @@ import (
 // It orchestrates module loading, release building, provider loading,
 // component matching, and transformer execution.
 type pipeline struct {
-	cueCtx         *cue.Context
-	providers      map[string]cue.Value
-	registry       string
+	cueCtx    *cue.Context
+	providers map[string]cue.Value
+	registry  string
+
 	releaseBuilder *release.Builder
-	provider       *transform.ProviderLoader
-	matcher        *transform.Matcher
 	executor       *transform.Executor
 }
 
@@ -47,8 +46,6 @@ func NewPipeline(cueCtx *cue.Context, providers map[string]cue.Value, registry s
 		providers:      providers,
 		registry:       registry,
 		releaseBuilder: release.NewBuilder(cueCtx, registry),
-		provider:       transform.NewProviderLoader(providers),
-		matcher:        transform.NewMatcher(),
 		executor:       transform.NewExecutor(),
 	}
 }
@@ -60,8 +57,8 @@ func NewPipeline(cueCtx *cue.Context, providers map[string]cue.Value, registry s
 //  2. Build #ModuleRelease via AST overlay (loads module with overlay + values)
 //     2a. ValidateValues: user values against #config schema
 //     2b. Validate: all components are concrete
-//  3. Load provider and transformers (ProviderLoader)
-//  4. Match components to transformers (Matcher)
+//  3. Load provider and transformers (transform.LoadProvider)
+//  4. Match components to transformers (provider.Match)
 //  5. Execute transformers (Executor)
 //  6. Build and return RenderResult
 //
@@ -146,38 +143,44 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 			break
 		}
 	}
-	provider, err := p.provider.Load(ctx, providerName)
+	provider, loadedTfs, err := transform.LoadProvider(p.providers, providerName)
 	if err != nil {
 		return nil, err // Fatal: provider loading failed
 	}
 
 	// Phase 4: Match components to transformers
-	components := componentsToSlice(rel.Components)
-	matchResult := p.matcher.Match(components, provider.Transformers)
-	matchPlan := matchResult.ToMatchPlan()
+	matchPlan := provider.Match(rel.Components)
 
 	// Collect errors for unmatched components
 	var errs []error
-	for _, comp := range matchResult.Unmatched {
-		name := ""
-		if comp.Metadata != nil {
-			name = comp.Metadata.Name
-		}
+	for _, compName := range matchPlan.Unmatched {
 		errs = append(errs, &UnmatchedComponentError{
-			ComponentName: name,
+			ComponentName: compName,
 			Available:     provider.Requirements(),
 		})
 	}
 
 	// Phase 5: Execute transformers (only for matched components)
+	// Build byTransformer map from match plan (matched pairs only).
+	byTransformer := make(map[string][]*core.Component)
+	for _, m := range matchPlan.Matches {
+		if m.Matched {
+			tfFQN := ""
+			if m.Transformer != nil && m.Transformer.Metadata != nil {
+				tfFQN = m.Transformer.Metadata.FQN
+			}
+			byTransformer[tfFQN] = append(byTransformer[tfFQN], m.Component)
+		}
+	}
+
 	var resources []*core.Resource
-	if len(matchResult.ByTransformer) > 0 {
-		// Build transformer map for executor
+	if len(byTransformer) > 0 {
+		// Build transformer map for executor (LoadedTransformer carries full CUE value).
 		transformerMap := make(map[string]*transform.LoadedTransformer)
-		for _, tf := range provider.Transformers {
+		for _, tf := range loadedTfs {
 			transformerMap[tf.FQN] = tf
 		}
-		execResult := p.executor.ExecuteWithTransformers(ctx, matchResult, rel, transformerMap)
+		execResult := p.executor.ExecuteWithTransformers(ctx, byTransformer, rel, transformerMap)
 		resources = execResult.Resources
 		errs = append(errs, execResult.Errors...)
 	}
@@ -210,13 +213,13 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	})
 
 	// Collect warnings (e.g., unhandled traits)
-	warnings := collectWarnings(matchResult)
+	warnings := collectWarnings(matchPlan)
 
 	return &RenderResult{
 		Resources: resources,
 		Release:   *rel.Metadata,
 		Module:    *rel.Module.Metadata,
-		MatchPlan: matchPlan,
+		MatchPlan: matchPlan.ToLegacyMatchPlan(),
 		Errors:    errs,
 		Warnings:  warnings,
 	}, nil
@@ -232,49 +235,38 @@ func (p *pipeline) resolveNamespace(flagValue, defaultNamespace string) string {
 	return defaultNamespace
 }
 
-// componentsToSlice converts a map of core.Component to a slice for use by the matcher and executor.
-func componentsToSlice(m map[string]*core.Component) []*core.Component {
-	result := make([]*core.Component, 0, len(m))
-	for _, comp := range m {
-		result = append(result, comp)
-	}
-	return result
-}
-
-// collectWarnings gathers non-fatal warnings from the match result.
+// collectWarnings gathers non-fatal warnings from the match plan.
 //
 // A trait is considered "unhandled" only if NO matched transformer handles it.
 // This means if ServiceTransformer requires Expose trait and DeploymentTransformer
 // doesn't, the Expose trait is still considered handled (by ServiceTransformer).
-func collectWarnings(result *transform.MatchResult) []string {
+func collectWarnings(plan *core.TransformerMatchPlan) []string {
 	var warnings []string
 
-	// Step 1: Count how many transformers matched each component
+	// Step 1: Count how many transformers matched each component.
 	componentMatchCount := make(map[string]int)
-	for i := range result.Details {
-		detail := &result.Details[i]
-		if detail.Matched {
-			componentMatchCount[detail.ComponentName]++
+	for _, m := range plan.Matches {
+		if m.Matched && m.Detail != nil {
+			componentMatchCount[m.Detail.ComponentName]++
 		}
 	}
 
-	// Step 2: Count how many matched transformers consider each trait unhandled
-	// Key: component name, Value: map of trait -> count of transformers that don't handle it
+	// Step 2: Count how many matched transformers consider each trait unhandled.
+	// Key: component name, Value: map of trait -> count of transformers that don't handle it.
 	traitUnhandledCount := make(map[string]map[string]int)
-	for i := range result.Details {
-		detail := &result.Details[i]
-		if detail.Matched {
-			if traitUnhandledCount[detail.ComponentName] == nil {
-				traitUnhandledCount[detail.ComponentName] = make(map[string]int)
+	for _, m := range plan.Matches {
+		if m.Matched && m.Detail != nil {
+			if traitUnhandledCount[m.Detail.ComponentName] == nil {
+				traitUnhandledCount[m.Detail.ComponentName] = make(map[string]int)
 			}
-			for _, trait := range detail.UnhandledTraits {
-				traitUnhandledCount[detail.ComponentName][trait]++
+			for _, trait := range m.Detail.UnhandledTraits {
+				traitUnhandledCount[m.Detail.ComponentName][trait]++
 			}
 		}
 	}
 
 	// Step 3: A trait is truly unhandled only if ALL matched transformers
-	// consider it unhandled (i.e., no transformer handles it)
+	// consider it unhandled (i.e., no transformer handles it).
 	for componentName, traitCounts := range traitUnhandledCount {
 		matchCount := componentMatchCount[componentName]
 		for trait, unhandledCount := range traitCounts {

@@ -1,7 +1,6 @@
 package transform
 
 import (
-	"context"
 	"fmt"
 
 	"cuelang.org/go/cue"
@@ -10,28 +9,9 @@ import (
 	"github.com/opmodel/cli/internal/output"
 )
 
-// ProviderLoader loads providers from a map of CUE values.
-type ProviderLoader struct {
-	providers map[string]cue.Value
-}
-
-// NewProviderLoader creates a new ProviderLoader.
-// providers maps provider names to their CUE values.
-func NewProviderLoader(providers map[string]cue.Value) *ProviderLoader {
-	return &ProviderLoader{providers: providers}
-}
-
-// LoadedProvider is the result of loading a provider.
-type LoadedProvider struct {
-	Name         string
-	Version      string
-	Transformers []*LoadedTransformer
-
-	// byFQN is an index for fast lookup.
-	byFQN map[string]*LoadedTransformer
-}
-
-// LoadedTransformer is a transformer with extracted requirements.
+// LoadedTransformer is a transformer with extracted requirements, used by the Executor.
+// It is retained alongside core.Transformer until core-transformer-match-plan-execute
+// migrates the executor to operate on core types directly.
 type LoadedTransformer struct {
 	Name              string
 	FQN               string // Fully qualified name
@@ -42,146 +22,6 @@ type LoadedTransformer struct {
 	OptionalResources []string
 	OptionalTraits    []string
 	Value             cue.Value // Full transformer value for execution
-}
-
-// Load loads a provider by name from the configured providers map.
-func (pl *ProviderLoader) Load(ctx context.Context, name string) (*LoadedProvider, error) {
-	if pl.providers == nil {
-		return nil, fmt.Errorf("no providers configured")
-	}
-
-	providerValue, ok := pl.providers[name]
-	if !ok {
-		available := make([]string, 0, len(pl.providers))
-		for k := range pl.providers {
-			available = append(available, k)
-		}
-		return nil, fmt.Errorf("provider %q not found (available: %v)", name, available)
-	}
-
-	provider := &LoadedProvider{
-		Name:  name,
-		byFQN: make(map[string]*LoadedTransformer),
-	}
-
-	// Extract version
-	if versionVal := providerValue.LookupPath(cue.ParsePath("version")); versionVal.Exists() {
-		if str, err := versionVal.String(); err == nil {
-			provider.Version = str
-		}
-	}
-
-	// Extract transformers
-	transformersValue := providerValue.LookupPath(cue.ParsePath("transformers"))
-	if !transformersValue.Exists() {
-		output.Debug("no transformers found in provider", "name", name)
-		return provider, nil
-	}
-
-	iter, err := transformersValue.Fields()
-	if err != nil {
-		return nil, fmt.Errorf("iterating transformers: %w", err)
-	}
-
-	for iter.Next() {
-		tfName := iter.Selector().Unquoted()
-		tfValue := iter.Value()
-
-		transformer, err := pl.extractTransformer(name, tfName, tfValue)
-		if err != nil {
-			return nil, fmt.Errorf("extracting transformer %s: %w", tfName, err)
-		}
-
-		provider.Transformers = append(provider.Transformers, transformer)
-		provider.byFQN[transformer.FQN] = transformer
-	}
-
-	output.Debug("loaded provider",
-		"name", name,
-		"version", provider.Version,
-		"transformers", len(provider.Transformers),
-	)
-
-	return provider, nil
-}
-
-// extractTransformer extracts a transformer's metadata and requirements.
-//
-//nolint:unparam // error return allows for future validation
-func (pl *ProviderLoader) extractTransformer(providerName, name string, value cue.Value) (*LoadedTransformer, error) {
-	transformer := &LoadedTransformer{
-		Name:              name,
-		FQN:               BuildFQN(providerName, name),
-		RequiredLabels:    make(map[string]string),
-		RequiredResources: make([]string, 0),
-		RequiredTraits:    make([]string, 0),
-		OptionalLabels:    make(map[string]string),
-		OptionalResources: make([]string, 0),
-		OptionalTraits:    make([]string, 0),
-		Value:             value,
-	}
-
-	pl.extractLabelsField(value, "requiredLabels", transformer.RequiredLabels)
-	transformer.RequiredResources = pl.extractMapKeys(value, "requiredResources")
-	transformer.RequiredTraits = pl.extractMapKeys(value, "requiredTraits")
-
-	pl.extractLabelsField(value, "optionalLabels", transformer.OptionalLabels)
-	transformer.OptionalResources = pl.extractMapKeys(value, "optionalResources")
-	transformer.OptionalTraits = pl.extractMapKeys(value, "optionalTraits")
-
-	output.Debug("extracted transformer",
-		"name", transformer.FQN,
-		"requiredResources", transformer.RequiredResources,
-		"requiredTraits", transformer.RequiredTraits,
-	)
-
-	return transformer, nil
-}
-
-// extractLabelsField extracts a labels map field from a CUE value.
-func (pl *ProviderLoader) extractLabelsField(value cue.Value, field string, labels map[string]string) {
-	fieldVal := value.LookupPath(cue.ParsePath(field))
-	if !fieldVal.Exists() {
-		return
-	}
-	iter, err := fieldVal.Fields()
-	if err != nil {
-		return
-	}
-	for iter.Next() {
-		if str, err := iter.Value().String(); err == nil {
-			labels[iter.Selector().Unquoted()] = str
-		}
-	}
-}
-
-// extractMapKeys extracts the keys from a map field as a string slice.
-func (pl *ProviderLoader) extractMapKeys(value cue.Value, field string) []string {
-	result := make([]string, 0)
-	fieldVal := value.LookupPath(cue.ParsePath(field))
-	if !fieldVal.Exists() {
-		return result
-	}
-
-	iter, err := fieldVal.Fields()
-	if err != nil {
-		return result
-	}
-	for iter.Next() {
-		key := iter.Selector().Unquoted()
-		result = append(result, key)
-	}
-	return result
-}
-
-// Requirements returns the provider's transformers as a []core.TransformerRequirements slice.
-// No data is copied; LoadedTransformer satisfies the interface directly.
-func (p *LoadedProvider) Requirements() []core.TransformerRequirements {
-	result := make([]core.TransformerRequirements, len(p.Transformers))
-	for i, t := range p.Transformers {
-		result[i] = t
-	}
-	return result
 }
 
 // GetFQN returns the transformer's fully qualified name.
@@ -199,4 +39,180 @@ func (t *LoadedTransformer) GetRequiredTraits() []string { return t.RequiredTrai
 // BuildFQN builds a fully qualified transformer name.
 func BuildFQN(providerName, transformerName string) string {
 	return providerName + "#" + transformerName
+}
+
+// LoadProvider loads a provider by name from the given providers map and returns:
+//   - a *core.Provider with Transformers populated (for use by Provider.Match())
+//   - a []*LoadedTransformer slice (for use by the Executor until the next migration step)
+//
+// No *cue.Context parameter is needed — all operations are field extractions on
+// existing cue.Values (category-A ops that carry their runtime internally).
+func LoadProvider(providers map[string]cue.Value, name string) (*core.Provider, []*LoadedTransformer, error) {
+	if providers == nil {
+		return nil, nil, fmt.Errorf("no providers configured")
+	}
+
+	providerValue, ok := providers[name]
+	if !ok {
+		available := make([]string, 0, len(providers))
+		for k := range providers {
+			available = append(available, k)
+		}
+		return nil, nil, fmt.Errorf("provider %q not found (available: %v)", name, available)
+	}
+
+	provider := &core.Provider{
+		Metadata:     &core.ProviderMetadata{Name: name},
+		Transformers: make(map[string]*core.Transformer),
+	}
+	var loadedTfs []*LoadedTransformer
+
+	// Extract version.
+	if versionVal := providerValue.LookupPath(cue.ParsePath("version")); versionVal.Exists() {
+		if str, err := versionVal.String(); err == nil {
+			provider.Metadata.Version = str
+		}
+	}
+
+	// Extract transformers.
+	transformersValue := providerValue.LookupPath(cue.ParsePath("transformers"))
+	if !transformersValue.Exists() {
+		output.Debug("no transformers found in provider", "name", name)
+		return provider, loadedTfs, nil
+	}
+
+	iter, err := transformersValue.Fields()
+	if err != nil {
+		return nil, nil, fmt.Errorf("iterating transformers: %w", err)
+	}
+
+	for iter.Next() {
+		tfName := iter.Selector().Unquoted()
+		tfValue := iter.Value()
+		fqn := BuildFQN(name, tfName)
+
+		coreTf := extractCoreTransformer(name, tfName, fqn, tfValue)
+		provider.Transformers[tfName] = coreTf
+
+		loadedTf := extractLoadedTransformer(name, tfName, fqn, tfValue)
+		loadedTfs = append(loadedTfs, loadedTf)
+
+		output.Debug("extracted transformer",
+			"name", fqn,
+			"requiredResources", loadedTf.RequiredResources,
+			"requiredTraits", loadedTf.RequiredTraits,
+		)
+	}
+
+	output.Debug("loaded provider",
+		"name", name,
+		"version", provider.Metadata.Version,
+		"transformers", len(provider.Transformers),
+	)
+
+	return provider, loadedTfs, nil
+}
+
+// extractCoreTransformer builds a *core.Transformer from a CUE transformer value.
+func extractCoreTransformer(providerName, name, fqn string, value cue.Value) *core.Transformer {
+	tf := &core.Transformer{
+		Metadata: &core.TransformerMetadata{
+			Name: name,
+			FQN:  fqn,
+		},
+		RequiredLabels:    make(map[string]string),
+		RequiredResources: extractCueValueMap(value, "requiredResources"),
+		RequiredTraits:    extractCueValueMap(value, "requiredTraits"),
+		OptionalLabels:    make(map[string]string),
+		OptionalResources: extractCueValueMap(value, "optionalResources"),
+		OptionalTraits:    extractCueValueMap(value, "optionalTraits"),
+	}
+
+	extractLabelsField(value, "requiredLabels", tf.RequiredLabels)
+	extractLabelsField(value, "optionalLabels", tf.OptionalLabels)
+
+	// Extract the #transform definition value if present.
+	if transformVal := value.LookupPath(cue.ParsePath("#transform")); transformVal.Exists() {
+		tf.Transform = transformVal
+	}
+
+	return tf
+}
+
+// extractLoadedTransformer builds a *LoadedTransformer from a CUE transformer value.
+// The LoadedTransformer is kept for the Executor until core-transformer-match-plan-execute.
+func extractLoadedTransformer(providerName, name, fqn string, value cue.Value) *LoadedTransformer {
+	tf := &LoadedTransformer{
+		Name:              name,
+		FQN:               fqn,
+		RequiredLabels:    make(map[string]string),
+		RequiredResources: make([]string, 0),
+		RequiredTraits:    make([]string, 0),
+		OptionalLabels:    make(map[string]string),
+		OptionalResources: make([]string, 0),
+		OptionalTraits:    make([]string, 0),
+		Value:             value,
+	}
+
+	extractLabelsField(value, "requiredLabels", tf.RequiredLabels)
+	tf.RequiredResources = extractMapKeys(value, "requiredResources")
+	tf.RequiredTraits = extractMapKeys(value, "requiredTraits")
+
+	extractLabelsField(value, "optionalLabels", tf.OptionalLabels)
+	tf.OptionalResources = extractMapKeys(value, "optionalResources")
+	tf.OptionalTraits = extractMapKeys(value, "optionalTraits")
+
+	return tf
+}
+
+// extractLabelsField extracts a labels map field from a CUE value into the given map.
+func extractLabelsField(value cue.Value, field string, labels map[string]string) {
+	fieldVal := value.LookupPath(cue.ParsePath(field))
+	if !fieldVal.Exists() {
+		return
+	}
+	iter, err := fieldVal.Fields()
+	if err != nil {
+		return
+	}
+	for iter.Next() {
+		if str, err := iter.Value().String(); err == nil {
+			labels[iter.Selector().Unquoted()] = str
+		}
+	}
+}
+
+// extractMapKeys extracts the keys from a CUE map field as a string slice.
+func extractMapKeys(value cue.Value, field string) []string {
+	result := make([]string, 0)
+	fieldVal := value.LookupPath(cue.ParsePath(field))
+	if !fieldVal.Exists() {
+		return result
+	}
+	iter, err := fieldVal.Fields()
+	if err != nil {
+		return result
+	}
+	for iter.Next() {
+		result = append(result, iter.Selector().Unquoted())
+	}
+	return result
+}
+
+// extractCueValueMap extracts a CUE map field as a map[string]cue.Value,
+// preserving the full CUE value for each entry (used by core.Transformer fields).
+func extractCueValueMap(value cue.Value, field string) map[string]cue.Value {
+	result := make(map[string]cue.Value)
+	fieldVal := value.LookupPath(cue.ParsePath(field))
+	if !fieldVal.Exists() {
+		return result
+	}
+	iter, err := fieldVal.Fields()
+	if err != nil {
+		return result
+	}
+	for iter.Next() {
+		result[iter.Selector().Unquoted()] = iter.Value()
+	}
+	return result
 }
