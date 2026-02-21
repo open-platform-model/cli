@@ -25,4 +25,4 @@
 
 ## 5. Commit
 
-- [ ] 5.1 Stage all changes (`git mv` output + 6 import path updates) and commit atomically: `refactor(build): move internal/build to internal/legacy`
+- [x] 5.1 Stage all changes (`git mv` output + 6 import path updates) and commit atomically: `refactor(build): move internal/build to internal/legacy`
