@@ -28,7 +28,6 @@ type pipeline struct {
 	registry  string
 
 	releaseBuilder *release.Builder
-	executor       *transform.Executor
 }
 
 // NewPipeline creates a new Pipeline implementation.
@@ -46,7 +45,6 @@ func NewPipeline(cueCtx *cue.Context, providers map[string]cue.Value, registry s
 		providers:      providers,
 		registry:       registry,
 		releaseBuilder: release.NewBuilder(cueCtx, registry),
-		executor:       transform.NewExecutor(),
 	}
 }
 
@@ -143,7 +141,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 			break
 		}
 	}
-	provider, loadedTfs, err := transform.LoadProvider(p.providers, providerName)
+	provider, _, err := transform.LoadProvider(p.cueCtx, p.providers, providerName)
 	if err != nil {
 		return nil, err // Fatal: provider loading failed
 	}
@@ -160,30 +158,9 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		})
 	}
 
-	// Phase 5: Execute transformers (only for matched components)
-	// Build byTransformer map from match plan (matched pairs only).
-	byTransformer := make(map[string][]*core.Component)
-	for _, m := range matchPlan.Matches {
-		if m.Matched {
-			tfFQN := ""
-			if m.Transformer != nil && m.Transformer.Metadata != nil {
-				tfFQN = m.Transformer.Metadata.FQN
-			}
-			byTransformer[tfFQN] = append(byTransformer[tfFQN], m.Component)
-		}
-	}
-
-	var resources []*core.Resource
-	if len(byTransformer) > 0 {
-		// Build transformer map for executor (LoadedTransformer carries full CUE value).
-		transformerMap := make(map[string]*transform.LoadedTransformer)
-		for _, tf := range loadedTfs {
-			transformerMap[tf.FQN] = tf
-		}
-		execResult := p.executor.ExecuteWithTransformers(ctx, byTransformer, rel, transformerMap)
-		resources = execResult.Resources
-		errs = append(errs, execResult.Errors...)
-	}
+	// Phase 5: Execute transformers via TransformerMatchPlan.Execute().
+	resources, execErrs := matchPlan.Execute(ctx, rel)
+	errs = append(errs, execErrs...)
 
 	// Phase 6: Build result
 	// Sort resources with deterministic 5-key total ordering:

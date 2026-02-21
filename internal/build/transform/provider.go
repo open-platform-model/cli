@@ -45,9 +45,9 @@ func BuildFQN(providerName, transformerName string) string {
 //   - a *core.Provider with Transformers populated (for use by Provider.Match())
 //   - a []*LoadedTransformer slice (for use by the Executor until the next migration step)
 //
-// No *cue.Context parameter is needed — all operations are field extractions on
-// existing cue.Values (category-A ops that carry their runtime internally).
-func LoadProvider(providers map[string]cue.Value, name string) (*core.Provider, []*LoadedTransformer, error) {
+// cueCtx is stored on the returned Provider.CueCtx so that TransformerMatchPlan.Execute()
+// can use it for CUE encoding without the caller having to pass it explicitly.
+func LoadProvider(cueCtx *cue.Context, providers map[string]cue.Value, name string) (*core.Provider, []*LoadedTransformer, error) {
 	if providers == nil {
 		return nil, nil, fmt.Errorf("no providers configured")
 	}
@@ -64,6 +64,7 @@ func LoadProvider(providers map[string]cue.Value, name string) (*core.Provider, 
 	provider := &core.Provider{
 		Metadata:     &core.ProviderMetadata{Name: name},
 		Transformers: make(map[string]*core.Transformer),
+		CueCtx:       cueCtx,
 	}
 	var loadedTfs []*LoadedTransformer
 

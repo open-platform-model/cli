@@ -1,10 +1,6 @@
-package transform
+package core
 
-import (
-	"github.com/opmodel/cli/internal/core"
-)
-
-// TransformerContext holds the context data passed to transformers.
+// TransformerContext holds the context data passed to transformers during execution.
 // This matches the CUE #TransformerContext definition.
 type TransformerContext struct {
 	// Name is the release name (from --name or module.metadata.name)
@@ -14,12 +10,12 @@ type TransformerContext struct {
 	Namespace string `json:"namespace"`
 
 	// ModuleMetadata contains module-level identity metadata.
-	ModuleMetadata *core.ModuleMetadata `json:"#moduleMetadata"`
+	ModuleMetadata *ModuleMetadata `json:"#moduleMetadata"`
 
 	// ReleaseMetadata contains release-level identity metadata.
-	ReleaseMetadata *core.ReleaseMetadata `json:"#releaseMetadata"`
+	ReleaseMetadata *ReleaseMetadata `json:"#releaseMetadata"`
 
-	// ComponentMetadata contains component-level metadata
+	// ComponentMetadata contains component-level metadata.
 	ComponentMetadata *TransformerComponentMetadata `json:"#componentMetadata"`
 }
 
@@ -31,7 +27,7 @@ type TransformerComponentMetadata struct {
 }
 
 // NewTransformerContext constructs the context for a transformer execution.
-func NewTransformerContext(rel *core.ModuleRelease, comp *core.Component) *TransformerContext {
+func NewTransformerContext(rel *ModuleRelease, comp *Component) *TransformerContext {
 	name := ""
 	labels := map[string]string{}
 	annotations := map[string]string{}
@@ -58,7 +54,7 @@ func NewTransformerContext(rel *core.ModuleRelease, comp *core.Component) *Trans
 }
 
 // ToMap converts TransformerContext to a map for CUE encoding.
-// The output shape is identical to the previous implementation:
+// The output shape matches the CUE #context definition:
 // #moduleReleaseMetadata contains name, namespace, fqn, version, identity, labels.
 // The identity value is the release UUID (from ReleaseMetadata.UUID).
 // The fqn and version values come from ModuleMetadata.

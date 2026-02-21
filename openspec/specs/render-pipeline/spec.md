@@ -333,6 +333,22 @@ The render pipeline SHALL produce byte-identical `RenderResult` output after the
 - **THEN** `Pipeline.Render()` SHALL return a non-nil `error` (fatal error)
 - **AND** `RenderResult` SHALL be `nil`
 
+#### Requirement: Pipeline GENERATE phase delegates to TransformerMatchPlan
+
+The `build/pipeline.go` GENERATE phase SHALL call `matchPlan.Execute(ctx, rel)` instead of constructing and invoking an `Executor` service. The `pipeline` struct SHALL NOT hold an executor field after this change.
+
+##### Scenario: Pipeline renders without Executor field
+
+- **WHEN** `pipeline.Render()` executes the GENERATE phase
+- **THEN** it SHALL invoke `matchPlan.Execute(ctx, rel)` on the `*core.TransformerMatchPlan` returned by the MATCHING phase
+- **AND** the `pipeline` struct SHALL NOT hold an `executor` field
+
+##### Scenario: Context cancellation propagated through Execute
+
+- **WHEN** the context passed to `pipeline.Render()` is cancelled during the GENERATE phase
+- **THEN** `matchPlan.Execute()` SHALL honour the cancellation
+- **AND** `pipeline.Render()` SHALL return a cancellation error (not in `RenderResult.Errors`)
+
 ---
 
 ## Non-Functional Requirements

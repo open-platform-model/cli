@@ -19,6 +19,11 @@ type Provider struct {
 	DeclaredResources   []cue.Value `json:"#declaredResources,omitempty"`
 	DeclaredTraits      []cue.Value `json:"#declaredTraits,omitempty"`
 	DeclaredDefinitions []cue.Value `json:"#declaredDefinitions,omitempty"`
+
+	// CueCtx is the CUE evaluation context used to compile this provider's values.
+	// Set by the loader (transform.LoadProvider) from GlobalConfig.CueContext.
+	// Propagated into TransformerMatchPlan.cueCtx by Match() for use in Execute().
+	CueCtx *cue.Context `json:"-"`
 }
 
 type ProviderMetadata struct {
@@ -120,6 +125,7 @@ func (p *Provider) Match(components map[string]*Component) *TransformerMatchPlan
 	plan := &TransformerMatchPlan{
 		Matches:   make([]*TransformerMatch, 0),
 		Unmatched: make([]string, 0),
+		cueCtx:    p.CueCtx,
 	}
 
 	// Sort component names for deterministic output.
@@ -294,6 +300,10 @@ func buildMatchReason(matched bool, detail *TransformerMatchDetail, tf *Transfor
 type TransformerMatchPlan struct {
 	Matches   []*TransformerMatch `json:"matches,omitempty"`
 	Unmatched []string            `json:"unmatched,omitempty"`
+
+	// cueCtx is the CUE evaluation context used by Execute() for encoding operations.
+	// Set by Provider.Match() from the Provider's own CueCtx field.
+	cueCtx *cue.Context
 }
 
 type TransformerMatch struct {
