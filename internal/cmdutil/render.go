@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/opmodel/cli/internal/build"
 	"github.com/opmodel/cli/internal/config"
 	oerrors "github.com/opmodel/cli/internal/errors"
+	build "github.com/opmodel/cli/internal/legacy"
 	"github.com/opmodel/cli/internal/output"
 )
 

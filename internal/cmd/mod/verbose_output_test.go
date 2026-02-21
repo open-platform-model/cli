@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/build"
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
+	build "github.com/opmodel/cli/internal/legacy"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -62,7 +62,7 @@ func TestVerboseOutput_TransformerMatches(t *testing.T) {
 	}
 
 	// Use the existing test-module fixture
-	modulePath, err := filepath.Abs(filepath.Join("..", "..", "build", "testdata", "test-module"))
+	modulePath, err := filepath.Abs(filepath.Join("..", "..", "legacy", "testdata", "test-module"))
 	require.NoError(t, err)
 
 	// Render the module

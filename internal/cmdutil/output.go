@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/opmodel/cli/internal/build"
 	"github.com/opmodel/cli/internal/core"
+	build "github.com/opmodel/cli/internal/legacy"
 	"github.com/opmodel/cli/internal/output"
 )
 

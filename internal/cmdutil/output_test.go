@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/build"
-	"github.com/opmodel/cli/internal/build/transform"
 	"github.com/opmodel/cli/internal/core"
+	build "github.com/opmodel/cli/internal/legacy"
+	"github.com/opmodel/cli/internal/legacy/transform"
 	"github.com/opmodel/cli/internal/output"
 )
 

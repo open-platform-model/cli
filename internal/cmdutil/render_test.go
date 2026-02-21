@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/opmodel/cli/internal/build"
 	"github.com/opmodel/cli/internal/core"
 	oerrors "github.com/opmodel/cli/internal/errors"
+	build "github.com/opmodel/cli/internal/legacy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

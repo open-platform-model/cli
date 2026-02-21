@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	buildmodule "github.com/opmodel/cli/internal/build/module"
-	"github.com/opmodel/cli/internal/build/release"
+	buildmodule "github.com/opmodel/cli/internal/legacy/module"
+	"github.com/opmodel/cli/internal/legacy/release"
 )
 
 // ----- Builder.Build() tests -----

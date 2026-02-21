@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	buildmodule "github.com/opmodel/cli/internal/build/module"
+	buildmodule "github.com/opmodel/cli/internal/legacy/module"
 )
 
 // testModulePath returns the absolute path to a test module fixture.

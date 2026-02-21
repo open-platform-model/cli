@@ -12,10 +12,10 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 
-	"github.com/opmodel/cli/internal/build/module"
-	"github.com/opmodel/cli/internal/build/release"
-	"github.com/opmodel/cli/internal/build/transform"
 	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/legacy/module"
+	"github.com/opmodel/cli/internal/legacy/release"
+	"github.com/opmodel/cli/internal/legacy/transform"
 	"github.com/opmodel/cli/internal/output"
 )
 

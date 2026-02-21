@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/opmodel/cli/internal/build/transform"
 	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/legacy/transform"
 )
 
 func TestUnmatchedComponentError(t *testing.T) {
