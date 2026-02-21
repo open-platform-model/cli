@@ -2,6 +2,20 @@
 
 `internal/build/` is the current monolithic pipeline package containing module loading, release building, matching, and generation. It will be replaced incrementally by focused phase packages (`internal/loader/`, `internal/builder/`, `internal/provider/`, `internal/transformer/`, `internal/pipeline/`). During that transition, the existing code must remain operational. Moving it to `internal/legacy/` makes the intent explicit without requiring any logic changes upfront.
 
+The current contents of `internal/build/` (after `core-transformer-match-plan-execute`):
+
+```
+internal/build/
+├── pipeline.go, pipeline_test.go, types.go, types_test.go
+├── errors.go, errors_test.go, values_resolution_test.go
+├── module/loader.go, loader_test.go
+├── release/builder.go, metadata.go, types.go, validation.go,
+│          validation_format.go + tests
+├── transform/provider.go, types.go   ← executor.go, context.go, matcher.go
+│                                        were removed by core-transformer-match-plan-execute
+└── testdata/
+```
+
 Six files outside the package import `internal/build`:
 - `internal/cmdutil/render.go`
 - `internal/cmdutil/render_test.go`
@@ -38,3 +52,4 @@ The move and the 6 import path updates must land together. A half-applied state 
 
 - **`git mv` vs manual copy** → Use `git mv internal/build internal/legacy` to preserve file history. A copy-delete loses history in `git log --follow`.
 - **Subpackage imports** → `internal/build/module`, `internal/build/release`, `internal/build/transform` also move. Check for any direct imports of subpackages beyond the 6 known files.
+- **`transform/` is nearly empty** → After `core-transformer-match-plan-execute`, `internal/build/transform/` only has `provider.go` and an empty `types.go`. These still move to `internal/legacy/transform/` — `LoadProvider()` remains the legacy entry point until `pipeline-provider` replaces it.

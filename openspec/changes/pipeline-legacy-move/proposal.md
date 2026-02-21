@@ -7,6 +7,7 @@ The current `internal/build/` package conflates all pipeline concerns — module
 - Move `internal/build/` directory → `internal/legacy/` (directory rename, no logic changes)
 - Update 6 import paths from `github.com/opmodel/cli/internal/build` → `github.com/opmodel/cli/internal/legacy`
 - Package declarations inside `legacy/` remain `package build` (no source changes required)
+- Note: `transform/executor.go` and `transform/context.go` are already absent (removed by `core-transformer-match-plan-execute`); the moved `transform/` package contains only `matcher.go`, `provider.go`, and `types.go` (MatchResult, MatchDetail)
 
 ## Capabilities
 

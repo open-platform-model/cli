@@ -23,6 +23,5 @@ _None. No spec-level behavior changes — the same CUE value is stored, just nam
 - `internal/core/module.go` — field rename + method removal
 - `internal/legacy/module/loader.go` — `mod.SetCUEValue(v)` → `mod.Raw = v`
 - `internal/legacy/release/builder.go` — `mod.CUEValue()` → `mod.Raw`
-- `internal/legacy/transform/executor.go` — any direct CUE value access
 - Related tests in `internal/core/` and `internal/legacy/`
 - SemVer: **PATCH** — internal type change, no CLI behavior changes
