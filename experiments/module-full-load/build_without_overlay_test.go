@@ -1,7 +1,7 @@
 package modulefullload
 
 // ---------------------------------------------------------------------------
-// Decision 7: release.Builder.Build() uses mod.CUEValue() — no overlay needed
+// Decision 7: release.Builder.Build() uses mod.Raw — no overlay needed
 //
 // The overlay's only purpose was to inject #opmReleaseMeta (UUID + labels)
 // into the CUE namespace so CUE could compute identity. With UUID computation
@@ -9,7 +9,7 @@ package modulefullload
 // result (Decision 9), the overlay has no remaining function.
 //
 // The build phase now does:
-//   base  = mod.CUEValue()                          // from Load()
+//   base  = mod.Raw                                  // from Load()
 //   filled = base.FillPath("#config", userValues)   // apply user values
 //   concreteComponents = ExtractComponents(filled.LookupPath("#components"))
 //
@@ -63,7 +63,7 @@ func TestBuildNoOverlay_FillConfigProducesConcrete(t *testing.T) {
 }
 
 // TestBuildNoOverlay_BaseValueUnchanged proves that FillPath does not mutate
-// the base value. This is the immutability guarantee that makes mod.CUEValue()
+// the base value. This is the immutability guarantee that makes mod.Raw
 // reusable across multiple Build() calls.
 //
 // With full #config defaults, the base value already has concrete spec fields
@@ -98,7 +98,7 @@ func TestBuildNoOverlay_BaseValueUnchanged(t *testing.T) {
 
 // TestBuildNoOverlay_MultipleReleases proves that the same base value can be
 // used for multiple independent FillPath calls — producing different concrete
-// releases from the same module. This is the core of Decision 2 (mod.CUEValue()
+// releases from the same module. This is the core of Decision 2 (mod.Raw
 // is reusable) and Decision 7 (no overlay per-release).
 func TestBuildNoOverlay_MultipleReleases(t *testing.T) {
 	ctx, base := buildBaseValue(t)

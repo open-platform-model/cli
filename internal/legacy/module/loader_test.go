@@ -11,7 +11,7 @@ import (
 
 // TestLoad_ValidModule verifies that Load returns a populated *core.Module
 // with a resolved absolute path, metadata name, defaultNamespace, pkgName,
-// FQN, version, UUID, CUEValue, Config, Values, and Components.
+// FQN, version, UUID, Raw, Config, Values, and Components.
 func TestLoad_ValidModule(t *testing.T) {
 	ctx := cuecontext.New()
 	// Use the test-module fixture from the build testdata directory.
@@ -34,8 +34,8 @@ func TestLoad_ValidModule(t *testing.T) {
 	assert.Equal(t, "1.0.0", mod.Metadata.Version, "version extracted from CUE eval")
 	assert.NotEmpty(t, mod.Metadata.UUID, "UUID extracted from CUE eval")
 
-	// CUEValue must be set
-	assert.True(t, mod.CUEValue().Exists(), "CUEValue must be set after Load")
+	// Raw must be set
+	assert.True(t, mod.Raw.Exists(), "Raw must be set after Load")
 
 	// #config and values must be extracted
 	assert.True(t, mod.Config.Exists(), "#config must be extracted")

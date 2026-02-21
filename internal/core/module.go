@@ -31,22 +31,8 @@ type Module struct {
 	// Accessed via PkgName().
 	pkgName string
 
-	// value is the fully evaluated CUE value for the module, set by module.Load()
-	// via setCUEValue(). Access via CUEValue().
-	value cue.Value
-}
-
-// CUEValue returns the fully evaluated CUE value for the module.
-// Returns the zero value if the module has not been fully loaded via module.Load().
-func (m *Module) CUEValue() cue.Value {
-	return m.value
-}
-
-// SetCUEValue stores the fully evaluated CUE value. Called by module.Load().
-// This is intentionally a package-accessible setter following the same pattern
-// as SetPkgName — internal packages call this; external callers use module.Load().
-func (m *Module) SetCUEValue(v cue.Value) {
-	m.value = v
+	// Raw is the fully evaluated CUE value for the module, set by module.Load().
+	Raw cue.Value
 }
 
 // PkgName returns the CUE package name of the module.
@@ -100,7 +86,7 @@ func (m *Module) Validate() error {
 	if m.Metadata.FQN == "" {
 		return fmt.Errorf("module metadata.fqn is empty — ensure the module was fully loaded via module.Load()")
 	}
-	if !m.CUEValue().Exists() {
+	if !m.Raw.Exists() {
 		return fmt.Errorf("module CUE value is not set — ensure the module was fully loaded via module.Load()")
 	}
 	return nil

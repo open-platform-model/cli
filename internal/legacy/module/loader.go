@@ -21,7 +21,7 @@ import (
 // (name, defaultNamespace, fqn, version, uuid, labels) are extracted from the
 // evaluated value using LookupPath. No AST inspection is performed.
 //
-// The returned module has CUEValue() set and passes mod.Validate().
+// The returned module has Raw set and passes mod.Validate().
 func Load(cueCtx *cue.Context, modulePath, registry string) (*core.Module, error) {
 	mod := &core.Module{ModulePath: modulePath}
 
@@ -78,7 +78,7 @@ func Load(cueCtx *cue.Context, modulePath, registry string) (*core.Module, error
 	}
 
 	// Step 7: Store the evaluated CUE value on the module
-	mod.SetCUEValue(baseValue)
+	mod.Raw = baseValue
 
 	output.Debug("loaded module",
 		"path", mod.ModulePath,

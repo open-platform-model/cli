@@ -95,7 +95,7 @@ func validModule(t *testing.T, modulePath string) *Module {
 			FQN:  "example.com/my-module@v0#my-module",
 		},
 	}
-	mod.SetCUEValue(val)
+	mod.Raw = val
 	return mod
 }
 
@@ -135,10 +135,10 @@ func TestModule_Validate_EmptyFQNFails(t *testing.T) {
 	assert.Contains(t, err.Error(), "fqn is empty")
 }
 
-func TestModule_Validate_ZeroCUEValueFails(t *testing.T) {
-	// CUEValue must be set by module.Load(). A zero value means Load() was not called.
+func TestModule_Validate_ZeroRawValueFails(t *testing.T) {
+	// Raw must be set by module.Load(). A zero value means Load() was not called.
 	mod := validModule(t, "/some/path")
-	mod.SetCUEValue(cue.Value{}) // reset to zero value
+	mod.Raw = cue.Value{} // reset to zero value
 	err := mod.Validate()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "CUE value is not set")

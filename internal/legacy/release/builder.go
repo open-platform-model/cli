@@ -13,7 +13,7 @@ import (
 
 // Builder creates a concrete release from a loaded module.
 //
-// It uses the module's pre-evaluated CUE value (mod.CUEValue()), selects
+// It uses the module's pre-evaluated CUE value (mod.Raw), selects
 // values, fills #config, and extracts concrete components.
 type Builder struct {
 	cueCtx   *cue.Context
@@ -31,7 +31,7 @@ func NewBuilder(ctx *cue.Context, registry string) *Builder {
 // Build creates a concrete release from a pre-loaded *core.Module.
 //
 // The build process:
-//  1. Precondition: mod.CUEValue() must exist (module was fully loaded)
+//  1. Precondition: mod.Raw must exist (module was fully loaded)
 //  2. Select values: use --values files if provided, else mod.Values
 //  3. Inject selected values into #config via FillPath (makes #config concrete)
 //  4. Validate the concrete release tree for structural errors
@@ -45,7 +45,7 @@ func (b *Builder) Build(mod *core.Module, opts Options, valuesFiles []string) (*
 	)
 
 	// Step 1: Precondition — module must have been fully loaded
-	base := mod.CUEValue()
+	base := mod.Raw
 	if !base.Exists() {
 		return nil, fmt.Errorf("module CUE value is not set — ensure the module was fully loaded via module.Load()")
 	}
