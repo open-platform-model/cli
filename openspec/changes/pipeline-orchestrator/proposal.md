@@ -4,10 +4,11 @@ With all phase packages in place (`loader`, `builder`, `provider`, `transformer`
 
 ## What Changes
 
-- Create `internal/pipeline/pipeline.go` implementing the `Pipeline` interface: sequences PREPARATION → BUILD → MATCHING → GENERATE, collects results and errors; MATCHING calls `provider.Match(rel.Components)` on `*core.Provider` (from `internal/provider/`); GENERATE calls `matchPlan.Execute(ctx, rel)` on `*core.TransformerMatchPlan` — both are `internal/core/` methods, no separate matcher or generator service
+- Create `internal/pipeline/pipeline.go` implementing the `Pipeline` interface: sequences PREPARATION → BUILD → MATCHING → GENERATE, collects results and errors
 - Create `internal/pipeline/types.go` with `Pipeline` interface, `RenderOptions`, `RenderResult` (replacing equivalents in `internal/legacy/`)
 - Update `internal/cmdutil/render.go` to import `internal/pipeline` instead of `internal/legacy`
 - Update `internal/cmdutil/output.go` import path
+- Update `internal/cmd/mod/verbose_output_test.go` import path
 - Delete `internal/legacy/` entirely
 
 ## Capabilities
@@ -27,5 +28,5 @@ _None._
 - `internal/cmdutil/output.go` — import updated
 - `internal/cmd/mod/verbose_output_test.go` — import updated
 - `internal/legacy/` — deleted
-- Depends on: `internal/loader/`, `internal/builder/`, `internal/provider/`, `internal/transformer/` (for `CollectWarnings`), `internal/core/`
+- Depends on: `internal/loader/`, `internal/builder/`, `internal/provider/`, `internal/transformer/`, `internal/core/`
 - SemVer: **MINOR** — internal restructure, no CLI behavior or flag changes
