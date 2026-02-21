@@ -22,7 +22,7 @@ metadata: {
 }
 
 #config: {
-	image:    string | *"nginx:latest"
+	image:    string
 	replicas: int & >=1 | *1
 }
 

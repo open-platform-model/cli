@@ -12,13 +12,12 @@ import (
 	"github.com/opmodel/cli/internal/loader"
 )
 
-// legacyFixture returns the absolute path to a named module in the legacy
-// testdata directory, which contains fully-featured CUE modules shared across
-// the pipeline test suite.
+// legacyFixture returns the absolute path to a named module in the loader
+// testdata directory.
 func legacyFixture(t *testing.T, name string) string {
 	t.Helper()
 	// filepath.Abs never errors on Linux/macOS; path validity is checked by Load.
-	abs, _ := filepath.Abs(filepath.Join("..", "legacy", "testdata", name))
+	abs, _ := filepath.Abs(filepath.Join("testdata", name))
 	return abs
 }
 
@@ -31,7 +30,7 @@ func invalidFixture(t *testing.T, name string) string {
 	return abs
 }
 
-// TestLoad_PathResolution covers path resolution behaviour:
+// TestLoad_PathResolution covers path resolution behavior:
 // relative paths are resolved, non-existent paths are rejected,
 // and directories missing cue.mod/ are rejected.
 func TestLoad_PathResolution(t *testing.T) {
@@ -46,7 +45,7 @@ func TestLoad_PathResolution(t *testing.T) {
 		{
 			name: "relative path resolves to valid module",
 			modulePath: func(t *testing.T) string {
-				return filepath.Join("..", "legacy", "testdata", "test-module")
+				return filepath.Join("testdata", "test-module")
 			},
 			wantErr: false,
 		},

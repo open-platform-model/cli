@@ -11,10 +11,22 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/opmodel/cli/internal/core"
-	build "github.com/opmodel/cli/internal/legacy"
-	"github.com/opmodel/cli/internal/legacy/transform"
 	"github.com/opmodel/cli/internal/output"
+	"github.com/opmodel/cli/internal/pipeline"
 )
+
+// testTransformerRequirements is a simple implementation of core.TransformerRequirements for tests.
+type testTransformerRequirements struct {
+	fqn               string
+	requiredLabels    map[string]string
+	requiredResources []string
+	requiredTraits    []string
+}
+
+func (t *testTransformerRequirements) GetFQN() string                       { return t.fqn }
+func (t *testTransformerRequirements) GetRequiredLabels() map[string]string { return t.requiredLabels }
+func (t *testTransformerRequirements) GetRequiredResources() []string       { return t.requiredResources }
+func (t *testTransformerRequirements) GetRequiredTraits() []string          { return t.requiredTraits }
 
 func TestPrintValidationError_ReleaseValidationWithDetails(t *testing.T) {
 	// Setup: capture both log output and stderr
@@ -102,14 +114,14 @@ func TestPrintRenderErrors_UnmatchedWithAvailable(t *testing.T) {
 
 	// Create an UnmatchedComponentError with Available transformers
 	errs := []error{
-		&build.UnmatchedComponentError{
+		&pipeline.UnmatchedComponentError{
 			ComponentName: "database",
 			Available: []core.TransformerRequirements{
-				&transform.LoadedTransformer{
-					FQN:               "example.com/transformers@v1#PostgresTransformer",
-					RequiredLabels:    map[string]string{"db-type": "postgres"},
-					RequiredResources: []string{"opmodel.dev/resources/Database@v0"},
-					RequiredTraits:    []string{"opmodel.dev/traits/Persistence@v0"},
+				&testTransformerRequirements{
+					fqn:               "example.com/transformers@v1#PostgresTransformer",
+					requiredLabels:    map[string]string{"db-type": "postgres"},
+					requiredResources: []string{"opmodel.dev/resources/Database@v0"},
+					requiredTraits:    []string{"opmodel.dev/traits/Persistence@v0"},
 				},
 			},
 		},
@@ -142,7 +154,7 @@ func TestPrintRenderErrors_UnmatchedWithoutAvailable(t *testing.T) {
 
 	// Create an UnmatchedComponentError without Available transformers
 	errs := []error{
-		&build.UnmatchedComponentError{
+		&pipeline.UnmatchedComponentError{
 			ComponentName: "cache",
 			Available:     nil,
 		},
@@ -213,7 +225,7 @@ func TestPrintRenderErrors_MultipleErrors(t *testing.T) {
 
 	// Create multiple errors
 	errs := []error{
-		&build.UnmatchedComponentError{
+		&pipeline.UnmatchedComponentError{
 			ComponentName: "worker",
 			Available:     nil,
 		},

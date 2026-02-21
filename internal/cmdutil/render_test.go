@@ -7,7 +7,7 @@ import (
 
 	"github.com/opmodel/cli/internal/core"
 	oerrors "github.com/opmodel/cli/internal/errors"
-	build "github.com/opmodel/cli/internal/legacy"
+	"github.com/opmodel/cli/internal/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,7 +36,7 @@ func TestResolveModulePath_Arg(t *testing.T) {
 
 func TestShowRenderOutput_WithErrors(t *testing.T) {
 	// Create a RenderResult with errors
-	result := &build.RenderResult{
+	result := &pipeline.RenderResult{
 		Release: core.ReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",
@@ -45,7 +45,7 @@ func TestShowRenderOutput_WithErrors(t *testing.T) {
 			Name: "test-module",
 		},
 		Errors: []error{
-			&build.UnmatchedComponentError{
+			&pipeline.UnmatchedComponentError{
 				ComponentName: "web",
 			},
 		},
@@ -63,7 +63,7 @@ func TestShowRenderOutput_WithErrors(t *testing.T) {
 
 func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 	// Create a RenderResult with no errors
-	result := &build.RenderResult{
+	result := &pipeline.RenderResult{
 		Release: core.ReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",
@@ -93,7 +93,7 @@ func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 
 func TestShowRenderOutput_Warnings(t *testing.T) {
 	// Create a RenderResult with warnings
-	result := &build.RenderResult{
+	result := &pipeline.RenderResult{
 		Release: core.ReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",

@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/opmodel/cli/internal/core"
-	build "github.com/opmodel/cli/internal/legacy"
 	"github.com/opmodel/cli/internal/output"
+	"github.com/opmodel/cli/internal/pipeline"
 )
 
 // PrintValidationError prints a render/validation error in a user-friendly format.
@@ -29,7 +29,7 @@ func PrintValidationError(msg string, err error) {
 func PrintRenderErrors(errs []error) {
 	output.Error("render completed with errors")
 	for _, err := range errs {
-		var unmatchedErr *build.UnmatchedComponentError
+		var unmatchedErr *pipeline.UnmatchedComponentError
 		var transformErr *core.TransformError
 
 		switch {
@@ -61,7 +61,7 @@ func PrintRenderErrors(errs []error) {
 
 // WriteTransformerMatches writes compact transformer match output (always shown).
 // Format: component <- provider - transformer
-func WriteTransformerMatches(result *build.RenderResult) {
+func WriteTransformerMatches(result *pipeline.RenderResult) {
 	releaseLog := output.ReleaseLogger(result.Release.Name)
 
 	// Transformer matching — one line per match
@@ -79,7 +79,7 @@ func WriteTransformerMatches(result *build.RenderResult) {
 
 // WriteVerboseMatchLog writes detailed verbose output with release metadata,
 // match reasons, and per-resource validation lines (--verbose only).
-func WriteVerboseMatchLog(result *build.RenderResult) {
+func WriteVerboseMatchLog(result *pipeline.RenderResult) {
 	releaseLog := output.ReleaseLogger(result.Release.Name)
 
 	// Release info — single line with key-value pairs

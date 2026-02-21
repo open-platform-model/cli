@@ -6,8 +6,8 @@ import (
 
 	"github.com/opmodel/cli/internal/config"
 	oerrors "github.com/opmodel/cli/internal/errors"
-	build "github.com/opmodel/cli/internal/legacy"
 	"github.com/opmodel/cli/internal/output"
+	"github.com/opmodel/cli/internal/pipeline"
 )
 
 // RenderReleaseOpts holds the inputs for RenderRelease.
@@ -33,7 +33,7 @@ type RenderReleaseOpts struct {
 //
 // On success it returns the RenderResult. On failure it returns an
 // *ExitError with the appropriate exit code and Printed flag.
-func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*build.RenderResult, error) {
+func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*pipeline.RenderResult, error) {
 	modulePath := ResolveModulePath(opts.Args)
 
 	// Validate config is loaded
@@ -65,7 +65,7 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*build.RenderRe
 	}
 
 	// Build render options
-	renderOpts := build.RenderOptions{
+	renderOpts := pipeline.RenderOptions{
 		ModulePath: modulePath,
 		Values:     opts.Values,
 		Name:       opts.ReleaseName,
@@ -79,7 +79,7 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*build.RenderRe
 	}
 
 	// Create and execute pipeline
-	pipeline := build.NewPipeline(opts.Config.CueContext, opts.Config.Providers, opts.Config.Registry)
+	pl := pipeline.NewPipeline(opts.Config.CueContext, opts.Config.Providers, opts.Config.Registry)
 
 	output.Debug("rendering release",
 		"module-path", modulePath,
@@ -87,7 +87,7 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*build.RenderRe
 		"provider", provider,
 	)
 
-	result, err := pipeline.Render(ctx, renderOpts)
+	result, err := pl.Render(ctx, renderOpts)
 	if err != nil {
 		PrintValidationError("render failed", err)
 		return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: err, Printed: true}
@@ -103,7 +103,7 @@ type ShowOutputOpts struct {
 
 // ShowRenderOutput checks for render errors, shows transformer match output,
 // and logs warnings. It returns an *ExitError if the result has errors.
-func ShowRenderOutput(result *build.RenderResult, opts ShowOutputOpts) error {
+func ShowRenderOutput(result *pipeline.RenderResult, opts ShowOutputOpts) error {
 	// Check for render errors
 	if result.HasErrors() {
 		PrintRenderErrors(result.Errors)
