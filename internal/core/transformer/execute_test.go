@@ -108,7 +108,7 @@ func TestTransformerMatchPlan_Execute_SingleResource(t *testing.T) {
 	}
 	rel := &modulerelease.ModuleRelease{
 		Metadata: &modulerelease.ReleaseMetadata{Name: "test", Namespace: "default", Labels: map[string]string{}},
-		Module:   module.Module{Metadata: &module.ModuleMetadata{Name: "test", Version: "1.0.0", FQN: "test@v0#Test", Labels: map[string]string{}}},
+		Module:   module.Module{Metadata: &module.ModuleMetadata{Name: "test", Version: "1.0.0", FQN: "test@v0#Test"}},
 	}
 
 	resources, errs := plan.Execute(context.Background(), rel)

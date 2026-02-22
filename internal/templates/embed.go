@@ -154,36 +154,3 @@ func Render(templateName TemplateName, targetDir string, data TemplateData) ([]s
 
 	return createdFiles, err
 }
-
-// ListTemplateFiles returns all files in a template.
-func ListTemplateFiles(templateName TemplateName) ([]string, error) {
-	fsys, rootDir, err := getFS(templateName)
-	if err != nil {
-		return nil, err
-	}
-
-	var files []string
-
-	err = fs.WalkDir(fsys, rootDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if d.IsDir() {
-			return nil
-		}
-
-		relPath, err := filepath.Rel(rootDir, path)
-		if err != nil {
-			return err
-		}
-
-		// Remove .tmpl extension (TrimSuffix is a no-op if suffix not present)
-		relPath = strings.TrimSuffix(relPath, ".tmpl")
-
-		files = append(files, relPath)
-		return nil
-	})
-
-	return files, err
-}

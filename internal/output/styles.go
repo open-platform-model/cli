@@ -41,6 +41,9 @@ var (
 
 	// styleDim styles structural chrome (scope prefixes, separators, timestamps).
 	styleDim = lipgloss.NewStyle().Faint(true)
+
+	// styledGreenCheck is the pre-rendered green checkmark glyph (✔).
+	styledGreenCheck = lipgloss.NewStyle().Foreground(colorGreenCheck).Render("✔")
 )
 
 // Resource status constants.
@@ -133,8 +136,7 @@ func FormatResourceLine(kind, namespace, name, status string) string {
 
 // FormatCheckmark renders a green checkmark with a message for stdout output.
 func FormatCheckmark(msg string) string {
-	check := lipgloss.NewStyle().Foreground(colorGreenCheck).Render("✔")
-	return check + " " + msg
+	return styledGreenCheck + " " + msg
 }
 
 // FormatNotice renders a yellow arrow with a message for action-required output.
@@ -208,8 +210,7 @@ const vetCheckColumnWidth = 34
 // right-aligned at column 34 from the start of the label. If detail is empty,
 // no trailing whitespace is added.
 func FormatVetCheck(label, detail string) string {
-	check := lipgloss.NewStyle().Foreground(colorGreenCheck).Render("✔")
-	result := check + " " + label
+	result := styledGreenCheck + " " + label
 
 	if detail != "" {
 		// Calculate padding for right-alignment

@@ -22,40 +22,32 @@ type TransformerContext struct {
 	ReleaseMetadata *modulerelease.ReleaseMetadata `json:"#releaseMetadata"`
 
 	// ComponentMetadata contains component-level metadata.
-	ComponentMetadata *TransformerComponentMetadata `json:"#componentMetadata"`
-}
-
-// TransformerComponentMetadata contains component metadata for transformers.
-type TransformerComponentMetadata struct {
-	Name        string            `json:"name"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
+	// Uses component.ComponentMetadata directly — no separate wrapper type needed.
+	ComponentMetadata *component.ComponentMetadata `json:"#componentMetadata"`
 }
 
 // NewTransformerContext constructs the context for a transformer execution.
 func NewTransformerContext(rel *modulerelease.ModuleRelease, comp *component.Component) *TransformerContext {
-	name := ""
-	labels := map[string]string{}
-	annotations := map[string]string{}
+	compMeta := &component.ComponentMetadata{
+		Name:        "",
+		Labels:      map[string]string{},
+		Annotations: map[string]string{},
+	}
 	if comp.Metadata != nil {
-		name = comp.Metadata.Name
+		compMeta.Name = comp.Metadata.Name
 		if comp.Metadata.Labels != nil {
-			labels = comp.Metadata.Labels
+			compMeta.Labels = comp.Metadata.Labels
 		}
 		if comp.Metadata.Annotations != nil {
-			annotations = comp.Metadata.Annotations
+			compMeta.Annotations = comp.Metadata.Annotations
 		}
 	}
 	return &TransformerContext{
-		Name:            rel.Metadata.Name,
-		Namespace:       rel.Metadata.Namespace,
-		ModuleMetadata:  rel.Module.Metadata,
-		ReleaseMetadata: rel.Metadata,
-		ComponentMetadata: &TransformerComponentMetadata{
-			Name:        name,
-			Labels:      labels,
-			Annotations: annotations,
-		},
+		Name:              rel.Metadata.Name,
+		Namespace:         rel.Metadata.Namespace,
+		ModuleMetadata:    rel.Module.Metadata,
+		ReleaseMetadata:   rel.Metadata,
+		ComponentMetadata: compMeta,
 	}
 }
 

@@ -107,16 +107,3 @@ func (e *pathRewrittenError) Path() []string {
 func (e *pathRewrittenError) Msg() (format string, args []interface{}) {
 	return e.inner.Msg()
 }
-
-// rewriteErrorPath wraps a CUE error with a new path.
-func rewriteErrorPath(e cueerrors.Error, basePath []string) cueerrors.Error {
-	errPath := e.Path()
-	newPath := make([]string, 0, len(basePath)+len(errPath))
-	newPath = append(newPath, basePath...)
-	newPath = append(newPath, errPath...)
-
-	return &pathRewrittenError{
-		inner:   e,
-		newPath: newPath,
-	}
-}

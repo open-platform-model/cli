@@ -265,7 +265,6 @@ func TestLoadModule_Success(t *testing.T) {
 	assert.Equal(t, "1.0.0", mod.Metadata.Version)
 	assert.NotEmpty(t, mod.Metadata.UUID)
 	assert.Equal(t, "default", mod.Metadata.DefaultNamespace)
-	assert.NotEmpty(t, mod.Metadata.Labels)
 
 	assert.True(t, mod.Raw.Exists(), "Raw must be set after LoadModule")
 	assert.True(t, mod.Config.Exists(), "#config must be extracted")
@@ -291,7 +290,6 @@ func TestLoadModule_PartialMetadata(t *testing.T) {
 	assert.Empty(t, mod.Metadata.FQN)
 	assert.Empty(t, mod.Metadata.UUID)
 	assert.Empty(t, mod.Metadata.DefaultNamespace)
-	assert.Empty(t, mod.Metadata.Labels)
 
 	// Values come from values.cue (pure Pattern A after fixture cleanup).
 	assert.True(t, mod.Values.Exists(), "Values must be populated from values.cue")

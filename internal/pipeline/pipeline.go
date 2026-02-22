@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -15,6 +14,7 @@ import (
 	"github.com/opmodel/cli/internal/core/module"
 	coreprovider "github.com/opmodel/cli/internal/core/provider"
 	"github.com/opmodel/cli/internal/core/transformer"
+	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/loader"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -108,7 +108,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	}
 	errs = append(errs, execErrs...)
 
-	sortResources(resources)
+	inventory.SortResources(resources)
 
 	// Ensure non-nil slices for consistent consumer behavior.
 	if resources == nil {
@@ -218,33 +218,6 @@ func collectMatchWarnings(matchPlan *transformer.TransformerMatchPlan, errs []er
 		warnings = rawWarnings
 	}
 	return errs, warnings
-}
-
-// sortResources sorts resources with a deterministic 5-key total ordering:
-// weight → group → kind → namespace → name.
-// This matches the digest sort in internal/inventory, making opm mod build
-// output deterministic for equal-weight resources.
-func sortResources(resources []*core.Resource) {
-	sort.SliceStable(resources, func(i, j int) bool {
-		ri, rj := resources[i], resources[j]
-		wi, wj := core.GetWeight(ri.GVK()), core.GetWeight(rj.GVK())
-		if wi != wj {
-			return wi < wj
-		}
-		gi, gj := ri.GVK().Group, rj.GVK().Group
-		if gi != gj {
-			return gi < gj
-		}
-		ki, kj := ri.GVK().Kind, rj.GVK().Kind
-		if ki != kj {
-			return ki < kj
-		}
-		nsi, nsj := ri.Namespace(), rj.Namespace()
-		if nsi != nsj {
-			return nsi < nsj
-		}
-		return ri.Name() < rj.Name()
-	})
 }
 
 // resolveNamespace resolves the target namespace using precedence:

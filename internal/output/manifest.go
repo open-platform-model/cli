@@ -59,6 +59,9 @@ func WriteManifests(resources []ResourceInfo, opts ManifestOptions) error {
 }
 
 // sortResourceInfos sorts resources by weight, then by namespace, then by name.
+// Intentional 3-key sort for display purposes (weight → namespace → name).
+// Does not need to match the 5-key apply order (weight → group → kind → namespace → name)
+// since this function only controls output file and table ordering.
 func sortResourceInfos(resources []ResourceInfo) {
 	sort.Slice(resources, func(i, j int) bool {
 		// Primary: sort by weight
@@ -96,9 +99,6 @@ func writeYAML(resources []ResourceInfo, w io.Writer) error {
 	return encoder.Close()
 }
 
-// writeYAMLObjects writes unstructured objects as YAML documents.
-// The yaml.v3 encoder automatically adds document separators between documents.
-
 // writeJSON writes resources as a JSON array.
 func writeJSON(resources []ResourceInfo, w io.Writer) error {
 	objects := make([]map[string]any, len(resources))
@@ -115,8 +115,6 @@ func writeJSON(resources []ResourceInfo, w io.Writer) error {
 
 	return nil
 }
-
-// writeJSONObjects writes unstructured objects as JSON array.
 
 // writeResource writes a single resource to the writer.
 func writeResource(resource *unstructured.Unstructured, format Format, w io.Writer) error {

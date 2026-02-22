@@ -89,7 +89,7 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 		gvr := schema.GroupVersionResource{
 			Group:    entry.Group,
 			Version:  entry.Version,
-			Resource: kindToResource(entry.Kind),
+			Resource: kubernetes.KindToResource(entry.Kind),
 		}
 
 		var obj interface{ GetDeletionTimestamp() *metav1.Time }
@@ -151,7 +151,7 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 		gvr := schema.GroupVersionResource{
 			Group:    entry.Group,
 			Version:  entry.Version,
-			Resource: kindToResource(entry.Kind),
+			Resource: kubernetes.KindToResource(entry.Kind),
 		}
 
 		propagation := metav1.DeletePropagationForeground
@@ -173,27 +173,4 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 		return fmt.Errorf("pruning stale resources: %d error(s): %v", len(errs), errs[0])
 	}
 	return nil
-}
-
-// kindToResource converts a Kind to its plural resource name for use in GVR.
-// This is a best-effort heuristic for the most common cases.
-// For accurate GVR resolution in production, use server-side discovery.
-func kindToResource(kind string) string {
-	switch kind {
-	case "Endpoints":
-		return "endpoints"
-	case "Series":
-		return "series"
-	default:
-		// Standard lowercase + "s" pluralization for most K8s resources
-		lower := ""
-		for _, c := range kind {
-			if c >= 'A' && c <= 'Z' {
-				lower += string(c + 32)
-			} else {
-				lower += string(c)
-			}
-		}
-		return lower + "s"
-	}
 }

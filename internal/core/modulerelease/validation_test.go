@@ -519,3 +519,17 @@ func TestValidate_ModuleRelease(t *testing.T) {
 		assert.Contains(t, valErr.Message, "non-concrete values")
 	})
 }
+
+// rewriteErrorPath wraps a CUE error with a new path.
+// Moved here from validation.go — only used in tests.
+func rewriteErrorPath(e cueerrors.Error, basePath []string) cueerrors.Error {
+	errPath := e.Path()
+	newPath := make([]string, 0, len(basePath)+len(errPath))
+	newPath = append(newPath, basePath...)
+	newPath = append(newPath, errPath...)
+
+	return &pathRewrittenError{
+		inner:   e,
+		newPath: newPath,
+	}
+}

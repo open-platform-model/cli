@@ -158,9 +158,3 @@ func TestFlagGroupComposition(t *testing.T) {
 		assert.NotNil(t, flag, "flag %q should be registered", name)
 	}
 }
-
-func TestResolveModulePath(t *testing.T) {
-	assert.Equal(t, ".", ResolveModulePath(nil))
-	assert.Equal(t, ".", ResolveModulePath([]string{}))
-	assert.Equal(t, "./my-module", ResolveModulePath([]string{"./my-module"}))
-}

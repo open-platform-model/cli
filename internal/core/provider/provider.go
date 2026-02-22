@@ -203,21 +203,11 @@ func buildMatchReason(matched bool, detail *transformer.TransformerMatchDetail, 
 			parts = append(parts, "requiredLabels["+strings.Join(labels, ", ")+"]")
 		}
 
-		if len(tf.RequiredResources) > 0 {
-			keys := make([]string, 0, len(tf.RequiredResources))
-			for k := range tf.RequiredResources {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys)
+		if keys := tf.GetRequiredResources(); len(keys) > 0 {
 			parts = append(parts, "requiredResources["+strings.Join(keys, ", ")+"]")
 		}
 
-		if len(tf.RequiredTraits) > 0 {
-			keys := make([]string, 0, len(tf.RequiredTraits))
-			for k := range tf.RequiredTraits {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys)
+		if keys := tf.GetRequiredTraits(); len(keys) > 0 {
 			parts = append(parts, "requiredTraits["+strings.Join(keys, ", ")+"]")
 		}
 

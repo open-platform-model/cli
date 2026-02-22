@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/opmodel/cli/internal/kubernetes"
 )
 
 // helper to build an InventoryEntry quickly
@@ -171,7 +173,7 @@ func TestKindToResource(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.kind, func(t *testing.T) {
-			assert.Equal(t, tc.resource, kindToResource(tc.kind))
+			assert.Equal(t, tc.resource, kubernetes.KindToResource(tc.kind))
 		})
 	}
 }

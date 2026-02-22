@@ -42,10 +42,7 @@ func (p *TransformerMatchPlan) Execute(ctx context.Context, rel *modulerelease.M
 		if match.Component != nil && match.Component.Metadata != nil {
 			compName = match.Component.Metadata.Name
 		}
-		tfFQN := ""
-		if match.Transformer != nil && match.Transformer.Metadata != nil {
-			tfFQN = match.Transformer.Metadata.FQN
-		}
+		tfFQN := match.Transformer.GetFQN()
 
 		res, err := p.executeMatch(match, rel, compName, tfFQN)
 		if err != nil {

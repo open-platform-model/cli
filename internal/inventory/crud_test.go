@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -189,34 +188,6 @@ func TestWriteInventory_OptimisticConcurrency_Conflict(t *testing.T) {
 	// The fake client may not enforce resourceVersion conflicts strictly,
 	// but we verify that passing a resourceVersion triggers an Update (not Create) path.
 	// This tests the code path rather than the Kubernetes conflict behavior.
-}
-
-// --- DeleteInventory ---
-
-func TestDeleteInventory_ExistingSecret(t *testing.T) {
-	testInv := makeTestInventory("myapp", "default", "uuid-del")
-	secret, err := inventory.MarshalToSecret(testInv)
-	require.NoError(t, err)
-	secret.ResourceVersion = "1"
-
-	client := makeTestClient(secret)
-	ctx := context.Background()
-
-	err = inventory.DeleteInventory(ctx, client, "myapp", "default", "uuid-del")
-	require.NoError(t, err)
-
-	// Verify the Secret was deleted
-	_, err = client.Clientset.CoreV1().Secrets("default").Get(ctx, inventory.SecretName("myapp", "uuid-del"), metav1.GetOptions{})
-	assert.True(t, apierrors.IsNotFound(err), "Secret should be deleted")
-}
-
-func TestDeleteInventory_Idempotent_NotFound(t *testing.T) {
-	client := makeTestClient() // no secrets
-	ctx := context.Background()
-
-	// Should not error when Secret doesn't exist
-	err := inventory.DeleteInventory(ctx, client, "nonexistent", "ns", "no-such-uuid")
-	require.NoError(t, err, "delete of non-existent inventory should succeed (idempotent)")
 }
 
 // --- DiscoverResources excludes inventory Secrets ---

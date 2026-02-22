@@ -26,7 +26,6 @@ func NewModDeleteCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var (
 		forceFlag          bool
 		dryRunFlag         bool
-		waitFlag           bool
 		ignoreNotFoundFlag bool
 	)
 
@@ -55,7 +54,7 @@ Examples:
   # Skip confirmation prompt
   opm mod delete --release-name my-app -n production --force`,
 		RunE: func(c *cobra.Command, args []string) error {
-			return runDelete(args, cfg, &rsf, &kf, forceFlag, dryRunFlag, waitFlag, ignoreNotFoundFlag)
+			return runDelete(args, cfg, &rsf, &kf, forceFlag, dryRunFlag, ignoreNotFoundFlag)
 		},
 	}
 
@@ -67,8 +66,6 @@ Examples:
 		"Skip confirmation prompt")
 	c.Flags().BoolVar(&dryRunFlag, "dry-run", false,
 		"Preview without deleting")
-	c.Flags().BoolVar(&waitFlag, "wait", false,
-		"Wait for resources to be deleted")
 	c.Flags().BoolVar(&ignoreNotFoundFlag, "ignore-not-found", false,
 		"Exit 0 when no resources match the selector")
 
@@ -76,7 +73,7 @@ Examples:
 }
 
 // runDelete executes the delete command.
-func runDelete(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, force, dryRun, _ /* wait */, ignoreNotFound bool) error { //nolint:gocyclo // orchestration function; complexity is inherent
+func runDelete(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, force, dryRun, ignoreNotFound bool) error { //nolint:gocyclo // orchestration function; complexity is inherent
 	ctx := context.Background()
 
 	// Validate release selector flags
@@ -125,48 +122,21 @@ func runDelete(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 		}
 	}
 
-	// Resolve the inventory Secret for this release.
-	// --release-id: direct GET by name (opm.<name>.<uuid>), with UUID label fallback.
-	// --release-name: label scan on inventory Secrets only (FindInventoryByReleaseName).
-	var inv *inventory.InventorySecret
-	var invErr error
-	switch {
-	case rsf.ReleaseID != "":
-		relName := rsf.ReleaseName
-		if relName == "" {
-			relName = rsf.ReleaseID
-		}
-		inv, invErr = inventory.GetInventory(ctx, k8sClient, relName, namespace, rsf.ReleaseID)
-	case rsf.ReleaseName != "":
-		inv, invErr = inventory.FindInventoryByReleaseName(ctx, k8sClient, rsf.ReleaseName, namespace)
-	}
-	if invErr != nil {
-		releaseLog.Error("reading inventory", "error", invErr)
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("reading inventory: %w", invErr)}
+	inv, liveResources, _, err := cmdutil.ResolveInventory(ctx, k8sClient, rsf, namespace, ignoreNotFound, releaseLog)
+	if err != nil {
+		return err
 	}
 	if inv == nil {
-		name := rsf.ReleaseName
-		if name == "" {
-			name = rsf.ReleaseID
-		}
-		notFound := &kubernetes.ReleaseNotFoundError{Name: name, Namespace: namespace}
-		if ignoreNotFound {
-			releaseLog.Info("release not found (ignored)")
-			return nil
-		}
-		releaseLog.Error("release not found", "name", name, "namespace", namespace)
-		return &oerrors.ExitError{Code: oerrors.ExitNotFound, Err: notFound, Printed: true}
-	}
-
-	liveResources, _, discoverErr := inventory.DiscoverResourcesFromInventory(ctx, k8sClient, inv)
-	if discoverErr != nil {
-		releaseLog.Error("discovering resources from inventory", "error", discoverErr)
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("discovering resources: %w", discoverErr)}
+		// ignoreNotFound was true and release was not found — treat as no-op.
+		return nil
 	}
 
 	// Delete resources
 	releaseLog.Info(fmt.Sprintf("deleting resources in namespace %q", namespace))
 
+	// The inventory Secret itself is tracked as a managed resource in the inventory,
+	// so it is deleted automatically by kubernetes.Delete via InventorySecretName below.
+	// There is no need to call a separate DeleteInventory function.
 	deleteOpts := kubernetes.DeleteOptions{
 		ReleaseName:              rsf.ReleaseName,
 		Namespace:                namespace,

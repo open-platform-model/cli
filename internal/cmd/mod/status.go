@@ -13,7 +13,6 @@ import (
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	oerrors "github.com/opmodel/cli/internal/errors"
-	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -127,43 +126,13 @@ func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 		return err
 	}
 
-	// Resolve the inventory Secret for this release.
-	// --release-id: direct GET by name (opm.<name>.<uuid>), with UUID label fallback.
-	// --release-name: label scan on inventory Secrets only (FindInventoryByReleaseName).
-	var inv *inventory.InventorySecret
-	var invErr error
-	switch {
-	case rsf.ReleaseID != "":
-		relName := rsf.ReleaseName
-		if relName == "" {
-			relName = rsf.ReleaseID
-		}
-		inv, invErr = inventory.GetInventory(ctx, k8sClient, relName, namespace, rsf.ReleaseID)
-	case rsf.ReleaseName != "":
-		inv, invErr = inventory.FindInventoryByReleaseName(ctx, k8sClient, rsf.ReleaseName, namespace)
-	}
-	if invErr != nil {
-		releaseLog.Error("reading inventory", "error", invErr)
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("reading inventory: %w", invErr)}
+	inv, liveResources, missingEntries, err := cmdutil.ResolveInventory(ctx, k8sClient, rsf, namespace, ignoreNotFound, releaseLog)
+	if err != nil {
+		return err
 	}
 	if inv == nil {
-		name := rsf.ReleaseName
-		if name == "" {
-			name = rsf.ReleaseID
-		}
-		notFound := &kubernetes.ReleaseNotFoundError{Name: name, Namespace: namespace}
-		if ignoreNotFound {
-			releaseLog.Info("release not found (ignored)")
-			return nil
-		}
-		releaseLog.Error("release not found", "name", name, "namespace", namespace)
-		return &oerrors.ExitError{Code: oerrors.ExitNotFound, Err: notFound, Printed: true}
-	}
-
-	liveResources, missingEntries, discoverErr := inventory.DiscoverResourcesFromInventory(ctx, k8sClient, inv)
-	if discoverErr != nil {
-		releaseLog.Error("discovering resources from inventory", "error", discoverErr)
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("discovering resources: %w", discoverErr)}
+		// ignoreNotFound was true and release was not found — treat as no-op.
+		return nil
 	}
 
 	statusOpts := kubernetes.StatusOptions{

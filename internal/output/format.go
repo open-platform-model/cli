@@ -40,13 +40,3 @@ func ParseFormat(s string) (Format, bool) {
 	f := Format(strings.ToLower(s))
 	return f, f.Valid()
 }
-
-// ValidFormats returns all valid output format strings.
-func ValidFormats() []string {
-	return []string{
-		string(FormatYAML),
-		string(FormatJSON),
-		string(FormatTable),
-		string(FormatDir),
-	}
-}

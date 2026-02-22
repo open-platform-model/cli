@@ -149,17 +149,3 @@ func FindInventoryByReleaseName(ctx context.Context, client *kubernetes.Client, 
 	}
 	return inv, nil
 }
-
-// DeleteInventory deletes the inventory Secret for a release.
-// Treats 404 (not found) as success — idempotent.
-func DeleteInventory(ctx context.Context, client *kubernetes.Client, name, namespace, releaseID string) error {
-	secretName := SecretName(name, releaseID)
-
-	err := client.Clientset.CoreV1().Secrets(namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return fmt.Errorf("deleting inventory Secret %q: %w", secretName, err)
-	}
-
-	output.Debug("deleted inventory Secret", "name", secretName, "namespace", namespace)
-	return nil
-}

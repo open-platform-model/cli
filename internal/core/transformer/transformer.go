@@ -28,8 +28,8 @@ type Transformer struct {
 }
 
 // TransformerMetadata holds identity metadata for a transformer.
+// Note: APIVersion is on the parent Transformer struct; it is not duplicated here.
 type TransformerMetadata struct {
-	APIVersion  string            `json:"apiVersion"`
 	Name        string            `json:"name"`
 	FQN         string            `json:"fqn"`
 	Description string            `json:"description,omitempty"`

@@ -59,13 +59,3 @@ func TestParseFormat(t *testing.T) {
 		})
 	}
 }
-
-func TestValidFormats(t *testing.T) {
-	formats := ValidFormats()
-
-	assert.Contains(t, formats, "yaml")
-	assert.Contains(t, formats, "json")
-	assert.Contains(t, formats, "table")
-	assert.Contains(t, formats, "dir")
-	assert.Len(t, formats, 4)
-}

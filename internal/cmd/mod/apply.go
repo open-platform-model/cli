@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -24,8 +23,6 @@ func NewModApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 	// Apply-specific flags (local to this command)
 	var (
 		dryRunFlag     bool
-		waitFlag       bool
-		timeoutFlag    time.Duration
 		createNSFlag   bool
 		noPruneFlag    bool
 		maxHistoryFlag int
@@ -60,9 +57,6 @@ Examples:
   # Preview what would be applied
   opm mod apply --dry-run
 
-  # Apply and wait for resources to be ready
-  opm mod apply --wait --timeout 10m
-
   # Apply without pruning stale resources
   opm mod apply --no-prune
 
@@ -70,7 +64,7 @@ Examples:
   opm mod apply --verbose`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runApply(args, cfg, &rf, &kf, dryRunFlag, waitFlag, timeoutFlag, createNSFlag, noPruneFlag, maxHistoryFlag, forceFlag)
+			return runApply(args, cfg, &rf, &kf, dryRunFlag, createNSFlag, noPruneFlag, maxHistoryFlag, forceFlag)
 		},
 	}
 
@@ -80,10 +74,6 @@ Examples:
 	// Apply-specific flags
 	c.Flags().BoolVar(&dryRunFlag, "dry-run", false,
 		"Server-side dry run (no changes made)")
-	c.Flags().BoolVar(&waitFlag, "wait", false,
-		"Wait for resources to be ready")
-	c.Flags().DurationVar(&timeoutFlag, "timeout", 5*time.Minute,
-		"Wait timeout")
 	c.Flags().BoolVar(&createNSFlag, "create-namespace", false,
 		"Create target namespace if it does not exist")
 	c.Flags().BoolVar(&noPruneFlag, "no-prune", false,
@@ -110,7 +100,7 @@ Examples:
 //     7b. Skip prune and inventory write if any apply failed
 //  8. Write inventory Secret with new change entry
 func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, kf *cmdutil.K8sFlags, //nolint:gocyclo // orchestration function; complexity is inherent
-	dryRun, wait bool, timeout time.Duration, createNS, noProbe bool, maxHistory int, force bool) error {
+	dryRun, createNS, noProbe bool, maxHistory int, force bool) error {
 	ctx := context.Background()
 
 	// Resolve all Kubernetes configuration once (flag > env > config > default).
@@ -179,6 +169,9 @@ func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 	output.Debug("manifest digest computed", "digest", manifestDigest)
 
 	// Step 3: Compute change ID
+	// Intentional: use "" as default (not ".") to preserve backward-compatible change IDs.
+	// inventory.ComputeChangeID writes modulePath bytes into SHA1; "" and "." differ,
+	// so switching defaults would invalidate existing inventory change IDs for local modules.
 	modulePath := ""
 	if len(args) > 0 {
 		modulePath = args[0]

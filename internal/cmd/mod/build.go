@@ -90,7 +90,7 @@ func runBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 		ProviderFlag:  rf.Provider,
 	})
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving config: %w", err)}
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
 	// Render module via shared pipeline

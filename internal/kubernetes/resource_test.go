@@ -30,7 +30,7 @@ func TestKindToResource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.kind, func(t *testing.T) {
-			assert.Equal(t, tt.expected, kindToResource(tt.kind))
+			assert.Equal(t, tt.expected, KindToResource(tt.kind))
 		})
 	}
 }
@@ -54,7 +54,7 @@ func TestHeuristicPluralize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.kind, func(t *testing.T) {
-			assert.Equal(t, tt.expected, heuristicPluralize(tt.kind))
+			assert.Equal(t, tt.expected, HeuristicPluralize(tt.kind))
 		})
 	}
 }

@@ -25,7 +25,6 @@ func TestNewTransformerContext(t *testing.T) {
 				Version: "1.0.0",
 				FQN:     "example.com/modules@v0#MyModule",
 				UUID:    "module-uuid",
-				Labels:  map[string]string{"env": "prod"},
 			},
 		},
 	}
@@ -100,7 +99,6 @@ func TestTransformerContext_ToMap(t *testing.T) {
 		Name:    "my-module",
 		FQN:     "example.com/modules@v0#MyModule",
 		Version: "2.0.0",
-		Labels:  map[string]string{"team": "platform"},
 	}
 	relMeta := &modulerelease.ReleaseMetadata{
 		Name:      "release-name",
@@ -113,7 +111,7 @@ func TestTransformerContext_ToMap(t *testing.T) {
 		Namespace:       "production",
 		ModuleMetadata:  modMeta,
 		ReleaseMetadata: relMeta,
-		ComponentMetadata: &TransformerComponentMetadata{
+		ComponentMetadata: &component.ComponentMetadata{
 			Name:   "api",
 			Labels: map[string]string{"tier": "backend"},
 		},
@@ -147,7 +145,6 @@ func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
 			Metadata: &module.ModuleMetadata{
 				Name:    "my-module",
 				Version: "1.0.0",
-				Labels:  map[string]string{},
 			},
 		},
 	}
@@ -180,7 +177,6 @@ func TestNewTransformerContext_EmptyAnnotations(t *testing.T) {
 			Metadata: &module.ModuleMetadata{
 				Name:    "my-module",
 				Version: "1.0.0",
-				Labels:  map[string]string{},
 			},
 		},
 	}
@@ -212,7 +208,7 @@ func TestTransformerContext_ToMap_WithAnnotations(t *testing.T) {
 			Name:      "release-name",
 			Namespace: "production",
 		},
-		ComponentMetadata: &TransformerComponentMetadata{
+		ComponentMetadata: &component.ComponentMetadata{
 			Name: "volumes-component",
 			Annotations: map[string]string{
 				"transformer.opmodel.dev/list-output": "true",
@@ -241,7 +237,7 @@ func TestTransformerContext_ToMap_WithoutAnnotations(t *testing.T) {
 			Name:      "release-name",
 			Namespace: "production",
 		},
-		ComponentMetadata: &TransformerComponentMetadata{
+		ComponentMetadata: &component.ComponentMetadata{
 			Name:        "simple-component",
 			Annotations: map[string]string{},
 		},

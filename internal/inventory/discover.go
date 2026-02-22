@@ -37,7 +37,7 @@ func DiscoverResourcesFromInventory(ctx context.Context, client *kubernetes.Clie
 		gvr := schema.GroupVersionResource{
 			Group:    entry.Group,
 			Version:  entry.Version,
-			Resource: kindToResource(entry.Kind),
+			Resource: kubernetes.KindToResource(entry.Kind),
 		}
 
 		obj, getErr := client.ResourceClient(gvr, entry.Namespace).Get(ctx, entry.Name, metav1.GetOptions{})

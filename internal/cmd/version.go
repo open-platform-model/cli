@@ -2,8 +2,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/config"
@@ -27,13 +25,6 @@ Displays:
 
 func runVersion(cmd *cobra.Command, args []string) error {
 	info := version.Get()
-
-	// Print CLI version info
-	output.Println(fmt.Sprintf("opm version %s", info.Version))
-	output.Println(fmt.Sprintf("  Commit:    %s", info.GitCommit))
-	output.Println(fmt.Sprintf("  Built:     %s", info.BuildDate))
-	output.Println(fmt.Sprintf("  Go:        %s", info.GoVersion))
-	output.Println(fmt.Sprintf("  CUE SDK:   %s", info.CUESDKVersion))
-
+	output.Println(info.String())
 	return nil
 }

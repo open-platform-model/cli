@@ -69,8 +69,6 @@ func buildFilenameFromInfo(res ResourceInfo, format Format, usedNames map[string
 	return baseName + ext
 }
 
-// buildFilenameFromUnstructured creates a filename for an unstructured resource.
-
 // sanitizeName makes a name safe for use in filenames.
 func sanitizeName(name string) string {
 	replacer := strings.NewReplacer(
@@ -97,5 +95,3 @@ func writeResourceFileFromInfo(res ResourceInfo, destPath string, format Format)
 
 	return writeResource(res.GetObject(), format, f)
 }
-
-// writeResourceFile writes a single unstructured resource to a file.

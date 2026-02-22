@@ -233,17 +233,4 @@ func extractModuleMetadata(v cue.Value, meta *module.ModuleMetadata) { //nolint:
 		}
 	}
 
-	if labelsVal := v.LookupPath(cue.ParsePath("metadata.labels")); labelsVal.Exists() {
-		labels := make(map[string]string)
-		if iter, err := labelsVal.Fields(); err == nil {
-			for iter.Next() {
-				if str, err := iter.Value().String(); err == nil {
-					labels[iter.Selector().Unquoted()] = str
-				}
-			}
-		}
-		if len(labels) > 0 {
-			meta.Labels = labels
-		}
-	}
 }

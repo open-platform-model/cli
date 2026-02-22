@@ -112,7 +112,7 @@ func applyResource(ctx context.Context, client *Client, obj *unstructured.Unstru
 
 	patchOpts := metav1.PatchOptions{
 		FieldManager: fieldManagerName,
-		Force:        boolPtr(true),
+		Force:        output.BoolPtr(true),
 	}
 
 	if opts.DryRun {
@@ -135,8 +135,4 @@ func applyResource(ctx context.Context, client *Client, obj *unstructured.Unstru
 		return output.StatusUnchanged, nil
 	}
 	return output.StatusConfigured, nil
-}
-
-func boolPtr(b bool) *bool {
-	return &b
 }

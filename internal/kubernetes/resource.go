@@ -14,7 +14,7 @@ func gvrFromUnstructured(obj *unstructured.Unstructured) schema.GroupVersionReso
 	return schema.GroupVersionResource{
 		Group:    gvk.Group,
 		Version:  gvk.Version,
-		Resource: kindToResource(gvk.Kind),
+		Resource: KindToResource(gvk.Kind),
 	}
 }
 
@@ -60,17 +60,17 @@ var knownKindResources = map[string]string{
 	"ValidatingAdmissionPolicyBinding": "validatingadmissionpolicybindings",
 }
 
-// kindToResource converts a Kind to its plural resource name.
+// KindToResource converts a Kind to its plural resource name.
 // Uses a known lookup table for common types, falls back to heuristic.
-func kindToResource(kind string) string {
+func KindToResource(kind string) string {
 	if resource, ok := knownKindResources[kind]; ok {
 		return resource
 	}
-	return heuristicPluralize(kind)
+	return HeuristicPluralize(kind)
 }
 
-// heuristicPluralize applies simple English pluralization rules.
-func heuristicPluralize(kind string) string {
+// HeuristicPluralize applies simple English pluralization rules.
+func HeuristicPluralize(kind string) string {
 	lower := strings.ToLower(kind)
 	switch {
 	case strings.HasSuffix(lower, "ss") || strings.HasSuffix(lower, "sh") || strings.HasSuffix(lower, "ch") || strings.HasSuffix(lower, "x"):

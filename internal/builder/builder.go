@@ -180,24 +180,8 @@ func extractReleaseMetadata(result cue.Value, opts Options) (*modulerelease.Rele
 		}
 	}
 
-	if v := result.LookupPath(cue.ParsePath("metadata.version")); v.Exists() {
-		if s, err := v.String(); err == nil {
-			_ = s // version is on module metadata; stored separately if needed
-		}
-	}
-
-	if labelsVal := result.LookupPath(cue.ParsePath("metadata.labels")); labelsVal.Exists() {
-		labels := make(map[string]string)
-		if iter, err := labelsVal.Fields(); err == nil {
-			for iter.Next() {
-				if s, err := iter.Value().String(); err == nil {
-					labels[iter.Selector().Unquoted()] = s
-				}
-			}
-		}
-		if len(labels) > 0 {
-			meta.Labels = labels
-		}
+	if labels, err := extractCUEStringMap(result, "metadata.labels"); err == nil && len(labels) > 0 {
+		meta.Labels = labels
 	}
 
 	return meta, nil
