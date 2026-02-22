@@ -113,16 +113,32 @@ The `examples/jellyfin` module demonstrates a stateful single-container applicat
 
 ### Build (render manifests locally)
 
+Without `--release-name` (defaults to the module name):
+
 ```bash
 opm mod build ./examples/jellyfin -n default
+```
+
+With a custom release name:
+
+```bash
+opm mod build ./examples/jellyfin -n default --release-name jellyfin-media
 ```
 
 Renders Kubernetes manifests from the module definition.
 
 ### Apply (deploy to cluster)
 
+Without `--release-name` (defaults to the module name):
+
 ```bash
 opm mod apply ./examples/jellyfin -n default
+```
+
+With a custom release name:
+
+```bash
+opm mod apply ./examples/jellyfin -n default --release-name jellyfin-media
 ```
 
 Applies resources to the cluster using server-side apply.
@@ -166,6 +182,15 @@ opm mod status --name Blog -n default
 opm mod delete --name Blog -n default --force
 ```
 
+With a custom release name:
+
+```bash
+opm mod build ./examples/blog -n default --release-name my-blog
+opm mod apply ./examples/blog -n default --release-name my-blog
+opm mod status --name my-blog -n default
+opm mod delete --name my-blog -n default --force
+```
+
 **Multi-tier** — demonstrates all four workload types (stateful, daemon, task, scheduled-task):
 
 ```bash
@@ -173,6 +198,15 @@ opm mod build ./examples/multi-tier-module -n default
 opm mod apply ./examples/multi-tier-module -n default
 opm mod status --name multi-tier-module -n default
 opm mod delete --name multi-tier-module -n default --force
+```
+
+With a custom release name:
+
+```bash
+opm mod build ./examples/multi-tier-module -n default --release-name my-app
+opm mod apply ./examples/multi-tier-module -n default --release-name my-app
+opm mod status --name my-app -n default
+opm mod delete --name my-app -n default --force
 ```
 
 ## Cleanup
