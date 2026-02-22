@@ -241,7 +241,7 @@ func TestLoadModule_InlineValues_NoSeparateValuesFile(t *testing.T) {
 // Metadata extraction
 // ---------------------------------------------------------------------------
 
-// TestLoadModule_Success verifies that LoadModule returns a fully populated *core.Module
+// TestLoadModule_Success verifies that LoadModule returns a fully populated *module.Module
 // with all fields set and that the module passes Validate().
 // Uses the test-module fixture (pure Pattern A).
 func TestLoadModule_Success(t *testing.T) {

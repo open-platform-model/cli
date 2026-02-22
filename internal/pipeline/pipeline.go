@@ -51,10 +51,10 @@ func NewPipeline(cueCtx *cue.Context, providers map[string]cue.Value, registry s
 // Render executes the pipeline and returns results.
 //
 // Phase sequence:
-//  1. PREPARATION:    loader.LoadModule() → *core.Module
-//  2. PROVIDER LOAD:  loader.LoadProvider() → *core.Provider
-//  3. BUILD:          builder.Build() → *core.ModuleRelease; then ValidateValues + Validate
-//  4. MATCHING:       core.Provider.Match() → *core.TransformerMatchPlan
+//  1. PREPARATION:    loader.LoadModule() → *module.Module
+//  2. PROVIDER LOAD:  loader.LoadProvider() → *coreprovider.Provider
+//  3. BUILD:          builder.Build() → *modulerelease.ModuleRelease; then ValidateValues + Validate
+//  4. MATCHING:       coreprovider.Provider.Match() → *transformer.TransformerMatchPlan
 //  5. GENERATE:       matchPlan.Execute() → []*core.Resource + []error
 //
 // Fatal errors from phases 1-4 return (nil, err). Generate errors land in

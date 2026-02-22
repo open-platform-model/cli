@@ -1,7 +1,16 @@
-## ADDED Requirements
+# Core Transformer
+
+## Purpose
+
+Defines transformer types, matching structures, context, execution logic, and warning collection in `internal/core/transformer`, mirroring `transformer.cue` in the CUE catalog. Consolidates transformer-related code previously spread across `internal/core/` and `internal/transformer/`.
+
+---
+
+## Requirements
 
 ### Requirement: Transformer types live in a dedicated subpackage
-`Transformer`, `TransformerMetadata`, `TransformerRequirements`, `TransformerContext`, `TransformerComponentMetadata`, `TransformerMatchPlan`, `TransformerMatch`, and `TransformerMatchDetail` SHALL be defined in `internal/core/transformer` (package `transformer`), mirroring `transformer.cue` in the CUE catalog. The package SHALL only import `internal/core`, `internal/core/component`, `internal/core/modulerelease`, CUE SDK, K8s apimachinery, and stdlib.
+
+`Transformer`, `TransformerMetadata`, `TransformerRequirements`, `TransformerContext`, `TransformerComponentMetadata`, `TransformerMatchPlan`, `TransformerMatch`, and `TransformerMatchDetail` SHALL be defined in `internal/core/transformer` (package `transformer`), mirroring `transformer.cue` in the CUE catalog. The package SHALL only import `internal/core`, `internal/core/component`, `internal/core/module`, `internal/core/modulerelease`, CUE SDK, K8s apimachinery, and stdlib. (`internal/core/module` is needed because `TransformerContext` holds a `*module.ModuleMetadata` reference.)
 
 #### Scenario: Package compiles with correct import path
 - **WHEN** a consumer imports `github.com/opmodel/cli/internal/core/transformer`
@@ -12,6 +21,7 @@
 - **THEN** it SHALL NOT import `internal/core/provider`
 
 ### Requirement: `CollectWarnings` is defined in the transformer package
+
 `CollectWarnings`, previously in `internal/transformer`, SHALL be defined in `internal/core/transformer` alongside `TransformerMatchPlan` which it operates on. The `internal/transformer` package SHALL be deleted.
 
 #### Scenario: CollectWarnings is accessible from core/transformer
@@ -23,6 +33,7 @@
 - **THEN** no file imports `github.com/opmodel/cli/internal/transformer`
 
 ### Requirement: Transformer execution behavior is preserved
+
 `TransformerMatchPlan.Execute()` SHALL produce identical resources and errors for identical inputs after the move.
 
 #### Scenario: Matched transformers produce same resources
@@ -34,6 +45,7 @@
 - **THEN** execution stops and `ctx.Err()` is returned as an error
 
 ### Requirement: Legacy MatchPlan types are preserved unchanged
+
 `MatchPlan`, `TransformerMatchOld`, and `ToLegacyMatchPlan()` SHALL be carried forward into the `transformer` package without modification. They remain as-is pending a separate cleanup change.
 
 #### Scenario: ToLegacyMatchPlan produces same output

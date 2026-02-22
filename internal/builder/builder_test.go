@@ -77,7 +77,7 @@ func TestBuild_EndToEnd(t *testing.T) {
 	assert.Equal(t, opts.Namespace, rel.Metadata.Namespace)
 }
 
-// TestBuild_ValuesViolateConfig ensures a *core.ValidationError is returned when
+// TestBuild_ValuesViolateConfig ensures a *errors.ValidationError is returned when
 // provided values do not satisfy the module's #config schema.
 func TestBuild_ValuesViolateConfig(t *testing.T) {
 	requireRegistry(t)
@@ -100,7 +100,7 @@ func TestBuild_ValuesViolateConfig(t *testing.T) {
 }
 
 // TestBuild_NonConcreteResult ensures that if values are incomplete and leave
-// #ModuleRelease non-concrete, a *core.ValidationError is returned.
+// #ModuleRelease non-concrete, a *errors.ValidationError is returned.
 func TestBuild_NonConcreteResult(t *testing.T) {
 	requireRegistry(t)
 

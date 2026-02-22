@@ -52,7 +52,7 @@ transformers: {
 }
 `
 
-// 3.1 — Named provider found returns *core.Provider with correct transformer count.
+// 3.1 — Named provider found returns *coreprovider.Provider with correct transformer count.
 func TestLoadProvider_NamedProviderFound(t *testing.T) {
 	ctx := cuecontext.New()
 	providers := buildProviderMap(ctx, map[string]string{
@@ -116,7 +116,7 @@ func TestLoadProvider_TransformerFQN(t *testing.T) {
 	assert.Equal(t, "kubernetes#deployment", p.Transformers["deployment"].GetFQN())
 }
 
-// 3.6 — Transformer with required and optional criteria populates all fields on *core.Transformer.
+// 3.6 — Transformer with required and optional criteria populates all fields on *transformer.Transformer.
 func TestLoadProvider_TransformerCriteria_AllFields(t *testing.T) {
 	ctx := cuecontext.New()
 	providers := buildProviderMap(ctx, map[string]string{
@@ -205,7 +205,7 @@ transformers: {
 	assert.Contains(t, fqns, "kubernetes#configmap")
 }
 
-// CueCtx is set on returned *core.Provider.
+// CueCtx is set on returned *coreprovider.Provider.
 func TestLoadProvider_CueCtxSet(t *testing.T) {
 	ctx := cuecontext.New()
 	providers := buildProviderMap(ctx, map[string]string{
