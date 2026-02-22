@@ -3,7 +3,6 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -142,14 +141,6 @@ func (p *pipeline) prepare(opts RenderOptions) (*module.Module, string, string, 
 	}
 	if err := mod.Validate(); err != nil {
 		return nil, "", "", err
-	}
-
-	// When no --values flags are provided, values.cue must exist on disk.
-	if len(opts.Values) == 0 {
-		valuesPath := filepath.Join(mod.ModulePath, "values.cue")
-		if _, statErr := os.Stat(valuesPath); os.IsNotExist(statErr) {
-			return nil, "", "", fmt.Errorf("values.cue not found in %s — provide values via values.cue or --values flag", mod.ModulePath)
-		}
 	}
 
 	// Build a set of explicitly-requested values file basenames so we can

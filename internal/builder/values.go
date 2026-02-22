@@ -50,7 +50,7 @@ func selectValues(ctx *cue.Context, mod *module.Module, valuesFiles []string) (c
 
 	if !mod.Values.Exists() {
 		return cue.Value{}, &opmerrors.ValidationError{
-			Message: "module missing 'values' field — provide values via values.cue or --values flag",
+			Message: "no values available — define 'values:' in values.cue, module.cue, or pass --values flag",
 		}
 	}
 	return mod.Values, nil
