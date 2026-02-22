@@ -130,7 +130,7 @@ func TestTransformerContext_ToMap(t *testing.T) {
 	assert.Equal(t, "production", moduleReleaseMetadata["namespace"])                // release namespace
 	assert.Equal(t, "2.0.0", moduleReleaseMetadata["version"])                       // module version
 	assert.Equal(t, "example.com/modules@v0#MyModule", moduleReleaseMetadata["fqn"]) // module FQN
-	assert.Equal(t, "release-uuid", moduleReleaseMetadata["identity"])               // release UUID
+	assert.Equal(t, "release-uuid", moduleReleaseMetadata["uuid"])                   // release UUID
 
 	componentMetadata := m["#componentMetadata"].(map[string]any)
 	assert.Equal(t, "api", componentMetadata["name"])

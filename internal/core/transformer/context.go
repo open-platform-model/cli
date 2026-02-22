@@ -61,8 +61,8 @@ func NewTransformerContext(rel *modulerelease.ModuleRelease, comp *component.Com
 
 // ToMap converts TransformerContext to a map for CUE encoding.
 // The output shape matches the CUE #context definition:
-// #moduleReleaseMetadata contains name, namespace, fqn, version, identity, labels.
-// The identity value is the release UUID (from ReleaseMetadata.UUID).
+// #moduleReleaseMetadata contains name, namespace, fqn, version, uuid, labels.
+// The uuid value is the release UUID (from ReleaseMetadata.UUID).
 // The fqn and version values come from ModuleMetadata.
 func (c *TransformerContext) ToMap() map[string]any {
 	moduleReleaseMetadata := map[string]any{
@@ -70,7 +70,7 @@ func (c *TransformerContext) ToMap() map[string]any {
 		"namespace": c.ReleaseMetadata.Namespace,
 		"fqn":       c.ModuleMetadata.FQN,
 		"version":   c.ModuleMetadata.Version,
-		"identity":  c.ReleaseMetadata.UUID,
+		"uuid":      c.ReleaseMetadata.UUID,
 	}
 	if len(c.ReleaseMetadata.Labels) > 0 {
 		moduleReleaseMetadata["labels"] = c.ReleaseMetadata.Labels

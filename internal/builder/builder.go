@@ -1,6 +1,6 @@
 // Package builder implements the BUILD phase of the OPM render pipeline.
 //
-// It uses Approach C: load #ModuleRelease from opmodel.dev/core@v0 (resolved
+// load #ModuleRelease from opmodel.dev/core@v0 (resolved
 // from the module's own pinned dependency cache), inject the module and user
 // values via FillPath, and let CUE evaluate UUID, labels, components, and
 // metadata natively. Go only reads back the resulting concrete values.
@@ -32,7 +32,7 @@ type Options struct {
 
 // Build creates a concrete *modulerelease.ModuleRelease from a pre-loaded *module.Module.
 //
-// The build process (Approach C):
+// The build process:
 //  1. Load opmodel.dev/core@v0 from the module's pinned dependency cache
 //  2. Extract #ModuleRelease schema from the core value
 //  3. Select values: use valuesFiles if provided, else mod.Values
@@ -45,7 +45,7 @@ type Options struct {
 // The ctx must be the same context used to load the module (mod.Raw was built
 // with it). Passing a different context will cause FillPath to fail.
 func Build(ctx *cue.Context, mod *module.Module, opts Options, valuesFiles []string) (*modulerelease.ModuleRelease, error) { //nolint:gocyclo // sequential build pipeline; each branch handles a distinct build step
-	output.Debug("building release (Approach C)",
+	output.Debug("building release",
 		"path", mod.ModulePath,
 		"name", opts.Name,
 		"namespace", opts.Namespace,
