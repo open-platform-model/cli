@@ -126,8 +126,9 @@ func TestLoadModule_EvaluationError(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestLoadModule_ExtraValuesFilesFilteredSilently proves that a module directory
-// containing values_prod.cue alongside values.cue loads without error, and
-// that mod.Values reflects only values.cue — the extra file has no effect.
+// containing values_prod.cue alongside values.cue loads without error, that
+// mod.Values reflects only values.cue, and that the extra file is reported in
+// mod.SkippedValuesFiles for the pipeline to use in user-facing messages.
 func TestLoadModule_ExtraValuesFilesFilteredSilently(t *testing.T) {
 	ctx := cuecontext.New()
 	mod, err := loader.LoadModule(ctx, fixture(t, "extra-values-module"), "")
@@ -146,6 +147,13 @@ func TestLoadModule_ExtraValuesFilesFilteredSilently(t *testing.T) {
 	require.NoError(t, repErr, "values.replicas must be a concrete int")
 	assert.Equal(t, int64(1), replicas,
 		"replicas must match values.cue default, not values_prod.cue override")
+
+	// The extra values file must be reported so the pipeline can produce an
+	// accurate filtered-files message without knowing the --values flag.
+	assert.Equal(t, []string{"values_prod.cue"}, mod.SkippedValuesFiles,
+		"values_prod.cue must appear in SkippedValuesFiles")
+	assert.True(t, mod.HasValuesCue,
+		"HasValuesCue must be true when values.cue is present")
 }
 
 // ---------------------------------------------------------------------------

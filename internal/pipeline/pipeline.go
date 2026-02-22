@@ -152,6 +152,33 @@ func (p *pipeline) prepare(opts RenderOptions) (*module.Module, string, string, 
 		}
 	}
 
+	// Build a set of explicitly-requested values file basenames so we can
+	// produce an accurate "filtered" message: only files that are truly
+	// not being used should appear there.
+	requestedSet := make(map[string]bool, len(opts.Values))
+	for _, vf := range opts.Values {
+		requestedSet[filepath.Base(vf)] = true
+	}
+
+	// Collect files that were filtered from the package load AND are not
+	// actively being used as values:
+	//   - When --values is provided, values.cue is bypassed entirely.
+	//   - Any skipped values*.cue file not in the explicit --values list is unused.
+	var filteredNotUsed []string
+	if mod.HasValuesCue && len(opts.Values) > 0 {
+		filteredNotUsed = append(filteredNotUsed, "values.cue")
+	}
+	for _, f := range mod.SkippedValuesFiles {
+		if !requestedSet[f] {
+			filteredNotUsed = append(filteredNotUsed, f)
+		}
+	}
+	if len(filteredNotUsed) > 0 {
+		output.Debug("filtered values files from package load (use --values to apply them)",
+			"files", strings.Join(filteredNotUsed, ", "),
+		)
+	}
+
 	if len(opts.Values) > 0 {
 		names := make([]string, len(opts.Values))
 		for i, vf := range opts.Values {

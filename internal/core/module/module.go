@@ -38,6 +38,18 @@ type Module struct {
 
 	// Raw is the fully evaluated CUE value for the module, set by module.Load().
 	Raw cue.Value
+
+	// SkippedValuesFiles holds the basenames of values*.cue files (excluding
+	// values.cue) that were filtered from the CUE package load. Populated by
+	// the loader; consumed by the pipeline to produce accurate user-facing debug
+	// messages after it knows which --values files are explicitly requested.
+	SkippedValuesFiles []string `json:"-"`
+
+	// HasValuesCue is true when values.cue was found in the module directory
+	// and loaded separately into Values. Used by the pipeline to decide whether
+	// values.cue itself should appear in the "filtered" message when --values
+	// files are explicitly provided (bypassing values.cue entirely).
+	HasValuesCue bool `json:"-"`
 }
 
 // PkgName returns the CUE package name of the module.

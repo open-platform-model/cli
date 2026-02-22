@@ -77,11 +77,8 @@ func LoadModule(cueCtx *cue.Context, modulePath, registry string) (*module.Modul
 		}
 		moduleFiles = append(moduleFiles, "./"+rel)
 	}
-	if len(skippedValuesFiles) > 0 {
-		output.Debug("filtered values files from package load (use --values to apply them)",
-			"files", strings.Join(skippedValuesFiles, ", "),
-		)
-	}
+	mod.SkippedValuesFiles = skippedValuesFiles
+	mod.HasValuesCue = valuesFilePath != ""
 
 	if len(moduleFiles) == 0 {
 		return nil, fmt.Errorf("no non-values .cue files found in %s", mod.ModulePath)
