@@ -2,50 +2,53 @@
 
 The current `opm mod status` implementation lives across three files:
 
-- `internal/cmd/mod_status.go` — command wiring, flag parsing, watch loop
-- `internal/kubernetes/status.go` — `GetModuleStatus()`, `StatusResult`, formatting
+- `internal/cmd/mod/status.go` — command wiring, flag parsing, watch loop
+- `internal/kubernetes/status.go` — `GetReleaseStatus()`, `StatusResult`, formatting
 - `internal/kubernetes/health.go` — `evaluateHealth()`, health status types
 
 The data flow today:
 
 ```text
-cmd/mod_status.go                kubernetes/status.go              kubernetes/discovery.go
-┌──────────────┐                ┌──────────────────┐              ┌────────────────────┐
-│ runStatus()  │───────────────▶│ GetModuleStatus() │─────────────▶│ DiscoverResources()│
-│              │                │                   │              │                    │
-│ • validate   │                │ • discover        │              │ • label selector   │
-│   flags      │                │ • evaluate health │              │ • scan all APIs    │
-│ • resolve    │                │ • compute age     │              │ • filter by labels │
-│   k8s config │                │ • aggregate       │              │ • exclude owned    │
-│ • create     │                │                   │              │                    │
-│   client     │                │ Returns:          │              │ Returns:           │
-│              │                │ StatusResult{     │              │ []*Unstructured    │
-│              │                │   Resources[]     │              └────────────────────┘
-│              │                │   AggregateStatus │
-│              │                │   ModuleID        │
-│              │                │   ReleaseID       │
-│              │                │ }                 │
-│              │◀───────────────│                   │
-│ format +     │                └──────────────────┘
-│ print        │
-└──────────────┘
+cmd/mod/status.go              inventory/                kubernetes/status.go
+┌───────────────┐                ┌────────────────────┐    ┌────────────────────┐
+│ runStatus()   │──────────────▶│ GetInventory() or  │    │ GetReleaseStatus() │
+│               │                │ FindInventoryBy    │    │                    │
+│ • resolve     │                │ ReleaseName()      │    │ • evaluate health  │
+│   k8s config  │                └────────┬───────────┘    │ • compute age      │
+│ • load        │                         │                │ • populate         │
+│   inventory   │                         ▼                │   component from   │
+│ • build       │                ┌────────────────────┐    │   ComponentMap     │
+│   ComponentMap│──────────────▶│ DiscoverResources  │    │ • populate         │
+│ • extract     │                │ FromInventory()    │    │   version/name     │
+│   version     │                │ (targeted GET per  │    │   from opts        │
+│               │                │  inventory entry)  │    │                    │
+│               │                │                    │    │ Returns:           │
+│               │                │ Returns:           │    │ StatusResult{      │
+│               │                │ live []*Unstructured    │   Resources[]      │
+│               │                │ missing []Entry    │    │   ReleaseName      │
+│               │                └────────┬───────────┘    │   Version          │
+│               │───────────────────────▶│                │   AggregateStatus  │
+│ format +      │◀────────────────────────────────────────│   Summary          │
+│ print         │                                          │ }                  │
+└───────────────┘                                          └────────────────────┘
 ```
 
 Key constraints from the current implementation:
 
-1. **Status is source-free** — it only queries the cluster via labels, never re-renders the module. This is intentional and must be preserved.
-2. **Discovery returns `*unstructured.Unstructured`** — the raw K8s objects are available, so we can extract any field from `.spec`, `.status`, or `.metadata.labels` without additional API calls.
-3. **Labels already on resources** include component name (`component.opmodel.dev/name`) and version (`module-release.opmodel.dev/version`) — these exist but are not read by status today.
-4. **The table uses `output.NewTable()`** which renders via `lipgloss/table`. Cell content is currently raw strings — color must be applied by rendering styled strings into cell values before passing to the table.
-5. **Exit codes are defined in `internal/errors/errors.go`** with existing constants: `ExitSuccess(0)`, `ExitGeneralError(1)`, `ExitValidationError(2)`, `ExitConnectivityError(3)`, `ExitPermissionDenied(4)`, `ExitNotFound(5)`.
+1. **Status is inventory-driven** — resources are discovered via the inventory Secret (targeted GET per entry), not via label scanning. The command layer pre-fetches live resources and passes them via `StatusOptions.InventoryLive`. No `discovery.go` exists in `internal/kubernetes/`.
+2. **Component names come from the inventory** — `InventoryEntry.Component` stores the component name at apply time. The command layer builds a `ComponentMap` from inventory entries and passes it through `StatusOptions`. No label constants are needed for component lookup.
+3. **Release metadata comes from the inventory** — `ReleaseName` and `Namespace` are already in `StatusOptions`; `Version` is sourced from `inv.Changes[latest].Source.Version` in the command layer.
+4. **Discovery returns `*unstructured.Unstructured`** — the raw K8s objects are available for wide-mode field extraction. For missing resources (tracked in inventory but no longer on the cluster), there is no live object.
+5. **The table uses `output.NewTable()`** which renders via `lipgloss/table`. Cell content is currently raw strings — color must be applied by rendering styled strings into cell values before passing to the table.
+6. **Exit codes are defined in `internal/errors/errors.go`** with existing constants: `ExitSuccess(0)`, `ExitGeneralError(1)`, `ExitValidationError(2)`, `ExitConnectivityError(3)`, `ExitPermissionDenied(4)`, `ExitNotFound(5)`.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Add component, version, and resource summary to status output using labels already on cluster resources
+- Add component, version, and resource summary to status output using data already available in the inventory
 - Provide wide format (`-o wide`) with workload-specific columns extracted from the unstructured objects already returned by discovery
-- Provide verbose mode (`--verbose`) with pod-level diagnostics for unhealthy workloads via ownerReference walking
+- Provide verbose mode (`--verbose`) with pod-level diagnostics for unhealthy workloads via label selector-based pod listing
 - Define semantic exit codes that distinguish "command failed" from "resources unhealthy"
 - Apply color to status output using the existing lipgloss palette
 
@@ -54,7 +57,7 @@ Key constraints from the current implementation:
 - Drift detection (handled separately by `mod diff`)
 - Event aggregation (handled separately by `mod events`)
 - Module source or registry queries — status remains source-free
-- Changes to the discovery mechanism itself
+- Changes to the inventory discovery mechanism itself
 - Custom resource detailed status (beyond existing Ready condition check)
 
 ## Decisions
@@ -119,35 +122,73 @@ type statusSummary struct {
 }
 ```
 
-The old `ModuleID` and `ReleaseID` fields (raw UUIDs) are removed from the struct. They provided no user value. If needed for debugging, they remain accessible via `-o json` on the raw resource objects or via the labels directly.
+The old `ModuleID` and `ReleaseID` fields (raw UUIDs) are removed from the struct. They provided no user value. If needed for debugging, they remain accessible on the raw inventory Secret.
 
-### Decision 2: Component extraction from labels
+### Decision 2: Component extraction from inventory
 
-**Context**: The `component.opmodel.dev/name` label is defined as `LabelComponentName` in `discovery.go` and is stamped by CUE transformers. It's already on the discovered resources.
+**Context**: Previously the design referenced a `LabelComponentName` label constant from `internal/kubernetes/discovery.go`. That file no longer exists — resource discovery is inventory-driven. The component name is already recorded in `InventoryEntry.Component` at apply time.
 
-**Decision**: Read the component label from each resource's labels during status evaluation. No new API calls needed — the unstructured objects from discovery already have their full label set.
-
-```go
-// In GetModuleStatus, when building resourceHealth:
-labels := res.GetLabels()
-component := labels[LabelComponentName] // "" if not present
-```
-
-Resources without the label get `""` which renders as `-` in the table.
-
-### Decision 3: Version extraction from labels
-
-**Context**: The `module-release.opmodel.dev/version` label is stamped by the CUE release overlay at render time. It's already on every managed resource.
-
-**Decision**: Extract version from the first resource's labels, same pattern as the existing module ID / release ID extraction. Add a new label constant:
+**Decision**: The command layer builds a `ComponentMap map[string]string` keyed by `"Kind/Namespace/Name"` from the inventory entries before calling `GetReleaseStatus`, and passes it through `StatusOptions`:
 
 ```go
-const labelReleaseVersion = "module-release.opmodel.dev/version"
+// In runStatus, after loading inventory:
+componentMap := make(map[string]string)
+if len(inv.Index) > 0 {
+    if change, ok := inv.Changes[inv.Index[0]]; ok {
+        for _, entry := range change.Inventory.Entries {
+            key := entry.Kind + "/" + entry.Namespace + "/" + entry.Name
+            componentMap[key] = entry.Component
+        }
+    }
+}
+statusOpts.ComponentMap = componentMap
 ```
+
+In `GetReleaseStatus`, when building `resourceHealth`:
+
+```go
+key := res.GetKind() + "/" + res.GetNamespace() + "/" + res.GetName()
+component := opts.ComponentMap[key] // "" if not present
+```
+
+Resources not in the map get `""` which renders as `-` in the table. This is more reliable than label reading: the component is recorded at apply time regardless of whether the CUE transformer stamps a label on the live resource.
+
+No label constants are needed for component lookup.
+
+### Decision 3: Version and release metadata from inventory
+
+**Context**: Previously the design referenced a `labelReleaseVersion` constant for `module-release.opmodel.dev/version` label extraction from live resources. Label-based discovery no longer exists.
+
+**Decision**: All release metadata is sourced from the inventory, which is already loaded by the command layer:
+
+- **ReleaseName**: Already in `StatusOptions.ReleaseName` (from `rsf.ReleaseName` or inventory)
+- **Namespace**: Already in `StatusOptions.Namespace` (from resolved k8s config)
+- **Version**: Extracted from `inv.Changes[inv.Index[0]].Source.Version` in the command layer and passed via new `StatusOptions.Version` field
+
+```go
+// In runStatus, after loading inventory:
+var version string
+if len(inv.Index) > 0 {
+    if change, ok := inv.Changes[inv.Index[0]]; ok {
+        version = change.Source.Version
+    }
+}
+statusOpts.Version = version
+```
+
+In `GetReleaseStatus`:
+
+```go
+result.ReleaseName = opts.ReleaseName
+result.Version     = opts.Version
+result.Namespace   = opts.Namespace
+```
+
+No label constants are needed for version or release name extraction.
 
 ### Decision 4: Wide format — extracting workload details from unstructured objects
 
-**Context**: Discovery already returns full `*unstructured.Unstructured` objects. The `.spec` and `.status` fields contain replica counts, container images, PVC capacity, and Ingress hosts. We need to extract these without importing typed K8s API structs (to stay consistent with the unstructured approach).
+**Context**: Discovery returns full `*unstructured.Unstructured` objects. The `.spec` and `.status` fields contain replica counts, container images, PVC capacity, and Ingress hosts. We need to extract these without importing typed K8s API structs.
 
 **Decision**: Use `unstructured.NestedInt64`, `unstructured.NestedString`, and `unstructured.NestedSlice` to pull fields from the raw objects. Create extraction functions per resource kind:
 
@@ -179,42 +220,23 @@ Extraction logic by kind:
 └──────────────────┴──────────────────────────────────┴──────────────────────────────────┘
 ```
 
-All of these fields are available on the unstructured objects already returned by `DiscoverResources()`. No additional API calls required for wide mode.
+All fields are available on the unstructured objects already returned by `DiscoverResourcesFromInventory`. No additional API calls required for wide mode.
 
-### Decision 5: Verbose mode — pod-level diagnostics via ownerReference walking
+`extractWideInfo` is never called for `MissingResource` entries — they have no live object. Missing entries always have `Wide = nil`.
 
-**Context**: When a Deployment/StatefulSet/DaemonSet is `NotReady`, the user needs to know *why*. The information is on the pods, which are children of the workload via ownerReferences. We need to query pods for unhealthy workloads only.
+### Decision 5: Verbose mode — pod-level diagnostics via label selector
 
-**Decision**: For each workload with `Status == healthNotReady`, list pods in the same namespace and filter by ownerReference chain. The walking strategy differs by workload type:
+**Context**: When a Deployment/StatefulSet/DaemonSet is `NotReady`, the user needs to know *why*. The information is on the pods, which are children of the workload.
+
+**Decision**: For each workload with `Status == healthNotReady`, list pods in the same namespace using the workload's `.spec.selector.matchLabels`. The walking strategy differs by workload type:
 
 ```text
-Deployment  → owns ReplicaSet(s) → owns Pod(s)     (2-hop)
+Deployment  → owns ReplicaSet(s) → owns Pod(s)     (2-hop, use label selector shortcut)
 StatefulSet → owns Pod(s) directly                   (1-hop)
 DaemonSet   → owns Pod(s) directly                   (1-hop)
 ```
 
-For Deployments (2-hop), we need to find the active ReplicaSet first, then find its pods. For StatefulSet/DaemonSet (1-hop), pods are direct children.
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│  Verbose Mode: Pod Discovery Flow (Deployment)                   │
-│                                                                   │
-│  1. Deployment is NotReady                                        │
-│  2. List Pods in namespace with label selector matching           │
-│     the Deployment's .spec.selector.matchLabels                   │
-│  3. For each Pod:                                                 │
-│     a. Extract phase from status.phase                            │
-│     b. Check containerStatuses for waiting/terminated reasons     │
-│     c. Sum restartCount across all containers                     │
-│     d. Check conditions for Ready=True                            │
-│  4. Build podInfo for each pod                                    │
-│                                                                   │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Why label selector instead of ownerReference walking**: Using the Deployment's `.spec.selector.matchLabels` to list pods directly is simpler than the 2-hop ownerReference chain (Deployment → find active ReplicaSet → find RS's pods). The label selector approach is a single API call and catches all pods regardless of which ReplicaSet owns them. For StatefulSets and DaemonSets, the same approach works — their `.spec.selector.matchLabels` directly identifies their pods.
-
-New function:
+**Why label selector instead of ownerReference walking**: Using the workload's `.spec.selector.matchLabels` to list pods directly is simpler and a single API call. For all three workload types, their `.spec.selector.matchLabels` directly identifies their pods.
 
 ```go
 func listWorkloadPods(ctx context.Context, client *Client, resource *unstructured.Unstructured) ([]podInfo, error)
@@ -227,55 +249,62 @@ This function:
 3. Extracts phase, conditions, container statuses, restart counts
 4. Returns `[]podInfo`
 
-**Performance**: This makes one additional `core/v1 Pods` list call per unhealthy workload. Since verbose mode is opt-in and typically there are few unhealthy workloads, this is acceptable. If a release has 10 workloads and 2 are unhealthy, that's 2 extra API calls.
+`listWorkloadPods` is never called for `MissingResource` entries — they have no live object and no pod selector. Missing entries always have `Verbose = nil`.
+
+**Performance**: One additional `core/v1 Pods` list call per unhealthy workload. Since verbose mode is opt-in and typically there are few unhealthy workloads, this is acceptable.
 
 ### Decision 6: StatusOptions changes — passing mode to the status layer
 
-**Context**: `GetModuleStatus` currently receives `StatusOptions` with namespace, release selector, and output format. It needs to know whether to compute wide/verbose data.
+**Context**: `GetReleaseStatus` needs to know the release version (from inventory), a component name map (from inventory entries), and whether to compute wide/verbose data.
 
-**Decision**: Add mode fields to `StatusOptions`:
+**Decision**: Extend `StatusOptions` with new fields:
 
 ```go
 type StatusOptions struct {
-    Namespace    string
-    ReleaseName  string
-    ReleaseID    string
-    OutputFormat output.Format
-    Wide         bool  // compute wide info (replicas, images)
-    Verbose      bool  // compute verbose info (pod details for unhealthy workloads)
+    Namespace        string
+    ReleaseName      string
+    ReleaseID        string
+    Version          string                // sourced from inv.Changes[latest].Source.Version
+    ComponentMap     map[string]string     // "Kind/Namespace/Name" → component name
+    OutputFormat     output.Format
+    InventoryLive    []*unstructured.Unstructured
+    MissingResources []MissingResource
+    Wide             bool  // compute wide info (replicas, images)
+    Verbose          bool  // compute verbose info (pod details for unhealthy workloads)
 }
 ```
 
-`GetModuleStatus` populates `wideInfo` and `verboseInfo` on each resource only when the corresponding flag is true. Default mode skips the extra work entirely.
+`GetReleaseStatus` populates `wideInfo` and `verboseInfo` on each resource only when the corresponding flag is true. `MissingResource` entries never have wide or verbose data populated.
 
 ### Decision 7: Exit codes — mapping to existing constants
 
-**Context**: The proposal specifies exit 0 (healthy), exit 1 (error), exit 2 (not ready), exit 3 (no resources). The existing exit code constants are: `ExitSuccess(0)`, `ExitGeneralError(1)`, `ExitValidationError(2)`, `ExitConnectivityError(3)`, `ExitPermissionDenied(4)`, `ExitNotFound(5)`.
+**Context**: The proposal specifies exit 0 (healthy), exit 1 (error), exit 2 (not ready), exit 3 (no resources). `noResourcesFoundError` is not a Kubernetes API error, so `ExitCodeFromK8sError` would map it to `ExitGeneralError(1)` — incorrect.
 
-**Options considered**:
-
-1. **Reuse existing constants** — map "not ready" to `ExitValidationError(2)` and "no resources" to `ExitNotFound(5)`
-2. **Add new status-specific constants** — `ExitUnhealthy`, `ExitNoResources`
-3. **Reuse existing constants with semantic meaning per command** — the numbers are per-contract, and commands can define their own meanings
-
-**Decision**: Option 1 — reuse existing constants. The semantics align well enough:
+**Decision**: Reuse existing constants with an explicit `IsNoResourcesFound` check before delegating to `ExitCodeFromK8sError`:
 
 ```text
 All healthy     → ExitSuccess (0)          — existing
 General error   → ExitGeneralError (1)     — existing, already used
-Resources not   → ExitValidationError (2)  — "the state doesn't validate as healthy"
+Resources not   → ExitValidationError (2)  — "the deployed state doesn't validate as healthy"
   ready
 No resources    → ExitNotFound (5)         — existing, semantically correct
   found
 ```
 
-This avoids adding new constants. `ExitValidationError` is a reasonable fit — the health check is a form of validation ("does the deployed state match the desired state?"). `ExitNotFound` already exists and is the correct semantic for "nothing matched the selector."
+In `fetchAndPrintStatus`:
+
+```go
+if kubernetes.IsNoResourcesFound(err) {
+    // handle --ignore-not-found override, else ExitNotFound(5)
+}
+// fall through to ExitCodeFromK8sError for K8s API errors
+```
 
 The `--ignore-not-found` flag overrides `ExitNotFound(5)` to `ExitSuccess(0)`, preserving current behavior.
 
 ### Decision 8: Color rendering approach
 
-**Context**: The `output.Table` renders cells as raw strings. Lipgloss color is applied by rendering styled strings *before* passing them as cell values. The `lipgloss/table` package handles width calculation correctly for ANSI-escaped strings.
+**Context**: The `output.Table` renders cells as raw strings. Lipgloss color is applied by rendering styled strings *before* passing them as cell values.
 
 **Decision**: Create health-status-specific style functions in `internal/output/styles.go` and apply them when building table rows. Do not modify the `Table` struct itself — color goes into the cell strings.
 
@@ -312,7 +341,7 @@ func FormatHealthStatus(status string) string {
 
 **Context**: The current header uses `fmt.Sprintf` for "Module ID: ..." and "Release ID: ..." lines. The new header needs release name, version, namespace, status, and resource summary.
 
-**Decision**: Render the header as a block of key-value lines with styled values, printed before the table. The header is independent of the table — it's plain `output.Println` calls.
+**Decision**: Render the header as a block of key-value lines with styled values, printed before the table.
 
 ```go
 func formatStatusHeader(result *StatusResult) string {
@@ -334,27 +363,11 @@ func formatStatusHeader(result *StatusResult) string {
 }
 ```
 
-Example output (colors represented by annotations):
-
-```text
-Release:    jellyfin-media              ← cyan
-Version:    1.2.0
-Namespace:  media                       ← cyan
-Status:     Ready                       ← green  (or "NotReady" in red)
-Resources:  6 total (6 ready)
-```
-
 ### Decision 10: Verbose output — inline pod details below table rows
 
-**Context**: Verbose mode needs to show pod details indented below the parent workload row. The `output.Table` renders a fixed-column table — it doesn't support sub-rows or indented detail lines.
+**Context**: Verbose mode needs to show pod details indented below the parent workload row.
 
-**Options considered**:
-
-1. **Render the table first, then append pod details after each row** — complex, requires tracking line positions
-2. **Skip the table for verbose mode and render manually** — full control but loses table alignment
-3. **Render the table normally, then print pod details as separate indented blocks keyed by resource name** — simple, clear separation
-
-**Decision**: Option 3 — render the standard table, then for each unhealthy workload, print an indented pod detail block below the table. This keeps the table clean and the pod details scannable.
+**Decision**: Render the standard table, then for each unhealthy workload, print an indented pod detail block below the table. This keeps the table clean and the pod details scannable.
 
 ```text
 KIND          NAME               COMPONENT   STATUS     AGE
@@ -368,45 +381,35 @@ Deployment/jellyfin-server (1/3 ready):
     jellyfin-server-abc12-x3    Pending       Insufficient memory
 ```
 
-This is simpler to implement, avoids fighting the table renderer, and produces output that's easy to parse visually. The detail blocks only appear for unhealthy workloads when `--verbose` is set.
+This is simpler to implement, avoids fighting the table renderer, and produces output that's easy to parse visually. Detail blocks only appear for unhealthy workloads when `--verbose` is set.
 
 ### Decision 11: `StatusOptions.OutputFormat` and `-o wide`
 
-**Context**: The `-o` flag currently accepts `table`, `yaml`, `json`. We're adding `wide` as a table variant, not a new format.
+**Context**: The `-o` flag currently accepts `table`, `yaml`, `json`. We're adding `wide` as a table variant.
 
-**Decision**: `wide` is a modifier on the table format, not a separate output format. The `-o` flag values remain `table`, `yaml`, `json`. The `wide` behavior is activated by `-o wide` which sets `StatusOptions.Wide = true` and uses `FormatTable` with the extra columns. This matches the kubectl pattern where `-o wide` is a table variant.
-
-Updated flag validation:
-
-```go
-// In NewModStatusCmd, validate output format:
-switch outputFlag {
-case "table", "yaml", "json", "wide":
-    // valid
-default:
-    // error
-}
-```
+**Decision**: `FormatWide Format = "wide"` is added to `internal/output/format.go` as a first-class format constant alongside `FormatTable`, `FormatJSON`, `FormatYAML`, `FormatDir`. `ParseFormat` and `Valid()` accept it. This matches the kubectl pattern where `-o wide` is a table variant.
 
 When `outputFlag == "wide"`:
 
-- `opts.OutputFormat = output.FormatTable`
-- `opts.Wide = true`
+- `opts.OutputFormat = output.FormatWide`
+- `opts.Wide = true` (set in `runStatus` after parsing)
+
+`FormatStatus` maps `FormatWide` to the wide table renderer.
 
 ### Decision 12: File organization — where new code lives
-
-**Context**: The change adds extraction functions, pod listing, and styling helpers. These need to go in the right packages per Principle II (Separation of Concerns).
 
 **Decision**:
 
 ```text
 internal/
-├── cmd/
-│   └── mod_status.go          MODIFIED: new flags, exit code mapping, wide/verbose wiring
+├── output/
+│   └── format.go              MODIFIED: add FormatWide constant
+├── cmd/mod/
+│   └── status.go              MODIFIED: new flags, exit code mapping, wide/verbose wiring,
+│                                        ComponentMap building, Version extraction
 ├── kubernetes/
 │   ├── status.go              MODIFIED: StatusResult changes, wide/verbose data population
 │   ├── health.go              UNCHANGED
-│   ├── discovery.go           UNCHANGED
 │   ├── wide.go                NEW: extractWideInfo() per-kind extraction
 │   └── pods.go                NEW: listWorkloadPods(), podInfo, pod status extraction
 └── output/
@@ -415,40 +418,46 @@ internal/
 
 - `wide.go` keeps the per-kind unstructured field extraction isolated
 - `pods.go` keeps the pod-listing and status extraction logic separate from the main status flow
-- No changes to `discovery.go` or `health.go` — they stay focused on their responsibilities
+- No changes to `internal/inventory/` — the discovery mechanism is unchanged
 
 ## Risks / Trade-offs
 
 ### Risk: Pod listing performance in verbose mode
 
-**Risk**: If a release has many unhealthy workloads, verbose mode makes one pod-list API call per unhealthy workload, which could be slow on large clusters.
+**Risk**: If a release has many unhealthy workloads, verbose mode makes one pod-list API call per unhealthy workload.
 
-**Mitigation**: Verbose mode is opt-in (`--verbose`). The call is only made for `NotReady` workloads, not all workloads. In practice, most releases have 1-3 workloads, and only the unhealthy ones trigger pod listing. If performance becomes an issue, we could batch pod listing with a single namespace-wide query and filter client-side — but that's a future optimization.
+**Mitigation**: Verbose mode is opt-in (`--verbose`). The call is only made for `NotReady` workloads. In practice, most releases have 1-3 workloads. Future optimization: batch pod listing with a single namespace-wide query filtered client-side.
 
 ### Risk: Unstructured field extraction brittleness
 
-**Risk**: Extracting replica counts and images from `*unstructured.Unstructured` using nested field accessors is fragile — field paths could differ across K8s API versions.
+**Risk**: Extracting replica counts and images from `*unstructured.Unstructured` using nested field accessors is fragile across K8s API versions.
 
-**Mitigation**: The field paths used (`spec.replicas`, `status.readyReplicas`, `spec.template.spec.containers[0].image`) are stable across all supported K8s versions (1.24+). They're part of the core API contract. We use safe accessors (`NestedInt64`, `NestedString`) that return zero values on missing fields rather than panicking. Wide info is best-effort — missing fields result in `-` display, not errors.
+**Mitigation**: Field paths used (`spec.replicas`, `status.readyReplicas`, `spec.template.spec.containers[0].image`) are stable across all supported K8s versions (1.24+). Safe accessors (`NestedInt64`, `NestedString`) return zero values on missing fields rather than panicking. Wide info is best-effort — missing fields result in `-` display, not errors.
 
 ### Risk: Exit code 2 breaking existing scripts
 
 **Risk**: Scripts that check `$? -eq 0` to mean "status command succeeded" will now get exit 2 when resources exist but are not ready.
 
-**Mitigation**: This is an intentional behavioral change. The old behavior (exit 0 for "command ran, resources unhealthy") was misleading for CI/CD. Document the change in the release notes. The exit code semantics align with kubectl conventions where non-zero indicates the checked condition failed.
+**Mitigation**: Intentional behavioral change. Document in release notes. Aligns with kubectl conventions.
+
+### Trade-off: Component from inventory vs. live labels
+
+Sourcing `Component` from the inventory (`InventoryEntry.Component`) means the component shown reflects the apply-time assignment, not any label that may exist on the live resource. If a resource was patched outside OPM and its label changed, the inventory value would differ.
+
+Accepted because: the inventory is the ground truth for OPM-managed resources. Label-based discovery no longer exists, and the inventory component is always present (no missing-label edge case).
 
 ### Trade-off: Verbose pod details below table vs. inline
 
-Rendering pod details as a separate block below the table (Decision 10) means the pod info is visually separated from its parent row. In a table with many resources, you have to scroll between the table and the detail blocks.
+Rendering pod details as a separate block below the table means the pod info is visually separated from its parent row.
 
-Accepted because: inline sub-rows would require either a custom table renderer or abandoning `output.Table` entirely. The separate-block approach is simpler, tested by the existing `FormatTransformerMatchVerbose` pattern, and works well for the common case (1-2 unhealthy workloads).
+Accepted because: inline sub-rows would require either a custom table renderer or abandoning `output.Table` entirely. The separate-block approach is simpler, tested by the existing `FormatTransformerMatchVerbose` pattern.
 
 ### Trade-off: Removing ModuleID/ReleaseID from StatusResult
 
 The old `ModuleID` and `ReleaseID` fields (UUIDs) are replaced by human-readable `ReleaseName` and `Version`. Users who relied on the UUID fields in JSON/YAML output will see them disappear.
 
-Accepted because: These UUIDs are still on the resources' labels and accessible via `kubectl`. The status command should surface human-readable information. If machine-readable IDs are needed, they can be added back as optional fields later.
+Accepted because: UUIDs are still on the inventory Secret and accessible via `kubectl`. Status should surface human-readable information.
 
 ## Open Questions
 
-None — all decisions are resolved based on the exploration and discussion. Future enhancements (drift summary, FQN display via annotations) are explicitly deferred and tracked as separate changes.
+None — all decisions are resolved. Future enhancements (drift summary, FQN display via annotations) are explicitly deferred and tracked as separate changes.

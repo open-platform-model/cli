@@ -4,7 +4,7 @@ The current `opm mod status` command is essentially `kubectl get` with OPM label
 
 When we analyzed the questions people actually ask about deployed modules, we identified seven levels of insight:
 
-```
+```text
 L1: Is it alive?           ← Current status answers this
 L2: Is it healthy?         ← Partially (Ready/NotReady, but no detail)
 L3: Is it current?         ← Not in status (separate: mod diff)
@@ -26,7 +26,7 @@ This is a **MINOR** change — new flags with sensible defaults, no breaking cha
 
 The status header currently shows Module ID and Release ID (UUIDs). These are not particularly useful to humans. Replace with actionable metadata sourced from labels already on the resources:
 
-```
+```text
 Current:
   Module ID:  c1cbe76d-5687-5a47-bfe6-83b081b15413
   Release ID: a1b2c3d4-e5f6-7890-abcd-ef1234567890
@@ -51,7 +51,7 @@ All data sourced from existing labels — no new annotations or module source re
 
 Add a COMPONENT column populated from the `component.opmodel.dev/name` label already stamped by CUE transformers. This groups resources by their logical component, making it easy to identify which part of a module owns each resource.
 
-```
+```text
 KIND          NAME               COMPONENT   STATUS   AGE
 Deployment    jellyfin-server    server      Ready    5d
 Service       jellyfin-svc       server      Ready    5d
@@ -67,7 +67,7 @@ Resources without a component label show `-` in the column.
 
 Extends the table with workload-specific details. Additional columns vary by resource kind:
 
-```
+```text
 KIND          NAME               COMPONENT   STATUS   REPLICAS   IMAGE                        AGE
 Deployment    jellyfin-server    server      Ready    3/3        jellyfin/jellyfin:10.8.13    5d
 Service       jellyfin-svc       server      Ready    -          -                            5d
@@ -90,7 +90,7 @@ This requires querying the workload specs (already fetched during discovery) —
 
 When a workload is unhealthy, verbose mode drills down to the pod level to show *why*. This is the biggest UX improvement — turning `NotReady` from a dead end into an actionable diagnostic.
 
-```
+```text
 Deployment    jellyfin-server    server      NotReady   5d
   Pods: 1/3 ready
     jellyfin-server-abc12-x1    Running     (ready)
@@ -111,7 +111,7 @@ Only unhealthy workloads get the pod drill-down. Ready workloads just show their
 
 ### Semantic exit codes
 
-```
+```text
 Exit 0: All resources healthy
 Exit 1: General error (connectivity, invalid flags, etc.)
 Exit 2: Resources not ready (command succeeded, but health check failed)
