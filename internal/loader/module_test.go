@@ -35,10 +35,10 @@ func invalidFixture(t *testing.T, name string) string {
 // Path resolution (pre-load validation)
 // ---------------------------------------------------------------------------
 
-// TestLoad_PathResolution covers path resolution behaviour:
+// TestLoadModule_PathResolution covers path resolution behaviour:
 // relative paths are resolved, non-existent paths are rejected,
 // and directories missing cue.mod/ are rejected.
-func TestLoad_PathResolution(t *testing.T) {
+func TestLoadModule_PathResolution(t *testing.T) {
 	ctx := cuecontext.New()
 
 	tests := []struct {
@@ -74,7 +74,7 @@ func TestLoad_PathResolution(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mod, err := loader.Load(ctx, tc.modulePath(t), "")
+			mod, err := loader.LoadModule(ctx, tc.modulePath(t), "")
 			if tc.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.errContains)
@@ -82,41 +82,41 @@ func TestLoad_PathResolution(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.NotNil(t, mod)
-				assert.True(t, filepath.IsAbs(mod.ModulePath), "ModulePath must be absolute after Load")
+				assert.True(t, filepath.IsAbs(mod.ModulePath), "ModulePath must be absolute after LoadModule")
 			}
 		})
 	}
 }
 
-// TestLoad_RegistryEnvVarIsCleanedUp verifies that CUE_REGISTRY is set during
-// Load when a registry is provided and is unset after Load returns.
-func TestLoad_RegistryEnvVarIsCleanedUp(t *testing.T) {
+// TestLoadModule_RegistryEnvVarIsCleanedUp verifies that CUE_REGISTRY is set during
+// LoadModule when a registry is provided and is unset after LoadModule returns.
+func TestLoadModule_RegistryEnvVarIsCleanedUp(t *testing.T) {
 	os.Unsetenv("CUE_REGISTRY") //nolint:errcheck
 	ctx := cuecontext.New()
-	mod, err := loader.Load(ctx, fixture(t, "test-module"), "fake-registry.test")
+	mod, err := loader.LoadModule(ctx, fixture(t, "test-module"), "fake-registry.test")
 	require.NoError(t, err)
 	assert.NotNil(t, mod)
-	assert.Empty(t, os.Getenv("CUE_REGISTRY"), "CUE_REGISTRY must be unset after Load returns")
+	assert.Empty(t, os.Getenv("CUE_REGISTRY"), "CUE_REGISTRY must be unset after LoadModule returns")
 }
 
 // ---------------------------------------------------------------------------
 // Error paths
 // ---------------------------------------------------------------------------
 
-// TestLoad_InstanceLoadError verifies that a CUE syntax error causes Load to
+// TestLoadModule_InstanceLoadError verifies that a CUE syntax error causes LoadModule to
 // return an error wrapping inst.Err.
-func TestLoad_InstanceLoadError(t *testing.T) {
+func TestLoadModule_InstanceLoadError(t *testing.T) {
 	ctx := cuecontext.New()
-	_, err := loader.Load(ctx, invalidFixture(t, "syntax-error"), "")
+	_, err := loader.LoadModule(ctx, invalidFixture(t, "syntax-error"), "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "loading module:")
 }
 
-// TestLoad_EvaluationError verifies that a CUE type conflict that is valid
-// syntax but fails at evaluation causes Load to return a wrapped error.
-func TestLoad_EvaluationError(t *testing.T) {
+// TestLoadModule_EvaluationError verifies that a CUE type conflict that is valid
+// syntax but fails at evaluation causes LoadModule to return a wrapped error.
+func TestLoadModule_EvaluationError(t *testing.T) {
 	ctx := cuecontext.New()
-	_, err := loader.Load(ctx, invalidFixture(t, "eval-error"), "")
+	_, err := loader.LoadModule(ctx, invalidFixture(t, "eval-error"), "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "evaluating module CUE:")
 }
@@ -125,12 +125,12 @@ func TestLoad_EvaluationError(t *testing.T) {
 // Extra values*.cue files: filtered, not rejected
 // ---------------------------------------------------------------------------
 
-// TestLoad_ExtraValuesFilesFilteredSilently proves that a module directory
+// TestLoadModule_ExtraValuesFilesFilteredSilently proves that a module directory
 // containing values_prod.cue alongside values.cue loads without error, and
 // that mod.Values reflects only values.cue — the extra file has no effect.
-func TestLoad_ExtraValuesFilesFilteredSilently(t *testing.T) {
+func TestLoadModule_ExtraValuesFilesFilteredSilently(t *testing.T) {
 	ctx := cuecontext.New()
-	mod, err := loader.Load(ctx, fixture(t, "extra-values-module"), "")
+	mod, err := loader.LoadModule(ctx, fixture(t, "extra-values-module"), "")
 	require.NoError(t, err, "module with values_prod.cue must load without error")
 	require.NotNil(t, mod)
 
@@ -152,26 +152,26 @@ func TestLoad_ExtraValuesFilesFilteredSilently(t *testing.T) {
 // Approach A: explicit filtered file list, Pattern A modules
 // ---------------------------------------------------------------------------
 
-// TestLoad_ApproachA_ModuleRawHasNoConcreteValues proves that after loading
+// TestLoadModule_ApproachA_ModuleRawHasNoConcreteValues proves that after loading
 // a Pattern A module (test-module: no inline values in module.cue), mod.Raw
 // does not contain a concrete values field. values.cue was excluded from the
 // package load; only the abstract #config schema is present in the package.
-func TestLoad_ApproachA_ModuleRawHasNoConcreteValues(t *testing.T) {
+func TestLoadModule_ApproachA_ModuleRawHasNoConcreteValues(t *testing.T) {
 	ctx := cuecontext.New()
-	mod, err := loader.Load(ctx, fixture(t, "test-module"), "")
+	mod, err := loader.LoadModule(ctx, fixture(t, "test-module"), "")
 	require.NoError(t, err)
 
 	valuesInRaw := mod.Raw.LookupPath(cue.ParsePath("values"))
 	assert.False(t, valuesInRaw.Exists(),
-		"mod.Raw must not have a concrete values field after Approach A load: values.cue was excluded from load.Instances")
+		"mod.Raw must not have a concrete values field after Approach A LoadModule: values.cue was excluded from load.Instances")
 }
 
-// TestLoad_ApproachA_DefaultValuesLoadedSeparately proves that values.cue,
+// TestLoadModule_ApproachA_DefaultValuesLoadedSeparately proves that values.cue,
 // loaded separately by the Approach A strategy, provides the expected concrete
 // defaults in mod.Values — distinct from anything in mod.Raw.
-func TestLoad_ApproachA_DefaultValuesLoadedSeparately(t *testing.T) {
+func TestLoadModule_ApproachA_DefaultValuesLoadedSeparately(t *testing.T) {
 	ctx := cuecontext.New()
-	mod, err := loader.Load(ctx, fixture(t, "test-module"), "")
+	mod, err := loader.LoadModule(ctx, fixture(t, "test-module"), "")
 	require.NoError(t, err)
 
 	require.True(t, mod.Values.Exists(),
@@ -186,13 +186,13 @@ func TestLoad_ApproachA_DefaultValuesLoadedSeparately(t *testing.T) {
 	assert.Equal(t, int64(2), replicas)
 }
 
-// TestLoad_ApproachA_PackageFilesAllRetained proves that filtering values*.cue
+// TestLoadModule_ApproachA_PackageFilesAllRetained proves that filtering values*.cue
 // does not accidentally drop other .cue files. All non-values package content
 // (metadata, #config, #components) must be present in mod.Raw after the
 // Approach A load.
-func TestLoad_ApproachA_PackageFilesAllRetained(t *testing.T) {
+func TestLoadModule_ApproachA_PackageFilesAllRetained(t *testing.T) {
 	ctx := cuecontext.New()
-	mod, err := loader.Load(ctx, fixture(t, "test-module"), "")
+	mod, err := loader.LoadModule(ctx, fixture(t, "test-module"), "")
 	require.NoError(t, err)
 
 	assert.True(t, mod.Raw.LookupPath(cue.ParsePath("metadata.name")).Exists(),
@@ -207,12 +207,12 @@ func TestLoad_ApproachA_PackageFilesAllRetained(t *testing.T) {
 // Pattern B: inline values, no values.cue
 // ---------------------------------------------------------------------------
 
-// TestLoad_InlineValues_PopulatesModValues proves that when a module defines
+// TestLoadModule_InlineValues_PopulatesModValues proves that when a module defines
 // values inline in module.cue with no values.cue present, mod.Values is
 // populated from mod.Raw's inline values field.
-func TestLoad_InlineValues_PopulatesModValues(t *testing.T) {
+func TestLoadModule_InlineValues_PopulatesModValues(t *testing.T) {
 	ctx := cuecontext.New()
-	mod, err := loader.Load(ctx, fixture(t, "inline-values-module"), "")
+	mod, err := loader.LoadModule(ctx, fixture(t, "inline-values-module"), "")
 	require.NoError(t, err)
 
 	require.True(t, mod.Values.Exists(),
@@ -227,10 +227,10 @@ func TestLoad_InlineValues_PopulatesModValues(t *testing.T) {
 	assert.Equal(t, int64(2), replicas)
 }
 
-// TestLoad_InlineValues_NoSeparateValuesFile proves that inline-values-module
+// TestLoadModule_InlineValues_NoSeparateValuesFile proves that inline-values-module
 // has no values.cue — mod.Values comes exclusively from the inline values
 // field in module.cue, not from a separately loaded file.
-func TestLoad_InlineValues_NoSeparateValuesFile(t *testing.T) {
+func TestLoadModule_InlineValues_NoSeparateValuesFile(t *testing.T) {
 	dir := fixture(t, "inline-values-module")
 	_, err := os.Stat(filepath.Join(dir, "values.cue"))
 	assert.True(t, os.IsNotExist(err),
@@ -241,12 +241,12 @@ func TestLoad_InlineValues_NoSeparateValuesFile(t *testing.T) {
 // Metadata extraction
 // ---------------------------------------------------------------------------
 
-// TestLoad_Success verifies that Load returns a fully populated *core.Module
+// TestLoadModule_Success verifies that LoadModule returns a fully populated *core.Module
 // with all fields set and that the module passes Validate().
 // Uses the test-module fixture (pure Pattern A).
-func TestLoad_Success(t *testing.T) {
+func TestLoadModule_Success(t *testing.T) {
 	ctx := cuecontext.New()
-	mod, err := loader.Load(ctx, fixture(t, "test-module"), "")
+	mod, err := loader.LoadModule(ctx, fixture(t, "test-module"), "")
 	require.NoError(t, err)
 	require.NotNil(t, mod)
 	require.NotNil(t, mod.Metadata)
@@ -259,7 +259,7 @@ func TestLoad_Success(t *testing.T) {
 	assert.Equal(t, "default", mod.Metadata.DefaultNamespace)
 	assert.NotEmpty(t, mod.Metadata.Labels)
 
-	assert.True(t, mod.Raw.Exists(), "Raw must be set after Load")
+	assert.True(t, mod.Raw.Exists(), "Raw must be set after LoadModule")
 	assert.True(t, mod.Config.Exists(), "#config must be extracted")
 	assert.True(t, mod.Values.Exists(), "Values must be populated from values.cue")
 	assert.NotEmpty(t, mod.Components, "#components must be extracted")
@@ -267,11 +267,11 @@ func TestLoad_Success(t *testing.T) {
 	require.NoError(t, mod.Validate())
 }
 
-// TestLoad_PartialMetadata verifies that a module with only some metadata fields
+// TestLoadModule_PartialMetadata verifies that a module with only some metadata fields
 // defined loads without error, with absent fields as zero values.
-func TestLoad_PartialMetadata(t *testing.T) {
+func TestLoadModule_PartialMetadata(t *testing.T) {
 	ctx := cuecontext.New()
-	mod, err := loader.Load(ctx, fixture(t, "no-metadata-module"), "")
+	mod, err := loader.LoadModule(ctx, fixture(t, "no-metadata-module"), "")
 	require.NoError(t, err)
 	require.NotNil(t, mod)
 	require.NotNil(t, mod.Metadata)
@@ -290,11 +290,11 @@ func TestLoad_PartialMetadata(t *testing.T) {
 	assert.True(t, mod.Raw.Exists())
 }
 
-// TestLoad_NoValues verifies that a module without a values field and without
+// TestLoadModule_NoValues verifies that a module without a values field and without
 // values.cue loads without error and that Module.Values is a zero cue.Value.
-func TestLoad_NoValues(t *testing.T) {
+func TestLoadModule_NoValues(t *testing.T) {
 	ctx := cuecontext.New()
-	mod, err := loader.Load(ctx, fixture(t, "test-module-no-values"), "")
+	mod, err := loader.LoadModule(ctx, fixture(t, "test-module-no-values"), "")
 	require.NoError(t, err)
 	require.NotNil(t, mod)
 
@@ -303,13 +303,13 @@ func TestLoad_NoValues(t *testing.T) {
 	assert.NotEmpty(t, mod.Components)
 }
 
-// TestLoad_NoComponents verifies that a module without #components loads
+// TestLoadModule_NoComponents verifies that a module without #components loads
 // without error and that Module.Components is nil.
-func TestLoad_NoComponents(t *testing.T) {
+func TestLoadModule_NoComponents(t *testing.T) {
 	ctx := cuecontext.New()
 	fixturesPath, _ := filepath.Abs(filepath.Join("..", "..", "tests", "fixtures", "valid", "simple-module"))
 
-	mod, err := loader.Load(ctx, fixturesPath, "")
+	mod, err := loader.LoadModule(ctx, fixturesPath, "")
 	require.NoError(t, err)
 	require.NotNil(t, mod)
 

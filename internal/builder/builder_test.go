@@ -48,7 +48,7 @@ func TestBuild_EndToEnd(t *testing.T) {
 	ctx := cuecontext.New()
 	modPath := realModulePath(t)
 
-	mod, err := loader.Load(ctx, modPath, os.Getenv("OPM_REGISTRY"))
+	mod, err := loader.LoadModule(ctx, modPath, os.Getenv("OPM_REGISTRY"))
 	require.NoError(t, err, "loading real_module should succeed")
 
 	// Provide concrete values that satisfy #config.
@@ -85,7 +85,7 @@ func TestBuild_ValuesViolateConfig(t *testing.T) {
 	ctx := cuecontext.New()
 	modPath := realModulePath(t)
 
-	mod, err := loader.Load(ctx, modPath, os.Getenv("OPM_REGISTRY"))
+	mod, err := loader.LoadModule(ctx, modPath, os.Getenv("OPM_REGISTRY"))
 	require.NoError(t, err)
 
 	// replicas must be >=1; provide 0 to violate the constraint.
@@ -107,7 +107,7 @@ func TestBuild_NonConcreteResult(t *testing.T) {
 	ctx := cuecontext.New()
 	modPath := realModulePath(t)
 
-	mod, err := loader.Load(ctx, modPath, os.Getenv("OPM_REGISTRY"))
+	mod, err := loader.LoadModule(ctx, modPath, os.Getenv("OPM_REGISTRY"))
 	require.NoError(t, err)
 
 	// Provide values with image but omit replicas — #config.replicas has a default (>=1 | *1)
@@ -135,7 +135,7 @@ func TestBuild_UUIDIsDeterministic(t *testing.T) {
 	ctx := cuecontext.New()
 	modPath := realModulePath(t)
 
-	mod, err := loader.Load(ctx, modPath, os.Getenv("OPM_REGISTRY"))
+	mod, err := loader.LoadModule(ctx, modPath, os.Getenv("OPM_REGISTRY"))
 	require.NoError(t, err)
 
 	valuesFile := writeTempValues(t, `values: {

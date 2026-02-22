@@ -161,13 +161,13 @@ func cueFilesInDir(t *testing.T, dir string) []string {
 }
 
 // ---------------------------------------------------------------------------
-// Core logic helpers — mirrors what loader.Load() and builder.Build() will do
+// Core logic helpers — mirrors what loader.LoadModule() and builder.Build() will do
 // ---------------------------------------------------------------------------
 
 // validateFileList implements Approach C: scans files for rogue values*.cue
 // entries (any values*.cue that is NOT "values.cue").
 // Returns an error naming all rogue files if any are found.
-// This mirrors the validation that will live in loader.Load().
+// This mirrors the validation that will live in loader.LoadModule().
 func validateFileList(files []string) error {
 	var rogue []string
 	for _, f := range files {

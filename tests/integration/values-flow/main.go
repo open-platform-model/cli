@@ -48,9 +48,9 @@ func main() {
 
 	// Step 1: Load module with extra values*.cue files present.
 	fmt.Println("1. Loading multi-values-module (values_prod.cue present in module dir)...")
-	mod, err := loader.Load(ctx, modPath, registry)
+	mod, err := loader.LoadModule(ctx, modPath, registry)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: loader.Load: %v\n", err)
+		fmt.Fprintf(os.Stderr, "FAIL: loader.LoadModule: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Println("   OK: load succeeded — values_prod.cue filtered silently")

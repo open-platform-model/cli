@@ -13,11 +13,11 @@ import (
 	"github.com/opmodel/cli/internal/output"
 )
 
-// Load constructs a *core.Module by resolving the module path, loading the CUE
+// LoadModule constructs a *core.Module by resolving the module path, loading the CUE
 // instance via Approach A (explicit filtered file list), and performing full CUE
 // evaluation.
 //
-// Load calls mod.ResolvePath() internally — the returned *core.Module always
+// LoadModule calls mod.ResolvePath() internally — the returned *core.Module always
 // has a validated, absolute ModulePath.
 //
 // Loading strategy (Approach A):
@@ -38,7 +38,7 @@ import (
 // extracted from the evaluated value using LookupPath. No AST inspection is performed.
 //
 // The returned module has Raw set and passes mod.Validate().
-func Load(cueCtx *cue.Context, modulePath, registry string) (*core.Module, error) {
+func LoadModule(cueCtx *cue.Context, modulePath, registry string) (*core.Module, error) {
 	mod := &core.Module{ModulePath: modulePath}
 
 	// Step 1: Resolve and validate the module path.

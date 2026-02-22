@@ -49,7 +49,7 @@ func NewPipeline(cueCtx *cue.Context, providers map[string]cue.Value, registry s
 // Render executes the pipeline and returns results.
 //
 // Phase sequence:
-//  1. PREPARATION:    loader.Load() → *core.Module
+//  1. PREPARATION:    loader.LoadModule() → *core.Module
 //  2. PROVIDER LOAD:  loader.LoadProvider() → *core.Provider
 //  3. BUILD:          builder.Build() → *core.ModuleRelease; then ValidateValues + Validate
 //  4. MATCHING:       core.Provider.Match() → *core.TransformerMatchPlan
@@ -134,7 +134,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 // checks for values.cue if no --values flags were provided, logs the
 // values source, and resolves the release name + namespace.
 func (p *pipeline) prepare(opts RenderOptions) (*core.Module, string, string, error) { //nolint:gocritic // unnamedResult: named returns would shadow inner err vars
-	mod, err := loader.Load(p.cueCtx, opts.ModulePath, p.registry)
+	mod, err := loader.LoadModule(p.cueCtx, opts.ModulePath, p.registry)
 	if err != nil {
 		return nil, "", "", err
 	}
