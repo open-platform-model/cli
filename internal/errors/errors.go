@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// DetailError captures structured error information per contracts/error-format.md.
+// DetailError captures structured error information.
 type DetailError struct {
 	// Type is the error category (required).
 	Type string
