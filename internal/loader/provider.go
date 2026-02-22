@@ -1,8 +1,4 @@
-// Package provider loads and parses transformer definitions from a provider's
-// CUE value sourced from GlobalConfig. It is the single responsibility of this
-// package to turn raw CUE values into structured [LoadedProvider] values ready
-// for use in component matching.
-package provider
+package loader
 
 import (
 	"fmt"
@@ -14,16 +10,14 @@ import (
 	"github.com/opmodel/cli/internal/output"
 )
 
-// Load loads a provider by name from the given providers map and returns a
-// fully-parsed [*LoadedProvider] containing all transformer definitions.
+// LoadProvider loads a provider by name from the given providers map and returns
+// a fully-parsed [*core.Provider] with all metadata fields, transformer definitions,
+// and CueCtx set.
 //
 // If name is empty and the map contains exactly one provider, that provider is
 // selected automatically. If name is empty and there are multiple providers, an
 // error is returned.
-//
-// cueCtx is used only during parsing and is not retained on the returned value.
-// Callers that need it for execution should set core.Provider.CueCtx themselves.
-func Load(cueCtx *cue.Context, name string, providers map[string]cue.Value) (*LoadedProvider, error) {
+func LoadProvider(cueCtx *cue.Context, name string, providers map[string]cue.Value) (*core.Provider, error) {
 	if len(providers) == 0 {
 		return nil, fmt.Errorf("no providers configured")
 	}
@@ -35,14 +29,14 @@ func Load(cueCtx *cue.Context, name string, providers map[string]cue.Value) (*Lo
 				name = k
 			}
 		} else {
-			available := sortedKeys(providers)
+			available := sortedProviderKeys(providers)
 			return nil, fmt.Errorf("provider name must be specified (available: %v)", available)
 		}
 	}
 
 	providerValue, ok := providers[name]
 	if !ok {
-		available := sortedKeys(providers)
+		available := sortedProviderKeys(providers)
 		return nil, fmt.Errorf("provider %q not found (available: %v)", name, available)
 	}
 
@@ -55,12 +49,77 @@ func Load(cueCtx *cue.Context, name string, providers map[string]cue.Value) (*Lo
 		return nil, fmt.Errorf("provider %q has no transformer definitions", name)
 	}
 
-	output.Debug("loaded provider", "name", name, "transformers", len(transformers))
+	transformerMap := make(map[string]*core.Transformer, len(transformers))
+	for _, tf := range transformers {
+		transformerMap[tf.Metadata.Name] = tf
+	}
 
-	return &LoadedProvider{
-		Name:         name,
-		Transformers: transformers,
-	}, nil
+	p := &core.Provider{
+		CueCtx:       cueCtx,
+		Transformers: transformerMap,
+	}
+	extractProviderMetadata(providerValue, name, p)
+
+	output.Debug("loaded provider",
+		"name", p.Metadata.Name,
+		"version", p.Metadata.Version,
+		"transformers", len(transformerMap),
+	)
+
+	return p, nil
+}
+
+// extractProviderMetadata fills all fields of p.Metadata and p.ApiVersion/Kind
+// from the provider CUE value. configKeyName is used as fallback for Metadata.Name
+// when metadata.name is absent from the CUE value.
+func extractProviderMetadata(v cue.Value, configKeyName string, p *core.Provider) { //nolint:gocyclo // linear field extraction; each branch is a distinct metadata field
+	meta := &core.ProviderMetadata{Name: configKeyName}
+
+	if f := v.LookupPath(cue.ParsePath("metadata.name")); f.Exists() {
+		if str, err := f.String(); err == nil {
+			meta.Name = str
+		}
+	}
+	if f := v.LookupPath(cue.ParsePath("metadata.description")); f.Exists() {
+		if str, err := f.String(); err == nil {
+			meta.Description = str
+		}
+	}
+	if f := v.LookupPath(cue.ParsePath("metadata.version")); f.Exists() {
+		if str, err := f.String(); err == nil {
+			meta.Version = str
+		}
+	}
+	if f := v.LookupPath(cue.ParsePath("metadata.minVersion")); f.Exists() {
+		if str, err := f.String(); err == nil {
+			meta.MinVersion = str
+		}
+	}
+	if labelsVal := v.LookupPath(cue.ParsePath("metadata.labels")); labelsVal.Exists() {
+		labels := make(map[string]string)
+		if iter, err := labelsVal.Fields(); err == nil {
+			for iter.Next() {
+				if str, err := iter.Value().String(); err == nil {
+					labels[iter.Selector().Unquoted()] = str
+				}
+			}
+		}
+		if len(labels) > 0 {
+			meta.Labels = labels
+		}
+	}
+	if f := v.LookupPath(cue.ParsePath("apiVersion")); f.Exists() {
+		if str, err := f.String(); err == nil {
+			p.ApiVersion = str
+		}
+	}
+	if f := v.LookupPath(cue.ParsePath("kind")); f.Exists() {
+		if str, err := f.String(); err == nil {
+			p.Kind = str
+		}
+	}
+
+	p.Metadata = meta
 }
 
 // parseTransformers iterates the transformers field of a provider CUE value
@@ -134,8 +193,8 @@ func buildFQN(providerName, transformerName string) string {
 	return providerName + "#" + transformerName
 }
 
-// sortedKeys returns the keys of a providers map in sorted order.
-func sortedKeys(m map[string]cue.Value) []string {
+// sortedProviderKeys returns the keys of a providers map in sorted order.
+func sortedProviderKeys(m map[string]cue.Value) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)

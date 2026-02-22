@@ -15,7 +15,6 @@ import (
 	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/loader"
 	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/internal/provider"
 	"github.com/opmodel/cli/internal/transformer"
 )
 
@@ -51,7 +50,7 @@ func NewPipeline(cueCtx *cue.Context, providers map[string]cue.Value, registry s
 //
 // Phase sequence:
 //  1. PREPARATION:    loader.Load() → *core.Module
-//  2. PROVIDER LOAD:  provider.Load() → *LoadedProvider
+//  2. PROVIDER LOAD:  loader.LoadProvider() → *core.Provider
 //  3. BUILD:          builder.Build() → *core.ModuleRelease; then ValidateValues + Validate
 //  4. MATCHING:       core.Provider.Match() → *core.TransformerMatchPlan
 //  5. GENERATE:       matchPlan.Execute() → []*core.Resource + []error
@@ -68,8 +67,8 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		return nil, err
 	}
 
-	// Phase 2: PROVIDER LOAD — parse transformers from the provider CUE value.
-	lp, err := provider.Load(p.cueCtx, opts.Provider, p.providers)
+	// Phase 2: PROVIDER LOAD — parse transformers and metadata from the provider CUE value.
+	coreProvider, err := loader.LoadProvider(p.cueCtx, opts.Provider, p.providers)
 	if err != nil {
 		return nil, err
 	}
@@ -95,13 +94,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		"components", len(rel.Components),
 	)
 
-	// Phase 4: MATCHING — construct *core.Provider from loaded transformers and match.
-	// CueCtx is set so that TransformerMatchPlan.Execute() can use it.
-	transformerMap := make(map[string]*core.Transformer, len(lp.Transformers))
-	for _, tf := range lp.Transformers {
-		transformerMap[tf.Metadata.Name] = tf
-	}
-	coreProvider := &core.Provider{Transformers: transformerMap, CueCtx: p.cueCtx}
+	// Phase 4: MATCHING — match all components against provider transformers.
 	matchPlan := coreProvider.Match(rel.Components)
 
 	errs := collectUnmatchedErrors(matchPlan, coreProvider)

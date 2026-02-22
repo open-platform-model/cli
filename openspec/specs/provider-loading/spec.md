@@ -1,26 +1,26 @@
 ## Purpose
 
-Defines how the system loads and parses transformer definitions from a provider's CUE value sourced from GlobalConfig, producing a structured `*LoadedProvider` ready for use in component matching.
+Defines how the system loads and parses transformer definitions from a provider's CUE value sourced from GlobalConfig, producing a fully-populated `*core.Provider` (with `CueCtx`, `Transformers`, and `Metadata` set) ready for use in component matching.
 
 ## Requirements
 
 ### Requirement: Load a named provider from config
-The system SHALL load a provider by name from a map of provider CUE values sourced from GlobalConfig, returning a fully-parsed `*LoadedProvider` containing all transformer definitions.
+The system SHALL load a provider by name from a map of provider CUE values sourced from GlobalConfig, returning a fully-parsed `*core.Provider` with all transformer definitions, metadata, and `CueCtx` set.
 
 #### Scenario: Named provider found
-- **WHEN** `Load` is called with a provider name that exists in the providers map
-- **THEN** the system returns a `*LoadedProvider` with all transformer definitions parsed from the provider's CUE value
+- **WHEN** `LoadProvider` is called with a provider name that exists in the providers map
+- **THEN** the system returns a `*core.Provider` with all transformer definitions parsed from the provider's CUE value
 
 #### Scenario: Provider name not found
-- **WHEN** `Load` is called with a provider name that does not exist in the providers map
+- **WHEN** `LoadProvider` is called with a provider name that does not exist in the providers map
 - **THEN** the system returns an error identifying the missing provider name and listing available provider names
 
 #### Scenario: Auto-select when exactly one provider is configured
-- **WHEN** `Load` is called with an empty provider name and the providers map contains exactly one entry
+- **WHEN** `LoadProvider` is called with an empty provider name and the providers map contains exactly one entry
 - **THEN** the system selects that provider automatically without error
 
 #### Scenario: Empty name with multiple providers
-- **WHEN** `Load` is called with an empty provider name and the providers map contains more than one entry
+- **WHEN** `LoadProvider` is called with an empty provider name and the providers map contains more than one entry
 - **THEN** the system returns an error indicating a provider name must be specified
 
 ### Requirement: Parse transformer definitions from provider CUE value
@@ -46,9 +46,4 @@ The system SHALL iterate over the `transformers` field of the provider CUE value
 - **WHEN** a transformer CUE value has a structural error (missing required fields, evaluation error)
 - **THEN** the system returns an error identifying which transformer failed to parse
 
-### Requirement: Return structured LoadedProvider
-The system SHALL return a `*LoadedProvider` that exposes the provider name, a slice of `*core.Transformer`, and a `Requirements()` method returning the FQNs of all transformers for use in error reporting.
 
-#### Scenario: Requirements list matches loaded transformers
-- **WHEN** a provider with three transformers is loaded successfully
-- **THEN** `LoadedProvider.Requirements()` returns a slice containing the FQN of each transformer
