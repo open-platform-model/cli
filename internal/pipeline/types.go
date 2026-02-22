@@ -81,7 +81,7 @@ type RenderResult struct {
 
 	// MatchPlan describes which transformers matched which components.
 	// Used for verbose output and debugging.
-	MatchPlan transformer.MatchPlan
+	MatchPlan *transformer.TransformerMatchPlan
 
 	// Errors contains aggregated render errors (fail-on-end pattern).
 	// Empty slice if all components rendered successfully.

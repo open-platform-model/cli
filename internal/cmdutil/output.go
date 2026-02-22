@@ -62,13 +62,17 @@ func PrintRenderErrors(errs []error) {
 // WriteTransformerMatches writes compact transformer match output (always shown).
 // Format: component <- provider - transformer
 func WriteTransformerMatches(result *pipeline.RenderResult) {
+	if result.MatchPlan == nil {
+		return
+	}
 	releaseLog := output.ReleaseLogger(result.Release.Name)
 
-	// Transformer matching — one line per match
-	for compName, matches := range result.MatchPlan.Matches {
-		for _, m := range matches {
-			releaseLog.Info(output.FormatTransformerMatch(compName, m.TransformerFQN))
+	// Transformer matching — one line per successful match
+	for _, m := range result.MatchPlan.Matches {
+		if !m.Matched || m.Detail == nil {
+			continue
 		}
+		releaseLog.Info(output.FormatTransformerMatch(m.Detail.ComponentName, m.Detail.TransformerFQN))
 	}
 
 	// Unmatched components
@@ -80,6 +84,9 @@ func WriteTransformerMatches(result *pipeline.RenderResult) {
 // WriteVerboseMatchLog writes detailed verbose output with release metadata,
 // match reasons, and per-resource validation lines (--verbose only).
 func WriteVerboseMatchLog(result *pipeline.RenderResult) {
+	if result.MatchPlan == nil {
+		return
+	}
 	releaseLog := output.ReleaseLogger(result.Release.Name)
 
 	// Release info — single line with key-value pairs
@@ -89,11 +96,12 @@ func WriteVerboseMatchLog(result *pipeline.RenderResult) {
 		"components", strings.Join(result.Release.Components, ", "),
 	)
 
-	// Transformer matching — one line per match with reason
-	for compName, matches := range result.MatchPlan.Matches {
-		for _, m := range matches {
-			releaseLog.Info(output.FormatTransformerMatchVerbose(compName, m.TransformerFQN, m.Reason))
+	// Transformer matching — one line per successful match with reason
+	for _, m := range result.MatchPlan.Matches {
+		if !m.Matched || m.Detail == nil {
+			continue
 		}
+		releaseLog.Info(output.FormatTransformerMatchVerbose(m.Detail.ComponentName, m.Detail.TransformerFQN, m.Detail.Reason))
 	}
 
 	// Unmatched components

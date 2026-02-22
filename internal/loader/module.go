@@ -15,13 +15,13 @@ import (
 )
 
 // LoadModule constructs a *module.Module by resolving the module path, loading the CUE
-// instance via Approach A (explicit filtered file list), and performing full CUE
+// instance via explicit filtered file list, and performing full CUE
 // evaluation.
 //
 // LoadModule calls mod.ResolvePath() internally — the returned *module.Module always
 // has a validated, absolute ModulePath.
 //
-// Loading strategy (Approach A):
+// Loading strategy:
 //  1. Enumerate all top-level .cue files in the module directory.
 //  2. Filter out all values*.cue files from the package load. Any values*.cue
 //     files other than values.cue are silently ignored and reported via DEBUG.
@@ -53,7 +53,7 @@ func LoadModule(cueCtx *cue.Context, modulePath, registry string) (*module.Modul
 		return nil, fmt.Errorf("enumerating module files: %w", err)
 	}
 
-	// Step 3: Separate module files from values*.cue files (Approach A filter).
+	// Step 3: Separate module files from values*.cue files.
 	// All values*.cue files are excluded from the package load. values.cue is
 	// loaded separately in Step 9. Any other values*.cue files (e.g. values_prod.cue)
 	// are silently skipped and reported via DEBUG so the user understands why
@@ -84,7 +84,7 @@ func LoadModule(cueCtx *cue.Context, modulePath, registry string) (*module.Modul
 		return nil, fmt.Errorf("no non-values .cue files found in %s", mod.ModulePath)
 	}
 
-	// Step 4: Load CUE instance from explicit filtered file list (Approach A).
+	// Step 4: Load CUE instance from explicit filtered file list.
 	if registry != "" {
 		_ = os.Setenv("CUE_REGISTRY", registry)
 		defer func() { _ = os.Unsetenv("CUE_REGISTRY") }()

@@ -74,10 +74,12 @@ func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 		Module: module.ModuleMetadata{
 			Name: "test-module",
 		},
-		MatchPlan: transformer.MatchPlan{
-			Matches: map[string][]transformer.TransformerMatchOld{
-				"web": {
-					{
+		MatchPlan: &transformer.TransformerMatchPlan{
+			Matches: []*transformer.TransformerMatch{
+				{
+					Matched: true,
+					Detail: &transformer.TransformerMatchDetail{
+						ComponentName:  "web",
 						TransformerFQN: "example.com/transformers@v1#DeploymentTransformer",
 						Reason:         "Matched: requiredResources[Container]",
 					},
@@ -104,8 +106,8 @@ func TestShowRenderOutput_Warnings(t *testing.T) {
 		Module: module.ModuleMetadata{
 			Name: "test-module",
 		},
-		MatchPlan: transformer.MatchPlan{
-			Matches: map[string][]transformer.TransformerMatchOld{},
+		MatchPlan: &transformer.TransformerMatchPlan{
+			Matches: []*transformer.TransformerMatch{},
 		},
 		Resources: []*core.Resource{},
 		Errors:    []error{},

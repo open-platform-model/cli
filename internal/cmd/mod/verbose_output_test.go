@@ -28,14 +28,20 @@ func buildTestResult() *pipeline.RenderResult {
 		Module: module.ModuleMetadata{
 			Version: "1.0.0",
 		},
-		MatchPlan: transformer.MatchPlan{
-			Matches: map[string][]transformer.TransformerMatchOld{
-				"web": {
-					{
+		MatchPlan: &transformer.TransformerMatchPlan{
+			Matches: []*transformer.TransformerMatch{
+				{
+					Matched: true,
+					Detail: &transformer.TransformerMatchDetail{
+						ComponentName:  "web",
 						TransformerFQN: "test#DeploymentTransformer",
 						Reason:         "Matched: requiredResources[opmodel.dev/resources/Container@v0]",
 					},
-					{
+				},
+				{
+					Matched: true,
+					Detail: &transformer.TransformerMatchDetail{
+						ComponentName:  "web",
 						TransformerFQN: "test#ServiceTransformer",
 						Reason:         "Matched: requiredResources[opmodel.dev/resources/Container@v0], requiredTraits[opmodel.dev/traits/Expose@v0]",
 					},
@@ -72,13 +78,15 @@ func TestVerboseOutput_TransformerMatches(t *testing.T) {
 	result := buildTestResult()
 
 	// Verify the MatchPlan has the expected structure.
-	assert.NotEmpty(t, result.MatchPlan.Matches, "should have at least one component with matches")
-	assert.Contains(t, result.MatchPlan.Matches, "web", "should have a 'web' component")
-	assert.NotEmpty(t, result.MatchPlan.Matches["web"], "web component should have transformer matches")
+	assert.NotEmpty(t, result.MatchPlan.Matches, "should have at least one match")
 
-	// Verify each match has a reason.
-	for _, match := range result.MatchPlan.Matches["web"] {
-		assert.NotEmpty(t, match.Reason, "each match should have a reason string")
+	// Verify each successful match has a component name and reason.
+	for _, m := range result.MatchPlan.Matches {
+		if !m.Matched || m.Detail == nil {
+			continue
+		}
+		assert.NotEmpty(t, m.Detail.ComponentName, "each match should have a component name")
+		assert.NotEmpty(t, m.Detail.Reason, "each match should have a reason string")
 	}
 
 	t.Run("default output shows compact matches", func(t *testing.T) {

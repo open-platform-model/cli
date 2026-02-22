@@ -126,7 +126,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		Resources: resources,
 		Release:   *rel.Metadata,
 		Module:    *rel.Module.Metadata,
-		MatchPlan: matchPlan.ToLegacyMatchPlan(),
+		MatchPlan: matchPlan,
 		Errors:    errs,
 		Warnings:  warnings,
 	}, nil
