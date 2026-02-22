@@ -11,25 +11,36 @@ package modulereleasecueeval
 //
 //   Strategy A (dual-load, no registry):
 //     1. Load opmodel.dev/core@v0 from local catalog source
-//     2. Load a fake module in the SAME context
+//     2. Load a fake module in the SAME context using Approach A filtering
+//        (values*.cue excluded from load.Instances; values.cue loaded separately)
 //     3. Get #ModuleRelease schema from catalog value
 //     4. FillPath to inject module + metadata + values
 //     5. Read back uuid, labels, components
 //
 //   Strategy B (overlay, Approach C proper, requires OPM_REGISTRY):
-//     1. Load a real module with an overlay that injects a synthetic file
-//        exposing #ModuleRelease as _ReleaseType
+//     1. Load a real module with Approach A filtering (values*.cue excluded)
+//        and opmodel.dev/core@v0 from the module's resolved deps
 //     2. FillPath to inject the module value itself as #module
 //     3. Read back the same fields
+//
+// Values hierarchy (Approach A):
+//   - Module package files are loaded WITHOUT values*.cue → values field is abstract
+//   - values.cue is loaded separately → provides module author defaults (Layer 1)
+//   - User-provided values → fully replace module defaults (Layer 2)
+//   - If user provides values, module defaults are ignored entirely.
+//   - If no user values, module defaults from values.cue are used.
 //
 // The catalog source is at catalog/v0/core/ in the monorepo root.
 // Both the catalog and the module must be loaded with the same *cue.Context.
 // ---------------------------------------------------------------------------
 
 import (
+	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"cuelang.org/go/cue"
@@ -86,19 +97,47 @@ func testModuleFromCatalog(t *testing.T, catalogVal cue.Value) cue.Value {
 }
 
 // buildFakeModuleValue loads the fake_module test fixture using the provided
-// context. The fake module does NOT import opmodel.dev/core@v0 — it is a bare
-// CUE file that mimics the #Module shape without the type constraint applied.
+// context and Approach A filtering: values*.cue files are excluded from
+// load.Instances so the module package has only abstract values: #config.
 //
-// Decision 3 tests whether this value can be injected into #module!: #Module.
+// The module's concrete defaults live in values.cue — load them separately
+// via buildFakeModuleDefaults.
 func buildFakeModuleValue(t *testing.T, ctx *cue.Context) cue.Value {
 	t.Helper()
 	path := fakeModulePath(t)
-	instances := load.Instances([]string{"."}, &load.Config{Dir: path})
-	require.Len(t, instances, 1)
-	require.NoError(t, instances[0].Err, "fake_module load.Instances should not error")
+
+	// Approach A: filter values*.cue files from the explicit file list.
+	all := cueFilesInDir(t, path)
+	var moduleFiles []string
+	for _, f := range all {
+		if isValuesFile(filepath.Base(f)) {
+			continue
+		}
+		rel, err := filepath.Rel(path, f)
+		require.NoError(t, err)
+		moduleFiles = append(moduleFiles, "./"+rel)
+	}
+
+	instances := load.Instances(moduleFiles, &load.Config{Dir: path})
+	require.Len(t, instances, 1, "filtered file list should produce exactly one package instance")
+	require.NoError(t, instances[0].Err, "fake_module filtered load should not error")
 	val := ctx.BuildInstance(instances[0])
-	require.NoError(t, val.Err(), "fake_module BuildInstance should not error")
+	require.NoError(t, val.Err(), "fake_module BuildInstance should not conflict after filtering")
 	return val
+}
+
+// buildFakeModuleDefaults loads the fake_module/values.cue separately via
+// ctx.CompileBytes, returning the module author defaults as a cue.Value.
+// The returned value has the shape: { values: { image: "nginx:latest", replicas: 1 } }.
+// Returns a zero cue.Value if values.cue does not exist.
+func buildFakeModuleDefaults(t *testing.T, ctx *cue.Context) cue.Value {
+	t.Helper()
+	valuesFile := filepath.Join(fakeModulePath(t), "values.cue")
+	content, err := os.ReadFile(valuesFile)
+	require.NoError(t, err, "fake_module/values.cue must be readable")
+	v := ctx.CompileBytes(content, cue.Filename(valuesFile))
+	require.NoError(t, v.Err(), "fake_module/values.cue should compile cleanly")
+	return v
 }
 
 // fillRelease performs the full FillPath sequence to construct a #ModuleRelease
@@ -127,13 +166,48 @@ func fillRelease(
 		FillPath(cue.ParsePath("values"), userVals)
 }
 
+// fillReleaseWithHierarchy constructs a #ModuleRelease applying the values
+// hierarchy: if userValuesCUE is non-empty, it is used as the effective values
+// (module defaults are ignored entirely). If userValuesCUE is empty, the module
+// author defaults (moduleDefaults.LookupPath("values")) are used instead.
+//
+// This implements the Approach A values hierarchy:
+//   - Layer 1 (lowest): module defaults from values.cue
+//   - Layer 2 (highest): user-provided values (--values flag / inline)
+//   - Rule: user values completely replace module defaults — no partial merge.
+func fillReleaseWithHierarchy(
+	schema cue.Value,
+	moduleVal cue.Value,
+	name, namespace string,
+	moduleDefaults cue.Value, // from buildFakeModuleDefaults / buildRealModuleDefaults
+	userValuesCUE string, // CUE literal, or "" to use module defaults
+) cue.Value {
+	ctx := schema.Context()
+
+	var effectiveValues cue.Value
+	if userValuesCUE != "" {
+		// User values completely replace module defaults.
+		effectiveValues = ctx.CompileString(userValuesCUE)
+	} else {
+		// No user values — fall back to module author defaults from values.cue.
+		effectiveValues = moduleDefaults.LookupPath(cue.ParsePath("values"))
+	}
+
+	return schema.
+		FillPath(cue.MakePath(cue.Def("module")), moduleVal).
+		FillPath(cue.ParsePath("metadata.name"), ctx.CompileString(`"`+name+`"`)).
+		FillPath(cue.ParsePath("metadata.namespace"), ctx.CompileString(`"`+namespace+`"`)).
+		FillPath(cue.ParsePath("values"), effectiveValues)
+}
+
 // ---------------------------------------------------------------------------
 // Strategy B: real-module helpers
 // ---------------------------------------------------------------------------
 
 // buildRealModuleWithSchema loads both the real_module test fixture AND
 // opmodel.dev/core@v0 (from the module's resolved dependency cache) into the
-// provided context. Returns both values.
+// provided context. Returns both values. The real module is loaded using
+// Approach A filtering (values*.cue excluded from load.Instances).
 //
 // Strategy B key insight: because the module already imports opmodel.dev/core@v0
 // in its cue.mod/module.cue, we can load the core package from within the module
@@ -157,14 +231,92 @@ func buildRealModuleWithSchema(t *testing.T, ctx *cue.Context) (moduleVal cue.Va
 	require.True(t, releaseSchema.Exists(), "#ModuleRelease must exist in core value")
 	require.NoError(t, releaseSchema.Err(), "#ModuleRelease must not error")
 
-	// Load the module itself with the SAME context so FillPath injection works.
-	modInstances := load.Instances([]string{"."}, &load.Config{Dir: path})
+	// Load the module itself with Approach A filtering (exclude values*.cue).
+	all := cueFilesInDir(t, path)
+	var moduleFiles []string
+	for _, f := range all {
+		if isValuesFile(filepath.Base(f)) {
+			continue
+		}
+		rel, err := filepath.Rel(path, f)
+		require.NoError(t, err)
+		moduleFiles = append(moduleFiles, "./"+rel)
+	}
+	modInstances := load.Instances(moduleFiles, &load.Config{Dir: path})
 	require.Len(t, modInstances, 1)
-	require.NoError(t, modInstances[0].Err, "real_module load should not error")
+	require.NoError(t, modInstances[0].Err, "real_module filtered load should not error")
 	moduleVal = ctx.BuildInstance(modInstances[0])
 	require.NoError(t, moduleVal.Err(), "real_module BuildInstance should not error")
 
 	return moduleVal, releaseSchema
+}
+
+// buildRealModuleDefaults loads real_module/values.cue separately via
+// ctx.CompileBytes, returning the module author defaults as a cue.Value.
+// Requires OPM_REGISTRY to be set (callers should call requireRegistry).
+func buildRealModuleDefaults(t *testing.T, ctx *cue.Context) cue.Value {
+	t.Helper()
+	valuesFile := filepath.Join(realModulePath(t), "values.cue")
+	content, err := os.ReadFile(valuesFile)
+	require.NoError(t, err, "real_module/values.cue must be readable")
+	v := ctx.CompileBytes(content, cue.Filename(valuesFile))
+	require.NoError(t, v.Err(), "real_module/values.cue should compile cleanly")
+	return v
+}
+
+// ---------------------------------------------------------------------------
+// Approach A utilities
+// ---------------------------------------------------------------------------
+
+// isValuesFile reports whether a filename matches the values*.cue pattern —
+// any .cue file whose base name starts with "values".
+func isValuesFile(name string) bool {
+	base := filepath.Base(name)
+	return strings.HasPrefix(base, "values") && strings.HasSuffix(base, ".cue")
+}
+
+// cueFilesInDir returns all .cue files in dir (non-recursive, excluding cue.mod/).
+func cueFilesInDir(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+
+	var files []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		if strings.HasSuffix(e.Name(), ".cue") {
+			files = append(files, filepath.Join(dir, e.Name()))
+		}
+	}
+	return files
+}
+
+// extractPackageName scans a .cue file line by line and returns the package
+// name from the first "package <name>" declaration found.
+func extractPackageName(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("opening file: %w", err)
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "//") || line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "package ") {
+			parts := strings.Fields(line)
+			if len(parts) == 2 {
+				return parts[1], nil
+			}
+		}
+		break
+	}
+	return "", fmt.Errorf("no package declaration found in %s", path)
 }
 
 // ---------------------------------------------------------------------------

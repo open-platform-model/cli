@@ -24,17 +24,19 @@ metadata: {
 	// Decision 3 will discover what CUE does when they are absent from the injected value.
 }
 
-// Configuration schema — matches the constraint shape in #Module
+// Configuration schema — matches the constraint shape in #Module.
+// Note: the built-in #config default for image ("nginx:1.0") intentionally
+// differs from values.cue's default ("nginx:latest"). This lets tests
+// distinguish between values coming from #config's own * marker vs. values
+// coming from the separately-loaded values.cue file.
 #config: {
-	image:    string | *"nginx:latest"
+	image:    string | *"nginx:1.0"
 	replicas: int & >=1 | *1
 }
 
-// Concrete default values
-values: {
-	image:    "nginx:latest"
-	replicas: 1
-}
+// values: #config — concrete defaults live in values.cue (loaded separately via
+// Approach A). The module package itself carries only the abstract constraint.
+values: #config
 
 // Components — structured like #Component but without the type constraint applied
 #components: {

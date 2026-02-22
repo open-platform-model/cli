@@ -82,13 +82,12 @@ func buildSnapshotWithValues(t *testing.T, ctx *cue.Context, valuesCUE string) m
 	return moduleSnapshot{Schema: schema, Evaluated: evaluated}
 }
 
-// testModulePath returns the absolute path to the shared test module fixture.
-// The fixture lives in the adjacent module-full-load experiment — no duplication.
+// testModulePath returns the absolute path to the test module fixture.
 func testModulePath(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("could not determine test file path")
 	}
-	return filepath.Join(filepath.Dir(file), "..", "module-full-load", "testdata", "test_module")
+	return filepath.Join(filepath.Dir(file), "testdata", "test_module")
 }
