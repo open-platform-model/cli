@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/modulerelease"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -57,7 +58,7 @@ func (e *resourceError) Error() string {
 
 // Apply performs server-side apply for a set of rendered resources.
 // Resources are assumed to be already ordered by weight (from RenderResult).
-func Apply(ctx context.Context, client *Client, resources []*core.Resource, meta core.ReleaseMetadata, opts ApplyOptions) (*ApplyResult, error) {
+func Apply(ctx context.Context, client *Client, resources []*core.Resource, meta modulerelease.ReleaseMetadata, opts ApplyOptions) (*ApplyResult, error) {
 	result := &ApplyResult{}
 	releaseLog := output.ReleaseLogger(meta.Name)
 

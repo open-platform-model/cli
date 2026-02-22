@@ -1,4 +1,4 @@
-package core
+package errors
 
 import "fmt"
 
@@ -19,7 +19,7 @@ func (e *TransformError) Unwrap() error {
 }
 
 // Component returns the component name where the error occurred.
-// Implements the build.RenderError interface.
+// Implements the pipeline.RenderError interface.
 func (e *TransformError) Component() string {
 	return e.ComponentName
 }

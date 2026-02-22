@@ -1,4 +1,4 @@
-package core_test
+package component_test
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/component"
 )
 
 func TestComponent_Validate(t *testing.T) {
@@ -16,15 +16,15 @@ func TestComponent_Validate(t *testing.T) {
 	val := ctx.CompileString(`{}`)
 
 	t.Run("nil metadata returns error", func(t *testing.T) {
-		c := &core.Component{Value: val}
+		c := &component.Component{Value: val}
 		err := c.Validate()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "metadata is nil")
 	})
 
 	t.Run("empty name returns error", func(t *testing.T) {
-		c := &core.Component{
-			Metadata:  &core.ComponentMetadata{Name: ""},
+		c := &component.Component{
+			Metadata:  &component.ComponentMetadata{Name: ""},
 			Resources: map[string]cue.Value{"r": val},
 			Value:     val,
 		}
@@ -34,8 +34,8 @@ func TestComponent_Validate(t *testing.T) {
 	})
 
 	t.Run("no resources returns error", func(t *testing.T) {
-		c := &core.Component{
-			Metadata:  &core.ComponentMetadata{Name: "mycomp"},
+		c := &component.Component{
+			Metadata:  &component.ComponentMetadata{Name: "mycomp"},
 			Resources: map[string]cue.Value{},
 			Value:     val,
 		}
@@ -45,8 +45,8 @@ func TestComponent_Validate(t *testing.T) {
 	})
 
 	t.Run("zero CUE value returns error", func(t *testing.T) {
-		c := &core.Component{
-			Metadata:  &core.ComponentMetadata{Name: "mycomp"},
+		c := &component.Component{
+			Metadata:  &component.ComponentMetadata{Name: "mycomp"},
 			Resources: map[string]cue.Value{"r": val},
 			Value:     cue.Value{},
 		}
@@ -56,8 +56,8 @@ func TestComponent_Validate(t *testing.T) {
 	})
 
 	t.Run("valid component passes", func(t *testing.T) {
-		c := &core.Component{
-			Metadata:  &core.ComponentMetadata{Name: "mycomp"},
+		c := &component.Component{
+			Metadata:  &component.ComponentMetadata{Name: "mycomp"},
 			Resources: map[string]cue.Value{"r": val},
 			Value:     val,
 		}
@@ -70,13 +70,13 @@ func TestComponent_IsConcrete(t *testing.T) {
 
 	t.Run("concrete value returns true", func(t *testing.T) {
 		val := ctx.CompileString(`{name: "app", replicas: 3}`)
-		c := &core.Component{Value: val}
+		c := &component.Component{Value: val}
 		assert.True(t, c.IsConcrete())
 	})
 
 	t.Run("non-concrete value returns false", func(t *testing.T) {
 		val := ctx.CompileString(`{name: string, replicas: int}`)
-		c := &core.Component{Value: val}
+		c := &component.Component{Value: val}
 		assert.False(t, c.IsConcrete())
 	})
 }
@@ -106,7 +106,7 @@ func TestExtractComponents(t *testing.T) {
 		}`)
 		require.NoError(t, v.Err())
 
-		components, err := core.ExtractComponents(v)
+		components, err := component.ExtractComponents(v)
 		require.NoError(t, err)
 		require.Len(t, components, 1)
 
@@ -136,7 +136,7 @@ func TestExtractComponents(t *testing.T) {
 		}`)
 		require.NoError(t, v.Err())
 
-		components, err := core.ExtractComponents(v)
+		components, err := component.ExtractComponents(v)
 		require.NoError(t, err)
 		comp := components["svc"]
 		require.NotNil(t, comp)
@@ -154,7 +154,7 @@ func TestExtractComponents(t *testing.T) {
 		}`)
 		require.NoError(t, v.Err())
 
-		components, err := core.ExtractComponents(v)
+		components, err := component.ExtractComponents(v)
 		require.NoError(t, err)
 		comp := components["mycomp"]
 		require.NotNil(t, comp)
@@ -169,7 +169,7 @@ func TestExtractComponents(t *testing.T) {
 		}`)
 		require.NoError(t, v.Err())
 
-		_, err := core.ExtractComponents(v)
+		_, err := component.ExtractComponents(v)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "bad")
 		assert.Contains(t, err.Error(), "no resources")
@@ -186,7 +186,7 @@ func TestExtractComponents(t *testing.T) {
 		}`)
 		require.NoError(t, v.Err())
 
-		components, err := core.ExtractComponents(v)
+		components, err := component.ExtractComponents(v)
 		require.NoError(t, err)
 		assert.Len(t, components, 2)
 		assert.Contains(t, components, "a")

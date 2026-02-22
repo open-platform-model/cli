@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/modulerelease"
 )
 
 // --- 8.1 / 8.2: Integration test for diff showing modifications ---
@@ -38,7 +39,7 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 	resources := []*core.Resource{
 		{Object: cm, Component: "test-component"},
 	}
-	meta := core.ReleaseMetadata{
+	meta := modulerelease.ReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 	}
@@ -97,7 +98,7 @@ func TestDiffIntegration_ApplyThenDiffShowsNoDifferences(t *testing.T) {
 	resources := []*core.Resource{
 		{Object: cm, Component: "test-component"},
 	}
-	meta := core.ReleaseMetadata{
+	meta := modulerelease.ReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 	}
@@ -147,7 +148,7 @@ func TestStatusIntegration_ReportsHealth(t *testing.T) {
 	resources := []*core.Resource{
 		{Object: cm, Component: "test-component"},
 	}
-	meta := core.ReleaseMetadata{
+	meta := modulerelease.ReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 	}
@@ -199,7 +200,7 @@ func TestDiffIntegration_AllAdditions(t *testing.T) {
 	resources := []*core.Resource{
 		{Object: cm, Component: "test-component"},
 	}
-	meta := core.ReleaseMetadata{
+	meta := modulerelease.ReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 	}

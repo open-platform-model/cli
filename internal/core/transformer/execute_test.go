@@ -1,4 +1,4 @@
-package core
+package transformer
 
 import (
 	"context"
@@ -8,6 +8,10 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/opmodel/cli/internal/core/component"
+	"github.com/opmodel/cli/internal/core/module"
+	"github.com/opmodel/cli/internal/core/modulerelease"
 )
 
 func TestTransformerMatchPlan_Execute_EmptyPlan(t *testing.T) {
@@ -17,9 +21,9 @@ func TestTransformerMatchPlan_Execute_EmptyPlan(t *testing.T) {
 		Unmatched: []string{},
 		cueCtx:    cueCtx,
 	}
-	rel := &ModuleRelease{
-		Metadata: &ReleaseMetadata{Name: "test", Namespace: "default"},
-		Module:   Module{Metadata: &ModuleMetadata{Name: "test", Version: "1.0.0"}},
+	rel := &modulerelease.ModuleRelease{
+		Metadata: &modulerelease.ReleaseMetadata{Name: "test", Namespace: "default"},
+		Module:   module.Module{Metadata: &module.ModuleMetadata{Name: "test", Version: "1.0.0"}},
 	}
 
 	resources, errs := plan.Execute(context.Background(), rel)
@@ -41,9 +45,9 @@ func TestTransformerMatchPlan_Execute_UnmatchedSkipped(t *testing.T) {
 		},
 		cueCtx: cueCtx,
 	}
-	rel := &ModuleRelease{
-		Metadata: &ReleaseMetadata{Name: "test", Namespace: "default"},
-		Module:   Module{Metadata: &ModuleMetadata{Name: "test", Version: "1.0.0"}},
+	rel := &modulerelease.ModuleRelease{
+		Metadata: &modulerelease.ReleaseMetadata{Name: "test", Namespace: "default"},
+		Module:   module.Module{Metadata: &module.ModuleMetadata{Name: "test", Version: "1.0.0"}},
 	}
 
 	resources, errs := plan.Execute(context.Background(), rel)
@@ -89,8 +93,8 @@ func TestTransformerMatchPlan_Execute_SingleResource(t *testing.T) {
 		Metadata:  &TransformerMetadata{Name: "DeploymentTransformer", FQN: "test#DeploymentTransformer"},
 		Transform: transformValue,
 	}
-	comp := &Component{
-		Metadata:  &ComponentMetadata{Name: "web", Labels: map[string]string{}, Annotations: map[string]string{}},
+	comp := &component.Component{
+		Metadata:  &component.ComponentMetadata{Name: "web", Labels: map[string]string{}, Annotations: map[string]string{}},
 		Resources: map[string]cue.Value{},
 		Traits:    map[string]cue.Value{},
 		Value:     componentCUE,
@@ -102,9 +106,9 @@ func TestTransformerMatchPlan_Execute_SingleResource(t *testing.T) {
 			{Matched: true, Transformer: tf, Component: comp},
 		},
 	}
-	rel := &ModuleRelease{
-		Metadata: &ReleaseMetadata{Name: "test", Namespace: "default", Labels: map[string]string{}},
-		Module:   Module{Metadata: &ModuleMetadata{Name: "test", Version: "1.0.0", FQN: "test@v0#Test", Labels: map[string]string{}}},
+	rel := &modulerelease.ModuleRelease{
+		Metadata: &modulerelease.ReleaseMetadata{Name: "test", Namespace: "default", Labels: map[string]string{}},
+		Module:   module.Module{Metadata: &module.ModuleMetadata{Name: "test", Version: "1.0.0", FQN: "test@v0#Test", Labels: map[string]string{}}},
 	}
 
 	resources, errs := plan.Execute(context.Background(), rel)
@@ -118,7 +122,7 @@ func TestTransformerMatchPlan_Execute_SingleResource(t *testing.T) {
 func TestTransformerMatchPlan_Execute_ContextCancellation(t *testing.T) {
 	cueCtx := cuecontext.New()
 
-	// A plan with a matched entry but a cancelled context: should stop immediately.
+	// A plan with a matched entry but a canceled context: should stop immediately.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel before Execute is called
 
@@ -131,8 +135,8 @@ func TestTransformerMatchPlan_Execute_ContextCancellation(t *testing.T) {
 					Metadata:  &TransformerMetadata{Name: "Tf", FQN: "test#Tf"},
 					Transform: cueCtx.CompileString(`{}`),
 				},
-				Component: &Component{
-					Metadata:  &ComponentMetadata{Name: "web"},
+				Component: &component.Component{
+					Metadata:  &component.ComponentMetadata{Name: "web"},
 					Resources: map[string]cue.Value{},
 					Traits:    map[string]cue.Value{},
 					Value:     cueCtx.CompileString(`{}`),
@@ -140,9 +144,9 @@ func TestTransformerMatchPlan_Execute_ContextCancellation(t *testing.T) {
 			},
 		},
 	}
-	rel := &ModuleRelease{
-		Metadata: &ReleaseMetadata{Name: "test", Namespace: "default"},
-		Module:   Module{Metadata: &ModuleMetadata{Name: "test", Version: "1.0.0"}},
+	rel := &modulerelease.ModuleRelease{
+		Metadata: &modulerelease.ReleaseMetadata{Name: "test", Namespace: "default"},
+		Module:   module.Module{Metadata: &module.ModuleMetadata{Name: "test", Version: "1.0.0"}},
 	}
 
 	resources, errs := plan.Execute(ctx, rel)

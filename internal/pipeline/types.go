@@ -7,6 +7,9 @@ import (
 	"errors"
 
 	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/module"
+	"github.com/opmodel/cli/internal/core/modulerelease"
+	"github.com/opmodel/cli/internal/core/transformer"
 )
 
 // Pipeline defines the contract for render pipelines.
@@ -71,14 +74,14 @@ type RenderResult struct {
 	Resources []*core.Resource
 
 	// Release contains release-level metadata (name, namespace, release UUID, labels).
-	Release core.ReleaseMetadata
+	Release modulerelease.ReleaseMetadata
 
 	// Module contains module-level metadata (canonical name, FQN, version, module UUID, labels).
-	Module core.ModuleMetadata
+	Module module.ModuleMetadata
 
 	// MatchPlan describes which transformers matched which components.
 	// Used for verbose output and debugging.
-	MatchPlan core.MatchPlan
+	MatchPlan transformer.MatchPlan
 
 	// Errors contains aggregated render errors (fail-on-end pattern).
 	// Empty slice if all components rendered successfully.

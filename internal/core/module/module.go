@@ -1,4 +1,7 @@
-package core
+// Package module defines the Module and ModuleMetadata types, mirroring the
+// module.cue definition in the CUE catalog. A Module represents the #Module
+// type before it is built into a release.
+package module
 
 import (
 	"fmt"
@@ -6,6 +9,8 @@ import (
 	"path/filepath"
 
 	"cuelang.org/go/cue"
+
+	"github.com/opmodel/cli/internal/core/component"
 )
 
 // Module represents the #Module type before it is built.
@@ -17,7 +22,7 @@ type Module struct {
 	Metadata *ModuleMetadata `json:"metadata"`
 
 	// Must preserve the original order of the #Module.#components map for deterministic output and to support index-based inventory tracking.
-	Components map[string]*Component `json:"#components,omitempty"`
+	Components map[string]*component.Component `json:"#components,omitempty"`
 
 	// The schema (#Module.#config)
 	Config cue.Value `json:"#config,omitempty"`

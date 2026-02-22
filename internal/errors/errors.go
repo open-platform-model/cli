@@ -1,25 +1,9 @@
-// Package errors provides sentinel errors for the OPM CLI.
+// Package errors provides sentinel errors and structured error types for the OPM CLI.
 package errors
 
 import (
-	"errors"
 	"fmt"
 	"strings"
-)
-
-// Sentinel errors for known conditions.
-var (
-	// ErrValidation indicates a CUE schema validation failure.
-	ErrValidation = errors.New("validation error")
-
-	// ErrConnectivity indicates a network connectivity issue.
-	ErrConnectivity = errors.New("connectivity error")
-
-	// ErrPermission indicates insufficient permissions.
-	ErrPermission = errors.New("permission denied")
-
-	// ErrNotFound indicates a resource, module, or file was not found.
-	ErrNotFound = errors.New("not found")
 )
 
 // DetailError captures structured error information per contracts/error-format.md.

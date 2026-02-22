@@ -13,9 +13,11 @@ import (
 
 	"github.com/opmodel/cli/internal/builder"
 	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/module"
+	coreprovider "github.com/opmodel/cli/internal/core/provider"
+	"github.com/opmodel/cli/internal/core/transformer"
 	"github.com/opmodel/cli/internal/loader"
 	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/internal/transformer"
 )
 
 // pipeline implements the Pipeline interface.
@@ -133,7 +135,7 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 // prepare runs Phase 1 (PREPARATION): loads the module, validates it,
 // checks for values.cue if no --values flags were provided, logs the
 // values source, and resolves the release name + namespace.
-func (p *pipeline) prepare(opts RenderOptions) (*core.Module, string, string, error) { //nolint:gocritic // unnamedResult: named returns would shadow inner err vars
+func (p *pipeline) prepare(opts RenderOptions) (*module.Module, string, string, error) { //nolint:gocritic // unnamedResult: named returns would shadow inner err vars
 	mod, err := loader.LoadModule(p.cueCtx, opts.ModulePath, p.registry)
 	if err != nil {
 		return nil, "", "", err
@@ -174,7 +176,7 @@ func (p *pipeline) prepare(opts RenderOptions) (*core.Module, string, string, er
 
 // collectUnmatchedErrors returns an error for each component that had no
 // matching transformer.
-func collectUnmatchedErrors(matchPlan *core.TransformerMatchPlan, cp *core.Provider) []error {
+func collectUnmatchedErrors(matchPlan *transformer.TransformerMatchPlan, cp *coreprovider.Provider) []error {
 	errs := make([]error, 0, len(matchPlan.Unmatched))
 	for _, compName := range matchPlan.Unmatched {
 		errs = append(errs, &UnmatchedComponentError{
@@ -187,7 +189,7 @@ func collectUnmatchedErrors(matchPlan *core.TransformerMatchPlan, cp *core.Provi
 
 // collectMatchWarnings collects unhandled-trait warnings from the match plan.
 // In strict mode warnings are promoted to errors; otherwise they are non-fatal.
-func collectMatchWarnings(matchPlan *core.TransformerMatchPlan, errs []error, strict bool) ([]error, []string) { //nolint:gocritic // unnamedResult: naming (errors, warnings) adds no clarity over the types
+func collectMatchWarnings(matchPlan *transformer.TransformerMatchPlan, errs []error, strict bool) ([]error, []string) { //nolint:gocritic // unnamedResult: naming (errors, warnings) adds no clarity over the types
 	rawWarnings := transformer.CollectWarnings(matchPlan)
 	var warnings []string
 	if strict {

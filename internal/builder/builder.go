@@ -14,7 +14,10 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/load"
 
-	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/component"
+	"github.com/opmodel/cli/internal/core/module"
+	"github.com/opmodel/cli/internal/core/modulerelease"
+	opmerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -27,7 +30,7 @@ type Options struct {
 	Namespace string
 }
 
-// Build creates a concrete *core.ModuleRelease from a pre-loaded *core.Module.
+// Build creates a concrete *modulerelease.ModuleRelease from a pre-loaded *module.Module.
 //
 // The build process (Approach C):
 //  1. Load opmodel.dev/core@v0 from the module's pinned dependency cache
@@ -37,11 +40,11 @@ type Options struct {
 //  5. FillPath chain: #module → metadata.name → metadata.namespace → values
 //  6. Validate the result is fully concrete
 //  7. Read back metadata (uuid, version, labels) and components from CUE
-//  8. Construct and return *core.ModuleRelease
+//  8. Construct and return *modulerelease.ModuleRelease
 //
 // The ctx must be the same context used to load the module (mod.Raw was built
 // with it). Passing a different context will cause FillPath to fail.
-func Build(ctx *cue.Context, mod *core.Module, opts Options, valuesFiles []string) (*core.ModuleRelease, error) {
+func Build(ctx *cue.Context, mod *module.Module, opts Options, valuesFiles []string) (*modulerelease.ModuleRelease, error) { //nolint:gocyclo // sequential build pipeline; each branch handles a distinct build step
 	output.Debug("building release (Approach C)",
 		"path", mod.ModulePath,
 		"name", opts.Name,
@@ -85,7 +88,7 @@ func Build(ctx *cue.Context, mod *core.Module, opts Options, valuesFiles []strin
 	if mod.Config.Exists() && selectedValues.Exists() {
 		unified := mod.Config.Unify(selectedValues)
 		if err := unified.Err(); err != nil {
-			return nil, &core.ValidationError{
+			return nil, &opmerrors.ValidationError{
 				Message: "values do not match module #config schema",
 				Cause:   err,
 			}
@@ -102,7 +105,7 @@ func Build(ctx *cue.Context, mod *core.Module, opts Options, valuesFiles []strin
 		FillPath(cue.ParsePath("values"), selectedValues)
 
 	if err := result.Err(); err != nil {
-		return nil, &core.ValidationError{
+		return nil, &opmerrors.ValidationError{
 			Message: "FillPath injection failed",
 			Cause:   err,
 		}
@@ -110,7 +113,7 @@ func Build(ctx *cue.Context, mod *core.Module, opts Options, valuesFiles []strin
 
 	// Step 6: Validate full concreteness of the #ModuleRelease result.
 	if err := result.Validate(cue.Concrete(true)); err != nil {
-		return nil, &core.ValidationError{
+		return nil, &opmerrors.ValidationError{
 			Message: "release is not fully concrete after value injection — check that all required values are provided",
 			Cause:   err,
 		}
@@ -127,7 +130,7 @@ func Build(ctx *cue.Context, mod *core.Module, opts Options, valuesFiles []strin
 	if !componentsVal.Exists() {
 		return nil, fmt.Errorf("#ModuleRelease is missing 'components' field")
 	}
-	components, err := core.ExtractComponents(componentsVal)
+	components, err := component.ExtractComponents(componentsVal)
 	if err != nil {
 		return nil, fmt.Errorf("extracting components: %w", err)
 	}
@@ -153,7 +156,7 @@ func Build(ctx *cue.Context, mod *core.Module, opts Options, valuesFiles []strin
 		"components", len(components),
 	)
 
-	return &core.ModuleRelease{
+	return &modulerelease.ModuleRelease{
 		Metadata:   relMeta,
 		Module:     modCopy,
 		Components: components,
@@ -163,8 +166,8 @@ func Build(ctx *cue.Context, mod *core.Module, opts Options, valuesFiles []strin
 
 // extractReleaseMetadata reads back scalar release metadata fields from the
 // fully-concrete #ModuleRelease CUE value.
-func extractReleaseMetadata(result cue.Value, opts Options) (*core.ReleaseMetadata, error) {
-	meta := &core.ReleaseMetadata{
+func extractReleaseMetadata(result cue.Value, opts Options) (*modulerelease.ReleaseMetadata, error) {
+	meta := &modulerelease.ReleaseMetadata{
 		Name:      opts.Name,
 		Namespace: opts.Namespace,
 	}

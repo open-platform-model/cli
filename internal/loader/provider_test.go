@@ -248,7 +248,7 @@ transformers: {
 	assert.Equal(t, "1.2.3", p.Metadata.Version)
 	assert.Equal(t, "0.5.0", p.Metadata.MinVersion)
 	assert.Equal(t, map[string]string{"env": "production", "tier": "infra"}, p.Metadata.Labels)
-	assert.Equal(t, "opmodel.dev/providers/kubernetes@v0", p.ApiVersion)
+	assert.Equal(t, "opmodel.dev/providers/kubernetes@v0", p.APIVersion)
 	assert.Equal(t, "Provider", p.Kind)
 }
 

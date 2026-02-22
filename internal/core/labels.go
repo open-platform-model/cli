@@ -1,5 +1,9 @@
-// Package core defines shared domain types used across OPM packages.
-// It depends only on stdlib and k8s.io/apimachinery — no CUE, no internal packages.
+// Package core provides shared primitives used across OPM packages:
+// resource identifiers (Resource), label constants, UUID helpers, and weights.
+// Domain types (Module, ModuleRelease, Component, Transformer, Provider) live in
+// sub-packages: core/module, core/modulerelease, core/component, core/transformer,
+// core/provider.
+// This package depends only on stdlib — no CUE, no internal packages.
 package core
 
 import "github.com/google/uuid"

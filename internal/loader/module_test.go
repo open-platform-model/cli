@@ -35,7 +35,7 @@ func invalidFixture(t *testing.T, name string) string {
 // Path resolution (pre-load validation)
 // ---------------------------------------------------------------------------
 
-// TestLoadModule_PathResolution covers path resolution behaviour:
+// TestLoadModule_PathResolution covers path resolution behavior:
 // relative paths are resolved, non-existent paths are rejected,
 // and directories missing cue.mod/ are rejected.
 func TestLoadModule_PathResolution(t *testing.T) {
@@ -91,7 +91,7 @@ func TestLoadModule_PathResolution(t *testing.T) {
 // TestLoadModule_RegistryEnvVarIsCleanedUp verifies that CUE_REGISTRY is set during
 // LoadModule when a registry is provided and is unset after LoadModule returns.
 func TestLoadModule_RegistryEnvVarIsCleanedUp(t *testing.T) {
-	os.Unsetenv("CUE_REGISTRY") //nolint:errcheck
+	_ = os.Unsetenv("CUE_REGISTRY")
 	ctx := cuecontext.New()
 	mod, err := loader.LoadModule(ctx, fixture(t, "test-module"), "fake-registry.test")
 	require.NoError(t, err)

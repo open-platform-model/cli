@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/modulerelease"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 )
@@ -367,8 +368,8 @@ func buildResources(names []string) []*core.Resource {
 }
 
 // moduleMeta returns the ReleaseMetadata for the test release.
-func moduleMeta() core.ReleaseMetadata {
-	return core.ReleaseMetadata{
+func moduleMeta() modulerelease.ReleaseMetadata {
+	return modulerelease.ReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 		UUID:      releaseID,

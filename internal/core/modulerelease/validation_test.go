@@ -1,4 +1,4 @@
-package core
+package modulerelease
 
 import (
 	"strings"
@@ -10,6 +10,10 @@ import (
 	"cuelang.org/go/cue/token"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/opmodel/cli/internal/core/component"
+	"github.com/opmodel/cli/internal/core/module"
+	opmerrors "github.com/opmodel/cli/internal/errors"
 )
 
 // testCUEError is a minimal implementation of cueerrors.Error for testing.
@@ -447,7 +451,7 @@ func TestValidateValuesAgainstConfig_ValidateValues(t *testing.T) {
 		valuesVal := ctx.CompileString(`{ name: "ok" }`, cue.Filename("values.cue"))
 
 		rel := &ModuleRelease{
-			Module: Module{Config: configVal},
+			Module: module.Module{Config: configVal},
 			Values: valuesVal,
 		}
 		assert.NoError(t, rel.ValidateValues())
@@ -460,13 +464,13 @@ func TestValidateValuesAgainstConfig_ValidateValues(t *testing.T) {
 		valuesVal := ctx.CompileString(`{ name: "ok", extra: "bad" }`, cue.Filename("values.cue"))
 
 		rel := &ModuleRelease{
-			Module: Module{Config: configVal},
+			Module: module.Module{Config: configVal},
 			Values: valuesVal,
 		}
 		err := rel.ValidateValues()
 		require.Error(t, err)
 
-		var valErr *ValidationError
+		var valErr *opmerrors.ValidationError
 		require.ErrorAs(t, err, &valErr)
 		assert.Contains(t, valErr.Message, "#config schema")
 	})
@@ -475,7 +479,7 @@ func TestValidateValuesAgainstConfig_ValidateValues(t *testing.T) {
 func TestValidate_ModuleRelease(t *testing.T) {
 	// Tests Validate() receiver method on ModuleRelease.
 	t.Run("empty components map passes", func(t *testing.T) {
-		rel := &ModuleRelease{Components: map[string]*Component{}}
+		rel := &ModuleRelease{Components: map[string]*component.Component{}}
 		assert.NoError(t, rel.Validate())
 	})
 
@@ -490,7 +494,7 @@ func TestValidate_ModuleRelease(t *testing.T) {
 		require.NoError(t, concVal.Err())
 
 		rel := &ModuleRelease{
-			Components: map[string]*Component{
+			Components: map[string]*component.Component{
 				"web": {Value: concVal},
 			},
 		}
@@ -503,14 +507,14 @@ func TestValidate_ModuleRelease(t *testing.T) {
 		require.NoError(t, openVal.Err())
 
 		rel := &ModuleRelease{
-			Components: map[string]*Component{
+			Components: map[string]*component.Component{
 				"web": {Value: openVal},
 			},
 		}
 		err := rel.Validate()
 		require.Error(t, err)
 
-		var valErr *ValidationError
+		var valErr *opmerrors.ValidationError
 		require.ErrorAs(t, err, &valErr)
 		assert.Contains(t, valErr.Message, "non-concrete values")
 	})

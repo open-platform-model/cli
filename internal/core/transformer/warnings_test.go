@@ -5,24 +5,23 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/opmodel/cli/internal/core"
-	"github.com/opmodel/cli/internal/transformer"
+	"github.com/opmodel/cli/internal/core/transformer"
 )
 
 func TestCollectWarnings(t *testing.T) {
 	tests := []struct {
 		name     string
-		matches  []*core.TransformerMatch
+		matches  []*transformer.TransformerMatch
 		wantWarn []string // nil means expect no warnings
 	}{
 		{
 			name: "trait handled by at least one matched transformer — no warning",
 			// Two transformers match the same component. One handles "expose", the other doesn't.
 			// Because one handles it, it must NOT be warned.
-			matches: []*core.TransformerMatch{
+			matches: []*transformer.TransformerMatch{
 				{
 					Matched: true,
-					Detail: &core.TransformerMatchDetail{
+					Detail: &transformer.TransformerMatchDetail{
 						ComponentName:   "web",
 						TransformerFQN:  "k8s#deployment",
 						UnhandledTraits: []string{}, // deployment handles expose
@@ -30,7 +29,7 @@ func TestCollectWarnings(t *testing.T) {
 				},
 				{
 					Matched: true,
-					Detail: &core.TransformerMatchDetail{
+					Detail: &transformer.TransformerMatchDetail{
 						ComponentName:   "web",
 						TransformerFQN:  "k8s#service",
 						UnhandledTraits: []string{"expose"}, // service doesn't, but deployment does
@@ -42,10 +41,10 @@ func TestCollectWarnings(t *testing.T) {
 		{
 			name: "trait unhandled by all matched transformers — warning emitted",
 			// Both matched transformers report "logging" as unhandled.
-			matches: []*core.TransformerMatch{
+			matches: []*transformer.TransformerMatch{
 				{
 					Matched: true,
-					Detail: &core.TransformerMatchDetail{
+					Detail: &transformer.TransformerMatchDetail{
 						ComponentName:   "api",
 						TransformerFQN:  "k8s#deployment",
 						UnhandledTraits: []string{"logging"},
@@ -53,7 +52,7 @@ func TestCollectWarnings(t *testing.T) {
 				},
 				{
 					Matched: true,
-					Detail: &core.TransformerMatchDetail{
+					Detail: &transformer.TransformerMatchDetail{
 						ComponentName:   "api",
 						TransformerFQN:  "k8s#service",
 						UnhandledTraits: []string{"logging"},
@@ -64,10 +63,10 @@ func TestCollectWarnings(t *testing.T) {
 		},
 		{
 			name: "component with no matched transformers — no warnings emitted",
-			matches: []*core.TransformerMatch{
+			matches: []*transformer.TransformerMatch{
 				{
 					Matched: false,
-					Detail: &core.TransformerMatchDetail{
+					Detail: &transformer.TransformerMatchDetail{
 						ComponentName:  "orphan",
 						TransformerFQN: "k8s#deployment",
 					},
@@ -79,11 +78,11 @@ func TestCollectWarnings(t *testing.T) {
 			name: "multiple components, mixed handled/unhandled traits — only truly unhandled warned",
 			// Component "web": "expose" handled by one transformer → no warning.
 			// Component "api": "logging" unhandled by both → warning.
-			matches: []*core.TransformerMatch{
+			matches: []*transformer.TransformerMatch{
 				// web — expose handled by deployment
 				{
 					Matched: true,
-					Detail: &core.TransformerMatchDetail{
+					Detail: &transformer.TransformerMatchDetail{
 						ComponentName:   "web",
 						TransformerFQN:  "k8s#deployment",
 						UnhandledTraits: []string{},
@@ -91,7 +90,7 @@ func TestCollectWarnings(t *testing.T) {
 				},
 				{
 					Matched: true,
-					Detail: &core.TransformerMatchDetail{
+					Detail: &transformer.TransformerMatchDetail{
 						ComponentName:   "web",
 						TransformerFQN:  "k8s#service",
 						UnhandledTraits: []string{"expose"},
@@ -100,7 +99,7 @@ func TestCollectWarnings(t *testing.T) {
 				// api — logging unhandled by both
 				{
 					Matched: true,
-					Detail: &core.TransformerMatchDetail{
+					Detail: &transformer.TransformerMatchDetail{
 						ComponentName:   "api",
 						TransformerFQN:  "k8s#deployment",
 						UnhandledTraits: []string{"logging"},
@@ -108,7 +107,7 @@ func TestCollectWarnings(t *testing.T) {
 				},
 				{
 					Matched: true,
-					Detail: &core.TransformerMatchDetail{
+					Detail: &transformer.TransformerMatchDetail{
 						ComponentName:   "api",
 						TransformerFQN:  "k8s#service",
 						UnhandledTraits: []string{"logging"},
@@ -121,7 +120,7 @@ func TestCollectWarnings(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			plan := &core.TransformerMatchPlan{
+			plan := &transformer.TransformerMatchPlan{
 				Matches: tc.matches,
 			}
 			got := transformer.CollectWarnings(plan)

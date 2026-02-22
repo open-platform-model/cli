@@ -116,6 +116,14 @@ linters:
       - linters:
           - gochecknoinits
         path: internal/cmd/
+      # The core sub-packages (component, module, modulerelease, provider, transformer)
+      # use type names that include the package-context prefix (e.g. TransformerContext,
+      # ComponentMetadata) for clarity and migration compatibility. These names are
+      # intentional and are not considered stutters in this project.
+      - linters:
+          - revive
+        text: "stutters; consider"
+        path: internal/core/(component|module|modulerelease|provider|transformer)/
     paths:
       - third_party$
       - builtin$

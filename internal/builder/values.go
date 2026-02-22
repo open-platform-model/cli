@@ -7,7 +7,8 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/module"
+	opmerrors "github.com/opmodel/cli/internal/errors"
 )
 
 // selectValues determines the CUE values to use for this build.
@@ -19,8 +20,8 @@ import (
 // If no valuesFiles are given, mod.Values (from values.cue loaded at module
 // load time) is returned as-is.
 //
-// Returns *core.ValidationError if no values are available.
-func selectValues(ctx *cue.Context, mod *core.Module, valuesFiles []string) (cue.Value, error) {
+// Returns *opmerrors.ValidationError if no values are available.
+func selectValues(ctx *cue.Context, mod *module.Module, valuesFiles []string) (cue.Value, error) {
 	if len(valuesFiles) > 0 {
 		var unified cue.Value
 		for i, path := range valuesFiles {
@@ -40,7 +41,7 @@ func selectValues(ctx *cue.Context, mod *core.Module, valuesFiles []string) (cue
 
 		values := unified.LookupPath(cue.ParsePath("values"))
 		if !values.Exists() {
-			return cue.Value{}, &core.ValidationError{
+			return cue.Value{}, &opmerrors.ValidationError{
 				Message: "no 'values' field found in provided values files — files must define a top-level 'values:' field",
 			}
 		}
@@ -48,7 +49,7 @@ func selectValues(ctx *cue.Context, mod *core.Module, valuesFiles []string) (cue
 	}
 
 	if !mod.Values.Exists() {
-		return cue.Value{}, &core.ValidationError{
+		return cue.Value{}, &opmerrors.ValidationError{
 			Message: "module missing 'values' field — provide values via values.cue or --values flag",
 		}
 	}

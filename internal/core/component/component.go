@@ -1,4 +1,6 @@
-package core
+// Package component provides the Component domain type and extraction helpers,
+// mirroring catalog/v0/core/component.cue.
+package component
 
 import (
 	"fmt"
@@ -9,7 +11,7 @@ import (
 // Component is a component with extracted metadata.
 // Components are extracted by the release builder during the build phase.
 type Component struct {
-	ApiVersion string             `json:"apiVersion"`
+	APIVersion string             `json:"apiVersion"`
 	Kind       string             `json:"kind"`
 	Metadata   *ComponentMetadata `json:"metadata"`
 

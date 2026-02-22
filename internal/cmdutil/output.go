@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/opmodel/cli/internal/core"
+	opmerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/pipeline"
 )
@@ -15,7 +15,7 @@ import (
 // summary line followed by the structured CUE error output (matching `cue vet` style).
 // For other errors, it falls back to the standard key-value log format.
 func PrintValidationError(msg string, err error) {
-	var releaseErr *core.ValidationError
+	var releaseErr *opmerrors.ValidationError
 	if errors.As(err, &releaseErr) && releaseErr.Details != "" {
 		output.Error(fmt.Sprintf("%s: %s", msg, releaseErr.Message))
 		// Print CUE details as plain text to stderr for readable multi-line output
@@ -30,7 +30,7 @@ func PrintRenderErrors(errs []error) {
 	output.Error("render completed with errors")
 	for _, err := range errs {
 		var unmatchedErr *pipeline.UnmatchedComponentError
-		var transformErr *core.TransformError
+		var transformErr *opmerrors.TransformError
 
 		switch {
 		case errors.As(err, &unmatchedErr):

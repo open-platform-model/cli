@@ -9,15 +9,16 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/load"
 
-	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/component"
+	"github.com/opmodel/cli/internal/core/module"
 	"github.com/opmodel/cli/internal/output"
 )
 
-// LoadModule constructs a *core.Module by resolving the module path, loading the CUE
+// LoadModule constructs a *module.Module by resolving the module path, loading the CUE
 // instance via Approach A (explicit filtered file list), and performing full CUE
 // evaluation.
 //
-// LoadModule calls mod.ResolvePath() internally — the returned *core.Module always
+// LoadModule calls mod.ResolvePath() internally — the returned *module.Module always
 // has a validated, absolute ModulePath.
 //
 // Loading strategy (Approach A):
@@ -38,8 +39,8 @@ import (
 // extracted from the evaluated value using LookupPath. No AST inspection is performed.
 //
 // The returned module has Raw set and passes mod.Validate().
-func LoadModule(cueCtx *cue.Context, modulePath, registry string) (*core.Module, error) {
-	mod := &core.Module{ModulePath: modulePath}
+func LoadModule(cueCtx *cue.Context, modulePath, registry string) (*module.Module, error) { //nolint:gocyclo // sequential module loading; each branch handles a distinct load step
+	mod := &module.Module{ModulePath: modulePath}
 
 	// Step 1: Resolve and validate the module path.
 	if err := mod.ResolvePath(); err != nil {
@@ -88,8 +89,8 @@ func LoadModule(cueCtx *cue.Context, modulePath, registry string) (*core.Module,
 
 	// Step 4: Load CUE instance from explicit filtered file list (Approach A).
 	if registry != "" {
-		os.Setenv("CUE_REGISTRY", registry) //nolint:errcheck
-		defer os.Unsetenv("CUE_REGISTRY")   //nolint:errcheck
+		_ = os.Setenv("CUE_REGISTRY", registry)
+		defer func() { _ = os.Unsetenv("CUE_REGISTRY") }()
 	}
 
 	cfg := &load.Config{Dir: mod.ModulePath}
@@ -110,7 +111,7 @@ func LoadModule(cueCtx *cue.Context, modulePath, registry string) (*core.Module,
 	}
 
 	// Step 6: Extract all metadata from the evaluated value.
-	mod.Metadata = &core.ModuleMetadata{}
+	mod.Metadata = &module.ModuleMetadata{}
 	extractModuleMetadata(baseValue, mod.Metadata)
 
 	// Step 7: Extract #config (zero value if absent — no error).
@@ -146,7 +147,7 @@ func LoadModule(cueCtx *cue.Context, modulePath, registry string) (*core.Module,
 
 	// Step 9: Extract schema-level components from #components.
 	if componentsValue := baseValue.LookupPath(cue.ParsePath("#components")); componentsValue.Exists() {
-		components, err := core.ExtractComponents(componentsValue)
+		components, err := component.ExtractComponents(componentsValue)
 		if err != nil {
 			return nil, fmt.Errorf("extracting components: %w", err)
 		}
@@ -196,7 +197,7 @@ func isValuesFile(name string) bool {
 
 // extractModuleMetadata extracts all scalar metadata fields from the
 // CUE-evaluated module value into the provided ModuleMetadata struct.
-func extractModuleMetadata(v cue.Value, meta *core.ModuleMetadata) { //nolint:gocyclo // linear field extraction; each branch is a distinct metadata field
+func extractModuleMetadata(v cue.Value, meta *module.ModuleMetadata) { //nolint:gocyclo // linear field extraction; each branch is a distinct metadata field
 	if f := v.LookupPath(cue.ParsePath("metadata.name")); f.Exists() {
 		if str, err := f.String(); err == nil {
 			meta.Name = str

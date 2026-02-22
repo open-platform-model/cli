@@ -1,4 +1,10 @@
-package core
+package transformer
+
+import (
+	"github.com/opmodel/cli/internal/core/component"
+	"github.com/opmodel/cli/internal/core/module"
+	"github.com/opmodel/cli/internal/core/modulerelease"
+)
 
 // TransformerContext holds the context data passed to transformers during execution.
 // This matches the CUE #TransformerContext definition.
@@ -10,10 +16,10 @@ type TransformerContext struct {
 	Namespace string `json:"namespace"`
 
 	// ModuleMetadata contains module-level identity metadata.
-	ModuleMetadata *ModuleMetadata `json:"#moduleMetadata"`
+	ModuleMetadata *module.ModuleMetadata `json:"#moduleMetadata"`
 
 	// ReleaseMetadata contains release-level identity metadata.
-	ReleaseMetadata *ReleaseMetadata `json:"#releaseMetadata"`
+	ReleaseMetadata *modulerelease.ReleaseMetadata `json:"#releaseMetadata"`
 
 	// ComponentMetadata contains component-level metadata.
 	ComponentMetadata *TransformerComponentMetadata `json:"#componentMetadata"`
@@ -27,7 +33,7 @@ type TransformerComponentMetadata struct {
 }
 
 // NewTransformerContext constructs the context for a transformer execution.
-func NewTransformerContext(rel *ModuleRelease, comp *Component) *TransformerContext {
+func NewTransformerContext(rel *modulerelease.ModuleRelease, comp *component.Component) *TransformerContext {
 	name := ""
 	labels := map[string]string{}
 	annotations := map[string]string{}

@@ -1,4 +1,4 @@
-package core
+package modulerelease
 
 import (
 	"cuelang.org/go/cue"

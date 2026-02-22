@@ -6,18 +6,19 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/internal/core"
+	coreprovider "github.com/opmodel/cli/internal/core/provider"
+	"github.com/opmodel/cli/internal/core/transformer"
 	"github.com/opmodel/cli/internal/output"
 )
 
 // LoadProvider loads a provider by name from the given providers map and returns
-// a fully-parsed [*core.Provider] with all metadata fields, transformer definitions,
+// a fully-parsed [*coreprovider.Provider] with all metadata fields, transformer definitions,
 // and CueCtx set.
 //
 // If name is empty and the map contains exactly one provider, that provider is
 // selected automatically. If name is empty and there are multiple providers, an
 // error is returned.
-func LoadProvider(cueCtx *cue.Context, name string, providers map[string]cue.Value) (*core.Provider, error) {
+func LoadProvider(cueCtx *cue.Context, name string, providers map[string]cue.Value) (*coreprovider.Provider, error) {
 	if len(providers) == 0 {
 		return nil, fmt.Errorf("no providers configured")
 	}
@@ -49,12 +50,12 @@ func LoadProvider(cueCtx *cue.Context, name string, providers map[string]cue.Val
 		return nil, fmt.Errorf("provider %q has no transformer definitions", name)
 	}
 
-	transformerMap := make(map[string]*core.Transformer, len(transformers))
+	transformerMap := make(map[string]*transformer.Transformer, len(transformers))
 	for _, tf := range transformers {
 		transformerMap[tf.Metadata.Name] = tf
 	}
 
-	p := &core.Provider{
+	p := &coreprovider.Provider{
 		CueCtx:       cueCtx,
 		Transformers: transformerMap,
 	}
@@ -69,11 +70,11 @@ func LoadProvider(cueCtx *cue.Context, name string, providers map[string]cue.Val
 	return p, nil
 }
 
-// extractProviderMetadata fills all fields of p.Metadata and p.ApiVersion/Kind
+// extractProviderMetadata fills all fields of p.Metadata and p.APIVersion/Kind
 // from the provider CUE value. configKeyName is used as fallback for Metadata.Name
 // when metadata.name is absent from the CUE value.
-func extractProviderMetadata(v cue.Value, configKeyName string, p *core.Provider) { //nolint:gocyclo // linear field extraction; each branch is a distinct metadata field
-	meta := &core.ProviderMetadata{Name: configKeyName}
+func extractProviderMetadata(v cue.Value, configKeyName string, p *coreprovider.Provider) { //nolint:gocyclo // linear field extraction; each branch is a distinct metadata field
+	meta := &coreprovider.ProviderMetadata{Name: configKeyName}
 
 	if f := v.LookupPath(cue.ParsePath("metadata.name")); f.Exists() {
 		if str, err := f.String(); err == nil {
@@ -110,7 +111,7 @@ func extractProviderMetadata(v cue.Value, configKeyName string, p *core.Provider
 	}
 	if f := v.LookupPath(cue.ParsePath("apiVersion")); f.Exists() {
 		if str, err := f.String(); err == nil {
-			p.ApiVersion = str
+			p.APIVersion = str
 		}
 	}
 	if f := v.LookupPath(cue.ParsePath("kind")); f.Exists() {
@@ -123,8 +124,8 @@ func extractProviderMetadata(v cue.Value, configKeyName string, p *core.Provider
 }
 
 // parseTransformers iterates the transformers field of a provider CUE value
-// and returns a slice of parsed [*core.Transformer] values.
-func parseTransformers(providerName string, providerValue cue.Value) ([]*core.Transformer, error) {
+// and returns a slice of parsed [*transformer.Transformer] values.
+func parseTransformers(providerName string, providerValue cue.Value) ([]*transformer.Transformer, error) {
 	transformersValue := providerValue.LookupPath(cue.ParsePath("transformers"))
 	if !transformersValue.Exists() {
 		return nil, nil
@@ -135,7 +136,7 @@ func parseTransformers(providerName string, providerValue cue.Value) ([]*core.Tr
 		return nil, fmt.Errorf("iterating transformers for provider %q: %w", providerName, err)
 	}
 
-	var transformers []*core.Transformer
+	var transformers []*transformer.Transformer
 	for iter.Next() {
 		tfName := iter.Selector().Unquoted()
 		tfValue := iter.Value()
@@ -158,14 +159,14 @@ func parseTransformers(providerName string, providerValue cue.Value) ([]*core.Tr
 	return transformers, nil
 }
 
-// extractTransformer builds a [*core.Transformer] from a CUE transformer value.
-func extractTransformer(name, fqn string, value cue.Value) (*core.Transformer, error) {
+// extractTransformer builds a [*transformer.Transformer] from a CUE transformer value.
+func extractTransformer(name, fqn string, value cue.Value) (*transformer.Transformer, error) {
 	if err := value.Err(); err != nil {
 		return nil, fmt.Errorf("CUE evaluation error: %w", err)
 	}
 
-	tf := &core.Transformer{
-		Metadata: &core.TransformerMetadata{
+	tf := &transformer.Transformer{
+		Metadata: &transformer.TransformerMetadata{
 			Name: name,
 			FQN:  fqn,
 		},

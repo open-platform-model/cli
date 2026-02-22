@@ -1,22 +1,26 @@
-package core
+package transformer
 
 import (
 	"testing"
 
 	"cuelang.org/go/cue"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/opmodel/cli/internal/core/component"
+	"github.com/opmodel/cli/internal/core/module"
+	"github.com/opmodel/cli/internal/core/modulerelease"
 )
 
 func TestNewTransformerContext(t *testing.T) {
-	rel := &ModuleRelease{
-		Metadata: &ReleaseMetadata{
+	rel := &modulerelease.ModuleRelease{
+		Metadata: &modulerelease.ReleaseMetadata{
 			Name:      "my-module",
 			Namespace: "default",
 			UUID:      "release-uuid",
 			Labels:    map[string]string{"env": "prod"},
 		},
-		Module: Module{
-			Metadata: &ModuleMetadata{
+		Module: module.Module{
+			Metadata: &module.ModuleMetadata{
 				Name:    "my-module",
 				Version: "1.0.0",
 				FQN:     "example.com/modules@v0#MyModule",
@@ -26,8 +30,8 @@ func TestNewTransformerContext(t *testing.T) {
 		},
 	}
 
-	comp := &Component{
-		Metadata: &ComponentMetadata{
+	comp := &component.Component{
+		Metadata: &component.ComponentMetadata{
 			Name:   "webapp",
 			Labels: map[string]string{"workload-type": "stateless"},
 		},
@@ -58,14 +62,14 @@ func TestNewTransformerContext_NameOverride(t *testing.T) {
 	// Verifies spec scenario: when --name overrides the module name, the
 	// TransformerContext carries the canonical module name in ModuleMetadata
 	// and the release name in ReleaseMetadata — independently.
-	rel := &ModuleRelease{
-		Metadata: &ReleaseMetadata{
+	rel := &modulerelease.ModuleRelease{
+		Metadata: &modulerelease.ReleaseMetadata{
 			Name:      "my-app-staging",
 			Namespace: "staging",
 			UUID:      "release-uuid",
 		},
-		Module: Module{
-			Metadata: &ModuleMetadata{
+		Module: module.Module{
+			Metadata: &module.ModuleMetadata{
 				Name:    "my-app",
 				Version: "1.0.0",
 				FQN:     "example.com/modules@v0#MyApp",
@@ -74,8 +78,8 @@ func TestNewTransformerContext_NameOverride(t *testing.T) {
 		},
 	}
 
-	comp := &Component{
-		Metadata: &ComponentMetadata{
+	comp := &component.Component{
+		Metadata: &component.ComponentMetadata{
 			Name:        "api",
 			Labels:      map[string]string{},
 			Annotations: map[string]string{},
@@ -92,13 +96,13 @@ func TestNewTransformerContext_NameOverride(t *testing.T) {
 }
 
 func TestTransformerContext_ToMap(t *testing.T) {
-	modMeta := &ModuleMetadata{
+	modMeta := &module.ModuleMetadata{
 		Name:    "my-module",
 		FQN:     "example.com/modules@v0#MyModule",
 		Version: "2.0.0",
 		Labels:  map[string]string{"team": "platform"},
 	}
-	relMeta := &ReleaseMetadata{
+	relMeta := &modulerelease.ReleaseMetadata{
 		Name:      "release-name",
 		Namespace: "production",
 		UUID:      "release-uuid",
@@ -133,14 +137,14 @@ func TestTransformerContext_ToMap(t *testing.T) {
 }
 
 func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
-	rel := &ModuleRelease{
-		Metadata: &ReleaseMetadata{
+	rel := &modulerelease.ModuleRelease{
+		Metadata: &modulerelease.ReleaseMetadata{
 			Name:      "my-module",
 			Namespace: "default",
 			Labels:    map[string]string{},
 		},
-		Module: Module{
-			Metadata: &ModuleMetadata{
+		Module: module.Module{
+			Metadata: &module.ModuleMetadata{
 				Name:    "my-module",
 				Version: "1.0.0",
 				Labels:  map[string]string{},
@@ -148,8 +152,8 @@ func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
 		},
 	}
 
-	comp := &Component{
-		Metadata: &ComponentMetadata{
+	comp := &component.Component{
+		Metadata: &component.ComponentMetadata{
 			Name:   "volumes-component",
 			Labels: map[string]string{},
 			Annotations: map[string]string{
@@ -166,14 +170,14 @@ func TestNewTransformerContext_PropagatesAnnotations(t *testing.T) {
 }
 
 func TestNewTransformerContext_EmptyAnnotations(t *testing.T) {
-	rel := &ModuleRelease{
-		Metadata: &ReleaseMetadata{
+	rel := &modulerelease.ModuleRelease{
+		Metadata: &modulerelease.ReleaseMetadata{
 			Name:      "my-module",
 			Namespace: "default",
 			Labels:    map[string]string{},
 		},
-		Module: Module{
-			Metadata: &ModuleMetadata{
+		Module: module.Module{
+			Metadata: &module.ModuleMetadata{
 				Name:    "my-module",
 				Version: "1.0.0",
 				Labels:  map[string]string{},
@@ -181,8 +185,8 @@ func TestNewTransformerContext_EmptyAnnotations(t *testing.T) {
 		},
 	}
 
-	comp := &Component{
-		Metadata: &ComponentMetadata{
+	comp := &component.Component{
+		Metadata: &component.ComponentMetadata{
 			Name:        "simple-component",
 			Labels:      map[string]string{},
 			Annotations: map[string]string{},
@@ -200,11 +204,11 @@ func TestTransformerContext_ToMap_WithAnnotations(t *testing.T) {
 	ctx := &TransformerContext{
 		Name:      "release-name",
 		Namespace: "production",
-		ModuleMetadata: &ModuleMetadata{
+		ModuleMetadata: &module.ModuleMetadata{
 			Name:    "my-module",
 			Version: "2.0.0",
 		},
-		ReleaseMetadata: &ReleaseMetadata{
+		ReleaseMetadata: &modulerelease.ReleaseMetadata{
 			Name:      "release-name",
 			Namespace: "production",
 		},
@@ -229,11 +233,11 @@ func TestTransformerContext_ToMap_WithoutAnnotations(t *testing.T) {
 	ctx := &TransformerContext{
 		Name:      "release-name",
 		Namespace: "production",
-		ModuleMetadata: &ModuleMetadata{
+		ModuleMetadata: &module.ModuleMetadata{
 			Name:    "my-module",
 			Version: "2.0.0",
 		},
-		ReleaseMetadata: &ReleaseMetadata{
+		ReleaseMetadata: &modulerelease.ReleaseMetadata{
 			Name:      "release-name",
 			Namespace: "production",
 		},

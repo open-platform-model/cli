@@ -123,16 +123,19 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 │   ├── cmdutil/           # Shared command utilities (flag groups, K8s client, output)
 │   ├── config/            # Config loading and validation
 │   │   └── schema/        # CUE schema for config validation
-│   ├── core/              # Shared domain types: Resource, labels, metadata, weights
+│   ├── core/              # Shared primitives: Resource, labels, UUID helpers, weights
+│   │   ├── component/     # Component and ComponentMetadata types
+│   │   ├── module/        # Module and ModuleMetadata types
+│   │   ├── modulerelease/ # ModuleRelease, ReleaseMetadata, and release validation
+│   │   ├── provider/      # Provider, ProviderMetadata, and match logic
+│   │   └── transformer/   # Transformer types, context, match plans, execute, warnings
 │   ├── errors/            # Error types and handling
 │   ├── inventory/         # Release inventory: secret CRUD, digest, stale detection
 │   ├── kubernetes/        # K8s client, apply, delete, discovery, health, status
 │   ├── loader/            # CUE module loading
 │   ├── output/            # Terminal output: spinner, table, log, styles, format
 │   ├── pipeline/          # Render pipeline interface and shared types
-│   ├── provider/          # Transformer definitions from provider CUE modules
 │   ├── templates/         # Module templates (simple, standard, advanced)
-│   ├── transformer/       # Transformer match plans and utilities
 │   └── version/           # Version info
 ├── tests/
 │   ├── e2e/               # End-to-end tests
@@ -158,8 +161,8 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 - `internal/loader/` - CUE module loading
 - `internal/pipeline/` - Render pipeline interface and shared types
 - `internal/builder/` - BUILD phase of the render pipeline
-- `internal/provider/` - Transformer definitions from provider CUE modules
-- `internal/transformer/` - Transformer match plans and utilities
+- `internal/core/transformer/` - Transformer types, context, match plans, execute, warnings
+- `internal/core/provider/` - Provider, ProviderMetadata, and match logic
 - `internal/cmd/` - Command implementations (root, mod/, config/)
 - `internal/cmdutil/` - Shared command utilities (flag groups, K8s client, output)
 - `internal/version/` - Version info

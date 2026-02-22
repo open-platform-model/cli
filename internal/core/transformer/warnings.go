@@ -1,17 +1,11 @@
-// Package transformer provides utilities for working with transformer match plans,
-// including warning collection for unhandled component traits.
 package transformer
-
-import (
-	"github.com/opmodel/cli/internal/core"
-)
 
 // CollectWarnings gathers non-fatal warnings from the match plan.
 //
 // A trait is considered "unhandled" only if NO matched transformer handles it.
 // This means if ServiceTransformer requires Expose trait and DeploymentTransformer
 // doesn't, the Expose trait is still considered handled (by ServiceTransformer).
-func CollectWarnings(plan *core.TransformerMatchPlan) []string {
+func CollectWarnings(plan *TransformerMatchPlan) []string {
 	var warnings []string
 
 	// Step 1: Count how many transformers matched each component.

@@ -6,6 +6,9 @@ import (
 	"testing"
 
 	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/module"
+	"github.com/opmodel/cli/internal/core/modulerelease"
+	"github.com/opmodel/cli/internal/core/transformer"
 	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/pipeline"
 	"github.com/stretchr/testify/assert"
@@ -37,11 +40,11 @@ func TestResolveModulePath_Arg(t *testing.T) {
 func TestShowRenderOutput_WithErrors(t *testing.T) {
 	// Create a RenderResult with errors
 	result := &pipeline.RenderResult{
-		Release: core.ReleaseMetadata{
+		Release: modulerelease.ReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",
 		},
-		Module: core.ModuleMetadata{
+		Module: module.ModuleMetadata{
 			Name: "test-module",
 		},
 		Errors: []error{
@@ -64,15 +67,15 @@ func TestShowRenderOutput_WithErrors(t *testing.T) {
 func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 	// Create a RenderResult with no errors
 	result := &pipeline.RenderResult{
-		Release: core.ReleaseMetadata{
+		Release: modulerelease.ReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",
 		},
-		Module: core.ModuleMetadata{
+		Module: module.ModuleMetadata{
 			Name: "test-module",
 		},
-		MatchPlan: core.MatchPlan{
-			Matches: map[string][]core.TransformerMatchOld{
+		MatchPlan: transformer.MatchPlan{
+			Matches: map[string][]transformer.TransformerMatchOld{
 				"web": {
 					{
 						TransformerFQN: "example.com/transformers@v1#DeploymentTransformer",
@@ -94,15 +97,15 @@ func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 func TestShowRenderOutput_Warnings(t *testing.T) {
 	// Create a RenderResult with warnings
 	result := &pipeline.RenderResult{
-		Release: core.ReleaseMetadata{
+		Release: modulerelease.ReleaseMetadata{
 			Name:      "test-module",
 			Namespace: "default",
 		},
-		Module: core.ModuleMetadata{
+		Module: module.ModuleMetadata{
 			Name: "test-module",
 		},
-		MatchPlan: core.MatchPlan{
-			Matches: map[string][]core.TransformerMatchOld{},
+		MatchPlan: transformer.MatchPlan{
+			Matches: map[string][]transformer.TransformerMatchOld{},
 		},
 		Resources: []*core.Resource{},
 		Errors:    []error{},

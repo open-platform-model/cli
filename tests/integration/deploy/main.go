@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/modulerelease"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 )
@@ -89,7 +90,7 @@ func main() {
 		{Object: cm, Component: "config"},
 		{Object: svc, Component: "web"},
 	}
-	meta := core.ReleaseMetadata{
+	meta := modulerelease.ReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 		UUID:      releaseID,

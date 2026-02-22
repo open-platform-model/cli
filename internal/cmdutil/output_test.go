@@ -10,12 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/transformer"
+	opmerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/pipeline"
 )
 
-// testTransformerRequirements is a simple implementation of core.TransformerRequirements for tests.
+// testTransformerRequirements is a simple implementation of transformer.TransformerRequirements for tests.
 type testTransformerRequirements struct {
 	fqn               string
 	requiredLabels    map[string]string
@@ -41,7 +42,7 @@ func TestPrintValidationError_ReleaseValidationWithDetails(t *testing.T) {
 	os.Stderr = w
 
 	// Create a ValidationError with CUE details
-	relErr := &core.ValidationError{
+	relErr := &opmerrors.ValidationError{
 		Message: "value not concrete",
 		Details: "path.to.field:\n    conflicting values \"foo\" and \"bar\"",
 	}
@@ -73,7 +74,7 @@ func TestPrintValidationError_ReleaseValidationWithoutDetails(t *testing.T) {
 	output.SetLogWriter(&buf)
 
 	// Create a ValidationError without CUE details
-	err := &core.ValidationError{
+	err := &opmerrors.ValidationError{
 		Message: "value not concrete",
 		Details: "", // empty details
 	}
@@ -116,7 +117,7 @@ func TestPrintRenderErrors_UnmatchedWithAvailable(t *testing.T) {
 	errs := []error{
 		&pipeline.UnmatchedComponentError{
 			ComponentName: "database",
-			Available: []core.TransformerRequirements{
+			Available: []transformer.TransformerRequirements{
 				&testTransformerRequirements{
 					fqn:               "example.com/transformers@v1#PostgresTransformer",
 					requiredLabels:    map[string]string{"db-type": "postgres"},
@@ -180,7 +181,7 @@ func TestPrintRenderErrors_TransformError(t *testing.T) {
 
 	// Create a TransformError
 	errs := []error{
-		&core.TransformError{
+		&opmerrors.TransformError{
 			ComponentName:  "api",
 			TransformerFQN: "example.com/transformers@v1#APITransformer",
 			Cause:          fmt.Errorf("missing required field: port"),
@@ -229,7 +230,7 @@ func TestPrintRenderErrors_MultipleErrors(t *testing.T) {
 			ComponentName: "worker",
 			Available:     nil,
 		},
-		&core.TransformError{
+		&opmerrors.TransformError{
 			ComponentName:  "api",
 			TransformerFQN: "example.com/transformers@v1#APITransformer",
 			Cause:          fmt.Errorf("validation failed"),

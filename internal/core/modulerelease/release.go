@@ -1,9 +1,17 @@
-package core
+// Package modulerelease defines the ModuleRelease and ReleaseMetadata types,
+// mirroring the module_release.cue definition in the CUE catalog. A
+// ModuleRelease represents the built module release after the build phase,
+// before any transformations are applied.
+package modulerelease
 
 import (
 	"fmt"
 
 	"cuelang.org/go/cue"
+
+	"github.com/opmodel/cli/internal/core/component"
+	"github.com/opmodel/cli/internal/core/module"
+	opmerrors "github.com/opmodel/cli/internal/errors"
 )
 
 // ModuleRelease represents the built module release after the build phase, before any transformations are applied.
@@ -17,11 +25,11 @@ type ModuleRelease struct {
 	Metadata *ReleaseMetadata `json:"metadata"`
 
 	// The original module definition, preserved for reference and verbose output.
-	Module Module `json:"module"`
+	Module module.Module `json:"module"`
 
 	// Concrete components with all metadata extracted and values merged, ready for matching and transformation.
 	// Must preserve the original order of the #ModuleRelease.components map for deterministic output and to support index-based inventory tracking.
-	Components map[string]*Component `json:"components,omitempty"`
+	Components map[string]*component.Component `json:"components,omitempty"`
 
 	// The values from the Module Release. End-user values.
 	Values cue.Value `json:"values,omitempty"`
@@ -39,7 +47,7 @@ func (rel *ModuleRelease) ValidateValues() error {
 	if combined == nil {
 		return nil
 	}
-	return &ValidationError{
+	return &opmerrors.ValidationError{
 		Message: "values do not satisfy #config schema",
 		Cause:   combined,
 	}
@@ -58,7 +66,7 @@ func (rel *ModuleRelease) Validate() error {
 		}
 	}
 	if len(concreteErrors) > 0 {
-		return &ValidationError{
+		return &opmerrors.ValidationError{
 			Message: fmt.Sprintf("%d component(s) have non-concrete values - check that all required values are provided", len(concreteErrors)),
 			Cause:   concreteErrors[0],
 		}

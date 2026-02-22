@@ -9,6 +9,9 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/module"
+	"github.com/opmodel/cli/internal/core/modulerelease"
+	"github.com/opmodel/cli/internal/core/transformer"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/pipeline"
 )
@@ -17,16 +20,16 @@ import (
 // testing output formatting without requiring a registry or real module render.
 func buildTestResult() *pipeline.RenderResult {
 	return &pipeline.RenderResult{
-		Release: core.ReleaseMetadata{
+		Release: modulerelease.ReleaseMetadata{
 			Name:       "test-release",
 			Namespace:  "default",
 			Components: []string{"web"},
 		},
-		Module: core.ModuleMetadata{
+		Module: module.ModuleMetadata{
 			Version: "1.0.0",
 		},
-		MatchPlan: core.MatchPlan{
-			Matches: map[string][]core.TransformerMatchOld{
+		MatchPlan: transformer.MatchPlan{
+			Matches: map[string][]transformer.TransformerMatchOld{
 				"web": {
 					{
 						TransformerFQN: "test#DeploymentTransformer",

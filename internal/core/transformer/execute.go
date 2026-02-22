@@ -1,10 +1,14 @@
-package core
+package transformer
 
 import (
 	"context"
 
 	"cuelang.org/go/cue"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/modulerelease"
+	opmerrors "github.com/opmodel/cli/internal/errors"
 )
 
 // Execute sequentially runs the transform function of each matched
@@ -18,11 +22,11 @@ import (
 // Any per-match errors are collected in the returned []error; execution
 // continues past individual match errors so all matches are attempted.
 // Context cancellation is checked between matches.
-func (m *TransformerMatchPlan) Execute(ctx context.Context, rel *ModuleRelease) ([]*Resource, []error) {
-	resources := make([]*Resource, 0)
+func (p *TransformerMatchPlan) Execute(ctx context.Context, rel *modulerelease.ModuleRelease) ([]*core.Resource, []error) {
+	resources := make([]*core.Resource, 0)
 	var errs []error
 
-	for _, match := range m.Matches {
+	for _, match := range p.Matches {
 		if !match.Matched {
 			continue
 		}
@@ -43,7 +47,7 @@ func (m *TransformerMatchPlan) Execute(ctx context.Context, rel *ModuleRelease) 
 			tfFQN = match.Transformer.Metadata.FQN
 		}
 
-		res, err := m.executeMatch(match, rel, compName, tfFQN)
+		res, err := p.executeMatch(match, rel, compName, tfFQN)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -55,18 +59,18 @@ func (m *TransformerMatchPlan) Execute(ctx context.Context, rel *ModuleRelease) 
 }
 
 // executeMatch runs a single (transformer, component) pair and returns the resources.
-func (m *TransformerMatchPlan) executeMatch(
+func (p *TransformerMatchPlan) executeMatch(
 	match *TransformerMatch,
-	rel *ModuleRelease,
+	rel *modulerelease.ModuleRelease,
 	compName, tfFQN string,
-) ([]*Resource, error) {
-	cueCtx := m.cueCtx
+) ([]*core.Resource, error) {
+	cueCtx := p.cueCtx
 
 	// Resolve the #transform CUE value from the transformer.
-	// core.Transformer stores the Transform field directly (extracted during LoadProvider).
+	// Transformer stores the Transform field directly (extracted during LoadProvider).
 	transformValue := match.Transformer.Transform
 	if !transformValue.Exists() {
-		return nil, &TransformError{
+		return nil, &opmerrors.TransformError{
 			ComponentName:  compName,
 			TransformerFQN: tfFQN,
 			Cause:          errMissingTransform,
@@ -76,7 +80,7 @@ func (m *TransformerMatchPlan) executeMatch(
 	// Inject #component into the transformer.
 	unified := transformValue.FillPath(cue.ParsePath("#component"), match.Component.Value)
 	if unified.Err() != nil {
-		return nil, &TransformError{
+		return nil, &opmerrors.TransformError{
 			ComponentName:  compName,
 			TransformerFQN: tfFQN,
 			Cause:          unified.Err(),
@@ -99,7 +103,7 @@ func (m *TransformerMatchPlan) executeMatch(
 	)
 
 	if unified.Err() != nil {
-		return nil, &TransformError{
+		return nil, &opmerrors.TransformError{
 			ComponentName:  compName,
 			TransformerFQN: tfFQN,
 			Cause:          unified.Err(),
@@ -109,11 +113,11 @@ func (m *TransformerMatchPlan) executeMatch(
 	// Extract output.
 	outputValue := unified.LookupPath(cue.ParsePath("output"))
 	if !outputValue.Exists() {
-		return []*Resource{}, nil
+		return []*core.Resource{}, nil
 	}
 
 	if outputValue.Err() != nil {
-		return nil, &TransformError{
+		return nil, &opmerrors.TransformError{
 			ComponentName:  compName,
 			TransformerFQN: tfFQN,
 			Cause:          outputValue.Err(),
@@ -121,15 +125,14 @@ func (m *TransformerMatchPlan) executeMatch(
 	}
 
 	// Decode output — three forms: list, single resource (has apiVersion), or map of resources.
-	//nolint:gocritic // ifElseChain: conditions are not comparable constants, switch is not applicable
 	if outputValue.Kind() == cue.ListKind {
 		return decodeResourceList(outputValue, compName, tfFQN)
 	} else if isSingleResource(outputValue) {
 		obj, err := decodeResource(outputValue)
 		if err != nil {
-			return nil, &TransformError{ComponentName: compName, TransformerFQN: tfFQN, Cause: err}
+			return nil, &opmerrors.TransformError{ComponentName: compName, TransformerFQN: tfFQN, Cause: err}
 		}
-		return []*Resource{{Object: obj, Component: compName, Transformer: tfFQN}}, nil
+		return []*core.Resource{{Object: obj, Component: compName, Transformer: tfFQN}}, nil
 	}
 	return decodeResourceMap(outputValue, compName, tfFQN)
 }
@@ -140,35 +143,35 @@ func isSingleResource(value cue.Value) bool {
 }
 
 // decodeResourceList decodes a CUE list of Kubernetes resource objects.
-func decodeResourceList(value cue.Value, compName, tfFQN string) ([]*Resource, error) {
-	var resources []*Resource
+func decodeResourceList(value cue.Value, compName, tfFQN string) ([]*core.Resource, error) {
+	var resources []*core.Resource
 	iter, err := value.List()
 	if err != nil {
-		return nil, &TransformError{ComponentName: compName, TransformerFQN: tfFQN, Cause: err}
+		return nil, &opmerrors.TransformError{ComponentName: compName, TransformerFQN: tfFQN, Cause: err}
 	}
 	for iter.Next() {
 		obj, err := decodeResource(iter.Value())
 		if err != nil {
-			return nil, &TransformError{ComponentName: compName, TransformerFQN: tfFQN, Cause: err}
+			return nil, &opmerrors.TransformError{ComponentName: compName, TransformerFQN: tfFQN, Cause: err}
 		}
-		resources = append(resources, &Resource{Object: obj, Component: compName, Transformer: tfFQN})
+		resources = append(resources, &core.Resource{Object: obj, Component: compName, Transformer: tfFQN})
 	}
 	return resources, nil
 }
 
 // decodeResourceMap decodes a CUE struct of named Kubernetes resource objects.
-func decodeResourceMap(value cue.Value, compName, tfFQN string) ([]*Resource, error) {
-	var resources []*Resource
+func decodeResourceMap(value cue.Value, compName, tfFQN string) ([]*core.Resource, error) {
+	var resources []*core.Resource
 	iter, err := value.Fields()
 	if err != nil {
-		return nil, &TransformError{ComponentName: compName, TransformerFQN: tfFQN, Cause: err}
+		return nil, &opmerrors.TransformError{ComponentName: compName, TransformerFQN: tfFQN, Cause: err}
 	}
 	for iter.Next() {
 		obj, err := decodeResource(iter.Value())
 		if err != nil {
-			return nil, &TransformError{ComponentName: compName, TransformerFQN: tfFQN, Cause: err}
+			return nil, &opmerrors.TransformError{ComponentName: compName, TransformerFQN: tfFQN, Cause: err}
 		}
-		resources = append(resources, &Resource{Object: obj, Component: compName, Transformer: tfFQN})
+		resources = append(resources, &core.Resource{Object: obj, Component: compName, Transformer: tfFQN})
 	}
 	return resources, nil
 }

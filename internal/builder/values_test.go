@@ -9,7 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/module"
+	opmerrors "github.com/opmodel/cli/internal/errors"
 )
 
 // testdataPath returns the absolute path to a testdata file.
@@ -20,15 +21,15 @@ func testdataPath(t *testing.T, name string) string {
 	return p
 }
 
-// moduleWithValues returns a *core.Module with a pre-compiled Values field.
-func moduleWithValues(ctx *cue.Context, valCUE string) *core.Module {
+// moduleWithValues returns a *module.Module with a pre-compiled Values field.
+func moduleWithValues(ctx *cue.Context, valCUE string) *module.Module {
 	v := ctx.CompileString(valCUE)
-	return &core.Module{Values: v}
+	return &module.Module{Values: v}
 }
 
-// moduleWithNoValues returns a *core.Module with an absent Values field.
-func moduleWithNoValues() *core.Module {
-	return &core.Module{} // Values is zero cue.Value — not Exists()
+// moduleWithNoValues returns a *module.Module with an absent Values field.
+func moduleWithNoValues() *module.Module {
+	return &module.Module{} // Values is zero cue.Value — not Exists()
 }
 
 func TestSelectValues(t *testing.T) {
@@ -53,7 +54,7 @@ func TestSelectValues(t *testing.T) {
 		_, err := selectValues(ctx, mod, nil)
 		require.Error(t, err)
 
-		var valErr *core.ValidationError
+		var valErr *opmerrors.ValidationError
 		require.ErrorAs(t, err, &valErr)
 		assert.Contains(t, valErr.Message, "values.cue")
 	})
@@ -103,7 +104,7 @@ func TestSelectValues(t *testing.T) {
 		_, err := selectValues(ctx, mod, []string{file})
 		require.Error(t, err)
 
-		var valErr *core.ValidationError
+		var valErr *opmerrors.ValidationError
 		require.ErrorAs(t, err, &valErr)
 		assert.Contains(t, valErr.Message, "'values'")
 	})

@@ -1,4 +1,5 @@
-package core
+// Package provider provides the Provider type and component-transformer matching logic.
+package provider
 
 import (
 	"fmt"
@@ -6,15 +7,20 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
+
+	"github.com/opmodel/cli/internal/core/component"
+	"github.com/opmodel/cli/internal/core/transformer"
 )
 
+// Provider holds the parsed representation of a provider CUE module,
+// including all transformer definitions and CUE evaluation context.
 type Provider struct {
-	ApiVersion string `json:"apiVersion"`
+	APIVersion string `json:"apiVersion"`
 	Kind       string `json:"kind"`
 
 	Metadata *ProviderMetadata `json:"metadata"`
 
-	Transformers map[string]*Transformer `json:"transformers,omitempty"`
+	Transformers map[string]*transformer.Transformer `json:"transformers,omitempty"`
 
 	DeclaredResources   []cue.Value `json:"#declaredResources,omitempty"`
 	DeclaredTraits      []cue.Value `json:"#declaredTraits,omitempty"`
@@ -26,6 +32,7 @@ type Provider struct {
 	CueCtx *cue.Context `json:"-"`
 }
 
+// ProviderMetadata holds identity metadata for a provider.
 type ProviderMetadata struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description,omitempty"`
@@ -34,75 +41,16 @@ type ProviderMetadata struct {
 	Labels      map[string]string `json:"labels,omitempty"`
 }
 
-type Transformer struct {
-	ApiVersion string `json:"apiVersion"`
-	Kind       string `json:"kind"`
-
-	Metadata *TransformerMetadata `json:"metadata"`
-
-	RequiredLabels    map[string]string    `json:"requiredLabels,omitempty"`
-	RequiredResources map[string]cue.Value `json:"requiredResources,omitempty"`
-	RequiredTraits    map[string]cue.Value `json:"requiredTraits,omitempty"`
-
-	OptionalLabels    map[string]string    `json:"optionalLabels,omitempty"`
-	OptionalResources map[string]cue.Value `json:"optionalResources,omitempty"`
-	OptionalTraits    map[string]cue.Value `json:"optionalTraits,omitempty"`
-
-	Transform cue.Value `json:"#transform,omitempty"`
-}
-
-type TransformerMetadata struct {
-	ApiVersion  string            `json:"apiVersion"`
-	Name        string            `json:"name"`
-	FQN         string            `json:"fqn"`
-	Description string            `json:"description,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-}
-
-// GetFQN returns the transformer's fully qualified name.
-func (t *Transformer) GetFQN() string {
-	if t.Metadata == nil {
-		return ""
-	}
-	return t.Metadata.FQN
-}
-
-// GetRequiredLabels returns the transformer's required labels.
-func (t *Transformer) GetRequiredLabels() map[string]string {
-	return t.RequiredLabels
-}
-
-// GetRequiredResources returns the FQNs of the transformer's required resources.
-func (t *Transformer) GetRequiredResources() []string {
-	keys := make([]string, 0, len(t.RequiredResources))
-	for k := range t.RequiredResources {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-// GetRequiredTraits returns the FQNs of the transformer's required traits.
-func (t *Transformer) GetRequiredTraits() []string {
-	keys := make([]string, 0, len(t.RequiredTraits))
-	for k := range t.RequiredTraits {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
 // Requirements returns all transformers as a []TransformerRequirements slice,
 // sorted by transformer name for deterministic output.
-func (p *Provider) Requirements() []TransformerRequirements {
+func (p *Provider) Requirements() []transformer.TransformerRequirements {
 	names := make([]string, 0, len(p.Transformers))
 	for name := range p.Transformers {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 
-	result := make([]TransformerRequirements, 0, len(names))
+	result := make([]transformer.TransformerRequirements, 0, len(names))
 	for _, name := range names {
 		result = append(result, p.Transformers[name])
 	}
@@ -121,12 +69,8 @@ func (p *Provider) Requirements() []TransformerRequirements {
 //
 // Component names and transformer names are both sorted before iteration to
 // produce a deterministic match plan regardless of map iteration order.
-func (p *Provider) Match(components map[string]*Component) *TransformerMatchPlan {
-	plan := &TransformerMatchPlan{
-		Matches:   make([]*TransformerMatch, 0),
-		Unmatched: make([]string, 0),
-		cueCtx:    p.CueCtx,
-	}
+func (p *Provider) Match(components map[string]*component.Component) *transformer.TransformerMatchPlan {
+	plan := transformer.NewMatchPlan(p.CueCtx)
 
 	// Sort component names for deterministic output.
 	compNames := make([]string, 0, len(components))
@@ -148,8 +92,8 @@ func (p *Provider) Match(components map[string]*Component) *TransformerMatchPlan
 
 		for _, tfName := range tfNames {
 			tf := p.Transformers[tfName]
-			m := p.evaluateMatch(comp, tf)
-			plan.Matches = append(plan.Matches, m)
+			m := evaluateMatch(comp, tf)
+			plan.AppendMatch(m)
 			if m.Matched {
 				matched = true
 			}
@@ -160,7 +104,7 @@ func (p *Provider) Match(components map[string]*Component) *TransformerMatchPlan
 			if comp.Metadata != nil {
 				name = comp.Metadata.Name
 			}
-			plan.Unmatched = append(plan.Unmatched, name)
+			plan.AppendUnmatched(name)
 		}
 	}
 
@@ -168,7 +112,7 @@ func (p *Provider) Match(components map[string]*Component) *TransformerMatchPlan
 }
 
 // evaluateMatch checks whether a single transformer matches a single component.
-func (p *Provider) evaluateMatch(comp *Component, tf *Transformer) *TransformerMatch {
+func evaluateMatch(comp *component.Component, tf *transformer.Transformer) *transformer.TransformerMatch { //nolint:gocyclo // linear per-field match evaluation; each branch is a distinct matching criterion
 	name := ""
 	if comp.Metadata != nil {
 		name = comp.Metadata.Name
@@ -183,7 +127,7 @@ func (p *Provider) evaluateMatch(comp *Component, tf *Transformer) *TransformerM
 		labels = comp.Metadata.Labels
 	}
 
-	detail := &TransformerMatchDetail{
+	detail := &transformer.TransformerMatchDetail{
 		ComponentName:  name,
 		TransformerFQN: fqn,
 	}
@@ -237,7 +181,7 @@ func (p *Provider) evaluateMatch(comp *Component, tf *Transformer) *TransformerM
 
 	detail.Reason = buildMatchReason(matched, detail, tf)
 
-	return &TransformerMatch{
+	return &transformer.TransformerMatch{
 		Matched:     matched,
 		Transformer: tf,
 		Component:   comp,
@@ -246,7 +190,7 @@ func (p *Provider) evaluateMatch(comp *Component, tf *Transformer) *TransformerM
 }
 
 // buildMatchReason creates a human-readable match reason string.
-func buildMatchReason(matched bool, detail *TransformerMatchDetail, tf *Transformer) string {
+func buildMatchReason(matched bool, detail *transformer.TransformerMatchDetail, tf *transformer.Transformer) string {
 	if matched {
 		var parts []string
 
@@ -295,90 +239,4 @@ func buildMatchReason(matched bool, detail *TransformerMatchDetail, tf *Transfor
 		reasons = append(reasons, "missing traits: "+strings.Join(detail.MissingTraits, ", "))
 	}
 	return "Not matched: " + strings.Join(reasons, "; ")
-}
-
-type TransformerMatchPlan struct {
-	Matches   []*TransformerMatch `json:"matches,omitempty"`
-	Unmatched []string            `json:"unmatched,omitempty"`
-
-	// cueCtx is the CUE evaluation context used by Execute() for encoding operations.
-	// Set by Provider.Match() from the Provider's own CueCtx field.
-	cueCtx *cue.Context
-}
-
-type TransformerMatch struct {
-	// Whether the transformer matched the component.
-	Matched bool `json:"matched"`
-	// The matched transformer
-	Transformer *Transformer `json:"transformer,omitempty"`
-	// The matched component
-	Component *Component `json:"component,omitempty"`
-
-	Detail *TransformerMatchDetail `json:"detail,omitempty"`
-}
-
-type TransformerMatchDetail struct {
-	// ComponentName is the name of the matched component, for verbose output and debugging.
-	ComponentName string `json:"componentName"`
-	// The fully qualified name of the matched transformer.
-	TransformerFQN string `json:"transformerFQN"`
-	// Reason explains why this transformer matched or did not match, for verbose output and debugging.
-	Reason string `json:"reason,omitempty"`
-
-	MissingLabels      []string `json:"missingLabels,omitempty"`
-	MissingResources   []string `json:"missingResources,omitempty"`
-	MissingTraits      []string `json:"missingTraits,omitempty"`
-	UnhandledResources []string `json:"unhandledResources,omitempty"`
-	UnhandledTraits    []string `json:"unhandledTraits,omitempty"`
-}
-
-// TransformerRequirements is the interface satisfied by types that expose
-// transformer matching requirements. Used for error messages and diagnostics.
-type TransformerRequirements interface {
-	GetFQN() string
-	GetRequiredLabels() map[string]string
-	GetRequiredResources() []string
-	GetRequiredTraits() []string
-}
-
-// ToLegacyMatchPlan converts a TransformerMatchPlan to a MatchPlan for use
-// by RenderResult consumers (cmdutil/output.go) until those are migrated to
-// read TransformerMatchPlan directly.
-func (p *TransformerMatchPlan) ToLegacyMatchPlan() MatchPlan {
-	matches := make(map[string][]TransformerMatchOld)
-	for _, m := range p.Matches {
-		if !m.Matched || m.Detail == nil {
-			continue
-		}
-		compName := m.Detail.ComponentName
-		matches[compName] = append(matches[compName], TransformerMatchOld{
-			TransformerFQN: m.Detail.TransformerFQN,
-			Reason:         m.Detail.Reason,
-		})
-	}
-	return MatchPlan{
-		Matches:   matches,
-		Unmatched: p.Unmatched,
-	}
-}
-
-// MatchPlan describes the transformer-component matching results.
-// Retained as the shape of RenderResult.MatchPlan; consumers use the
-// map-keyed-by-component-name view. Will be replaced by TransformerMatchPlan
-// when cmdutil/output.go and its tests are migrated.
-type MatchPlan struct {
-	// Matches maps component names to their matched transformers.
-	Matches map[string][]TransformerMatchOld
-
-	// Unmatched lists components with no matching transformers.
-	Unmatched []string
-}
-
-// TransformerMatchOld records a single transformer match for MatchPlan.
-type TransformerMatchOld struct {
-	// TransformerFQN is the fully qualified transformer name.
-	TransformerFQN string
-
-	// Reason explains why this transformer matched.
-	Reason string
 }
