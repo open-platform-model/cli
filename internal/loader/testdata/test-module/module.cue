@@ -20,13 +20,6 @@ metadata: {
 	port:     int | *8080
 }
 
-// Concrete values
-values: {
-	image:    "nginx:1.25"
-	replicas: 2
-	port:     8080
-}
-
 // Component definitions
 #components: {
 	web: {

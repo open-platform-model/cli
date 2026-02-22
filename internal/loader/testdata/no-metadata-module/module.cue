@@ -11,8 +11,4 @@ metadata: {
 	image: string
 }
 
-values: {
-	image: "nginx:latest"
-}
-
 #components: {}

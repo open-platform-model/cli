@@ -4,7 +4,7 @@
 
 ## Overview
 
-Go CLI for OPM module operations. Uses cobra, CUE SDK, and zap logging.
+Go CLI for OPM module operations. Uses cobra, CUE SDK, and charmbracelet/log.
 
 ## Constitution
 
@@ -23,15 +23,40 @@ All agents MUST read and adhere to `openspec/config.yaml`.
 
 **Governance**: The constitution supersedes this file in case of conflict.
 
-## Build/Test Commands
+## Commands
 
-- Build: `task build` (output: ./bin/opm)
-- Test all: `task test`
-- Test verbose: `task test:verbose`
-- Single test: `go test ./internal/build -v -run TestName`
-- Coverage: `task test:coverage`
-- All checks: `task check` (fmt + vet + test)
-- Run: `task run -- mod init ./my-module`
+### Build
+
+- `task build` — build binary (output: `./bin/opm`)
+- `task build:all` — cross-compile for all platforms (linux, darwin, windows)
+- `task install` — install to `$GOPATH/bin`
+- `task clean` — remove build artifacts and coverage files
+
+### Testing
+
+- `task test` — run all tests (unit + integration + e2e)
+- `task test:unit` — unit tests only (`./internal/...`)
+- `task test:integration` — integration tests (requires `kind-opm-dev` cluster; run `task cluster:create` first)
+- `task test:e2e` — end-to-end tests
+- `task test:run TEST=TestName` — run a single test by name across all packages
+- `task test:verbose` — all tests with verbose output
+- `task test:coverage` — generate HTML coverage report
+
+### Code Quality
+
+- `task fmt` — format code (`go fmt` + `goimports`)
+- `task vet` — run `go vet`
+- `task lint` — run `golangci-lint`
+- `task lint:fix` — run linter with auto-fix
+- `task tidy` — run `go mod tidy`
+- `task check` — run all checks (fmt + vet + lint + test)
+
+### Cluster (for integration tests)
+
+- `task cluster:create` — create local `kind` cluster (`kind-opm-dev`)
+- `task cluster:delete` — delete local `kind` cluster
+- `task cluster:status` — show cluster status
+- `task cluster:recreate` — delete and recreate cluster
 
 ## OPM and CUE
 
@@ -49,8 +74,6 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 - spf13/cobra: Commands, auto-generated help, shell completion
 - charmbracelet/lipgloss: Terminal styling
 - charmbracelet/log: Structured logging with key-value output
-- charmbracelet/glamour: Markdown rendering in terminal
-- charmbracelet/huh: Interactive prompts for init commands
 
 ### Configuration
 
@@ -68,10 +91,6 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 - k8s.io/client-go: Server-side apply, resource discovery
 - k8s.io/apimachinery: Unstructured types, version parsing
 
-### Distribution
-
-- oras.land/oras-go/v2: OCI push/pull for module distribution
-
 ### Diff & Comparison
 
 - homeport/dyff: Human-readable semantic diffs
@@ -79,7 +98,6 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 ### Testing
 
 - stretchr/testify: Assertions and mocking
-- sigs.k8s.io/controller-runtime/pkg/envtest: K8s integration tests
 
 ## Code Style
 
@@ -93,28 +111,40 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 ## Project Structure
 
 ```text
-├── cmd/opm/           # CLI entry point (main.go, root.go, version.go)
+├── cmd/opm/               # CLI entry point (main.go, root.go, version.go)
+├── docs/                  # Design docs, RFCs, comparisons, vision
+├── examples/              # Example OPM modules (jellyfin, minecraft, webapp, etc.)
+├── experiments/           # Experimental pipeline explorations (not production)
 ├── internal/
-│   ├── build/         # Render pipeline: public API + subpackages
-│   │   ├── module/    # Module inspection: path resolution, AST metadata extraction
-│   │   ├── release/   # Release building: CUE overlay, values, metadata, validation
-│   │   └── transform/ # Transformer logic: provider loading, matching, execution
-│   ├── cmd/           # Command implementations (root, version, exit)
-│   │   ├── config/    # config init, vet commands
-│   │   └── mod/       # mod apply, build, delete, diff, init, status, vet commands
-│   ├── cmdutil/       # Shared command utilities (flag groups, render pipeline, K8s client, output)
-│   ├── config/        # Config loading, validation, paths
-│   ├── core/          # Shared domain types: Resource, labels, metadata, errors, weights
-│   ├── errors/        # Error types and handling
-│   ├── inventory/     # Release inventory: secret CRUD, digest, stale detection
-│   ├── kubernetes/    # K8s client, apply, delete, discovery, health, status
-│   ├── output/        # Spinner, table, log, styles, format
-│   ├── templates/     # Module templates (simple, standard, advanced)
-│   └── version/       # Version handling
+│   ├── builder/           # BUILD phase of the render pipeline
+│   ├── cmd/               # Command implementations
+│   │   ├── config/        # config init, vet commands
+│   │   └── mod/           # mod apply, build, delete, diff, init, status, vet commands
+│   ├── cmdutil/           # Shared command utilities (flag groups, K8s client, output)
+│   ├── config/            # Config loading and validation
+│   │   └── schema/        # CUE schema for config validation
+│   ├── core/              # Shared domain types: Resource, labels, metadata, weights
+│   ├── errors/            # Error types and handling
+│   ├── inventory/         # Release inventory: secret CRUD, digest, stale detection
+│   ├── kubernetes/        # K8s client, apply, delete, discovery, health, status
+│   ├── loader/            # CUE module loading
+│   ├── output/            # Terminal output: spinner, table, log, styles, format
+│   ├── pipeline/          # Render pipeline interface and shared types
+│   ├── provider/          # Transformer definitions from provider CUE modules
+│   ├── templates/         # Module templates (simple, standard, advanced)
+│   ├── transformer/       # Transformer match plans and utilities
+│   └── version/           # Version info
 ├── tests/
-│   ├── fixtures/      # Test module fixtures
-│   └── integration/   # Integration tests
-├── Taskfile.yml       # Build automation
+│   ├── e2e/               # End-to-end tests
+│   ├── fixtures/
+│   │   ├── valid/         # Valid test module fixtures
+│   │   └── invalid/       # Invalid test module fixtures
+│   └── integration/
+│       ├── deploy/
+│       ├── inventory-apply/
+│       ├── inventory-ops/
+│       └── values-flow/
+├── Taskfile.yml           # Build automation
 └── go.mod
 ```
 
@@ -125,10 +155,14 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 ## Key Packages
 
 - `cmd/opm/` - Entry point
-- `internal/build/` - CUE module loading and render pipeline
-- `internal/version/` - Version info
+- `internal/loader/` - CUE module loading
+- `internal/pipeline/` - Render pipeline interface and shared types
+- `internal/builder/` - BUILD phase of the render pipeline
+- `internal/provider/` - Transformer definitions from provider CUE modules
+- `internal/transformer/` - Transformer match plans and utilities
 - `internal/cmd/` - Command implementations (root, mod/, config/)
-- `internal/cmdutil/` - Shared command utilities (flag groups, render pipeline, K8s client, output)
+- `internal/cmdutil/` - Shared command utilities (flag groups, K8s client, output)
+- `internal/version/` - Version info
 
 ## Patterns
 

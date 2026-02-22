@@ -7,7 +7,9 @@ metadata: {
 	version:    "0.1.0"
 }
 
-// Module values
+// Abstract value schema with CUE defaults — required for manifests to evaluate.
+// Concrete defaults live in values.cue (Pattern A); this provides the type
+// context so that references to values.* in manifests resolve during package load.
 values: {
 	replicas: *1 | int
 	image:    *"nginx:latest" | string
