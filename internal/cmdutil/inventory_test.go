@@ -66,7 +66,7 @@ func TestResolveInventory_ByReleaseName_Success(t *testing.T) {
 	ctx := context.Background()
 
 	rsf := &cmdutil.ReleaseSelectorFlags{ReleaseName: "myapp", Namespace: "default"}
-	inv, live, missing, err := cmdutil.ResolveInventory(ctx, client, rsf, "default", false, silentLogger())
+	inv, live, missing, err := cmdutil.ResolveInventory(ctx, client, rsf, "default", silentLogger())
 
 	require.NoError(t, err)
 	require.NotNil(t, inv)
@@ -84,7 +84,7 @@ func TestResolveInventory_ByReleaseID_Success(t *testing.T) {
 	ctx := context.Background()
 
 	rsf := &cmdutil.ReleaseSelectorFlags{ReleaseName: "myapp", ReleaseID: "uuid-xyz-789", Namespace: "production"}
-	inv, live, missing, err := cmdutil.ResolveInventory(ctx, client, rsf, "production", false, silentLogger())
+	inv, live, missing, err := cmdutil.ResolveInventory(ctx, client, rsf, "production", silentLogger())
 
 	require.NoError(t, err)
 	require.NotNil(t, inv)
@@ -102,21 +102,21 @@ func TestResolveInventory_ByReleaseID_NoReleaseName(t *testing.T) {
 
 	// Only ReleaseID set — no ReleaseName
 	rsf := &cmdutil.ReleaseSelectorFlags{ReleaseID: "uuid-nnn-000", Namespace: "default"}
-	inv, _, _, err := cmdutil.ResolveInventory(ctx, client, rsf, "default", false, silentLogger())
+	inv, _, _, err := cmdutil.ResolveInventory(ctx, client, rsf, "default", silentLogger())
 
 	require.NoError(t, err)
 	require.NotNil(t, inv)
 	assert.Equal(t, "uuid-nnn-000", inv.ReleaseMetadata.ReleaseID)
 }
 
-// TestResolveInventory_NotFound_IgnoreNotFoundFalse verifies that when the inventory
-// Secret does not exist and ignoreNotFound is false, an ExitNotFound error is returned.
-func TestResolveInventory_NotFound_IgnoreNotFoundFalse(t *testing.T) {
+// TestResolveInventory_NotFound verifies that when the inventory
+// Secret does not exist, an ExitNotFound error is returned.
+func TestResolveInventory_NotFound(t *testing.T) {
 	client := makeTestK8sClient() // empty — no secrets
 	ctx := context.Background()
 
 	rsf := &cmdutil.ReleaseSelectorFlags{ReleaseName: "nonexistent", Namespace: "default"}
-	inv, live, missing, err := cmdutil.ResolveInventory(ctx, client, rsf, "default", false, silentLogger())
+	inv, live, missing, err := cmdutil.ResolveInventory(ctx, client, rsf, "default", silentLogger())
 
 	require.Error(t, err)
 	assert.Nil(t, inv)
@@ -126,21 +126,6 @@ func TestResolveInventory_NotFound_IgnoreNotFoundFalse(t *testing.T) {
 	var exitErr *oerrors.ExitError
 	require.True(t, errors.As(err, &exitErr))
 	assert.Equal(t, oerrors.ExitNotFound, exitErr.Code)
-}
-
-// TestResolveInventory_NotFound_IgnoreNotFoundTrue verifies that when the inventory
-// Secret does not exist and ignoreNotFound is true, (nil, nil, nil, nil) is returned.
-func TestResolveInventory_NotFound_IgnoreNotFoundTrue(t *testing.T) {
-	client := makeTestK8sClient() // empty — no secrets
-	ctx := context.Background()
-
-	rsf := &cmdutil.ReleaseSelectorFlags{ReleaseName: "nonexistent", Namespace: "default"}
-	inv, live, missing, err := cmdutil.ResolveInventory(ctx, client, rsf, "default", true, silentLogger())
-
-	require.NoError(t, err)
-	assert.Nil(t, inv)
-	assert.Nil(t, live)
-	assert.Nil(t, missing)
 }
 
 // TestResolveInventory_K8sError_LookupFails verifies that a Kubernetes API error
@@ -165,7 +150,7 @@ func TestResolveInventory_K8sError_LookupFails(t *testing.T) {
 	ctx := context.Background()
 
 	rsf := &cmdutil.ReleaseSelectorFlags{ReleaseName: "brokenapp", Namespace: "default"}
-	inv, live, missing, err := cmdutil.ResolveInventory(ctx, client, rsf, "default", false, silentLogger())
+	inv, live, missing, err := cmdutil.ResolveInventory(ctx, client, rsf, "default", silentLogger())
 
 	require.Error(t, err)
 	assert.Nil(t, inv)

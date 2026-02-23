@@ -54,7 +54,7 @@ func (e *ReleaseNotFoundError) Error() string {
 }
 
 // Is implements errors.Is so that IsNoResourcesFound matches ReleaseNotFoundError,
-// allowing --ignore-not-found to suppress both error types uniformly.
+// allowing both error types to map to the same ExitNotFound exit code.
 func (e *ReleaseNotFoundError) Is(target error) bool {
 	return target == errNoResourcesFound
 }

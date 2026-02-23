@@ -37,12 +37,6 @@ The command SHALL exit with code 5 (`ExitNotFound`) when no resources match the 
 - **AND** no resources match the selector
 - **THEN** the command SHALL print a "no resources found" message and exit with code 5
 
-#### Scenario: Ignore not found overrides to exit 0
-
-- **WHEN** the user runs `opm mod status --release-name nonexistent -n prod --ignore-not-found`
-- **AND** no resources match the selector
-- **THEN** the command SHALL print "no resources found (ignored)" and exit with code 0
-
 ### Requirement: Status exits with code 1 for general errors
 
 The command SHALL exit with code 1 (`ExitGeneralError`) for errors that prevent the status check from completing, such as invalid flags, configuration errors, or unexpected API failures.

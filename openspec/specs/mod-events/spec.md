@@ -40,14 +40,7 @@ Non-workload resources (ConfigMap, Secret, Service, PVC, Ingress, etc.) SHALL NO
 #### Scenario: No OPM resources found
 
 - **WHEN** no resources match the release selector
-- **AND** `--ignore-not-found` is not set
 - **THEN** the command SHALL exit with a non-zero exit code and display an error message
-
-#### Scenario: No OPM resources found with ignore flag
-
-- **WHEN** no resources match the release selector
-- **AND** `--ignore-not-found` is set
-- **THEN** the command SHALL exit with code 0 and display an informational message
 
 ---
 

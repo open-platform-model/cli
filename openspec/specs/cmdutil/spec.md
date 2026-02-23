@@ -256,7 +256,6 @@ The function SHALL accept:
 - A Kubernetes client
 - A `*ReleaseSelectorFlags` (carrying release name and/or release ID)
 - A namespace string
-- An `ignoreNotFound bool` flag
 - A structured logger scoped to the release
 
 The function SHALL return the resolved `*inventory.InventorySecret`, the discovered
@@ -270,10 +269,8 @@ The function MUST implement the following resolution logic:
   `inventory.FindInventoryByReleaseName`.
 - If inventory lookup fails: log the error and return an `*ExitError` with code
   `ExitGeneralError`.
-- If the inventory Secret is not found and `ignoreNotFound` is true: log info and
-  return `nil, nil, nil`.
-- If the inventory Secret is not found and `ignoreNotFound` is false: log the error
-  and return an `*ExitError` with code `ExitNotFound`.
+- If the inventory Secret is not found: log the error and return an `*ExitError`
+  with code `ExitNotFound`.
 - After resolving the Secret: call `inventory.DiscoverResourcesFromInventory` to fetch
   live resources. If this fails: log the error and return an `*ExitError` with code
   `ExitGeneralError`.
@@ -288,15 +285,10 @@ The function MUST implement the following resolution logic:
 - **WHEN** `ReleaseSelectorFlags.ReleaseID` is set and the inventory Secret exists
 - **THEN** `ResolveInventory` returns the Secret and its discovered live resources with no error
 
-#### Scenario: Release not found with ignoreNotFound false
+#### Scenario: Release not found
 
-- **WHEN** the inventory Secret does not exist and `ignoreNotFound` is false
+- **WHEN** the inventory Secret does not exist
 - **THEN** `ResolveInventory` returns an `*ExitError` with code `ExitNotFound`
-
-#### Scenario: Release not found with ignoreNotFound true
-
-- **WHEN** the inventory Secret does not exist and `ignoreNotFound` is true
-- **THEN** `ResolveInventory` returns `nil, nil, nil` (callers treat this as a no-op)
 
 #### Scenario: Kubernetes error during inventory lookup
 

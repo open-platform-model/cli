@@ -24,10 +24,9 @@ func NewModStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
 
 	// Status-specific flags (local to this command)
 	var (
-		outputFlag         string
-		watchFlag          bool
-		ignoreNotFoundFlag bool
-		verboseFlag        bool
+		outputFlag  string
+		watchFlag   bool
+		verboseFlag bool
 	)
 
 	c := &cobra.Command{
@@ -51,7 +50,7 @@ Exit codes:
   0  All resources healthy
   1  Command error (cluster unreachable, permission denied, etc.)
   2  Resources exist but are not ready
-  5  No resources found (override with --ignore-not-found to exit 0)
+  5  No resources found
 
 Examples:
   # Show status by release name
@@ -69,7 +68,7 @@ Examples:
   # Watch status continuously
   opm mod status --release-name my-app -n production --watch`,
 		RunE: func(c *cobra.Command, args []string) error {
-			return runStatus(args, cfg, &rsf, &kf, outputFlag, watchFlag, ignoreNotFoundFlag, verboseFlag)
+			return runStatus(args, cfg, &rsf, &kf, outputFlag, watchFlag, verboseFlag)
 		},
 	}
 
@@ -81,8 +80,6 @@ Examples:
 		"Output format (table, wide, yaml, json)")
 	c.Flags().BoolVar(&watchFlag, "watch", false,
 		"Watch status continuously (poll every 2s)")
-	c.Flags().BoolVar(&ignoreNotFoundFlag, "ignore-not-found", false,
-		"Exit 0 when no resources match the selector")
 	c.Flags().BoolVar(&verboseFlag, "verbose", false,
 		"Show pod-level diagnostics for unhealthy workloads")
 
@@ -90,7 +87,7 @@ Examples:
 }
 
 // runStatus executes the status command.
-func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, outputFmt string, watch, ignoreNotFound, verbose bool) error {
+func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, outputFmt string, watch, verbose bool) error {
 	ctx := context.Background()
 
 	// Validate release selector flags
@@ -138,13 +135,9 @@ func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 		return err
 	}
 
-	inv, liveResources, missingEntries, err := cmdutil.ResolveInventory(ctx, k8sClient, rsf, namespace, ignoreNotFound, releaseLog)
+	inv, liveResources, missingEntries, err := cmdutil.ResolveInventory(ctx, k8sClient, rsf, namespace, releaseLog)
 	if err != nil {
 		return err
-	}
-	if inv == nil {
-		// ignoreNotFound was true and release was not found — treat as no-op.
-		return nil
 	}
 
 	// Build ComponentMap from inventory entries (Kind/Namespace/Name → component name).
@@ -190,26 +183,21 @@ func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 
 	// If watch mode, run in loop
 	if watch {
-		return runStatusWatch(ctx, k8sClient, statusOpts, logName, ignoreNotFound)
+		return runStatusWatch(ctx, k8sClient, statusOpts, logName)
 	}
 
 	// Single run
-	return fetchAndPrintStatus(ctx, k8sClient, statusOpts, logName, ignoreNotFound, false)
+	return fetchAndPrintStatus(ctx, k8sClient, statusOpts, logName, false)
 }
 
 // fetchAndPrintStatus fetches and displays the current status.
 // forWatch controls whether table format is forced (true in watch mode).
-func fetchAndPrintStatus(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string, ignoreNotFound, forWatch bool) error {
+func fetchAndPrintStatus(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string, forWatch bool) error {
 	releaseLog := output.ReleaseLogger(logName)
 
 	result, err := kubernetes.GetReleaseStatus(ctx, client, opts)
 	if err != nil {
-		// Explicitly check for no-resources-found first (not a K8s API error).
 		if kubernetes.IsNoResourcesFound(err) {
-			if ignoreNotFound {
-				releaseLog.Info("no resources found (ignored)")
-				return nil
-			}
 			releaseLog.Error("getting status", "error", err)
 			return &oerrors.ExitError{Code: oerrors.ExitNotFound, Err: err, Printed: true}
 		}
@@ -240,7 +228,7 @@ func fetchAndPrintStatus(ctx context.Context, client *kubernetes.Client, opts ku
 }
 
 // runStatusWatch runs status in continuous watch mode, polling every 2 seconds.
-func runStatusWatch(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string, ignoreNotFound bool) error {
+func runStatusWatch(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string) error {
 	// Set up signal handling for clean exit
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -256,7 +244,7 @@ func runStatusWatch(ctx context.Context, client *kubernetes.Client, opts kuberne
 	defer ticker.Stop()
 
 	// Initial display
-	if err := fetchAndPrintStatus(ctx, client, opts, logName, ignoreNotFound, true); err != nil {
+	if err := fetchAndPrintStatus(ctx, client, opts, logName, true); err != nil {
 		return err
 	}
 
@@ -267,7 +255,7 @@ func runStatusWatch(ctx context.Context, client *kubernetes.Client, opts kuberne
 		case <-ticker.C:
 			// Clear screen
 			output.ClearScreen()
-			if err := fetchAndPrintStatus(ctx, client, opts, logName, ignoreNotFound, true); err != nil {
+			if err := fetchAndPrintStatus(ctx, client, opts, logName, true); err != nil {
 				return err
 			}
 		}

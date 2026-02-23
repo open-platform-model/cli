@@ -26,11 +26,10 @@ func NewModEventsCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var kf cmdutil.K8sFlags
 
 	var (
-		sinceFlag          string
-		typeFlag           string
-		watchFlag          bool
-		outputFlag         string
-		ignoreNotFoundFlag bool
+		sinceFlag  string
+		typeFlag   string
+		watchFlag  bool
+		outputFlag string
 	)
 
 	c := &cobra.Command{
@@ -52,7 +51,7 @@ flag defaults to 1h to match this retention window.
 Exit codes:
   0  Success (events displayed, or no events found)
   1  Command error (cluster unreachable, permission denied, etc.)
-  5  No resources found (override with --ignore-not-found to exit 0)
+  5  No resources found
 
 Examples:
   # Show events from the last hour (default)
@@ -70,7 +69,7 @@ Examples:
   # JSON output for tooling
   opm mod events --release-name jellyfin -n media -o json`,
 		RunE: func(c *cobra.Command, args []string) error {
-			return runEvents(args, cfg, &rsf, &kf, sinceFlag, typeFlag, watchFlag, outputFlag, ignoreNotFoundFlag)
+			return runEvents(args, cfg, &rsf, &kf, sinceFlag, typeFlag, watchFlag, outputFlag)
 		},
 	}
 
@@ -85,16 +84,13 @@ Examples:
 		"Stream new events in real-time")
 	c.Flags().StringVarP(&outputFlag, "output", "o", "table",
 		"Output format (table, json, yaml)")
-	c.Flags().BoolVar(&ignoreNotFoundFlag, "ignore-not-found", false,
-		"Exit 0 when no resources match the selector")
-
 	return c
 }
 
 // runEvents executes the events command.
 //
 //nolint:gocyclo // linear validation + dispatch; each branch is distinct
-func runEvents(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, since, eventType string, watchMode bool, outputFmt string, ignoreNotFound bool) error {
+func runEvents(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, since, eventType string, watchMode bool, outputFmt string) error {
 	ctx := context.Background()
 
 	// Validate release selector flags.
@@ -155,13 +151,9 @@ func runEvents(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 	}
 
 	// Resolve inventory and live resources.
-	inv, liveResources, _, err := cmdutil.ResolveInventory(ctx, k8sClient, rsf, namespace, ignoreNotFound, releaseLog)
+	_, liveResources, _, err := cmdutil.ResolveInventory(ctx, k8sClient, rsf, namespace, releaseLog)
 	if err != nil {
 		return err
-	}
-	if inv == nil {
-		// ignoreNotFound was true and release was not found.
-		return nil
 	}
 
 	eventsOpts := kubernetes.EventsOptions{
@@ -182,10 +174,6 @@ func runEvents(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 	result, err := kubernetes.GetModuleEvents(ctx, k8sClient, eventsOpts)
 	if err != nil {
 		if kubernetes.IsNoResourcesFound(err) {
-			if ignoreNotFound {
-				releaseLog.Info("no resources found (ignored)")
-				return nil
-			}
 			releaseLog.Error("getting events", "error", err)
 			return &oerrors.ExitError{Code: oerrors.ExitNotFound, Err: err, Printed: true}
 		}

@@ -20,15 +20,13 @@ import (
 //   - ReleaseID set: direct GET via inventory.GetInventory (release name used as display name if set)
 //   - ReleaseName set: label scan via inventory.FindInventoryByReleaseName
 //
-// If the inventory is not found and ignoreNotFound is true, returns (nil, nil, nil, nil).
-// If the inventory is not found and ignoreNotFound is false, returns an *ExitError with ExitNotFound.
+// If the inventory is not found, returns an *ExitError with ExitNotFound.
 // Any other lookup or discovery error returns an *ExitError with ExitGeneralError.
 func ResolveInventory(
 	ctx context.Context,
 	client *kubernetes.Client,
 	rsf *ReleaseSelectorFlags,
 	namespace string,
-	ignoreNotFound bool,
 	releaseLog *log.Logger,
 ) (*inventory.InventorySecret, []*unstructured.Unstructured, []inventory.InventoryEntry, error) {
 	// Resolve the inventory Secret.
@@ -56,10 +54,6 @@ func ResolveInventory(
 			name = rsf.ReleaseID
 		}
 		notFound := &kubernetes.ReleaseNotFoundError{Name: name, Namespace: namespace}
-		if ignoreNotFound {
-			releaseLog.Info("release not found (ignored)")
-			return nil, nil, nil, nil
-		}
 		releaseLog.Error("release not found", "name", name, "namespace", namespace)
 		return nil, nil, nil, &oerrors.ExitError{Code: oerrors.ExitNotFound, Err: notFound, Printed: true}
 	}

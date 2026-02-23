@@ -21,7 +21,7 @@ func TestNewModEventsCmd_FlagsExist(t *testing.T) {
 	flags := []string{
 		"release-name", "release-id", "namespace",
 		"kubeconfig", "context",
-		"since", "type", "watch", "output", "ignore-not-found",
+		"since", "type", "watch", "output",
 	}
 	for _, name := range flags {
 		f := cmd.Flags().Lookup(name)
@@ -37,7 +37,6 @@ func TestNewModEventsCmd_FlagDefaults(t *testing.T) {
 	assert.Equal(t, "", cmd.Flags().Lookup("type").DefValue)
 	assert.Equal(t, "false", cmd.Flags().Lookup("watch").DefValue)
 	assert.Equal(t, "table", cmd.Flags().Lookup("output").DefValue)
-	assert.Equal(t, "false", cmd.Flags().Lookup("ignore-not-found").DefValue)
 }
 
 func TestNewModEventsCmd_OutputShorthand(t *testing.T) {
@@ -103,7 +102,7 @@ func TestRunEvents_ValidationErrors(t *testing.T) {
 			if sinceFmt == "" {
 				sinceFmt = "1h"
 			}
-			err := runEvents(nil, cfg, &tt.rsf, kf, sinceFmt, tt.typeFlag, false, outputFmt, false)
+			err := runEvents(nil, cfg, &tt.rsf, kf, sinceFmt, tt.typeFlag, false, outputFmt)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.expectErr)
 		})

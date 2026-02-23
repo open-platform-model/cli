@@ -132,7 +132,7 @@ func runTree(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorF
 	}
 
 	// Resolve inventory and live resources.
-	inv, liveResources, _, err := cmdutil.ResolveInventory(ctx, k8sClient, rsf, namespace, false, releaseLog)
+	inv, liveResources, _, err := cmdutil.ResolveInventory(ctx, k8sClient, rsf, namespace, releaseLog)
 	if err != nil {
 		return err
 	}

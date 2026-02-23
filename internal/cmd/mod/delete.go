@@ -24,9 +24,8 @@ func NewModDeleteCmd(cfg *config.GlobalConfig) *cobra.Command {
 
 	// Delete-specific flags (local to this command)
 	var (
-		forceFlag          bool
-		dryRunFlag         bool
-		ignoreNotFoundFlag bool
+		forceFlag  bool
+		dryRunFlag bool
 	)
 
 	c := &cobra.Command{
@@ -54,7 +53,7 @@ Examples:
   # Skip confirmation prompt
   opm mod delete --release-name my-app -n production --force`,
 		RunE: func(c *cobra.Command, args []string) error {
-			return runDelete(args, cfg, &rsf, &kf, forceFlag, dryRunFlag, ignoreNotFoundFlag)
+			return runDelete(args, cfg, &rsf, &kf, forceFlag, dryRunFlag)
 		},
 	}
 
@@ -66,14 +65,11 @@ Examples:
 		"Skip confirmation prompt")
 	c.Flags().BoolVar(&dryRunFlag, "dry-run", false,
 		"Preview without deleting")
-	c.Flags().BoolVar(&ignoreNotFoundFlag, "ignore-not-found", false,
-		"Exit 0 when no resources match the selector")
-
 	return c
 }
 
 // runDelete executes the delete command.
-func runDelete(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, force, dryRun, ignoreNotFound bool) error { //nolint:gocyclo // orchestration function; complexity is inherent
+func runDelete(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, force, dryRun bool) error {
 	ctx := context.Background()
 
 	// Validate release selector flags
@@ -122,13 +118,9 @@ func runDelete(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 		}
 	}
 
-	inv, liveResources, _, err := cmdutil.ResolveInventory(ctx, k8sClient, rsf, namespace, ignoreNotFound, releaseLog)
+	inv, liveResources, _, err := cmdutil.ResolveInventory(ctx, k8sClient, rsf, namespace, releaseLog)
 	if err != nil {
 		return err
-	}
-	if inv == nil {
-		// ignoreNotFound was true and release was not found — treat as no-op.
-		return nil
 	}
 
 	// Delete resources
@@ -149,10 +141,6 @@ func runDelete(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 
 	deleteResult, err := kubernetes.Delete(ctx, k8sClient, deleteOpts)
 	if err != nil {
-		if ignoreNotFound && kubernetes.IsNoResourcesFound(err) {
-			releaseLog.Info("no resources found (ignored)")
-			return nil
-		}
 		releaseLog.Error("delete failed", "error", err)
 		return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
