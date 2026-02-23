@@ -7,19 +7,23 @@ The OPM CLI currently has `mod status` for checking resource health and `mod dif
 The existing command pattern follows a consistent structure:
 
 ```text
-cmd/mod_<command>.go          cobra command, flag parsing, output formatting
+internal/cmd/mod/<command>.go       cobra command, flag parsing, output formatting
   │
   ├─ cmdutil.ReleaseSelectorFlags    shared --release-name/--release-id/-n
   ├─ cmdutil.K8sFlags                shared --kubeconfig/--context
   │
+  ├─ cmdutil.ResolveInventory()      inventory Secret lookup + live resource fetch
+  │    └─ inventory.DiscoverResourcesFromInventory()  targeted GET per inventory entry
+  │
   └─ kubernetes/<operation>.go       business logic
        │
-       ├─ DiscoverResources()        label-based resource discovery
-       ├─ <operation>()              core logic (e.g., GetModuleStatus, Delete)
+       ├─ <operation>()              core logic (e.g., GetReleaseStatus, GetModuleTree)
        └─ Format<operation>()        output formatting (table/json/yaml)
 ```
 
 The events command fits cleanly into this pattern. The key new capability is **downward ownerReference traversal** — walking from OPM-managed parents to Kubernetes-owned children to collect their UIDs for event filtering.
+
+Note: `mod tree` already implements equivalent ownership walking in `internal/kubernetes/tree.go` via `walkOwnership`, `walkDeployment`, `walkStatefulSet`, `walkDaemonSet`, `walkJob`, and `hasOwnerWithUID`. Those functions return `[]ResourceNode` for tree display. The events command needs a UID-returning variant: same traversal logic, different output shape.
 
 ### Kubernetes Event API
 
@@ -104,7 +108,7 @@ Job (OPM-managed)
 
 ### Decision 3: Child resource discovery implementation
 
-**Choice:** Add a new `DiscoverChildren` function to `internal/kubernetes/discovery.go` that takes parent resources and returns their Kubernetes-owned children.
+**Choice:** Add a new `DiscoverChildren` function to a new file `internal/kubernetes/children.go` that takes parent resources and returns their Kubernetes-owned children.
 
 ```go
 // DiscoverChildren finds Kubernetes-owned child resources of the given parents.
@@ -163,7 +167,7 @@ This is **not** a generic recursive walker. It uses knowledge of Kubernetes work
 
 **Alternatives considered:**
 
-- **(A) Extend DiscoverResources** — add child traversal as an option on the existing function. Rejected because it would complicate an already-complex function and mix two different concerns (label-based discovery vs. ownerReference traversal).
+- **(A) Reuse `walkOwnership` from `tree.go`** — the tree command already implements ownership walking that returns `[]ResourceNode`. Rejected for events because the return type is wrong (events needs `[]types.UID`, not `ResourceNode` trees), and coupling events to tree's rendering types would be an abstraction leak. `children.go` borrows the same traversal patterns from `tree.go` but with a purpose-fit signature.
 - **(B) Generic recursive ownerReference walker** — traverse all kinds, not just known workloads. Rejected because it's overengineered and could query unexpected resource types.
 
 ### Decision 4: Watch mode implementation
@@ -228,8 +232,8 @@ Column details:
 | Column | Source | Formatting |
 |--------|--------|------------|
 | LAST SEEN | `event.LastTimestamp` | Relative duration (e.g., `3m`, `1h`, `2d`) using existing `formatDuration` |
-| TYPE | `event.Type` | `Warning` in yellow, `Normal` in dim gray |
-| RESOURCE | `event.InvolvedObject.Kind/Name` | Cyan (matches `styleNoun`) |
+| TYPE | `event.Type` | `Warning` via `output.ColorYellow` (220); `Normal` via `output.Dim()` |
+| RESOURCE | `event.InvolvedObject.Kind/Name` | Cyan via `output.StyleNoun()` |
 | REASON | `event.Reason` | Default (unstyled) |
 | MESSAGE | `event.Message` | Default, truncated to terminal width if needed |
 
@@ -264,17 +268,17 @@ type EventEntry struct {
 Following the existing separation of concerns:
 
 ```text
-internal/cmd/mod_events.go           Command definition, flag parsing
-internal/cmd/mod_events_test.go      Flag validation tests
+internal/cmd/mod/events.go           Command definition, flag parsing
+internal/cmd/mod/events_test.go      Flag validation tests
 
 internal/kubernetes/events.go        Event collection, filtering, formatting
 internal/kubernetes/events_test.go   Event logic tests
 
-internal/kubernetes/children.go      OwnerReference child discovery
+internal/kubernetes/children.go      OwnerReference child discovery (UID-returning)
 internal/kubernetes/children_test.go Child discovery tests
 ```
 
-`children.go` is separate from `discovery.go` because it has a fundamentally different concern: `discovery.go` finds OPM-managed resources by labels; `children.go` finds Kubernetes-owned resources by ownerReferences. Keeping them separate follows the single-responsibility principle and avoids bloating `discovery.go`.
+`children.go` is a new file focused purely on ownerReference traversal, returning child UIDs for event filtering. It is intentionally separate from `tree.go`'s ownership walking (which returns `[]ResourceNode` for tree display) — same traversal patterns, different output contract. This follows the single-responsibility principle: `tree.go` owns tree rendering, `children.go` owns UID collection.
 
 ### Decision 9: Signal handling and graceful shutdown
 
@@ -292,7 +296,7 @@ go func() {
 }()
 ```
 
-Exit code 0 on clean interrupt. This matches the existing `runStatusWatch` pattern in `mod_status.go:175-207`.
+Exit code 0 on clean interrupt. This matches the existing `runStatusWatch` pattern in `internal/cmd/mod/status.go:242`.
 
 ## Risks / Trade-offs
 

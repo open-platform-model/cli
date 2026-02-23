@@ -63,8 +63,8 @@ LAST SEEN   TYPE      RESOURCE                        REASON          MESSAGE
 
 The command discovers events in two phases:
 
-1. **Discover OPM-managed resources** — using existing `DiscoverResources` with OPM label selectors (same as `mod status` and `mod delete`).
-2. **Walk ownerReferences downward** — for workload resources (Deployment, StatefulSet, DaemonSet, Job), traverse ownerReferences to find Kubernetes-owned children (ReplicaSets, Pods) that aren't OPM-labeled but belong to OPM-managed parents. These children are where the most useful events live (OOMKilled, ImagePullBackOff, scheduling failures, etc.).
+1. **Discover OPM-managed resources** — via `cmdutil.ResolveInventory`, which reads the release inventory Secret and fetches each tracked resource by targeted GET (same pattern as `mod status`, `mod delete`, `mod tree`). The inventory Secret is identified by `--release-name` or `--release-id`.
+2. **Walk ownerReferences downward** — for workload resources (Deployment, StatefulSet, DaemonSet, Job), traverse ownerReferences to find Kubernetes-owned children (ReplicaSets, Pods) that aren't OPM-managed but belong to OPM-managed parents. These children are where the most useful events live (OOMKilled, ImagePullBackOff, scheduling failures, etc.).
 3. **Query events** — collect all `involvedObject` UIDs from both phases, query `v1.Event` list filtered by namespace and sorted by `lastTimestamp`. Filter to events matching collected UIDs.
 4. **Apply filters** — filter by `--since` time window and `--type` if specified.
 
@@ -74,9 +74,9 @@ Follows existing CLI style conventions from `internal/output/styles.go`:
 
 | Element | Color | Source |
 |---------|-------|--------|
-| `Warning` type | yellow (`ColorYellow`, 220) | Matches existing "configured" status style |
-| `Normal` type | dim gray (`colorDimGray`, 240) | Non-urgent, don't shout |
-| Resource names in RESOURCE column | cyan (`ColorCyan`, 14) | Matches existing `styleNoun` convention |
+| `Warning` type | yellow (`output.ColorYellow`, 220) | Matches existing "configured" status style |
+| `Normal` type | faint/dim (`output.Dim()`) | Non-urgent, don't shout |
+| Resource names in RESOURCE column | cyan (`output.StyleNoun()`) | Matches existing `styleNoun` convention |
 
 ### Watch mode
 
@@ -90,7 +90,7 @@ This command reuses established patterns:
 
 - **`ReleaseSelectorFlags`** (`internal/cmdutil/flags.go`): Shared flag group for `--release-name`/`--release-id`/`-n` with mutual exclusivity validation.
 - **`K8sFlags`** (`internal/cmdutil/flags.go`): Shared `--kubeconfig`/`--context` flags.
-- **`DiscoverResources`** (`internal/kubernetes/discovery.go`): Existing label-based resource discovery. Same function used by `mod status` and `mod delete`.
+- **`cmdutil.ResolveInventory`** (`internal/cmdutil/inventory.go`): Shared inventory resolution and live resource discovery. Reads the inventory Secret and fetches live resources — same function used by `mod status`, `mod delete`, and `mod tree`.
 - **Output formatting**: Table via `output.NewTable`, JSON via `json.MarshalIndent`, YAML via `yaml.Marshal` — same patterns as `mod status`.
 
 ## Capabilities
@@ -101,12 +101,12 @@ This command reuses established patterns:
 
 ### Modified Capabilities
 
-- `resource-discovery`: Discovery needs a new capability to walk ownerReferences downward from OPM-managed workloads to find Kubernetes-owned children (Pods, ReplicaSets) that aren't OPM-labeled. This is distinct from the existing `ExcludeOwned` filter (which filters *out* owned resources) — we need the inverse: given parent resources, find their children.
+- `resource-discovery`: Discovery needs a new capability to walk ownerReferences downward from OPM-managed workloads to find Kubernetes-owned children (Pods, ReplicaSets) that aren't tracked in the inventory. Given parent resources, find their Kubernetes-owned children. Note: `mod tree` already implements equivalent ownership walking in `internal/kubernetes/tree.go` (`walkOwnership` and friends) — the events command requires a UID-returning variant (rather than the `ResourceNode`-returning variant used for tree display).
 
 ## Impact
 
-- **New files**: `internal/cmd/mod_events.go`, `internal/cmd/mod_events_test.go`, `internal/kubernetes/events.go`, `internal/kubernetes/events_test.go`
-- **Modified files**: `internal/cmd/mod.go` (register new subcommand), `internal/kubernetes/discovery.go` (add child resource traversal)
+- **New files**: `internal/cmd/mod/events.go`, `internal/cmd/mod/events_test.go`, `internal/kubernetes/events.go`, `internal/kubernetes/events_test.go`, `internal/kubernetes/children.go`, `internal/kubernetes/children_test.go`
+- **Modified files**: `internal/cmd/mod/mod.go` (register new subcommand)
 - **Dependencies**: No new external dependencies — uses existing `client-go` APIs (`v1.EventList`, `v1.Event`, Watch API)
 - **SemVer**: MINOR — new command, no breaking changes to existing commands or flags
 - **Testing**: Unit tests for event filtering/formatting, integration tests for ownerReference traversal

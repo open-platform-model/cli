@@ -2,7 +2,9 @@
 
 ### Requirement: Child resource discovery via ownerReference traversal
 
-The resource discovery package SHALL provide a `DiscoverChildren` function that, given a set of parent resources, walks ownerReferences downward to find Kubernetes-owned child resources. This is the inverse of the existing `ExcludeOwned` filter — instead of filtering out owned resources, it finds children of known parents.
+The resource discovery package SHALL provide a `DiscoverChildren` function in `internal/kubernetes/children.go` that, given a set of parent resources, walks ownerReferences downward to find Kubernetes-owned child resources. It returns children as `[]*unstructured.Unstructured` for UID extraction (used by the events command to match `event.involvedObject.uid`).
+
+Note: `internal/kubernetes/tree.go` already implements equivalent ownership walking (`walkOwnership` and related helpers) that returns `[]ResourceNode` for tree display. `DiscoverChildren` follows the same traversal patterns with a different return contract — callers need the raw child resources, not rendered display nodes.
 
 The traversal SHALL be targeted, not generic. It SHALL use knowledge of Kubernetes workload hierarchies to make specific queries:
 

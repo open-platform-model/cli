@@ -1,8 +1,8 @@
 ## 1. Child Resource Discovery
 
-- [ ] 1.1 Create `internal/kubernetes/children.go` with `DiscoverChildren` function that accepts parent resources and returns Kubernetes-owned children via ownerReference traversal
+- [ ] 1.1 Create `internal/kubernetes/children.go` with `DiscoverChildren` function that accepts parent resources and returns Kubernetes-owned children (as `[]*unstructured.Unstructured`) via ownerReference traversal. Note: `internal/kubernetes/tree.go` already implements equivalent ownership walking (`walkOwnership`, `walkDeployment`, `walkStatefulSet`, etc.) returning `[]ResourceNode` — follow those same traversal patterns, returning child resources rather than display nodes.
 - [ ] 1.2 Implement targeted traversal for each workload kind: Deployment→ReplicaSet→Pod, StatefulSet→Pod, DaemonSet→Pod, Job→Pod, CronJob→Job→Pod
-- [ ] 1.3 Implement ownerReference UID matching logic — list candidate children by kind, filter by `ownerReferences[].uid` against parent UID
+- [ ] 1.3 Implement ownerReference UID matching logic — list candidate children by kind, filter by `ownerReferences[].uid` against parent UID. Reuse the `hasOwnerWithUID` helper from `tree.go` (or duplicate if keeping packages clean).
 - [ ] 1.4 Handle non-fatal API errors during child listing (log warning, continue with other parents)
 - [ ] 1.5 Create `internal/kubernetes/children_test.go` with table-driven tests: Deployment children, StatefulSet children, non-workload parents skipped, no children exist, API errors non-fatal
 
@@ -23,12 +23,12 @@
 
 ## 4. Command Definition
 
-- [ ] 4.1 Create `internal/cmd/mod_events.go` with `NewModEventsCmd` using cobra, `ReleaseSelectorFlags`, `K8sFlags`, and events-specific flags (--since, --type, --watch, --output, --ignore-not-found)
-- [ ] 4.2 Implement `runEvents` function: validate flags → resolve K8s config → create client → call GetModuleEvents → format and print
+- [ ] 4.1 Create `internal/cmd/mod/events.go` with `NewModEventsCmd` using cobra, `ReleaseSelectorFlags`, `K8sFlags`, and events-specific flags (--since, --type, --watch, --output, --ignore-not-found). Follow the structure of `internal/cmd/mod/tree.go` or `status.go` as a reference — use `cmdutil.ResolveInventory` for resource discovery.
+- [ ] 4.2 Implement `runEvents` function: validate flags → resolve K8s config → create client → call `cmdutil.ResolveInventory` → call `GetModuleEvents` → format and print
 - [ ] 4.3 Implement `--type` flag validation (reject values other than `Normal`, `Warning`)
 - [ ] 4.4 Implement `--output` flag validation (reject values other than `table`, `json`, `yaml`)
-- [ ] 4.5 Register `NewModEventsCmd` in `internal/cmd/mod.go` via `cmd.AddCommand`
-- [ ] 4.6 Create `internal/cmd/mod_events_test.go` with flag validation tests: mutual exclusivity of selectors, invalid --type, invalid --output, invalid --since, flags exist
+- [ ] 4.5 Register `NewModEventsCmd` in `internal/cmd/mod/mod.go` via `c.AddCommand`
+- [ ] 4.6 Create `internal/cmd/mod/events_test.go` with flag validation tests: mutual exclusivity of selectors, invalid --type, invalid --output, invalid --since, flags exist
 
 ## 5. Watch Mode
 
