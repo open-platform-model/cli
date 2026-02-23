@@ -26,11 +26,11 @@ values: {
 	media: {
 		tvshows: {
 			mountPath: "/data/tvshows"
-			size:      "100Gi"
+			size:      "10Gi"
 		}
 		movies: {
 			mountPath: "/data/movies"
-			size:      "100Gi"
+			size:      "10Gi"
 		}
 	}
 }

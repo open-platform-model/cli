@@ -18,13 +18,13 @@ values: {
 
 		// Low resource requests for local development
 		resources: {
-			requests: {
-				cpu:    "50m"
-				memory: "64Mi"
+			cpu: {
+				request: "50m"
+				limit:   "200m"
 			}
-			limits: {
-				cpu:    "200m"
-				memory: "128Mi"
+			memory: {
+				request: "64Mi"
+				limit:   "128Mi"
 			}
 		}
 

@@ -85,16 +85,16 @@ import (
 						value: "secretpassword"
 					}
 				}
-				resources: {
-					requests: {
-						cpu:    "500m"
-						memory: "1Gi"
-					}
-					limits: {
-						cpu:    "2000m"
-						memory: "4Gi"
-					}
+			resources: {
+				cpu: {
+					request: "500m"
+					limit:   "2000m"
 				}
+				memory: {
+					request: "1Gi"
+					limit:   "4Gi"
+				}
+			}
 				volumeMounts: data: {
 					name:      "data"
 					mountPath: "/var/lib/postgresql/data"
@@ -152,16 +152,16 @@ import (
 					name:       "metrics"
 					targetPort: 9100
 				}
-				resources: {
-					requests: {
-						cpu:    "100m"
-						memory: "128Mi"
-					}
-					limits: {
-						cpu:    "200m"
-						memory: "256Mi"
-					}
+			resources: {
+				cpu: {
+					request: "100m"
+					limit:   "200m"
 				}
+				memory: {
+					request: "128Mi"
+					limit:   "256Mi"
+				}
+			}
 				volumeMounts: {
 					proc: {
 						name:      "proc"
@@ -222,16 +222,16 @@ import (
 						value: "v2.0.0"
 					}
 				}
-				resources: {
-					requests: {
-						cpu:    "500m"
-						memory: "512Mi"
-					}
-					limits: {
-						cpu:    "1000m"
-						memory: "1Gi"
-					}
+			resources: {
+				cpu: {
+					request: "500m"
+					limit:   "1000m"
 				}
+				memory: {
+					request: "512Mi"
+					limit:   "1Gi"
+				}
+			}
 			}
 		}
 	}
@@ -288,16 +288,16 @@ import (
 						value: "/backups"
 					}
 				}
-				resources: {
-					requests: {
-						cpu:    "250m"
-						memory: "256Mi"
-					}
-					limits: {
-						cpu:    "500m"
-						memory: "512Mi"
-					}
+			resources: {
+				cpu: {
+					request: "250m"
+					limit:   "500m"
 				}
+				memory: {
+					request: "256Mi"
+					limit:   "512Mi"
+				}
+			}
 				volumeMounts: backups: {
 					name:      "backup-storage"
 					mountPath: "/backups"

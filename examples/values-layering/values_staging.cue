@@ -18,13 +18,13 @@ values: {
 
 		// Higher resource requests for realistic load
 		resources: {
-			requests: {
-				cpu:    "100m"
-				memory: "128Mi"
+			cpu: {
+				request: "100m"
+				limit:   "500m"
 			}
-			limits: {
-				cpu:    "500m"
-				memory: "256Mi"
+			memory: {
+				request: "128Mi"
+				limit:   "256Mi"
 			}
 		}
 

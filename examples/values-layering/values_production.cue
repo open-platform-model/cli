@@ -18,13 +18,13 @@ values: {
 
 		// Production-grade resource allocation
 		resources: {
-			requests: {
-				cpu:    "200m"
-				memory: "256Mi"
+			cpu: {
+				request: "200m"
+				limit:   "1000m"
 			}
-			limits: {
-				cpu:    "1000m"
-				memory: "512Mi"
+			memory: {
+				request: "256Mi"
+				limit:   "512Mi"
 			}
 		}
 

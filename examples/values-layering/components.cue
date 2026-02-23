@@ -79,16 +79,16 @@ import (
 						value: #config.environment
 					}
 				}
-				resources: {
-					requests: {
-						cpu:    #config.web.resources.requests.cpu
-						memory: #config.web.resources.requests.memory
-					}
-					limits: {
-						cpu:    #config.web.resources.limits.cpu
-						memory: #config.web.resources.limits.memory
-					}
+			resources: {
+				cpu: {
+					request: #config.web.resources.cpu.request
+					limit:   #config.web.resources.cpu.limit
 				}
+				memory: {
+					request: #config.web.resources.memory.request
+					limit:   #config.web.resources.memory.limit
+				}
+			}
 			}
 
 			expose: {

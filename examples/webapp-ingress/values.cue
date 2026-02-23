@@ -20,13 +20,13 @@ values: {
 
 		// Resource requests and limits
 		resources: {
-			requests: {
-				cpu:    "100m"
-				memory: "128Mi"
+			cpu: {
+				request: "100m"
+				limit:   "500m"
 			}
-			limits: {
-				cpu:    "500m"
-				memory: "512Mi"
+			memory: {
+				request: "128Mi"
+				limit:   "512Mi"
 			}
 		}
 

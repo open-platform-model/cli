@@ -85,16 +85,16 @@ import (
 						}
 					}
 				}
-				resources: {
-					requests: {
-						cpu:    "500m"
-						memory: "1Gi"
-					}
-					limits: {
-						cpu:    "4000m"
-						memory: "4Gi"
-					}
+			resources: {
+				cpu: {
+					request: "500m"
+					limit:   "4000m"
 				}
+				memory: {
+					request: "1Gi"
+					limit:   "4Gi"
+				}
+			}
 				volumeMounts: {
 					config: {
 						name:      "config"

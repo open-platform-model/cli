@@ -42,13 +42,13 @@ metadata: {
 
 		// Resource requests and limits
 		resources: {
-			requests: {
-				cpu:    string
-				memory: string
+			cpu: {
+				request: string
+				limit:   string
 			}
-			limits: {
-				cpu:    string
-				memory: string
+			memory: {
+				request: string
+				limit:   string
 			}
 		}
 
