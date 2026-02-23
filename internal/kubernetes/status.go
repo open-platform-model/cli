@@ -188,7 +188,7 @@ func GetReleaseStatus(ctx context.Context, client *Client, opts StatusOptions) (
 	// Compute summary
 	for _, r := range result.Resources {
 		result.Summary.Total++
-		if r.Status == healthReady || r.Status == healthComplete {
+		if r.Status == healthReady || r.Status == healthComplete || r.Status == healthBound {
 			result.Summary.Ready++
 		} else {
 			result.Summary.NotReady++
@@ -229,7 +229,7 @@ func buildResourceHealth(ctx context.Context, client *Client, res *unstructured.
 		}
 	}
 
-	healthy := health == healthReady || health == healthComplete
+	healthy := health == healthReady || health == healthComplete || health == healthBound
 	return rh, healthy
 }
 
