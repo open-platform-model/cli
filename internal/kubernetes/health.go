@@ -21,6 +21,9 @@ const (
 	healthMissing healthStatus = "Missing"
 )
 
+// conditionStatusTrue is the Kubernetes condition status value representing "true".
+const conditionStatusTrue = "True"
+
 // workloadKinds are resources that use the Ready condition for health.
 var workloadKinds = map[string]bool{
 	"Deployment":  true,
@@ -83,7 +86,7 @@ func evaluateWorkloadHealth(resource *unstructured.Unstructured) healthStatus {
 	conditions := getConditions(resource)
 	for _, c := range conditions {
 		if c.Type == "Available" || c.Type == "Ready" {
-			if c.Status == "True" {
+			if c.Status == conditionStatusTrue {
 				return healthReady
 			}
 			return healthNotReady
@@ -97,12 +100,12 @@ func evaluateJobHealth(resource *unstructured.Unstructured) healthStatus {
 	conditions := getConditions(resource)
 	for _, c := range conditions {
 		if c.Type == "Complete" {
-			if c.Status == "True" {
+			if c.Status == conditionStatusTrue {
 				return healthComplete
 			}
 		}
 		if c.Type == "Failed" {
-			if c.Status == "True" {
+			if c.Status == conditionStatusTrue {
 				return healthNotReady
 			}
 		}
@@ -116,7 +119,7 @@ func evaluateCustomHealth(resource *unstructured.Unstructured) healthStatus {
 	conditions := getConditions(resource)
 	for _, c := range conditions {
 		if c.Type == "Ready" {
-			if c.Status == "True" {
+			if c.Status == conditionStatusTrue {
 				return healthReady
 			}
 			return healthNotReady

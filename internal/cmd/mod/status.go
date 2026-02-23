@@ -27,6 +27,7 @@ func NewModStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
 		outputFlag         string
 		watchFlag          bool
 		ignoreNotFoundFlag bool
+		verboseFlag        bool
 	)
 
 	c := &cobra.Command{
@@ -46,12 +47,21 @@ module source is not required. Health is evaluated per resource category:
 Exactly one of --release-name or --release-id is required to identify the release.
 The --namespace flag defaults to the value configured in ~/.opm/config.cue.
 
+Exit codes:
+  0  All resources healthy
+  1  Command error (cluster unreachable, permission denied, etc.)
+  2  Resources exist but are not ready
+  5  No resources found (override with --ignore-not-found to exit 0)
+
 Examples:
   # Show status by release name
   opm mod status --release-name my-app -n production
 
-  # Show status by release ID
-  opm mod status --release-id a1b2c3d4-e5f6-7890-abcd-ef1234567890 -n production
+  # Show status with extra columns (replicas, image)
+  opm mod status --release-name my-app -n production -o wide
+
+  # Show pod-level diagnostics for unhealthy workloads
+  opm mod status --release-name my-app -n production --verbose
 
   # Show status in JSON format
   opm mod status --release-name my-app -n production -o json
@@ -59,7 +69,7 @@ Examples:
   # Watch status continuously
   opm mod status --release-name my-app -n production --watch`,
 		RunE: func(c *cobra.Command, args []string) error {
-			return runStatus(args, cfg, &rsf, &kf, outputFlag, watchFlag, ignoreNotFoundFlag)
+			return runStatus(args, cfg, &rsf, &kf, outputFlag, watchFlag, ignoreNotFoundFlag, verboseFlag)
 		},
 	}
 
@@ -68,17 +78,19 @@ Examples:
 
 	// Status-specific flags
 	c.Flags().StringVarP(&outputFlag, "output", "o", "table",
-		"Output format (table, yaml, json)")
+		"Output format (table, wide, yaml, json)")
 	c.Flags().BoolVar(&watchFlag, "watch", false,
 		"Watch status continuously (poll every 2s)")
 	c.Flags().BoolVar(&ignoreNotFoundFlag, "ignore-not-found", false,
 		"Exit 0 when no resources match the selector")
+	c.Flags().BoolVar(&verboseFlag, "verbose", false,
+		"Show pod-level diagnostics for unhealthy workloads")
 
 	return c
 }
 
 // runStatus executes the status command.
-func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, outputFmt string, watch, ignoreNotFound bool) error {
+func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, outputFmt string, watch, ignoreNotFound, verbose bool) error {
 	ctx := context.Background()
 
 	// Validate release selector flags
@@ -115,7 +127,7 @@ func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 	if !valid || outputFormat == output.FormatDir {
 		return &oerrors.ExitError{
 			Code: oerrors.ExitGeneralError,
-			Err:  fmt.Errorf("invalid output format %q (valid: table, yaml, json)", outputFmt),
+			Err:  fmt.Errorf("invalid output format %q (valid: table, wide, yaml, json)", outputFmt),
 		}
 	}
 
@@ -135,12 +147,38 @@ func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 		return nil
 	}
 
+	// Build ComponentMap from inventory entries (Kind/Namespace/Name → component name).
+	componentMap := make(map[string]string)
+	if len(inv.Index) > 0 {
+		if change, ok := inv.Changes[inv.Index[0]]; ok {
+			for _, entry := range change.Inventory.Entries {
+				key := entry.Kind + "/" + entry.Namespace + "/" + entry.Name
+				componentMap[key] = entry.Component
+			}
+		}
+	}
+
+	// Extract version from latest change source.
+	var version string
+	if len(inv.Index) > 0 {
+		if change, ok := inv.Changes[inv.Index[0]]; ok {
+			version = change.Source.Version
+		}
+	}
+
+	// Determine wide mode from output format.
+	wideMode := outputFormat == output.FormatWide
+
 	statusOpts := kubernetes.StatusOptions{
 		Namespace:     namespace,
 		ReleaseName:   rsf.ReleaseName,
 		ReleaseID:     rsf.ReleaseID,
+		Version:       version,
+		ComponentMap:  componentMap,
 		OutputFormat:  outputFormat,
 		InventoryLive: liveResources,
+		Wide:          wideMode,
+		Verbose:       verbose,
 	}
 	for _, m := range missingEntries {
 		statusOpts.MissingResources = append(statusOpts.MissingResources, kubernetes.MissingResource{
@@ -166,9 +204,14 @@ func fetchAndPrintStatus(ctx context.Context, client *kubernetes.Client, opts ku
 
 	result, err := kubernetes.GetReleaseStatus(ctx, client, opts)
 	if err != nil {
-		if ignoreNotFound && kubernetes.IsNoResourcesFound(err) {
-			releaseLog.Info("no resources found (ignored)")
-			return nil
+		// Explicitly check for no-resources-found first (not a K8s API error).
+		if kubernetes.IsNoResourcesFound(err) {
+			if ignoreNotFound {
+				releaseLog.Info("no resources found (ignored)")
+				return nil
+			}
+			releaseLog.Error("getting status", "error", err)
+			return &oerrors.ExitError{Code: oerrors.ExitNotFound, Err: err, Printed: true}
 		}
 		releaseLog.Error("getting status", "error", err)
 		return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
@@ -187,6 +230,12 @@ func fetchAndPrintStatus(ctx context.Context, client *kubernetes.Client, opts ku
 	}
 
 	output.Println(formatted)
+
+	// Return exit code 2 when resources exist but are not all ready.
+	if result.AggregateStatus != "Ready" && result.AggregateStatus != "Complete" {
+		return &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: fmt.Errorf("release %q: %d resource(s) not ready", opts.ReleaseName, result.Summary.NotReady), Printed: true}
+	}
+
 	return nil
 }
 

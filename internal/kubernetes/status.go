@@ -10,7 +10,6 @@ import (
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -36,7 +35,14 @@ type StatusOptions struct {
 	// Mutually exclusive with ReleaseName.
 	ReleaseID string
 
-	// OutputFormat is the desired output format (table, yaml, json).
+	// Version is the module version, sourced from inv.Changes[latest].Source.Version.
+	// Empty for local modules.
+	Version string
+
+	// ComponentMap maps "Kind/Namespace/Name" to component name, built from inventory entries.
+	ComponentMap map[string]string
+
+	// OutputFormat is the desired output format (table, yaml, json, wide).
 	OutputFormat output.Format
 
 	// InventoryLive is the list of live resources pre-fetched from the inventory
@@ -47,6 +53,12 @@ type StatusOptions struct {
 	// MissingResources is the list of resources tracked in the inventory that
 	// no longer exist on the cluster. These are shown with "Missing" status.
 	MissingResources []MissingResource
+
+	// Wide enables extraction of workload-specific wide info (replicas, image).
+	Wide bool
+
+	// Verbose enables pod-level diagnostics for unhealthy workloads.
+	Verbose bool
 }
 
 // resourceHealth contains health information for a single resource.
@@ -57,22 +69,59 @@ type resourceHealth struct {
 	Name string `json:"name" yaml:"name"`
 	// Namespace is the resource namespace.
 	Namespace string `json:"namespace" yaml:"namespace"`
+	// Component is the source component name (from inventory).
+	Component string `json:"component,omitempty" yaml:"component,omitempty"`
 	// Status is the evaluated health status.
 	Status healthStatus `json:"status" yaml:"status"`
 	// Age is the human-readable age of the resource.
 	Age string `json:"age" yaml:"age"`
+	// Wide holds extra workload-specific info (replicas, image), populated when Wide mode is on.
+	Wide *wideInfo `json:"wide,omitempty" yaml:"wide,omitempty"`
+	// Verbose holds pod-level diagnostics, populated when Verbose mode is on.
+	Verbose *verboseInfo `json:"verbose,omitempty" yaml:"verbose,omitempty"`
+}
+
+// wideInfo holds workload-specific wide-format info extracted from the unstructured resource.
+type wideInfo struct {
+	Replicas string `json:"replicas,omitempty" yaml:"replicas,omitempty"` // "3/3", "10Gi (Bound)"
+	Image    string `json:"image,omitempty" yaml:"image,omitempty"`       // "nginx:1.25", "app.local"
+}
+
+// verboseInfo holds pod-level diagnostics for a workload resource.
+type verboseInfo struct {
+	Pods []podInfo `json:"pods,omitempty" yaml:"pods,omitempty"`
+}
+
+// podInfo holds status info for a single pod.
+type podInfo struct {
+	Name     string `json:"name" yaml:"name"`
+	Phase    string `json:"phase" yaml:"phase"` // Running, Pending, Failed
+	Ready    bool   `json:"ready" yaml:"ready"`
+	Reason   string `json:"reason,omitempty" yaml:"reason,omitempty"` // OOMKilled, ImagePullBackOff
+	Restarts int    `json:"restarts" yaml:"restarts"`
+}
+
+// statusSummary contains aggregate resource counts.
+type statusSummary struct {
+	Total    int `json:"total" yaml:"total"`
+	Ready    int `json:"ready" yaml:"ready"`
+	NotReady int `json:"notReady" yaml:"notReady"`
 }
 
 // StatusResult contains the full status output.
 type StatusResult struct {
+	// ReleaseName is the human-readable release name.
+	ReleaseName string `json:"releaseName" yaml:"releaseName"`
+	// Version is the module version (empty for local modules).
+	Version string `json:"version,omitempty" yaml:"version,omitempty"`
+	// Namespace is the Kubernetes namespace.
+	Namespace string `json:"namespace" yaml:"namespace"`
 	// Resources is the list of resource health statuses.
 	Resources []resourceHealth `json:"resources" yaml:"resources"`
 	// AggregateStatus is the overall module health.
 	AggregateStatus healthStatus `json:"aggregateStatus" yaml:"aggregateStatus"`
-	// ModuleID is the module identity UUID (if present on resources).
-	ModuleID string `json:"moduleId,omitempty" yaml:"moduleId,omitempty"`
-	// ReleaseID is the release identity UUID (if present on resources).
-	ReleaseID string `json:"releaseId,omitempty" yaml:"releaseId,omitempty"`
+	// Summary contains aggregate resource counts.
+	Summary statusSummary `json:"summary" yaml:"summary"`
 }
 
 // GetReleaseStatus evaluates health for all resources tracked in opts.InventoryLive.
@@ -99,31 +148,17 @@ func GetReleaseStatus(ctx context.Context, client *Client, opts StatusOptions) (
 		}
 	}
 
-	result := &StatusResult{}
+	result := &StatusResult{
+		ReleaseName: opts.ReleaseName,
+		Version:     opts.Version,
+		Namespace:   opts.Namespace,
+	}
 	allReady := true
 
-	// Extract identity labels from first resource (if available)
-	if len(resources) > 0 {
-		labels := resources[0].GetLabels()
-		if labels != nil {
-			result.ModuleID = labels[core.LabelModuleUUID]
-			result.ReleaseID = labels[core.LabelReleaseUUID]
-		}
-	}
-
 	for _, res := range resources {
-		health := evaluateHealth(res)
-		age := computeAge(res)
-
-		result.Resources = append(result.Resources, resourceHealth{
-			Kind:      res.GetKind(),
-			Name:      res.GetName(),
-			Namespace: res.GetNamespace(),
-			Status:    health,
-			Age:       age,
-		})
-
-		if health != healthReady && health != healthComplete {
+		rh, healthy := buildResourceHealth(ctx, client, res, opts)
+		result.Resources = append(result.Resources, rh)
+		if !healthy {
 			allReady = false
 		}
 	}
@@ -141,41 +176,186 @@ func GetReleaseStatus(ctx context.Context, client *Client, opts StatusOptions) (
 	}
 
 	// Compute aggregate status
-	if len(result.Resources) == 0 {
+	switch {
+	case len(result.Resources) == 0:
 		result.AggregateStatus = healthUnknown
-	} else if allReady {
+	case allReady:
 		result.AggregateStatus = healthReady
-	} else {
+	default:
 		result.AggregateStatus = healthNotReady
+	}
+
+	// Compute summary
+	for _, r := range result.Resources {
+		result.Summary.Total++
+		if r.Status == healthReady || r.Status == healthComplete {
+			result.Summary.Ready++
+		} else {
+			result.Summary.NotReady++
+		}
 	}
 
 	return result, nil
 }
 
-// FormatStatusTable renders the status result as a formatted table.
+// buildResourceHealth constructs a resourceHealth for a single live resource.
+// Returns the populated struct and whether the resource is healthy.
+func buildResourceHealth(ctx context.Context, client *Client, res *unstructured.Unstructured, opts StatusOptions) (resourceHealth, bool) {
+	health := evaluateHealth(res)
+	age := computeAge(res)
+
+	key := res.GetKind() + "/" + res.GetNamespace() + "/" + res.GetName()
+
+	rh := resourceHealth{
+		Kind:      res.GetKind(),
+		Name:      res.GetName(),
+		Namespace: res.GetNamespace(),
+		Component: opts.ComponentMap[key],
+		Status:    health,
+		Age:       age,
+	}
+
+	if opts.Wide {
+		rh.Wide = extractWideInfo(res)
+	}
+
+	// listWorkloadPods is only called for live, unhealthy workloads.
+	// Missing resources are never passed through buildResourceHealth — they are
+	// appended directly in GetReleaseStatus, so health == healthMissing cannot
+	// occur here.
+	if opts.Verbose && health == healthNotReady {
+		if pods, err := listWorkloadPods(ctx, client, res); err == nil && len(pods) > 0 {
+			rh.Verbose = &verboseInfo{Pods: pods}
+		}
+	}
+
+	healthy := health == healthReady || health == healthComplete
+	return rh, healthy
+}
+
+// FormatStatusTable renders the status result as a formatted table (default format).
 func FormatStatusTable(result *StatusResult) string {
 	var sb strings.Builder
 
-	// Show identity information if present
-	if result.ModuleID != "" || result.ReleaseID != "" {
-		if result.ModuleID != "" {
-			sb.WriteString(fmt.Sprintf("Module ID:  %s\n", result.ModuleID))
-		}
-		if result.ReleaseID != "" {
-			sb.WriteString(fmt.Sprintf("Release ID: %s\n", result.ReleaseID))
-		}
-		sb.WriteString("\n")
-	}
+	// Render metadata header
+	sb.WriteString(formatStatusHeader(result))
+	sb.WriteString("\n")
 
 	if len(result.Resources) == 0 {
 		return sb.String()
 	}
 
-	tbl := output.NewTable("KIND", "NAME", "NAMESPACE", "STATUS", "AGE")
+	tbl := output.NewTable("KIND", "NAME", "COMPONENT", "STATUS", "AGE")
 	for _, r := range result.Resources {
-		tbl.Row(r.Kind, r.Name, r.Namespace, string(r.Status), r.Age)
+		tbl.Row(r.Kind, r.Name, output.FormatComponent(r.Component), output.FormatHealthStatus(string(r.Status)), r.Age)
 	}
 	sb.WriteString(tbl.String())
+
+	// Render verbose pod details below the table
+	sb.WriteString(formatVerboseBlocks(result))
+
+	return sb.String()
+}
+
+// formatStatusWide renders the status result as a wide table with replicas and image columns.
+func formatStatusWide(result *StatusResult) string {
+	var sb strings.Builder
+
+	sb.WriteString(formatStatusHeader(result))
+	sb.WriteString("\n")
+
+	if len(result.Resources) == 0 {
+		return sb.String()
+	}
+
+	tbl := output.NewTable("KIND", "NAME", "COMPONENT", "STATUS", "REPLICAS", "IMAGE", "AGE")
+	for _, r := range result.Resources {
+		replicas := "-"
+		image := "-"
+		if r.Wide != nil {
+			if r.Wide.Replicas != "" {
+				replicas = r.Wide.Replicas
+			}
+			if r.Wide.Image != "" {
+				image = r.Wide.Image
+			}
+		}
+		tbl.Row(r.Kind, r.Name, output.FormatComponent(r.Component), output.FormatHealthStatus(string(r.Status)), replicas, image, r.Age)
+	}
+	sb.WriteString(tbl.String())
+
+	sb.WriteString(formatVerboseBlocks(result))
+
+	return sb.String()
+}
+
+// formatStatusHeader renders the release metadata header block.
+func formatStatusHeader(result *StatusResult) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Release:    %s\n", output.StyleNoun(result.ReleaseName))
+	if result.Version != "" {
+		fmt.Fprintf(&sb, "Version:    %s\n", result.Version)
+	}
+	fmt.Fprintf(&sb, "Namespace:  %s\n", output.StyleNoun(result.Namespace))
+	fmt.Fprintf(&sb, "Status:     %s\n", output.FormatHealthStatus(string(result.AggregateStatus)))
+	fmt.Fprintf(&sb, "Resources:  %d total (%d ready", result.Summary.Total, result.Summary.Ready)
+	if result.Summary.NotReady > 0 {
+		fmt.Fprintf(&sb, ", %d not ready", result.Summary.NotReady)
+	}
+	sb.WriteString(")\n")
+	return sb.String()
+}
+
+// formatVerboseBlocks renders pod detail blocks for resources with verbose data.
+// Column widths are computed dynamically per block from actual pod name and phase
+// lengths, producing compact kubectl-style output with no excess whitespace.
+func formatVerboseBlocks(result *StatusResult) string {
+	var sb strings.Builder
+	for _, r := range result.Resources {
+		if r.Verbose == nil || len(r.Verbose.Pods) == 0 {
+			continue
+		}
+
+		readyCount := 0
+		for _, p := range r.Verbose.Pods {
+			if p.Ready {
+				readyCount++
+			}
+		}
+
+		// Compute column widths for this block.
+		nameWidth, phaseWidth := 0, 0
+		for _, p := range r.Verbose.Pods {
+			if len(p.Name) > nameWidth {
+				nameWidth = len(p.Name)
+			}
+			if len(p.Phase) > phaseWidth {
+				phaseWidth = len(p.Phase)
+			}
+		}
+
+		fmt.Fprintf(&sb, "\n%s/%s (%d/%d ready):\n", r.Kind, r.Name, readyCount, len(r.Verbose.Pods))
+		for _, p := range r.Verbose.Pods {
+			// When a termination reason is available, it is the primary context.
+			// Fall back to "(not ready)" only when no specific reason exists.
+			var detail string
+			switch {
+			case p.Ready:
+				detail = "(ready)"
+			case p.Reason != "":
+				detail = p.Reason
+			default:
+				detail = "(not ready)"
+			}
+			if p.Restarts > 0 {
+				detail += fmt.Sprintf(", %d restarts", p.Restarts)
+			}
+
+			namePad := strings.Repeat(" ", nameWidth-len(p.Name))
+			phasePad := strings.Repeat(" ", phaseWidth-len(p.Phase))
+			fmt.Fprintf(&sb, "    %s%s   %s%s   %s\n", p.Name, namePad, p.Phase, phasePad, detail)
+		}
+	}
 	return sb.String()
 }
 
@@ -239,6 +419,8 @@ func FormatStatus(result *StatusResult, format output.Format) (string, error) {
 		return formatStatusJSON(result)
 	case output.FormatYAML:
 		return formatStatusYAML(result)
+	case output.FormatWide:
+		return formatStatusWide(result), nil
 	case output.FormatTable:
 		return FormatStatusTable(result), nil
 	case output.FormatDir:

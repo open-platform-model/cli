@@ -2,7 +2,7 @@
 
 ### Requirement: Status supports table output format
 
-The default output format SHALL be a table showing: resource kind, name, namespace, component, health status, and age. The COMPONENT column SHALL be populated from the `component.opmodel.dev/name` label on each resource. Resources without this label SHALL display `-` in the COMPONENT column. Columns SHALL be aligned and human-readable.
+The default output format SHALL be a table showing: resource kind, name, namespace, component, health status, and age. The COMPONENT column SHALL be populated from the `component.opmodel.dev/name` label on each resource. Resources without this label SHALL display `-` in the COMPONENT column. Columns SHALL be aligned and human-readable. The table SHALL render as plain, space-padded columns with no border characters, consistent with kubectl output conventions.
 
 The `--output`/`-o` flag SHALL accept `wide` as a valid value in addition to `table`, `yaml`, and `json`. When `-o wide` is specified, the command SHALL render a table format with additional columns.
 
@@ -24,24 +24,24 @@ The `--output`/`-o` flag SHALL accept `wide` as a valid value in addition to `ta
 
 ### Requirement: Status displays metadata header
 
-The status output SHALL display a metadata header above the resource table containing: release name, module version, namespace, aggregate health status, and a resource summary. All metadata SHALL be sourced from labels already present on the discovered resources — the command MUST NOT require module source or re-rendering.
+The status output SHALL display a metadata header above the resource table containing: release name, module version, namespace, aggregate health status, and a resource summary. All metadata SHALL be sourced from the release inventory — the command MUST NOT require module source or re-rendering.
 
 The header SHALL include:
-- **Release**: from the `module-release.opmodel.dev/name` label
-- **Version**: from the `module-release.opmodel.dev/version` label (omitted if not present)
-- **Namespace**: from the resource metadata
+- **Release**: from the release name (`StatusOptions.ReleaseName`, resolved from inventory)
+- **Version**: from the latest inventory change source version (omitted if not present, e.g. local modules)
+- **Namespace**: from the resolved Kubernetes configuration
 - **Status**: the aggregate health status (Ready, NotReady, Unknown)
 - **Resources**: total count with breakdown (e.g., "6 total (6 ready)" or "6 total (5 ready, 1 not ready)")
 
 #### Scenario: Header shows release metadata
 
 - **WHEN** the user runs `opm mod status --release-name jellyfin -n media`
-- **AND** the discovered resources have the labels `module-release.opmodel.dev/name: jellyfin` and `module-release.opmodel.dev/version: 1.2.0`
+- **AND** the release inventory records version `1.2.0`
 - **THEN** the output SHALL begin with a header showing `Release: jellyfin`, `Version: 1.2.0`, `Namespace: media`, the aggregate status, and a resource count summary
 
-#### Scenario: Header omits version when label is absent
+#### Scenario: Header omits version when not recorded in inventory
 
-- **WHEN** the discovered resources do not have the `module-release.opmodel.dev/version` label
+- **WHEN** the release was applied from a local module (no registry version)
 - **THEN** the header SHALL omit the Version line entirely
 
 #### Scenario: Header shows not ready count
@@ -55,7 +55,7 @@ The status table and header SHALL use color-coded output when stdout is a TTY. C
 
 The color mapping SHALL be:
 - Health status `Ready` and `Complete`: green
-- Health status `NotReady`: red
+- Health status `NotReady` and `Missing`: red
 - Health status `Unknown`: yellow
 - Component names: cyan
 - Resource names: cyan

@@ -2,75 +2,88 @@
 package output
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
 )
 
-// tableStyle defines the style for table output.
-type tableStyle struct {
-	// Border is the border style.
-	Border lipgloss.Border
-
-	// BorderColor is the color for borders.
-	BorderColor lipgloss.Color
-
-	// HeaderStyle is the style for header cells.
-	HeaderStyle lipgloss.Style
-
-	// CellStyle is the style for regular cells.
-	CellStyle lipgloss.Style
-}
-
-// defaultTableStyle returns the default table style.
-func defaultTableStyle() tableStyle {
-	return tableStyle{
-		Border:      lipgloss.NormalBorder(),
-		BorderColor: colorDimGray,
-		HeaderStyle: lipgloss.NewStyle().Bold(true).Foreground(ColorCyan),
-		CellStyle:   lipgloss.NewStyle(),
-	}
-}
-
-// Table represents a styled table.
+// Table renders a kubectl-style plain text table: space-padded columns with no
+// border characters. Column widths are computed from the max content width
+// (ANSI-aware via lipgloss.Width). Headers are bold cyan. Columns are separated
+// by a 3-space gap. The last column is never padded.
 type Table struct {
 	headers []string
 	rows    [][]string
-	style   tableStyle
 }
 
-// NewTable creates a new table with the given headers.
+// NewTable creates a new plain table with the given column headers.
 func NewTable(headers ...string) *Table {
 	return &Table{
 		headers: headers,
 		rows:    make([][]string, 0),
-		style:   defaultTableStyle(),
 	}
 }
 
-// Row adds a row to the table.
+// Row adds a data row to the table.
 func (t *Table) Row(cells ...string) *Table {
 	t.rows = append(t.rows, cells)
 	return t
 }
 
-// String renders the table as a string.
+// String renders the table as plain column-aligned text.
 func (t *Table) String() string {
-	tbl := table.New().
-		Border(t.style.Border).
-		BorderStyle(lipgloss.NewStyle().Foreground(t.style.BorderColor)).
-		Headers(t.headers...).
-		StyleFunc(func(row, col int) lipgloss.Style {
-			if row == table.HeaderRow {
-				return t.style.HeaderStyle
-			}
-			return t.style.CellStyle
-		})
-
-	for _, row := range t.rows {
-		tbl.Row(row...)
+	if len(t.headers) == 0 {
+		return ""
 	}
 
-	return tbl.String()
+	// Compute column widths. Headers are plain ASCII; cells may contain ANSI
+	// escape codes so we use lipgloss.Width for correct measurement.
+	widths := make([]int, len(t.headers))
+	for i, h := range t.headers {
+		widths[i] = len(h)
+	}
+	for _, row := range t.rows {
+		for i, cell := range row {
+			if i < len(widths) {
+				if w := lipgloss.Width(cell); w > widths[i] {
+					widths[i] = w
+				}
+			}
+		}
+	}
+
+	const colGap = "   " // 3-space gap between columns (kubectl convention)
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(ColorCyan)
+
+	var sb strings.Builder
+
+	// Header row
+	for i, h := range t.headers {
+		if i > 0 {
+			sb.WriteString(colGap)
+		}
+		sb.WriteString(headerStyle.Render(h))
+		if i < len(t.headers)-1 {
+			sb.WriteString(strings.Repeat(" ", widths[i]-len(h)))
+		}
+	}
+	sb.WriteString("\n")
+
+	// Data rows
+	for _, row := range t.rows {
+		for i, cell := range row {
+			if i > 0 {
+				sb.WriteString(colGap)
+			}
+			sb.WriteString(cell)
+			if i < len(row)-1 && i < len(widths) {
+				sb.WriteString(strings.Repeat(" ", widths[i]-lipgloss.Width(cell)))
+			}
+		}
+		sb.WriteString("\n")
+	}
+
+	return sb.String()
 }
 
 // RenderFileTree renders a file tree with aligned descriptions.

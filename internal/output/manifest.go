@@ -52,7 +52,7 @@ func WriteManifests(resources []ResourceInfo, opts ManifestOptions) error {
 		return writeJSON(resources, opts.Writer)
 	case FormatYAML:
 		return writeYAML(resources, opts.Writer)
-	case FormatTable, FormatDir:
+	case FormatTable, FormatDir, FormatWide:
 		return fmt.Errorf("format %s not supported for manifest output", opts.Format)
 	}
 	return writeYAML(resources, opts.Writer) // Default to YAML
@@ -131,7 +131,7 @@ func writeResource(resource *unstructured.Unstructured, format Format, w io.Writ
 			err = closeErr
 		}
 		return err
-	case FormatTable, FormatDir:
+	case FormatTable, FormatDir, FormatWide:
 		return fmt.Errorf("format %s not supported for single resource output", format)
 	}
 	// Default to YAML

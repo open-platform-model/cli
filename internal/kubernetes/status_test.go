@@ -12,11 +12,14 @@ import (
 
 func TestFormatStatus_Table(t *testing.T) {
 	result := &StatusResult{
+		ReleaseName:     "my-app",
+		Namespace:       "default",
+		AggregateStatus: healthReady,
+		Summary:         statusSummary{Total: 2, Ready: 2},
 		Resources: []resourceHealth{
 			{Kind: "Deployment", Name: "web", Namespace: "default", Status: healthReady, Age: "5m"},
 			{Kind: "ConfigMap", Name: "config", Namespace: "default", Status: healthReady, Age: "5m"},
 		},
-		AggregateStatus: healthReady,
 	}
 
 	formatted, err := FormatStatus(result, "table")
@@ -30,10 +33,13 @@ func TestFormatStatus_Table(t *testing.T) {
 
 func TestFormatStatus_JSON(t *testing.T) {
 	result := &StatusResult{
+		ReleaseName:     "my-app",
+		Namespace:       "default",
+		AggregateStatus: healthReady,
+		Summary:         statusSummary{Total: 1, Ready: 1},
 		Resources: []resourceHealth{
 			{Kind: "Deployment", Name: "web", Namespace: "default", Status: healthReady, Age: "5m"},
 		},
-		AggregateStatus: healthReady,
 	}
 
 	formatted, err := FormatStatus(result, "json")
@@ -45,10 +51,13 @@ func TestFormatStatus_JSON(t *testing.T) {
 
 func TestFormatStatus_YAML(t *testing.T) {
 	result := &StatusResult{
+		ReleaseName:     "my-app",
+		Namespace:       "default",
+		AggregateStatus: healthReady,
+		Summary:         statusSummary{Total: 1, Ready: 1},
 		Resources: []resourceHealth{
 			{Kind: "Deployment", Name: "web", Namespace: "default", Status: healthReady, Age: "5m"},
 		},
-		AggregateStatus: healthReady,
 	}
 
 	formatted, err := FormatStatus(result, "yaml")
@@ -56,6 +65,97 @@ func TestFormatStatus_YAML(t *testing.T) {
 	assert.Contains(t, formatted, "kind: Deployment")
 	assert.Contains(t, formatted, "name: web")
 	assert.Contains(t, formatted, "status: Ready")
+}
+
+func TestFormatStatusTable_DefaultColumns(t *testing.T) {
+	result := &StatusResult{
+		ReleaseName:     "my-app",
+		Namespace:       "production",
+		AggregateStatus: healthReady,
+		Summary:         statusSummary{Total: 2, Ready: 2},
+		Resources: []resourceHealth{
+			{Kind: "Deployment", Name: "web", Namespace: "production", Component: "server", Status: healthReady, Age: "5m"},
+			{Kind: "ConfigMap", Name: "config", Namespace: "production", Component: "", Status: healthReady, Age: "5m"},
+		},
+	}
+
+	out := FormatStatusTable(result)
+	assert.Contains(t, out, "KIND")
+	assert.Contains(t, out, "COMPONENT")
+	assert.Contains(t, out, "STATUS")
+	assert.Contains(t, out, "Deployment")
+	assert.Contains(t, out, "server")
+	assert.Contains(t, out, "Release:")
+	assert.Contains(t, out, "my-app")
+	assert.Contains(t, out, "2 total")
+}
+
+func TestFormatStatusTable_WideColumns(t *testing.T) {
+	result := &StatusResult{
+		ReleaseName:     "my-app",
+		Namespace:       "production",
+		AggregateStatus: healthNotReady,
+		Summary:         statusSummary{Total: 1, Ready: 0, NotReady: 1},
+		Resources: []resourceHealth{
+			{
+				Kind: "Deployment", Name: "web", Namespace: "production", Component: "server",
+				Status: healthNotReady, Age: "5m",
+				Wide: &wideInfo{Replicas: "1/3", Image: "nginx:1.25"},
+			},
+		},
+	}
+
+	out, err := FormatStatus(result, "wide")
+	require.NoError(t, err)
+	assert.Contains(t, out, "REPLICAS")
+	assert.Contains(t, out, "IMAGE")
+	assert.Contains(t, out, "1/3")
+	assert.Contains(t, out, "nginx:1.25")
+}
+
+func TestFormatStatusTable_VerboseBlocks(t *testing.T) {
+	result := &StatusResult{
+		ReleaseName:     "my-app",
+		Namespace:       "production",
+		AggregateStatus: healthNotReady,
+		Summary:         statusSummary{Total: 1, Ready: 0, NotReady: 1},
+		Resources: []resourceHealth{
+			{
+				Kind: "Deployment", Name: "web", Namespace: "production", Component: "server",
+				Status: healthNotReady, Age: "5m",
+				Verbose: &verboseInfo{
+					Pods: []podInfo{
+						{Name: "web-abc-1", Phase: "Running", Ready: false, Reason: "CrashLoopBackOff", Restarts: 5},
+					},
+				},
+			},
+		},
+	}
+
+	out := FormatStatusTable(result)
+	assert.Contains(t, out, "Deployment/web")
+	assert.Contains(t, out, "web-abc-1")
+	assert.Contains(t, out, "CrashLoopBackOff")
+	assert.Contains(t, out, "5 restarts")
+}
+
+func TestFormatStatusTable_NotReadySummary(t *testing.T) {
+	result := &StatusResult{
+		ReleaseName:     "my-app",
+		Namespace:       "production",
+		AggregateStatus: healthNotReady,
+		Summary:         statusSummary{Total: 3, Ready: 2, NotReady: 1},
+		Resources: []resourceHealth{
+			{Kind: "Deployment", Name: "web", Namespace: "production", Status: healthNotReady, Age: "5m"},
+			{Kind: "Service", Name: "svc", Namespace: "production", Status: healthReady, Age: "5m"},
+			{Kind: "ConfigMap", Name: "cfg", Namespace: "production", Status: healthReady, Age: "5m"},
+		},
+	}
+
+	out := FormatStatusTable(result)
+	assert.Contains(t, out, "3 total")
+	assert.Contains(t, out, "2 ready")
+	assert.Contains(t, out, "1 not ready")
 }
 
 func TestFormatDuration(t *testing.T) {

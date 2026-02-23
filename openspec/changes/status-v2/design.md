@@ -325,7 +325,7 @@ func FormatHealthStatus(status string) string {
     switch status {
     case "Ready", "Complete":
         return lipgloss.NewStyle().Foreground(colorGreen).Render(status)
-    case "NotReady":
+    case "NotReady", "Missing":
         return lipgloss.NewStyle().Foreground(colorRed).Render(status)
     case "Unknown":
         return lipgloss.NewStyle().Foreground(ColorYellow).Render(status)
@@ -419,6 +419,52 @@ internal/
 - `wide.go` keeps the per-kind unstructured field extraction isolated
 - `pods.go` keeps the pod-listing and status extraction logic separate from the main status flow
 - No changes to `internal/inventory/` — the discovery mechanism is unchanged
+
+### Decision 13: Table rendering — plain columns vs. bordered
+
+**Context**: The initial implementation used `output.Table` with `lipgloss.NormalBorder()`, which
+renders box-drawing border characters (`│ ─ ┌ ┐ └ ┘`). The proposal examples and kubectl
+conventions require plain, space-padded columns with no border characters.
+
+**Decision**: Replace the lipgloss bordered renderer in `output.Table.String()` with a plain
+column-aligned implementation:
+
+- Column widths computed from max content width using `lipgloss.Width()` (ANSI-aware — correctly
+  measures cells that contain color escape codes)
+- Headers rendered bold cyan via lipgloss
+- 3-space gap between columns (kubectl convention)
+- Last column is never padded (no trailing whitespace)
+- No border characters, no separator lines between header and data rows
+
+The `tableStyle` struct and `defaultTableStyle()` function are removed. The `NewTable()` and
+`Row()` call API is unchanged — no callers require modification.
+
+### Decision 14: Verbose pod phase display and reason filtering
+
+**Context**: Three bugs were found in the initial verbose output implementation:
+
+1. `extractPodInfoFromPod` always stored `pod.Status.Phase` in `Phase` and put the waiting
+   reason in `Reason`. Both were rendered, producing e.g. `Running … CrashLoopBackOff` instead
+   of the spec-required `CrashLoop`.
+2. `"Completed"` (`lastState.terminated.reason`) was shown as a diagnostic reason. It means the
+   container exited with code 0 — normal exit, not an error — and is not useful as a diagnostic.
+3. `formatVerboseBlocks` used hardcoded `%-50s %-12s` padding, producing large amounts of
+   whitespace for short pod names.
+
+**Decision**:
+
+- **Phase override**: when a container has a waiting reason, `info.Phase` is overridden with
+  `mapWaitingReason(reason)`. `CrashLoopBackOff` → `"CrashLoop"` (per spec); all other waiting
+  reasons pass through unchanged. The `Reason` field is reserved for the last-terminated detail
+  (OOMKilled, Error, etc.).
+- **"Completed" filtering**: `lastState.terminated.reason == "Completed"` is skipped when
+  populating `info.Reason`. A pod that keeps exiting with code 0 will show its restart count
+  without the misleading "Completed" label.
+- **Dynamic padding**: `formatVerboseBlocks` computes `nameWidth` and `phaseWidth` per block
+  from actual content lengths, using 3-space gaps (consistent with the table renderer).
+- **Detail column format**: when a termination reason is available (`Reason != ""`), it is
+  used as the primary detail text (e.g. `"OOMKilled, 5 restarts"`). `"(not ready)"` is the
+  fallback only when no specific reason exists. Ready pods always show `"(ready)"`.
 
 ## Risks / Trade-offs
 

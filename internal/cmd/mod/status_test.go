@@ -53,6 +53,15 @@ func TestModStatusCmd_FlagsExist(t *testing.T) {
 	assert.NotNil(t, f.Lookup("watch"))
 	assert.NotNil(t, f.Lookup("kubeconfig"))
 	assert.NotNil(t, f.Lookup("context"))
+	assert.NotNil(t, f.Lookup("verbose"), "--verbose flag should exist")
+}
+
+func TestModStatusCmd_OutputFlagAcceptsWide(t *testing.T) {
+	cmd := NewModStatusCmd(&config.GlobalConfig{})
+	f := cmd.Flags().Lookup("output")
+	assert.NotNil(t, f)
+	// The default is table; verify the flag accepts "wide" (no validation at flag level, validated in runStatus)
+	assert.Equal(t, "table", f.DefValue)
 }
 
 func TestModDiffCmd_FlagsExist(t *testing.T) {

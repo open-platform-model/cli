@@ -29,9 +29,6 @@ var (
 
 	// colorGreenCheck is used for the completion checkmark (✔).
 	colorGreenCheck = lipgloss.Color("10")
-
-	// colorDimGray is used for borders and other structural chrome.
-	colorDimGray = lipgloss.Color("240")
 )
 
 // Semantic styles — map domain concepts to visual presentation.
@@ -200,6 +197,35 @@ func FormatTransformerUnmatched(component string) string {
 
 // vetCheckColumnWidth is the alignment column for detail text in FormatVetCheck.
 const vetCheckColumnWidth = 34
+
+// StyleNoun renders a string using the noun style (cyan). Exported for use outside
+// the output package (e.g., kubernetes/status.go).
+func StyleNoun(s string) string {
+	return styleNoun.Render(s)
+}
+
+// FormatHealthStatus renders a health status string with the appropriate color.
+// Ready/Complete → green, NotReady/Missing → red, Unknown → yellow, others → unstyled.
+func FormatHealthStatus(status string) string {
+	switch status {
+	case "Ready", "Complete":
+		return lipgloss.NewStyle().Foreground(colorGreen).Render(status)
+	case "NotReady", "Missing":
+		return lipgloss.NewStyle().Foreground(colorRed).Render(status)
+	case "Unknown":
+		return lipgloss.NewStyle().Foreground(ColorYellow).Render(status)
+	default:
+		return status
+	}
+}
+
+// FormatComponent renders a component name in cyan. Returns "-" unstyled for empty names.
+func FormatComponent(name string) string {
+	if name == "" {
+		return "-"
+	}
+	return styleNoun.Render(name)
+}
 
 // FormatVetCheck renders a validation check result with a green checkmark, label,
 // and optional right-aligned detail text.

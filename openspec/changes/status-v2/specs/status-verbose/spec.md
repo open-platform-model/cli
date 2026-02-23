@@ -55,8 +55,9 @@ The termination reason SHALL be extracted from `status.containerStatuses[].state
 #### Scenario: Pod terminated by OOMKilled
 
 - **WHEN** a pod has a container with `lastState.terminated.reason: OOMKilled`
-- **AND** the container's resource limit is `512Mi`
-- **THEN** the detail text SHALL include "OOMKilled (512Mi limit)"
+- **THEN** the detail text SHALL include "OOMKilled"
+
+Note: Memory limit enrichment (e.g. "OOMKilled (512Mi limit)") is deferred — the termination reason is surfaced as-is from `lastState.terminated.reason`.
 
 #### Scenario: Pod terminated with generic error
 

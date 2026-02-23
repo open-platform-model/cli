@@ -18,16 +18,24 @@ const (
 
 	// FormatDir outputs to a directory.
 	FormatDir Format = "dir"
+
+	// FormatWide outputs as a wide table with additional columns (kubectl-style).
+	FormatWide Format = "wide"
 )
 
 // Valid returns true if the format is valid.
 func (f Format) Valid() bool {
 	switch f {
-	case FormatYAML, FormatJSON, FormatTable, FormatDir:
+	case FormatYAML, FormatJSON, FormatTable, FormatDir, FormatWide:
 		return true
 	default:
 		return false
 	}
+}
+
+// ValidFormats returns all valid format strings.
+func ValidFormats() []string {
+	return []string{string(FormatTable), string(FormatWide), string(FormatJSON), string(FormatYAML), string(FormatDir)}
 }
 
 // String returns the string representation.
