@@ -28,8 +28,8 @@ const conditionStatusTrue = "True"
 // Note: StatefulSet is intentionally excluded — it does not emit conditions
 // and must be evaluated via readyReplicas instead.
 var workloadKinds = map[string]bool{
-	"Deployment": true,
-	"DaemonSet":  true,
+	kindDeployment: true,
+	kindDaemonSet:  true,
 }
 
 // passiveKinds are resources that are healthy as soon as they exist.
@@ -64,12 +64,12 @@ func evaluateHealth(resource *unstructured.Unstructured) healthStatus {
 	}
 
 	// StatefulSet: does not emit status conditions; check readyReplicas instead
-	if kind == "StatefulSet" {
+	if kind == kindStatefulSet {
 		return evaluateStatefulSetHealth(resource)
 	}
 
 	// Jobs: check Complete condition
-	if kind == "Job" {
+	if kind == kindJob {
 		return evaluateJobHealth(resource)
 	}
 

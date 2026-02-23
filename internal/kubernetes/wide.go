@@ -15,9 +15,9 @@ func extractWideInfo(resource *unstructured.Unstructured) *wideInfo {
 	}
 	kind := resource.GetKind()
 	switch kind {
-	case "Deployment", "StatefulSet":
+	case kindDeployment, kindStatefulSet:
 		return extractWorkloadWideInfo(resource)
-	case "DaemonSet":
+	case kindDaemonSet:
 		return extractDaemonSetWideInfo(resource)
 	case "PersistentVolumeClaim":
 		return extractPVCWideInfo(resource)

@@ -1,29 +1,29 @@
 ## ADDED Requirements
 
-### Requirement: Tree discovers resources via OPM labels
+### Requirement: Tree discovers resources via inventory
 
-The `opm mod tree` command SHALL discover deployed resources by querying the cluster using OPM label selectors (`app.kubernetes.io/managed-by=open-platform-model` and either release name or release ID) within the target namespace. It MUST NOT require module source or re-rendering.
+The `opm mod tree` command SHALL discover deployed resources by looking up the OPM inventory Secret for the release (via `cmdutil.ResolveInventory` / `inventory.DiscoverResourcesFromInventory`), then fetching each tracked resource by GVK + name. It MUST NOT require module source or re-rendering.
 
 #### Scenario: Tree shows deployed resources by release name
 
 - **WHEN** the user runs `opm mod tree --release-name jellyfin -n media`
-- **THEN** the command SHALL discover and display all resources with labels `app.kubernetes.io/managed-by=open-platform-model` and `module-release.opmodel.dev/name=jellyfin` in namespace `media`
+- **THEN** the command SHALL look up the inventory Secret for release name `jellyfin` in namespace `media` and display all tracked resources
 
 #### Scenario: Tree shows deployed resources by release ID
 
 - **WHEN** the user runs `opm mod tree --release-id abc123-def456 -n media`
-- **THEN** the command SHALL discover and display all resources with labels `app.kubernetes.io/managed-by=open-platform-model` and `module-release.opmodel.dev/uuid=abc123-def456` in namespace `media`
+- **THEN** the command SHALL look up the inventory Secret for release ID `abc123-def456` in namespace `media` and display all tracked resources
 
 #### Scenario: No resources found
 
-- **WHEN** no resources match the given release selector and namespace
-- **THEN** the command SHALL exit with code 3 and display error "no resources found for release <name|id> in namespace <namespace>"
+- **WHEN** no inventory Secret (or no tracked resources) is found for the given release selector and namespace
+- **THEN** the command SHALL exit with code 5 and display error "no resources found for release <name|id> in namespace <namespace>"
 
 ---
 
 ### Requirement: Tree groups resources by component
 
-The command SHALL group resources by the `component.opmodel.dev/name` label. Resources SHALL be sorted alphabetically by component name. Resources without a component label SHALL be grouped under a special section labeled `(no component)` displayed last.
+The command SHALL group resources by the `component.opmodel.dev/name` label recorded in the inventory. Resources SHALL be sorted alphabetically by component name. Resources without a component label SHALL be grouped under a special section labeled `(no component)` displayed last.
 
 #### Scenario: Resources grouped by component label
 
@@ -88,7 +88,7 @@ The command SHALL walk Kubernetes `ownerReferences` to discover child resources 
 
 ### Requirement: Tree displays health status and replica counts
 
-The command SHALL display health status for each resource using the same evaluation logic as `mod status`. For workload resources (Deployment, StatefulSet, DaemonSet), it SHALL display replica counts in `ready/desired` format.
+The command SHALL display health status for each resource using the same evaluation logic as `mod status`. For workload resources (Deployment, StatefulSet, DaemonSet), it SHALL display replica counts in `ready/desired` format. For Pod nodes, the raw Kubernetes phase string SHALL be displayed (matching `mod status` pod display).
 
 #### Scenario: Workload shows replica count
 
@@ -118,7 +118,8 @@ The command SHALL display health status for each resource using the same evaluat
 #### Scenario: Pod shows detailed container status
 
 - **WHEN** a Pod has `status.containerStatuses[].state.waiting.reason=CrashLoopBackOff`
-- **THEN** the tree output SHALL display `Pod/name  CrashLoopBackOff`
+- **THEN** the tree output SHALL display `Pod/name  CrashLoop`
+  (CrashLoopBackOff is shortened to CrashLoop per the project's display convention)
 
 #### Scenario: Passive resource shows Ready
 
@@ -160,7 +161,7 @@ The command SHALL support a `--depth` flag with values 0, 1, or 2 to control tre
 
 ### Requirement: Tree renders with colored box-drawing characters
 
-The command SHALL render tree structure using Unicode box-drawing characters (├── └── │) with colors applied via lipgloss. The command MUST detect TTY and render plain text without colors for non-TTY environments.
+The command SHALL render tree structure using Unicode box-drawing characters (├── └── │) with colors applied via lipgloss. Color stripping for non-TTY environments is handled automatically by lipgloss/termenv (which detects `Ascii` color profile on non-TTY stdout).
 
 #### Scenario: Colored tree rendering in TTY
 
@@ -269,12 +270,12 @@ The command SHALL fail immediately with a clear error message if the Kubernetes 
 #### Scenario: Cluster unreachable
 
 - **WHEN** the cluster specified by kubeconfig/context is not reachable
-- **THEN** the command SHALL exit with code 3 and display a connectivity error message
+- **THEN** the command SHALL exit with code 1 and display a connectivity error message
 
 #### Scenario: Authentication failure
 
 - **WHEN** the kubeconfig credentials are invalid or expired
-- **THEN** the command SHALL exit with code 3 and display an authentication error message
+- **THEN** the command SHALL exit with code 1 and display an authentication error message
 
 ---
 
@@ -296,7 +297,7 @@ The command SHALL display release metadata in the header: release name, module F
 
 ### Requirement: Tree sorts resources within components by weight
 
-Within each component group, resources SHALL be sorted by OPM weight (ascending) and then alphabetically by name. This ensures tree output matches apply order.
+Within each component group, resources SHALL be sorted by OPM weight (ascending) and then alphabetically by name. This ensures tree output matches apply order. In practice, this ordering is preserved by maintaining the inventory entry order, which is written in weight-sorted order during `opm mod apply`.
 
 #### Scenario: Resources sorted by weight
 
@@ -312,7 +313,7 @@ Within each component group, resources SHALL be sorted by OPM weight (ascending)
 
 ### Requirement: Tree exit codes match CLI conventions
 
-The command SHALL use exit codes consistently with other CLI commands: 0 for success, 1 for general errors (invalid flags), 3 for resource not found or cluster connectivity errors.
+The command SHALL use exit codes consistently with other CLI commands: 0 for success, 1 for general errors (invalid flags, connectivity failures), 5 for resource not found.
 
 #### Scenario: Successful tree display
 
@@ -327,9 +328,9 @@ The command SHALL use exit codes consistently with other CLI commands: 0 for suc
 #### Scenario: No resources found
 
 - **WHEN** no resources match the selector
-- **THEN** the command SHALL exit with code 3
+- **THEN** the command SHALL exit with code 5
 
 #### Scenario: Cluster connectivity error
 
 - **WHEN** the cluster is unreachable
-- **THEN** the command SHALL exit with code 3
+- **THEN** the command SHALL exit with code 1

@@ -8,7 +8,7 @@ The `opm mod tree` command fills the gap between flat resource lists (`mod statu
 
 The implementation leverages existing infrastructure:
 
-- `kubernetes.DiscoverResources` for finding OPM-managed resources by labels
+- `cmdutil.ResolveInventory` / `inventory.DiscoverResourcesFromInventory` for finding OPM-managed resources via the inventory Secret (same pattern as `mod status`)
 - Component labels (`component.opmodel.dev/name`) already stamped by CUE transformers
 - Kubernetes `ownerReferences` for parent→child relationships
 - `kubernetes.evaluateHealth` for status per resource
@@ -398,9 +398,9 @@ func getReplicaCount(resource *unstructured.Unstructured) string {
               "kind": "ReplicaSet",
               "name": "jellyfin-server-abc",
               "children": [
-                {"kind": "Pod", "name": "jellyfin-server-abc-x1", "status": "Running"},
-                {"kind": "Pod", "name": "jellyfin-server-abc-x2", "status": "Running"},
-                {"kind": "Pod", "name": "jellyfin-server-abc-x3", "status": "Running"}
+                {"kind": "Pod", "name": "jellyfin-server-abc-x1", "status": "Running", "ready": true},
+                {"kind": "Pod", "name": "jellyfin-server-abc-x2", "status": "Running", "ready": true},
+                {"kind": "Pod", "name": "jellyfin-server-abc-x3", "status": "Running", "ready": true}
               ]
             }
           ]
