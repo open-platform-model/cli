@@ -205,14 +205,14 @@ func StyleNoun(s string) string {
 }
 
 // FormatHealthStatus renders a health status string with the appropriate color.
-// Ready/Complete → green, NotReady/Missing → red, Unknown → yellow, others → unstyled.
+// Ready/Complete/Bound → green, NotReady/Missing → red, Unknown/Pending/Lost → yellow, others → unstyled.
 func FormatHealthStatus(status string) string {
 	switch status {
-	case "Ready", "Complete":
+	case "Ready", "Complete", "Bound":
 		return lipgloss.NewStyle().Foreground(colorGreen).Render(status)
 	case "NotReady", "Missing":
 		return lipgloss.NewStyle().Foreground(colorRed).Render(status)
-	case "Unknown":
+	case "Unknown", "Pending", "Lost":
 		return lipgloss.NewStyle().Foreground(ColorYellow).Render(status)
 	default:
 		return status

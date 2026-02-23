@@ -162,6 +162,34 @@
 - [ ] 14.7 Add integration test: verify component grouping with real resources
 - [ ] 14.8 Add integration test: verify StatefulSet→Pod chain at depth=2
 
+## 17. Output Refinements (column alignment, PVC, RS)
+
+- [x] 17.1 Add `displayKind()` helper: abbreviate `PersistentVolumeClaim` → `PVC` in terminal display;
+          full kind preserved in `ResourceNode.Kind` for JSON/YAML
+- [x] 17.2 Add `healthBound` constant (`"Bound"`) to health.go
+- [x] 17.3 Implement `evaluatePVCHealth()`: read `status.phase` → Bound/Pending/Lost/fallback-Ready;
+          remove PVC from `passiveKinds`
+- [x] 17.4 Update `FormatHealthStatus` in styles.go: Bound → green, Pending/Lost → yellow
+- [x] 17.5 Update `getReplicaCount()`: PVC returns `status.capacity.storage`
+          (fallback: `spec.resources.requests.storage`)
+- [x] 17.6 Update `aggregateStatus()`: treat `healthBound` as healthy alongside `healthReady`/`healthComplete`
+- [x] 17.7 Implement `measureTreeWidth()` + `measureNodeWidth()`: two-pass column width measurement
+          using `displayKind()` for accurate abbreviated widths
+- [x] 17.8 Thread `colWidth int` parameter through `renderComponent` and `renderResourceNode`
+- [x] 17.9 Rewrite `renderResourceNode` line-building:
+          - Use `displayKind()` for terminal display
+          - Compute padding from `colWidth` (minimum 2 spaces)
+          - Status before replicas column order
+          - ReplicaSet nodes: show only pod count, no health status
+          - Pod nodes: show phase string only (no replicas)
+          - All others: status then replica annotation
+- [x] 17.10 Update `health_test.go`: remove PVC from `TestEvaluateHealth_Passive`;
+           add `TestEvaluateHealth_PVC` table test (Bound/Pending/Lost/no-phase)
+- [x] 17.11 Update `tree_test.go`: remove PVC from passive replica test;
+           add `TestDisplayKind_*`, `TestGetReplicaCount_PVC_*`, `TestMeasureTreeWidth_*`,
+           `TestFormatPlainTree_StatusBeforeReplicas`, `TestFormatPlainTree_AlignedColumns`,
+           `TestFormatPlainTree_RSStatusSuppressed`, `TestFormatPlainTree_PVCAbbreviated`
+
 ## 15. Documentation
 
 - [x] 15.1 Add help text and examples to `NewModTreeCmd()` long description

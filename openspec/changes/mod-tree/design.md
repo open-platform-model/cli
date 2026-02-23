@@ -527,6 +527,80 @@ if err != nil {
 
 ---
 
+### Decision 8: Two-pass rendering for column alignment
+
+**Choice:** Measure the maximum display width of all `prefix + Kind/Name` strings across the entire tree, then render with consistent padding so all status tokens start at the same column.
+
+**Algorithm:**
+
+```text
+Pass 1 (measureTreeWidth):
+  For each node at nesting depth d:
+    width = (d × 4) + 4 + len(displayKind(kind) + "/" + name)
+    track global max
+
+colWidth = max + 2   (minimum 2-space gap)
+
+Pass 2 (rendering):
+  For each node:
+    padding = colWidth - (len(prefix) + 4 + len(kindNameDisplay))
+    padding = max(padding, 2)
+    line = chrome + kindNameDisplay + " "×padding + status [+ "  " + replicas]
+```
+
+The prefix is always a multiple of 4 chars wide (`│   ` and `    ` are both 4 chars, `├── ` and `└── ` are both 4 chars), so `len(prefix)` gives the exact visual width even without rendering it.
+
+**Column order:** Status appears before replicas on the same line. This matches how humans read health first, then capacity/ratio.
+
+**Rationale:**
+
+- Aligned columns are dramatically easier to scan than ragged output
+- Global alignment (vs. per-component) avoids jarring shifts when moving between sections
+- Two-pass is O(n) with negligible overhead; no performance concern
+- Padding is computed on raw (uncolored) string lengths — ANSI codes are zero visual width
+
+**Alternatives considered:**
+
+- Per-component alignment: Rejected — alignment resets between components, harder to scan
+- Fixed global column (e.g. column 48): Rejected — wastes space for short names, truncates long ones
+
+---
+
+### Decision 9: PVC-specific health evaluation and display abbreviation
+
+**Choice:** PersistentVolumeClaims get dedicated health evaluation and a display abbreviation.
+
+**Health evaluation (`evaluatePVCHealth`):**
+
+PVC has a lifecycle phase in `status.phase`: `Pending → Bound → Lost`. This is more informative than the passive "healthy on creation" treatment used for ConfigMap/Service/etc. The PVC branch is evaluated before `passiveKinds`:
+
+```text
+status.phase == "Bound"   → healthBound (green)  — volume is attached, data accessible
+status.phase == "Pending" → "Pending"  (yellow)  — waiting for provisioner
+status.phase == "Lost"    → "Lost"     (yellow)  — backing PV is gone (warning, not fatal)
+no status.phase           → healthReady           — fallback for freshly created PVCs
+```
+
+`Lost` is yellow (not red) because the PVC object still exists and may recover if the PV is restored. Red is reserved for NotReady workloads where action is immediately required.
+
+**Storage capacity annotation:**
+
+`getReplicaCount` returns the PVC storage size in the annotation slot (column after status). Prefers `status.capacity.storage` (actual provisioned size) with fallback to `spec.resources.requests.storage` (requested size).
+
+**Display abbreviation (`displayKind`):**
+
+`PersistentVolumeClaim` (22 chars) is abbreviated to `PVC` (3 chars) in terminal output only. The full kind is preserved in `ResourceNode.Kind` for JSON/YAML serialization. This abbreviation keeps tree lines compact and avoids distorting column alignment for all other resources.
+
+**`aggregateStatus` update:**
+
+Component health aggregation now treats `healthBound` as a "healthy" status alongside `healthReady` and `healthComplete`, so a component containing only healthy PVCs correctly aggregates to `healthReady`.
+
+**ReplicaSet status suppression:**
+
+ReplicaSet nodes display only their pod count (`"3 pods"`, `"0 pods"`), no health status. The RS health is already implicit in the parent Deployment's replica ratio (`Ready  3/3`). Showing RS health separately adds noise without insight.
+
+---
+
 ## Migration Plan
 
 **Deployment Steps:**

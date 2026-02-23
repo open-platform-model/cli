@@ -727,3 +727,199 @@ func TestPodToNode_PendingPod(t *testing.T) {
 	assert.Equal(t, healthStatus("Pending"), node.Status)
 	assert.False(t, node.Ready)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section 10: Output refinements — displayKind, PVC capacity, alignment
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestDisplayKind_PVC(t *testing.T) {
+	assert.Equal(t, "PVC", displayKind("PersistentVolumeClaim"))
+}
+
+func TestDisplayKind_OtherKindsUnchanged(t *testing.T) {
+	for _, kind := range []string{"Deployment", "StatefulSet", "Service", "ConfigMap", "Ingress", "Pod"} {
+		assert.Equal(t, kind, displayKind(kind), "kind %s should not be abbreviated", kind)
+	}
+}
+
+func TestGetReplicaCount_PVC_ActualCapacity(t *testing.T) {
+	pvc := makeRes("PersistentVolumeClaim", "ns", "data")
+	_ = unstructured.SetNestedField(pvc.Object, "10Gi", "status", "capacity", "storage")
+	assert.Equal(t, "10Gi", getReplicaCount(pvc))
+}
+
+func TestGetReplicaCount_PVC_FallbackToRequest(t *testing.T) {
+	// No status.capacity — falls back to spec.resources.requests.storage.
+	pvc := makeRes("PersistentVolumeClaim", "ns", "data")
+	_ = unstructured.SetNestedField(pvc.Object, "5Gi", "spec", "resources", "requests", "storage")
+	assert.Equal(t, "5Gi", getReplicaCount(pvc))
+}
+
+func TestGetReplicaCount_PVC_NoCapacity(t *testing.T) {
+	// Neither status nor spec capacity → empty string.
+	pvc := makeRes("PersistentVolumeClaim", "ns", "data")
+	assert.Empty(t, getReplicaCount(pvc))
+}
+
+func TestMeasureTreeWidths_SingleResource(t *testing.T) {
+	// "Service/web-svc" at depth=0, prefix=4: width = 4 + 4 + 15 = 23.
+	// colWidths[0] = 23 + 6 = 29.
+	result := &TreeResult{
+		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
+		Components: []Component{
+			{
+				Name:          "server",
+				ResourceCount: 1,
+				Resources:     []ResourceNode{{Kind: "Service", Name: "web-svc", Status: healthReady}},
+			},
+		},
+	}
+	assert.Equal(t, map[int]int{0: 29}, measureTreeWidths(result))
+}
+
+func TestMeasureTreeWidths_PerDepthAlignment(t *testing.T) {
+	// Deployment/web at depth 0 (prefix=4): 4+4+14 = 22 → colWidths[0] = 22+6 = 28
+	// ReplicaSet/web-rs-abc at depth 1 (prefix=8): 8+4+21 = 33 → colWidths[1] = 33+6 = 39
+	result := &TreeResult{
+		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
+		Components: []Component{
+			{
+				Name:          "server",
+				ResourceCount: 1,
+				Resources: []ResourceNode{
+					{
+						Kind: "Deployment", Name: "web", Status: healthReady,
+						Children: []ResourceNode{
+							{Kind: "ReplicaSet", Name: "web-rs-abc", Status: healthReady, Replicas: "2 pods"},
+						},
+					},
+				},
+			},
+		},
+	}
+	assert.Equal(t, map[int]int{0: 28, 1: 39}, measureTreeWidths(result))
+}
+
+func TestMeasureTreeWidths_PVCAbbreviated(t *testing.T) {
+	// PVC/data at depth 0 (prefix=4): 4+4+8 = 16 → colWidths[0] = 16+6 = 22.
+	result := &TreeResult{
+		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
+		Components: []Component{
+			{
+				Name:          "storage",
+				ResourceCount: 1,
+				Resources:     []ResourceNode{{Kind: "PersistentVolumeClaim", Name: "data", Status: healthBound, Replicas: "10Gi"}},
+			},
+		},
+	}
+	assert.Equal(t, map[int]int{0: 22}, measureTreeWidths(result))
+}
+
+// TestFormatPlainTree_StatusBeforeReplicas verifies that status appears before replicas.
+func TestFormatPlainTree_StatusBeforeReplicas(t *testing.T) {
+	result := makeSimpleResult() // has Deployment with Replicas="3/3" and Status=healthReady
+	out := formatPlainTree(result)
+
+	// Find the Deployment line and check "Ready" comes before "3/3".
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "Deployment/web") {
+			readyIdx := strings.Index(line, "Ready")
+			replicasIdx := strings.Index(line, "3/3")
+			require.True(t, readyIdx >= 0, "Ready not found in line: %q", line)
+			require.True(t, replicasIdx >= 0, "3/3 not found in line: %q", line)
+			assert.Less(t, readyIdx, replicasIdx, "Ready should appear before 3/3 in: %q", line)
+			return
+		}
+	}
+	t.Fatal("Deployment/web line not found in output")
+}
+
+// TestFormatPlainTree_AlignedColumns verifies all status tokens start at the same column.
+func TestFormatPlainTree_AlignedColumns(t *testing.T) {
+	result := &TreeResult{
+		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
+		Components: []Component{
+			{
+				Name:          "server",
+				ResourceCount: 2,
+				Status:        healthReady,
+				Resources: []ResourceNode{
+					// Longer name drives the column width.
+					{Kind: "Deployment", Name: "web-server", Status: healthReady, Replicas: "3/3"},
+					{Kind: "Service", Name: "svc", Status: healthReady},
+				},
+			},
+		},
+	}
+	out := formatPlainTree(result)
+
+	// Collect the column index of "Ready" on each resource line.
+	var readyCols []int
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "Deployment/web-server") || strings.Contains(line, "Service/svc") {
+			idx := strings.Index(line, "Ready")
+			require.True(t, idx >= 0, "Ready not found in line: %q", line)
+			readyCols = append(readyCols, idx)
+		}
+	}
+
+	require.Len(t, readyCols, 2, "expected two resource lines")
+	assert.Equal(t, readyCols[0], readyCols[1], "status columns should be aligned")
+}
+
+// TestFormatPlainTree_RSStatusSuppressed verifies ReplicaSet nodes omit the status column.
+func TestFormatPlainTree_RSStatusSuppressed(t *testing.T) {
+	result := &TreeResult{
+		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
+		Components: []Component{
+			{
+				Name:          "server",
+				ResourceCount: 1,
+				Status:        healthReady,
+				Resources: []ResourceNode{
+					{
+						Kind: "Deployment", Name: "web", Status: healthReady, Replicas: "2/2",
+						Children: []ResourceNode{
+							{Kind: "ReplicaSet", Name: "web-rs", Status: healthReady, Replicas: "2 pods"},
+						},
+					},
+				},
+			},
+		},
+	}
+	out := formatPlainTree(result)
+
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "ReplicaSet/web-rs") {
+			// Should contain "2 pods" (the replica count)...
+			assert.Contains(t, line, "2 pods")
+			// ...but NOT "Ready" (the health status).
+			assert.NotContains(t, line, "Ready", "ReplicaSet line should not show health status: %q", line)
+			return
+		}
+	}
+	t.Fatal("ReplicaSet/web-rs line not found in output")
+}
+
+// TestFormatPlainTree_PVCAbbreviated verifies PersistentVolumeClaim is displayed as PVC.
+func TestFormatPlainTree_PVCAbbreviated(t *testing.T) {
+	result := &TreeResult{
+		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
+		Components: []Component{
+			{
+				Name:          "storage",
+				ResourceCount: 1,
+				Status:        healthBound,
+				Resources: []ResourceNode{
+					{Kind: "PersistentVolumeClaim", Name: "data", Status: healthBound, Replicas: "10Gi"},
+				},
+			},
+		},
+	}
+	out := formatPlainTree(result)
+
+	assert.Contains(t, out, "PVC/data", "display kind should be abbreviated")
+	assert.NotContains(t, out, "PersistentVolumeClaim/data", "full kind should not appear in terminal output")
+	assert.Contains(t, out, "Bound")
+	assert.Contains(t, out, "10Gi")
+}

@@ -19,6 +19,8 @@ const (
 	// healthMissing means the resource is tracked in the inventory but no longer
 	// exists on the cluster (deleted outside of OPM).
 	healthMissing healthStatus = "Missing"
+	// healthBound means a PersistentVolumeClaim is bound to a PersistentVolume.
+	healthBound healthStatus = "Bound"
 )
 
 // conditionStatusTrue is the Kubernetes condition status value representing "true".
@@ -33,24 +35,25 @@ var workloadKinds = map[string]bool{
 }
 
 // passiveKinds are resources that are healthy as soon as they exist.
+// Note: PersistentVolumeClaim is intentionally excluded — it has a lifecycle
+// phase (Pending → Bound → Lost) evaluated by evaluatePVCHealth.
 var passiveKinds = map[string]bool{
-	"ConfigMap":             true,
-	"Secret":                true,
-	"Service":               true,
-	"PersistentVolumeClaim": true,
-	"ServiceAccount":        true,
-	"Namespace":             true,
-	"ClusterRole":           true,
-	"ClusterRoleBinding":    true,
-	"Role":                  true,
-	"RoleBinding":           true,
-	"Ingress":               true,
-	"NetworkPolicy":         true,
-	"PodDisruptionBudget":   true,
-	"ResourceQuota":         true,
-	"LimitRange":            true,
-	"StorageClass":          true,
-	"PriorityClass":         true,
+	"ConfigMap":           true,
+	"Secret":              true,
+	"Service":             true,
+	"ServiceAccount":      true,
+	"Namespace":           true,
+	"ClusterRole":         true,
+	"ClusterRoleBinding":  true,
+	"Role":                true,
+	"RoleBinding":         true,
+	"Ingress":             true,
+	"NetworkPolicy":       true,
+	"PodDisruptionBudget": true,
+	"ResourceQuota":       true,
+	"LimitRange":          true,
+	"StorageClass":        true,
+	"PriorityClass":       true,
 }
 
 // EvaluateHealth determines the health status of a Kubernetes resource
@@ -78,6 +81,11 @@ func evaluateHealth(resource *unstructured.Unstructured) healthStatus {
 		return healthReady
 	}
 
+	// PersistentVolumeClaim: has a lifecycle phase (Pending → Bound → Lost).
+	if kind == "PersistentVolumeClaim" {
+		return evaluatePVCHealth(resource)
+	}
+
 	// Passive resources: healthy on creation
 	if passiveKinds[kind] {
 		return healthReady
@@ -85,6 +93,17 @@ func evaluateHealth(resource *unstructured.Unstructured) healthStatus {
 
 	// Custom resources: check for Ready condition, fallback to passive
 	return evaluateCustomHealth(resource)
+}
+
+// evaluatePVCHealth reads the PVC lifecycle phase from status.phase.
+// Bound → healthBound (green), Pending/Lost → their raw phase (yellow).
+// Falls back to healthReady for PVCs with no status yet (e.g. just created).
+func evaluatePVCHealth(resource *unstructured.Unstructured) healthStatus {
+	phase, _, _ := unstructured.NestedString(resource.Object, "status", "phase") //nolint:errcheck // best-effort PVC phase display
+	if phase != "" {
+		return healthStatus(phase)
+	}
+	return healthReady // fallback: PVC created but not yet provisioned
 }
 
 // evaluateWorkloadHealth checks the Ready condition on workload resources.

@@ -199,8 +199,9 @@ func TestEvaluateHealth_CronJob(t *testing.T) {
 }
 
 func TestEvaluateHealth_Passive(t *testing.T) {
+	// PersistentVolumeClaim is intentionally excluded — it has its own evaluatePVCHealth branch.
 	passiveResources := []string{
-		"ConfigMap", "Secret", "Service", "PersistentVolumeClaim",
+		"ConfigMap", "Secret", "Service",
 		"ServiceAccount", "Namespace", "ClusterRole", "ClusterRoleBinding",
 		"Role", "RoleBinding",
 	}
@@ -209,6 +210,35 @@ func TestEvaluateHealth_Passive(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			resource := makeResource(kind, nil)
 			assert.Equal(t, healthReady, evaluateHealth(resource))
+		})
+	}
+}
+
+func TestEvaluateHealth_PVC(t *testing.T) {
+	tests := []struct {
+		name     string
+		phase    string
+		expected healthStatus
+	}{
+		{name: "Bound", phase: "Bound", expected: healthBound},
+		{name: "Pending", phase: "Pending", expected: healthStatus("Pending")},
+		{name: "Lost", phase: "Lost", expected: healthStatus("Lost")},
+		{name: "no phase (fallback)", phase: "", expected: healthReady},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pvc := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "PersistentVolumeClaim",
+					"metadata":   map[string]interface{}{"name": "data", "namespace": "ns"},
+				},
+			}
+			if tc.phase != "" {
+				_ = unstructured.SetNestedField(pvc.Object, tc.phase, "status", "phase")
+			}
+			assert.Equal(t, tc.expected, evaluateHealth(pvc))
 		})
 	}
 }

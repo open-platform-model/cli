@@ -105,10 +105,12 @@ The command SHALL display health status for each resource using the same evaluat
 - **WHEN** a Job has `status.succeeded=5` and `spec.completions=10`
 - **THEN** the tree output SHALL display `Job/name  NotReady  5/10`
 
-#### Scenario: ReplicaSet shows pod count
+#### Scenario: ReplicaSet shows pod count only (no health status)
 
 - **WHEN** a ReplicaSet has `status.replicas=3`
 - **THEN** the tree output SHALL display `ReplicaSet/name  3 pods`
+- **AND** SHALL NOT display a health status for the ReplicaSet node
+  (health is implicit in the parent Deployment's replica ratio)
 
 #### Scenario: Pod shows phase status
 
@@ -123,8 +125,20 @@ The command SHALL display health status for each resource using the same evaluat
 
 #### Scenario: Passive resource shows Ready
 
-- **WHEN** a ConfigMap, Secret, Service, or PVC is discovered
+- **WHEN** a ConfigMap, Secret, or Service is discovered
 - **THEN** the tree output SHALL display the resource with status `Ready`
+
+#### Scenario: PVC shows phase and storage capacity
+
+- **WHEN** a PersistentVolumeClaim is discovered
+- **THEN** the tree output SHALL display the kind abbreviated as `PVC` (e.g. `PVC/data`)
+- **AND** SHALL display the PVC lifecycle phase (`Bound`, `Pending`, or `Lost`) as the status
+  - `Bound` → green (healthy — volume is attached)
+  - `Pending` → yellow (transitional — waiting for provisioning)
+  - `Lost` → yellow (warning — backing PersistentVolume is gone)
+- **AND** SHALL display the storage capacity after the status (from `status.capacity.storage`,
+  falling back to `spec.resources.requests.storage`), e.g. `PVC/data  Bound  10Gi`
+- **AND** PVC nodes with no `status.phase` set SHALL display `Ready` (fallback for unprovisioned PVCs)
 
 ---
 
@@ -167,7 +181,18 @@ The command SHALL render tree structure using Unicode box-drawing characters (�
 
 - **WHEN** the command runs in a TTY environment
 - **THEN** the output SHALL use Unicode box-drawing characters for tree structure
-- **AND** SHALL apply colors: cyan for component names, green for Ready status, red for NotReady, dim gray for tree chrome
+- **AND** SHALL apply colors: cyan for component names, green for Ready/Bound status, red for NotReady, yellow for Pending/Lost/Unknown, dim gray for tree chrome
+
+#### Scenario: Status column alignment
+
+- **WHEN** a component contains multiple resources (including children at different nesting depths)
+- **THEN** the status tokens for all nodes SHALL align to the same horizontal column (two-pass rendering: measure first, then render)
+- **AND** there SHALL be a minimum gap of 2 spaces between the end of the resource name and the status token
+
+#### Scenario: Status appears before replica count
+
+- **WHEN** a resource has both a status and a replica count (e.g. Deployment with `Ready  3/3`)
+- **THEN** the status token SHALL appear before the replica count on the same line
 
 #### Scenario: Plain rendering in non-TTY
 

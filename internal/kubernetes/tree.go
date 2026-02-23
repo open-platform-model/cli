@@ -20,11 +20,26 @@ import (
 // noComponentLabel is the placeholder used for resources missing a component mapping.
 const noComponentLabel = "(no component)"
 
+// displayKind returns an abbreviated kind name for terminal display.
+// PersistentVolumeClaim is shortened to PVC to keep tree lines compact.
+// The full kind is preserved in ResourceNode.Kind for JSON/YAML output.
+func displayKind(kind string) string {
+	if kind == "PersistentVolumeClaim" {
+		return "PVC"
+	}
+	return kind
+}
+
 // Tree chrome constants — box-drawing connectors used in terminal rendering.
 const (
 	treeConnMid  = "├── "
 	treeConnLast = "└── "
 )
+
+// treeMinStatusGap is the minimum number of spaces between the end of a
+// resource name and its status token. The longest name in the tree is the
+// anchor; all other names get more padding to reach the same column.
+const treeMinStatusGap = 6
 
 // Kubernetes workload kind constants shared across the kubernetes package.
 const (
@@ -217,7 +232,7 @@ func aggregateStatus(resources []ResourceNode, resourceCount int) healthStatus {
 		return healthUnknown
 	}
 	for _, r := range resources {
-		if r.Status != healthReady && r.Status != healthComplete {
+		if r.Status != healthReady && r.Status != healthComplete && r.Status != healthBound {
 			return healthNotReady
 		}
 	}
@@ -247,6 +262,13 @@ func getReplicaCount(res *unstructured.Unstructured) string {
 		completions, _, _ := unstructured.NestedInt64(res.Object, "spec", "completions") //nolint:errcheck // best-effort replica display
 		succeeded, _, _ := unstructured.NestedInt64(res.Object, "status", "succeeded")   //nolint:errcheck // best-effort replica display
 		return fmt.Sprintf("%d/%d", succeeded, completions)
+	case "PersistentVolumeClaim":
+		// Prefer the actual provisioned capacity; fall back to the requested size.
+		if cap, found, _ := unstructured.NestedString(res.Object, "status", "capacity", "storage"); found && cap != "" { //nolint:errcheck // best-effort capacity display
+			return cap
+		}
+		cap, _, _ := unstructured.NestedString(res.Object, "spec", "resources", "requests", "storage") //nolint:errcheck // best-effort capacity display
+		return cap
 	}
 	return ""
 }
@@ -427,6 +449,43 @@ func FormatTree(result *TreeResult, format output.Format) (string, error) {
 	}
 }
 
+// measureTreeWidths computes the status column position independently for each
+// nesting depth. The longest resource name at a given depth is the anchor — it
+// gets exactly treeMinStatusGap spaces before the status token. All other names
+// at that depth get proportionally more padding so their status tokens align.
+//
+// Depth 0 = OPM-managed resources (direct children of a component).
+// Depth 1 = K8s-owned children (ReplicaSets, Pods under a Deployment).
+// Depth 2 = K8s grandchildren (Pods under a ReplicaSet).
+//
+// Returns a map from depth → column index where status should start.
+func measureTreeWidths(result *TreeResult) map[int]int {
+	maxByDepth := make(map[int]int)
+	for _, comp := range result.Components {
+		for _, res := range comp.Resources {
+			measureNodeWidths(res, 4, 0, maxByDepth)
+		}
+	}
+	colWidths := make(map[int]int, len(maxByDepth))
+	for depth, max := range maxByDepth {
+		colWidths[depth] = max + treeMinStatusGap
+	}
+	return colWidths
+}
+
+// measureNodeWidths recursively computes the visual width of a node's
+// prefix + kindName at its depth and updates maxByDepth if it's the widest.
+func measureNodeWidths(node ResourceNode, prefixLen, depth int, maxByDepth map[int]int) {
+	// +4 for the connector ("├── " or "└── "), always 4 chars wide.
+	w := prefixLen + 4 + len(displayKind(node.Kind)+"/"+node.Name)
+	if w > maxByDepth[depth] {
+		maxByDepth[depth] = w
+	}
+	for _, child := range node.Children {
+		measureNodeWidths(child, prefixLen+4, depth+1, maxByDepth)
+	}
+}
+
 // formatTreeTable renders the tree as a terminal-friendly string.
 // colored=true applies ANSI color via the output package helpers.
 func formatTreeTable(result *TreeResult, colored bool) string {
@@ -461,7 +520,9 @@ func formatTreeTable(result *TreeResult, colored bool) string {
 		return sb.String()
 	}
 
-	// ── Depth>=1: vertical separator after header, then component groups ──────
+	// ── Depth>=1: measure first, then render with aligned columns ─────────────
+	colWidths := measureTreeWidths(result)
+
 	pipe := "│"
 	if colored {
 		pipe = output.Dim(pipe)
@@ -470,7 +531,7 @@ func formatTreeTable(result *TreeResult, colored bool) string {
 
 	for i, comp := range result.Components {
 		isLast := i == len(result.Components)-1
-		renderComponent(&sb, comp, "", isLast, colored)
+		renderComponent(&sb, comp, "", isLast, colored, colWidths)
 		if !isLast {
 			sb.WriteString(pipe + "\n")
 		}
@@ -508,7 +569,7 @@ func renderDepth0Components(sb *strings.Builder, components []Component, colored
 }
 
 // renderComponent renders one component and its resources.
-func renderComponent(sb *strings.Builder, comp Component, prefix string, isLast, colored bool) {
+func renderComponent(sb *strings.Builder, comp Component, prefix string, isLast, colored bool, colWidths map[int]int) {
 	conn := treeConnMid
 	if isLast {
 		conn = treeConnLast
@@ -529,33 +590,46 @@ func renderComponent(sb *strings.Builder, comp Component, prefix string, isLast,
 
 	for i, res := range comp.Resources {
 		resIsLast := i == len(comp.Resources)-1
-		renderResourceNode(sb, res, childPrefix, resIsLast, false, colored)
+		renderResourceNode(sb, res, childPrefix, resIsLast, false, colored, colWidths, 0)
 	}
 }
 
 // renderResourceNode renders a resource node and recursively its children.
 // isChild=true indicates a K8s-owned child (ReplicaSet, Pod) — rendered dimmer.
-func renderResourceNode(sb *strings.Builder, node ResourceNode, prefix string, isLast, isChild, colored bool) {
+// colWidths maps nesting depth → status column position (from measureTreeWidths).
+// depth is the current nesting depth (0 = OPM resource, 1 = child, 2 = grandchild).
+func renderResourceNode(sb *strings.Builder, node ResourceNode, prefix string, isLast, isChild, colored bool, colWidths map[int]int, depth int) {
 	conn := treeConnMid
 	if isLast {
 		conn = treeConnLast
 	}
 
-	chrome := prefix + conn
-	kindName := node.Kind + "/" + node.Name
+	// Use the abbreviated kind for display; node.Kind stays full for JSON/YAML.
+	kindNameDisplay := displayKind(node.Kind) + "/" + node.Name
 	status := string(node.Status)
 	replicas := node.Replicas
 
+	// Compute padding using raw (uncolored) widths — ANSI codes are visually zero-width.
+	// prefix + connector (4 chars) + kindNameDisplay = the column where status starts.
+	// Each depth level has its own column anchor (per-depth alignment).
+	rawWidth := len(prefix) + 4 + len(kindNameDisplay)
+	padding := colWidths[depth] - rawWidth
+	if padding < treeMinStatusGap {
+		padding = treeMinStatusGap
+	}
+
+	// Apply color styling after padding is computed (ANSI codes must not affect width math).
+	chrome := prefix + conn
 	if colored {
 		chrome = output.Dim(chrome)
 		if isChild {
-			kindName = output.Dim(kindName)
+			kindNameDisplay = output.Dim(kindNameDisplay)
 			if replicas != "" {
 				replicas = output.Dim(replicas)
 			}
 		}
-		// Pod nodes display their raw K8s phase with phase-aware coloring.
-		// All other nodes use the standard health-status palette.
+		// Pod nodes: phase-aware coloring (Running→green, Pending→yellow, errors→red).
+		// All other nodes: standard health-status palette.
 		if node.Kind == "Pod" {
 			status = output.FormatPodPhase(status, node.Ready)
 		} else {
@@ -563,20 +637,32 @@ func renderResourceNode(sb *strings.Builder, node ResourceNode, prefix string, i
 		}
 	}
 
-	line := chrome + kindName
-	if replicas != "" {
-		line += "  " + replicas
+	line := chrome + kindNameDisplay + strings.Repeat(" ", padding)
+	switch {
+	case node.Kind == kindReplicaSet:
+		// ReplicaSet: show only pod count. Health is implicit in the parent's replica ratio.
+		if replicas != "" {
+			line += replicas
+		}
+	case node.Kind == "Pod":
+		// Pod: phase string only. Pods never carry a replica count.
+		line += status
+	default:
+		// All others: status first, then optional replica annotation (e.g. "3/3", "10Gi").
+		line += status
+		if replicas != "" {
+			line += "  " + replicas
+		}
 	}
-	line += "  " + status
 	sb.WriteString(line + "\n")
 
-	// Recurse into children (always isChild=true for nested levels)
+	// Recurse into children (always isChild=true for nested levels).
 	childPrefix := prefix + "│   "
 	if isLast {
 		childPrefix = prefix + "    "
 	}
 	for i, child := range node.Children {
-		renderResourceNode(sb, child, childPrefix, i == len(node.Children)-1, true, colored)
+		renderResourceNode(sb, child, childPrefix, i == len(node.Children)-1, true, colored, colWidths, depth+1)
 	}
 }
 
