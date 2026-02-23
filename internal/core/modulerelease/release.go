@@ -17,9 +17,6 @@ import (
 // ModuleRelease represents the built module release after the build phase, before any transformations are applied.
 // Contains the fully concrete components with all metadata extracted and values merged, ready for matching and transformation.
 type ModuleRelease struct {
-	APIVersion string `json:"apiVersion"`
-	Kind       string `json:"kind"`
-
 	// Metadata contains release-level identity information for a deployed module.
 	// This metadata is used for labeling resources, inventory tracking, and verbose output.
 	Metadata *ReleaseMetadata `json:"metadata"`
@@ -92,9 +89,8 @@ type ReleaseMetadata struct {
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Annotations from the module release.
-	// TODO: not yet implemented. Populate this in extractReleaseMetadata (internal/build/release/metadata.go)
-	// once CUE annotation extraction is added, then wire it into TransformerContext.ToMap
-	// (internal/build/transform/context.go) alongside Labels.
+	// Populated at build time from metadata.annotations in the concrete CUE result.
+	// Injected into TransformerContext alongside Labels.
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Components lists the component names rendered in this release.

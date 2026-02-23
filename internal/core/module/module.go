@@ -15,9 +15,6 @@ import (
 
 // Module represents the #Module type before it is built.
 type Module struct {
-	APIVersion string `json:"apiVersion"`
-	Kind       string `json:"kind"`
-
 	// Metadata is the module metadata extracted from the module definition.
 	Metadata *ModuleMetadata `json:"metadata"`
 
@@ -128,16 +125,14 @@ type ModuleMetadata struct {
 	// UUID is the module identity UUID (from #Module.metadata.identity).
 	UUID string `json:"uuid"`
 
-	// Labels from the module definition.
-	// TODO: not yet consumed after extraction. TransformerContext.ToMap (internal/build/transform/context.go)
-	// currently injects ReleaseMetadata.Labels into CUE instead of these module-level labels.
-	// Decide whether module-level labels should be passed separately to transformers and implement accordingly.
+	// Labels from the module definition (pre-build, author-declared).
+	// Populated at LoadModule time from metadata.labels in the CUE value.
+	// Distinct from ReleaseMetadata.Labels which is the fully merged set computed by CUE at build time.
+	// Not injected into TransformerContext — transformers receive the merged ReleaseMetadata.Labels.
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Annotations from the module definition.
-	// TODO: not yet implemented. Neither set in extractModuleMetadata (internal/build/release/metadata.go)
-	// nor consumed anywhere. Populate from CUE metadata.annotations, then wire into
-	// TransformerContext.ToMap (internal/build/transform/context.go) alongside module Labels.
+	// TODO: not yet implemented. Populate from CUE metadata.annotations once a CUE path is defined.
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Components lists the component names rendered in this release.

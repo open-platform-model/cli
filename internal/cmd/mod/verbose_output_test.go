@@ -21,12 +21,19 @@ import (
 func buildTestResult() *pipeline.RenderResult {
 	return &pipeline.RenderResult{
 		Release: modulerelease.ReleaseMetadata{
-			Name:       "test-release",
-			Namespace:  "default",
-			Components: []string{"web"},
+			Name:      "test-release",
+			Namespace: "default",
 		},
 		Module: module.ModuleMetadata{
 			Version: "1.0.0",
+		},
+		Components: []pipeline.ComponentSummary{
+			{
+				Name:         "web",
+				Labels:       map[string]string{"core.opmodel.dev/workload-type": "stateless"},
+				ResourceFQNs: []string{"opmodel.dev/resources/Container@v0"},
+				TraitFQNs:    []string{"opmodel.dev/traits/Expose@v0"},
+			},
 		},
 		MatchPlan: &transformer.TransformerMatchPlan{
 			Matches: []*transformer.TransformerMatch{
@@ -119,7 +126,9 @@ func TestVerboseOutput_TransformerMatches(t *testing.T) {
 		assert.Contains(t, outputStr, "release", "verbose should contain release metadata")
 		assert.Contains(t, outputStr, "namespace=default", "verbose should show namespace")
 		assert.Contains(t, outputStr, "version=1.0.0", "verbose should show version")
-		assert.Contains(t, outputStr, "components=web", "verbose should show component list")
+		assert.Contains(t, outputStr, "component: web", "verbose should show component name")
+		assert.Contains(t, outputStr, "Container", "verbose should show component resources")
+		assert.Contains(t, outputStr, "Expose", "verbose should show component traits")
 
 		assert.Contains(t, outputStr, "▸", "should contain bullet")
 		assert.Contains(t, outputStr, "web", "should contain component")

@@ -10,6 +10,19 @@ import (
 	"github.com/opmodel/cli/internal/pipeline"
 )
 
+// formatFQNList formats a slice of FQN strings into a compact comma-separated
+// list using output.FormatFQN for each entry.
+func formatFQNList(fqns []string) string {
+	if len(fqns) == 0 {
+		return ""
+	}
+	formatted := make([]string, len(fqns))
+	for i, fqn := range fqns {
+		formatted[i] = output.FormatFQN(fqn)
+	}
+	return strings.Join(formatted, ", ")
+}
+
 // PrintValidationError prints a render/validation error in a user-friendly format.
 // When the error is a ValidationError with CUE details, it prints a short
 // summary line followed by the structured CUE error output (matching `cue vet` style).
@@ -82,7 +95,7 @@ func WriteTransformerMatches(result *pipeline.RenderResult) {
 }
 
 // WriteVerboseMatchLog writes detailed verbose output with release metadata,
-// match reasons, and per-resource validation lines (--verbose only).
+// per-component properties, match reasons, and per-resource validation lines (--verbose only).
 func WriteVerboseMatchLog(result *pipeline.RenderResult) {
 	if result.MatchPlan == nil {
 		return
@@ -93,8 +106,22 @@ func WriteVerboseMatchLog(result *pipeline.RenderResult) {
 	releaseLog.Info("release",
 		"namespace", result.Release.Namespace,
 		"version", result.Module.Version,
-		"components", strings.Join(result.Release.Components, ", "),
 	)
+
+	// Per-component summary — one line per component with its properties
+	for _, comp := range result.Components {
+		attrs := []any{}
+		if resources := formatFQNList(comp.ResourceFQNs); resources != "" {
+			attrs = append(attrs, "resources", resources)
+		}
+		if traits := formatFQNList(comp.TraitFQNs); traits != "" {
+			attrs = append(attrs, "traits", traits)
+		}
+		for k, v := range comp.Labels {
+			attrs = append(attrs, k, v)
+		}
+		releaseLog.Info(fmt.Sprintf("component: %s", comp.Name), attrs...)
+	}
 
 	// Transformer matching — one line per successful match with reason
 	for _, m := range result.MatchPlan.Matches {

@@ -233,4 +233,7 @@ func extractModuleMetadata(v cue.Value, meta *module.ModuleMetadata) { //nolint:
 		}
 	}
 
+	if labels, err := extractCUEStringMap(v, "metadata.labels"); err == nil && len(labels) > 0 {
+		meta.Labels = labels
+	}
 }

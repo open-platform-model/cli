@@ -184,5 +184,9 @@ func extractReleaseMetadata(result cue.Value, opts Options) (*modulerelease.Rele
 		meta.Labels = labels
 	}
 
+	if annotations, err := extractCUEStringMap(result, "metadata.annotations"); err == nil && len(annotations) > 0 {
+		meta.Annotations = annotations
+	}
+
 	return meta, nil
 }

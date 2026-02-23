@@ -65,6 +65,28 @@ func (o RenderOptions) Validate() error {
 	return nil
 }
 
+// ComponentSummary contains display-oriented summary data extracted from a Component
+// after the BUILD phase. It captures the key properties useful for verbose output
+// without exposing cue.Value fields.
+type ComponentSummary struct {
+	// Name is the component name.
+	Name string
+
+	// Labels are the component-level labels from ComponentMetadata.Labels.
+	// Example: {"core.opmodel.dev/workload-type": "stateless"}
+	Labels map[string]string
+
+	// ResourceFQNs are the FQNs of resource types declared by the component.
+	// Sorted for deterministic output.
+	// Example: ["opmodel.dev/resources/Container@v0"]
+	ResourceFQNs []string
+
+	// TraitFQNs are the FQNs of traits declared by the component.
+	// Sorted for deterministic output.
+	// Example: ["opmodel.dev/traits/Expose@v0", "opmodel.dev/traits/Scaling@v0"]
+	TraitFQNs []string
+}
+
 // RenderResult is the output of a render operation.
 // This is the contract between rendering and consumers.
 type RenderResult struct {
@@ -78,6 +100,10 @@ type RenderResult struct {
 
 	// Module contains module-level metadata (canonical name, FQN, version, module UUID, labels).
 	Module module.ModuleMetadata
+
+	// Components contains summary data for each component rendered in this release.
+	// Sorted by component name for deterministic output.
+	Components []ComponentSummary
 
 	// MatchPlan describes which transformers matched which components.
 	// Used for verbose output and debugging.

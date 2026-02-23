@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/opmodel/cli/internal/builder"
 	"github.com/opmodel/cli/internal/core"
+	"github.com/opmodel/cli/internal/core/component"
 	"github.com/opmodel/cli/internal/core/module"
 	coreprovider "github.com/opmodel/cli/internal/core/provider"
 	"github.com/opmodel/cli/internal/core/transformer"
@@ -122,13 +124,47 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 	}
 
 	return &RenderResult{
-		Resources: resources,
-		Release:   *rel.Metadata,
-		Module:    *rel.Module.Metadata,
-		MatchPlan: matchPlan,
-		Errors:    errs,
-		Warnings:  warnings,
+		Resources:  resources,
+		Release:    *rel.Metadata,
+		Module:     *rel.Module.Metadata,
+		Components: summarizeComponents(rel.Components),
+		MatchPlan:  matchPlan,
+		Errors:     errs,
+		Warnings:   warnings,
 	}, nil
+}
+
+// summarizeComponents converts the component map from a built ModuleRelease into
+// a sorted slice of ComponentSummary for use in RenderResult.
+func summarizeComponents(components map[string]*component.Component) []ComponentSummary {
+	summaries := make([]ComponentSummary, 0, len(components))
+	for name, comp := range components {
+		summary := ComponentSummary{Name: name}
+
+		if comp.Metadata != nil {
+			summary.Labels = comp.Metadata.Labels
+		}
+
+		resourceFQNs := make([]string, 0, len(comp.Resources))
+		for fqn := range comp.Resources {
+			resourceFQNs = append(resourceFQNs, fqn)
+		}
+		sort.Strings(resourceFQNs)
+		summary.ResourceFQNs = resourceFQNs
+
+		traitFQNs := make([]string, 0, len(comp.Traits))
+		for fqn := range comp.Traits {
+			traitFQNs = append(traitFQNs, fqn)
+		}
+		sort.Strings(traitFQNs)
+		summary.TraitFQNs = traitFQNs
+
+		summaries = append(summaries, summary)
+	}
+	sort.Slice(summaries, func(i, j int) bool {
+		return summaries[i].Name < summaries[j].Name
+	})
+	return summaries
 }
 
 // prepare runs Phase 1 (PREPARATION): loads the module, validates it,
