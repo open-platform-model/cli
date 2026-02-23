@@ -24,11 +24,12 @@ const (
 // conditionStatusTrue is the Kubernetes condition status value representing "true".
 const conditionStatusTrue = "True"
 
-// workloadKinds are resources that use the Ready condition for health.
+// workloadKinds are resources that use the Available/Ready condition for health.
+// Note: StatefulSet is intentionally excluded — it does not emit conditions
+// and must be evaluated via readyReplicas instead.
 var workloadKinds = map[string]bool{
-	"Deployment":  true,
-	"StatefulSet": true,
-	"DaemonSet":   true,
+	"Deployment": true,
+	"DaemonSet":  true,
 }
 
 // passiveKinds are resources that are healthy as soon as they exist.
@@ -57,9 +58,14 @@ var passiveKinds = map[string]bool{
 func evaluateHealth(resource *unstructured.Unstructured) healthStatus {
 	kind := resource.GetKind()
 
-	// Workloads: Deployment, StatefulSet, DaemonSet — check Ready condition
+	// Workloads: Deployment, DaemonSet — check Available/Ready condition
 	if workloadKinds[kind] {
 		return evaluateWorkloadHealth(resource)
+	}
+
+	// StatefulSet: does not emit status conditions; check readyReplicas instead
+	if kind == "StatefulSet" {
+		return evaluateStatefulSetHealth(resource)
 	}
 
 	// Jobs: check Complete condition
@@ -91,6 +97,24 @@ func evaluateWorkloadHealth(resource *unstructured.Unstructured) healthStatus {
 			}
 			return healthNotReady
 		}
+	}
+	return healthNotReady
+}
+
+// evaluateStatefulSetHealth checks readyReplicas for StatefulSet resources.
+// StatefulSets do not emit Available/Ready status conditions; readiness is
+// signalled via readyReplicas reaching the desired replica count.
+func evaluateStatefulSetHealth(resource *unstructured.Unstructured) healthStatus {
+	desired, found, _ := unstructured.NestedInt64(resource.Object, "spec", "replicas") //nolint:errcheck
+	if !found {
+		desired = 1 // spec.replicas defaults to 1 when omitted
+	}
+	if desired == 0 {
+		return healthReady
+	}
+	ready, _, _ := unstructured.NestedInt64(resource.Object, "status", "readyReplicas") //nolint:errcheck
+	if ready >= desired {
+		return healthReady
 	}
 	return healthNotReady
 }

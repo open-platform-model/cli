@@ -7,12 +7,12 @@ deps: {
 		v: "v0.1.31"
 	}
 	"opmodel.dev/resources@v0": {
-		v: "v0.2.40"
+		v: "v0.2.42"
 	}
 	"opmodel.dev/schemas@v0": {
-		v: "v0.2.5"
+		v: "v0.2.7"
 	}
 	"opmodel.dev/traits@v0": {
-		v: "v0.1.52"
+		v: "v0.1.54"
 	}
 }

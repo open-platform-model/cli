@@ -319,24 +319,41 @@ import (
 			}
 
 			// === Health Checks ===
+			// mc-monitor is called directly (not via the mc-health wrapper) because
+			// mc-health uses ${SERVER_PORT:-25565} which collides with the Kubernetes
+			// service-link env var SERVER_PORT=tcp://... injected for the "server" Service.
+			// mc-monitor accepts explicit flags and is not affected by that env var.
 			healthCheck: {
+				// Startup probe: gates liveness/readiness until the server is up.
+				// Gives the server up to 5 minutes to boot before Kubernetes gives up
+				// (failureThreshold=30 × periodSeconds=10 = 300s window).
+				// This prevents crashloops on slow first-starts (PAPER jar download, world gen).
+				startupProbe: {
+					exec: {
+						command: ["mc-monitor", "status", "--port", "\(#config.port)"]
+					}
+					periodSeconds:    10
+					timeoutSeconds:   5
+					failureThreshold: 30
+				}
+				// Liveness probe: only active after startupProbe succeeds.
+				// No initialDelaySeconds needed — startup probe handles that gate.
 				livenessProbe: {
 					exec: {
-						command: ["mc-health"]
+						command: ["mc-monitor", "status", "--port", "\(#config.port)"]
 					}
-					initialDelaySeconds: 60
-					periodSeconds:       30
-					timeoutSeconds:      5
-					failureThreshold:    3
+					periodSeconds:    30
+					timeoutSeconds:   5
+					failureThreshold: 3
 				}
+				// Readiness probe: marks the pod ready to receive traffic.
 				readinessProbe: {
 					exec: {
-						command: ["mc-health"]
+						command: ["mc-monitor", "status", "--port", "\(#config.port)"]
 					}
-					initialDelaySeconds: 30
-					periodSeconds:       10
-					timeoutSeconds:      3
-					failureThreshold:    3
+					periodSeconds:    10
+					timeoutSeconds:   3
+					failureThreshold: 3
 				}
 			}
 
