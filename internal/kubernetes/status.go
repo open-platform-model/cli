@@ -334,26 +334,40 @@ func formatVerboseBlocks(result *StatusResult) string {
 			}
 		}
 
-		fmt.Fprintf(&sb, "\n%s/%s (%d/%d ready):\n", r.Kind, r.Name, readyCount, len(r.Verbose.Pods))
+		// Block header: "Kind/Name (N/M ready):"
+		// Ready ratio is colored by health (red/yellow/green); Kind/Name is plain.
+		fmt.Fprintf(&sb, "\n%s/%s %s:\n",
+			r.Kind, r.Name,
+			output.FormatReadyRatio(readyCount, len(r.Verbose.Pods)),
+		)
 		for _, p := range r.Verbose.Pods {
-			// When a termination reason is available, it is the primary context.
-			// Fall back to "(not ready)" only when no specific reason exists.
-			var detail string
-			switch {
-			case p.Ready:
-				detail = "(ready)"
-			case p.Reason != "":
-				detail = p.Reason
-			default:
-				detail = "(not ready)"
-			}
-			if p.Restarts > 0 {
-				detail += fmt.Sprintf(", %d restarts", p.Restarts)
-			}
-
+			// Compute padding from raw string lengths BEFORE applying color — ANSI
+			// escape codes inflate byte length but not visual width.
 			namePad := strings.Repeat(" ", nameWidth-len(p.Name))
 			phasePad := strings.Repeat(" ", phaseWidth-len(p.Phase))
-			fmt.Fprintf(&sb, "    %s%s   %s%s   %s\n", p.Name, namePad, p.Phase, phasePad, detail)
+
+			styledPhase := output.FormatPodPhase(p.Phase, p.Ready)
+
+			// Detail: base text + optional restart count.
+			// "(ready)" and "(not ready)" are supplementary/fallback → dim.
+			// Reason text (OOMKilled, Error, …) is diagnostic → leave unstyled.
+			// Restart count is colored by churn severity.
+			var styledDetail string
+			switch {
+			case p.Ready:
+				styledDetail = output.Dim("(ready)")
+			case p.Reason != "":
+				styledDetail = p.Reason
+			default:
+				styledDetail = output.Dim("(not ready)")
+			}
+			if p.Restarts > 0 {
+				styledDetail += output.FormatRestartCount(p.Restarts,
+					fmt.Sprintf(", %d restarts", p.Restarts))
+			}
+
+			fmt.Fprintf(&sb, "    %s%s   %s%s   %s\n",
+				p.Name, namePad, styledPhase, phasePad, styledDetail)
 		}
 	}
 	return sb.String()

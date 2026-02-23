@@ -466,6 +466,35 @@ The `tableStyle` struct and `defaultTableStyle()` function are removed. The `New
   used as the primary detail text (e.g. `"OOMKilled, 5 restarts"`). `"(not ready)"` is the
   fallback only when no specific reason exists. Ready pods always show `"(ready)"`.
 
+### Decision 15: Verbose output color coding
+
+**Context**: The initial verbose block was plain text. Phase names like `CrashLoop` and restart counts like `22 restarts` are hard to spot at a glance.
+
+**Decision**: Apply severity-based color throughout the verbose block:
+
+```text
+Element             Color               Rationale
+──────────────────  ──────────────────  ──────────────────────────────────────────
+Kind/Name header    Cyan (bold noun)    Consistent with resource NAME column
+(N/M ready) ratio   Red/yellow/green    Same health-status semantic as STATUS column
+Pod name            Cyan                Consistent with noun styling
+Phase               Red/yellow/green    Severity-based (see mapping below)
+"(ready)"/"(not     Dim/faint           Supplementary/fallback — recedes visually
+ ready)" detail
+Reason text         Unstyled (default)  Diagnostic info — let it stand on its own
+", N restarts"      Yellow (1–9)        Churn severity: some restarts = warning
+                    Red (10+)           Persistent crash loop = error
+```
+
+Phase color mapping:
+- `ready=true` or `Succeeded` → green
+- `Running` (not ready), `Pending`, `ContainerCreating`, `PodInitializing`, `Unknown` → yellow
+- All other phases (default) → red: covers `CrashLoop`, `Failed`, `ImagePullBackOff`, `ErrImagePull`, and any future waiting-reason overrides from `mapWaitingReason`
+
+**Key implementation note**: padding widths are computed from raw string lengths *before* applying color. ANSI escape codes inflate byte length but not visual width, so `nameWidth - len(p.Name)` remains correct after `StyleNoun(p.Name)` is applied.
+
+New exported functions in `internal/output/styles.go`: `Dim`, `FormatPodPhase`, `FormatReadyRatio`, `FormatRestartCount`. No lipgloss import needed in `kubernetes/status.go` — consistent with the pattern established by `StyleNoun`, `FormatHealthStatus`, `FormatComponent`.
+
 ## Risks / Trade-offs
 
 ### Risk: Pod listing performance in verbose mode

@@ -227,6 +227,66 @@ func FormatComponent(name string) string {
 	return styleNoun.Render(name)
 }
 
+// Dim renders a string in the faint/dim style. Use for supplementary or fallback
+// text that should recede visually (e.g. "(ready)", "(not ready)" in verbose output).
+func Dim(s string) string {
+	return styleDim.Render(s)
+}
+
+// FormatPodPhase renders a pod phase string with severity-based color.
+//
+// Color mapping:
+//   - ready=true or Succeeded: green
+//   - Running (not ready), Pending, ContainerCreating, PodInitializing, Unknown: yellow
+//   - All other phases (CrashLoop, Failed, ImagePullBackOff, ErrImagePull, …): red
+//
+// The "all other → red" default cleanly covers waiting-reason overrides
+// (e.g. CrashLoopBackOff → CrashLoop) without enumerating error states.
+func FormatPodPhase(phase string, ready bool) string {
+	if ready {
+		return lipgloss.NewStyle().Foreground(colorGreen).Render(phase)
+	}
+	switch phase {
+	case "Succeeded":
+		return lipgloss.NewStyle().Foreground(colorGreen).Render(phase)
+	case "Running", "Pending", "ContainerCreating", "PodInitializing", "Unknown":
+		return lipgloss.NewStyle().Foreground(ColorYellow).Render(phase)
+	default:
+		return lipgloss.NewStyle().Foreground(colorRed).Render(phase)
+	}
+}
+
+// FormatReadyRatio renders a "(ready/total ready)" string with health-status color.
+//
+// Color mapping:
+//   - all ready (ready == total): green
+//   - partially ready (ready > 0): yellow
+//   - none ready (ready == 0): red
+func FormatReadyRatio(ready, total int) string {
+	s := fmt.Sprintf("(%d/%d ready)", ready, total)
+	switch {
+	case ready == total:
+		return lipgloss.NewStyle().Foreground(colorGreen).Render(s)
+	case ready > 0:
+		return lipgloss.NewStyle().Foreground(ColorYellow).Render(s)
+	default:
+		return lipgloss.NewStyle().Foreground(colorRed).Render(s)
+	}
+}
+
+// FormatRestartCount renders a restart count suffix with churn-severity color.
+// text is the pre-formatted string (e.g. ", 22 restarts").
+//
+// Color mapping:
+//   - 10+ restarts: red (persistent crash loop)
+//   - 1–9 restarts: yellow (elevated but not critical)
+func FormatRestartCount(count int, text string) string {
+	if count >= 10 {
+		return lipgloss.NewStyle().Foreground(colorRed).Render(text)
+	}
+	return lipgloss.NewStyle().Foreground(ColorYellow).Render(text)
+}
+
 // FormatVetCheck renders a validation check result with a green checkmark, label,
 // and optional right-aligned detail text.
 //

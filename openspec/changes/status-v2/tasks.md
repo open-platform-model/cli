@@ -88,3 +88,17 @@ Three bugs in the `--verbose` pod detail rendering:
 - [x] 10.4 Update `pods_test.go`: update CrashLoopBackOff and ImagePullBackOff test cases for new phase-override behaviour; add "Completed last state filtered" and "CrashLoopBackOff with OOMKilled last state" cases
 - [x] 10.5 Run `task fmt` and `task test:unit` — verify all pass
 - [x] 10.6 Run `task check` — verify full check suite
+
+## 11. Verbose Output Color Coding
+
+Color-code the verbose pod detail blocks to make phase severity and restart churn
+immediately scannable without reading the text.
+
+- [x] 11.1 Add `Dim(s string) string` to `internal/output/styles.go` — faint style for supplementary fallback text
+- [x] 11.2 Add `FormatPodPhase(phase string, ready bool) string` to `internal/output/styles.go` — green (ready/Succeeded), yellow (Running/Pending/transitional), red (CrashLoop/Failed/ImagePullBackOff/…)
+- [x] 11.3 Add `FormatReadyRatio(ready, total int) string` to `internal/output/styles.go` — colors the "(N/M ready)" ratio: green (all), yellow (partial), red (none)
+- [x] 11.4 Add `FormatRestartCount(count int, text string) string` to `internal/output/styles.go` — yellow (1–9 restarts), red (10+ restarts)
+- [x] 11.5 Update `formatVerboseBlocks` in `internal/kubernetes/status.go`: apply colors to block header, pod name, phase, detail base, and restart count; compute padding from raw string lengths before applying color
+- [x] 11.6 Add unit tests for `FormatPodPhase`, `FormatReadyRatio`, `FormatRestartCount` in `internal/output/styles_test.go`
+- [x] 11.7 Run `task fmt` and `task test:unit` — verify all pass
+- [x] 11.8 Run `task check` — verify full check suite
