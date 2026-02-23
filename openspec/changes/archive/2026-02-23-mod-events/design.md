@@ -112,14 +112,13 @@ Job (OPM-managed)
 
 ```go
 // DiscoverChildren finds Kubernetes-owned child resources of the given parents.
-// It walks ownerReferences downward up to maxDepth levels.
-// Returns children grouped by parent UID for attribution.
+// It walks ownerReferences downward using knowledge of standard workload
+// hierarchies (depth is implicit per workload kind, not configurable).
 func DiscoverChildren(
     ctx context.Context,
     client *Client,
     parents []*unstructured.Unstructured,
     namespace string,
-    maxDepth int,
 ) ([]*unstructured.Unstructured, error)
 ```
 

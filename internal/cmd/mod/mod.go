@@ -23,6 +23,7 @@ func NewModCmd(cfg *config.GlobalConfig) *cobra.Command {
 	c.AddCommand(NewModDiffCmd(cfg))
 	c.AddCommand(NewModStatusCmd(cfg))
 	c.AddCommand(NewModTreeCmd(cfg))
+	c.AddCommand(NewModEventsCmd(cfg))
 
 	return c
 }

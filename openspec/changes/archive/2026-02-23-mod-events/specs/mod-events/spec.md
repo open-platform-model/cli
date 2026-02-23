@@ -2,7 +2,7 @@
 
 ### Requirement: Events command discovers release resources and their children
 
-The `opm mod events` command SHALL discover OPM-managed resources using existing label selectors (`DiscoverResources`), then walk ownerReferences downward to find Kubernetes-owned children (ReplicaSets, Pods) of workload resources. The combined set of resource UIDs SHALL be used to filter events.
+The `opm mod events` command SHALL discover OPM-managed resources via `cmdutil.ResolveInventory` (inventory-based discovery), then walk ownerReferences downward to find Kubernetes-owned children (ReplicaSets, Pods) of workload resources. The combined set of resource UIDs SHALL be used to filter events.
 
 The ownerReference traversal SHALL cover these workload hierarchies:
 
@@ -139,19 +139,19 @@ The default output format SHALL be a table with columns: LAST SEEN, TYPE, RESOUR
 
 The table output SHALL apply color coding consistent with existing CLI style conventions:
 
-- `Warning` type: yellow (`ColorYellow`, ANSI 220)
-- `Normal` type: dim gray (`colorDimGray`, ANSI 240)
-- Resource names in RESOURCE column: cyan (`ColorCyan`, ANSI 14)
+- `Warning` type: yellow (`output.ColorYellow`, ANSI 220)
+- `Normal` type: dim/faint (`output.Dim()`)
+- Resource names in RESOURCE column: cyan (`output.StyleNoun()`, ANSI 14)
 
 #### Scenario: Warning events displayed in yellow
 
 - **WHEN** an event has `type == "Warning"`
 - **THEN** the TYPE column value SHALL be rendered in yellow
 
-#### Scenario: Normal events displayed in dim gray
+#### Scenario: Normal events displayed in dim/faint
 
 - **WHEN** an event has `type == "Normal"`
-- **THEN** the TYPE column value SHALL be rendered in dim gray
+- **THEN** the TYPE column value SHALL be rendered in dim/faint style via `output.Dim()`
 
 #### Scenario: Resource names displayed in cyan
 
