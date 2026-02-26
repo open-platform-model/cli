@@ -761,60 +761,6 @@ func TestGetReplicaCount_PVC_NoCapacity(t *testing.T) {
 	assert.Empty(t, getReplicaCount(pvc))
 }
 
-func TestMeasureTreeWidths_SingleResource(t *testing.T) {
-	// "Service/web-svc" at depth=0, prefix=4: width = 4 + 4 + 15 = 23.
-	// colWidths[0] = 23 + 6 = 29.
-	result := &TreeResult{
-		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
-		Components: []Component{
-			{
-				Name:          "server",
-				ResourceCount: 1,
-				Resources:     []ResourceNode{{Kind: "Service", Name: "web-svc", Status: HealthReady}},
-			},
-		},
-	}
-	assert.Equal(t, map[int]int{0: 29}, measureTreeWidths(result))
-}
-
-func TestMeasureTreeWidths_PerDepthAlignment(t *testing.T) {
-	// Deployment/web at depth 0 (prefix=4): 4+4+14 = 22 → colWidths[0] = 22+6 = 28
-	// ReplicaSet/web-rs-abc at depth 1 (prefix=8): 8+4+21 = 33 → colWidths[1] = 33+6 = 39
-	result := &TreeResult{
-		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
-		Components: []Component{
-			{
-				Name:          "server",
-				ResourceCount: 1,
-				Resources: []ResourceNode{
-					{
-						Kind: "Deployment", Name: "web", Status: HealthReady,
-						Children: []ResourceNode{
-							{Kind: "ReplicaSet", Name: "web-rs-abc", Status: HealthReady, Replicas: "2 pods"},
-						},
-					},
-				},
-			},
-		},
-	}
-	assert.Equal(t, map[int]int{0: 28, 1: 39}, measureTreeWidths(result))
-}
-
-func TestMeasureTreeWidths_PVCAbbreviated(t *testing.T) {
-	// PVC/data at depth 0 (prefix=4): 4+4+8 = 16 → colWidths[0] = 16+6 = 22.
-	result := &TreeResult{
-		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
-		Components: []Component{
-			{
-				Name:          "storage",
-				ResourceCount: 1,
-				Resources:     []ResourceNode{{Kind: "PersistentVolumeClaim", Name: "data", Status: HealthBound, Replicas: "10Gi"}},
-			},
-		},
-	}
-	assert.Equal(t, map[int]int{0: 22}, measureTreeWidths(result))
-}
-
 // TestFormatPlainTree_StatusBeforeReplicas verifies that status appears before replicas.
 func TestFormatPlainTree_StatusBeforeReplicas(t *testing.T) {
 	result := makeSimpleResult() // has Deployment with Replicas="3/3" and Status=HealthReady
@@ -834,18 +780,122 @@ func TestFormatPlainTree_StatusBeforeReplicas(t *testing.T) {
 	t.Fatal("Deployment/web line not found in output")
 }
 
-// TestFormatPlainTree_AlignedColumns verifies all status tokens start at the same column.
+// TestFormatPlainTree_AlignedColumns verifies all status tokens start at the same column
+// globally — including across different tree depths (the key fix for cross-depth alignment).
 func TestFormatPlainTree_AlignedColumns(t *testing.T) {
+	// StatefulSet/jellyfin at depth 0, Pod/jellyfin-0 at depth 1.
+	// "ContainerCreating" (17 chars) is the longest status; all col2 values must
+	// start at the same column regardless of depth.
+	result := &TreeResult{
+		Release: ReleaseInfo{Name: "jf", Namespace: "ns", Module: "jellyfin", Version: "0.1.0"},
+		Components: []Component{
+			{
+				Name:          "jellyfin",
+				ResourceCount: 3,
+				Status:        HealthNotReady,
+				Resources: []ResourceNode{
+					{Kind: "PersistentVolumeClaim", Name: "config", Status: HealthBound, Replicas: "15Gi"},
+					{Kind: "Service", Name: "jellyfin", Status: HealthReady},
+					{
+						Kind: "StatefulSet", Name: "jellyfin", Status: HealthNotReady, Replicas: "0/1",
+						Children: []ResourceNode{
+							{Kind: "Pod", Name: "jellyfin-0", Status: "ContainerCreating"},
+						},
+					},
+				},
+			},
+		},
+	}
+	out := formatPlainTree(result)
+
+	// Collect the col2 start index for every resource line.
+	targets := map[string]bool{
+		"PVC/config":           true,
+		"Service/jellyfin":     true,
+		"StatefulSet/jellyfin": true,
+		"Pod/jellyfin-0":       true,
+	}
+	col2Cols := map[string]int{}
+	for _, line := range strings.Split(out, "\n") {
+		for key := range targets {
+			if strings.Contains(line, key) {
+				// Find the first non-space character after the kind/name token.
+				afterName := strings.Index(line, key) + len(key)
+				rest := line[afterName:]
+				spaceCount := len(rest) - len(strings.TrimLeft(rest, " "))
+				col2Cols[key] = afterName + spaceCount
+			}
+		}
+	}
+
+	require.Len(t, col2Cols, 4, "expected four resource lines, got: %v", col2Cols)
+
+	cols := make([]int, 0, len(col2Cols))
+	for _, c := range col2Cols {
+		cols = append(cols, c)
+	}
+	for i := 1; i < len(cols); i++ {
+		assert.Equal(t, cols[0], cols[i], "all col2 values must start at the same column, got %v", col2Cols)
+	}
+}
+
+// TestFormatPlainTree_Col3Aligned verifies that col3 values (replicas/capacity)
+// start at the same column on every row that carries them, regardless of status width.
+func TestFormatPlainTree_Col3Aligned(t *testing.T) {
+	result := &TreeResult{
+		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
+		Components: []Component{
+			{
+				Name:          "store",
+				ResourceCount: 2,
+				Status:        HealthReady,
+				Resources: []ResourceNode{
+					// "Bound" (5 chars) + col3 "15Gi"
+					{Kind: "PersistentVolumeClaim", Name: "config", Status: HealthBound, Replicas: "15Gi"},
+					// "NotReady" (8 chars) + col3 "0/1"
+					{Kind: "StatefulSet", Name: "db", Status: HealthNotReady, Replicas: "0/1"},
+				},
+			},
+		},
+	}
+	out := formatPlainTree(result)
+
+	var col3Cols []int
+	for _, line := range strings.Split(out, "\n") {
+		var col3Val string
+		if strings.Contains(line, "PVC/config") {
+			col3Val = "15Gi"
+		} else if strings.Contains(line, "StatefulSet/db") {
+			col3Val = "0/1"
+		} else {
+			continue
+		}
+		idx := strings.Index(line, col3Val)
+		require.True(t, idx >= 0, "col3 %q not found in line: %q", col3Val, line)
+		col3Cols = append(col3Cols, idx)
+	}
+
+	require.Len(t, col3Cols, 2, "expected two rows with col3")
+	assert.Equal(t, col3Cols[0], col3Cols[1], "col3 values must start at the same column")
+}
+
+// TestFormatPlainTree_CrossDepthAlignment verifies col2 aligns across depth-0 and depth-1 nodes.
+func TestFormatPlainTree_CrossDepthAlignment(t *testing.T) {
 	result := &TreeResult{
 		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
 		Components: []Component{
 			{
 				Name:          "server",
-				ResourceCount: 2,
+				ResourceCount: 1,
 				Status:        HealthReady,
 				Resources: []ResourceNode{
-					// Longer name drives the column width.
-					{Kind: "Deployment", Name: "web-server", Status: HealthReady, Replicas: "3/3"},
+					{
+						Kind: "Deployment", Name: "web", Status: HealthReady, Replicas: "1/1",
+						Children: []ResourceNode{
+							// Pod at depth 1 with a long status — must share col2 with depth-0 rows.
+							{Kind: "Pod", Name: "web-0", Status: "ContainerCreating"},
+						},
+					},
 					{Kind: "Service", Name: "svc", Status: HealthReady},
 				},
 			},
@@ -853,18 +903,28 @@ func TestFormatPlainTree_AlignedColumns(t *testing.T) {
 	}
 	out := formatPlainTree(result)
 
-	// Collect the column index of "Ready" on each resource line.
-	var readyCols []int
+	col2ByLine := map[string]int{}
 	for _, line := range strings.Split(out, "\n") {
-		if strings.Contains(line, "Deployment/web-server") || strings.Contains(line, "Service/svc") {
-			idx := strings.Index(line, "Ready")
-			require.True(t, idx >= 0, "Ready not found in line: %q", line)
-			readyCols = append(readyCols, idx)
+		var key, token string
+		switch {
+		case strings.Contains(line, "Deployment/web"):
+			key, token = "Deployment/web", "Ready"
+		case strings.Contains(line, "Pod/web-0"):
+			key, token = "Pod/web-0", "ContainerCreating"
+		case strings.Contains(line, "Service/svc"):
+			key, token = "Service/svc", "Ready"
+		default:
+			continue
 		}
+		idx := strings.Index(line, token)
+		require.True(t, idx >= 0, "token %q not found in line: %q", token, line)
+		col2ByLine[key] = idx
 	}
 
-	require.Len(t, readyCols, 2, "expected two resource lines")
-	assert.Equal(t, readyCols[0], readyCols[1], "status columns should be aligned")
+	require.Len(t, col2ByLine, 3)
+	cols := []int{col2ByLine["Deployment/web"], col2ByLine["Pod/web-0"], col2ByLine["Service/svc"]}
+	assert.Equal(t, cols[0], cols[1], "depth-0 and depth-1 col2 must align: %v", col2ByLine)
+	assert.Equal(t, cols[0], cols[2], "all depth-0 col2 must align: %v", col2ByLine)
 }
 
 // TestFormatPlainTree_RSStatusSuppressed verifies ReplicaSet nodes omit the status column.

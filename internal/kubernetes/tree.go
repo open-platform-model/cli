@@ -430,6 +430,39 @@ func podToNode(pod *corev1.Pod) ResourceNode {
 // Rendering — table (terminal tree)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// treeMinColGap is the minimum number of spaces between adjacent columns.
+const treeMinColGap = 2
+
+// treeRow is a single rendered line in the terminal tree.
+//
+// Rows come in two flavours:
+//   - isResource=false: literal lines (header, │ separators, component names).
+//     These are emitted verbatim; they do not participate in column measurement.
+//   - isResource=true: columnar resource lines. col1/col2/col3 are kept separate
+//     so that a second pass can measure the global maximum widths and align all
+//     three columns uniformly across every depth level.
+//
+// All width fields store the visual (ANSI-free) character count so that color
+// escape codes never disturb alignment arithmetic.
+type treeRow struct {
+	// Literal line — used when isResource=false.
+	literal string
+
+	// Column 1: tree chrome (dim connectors) + "Kind/Name".
+	col1      string
+	col1Width int
+
+	// Column 2: status token ("Ready", "ContainerCreating", "2 pods", …).
+	col2      string
+	col2Width int
+
+	// Column 3: extra annotation ("3/3", "15Gi"). Empty for most rows.
+	col3 string
+
+	// isResource marks columnar rows that participate in global alignment.
+	isResource bool
+}
+
 // FormatTree formats a TreeResult according to the requested output format.
 // Color stripping for non-TTY environments is handled automatically: lipgloss
 // uses termenv.ColorProfile() to detect the terminal capability and falls back
@@ -446,43 +479,6 @@ func FormatTree(result *TreeResult, format output.Format) (string, error) {
 		return formatTreeTable(result, true), nil
 	default:
 		return formatTreeTable(result, true), nil
-	}
-}
-
-// measureTreeWidths computes the status column position independently for each
-// nesting depth. The longest resource name at a given depth is the anchor — it
-// gets exactly treeMinStatusGap spaces before the status token. All other names
-// at that depth get proportionally more padding so their status tokens align.
-//
-// Depth 0 = OPM-managed resources (direct children of a component).
-// Depth 1 = K8s-owned children (ReplicaSets, Pods under a Deployment).
-// Depth 2 = K8s grandchildren (Pods under a ReplicaSet).
-//
-// Returns a map from depth → column index where status should start.
-func measureTreeWidths(result *TreeResult) map[int]int {
-	maxByDepth := make(map[int]int)
-	for _, comp := range result.Components {
-		for _, res := range comp.Resources {
-			measureNodeWidths(res, 4, 0, maxByDepth)
-		}
-	}
-	colWidths := make(map[int]int, len(maxByDepth))
-	for depth, max := range maxByDepth {
-		colWidths[depth] = max + treeMinStatusGap
-	}
-	return colWidths
-}
-
-// measureNodeWidths recursively computes the visual width of a node's
-// prefix + kindName at its depth and updates maxByDepth if it's the widest.
-func measureNodeWidths(node ResourceNode, prefixLen, depth int, maxByDepth map[int]int) {
-	// +4 for the connector ("├── " or "└── "), always 4 chars wide.
-	w := prefixLen + 4 + len(displayKind(node.Kind)+"/"+node.Name)
-	if w > maxByDepth[depth] {
-		maxByDepth[depth] = w
-	}
-	for _, child := range node.Children {
-		measureNodeWidths(child, prefixLen+4, depth+1, maxByDepth)
 	}
 }
 
@@ -520,23 +516,184 @@ func formatTreeTable(result *TreeResult, colored bool) string {
 		return sb.String()
 	}
 
-	// ── Depth>=1: measure first, then render with aligned columns ─────────────
-	colWidths := measureTreeWidths(result)
+	// ── Depth>=1: collect rows, then format with globally aligned columns ─────
+	rows := collectTreeRows(result, colored)
+	sb.WriteString(formatTreeRows(rows))
+	return sb.String()
+}
 
+// collectTreeRows walks the TreeResult and produces a flat slice of treeRows.
+// Literal rows (separator pipes, component headings) are interspersed with
+// columnar resource rows. The caller passes the result to formatTreeRows which
+// measures global column widths and emits the final string.
+func collectTreeRows(result *TreeResult, colored bool) []treeRow {
 	pipe := "│"
 	if colored {
 		pipe = output.Dim(pipe)
 	}
-	sb.WriteString(pipe + "\n")
 
+	var rows []treeRow
 	for i, comp := range result.Components {
 		isLast := i == len(result.Components)-1
-		renderComponent(&sb, comp, "", isLast, colored, colWidths)
-		if !isLast {
-			sb.WriteString(pipe + "\n")
+
+		// ── │ separator between components ────────────────────────────────────
+		rows = append(rows, treeRow{literal: pipe + "\n"})
+
+		// ── Component heading ─────────────────────────────────────────────────
+		conn := treeConnMid
+		if isLast {
+			conn = treeConnLast
+		}
+		chrome := conn
+		name := comp.Name
+		if colored {
+			chrome = output.Dim(chrome)
+			name = output.StyleNoun(name)
+		}
+		rows = append(rows, treeRow{literal: chrome + name + "\n"})
+
+		// ── Resource rows ─────────────────────────────────────────────────────
+		childPrefix := "│   "
+		if isLast {
+			childPrefix = "    "
+		}
+		for j, res := range comp.Resources {
+			resIsLast := j == len(comp.Resources)-1
+			rows = append(rows, collectResourceRows(res, childPrefix, resIsLast, false, colored)...)
+		}
+	}
+	return rows
+}
+
+// collectResourceRows produces treeRows for a single ResourceNode and its
+// children. isChild=true dims the kind/name and replicas (K8s-owned nodes).
+func collectResourceRows(node ResourceNode, prefix string, isLast, isChild, colored bool) []treeRow {
+	conn := treeConnMid
+	if isLast {
+		conn = treeConnLast
+	}
+
+	// Raw (uncolored) values for width measurement — must be captured before
+	// any ANSI escape codes are applied.
+	kindName := displayKind(node.Kind) + "/" + node.Name
+	rawStatus := string(node.Status)
+	rawReplicas := node.Replicas
+	rawChrome := prefix + conn
+
+	// col1 raw width: chrome + kindName (connector is always 4 chars).
+	col1Width := len(rawChrome) + len(kindName)
+
+	// Apply ANSI coloring after all widths are locked in.
+	chrome := rawChrome
+	kindNameColored := kindName
+	statusColored := rawStatus
+	replicasColored := rawReplicas
+	if colored {
+		chrome = output.Dim(chrome)
+		if isChild {
+			kindNameColored = output.Dim(kindName)
+			if rawReplicas != "" {
+				replicasColored = output.Dim(rawReplicas)
+			}
+		}
+		if node.Kind == "Pod" {
+			statusColored = output.FormatPodPhase(rawStatus, node.Ready)
+		} else {
+			statusColored = output.FormatHealthStatus(rawStatus)
 		}
 	}
 
+	col1 := chrome + kindNameColored
+
+	// Assign col2 and col3 based on resource kind.
+	//   ReplicaSet → col2=replicas ("2 pods"),  col3=""
+	//   Pod        → col2=phase,                col3=""
+	//   Everything → col2=status,               col3=replicas (if any)
+	var col2, col3 string
+	var col2Width int
+	switch {
+	case node.Kind == kindReplicaSet:
+		col2 = replicasColored
+		col2Width = len(rawReplicas)
+	case node.Kind == "Pod":
+		col2 = statusColored
+		col2Width = len(rawStatus)
+	default:
+		col2 = statusColored
+		col2Width = len(rawStatus)
+		col3 = replicasColored
+	}
+
+	rows := []treeRow{{
+		col1:       col1,
+		col1Width:  col1Width,
+		col2:       col2,
+		col2Width:  col2Width,
+		col3:       col3,
+		isResource: true,
+	}}
+
+	// Recurse into K8s-owned children (isChild=true from here down).
+	childPrefix := prefix + "│   "
+	if isLast {
+		childPrefix = prefix + "    "
+	}
+	for i, child := range node.Children {
+		childIsLast := i == len(node.Children)-1
+		rows = append(rows, collectResourceRows(child, childPrefix, childIsLast, true, colored)...)
+	}
+	return rows
+}
+
+// formatTreeRows takes the flat row slice from collectTreeRows, measures global
+// maximum column widths, and emits the final aligned string.
+//
+// Column layout (for isResource=true rows):
+//
+//	col1 <gap> col2 <gap> col3
+//
+// col1 is right-padded to the global maximum so col2 starts at a fixed position.
+// col2 is right-padded to the global maximum (only when col3 is non-empty on any
+// row) so col3 starts at a fixed position — left-aligned like col2.
+// Rows with no col3 are not padded after col2 (avoids trailing whitespace).
+func formatTreeRows(rows []treeRow) string {
+	// ── Pass 1: measure global maxima ────────────────────────────────────────
+	var maxCol1, maxCol2 int
+	hasCol3 := false
+	for _, r := range rows {
+		if !r.isResource {
+			continue
+		}
+		if r.col1Width > maxCol1 {
+			maxCol1 = r.col1Width
+		}
+		if r.col2Width > maxCol2 {
+			maxCol2 = r.col2Width
+		}
+		if r.col3 != "" {
+			hasCol3 = true
+		}
+	}
+
+	// ── Pass 2: emit ─────────────────────────────────────────────────────────
+	var sb strings.Builder
+	for _, r := range rows {
+		if !r.isResource {
+			sb.WriteString(r.literal)
+			continue
+		}
+
+		col1Pad := maxCol1 - r.col1Width + treeMinColGap
+		line := r.col1 + strings.Repeat(" ", col1Pad) + r.col2
+		if r.col3 != "" {
+			col2Pad := maxCol2 - r.col2Width + treeMinColGap
+			line += strings.Repeat(" ", col2Pad) + r.col3
+		} else if hasCol3 {
+			// col2 is the last token on this line — no trailing spaces needed.
+			_ = hasCol3
+		}
+		sb.WriteString(line + "\n")
+	}
 	return sb.String()
 }
 
@@ -565,104 +722,6 @@ func renderDepth0Components(sb *strings.Builder, components []Component, colored
 
 		fmt.Fprintf(sb, "%s%s   %d %s   %s\n",
 			chrome, name, comp.ResourceCount, resourceWord, status)
-	}
-}
-
-// renderComponent renders one component and its resources.
-func renderComponent(sb *strings.Builder, comp Component, prefix string, isLast, colored bool, colWidths map[int]int) {
-	conn := treeConnMid
-	if isLast {
-		conn = treeConnLast
-	}
-
-	chrome := prefix + conn
-	name := comp.Name
-	if colored {
-		chrome = output.Dim(chrome)
-		name = output.StyleNoun(name)
-	}
-	sb.WriteString(chrome + name + "\n")
-
-	childPrefix := prefix + "│   "
-	if isLast {
-		childPrefix = prefix + "    "
-	}
-
-	for i, res := range comp.Resources {
-		resIsLast := i == len(comp.Resources)-1
-		renderResourceNode(sb, res, childPrefix, resIsLast, false, colored, colWidths, 0)
-	}
-}
-
-// renderResourceNode renders a resource node and recursively its children.
-// isChild=true indicates a K8s-owned child (ReplicaSet, Pod) — rendered dimmer.
-// colWidths maps nesting depth → status column position (from measureTreeWidths).
-// depth is the current nesting depth (0 = OPM resource, 1 = child, 2 = grandchild).
-func renderResourceNode(sb *strings.Builder, node ResourceNode, prefix string, isLast, isChild, colored bool, colWidths map[int]int, depth int) {
-	conn := treeConnMid
-	if isLast {
-		conn = treeConnLast
-	}
-
-	// Use the abbreviated kind for display; node.Kind stays full for JSON/YAML.
-	kindNameDisplay := displayKind(node.Kind) + "/" + node.Name
-	status := string(node.Status)
-	replicas := node.Replicas
-
-	// Compute padding using raw (uncolored) widths — ANSI codes are visually zero-width.
-	// prefix + connector (4 chars) + kindNameDisplay = the column where status starts.
-	// Each depth level has its own column anchor (per-depth alignment).
-	rawWidth := len(prefix) + 4 + len(kindNameDisplay)
-	padding := colWidths[depth] - rawWidth
-	if padding < treeMinStatusGap {
-		padding = treeMinStatusGap
-	}
-
-	// Apply color styling after padding is computed (ANSI codes must not affect width math).
-	chrome := prefix + conn
-	if colored {
-		chrome = output.Dim(chrome)
-		if isChild {
-			kindNameDisplay = output.Dim(kindNameDisplay)
-			if replicas != "" {
-				replicas = output.Dim(replicas)
-			}
-		}
-		// Pod nodes: phase-aware coloring (Running→green, Pending→yellow, errors→red).
-		// All other nodes: standard health-status palette.
-		if node.Kind == "Pod" {
-			status = output.FormatPodPhase(status, node.Ready)
-		} else {
-			status = output.FormatHealthStatus(status)
-		}
-	}
-
-	line := chrome + kindNameDisplay + strings.Repeat(" ", padding)
-	switch {
-	case node.Kind == kindReplicaSet:
-		// ReplicaSet: show only pod count. Health is implicit in the parent's replica ratio.
-		if replicas != "" {
-			line += replicas
-		}
-	case node.Kind == "Pod":
-		// Pod: phase string only. Pods never carry a replica count.
-		line += status
-	default:
-		// All others: status first, then optional replica annotation (e.g. "3/3", "10Gi").
-		line += status
-		if replicas != "" {
-			line += "  " + replicas
-		}
-	}
-	sb.WriteString(line + "\n")
-
-	// Recurse into children (always isChild=true for nested levels).
-	childPrefix := prefix + "│   "
-	if isLast {
-		childPrefix = prefix + "    "
-	}
-	for i, child := range node.Children {
-		renderResourceNode(sb, child, childPrefix, i == len(node.Children)-1, true, colored, colWidths, depth+1)
 	}
 }
 
