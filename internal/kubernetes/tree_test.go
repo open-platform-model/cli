@@ -201,13 +201,13 @@ func TestWalkDeployment_ReturnsRSAndPods(t *testing.T) {
 	assert.Equal(t, "ReplicaSet", children[0].Kind)
 	assert.Equal(t, "web-rs-abc", children[0].Name)
 	assert.Equal(t, "2 pods", children[0].Replicas)
-	assert.Equal(t, healthReady, children[0].Status)
+	assert.Equal(t, HealthReady, children[0].Status)
 
 	require.Len(t, children[0].Children, 1)
 	assert.Equal(t, "Pod", children[0].Children[0].Kind)
 	assert.Equal(t, "web-rs-abc-x1", children[0].Children[0].Name)
-	// Pod status is raw K8s phase ("Running"), not a healthStatus enum value.
-	assert.Equal(t, healthStatus("Running"), children[0].Children[0].Status)
+	// Pod status is raw K8s phase ("Running"), not a HealthStatus enum value.
+	assert.Equal(t, HealthStatus("Running"), children[0].Children[0].Status)
 	assert.True(t, children[0].Children[0].Ready, "pod with Ready condition=True should have Ready=true")
 }
 
@@ -233,7 +233,7 @@ func TestWalkDeployment_OldRSWithZeroPods(t *testing.T) {
 
 	children := walkDeployment(ctx, client, deploy)
 	require.Len(t, children, 1)
-	assert.Equal(t, healthReady, children[0].Status, "RS with 0 replicas should be Ready")
+	assert.Equal(t, HealthReady, children[0].Status, "RS with 0 replicas should be Ready")
 	assert.Equal(t, "0 pods", children[0].Replicas)
 }
 
@@ -265,8 +265,8 @@ func TestWalkStatefulSet_ReturnsPods(t *testing.T) {
 	require.Len(t, children, 1)
 	assert.Equal(t, "Pod", children[0].Kind)
 	assert.Equal(t, "db-0", children[0].Name)
-	// Pod status is raw K8s phase, not healthStatus enum.
-	assert.Equal(t, healthStatus("Running"), children[0].Status)
+	// Pod status is raw K8s phase, not HealthStatus enum.
+	assert.Equal(t, HealthStatus("Running"), children[0].Status)
 	assert.True(t, children[0].Ready)
 	assert.Empty(t, children[0].Children, "StatefulSet pods should have no RS layer")
 }
@@ -499,18 +499,18 @@ func makeSimpleResult() *TreeResult {
 			{
 				Name:          "server",
 				ResourceCount: 2,
-				Status:        healthReady,
+				Status:        HealthReady,
 				Resources: []ResourceNode{
-					{Kind: "Deployment", Name: "web", Namespace: "ns", Status: healthReady, Replicas: "3/3"},
-					{Kind: "Service", Name: "web-svc", Namespace: "ns", Status: healthReady},
+					{Kind: "Deployment", Name: "web", Namespace: "ns", Status: HealthReady, Replicas: "3/3"},
+					{Kind: "Service", Name: "web-svc", Namespace: "ns", Status: HealthReady},
 				},
 			},
 			{
 				Name:          "database",
 				ResourceCount: 1,
-				Status:        healthReady,
+				Status:        HealthReady,
 				Resources: []ResourceNode{
-					{Kind: "StatefulSet", Name: "db", Namespace: "ns", Status: healthReady, Replicas: "1/1"},
+					{Kind: "StatefulSet", Name: "db", Namespace: "ns", Status: HealthReady, Replicas: "1/1"},
 				},
 			},
 		},
@@ -554,8 +554,8 @@ func TestFormatTreeTable_Depth0_SummaryLines(t *testing.T) {
 	result := &TreeResult{
 		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
 		Components: []Component{
-			{Name: "server", ResourceCount: 3, Status: healthReady},
-			{Name: "database", ResourceCount: 1, Status: healthNotReady},
+			{Name: "server", ResourceCount: 3, Status: HealthReady},
+			{Name: "database", ResourceCount: 1, Status: HealthNotReady},
 		},
 	}
 	out := formatPlainTree(result)
@@ -571,7 +571,7 @@ func TestFormatTreeTable_Depth0_SummaryLines(t *testing.T) {
 func TestFormatTreeTable_NoModule_HeaderSimple(t *testing.T) {
 	result := &TreeResult{
 		Release:    ReleaseInfo{Name: "local-app", Namespace: "ns"},
-		Components: []Component{{Name: "core", ResourceCount: 1, Status: healthReady}},
+		Components: []Component{{Name: "core", ResourceCount: 1, Status: HealthReady}},
 	}
 	out := formatPlainTree(result)
 	// Header should just be the release name, no parenthesised module
@@ -585,13 +585,13 @@ func TestFormatTreeTable_Children_Rendered(t *testing.T) {
 			{
 				Name:          "server",
 				ResourceCount: 1,
-				Status:        healthReady,
+				Status:        HealthReady,
 				Resources: []ResourceNode{
 					{
-						Kind: "Deployment", Name: "web", Namespace: "ns", Status: healthReady, Replicas: "2/2",
+						Kind: "Deployment", Name: "web", Namespace: "ns", Status: HealthReady, Replicas: "2/2",
 						Children: []ResourceNode{
 							{
-								Kind: "ReplicaSet", Name: "web-rs", Namespace: "ns", Status: healthReady, Replicas: "2 pods",
+								Kind: "ReplicaSet", Name: "web-rs", Namespace: "ns", Status: HealthReady, Replicas: "2 pods",
 								Children: []ResourceNode{
 									{Kind: "Pod", Name: "web-rs-p1", Namespace: "ns", Status: "Running", Ready: true},
 									{Kind: "Pod", Name: "web-rs-p2", Namespace: "ns", Status: "Running", Ready: true},
@@ -646,12 +646,12 @@ func TestFormatTreeJSON_NestedChildren(t *testing.T) {
 			{
 				Name:          "server",
 				ResourceCount: 1,
-				Status:        healthReady,
+				Status:        HealthReady,
 				Resources: []ResourceNode{
 					{
-						Kind: "Deployment", Name: "web", Namespace: "ns", Status: healthReady,
+						Kind: "Deployment", Name: "web", Namespace: "ns", Status: HealthReady,
 						Children: []ResourceNode{
-							{Kind: "ReplicaSet", Name: "web-rs", Namespace: "ns", Status: healthReady,
+							{Kind: "ReplicaSet", Name: "web-rs", Namespace: "ns", Status: HealthReady,
 								Children: []ResourceNode{
 									{Kind: "Pod", Name: "web-rs-p1", Namespace: "ns", Status: "Running", Ready: true},
 								},
@@ -688,7 +688,7 @@ func TestPodToNode_RunningReadyPod(t *testing.T) {
 		},
 	}
 	node := podToNode(pod)
-	assert.Equal(t, healthStatus("Running"), node.Status, "Running pod should preserve phase, not use healthStatus enum")
+	assert.Equal(t, HealthStatus("Running"), node.Status, "Running pod should preserve phase, not use HealthStatus enum")
 	assert.True(t, node.Ready)
 }
 
@@ -712,7 +712,7 @@ func TestPodToNode_CrashLoopPod(t *testing.T) {
 		},
 	}
 	node := podToNode(pod)
-	assert.Equal(t, healthStatus("CrashLoop"), node.Status,
+	assert.Equal(t, HealthStatus("CrashLoop"), node.Status,
 		"CrashLoopBackOff should be shortened to CrashLoop per mapWaitingReason")
 	assert.False(t, node.Ready)
 }
@@ -724,7 +724,7 @@ func TestPodToNode_PendingPod(t *testing.T) {
 		Status:     corev1.PodStatus{Phase: corev1.PodPending},
 	}
 	node := podToNode(pod)
-	assert.Equal(t, healthStatus("Pending"), node.Status)
+	assert.Equal(t, HealthStatus("Pending"), node.Status)
 	assert.False(t, node.Ready)
 }
 
@@ -770,7 +770,7 @@ func TestMeasureTreeWidths_SingleResource(t *testing.T) {
 			{
 				Name:          "server",
 				ResourceCount: 1,
-				Resources:     []ResourceNode{{Kind: "Service", Name: "web-svc", Status: healthReady}},
+				Resources:     []ResourceNode{{Kind: "Service", Name: "web-svc", Status: HealthReady}},
 			},
 		},
 	}
@@ -788,9 +788,9 @@ func TestMeasureTreeWidths_PerDepthAlignment(t *testing.T) {
 				ResourceCount: 1,
 				Resources: []ResourceNode{
 					{
-						Kind: "Deployment", Name: "web", Status: healthReady,
+						Kind: "Deployment", Name: "web", Status: HealthReady,
 						Children: []ResourceNode{
-							{Kind: "ReplicaSet", Name: "web-rs-abc", Status: healthReady, Replicas: "2 pods"},
+							{Kind: "ReplicaSet", Name: "web-rs-abc", Status: HealthReady, Replicas: "2 pods"},
 						},
 					},
 				},
@@ -808,7 +808,7 @@ func TestMeasureTreeWidths_PVCAbbreviated(t *testing.T) {
 			{
 				Name:          "storage",
 				ResourceCount: 1,
-				Resources:     []ResourceNode{{Kind: "PersistentVolumeClaim", Name: "data", Status: healthBound, Replicas: "10Gi"}},
+				Resources:     []ResourceNode{{Kind: "PersistentVolumeClaim", Name: "data", Status: HealthBound, Replicas: "10Gi"}},
 			},
 		},
 	}
@@ -817,7 +817,7 @@ func TestMeasureTreeWidths_PVCAbbreviated(t *testing.T) {
 
 // TestFormatPlainTree_StatusBeforeReplicas verifies that status appears before replicas.
 func TestFormatPlainTree_StatusBeforeReplicas(t *testing.T) {
-	result := makeSimpleResult() // has Deployment with Replicas="3/3" and Status=healthReady
+	result := makeSimpleResult() // has Deployment with Replicas="3/3" and Status=HealthReady
 	out := formatPlainTree(result)
 
 	// Find the Deployment line and check "Ready" comes before "3/3".
@@ -842,11 +842,11 @@ func TestFormatPlainTree_AlignedColumns(t *testing.T) {
 			{
 				Name:          "server",
 				ResourceCount: 2,
-				Status:        healthReady,
+				Status:        HealthReady,
 				Resources: []ResourceNode{
 					// Longer name drives the column width.
-					{Kind: "Deployment", Name: "web-server", Status: healthReady, Replicas: "3/3"},
-					{Kind: "Service", Name: "svc", Status: healthReady},
+					{Kind: "Deployment", Name: "web-server", Status: HealthReady, Replicas: "3/3"},
+					{Kind: "Service", Name: "svc", Status: HealthReady},
 				},
 			},
 		},
@@ -875,12 +875,12 @@ func TestFormatPlainTree_RSStatusSuppressed(t *testing.T) {
 			{
 				Name:          "server",
 				ResourceCount: 1,
-				Status:        healthReady,
+				Status:        HealthReady,
 				Resources: []ResourceNode{
 					{
-						Kind: "Deployment", Name: "web", Status: healthReady, Replicas: "2/2",
+						Kind: "Deployment", Name: "web", Status: HealthReady, Replicas: "2/2",
 						Children: []ResourceNode{
-							{Kind: "ReplicaSet", Name: "web-rs", Status: healthReady, Replicas: "2 pods"},
+							{Kind: "ReplicaSet", Name: "web-rs", Status: HealthReady, Replicas: "2 pods"},
 						},
 					},
 				},
@@ -909,9 +909,9 @@ func TestFormatPlainTree_PVCAbbreviated(t *testing.T) {
 			{
 				Name:          "storage",
 				ResourceCount: 1,
-				Status:        healthBound,
+				Status:        HealthBound,
 				Resources: []ResourceNode{
-					{Kind: "PersistentVolumeClaim", Name: "data", Status: healthBound, Replicas: "10Gi"},
+					{Kind: "PersistentVolumeClaim", Name: "data", Status: HealthBound, Replicas: "10Gi"},
 				},
 			},
 		},

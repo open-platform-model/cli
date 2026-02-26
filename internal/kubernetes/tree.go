@@ -63,7 +63,7 @@ type ReleaseInfo struct {
 type Component struct {
 	Name          string         `json:"name" yaml:"name"`
 	ResourceCount int            `json:"resourceCount" yaml:"resourceCount"`
-	Status        healthStatus   `json:"status" yaml:"status"`
+	Status        HealthStatus   `json:"status" yaml:"status"`
 	Resources     []ResourceNode `json:"resources,omitempty" yaml:"resources,omitempty"`
 }
 
@@ -73,13 +73,13 @@ type Component struct {
 // For Pod nodes Status holds the raw Kubernetes phase string (e.g. "Running",
 // "CrashLoop", "Pending") and Ready reflects the Pod Ready condition. This
 // matches the display convention used by `mod status` via output.FormatPodPhase.
-// For all other nodes Status is a healthStatus value ("Ready", "NotReady", etc.)
+// For all other nodes Status is a HealthStatus value ("Ready", "NotReady", etc.)
 // and Ready is unused.
 type ResourceNode struct {
 	Kind      string         `json:"kind" yaml:"kind"`
 	Name      string         `json:"name" yaml:"name"`
 	Namespace string         `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-	Status    healthStatus   `json:"status" yaml:"status"`
+	Status    HealthStatus   `json:"status" yaml:"status"`
 	Ready     bool           `json:"ready,omitempty" yaml:"ready,omitempty"`
 	Replicas  string         `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 	Children  []ResourceNode `json:"children,omitempty" yaml:"children,omitempty"`
@@ -169,7 +169,7 @@ func buildResourceNode(ctx context.Context, client *Client, res *unstructured.Un
 		Kind:      res.GetKind(),
 		Name:      res.GetName(),
 		Namespace: res.GetNamespace(),
-		Status:    evaluateHealth(res),
+		Status:    EvaluateHealth(res),
 		Replicas:  getReplicaCount(res),
 	}
 	if depth >= 2 {
@@ -224,19 +224,19 @@ func sortedComponentNames(groups map[string][]*unstructured.Unstructured) []stri
 // aggregateStatus returns the rollup health of a component.
 // When depth=0 no ResourceNodes are available, so resourceCount is used to
 // signal "unknown" vs "empty". At depth>=1 all resources must be Ready/Complete.
-func aggregateStatus(resources []ResourceNode, resourceCount int) healthStatus {
+func aggregateStatus(resources []ResourceNode, resourceCount int) HealthStatus {
 	if len(resources) == 0 {
 		if resourceCount > 0 {
-			return healthUnknown // depth=0 — we have resources but didn't evaluate them
+			return HealthUnknown // depth=0 — we have resources but didn't evaluate them
 		}
-		return healthUnknown
+		return HealthUnknown
 	}
 	for _, r := range resources {
-		if r.Status != healthReady && r.Status != healthComplete && r.Status != healthBound {
-			return healthNotReady
+		if r.Status != HealthReady && r.Status != HealthComplete && r.Status != HealthBound {
+			return HealthNotReady
 		}
 	}
-	return healthReady
+	return HealthReady
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -400,15 +400,15 @@ func hasOwnerWithUID(refs []metav1.OwnerReference, uid types.UID) bool {
 	return false
 }
 
-// replicaSetHealth returns healthReady when all replicas are ready (or the RS is scaled to 0).
-func replicaSetHealth(rs *appsv1.ReplicaSet) healthStatus {
+// replicaSetHealth returns HealthReady when all replicas are ready (or the RS is scaled to 0).
+func replicaSetHealth(rs *appsv1.ReplicaSet) HealthStatus {
 	if rs.Status.Replicas == 0 {
-		return healthReady
+		return HealthReady
 	}
 	if rs.Status.ReadyReplicas >= rs.Status.Replicas {
-		return healthReady
+		return HealthReady
 	}
-	return healthNotReady
+	return HealthNotReady
 }
 
 // podToNode converts a corev1.Pod to a ResourceNode for tree display.
@@ -421,7 +421,7 @@ func podToNode(pod *corev1.Pod) ResourceNode {
 		Kind:      "Pod",
 		Name:      pod.Name,
 		Namespace: pod.Namespace,
-		Status:    healthStatus(info.Phase),
+		Status:    HealthStatus(info.Phase),
 		Ready:     info.Ready,
 	}
 }

@@ -18,6 +18,7 @@ func NewModCmd(cfg *config.GlobalConfig) *cobra.Command {
 	c.AddCommand(NewModInitCmd(cfg))
 	c.AddCommand(NewModBuildCmd(cfg))
 	c.AddCommand(NewModVetCmd(cfg))
+	c.AddCommand(NewModListCmd(cfg))
 	c.AddCommand(NewModApplyCmd(cfg))
 	c.AddCommand(NewModDeleteCmd(cfg))
 	c.AddCommand(NewModDiffCmd(cfg))

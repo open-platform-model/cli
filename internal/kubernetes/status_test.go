@@ -14,11 +14,11 @@ func TestFormatStatus_Table(t *testing.T) {
 	result := &StatusResult{
 		ReleaseName:     "my-app",
 		Namespace:       "default",
-		AggregateStatus: healthReady,
+		AggregateStatus: HealthReady,
 		Summary:         statusSummary{Total: 2, Ready: 2},
 		Resources: []resourceHealth{
-			{Kind: "Deployment", Name: "web", Namespace: "default", Status: healthReady, Age: "5m"},
-			{Kind: "ConfigMap", Name: "config", Namespace: "default", Status: healthReady, Age: "5m"},
+			{Kind: "Deployment", Name: "web", Namespace: "default", Status: HealthReady, Age: "5m"},
+			{Kind: "ConfigMap", Name: "config", Namespace: "default", Status: HealthReady, Age: "5m"},
 		},
 	}
 
@@ -35,10 +35,10 @@ func TestFormatStatus_JSON(t *testing.T) {
 	result := &StatusResult{
 		ReleaseName:     "my-app",
 		Namespace:       "default",
-		AggregateStatus: healthReady,
+		AggregateStatus: HealthReady,
 		Summary:         statusSummary{Total: 1, Ready: 1},
 		Resources: []resourceHealth{
-			{Kind: "Deployment", Name: "web", Namespace: "default", Status: healthReady, Age: "5m"},
+			{Kind: "Deployment", Name: "web", Namespace: "default", Status: HealthReady, Age: "5m"},
 		},
 	}
 
@@ -53,10 +53,10 @@ func TestFormatStatus_YAML(t *testing.T) {
 	result := &StatusResult{
 		ReleaseName:     "my-app",
 		Namespace:       "default",
-		AggregateStatus: healthReady,
+		AggregateStatus: HealthReady,
 		Summary:         statusSummary{Total: 1, Ready: 1},
 		Resources: []resourceHealth{
-			{Kind: "Deployment", Name: "web", Namespace: "default", Status: healthReady, Age: "5m"},
+			{Kind: "Deployment", Name: "web", Namespace: "default", Status: HealthReady, Age: "5m"},
 		},
 	}
 
@@ -71,11 +71,11 @@ func TestFormatStatusTable_DefaultColumns(t *testing.T) {
 	result := &StatusResult{
 		ReleaseName:     "my-app",
 		Namespace:       "production",
-		AggregateStatus: healthReady,
+		AggregateStatus: HealthReady,
 		Summary:         statusSummary{Total: 2, Ready: 2},
 		Resources: []resourceHealth{
-			{Kind: "Deployment", Name: "web", Namespace: "production", Component: "server", Status: healthReady, Age: "5m"},
-			{Kind: "ConfigMap", Name: "config", Namespace: "production", Component: "", Status: healthReady, Age: "5m"},
+			{Kind: "Deployment", Name: "web", Namespace: "production", Component: "server", Status: HealthReady, Age: "5m"},
+			{Kind: "ConfigMap", Name: "config", Namespace: "production", Component: "", Status: HealthReady, Age: "5m"},
 		},
 	}
 
@@ -94,12 +94,12 @@ func TestFormatStatusTable_WideColumns(t *testing.T) {
 	result := &StatusResult{
 		ReleaseName:     "my-app",
 		Namespace:       "production",
-		AggregateStatus: healthNotReady,
+		AggregateStatus: HealthNotReady,
 		Summary:         statusSummary{Total: 1, Ready: 0, NotReady: 1},
 		Resources: []resourceHealth{
 			{
 				Kind: "Deployment", Name: "web", Namespace: "production", Component: "server",
-				Status: healthNotReady, Age: "5m",
+				Status: HealthNotReady, Age: "5m",
 				Wide: &wideInfo{Replicas: "1/3", Image: "nginx:1.25"},
 			},
 		},
@@ -117,12 +117,12 @@ func TestFormatStatusTable_VerboseBlocks(t *testing.T) {
 	result := &StatusResult{
 		ReleaseName:     "my-app",
 		Namespace:       "production",
-		AggregateStatus: healthNotReady,
+		AggregateStatus: HealthNotReady,
 		Summary:         statusSummary{Total: 1, Ready: 0, NotReady: 1},
 		Resources: []resourceHealth{
 			{
 				Kind: "Deployment", Name: "web", Namespace: "production", Component: "server",
-				Status: healthNotReady, Age: "5m",
+				Status: HealthNotReady, Age: "5m",
 				Verbose: &verboseInfo{
 					Pods: []podInfo{
 						{Name: "web-abc-1", Phase: "Running", Ready: false, Reason: "CrashLoopBackOff", Restarts: 5},
@@ -143,12 +143,12 @@ func TestFormatStatusTable_NotReadySummary(t *testing.T) {
 	result := &StatusResult{
 		ReleaseName:     "my-app",
 		Namespace:       "production",
-		AggregateStatus: healthNotReady,
+		AggregateStatus: HealthNotReady,
 		Summary:         statusSummary{Total: 3, Ready: 2, NotReady: 1},
 		Resources: []resourceHealth{
-			{Kind: "Deployment", Name: "web", Namespace: "production", Status: healthNotReady, Age: "5m"},
-			{Kind: "Service", Name: "svc", Namespace: "production", Status: healthReady, Age: "5m"},
-			{Kind: "ConfigMap", Name: "cfg", Namespace: "production", Status: healthReady, Age: "5m"},
+			{Kind: "Deployment", Name: "web", Namespace: "production", Status: HealthNotReady, Age: "5m"},
+			{Kind: "Service", Name: "svc", Namespace: "production", Status: HealthReady, Age: "5m"},
+			{Kind: "ConfigMap", Name: "cfg", Namespace: "production", Status: HealthReady, Age: "5m"},
 		},
 	}
 
@@ -174,7 +174,7 @@ func TestFormatDuration(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			d := (time.Duration(tc.seconds) * time.Second)
-			assert.Equal(t, tc.expected, formatDuration(d))
+			assert.Equal(t, tc.expected, FormatDuration(d))
 		})
 	}
 }

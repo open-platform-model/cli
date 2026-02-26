@@ -248,7 +248,7 @@ func FormatEventsTable(result *EventsResult) string {
 		// Parse the RFC3339 lastSeen to compute relative duration.
 		lastSeen := ev.LastSeen
 		if t, err := time.Parse(time.RFC3339, ev.LastSeen); err == nil {
-			lastSeen = formatDuration(time.Since(t))
+			lastSeen = FormatDuration(time.Since(t))
 		}
 
 		// Color the TYPE column.
@@ -290,7 +290,7 @@ func FormatEventsYAML(result *EventsResult) (string, error) {
 // FormatSingleEventLine formats a single event for watch mode streaming output.
 // Uses the same table renderer as FormatEventsTable to ensure ANSI-aware column alignment.
 func FormatSingleEventLine(ev *corev1.Event) string {
-	lastSeen := formatDuration(time.Since(eventLastTimestamp(ev)))
+	lastSeen := FormatDuration(time.Since(eventLastTimestamp(ev)))
 
 	warningStyle := lipgloss.NewStyle().Foreground(output.ColorYellow)
 

@@ -72,7 +72,7 @@ type resourceHealth struct {
 	// Component is the source component name (from inventory).
 	Component string `json:"component,omitempty" yaml:"component,omitempty"`
 	// Status is the evaluated health status.
-	Status healthStatus `json:"status" yaml:"status"`
+	Status HealthStatus `json:"status" yaml:"status"`
 	// Age is the human-readable age of the resource.
 	Age string `json:"age" yaml:"age"`
 	// Wide holds extra workload-specific info (replicas, image), populated when Wide mode is on.
@@ -119,7 +119,7 @@ type StatusResult struct {
 	// Resources is the list of resource health statuses.
 	Resources []resourceHealth `json:"resources" yaml:"resources"`
 	// AggregateStatus is the overall module health.
-	AggregateStatus healthStatus `json:"aggregateStatus" yaml:"aggregateStatus"`
+	AggregateStatus HealthStatus `json:"aggregateStatus" yaml:"aggregateStatus"`
 	// Summary contains aggregate resource counts.
 	Summary statusSummary `json:"summary" yaml:"summary"`
 }
@@ -169,7 +169,7 @@ func GetReleaseStatus(ctx context.Context, client *Client, opts StatusOptions) (
 			Kind:      m.Kind,
 			Name:      m.Name,
 			Namespace: m.Namespace,
-			Status:    healthMissing,
+			Status:    HealthMissing,
 			Age:       "<unknown>",
 		})
 		allReady = false
@@ -178,17 +178,17 @@ func GetReleaseStatus(ctx context.Context, client *Client, opts StatusOptions) (
 	// Compute aggregate status
 	switch {
 	case len(result.Resources) == 0:
-		result.AggregateStatus = healthUnknown
+		result.AggregateStatus = HealthUnknown
 	case allReady:
-		result.AggregateStatus = healthReady
+		result.AggregateStatus = HealthReady
 	default:
-		result.AggregateStatus = healthNotReady
+		result.AggregateStatus = HealthNotReady
 	}
 
 	// Compute summary
 	for _, r := range result.Resources {
 		result.Summary.Total++
-		if r.Status == healthReady || r.Status == healthComplete || r.Status == healthBound {
+		if r.Status == HealthReady || r.Status == HealthComplete || r.Status == HealthBound {
 			result.Summary.Ready++
 		} else {
 			result.Summary.NotReady++
@@ -201,7 +201,7 @@ func GetReleaseStatus(ctx context.Context, client *Client, opts StatusOptions) (
 // buildResourceHealth constructs a resourceHealth for a single live resource.
 // Returns the populated struct and whether the resource is healthy.
 func buildResourceHealth(ctx context.Context, client *Client, res *unstructured.Unstructured, opts StatusOptions) (resourceHealth, bool) {
-	health := evaluateHealth(res)
+	health := EvaluateHealth(res)
 	age := computeAge(res)
 
 	key := res.GetKind() + "/" + res.GetNamespace() + "/" + res.GetName()
@@ -221,15 +221,15 @@ func buildResourceHealth(ctx context.Context, client *Client, res *unstructured.
 
 	// listWorkloadPods is only called for live, unhealthy workloads.
 	// Missing resources are never passed through buildResourceHealth — they are
-	// appended directly in GetReleaseStatus, so health == healthMissing cannot
+	// appended directly in GetReleaseStatus, so health == HealthMissing cannot
 	// occur here.
-	if opts.Verbose && health == healthNotReady {
+	if opts.Verbose && health == HealthNotReady {
 		if pods, err := listWorkloadPods(ctx, client, res); err == nil && len(pods) > 0 {
 			rh.Verbose = &verboseInfo{Pods: pods}
 		}
 	}
 
-	healthy := health == healthReady || health == healthComplete || health == healthBound
+	healthy := health == HealthReady || health == HealthComplete || health == HealthBound
 	return rh, healthy
 }
 
@@ -399,11 +399,11 @@ func computeAge(resource *unstructured.Unstructured) string {
 	}
 
 	duration := time.Since(timestamp.Time)
-	return formatDuration(duration)
+	return FormatDuration(duration)
 }
 
-// formatDuration converts a duration to a human-readable string (e.g., "5m", "2h", "3d").
-func formatDuration(d time.Duration) string {
+// FormatDuration converts a duration to a human-readable string (e.g., "5m", "2h", "3d").
+func FormatDuration(d time.Duration) string {
 	if d < 0 {
 		d = 0
 	}

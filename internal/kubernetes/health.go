@@ -4,23 +4,23 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// healthStatus represents the health state of a resource.
-type healthStatus string
+// HealthStatus represents the health state of a resource.
+type HealthStatus string
 
 const (
-	// healthReady means the resource is ready and healthy.
-	healthReady healthStatus = "Ready"
-	// healthNotReady means the resource exists but is not yet ready.
-	healthNotReady healthStatus = "NotReady"
-	// healthComplete means the resource has completed (e.g., a Job).
-	healthComplete healthStatus = "Complete"
-	// healthUnknown means the health state could not be determined.
-	healthUnknown healthStatus = "Unknown"
-	// healthMissing means the resource is tracked in the inventory but no longer
+	// HealthReady means the resource is ready and healthy.
+	HealthReady HealthStatus = "Ready"
+	// HealthNotReady means the resource exists but is not yet ready.
+	HealthNotReady HealthStatus = "NotReady"
+	// HealthComplete means the resource has completed (e.g., a Job).
+	HealthComplete HealthStatus = "Complete"
+	// HealthUnknown means the health state could not be determined.
+	HealthUnknown HealthStatus = "Unknown"
+	// HealthMissing means the resource is tracked in the inventory but no longer
 	// exists on the cluster (deleted outside of OPM).
-	healthMissing healthStatus = "Missing"
-	// healthBound means a PersistentVolumeClaim is bound to a PersistentVolume.
-	healthBound healthStatus = "Bound"
+	HealthMissing HealthStatus = "Missing"
+	// HealthBound means a PersistentVolumeClaim is bound to a PersistentVolume.
+	HealthBound HealthStatus = "Bound"
 )
 
 // conditionStatusTrue is the Kubernetes condition status value representing "true".
@@ -58,7 +58,7 @@ var passiveKinds = map[string]bool{
 
 // EvaluateHealth determines the health status of a Kubernetes resource
 // based on its kind and status conditions.
-func evaluateHealth(resource *unstructured.Unstructured) healthStatus {
+func EvaluateHealth(resource *unstructured.Unstructured) HealthStatus {
 	kind := resource.GetKind()
 
 	// Workloads: Deployment, DaemonSet — check Available/Ready condition
@@ -78,7 +78,7 @@ func evaluateHealth(resource *unstructured.Unstructured) healthStatus {
 
 	// CronJobs: always healthy (scheduled)
 	if kind == "CronJob" {
-		return healthReady
+		return HealthReady
 	}
 
 	// PersistentVolumeClaim: has a lifecycle phase (Pending → Bound → Lost).
@@ -88,88 +88,117 @@ func evaluateHealth(resource *unstructured.Unstructured) healthStatus {
 
 	// Passive resources: healthy on creation
 	if passiveKinds[kind] {
-		return healthReady
+		return HealthReady
 	}
 
 	// Custom resources: check for Ready condition, fallback to passive
 	return evaluateCustomHealth(resource)
 }
 
+// IsHealthy returns true if the given health status represents a healthy state.
+// Healthy statuses are: HealthReady, HealthComplete, HealthBound.
+func IsHealthy(status HealthStatus) bool {
+	return status == HealthReady || status == HealthComplete || status == HealthBound
+}
+
+// QuickReleaseHealth evaluates aggregate health from pre-fetched resources.
+// It calls EvaluateHealth on each live resource and counts healthy vs total.
+// missingCount is the number of inventory-tracked resources not found on the cluster.
+// Returns the aggregate status, ready count, and total count.
+func QuickReleaseHealth(resources []*unstructured.Unstructured, missingCount int) (status HealthStatus, readyCount, totalCount int) {
+	total := len(resources) + missingCount
+	if total == 0 {
+		return HealthUnknown, 0, 0
+	}
+
+	ready := 0
+	for _, res := range resources {
+		if IsHealthy(EvaluateHealth(res)) {
+			ready++
+		}
+	}
+
+	if ready == total {
+		return HealthReady, ready, total
+	}
+	return HealthNotReady, ready, total
+}
+
 // evaluatePVCHealth reads the PVC lifecycle phase from status.phase.
-// Bound → healthBound (green), Pending/Lost → their raw phase (yellow).
-// Falls back to healthReady for PVCs with no status yet (e.g. just created).
-func evaluatePVCHealth(resource *unstructured.Unstructured) healthStatus {
+// Bound → HealthBound (green), Pending/Lost → their raw phase (yellow).
+// Falls back to HealthReady for PVCs with no status yet (e.g. just created).
+func evaluatePVCHealth(resource *unstructured.Unstructured) HealthStatus {
 	phase, _, _ := unstructured.NestedString(resource.Object, "status", "phase") //nolint:errcheck // best-effort PVC phase display
 	if phase != "" {
-		return healthStatus(phase)
+		return HealthStatus(phase)
 	}
-	return healthReady // fallback: PVC created but not yet provisioned
+	return HealthReady // fallback: PVC created but not yet provisioned
 }
 
 // evaluateWorkloadHealth checks the Ready condition on workload resources.
-func evaluateWorkloadHealth(resource *unstructured.Unstructured) healthStatus {
+func evaluateWorkloadHealth(resource *unstructured.Unstructured) HealthStatus {
 	conditions := getConditions(resource)
 	for _, c := range conditions {
 		if c.Type == "Available" || c.Type == "Ready" {
 			if c.Status == conditionStatusTrue {
-				return healthReady
+				return HealthReady
 			}
-			return healthNotReady
+			return HealthNotReady
 		}
 	}
-	return healthNotReady
+	return HealthNotReady
 }
 
 // evaluateStatefulSetHealth checks readyReplicas for StatefulSet resources.
 // StatefulSets do not emit Available/Ready status conditions; readiness is
-// signalled via readyReplicas reaching the desired replica count.
-func evaluateStatefulSetHealth(resource *unstructured.Unstructured) healthStatus {
-	desired, found, _ := unstructured.NestedInt64(resource.Object, "spec", "replicas") //nolint:errcheck
+// signaled via readyReplicas reaching the desired replica count.
+func evaluateStatefulSetHealth(resource *unstructured.Unstructured) HealthStatus {
+	desired, found, _ := unstructured.NestedInt64(resource.Object, "spec", "replicas") //nolint:errcheck // best-effort replica count
 	if !found {
 		desired = 1 // spec.replicas defaults to 1 when omitted
 	}
 	if desired == 0 {
-		return healthReady
+		return HealthReady
 	}
-	ready, _, _ := unstructured.NestedInt64(resource.Object, "status", "readyReplicas") //nolint:errcheck
+	ready, _, _ := unstructured.NestedInt64(resource.Object, "status", "readyReplicas") //nolint:errcheck // best-effort ready count
 	if ready >= desired {
-		return healthReady
+		return HealthReady
 	}
-	return healthNotReady
+	return HealthNotReady
 }
 
 // evaluateJobHealth checks the Complete condition on Job resources.
-func evaluateJobHealth(resource *unstructured.Unstructured) healthStatus {
+func evaluateJobHealth(resource *unstructured.Unstructured) HealthStatus {
 	conditions := getConditions(resource)
 	for _, c := range conditions {
 		if c.Type == "Complete" {
 			if c.Status == conditionStatusTrue {
-				return healthComplete
+				return HealthComplete
 			}
 		}
 		if c.Type == "Failed" {
 			if c.Status == conditionStatusTrue {
-				return healthNotReady
+				return HealthNotReady
 			}
 		}
 	}
-	return healthNotReady
+	return HealthNotReady
 }
 
 // evaluateCustomHealth checks for a Ready condition on custom resources.
 // If no Ready condition exists, treats the resource as passive (healthy).
-func evaluateCustomHealth(resource *unstructured.Unstructured) healthStatus {
+func evaluateCustomHealth(resource *unstructured.Unstructured) HealthStatus {
 	conditions := getConditions(resource)
 	for _, c := range conditions {
 		if c.Type == "Ready" {
 			if c.Status == conditionStatusTrue {
-				return healthReady
+				return HealthReady
 			}
-			return healthNotReady
+			return HealthNotReady
 		}
 	}
 	// No Ready condition — treat as passive
-	return healthReady
+	return HealthReady
 }
 
 // condition represents a Kubernetes status condition.
@@ -197,8 +226,8 @@ func getConditions(resource *unstructured.Unstructured) []condition {
 			continue
 		}
 
-		condType, _, _ := unstructured.NestedString(c, "type")
-		condStatus, _, _ := unstructured.NestedString(c, "status")
+		condType, _, _ := unstructured.NestedString(c, "type")     //nolint:errcheck // best-effort condition parsing
+		condStatus, _, _ := unstructured.NestedString(c, "status") //nolint:errcheck // best-effort condition parsing
 
 		if condType != "" {
 			conditions = append(conditions, condition{

@@ -57,56 +57,56 @@ func TestEvaluateHealth_StatefulSet(t *testing.T) {
 		name          string
 		specReplicas  *int64
 		readyReplicas int64
-		expected      healthStatus
+		expected      HealthStatus
 	}{
 		{
 			name:          "1/1 ready",
 			specReplicas:  ptr64(1),
 			readyReplicas: 1,
-			expected:      healthReady,
+			expected:      HealthReady,
 		},
 		{
 			name:          "3/3 ready",
 			specReplicas:  ptr64(3),
 			readyReplicas: 3,
-			expected:      healthReady,
+			expected:      HealthReady,
 		},
 		{
 			name:          "0/1 ready",
 			specReplicas:  ptr64(1),
 			readyReplicas: 0,
-			expected:      healthNotReady,
+			expected:      HealthNotReady,
 		},
 		{
 			name:          "1/3 ready",
 			specReplicas:  ptr64(3),
 			readyReplicas: 1,
-			expected:      healthNotReady,
+			expected:      HealthNotReady,
 		},
 		{
 			name:          "spec.replicas omitted defaults to 1, pod ready",
 			specReplicas:  nil,
 			readyReplicas: 1,
-			expected:      healthReady,
+			expected:      HealthReady,
 		},
 		{
 			name:          "spec.replicas omitted defaults to 1, pod not ready",
 			specReplicas:  nil,
 			readyReplicas: 0,
-			expected:      healthNotReady,
+			expected:      HealthNotReady,
 		},
 		{
 			name:          "scaled to zero is always ready",
 			specReplicas:  ptr64(0),
 			readyReplicas: 0,
-			expected:      healthReady,
+			expected:      HealthReady,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			resource := makeStatefulSet(tc.specReplicas, tc.readyReplicas)
-			assert.Equal(t, tc.expected, evaluateHealth(resource))
+			assert.Equal(t, tc.expected, EvaluateHealth(resource))
 		})
 	}
 }
@@ -116,7 +116,7 @@ func TestEvaluateHealth_Workloads(t *testing.T) {
 		name       string
 		kind       string
 		conditions []map[string]interface{}
-		expected   healthStatus
+		expected   HealthStatus
 	}{
 		{
 			name: "Deployment with Available=True",
@@ -124,7 +124,7 @@ func TestEvaluateHealth_Workloads(t *testing.T) {
 			conditions: []map[string]interface{}{
 				{"type": "Available", "status": "True"},
 			},
-			expected: healthReady,
+			expected: HealthReady,
 		},
 		{
 			name: "Deployment with Available=False",
@@ -132,13 +132,13 @@ func TestEvaluateHealth_Workloads(t *testing.T) {
 			conditions: []map[string]interface{}{
 				{"type": "Available", "status": "False"},
 			},
-			expected: healthNotReady,
+			expected: HealthNotReady,
 		},
 		{
 			name:       "Deployment with no conditions",
 			kind:       "Deployment",
 			conditions: nil,
-			expected:   healthNotReady,
+			expected:   HealthNotReady,
 		},
 		{
 			name: "DaemonSet with Available=False",
@@ -146,14 +146,14 @@ func TestEvaluateHealth_Workloads(t *testing.T) {
 			conditions: []map[string]interface{}{
 				{"type": "Available", "status": "False"},
 			},
-			expected: healthNotReady,
+			expected: HealthNotReady,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			resource := makeResource(tc.kind, tc.conditions)
-			assert.Equal(t, tc.expected, evaluateHealth(resource))
+			assert.Equal(t, tc.expected, EvaluateHealth(resource))
 		})
 	}
 }
@@ -162,40 +162,40 @@ func TestEvaluateHealth_Job(t *testing.T) {
 	tests := []struct {
 		name       string
 		conditions []map[string]interface{}
-		expected   healthStatus
+		expected   HealthStatus
 	}{
 		{
 			name: "Job completed",
 			conditions: []map[string]interface{}{
 				{"type": "Complete", "status": "True"},
 			},
-			expected: healthComplete,
+			expected: HealthComplete,
 		},
 		{
 			name: "Job failed",
 			conditions: []map[string]interface{}{
 				{"type": "Failed", "status": "True"},
 			},
-			expected: healthNotReady,
+			expected: HealthNotReady,
 		},
 		{
 			name:       "Job in progress",
 			conditions: nil,
-			expected:   healthNotReady,
+			expected:   HealthNotReady,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			resource := makeResource("Job", tc.conditions)
-			assert.Equal(t, tc.expected, evaluateHealth(resource))
+			assert.Equal(t, tc.expected, EvaluateHealth(resource))
 		})
 	}
 }
 
 func TestEvaluateHealth_CronJob(t *testing.T) {
 	resource := makeResource("CronJob", nil)
-	assert.Equal(t, healthReady, evaluateHealth(resource))
+	assert.Equal(t, HealthReady, EvaluateHealth(resource))
 }
 
 func TestEvaluateHealth_Passive(t *testing.T) {
@@ -209,7 +209,7 @@ func TestEvaluateHealth_Passive(t *testing.T) {
 	for _, kind := range passiveResources {
 		t.Run(kind, func(t *testing.T) {
 			resource := makeResource(kind, nil)
-			assert.Equal(t, healthReady, evaluateHealth(resource))
+			assert.Equal(t, HealthReady, EvaluateHealth(resource))
 		})
 	}
 }
@@ -218,12 +218,12 @@ func TestEvaluateHealth_PVC(t *testing.T) {
 	tests := []struct {
 		name     string
 		phase    string
-		expected healthStatus
+		expected HealthStatus
 	}{
-		{name: "Bound", phase: "Bound", expected: healthBound},
-		{name: "Pending", phase: "Pending", expected: healthStatus("Pending")},
-		{name: "Lost", phase: "Lost", expected: healthStatus("Lost")},
-		{name: "no phase (fallback)", phase: "", expected: healthReady},
+		{name: "Bound", phase: "Bound", expected: HealthBound},
+		{name: "Pending", phase: "Pending", expected: HealthStatus("Pending")},
+		{name: "Lost", phase: "Lost", expected: HealthStatus("Lost")},
+		{name: "no phase (fallback)", phase: "", expected: HealthReady},
 	}
 
 	for _, tc := range tests {
@@ -238,7 +238,7 @@ func TestEvaluateHealth_PVC(t *testing.T) {
 			if tc.phase != "" {
 				_ = unstructured.SetNestedField(pvc.Object, tc.phase, "status", "phase")
 			}
-			assert.Equal(t, tc.expected, evaluateHealth(pvc))
+			assert.Equal(t, tc.expected, EvaluateHealth(pvc))
 		})
 	}
 }
@@ -247,40 +247,40 @@ func TestEvaluateHealth_Custom(t *testing.T) {
 	tests := []struct {
 		name       string
 		conditions []map[string]interface{}
-		expected   healthStatus
+		expected   HealthStatus
 	}{
 		{
 			name: "Custom with Ready=True",
 			conditions: []map[string]interface{}{
 				{"type": "Ready", "status": "True"},
 			},
-			expected: healthReady,
+			expected: HealthReady,
 		},
 		{
 			name: "Custom with Ready=False",
 			conditions: []map[string]interface{}{
 				{"type": "Ready", "status": "False"},
 			},
-			expected: healthNotReady,
+			expected: HealthNotReady,
 		},
 		{
 			name:       "Custom without Ready condition (passive fallback)",
 			conditions: nil,
-			expected:   healthReady,
+			expected:   HealthReady,
 		},
 		{
 			name: "Custom with other conditions but no Ready",
 			conditions: []map[string]interface{}{
 				{"type": "Synced", "status": "True"},
 			},
-			expected: healthReady,
+			expected: HealthReady,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			resource := makeResource("MyCustomResource", tc.conditions)
-			assert.Equal(t, tc.expected, evaluateHealth(resource))
+			assert.Equal(t, tc.expected, EvaluateHealth(resource))
 		})
 	}
 }

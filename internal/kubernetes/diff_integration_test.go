@@ -165,7 +165,7 @@ func TestStatusIntegration_ReportsHealth(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(statusResult.Resources), 1)
-	assert.Equal(t, healthReady, statusResult.AggregateStatus)
+	assert.Equal(t, HealthReady, statusResult.AggregateStatus)
 
 	// Cleanup
 	_, err = Delete(ctx, client, DeleteOptions{

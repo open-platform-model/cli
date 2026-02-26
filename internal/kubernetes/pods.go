@@ -68,7 +68,7 @@ func extractPodInfoFromPod(pod *corev1.Pod) podInfo {
 
 	// Determine ready from conditions
 	for _, cond := range pod.Status.Conditions {
-		if string(cond.Type) == string(healthReady) {
+		if string(cond.Type) == string(HealthReady) {
 			info.Ready = cond.Status == conditionStatusTrue
 			break
 		}

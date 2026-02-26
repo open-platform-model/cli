@@ -83,6 +83,7 @@ tasks:
       - go run tests/integration/deploy/main.go
       - go run tests/integration/inventory-apply/main.go
       - go run tests/integration/inventory-ops/main.go
+      - go run tests/integration/mod-list/main.go
       - go run tests/integration/values-flow/main.go
 
   test:registry:
