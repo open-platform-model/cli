@@ -156,7 +156,6 @@ func getFileDescription(filename string) string {
 	descriptions := map[string]string{
 		"cue.mod/module.cue": "CUE module metadata",
 		"module.cue":         "Module definition",
-		"values.cue":         "Default values",
 		"components.cue":     "Component definitions",
 		"scopes.cue":         "Scope definitions",
 		"policies.cue":       "Policy definitions",

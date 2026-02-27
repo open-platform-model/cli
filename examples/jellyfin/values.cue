@@ -12,7 +12,8 @@ values: {
 	}
 
 	// Web UI exposed port
-	port: 8096
+	// port: 8096
+	port: "invalidPort" // This value does not satisfy the schema constraints and will be ignored
 
 	// LinuxServer.io user/group identity (default: 1000)
 	puid: 1000
@@ -28,6 +29,7 @@ values: {
 	// Media library mount points with persistent storage.
 	// Operators can override sizes at ModuleRelease time.
 	media: {
+		invalidField: "this field is not defined in the schema and will be ignored"
 		tvshows: {
 			mountPath: "/data/tvshows"
 			size:      "10Gi"
@@ -37,4 +39,5 @@ values: {
 			size:      "10Gi"
 		}
 	}
+	invalidField: "This field is not defined in the #config schema and will be ignored"
 }

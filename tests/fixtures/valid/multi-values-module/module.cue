@@ -1,7 +1,6 @@
 // Package main defines an OPM module used by the values-flow integration tests.
-// It mirrors the real_module experiment fixture structure (same component/traits)
-// with the addition of values_prod.cue alongside values.cue — proving that
-// extra values*.cue files in the module directory are harmless.
+// It mirrors the real_module experiment fixture structure (same component/traits).
+// values_prod.cue sits alongside this module to prove the loader filters it silently.
 package main
 
 import (

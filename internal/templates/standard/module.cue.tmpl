@@ -1,8 +1,7 @@
 // Package main defines the {{.ModuleName}} module.
 // This is a standard module with separated concerns:
-// - module.cue: metadata and schema
+// - module.cue: metadata and #config schema (with defaults)
 // - components.cue: component definitions
-// - values.cue: default values
 package main
 
 import (
@@ -24,29 +23,38 @@ metadata: {
 
 // Components are defined in components.cue
 
-// Schema and default values are defined in values.cue
+// #config defines the configuration schema with defaults.
+// Override fields at deploy time via: opm mod apply -f my-values.cue .
 #config: {
 	// Web component configuration
 	web: {
-		// Container image (required)
-		image!: schemas.#Image
+		// Container image
+		image: schemas.#Image & {
+			repository: string | *"nginx"
+			tag:        string | *"latest"
+			digest:     string | *""
+		}
 
 		// Number of replicas
-		scaling?: int & >=1
+		scaling: int & >=1 | *2
 
 		// Port to expose
-		port?: int & >0 & <=65535
+		port: int & >0 & <=65535 | *8080
 	}
 
 	// API component configuration
 	api: {
-		// Container image (required)
-		image!: schemas.#Image
+		// Container image
+		image: schemas.#Image & {
+			repository: string | *"node"
+			tag:        string | *"20-alpine"
+			digest:     string | *""
+		}
 
 		// Number of replicas
-		scaling?: int & >=1
+		scaling: int & >=1 | *2
 
 		// Port to expose
-		port?: int & >0 & <=65535
+		port: int & >0 & <=65535 | *3000
 	}
 }

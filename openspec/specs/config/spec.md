@@ -136,7 +136,7 @@ The following debug log lines SHALL be removed as redundant:
 - `"release built successfully"` in `ReleaseBuilder.Build()` and `ReleaseBuilder.BuildFromValue()` — duplicate of pipeline-level "release built"
 - `"loading provider"` in `ProviderLoader.LoadProvider()` — redundant with the `"loaded provider"` summary that follows
 
-The `"extracted transformer"` debug log SHALL use the FQN as the `name` field value and SHALL NOT include a separate `fqn` field.
+The `"extracted transformer"` debug log SHALL use the FQN as the `name` field value and SHALL NOT include a separate `fqn` field. Transformer FQNs SHALL use the v1alpha1 format (e.g., `kubernetes#opmodel.dev/providers/kubernetes/transformers@v1#DeploymentTransformer`).
 
 #### Scenario: Single release-built log per build
 
@@ -149,5 +149,19 @@ The `"extracted transformer"` debug log SHALL use the FQN as the `name` field va
 
 - **WHEN** `--verbose` flag is specified
 - **WHEN** transformers are extracted from a provider
-- **THEN** the "extracted transformer" log SHALL show `name=kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#DeploymentTransformer`
+- **THEN** the "extracted transformer" log SHALL show the v1alpha1 FQN format
 - **THEN** the log SHALL NOT include a separate `fqn=` field
+
+### Requirement: Config default template uses v1 module paths
+
+The `DefaultModuleTemplate` SHALL use `opmodel.dev/config@v1` as the CUE module path. Provider imports SHALL reference `opmodel.dev/providers@v1`.
+
+#### Scenario: Default config module path
+
+- **WHEN** `opm config init` generates a default configuration
+- **THEN** the CUE module declaration SHALL be `module: "opmodel.dev/config@v1"`
+
+#### Scenario: Provider import path
+
+- **WHEN** the default config template includes provider imports
+- **THEN** the import path SHALL be `opmodel.dev/providers@v1`

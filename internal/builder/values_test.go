@@ -22,14 +22,14 @@ func testdataPath(t *testing.T, name string) string {
 	return p
 }
 
-// loaderFixturePath returns the absolute path to a loader testdata module.
-// This allows builder tests to reuse the loader fixtures as real CUE module
-// directories when testing values.cue discovery from mod.ModulePath.
-func loaderFixturePath(t *testing.T, name string) string {
+// moduleWithValuesFile creates a temp directory containing a values.cue file with the
+// given CUE content and returns its path.
+func moduleWithValuesFile(t *testing.T, content string) string {
 	t.Helper()
-	p, err := filepath.Abs(filepath.Join("..", "loader", "testdata", name))
-	require.NoError(t, err)
-	return p
+	dir := t.TempDir()
+	path := filepath.Join(dir, "values.cue")
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+	return dir
 }
 
 // moduleAtPath returns a *module.Module with ModulePath set to the given path.
@@ -41,12 +41,17 @@ func TestSelectValues(t *testing.T) {
 	ctx := cuecontext.New()
 
 	// -----------------------------------------------------------------------
-	// Discovery from module directory (no --values provided)
+	// Fallback: no --values provided
 	// -----------------------------------------------------------------------
 
-	t.Run("no files, values.cue present in module dir returns its values", func(t *testing.T) {
-		// test-module fixture has values.cue with image=nginx, replicas=2.
-		mod := moduleAtPath(loaderFixturePath(t, "test-module"))
+	t.Run("no --values, values.cue present used as fallback values file", func(t *testing.T) {
+		// values.cue is treated as a regular values file — no semantic distinction
+		// from an explicit --values argument. Defaults live in #config, not here.
+		dir := moduleWithValuesFile(t, `values: {
+			image: { repository: "nginx", tag: "1.25", digest: "" }
+			replicas: 2
+		}`)
+		mod := moduleAtPath(dir)
 
 		got, err := selectValues(ctx, mod, nil)
 		require.NoError(t, err)
@@ -57,8 +62,7 @@ func TestSelectValues(t *testing.T) {
 		assert.Equal(t, "nginx", img)
 	})
 
-	t.Run("no files, no values.cue in module dir returns ValidationError", func(t *testing.T) {
-		// Create a temp dir with cue.mod to satisfy ModulePath (no values.cue).
+	t.Run("no --values, no values.cue present returns ValidationError", func(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, "cue.mod"), 0o755))
 
@@ -73,7 +77,7 @@ func TestSelectValues(t *testing.T) {
 	})
 
 	// -----------------------------------------------------------------------
-	// --values files provided
+	// Explicit --values files provided
 	// -----------------------------------------------------------------------
 
 	t.Run("one file provided extracts values field", func(t *testing.T) {
@@ -115,9 +119,13 @@ func TestSelectValues(t *testing.T) {
 	})
 
 	t.Run("--values ignores values.cue in module dir", func(t *testing.T) {
-		// test-module has values.cue with image=nginx — we override with values-a.cue.
-		// The result must come from values-a.cue only, not from values.cue.
-		mod := moduleAtPath(loaderFixturePath(t, "test-module"))
+		// When --values is provided explicitly, values.cue in the module directory
+		// must NOT be read. Only the explicit files are used.
+		dir := moduleWithValuesFile(t, `values: {
+			image: { repository: "should-be-ignored", tag: "latest", digest: "" }
+			replicas: 99
+		}`)
+		mod := moduleAtPath(dir)
 		file := testdataPath(t, "values-a.cue")
 
 		got, err := selectValues(ctx, mod, []string{file})
@@ -127,7 +135,7 @@ func TestSelectValues(t *testing.T) {
 		// values-a.cue has image="nginx:1.0" at the root "image" key (not image.repository).
 		img, err := got.LookupPath(cue.ParsePath("image")).String()
 		require.NoError(t, err)
-		assert.Equal(t, "nginx:1.0", img, "--values must be the sole source, values.cue must be ignored")
+		assert.Equal(t, "nginx:1.0", img, "--values must be the sole source; values.cue must be ignored")
 	})
 
 	t.Run("file with no values field returns ValidationError", func(t *testing.T) {

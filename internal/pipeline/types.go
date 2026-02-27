@@ -31,8 +31,10 @@ type RenderOptions struct {
 	// Required. Must contain cue.mod/ and module.cue.
 	ModulePath string
 
-	// Values are paths to additional values files to unify (in order).
-	// Optional. Files are unified after values.cue from module root.
+	// Values are paths to values files to unify (in order).
+	// Optional. If not provided, values.cue in the module directory is used as
+	// a fallback and treated as a regular values file — not "module defaults".
+	// Actual defaults belong in #config inside module.cue.
 	Values []string
 
 	// Name is the release name.

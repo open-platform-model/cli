@@ -126,9 +126,9 @@ func TestLoadModule_EvaluationError(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestLoadModule_ExtraValuesFilesFilteredSilently proves that a module directory
-// containing values_prod.cue alongside values.cue loads without error. The
-// loader filters all values*.cue files from the package load — no values are
-// loaded by the loader in v1alpha1 (that is the builder's responsibility).
+// containing values_prod.cue loads without error. The loader filters all values*.cue
+// files from the package load — no values are loaded by the loader in v1alpha1
+// (values discovery is the builder's responsibility at build time).
 func TestLoadModule_ExtraValuesFilesFilteredSilently(t *testing.T) {
 	ctx := cuecontext.New()
 	mod, err := loader.LoadModule(ctx, fixture(t, "extra-values-module"), "")
@@ -146,9 +146,9 @@ func TestLoadModule_ExtraValuesFilesFilteredSilently(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestLoadModule_ApproachA_ModuleRawHasNoConcreteValues proves that after loading
-// a module (test-module: no inline values in module.cue), mod.Raw does not
-// contain a concrete values field. values.cue was excluded from the package load;
-// only the abstract #config schema is present in the package.
+// a module, mod.Raw does not contain a top-level values field. In v1alpha1, modules
+// do not define a values field — defaults live in #config, and user values are
+// supplied at build time via --values / -f flags.
 func TestLoadModule_ApproachA_ModuleRawHasNoConcreteValues(t *testing.T) {
 	ctx := cuecontext.New()
 	mod, err := loader.LoadModule(ctx, fixture(t, "test-module"), "")
@@ -225,11 +225,13 @@ func TestLoadModule_PartialMetadata(t *testing.T) {
 	assert.True(t, mod.Raw.Exists())
 }
 
-// TestLoadModule_NoValues verifies that a module without values.cue loads without error.
+// TestLoadModule_NoValues verifies that any module loads without error since all
+// modules in v1alpha1 carry defaults in #config rather than in a values.cue file.
 // The loader does not load values — values discovery is the builder's responsibility.
 func TestLoadModule_NoValues(t *testing.T) {
 	ctx := cuecontext.New()
-	mod, err := loader.LoadModule(ctx, fixture(t, "test-module-no-values"), "")
+	// test-module has no values.cue; it carries defaults inside #config.
+	mod, err := loader.LoadModule(ctx, fixture(t, "test-module"), "")
 	require.NoError(t, err)
 	require.NotNil(t, mod)
 
@@ -248,7 +250,7 @@ func TestLoadModule_NoComponents(t *testing.T) {
 	require.NotNil(t, mod)
 
 	assert.Nil(t, mod.Components)
-	assert.False(t, mod.Config.Exists(), "#config must be zero when absent from module")
+	assert.True(t, mod.Config.Exists(), "#config is present (simple-module defines it with defaults)")
 	assert.Equal(t, "simple-module", mod.Metadata.Name)
 	assert.True(t, mod.Raw.Exists())
 }

@@ -15,78 +15,64 @@ import (
 
 // selectValues determines the CUE values to use for this build.
 //
-// If valuesFiles are provided, they are the sole values source. Each file is
-// loaded and CUE-unified (unification is commutative — no ordering). The
-// top-level "values" field is extracted from the unified result. values.cue
-// in the module directory is completely ignored.
+// If valuesFiles are provided via --values, they are the sole values source.
+// values.cue in the module directory is completely ignored.
 //
-// If no valuesFiles are given, values.cue is discovered from mod.ModulePath.
-// If found, it is loaded via ctx.CompileBytes and the "values" field is extracted.
-// If not found, a *opmerrors.ValidationError is returned — building without any
-// values source is not supported.
+// If no --values are given, values.cue is looked up in mod.ModulePath as a
+// conventional fallback. It is treated identically to an explicit --values
+// argument — there is no semantic distinction between the two. values.cue is
+// not "default values"; it is simply a regular values file with a conventional
+// name. Actual defaults belong in #config inside module.cue.
+//
+// In both cases every file must define a top-level "values:" field, and the
+// results are CUE-unified when multiple files are provided. Unification is
+// commutative — ordering has no semantic effect.
 //
 // Returns *opmerrors.ValidationError if no values source is available, or if
-// the values source does not contain a top-level "values" field.
+// a values file does not contain a top-level "values" field.
 func selectValues(ctx *cue.Context, mod *module.Module, valuesFiles []string) (cue.Value, error) {
-	if len(valuesFiles) > 0 {
+	// If no explicit --values were provided, fall back to values.cue in the
+	// module directory (treated as a regular values file).
+	if len(valuesFiles) == 0 {
+		fallback := filepath.Join(mod.ModulePath, "values.cue")
+		if _, err := os.Stat(fallback); os.IsNotExist(err) { //nolint:gosec // path is mod.ModulePath + "values.cue"; ModulePath is validated by loader.ResolvePath
+			return cue.Value{}, &opmerrors.ValidationError{
+				Message: "no values file found — pass --values <file> or create values.cue in the module directory",
+			}
+		}
+		output.Debug("using values.cue fallback", "path", fallback)
+		valuesFiles = []string{fallback}
+	} else {
 		names := make([]string, len(valuesFiles))
 		for i, vf := range valuesFiles {
 			names[i] = filepath.Base(vf)
 		}
 		output.Debug("using values files (--values)", "files", strings.Join(names, ", "))
-
-		var unified cue.Value
-		for i, path := range valuesFiles {
-			v, err := loadValuesFile(ctx, path)
-			if err != nil {
-				return cue.Value{}, fmt.Errorf("loading values file %s: %w", path, err)
-			}
-			if i == 0 {
-				unified = v
-			} else {
-				unified = unified.Unify(v)
-			}
-		}
-		if err := unified.Err(); err != nil {
-			return cue.Value{}, fmt.Errorf("unifying values files: %w", err)
-		}
-
-		values := unified.LookupPath(cue.ParsePath("values"))
-		if !values.Exists() {
-			return cue.Value{}, &opmerrors.ValidationError{
-				Message: "no 'values' field found in provided values files — files must define a top-level 'values:' field",
-			}
-		}
-		return values, nil
 	}
 
-	// No --values provided: discover values.cue from the module directory.
-	valuesPath := filepath.Join(mod.ModulePath, "values.cue")
-	if _, err := os.Stat(valuesPath); os.IsNotExist(err) { //nolint:gosec // path is mod.ModulePath + "values.cue"; ModulePath is validated by loader.ResolvePath
-		return cue.Value{}, &opmerrors.ValidationError{
-			Message: "no values source available — add values.cue to the module directory or pass --values flag",
+	// Load and unify all values files through the same code path.
+	var unified cue.Value
+	for i, path := range valuesFiles {
+		v, err := loadValuesFile(ctx, path)
+		if err != nil {
+			return cue.Value{}, fmt.Errorf("loading values file %s: %w", path, err)
+		}
+		if i == 0 {
+			unified = v
+		} else {
+			unified = unified.Unify(v)
 		}
 	}
-
-	output.Debug("using default values.cue", "path", valuesPath)
-
-	content, err := os.ReadFile(valuesPath) //nolint:gosec // path is mod.ModulePath + "values.cue"; ModulePath is validated by loader.ResolvePath
-	if err != nil {
-		return cue.Value{}, fmt.Errorf("reading values.cue: %w", err)
+	if err := unified.Err(); err != nil {
+		return cue.Value{}, fmt.Errorf("unifying values files: %w", err)
 	}
 
-	compiled := ctx.CompileBytes(content, cue.Filename(valuesPath))
-	if err := compiled.Err(); err != nil {
-		return cue.Value{}, fmt.Errorf("compiling values.cue: %w", err)
-	}
-
-	values := compiled.LookupPath(cue.ParsePath("values"))
+	values := unified.LookupPath(cue.ParsePath("values"))
 	if !values.Exists() {
 		return cue.Value{}, &opmerrors.ValidationError{
-			Message: "no 'values' field found in values.cue — values.cue must define a top-level 'values:' field",
+			Message: "no 'values' field found in values file(s) — each file must define a top-level 'values:' field",
 		}
 	}
-
 	return values, nil
 }
 
@@ -101,7 +87,7 @@ func loadValuesFile(ctx *cue.Context, path string) (cue.Value, error) {
 		return cue.Value{}, fmt.Errorf("file not found: %s", absPath)
 	}
 
-	content, err := os.ReadFile(absPath)
+	content, err := os.ReadFile(absPath) //nolint:gosec // absPath is resolved from caller-provided paths validated upstream
 	if err != nil {
 		return cue.Value{}, fmt.Errorf("reading file: %w", err)
 	}

@@ -1,9 +1,9 @@
 package extravaluesmodule
 
 // extra-values-module: fixture for testing that extra values*.cue files in the
-// module directory are silently filtered out and do not affect the loaded defaults.
-// values.cue provides the canonical defaults; values_prod.cue is present but ignored
-// by the loader (it can be passed via --values at build time).
+// module directory are silently filtered out by the loader.
+// values_prod.cue is present but ignored by the loader; pass it via --values at build time.
+// Defaults are defined in #config — no values.cue is needed.
 
 metadata: {
 	modulePath: "example.com/modules"
@@ -14,9 +14,9 @@ metadata: {
 
 #config: {
 	image: {
-		repository: string
-		tag:        string
-		digest:     string
+		repository: string | *"nginx"
+		tag:        string | *"default"
+		digest:     string | *""
 	}
-	replicas: int & >=1
+	replicas: int & >=1 | *1
 }

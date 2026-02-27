@@ -61,7 +61,6 @@ func TestRender(t *testing.T) {
 			},
 			wantFiles: []string{
 				"module.cue",
-				"values.cue",
 				"cue.mod/module.cue",
 			},
 			wantContains: map[string]string{
@@ -80,7 +79,6 @@ func TestRender(t *testing.T) {
 			},
 			wantFiles: []string{
 				"module.cue",
-				"values.cue",
 				"components.cue",
 				"cue.mod/module.cue",
 			},
@@ -190,8 +188,9 @@ func TestRender_AdvancedTemplate(t *testing.T) {
 		assert.True(t, info.IsDir(), "%s should be a directory", dir)
 	}
 
-	// Should have multiple files
-	assert.Equal(t, len(createdFiles), 8, "should create multiple files")
+	// Should have multiple files (advanced template: module.cue, components.cue, cue.mod/module.cue,
+	// components/{api,db,web,worker}.cue = 7 files; values.cue is no longer generated)
+	assert.Equal(t, len(createdFiles), 7, "should create 7 files (no values.cue)")
 }
 
 func TestGetFS(t *testing.T) {

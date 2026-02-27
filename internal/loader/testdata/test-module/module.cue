@@ -14,14 +14,14 @@ metadata: {
 	}
 }
 
-// Configuration schema
+// Configuration schema with defaults.
 #config: {
 	image: {
-		repository: string
-		tag:        string
-		digest:     string
+		repository: string | *"nginx"
+		tag:        string | *"1.25"
+		digest:     string | *""
 	}
-	replicas: int & >=1
+	replicas: int & >=1 | *2
 	port:     int | *8080
 }
 

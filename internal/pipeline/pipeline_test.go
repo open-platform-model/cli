@@ -25,10 +25,18 @@ func writeTempValues(t *testing.T, content string) string {
 }
 
 // concreteValues returns a temp values file path with concrete defaults for real_module.
-// real_module's #config requires image (string, no default) and replicas (int >=1, default 1).
+// real_module's #config requires image (schemas.#Image struct) and replicas (int >=1, default 1).
 func concreteValues(t *testing.T) string {
 	t.Helper()
-	return writeTempValues(t, "values: {\n\timage:    \"nginx:latest\"\n\treplicas: 1\n}\n")
+	return writeTempValues(t, `values: {
+	image: {
+		repository: "nginx"
+		tag:        "latest"
+		digest:     ""
+	}
+	replicas: 1
+}
+`)
 }
 
 // requireRegistry skips the test if OPM_REGISTRY is not set and configures

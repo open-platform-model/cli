@@ -92,8 +92,8 @@ func TestModInit_Simple(t *testing.T) {
 
 	// Check files were created
 	assert.FileExists(t, filepath.Join(targetDir, "module.cue"))
-	assert.FileExists(t, filepath.Join(targetDir, "values.cue"))
 	assert.FileExists(t, filepath.Join(targetDir, "cue.mod", "module.cue"))
+	assert.NoFileExists(t, filepath.Join(targetDir, "values.cue"), "values.cue must not be generated — defaults live in #config")
 }
 
 func TestModInit_Standard(t *testing.T) {
@@ -114,9 +114,9 @@ func TestModInit_Standard(t *testing.T) {
 
 	// Check files were created
 	assert.FileExists(t, filepath.Join(targetDir, "module.cue"))
-	assert.FileExists(t, filepath.Join(targetDir, "values.cue"))
 	assert.FileExists(t, filepath.Join(targetDir, "components.cue"))
 	assert.FileExists(t, filepath.Join(targetDir, "cue.mod", "module.cue"))
+	assert.NoFileExists(t, filepath.Join(targetDir, "values.cue"), "values.cue must not be generated — defaults live in #config")
 }
 
 func TestModInit_Advanced(t *testing.T) {
@@ -137,9 +137,9 @@ func TestModInit_Advanced(t *testing.T) {
 
 	// Check files and directories were created
 	assert.FileExists(t, filepath.Join(targetDir, "module.cue"))
-	assert.FileExists(t, filepath.Join(targetDir, "values.cue"))
 	assert.FileExists(t, filepath.Join(targetDir, "components.cue"))
 	assert.DirExists(t, filepath.Join(targetDir, "components"))
+	assert.NoFileExists(t, filepath.Join(targetDir, "values.cue"), "values.cue must not be generated — defaults live in #config")
 }
 
 func TestModInit_DefaultDir(t *testing.T) {
@@ -196,7 +196,6 @@ func TestGetFileDescription(t *testing.T) {
 		want     string
 	}{
 		{"module.cue", "Module definition"},
-		{"values.cue", "Default values"},
 		{"components.cue", "Component definitions"},
 		{"cue.mod/module.cue", "CUE module metadata"},
 		{"scopes.cue", "Scope definitions"},

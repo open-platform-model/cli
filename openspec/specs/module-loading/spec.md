@@ -18,7 +18,7 @@ The loader SHALL resolve the provided module path to an absolute, validated path
 ---
 
 ### Requirement: CUE instance is loaded with registry configuration
-The loader SHALL load the CUE instance from the resolved module path using `load.Instances`. When a registry string is provided, the loader SHALL set `CUE_REGISTRY` for the duration of the load.
+The loader SHALL load the CUE instance from the resolved module path using `load.Instances` with an explicit file list that excludes all `values*.cue` files. When a registry string is provided, the loader SHALL set `CUE_REGISTRY` for the duration of the load. The loader SHALL enumerate all top-level `.cue` files, filter out any file whose base name starts with `values` and ends with `.cue`, and pass only the remaining files to `load.Instances`.
 
 #### Scenario: Registry is set during load
 - **WHEN** a non-empty registry string is provided
@@ -31,6 +31,11 @@ The loader SHALL load the CUE instance from the resolved module path using `load
 #### Scenario: Instance load error is surfaced
 - **WHEN** `load.Instances` returns an instance with a non-nil error
 - **THEN** the loader returns that error wrapped with context
+
+#### Scenario: values*.cue files are excluded from package load
+- **WHEN** the module directory contains files matching `values*.cue` (e.g., `values.cue`, `values_prod.cue`)
+- **THEN** those files SHALL be excluded from the file list passed to `load.Instances`
+- **AND** the remaining module files SHALL load without error
 
 ---
 
@@ -66,19 +71,6 @@ The loader SHALL extract the `#config` definition from the evaluated value and s
 #### Scenario: Absent config is not an error
 - **WHEN** the module does not define `#config`
 - **THEN** `Module.Config` is a zero value and no error is returned
-
----
-
-### Requirement: Default values are extracted into Module.Values
-The loader SHALL extract the `values` field from the evaluated value and set it on `core.Module.Values`. If `values` is absent, `Module.Values` SHALL remain a zero `cue.Value` without error.
-
-#### Scenario: Values field is present
-- **WHEN** the module defines a top-level `values` field
-- **THEN** `Module.Values` is set to the extracted value
-
-#### Scenario: Absent values is not an error
-- **WHEN** the module does not define a `values` field
-- **THEN** `Module.Values` is a zero value and no error is returned
 
 ---
 

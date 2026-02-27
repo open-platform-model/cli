@@ -1,6 +1,5 @@
-// values.cue — canonical default values for multi-values-module.
-// Loaded separately by the loader (Pattern A) as mod.Values.
-// These are the defaults used when no --values flag is provided.
+// values.cue — default values for multi-values-module.
+// These match the #config defaults and serve as the fallback when no --values flag is passed.
 package main
 
 values: {

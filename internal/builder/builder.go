@@ -35,7 +35,8 @@ type Options struct {
 // The build process:
 //  1. Load opmodel.dev/core@v1 from the module's pinned dependency cache
 //  2. Extract #ModuleRelease schema from the core value
-//  3. Select values: use valuesFiles if provided, else discover values.cue from mod.ModulePath
+//  3. Select values: use valuesFiles if provided, else fall back to values.cue in mod.ModulePath
+//     (values.cue is treated as a regular values file — not "defaults"; actual defaults live in #config)
 //  4. Validate selected values against mod's #config schema
 //  5. FillPath chain: #module → metadata.name → metadata.namespace → values
 //  6. Validate the result is fully concrete

@@ -11,9 +11,9 @@ metadata: {
 
 #config: {
 	image: {
-		repository: string
-		tag:        string
-		digest:     string
+		repository: string | *"nginx"
+		tag:        string | *"latest"
+		digest:     string | *""
 	}
 }
 

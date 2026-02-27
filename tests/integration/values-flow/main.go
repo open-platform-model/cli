@@ -3,21 +3,21 @@
 // Values-flow integration test.
 //
 // Validates the end-to-end loader → builder pipeline for a module that has
-// extra values*.cue files sitting in the module directory alongside values.cue.
+// both values.cue (fallback values file) and values_prod.cue (prod values) in its directory.
 //
 // What is tested:
 //
 //  1. loader.Load succeeds despite values_prod.cue being present — the file is
-//     filtered silently and mod.Values reflects values.cue defaults only.
+//     filtered silently; values.cue is read as the fallback values file at build time.
 //
-//  2. builder.Build with no --values uses values.cue defaults (image=nginx:default,
-//     replicas=1). The extra values_prod.cue has no effect on the release.
+//  2. builder.Build with no --values uses values.cue as the fallback values file
+//     (image=nginx:default, replicas=1). values_prod.cue has no effect on the release.
 //
 //  3. builder.Build with --values=values_prod.cue uses the prod values
 //     (image=nginx:prod, replicas=3), proving clean separation between the
-//     loader's filter path and the builder's explicit override path.
+//     loader's filter path and the builder's explicit --values path.
 //
-// Requires OPM_REGISTRY to be set for opmodel.dev/core@v0 resolution.
+// Requires OPM_REGISTRY to be set for opmodel.dev/core@v1 resolution.
 package main
 
 import (
@@ -47,8 +47,8 @@ func main() {
 	modPath := fixturePath()
 
 	// Step 1: Load module with extra values*.cue files present.
-	// In v1alpha1, the loader no longer loads values — it only filters values*.cue
-	// from the package load. Values are discovered by the builder at build time.
+	// The loader filters all values*.cue files from the package load.
+	// values.cue (fallback) and values_prod.cue are both filtered silently.
 	fmt.Println("1. Loading multi-values-module (values_prod.cue present in module dir)...")
 	mod, err := loader.LoadModule(ctx, modPath, registry)
 	if err != nil {
@@ -57,9 +57,9 @@ func main() {
 	}
 	fmt.Println("   OK: load succeeded — values_prod.cue filtered silently")
 
-	// Step 2: Build release with default values (no --values).
+	// Step 2: Build release using values.cue as fallback (no --values).
 	fmt.Println()
-	fmt.Println("2. Building release with default values (no --values)...")
+	fmt.Println("2. Building release with values.cue fallback (no --values)...")
 	opts := builder.Options{Name: "values-flow-test", Namespace: "default"}
 	rel, err := builder.Build(ctx, mod, opts, nil)
 	if err != nil {
@@ -72,7 +72,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("   OK: release.Values: image=nginx:default, replicas=1 (from values.cue)")
+	fmt.Println("   OK: release.Values: image=nginx:default, replicas=1 (from values.cue fallback)")
 
 	// Step 3: Build release with --values=values_prod.cue.
 	fmt.Println()

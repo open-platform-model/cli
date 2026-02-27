@@ -43,14 +43,19 @@ metadata: {
 	}
 }
 
-// Configuration schema
+// Configuration schema with defaults.
+// Override fields at deploy time via: opm mod apply -f my-values.cue .
 #config: {
 	// Container image to deploy
-	image!: schemas.#Image
+	image: schemas.#Image & {
+		repository: string | *"busybox"
+		tag:        string | *"latest"
+		digest:     string | *""
+	}
 
 	// Number of replicas
-	scaling?: int & >=1
+	scaling: int & >=1 | *1
 
 	// Port to expose
-	port?: int & >0 & <=65535
+	port: int & >0 & <=65535 | *8080
 }

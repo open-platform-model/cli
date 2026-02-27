@@ -10,7 +10,13 @@ Specifies how `module.Load` extracts all scalar metadata fields (`Name`, `Defaul
 
 ### Requirement: All scalar metadata fields extracted from CUE evaluation
 
-`module.Load` SHALL populate all scalar `ModuleMetadata` fields (`Name`, `DefaultNamespace`, `FQN`, `Version`, `UUID`, `Labels`) by looking up the corresponding paths in the fully evaluated `cue.Value`. No AST inspection SHALL be used for metadata extraction.
+`module.Load` SHALL populate all scalar `ModuleMetadata` fields (`Name`, `DefaultNamespace`, `ModulePath`, `FQN`, `Version`, `UUID`, `Labels`) by looking up the corresponding paths in the fully evaluated `cue.Value`. No AST inspection SHALL be used for metadata extraction.
+
+FQN SHALL be extracted directly from `metadata.fqn` — it is a computed field in v1alpha1 (`#ModuleFQNType` = `modulePath/name:semver`). The loader SHALL NOT compute FQN in Go; it reads the pre-computed value from CUE evaluation.
+
+`ModulePath` SHALL be extracted from `metadata.modulePath`.
+
+`Version` SHALL be extracted from `metadata.version` (semver for modules, major version for primitives).
 
 #### Scenario: Static string literal name
 
@@ -27,13 +33,29 @@ Specifies how `module.Load` extracts all scalar metadata fields (`Name`, `Defaul
 - **WHEN** `metadata.name` is not concrete after CUE evaluation (e.g., an open type or unresolved reference)
 - **THEN** `mod.Metadata.Name` is empty and `mod.Validate()` returns an error
 
+#### Scenario: ModulePath extracted from metadata
+
+- **WHEN** the module has `metadata: modulePath: "example.com/modules"`
+- **THEN** `mod.Metadata.ModulePath` SHALL equal `"example.com/modules"`
+
+#### Scenario: FQN extracted directly from CUE evaluation
+
+- **WHEN** the module has `metadata: modulePath: "example.com/modules"`, `name: "my-app"`, `version: "1.0.0"`
+- **THEN** CUE evaluates `metadata.fqn` to `"example.com/modules/my-app:1.0.0"`
+- **THEN** `mod.Metadata.FQN` SHALL equal `"example.com/modules/my-app:1.0.0"`
+
+#### Scenario: Version extracted from metadata
+
+- **WHEN** the module has `metadata: version: "1.0.0"`
+- **THEN** `mod.Metadata.Version` SHALL equal `"1.0.0"`
+
 ### Requirement: Config and Components remain as CUE values
 
 `module.Load` SHALL populate `mod.Config` and `mod.Components` as non-concrete `cue.Value` references. These fields SHALL NOT be decoded into concrete Go types.
 
 #### Scenario: Config is a CUE definition
 
-- **WHEN** `#config` is a CUE struct definition with constraints (e.g., `image: string`)
+- **WHEN** `#config` is a CUE struct definition with constraints (e.g., `image: schemas.#Image`)
 - **THEN** `mod.Config` is a `cue.Value` that preserves the schema definition, not a decoded Go struct
 
 #### Scenario: Components contain resource references
