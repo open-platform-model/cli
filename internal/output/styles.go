@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+
+	opmerrors "github.com/opmodel/cli/internal/errors"
 )
 
 // Color palette — named constants for all ANSI 256 colors used in the CLI.
@@ -272,6 +274,39 @@ func FormatReadyRatio(ready, total int) string {
 	default:
 		return lipgloss.NewStyle().Foreground(colorRed).Render(s)
 	}
+}
+
+// FormatValuesValidationError renders a *opmerrors.ValuesValidationError as a
+// colored, human-readable string for terminal output.
+//
+// Output format (one block per error):
+//
+//	<file>:<line>:<col>          ← yellow
+//	  <path>: <message>          ← path bold, message plain
+//
+// Errors without a valid source position omit the location line.
+func FormatValuesValidationError(e *opmerrors.ValuesValidationError) string {
+	styleLoc := lipgloss.NewStyle().Foreground(ColorYellow)
+	stylePath := lipgloss.NewStyle().Bold(true)
+
+	var sb strings.Builder
+	for i, fe := range e.Errors {
+		if i > 0 {
+			sb.WriteByte('\n')
+		}
+		if fe.File != "" && fe.Line > 0 {
+			sb.WriteString("  ")
+			sb.WriteString(styleLoc.Render(fmt.Sprintf("%s:%d:%d", fe.File, fe.Line, fe.Column)))
+			sb.WriteByte('\n')
+		}
+		sb.WriteString("    ")
+		if fe.Path != "" {
+			sb.WriteString(stylePath.Render(fe.Path + ":"))
+			sb.WriteByte(' ')
+		}
+		sb.WriteString(fe.Message)
+	}
+	return sb.String()
 }
 
 // FormatRestartCount renders a restart count suffix with churn-severity color.

@@ -35,9 +35,8 @@ type Options struct {
 // The build process:
 //  1. Load opmodel.dev/core@v1 from the module's pinned dependency cache
 //  2. Extract #ModuleRelease schema from the core value
-//  3. Select values: use valuesFiles if provided, else fall back to values.cue in mod.ModulePath
-//     (values.cue is treated as a regular values file — not "defaults"; actual defaults live in #config)
-//  4. Validate selected values against mod's #config schema
+//  3. Resolve values file paths (--values flags or values.cue fallback)
+//  4. Load, validate, and unify values files against mod's #config schema
 //  5. FillPath chain: #module → metadata.name → metadata.namespace → values
 //  6. Validate the result is fully concrete
 //  7. Read back metadata (uuid, version, labels) and components from CUE
@@ -45,7 +44,7 @@ type Options struct {
 //
 // The ctx must be the same context used to load the module (mod.Raw was built
 // with it). Passing a different context will cause FillPath to fail.
-func Build(ctx *cue.Context, mod *module.Module, opts Options, valuesFiles []string) (*modulerelease.ModuleRelease, error) { //nolint:gocyclo // sequential build pipeline; each branch handles a distinct build step
+func Build(ctx *cue.Context, mod *module.Module, opts Options, valuesFiles []string) (*modulerelease.ModuleRelease, error) {
 	output.Debug("building release",
 		"path", mod.ModulePath,
 		"name", opts.Name,
@@ -79,21 +78,17 @@ func Build(ctx *cue.Context, mod *module.Module, opts Options, valuesFiles []str
 		return nil, fmt.Errorf("#ModuleRelease is invalid: %w", err)
 	}
 
-	// Step 3: Select values (external files or module defaults).
-	selectedValues, err := selectValues(ctx, mod, valuesFiles)
+	// Step 3: Resolve values file paths (--values flags or values.cue fallback).
+	filePaths, err := resolveValuesFiles(mod.ModulePath, valuesFiles)
 	if err != nil {
 		return nil, err
 	}
 
-	// Step 4: Validate selected values against module's #config schema.
-	if mod.Config.Exists() && selectedValues.Exists() {
-		unified := mod.Config.Unify(selectedValues)
-		if err := unified.Err(); err != nil {
-			return nil, &opmerrors.ValidationError{
-				Message: "values do not match module #config schema",
-				Cause:   err,
-			}
-		}
+	// Step 4: Load, validate, and unify values files against #config schema.
+	// Collects all errors across all files before returning.
+	selectedValues, err := ValidateValues(ctx, mod.Config, filePaths)
+	if err != nil {
+		return nil, err
 	}
 
 	// Step 5: FillPath chain — order matters (see design Decision 4).

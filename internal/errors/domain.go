@@ -1,6 +1,9 @@
 package errors
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // TransformError indicates transformer execution failed.
 type TransformError struct {
@@ -47,4 +50,54 @@ func (e *ValidationError) Error() string {
 
 func (e *ValidationError) Unwrap() error {
 	return e.Cause
+}
+
+// FieldError is a single validation error tied to a specific source location
+// in a values file.
+type FieldError struct {
+	// File is the values file name where the error occurred (e.g. "values-prod.cue").
+	File string
+
+	// Line is the 1-based line number in File.
+	Line int
+
+	// Column is the 1-based column number in File.
+	Column int
+
+	// Path is the dot-joined field path from the values root (e.g. "values.db.port").
+	Path string
+
+	// Message is the human-readable error description.
+	Message string
+}
+
+// ValuesValidationError is returned by ValidateValues when one or more fields
+// in a values file violate the module's #config schema. It collects all errors
+// rather than stopping at the first.
+type ValuesValidationError struct {
+	Errors []FieldError
+}
+
+func (e *ValuesValidationError) Error() string {
+	n := len(e.Errors)
+	if n == 1 {
+		return "values validation failed: 1 error"
+	}
+	return fmt.Sprintf("values validation failed: %d errors", n)
+}
+
+// Lines returns all errors formatted as plain text (no color), one per line.
+// Useful for logging and test assertions.
+func (e *ValuesValidationError) Lines() []string {
+	lines := make([]string, 0, len(e.Errors)*2)
+	for _, fe := range e.Errors {
+		loc := fmt.Sprintf("%s:%d:%d", fe.File, fe.Line, fe.Column)
+		lines = append(lines, loc, "  "+fe.Path+": "+fe.Message)
+	}
+	return lines
+}
+
+// PlainText returns all errors as a single plain-text string.
+func (e *ValuesValidationError) PlainText() string {
+	return strings.Join(e.Lines(), "\n")
 }

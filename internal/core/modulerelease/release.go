@@ -32,24 +32,6 @@ type ModuleRelease struct {
 	Values cue.Value `json:"values,omitempty"`
 }
 
-// ValidateValues validates the user-supplied Values field against the Module.Config CUE schema.
-// Uses recursive CUE field walking on the already-populated cue.Value fields.
-// Returns nil if Module.Config or Values are not present (nothing to validate).
-// This is a pure read operation — it does not mutate any field on ModuleRelease.
-func (rel *ModuleRelease) ValidateValues() error {
-	if !rel.Module.Config.Exists() || !rel.Values.Exists() {
-		return nil
-	}
-	combined := validateFieldsRecursive(rel.Module.Config, rel.Values, []string{"values"}, nil)
-	if combined == nil {
-		return nil
-	}
-	return &opmerrors.ValidationError{
-		Message: "values do not satisfy #config schema",
-		Cause:   combined,
-	}
-}
-
 // Validate checks that all components in Components are concrete CUE values,
 // confirming the release is ready for transformer matching.
 // This is a readiness gate, not a schema check; it does not re-run ValidateValues.

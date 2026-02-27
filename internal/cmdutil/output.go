@@ -24,14 +24,31 @@ func formatFQNList(fqns []string) string {
 }
 
 // PrintValidationError prints a render/validation error in a user-friendly format.
-// When the error is a ValidationError with CUE details, it prints a short
-// summary line followed by the structured CUE error output (matching `cue vet` style).
-// For other errors, it falls back to the standard key-value log format.
+//
+// For ValuesValidationError (values schema failures), it prints a summary
+// header followed by colored per-error blocks with file, position, path, and
+// message — one block per field error.
+//
+// For generic ValidationError with CUE details, it prints a summary line
+// followed by the structured CUE output.
+//
+// All other errors fall back to the standard key-value log format.
 func PrintValidationError(msg string, err error) {
+	var valuesErr *opmerrors.ValuesValidationError
+	if errors.As(err, &valuesErr) {
+		n := len(valuesErr.Errors)
+		noun := "error"
+		if n != 1 {
+			noun = "errors"
+		}
+		output.Error(fmt.Sprintf("%s: %d %s", msg, n, noun))
+		output.Details(output.FormatValuesValidationError(valuesErr))
+		return
+	}
+
 	var releaseErr *opmerrors.ValidationError
 	if errors.As(err, &releaseErr) && releaseErr.Details != "" {
 		output.Error(fmt.Sprintf("%s: %s", msg, releaseErr.Message))
-		// Print CUE details as plain text to stderr for readable multi-line output
 		output.Details(releaseErr.Details)
 		return
 	}

@@ -52,7 +52,7 @@ func NewPipeline(cueCtx *cue.Context, providers map[string]cue.Value, registry s
 // Phase sequence:
 //  1. PREPARATION:    loader.LoadModule() → *module.Module
 //  2. PROVIDER LOAD:  loader.LoadProvider() → *coreprovider.Provider
-//  3. BUILD:          builder.Build() → *modulerelease.ModuleRelease; then ValidateValues + Validate
+//  3. BUILD:          builder.Build() → *modulerelease.ModuleRelease; then Validate
 //  4. MATCHING:       coreprovider.Provider.Match() → *transformer.TransformerMatchPlan
 //  5. GENERATE:       matchPlan.Execute() → []*core.Resource + []error
 //
@@ -80,9 +80,6 @@ func (p *pipeline) Render(ctx context.Context, opts RenderOptions) (*RenderResul
 		Namespace: namespace,
 	}, opts.Values)
 	if err != nil {
-		return nil, err
-	}
-	if err := rel.ValidateValues(); err != nil {
 		return nil, err
 	}
 	if err := rel.Validate(); err != nil {
