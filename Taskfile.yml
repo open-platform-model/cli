@@ -89,7 +89,7 @@ tasks:
   test:registry:
     desc: Run registry-dependent tests
     summary: |
-      Run tests that require a CUE registry to resolve opmodel.dev/core@v0.
+      Run tests that require a CUE registry to resolve opmodel.dev/core@v1.
 
       Defaults to the canonical dev registry. Override by exporting OPM_REGISTRY:
         export OPM_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'

@@ -1,10 +1,12 @@
 // Package main defines the blueprint-module example.
-// Demonstrates "easy mode" module authoring using blueprints.
-// Blueprints eliminate boilerplate by pre-composing resources + traits.
+// Demonstrates a two-tier module with a stateless API and a stateful database.
+// Note: Blueprints (opmodel.dev/blueprints) are not yet available in v1alpha1.
+// This example uses raw resources + traits directly, which is the equivalent approach.
 package main
 
 import (
-	"opmodel.dev/core@v0"
+	"opmodel.dev/core@v1"
+	schemas "opmodel.dev/schemas@v1"
 )
 
 // Module definition
@@ -12,10 +14,10 @@ core.#Module
 
 // Module metadata
 metadata: {
-	apiVersion:       "example.com/blueprint-module@v0"
+	modulePath:       "example.com/modules"
 	name:             "blueprint-module"
 	version:          "0.1.0"
-	description:      string | *"Blueprint-based module authoring example"
+	description:      string | *"Two-tier module: stateless API + stateful database"
 	defaultNamespace: "default"
 }
 
@@ -23,15 +25,15 @@ metadata: {
 #config: {
 	// API component (stateless workload)
 	api: {
-		image:    string
+		image:    schemas.#Image
 		replicas: int & >=1
 		port:     int & >0 & <=65535
 	}
 
-	// Database component (simple database)
+	// Database component (stateful workload)
 	database: {
+		image:    schemas.#Image
 		engine:   "postgres" | "mysql" | "mongodb" | "redis"
-		version:  string
 		dbName:   string
 		username: string
 		password: string
@@ -42,5 +44,3 @@ metadata: {
 	}
 }
 
-// Values must satisfy #config - concrete values in values.cue
-values: #config

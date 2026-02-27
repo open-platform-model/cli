@@ -7,7 +7,11 @@ values: {
 	// === Server Configuration ===
 	server: {
 		// Official itzg/minecraft-server image
-		image: "itzg/minecraft-server:latest"
+		image: {
+			repository: "itzg/minecraft-server"
+			tag:        "latest"
+			digest:     ""
+		}
 
 		// Paper: Optimized Minecraft server with plugin support
 		// Best performance and most popular for multiplayer servers
@@ -67,7 +71,11 @@ values: {
 		enabled: true
 
 		// Official itzg/mc-backup image
-		image: "itzg/mc-backup:latest"
+		image: {
+			repository: "itzg/mc-backup"
+			tag:        "latest"
+			digest:     ""
+		}
 
 		// Tar: Simple compressed backups, easy to restore
 		method: "tar"

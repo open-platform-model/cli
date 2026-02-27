@@ -6,7 +6,8 @@
 package main
 
 import (
-	"opmodel.dev/core@v0"
+	"opmodel.dev/core@v1"
+	"opmodel.dev/schemas@v1"
 )
 
 // Module definition
@@ -14,8 +15,8 @@ core.#Module
 
 // Module metadata
 metadata: {
-	apiVersion:  "{{.ModulePath}}@v0"
-	name:        "{{.ModuleNamePascal}}"
+	modulePath:  "{{.ModulePath}}"
+	name:        "{{.ModuleName}}"
 	version:     "{{.Version}}"
 	description: string | *"A standard OPM module"
 	defaultNamespace: "default"
@@ -28,10 +29,10 @@ metadata: {
 	// Web component configuration
 	web: {
 		// Container image (required)
-		image!: string
+		image!: schemas.#Image
 
 		// Number of replicas
-		replicas?: int & >=1
+		scaling?: int & >=1
 
 		// Port to expose
 		port?: int & >0 & <=65535
@@ -40,10 +41,10 @@ metadata: {
 	// API component configuration
 	api: {
 		// Container image (required)
-		image!: string
+		image!: schemas.#Image
 
 		// Number of replicas
-		replicas?: int & >=1
+		scaling?: int & >=1
 
 		// Port to expose
 		port?: int & >0 & <=65535

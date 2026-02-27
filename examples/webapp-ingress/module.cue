@@ -8,7 +8,8 @@
 package main
 
 import (
-	"opmodel.dev/core@v0"
+	"opmodel.dev/core@v1"
+	schemas "opmodel.dev/schemas@v1"
 )
 
 // Module definition
@@ -16,7 +17,7 @@ core.#Module
 
 // Module metadata
 metadata: {
-	apiVersion:       "example.com/webapp-ingress@v0"
+	modulePath:       "example.com/modules"
 	name:             "webapp-ingress"
 	version:          "0.1.0"
 	description:      string | *"Production web app with Ingress, HPA, and security"
@@ -28,7 +29,7 @@ metadata: {
 	// Web application configuration
 	web: {
 		// Container image
-		image: string
+		image: schemas.#Image
 
 		// Service port
 		port: int & >0 & <=65535
@@ -78,10 +79,8 @@ metadata: {
 		// Sidecar configuration
 		sidecar: {
 			enabled: bool | *false
-			image:   string
+			image:   schemas.#Image
 		}
 	}
 }
 
-// Values must satisfy #config - concrete values in values.cue
-values: #config

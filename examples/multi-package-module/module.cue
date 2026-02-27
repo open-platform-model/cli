@@ -5,7 +5,8 @@
 package main
 
 import (
-	"opmodel.dev/core@v0"
+	"opmodel.dev/core@v1"
+	schemas "opmodel.dev/schemas@v1"
 )
 
 // Module definition
@@ -13,7 +14,7 @@ core.#Module
 
 // Module metadata
 metadata: {
-	apiVersion:       "example.com/multi-package-module@v0"
+	modulePath:       "example.com/modules"
 	name:             "multi-package-module"
 	version:          "0.1.0"
 	description:      string | *"Multi-file module organization example"
@@ -24,21 +25,21 @@ metadata: {
 #config: {
 	// Frontend configuration
 	frontend: {
-		image:    string
+		image:    schemas.#Image
 		replicas: int & >=1
 		port:     int & >0 & <=65535
 	}
 
 	// Backend configuration
 	backend: {
-		image:    string
+		image:    schemas.#Image
 		replicas: int & >=1
 		port:     int & >0 & <=65535
 	}
 
 	// Worker configuration
 	worker: {
-		image:    string
+		image:    schemas.#Image
 		replicas: int & >=1
 	}
 }
@@ -46,5 +47,3 @@ metadata: {
 // Components defined in separate files (frontend.cue, backend.cue, worker.cue)
 // #components is populated by those files
 
-// Values must satisfy #config - concrete values in values.cue
-values: #config

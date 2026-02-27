@@ -145,9 +145,9 @@ func FormatNotice(msg string) string {
 
 // FormatFQN formats a fully qualified name for display by replacing the
 // first "#" (provider#path separator) with " - " for readability.
-// Any "#" inside the path (e.g. @v0#TransformerName) is preserved.
+// Any "#" inside the path is preserved.
 //
-// Example: "kubernetes#opmodel.dev/...@v0#Name" → "kubernetes - opmodel.dev/...@v0#Name"
+// Example: "kubernetes#deployment-transformer" → "kubernetes - deployment-transformer"
 func FormatFQN(fqn string) string {
 	return strings.Replace(fqn, "#", " - ", 1)
 }

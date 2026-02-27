@@ -6,15 +6,23 @@ package main
 values: {
 	// API component
 	api: {
-		image:    "node:20-alpine"
+		image: {
+			repository: "node"
+			tag:        "20-alpine"
+			digest:     ""
+		}
 		replicas: 3
 		port:     3000
 	}
 
 	// Database component (PostgreSQL)
 	database: {
+		image: {
+			repository: "postgres"
+			tag:        "15-alpine"
+			digest:     ""
+		}
 		engine:   "postgres"
-		version:  "15-alpine"
 		dbName:   "myapp"
 		username: "appuser"
 		password: "change-me-in-production"

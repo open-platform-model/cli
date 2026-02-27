@@ -31,4 +31,9 @@ const (
 
 	// LabelReleaseUUID is the release identity UUID label for resource discovery.
 	LabelReleaseUUID = "module-release.opmodel.dev/uuid"
+
+	// LabelWorkloadType is the v1alpha1 label for workload type classification.
+	// Required on components using #Container resource.
+	// Values: "stateless", "stateful", "daemon", "task", "scheduled-task".
+	LabelWorkloadType = "core.opmodel.dev/workload-type"
 )

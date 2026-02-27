@@ -5,13 +5,13 @@ import (
 	comps "{{.ModulePath}}@v0/components"
 )
 
-// _components extends the component templates with module-specific configuration.
+// #components extends the component templates with module-specific configuration.
 #components: {
 	// Web frontend using the web component template
 	web: comps.#web & {
 		spec: {
 			container: image: #config.web.image
-			replicas: #config.web.replicas
+			scaling: count: #config.web.scaling
 		}
 	}
 
@@ -19,7 +19,7 @@ import (
 	api: comps.#api & {
 		spec: {
 			container: image: #config.api.image
-			replicas: #config.api.replicas
+			scaling: count: #config.api.scaling
 		}
 	}
 
@@ -27,7 +27,7 @@ import (
 	worker: comps.#worker & {
 		spec: {
 			container: image: #config.worker.image
-			replicas: #config.worker.replicas
+			scaling: count: #config.worker.scaling
 		}
 	}
 
@@ -35,7 +35,7 @@ import (
 	db: comps.#db & {
 		spec: {
 			container: image: #config.db.image
-			storage: size: #config.db.storageSize
+			volumes: data: persistentClaim: size: #config.db.storageSize
 		}
 	}
 }

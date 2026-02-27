@@ -9,7 +9,11 @@ values: {
 
 	web: {
 		// Staging uses versioned image (not 'latest')
-		image: "nginx:1.25.3-alpine"
+		image: {
+			repository: "nginx"
+			tag:        "1.25.3-alpine"
+			digest:     ""
+		}
 
 		// Staging scales up for load testing
 		replicas: 3

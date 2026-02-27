@@ -6,12 +6,17 @@ package extravaluesmodule
 // by the loader (it can be passed via --values at build time).
 
 metadata: {
-	name:    "extra-values-module"
-	version: "1.0.0"
-	fqn:     "example.com/extra-values-module@v0#extra-values-module"
+	modulePath: "example.com/modules"
+	name:       "extra-values-module"
+	version:    "1.0.0"
+	fqn:        "example.com/modules/extra-values-module:1.0.0"
 }
 
 #config: {
-	image:    string
+	image: {
+		repository: string
+		tag:        string
+		digest:     string
+	}
 	replicas: int & >=1
 }

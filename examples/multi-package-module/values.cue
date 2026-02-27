@@ -5,19 +5,31 @@ package main
 // Concrete default values
 values: {
 	frontend: {
-		image:    "nginx:1.25-alpine"
+		image: {
+			repository: "nginx"
+			tag:        "1.25-alpine"
+			digest:     ""
+		}
 		replicas: 3
 		port:     8080
 	}
 
 	backend: {
-		image:    "node:20-alpine"
+		image: {
+			repository: "node"
+			tag:        "20-alpine"
+			digest:     ""
+		}
 		replicas: 3
 		port:     3000
 	}
 
 	worker: {
-		image:    "python:3.11-slim"
+		image: {
+			repository: "python"
+			tag:        "3.11-slim"
+			digest:     ""
+		}
 		replicas: 2
 	}
 }

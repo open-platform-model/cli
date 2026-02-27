@@ -1,5 +1,9 @@
 package nometadata
 
 values: {
-	image: "nginx:latest"
+	image: {
+		repository: "nginx"
+		tag:        "latest"
+		digest:     ""
+	}
 }

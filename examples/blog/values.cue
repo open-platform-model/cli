@@ -6,14 +6,22 @@ package main
 values: {
 	// Web frontend configuration
 	web: {
-		image:    "nginx:latest"
+		image: {
+			repository: "nginx"
+			tag:        "latest"
+			digest:     ""
+		}
 		replicas: 4
 		port:     8080
 	}
 
 	// API backend configuration
 	api: {
-		image:    "node:20-alpine"
+		image: {
+			repository: "node"
+			tag:        "20-alpine"
+			digest:     ""
+		}
 		replicas: 4
 		port:     3000
 	}

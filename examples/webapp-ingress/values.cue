@@ -6,7 +6,11 @@ package main
 values: {
 	web: {
 		// Container image
-		image: "nginx:1.25-alpine"
+		image: {
+			repository: "nginx"
+			tag:        "1.25-alpine"
+			digest:     ""
+		}
 
 		// Service port
 		port: 8080
@@ -56,7 +60,11 @@ values: {
 		// Sidecar: disabled by default
 		sidecar: {
 			enabled: false
-			image:   "fluent/fluent-bit:2.0-distroless"
+			image: {
+				repository: "fluent/fluent-bit"
+				tag:        "2.0-distroless"
+				digest:     ""
+			}
 		}
 	}
 }

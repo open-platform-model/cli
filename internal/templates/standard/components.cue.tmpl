@@ -3,21 +3,24 @@
 package main
 
 import (
-	resources_workload "opmodel.dev/resources/workload@v0"
-	traits_workload "opmodel.dev/traits/workload@v0"
-	traits_network "opmodel.dev/traits/network@v0"
+	resources_workload "opmodel.dev/resources/workload@v1"
+	traits_workload "opmodel.dev/traits/workload@v1"
+	traits_network "opmodel.dev/traits/network@v1"
 )
 
 // #components contains component definitions using resources and traits.
 #components: {
 	// Web frontend component
 	web: {
+		metadata: labels: "core.opmodel.dev/workload-type": "stateless"
+
 		resources_workload.#Container
-		traits_workload.#Replicas
+		traits_workload.#Scaling
 		traits_network.#Expose
 
 		spec: {
 			container: {
+				name:  "web"
 				image: #config.web.image
 				ports: http: {
 					targetPort: 80
@@ -27,7 +30,7 @@ import (
 					value: "http://api:\(#config.api.port)"
 				}
 			}
-			replicas: #config.web.replicas
+			scaling: count: #config.web.scaling
 			expose: {
 				ports: http: container.ports.http & {
 					exposedPort: #config.web.port
@@ -39,17 +42,20 @@ import (
 
 	// API backend component
 	api: {
+		metadata: labels: "core.opmodel.dev/workload-type": "stateless"
+
 		resources_workload.#Container
-		traits_workload.#Replicas
+		traits_workload.#Scaling
 
 		spec: {
 			container: {
+				name:  "api"
 				image: #config.api.image
 				ports: http: {
 					targetPort: #config.api.port
 				}
 			}
-			replicas: #config.api.replicas
+			scaling: count: #config.api.scaling
 		}
 	}
 }

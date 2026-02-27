@@ -47,6 +47,8 @@ func main() {
 	modPath := fixturePath()
 
 	// Step 1: Load module with extra values*.cue files present.
+	// In v1alpha1, the loader no longer loads values — it only filters values*.cue
+	// from the package load. Values are discovered by the builder at build time.
 	fmt.Println("1. Loading multi-values-module (values_prod.cue present in module dir)...")
 	mod, err := loader.LoadModule(ctx, modPath, registry)
 	if err != nil {
@@ -54,16 +56,6 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("   OK: load succeeded — values_prod.cue filtered silently")
-
-	if !mod.Values.Exists() {
-		fmt.Fprintln(os.Stderr, "FAIL: mod.Values is not set after load")
-		os.Exit(1)
-	}
-	if err := assertValues(mod.Values, "nginx:default", 1, "mod.Values (from values.cue)"); err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Println("   OK: mod.Values from values.cue: image=nginx:default, replicas=1")
 
 	// Step 2: Build release with default values (no --values).
 	fmt.Println()
@@ -104,12 +96,17 @@ func main() {
 }
 
 // assertValues checks that the given CUE value has the expected image string
-// and replicas integer at the top level. label is used in error messages.
+// (in "repository:tag" form) and replicas integer. label is used in error messages.
 func assertValues(v cue.Value, wantImage string, wantReplicas int64, label string) error {
-	image, err := v.LookupPath(cue.ParsePath("image")).String()
+	repo, err := v.LookupPath(cue.ParsePath("image.repository")).String()
 	if err != nil {
-		return fmt.Errorf("%s: reading image: %w", label, err)
+		return fmt.Errorf("%s: reading image.repository: %w", label, err)
 	}
+	tag, err := v.LookupPath(cue.ParsePath("image.tag")).String()
+	if err != nil {
+		return fmt.Errorf("%s: reading image.tag: %w", label, err)
+	}
+	image := repo + ":" + tag
 	if image != wantImage {
 		return fmt.Errorf("%s: image = %q, want %q", label, image, wantImage)
 	}

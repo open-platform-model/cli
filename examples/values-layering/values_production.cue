@@ -9,7 +9,11 @@ values: {
 
 	web: {
 		// Production uses pinned SHA digest for immutability
-		image: "nginx:1.25.3-alpine@sha256:a59278fd22a9d411121e190b8cec8aa57b306aa3332459197777583beb728f59"
+		image: {
+			repository: "nginx"
+			tag:        "1.25.3-alpine"
+			digest:     "sha256:a59278fd22a9d411121e190b8cec8aa57b306aa3332459197777583beb728f59"
+		}
 
 		// Production requires high availability (enforced by schema constraint)
 		replicas: 5

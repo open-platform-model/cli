@@ -2,18 +2,21 @@
 package components
 
 import (
-	resources_workload "opmodel.dev/resources/workload@v0"
-	resources_storage "opmodel.dev/resources/storage@v0"
+	resources_workload "opmodel.dev/resources/workload@v1"
+	resources_storage "opmodel.dev/resources/storage@v1"
 )
 
-// _db is a reusable database component template.
+// #db is a reusable database component template.
 #db: {
+	metadata: labels: "core.opmodel.dev/workload-type": "stateful"
+
 	resources_workload.#Container
-	resources_storage.#PersistentVolume
+	resources_storage.#Volumes
 
 	spec: {
 		container: {
-			image: string
+			name:  "db"
+			image: _
 			ports: db: {
 				targetPort: 5432
 			}
@@ -32,8 +35,7 @@ import (
 				mountPath: "/var/lib/postgresql/data"
 			}]
 		}
-		storage: {
-			name: "data"
+		volumes: data: persistentClaim: {
 			size: string | *"10Gi"
 		}
 	}

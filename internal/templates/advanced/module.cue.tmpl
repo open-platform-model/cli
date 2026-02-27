@@ -2,20 +2,22 @@
 // This is an advanced multi-package module with:
 // - module.cue: metadata and schema
 // - components.cue: component composition
-// - scopes.cue: scope definitions
 // - values.cue: default values
 // - components/: component templates (subpackage)
 package main
 
-import "opmodel.dev/core@v0"
+import (
+	"opmodel.dev/core@v1"
+	"opmodel.dev/schemas@v1"
+)
 
 // Module definition
 core.#Module
 
 // Module metadata
 metadata: {
-	apiVersion:  "{{.ModulePath}}@v0"
-	name:        "{{.ModuleNamePascal}}"
+	modulePath:  "{{.ModulePath}}"
+	name:        "{{.ModuleName}}"
 	version:     "{{.Version}}"
 	description: string | *"An advanced OPM module with multi-package architecture"
 	defaultNamespace: "default"
@@ -23,31 +25,31 @@ metadata: {
 
 // Components are defined in components.cue
 
-// #values defines the configuration schema for this module.
+// #config defines the configuration schema for this module.
 #config: {
 	// Web frontend configuration
 	web: {
-		image!:    string
-		replicas?: int & >=1
-		port?:     int & >0 & <=65535
+		image!:   schemas.#Image
+		scaling?: int & >=1
+		port?:    int & >0 & <=65535
 	}
 
 	// API backend configuration
 	api: {
-		image!:    string
-		replicas?: int & >=1
-		port?:     int & >0 & <=65535
+		image!:   schemas.#Image
+		scaling?: int & >=1
+		port?:    int & >0 & <=65535
 	}
 
 	// Worker configuration
 	worker: {
-		image!:    string
-		replicas?: int & >=1
+		image!:   schemas.#Image
+		scaling?: int & >=1
 	}
 
 	// Database configuration
 	db: {
-		image!:       string
+		image!:       schemas.#Image
 		storageSize?: string
 		port?:        int & >0 & <=65535
 	}

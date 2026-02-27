@@ -7,7 +7,11 @@ package main
 
 values: {
 	server: {
-		image:   "itzg/minecraft-server:latest"
+		image: {
+			repository: "itzg/minecraft-server"
+			tag:        "latest"
+			digest:     ""
+		}
 		type:    "PAPER"
 		version: "LATEST"
 		eula:    true
@@ -38,8 +42,12 @@ values: {
 
 	// Disable backups for testing
 	backup: {
-		enabled:      false
-		image:        "itzg/mc-backup:latest"
+		enabled: false
+		image: {
+			repository: "itzg/mc-backup"
+			tag:        "latest"
+			digest:     ""
+		}
 		method:       "tar"
 		interval:     "24h"
 		initialDelay: "5m"

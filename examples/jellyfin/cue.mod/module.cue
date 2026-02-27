@@ -3,16 +3,10 @@ language: {
 	version: "v0.11.1"
 }
 deps: {
-	"opmodel.dev/core@v0": {
-		v: "v0.1.31"
+	"cue.dev/x/k8s.io@v0": {
+		v: "v0.6.0"
 	}
-	"opmodel.dev/resources@v0": {
-		v: "v0.2.42"
-	}
-	"opmodel.dev/schemas@v0": {
-		v: "v0.2.7"
-	}
-	"opmodel.dev/traits@v0": {
-		v: "v0.1.54"
+	"opmodel.dev@v1": {
+		v: "v1.0.4"
 	}
 }

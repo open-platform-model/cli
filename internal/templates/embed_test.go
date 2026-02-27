@@ -65,7 +65,7 @@ func TestRender(t *testing.T) {
 				"cue.mod/module.cue",
 			},
 			wantContains: map[string]string{
-				"module.cue":         "TestApp",
+				"module.cue":         "test-app",
 				"cue.mod/module.cue": "example.com/test-app@v0",
 			},
 		},
@@ -85,7 +85,7 @@ func TestRender(t *testing.T) {
 				"cue.mod/module.cue",
 			},
 			wantContains: map[string]string{
-				"module.cue":         "MyService",
+				"module.cue":         "my-service",
 				"cue.mod/module.cue": "mycompany.com/my-service@v0",
 			},
 		},

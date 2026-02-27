@@ -4,6 +4,10 @@
 package main
 
 values: {
-	image:    "nginx:default"
+	image: {
+		repository: "nginx"
+		tag:        "default"
+		digest:     ""
+	}
 	replicas: 1
 }

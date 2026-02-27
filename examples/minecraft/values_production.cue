@@ -4,7 +4,11 @@ package main
 
 values: {
 	server: {
-		image:   "itzg/minecraft-server:latest"
+		image: {
+			repository: "itzg/minecraft-server"
+			tag:        "latest"
+			digest:     ""
+		}
 		type:    "PAPER"
 		version: "1.20.4"
 		eula:    true
@@ -50,8 +54,12 @@ values: {
 
 	backup: {
 		enabled: false
-		image:   "itzg/mc-backup:latest"
-		method:  "restic"
+		image: {
+			repository: "itzg/mc-backup"
+			tag:        "latest"
+			digest:     ""
+		}
+		method: "restic"
 
 		// Backup every 6 hours
 		interval:     "6h"

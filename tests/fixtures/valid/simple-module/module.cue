@@ -1,10 +1,11 @@
 package simplemodule
 
-// Module metadata
+// Module metadata (v1alpha1 format)
 metadata: {
-	apiVersion: "example.com/modules@v0"
+	modulePath: "example.com/modules"
 	name:       "simple-module"
 	version:    "0.1.0"
+	fqn:        "example.com/modules/simple-module:0.1.0"
 }
 
 // Abstract value schema with CUE defaults — required for manifests to evaluate.

@@ -5,7 +5,11 @@ package main
 // Concrete default values
 values: {
 	app: {
-		image:    "node:20-alpine"
+		image: {
+			repository: "node"
+			tag:        "20-alpine"
+			digest:     ""
+		}
 		port:     3000
 		replicas: 2
 

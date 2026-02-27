@@ -126,34 +126,19 @@ func TestLoadModule_EvaluationError(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestLoadModule_ExtraValuesFilesFilteredSilently proves that a module directory
-// containing values_prod.cue alongside values.cue loads without error, that
-// mod.Values reflects only values.cue, and that the extra file is reported in
-// mod.SkippedValuesFiles for the pipeline to use in user-facing messages.
+// containing values_prod.cue alongside values.cue loads without error. The
+// loader filters all values*.cue files from the package load — no values are
+// loaded by the loader in v1alpha1 (that is the builder's responsibility).
 func TestLoadModule_ExtraValuesFilesFilteredSilently(t *testing.T) {
 	ctx := cuecontext.New()
 	mod, err := loader.LoadModule(ctx, fixture(t, "extra-values-module"), "")
 	require.NoError(t, err, "module with values_prod.cue must load without error")
 	require.NotNil(t, mod)
 
-	// mod.Values must come from values.cue, not values_prod.cue.
-	require.True(t, mod.Values.Exists(), "mod.Values must be populated from values.cue")
-
-	image, imgErr := mod.Values.LookupPath(cue.ParsePath("image")).String()
-	require.NoError(t, imgErr, "values.image must be a concrete string")
-	assert.Equal(t, "nginx:default", image,
-		"image must match values.cue default, not values_prod.cue override")
-
-	replicas, repErr := mod.Values.LookupPath(cue.ParsePath("replicas")).Int64()
-	require.NoError(t, repErr, "values.replicas must be a concrete int")
-	assert.Equal(t, int64(1), replicas,
-		"replicas must match values.cue default, not values_prod.cue override")
-
-	// The extra values file must be reported so the pipeline can produce an
-	// accurate filtered-files message without knowing the --values flag.
-	assert.Equal(t, []string{"values_prod.cue"}, mod.SkippedValuesFiles,
-		"values_prod.cue must appear in SkippedValuesFiles")
-	assert.True(t, mod.HasValuesCue,
-		"HasValuesCue must be true when values.cue is present")
+	// The module itself must be valid — metadata, config, components present.
+	assert.True(t, mod.Raw.Exists(), "mod.Raw must be set")
+	assert.True(t, mod.Config.Exists(), "#config must be extracted")
+	assert.NotEmpty(t, mod.Metadata.Name, "metadata.name must be populated")
 }
 
 // ---------------------------------------------------------------------------
@@ -161,9 +146,9 @@ func TestLoadModule_ExtraValuesFilesFilteredSilently(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestLoadModule_ApproachA_ModuleRawHasNoConcreteValues proves that after loading
-// a Pattern A module (test-module: no inline values in module.cue), mod.Raw
-// does not contain a concrete values field. values.cue was excluded from the
-// package load; only the abstract #config schema is present in the package.
+// a module (test-module: no inline values in module.cue), mod.Raw does not
+// contain a concrete values field. values.cue was excluded from the package load;
+// only the abstract #config schema is present in the package.
 func TestLoadModule_ApproachA_ModuleRawHasNoConcreteValues(t *testing.T) {
 	ctx := cuecontext.New()
 	mod, err := loader.LoadModule(ctx, fixture(t, "test-module"), "")
@@ -171,33 +156,12 @@ func TestLoadModule_ApproachA_ModuleRawHasNoConcreteValues(t *testing.T) {
 
 	valuesInRaw := mod.Raw.LookupPath(cue.ParsePath("values"))
 	assert.False(t, valuesInRaw.Exists(),
-		"mod.Raw must not have a concrete values field after Approach A LoadModule: values.cue was excluded from load.Instances")
-}
-
-// TestLoadModule_ApproachA_DefaultValuesLoadedSeparately proves that values.cue,
-// loaded separately by the Approach A strategy, provides the expected concrete
-// defaults in mod.Values — distinct from anything in mod.Raw.
-func TestLoadModule_ApproachA_DefaultValuesLoadedSeparately(t *testing.T) {
-	ctx := cuecontext.New()
-	mod, err := loader.LoadModule(ctx, fixture(t, "test-module"), "")
-	require.NoError(t, err)
-
-	require.True(t, mod.Values.Exists(),
-		"mod.Values must be populated from values.cue (Approach A)")
-
-	image, imgErr := mod.Values.LookupPath(cue.ParsePath("image")).String()
-	require.NoError(t, imgErr, "values.image must be a concrete string from values.cue")
-	assert.Equal(t, "nginx:1.25", image)
-
-	replicas, repErr := mod.Values.LookupPath(cue.ParsePath("replicas")).Int64()
-	require.NoError(t, repErr, "values.replicas must be a concrete int from values.cue")
-	assert.Equal(t, int64(2), replicas)
+		"mod.Raw must not have a concrete values field after LoadModule: values.cue was excluded from load.Instances")
 }
 
 // TestLoadModule_ApproachA_PackageFilesAllRetained proves that filtering values*.cue
 // does not accidentally drop other .cue files. All non-values package content
-// (metadata, #config, #components) must be present in mod.Raw after the
-// Approach A load.
+// (metadata, #config, #components) must be present in mod.Raw after load.
 func TestLoadModule_ApproachA_PackageFilesAllRetained(t *testing.T) {
 	ctx := cuecontext.New()
 	mod, err := loader.LoadModule(ctx, fixture(t, "test-module"), "")
@@ -212,46 +176,12 @@ func TestLoadModule_ApproachA_PackageFilesAllRetained(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Pattern B: inline values, no values.cue
-// ---------------------------------------------------------------------------
-
-// TestLoadModule_InlineValues_PopulatesModValues proves that when a module defines
-// values inline in module.cue with no values.cue present, mod.Values is
-// populated from mod.Raw's inline values field.
-func TestLoadModule_InlineValues_PopulatesModValues(t *testing.T) {
-	ctx := cuecontext.New()
-	mod, err := loader.LoadModule(ctx, fixture(t, "inline-values-module"), "")
-	require.NoError(t, err)
-
-	require.True(t, mod.Values.Exists(),
-		"mod.Values must be set from inline values when no values.cue exists")
-
-	image, err := mod.Values.LookupPath(cue.ParsePath("image")).String()
-	require.NoError(t, err, "values.image must be concrete in inline-values-module")
-	assert.Equal(t, "nginx:stable", image)
-
-	replicas, err := mod.Values.LookupPath(cue.ParsePath("replicas")).Int64()
-	require.NoError(t, err, "values.replicas must be concrete in inline-values-module")
-	assert.Equal(t, int64(2), replicas)
-}
-
-// TestLoadModule_InlineValues_NoSeparateValuesFile proves that inline-values-module
-// has no values.cue — mod.Values comes exclusively from the inline values
-// field in module.cue, not from a separately loaded file.
-func TestLoadModule_InlineValues_NoSeparateValuesFile(t *testing.T) {
-	dir := fixture(t, "inline-values-module")
-	_, err := os.Stat(filepath.Join(dir, "values.cue"))
-	assert.True(t, os.IsNotExist(err),
-		"inline-values-module must not contain values.cue")
-}
-
-// ---------------------------------------------------------------------------
 // Metadata extraction
 // ---------------------------------------------------------------------------
 
 // TestLoadModule_Success verifies that LoadModule returns a fully populated *module.Module
 // with all fields set and that the module passes Validate().
-// Uses the test-module fixture (pure Pattern A).
+// Uses the test-module fixture.
 func TestLoadModule_Success(t *testing.T) {
 	ctx := cuecontext.New()
 	mod, err := loader.LoadModule(ctx, fixture(t, "test-module"), "")
@@ -261,14 +191,14 @@ func TestLoadModule_Success(t *testing.T) {
 
 	assert.True(t, filepath.IsAbs(mod.ModulePath))
 	assert.Equal(t, "test-module", mod.Metadata.Name)
-	assert.Equal(t, "example.com/test-module@v0#test-module", mod.Metadata.FQN)
+	assert.Equal(t, "example.com/modules", mod.Metadata.ModulePath)
+	assert.Equal(t, "example.com/modules/test-module:1.0.0", mod.Metadata.FQN)
 	assert.Equal(t, "1.0.0", mod.Metadata.Version)
 	assert.NotEmpty(t, mod.Metadata.UUID)
 	assert.Equal(t, "default", mod.Metadata.DefaultNamespace)
 
 	assert.True(t, mod.Raw.Exists(), "Raw must be set after LoadModule")
 	assert.True(t, mod.Config.Exists(), "#config must be extracted")
-	assert.True(t, mod.Values.Exists(), "Values must be populated from values.cue")
 	assert.NotEmpty(t, mod.Components, "#components must be extracted")
 
 	require.NoError(t, mod.Validate())
@@ -284,27 +214,25 @@ func TestLoadModule_PartialMetadata(t *testing.T) {
 	require.NotNil(t, mod.Metadata)
 
 	assert.Equal(t, "computed-module", mod.Metadata.Name)
+	assert.Equal(t, "example.com/modules", mod.Metadata.ModulePath)
 	assert.Equal(t, "1.0.0", mod.Metadata.Version)
+	assert.Equal(t, "example.com/modules/computed-module:1.0.0", mod.Metadata.FQN)
 
 	// Absent fields remain zero values.
-	assert.Empty(t, mod.Metadata.FQN)
 	assert.Empty(t, mod.Metadata.UUID)
 	assert.Empty(t, mod.Metadata.DefaultNamespace)
 
-	// Values come from values.cue (pure Pattern A after fixture cleanup).
-	assert.True(t, mod.Values.Exists(), "Values must be populated from values.cue")
 	assert.True(t, mod.Raw.Exists())
 }
 
-// TestLoadModule_NoValues verifies that a module without a values field and without
-// values.cue loads without error and that Module.Values is a zero cue.Value.
+// TestLoadModule_NoValues verifies that a module without values.cue loads without error.
+// The loader does not load values — values discovery is the builder's responsibility.
 func TestLoadModule_NoValues(t *testing.T) {
 	ctx := cuecontext.New()
 	mod, err := loader.LoadModule(ctx, fixture(t, "test-module-no-values"), "")
 	require.NoError(t, err)
 	require.NotNil(t, mod)
 
-	assert.False(t, mod.Values.Exists(), "Values must be zero when neither values.cue nor inline values exist")
 	assert.True(t, mod.Config.Exists(), "#config is present")
 	assert.NotEmpty(t, mod.Components)
 }
@@ -323,6 +251,4 @@ func TestLoadModule_NoComponents(t *testing.T) {
 	assert.False(t, mod.Config.Exists(), "#config must be zero when absent from module")
 	assert.Equal(t, "simple-module", mod.Metadata.Name)
 	assert.True(t, mod.Raw.Exists())
-	// simple-module has values.cue (Pattern A after fixture cleanup).
-	assert.True(t, mod.Values.Exists(), "Values must be populated from values.cue")
 }

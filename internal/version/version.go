@@ -52,6 +52,6 @@ func Get() Info {
 
 // String returns a formatted version string.
 func (i Info) String() string {
-	return fmt.Sprintf("opm %s (%s) built %s with %s\nCUE SDK: %s",
+	return fmt.Sprintf("opm version %s (%s) built %s with %s\nCUE SDK: %s",
 		i.Version, i.GitCommit, i.BuildDate, i.GoVersion, i.CUESDKVersion)
 }

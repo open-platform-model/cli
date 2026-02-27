@@ -6,7 +6,8 @@
 package main
 
 import (
-	"opmodel.dev/core@v0"
+	"opmodel.dev/core@v1"
+	schemas "opmodel.dev/schemas@v1"
 )
 
 // Module definition
@@ -14,7 +15,7 @@ core.#Module
 
 // Module metadata
 metadata: {
-	apiVersion:       "example.com/multi-tier-module@v0"
+	modulePath:       "example.com/modules"
 	name:             "multi-tier-module"
 	version:          "0.1.0"
 	description:      string | *"A multi-tier OPM module with all workload types"
@@ -25,26 +26,24 @@ metadata: {
 #config: {
 	// Database component configuration (stateful workload)
 	database: {
-		image:   string
+		image:   schemas.#Image
 		scaling: int & >=1
 	}
 
 	// Log agent component configuration (daemon workload)
 	logAgent: {
-		image: string
+		image: schemas.#Image
 	}
 
 	// Setup job component configuration (task workload)
 	setupJob: {
-		image: string
+		image: schemas.#Image
 	}
 
 	// Backup job component configuration (scheduled-task workload)
 	backupJob: {
-		image:    string
+		image:    schemas.#Image
 		schedule: string
 	}
 }
 
-// Values must satisfy #config - concrete values in values.cue
-values: #config

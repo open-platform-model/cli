@@ -8,7 +8,7 @@ const DefaultConfigTemplate = `// OPM CLI Configuration
 package config
 
 import (
-	provs "opmodel.dev/providers@v0"
+	provs "opmodel.dev/providers@v1"
 )
 
 config: {
@@ -57,7 +57,7 @@ config: {
 
 // DefaultModuleTemplate is the embedded template for cue.mod/module.cue.
 // Deps
-const DefaultModuleTemplate = `module: "opmodel.dev/config@v0"
+const DefaultModuleTemplate = `module: "opmodel.dev/config@v1"
 
 language: {
 	version: "v0.15.0"

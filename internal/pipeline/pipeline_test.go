@@ -43,7 +43,7 @@ func requireRegistry(t *testing.T) {
 }
 
 // realModulePath returns the absolute path to the real_module test fixture
-// that imports opmodel.dev/core@v0 (required for Approach C builder).
+// that imports opmodel.dev/core@v1 (required for Approach C builder).
 func realModulePath(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
@@ -62,9 +62,9 @@ func buildMatchingProvider(t *testing.T, cueCtx *cue.Context) cue.Value {
 	t.Helper()
 	v := cueCtx.CompileString(`{
 		version: "1.0.0"
-		transformers: {
+		#transformers: {
 			WebTransformer: {
-				requiredResources: { "opmodel.dev/resources/workload@v0#Container": _ }
+				requiredResources: { "opmodel.dev/resources/workload/container@v1": _ }
 				#transform: {
 					#component: _
 					#context: { name: string, namespace: string, #moduleReleaseMetadata: _, #componentMetadata: _ }
@@ -88,9 +88,9 @@ func buildBrokenProvider(t *testing.T, cueCtx *cue.Context) cue.Value {
 	t.Helper()
 	v := cueCtx.CompileString(`{
 		version: "1.0.0"
-		transformers: {
+		#transformers: {
 			BrokenTransformer: {
-				requiredResources: { "opmodel.dev/resources/workload@v0#Container": _ }
+				requiredResources: { "opmodel.dev/resources/workload/container@v1": _ }
 			}
 		}
 	}`)

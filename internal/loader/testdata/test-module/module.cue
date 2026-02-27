@@ -1,10 +1,11 @@
 package testmodule
 
-// Module metadata
+// Module metadata (v1alpha1 format)
 metadata: {
+	modulePath:       "example.com/modules"
 	name:             "test-module"
 	version:          "1.0.0"
-	fqn:              "example.com/test-module@v0#test-module"
+	fqn:              "example.com/modules/test-module:1.0.0"
 	uuid:             "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 	defaultNamespace: "default"
 	labels: {
@@ -15,7 +16,11 @@ metadata: {
 
 // Configuration schema
 #config: {
-	image:    string
+	image: {
+		repository: string
+		tag:        string
+		digest:     string
+	}
 	replicas: int & >=1
 	port:     int | *8080
 }
@@ -26,17 +31,17 @@ metadata: {
 		metadata: {
 			name: "web"
 			labels: {
-				"workload-type": "stateless"
+				"core.opmodel.dev/workload-type": "stateless"
 			}
 		}
 		#resources: {
-			"opmodel.dev/resources/Container@v0": {
-				image:    #config.image
-				replicas: #config.replicas
+			"opmodel.dev/resources/workload/container@v1": {
+				image: #config.image
+				scaling: count: #config.replicas
 			}
 		}
 		#traits: {
-			"opmodel.dev/traits/Expose@v0": {
+			"opmodel.dev/traits/network/expose@v1": {
 				port: #config.port
 			}
 		}
@@ -44,7 +49,7 @@ metadata: {
 			container: {
 				image: #config.image
 			}
-			replicas: #config.replicas
+			scaling: count: #config.replicas
 		}
 	}
 }

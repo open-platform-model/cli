@@ -9,7 +9,11 @@ values: {
 
 	web: {
 		// Dev uses lightweight image
-		image: "nginx:1.25-alpine"
+		image: {
+			repository: "nginx"
+			tag:        "1.25-alpine"
+			digest:     ""
+		}
 
 		// Dev uses minimal resources
 		replicas: 1

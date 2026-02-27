@@ -3,10 +3,10 @@
 package main
 
 import (
-	resources_workload "opmodel.dev/resources/workload@v0"
-	resources_storage "opmodel.dev/resources/storage@v0"
-	traits_workload "opmodel.dev/traits/workload@v0"
-	traits_network "opmodel.dev/traits/network@v0"
+	resources_workload "opmodel.dev/resources/workload@v1"
+	resources_storage "opmodel.dev/resources/storage@v1"
+	traits_workload "opmodel.dev/traits/workload@v1"
+	traits_network "opmodel.dev/traits/network@v1"
 )
 
 // #components contains component definitions.
@@ -21,7 +21,6 @@ import (
 		resources_workload.#Container
 		resources_storage.#Volumes
 		traits_workload.#Scaling
-		traits_workload.#HealthCheck
 		traits_workload.#RestartPolicy
 		traits_network.#Expose
 
@@ -34,33 +33,9 @@ import (
 
 			restartPolicy: "Always"
 
-			healthCheck: {
-				livenessProbe: {
-					httpGet: {
-						path: "/health"
-						port: 8096
-					}
-					initialDelaySeconds: 30
-					periodSeconds:       10
-					timeoutSeconds:      5
-					failureThreshold:    3
-				}
-				readinessProbe: {
-					httpGet: {
-						path: "/health"
-						port: 8096
-					}
-					initialDelaySeconds: 10
-					periodSeconds:       10
-					timeoutSeconds:      3
-					failureThreshold:    3
-				}
-			}
-
 			container: {
-				name:            "jellyfin"
-				image:           #config.image
-				imagePullPolicy: "IfNotPresent"
+				name:  "jellyfin"
+				image: #config.image
 				ports: http: {
 					name:       "http"
 					targetPort: 8096
@@ -85,16 +60,36 @@ import (
 						}
 					}
 				}
-			resources: {
-				cpu: {
-					request: "500m"
-					limit:   "4000m"
+				livenessProbe: {
+					httpGet: {
+						path: "/health"
+						port: 8096
+					}
+					initialDelaySeconds: 30
+					periodSeconds:       10
+					timeoutSeconds:      5
+					failureThreshold:    3
 				}
-				memory: {
-					request: "1Gi"
-					limit:   "4Gi"
+				readinessProbe: {
+					httpGet: {
+						path: "/health"
+						port: 8096
+					}
+					initialDelaySeconds: 10
+					periodSeconds:       10
+					timeoutSeconds:      3
+					failureThreshold:    3
 				}
-			}
+				resources: {
+					requests: {
+						cpu:    "500m"
+						memory: "1Gi"
+					}
+					limits: {
+						cpu:    "4000m"
+						memory: "4Gi"
+					}
+				}
 				volumeMounts: {
 					config: {
 						name:      "config"

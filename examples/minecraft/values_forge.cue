@@ -4,8 +4,12 @@ package main
 
 values: {
 	server: {
-		image: "itzg/minecraft-server:latest"
-		type:  "FORGE"
+		image: {
+			repository: "itzg/minecraft-server"
+			tag:        "latest"
+			digest:     ""
+		}
+		type: "FORGE"
 		// Specific Forge version for mod compatibility
 		version: "1.20.1"
 		eula:    true
@@ -43,8 +47,12 @@ values: {
 
 	backup: {
 		enabled: true
-		image:   "itzg/mc-backup:latest"
-		method:  "tar"
+		image: {
+			repository: "itzg/mc-backup"
+			tag:        "latest"
+			digest:     ""
+		}
+		method: "tar"
 
 		// Backup twice daily
 		interval:     "12h"

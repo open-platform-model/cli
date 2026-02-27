@@ -5,7 +5,11 @@ package main
 // Concrete default values
 values: {
 	// LinuxServer.io Jellyfin image
-	image: "lscr.io/linuxserver/jellyfin:latest"
+	image: {
+		repository: "lscr.io/linuxserver/jellyfin"
+		tag:        "latest"
+		digest:     ""
+	}
 
 	// Web UI exposed port
 	port: 8096

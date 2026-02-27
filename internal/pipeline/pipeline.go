@@ -3,9 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"sort"
-	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
@@ -168,8 +166,7 @@ func summarizeComponents(components map[string]*component.Component) []Component
 }
 
 // prepare runs Phase 1 (PREPARATION): loads the module, validates it,
-// checks for values.cue if no --values flags were provided, logs the
-// values source, and resolves the release name + namespace.
+// and resolves the release name + namespace.
 func (p *pipeline) prepare(opts RenderOptions) (*module.Module, string, string, error) { //nolint:gocritic // unnamedResult: named returns would shadow inner err vars
 	mod, err := loader.LoadModule(p.cueCtx, opts.ModulePath, p.registry)
 	if err != nil {
@@ -177,43 +174,6 @@ func (p *pipeline) prepare(opts RenderOptions) (*module.Module, string, string, 
 	}
 	if err := mod.Validate(); err != nil {
 		return nil, "", "", err
-	}
-
-	// Build a set of explicitly-requested values file basenames so we can
-	// produce an accurate "filtered" message: only files that are truly
-	// not being used should appear there.
-	requestedSet := make(map[string]bool, len(opts.Values))
-	for _, vf := range opts.Values {
-		requestedSet[filepath.Base(vf)] = true
-	}
-
-	// Collect files that were filtered from the package load AND are not
-	// actively being used as values:
-	//   - When --values is provided, values.cue is bypassed entirely.
-	//   - Any skipped values*.cue file not in the explicit --values list is unused.
-	var filteredNotUsed []string
-	if mod.HasValuesCue && len(opts.Values) > 0 {
-		filteredNotUsed = append(filteredNotUsed, "values.cue")
-	}
-	for _, f := range mod.SkippedValuesFiles {
-		if !requestedSet[f] {
-			filteredNotUsed = append(filteredNotUsed, f)
-		}
-	}
-	if len(filteredNotUsed) > 0 {
-		output.Debug("filtered values files from package load (use --values to apply them)",
-			"files", strings.Join(filteredNotUsed, ", "),
-		)
-	}
-
-	if len(opts.Values) > 0 {
-		names := make([]string, len(opts.Values))
-		for i, vf := range opts.Values {
-			names[i] = filepath.Base(vf)
-		}
-		output.Debug("using values files", "files", strings.Join(names, ", "))
-	} else {
-		output.Debug("using default values.cue")
 	}
 
 	releaseName := opts.Name

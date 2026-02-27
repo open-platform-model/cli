@@ -3,9 +3,9 @@
 package main
 
 import (
-	resources_workload "opmodel.dev/resources/workload@v0"
-	traits_workload "opmodel.dev/traits/workload@v0"
-	traits_network "opmodel.dev/traits/network@v0"
+	resources_workload "opmodel.dev/resources/workload@v1"
+	traits_workload "opmodel.dev/traits/workload@v1"
+	traits_network "opmodel.dev/traits/network@v1"
 )
 
 // Frontend component

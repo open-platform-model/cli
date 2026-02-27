@@ -2,18 +2,21 @@
 package components
 
 import (
-	resources_workload "opmodel.dev/resources/workload@v0"
-	traits_workload "opmodel.dev/traits/workload@v0"
+	resources_workload "opmodel.dev/resources/workload@v1"
+	traits_workload "opmodel.dev/traits/workload@v1"
 )
 
-// _worker is a reusable background worker component template.
+// #worker is a reusable background worker component template.
 #worker: {
+	metadata: labels: "core.opmodel.dev/workload-type": "stateless"
+
 	resources_workload.#Container
-	traits_workload.#Replicas
+	traits_workload.#Scaling
 
 	spec: {
 		container: {
-			image: string
+			name:  "worker"
+			image: _
 			resources: {
 				requests: {
 					cpu:    "100m"
@@ -25,6 +28,6 @@ import (
 				}
 			}
 		}
-		replicas: int | *2
+		scaling: count: int | *2
 	}
 }

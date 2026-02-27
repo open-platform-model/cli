@@ -23,7 +23,7 @@ func TestNewTransformerContext(t *testing.T) {
 			Metadata: &module.ModuleMetadata{
 				Name:    "my-module",
 				Version: "1.0.0",
-				FQN:     "example.com/modules@v0#MyModule",
+				FQN:     "example.com/modules/my-module:1.0.0",
 				UUID:    "module-uuid",
 			},
 		},
@@ -52,7 +52,7 @@ func TestNewTransformerContext(t *testing.T) {
 	assert.Equal(t, "release-uuid", ctx.ReleaseMetadata.UUID)
 	// ModuleMetadata: module-level fields
 	assert.Equal(t, "1.0.0", ctx.ModuleMetadata.Version)
-	assert.Equal(t, "example.com/modules@v0#MyModule", ctx.ModuleMetadata.FQN)
+	assert.Equal(t, "example.com/modules/my-module:1.0.0", ctx.ModuleMetadata.FQN)
 	assert.Equal(t, "module-uuid", ctx.ModuleMetadata.UUID)
 	assert.Equal(t, "webapp", ctx.ComponentMetadata.Name)
 }
@@ -71,7 +71,7 @@ func TestNewTransformerContext_NameOverride(t *testing.T) {
 			Metadata: &module.ModuleMetadata{
 				Name:    "my-app",
 				Version: "1.0.0",
-				FQN:     "example.com/modules@v0#MyApp",
+				FQN:     "example.com/modules/my-app:1.0.0",
 				UUID:    "module-uuid",
 			},
 		},
@@ -97,7 +97,7 @@ func TestNewTransformerContext_NameOverride(t *testing.T) {
 func TestTransformerContext_ToMap(t *testing.T) {
 	modMeta := &module.ModuleMetadata{
 		Name:    "my-module",
-		FQN:     "example.com/modules@v0#MyModule",
+		FQN:     "example.com/modules/my-module:2.0.0",
 		Version: "2.0.0",
 	}
 	relMeta := &modulerelease.ReleaseMetadata{
@@ -124,11 +124,11 @@ func TestTransformerContext_ToMap(t *testing.T) {
 
 	// CUE output shape is unchanged: #moduleReleaseMetadata with same fields
 	moduleReleaseMetadata := m["#moduleReleaseMetadata"].(map[string]any)
-	assert.Equal(t, "release-name", moduleReleaseMetadata["name"])                   // release name
-	assert.Equal(t, "production", moduleReleaseMetadata["namespace"])                // release namespace
-	assert.Equal(t, "2.0.0", moduleReleaseMetadata["version"])                       // module version
-	assert.Equal(t, "example.com/modules@v0#MyModule", moduleReleaseMetadata["fqn"]) // module FQN
-	assert.Equal(t, "release-uuid", moduleReleaseMetadata["uuid"])                   // release UUID
+	assert.Equal(t, "release-name", moduleReleaseMetadata["name"])                       // release name
+	assert.Equal(t, "production", moduleReleaseMetadata["namespace"])                    // release namespace
+	assert.Equal(t, "2.0.0", moduleReleaseMetadata["version"])                           // module version
+	assert.Equal(t, "example.com/modules/my-module:2.0.0", moduleReleaseMetadata["fqn"]) // module FQN
+	assert.Equal(t, "release-uuid", moduleReleaseMetadata["uuid"])                       // release UUID
 
 	componentMetadata := m["#componentMetadata"].(map[string]any)
 	assert.Equal(t, "api", componentMetadata["name"])

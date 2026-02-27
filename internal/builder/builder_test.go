@@ -53,7 +53,7 @@ func TestBuild_EndToEnd(t *testing.T) {
 
 	// Provide concrete values that satisfy #config.
 	valuesFile := writeTempValues(t, `values: {
-		image:    "nginx:1.28"
+		image: {repository: "nginx", tag: "1.28", digest: ""}
 		replicas: 2
 	}`)
 
@@ -90,7 +90,7 @@ func TestBuild_ValuesViolateConfig(t *testing.T) {
 
 	// replicas must be >=1; provide 0 to violate the constraint.
 	valuesFile := writeTempValues(t, `values: {
-		image:    "nginx:1.0"
+		image: {repository: "nginx", tag: "1.0", digest: ""}
 		replicas: 0
 	}`)
 
@@ -118,7 +118,7 @@ func TestBuild_NonConcreteResult(t *testing.T) {
 	// produces a concrete release. Instead, confirm that providing an explicit abstract
 	// value (CUE string type) triggers the concreteness error.
 	valuesFile := writeTempValues(t, `values: {
-		image:    string
+		image: {repository: string, tag: "1.0", digest: ""}
 		replicas: 1
 	}`)
 
@@ -139,7 +139,7 @@ func TestBuild_UUIDIsDeterministic(t *testing.T) {
 	require.NoError(t, err)
 
 	valuesFile := writeTempValues(t, `values: {
-		image:    "nginx:1.0"
+		image: {repository: "nginx", tag: "1.0", digest: ""}
 		replicas: 1
 	}`)
 

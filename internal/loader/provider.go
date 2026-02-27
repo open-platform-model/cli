@@ -113,10 +113,10 @@ func extractProviderMetadata(v cue.Value, configKeyName string, p *coreprovider.
 	p.Metadata = meta
 }
 
-// parseTransformers iterates the transformers field of a provider CUE value
+// parseTransformers iterates the #transformers definition of a provider CUE value
 // and returns a slice of parsed [*transformer.Transformer] values.
 func parseTransformers(providerName string, providerValue cue.Value) ([]*transformer.Transformer, error) {
-	transformersValue := providerValue.LookupPath(cue.ParsePath("transformers"))
+	transformersValue := providerValue.LookupPath(cue.ParsePath("#transformers"))
 	if !transformersValue.Exists() {
 		return nil, nil
 	}

@@ -121,8 +121,8 @@ func TestPrintRenderErrors_UnmatchedWithAvailable(t *testing.T) {
 				&testTransformerRequirements{
 					fqn:               "example.com/transformers@v1#PostgresTransformer",
 					requiredLabels:    map[string]string{"db-type": "postgres"},
-					requiredResources: []string{"opmodel.dev/resources/Database@v0"},
-					requiredTraits:    []string{"opmodel.dev/traits/Persistence@v0"},
+					requiredResources: []string{"opmodel.dev/resources/workload/database@v1"},
+					requiredTraits:    []string{"opmodel.dev/traits/workload/persistence@v1"},
 				},
 			},
 		},
@@ -142,9 +142,9 @@ func TestPrintRenderErrors_UnmatchedWithAvailable(t *testing.T) {
 	assert.Contains(t, got, "requiredLabels", "should show required labels")
 	assert.Contains(t, got, "db-type", "should show label key")
 	assert.Contains(t, got, "requiredResources", "should show required resources")
-	assert.Contains(t, got, "Database", "should show resource name")
+	assert.Contains(t, got, "database", "should show resource name")
 	assert.Contains(t, got, "requiredTraits", "should show required traits")
-	assert.Contains(t, got, "Persistence", "should show trait name")
+	assert.Contains(t, got, "persistence", "should show trait name")
 }
 
 func TestPrintRenderErrors_UnmatchedWithoutAvailable(t *testing.T) {

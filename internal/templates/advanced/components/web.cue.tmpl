@@ -2,20 +2,23 @@
 package components
 
 import (
-	resources_workload "opmodel.dev/resources/workload@v0"
-	traits_workload "opmodel.dev/traits/workload@v0"
-	traits_network "opmodel.dev/traits/network@v0"
+	resources_workload "opmodel.dev/resources/workload@v1"
+	traits_workload "opmodel.dev/traits/workload@v1"
+	traits_network "opmodel.dev/traits/network@v1"
 )
 
-// _web is a reusable web server component template.
+// #web is a reusable web server component template.
 #web: {
+	metadata: labels: "core.opmodel.dev/workload-type": "stateless"
+
 	resources_workload.#Container
-	traits_workload.#Replicas
+	traits_workload.#Scaling
 	traits_network.#Expose
 
 	spec: {
 		container: {
-			image: string
+			name:  "web"
+			image: _
 			ports: http: {
 				targetPort: 8080
 			}
@@ -30,7 +33,7 @@ import (
 				}
 			}
 		}
-		replicas: int | *2
+		scaling: count: int | *2
 		expose: {
 			ports: http: container.ports.http & {
 				exposedPort: 8080

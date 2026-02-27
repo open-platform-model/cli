@@ -6,8 +6,8 @@
 package main
 
 import (
-	"opmodel.dev/core@v0"
-	schemas "opmodel.dev/schemas@v0"
+	"opmodel.dev/core@v1"
+	schemas "opmodel.dev/schemas@v1"
 )
 
 // Module definition
@@ -15,7 +15,7 @@ core.#Module
 
 // Module metadata
 metadata: {
-	apiVersion:       "example.com/minecraft@v0"
+	modulePath:       "example.com/modules"
 	name:             "minecraft"
 	version:          "0.1.0"
 	description:      string | *"Minecraft Java Edition server with automated backup support"
@@ -27,7 +27,7 @@ metadata: {
 	// === Server Configuration ===
 	server: {
 		// Container image for Minecraft server
-		image: string
+		image: schemas.#Image
 
 		// Server type determines which server software to run
 		type: "VANILLA" | "PAPER" | "FORGE" | "FABRIC" | "SPIGOT" | "BUKKIT" | "PURPUR" | "MAGMA"
@@ -113,7 +113,7 @@ metadata: {
 		enabled: bool
 
 		// Backup container image
-		image: string
+		image: schemas.#Image
 
 		// Backup method determines how backups are stored
 		method: "tar" | "rsync" | "restic" | "rclone"
@@ -170,5 +170,3 @@ metadata: {
 	serviceType: "ClusterIP" | "LoadBalancer" | "NodePort"
 }
 
-// Values must satisfy #config - concrete values in values.cue
-values: #config

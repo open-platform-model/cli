@@ -1,6 +1,6 @@
 // Package builder implements the BUILD phase of the OPM render pipeline.
 //
-// load #ModuleRelease from opmodel.dev/core@v0 (resolved
+// load #ModuleRelease from opmodel.dev/core@v1 (resolved
 // from the module's own pinned dependency cache), inject the module and user
 // values via FillPath, and let CUE evaluate UUID, labels, components, and
 // metadata natively. Go only reads back the resulting concrete values.
@@ -33,9 +33,9 @@ type Options struct {
 // Build creates a concrete *modulerelease.ModuleRelease from a pre-loaded *module.Module.
 //
 // The build process:
-//  1. Load opmodel.dev/core@v0 from the module's pinned dependency cache
+//  1. Load opmodel.dev/core@v1 from the module's pinned dependency cache
 //  2. Extract #ModuleRelease schema from the core value
-//  3. Select values: use valuesFiles if provided, else mod.Values
+//  3. Select values: use valuesFiles if provided, else discover values.cue from mod.ModulePath
 //  4. Validate selected values against mod's #config schema
 //  5. FillPath chain: #module → metadata.name → metadata.namespace → values
 //  6. Validate the result is fully concrete
@@ -51,28 +51,28 @@ func Build(ctx *cue.Context, mod *module.Module, opts Options, valuesFiles []str
 		"namespace", opts.Namespace,
 	)
 
-	// Step 1: Load opmodel.dev/core@v0 from the module's pinned dep cache.
+	// Step 1: Load opmodel.dev/core@v1 from the module's pinned dep cache.
 	// Using Dir: mod.ModulePath tells CUE to resolve the import against the
 	// module's own cue.mod/module.cue — no separate registry call needed.
-	coreInstances := load.Instances([]string{"opmodel.dev/core@v0"}, &load.Config{
+	coreInstances := load.Instances([]string{"opmodel.dev/core@v1"}, &load.Config{
 		Dir: mod.ModulePath,
 	})
 	if len(coreInstances) == 0 {
-		return nil, fmt.Errorf("loading opmodel.dev/core@v0: no instances returned")
+		return nil, fmt.Errorf("loading opmodel.dev/core@v1: no instances returned")
 	}
 	if coreInstances[0].Err != nil {
-		return nil, fmt.Errorf("loading opmodel.dev/core@v0: %w", coreInstances[0].Err)
+		return nil, fmt.Errorf("loading opmodel.dev/core@v1: %w", coreInstances[0].Err)
 	}
 
 	coreVal := ctx.BuildInstance(coreInstances[0])
 	if err := coreVal.Err(); err != nil {
-		return nil, fmt.Errorf("building opmodel.dev/core@v0: %w", err)
+		return nil, fmt.Errorf("building opmodel.dev/core@v1: %w", err)
 	}
 
 	// Step 2: Extract #ModuleRelease schema.
 	releaseSchema := coreVal.LookupPath(cue.ParsePath("#ModuleRelease"))
 	if !releaseSchema.Exists() {
-		return nil, fmt.Errorf("#ModuleRelease not found in opmodel.dev/core@v0")
+		return nil, fmt.Errorf("#ModuleRelease not found in opmodel.dev/core@v1")
 	}
 	if err := releaseSchema.Err(); err != nil {
 		return nil, fmt.Errorf("#ModuleRelease is invalid: %w", err)
@@ -149,7 +149,6 @@ func Build(ctx *cue.Context, mod *module.Module, opts Options, valuesFiles []str
 		metaCopy.Components = append([]string{}, componentNames...)
 		modCopy.Metadata = &metaCopy
 	}
-	modCopy.Values = selectedValues
 
 	output.Debug("release built",
 		"uuid", relMeta.UUID,

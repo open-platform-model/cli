@@ -3,9 +3,10 @@
 package main
 
 import (
-	"opmodel.dev/core@v0"
-	resources_workload "opmodel.dev/resources/workload@v0"
-	traits_workload "opmodel.dev/traits/workload@v0"
+	"opmodel.dev/core@v1"
+	"opmodel.dev/schemas@v1"
+	resources_workload "opmodel.dev/resources/workload@v1"
+	traits_workload "opmodel.dev/traits/workload@v1"
 )
 
 // Module definition
@@ -13,8 +14,8 @@ core.#Module
 
 // Module metadata
 metadata: {
-	apiVersion:  "{{.ModulePath}}@v0"
-	name:        "{{.ModuleNamePascal}}"
+	modulePath:  "{{.ModulePath}}"
+	name:        "{{.ModuleName}}"
 	version:     "{{.Version}}"
 	description: string | *"A simple OPM module"
 	defaultNamespace: "default"
@@ -24,17 +25,20 @@ metadata: {
 #components: {
 	// Example: web server component
 	app: {
+		metadata: labels: "core.opmodel.dev/workload-type": "stateless"
+
 		resources_workload.#Container
-		traits_workload.#Replicas
+		traits_workload.#Scaling
 
 		spec: {
 			container: {
+				name:  "app"
 				image: #config.image
 				ports: http: {
 					targetPort: #config.port
 				}
 			}
-			replicas: #config.replicas
+			scaling: count: #config.scaling
 		}
 	}
 }
@@ -42,10 +46,10 @@ metadata: {
 // Configuration schema
 #config: {
 	// Container image to deploy
-	image!: string
+	image!: schemas.#Image
 
 	// Number of replicas
-	replicas?: int & >=1
+	scaling?: int & >=1
 
 	// Port to expose
 	port?: int & >0 & <=65535

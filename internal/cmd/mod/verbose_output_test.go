@@ -31,8 +31,8 @@ func buildTestResult() *pipeline.RenderResult {
 			{
 				Name:         "web",
 				Labels:       map[string]string{"core.opmodel.dev/workload-type": "stateless"},
-				ResourceFQNs: []string{"opmodel.dev/resources/Container@v0"},
-				TraitFQNs:    []string{"opmodel.dev/traits/Expose@v0"},
+				ResourceFQNs: []string{"opmodel.dev/resources/workload/container@v1"},
+				TraitFQNs:    []string{"opmodel.dev/traits/network/expose@v1"},
 			},
 		},
 		MatchPlan: &transformer.TransformerMatchPlan{
@@ -42,7 +42,7 @@ func buildTestResult() *pipeline.RenderResult {
 					Detail: &transformer.TransformerMatchDetail{
 						ComponentName:  "web",
 						TransformerFQN: "test#DeploymentTransformer",
-						Reason:         "Matched: requiredResources[opmodel.dev/resources/Container@v0]",
+						Reason:         "Matched: requiredResources[opmodel.dev/resources/workload/container@v1]",
 					},
 				},
 				{
@@ -50,7 +50,7 @@ func buildTestResult() *pipeline.RenderResult {
 					Detail: &transformer.TransformerMatchDetail{
 						ComponentName:  "web",
 						TransformerFQN: "test#ServiceTransformer",
-						Reason:         "Matched: requiredResources[opmodel.dev/resources/Container@v0], requiredTraits[opmodel.dev/traits/Expose@v0]",
+						Reason:         "Matched: requiredResources[opmodel.dev/resources/workload/container@v1], requiredTraits[opmodel.dev/traits/network/expose@v1]",
 					},
 				},
 			},
@@ -127,8 +127,8 @@ func TestVerboseOutput_TransformerMatches(t *testing.T) {
 		assert.Contains(t, outputStr, "namespace=default", "verbose should show namespace")
 		assert.Contains(t, outputStr, "version=1.0.0", "verbose should show version")
 		assert.Contains(t, outputStr, "component: web", "verbose should show component name")
-		assert.Contains(t, outputStr, "Container", "verbose should show component resources")
-		assert.Contains(t, outputStr, "Expose", "verbose should show component traits")
+		assert.Contains(t, outputStr, "container", "verbose should show component resources")
+		assert.Contains(t, outputStr, "expose", "verbose should show component traits")
 
 		assert.Contains(t, outputStr, "▸", "should contain bullet")
 		assert.Contains(t, outputStr, "web", "should contain component")

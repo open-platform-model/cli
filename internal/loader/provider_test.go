@@ -21,7 +21,7 @@ func buildProviderMap(ctx *cue.Context, sources map[string]string) map[string]cu
 }
 
 const singleTransformerCUE = `
-transformers: {
+#transformers: {
 	deployment: {
 		requiredResources: {
 			"apps/Deployment": {}
@@ -43,7 +43,7 @@ transformers: {
 `
 
 const noOptionalCUE = `
-transformers: {
+#transformers: {
 	service: {
 		requiredResources: {
 			"v1/Service": {}
@@ -168,7 +168,7 @@ func TestLoadProvider_NoTransformers(t *testing.T) {
 func TestLoadProvider_InvalidTransformerDefinition(t *testing.T) {
 	ctx := cuecontext.New()
 	providers := buildProviderMap(ctx, map[string]string{
-		"kubernetes": `transformers: { broken: _|_ }`,
+		"kubernetes": `#transformers: { broken: _|_ }`,
 	})
 
 	_, err := loader.LoadProvider(ctx, "kubernetes", providers)
@@ -180,7 +180,7 @@ func TestLoadProvider_InvalidTransformerDefinition(t *testing.T) {
 func TestLoadProvider_Requirements(t *testing.T) {
 	ctx := cuecontext.New()
 	multiTfCUE := `
-transformers: {
+#transformers: {
 	deployment: { requiredResources: { "apps/Deployment": {} } }
 	service:    { requiredResources: { "v1/Service": {} } }
 	configmap:  { requiredResources: { "v1/ConfigMap": {} } }
@@ -221,7 +221,7 @@ func TestLoadProvider_CueCtxSet(t *testing.T) {
 func TestLoadProvider_MetadataExtraction(t *testing.T) {
 	ctx := cuecontext.New()
 	withMetaCUE := `
-apiVersion: "opmodel.dev/providers/kubernetes@v0"
+apiVersion: "opmodel.dev/core/v1alpha1"
 kind: "Provider"
 metadata: {
 	name:        "kubernetes-provider"
@@ -233,7 +233,7 @@ metadata: {
 		tier: "infra"
 	}
 }
-transformers: {
+#transformers: {
 	deployment: { requiredResources: { "apps/Deployment": {} } }
 }
 `
@@ -248,7 +248,7 @@ transformers: {
 	assert.Equal(t, "1.2.3", p.Metadata.Version)
 	assert.Equal(t, "0.5.0", p.Metadata.MinVersion)
 	assert.Equal(t, map[string]string{"env": "production", "tier": "infra"}, p.Metadata.Labels)
-	assert.Equal(t, "opmodel.dev/providers/kubernetes@v0", p.APIVersion)
+	assert.Equal(t, "opmodel.dev/core/v1alpha1", p.APIVersion)
 	assert.Equal(t, "Provider", p.Kind)
 }
 

@@ -4,6 +4,10 @@
 package main
 
 values: {
-	image:    "nginx:prod"
+	image: {
+		repository: "nginx"
+		tag:        "prod"
+		digest:     ""
+	}
 	replicas: 3
 }

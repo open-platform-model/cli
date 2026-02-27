@@ -1,7 +1,11 @@
 package testmodule
 
 values: {
-	image:    "nginx:1.25"
+	image: {
+		repository: "nginx"
+		tag:        "1.25"
+		digest:     ""
+	}
 	replicas: 2
 	port:     8080
 }

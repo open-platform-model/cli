@@ -6,23 +6,39 @@ package main
 values: {
 	// Database (stateful workload) configuration
 	database: {
-		image:   "postgres:14"
+		image: {
+			repository: "postgres"
+			tag:        "14"
+			digest:     ""
+		}
 		scaling: 1
 	}
 
 	// Log agent (daemon workload) configuration
 	logAgent: {
-		image: "prom/node-exporter:v1.6.1"
+		image: {
+			repository: "prom/node-exporter"
+			tag:        "v1.6.1"
+			digest:     ""
+		}
 	}
 
 	// Setup job (task workload) configuration
 	setupJob: {
-		image: "myregistry.io/migrations:v2.0.0"
+		image: {
+			repository: "myregistry.io/migrations"
+			tag:        "v2.0.0"
+			digest:     ""
+		}
 	}
 
 	// Backup job (scheduled-task workload) configuration
 	backupJob: {
-		image:    "postgres:14"
+		image: {
+			repository: "postgres"
+			tag:        "14"
+			digest:     ""
+		}
 		schedule: "0 2 * * *"
 	}
 }

@@ -1,67 +1,43 @@
-// Package main defines a minimal OPM module that imports opmodel.dev/core@v0.
-// Used by Strategy B (overlay) tests that prove Approach C:
-//   - The module already imports opmodel.dev/core@v0
-//   - The core package can be loaded from the module's resolved deps
-//   - The loaded module cue.Value can be injected into #ModuleRelease.#module
+// Package main defines a minimal OPM module in v1alpha1 format.
+// Used by builder tests that prove the BUILD phase pipeline:
+//   - The module imports opmodel.dev/core@v1 (sub-package of opmodel.dev@v1)
+//   - The core package is loaded from the module's resolved deps
+//   - The loaded module cue.Value is injected into #ModuleRelease.#module
 //
 // Requires OPM_REGISTRY to be set for dependency resolution.
 package main
 
 import (
-	"opmodel.dev/core@v0"
+	"opmodel.dev/core@v1"
+	schemas "opmodel.dev/schemas@v1"
+	resources_workload "opmodel.dev/resources/workload@v1"
+	traits_workload "opmodel.dev/traits/workload@v1"
 )
 
 // Apply the #Module constraint so this file IS a #Module when evaluated.
 core.#Module
 
 metadata: {
-	apiVersion:       "example.com/exp-release-module@v0"
+	modulePath:       "example.com/modules"
 	name:             "exp-release-module"
 	version:          "0.1.0"
 	defaultNamespace: "default"
 }
 
 #config: {
-	image:    string
+	image:    schemas.#Image
 	replicas: int & >=1 | *1
 }
 
-// values holds the module author's defaults. For the experiment fixture we keep
-// these at schema-level (open to override) so that release values can unify
-// without conflict. In production, module authors set concrete defaults here.
-values: #config
-
-// #components must use #resources/#traits so spec is derived via close({_allFields}).
-// Direct spec.image would be rejected by #Component.spec: close({...}).
+// #components uses direct type composition from resources and traits packages.
 #components: {
-	web: core.#Component & {
-		metadata: name: "web"
+	web: {
+		resources_workload.#Container
+		traits_workload.#Scaling
 
-		#resources: {
-			"opmodel.dev/resources/workload@v0#Container": core.#Resource & {
-				metadata: {
-					apiVersion:  "opmodel.dev/resources/workload@v0"
-					name:        "container"
-					description: "Web container"
-				}
-				#spec: container: {
-					name!:  core.#NameType
-					image!: string
-				}
-			}
-		}
-
-		#traits: {
-			"opmodel.dev/traits/workload@v0#Scaling": core.#Trait & {
-				metadata: {
-					apiVersion:  "opmodel.dev/traits/workload@v0"
-					name:        "scaling"
-					description: "Scaling trait"
-				}
-				#spec: scaling: {
-					count: int & >=1 | *1
-				}
-			}
+		metadata: {
+			name: "web"
+			labels: "core.opmodel.dev/workload-type": "stateless"
 		}
 
 		spec: {

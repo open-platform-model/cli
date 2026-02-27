@@ -7,7 +7,8 @@
 package main
 
 import (
-	"opmodel.dev/core@v0"
+	"opmodel.dev/core@v1"
+	schemas "opmodel.dev/schemas@v1"
 )
 
 // Module definition
@@ -15,7 +16,7 @@ core.#Module
 
 // Module metadata
 metadata: {
-	apiVersion:       "example.com/app-config@v0"
+	modulePath:       "example.com/modules"
 	name:             "app-config"
 	version:          "0.1.0"
 	description:      string | *"Application with ConfigMaps and Secrets"
@@ -26,7 +27,7 @@ metadata: {
 #config: {
 	// Application configuration
 	app: {
-		image:    string
+		image:    schemas.#Image
 		port:     int & >0 & <=65535
 		replicas: int & >=1
 
@@ -62,5 +63,3 @@ metadata: {
 	}
 }
 
-// Values must satisfy #config - concrete values in values.cue
-values: #config

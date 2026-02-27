@@ -2,18 +2,21 @@
 package components
 
 import (
-	resources_workload "opmodel.dev/resources/workload@v0"
-	traits_workload "opmodel.dev/traits/workload@v0"
+	resources_workload "opmodel.dev/resources/workload@v1"
+	traits_workload "opmodel.dev/traits/workload@v1"
 )
 
-// _api is a reusable API server component template.
+// #api is a reusable API server component template.
 #api: {
+	metadata: labels: "core.opmodel.dev/workload-type": "stateless"
+
 	resources_workload.#Container
-	traits_workload.#Replicas
+	traits_workload.#Scaling
 
 	spec: {
 		container: {
-			image: string
+			name:  "api"
+			image: _
 			ports: http: {
 				targetPort: 3000
 			}
@@ -28,6 +31,6 @@ import (
 				}
 			}
 		}
-		replicas: int | *3
+		scaling: count: int | *3
 	}
 }

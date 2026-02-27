@@ -91,8 +91,10 @@ func validModule(t *testing.T, modulePath string) *Module {
 	mod := &Module{
 		ModulePath: modulePath,
 		Metadata: &ModuleMetadata{
-			Name: "my-module",
-			FQN:  "example.com/my-module@v0#my-module",
+			Name:       "my-module",
+			ModulePath: "example.com/modules",
+			FQN:        "example.com/modules/my-module:0.1.0",
+			Version:    "0.1.0",
 		},
 	}
 	mod.Raw = val

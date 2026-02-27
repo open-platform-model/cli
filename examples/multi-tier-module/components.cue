@@ -3,10 +3,9 @@
 package main
 
 import (
-	// "opmodel.dev/core@v0"
-	resources_workload "opmodel.dev/resources/workload@v0"
-	resources_storage "opmodel.dev/resources/storage@v0"
-	traits_workload "opmodel.dev/traits/workload@v0"
+	resources_workload "opmodel.dev/resources/workload@v1"
+	resources_storage "opmodel.dev/resources/storage@v1"
+	traits_workload "opmodel.dev/traits/workload@v1"
 )
 
 // #components contains component definitions.

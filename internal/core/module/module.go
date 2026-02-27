@@ -1,6 +1,10 @@
 // Package module defines the Module and ModuleMetadata types, mirroring the
-// module.cue definition in the CUE catalog. A Module represents the #Module
-// type before it is built into a release.
+// #Module definition in the CUE catalog (v1alpha1). A Module represents the
+// parsed module definition before it is built into a release.
+//
+// In v1alpha1, concrete author defaults live in values.cue alongside the
+// module definition. The Module struct does not carry values — all values
+// resolution happens in the builder phase.
 package module
 
 import (
@@ -21,11 +25,9 @@ type Module struct {
 	// Must preserve the original order of the #Module.#components map for deterministic output and to support index-based inventory tracking.
 	Components map[string]*component.Component `json:"#components,omitempty"`
 
-	// The schema (#Module.#config)
+	// Config is the #config schema from the module definition (#Module.#config).
+	// It defines the constraints and defaults for module values.
 	Config cue.Value `json:"#config,omitempty"`
-
-	// The default values (#Module.values)
-	Values cue.Value `json:"values,omitempty"`
 
 	ModulePath string `json:"modulePath,omitempty"`
 
@@ -35,18 +37,6 @@ type Module struct {
 
 	// Raw is the fully evaluated CUE value for the module, set by module.Load().
 	Raw cue.Value
-
-	// SkippedValuesFiles holds the basenames of values*.cue files (excluding
-	// values.cue) that were filtered from the CUE package load. Populated by
-	// the loader; consumed by the pipeline to produce accurate user-facing debug
-	// messages after it knows which --values files are explicitly requested.
-	SkippedValuesFiles []string `json:"-"`
-
-	// HasValuesCue is true when values.cue was found in the module directory
-	// and loaded separately into Values. Used by the pipeline to decide whether
-	// values.cue itself should appear in the "filtered" message when --values
-	// files are explicitly provided (bypassing values.cue entirely).
-	HasValuesCue bool `json:"-"`
 }
 
 // PkgName returns the CUE package name of the module.
@@ -109,14 +99,21 @@ func (m *Module) Validate() error {
 // ModuleMetadata contains module-level identity and version information.
 // This is the module's canonical metadata, distinct from the release it is deployed as.
 type ModuleMetadata struct {
-	// Name is the canonical module name from module.metadata.name.
+	// Name is the canonical module name from module.metadata.name (kebab-case).
 	// Distinct from the release name when --name overrides the default.
 	Name string `json:"name"`
+
+	// ModulePath is the CUE registry module path from metadata.modulePath.
+	// This is the registry path (e.g., "opmodel.dev/modules"), NOT a filesystem path.
+	// Distinct from Module.ModulePath which is the local filesystem directory.
+	ModulePath string `json:"modulePath"`
 
 	// DefaultNamespace is the default namespace from the module definition.
 	DefaultNamespace string `json:"defaultNamespace"`
 
-	// FQN is the fully qualified module name.
+	// FQN is the fully qualified module name (v1alpha1: modulePath/name:version).
+	// Example: "opmodel.dev/modules/my-app:1.0.0"
+	// Extracted directly from CUE evaluation of metadata.fqn.
 	FQN string `json:"fqn"`
 
 	// Version is the module version (semver).
