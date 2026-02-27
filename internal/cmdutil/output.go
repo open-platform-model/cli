@@ -36,7 +36,7 @@ func formatFQNList(fqns []string) string {
 func PrintValidationError(msg string, err error) {
 	var valuesErr *opmerrors.ValuesValidationError
 	if errors.As(err, &valuesErr) {
-		n := len(valuesErr.Errors)
+		n := len(valuesErr.Errors) + len(valuesErr.Conflicts)
 		noun := "error"
 		if n != 1 {
 			noun = "errors"

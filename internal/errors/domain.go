@@ -71,28 +71,62 @@ type FieldError struct {
 	Message string
 }
 
+// ConflictLocation is a source position for one side of a cross-file conflict.
+type ConflictLocation struct {
+	// File is the values file name (e.g. "values-prod.cue").
+	File string
+
+	// Line is the 1-based line number in File.
+	Line int
+
+	// Column is the 1-based column number in File.
+	Column int
+}
+
+// ConflictError represents a conflict between values in two or more files for
+// the same field. It carries the positions of all conflicting sides so the
+// user can see exactly which files are in tension.
+type ConflictError struct {
+	// Path is the dot-joined field path (e.g. "values.configStorageSize").
+	Path string
+
+	// Message is the human-readable conflict description (e.g. "conflicting values ...").
+	Message string
+
+	// Locations holds one entry per conflicting source position.
+	Locations []ConflictLocation
+}
+
 // ValuesValidationError is returned by ValidateValues when one or more fields
 // in a values file violate the module's #config schema. It collects all errors
 // rather than stopping at the first.
 type ValuesValidationError struct {
-	Errors []FieldError
+	Errors    []FieldError
+	Conflicts []ConflictError
 }
 
 func (e *ValuesValidationError) Error() string {
-	n := len(e.Errors)
+	n := len(e.Errors) + len(e.Conflicts)
 	if n == 1 {
 		return "values validation failed: 1 error"
 	}
 	return fmt.Sprintf("values validation failed: %d errors", n)
 }
 
-// Lines returns all errors formatted as plain text (no color), one per line.
+// Lines returns all errors and conflicts formatted as plain text (no color).
 // Useful for logging and test assertions.
 func (e *ValuesValidationError) Lines() []string {
-	lines := make([]string, 0, len(e.Errors)*2)
+	lines := make([]string, 0, (len(e.Errors)+len(e.Conflicts))*2)
 	for _, fe := range e.Errors {
 		loc := fmt.Sprintf("%s:%d:%d", fe.File, fe.Line, fe.Column)
 		lines = append(lines, loc, "  "+fe.Path+": "+fe.Message)
+	}
+	for _, ce := range e.Conflicts {
+		locs := make([]string, len(ce.Locations))
+		for i, l := range ce.Locations {
+			locs[i] = fmt.Sprintf("%s:%d:%d", l.File, l.Line, l.Column)
+		}
+		lines = append(lines, strings.Join(locs, " vs "), "  "+ce.Path+": "+ce.Message)
 	}
 	return lines
 }

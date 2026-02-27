@@ -62,19 +62,24 @@ func ValidateValues(ctx *cue.Context, config cue.Value, filePaths []string) (cue
 			}
 		}
 	}
+	fieldErrors = collapseFieldErrors(fieldErrors)
 
 	// Unify all files into a single value. Only performed when more than one
 	// file is provided; a single-file path skips the unification step entirely.
+	var conflictErrors []opmerrors.ConflictError
 	unified := files[0].values
 	for _, f := range files[1:] {
 		unified = unified.Unify(f.values)
 		if err := unified.Err(); err != nil {
-			fieldErrors = append(fieldErrors, extractConflictErrors(err)...)
+			conflictErrors = append(conflictErrors, extractConflictErrors(err)...)
 		}
 	}
 
-	if len(fieldErrors) > 0 {
-		return cue.Value{}, &opmerrors.ValuesValidationError{Errors: fieldErrors}
+	if len(fieldErrors) > 0 || len(conflictErrors) > 0 {
+		return cue.Value{}, &opmerrors.ValuesValidationError{
+			Errors:    fieldErrors,
+			Conflicts: conflictErrors,
+		}
 	}
 
 	return unified, nil
@@ -82,6 +87,8 @@ func ValidateValues(ctx *cue.Context, config cue.Value, filePaths []string) (cue
 
 // extractFieldErrors converts a cueerrors.Error chain (from validateFieldsRecursive)
 // into a slice of FieldError, pulling source positions from each error.
+// Messages are derived from Msg() rather than Error() to avoid the schema path
+// prefix that CUE injects into Error() output (e.g. "#config.port: ...").
 func extractFieldErrors(err cueerrors.Error) []opmerrors.FieldError {
 	var out []opmerrors.FieldError
 	for _, e := range cueerrors.Errors(err) {
@@ -95,20 +102,63 @@ func extractFieldErrors(err cueerrors.Error) []opmerrors.FieldError {
 			Line:    pos.Line(),
 			Column:  pos.Column(),
 			Path:    strings.Join(e.Path(), "."),
-			Message: e.Error(),
+			Message: msgString(e),
 		})
 	}
 	return out
 }
 
+// collapseFieldErrors deduplicates disjunction noise from CUE validation.
+// CUE emits a triplet for type mismatches: a summary ("N errors in empty
+// disjunction") followed by one entry per branch. We drop the summary and
+// keep only the first branch per (File, Line, Column, Path) group, which is
+// the most concrete conflict description.
+func collapseFieldErrors(errs []opmerrors.FieldError) []opmerrors.FieldError {
+	if len(errs) == 0 {
+		return errs
+	}
+
+	// First pass: drop "N errors in empty disjunction" summary lines.
+	filtered := errs[:0:len(errs)]
+	for _, fe := range errs {
+		if strings.Contains(fe.Message, "errors in empty disjunction") {
+			continue
+		}
+		filtered = append(filtered, fe)
+	}
+
+	// Second pass: deduplicate by (File, Line, Column, Path), keeping first.
+	type key struct {
+		file, path string
+		line, col  int
+	}
+	seen := make(map[key]bool, len(filtered))
+	out := filtered[:0:len(filtered)]
+	for _, fe := range filtered {
+		k := key{fe.File, fe.Path, fe.Line, fe.Column}
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		out = append(out, fe)
+	}
+	return out
+}
+
 // extractConflictErrors converts a CUE unification conflict error into
-// FieldErrors. CUE's InputPositions() returns positions for both sides of
-// a conflict, so each conflict produces one FieldError per offending position,
-// giving the user exact file+line attribution for each conflicting value.
-func extractConflictErrors(err error) []opmerrors.FieldError {
-	var out []opmerrors.FieldError
+// ConflictErrors. CUE's InputPositions() returns positions for both sides of
+// a conflict; we group all positions for the same path into a single
+// ConflictError so the user sees both sides together.
+func extractConflictErrors(err error) []opmerrors.ConflictError {
+	var out []opmerrors.ConflictError
 	for _, e := range cueerrors.Errors(err) {
 		path := strings.Join(e.Path(), ".")
+
+		// Skip disjunction summary lines — they add noise without location info.
+		msg := msgString(e)
+		if strings.Contains(msg, "errors in empty disjunction") {
+			continue
+		}
 
 		// Prefer InputPositions (both sides of a conflict) over Position.
 		positions := e.InputPositions()
@@ -117,6 +167,7 @@ func extractConflictErrors(err error) []opmerrors.FieldError {
 		}
 
 		seen := make(map[string]bool)
+		var locs []opmerrors.ConflictLocation
 		for _, pos := range positions {
 			if !pos.IsValid() {
 				continue
@@ -127,17 +178,30 @@ func extractConflictErrors(err error) []opmerrors.FieldError {
 				continue
 			}
 			seen[key] = true
-
-			out = append(out, opmerrors.FieldError{
-				File:    filepath.Base(pos.Filename()),
-				Line:    pos.Line(),
-				Column:  pos.Column(),
-				Path:    path,
-				Message: e.Error(),
+			locs = append(locs, opmerrors.ConflictLocation{
+				File:   filepath.Base(pos.Filename()),
+				Line:   pos.Line(),
+				Column: pos.Column(),
 			})
 		}
+
+		out = append(out, opmerrors.ConflictError{
+			Path:      path,
+			Message:   msg,
+			Locations: locs,
+		})
 	}
 	return out
+}
+
+// msgString formats a cueerrors.Error message using Msg() to avoid the schema
+// path prefix that CUE injects into Error() output (e.g. "#config.port: ...").
+func msgString(e cueerrors.Error) string {
+	format, args := e.Msg()
+	if len(args) == 0 {
+		return format
+	}
+	return fmt.Sprintf(format, args...)
 }
 
 // loadValuesFile reads and compiles a single CUE values file.

@@ -54,9 +54,12 @@ func cueErrorPaths(err error) string {
 
 // collectPaths extracts the Path field from each FieldError.
 func collectPaths(err *opmerrors.ValuesValidationError) []string {
-	paths := make([]string, 0, len(err.Errors))
+	paths := make([]string, 0, len(err.Errors)+len(err.Conflicts))
 	for _, fe := range err.Errors {
 		paths = append(paths, fe.Path)
+	}
+	for _, ce := range err.Conflicts {
+		paths = append(paths, ce.Path)
 	}
 	return paths
 }
@@ -440,12 +443,15 @@ func TestValidateValues(t *testing.T) {
 
 		var valErr *opmerrors.ValuesValidationError
 		require.ErrorAs(t, err, &valErr)
-		require.NotEmpty(t, valErr.Errors)
+		// Cross-file conflicts go into Conflicts, not Errors.
+		require.NotEmpty(t, valErr.Conflicts)
 
-		// At least one error should point to one of the two files.
+		// At least one conflict should reference one of the two files.
 		files := make(map[string]bool)
-		for _, fe := range valErr.Errors {
-			files[fe.File] = true
+		for _, ce := range valErr.Conflicts {
+			for _, loc := range ce.Locations {
+				files[loc.File] = true
+			}
 		}
 		assert.True(t, files["base.cue"] || files["prod.cue"],
 			"conflict errors must point to one of the source files, got: %v", files)
