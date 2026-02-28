@@ -213,7 +213,8 @@ import (
 // #SecretContentHash normalizes #Secret entries to strings, then delegates
 // to #ContentHash. The normalization is variant-aware:
 //   #SecretLiteral  -> key=<value>
-//   #SecretRef      -> key=ref:<source>:<path>:<remoteKey>
+//   #SecretK8sRef   -> key=k8sref:<secretName>:<remoteKey>
+//   #SecretEsoRef   -> key=esoref:<externalPath>:<remoteKey>
 #SecretContentHash: {
     #data: [string]: #Secret
 
@@ -223,8 +224,11 @@ import (
             if (v & #SecretLiteral) != _|_ {
                 "\(k)": v.value
             }
-            if (v & #SecretRef) != _|_ {
-                "\(k)": "ref:\(v.source):\(v.path):\(v.remoteKey)"
+            if (v & #SecretK8sRef) != _|_ {
+                "\(k)": "k8sref:\(v.secretName):\(v.remoteKey)"
+            }
+            if (v & #SecretEsoRef) != _|_ {
+                "\(k)": "esoref:\(v.externalPath):\(v.remoteKey)"
             }
         }
     }
@@ -270,7 +274,14 @@ import (
 **Algorithm details:**
 
 - **Input**: For ConfigMaps, only the `data` field string values. For Secrets,
-  the `#Secret` entries are normalized: `#SecretLiteral` hashes the `value`   field, `#SecretRef` hashes `source:path:remoteKey` as a composite string.   The `type` field (for Secrets) and `immutable` flag itself are excluded.   Changing `type` from `Opaque` to `kubernetes.io/tls` without changing data   does not create a new resource. For `#SecretRef`, the hash captures the   reference metadata — changes to the external path trigger recreation, while   runtime secret rotation by the external store does not.
+  the `#Secret` entries are normalized: `#SecretLiteral` hashes the `value`
+  field, `#SecretK8sRef` hashes `secretName:remoteKey`, and `#SecretEsoRef`
+  hashes `externalPath:remoteKey` as composite strings. The `type` field (for
+  Secrets) and `immutable` flag itself are excluded. Changing `type` from
+  `Opaque` to `kubernetes.io/tls` without changing data does not create a new
+  resource. For reference variants (`#SecretK8sRef`, `#SecretEsoRef`), the hash
+  captures the reference metadata — changes to the external path trigger
+  recreation, while runtime secret rotation by the external store does not.
 - **Determinism**: Keys are explicitly sorted with `list.SortStrings` before
   concatenation. CUE struct field ordering is deterministic, but explicit   sorting removes any dependency on declaration order.
 - **Length**: 10 hex characters (5 bytes of SHA256). This matches Kustomize's
@@ -293,7 +304,7 @@ Both `SecretTransformer` and `ConfigMapTransformer` are updated to use `#SecretI
 
     output: {
         for _entryName, _secret in _secrets {
-            // Skip entirely if all entries are source: "k8s" (pre-existing)
+            // Skip entirely if all entries are #SecretK8sRef (pre-existing)
             // Each entry dispatched independently by variant
 
             let _outputName = (schemas.#SecretImmutableName & {
@@ -303,8 +314,8 @@ Both `SecretTransformer` and `ConfigMapTransformer` are updated to use `#SecretI
             }).out
 
             // #SecretLiteral -> K8s Secret
-            // #SecretRef (esc) -> ExternalSecret CR
-            // #SecretRef (k8s) -> skip
+            // #SecretEsoRef  -> ExternalSecret CR
+            // #SecretK8sRef  -> skip (pre-existing)
             // See RFC-0005 for full variant dispatch table.
 
             "\(_outputName)": k8scorev1.#Secret & {
@@ -331,7 +342,7 @@ Both `SecretTransformer` and `ConfigMapTransformer` are updated to use `#SecretI
 }
 ```
 
-> **Note**: The transformer above shows the `#SecretLiteral` path for clarity. > The full variant dispatch (ExternalSecret for esc, skip for k8s) > is specified in > [RFC-0005](0005-env-config-wiring.md). The `#SecretImmutableName` hash > computation applies to all variants — for `#SecretRef`, it hashes the > reference metadata rather than the secret value.
+> **Note**: The transformer above shows the `#SecretLiteral` path for clarity. The full variant dispatch (`#SecretEsoRef` -> ExternalSecret CR, `#SecretK8sRef` -> skip) is specified in [RFC-0005](0005-env-config-wiring.md). The `#SecretImmutableName` hash computation applies to all variants — for `#SecretK8sRef` and `#SecretEsoRef`, it hashes the reference metadata rather than the secret value.
 
 #### ConfigMapTransformer (updated)
 
@@ -468,13 +479,13 @@ pruning, old immutable resources would accumulate as orphans. While label-based 
 
 They compose as follows:
 
-| `#Secret` Variant   | Immutable Applicable? | Hash Input               | Notes                              |
-|----------------------|-----------------------|--------------------------|------------------------------------|
-| `#SecretLiteral`     | Yes                   | data values              | Standard case — hash the literal   |
-| `#SecretRef` (esc)   | Yes                   | source + path + remoteKey | Hash the reference, not the runtime value. OPM doesn't know the actual secret. ESC handles rotation. |
-| `#SecretRef` (k8s)   | No                    | N/A                      | OPM doesn't own the resource. Immutable is inapplicable. |
+| `#Secret` Variant    | Immutable Applicable? | Hash Input                        | Notes                              |
+|----------------------|-----------------------|-----------------------------------|------------------------------------|
+| `#SecretLiteral`     | Yes                   | data values                       | Standard case — hash the literal   |
+| `#SecretEsoRef`      | Yes                   | `externalPath` + `remoteKey`      | Hash the reference, not the runtime value. OPM doesn't know the actual secret. ESO handles rotation. |
+| `#SecretK8sRef`      | No                    | N/A                               | OPM doesn't own the resource. Immutable is inapplicable. |
 
-The hash input varies by source type because OPM's visibility into the data varies. For `#SecretLiteral`, OPM has the actual values. For `#SecretRef`, OPM only has the reference metadata. The hash captures what OPM knows — changes to the reference trigger recreation, while runtime rotation by the external store does not.
+The hash input varies by variant because OPM's visibility into the data varies. For `#SecretLiteral`, OPM has the actual values. For `#SecretEsoRef`, OPM only has the reference metadata. For `#SecretK8sRef`, OPM doesn't own the resource at all. The hash captures what OPM knows — changes to the reference trigger recreation, while runtime rotation by the external store does not.
 
 ### Release Inventory (RFC-0001)
 
@@ -749,7 +760,7 @@ The workload transformer side of the cross-transformer reference pattern. When i
 
 ### ExternalSecret Immutability
 
-For `#SecretRef` sources that produce ExternalSecret CRs (esc), the `immutable` field could be propagated to the ExternalSecret's `target` spec. This is a provider-level concern deferred to the ESC handler implementation.
+For `#SecretEsoRef` sources that produce ExternalSecret CRs, the `immutable` field could be propagated to the ExternalSecret's `target` spec. This is a provider-level concern deferred to the ESO handler implementation.
 
 ## References
 

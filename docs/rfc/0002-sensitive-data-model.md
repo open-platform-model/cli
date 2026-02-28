@@ -1,10 +1,10 @@
 # RFC-0002: Sensitive Data Model
 
-| Field       | Value              |
-|-------------|--------------------|
-| **Status**  | Draft              |
-| **Created** | 2026-02-09         |
-| **Authors** | OPM Contributors   |
+| Field        | Value              |
+|--------------|------------------  |
+| **Status**   | Draft              |
+| **Created**  | 2026-02-09         |
+| **Authors**  | OPM Contributors   |
 
 ## Summary
 
@@ -20,18 +20,22 @@ The design supports three input paths (literal values, K8s Secret references, ES
 
 ### The Problem
 
-OPM has no concept of "sensitive." Every value that passes through `#config` → `values` → transformer is a plain string:
+The v1alpha1 schema has no concept of "sensitive." Every value that passes through `#config` → `values` → transformer is a plain string. This is visible in the current schemas:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│  Module #config                                                 │
+│  v1alpha1 schemas/data.cue — #SimpleDatabaseSchema              │
 │                                                                 │
-│  db: {                                                          │
-│      host:     string     <- not sensitive                      │
-│      password: string     <- sensitive, but OPM can't tell      │
-│  }                                                              │
+│  dbName!:   string     <- not sensitive                         │
+│  username!: string     <- sensitive, but typed identically      │
+│  password!: string     <- sensitive, but typed identically      │
 │                                                                 │
-│  Both fields flow identically:                                  │
+│  v1alpha1 schemas/workload.cue — #EnvVarSchema                  │
+│                                                                 │
+│  name:   string                                                 │
+│  value!: string        <- all values are plain strings          │
+│                                                                 │
+│  Both sensitive and non-sensitive fields flow identically:      │
 │    CUE file -> git -> rendered YAML -> kubectl apply            │
 │    Password is plaintext at every stage.                        │
 └─────────────────────────────────────────────────────────────────┘
@@ -144,7 +148,9 @@ The `secret-discovery` experiment (`experiments/002-secret-discovery/`) built on
 - Auto-grouping comprehension pattern
 - `from:` / `value:` env var wiring distinction
 
-## Design
+## Proposed Design
+
+The following sections describe changes to be applied on top of the v1alpha1 schema. None of these types or mechanisms exist in v1alpha1 today.
 
 ### The #Secret Type
 
@@ -755,27 +761,19 @@ The `ClusterSecretStore` name is resolved at the platform level. Module authors 
 Not all secrets are environment variables. TLS certificates, service account keys, and credential files are mounted as volumes. The same `#Secret` type handles both — what differs is the wiring target.
 
 ```cue
-// Env var wiring
+// Env var wiring — from: on #EnvVarSchema
 env: DB_PASSWORD: { name: "DB_PASSWORD", from: values.db.password }
 
-// Volume mount wiring
-volumeMounts: "tls-cert": { mountPath: "/etc/tls", from: values.tls }
-```
-
-When `from` resolves to a `#Secret` in a volume mount context, the transformer emits a K8s Secret (or ExternalSecret), a `volume` entry referencing it, and a `volumeMount` on the container.
-
-Multi-key secrets become multiple files in the mounted volume:
-
-```cue
-#config: tls: #Secret & { $secretName: "tls-cert", $dataKey: "tls.crt" }
-
-volumeMounts: "tls": {
+// Volume mount wiring — #VolumeMountSchema embeds #VolumeSchema
+// The secret source is carried through CUE unification
+volumeMounts: "tls-cert": #VolumeMountSchema & {
+    name:      "tls-cert"
     mountPath: "/etc/tls"
-    from:      values.tls
-    // -> /etc/tls/tls.crt
-    // -> /etc/tls/tls.key
+    secret:    spec.secrets["tls-cert"]
 }
 ```
+
+The SecretTransformer emits the K8s Secret (or ExternalSecret) from `spec.secrets`. The workload transformer reads the volume mount's embedded `secret` field and emits both a `volumes[]` entry referencing the K8s Secret by name and a `volumeMounts[]` entry on the container. Both transformers use the same shared CUE name helper to compute the K8s resource name (see [RFC-0005](0005-env-config-wiring.md) for the full volume mount design).
 
 ### Unified Config Pattern
 
@@ -799,14 +797,19 @@ spec: container: {
         DB_PASSWORD: { from:  values.db_password }
         API_KEY:     { from:  values.api_key }
     }
-    volumeMounts: "tls": { mountPath: "/etc/tls", from: values.tls }
+    // Volume mount via embedding — secret source carried through unification
+    volumeMounts: "tls": #VolumeMountSchema & {
+        name:      "tls"
+        mountPath: "/etc/tls"
+        secret:    spec.secrets["tls-cert"]
+    }
 }
 ```
 
 ```text
 value: values.log_level   type: string   -> { value: "info" }
 from:  values.db_password type: #Secret  -> K8s Secret + secretKeyRef
-from:  values.tls         type: #Secret  -> K8s Secret + volume + volumeMount
+secret: spec.secrets[...]                -> K8s Secret + volume + volumeMount
 ```
 
 Non-sensitive fields resolve to plain strings via `value:`. The transformer emits inline `{ value: "..." }` on the env var. No ConfigMap is generated from `value:` references — if ConfigMap-backed config is needed, use `spec.configMaps` directly. See [RFC-0005](0005-env-config-wiring.md) for the full env wiring model.
@@ -815,10 +818,36 @@ Secret fields are auto-discovered from `values` and auto-grouped into `spec.secr
 
 ## Interface Integration
 
-The [RFC-0004: Interface Architecture](0004-interface-architecture.md) defines `provides`/`requires` with typed shapes. This RFC upgrades sensitive fields from `string` to `#Secret`:
+The [RFC-0004: Interface Architecture](0004-interface-architecture.md) defines `provides`/`requires` with typed shapes. This RFC upgrades sensitive fields from `string` to `#Secret`.
+
+The v1alpha1 `#SimpleDatabaseSchema` (`schemas/data.cue`) is a concrete example of this upgrade:
 
 ```cue
-// Before
+// v1alpha1 current — schemas/data.cue
+#SimpleDatabaseSchema: {
+    engine!:   "postgres" | "mysql" | "mongodb" | "redis"
+    version!:  string
+    dbName!:   string
+    username!: string
+    password!: string  // no sensitivity distinction
+    // ...
+}
+
+// Proposed — password becomes #Secret
+#SimpleDatabaseSchema: {
+    engine!:   "postgres" | "mysql" | "mongodb" | "redis"
+    version!:  string
+    dbName!:   string
+    username!: string
+    password!: #Secret  // now typed as sensitive
+    // ...
+}
+```
+
+Similarly, interface shapes would change:
+
+```cue
+// v1alpha1 current (hypothetical interface shape)
 #PostgresInterface: #Interface & {
     #shape: {
         host!:     string
@@ -829,7 +858,7 @@ The [RFC-0004: Interface Architecture](0004-interface-architecture.md) defines `
     }
 }
 
-// After
+// Proposed
 #PostgresInterface: #Interface & {
     #shape: {
         host!:     string
@@ -869,6 +898,17 @@ values: db: password: { value: "my-secret-password" }
 ```
 
 `#Secret` does not accept bare `string`. This is deliberate — it ensures that sensitivity is always explicit and the transformer can distinguish sensitive fields by shape without inspecting the schema type.
+
+### v1alpha1 Impact
+
+The v1alpha1 example modules (`examples/modules/`) currently have no sensitive fields in their `#config` schemas — they configure images, replicas, and volume sizes. No migration is needed for these existing examples.
+
+However, the following v1alpha1 schemas would require migration when `#Secret` is introduced:
+
+- **`#SimpleDatabaseSchema`** (`schemas/data.cue`): `password!: string` -> `password!: #Secret`
+- **`#EnvVarSchema`** (`schemas/workload.cue`): Must be expanded to support `from?: #Secret` (see [RFC-0005](0005-env-config-wiring.md))
+- **`#SecretSchema`** (`schemas/config.cue`): No change — this is the K8s output schema, not the contract type. It continues to describe what the SecretTransformer emits.
+- **`#VolumeSchema`** (`schemas/storage.cue`): The `secret?: #SecretSchema` field already supports Secret-backed volumes. `#VolumeMountSchema` embeds `#VolumeSchema`, so volume mounts carry the secret source through CUE unification with declared `spec.secrets` entries (see [RFC-0005](0005-env-config-wiring.md)). No schema change needed.
 
 ### Warnings
 
@@ -1092,9 +1132,7 @@ Where does the user specify which `ClusterSecretStore` to use for a given `#Secr
 
 ### Q5: Interaction with Volume Resources
 
-How does `#Secret`-based volume mounting interact with the existing `#VolumeSchema`? Options: (A) Separate concepts. (B) Unified `from:` resolves to either. (C) New volume type in existing system.
-
-**Recommendation:** Option A for now. PVC and secret volumes have different lifecycle and security properties.
+**Resolved.** `#VolumeMountSchema` embeds `#VolumeSchema`, which already has `secret?: #SecretSchema`. Volume-mounted secrets use CUE unification with declared `spec.secrets` entries — the secret source is carried through the embedding. No new fields are needed. See [RFC-0005](0005-env-config-wiring.md) for the full volume mount design.
 
 ### Q6: @opm() Attribute as Field Decorator
 

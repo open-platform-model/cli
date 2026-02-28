@@ -19,12 +19,15 @@ The design was validated in [Experiment 002: Secret Discovery](../../../catalog/
 
 ### The Problem
 
-`#ContainerSchema.env` only supports inline string values:
+The v1alpha1 `#ContainerSchema.env` (`schemas/workload.cue`) only supports inline string values:
 
 ```cue
-env?: [string]: {
-    name:  string
-    value: string
+// v1alpha1 current — schemas/workload.cue
+env?: [envName=string]: #EnvVarSchema & {name: envName}
+
+#EnvVarSchema: {
+    name:   string
+    value!: string
 }
 ```
 
@@ -50,56 +53,26 @@ RFC-0002 defines how secrets enter OPM (`#Secret` type, input paths, provider ha
 - The full `#EnvVarSchema` replacing the current `{ name, value }` struct.
 - Bulk injection, downward API, and volume mount wiring.
 
-## Design
+## Proposed Design
 
-### #Secret Type Definition
+### #Secret Type Definition (Canonical: RFC-0002)
 
-`#Secret` is a **contract type** — a disjunction of fulfillment variants. Module authors annotate `#config` fields with `#Secret`; users provide values that resolve to one of the variants.
+The `#Secret` contract type is defined in [RFC-0002: Sensitive Data Model](0002-sensitive-data-model.md). This RFC uses that definition without modification. Summary:
 
 ```cue
-#Secret: #SecretLiteral | #SecretRef
-
-#SecretLiteral: {
-    $opm:         "secret"
-    $secretName!: #NameType    // K8s Secret resource name (grouping key)
-    $dataKey!:    string       // data key within that K8s Secret
-    description?: string
-    value!:       string
-}
-
-#SecretRef: {
-    $opm:         "secret"
-    $secretName!: #NameType
-    $dataKey!:    string
-    description?: string
-    source!:      *"k8s" | "esc"
-    path!:        string       // K8s Secret name (k8s) or external path (esc)
-    remoteKey!:   string       // key within the referenced secret
-}
+#Secret: #SecretLiteral | #SecretK8sRef | #SecretEsoRef
 ```
 
-Design rationale:
+Three variants, each carrying `$opm: "secret"` as a discriminator, plus `$secretName` and `$dataKey` as routing fields. See RFC-0002 for full type definitions, design rationale, and the auto-discovery mechanism.
 
-- **`$opm: "secret"` discriminator.** A concrete value present on every
-  `#Secret` variant. Enables CUE-native auto-discovery via the negation test   (see [Auto-Discovery](#auto-discovery)). No external tooling or tags needed.
+**Key properties relevant to this RFC:**
 
-- **`$secretName` and `$dataKey` are routing info.** The module author sets
-  these in the `#config` schema declaration. `$secretName` names the K8s Secret   resource (and acts as the grouping key). `$dataKey` names the data key within   that K8s Secret. Multiple `#config` fields sharing the same `$secretName` are   grouped into one K8s Secret.
-
-- **Users never set `$secretName`/`$dataKey`.** CUE unification propagates the
-  author's values through. Users only provide `value` (for literals) or   `source`/`path`/`remoteKey` (for refs).
-
-- **`$`-prefixed fields.** These are regular CUE fields (visible in iteration),
-  not hidden. The `$` prefix is a naming convention to visually distinguish   author-set routing fields from user-set fulfillment fields.
-
-- **No `#SecretDeferred`.** Unfulfilled `#Secret` fields are CUE incompleteness
-  errors, caught at evaluation time. If a user omits a required secret value,   CUE itself reports the error — no special deferred variant needed.
-
-- **`#SecretRef.remoteKey` is separate from `$dataKey`.** The external secret's
-  key (in Vault, ESO, or another K8s Secret) may differ from the logical data   key that the module uses. `$dataKey` is the output key; `remoteKey` is the   input key.
-
-- **`source: *"k8s" | "esc"`.** Simplified from the previous design's
-  `vault`/`aws-sm`/`gcp-sm`/`k8s` enumeration. ESO (External Secrets Operator)   abstracts over external providers, so `"esc"` covers all external sources.
+- **`$secretName`** — K8s Secret resource name (grouping key). Set by module author.
+- **`$dataKey`** — data key within that K8s Secret. Set by module author.
+- **Users never set `$secretName`/`$dataKey`.** CUE unification propagates the author's values.
+- **`#SecretLiteral`** — user provides `value!: string`.
+- **`#SecretK8sRef`** — user provides `secretName!: string` + `remoteKey!: string` (pre-existing K8s Secret).
+- **`#SecretEsoRef`** — user provides `externalPath: string` + `remoteKey: string` (ESO reference).
 
 Example usage:
 
@@ -128,7 +101,7 @@ values: {
     db: password: { value: "my-secret" }
     db: username: { value: "admin" }
     apiKey: {
-        source: "esc", path: "prod/api", remoteKey: "token"
+        externalPath: "prod/api", remoteKey: "token"
     }
 }
 
@@ -143,8 +116,8 @@ values: {
 // }
 // apiKey: {
 //     $opm: "secret", $secretName: "api-credentials",
-//     $dataKey: "api-key", source: "esc",
-//     path: "prod/api", remoteKey: "token"
+//     $dataKey: "api-key",
+//     externalPath: "prod/api", remoteKey: "token"
 // }
 ```
 
@@ -257,7 +230,7 @@ spec: secrets: (_#groupSecrets & {#in: _discovered}).out
 │       ▼                                                                  │
 │  _#discoverSecrets                                                       │
 │    Traverses up to 3 levels                                              │
-│    Tests: (v & {$opm: !="secret", ...}) == _|_                          │
+│    Tests: (v & {$opm: !="secret", ...}) == _|_                           │
 │    Collects all #Secret fields into flat map                             │
 │       │                                                                  │
 │       ▼                                                                  │
@@ -268,17 +241,17 @@ spec: secrets: (_#groupSecrets & {#in: _discovered}).out
 │       ▼                                                                  │
 │  spec.secrets (auto-generated)                                           │
 │    "db-credentials":                                                     │
-│      username: {$opm: "secret", value: "admin", ...}                    │
-│      password: {$opm: "secret", source: "k8s", ...}                    │
+│      username: {$opm: "secret", value: "admin", ...}     #SecretLiteral  │
+│      password: {$opm: "secret", secretName: ..., ...}    #SecretK8sRef   │
 │    "api-credentials":                                                    │
-│      api-key: {$opm: "secret", value: "sk_live_...", ...}                │
+│      api-key: {$opm: "secret", value: "sk_live_...", ...} #SecretLiteral │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### SecretTransformer Variant Dispatch
 
-The SecretTransformer reads `spec.secrets` (auto-generated) and inspects the `#Secret` variant of each data entry. **Each entry is dispatched independently** — mixed variants within a group are supported.
+The SecretTransformer reads `spec.secrets` (auto-generated) and inspects the `#Secret` variant of each data entry. **Each entry is dispatched independently** — mixed variants within a group are supported. Dispatch uses the three-variant type system from [RFC-0002](0002-sensitive-data-model.md) — no `source` field inspection needed.
 
 ```text
 ┌──────────────────────────────┬───────────────────────────────────────────┐
@@ -287,14 +260,14 @@ The SecretTransformer reads `spec.secrets` (auto-generated) and inspects the `#S
 │ #SecretLiteral               │ Include in K8s Secret                     │
 │                              │   data[entry.$dataKey]: base64(value)     │
 │                              │                                           │
-│ #SecretRef (esc)             │ ExternalSecret CR                         │
+│ #SecretEsoRef                │ ExternalSecret CR                         │
 │                              │   metadata.name: $secretName              │
 │                              │   spec.data: [{secretKey: $dataKey,       │
-│                              │     remoteRef: {key: path,                │
+│                              │     remoteRef: {key: externalPath,        │
 │                              │       property: remoteKey}}]              │
 │                              │   spec.target.name: $secretName           │
 │                              │                                           │
-│ #SecretRef (k8s)             │ Skip. Resource already exists.            │
+│ #SecretK8sRef                │ Skip. Resource already exists.            │
 │                              │                                           │
 │ Mixed variants in group      │ Supported. Each entry dispatched          │
 │                              │ independently. Literal entries create     │
@@ -304,14 +277,14 @@ The SecretTransformer reads `spec.secrets` (auto-generated) and inspects the `#S
 ```
 
 **Mixed variants are supported.** Unlike the previous design which rejected
-mixed variants, each entry within a `spec.secrets` group is dispatched on its own variant. A group like `"db-credentials"` can contain a `#SecretLiteral` for `username` and a `#SecretRef (k8s)` for `password`. The literal creates a K8s Secret data entry; the k8s ref is skipped. This was validated in experiment 002.
+mixed variants, each entry within a `spec.secrets` group is dispatched on its own variant. A group like `"db-credentials"` can contain a `#SecretLiteral` for `username` and a `#SecretK8sRef` for `password`. The literal creates a K8s Secret data entry; the K8s ref is skipped. This was validated in experiment 002.
 
-**Silent skip for `source: "k8s"`.** When an entry resolves to `#SecretRef`
-with `source: "k8s"`, the SecretTransformer emits nothing for that entry. The referenced Secret already exists in the cluster.
+**Silent skip for `#SecretK8sRef`.** When an entry resolves to `#SecretK8sRef`,
+the SecretTransformer emits nothing for that entry. The referenced Secret already exists in the cluster.
 
 ### #EnvVarSchema
 
-The full environment variable schema replaces the current `{ name, value }` struct:
+The full environment variable schema replaces the v1alpha1 `#EnvVarSchema` (`schemas/workload.cue`), which currently only supports `{name: string, value!: string}`:
 
 ```cue
 #EnvVarSchema: {
@@ -367,56 +340,56 @@ For `value:` fields, the transformer emits an inline `value`. For `from:` fields
 The workload transformer (DeploymentTransformer, StatefulSetTransformer, etc.) handles each env var source type:
 
 ```text
-┌──────────────────────────┬──────────────────────────────────────────────┐
-│ Source                   │ K8s Output                                   │
-├──────────────────────────┼──────────────────────────────────────────────┤
-│ value: "info"            │ env:                                         │
-│                          │   - name: LOG_LEVEL                          │
-│                          │     value: "info"                            │
-│                          │                                              │
-│ from: #SecretLiteral     │ env:                                         │
-│   ($secretName: "db-c")  │   - name: DB_PASSWORD                       │
-│   ($dataKey: "password") │     valueFrom:                              │
-│                          │       secretKeyRef:                          │
-│                          │         name: db-credentials                 │
-│                          │         key: password                        │
-│                          │                                              │
-│ from: #SecretRef (esc)   │ env:                                         │
-│   ($secretName: "cache") │   - name: CACHE_PW                          │
-│   ($dataKey: "password") │     valueFrom:                              │
-│                          │       secretKeyRef:                          │
-│                          │         name: cache-credentials              │
-│                          │         key: password                        │
-│                          │ (ESC creates Secret named $secretName)       │
-│                          │                                              │
-│ from: #SecretRef (k8s)   │ env:                                         │
-│   (path: "existing-sec") │   - name: DB_PASSWORD                       │
-│   (remoteKey: "pw")      │     valueFrom:                              │
-│                          │       secretKeyRef:                          │
-│                          │         name: existing-sec                   │
-│                          │         key: pw                              │
-│                          │                                              │
-│ fieldRef:                │ env:                                         │
-│   fieldPath: "meta..."   │   - name: POD_NAME                          │
-│                          │     valueFrom:                              │
-│                          │       fieldRef:                              │
-│                          │         fieldPath: metadata.name             │
-│                          │                                              │
-│ resourceFieldRef:        │ env:                                         │
-│   resource: "limits.cpu" │   - name: CPU_LIMIT                         │
-│                          │     valueFrom:                              │
-│                          │       resourceFieldRef:                     │
-│                          │         resource: limits.cpu                 │
-└──────────────────────────┴──────────────────────────────────────────────┘
+┌───────────────────────────────┬──────────────────────────────────────────────┐
+│ Source                        │ K8s Output                                   │
+├───────────────────────────────┼──────────────────────────────────────────────┤
+│ value: "info"                 │ env:                                         │
+│                               │   - name: LOG_LEVEL                          │
+│                               │     value: "info"                            │
+│                               │                                              │
+│ from: #SecretLiteral          │ env:                                         │
+│   ($secretName: "db-creds")   │   - name: DB_PASSWORD                        │
+│   ($dataKey: "password")      │     valueFrom:                               │
+│                               │       secretKeyRef:                          │
+│                               │         name: db-credentials                 │
+│                               │         key: password                        │
+│                               │                                              │
+│ from: #SecretEsoRef           │ env:                                         │
+│   ($secretName: "cache")      │   - name: CACHE_PW                           │
+│   ($dataKey: "password")      │     valueFrom:                               │
+│                               │       secretKeyRef:                          │
+│                               │         name: cache-credentials              │
+│                               │         key: password                        │
+│                               │ (ESO creates Secret named $secretName)       │
+│                               │                                              │
+│ from: #SecretK8sRef           │ env:                                         │
+│   (secretName: "existing-s")  │   - name: DB_PASSWORD                        │
+│   (remoteKey: "pw")           │     valueFrom:                               │
+│                               │       secretKeyRef:                          │
+│                               │         name: existing-sec                   │
+│                               │         key: pw                              │
+│                               │                                              │
+│ fieldRef:                     │ env:                                         │
+│   fieldPath: "meta..."        │   - name: POD_NAME                           │
+│                               │     valueFrom:                               │
+│                               │       fieldRef:                              │
+│                               │         fieldPath: metadata.name             │
+│                               │                                              │
+│ resourceFieldRef:             │ env:                                         │
+│   resource: "limits.cpu"      │   - name: CPU_LIMIT                          │
+│                               │     valueFrom:                               │
+│                               │       resourceFieldRef:                      │
+│                               │         resource: limits.cpu                 │
+└───────────────────────────────┴──────────────────────────────────────────────┘
 ```
 
 **Name resolution for `secretKeyRef`:**
 
 ```text
-#SecretLiteral       -> secretKeyRef: { name: $secretName, key: $dataKey }
-#SecretRef (esc)     -> secretKeyRef: { name: $secretName, key: $dataKey }
-                        (ESC creates the target Secret named $secretName)
-#SecretRef (k8s)     -> secretKeyRef: { name: path, key: remoteKey }
+#SecretLiteral  -> secretKeyRef: { name: $secretName, key: $dataKey }
+#SecretEsoRef   -> secretKeyRef: { name: $secretName, key: $dataKey }
+                   (ESO creates the target Secret named $secretName)
+#SecretK8sRef   -> secretKeyRef: { name: secretName, key: remoteKey }
 ```
 
 The transformer converts env from OPM's struct-keyed map to Kubernetes' list format, applying the appropriate `valueFrom` structure based on which source field is set. The `envFrom` list passes through with minimal transformation.
@@ -512,9 +485,13 @@ Supported `resource` values:
 
 The `divisor` field controls the unit of the output value. Without a divisor, CPU is reported in cores and memory in bytes.
 
-### Volume-Mounted Secrets
+### Volume-Mounted Secrets and ConfigMaps
 
-Secrets can be mounted as files via `from:` on volume mounts. The same `#Secret` type used for env vars drives the volume wiring:
+Volume mounts in v1alpha1 use the `#VolumeMountSchema`, which embeds `#VolumeSchema`. The volume source (secret, configMap, emptyDir, persistentClaim) is part of the mount itself — carried through CUE unification with a declared resource. No `from:` field is needed.
+
+#### Pattern: Secret Volume Mount
+
+The module author declares secrets in `spec.secrets` (auto-generated from `#config` via the discovery pipeline), then creates a volume mount that unifies with the declared secret:
 
 ```cue
 #config: tls: #Secret & {
@@ -522,60 +499,138 @@ Secrets can be mounted as files via `from:` on volume mounts. The same `#Secret`
     $dataKey:    "tls.crt"
 }
 
-spec: container: {
-    volumeMounts: "tls": {
-        mountPath: "/etc/tls"
-        from:      #config.tls
+// spec.secrets is auto-generated from #config:
+//   "tls-cert": { data: { "tls.crt": ... } }
+
+// Volume mount unifies with the declared secret
+spec: container: volumeMounts: "tls": #VolumeMountSchema & {
+    name:      "tls"
+    mountPath: "/etc/tls"
+    secret:    spec.secrets["tls-cert"]
+}
+```
+
+The workload transformer reads the volume mount, extracts the mount fields for K8s `volumeMounts[]`, and extracts the source for K8s `volumes[]`. Both the SecretTransformer and the workload transformer use the same shared CUE name-generation helper to compute the K8s Secret resource name (see [RFC-0003](0003-immutable-config.md) for the duplicate hash computation pattern):
+
+```text
+spec: container: volumeMounts: "tls": {
+    name: "tls", mountPath: "/etc/tls",
+    secret: spec.secrets["tls-cert"]
+}
+
+Workload transformer emits on pod spec:
+  volumes:
+    - name: tls
+      secret:
+        secretName: tls-cert     (from shared name helper)
+
+  containers[0].volumeMounts:
+    - name: tls
+      mountPath: /etc/tls
+```
+
+#### Pattern: ConfigMap Volume Mount
+
+ConfigMaps are explicitly declared by the module author (no auto-discovery). The same embedding pattern applies:
+
+```cue
+spec: configMaps: "app-config": #ConfigMapSchema & {
+    data: {
+        "settings.yaml": values.settingsYaml
+        "defaults.json": values.defaultsJson
+    }
+}
+
+spec: container: volumeMounts: "config": #VolumeMountSchema & {
+    name:      "config"
+    mountPath: "/etc/app"
+    readOnly:  true
+    configMap: spec.configMaps["app-config"]
+}
+```
+
+```text
+Workload transformer emits on pod spec:
+  volumes:
+    - name: config
+      configMap:
+        name: app-config          (from shared name helper)
+
+  containers[0].volumeMounts:
+    - name: config
+      mountPath: /etc/app
+      readOnly: true
+```
+
+#### Transformer Responsibilities
+
+The workload transformer handles `#VolumeMountSchema` entries by splitting them into two K8s constructs:
+
+1. **`volumes[]`** on the pod spec — references the K8s resource by name
+   (computed via the shared name helper, which handles hash suffixes for
+   immutable resources per RFC-0003).
+2. **`volumeMounts[]`** on the container — carries `name`, `mountPath`,
+   `subPath`, `readOnly`.
+
+The K8s Secret/ConfigMap resources themselves are emitted by the SecretTransformer and ConfigMapTransformer respectively. Both the config transformer and the workload transformer independently compute the same K8s resource name because they use the same CUE helper with the same `spec.secrets` / `spec.configMaps` data as input.
+
+### ConfigMap Wiring
+
+Unlike secrets, ConfigMaps have no contract type, no discriminator field, and no auto-discovery. The module author explicitly declares `spec.configMaps` entries using `#ConfigMapSchema`, populated from `#config` values:
+
+```cue
+#config: {
+    logLevel:   string | *"info"
+    maxRetries: string | *"3"
+    featureFlags: [string]: string
+}
+
+spec: configMaps: {
+    "app-settings": #ConfigMapSchema & {
+        data: {
+            log_level:   values.logLevel
+            max_retries: values.maxRetries
+        }
+    }
+    "feature-flags": #ConfigMapSchema & {
+        data: values.featureFlags
     }
 }
 ```
 
-When the workload transformer encounters `from:` on a volume mount resolving to `#Secret`, it emits:
+**Why no `#ConfigRef` type?** ConfigMap values are plain strings — there is no variant dispatch (literal vs. external reference) and no sensitivity concern. The module author knows exactly which `#config` fields go into which ConfigMap. Auto-discovery adds complexity without benefit for non-sensitive data.
 
-1. A `volumes[]` entry on the pod spec referencing the Secret by its
-   `$secretName` (or `path` for `source: "k8s"`).
-2. A `volumeMount` on the container at the specified `mountPath`.
+**Three ways to consume ConfigMaps:**
 
-The K8s Secret resource itself is emitted by the SecretTransformer from the auto-generated `spec.secrets`.
+1. **`envFrom` (bulk injection)** — inject all keys as env vars:
 
-```text
-from: #config.tls  ($secretName: "tls-cert")
-
-Workload transformer emits on pod spec:
-  volumes:
-    - name: tls
-      secret:
-        secretName: tls-cert
-
-  containers[0].volumeMounts:
-    - name: tls
-      mountPath: /etc/tls
+```cue
+spec: container: envFrom: [{
+    configMapRef: name: "feature-flags"
+    prefix: "FF_"
+}]
 ```
 
-For `#SecretRef` with `source: "k8s"`, the volume references the `path` (pre-existing Secret name) and uses `remoteKey` for item selection:
+2. **`value:` on `#EnvVarSchema` (selective)** — wire individual values inline:
 
-```text
-from: #config.tls  (source: "k8s", path: "wildcard-tls", remoteKey: "tls.crt")
-
-Workload transformer emits on pod spec:
-  volumes:
-    - name: tls
-      secret:
-        secretName: wildcard-tls
-        items:
-          - key: tls.crt
-            path: tls.crt
-
-  containers[0].volumeMounts:
-    - name: tls
-      mountPath: /etc/tls
+```cue
+spec: container: env: {
+    LOG_LEVEL: { value: values.logLevel }
+}
 ```
 
-### #ConfigRef (Placeholder)
+3. **Volume mount (file-based)** — mount as files via the embedding pattern:
 
-This RFC focuses on `#Secret` wiring. A parallel `#ConfigRef` type for non-sensitive ConfigMap-backed values may be introduced in a future RFC. The design would mirror `#Secret` — a struct type with `$configMapName` and `$dataKey` fields that the ConfigMapTransformer and WorkloadTransformer both read.
+```cue
+spec: container: volumeMounts: "config": #VolumeMountSchema & {
+    name:      "config"
+    mountPath: "/etc/app"
+    readOnly:  true
+    configMap: spec.configMaps["app-settings"]
+}
+```
 
-For now, non-sensitive env vars use `value:` (inline strings). If ConfigMap-backed config is needed, use `spec.configMaps` directly combined with `envFrom` or the existing ConfigMapTransformer.
+The ConfigMapTransformer reads `spec.configMaps` and emits K8s ConfigMap resources. The workload transformer uses the same shared name-generation helper to compute the K8s resource name (including hash suffixes for immutable ConfigMaps per [RFC-0003](0003-immutable-config.md)).
 
 ## Interaction with Other RFCs
 
@@ -585,25 +640,26 @@ The inventory tracks all resources emitted by transformers, including Secrets ge
 
 ### RFC-0002: Sensitive Data Model
 
-This RFC is the output counterpart to RFC-0002's input model:
+This RFC is the output counterpart to RFC-0002's input model. RFC-0002 is the canonical source for the `#Secret` type definition (`#SecretLiteral | #SecretK8sRef | #SecretEsoRef`). This RFC does not redefine `#Secret` — it references RFC-0002's three-variant design throughout.
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  RFC-0002 (Input)                    RFC-0005 (Output)                   │
 │  ═══════════════                     ════════════════                    │
-│  #Secret type definition             #Secret contract type               │
-│  #SecretLiteral | #SecretRef         $opm discriminator                  │
-│  $secretName + $dataKey routing      Auto-discovery pipeline             │
-│  Provider handler interface          Auto-generated spec.secrets         │
-│  Input paths (literal, ref)          SecretTransformer variant dispatch  │
-│                                      #EnvVarSchema (value, from,         │
-│                                        fieldRef, resourceFieldRef)       │
+│  #Secret type definition             from?: #Secret on #EnvVarSchema    │
+│  #SecretLiteral | #SecretK8sRef |    Auto-discovery pipeline             │
+│    #SecretEsoRef                     Auto-generated spec.secrets         │
+│  $secretName + $dataKey routing      SecretTransformer variant dispatch  │
+│  Provider handler interface          #EnvVarSchema (value, from,         │
+│  Input paths (literal, refs)           fieldRef, resourceFieldRef)       │
 │                                      envFrom bulk injection              │
 │                                      Volume mount transformer output     │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-RFC-0002 defines `#Secret` with `$secretName!` and `$dataKey!`, the `#Secret` variants, and the `from?: #Secret` field on `#EnvVarSchema`. This RFC extends the schema with `fieldRef` and `resourceFieldRef`, defines auto-discovery, and specifies how all source types transform to Kubernetes output.
+RFC-0002 defines `#Secret` with `$secretName!` and `$dataKey!`, the three variants (`#SecretLiteral`, `#SecretK8sRef`, `#SecretEsoRef`), and the `from?: #Secret` field on `#EnvVarSchema`. This RFC extends the env schema with `fieldRef` and `resourceFieldRef`, defines auto-discovery, and specifies how all source types transform to Kubernetes output.
+
+Neither RFC is implemented in v1alpha1 today.
 
 ### RFC-0003: Immutable ConfigMaps and Secrets
 
@@ -722,7 +778,7 @@ WorkloadTransformer emits:
 Two #config fields, one K8s Secret, two env vars. [x]
 ```
 
-### Scenario D: Pre-existing K8s Secret via #SecretRef [x]
+### Scenario D: Pre-existing K8s Secret via #SecretK8sRef [x]
 
 ```text
 Schema:
@@ -730,28 +786,30 @@ Schema:
       $secretName: "db-credentials", $dataKey: "password"
   }
   values: db: password: {
-      source: "k8s", path: "existing-db-secret", remoteKey: "pw"
+      secretName: "existing-db-secret", remoteKey: "pw"
   }
+
+Resolves to: #SecretK8sRef
 
 Auto-grouped spec.secrets:
   "db-credentials": {
-      password: { ... source: "k8s", path: "existing-db-secret", remoteKey: "pw" }
+      password: { ... secretName: "existing-db-secret", remoteKey: "pw" }
   }
 
-SecretTransformer: source: "k8s" -> skip, emit nothing.
+SecretTransformer: #SecretK8sRef -> skip, emit nothing.
 
 WorkloadTransformer emits:
   env:
     - name: DB_PASSWORD
       valueFrom:
         secretKeyRef:
-          name: existing-db-secret    (uses path, not $secretName)
+          name: existing-db-secret    (uses secretName, not $secretName)
           key: pw                     (uses remoteKey, not $dataKey)
 
 Module definition unchanged regardless of how users fulfill secrets. [x]
 ```
 
-### Scenario E: ExternalSecret via #SecretRef (esc) [x]
+### Scenario E: ExternalSecret via #SecretEsoRef [x]
 
 ```text
 Schema:
@@ -759,12 +817,14 @@ Schema:
       $secretName: "cache-credentials", $dataKey: "password"
   }
   values: cache: password: {
-      source: "esc", path: "production/redis", remoteKey: "password"
+      externalPath: "production/redis", remoteKey: "password"
   }
+
+Resolves to: #SecretEsoRef
 
 Auto-grouped spec.secrets:
   "cache-credentials": {
-      password: { ... source: "esc", path: "production/redis",
+      password: { ... externalPath: "production/redis",
           remoteKey: "password" }
   }
 
@@ -779,7 +839,7 @@ WorkloadTransformer emits:
     - name: CACHE_PASSWORD
       valueFrom:
         secretKeyRef:
-          name: cache-credentials     (ESC creates this Secret)
+          name: cache-credentials     (ESO creates this Secret)
           key: password
 
 [x]
@@ -794,19 +854,19 @@ Schema:
       password: #Secret & { $secretName: "db-credentials", $dataKey: "password" }
   }
   values: db: {
-      username: { value: "admin" }                                    // literal
-      password: { source: "k8s", path: "myapp-secrets", remoteKey: "pw" } // k8s ref
+      username: { value: "admin" }                                          // #SecretLiteral
+      password: { secretName: "myapp-secrets", remoteKey: "pw" }            // #SecretK8sRef
   }
 
 Auto-grouped spec.secrets:
   "db-credentials": {
-      username: { $opm: "secret", value: "admin", ... }              // literal
-      password: { $opm: "secret", source: "k8s", path: "myapp-secrets", ... }
+      username: { $opm: "secret", value: "admin", ... }                    // #SecretLiteral
+      password: { $opm: "secret", secretName: "myapp-secrets", ... }       // #SecretK8sRef
   }
 
 SecretTransformer dispatches each entry independently:
-  username (literal) -> K8s Secret data entry: username: base64("admin")
-  password (k8s ref) -> skip (pre-existing)
+  username (#SecretLiteral) -> K8s Secret data entry: username: base64("admin")
+  password (#SecretK8sRef)  -> skip (pre-existing)
 
   Emits: Secret/db-credentials { data: { username: base64("admin") } }
   (Only literal entries included in the K8s Secret)
@@ -912,24 +972,32 @@ Resources must exist (managed by OPM via auto-discovery or pre-existing). [x]
 
 ```text
 #config: tls: #Secret & { $secretName: "tls-cert", $dataKey: "tls.crt" }
-values:  tls: { source: "k8s", path: "wildcard-tls", remoteKey: "tls.crt" }
+values:  tls: { secretName: "wildcard-tls", remoteKey: "tls.crt" }
 
-spec: container: {
-    volumeMounts: "tls": { mountPath: "/etc/tls", from: values.tls }
-}
+Resolves to: #SecretK8sRef
 
-SecretTransformer: source: "k8s" -> nothing emitted.
+Auto-generated spec.secrets:
+  "tls-cert": { data: { "tls.crt": { ... secretName: "wildcard-tls" } } }
 
-WorkloadTransformer emits:
+Volume mount via embedding:
+  spec: container: volumeMounts: "tls": #VolumeMountSchema & {
+      name:      "tls"
+      mountPath: "/etc/tls"
+      secret:    spec.secrets["tls-cert"]
+  }
+
+SecretTransformer: #SecretK8sRef -> nothing emitted.
+
+WorkloadTransformer reads volumeMount, splits into:
   volumes:
     - name: tls
       secret:
-        secretName: wildcard-tls   (uses path, not $secretName)
+        secretName: wildcard-tls   (uses secretName, not $secretName)
   containers[0].volumeMounts:
     - name: tls
       mountPath: /etc/tls
 
-[x]
+No from: field. Source carried via #VolumeMountSchema embedding #VolumeSchema. [x]
 ```
 
 ### Scenario K: Mixed — All Wiring Types [x]
@@ -950,9 +1018,14 @@ values: {
     logLevel: "info"
     db: {
         host:     "db.prod.internal"
-        password: { value: "my-secret" }
+        password: { value: "my-secret" }                                // #SecretLiteral
     }
-    tls: { source: "k8s", path: "wildcard-tls", remoteKey: "tls.crt" }
+    tls: { secretName: "wildcard-tls", remoteKey: "tls.crt" }          // #SecretK8sRef
+}
+
+// Explicit ConfigMap declaration
+spec: configMaps: "shared-feature-flags": #ConfigMapSchema & {
+    data: values.featureFlags
 }
 
 spec: container: {
@@ -966,18 +1039,24 @@ spec: container: {
     envFrom: [{
         configMapRef: name: "shared-feature-flags"
     }]
-    volumeMounts: "tls": { mountPath: "/etc/tls", from: values.tls }
+    // Volume mount via embedding — no from: field
+    volumeMounts: "tls": #VolumeMountSchema & {
+        name:      "tls"
+        mountPath: "/etc/tls"
+        secret:    spec.secrets["tls-cert"]
+    }
 }
 
 Auto-generated spec.secrets:
-  "db-credentials": { password: { ... value: "my-secret" } }
-  "tls-cert":       { tls.crt: { ... source: "k8s", path: "wildcard-tls" } }
+  "db-credentials": { password: { ... value: "my-secret" } }           // #SecretLiteral
+  "tls-cert":       { tls.crt: { ... secretName: "wildcard-tls" } }    // #SecretK8sRef
 
 Result:
   5 env vars (2 literal, 1 secretKeyRef, 1 fieldRef, 1 resourceFieldRef)
   1 envFrom (configMapRef)
-  1 volume mount (secret)
-  1 K8s Secret emitted (db-credentials); tls-cert skipped (k8s ref)
+  1 volume mount (secret, via embedding)
+  1 K8s Secret emitted (db-credentials); tls-cert skipped (#SecretK8sRef)
+  1 K8s ConfigMap emitted (shared-feature-flags)
   All coexist cleanly. [x]
 ```
 
@@ -1016,14 +1095,6 @@ The CUE-based discovery traverses 3 levels, which covers practical nesting patte
 Is 3 levels sufficient? Current evidence says yes — module configs rarely nest secrets deeper than `integrations.payments.stripeKey` (level 3).
 
 ## Deferred Work
-
-### #ConfigRef Full Design
-
-A `#ConfigRef` type parallel to `#Secret` for ConfigMap-backed non-sensitive values. Would enable `from:` syntax for ConfigMaps with the same transformer-independent name resolution. Deferred until demand is clear.
-
-### ConfigMap Aggregation
-
-When multiple non-sensitive config values exist, should they be aggregated into a single ConfigMap per component? This optimization is provider-specific and deferred to the `#ConfigRef` design.
 
 ### @opm() Attribute
 
