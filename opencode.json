@@ -2,6 +2,11 @@
     "$schema": "https://opencode.ai/config.json",
     "theme": "nord",
     "permission": {
+        "external_directory": {
+            "../catalog/**": "allow",
+            "../opm/**": "allow",
+            "../opmodel.dev/**": "allow"
+        },
         "read": {
             "*": "allow",
             "*.env": "deny",
