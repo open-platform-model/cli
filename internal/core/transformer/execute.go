@@ -2,6 +2,8 @@ package transformer
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"cuelang.org/go/cue"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -74,8 +76,29 @@ func (p *TransformerMatchPlan) executeMatch(
 		}
 	}
 
+	// Materialize the component value before injection.
+	//
+	// CUE values from module evaluation carry schema constraints (e.g., matchN
+	// validators on #VolumeSchema). These constraints interact badly with
+	// `if field != _|_` guards in transformer comprehensions when the value is
+	// injected via FillPath — the guard sees the optional-field template from
+	// the constraint rather than the concrete data. JSON round-tripping produces
+	// an equivalent concrete value without schema constraints, which allows
+	// transformer comprehensions to correctly evaluate conditional branches.
+	//
+	// See: CUE matchN + FillPath interaction causing hostPath volumes to be
+	// silently dropped in DaemonSet/Deployment/StatefulSet transformers.
+	materializedComp, err := materialize(cueCtx, match.Component.Value)
+	if err != nil {
+		return nil, &opmerrors.TransformError{
+			ComponentName:  compName,
+			TransformerFQN: tfFQN,
+			Cause:          fmt.Errorf("materializing component: %w", err),
+		}
+	}
+
 	// Inject #component into the transformer.
-	unified := transformValue.FillPath(cue.ParsePath("#component"), match.Component.Value)
+	unified := transformValue.FillPath(cue.ParsePath("#component"), materializedComp)
 	if unified.Err() != nil {
 		return nil, &opmerrors.TransformError{
 			ComponentName:  compName,
@@ -180,6 +203,26 @@ func decodeResource(value cue.Value) (*unstructured.Unstructured, error) {
 		return nil, err
 	}
 	return &unstructured.Unstructured{Object: obj}, nil
+}
+
+// materialize converts a CUE value to a constraint-free equivalent by
+// round-tripping through JSON. This strips schema validators (e.g., matchN)
+// that can interfere with transformer comprehension guards while preserving
+// the concrete data.
+func materialize(ctx *cue.Context, v cue.Value) (cue.Value, error) {
+	var data any
+	if err := v.Decode(&data); err != nil {
+		return cue.Value{}, fmt.Errorf("decoding CUE value: %w", err)
+	}
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return cue.Value{}, fmt.Errorf("marshalling to JSON: %w", err)
+	}
+	result := ctx.CompileBytes(raw)
+	if result.Err() != nil {
+		return cue.Value{}, fmt.Errorf("compiling materialized JSON: %w", result.Err())
+	}
+	return result, nil
 }
 
 var errMissingTransform = &transformMissingError{}

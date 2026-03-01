@@ -62,6 +62,7 @@ let _alertmanagerConfig = {
 				// === ConfigMaps ===
 				configMaps: {
 					"alertmanager-config": {
+						name: "alertmanager-config"
 						data: {
 							"alertmanager.yml": yaml.Marshal(_alertmanagerConfig)
 						}
@@ -87,9 +88,12 @@ let _alertmanagerConfig = {
 					]
 
 					volumeMounts: {
-						"alertmanager-data": {
-							name:      "alertmanager-data"
+						"alertmanager-data": volumes["alertmanager-data"] & {
 							mountPath: "/data"
+						}
+						"alertmanager-config": volumes["alertmanager-config"] & {
+							mountPath: "/etc/alertmanager"
+							readOnly:  true
 						}
 					}
 
@@ -157,9 +161,11 @@ let _alertmanagerConfig = {
 						}
 					}
 
-					// NOTE: ConfigMap volume mounting is a provider-level concern.
-					// The alertmanager-config ConfigMap is created by the ConfigMaps resource
-					// and the Kubernetes provider handles mounting it into the pod.
+					// ConfigMap volume: mounts alertmanager.yml
+					"alertmanager-config": {
+						name: "alertmanager-config"
+						configMap: configMaps["alertmanager-config"]
+					}
 				}
 			}
 		}

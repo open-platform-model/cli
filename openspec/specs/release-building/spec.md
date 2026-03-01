@@ -5,7 +5,7 @@ Defines the contract for building a concrete `*core.ModuleRelease` from a loaded
 ## Requirements
 
 ### Requirement: Builder accepts a loaded module and produces a concrete release
-The builder SHALL accept a fully-loaded `*core.Module` and release options (name, namespace, optional values files) and return a concrete `*core.ModuleRelease` with all fields populated. The builder SHALL NOT depend on `Module.Values` being set.
+The builder SHALL accept a fully-loaded `*core.Module` and release options (name, namespace, optional values files) and return a concrete `*core.ModuleRelease` with all fields populated. The builder SHALL NOT depend on `Module.Values` being set. When the module's `#config` contains `#Secret` fields, the builder SHALL additionally inject an auto-generated `opm-secrets` component into the release's component map.
 
 #### Scenario: Successful build with default values
 - **WHEN** a loaded module is provided and no values files are given
@@ -19,6 +19,11 @@ The builder SHALL accept a fully-loaded `*core.Module` and release options (name
 #### Scenario: Multiple values files are unified
 - **WHEN** more than one values file is provided
 - **THEN** the builder SHALL unify all files together before injection, with later files taking precedence over earlier ones
+
+#### Scenario: Build with secrets produces release containing opm-secrets component
+- **WHEN** a loaded module with `#Secret` fields in `#config` is provided with concrete secret values
+- **THEN** the builder SHALL return a concrete `*core.ModuleRelease`
+- **AND** the release's components SHALL include `"opm-secrets"` with the correct `#resources` FQN
 
 ### Requirement: Values are validated against the module config schema before injection
 The builder SHALL validate the selected values against the module's `#config` schema and return a descriptive error if they do not conform.

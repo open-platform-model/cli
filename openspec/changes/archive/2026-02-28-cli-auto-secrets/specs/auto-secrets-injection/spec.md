@@ -1,44 +1,44 @@
 ## ADDED Requirements
 
-### Requirement: Builder reads _autoSecrets from evaluated ModuleRelease
+### Requirement: Builder reads autoSecrets from evaluated ModuleRelease
 
-The builder SHALL read the `_autoSecrets` hidden field from the fully-evaluated `#ModuleRelease` CUE value after component extraction. If the field is absent, bottom, or an empty struct, the builder SHALL skip auto-secrets injection and return the components map unchanged.
+The builder SHALL read the `autoSecrets` field from the fully-evaluated `#ModuleRelease` CUE value after component extraction. If the field is absent, bottom, or an empty struct, the builder SHALL skip auto-secrets injection and return the components map unchanged.
 
 #### Scenario: Module with no secrets skips injection
 
 - **WHEN** a module's `#config` contains no `#Secret` fields
-- **THEN** `_autoSecrets` SHALL be an empty struct
+- **THEN** `autoSecrets` SHALL be an empty struct
 - **AND** the builder SHALL return the components map unchanged
 - **AND** no `opm-secrets` component SHALL exist in the output
 
 #### Scenario: Module with secrets triggers injection
 
 - **WHEN** a module's `#config` contains one or more `#Secret` fields with concrete values
-- **THEN** `_autoSecrets` SHALL be a non-empty struct grouped by `$secretName`/`$dataKey`
+- **THEN** `autoSecrets` SHALL be a non-empty struct grouped by `$secretName`/`$dataKey`
 - **AND** the builder SHALL proceed with component construction
 
-#### Scenario: Old module without _autoSecrets field
+#### Scenario: Old module without autoSecrets field
 
-- **WHEN** a module is built against an older catalog version that does not define `_autoSecrets` on `#ModuleRelease`
+- **WHEN** a module is built against an older catalog version (< v1.0.8) that does not define `autoSecrets` on `#ModuleRelease`
 - **THEN** the builder SHALL detect the field as absent
 - **AND** the builder SHALL skip injection without error
 
 ### Requirement: Builder constructs opm-secrets component via FillPath with #Secrets schema
 
-The builder SHALL load `opmodel.dev/resources/config@v1` from the module's dependency cache and extract the `#Secrets` definition. The builder SHALL construct the `opm-secrets` component by starting from the `#Secrets` schema and using `FillPath` to set `metadata.name` and `spec.secrets` entries. Each entry in `_autoSecrets` SHALL be mapped to `spec.secrets."<secretName>".data`.
+The builder SHALL load `opmodel.dev/resources/config@v1` from the module's dependency cache and extract the `#Secrets` definition. The builder SHALL construct the `opm-secrets` component by starting from the `#Secrets` schema and using `FillPath` to set `metadata.name` and `spec.secrets` entries. Each entry in `autoSecrets` SHALL be mapped to `spec.secrets."<secretName>".data`.
 
 #### Scenario: Single secret group produces correct component
 
-- **WHEN** `_autoSecrets` contains one entry `"db-creds"` with keys `"username"` and `"password"`
+- **WHEN** `autoSecrets` contains one entry `"db-creds"` with keys `"username"` and `"password"`
 - **THEN** the constructed component SHALL have `metadata.name` equal to `"opm-secrets"`
 - **AND** `spec.secrets."db-creds".data` SHALL contain both `"username"` and `"password"` entries
 - **AND** `spec.secrets."db-creds".name` SHALL default to `"db-creds"`
 
 #### Scenario: Multiple secret groups produce correct component
 
-- **WHEN** `_autoSecrets` contains entries for `"db-creds"` and `"api-keys"`
+- **WHEN** `autoSecrets` contains entries for `"db-creds"` and `"api-keys"`
 - **THEN** the constructed component SHALL have both groups in `spec.secrets`
-- **AND** each group SHALL have its `data` entries populated from `_autoSecrets`
+- **AND** each group SHALL have its `data` entries populated from `autoSecrets`
 
 #### Scenario: Component has correct resource FQN for transformer matching
 
@@ -49,7 +49,8 @@ The builder SHALL load `opmodel.dev/resources/config@v1` from the module's depen
 #### Scenario: Component has list-output annotation
 
 - **WHEN** the `opm-secrets` component is constructed
-- **THEN** `metadata.annotations` SHALL contain `"transformer.opmodel.dev/list-output": "true"`
+- **THEN** the CUE value SHALL contain `metadata.annotations."transformer.opmodel.dev/list-output": true`
+- **NOTE** The catalog defines this as a CUE bool `true`. The Go `ExtractComponents` annotation reader uses `.String()` which silently drops non-string values. This is a known limitation shared by all `list-output` components (secrets, configmaps, volumes, CRDs). The annotation is present in the CUE value and accessible to CUE-side transformers.
 
 ### Requirement: Builder injects opm-secrets into the components map
 
@@ -68,14 +69,14 @@ The builder SHALL check for a name collision before injecting the auto-secrets c
 #### Scenario: Name collision produces clear error
 
 - **WHEN** a module defines a component named `"opm-secrets"` in its `#components`
-- **AND** `_autoSecrets` is non-empty
+- **AND** `autoSecrets` is non-empty
 - **THEN** the builder SHALL return an error containing `"reserved for auto-secret injection"`
 - **AND** no `*ModuleRelease` SHALL be returned
 
 #### Scenario: No collision when user has different component names
 
 - **WHEN** a module defines components with names other than `"opm-secrets"`
-- **AND** `_autoSecrets` is non-empty
+- **AND** `autoSecrets` is non-empty
 - **THEN** the builder SHALL inject `"opm-secrets"` without error
 
 ## MODIFIED Requirements

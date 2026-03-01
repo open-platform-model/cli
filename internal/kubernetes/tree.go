@@ -243,6 +243,14 @@ func aggregateStatus(resources []ResourceNode, resourceCount int) HealthStatus {
 // Replica count extraction (for OPM-managed unstructured resources)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// pluralPods returns "1 pod" or "N pods" depending on the count.
+func pluralPods(n int64) string {
+	if n == 1 {
+		return "1 pod"
+	}
+	return fmt.Sprintf("%d pods", n)
+}
+
 // getReplicaCount returns a "ready/desired" replica string for workload resources,
 // or an empty string for non-workload resources.
 func getReplicaCount(res *unstructured.Unstructured) string {
@@ -255,9 +263,8 @@ func getReplicaCount(res *unstructured.Unstructured) string {
 		ready, _, _ := unstructured.NestedInt64(res.Object, "status", "readyReplicas") //nolint:errcheck // best-effort replica display
 		return fmt.Sprintf("%d/%d", ready, desired)
 	case kindDaemonSet:
-		desired, _, _ := unstructured.NestedInt64(res.Object, "status", "desiredNumberScheduled") //nolint:errcheck // best-effort replica display
-		ready, _, _ := unstructured.NestedInt64(res.Object, "status", "numberReady")              //nolint:errcheck // best-effort replica display
-		return fmt.Sprintf("%d/%d", ready, desired)
+		n, _, _ := unstructured.NestedInt64(res.Object, "status", "currentNumberScheduled") //nolint:errcheck // best-effort pod count display
+		return pluralPods(n)
 	case kindJob:
 		completions, _, _ := unstructured.NestedInt64(res.Object, "spec", "completions") //nolint:errcheck // best-effort replica display
 		succeeded, _, _ := unstructured.NestedInt64(res.Object, "status", "succeeded")   //nolint:errcheck // best-effort replica display
@@ -318,7 +325,7 @@ func walkDeployment(ctx context.Context, client *Client, res *unstructured.Unstr
 			Name:      rs.Name,
 			Namespace: rs.Namespace,
 			Status:    replicaSetHealth(rs),
-			Replicas:  fmt.Sprintf("%d pods", rs.Status.Replicas),
+			Replicas:  pluralPods(int64(rs.Status.Replicas)),
 			Children:  walkReplicaSet(ctx, client, rs),
 		}
 		nodes = append(nodes, node)
@@ -595,6 +602,8 @@ func collectResourceRows(node ResourceNode, prefix string, isLast, isChild, colo
 			if rawReplicas != "" {
 				replicasColored = output.Dim(rawReplicas)
 			}
+		} else if node.Kind == kindDaemonSet && rawReplicas != "" {
+			replicasColored = output.Dim(rawReplicas)
 		}
 		if node.Kind == "Pod" {
 			statusColored = output.FormatPodPhase(rawStatus, node.Ready)
@@ -612,7 +621,7 @@ func collectResourceRows(node ResourceNode, prefix string, isLast, isChild, colo
 	var col2, col3 string
 	var col2Width int
 	switch {
-	case node.Kind == kindReplicaSet:
+	case node.Kind == kindReplicaSet || node.Kind == kindDaemonSet:
 		col2 = replicasColored
 		col2Width = len(rawReplicas)
 	case node.Kind == "Pod":

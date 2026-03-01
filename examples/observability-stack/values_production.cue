@@ -33,7 +33,7 @@ values: {
 		}
 
 		// HA: two replicas with stable identity (StatefulSet)
-		replicas: 2
+		replicas: 1
 
 		// 30 days retention with size cap
 		retention:     "30d"
