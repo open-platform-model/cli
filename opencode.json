@@ -3,6 +3,9 @@
     "theme": "nord",
     "permission": {
         "external_directory": {
+            "~/Dev/open-platform-model/catalog/**": "allow",
+            "~/Dev/open-platform-model/opm/**": "allow",
+            "~/Dev/open-platform-model/opmodel.dev/**": "allow",
             "../catalog/**": "allow",
             "../opm/**": "allow",
             "../opmodel.dev/**": "allow"
