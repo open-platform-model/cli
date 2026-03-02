@@ -44,7 +44,7 @@ type Options struct {
 //
 // The ctx must be the same context used to load the module (mod.Raw was built
 // with it). Passing a different context will cause FillPath to fail.
-func Build(ctx *cue.Context, mod *module.Module, opts Options, valuesFiles []string) (*modulerelease.ModuleRelease, error) {
+func Build(ctx *cue.Context, mod *module.Module, opts Options, valuesFiles []string) (*modulerelease.ModuleRelease, error) { //nolint:gocyclo // linear build pipeline; each step is distinct
 	output.Debug("building release",
 		"path", mod.ModulePath,
 		"name", opts.Name,
@@ -129,6 +129,11 @@ func Build(ctx *cue.Context, mod *module.Module, opts Options, valuesFiles []str
 	components, err := component.ExtractComponents(componentsVal)
 	if err != nil {
 		return nil, fmt.Errorf("extracting components: %w", err)
+	}
+
+	// Step 7c: Inject auto-secrets component if autoSecrets is non-empty.
+	if err := injectAutoSecrets(ctx, result, mod.ModulePath, components); err != nil {
+		return nil, fmt.Errorf("injecting auto-secrets: %w", err)
 	}
 
 	// Collect component names for metadata.

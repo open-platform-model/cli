@@ -141,12 +141,18 @@ func TestEvaluateHealth_Workloads(t *testing.T) {
 			expected:   HealthNotReady,
 		},
 		{
-			name: "DaemonSet with Available=False",
+			name:       "DaemonSet is always passive (Ready on existence)",
+			kind:       "DaemonSet",
+			conditions: nil,
+			expected:   HealthReady,
+		},
+		{
+			name: "DaemonSet with Available=False is still passive (Ready)",
 			kind: "DaemonSet",
 			conditions: []map[string]interface{}{
 				{"type": "Available", "status": "False"},
 			},
-			expected: HealthNotReady,
+			expected: HealthReady,
 		},
 	}
 

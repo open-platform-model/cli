@@ -7,6 +7,7 @@ package main
 
 import (
 	resources_workload "opmodel.dev/resources/workload@v1"
+	resources_storage "opmodel.dev/resources/storage@v1"
 	traits_workload "opmodel.dev/traits/workload@v1"
 	traits_network "opmodel.dev/traits/network@v1"
 	traits_security "opmodel.dev/traits/security@v1"
@@ -21,6 +22,7 @@ import (
 	if #config.nodeExporter.enabled {
 		"node-exporter": {
 			resources_workload.#Container
+			resources_storage.#Volumes
 			traits_workload.#RestartPolicy
 			traits_workload.#UpdateStrategy
 			traits_network.#Expose
@@ -34,6 +36,32 @@ import (
 				updateStrategy: {
 					type: "RollingUpdate"
 					rollingUpdate: maxUnavailable: 1
+				}
+
+				// === Volumes ===
+				// hostPath volumes for reading host-level metrics
+				volumes: {
+					"host-proc": {
+						name: "host-proc"
+						hostPath: {
+							path: #config.nodeExporter.hostPaths.proc
+							type: "Directory"
+						}
+					}
+					"host-sys": {
+						name: "host-sys"
+						hostPath: {
+							path: #config.nodeExporter.hostPaths.sys
+							type: "Directory"
+						}
+					}
+					"host-root": {
+						name: "host-root"
+						hostPath: {
+							path: "/"
+							type: "Directory"
+						}
+					}
 				}
 
 				// === Main Container ===
@@ -61,11 +89,21 @@ import (
 						"--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)",
 					]
 
-					// NOTE: Node exporter typically needs hostPath volume mounts for
-					// /proc, /sys, and / to read host-level metrics. However, OPM's
-					// #VolumeSchema does not currently support hostPath volumes.
-					// In production, these would be added via provider-specific config
-					// or a custom transformer extension.
+					// Mount host filesystems as read-only for metrics collection
+					volumeMounts: {
+						"host-proc": volumes["host-proc"] & {
+							mountPath: "/host/proc"
+							readOnly:  true
+						}
+						"host-sys": volumes["host-sys"] & {
+							mountPath: "/host/sys"
+							readOnly:  true
+						}
+						"host-root": volumes["host-root"] & {
+							mountPath: "/host/root"
+							readOnly:  true
+						}
+					}
 
 					if #config.nodeExporter.resources != _|_ {
 						resources: #config.nodeExporter.resources

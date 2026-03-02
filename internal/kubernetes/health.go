@@ -29,15 +29,19 @@ const conditionStatusTrue = "True"
 // workloadKinds are resources that use the Available/Ready condition for health.
 // Note: StatefulSet is intentionally excluded — it does not emit conditions
 // and must be evaluated via readyReplicas instead.
+// Note: DaemonSet is intentionally excluded — it does not reliably emit
+// Available/Ready conditions. Its health is conveyed via pod count in the tree.
 var workloadKinds = map[string]bool{
 	kindDeployment: true,
-	kindDaemonSet:  true,
 }
 
 // passiveKinds are resources that are healthy as soon as they exist.
 // Note: PersistentVolumeClaim is intentionally excluded — it has a lifecycle
 // phase (Pending → Bound → Lost) evaluated by evaluatePVCHealth.
+// Note: DaemonSet is included here — its health is conveyed via pod count in
+// the tree (like ReplicaSet), not a binary ready/not-ready label.
 var passiveKinds = map[string]bool{
+	kindDaemonSet:         true,
 	"ConfigMap":           true,
 	"Secret":              true,
 	"Service":             true,

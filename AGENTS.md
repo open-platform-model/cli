@@ -6,6 +6,13 @@
 
 Go CLI for OPM module operations. Uses cobra, CUE SDK, and charmbracelet/log.
 
+## Related folders
+
+- catalog - catalog of definitions: `../catalog/`
+- v1alpha1 definitions: `../catalog/v1alpha1/`
+- v1alpha1 definition INDEX.md - Useful to get a quick overview: `../catalog/v1alpha1/INDEX.md`
+- opm - main repo and docs: `../opm/`
+
 ## Constitution
 
 This project follows the **Open Platform Model Constitution**.

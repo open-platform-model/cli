@@ -136,9 +136,14 @@ func TestGetReplicaCount_StatefulSet(t *testing.T) {
 
 func TestGetReplicaCount_DaemonSet(t *testing.T) {
 	res := makeRes("DaemonSet", "ns", "agent")
-	_ = unstructured.SetNestedField(res.Object, int64(3), "status", "desiredNumberScheduled")
-	_ = unstructured.SetNestedField(res.Object, int64(3), "status", "numberReady")
-	assert.Equal(t, "3/3", getReplicaCount(res))
+	_ = unstructured.SetNestedField(res.Object, int64(3), "status", "currentNumberScheduled")
+	assert.Equal(t, "3 pods", getReplicaCount(res))
+}
+
+func TestGetReplicaCount_DaemonSet_SinglePod(t *testing.T) {
+	res := makeRes("DaemonSet", "ns", "agent")
+	_ = unstructured.SetNestedField(res.Object, int64(1), "status", "currentNumberScheduled")
+	assert.Equal(t, "1 pod", getReplicaCount(res))
 }
 
 func TestGetReplicaCount_Job(t *testing.T) {

@@ -230,9 +230,12 @@ let _recordingRules = {
 				}
 
 				volumeMounts: {
-					"prometheus-data": {
-						name:      "prometheus-data"
+					"prometheus-data": volumes["prometheus-data"] & {
 						mountPath: "/data"
+					}
+					"prometheus-config": volumes["prometheus-config"] & {
+						mountPath: "/etc/prometheus"
+						readOnly:  true
 					}
 				}
 
@@ -291,6 +294,13 @@ let _recordingRules = {
 						reloader: {
 							targetPort: #config.prometheus.configReload.port
 							protocol:   "TCP"
+						}
+					}
+
+					volumeMounts: {
+						"prometheus-config": volumes["prometheus-config"] & {
+							mountPath: "/etc/prometheus"
+							readOnly:  true
 						}
 					}
 
@@ -376,9 +386,11 @@ let _recordingRules = {
 					}
 				}
 
-				// NOTE: ConfigMap volume mounting is a provider-level concern.
-				// The prometheus-config ConfigMap is created by the ConfigMaps resource
-				// and the Kubernetes provider handles mounting it into the pod.
+				// ConfigMap volume: mounts prometheus.yml, alerting/recording rules
+				"prometheus-config": {
+					name: "prometheus-config"
+					configMap: configMaps["prometheus-config"]
+				}
 			}
 		}
 	}
