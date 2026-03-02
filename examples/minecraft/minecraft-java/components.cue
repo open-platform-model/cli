@@ -810,9 +810,18 @@ import (
 					image: #config.backup.image
 
 					env: {
-						BACKUP_METHOD: {
-							name:  "BACKUP_METHOD"
-							value: #config.backup.method
+						// Derive method from which struct is present (matchN ensures exactly one)
+						if #config.backup.tar != _|_ {
+							BACKUP_METHOD: {name: "BACKUP_METHOD", value: "tar"}
+						}
+						if #config.backup.rsync != _|_ {
+							BACKUP_METHOD: {name: "BACKUP_METHOD", value: "rsync"}
+						}
+						if #config.backup.restic != _|_ {
+							BACKUP_METHOD: {name: "BACKUP_METHOD", value: "restic"}
+						}
+						if #config.backup.rclone != _|_ {
+							BACKUP_METHOD: {name: "BACKUP_METHOD", value: "rclone"}
 						}
 						BACKUP_INTERVAL: {
 							name:  "BACKUP_INTERVAL"
@@ -852,62 +861,90 @@ import (
 							name:  "PAUSE_IF_NO_PLAYERS"
 							value: "\(#config.backup.pauseIfNoPlayers)"
 						}
-						if #config.backup.method == "tar" {
-							if #config.backup.tar != _|_ {
-								TAR_COMPRESS_METHOD: {
-									name:  "TAR_COMPRESS_METHOD"
-									value: #config.backup.tar.compressMethod
-								}
-								LINK_LATEST: {
-									name:  "LINK_LATEST"
-									value: "\(#config.backup.tar.linkLatest)"
+						// TAR-specific vars
+						if #config.backup.tar != _|_ {
+							TAR_COMPRESS_METHOD: {
+								name:  "TAR_COMPRESS_METHOD"
+								value: #config.backup.tar.compressMethod
+							}
+							LINK_LATEST: {
+								name:  "LINK_LATEST"
+								value: "\(#config.backup.tar.linkLatest)"
+							}
+							if #config.backup.tar.compressParameters != _|_ {
+								TAR_COMPRESS_PARAMETERS: {
+									name:  "TAR_COMPRESS_PARAMETERS"
+									value: #config.backup.tar.compressParameters
 								}
 							}
 						}
-						if #config.backup.method == "restic" {
-							if #config.backup.restic != _|_ {
-								RESTIC_REPOSITORY: {
-									name:  "RESTIC_REPOSITORY"
-									value: #config.backup.restic.repository
+						// RSYNC-specific vars
+						if #config.backup.rsync != _|_ {
+							LINK_LATEST: {
+								name:  "LINK_LATEST"
+								value: "\(#config.backup.rsync.linkLatest)"
+							}
+						}
+						// RESTIC-specific vars
+						if #config.backup.restic != _|_ {
+							RESTIC_REPOSITORY: {
+								name:  "RESTIC_REPOSITORY"
+								value: #config.backup.restic.repository
+							}
+							RESTIC_PASSWORD: {
+								name: "RESTIC_PASSWORD"
+								from: #config.backup.restic.password
+							}
+							if #config.backup.restic.retention != _|_ {
+								PRUNE_RESTIC_RETENTION: {
+									name:  "PRUNE_RESTIC_RETENTION"
+									value: #config.backup.restic.retention
 								}
-								RESTIC_PASSWORD: {
-									name: "RESTIC_PASSWORD"
-									from: #config.backup.restic.password
+							}
+							if #config.backup.restic.hostname != _|_ {
+								RESTIC_HOSTNAME: {
+									name:  "RESTIC_HOSTNAME"
+									value: #config.backup.restic.hostname
 								}
-								if #config.backup.restic.retention != _|_ {
-									PRUNE_RESTIC_RETENTION: {
-										name:  "PRUNE_RESTIC_RETENTION"
-										value: #config.backup.restic.retention
-									}
+							}
+							if #config.backup.restic.verbose != _|_ {
+								RESTIC_VERBOSE: {
+									name:  "RESTIC_VERBOSE"
+									value: "\(#config.backup.restic.verbose)"
 								}
-								if #config.backup.restic.hostname != _|_ {
-									RESTIC_HOSTNAME: {
-										name:  "RESTIC_HOSTNAME"
-										value: #config.backup.restic.hostname
-									}
+							}
+							if #config.backup.restic.additionalTags != _|_ {
+								RESTIC_ADDITIONAL_TAGS: {
+									name:  "RESTIC_ADDITIONAL_TAGS"
+									value: #config.backup.restic.additionalTags
 								}
-								if #config.backup.restic.verbose != _|_ {
-									RESTIC_VERBOSE: {
-										name:  "RESTIC_VERBOSE"
-										value: "\(#config.backup.restic.verbose)"
-									}
+							}
+							if #config.backup.restic.limitUpload != _|_ {
+								RESTIC_LIMIT_UPLOAD: {
+									name:  "RESTIC_LIMIT_UPLOAD"
+									value: "\(#config.backup.restic.limitUpload)"
+								}
+							}
+							if #config.backup.restic.retryLock != _|_ {
+								RESTIC_RETRY_LOCK: {
+									name:  "RESTIC_RETRY_LOCK"
+									value: #config.backup.restic.retryLock
 								}
 							}
 						}
-						if #config.backup.method == "rclone" {
-							if #config.backup.rclone != _|_ {
-								RCLONE_REMOTE: {
-									name:  "RCLONE_REMOTE"
-									value: #config.backup.rclone.remote
-								}
-								RCLONE_DEST_DIR: {
-									name:  "RCLONE_DEST_DIR"
-									value: #config.backup.rclone.destDir
-								}
-								RCLONE_COMPRESS_METHOD: {
-									name:  "RCLONE_COMPRESS_METHOD"
-									value: #config.backup.rclone.compressMethod
-								}
+						// RCLONE-specific vars
+						if #config.backup.rclone != _|_ {
+							RCLONE_REMOTE: {
+								name:  "RCLONE_REMOTE"
+								value: #config.backup.rclone.remote
+							}
+							RCLONE_DEST_DIR: {
+								name:  "RCLONE_DEST_DIR"
+								value: #config.backup.rclone.destDir
+							}
+							RCLONE_COMPRESS_METHOD: {
+								name:  "RCLONE_COMPRESS_METHOD"
+								value: #config.backup.rclone.compressMethod
 							}
 						}
 					}

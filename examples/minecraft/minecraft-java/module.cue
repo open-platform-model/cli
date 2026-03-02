@@ -345,31 +345,66 @@ metadata: {
 		// Pause backups if no players online
 		pauseIfNoPlayers: bool | *true
 
-		// Tar-specific configuration (used when method == "tar")
+		// === Backup Method ===
+		// Set exactly ONE of the following to select the backup method.
+		// The matchN(1, [...]) constraint enforces that only one is chosen.
+		//
+		// Example — Tar (compressed archives, default):
+		//   tar: {}
+		//
+		// Example — Rsync (incremental file-level):
+		//   rsync: {}
+		//
+		// Example — Restic (encrypted, deduplicated, to S3/rclone/etc.):
+		//   restic: { repository: "s3:s3.amazonaws.com/my-bucket", password: value: "secret" }
+		//
+		// Example — Rclone (tar + upload to remote):
+		//   rclone: { remote: "myremote", destDir: "minecraft-backups" }
+
+		// TAR — compressed tarballs written to DEST_DIR
 		tar?: {
-			compressMethod: "gzip" | "bzip2" | "lzip" | "lzma" | "lzop" | *"xz" | "zstd"
-			linkLatest:     bool | *true
+			compressMethod:    "gzip" | "bzip2" | "lzip" | "lzma" | "lzop" | *"xz" | "zstd"
+			compressParameters?: string
+			linkLatest:        bool | *false
 		}
 
-		// Restic-specific configuration (used when method == "restic")
+		// RSYNC — incremental file-level backup to DEST_DIR
+		rsync?: {
+			linkLatest: bool | *false
+		}
+
+		// RESTIC — encrypted, deduplicated backup to any restic backend
 		restic?: {
+			// Restic repository URL (e.g. "s3:s3.amazonaws.com/bucket", "rclone:remote:path")
 			repository: string
 			// Restic repo password — stored in a K8s Secret
 			password: schemas.#Secret & {
 				$secretName: "backup-secrets"
 				$dataKey:    "restic-password"
 			}
-			retention?: string
-			hostname?:  string
-			verbose?:   bool
+			retention?:        string
+			hostname?:         string
+			verbose?:          bool
+			additionalTags?:   string
+			limitUpload?:      uint
+			retryLock?:        string
 		}
 
-		// Rclone-specific configuration (used when method == "rclone")
+		// RCLONE — tar + upload via rclone to a configured remote
 		rclone?: {
-			remote:         string
-			destDir:        string
-			compressMethod: "gzip" | "bzip2" | "lzip" | "lzma" | "lzop" | "xz" | "zstd"
+			// Name of the rclone remote (from rclone.conf)
+			remote:          string
+			// Directory on the remote to upload backups to
+			destDir:         string
+			compressMethod:  "gzip" | "bzip2" | "lzip" | "lzma" | "lzop" | "xz" | "zstd"
 		}
+
+		matchN(1, [
+			{tar!: _},
+			{rsync!: _},
+			{restic!: _},
+			{rclone!: _},
+		])
 	}
 
 	// === Resource Limits (catalog-standard shape) ===

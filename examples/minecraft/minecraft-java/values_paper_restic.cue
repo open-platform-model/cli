@@ -45,7 +45,6 @@ values: {
 	// Restic: encrypted, deduplicated, incremental backups to S3
 	backup: {
 		enabled:      true
-		method:       "restic"
 		interval:     "6h"
 		initialDelay: "10m"
 

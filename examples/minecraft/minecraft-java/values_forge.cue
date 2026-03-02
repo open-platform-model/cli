@@ -48,8 +48,11 @@ values: {
 	}
 
 	// === Backup ===
-	// Disabled by default; method/interval/initialDelay use schema defaults (tar/24h/5m)
-	backup: enabled: false
+	// Disabled by default; tar is the default method
+	backup: {
+		enabled: false
+		tar: {}
+	}
 
 	// === Resources ===
 	resources: {
