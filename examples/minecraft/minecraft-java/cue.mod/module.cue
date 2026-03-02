@@ -1,4 +1,4 @@
-module: "opmodel.dev/modules/jellyfin@v0"
+module: "example.com/modules/minecraft-java@v0"
 language: {
 	version: "v0.11.1"
 }

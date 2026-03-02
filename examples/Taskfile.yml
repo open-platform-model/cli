@@ -10,18 +10,41 @@ tasks:
     desc: Update all CUE dependencies to latest versions across example modules
     cmds:
       - |
-        for dir in */; do
-          if [ -d "${dir}cue.mod" ]; then
-            echo "==> Updating deps in ${dir%/}"
-            cd "$dir"
-            deps=$(sed -n '/^deps: {$/,/^}$/p' cue.mod/module.cue | grep -oP '"opmodel\.dev/[^"]+@v[^"]*"' | tr -d '"')
+        find . -name "cue.mod" -type d | sort | while read -r moddir; do
+          dir=$(dirname "$moddir")
+          printf "==> Updating deps in %s\n" "$dir"
+          cd "$dir"
+
+          deps=$(sed -n '/^deps: {$/,/^}$/p' cue.mod/module.cue | grep -oP '"opmodel\.dev(/[^"]+)?@v[^"]*"' | tr -d '"')
+
+          if [ -n "$deps" ]; then
+            tmpfile=$(mktemp)
+
             for dep in $deps; do
-              echo "    cue mod get $dep"
+              old_ver=$(grep -A5 "\"${dep}\"" cue.mod/module.cue | grep -oP 'v:\s*"\K[^"]+' | head -1)
+              printf '%s:%s\n' "$dep" "$old_ver" >> "$tmpfile"
+              printf "    cue mod get %s\n" "$dep"
               cue mod get "$dep"
             done
-            echo "    cue mod tidy"
+
+            printf "    cue mod tidy\n"
             cue mod tidy
-            cd ..
+
+            while IFS=: read -r dep old_ver; do
+              new_ver=$(grep -A5 "\"${dep}\"" cue.mod/module.cue | grep -oP 'v:\s*"\K[^"]+' | head -1)
+              if [ "$old_ver" != "$new_ver" ]; then
+                printf "    %s: \033[1;33m%s\033[0m -> \033[0;32m%s\033[0m\n" "$dep" "$old_ver" "$new_ver"
+              else
+                printf "    %s: \033[2m%s (unchanged)\033[0m\n" "$dep" "$old_ver"
+              fi
+            done < "$tmpfile"
+
+            rm -f "$tmpfile"
+          else
+            printf "    cue mod tidy\n"
+            cue mod tidy
           fi
+
+          cd - > /dev/null
         done
-        echo "Done."
+        printf "Done.\n"
