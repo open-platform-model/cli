@@ -52,17 +52,17 @@ Set exactly one type struct in your values to select the server software. The `m
 
 ```
   values.cue                    module.cue
-  ┌──────────────────┐          ┌──────────────────────────────────────┐
+  ┌───────────────────┐         ┌──────────────────────────────────────┐
   │ paper: {}         │  ─────> │ paper?: { downloadUrl?: string }     │
   │                   │         │                                      │
   │ // OR             │         │ matchN(1, [                          │
   │ forge: {          │         │   {vanilla!: _},                     │
-  │   version: "47.2" │         │   {paper!: _},                      │
+  │   version: "47.2" │         │   {paper!: _},                       │
   │ }                 │         │   {forge!: _},                       │
   │                   │         │   ...11 options                      │
   │ // OR             │         │ ])                                   │
   │ vanilla: {}       │         │                                      │
-  └──────────────────┘          └──────────────────────────────────────┘
+  └───────────────────┘         └──────────────────────────────────────┘
 ```
 
 ### Available Types
@@ -209,163 +209,37 @@ Optional `securityContext` field using catalog `#SecurityContextSchema`. Default
 
 ### Example 1: Modded Forge Server
 
-```cue
-values: {
-    forge: { version: "47.2.0" }       // Server type
-    version: "1.20.1"
+See [`values_forge.cue`](values_forge.cue) for the full configuration. Key settings:
 
-    jvm: {
-        memory:  "8G"
-        opts:    "-XX:+UseG1GC -XX:+ParallelRefProcEnabled"
-    }
-
-    server: maxPlayers: 50
-
-    rcon: {
-        enabled:  true
-        password: value: "CHANGE-THIS-PASSWORD"
-        port:     25575
-    }
-
-    storage: {
-        data: {
-            type:         "hostPath"
-            path:         "/mnt/minecraft/modded-server"
-            hostPathType: "DirectoryOrCreate"
-        }
-        backups: {
-            type:         "hostPath"
-            path:         "/mnt/minecraft/backups"
-            hostPathType: "DirectoryOrCreate"
-        }
-    }
-
-    resources: {
-        requests: { cpu: "2000m", memory: "8Gi" }
-        limits:   { cpu: "4000m", memory: "12Gi" }
-    }
-
-    port:        25565
-    serviceType: "NodePort"
-}
-```
+- Forge 47.2.0 on Minecraft 1.20.1
+- 8G JVM with G1GC flags, 50 max players
+- hostPath storage (bare-metal), NodePort service
 
 ### Example 2: Fabric with Modrinth Mods
 
-```cue
-values: {
-    fabric: { loaderVersion: "0.15.0" }    // Server type
-    version: "1.20.1"
+See [`values_fabric_modrinth.cue`](values_fabric_modrinth.cue) for the full configuration. Key settings:
 
-    jvm: memory: "6G"
+- Fabric 0.15.0 on Minecraft 1.20.1
+- Modrinth mods: sodium, lithium, starlight (auto-downloaded, release only)
+- PVC storage (cloud), LoadBalancer service
 
-    server: motd: "Modrinth Modpack Server"
-
-    mods: {
-        modrinth: {
-            projects:             ["sodium", "lithium", "starlight"]
-            downloadDependencies: "required"
-            allowedVersionType:   "release"
-        }
-    }
-
-    rcon: {
-        enabled:  true
-        password: value: "CHANGE-ME"
-        port:     25575
-    }
-
-    storage: {
-        data:    { type: "pvc", size: "20Gi" }
-        backups: { type: "pvc", size: "10Gi" }
-    }
-
-    resources: {
-        requests: { cpu: "2000m", memory: "6Gi" }
-        limits:   { cpu: "4000m", memory: "8Gi" }
-    }
-
-    port:        25565
-    serviceType: "LoadBalancer"
-}
-```
+> **Note:** In the `#config` schema, mods are nested inside the server type struct
+> (`fabric: { mods: { modrinth: {...} } }`), not at the top level.
 
 ### Example 3: Production Paper with Restic Cloud Backups
 
-```cue
-values: {
-    paper: {}                               // Server type
-    version: "1.20.4"
+See [`values_paper_restic.cue`](values_paper_restic.cue) for the full configuration. Key settings:
 
-    server: {
-        motd:       "Production SMP Server"
-        maxPlayers: 100
-        ops:        ["player1", "player2"]
-    }
-
-    rcon: {
-        enabled:  true
-        password: value: "USE-A-SECURE-PASSWORD-HERE"
-        port:     25575
-    }
-
-    storage: {
-        data:    { type: "pvc", size: "50Gi", storageClass: "fast-ssd" }
-        backups: { type: "pvc", size: "10Gi" }
-    }
-
-    backup: {
-        enabled:      true
-        method:       "restic"
-        interval:     "6h"
-        initialDelay: "10m"
-
-        restic: {
-            repository: "s3:s3.amazonaws.com/my-minecraft-backups"
-            password:   value: "restic-repo-password"
-            hostname:   "production-smp"
-            retention:  "--keep-daily 7 --keep-weekly 4 --keep-monthly 6"
-        }
-    }
-
-    resources: {
-        requests: { cpu: "2000m", memory: "4Gi" }
-        limits:   { cpu: "8000m", memory: "16Gi" }
-    }
-
-    port:        25565
-    serviceType: "LoadBalancer"
-}
-```
+- Paper on Minecraft 1.20.4, 100 max players
+- PVC storage with fast-ssd class, LoadBalancer service
+- Restic backups to S3 every 6h, retaining 7 daily / 4 weekly / 6 monthly snapshots
 
 ### Example 4: Testing/Development (Ephemeral)
 
-```cue
-values: {
-    paper: {}                               // Server type
+See [`values.cue`](values.cue) — this is the default configuration shipped with the module. Key settings:
 
-    rcon: {
-        enabled:  true
-        password: value: "test"
-        port:     25575
-    }
-
-    storage: {
-        data:    type: "emptyDir"           // Data deleted when pod restarts
-        backups: type: "emptyDir"
-    }
-
-    backup: enabled: false
-
-    resources: {
-        requests: { cpu: "500m", memory: "1Gi" }
-        limits:   { cpu: "2000m", memory: "4Gi" }
-    }
-
-    port:        25565
-    serviceType: "ClusterIP"
-}
-```
+- Paper (latest), emptyDir storage (data deleted on pod restart)
+- Backups disabled, ClusterIP service
 
 ## Backup Methods
 

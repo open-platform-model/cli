@@ -345,36 +345,30 @@ metadata: {
 		// Pause backups if no players online
 		pauseIfNoPlayers: bool | *true
 
-		// Tar-specific configuration
-		if method == "tar" {
-			tar?: {
-				compressMethod: "gzip" | "bzip2" | "lzip" | "lzma" | "lzop" | *"xz" | "zstd"
-				linkLatest:     bool | *true
-			}
+		// Tar-specific configuration (used when method == "tar")
+		tar?: {
+			compressMethod: "gzip" | "bzip2" | "lzip" | "lzma" | "lzop" | *"xz" | "zstd"
+			linkLatest:     bool | *true
 		}
 
-		// Restic-specific configuration
-		if method == "restic" {
-			restic?: {
-				repository: string
-				// Restic repo password — stored in a K8s Secret
-				password: schemas.#Secret & {
-					$secretName: "backup-secrets"
-					$dataKey:    "restic-password"
-				}
-				retention?: string
-				hostname?:  string
-				verbose?:   bool
+		// Restic-specific configuration (used when method == "restic")
+		restic?: {
+			repository: string
+			// Restic repo password — stored in a K8s Secret
+			password: schemas.#Secret & {
+				$secretName: "backup-secrets"
+				$dataKey:    "restic-password"
 			}
+			retention?: string
+			hostname?:  string
+			verbose?:   bool
 		}
 
-		// Rclone-specific configuration
-		if method == "rclone" {
-			rclone?: {
-				remote:         string
-				destDir:        string
-				compressMethod: "gzip" | "bzip2" | "lzip" | "lzma" | "lzop" | "xz" | "zstd"
-			}
+		// Rclone-specific configuration (used when method == "rclone")
+		rclone?: {
+			remote:         string
+			destDir:        string
+			compressMethod: "gzip" | "bzip2" | "lzip" | "lzma" | "lzop" | "xz" | "zstd"
 		}
 	}
 
