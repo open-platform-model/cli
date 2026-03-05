@@ -23,7 +23,7 @@ metadata: {
 	modulePath:       "example.com/modules"
 	name:             "observability-stack"
 	version:          "0.1.0"
-	description:      string | *"Production monitoring stack with Prometheus, Alertmanager, Node Exporter, Kube State Metrics, and Pushgateway"
+	description:      "Production monitoring stack with Prometheus, Alertmanager, Node Exporter, Kube State Metrics, and Pushgateway"
 	defaultNamespace: "monitoring"
 }
 
