@@ -10,6 +10,7 @@ OPM modules for the [itzg](https://github.com/itzg) Minecraft Docker/Helm ecosys
 | [minecraft-bedrock](./minecraft-bedrock/) | `itzg/minecraft-bedrock-server` | Bedrock Edition server (UDP, XUID auth) |
 | [minecraft-proxy](./minecraft-proxy/) | `itzg/bungeecord` | BungeeCord / Waterfall / Velocity proxy |
 | [mc-router](./mc-router/) | `itzg/mc-router` | TCP hostname router with auto-scale |
+| [mc-monitor](./mc-monitor/) | `itzg/mc-monitor` | Prometheus/OTel metrics exporter for server status |
 | [rcon-web-admin](./rcon-web-admin/) | `itzg/rcon` | Web UI for RCON console management |
 
 ## Composition
@@ -46,6 +47,14 @@ Each module is independently deployable. When composed, they connect via network
     | minecraft-    |
     | bedrock       |  :19132 UDP (standalone)
     +---------------+
+            :                          :
+            :  (Minecraft protocol)    :
+            v                          v
+          +------------------------------+
+          |         mc-monitor           |  :8080 /metrics
+          |  (status probes via MC       |  (Prometheus)
+          |   protocol, not RCON)        |  or push to OTel
+          +------------------------------+
 ```
 
 ## Quick Start
@@ -73,6 +82,17 @@ opm mod apply --module-dir ./examples/minecraft/minecraft-java
 opm mod apply --module-dir ./examples/minecraft/rcon-web-admin
 ```
 
+### Java Server + Monitoring
+
+```bash
+# Deploy the Minecraft server
+opm mod apply --module-dir ./examples/minecraft/minecraft-java
+
+# Deploy mc-monitor pointed at the server
+# Update mc-monitor values to list your server(s) in javaServers
+opm mod apply --module-dir ./examples/minecraft/mc-monitor
+```
+
 ### Multi-Server with Router
 
 ```bash
@@ -90,3 +110,4 @@ opm mod apply --module-dir ./examples/minecraft/minecraft-java --values-file val
 - [itzg/docker-mc-backup](https://github.com/itzg/docker-mc-backup)
 - [itzg/minecraft-server-charts](https://github.com/itzg/minecraft-server-charts)
 - [itzg/mc-router](https://github.com/itzg/mc-router)
+- [itzg/mc-monitor](https://github.com/itzg/mc-monitor)
