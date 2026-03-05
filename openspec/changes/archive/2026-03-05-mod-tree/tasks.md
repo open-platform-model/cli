@@ -153,14 +153,14 @@
 
 ## 14. Integration Tests
 
-- [ ] 14.1 Add integration test: deploy test module with multiple components
-- [ ] 14.2 Add integration test: verify tree output at depth=0 (component summary)
-- [ ] 14.3 Add integration test: verify tree output at depth=1 (resources only)
-- [ ] 14.4 Add integration test: verify tree output at depth=2 (Deployment→RS→Pod visible)
-- [ ] 14.5 Add integration test: verify JSON output structure matches schema
-- [ ] 14.6 Add integration test: verify no-release-found error (exit code matches ExitNotFound)
-- [ ] 14.7 Add integration test: verify component grouping with real resources
-- [ ] 14.8 Add integration test: verify StatefulSet→Pod chain at depth=2
+- [x] 14.1 Add integration test: deploy test module with multiple components
+- [x] 14.2 Add integration test: verify tree output at depth=0 (component summary)
+- [x] 14.3 Add integration test: verify tree output at depth=1 (resources only)
+- [x] 14.4 Add integration test: verify tree output at depth=2 (Deployment→RS→Pod visible)
+- [x] 14.5 Add integration test: verify JSON output structure matches schema
+- [x] 14.6 Add integration test: verify no-release-found error (exit code matches ExitNotFound)
+- [x] 14.7 Add integration test: verify component grouping with real resources
+- [x] 14.8 Add integration test: verify StatefulSet→Pod chain at depth=2
 
 ## 17. Output Refinements (column alignment, PVC, RS)
 
@@ -193,17 +193,17 @@
 ## 15. Documentation
 
 - [x] 15.1 Add help text and examples to `NewModTreeCmd()` long description
-- [ ] 15.2 Update CLI README with `opm mod tree` command if a command reference exists
+- [x] 15.2 Update CLI README with `opm mod tree` command if a command reference exists
 
 ## 16. Validation & Polish
 
 - [x] 16.1 Run `task fmt` and fix any formatting issues
 - [x] 16.2 Run `task lint` and fix any linter warnings (new files lint-clean)
 - [x] 16.3 Run `task test` and ensure all tests pass
-- [ ] 16.4 Run integration tests against kind cluster (`task cluster:create` first)
-- [ ] 16.5 Test against a real multi-component module (e.g. examples/jellyfin)
-- [ ] 16.6 Verify exit codes: 0=success, ExitNotFound=no resources, ExitGeneralError=other
-- [ ] 16.7 Verify colored output in terminal
-- [ ] 16.8 Verify plain output in non-TTY (`opm mod tree ... | cat`)
-- [ ] 16.9 Verify JSON output is valid (`opm mod tree ... -o json | jq .`)
-- [ ] 16.10 Verify YAML output is valid
+- [x] 16.4 Run integration tests against kind cluster (`task cluster:create` first)
+- [x] 16.5 Test against a real multi-component module (e.g. examples/jellyfin)
+- [x] 16.6 Verify exit codes: 0=success, ExitNotFound=no resources, ExitGeneralError=other
+- [x] 16.7 Verify colored output in terminal
+- [x] 16.8 Verify plain output in non-TTY (`opm mod tree ... | cat`)
+- [x] 16.9 Verify JSON output is valid (`opm mod tree ... -o json | jq .`)
+- [x] 16.10 Verify YAML output is valid

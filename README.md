@@ -25,6 +25,53 @@ task build
 - **OCI-based distribution** for modules
 - **Interactive CLI** with rich terminal output
 
+## Commands
+
+### Module Operations (`opm mod`)
+
+| Command | Description |
+|---------|-------------|
+| `mod init` | Create a new module from template |
+| `mod build` | Render module to manifests |
+| `mod vet` | Validate module without generating manifests |
+| `mod apply` | Deploy module to cluster |
+| `mod status` | Show resource status |
+| `mod tree` | Show module resource hierarchy (component → resource → K8s children) |
+| `mod diff` | Show differences with cluster |
+| `mod delete` | Delete release resources from cluster |
+| `mod list` | List deployed module releases |
+| `mod events` | Show events for a release |
+
+### Configuration (`opm config`)
+
+| Command | Description |
+|---------|-------------|
+| `config init` | Initialize OPM configuration |
+| `config vet` | Validate configuration |
+
+### `opm mod tree`
+
+Show the component and resource hierarchy of a deployed release.
+
+```bash
+# Full tree (default depth=2: components → resources → K8s children)
+opm mod tree --release-name my-app -n production
+
+# Component summary only (depth=0)
+opm mod tree --release-name my-app -n production --depth 0
+
+# Resources without K8s children (depth=1)
+opm mod tree --release-name my-app -n production --depth 1
+
+# JSON output for scripting
+opm mod tree --release-name my-app -n production -o json
+```
+
+Depth levels:
+- **0** — Component summary (resource counts and aggregate status)
+- **1** — OPM-managed resources grouped by component
+- **2** — Full tree with Kubernetes-owned children (Deployment→ReplicaSet→Pod, StatefulSet→Pod)
+
 ## Documentation
 
 For development guidelines, architecture details, and agent instructions, see [AGENTS.md](./AGENTS.md).
