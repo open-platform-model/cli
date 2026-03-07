@@ -73,7 +73,7 @@ import (
 			kind:       "Service"
 			metadata: {
 				name:      #component.metadata.name
-				namespace: #context.#moduleReleaseMetadata.namespace | *"default"
+				namespace: #context.#moduleReleaseMetadata.namespace
 				labels:    #context.labels
 				// Include component annotations if present
 				if len(#context.componentAnnotations) > 0 {
