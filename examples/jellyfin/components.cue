@@ -27,6 +27,8 @@ import (
 		metadata: name: "jellyfin"
 		metadata: labels: "core.opmodel.dev/workload-type": "stateful"
 
+		_volumes: spec.volumes
+
 		spec: {
 			// Single replica - Jellyfin does not support horizontal scaling
 			scaling: count: 1
@@ -90,20 +92,18 @@ import (
 						memory: "4Gi"
 					}
 				}
-				volumeMounts: {
-					config: {
-						name:      "config"
-						mountPath: "/config"
-					}
-					if #config.media != _|_ {
-						for vName, lib in #config.media {
-							(vName): {
-								"name":    vName
-								mountPath: lib.mountPath
-							}
+			volumeMounts: {
+				config: _volumes.config & {
+					mountPath: "/config"
+				}
+				if #config.media != _|_ {
+					for vName, lib in #config.media {
+						(vName): _volumes[vName] & {
+							mountPath: lib.mountPath
 						}
 					}
 				}
+			}
 			}
 
 			// Expose the web UI
