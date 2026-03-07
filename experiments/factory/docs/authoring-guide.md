@@ -545,6 +545,262 @@ values: {
 
 ---
 
+## 3b. Dynamic Instance Generation
+
+Sometimes a bundle should deploy a variable number of module instances determined
+by the consumer at release time — for example, a game server fleet where the
+operator names and configures each server independently.
+
+This section documents the **dynamic instance generation** pattern used in the
+`gamestack` bundle.
+
+### When to use this pattern
+
+Use dynamic instance generation when:
+
+- The number of instances is not known at bundle authoring time
+- Each instance is homogeneous in type (same module) but heterogeneous in config
+- Infrastructure modules (router, monitor, etc.) need to auto-discover all instances
+
+### The `#config` map field
+
+Declare a map field in the bundle `#config` for the dynamic instances. Use a
+private helper definition (`_#`) to constrain the per-entry shape:
+
+```cue
+C=#config: {
+    // Consumer adds named entries here; each entry becomes a module instance.
+    servers?: [string]: _#serverConfig
+}
+
+// Private: per-entry config shape — not directly consumer-facing
+_#serverConfig: {
+    motd?:      string
+    maxPlayers: uint & >0 & <=1000 | *20
+    port:       uint & >0 & <=65535 | *25565
+    // ... other per-instance fields
+}
+```
+
+`_#` prefixed definitions are private to the package and not exported. This keeps
+the per-entry schema clean without polluting the module's exported API surface.
+
+### Iterating the map in `#instances`
+
+Use a `for` comprehension inside `#instances` to generate one `#BundleInstance`
+per map entry. Always apply three rules:
+
+**Rule 1 — `*field | {}` fallback for optional maps**
+
+CUE cannot iterate over `_|_` (bottom), and a plain `field | {}` disjunction
+stays unresolved when the field IS present (both branches satisfy the open struct
+`{}`). The `*` default marker disambiguates: it picks the concrete value when
+present and falls back to `{}` when the field is absent (`_|_`):
+
+```cue
+for _name, _cfg in (*C.servers | {}) { ... }  // correct: * resolves the disjunction
+for _name, _cfg in (C.servers | {})  { ... }  // wrong: unresolved disjunction error
+for _name, _cfg in C.servers         { ... }  // error if servers is absent
+```
+
+**Rule 2 — `let`-capture comprehension variables**
+
+CUE comprehension variables are lazy references. If passed directly into a
+definition unification, the definition's type constraints dominate and concrete
+values may be stripped. Capture with `let` at each loop iteration:
+
+```cue
+for _name, _cfg in (C.servers | {}) {
+    let _c = _cfg                // <-- capture before crossing the definition boundary
+    "\(_name)": {
+        module: mc
+        values: { maxPlayers: _c.maxPlayers }  // concrete value preserved
+    }
+}
+```
+
+Without `let _c = _cfg`, the transformer pipeline may receive empty `{}` for
+struct fields that should contain concrete values.
+
+**Rule 3 — Pre-compute shared `let` bindings outside comprehensions**
+
+`let` bindings declared in a struct scope are visible to all comprehensions in
+that struct. Pre-compute any values used across multiple comprehensions once,
+at the top of `#instances`:
+
+```cue
+#instances: {
+    let _ns      = C.namespace    // resolved once, used in every instance
+    let _relName = C.releaseName
+
+    for _name, _cfg in (C.servers | {}) {
+        let _c = _cfg
+        "\(_name)": { metadata: namespace: _ns }
+    }
+
+    router: { metadata: namespace: _ns }  // same binding, no duplication
+}
+```
+
+This also avoids carrying `#NameType` constraints from `C.namespace` (a
+constrained type) into string interpolations — the `let` resolves the concrete
+value in the current scope.
+
+### Auto-wiring infrastructure modules
+
+The key benefit of the dynamic map is that infrastructure modules (mc-router,
+mc-monitor, etc.) can derive their configuration directly from the same map.
+
+**Pattern: build lists via comprehension, then wire**
+
+```cue
+#instances: {
+    let _domain  = C.domain
+    let _relName = C.releaseName
+    let _ns      = C.namespace
+
+    // Dynamic server instances
+    for _name, _cfg in (C.servers | {}) {
+        let _c = _cfg
+        "\(_name)": { module: mc, ... }
+    }
+
+    // mc-router: one mapping per server, auto-built
+    let _mappings = [ for _name, _cfg in (*C.servers | {}) {
+        {
+            externalHostname: "\(_name).\(_domain)"
+            host:             "\(_relName)-\(_name).\(_ns).svc"
+            port:             _cfg.port
+        }
+    }]
+
+    router: {
+        module: mcRouter
+        values: { router: mappings: _mappings }
+    }
+
+    // mc-monitor: one javaServer target per server, auto-built
+    let _targets = [ for _name, _cfg in (*C.servers | {}) {
+        {
+            host: "\(_relName)-\(_name).\(_ns).svc"
+            port: _cfg.port
+        }
+    }]
+
+    monitor: {
+        module: mcMonitor
+        values: { javaServers: _targets, prometheus: {} }
+    }
+}
+```
+
+### Conditional list elements for optional maps
+
+When you need a list that contains one element only if a condition is true (and
+is otherwise empty), use the conditional list element syntax:
+
+```cue
+// [{...}] when condition is true, [] otherwise
+let _proxyMapping = [
+    if C.network != _|_ {
+        {
+            externalHostname: "\(C.network.hostname).\(_domain)"
+            host:             "\(_relName)-proxy.\(_ns).svc"
+            port:             25577
+        }
+    },
+]
+```
+
+This is the idiomatic way to produce a "maybe one" list in CUE.
+
+### Merging dynamic and static lists
+
+Lists from multiple comprehensions can be concatenated with `+`:
+
+```cue
+let _standaloneTargets = [ for _name, _cfg in (C.servers | {}) { ... }]
+let _networkTargets    = [ for _name, _cfg in (C.network.servers | {}) { ... }]
+
+monitor: {
+    values: { javaServers: _standaloneTargets + _networkTargets }
+}
+```
+
+`*C.network.servers | {}` safely returns `{}` (iterable empty) when `C.network`
+is absent, because an absent optional field evaluates to `_|_` and
+`*_|_ | {}` resolves to `{}`.
+
+### The `releaseName` convention
+
+When instances need to discover each other via K8s service DNS, the bundle needs
+to know the release name to construct service hostnames like:
+
+```
+{releaseName}-{instanceName}.{namespace}.svc
+```
+
+The BundleRelease produces ModuleRelease names of the form `{releaseName}-{instanceName}`
+(see `core/bundlerelease/bundle_release.cue`). Expose `releaseName` as a required
+config field and document that it must match `BundleRelease.metadata.name`:
+
+```cue
+C=#config: {
+    // Must match the BundleRelease metadata.name exactly.
+    // Used to compute K8s service DNS names for cross-instance references.
+    releaseName: string
+    ...
+}
+```
+
+### Multiple concurrent modes (optional + required instances)
+
+A bundle can mix dynamic and static instances in the same `#instances` block,
+and can support multiple optional modes simultaneously:
+
+```cue
+#instances: {
+    // Dynamic: standalone servers (optional map)
+    for _name, _cfg in (C.servers | {}) { ... }
+
+    // Dynamic + conditional: proxied backend servers (only when network is set)
+    if C.network != _|_ {
+        for _name, _cfg in C.network.servers { ... }
+        proxy: { module: vel, ... }  // static instance inside conditional block
+    }
+
+    // Static: always present regardless of mode
+    router:  { module: rtr, ... }
+    monitor: { module: mon, ... }
+}
+```
+
+CUE merges comprehensions, conditional blocks, and literal fields in a struct
+without ordering constraints. The resulting `#instances` map is the union of all
+generated entries.
+
+### Instance name collision
+
+Dynamic comprehensions and static instance names share the same `#instances` map
+key space. A consumer using a reserved name (e.g. `servers: { router: {...} }`)
+will cause a CUE unification conflict. Document reserved names in your bundle:
+
+```cue
+C=#config: {
+    // Reserved instance names: router, monitor, proxy
+    // Do not use these as server names.
+    servers?: [string]: _#serverConfig
+}
+```
+
+### Gamestack example
+
+The `examples/bundles/gamestack/bundle.cue` demonstrates all of these patterns
+in a production-representative scenario: 2 deployment modes, 4 module types, and
+auto-wired infrastructure across a variable-size server fleet.
+
+---
+
 ## 4. Writing a BundleRelease
 
 A BundleRelease binds a Bundle to concrete values.
@@ -950,6 +1206,49 @@ properties. Default values (`*"x" | string`) map to `default`.
 
 ---
 
+### `debugValues` — Required for Full Evaluation
+
+Every module and bundle **must** declare concrete `debugValues`. Without them,
+dependent packages (bundles importing the module, releases importing the bundle)
+cannot fully evaluate through the component and transformer chain.
+
+`debugValues` is typed as `_` (top) in `#Module` and `#Bundle`. Provide a value
+that satisfies the full `#config` schema with concrete, representative data:
+
+```cue
+// module.cue — satisfies every required field and exercises optional ones
+debugValues: #config & {
+    motd:       "Debug Server"
+    maxPlayers: 10
+    port:       25565
+    // optional fields shown to exercise conditional component branches:
+    rcon: { enabled: true, port: 25575 }
+}
+```
+
+For bundles, use the `C=` alias so the value is constrained by the bundle schema:
+
+```cue
+// bundle.cue
+debugValues: C & {
+    namespace:   "debug"
+    releaseName: "debug-stack"
+    // ... all required fields
+}
+```
+
+**Why it matters:** When a `#BundleRelease` iterates `unifiedBundle.#instances`,
+each instance's `values` field is typed as `module.#config`. Without concrete
+`debugValues` on the imported module, `module.#config` stays as `_` (top) and
+`values` evaluates to `_` in the release — meaning the values are never wired
+through and the module runs entirely on defaults. This produces no error during
+`cue vet` but silently breaks the release.
+
+**Symptom:** `releases.<instance>.values: _` in `cue eval -A` output, and the
+rendered components use module defaults instead of your configured values.
+
+---
+
 ## Quick Reference
 
 ### Module Author Checklist
@@ -962,6 +1261,7 @@ properties. Default values (`*"x" | string`) map to `default`.
 - [ ] Workload type label set: `"core.opmodel.dev/workload-type": "stateful" | ...`
 - [ ] Optional config fields guarded with `!= _|_` in component conditionals
 - [ ] Secret env vars use `from:` not `value:`
+- [ ] `debugValues: #config & { ... }` with concrete values for all required fields
 
 ### Platform Operator (Bundle) Checklist
 
@@ -970,6 +1270,7 @@ properties. Default values (`*"x" | string`) map to `default`.
 - [ ] Secret passthrough uses `schemas.#Secret & module.#config.field`
 - [ ] Each `#instances` entry has `module:`, `metadata.namespace`, and `values:`
 - [ ] Values wiring is explicit — no implicit inheritance between instances
+- [ ] `debugValues: C & { ... }` with concrete values for all required fields
 
 ### End-user (Release) Checklist
 
