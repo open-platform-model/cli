@@ -21,6 +21,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -157,11 +158,8 @@ func (e *UnmatchedComponentsError) Error() string {
 	return sb.String()
 }
 
-// joinErrors combines multiple errors into one for return as a single error value.
+// joinErrors combines multiple errors into one unwrappable error using errors.Join.
+// Each constituent error remains accessible via errors.Is / errors.As.
 func joinErrors(errs []error) error {
-	msgs := make([]string, len(errs))
-	for i, e := range errs {
-		msgs[i] = e.Error()
-	}
-	return fmt.Errorf("%s", strings.Join(msgs, "; "))
+	return errors.Join(errs...)
 }

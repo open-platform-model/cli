@@ -191,6 +191,10 @@ func injectContext(
 	// back as a typed struct. Stays entirely in CUE-land: Decode() for reading,
 	// Encode() for writing back.
 	compMeta := componentContextData{Name: compName}
+	// TODO(production): Decode errors are silently discarded here. In production this
+	// should log or propagate the error so that malformed metadata fields are surfaced
+	// to the operator rather than silently producing empty labels/annotations in the
+	// generated manifests. See experiments/factory/DEBT.md § "Silent error discard".
 	if labelsVal := compVal.LookupPath(cue.ParsePath("metadata.labels")); labelsVal.Exists() {
 		_ = labelsVal.Decode(&compMeta.Labels) // best-effort; empty map if not decodable
 	}
