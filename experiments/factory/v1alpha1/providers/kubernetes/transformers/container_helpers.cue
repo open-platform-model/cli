@@ -14,10 +14,15 @@ import (
 //   fieldRef?         -> { name, valueFrom: { fieldRef: ... } }
 //   resourceFieldRef? -> { name, valueFrom: { resourceFieldRef: ... } }
 //
+// When #releasePrefix is set, it is prepended to the secretKeyRef name for
+// auto-generated secrets (#SecretLiteral / #SecretEsoRef). Pre-existing K8s
+// Secret references (#SecretK8sRef) are never prefixed.
+//
 // Usage:
-//   (#ToK8sContainer & {"in": _container}).out
+//   (#ToK8sContainer & {"in": _container, #releasePrefix: "my-release"}).out
 #ToK8sContainer: {
-	X="in": schemas.#ContainerSchema
+	X="in":          schemas.#ContainerSchema
+	#releasePrefix?: string
 
 	out: k8scorev1.#Container & {
 		name:            X.name
@@ -59,13 +64,24 @@ import (
 						}
 					}
 
-					// #SecretLiteral / #SecretEsoRef: use $secretName / $dataKey
-					if e.from.secretName == _|_ {
+				// #SecretLiteral / #SecretEsoRef: use $secretName / $dataKey.
+				// When #releasePrefix is set, prepend it to the secret name so
+				// that multiple releases of the same module can coexist in one
+				// namespace without their auto-generated secrets colliding.
+				if e.from.secretName == _|_ {
+					if #releasePrefix != _|_ {
+						valueFrom: secretKeyRef: {
+							name: "\(#releasePrefix)-\(e.from.$secretName)"
+							key:  e.from.$dataKey
+						}
+					}
+					if #releasePrefix == _|_ {
 						valueFrom: secretKeyRef: {
 							name: e.from.$secretName
 							key:  e.from.$dataKey
 						}
 					}
+				}
 				}
 
 				// Downward API — pod/container metadata
@@ -151,12 +167,13 @@ import (
 // #ToK8sContainers converts a list of OPM containers to Kubernetes containers.
 //
 // Usage:
-//   (#ToK8sContainers & {"in": _initContainers}).out
+//   (#ToK8sContainers & {"in": _initContainers, #releasePrefix: "my-release"}).out
 #ToK8sContainers: {
-	X="in": [...schemas.#ContainerSchema]
+	X="in":          [...schemas.#ContainerSchema]
+	#releasePrefix?: string
 
 	out: [for c in X {
-		(#ToK8sContainer & {"in": c}).out
+		(#ToK8sContainer & {"in": c, #releasePrefix: #releasePrefix}).out
 	}]
 }
 

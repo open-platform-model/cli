@@ -48,9 +48,11 @@ import (
 
 		output: {
 			for _secretName, secret in _secrets {
-				// Compute the deterministic K8s resource name
+				// Compute the deterministic K8s resource name.
+				// Prefix with the release name so multiple releases of the same
+				// module can coexist in one namespace without secret name collisions.
 				let _k8sName = (schemas.#SecretImmutableName & {
-					baseName:  secret.name
+					baseName:  "\(#context.#moduleReleaseMetadata.name)-\(secret.name)"
 					data:      secret.data
 					immutable: secret.immutable
 				}).out

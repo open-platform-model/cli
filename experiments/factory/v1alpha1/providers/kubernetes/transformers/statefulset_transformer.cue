@@ -86,7 +86,7 @@ import (
 		}
 
 		// Build main container: base conversion via helper, unified with trait fields
-		_mainContainer: (#ToK8sContainer & {"in": _container}).out
+		_mainContainer: (#ToK8sContainer & {"in": _container, #releasePrefix: #context.#moduleReleaseMetadata.name}).out
 
 		// Build container list (main container + optional sidecars)
 		_sidecarContainers: *optionalTraits["opmodel.dev/traits/workload/sidecar-containers@v1"].#defaults | [...]
@@ -120,11 +120,11 @@ import (
 				template: {
 					metadata: labels: #context.componentLabels
 					spec: {
-						_convertedSidecars: (#ToK8sContainers & {"in": _sidecarContainers}).out
+						_convertedSidecars: (#ToK8sContainers & {"in": _sidecarContainers, #releasePrefix: #context.#moduleReleaseMetadata.name}).out
 						containers: list.Concat([[_mainContainer], _convertedSidecars])
 
 						if len(_initContainers) > 0 {
-							initContainers: (#ToK8sContainers & {"in": _initContainers}).out
+							initContainers: (#ToK8sContainers & {"in": _initContainers, #releasePrefix: #context.#moduleReleaseMetadata.name}).out
 						}
 
 						restartPolicy: _restartPolicy
