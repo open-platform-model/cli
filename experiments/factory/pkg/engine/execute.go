@@ -6,8 +6,8 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/experiments/factory/internal/core"
-	"github.com/opmodel/cli/experiments/factory/internal/core/modulerelease"
+	"github.com/opmodel/cli/experiments/factory/pkg/core"
+	"github.com/opmodel/cli/experiments/factory/pkg/modulerelease"
 )
 
 // moduleReleaseContextData is the Go-side mirror of #TransformerContext.#moduleReleaseMetadata.

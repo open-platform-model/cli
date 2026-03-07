@@ -31,10 +31,10 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 
-	"github.com/opmodel/cli/experiments/factory/internal/core/provider"
 	"github.com/opmodel/cli/experiments/factory/pkg/engine"
 	"github.com/opmodel/cli/experiments/factory/pkg/loader"
 	"github.com/opmodel/cli/experiments/factory/pkg/output"
+	"github.com/opmodel/cli/experiments/factory/pkg/provider"
 )
 
 func main() {

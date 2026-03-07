@@ -7,9 +7,9 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/experiments/factory/internal/core"
-	"github.com/opmodel/cli/experiments/factory/internal/core/bundlerelease"
-	"github.com/opmodel/cli/experiments/factory/internal/core/provider"
+	"github.com/opmodel/cli/experiments/factory/pkg/bundlerelease"
+	"github.com/opmodel/cli/experiments/factory/pkg/core"
+	"github.com/opmodel/cli/experiments/factory/pkg/provider"
 )
 
 // BundleRenderer drives the OPM render pipeline for a BundleRelease.

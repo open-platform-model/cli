@@ -7,7 +7,7 @@ package modulerelease
 import (
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/experiments/factory/internal/core/module"
+	"github.com/opmodel/cli/experiments/factory/pkg/module"
 )
 
 // ModuleRelease is the built module release, ready for pipeline evaluation.

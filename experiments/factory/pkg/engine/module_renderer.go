@@ -27,9 +27,9 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/experiments/factory/internal/core"
-	"github.com/opmodel/cli/experiments/factory/internal/core/modulerelease"
-	"github.com/opmodel/cli/experiments/factory/internal/core/provider"
+	"github.com/opmodel/cli/experiments/factory/pkg/core"
+	"github.com/opmodel/cli/experiments/factory/pkg/modulerelease"
+	"github.com/opmodel/cli/experiments/factory/pkg/provider"
 )
 
 // ModuleRenderer drives the OPM render pipeline for a single ModuleRelease.

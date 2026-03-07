@@ -9,7 +9,7 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/load"
 
-	"github.com/opmodel/cli/experiments/factory/internal/core/provider"
+	"github.com/opmodel/cli/experiments/factory/pkg/provider"
 )
 
 // LoadProvider loads a named provider from the factory's provider registry.

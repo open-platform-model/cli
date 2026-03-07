@@ -6,10 +6,10 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/experiments/factory/internal/core/bundle"
-	"github.com/opmodel/cli/experiments/factory/internal/core/bundlerelease"
-	"github.com/opmodel/cli/experiments/factory/internal/core/module"
-	"github.com/opmodel/cli/experiments/factory/internal/core/modulerelease"
+	"github.com/opmodel/cli/experiments/factory/pkg/bundle"
+	"github.com/opmodel/cli/experiments/factory/pkg/bundlerelease"
+	"github.com/opmodel/cli/experiments/factory/pkg/module"
+	"github.com/opmodel/cli/experiments/factory/pkg/modulerelease"
 )
 
 // LoadBundleReleaseFromValue decodes a BundleRelease from an already-loaded

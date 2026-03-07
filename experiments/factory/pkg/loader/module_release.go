@@ -8,8 +8,8 @@ import (
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/load"
 
-	"github.com/opmodel/cli/experiments/factory/internal/core/module"
-	"github.com/opmodel/cli/experiments/factory/internal/core/modulerelease"
+	"github.com/opmodel/cli/experiments/factory/pkg/module"
+	"github.com/opmodel/cli/experiments/factory/pkg/modulerelease"
 )
 
 // LoadReleasePackage loads a release CUE package (release.cue + values.cue)

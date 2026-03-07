@@ -899,6 +899,7 @@ appear empty after `cue export` (e.g. `data: {}`), even though `cue eval -A`
 shows the values as present.
 
 **When this applies:**
+
 - The map values are structs with concrete scalar fields
 - The definition being unified with has a typed field (e.g. `[string]: #Secret`)
 - The output must survive `cue export` / `Syntax(cue.Final())`

@@ -7,8 +7,8 @@ package bundlerelease
 import (
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/experiments/factory/internal/core/bundle"
-	"github.com/opmodel/cli/experiments/factory/internal/core/modulerelease"
+	"github.com/opmodel/cli/experiments/factory/pkg/bundle"
+	"github.com/opmodel/cli/experiments/factory/pkg/modulerelease"
 )
 
 // BundleRelease is the built bundle release, ready for orchestrated rendering.

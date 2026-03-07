@@ -10,7 +10,7 @@ import (
 
 	cueyaml "cuelang.org/go/encoding/yaml"
 
-	"github.com/opmodel/cli/experiments/factory/internal/core"
+	"github.com/opmodel/cli/experiments/factory/pkg/core"
 )
 
 // PrintResources writes each resource as a YAML document to w.
