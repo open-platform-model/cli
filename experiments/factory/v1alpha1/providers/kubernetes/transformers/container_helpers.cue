@@ -170,10 +170,9 @@ import (
 //   (#ToK8sContainers & {"in": _initContainers, #releasePrefix: "my-release"}).out
 #ToK8sContainers: {
 	X="in":          [...schemas.#ContainerSchema]
-	#releasePrefix?: string
-
+	_prefix=#releasePrefix?: string
 	out: [for c in X {
-		(#ToK8sContainer & {"in": c, #releasePrefix: #releasePrefix}).out
+		(#ToK8sContainer & {"in": c, #releasePrefix: _prefix}).out
 	}]
 }
 
@@ -183,9 +182,10 @@ import (
 // using the immutable name helpers (same helpers used by ConfigMap/Secret transformers).
 //
 // Usage:
-//   (#ToK8sVolumes & {"in": _component.spec.volumes}).out
+//   (#ToK8sVolumes & {"in": _component.spec.volumes, #releasePrefix: "my-release"}).out
 #ToK8sVolumes: {
 	X="in": [string]: schemas.#VolumeSchema
+	_prefix=#releasePrefix?: string
 
 	out: [for vName, vol in X {
 		name: vol.name | *vName
@@ -200,7 +200,7 @@ import (
 			}
 		}
 		if vol.persistentClaim != _|_ {
-			persistentVolumeClaim: claimName: vol.name | *vName
+			persistentVolumeClaim: claimName: "\(_prefix)-\(vol.name | *vName)"
 		}
 		if vol.configMap != _|_ {
 			configMap: name: (schemas.#ImmutableName & {

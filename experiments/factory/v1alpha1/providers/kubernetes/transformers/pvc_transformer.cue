@@ -50,7 +50,7 @@ import (
 					apiVersion: "v1"
 					kind:       "PersistentVolumeClaim"
 					metadata: {
-						name:      volume.name | *volumeName
+						name:      "\(#context.#moduleReleaseMetadata.name)-\(volume.name | *volumeName)"
 						namespace: #context.#moduleReleaseMetadata.namespace
 						labels:    #context.labels
 						// Include component annotations if present

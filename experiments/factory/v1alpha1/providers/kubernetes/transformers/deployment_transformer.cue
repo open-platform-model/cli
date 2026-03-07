@@ -106,7 +106,7 @@ import (
 			apiVersion: "apps/v1"
 			kind:       "Deployment"
 			metadata: {
-				name:      #component.metadata.name
+				name:      "\(#context.#moduleReleaseMetadata.name)-\(#component.metadata.name)"
 				namespace: #context.#moduleReleaseMetadata.namespace
 				labels:    #context.labels
 				// Include component annotations if present
@@ -154,7 +154,7 @@ import (
 
 						// Volumes: convert OPM volume specs to Kubernetes volume specs
 						if #component.spec.volumes != _|_ {
-							volumes: (#ToK8sVolumes & {"in": #component.spec.volumes}).out
+							volumes: (#ToK8sVolumes & {"in": #component.spec.volumes, #releasePrefix: #context.#moduleReleaseMetadata.name}).out
 						}
 					}
 				}

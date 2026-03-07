@@ -87,7 +87,7 @@ import (
 			apiVersion: "batch/v1"
 			kind:       "CronJob"
 			metadata: {
-				name:      #component.metadata.name
+				name:      "\(#context.#moduleReleaseMetadata.name)-\(#component.metadata.name)"
 				namespace: #context.#moduleReleaseMetadata.namespace
 				labels:    #context.labels
 				// Include component annotations if present
