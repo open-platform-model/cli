@@ -60,3 +60,18 @@ metadata: {
 }
 
 _#portSchema: uint & >0 & <=65535
+
+debugValues: {
+	image: {
+		repository: "itzg/mc-proxy"
+		tag:        "latest"
+		digest:     ""
+	}
+	type: "VELOCITY"
+	motd: "Welcome to the Velocity Proxy!"
+	onlineMode: true
+	maxPlayers: 500
+	bindPort: 25577
+	forwardingMode: "MODERN"
+	forwardingSecret: "change-me-in-production"
+}

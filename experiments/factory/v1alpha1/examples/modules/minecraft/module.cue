@@ -454,3 +454,55 @@ _#pluginsConfig: {
 	// Remove old plugins before installing new ones
 	removeOldMods: bool | *false
 }
+
+debugValues: {
+	// Example config exercising the full schema for local cue vet / cue eval.
+	// Demonstrates multiple server types, backup config, mods/plugins, and more.
+	version: "1.20.4"
+	eula:    true
+
+	paper: {
+		plugins: {
+			urls: [
+				"https://example.com/plugins/EssentialsX.jar",
+				"https://example.com/plugins/LuckPerms.jar"
+			]
+			modrinth: {
+				projects: ["some-paper-plugin"]
+			}
+			removeOldMods: true
+		}
+	}
+
+	storage: {
+		data: {
+			type: "pvc"
+			size: "20Gi"
+		}
+		backups: {
+			type: "pvc"
+			size: "20Gi"
+		}
+	}
+
+	rcon: {
+		password: value: "debug-rcon-password"
+	}
+
+	backup: {
+		enabled: true
+		method:  "restic"
+		interval: "12h"
+		initialDelay: "10m"
+		pruneBackupsDays: 14
+		pauseIfNoPlayers: true
+
+		restic: {
+			repository: "s3:s3.amazonaws.com/my-minecraft-backups"
+			password: value: "supersecretresticpassword"
+			retention: "30d"
+			additionalTags: "env=prod,type=minecraft-backup"
+			retryLock: "10m"
+		}
+	}
+}
