@@ -33,10 +33,10 @@ import (
 			(#SecretsResourceFQN): {
 				spec: {
 					secrets: {
-						for secretName, data in #secrets {
+						for secretName, _data in #secrets {
 							(secretName): schemas.#SecretSchema & {
 								name: secretName
-								data: data
+								data: _data
 							}
 						}
 					}
@@ -48,10 +48,10 @@ import (
 		// by transformers (matches the shape of #SecretsResource.spec).
 		spec: close({
 			secrets: {
-				for secretName, data in #secrets {
+				for secretName, _data in #secrets {
 					(secretName): schemas.#SecretSchema & {
 						name: secretName
-						data: data
+						data: _data
 					}
 				}
 			}
