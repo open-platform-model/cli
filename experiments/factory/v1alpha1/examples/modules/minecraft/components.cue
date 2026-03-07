@@ -3,6 +3,7 @@
 package minecraft
 
 import (
+	"list"
 	"strings"
 
 	resources_workload "opmodel.dev/resources/workload@v1"
@@ -23,7 +24,7 @@ import (
 	server: {
 		resources_workload.#Container
 		resources_storage.#Volumes
-		if #config.backup.enabled {
+		if #config.backup.enabled || #config.monitor.enabled {
 			traits_workload.#SidecarContainers
 		}
 		traits_workload.#Scaling
@@ -803,9 +804,12 @@ import (
 				}
 			}
 
-			// === Sidecar Container: Backup ===
-			if #config.backup.enabled {
-				sidecarContainers: [{
+			// === Sidecar Containers ===
+			// Built with list.Concat so each sidecar is independently conditional.
+			// Each sub-list is either [] or [{...}] depending on the config flag.
+
+			let _backupSidecar = [if #config.backup.enabled {
+				{
 					name:  "backup"
 					image: #config.backup.image
 
@@ -972,15 +976,67 @@ import (
 							memory: "1Gi"
 						}
 					}
-				}]
-			}
+				}
+			}]
+
+			// === Sidecar Container: mc-monitor ===
+			// Co-located Prometheus exporter using mc-monitor.
+			// Uses the mc-monitor binary (itzg/mc-monitor image) pointing at :{port}.
+			// server_host label on emitted metrics = #config.monitor.serverHost.
+			let _monitorSidecar = [if #config.monitor.enabled {
+				{
+					name:  "mc-monitor"
+					image: #config.monitor.image
+					command: ["/mc-monitor", "export-for-prometheus"]
+					ports: metrics: {
+						name:       "metrics"
+						targetPort: #config.monitor.port
+						protocol:   "TCP"
+					}
+					env: {
+						EXPORT_SERVERS: {
+							name:  "EXPORT_SERVERS"
+							value: "\(#config.monitor.serverHost):\(#config.port)"
+						}
+						EXPORT_PORT: {
+							name:  "EXPORT_PORT"
+							value: "\(#config.monitor.port)"
+						}
+						TIMEOUT: {
+							name:  "TIMEOUT"
+							value: #config.monitor.timeout
+						}
+					}
+					resources: {
+						requests: {
+							cpu:    "10m"
+							memory: "32Mi"
+						}
+						limits: {
+							cpu:    "100m"
+							memory: "64Mi"
+						}
+					}
+				}
+			}]
+
+			sidecarContainers: list.Concat([_backupSidecar, _monitorSidecar])
 
 			// === Network Exposure ===
 			expose: {
-				ports: minecraft: {
-					targetPort:  25565
-					protocol:    "TCP"
-					exposedPort: #config.port
+				ports: {
+					minecraft: {
+						targetPort:  25565
+						protocol:    "TCP"
+						exposedPort: #config.port
+					}
+					if #config.monitor.enabled {
+						metrics: {
+							targetPort:  #config.monitor.port
+							protocol:    "TCP"
+							exposedPort: #config.monitor.port
+						}
+					}
 				}
 				type: #config.serviceType
 			}

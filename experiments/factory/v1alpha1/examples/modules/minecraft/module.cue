@@ -15,6 +15,11 @@ import (
 // Module definition
 m.#Module
 
+// #workloadComponent is the name of the primary workload component in this module.
+// Bundles reference this to construct Kubernetes Service DNS names:
+//   {releaseName}-{instanceName}-{#workloadComponent}.{namespace}.svc
+#workloadComponent: "server"
+
 // Module metadata
 metadata: {
 	modulePath:       "example.com/modules"
@@ -407,6 +412,34 @@ metadata: {
 			{rclone!: _},
 		])
 	}
+	}
+
+	// === Monitor Sidecar ===
+	// Runs itzg/mc-monitor as a co-located sidecar to export Prometheus metrics.
+	// Metrics served at :{port}/metrics.
+	// Disable per-server with: monitor: enabled: false
+	monitor: {
+		enabled: bool | *true
+
+		image: schemas.#Image & {
+			repository: string | *"itzg/mc-monitor"
+			tag:        string | *"0.16.1"
+			digest:     string | *""
+		}
+
+		// HTTP port to serve /metrics on (env EXPORT_PORT)
+		port: uint & >0 & <=65535 | *8080
+
+		// Per-server check timeout (env TIMEOUT)
+		timeout: string | *"1m0s"
+
+		// Hostname passed to EXPORT_SERVERS (env EXPORT_SERVERS host portion).
+		// This becomes the server_host label on all exported Prometheus metrics.
+		// Defaults to "localhost" (co-located sidecar, no DNS dependency).
+		// Override with the K8s Service name for meaningful per-release labels,
+		// e.g. "{releaseName}-{componentName}" when running multiple releases
+		// in the same namespace.
+		serverHost: string | *"localhost"
 	}
 
 	// === Resource Limits (catalog-standard shape) ===

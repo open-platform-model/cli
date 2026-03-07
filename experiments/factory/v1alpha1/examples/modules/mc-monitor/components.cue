@@ -70,16 +70,16 @@ import (
 						name: "EXPORT_SERVERS"
 						value: strings.Join([ for s in #config.javaServers {
 							"\(s.host):\(s.port)"
-						}], " ")
+						}], ",")
 					}
 
 					// Bedrock servers — space-separated host:port list (conditional)
 					if #config.bedrockServers != _|_ {
 						EXPORT_BEDROCK_SERVERS: {
 							name: "EXPORT_BEDROCK_SERVERS"
-							value: strings.Join([ for s in #config.bedrockServers {
-								"\(s.host):\(s.port)"
-							}], " ")
+					value: strings.Join([ for s in #config.bedrockServers {
+							"\(s.host):\(s.port)"
+						}], ",")
 						}
 					}
 

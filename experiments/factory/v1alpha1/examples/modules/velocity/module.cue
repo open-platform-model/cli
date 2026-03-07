@@ -15,6 +15,11 @@ import (
 // Module definition
 m.#Module
 
+// #workloadComponent is the name of the primary workload component in this module.
+// Bundles reference this to construct Kubernetes Service DNS names:
+//   {releaseName}-{instanceName}-{#workloadComponent}.{namespace}.svc
+#workloadComponent: "proxy"
+
 // Module metadata
 metadata: {
 	modulePath:       "example.com/modules"

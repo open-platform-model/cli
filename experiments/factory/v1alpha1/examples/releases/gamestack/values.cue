@@ -32,117 +32,111 @@ values: {
 
 			// Paper — high-performance Spigot fork with plugin ecosystem
 			paper: {
-				plugins: {
-					// WorldEdit + CoreProtect for creative build management
-					modrinth: {
-						projects: ["worldedit", "coreprotect"]
-					}
-				}
+				// plugins: {
+				// 	// WorldEdit + CoreProtect for creative build management
+				// 	modrinth: {
+				// 		projects: ["worldedit", "coreprotect"]
+				// 	}
+				// }
 			}
 
 			storage: {
 				data: {
-					type:         "hostPath"
-					path:         "/mnt/gamestack/creative/data"
-					hostPathType: "DirectoryOrCreate"
+					type: "pvc"
+					size: "10Gi"
 				}
 				backups: {
-					type:         "hostPath"
-					path:         "/mnt/gamestack/creative/backups"
-					hostPathType: "DirectoryOrCreate"
+					type: "pvc"
+					size: "5Gi"
 				}
 			}
 		}
 
-		// ── Minigames server ──────────────────────────────────────────────────
-		// Paper for its broad plugin ecosystem and Spiget integration.
-		minigames: {
-			motd:       "Minigames — Play and Compete!"
-			maxPlayers: 100
-			difficulty: "normal"
+		// // ── Minigames server ──────────────────────────────────────────────────
+		// // Paper for its broad plugin ecosystem and Spiget integration.
+		// minigames: {
+		// 	motd:       "Minigames — Play and Compete!"
+		// 	maxPlayers: 100
+		// 	difficulty: "normal"
 
-			// Paper — best plugin compatibility for minigame frameworks
-			paper: {
-				plugins: {
-					// MiniGamesLib + EssentialsX via Spiget
-					spigetResources: [81534, 9089]
-				}
-			}
+		// 	// Paper — best plugin compatibility for minigame frameworks
+		// 	paper: {
+		// 		plugins: {
+		// 			// MiniGamesLib + EssentialsX via Spiget
+		// 			spigetResources: [81534, 9089]
+		// 		}
+		// 	}
 
-			storage: {
-				data: {
-					type:         "hostPath"
-					path:         "/mnt/gamestack/minigames/data"
-					hostPathType: "DirectoryOrCreate"
-				}
-				backups: {
-					type:         "hostPath"
-					path:         "/mnt/gamestack/minigames/backups"
-					hostPathType: "DirectoryOrCreate"
-				}
-			}
-		}
+		// 	storage: {
+		// 		data: {
+		// 			type: "pvc"
+		// 			size: "10Gi"
+		// 		}
+		// 		backups: {
+		// 			type: "pvc"
+		// 			size: "5Gi"
+		// 		}
+		// 	}
+		// }
 
-		// ── Create mod server ─────────────────────────────────────────────────
-		// Forge 1.20.1 with the Create mod and a few common companions.
-		// Create is a tech/engineering mod — needs more RAM than vanilla.
-		"create-mod": {
-			version:    "1.20.1"
-			motd:       "Create Mod — Engineering Fun!"
-			maxPlayers: 20
-			mode:       "survival"
-			pvp:        false
-			difficulty: "easy"
+		// // ── Create mod server ─────────────────────────────────────────────────
+		// // Forge 1.20.1 with the Create mod and a few common companions.
+		// // Create is a tech/engineering mod — needs more RAM than vanilla.
+		// "create-mod": {
+		// 	version:    "1.20.1"
+		// 	motd:       "Create Mod — Engineering Fun!"
+		// 	maxPlayers: 20
+		// 	mode:       "survival"
+		// 	pvp:        false
+		// 	difficulty: "easy"
 
-			// Forge — required by Create and its addon ecosystem
-			forge: {
-				version: "47.3.0"
-				mods: {
-					// Core mod + common companions via Modrinth
-					modrinth: {
-						projects: [
-							"create",          // Create: Mechanical engineering
-							"create-steam-n-rails", // Trains & railways addon
-							"jei",             // Just Enough Items — recipe viewer
-						]
-						downloadDependencies: "required"
-						allowedVersionType:   "release"
-					}
-				}
-			}
+		// 	// Forge — required by Create and its addon ecosystem
+		// 	forge: {
+		// 		version: "47.3.0"
+		// 		mods: {
+		// 			// Core mod + common companions via Modrinth
+		// 			modrinth: {
+		// 				projects: [
+		// 					"create",          // Create: Mechanical engineering
+		// 					"create-steam-n-rails", // Trains & railways addon
+		// 					"jei",             // Just Enough Items — recipe viewer
+		// 				]
+		// 				downloadDependencies: "required"
+		// 				allowedVersionType:   "release"
+		// 			}
+		// 		}
+		// 	}
 
-			// Create is memory-heavy — give it more headroom
-			jvm: {
-				memory:       "4G"
-				useAikarFlags: true
-			}
+		// 	// Create is memory-heavy — give it more headroom
+		// 	jvm: {
+		// 		memory:       "4G"
+		// 		useAikarFlags: true
+		// 	}
 
-			storage: {
-				data: {
-					type:         "hostPath"
-					path:         "/mnt/gamestack/create-mod/data"
-					hostPathType: "DirectoryOrCreate"
-				}
-				backups: {
-					type:         "hostPath"
-					path:         "/mnt/gamestack/create-mod/backups"
-					hostPathType: "DirectoryOrCreate"
-				}
-			}
+		// 	storage: {
+		// 		data: {
+		// 			type: "pvc"
+		// 			size: "10Gi"
+		// 		}
+		// 		backups: {
+		// 			type: "pvc"
+		// 			size: "5Gi"
+		// 		}
+		// 	}
 
-			// Enable tar backups for the modded world
-			backup: {
-				enabled:          true
-				interval:         "12h"
-				initialDelay:     "10m"
-				pruneBackupsDays: 14
-				pauseIfNoPlayers: true
-				tar: {
-					compressMethod: "zstd"
-					linkLatest:     true
-				}
-			}
-		}
+		// 	// Enable tar backups for the modded world
+		// 	backup: {
+		// 		enabled:          true
+		// 		interval:         "12h"
+		// 		initialDelay:     "10m"
+		// 		pruneBackupsDays: 14
+		// 		pauseIfNoPlayers: true
+		// 		tar: {
+		// 			compressMethod: "zstd"
+		// 			linkLatest:     true
+		// 		}
+		// 	}
+		// }
 	}
 
 	// ── Proxied network ───────────────────────────────────────────────────────

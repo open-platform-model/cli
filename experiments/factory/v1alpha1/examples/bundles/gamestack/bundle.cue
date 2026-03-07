@@ -31,9 +31,9 @@
 // The BundleRelease produces ModuleRelease names of the form:
 //   {releaseName}-{instanceName}
 // The K8s Service for each server is reachable at:
-//   {releaseName}-{serverName}.{namespace}.svc
+//   {releaseName}-{serverName}-{mc.#workloadComponent}.{namespace}.svc
 // The Velocity proxy service:
-//   {releaseName}-proxy.{namespace}.svc
+//   {releaseName}-proxy-{vel.#workloadComponent}.{namespace}.svc
 //
 // Set `releaseName` to exactly match the BundleRelease `metadata.name`.
 package gamestack
@@ -46,7 +46,6 @@ import (
 	mc      "opmodel.dev/examples/modules/minecraft@v1"
 	vel     "opmodel.dev/examples/modules/velocity@v1"
 	rtr     "opmodel.dev/examples/modules/mc-router@v1:mcrouter"
-	mon     "opmodel.dev/examples/modules/mc-monitor@v1:mcmonitor"
 )
 
 _#portSchema: uint & >0 & <=65535
@@ -115,7 +114,7 @@ C=#config: {
 
 	// Must match the BundleRelease metadata.name exactly.
 	// Used to compute K8s service DNS names:
-	//   {releaseName}-{serverName}.{namespace}.svc
+	//   {releaseName}-{serverName}-{mc.#workloadComponent}.{namespace}.svc
 	releaseName: string
 
 	// Kubernetes namespace for all module instances
@@ -633,8 +632,11 @@ debugValues: {
 			// Embed the full per-server config and override the bundle-level RCON secret.
 			// Standalone servers always authenticate directly against Mojang (onlineMode
 			// defaults to true in _#serverConfig and is not overridden here).
+			// Auto-wire monitor.serverHost to the K8s Service name so the server_host
+			// label on Prometheus metrics identifies the release, not just "localhost".
 			values: _c & {
-				rcon: password: C.rconPassword
+				rcon:    password:   C.rconPassword
+				monitor: serverHost: "\(_relName)-\(_name)-\(mc.#workloadComponent)"
 			}
 		}
 	}
@@ -655,9 +657,11 @@ debugValues: {
 				// Embed the full per-server config, then apply bundle-level overrides:
 				//   - rcon.password: shared bundle secret
 				//   - server.onlineMode: driven by proxy forwarding mode
+				//   - monitor.serverHost: K8s Service name for correct Prometheus labels
 				values: _c & {
-					server: onlineMode: _onlineMode
-					rcon:   password:   C.rconPassword
+					server:  onlineMode: _onlineMode
+					rcon:    password:   C.rconPassword
+					monitor: serverHost: "\(_relName)-\(_name)-\(mc.#workloadComponent)"
 				}
 			}
 		}
@@ -677,12 +681,12 @@ debugValues: {
 
 	// ── mc-router ─────────────────────────────────────────────────────────────
 	// Always present. Static --mapping args auto-built from both server maps:
-	//   standalone: {name}.{domain}     → {releaseName}-{name}.{namespace}.svc
-	//   network:    {hostname}.{domain} → {releaseName}-proxy.{namespace}.svc
+	//   standalone: {name}.{domain}     → {releaseName}-{name}-{mc.#workloadComponent}.{namespace}.svc
+	//   network:    {hostname}.{domain} → {releaseName}-proxy-{vel.#workloadComponent}.{namespace}.svc
 	let _standaloneMappings = [ for _name, _cfg in (*C.servers | {}) {
 		{
 			externalHostname: "\(_name).\(_domain)"
-			host:             "\(_relName)-\(_name).\(_ns).svc"
+			host:             "\(_relName)-\(_name)-\(mc.#workloadComponent).\(_ns).svc"
 			port:             _cfg.port
 		}
 	}]
@@ -692,7 +696,7 @@ debugValues: {
 		if C.network != _|_ {
 			{
 				externalHostname: "\(C.network.hostname).\(_domain)"
-				host:             "\(_relName)-proxy.\(_ns).svc"
+				host:             "\(_relName)-proxy-\(vel.#workloadComponent).\(_ns).svc"
 				port:             25577
 			}
 		},
@@ -708,32 +712,7 @@ debugValues: {
 		}
 	}
 
-	// ── mc-monitor ────────────────────────────────────────────────────────────
-	// Always present. Monitors ALL Minecraft servers directly (standalone + backends).
-	// mc-monitor bypasses the proxy so each server is checked individually.
-	//
-	// `C.network.servers | {}` safely returns {} when C.network is absent.
-	let _standaloneTargets = [ for _name, _cfg in (*C.servers | {}) {
-		{
-			host: "\(_relName)-\(_name).\(_ns).svc"
-			port: _cfg.port
-		}
-	}]
-
-	let _networkTargets = [ for _name, _cfg in (*C.network.servers | {}) {
-		{
-			host: "\(_relName)-\(_name).\(_ns).svc"
-			port: _cfg.port
-		}
-	}]
-
-	monitor: {
-		module: mon
-		metadata: namespace: _ns
-		values: {
-			javaServers: list.Concat([_standaloneTargets, _networkTargets])
-			prometheus: {}
-			serviceType: "ClusterIP"
-		}
-	}
+	// mc-monitor is embedded as a sidecar in each Minecraft server pod.
+	// See minecraft/module.cue #config.monitor — enabled by default.
+	// Each server's Service exposes port 8080 (/metrics) for Prometheus scraping.
 }

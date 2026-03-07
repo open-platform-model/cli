@@ -122,7 +122,8 @@ import (
 	}
 
 	componentLabels: {
-		"app.kubernetes.io/name": #componentMetadata.name
+		"app.kubernetes.io/name":                  #componentMetadata.name
+		"module-release.opmodel.dev/name":         #moduleReleaseMetadata.name
 		if #componentMetadata.labels != _|_ {
 			for k, v in #componentMetadata.labels {
 				if !strings.HasPrefix(k, "transformer.opmodel.dev/") {
