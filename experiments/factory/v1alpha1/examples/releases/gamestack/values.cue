@@ -42,10 +42,15 @@ values: {
 
 			storage: {
 				data: {
-					type: "pvc"
-					size: "20Gi"
+					type:         "hostPath"
+					path:         "/mnt/gamestack/creative/data"
+					hostPathType: "DirectoryOrCreate"
 				}
-				backups: type: "emptyDir"
+				backups: {
+					type:         "hostPath"
+					path:         "/mnt/gamestack/creative/backups"
+					hostPathType: "DirectoryOrCreate"
+				}
 			}
 		}
 
@@ -66,10 +71,15 @@ values: {
 
 			storage: {
 				data: {
-					type: "pvc"
-					size: "10Gi"
+					type:         "hostPath"
+					path:         "/mnt/gamestack/minigames/data"
+					hostPathType: "DirectoryOrCreate"
 				}
-				backups: type: "emptyDir"
+				backups: {
+					type:         "hostPath"
+					path:         "/mnt/gamestack/minigames/backups"
+					hostPathType: "DirectoryOrCreate"
+				}
 			}
 		}
 
@@ -109,12 +119,14 @@ values: {
 
 			storage: {
 				data: {
-					type: "pvc"
-					size: "30Gi"
+					type:         "hostPath"
+					path:         "/mnt/gamestack/create-mod/data"
+					hostPathType: "DirectoryOrCreate"
 				}
 				backups: {
-					type: "pvc"
-					size: "20Gi"
+					type:         "hostPath"
+					path:         "/mnt/gamestack/create-mod/backups"
+					hostPathType: "DirectoryOrCreate"
 				}
 			}
 
