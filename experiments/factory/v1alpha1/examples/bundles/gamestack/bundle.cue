@@ -7,9 +7,10 @@
 package gamestack
 
 import (
-	bundle "opmodel.dev/core/bundle@v1"
-	mc "opmodel.dev/examples/modules/minecraft@v1"
-	vel "opmodel.dev/examples/modules/velocity@v1"
+	bundle  "opmodel.dev/core/bundle@v1"
+	schemas "opmodel.dev/schemas@v1"
+	mc      "opmodel.dev/examples/modules/minecraft@v1"
+	vel     "opmodel.dev/examples/modules/velocity@v1"
 )
 
 // Bundle definition
@@ -44,9 +45,15 @@ C=#config: {
 	// MODERN forwarding requires this on both proxy and server.
 	forwardingSecret: string | *"changeme"
 
-	// RCON password — resolves the minecraft module's #Secret disjunction.
-	// Consumers should override this in production.
-	rconPassword: string | *"changeme"
+	// RCON password — exposed as a #Secret so consumers can choose how to fulfill it:
+	//   Literal:  values: rconPassword: value: "my-password"
+	//   K8s ref:  values: rconPassword: secretName: "existing-k8s-secret", remoteKey: "rcon-pw"
+	//
+	// Embedding mc.#config.rcon.password inherits the module's $secretName and
+	// $dataKey routing metadata via CUE unification, keeping the module as the
+	// single source of truth for secret routing. The bundle author never needs
+	// to duplicate routing metadata — it flows in from the module definition.
+	rconPassword: schemas.#Secret & mc.#config.rcon.password
 }
 
 // Bundle instances.
@@ -63,7 +70,7 @@ C=#config: {
 				maxPlayers: C.maxPlayers
 				motd:       C.motd
 			}
-			rcon: password: value: C.rconPassword
+			rcon: password: C.rconPassword
 		}
 	}
 

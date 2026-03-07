@@ -15,4 +15,11 @@ values: {
 
 	// Shared forwarding secret (proxy <-> server authentication)
 	forwardingSecret: "change-me-in-production"
+
+	// RCON password — resolved as a #SecretLiteral here.
+	// Consumers with existing K8s secrets or ESO stores can use
+	// the other variants instead:
+	//   K8s ref: rconPassword: secretName: "my-secret", remoteKey: "rcon-pw"
+	//   ESO ref: rconPassword: externalPath: "aws/secrets/mc", remoteKey: "rcon-password"
+	rconPassword: value: "change-me-in-production"
 }
