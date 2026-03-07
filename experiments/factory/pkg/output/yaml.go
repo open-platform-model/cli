@@ -26,10 +26,10 @@ import (
 func PrintResources(w io.Writer, resources []*core.Resource) error {
 	for _, res := range resources {
 		if res.Release != "" {
-			fmt.Fprintf(w, "# release: %s  component: %s  transformer: %s\n",
+			fmt.Fprintf(w, "# release: %s\n# component: %s\n# transformer: %s\n",
 				res.Release, res.Component, res.Transformer)
 		} else {
-			fmt.Fprintf(w, "# component: %s  transformer: %s\n",
+			fmt.Fprintf(w, "# component: %s\n# transformer: %s\n",
 				res.Component, res.Transformer)
 		}
 
