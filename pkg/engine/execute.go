@@ -232,11 +232,7 @@ func injectContext(
 }
 
 // isSingleResource reports whether a CUE struct value is a single Kubernetes resource.
-//
-// A resource is considered "single" when it has both an "apiVersion" field and a
-// "kind" field at the top level. Requiring both fields is more resilient than
-// checking "apiVersion" alone (fix for DEBT.md #6).
-//
+// 
 // Transformer output must conform to one of three forms:
 //   - list of resources    (cue.ListKind)
 //   - single resource      (cue.StructKind with apiVersion + kind)
