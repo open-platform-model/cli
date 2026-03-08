@@ -168,18 +168,36 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*RenderResult, 
 		}
 
 		// Resolve values: -f flag takes precedence over debugValues.
+		// Three cases, expressed as a switch on what we have:
+		//   - One or more -f files: load and unify all of them.
+		//   - No -f and DebugValues: true: extract debugValues from the module.
+		//   - No -f and DebugValues: false: no values source — error.
 		var valuesVal cue.Value
-		if len(opts.Values) > 0 {
-			// Task 3.4: load values from the first -f file.
-			var loadErr error
-			valuesVal, loadErr = loader.LoadValuesFile(cueCtx, opts.Values[0])
+		switch {
+		case len(opts.Values) > 0:
+			// Load values from -f files, unifying all of them together.
+			// Multiple -f files are unified so each file's values are merged.
+			first, loadErr := loader.LoadValuesFile(cueCtx, opts.Values[0])
 			if loadErr != nil {
-				return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("loading values file: %w", loadErr)}
+				return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("loading values file %q: %w", opts.Values[0], loadErr)}
 			}
-		} else {
-			// Task 3.3: DebugValues path — extract debugValues from the module.
-			// When DebugValues is false and no -f is given we still try debugValues
-			// so that "opm mod build ." without any flag works the same way.
+			valuesVal = first
+			for _, vf := range opts.Values[1:] {
+				next, loadErr := loader.LoadValuesFile(cueCtx, vf)
+				if loadErr != nil {
+					return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("loading values file %q: %w", vf, loadErr)}
+				}
+				valuesVal = valuesVal.Unify(next)
+				if err := valuesVal.Err(); err != nil {
+					return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: fmt.Errorf("unifying values files: %w", err)}
+				}
+			}
+		case opts.DebugValues:
+			// DebugValues path — extract debugValues from the module.
+			// Only attempted when DebugValues: true (callers set this when no -f
+			// flag is given). Keeping the guard here preserves the spec contract:
+			// a future caller that sets DebugValues: false without -f will get a
+			// clear error rather than silently falling through to debugValues.
 			debugVal := modVal.LookupPath(cue.ParsePath("debugValues"))
 			if !debugVal.Exists() {
 				return nil, &oerrors.ExitError{
@@ -196,6 +214,12 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*RenderResult, 
 				}
 			}
 			valuesVal = debugVal
+		default:
+			// No -f flag and DebugValues: false — no values source available.
+			return nil, &oerrors.ExitError{
+				Code: oerrors.ExitGeneralError,
+				Err:  fmt.Errorf("no release.cue found — use -f <values-file> to provide values"),
+			}
 		}
 
 		// Task 3.5: Resolve releaseName.
