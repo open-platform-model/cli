@@ -1,11 +1,10 @@
 version: "3"
 
-silent: true
+silent: false
 
 vars:
-  ROOT_DIR:
-    sh: cd ../.. && pwd
-  CUE_MODULE_DIR: "{{.ROOT_DIR}}/experiments/factory/v1alpha1"
+  EXEC_DIR: "{{.ROOT_DIR}}/cmd"
+  CUE_MODULE_DIR: "{{.ROOT_DIR}}/v1alpha1"
   MINECRAFT_RELEASE_DIR: "{{.CUE_MODULE_DIR}}/examples/releases/minecraft"
 
 tasks:
@@ -18,34 +17,34 @@ tasks:
     desc: "Render the minecraft release with default Paper server values"
     dir: "{{.ROOT_DIR}}"
     cmds:
-      - go run ./experiments/factory/cmd
+      - go run {{.EXEC_DIR}}
 
   run:bundle:
     desc: "Render the gamestack bundle release (Minecraft + Velocity proxy)"
     dir: "{{.ROOT_DIR}}"
     cmds:
-      - go run ./experiments/factory/cmd
+      - go run {{.EXEC_DIR}}
         -release {{.CUE_MODULE_DIR}}/examples/releases/gamestack/
 
   run:forge:
     desc: "Render the minecraft release with Forge modded server values"
     dir: "{{.ROOT_DIR}}"
     cmds:
-      - go run ./experiments/factory/cmd
+      - go run {{.EXEC_DIR}}
         -values {{.MINECRAFT_RELEASE_DIR}}/values_forge.cue
 
   run:fabric:
     desc: "Render the minecraft release with Fabric + Modrinth mods values"
     dir: "{{.ROOT_DIR}}"
     cmds:
-      - go run ./experiments/factory/cmd
+      - go run {{.EXEC_DIR}}
         -values {{.MINECRAFT_RELEASE_DIR}}/values_fabric_modrinth.cue
 
   run:paper-restic:
     desc: "Render the minecraft release with Paper + restic backup values"
     dir: "{{.ROOT_DIR}}"
     cmds:
-      - go run ./experiments/factory/cmd
+      - go run {{.EXEC_DIR}}
         -values {{.MINECRAFT_RELEASE_DIR}}/values_paper_restic.cue
 
   fmt:cue:
@@ -64,7 +63,7 @@ tasks:
     desc: "Vet all Go packages in the factory experiment"
     dir: "{{.ROOT_DIR}}"
     cmds:
-      - go vet ./experiments/factory/...
+      - go vet {{.ROOT_DIR}}/...
 
   vet:
     desc: "Vet CUE and Go"
