@@ -26,11 +26,15 @@ This is a **MINOR** version change. Existing `opm mod` commands continue to work
 
 - `mod-vet`: `opm mod vet` uses `debugValues` from the module by default when no `-f` values flag is provided
 - `cmd-structure`: New `internal/cmd/release/` package added; cluster-query commands migrate from `mod` to `rel`
-- `release-building`: Builder gains an alternate code path for pre-defined release files (skip module loading when `#module` is already filled via import)
+- `release-building`: Loading IS building (promote-factory-engine architecture); `pkg/loader/` gains release-file loading functions; no separate builder phase
 
 ## Impact
 
 - **New package**: `internal/cmd/release/` — all `release` subcommands
-- **Modified packages**: `internal/cmd/mod/` (remove migrated commands, alias build/apply), `internal/cmd/root.go` (register `release` group), `internal/builder/` (support pre-filled releases), `internal/loader/` (release file loading with type detection), `internal/cmdutil/` (new flag groups for release commands)
-- **Modified specs**: `cmd-structure`, `mod-vet`, `release-building`
-- **No breaking changes**: `opm mod` commands retain current behavior; migrated commands can be aliased during deprecation period (deprecation notices reference `opm release` not `opm rel`)
+- **New functions**: `pkg/loader/release_file.go` — `LoadReleaseFile()`, `LoadModulePackage()`, `LoadReleasePackageWithValue()`
+- **Modified packages**: `internal/cmd/mod/` (deprecation aliases for migrated commands), `internal/cmd/root.go` (register `release` group), `internal/cmdutil/` (new flag groups, `RenderFromReleaseFile()`, `DebugValues` on `RenderReleaseOpts`)
+- **Unchanged packages**: `internal/cmd/mod/build.go`, `internal/cmd/mod/apply.go` — already use `cmdutil.RenderRelease()`, no changes needed
+- **Modified specs**: `cmd-structure`, `mod-vet`, `release-building`, `release-file-loading`
+- **No breaking changes**: `opm mod` commands retain current behavior; migrated commands emit deprecation notices referencing `opm release`
+
+> Note: `internal/builder/`, `internal/pipeline/`, and `internal/loader/` no longer exist after `promote-factory-engine`. All references to those packages in this change have been updated to use `pkg/loader/` and `pkg/engine/` instead.

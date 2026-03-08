@@ -1,72 +1,76 @@
-## 1. Release File Loader
+## 1. Release File Loader (`pkg/loader/`)
 
-- [ ] 1.1 Define `ReleaseType` enum (`ModuleRelease`, `BundleRelease`) in `internal/loader/release.go`
-- [ ] 1.2 Create `internal/loader/release.go` with `LoadRelease(ctx *cue.Context, filePath string, registry string) (cue.Value, ReleaseType, string, error)` — loads a `.cue` file via `load.Instances()`, evaluates it, detects release type by reading the `kind` field
-- [ ] 1.3 Add unit tests for `LoadRelease()` — valid `#ModuleRelease` file, valid `#BundleRelease` file (returns `BundleRelease` type), invalid CUE, unrecognised `kind`, release with registry import
-- [ ] 1.4 Add `FillModule(releaseVal cue.Value, moduleRaw cue.Value) cue.Value` helper for `--module` flag injection via FillPath
+- [ ] 1.1 Create `pkg/loader/release_file.go` with `LoadReleaseFile(ctx *cue.Context, filePath string, registry string) (cue.Value, string, error)` — loads a standalone `.cue` file via `load.Instances()` with the file's parent directory for `cue.mod` resolution; sets `CUE_REGISTRY` env var if registry is non-empty; returns evaluated CUE value + resolve directory
+- [ ] 1.2 Add `LoadModulePackage(ctx *cue.Context, dirPath string) (cue.Value, error)` to `pkg/loader/release_file.go` — loads a module CUE package from a local directory for `--module` flag injection; replaces the now-deleted `internal/loader.LoadModule()`
+- [ ] 1.3 Add unit tests for `LoadReleaseFile()` — valid `#ModuleRelease` file, valid `#BundleRelease` file, invalid CUE, unrecognised `kind`, registry import (fixture only, no live registry)
+- [ ] 1.4 Add unit tests for `LoadModulePackage()` — valid module directory, missing directory, missing CUE files
+- [ ] 1.5 Verify: `go test ./pkg/loader/...` passes (all existing + new tests)
 
-## 2. Builder: debugValues Support
+> Note: `DetectReleaseKind()` already exists in `pkg/loader/module_release.go` and works as-is. `LoadModuleReleaseFromValue()` accepts any `cue.Value` regardless of how it was loaded. No changes needed to either.
 
-- [ ] 2.1 Add `DebugValues bool` option to builder's `BuildOptions` struct
-- [ ] 2.2 Implement debugValues extraction from module's CUE value (`mod.Raw`) — extract `debugValues` field, validate it's not open/empty
-- [ ] 2.3 Wire debugValues as values source in the builder when `DebugValues: true` — skip `values.cue` fallback and `--values` files
-- [ ] 2.4 Add unit tests — debugValues used when option set, error when debugValues is `_`, `-f` flag overrides debugValues
+## 2. debugValues Support (`internal/cmdutil/`)
 
-## 3. Builder: Pre-filled Release Support
+- [ ] 2.1 Add `DebugValues bool` field to `RenderReleaseOpts` in `internal/cmdutil/render.go`
+- [ ] 2.2 Implement debugValues extraction in `RenderRelease()` — when `DebugValues: true`, call `loader.LoadModulePackage()` to get the module CUE value, extract `debugValues` field, validate it is not `_` (unconstrained); error clearly if absent or open
+- [ ] 2.3 Wire the extracted `debugValues` CUE value as the values source — add `LoadReleasePackageWithValue(ctx, releaseFile string, valuesVal cue.Value) (cue.Value, string, error)` to `pkg/loader/release_file.go` that accepts a pre-loaded CUE value instead of a values file path; avoids temp file creation
+- [ ] 2.4 Update `opm mod vet` command in `internal/cmd/mod/vet.go` — set `DebugValues: len(rf.Values) == 0` on `RenderReleaseOpts`; update the vet summary output to say "debugValues" when no `-f` flag was provided
+- [ ] 2.5 Add unit tests — debugValues used when option set, error when debugValues is `_`, `-f` flag overrides debugValues (DebugValues: false)
+- [ ] 2.6 Verify: `go test ./internal/cmd/mod/...` passes
 
-- [ ] 3.1 Add alternate `BuildFromRelease(ctx, releaseVal cue.Value, opts) (*modulerelease.ModuleRelease, error)` code path — accepts pre-evaluated CUE value, validates concreteness, extracts metadata/components/autoSecrets
-- [ ] 3.2 Handle `--module` override for pre-filled releases — FillPath `#module` before validation
-- [ ] 3.3 Add unit tests — build from pre-filled release value, build with --module override, concreteness errors
+## 3. cmdutil: Release Orchestration (`internal/cmdutil/`)
 
-## 4. cmdutil: Release Shared Utilities
+- [ ] 3.1 Add `ReleaseFileFlags` struct to `internal/cmdutil/flags.go` — `Module string` (`--module`), `Provider string` (`--provider`), with `AddTo(*cobra.Command)` method
+- [ ] 3.2 Add `RenderFromReleaseFileOpts` struct and `RenderFromReleaseFile(ctx, opts) (*RenderResult, error)` to `internal/cmdutil/render.go` — loads release file via `loader.LoadReleaseFile()`, detects kind (errors on BundleRelease), optionally calls `loader.LoadModulePackage()` + `FillPath` for `--module`, then calls `loader.LoadModuleReleaseFromValue()`, `loader.LoadProvider()`, `engine.ModuleRenderer.Render()`, converts resources to `Unstructured`
+- [ ] 3.3 Add `ResolveReleaseIdentifier(arg string) (name string, uuid string)` to `internal/cmdutil/` — UUID pattern detection (`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`) vs release name
+- [ ] 3.4 Add unit tests for `RenderFromReleaseFile()` — valid release file, BundleRelease rejection, `--module` injection, missing `#module` error
+- [ ] 3.5 Add unit tests for `ResolveReleaseIdentifier()` — UUID format, name format, edge cases
+- [ ] 3.6 Verify: `go test ./internal/cmdutil/...` passes
 
-- [ ] 4.1 Add `ReleaseFileFlags` struct to `cmdutil/flags.go` with `--module` flag and `AddTo(*cobra.Command)` method
-- [ ] 4.2 Add `RenderFromReleaseFile(ctx, opts) (*pipeline.RenderResult, error)` to `cmdutil/release.go` — loads release file, checks `ReleaseType` (errors on `BundleRelease`), optionally loads module via --module, calls builder, runs match+generate
-- [ ] 4.3 Add `ResolveReleaseIdentifier(arg string) (name string, uuid string)` helper — detects UUID pattern vs release name from positional arg
-- [ ] 4.4 Update `ReleaseSelectorFlags` or create `ReleaseIdentifierArg` for positional arg parsing in cluster-query commands
+## 4. Release Command Group: Scaffold
 
-## 5. Release Command Group: Scaffold
+- [ ] 4.1 Create `internal/cmd/release/release.go` with `NewReleaseCmd(*config.GlobalConfig)` — group container with `Use: "release"`, `Aliases: []string{"rel"}`, `Short: "Release operations"`
+- [ ] 4.2 Register `opm release` in `internal/cmd/root.go` via `rootCmd.AddCommand(cmdrelease.NewReleaseCmd(&cfg))`
 
-- [ ] 5.1 Create `internal/cmd/release/release.go` with `NewReleaseCmd(*config.GlobalConfig)` — group container with `Use: "release"`, `Aliases: []string{"rel"}`, `Short: "Release operations"`
-- [ ] 5.2 Register `opm release` in `internal/cmd/root.go` via `rootCmd.AddCommand(cmdrelease.NewReleaseCmd(&cfg))`
+## 5. Release Render Commands (`internal/cmd/release/`)
 
-## 6. Release Render Commands
+- [ ] 5.1 Implement `opm release vet <release.cue>` — requires positional arg, `ReleaseFileFlags`, calls `RenderFromReleaseFile()`, outputs per-resource validation lines, summary "Release valid (N resources)"
+- [ ] 5.2 Implement `opm release build <release.cue>` — requires positional arg, `ReleaseFileFlags`, output flags (`-o yaml/json`, `--split`, `--out-dir`), calls `RenderFromReleaseFile()`, writes manifests
+- [ ] 5.3 Implement `opm release apply <release.cue>` — requires positional arg, `ReleaseFileFlags`, `K8sFlags`, `--dry-run`, calls `RenderFromReleaseFile()`, SSA apply with inventory
+- [ ] 5.4 Implement `opm release diff <release.cue>` — requires positional arg, `ReleaseFileFlags`, `K8sFlags`, calls `RenderFromReleaseFile()`, compares against live cluster state
+- [ ] 5.5 Wire `--module` flag gating: if `kind == BundleRelease` and `--module` provided, error early rather than silently ignoring
 
-- [ ] 6.1 Implement `opm release vet <release.cue>` — load release file, check type (error on BundleRelease), render through pipeline, output per-resource validation
-- [ ] 6.2 Implement `opm release build <release.cue>` — load release file, check type, render, output manifests (stdout or split files)
-- [ ] 6.3 Implement `opm release apply <release.cue>` — load release file, check type, render, SSA apply to cluster with inventory
-- [ ] 6.4 Implement `opm release diff <release.cue>` — load release file, check type, render, compare against live cluster state
-- [ ] 6.5 Wire `--module`, `--provider`, `--kubeconfig`, `--context` flags to render commands; validate `--module` is not used with BundleRelease files
+## 6. Release Cluster-Query Commands (`internal/cmd/release/`)
 
-## 7. Release Cluster-Query Commands
+- [ ] 6.1 Implement `opm release status <name|uuid>` — positional arg via `ResolveReleaseIdentifier()`, display release health; delegate to same logic as existing `opm mod status`
+- [ ] 6.2 Implement `opm release tree <name|uuid>` — positional arg, display resource hierarchy
+- [ ] 6.3 Implement `opm release events <name|uuid>` — positional arg, display K8s events
+- [ ] 6.4 Implement `opm release delete <name|uuid>` — positional arg, `--dry-run`, delete release from cluster
+- [ ] 6.5 Implement `opm release list` — list all releases in namespace, no positional arg
 
-- [ ] 7.1 Implement `opm release status <name|uuid>` — positional arg, auto-detect name vs UUID, display release health
-- [ ] 7.2 Implement `opm release tree <name|uuid>` — positional arg, display resource hierarchy
-- [ ] 7.3 Implement `opm release events <name|uuid>` — positional arg, display K8s events
-- [ ] 7.4 Implement `opm release delete <name|uuid>` — positional arg, delete release from cluster
-- [ ] 7.5 Implement `opm release list` — list all releases in namespace
+## 7. Module Command Migration
 
-## 8. Module Command Migration
+- [ ] 7.1 Update `opm mod vet` in `internal/cmd/mod/vet.go` — pass `DebugValues: len(rf.Values) == 0` to `RenderReleaseOpts`; update values detail string in output ("debugValues" when no `-f` flag)
+- [ ] 7.2 Add Cobra `Deprecated` field to `opm mod status` — `"use 'opm release status <name>' instead"` — delegate to shared run function
+- [ ] 7.3 Add Cobra `Deprecated` field to `opm mod tree` — `"use 'opm release tree <name>' instead"`
+- [ ] 7.4 Add Cobra `Deprecated` field to `opm mod events` — `"use 'opm release events <name>' instead"`
+- [ ] 7.5 Add Cobra `Deprecated` field to `opm mod delete` — `"use 'opm release delete <name>' instead"`
+- [ ] 7.6 Add Cobra `Deprecated` field to `opm mod list` — `"use 'opm release list' instead"`
 
-- [ ] 8.1 Refactor `opm mod build` to construct ephemeral release and delegate to release pipeline
-- [ ] 8.2 Refactor `opm mod apply` to construct ephemeral release and delegate to release pipeline
-- [ ] 8.3 Update `opm mod vet` to use `debugValues` by default (pass `DebugValues: true` to builder when no `-f` flag)
-- [ ] 8.4 Add deprecation aliases for `opm mod status/tree/events/delete/list` that delegate to `opm release` equivalents with deprecation notice (e.g., `use 'opm release status <name>' instead`)
+> Note: `opm mod build` and `opm mod apply` require no changes — they already call `cmdutil.RenderRelease()` which is the unified pipeline.
 
-## 9. Testing
+## 8. Testing
 
-- [ ] 9.1 Add unit tests for all `release` render commands (vet, build with release file, build with --module)
-- [ ] 9.2 Add unit tests for `release` cluster-query commands (positional arg parsing, name vs UUID detection)
-- [ ] 9.3 Add unit tests for `opm mod vet` with debugValues
-- [ ] 9.4 Add unit tests for `opm mod build/apply` alias behavior
-- [ ] 9.5 Create test fixture: example `<name>_release.cue` file with registry import pattern (`kind: "ModuleRelease"`)
-- [ ] 9.6 Create test fixture: example `<name>_release.cue` file for --module flag pattern
-- [ ] 9.7 Add unit test: `BundleRelease` file passed to render command returns clear unsupported error
-- [ ] 9.8 Add unit test: `LoadRelease()` correctly detects `ModuleRelease` vs `BundleRelease` via `kind` field
+- [ ] 8.1 Add unit tests for `release` render commands (vet, build with release file, build with --module)
+- [ ] 8.2 Add unit tests for `release` cluster-query commands (positional arg parsing, name vs UUID detection)
+- [ ] 8.3 Add unit tests for `opm mod vet` with debugValues (no `-f`, uses debugValues; with `-f`, ignores debugValues)
+- [ ] 8.4 Create test fixture: `testdata/jellyfin_release.cue` with `kind: "ModuleRelease"` and concrete metadata/values
+- [ ] 8.5 Create test fixture: `testdata/bundle_release.cue` with `kind: "BundleRelease"` for rejection testing
+- [ ] 8.6 Add unit test: `BundleRelease` file passed to render command returns clear unsupported error
+- [ ] 8.7 Add unit test: `LoadReleaseFile()` correctly loads and evaluates a `ModuleRelease` file
 
-## 10. Validation Gates
+## 9. Validation Gates
 
-- [ ] 10.1 Run `task fmt` — all files formatted
-- [ ] 10.2 Run `task lint` — golangci-lint passes
-- [ ] 10.3 Run `task test` — all unit tests pass
-- [ ] 10.4 Run `task test:e2e` — end-to-end tests pass (if applicable)
+- [ ] 9.1 Run `task fmt` — all files formatted
+- [ ] 9.2 Run `task lint` — golangci-lint passes
+- [ ] 9.3 Run `task test` — all unit tests pass
+- [ ] 9.4 Run `task test:e2e` — end-to-end tests pass (if applicable)

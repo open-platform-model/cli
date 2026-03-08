@@ -1,27 +1,60 @@
 ## Context
 
-Today, `ModuleRelease` is an internal construct built ephemerally during the render pipeline's BUILD phase. The builder loads `#ModuleRelease` from `opmodel.dev/core@v1`, then injects the module, release name, namespace, and values via `FillPath`. Users interact only with modules (source files) and values (override files) — the release is never materialized as a file.
+`ModuleRelease` is currently an internal, ephemeral construct — built in-memory during the render pipeline and never exposed to users. The CLI command surface splits `opm mod` into two archetypes:
 
-The CLI command surface splits `opm mod` into two archetypes:
-
-- **Render-based** (build, vet, apply, diff): accept a module path, use `RenderFlags`, call the render pipeline
+- **Render-based** (build, vet, apply, diff): accept a module path, use `RenderFlags`, call `cmdutil.RenderRelease()`
 - **Cluster-query** (status, tree, events, delete, list): accept `ReleaseSelectorFlags` (--release-name/--release-id), use `K8sFlags`, query inventory Secrets
 
-The cluster-query commands already operate on releases, not modules. They belong under a `rel` group.
+The cluster-query commands already operate on releases, not modules. They belong under a `release` group.
+
+### Post-refactor Architecture (promote-factory-engine)
+
+The `promote-factory-engine` change replaced `internal/builder/`, `internal/pipeline/`, `internal/loader/`, and `internal/core/{component,transformer,provider}` with a clean `pkg/` surface. This directly affects how this change is implemented:
+
+**Packages that no longer exist** (and what replaced them):
+
+```text
+GONE                            REPLACEMENT
+──────────────────────────────────────────────────────────────────
+internal/builder/               pkg/loader/ (validation gates)
+internal/pipeline/              pkg/engine/ + internal/cmdutil/render.go
+internal/loader/                pkg/loader/
+internal/core/component/        (eliminated — CUE-native matching)
+internal/core/transformer/      pkg/engine/execute.go
+internal/core/provider/         pkg/provider/ (thin wrapper, no Match())
+```
+
+**The render orchestration layer** is now `internal/cmdutil/render.go`, which calls:
+
+```text
+pkg/loader.LoadReleasePackage()       → load CUE instance
+pkg/loader.DetectReleaseKind()        → "ModuleRelease" or "BundleRelease"
+pkg/loader.LoadModuleReleaseFromValue() → decode + validate + finalize
+pkg/loader.LoadProvider()             → wrap provider CUE value
+pkg/engine.ModuleRenderer.Render()    → CUE-native match + execute
+resource.ToUnstructured()             → convert at cmdutil boundary
+```
+
+**Key implications for this change:**
+
+- No builder to modify for `debugValues` — extraction moves to `cmdutil` layer
+- No pipeline phases to skip — write a parallel `RenderFromReleaseFile()` in `cmdutil`
+- `BuildFromRelease()` is unnecessary — `LoadModuleReleaseFromValue()` already does this
+- `loader.LoadModule()` is gone — need a new `pkg/loader.LoadModulePackage()` for `--module` flag
+- `DetectReleaseKind()` already exists and works exactly as designed
+- Auto-secrets are free — CUE `#AutoSecrets` handles them in the loader
 
 ### Prior Art: Module Import Experiment
 
 The `experiments/module-import/` experiment (completed 2026-03-02) validated the core CUE mechanics this change depends on. Key findings:
 
-1. **Flattened module embedding works with CUE imports** — modules using `core.#Module` embedded at package root (not nested under a named field) are fully importable via CUE's native module system. Hidden definitions (`#config`, `#components`) remain accessible across package boundaries.
+1. **Flattened module embedding works with CUE imports** — modules using `core.#Module` embedded at package root are fully importable via CUE's native module system. Hidden definitions (`#config`, `#components`) remain accessible across package boundaries.
 
-2. **`#ModuleRelease` integration works** — the pattern `#module: importedModule` + `values: {...}` correctly unifies, resolves components with concrete values, and computes UUIDs/labels. This is exactly the mechanism release files will use.
+2. **`#ModuleRelease` integration works** — the pattern `#module: importedModule` + `values: {...}` correctly unifies, resolves components with concrete values, and computes UUIDs/labels.
 
-3. **`values.cue` breaks importability** — when a module package includes `values.cue` at package root, the extra `values` field violates `#Module`'s closedness on import. **This means published modules must not include `values.cue`** — it stays as a local dev-only file. Module defaults belong in `#config` via `| *defaultValue` syntax.
+3. **`values.cue` breaks importability** — when a module package includes `values.cue` at package root, the extra `values` field violates `#Module`'s closedness on import. Published modules must not include `values.cue`. Module defaults belong in `#config` via `| *defaultValue` syntax.
 
-4. **`debugValues` is unaffected** — the `debugValues` field is part of the `#Module` definition itself, so it survives import. This reinforces Decision 5 (`opm mod vet` using `debugValues`).
-
-These findings directly inform the design: release files that import modules from a registry will work because `#module: importedModule` unification is proven. The `--module` flag (local dev) uses `FillPath` injection which bypasses the closedness constraint entirely (same as today's builder).
+4. **`debugValues` is unaffected** — the `debugValues` field is part of the `#Module` definition itself, so it survives import.
 
 ## Goals / Non-Goals
 
@@ -33,7 +66,6 @@ These findings directly inform the design: release files that import modules fro
 - Support hybrid module resolution: registry import or `--module` flag for local dev
 - Improve UX with positional arguments: file path for render commands, name/UUID for cluster commands
 - Make `opm mod vet` use `debugValues` by default (no values file needed for module validation)
-- Alias `opm mod build/apply` to construct ephemeral releases using the same pipeline
 
 **Non-Goals:**
 
@@ -42,23 +74,61 @@ These findings directly inform the design: release files that import modules fro
 - Bundle/multi-module orchestration (future work)
 - CRD-based release management on cluster
 - Release file discovery by convention (always explicit file path)
+- Modifying `pkg/loader/` or `pkg/engine/` internals beyond adding new functions
 
 ## Decisions
 
-### Decision 1: Release file loading via CUE evaluation
+### Decision 1: Release file loading lives in `pkg/loader/`
 
-**Choice**: Load `<name>_release.cue` as a CUE file using `load.Instances()`, evaluate it, and extract the `#ModuleRelease` value. When `#module` is already filled (via import), skip module loading. When `#module` is open, require `--module` flag and fill via `FillPath`.
+**Choice**: The new `LoadReleaseFile()` function belongs in `pkg/loader/release_file.go`, not in `internal/loader/` (which no longer exists). It uses `load.Instances()` with the file's parent directory for `cue.mod` resolution, enabling registry module imports.
 
 **Alternatives considered**:
 
-- *Compile release file with `ctx.CompileBytes()`*: Simpler but can't resolve CUE imports (registry modules). Since registry import is the primary use case, `load.Instances()` is required.
-- *New release-specific CUE schema*: Unnecessary — `#ModuleRelease` from `opmodel.dev/core@v1` already defines the shape. Reuse it directly.
+- *`internal/loader/release.go`*: The package is gone. All loader functions live in `pkg/loader/`.
+- *Compile release file with `ctx.CompileBytes()`*: Can't resolve CUE imports. Registry import is the primary use case.
 
-**Rationale**: This approach reuses existing CUE infrastructure and the catalog's `#ModuleRelease` definition. CUE handles import resolution, schema validation, and field computation (UUID, labels) natively. The `experiments/module-import/` experiment confirmed this pattern works end-to-end (see Context section).
+**Rationale**: Consistent with the new package structure. `pkg/loader/` already has `LoadReleasePackage()` (module directory path) — `LoadReleaseFile()` is the parallel function for standalone `.cue` files.
+
+#### How the two loader paths differ
+
+```
+LoadReleasePackage(ctx, dir, valuesFile)       LoadReleaseFile(ctx, filePath, registry)
+────────────────────────────────────────       ───────────────────────────────────────
+Input: module directory                        Input: standalone .cue file path
+Loads: release.cue + values.cue               Loads: single .cue file with imports
+Use:   opm mod build/vet/apply/diff            Use:   opm release build/vet/apply/diff
+cue.mod: inside module directory               cue.mod: deployment repo (parent chain)
+Registry: from config                          Registry: from config (env var)
+```
+
+Both return a `cue.Value` that can be passed directly to `DetectReleaseKind()` and `LoadModuleReleaseFromValue()` — those functions are agnostic to how the value was loaded.
+
+#### Loader function signature
+
+New function in `pkg/loader/release_file.go`:
+
+```go
+// LoadReleaseFile loads a #ModuleRelease or #BundleRelease from a standalone
+// .cue file. CUE imports (including registry module references) are resolved
+// via load.Instances() using the file's parent directory for cue.mod resolution.
+//
+// The returned cue.Value may have #module unfilled if the release file does not
+// import a module. The caller is responsible for filling #module via FillPath
+// when --module is provided.
+//
+// Returns the evaluated CUE value and the directory used for CUE resolution.
+func LoadReleaseFile(ctx *cue.Context, filePath string, registry string) (cue.Value, string, error)
+```
+
+Loading mechanics:
+
+1. Resolve `filePath` to absolute path, derive parent directory
+2. Set `CUE_REGISTRY` env var if `registry` is non-empty
+3. Call `load.Instances([]string{filePath}, &load.Config{Dir: parentDir})`
+4. Build and evaluate the instance via `ctx.BuildInstance()`
+5. Return the evaluated value — do NOT validate concreteness yet
 
 #### Release file structure
-
-**Important constraint from experiment**: The imported module package must NOT contain `values.cue` at package root — CUE's closedness check on `#Module` rejects the extra `values` field. Published modules rely on `#config` defaults and `debugValues` only. This is already the v1alpha1 convention.
 
 A release file using a registry-imported module:
 
@@ -115,35 +185,6 @@ deployment-repo/
     └── module.cue                 # deps: opmodel.dev/modules/jellyfin@v1, etc.
 ```
 
-#### Loader function signature
-
-New function in `internal/loader/release.go`:
-
-```go
-// LoadRelease loads a #ModuleRelease from a CUE file.
-//
-// The file must define a top-level value that conforms to #ModuleRelease.
-// CUE imports (including registry module references) are resolved via
-// load.Instances() using the file's parent directory for cue.mod resolution.
-//
-// The returned cue.Value may have #module unfilled if the release file
-// does not import a module. The caller is responsible for filling #module
-// via FillPath when --module is provided.
-//
-// Returns the evaluated CUE value and the directory used for CUE resolution
-// (needed later for loading opmodel.dev/core@v1 for auto-secrets).
-func LoadRelease(ctx *cue.Context, filePath string, registry string) (cue.Value, string, error)
-```
-
-Loading mechanics:
-
-1. Resolve `filePath` to absolute path, derive parent directory
-2. Check that `cue.mod/` exists in the parent directory (or an ancestor)
-3. Set `CUE_REGISTRY` env var if `registry` is non-empty (same pattern as `LoadModule`)
-4. Call `load.Instances([]string{filePath}, &load.Config{Dir: parentDir})`
-5. Build and evaluate the instance via `ctx.BuildInstance()`
-6. Return the evaluated value — do NOT validate concreteness yet (caller handles that)
-
 #### Detecting whether `#module` is filled
 
 After loading, the caller checks if `#module` is concrete:
@@ -159,10 +200,6 @@ If `moduleIsFilled` is false and `--module` was not provided, return a clear err
 ### Decision 2: Positional argument semantics split by command type
 
 **Choice**: Render commands (`vet`, `build`, `apply`, `diff`) interpret the positional arg as a `.cue` file path. Cluster-query commands (`status`, `tree`, `events`, `delete`) interpret it as a release identifier (name or UUID, auto-detected by format). `list` takes no positional arg.
-
-**Alternatives considered**:
-
-- *Unified positional arg with file detection*: Ambiguous — a name like `jellyfin` could be a file or a release name. Splitting by command type eliminates ambiguity.
 
 **Rationale**: Each command type has a clear, unambiguous contract. Render commands always need a file. Cluster commands always need an identifier.
 
@@ -189,7 +226,7 @@ opm release list              [-n namespace] [--kubeconfig] [--context]
 
 **Choice**: For cluster-query commands, detect whether the positional arg is a UUID (matches hex-dash UUID pattern) or a release name. Use the appropriate lookup method (label scan for name, direct GET for UUID).
 
-**Rationale**: Replaces the verbose `--release-name` / `--release-id` flags with a single positional arg. The formats are unambiguous — UUIDs have a distinct `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` pattern that won't collide with kebab-case release names.
+**Rationale**: Replaces the verbose `--release-name` / `--release-id` flags with a single positional arg. The formats are unambiguous.
 
 #### Implementation
 
@@ -222,61 +259,28 @@ rsf := cmdutil.ReleaseSelectorFlags{
 inv, liveResources, missing, err := cmdutil.ResolveInventory(ctx, client, &rsf, namespace, logger)
 ```
 
-### Decision 4: `opm mod build/apply` as thin aliases
+### Decision 4: `opm mod build/apply` require no changes
 
-**Choice**: `opm mod build` and `opm mod apply` remain as commands but internally construct an ephemeral `#ModuleRelease` from flags (--values, --namespace, --release-name) and feed it through the same release pipeline. They are not literal aliases — they use the same underlying pipeline but with a different entry point (flags → ephemeral release vs. file → predefined release).
+**Context**: The original design said `opm mod build/apply` would be refactored to "delegate to the release pipeline". After `promote-factory-engine`, this is already true — both commands call `cmdutil.RenderRelease()` which orchestrates `pkg/loader` and `pkg/engine` directly. The pipeline is unified.
 
-**Alternatives considered**:
+**Decision**: No changes to `internal/cmd/mod/build.go` or `internal/cmd/mod/apply.go` for this purpose. The "alias" is already implemented.
 
-- *Deprecate `mod build/apply`*: Too disruptive. Module authors need the quick `opm mod build .` workflow.
-- *Literal alias (generate temp file)*: Unnecessary indirection. Share the pipeline, not the file format.
+### Decision 5: `debugValues` extraction at the `cmdutil` layer
 
-**Rationale**: Module authors keep their workflow. The pipeline is unified. No code duplication.
+**Context**: The original design placed `debugValues` extraction in `builder.Options`. The builder no longer exists.
 
-#### How the alias works internally
-
-`opm mod build [path] -f values.cue -n production --release-name my-app` maps to:
-
-```go
-// In runModBuild (internal/cmd/mod/build.go):
-// This is conceptually identical to today's flow — the pipeline
-// still constructs the ephemeral #ModuleRelease internally.
-// The "alias" means the underlying pipeline.Render() is the same
-// code path that opm rel build eventually calls after loading a release file.
-result, err := cmdutil.RenderRelease(ctx, cmdutil.RenderReleaseOpts{
-    Args:        args,           // module path
-    Values:      rf.Values,      // --values files
-    ReleaseName: rf.ReleaseName, // --release-name
-    K8sConfig:   k8sConfig,      // resolved namespace, provider
-    Config:      cfg,
-})
-```
-
-No behavior change from today. The `RenderRelease` helper continues to work exactly as before for module-based rendering. The new `RenderFromReleaseFile` helper (see below) provides the file-based path.
-
-### Decision 5: `opm mod vet` uses `debugValues` by default
-
-**Choice**: When `opm mod vet` is run without `-f` flags, the loader extracts `debugValues` from the module and uses it as the values source for the render pipeline. If `-f` is provided, it overrides and `debugValues` is ignored. If neither `debugValues` nor `-f` exists, error.
+**Choice**: Add `DebugValues bool` to `RenderReleaseOpts` in `internal/cmdutil/render.go`. When set, `RenderRelease()` extracts `debugValues` from the loaded module CUE package before calling `LoadModuleReleaseFromValue()`.
 
 **Alternatives considered**:
 
-- *Always require values*: Defeats the purpose of `debugValues` — module authors would still need a separate values file just to validate.
+- *`pkg/loader/` function*: Would require exposing a module-extraction function that's only needed for one CLI option. Better kept at the cmdutil layer as a CLI concern.
+- *New `LoadReleasePackageWithDebugValues()`*: Leaks CLI-level concept into the loader. Rejected.
 
-**Rationale**: `debugValues` exists precisely for this use case. Module authors embed test values in their module definition. `opm mod vet` should use them automatically for a zero-friction validation experience.
+**Rationale**: `RenderRelease()` already orchestrates the full pipeline. The `DebugValues` flag is a CLI-level concern (replacing `--values` flags with module-embedded values). It belongs at the orchestration layer, not in the loader.
 
 #### How debugValues extraction works
 
-The module's `debugValues` is a CUE field on `#Module`:
-
-```cue
-// In catalog: v1alpha1/core/module.cue
-#Module: {
-    // ...
-    debugValues: _   // open type, filled by module author
-}
-```
-
-Module authors provide concrete values:
+The module's `debugValues` is a CUE field on `#Module`. Module authors provide concrete values:
 
 ```cue
 // In module.cue
@@ -285,37 +289,38 @@ debugValues: {
     web: image: { repository: "nginx", tag: "1.20.0", digest: "" }
     db: image: { repository: "postgres", tag: "14.0", digest: "" }
     db: volumeSize: "5Gi"
-    db: password: value: "dev-password"
-    db: host: value: "localhost"
 }
 ```
 
-Extraction in the builder:
+Extraction in `cmdutil.RenderRelease()`:
 
 ```go
-// New option in builder.Options:
-type Options struct {
-    Name          string
-    Namespace     string
-    DebugValues   bool   // when true, extract debugValues from module
+// RenderReleaseOpts gains:
+type RenderReleaseOpts struct {
+    // ... existing fields ...
+    DebugValues bool   // when true, extract debugValues from module instead of loading values files
 }
 
-// In Build(), before step 3 (resolve values files):
+// In RenderRelease(), before calling LoadReleasePackage():
 if opts.DebugValues {
-    debugVal := mod.Raw.LookupPath(cue.ParsePath("debugValues"))
-    if !debugVal.Exists() {
-        return nil, fmt.Errorf("module does not define debugValues")
+    // Load the module CUE package to extract debugValues
+    modPkg, err := loader.LoadModulePackage(cueCtx, modulePath)
+    if err != nil {
+        return nil, &oerrors.ExitError{...}
     }
-    // Check that debugValues is not just `_` (open/unconstrained)
+    debugVal := modPkg.LookupPath(cue.ParsePath("debugValues"))
+    if !debugVal.Exists() {
+        return nil, &oerrors.ExitError{..., Err: fmt.Errorf("module does not define debugValues")}
+    }
     if err := debugVal.Validate(cue.Concrete(true)); err != nil {
-        return nil, &opmerrors.ValidationError{
+        return nil, &oerrors.ExitError{..., Err: &oerrors.ValidationError{
             Message: "debugValues is not concrete — module must provide complete test values",
             Cause:   err,
-        }
+        }}
     }
-    selectedValues = debugVal
-    // Skip steps 3-4 (resolveValuesFiles, ValidateValues)
-    // Proceed directly to step 5 (FillPath)
+    // Write debugValues to a temp file and use it as the values source
+    // OR pass the cue.Value directly through a new LoadReleasePackageWithValues() variant
+    // Implementation detail: TBD during task 2
 }
 ```
 
@@ -331,47 +336,46 @@ result, err := cmdutil.RenderRelease(ctx, cmdutil.RenderReleaseOpts{
     ReleaseName: rf.ReleaseName,
     K8sConfig:   k8sConfig,
     Config:      cfg,
-    DebugValues: useDebugValues,  // new field
+    DebugValues: useDebugValues,
 })
 ```
 
-This requires threading `DebugValues` through `RenderReleaseOpts` → `RenderOptions` → `builder.Options`.
+### Decision 6: `--module` flag uses a new `LoadModulePackage()` loader function
 
-### Decision 6: `--module` flag for local module injection
+**Context**: The original design called `loader.LoadModule()` for `--module` flag injection. `internal/loader/` and its `LoadModule()` function no longer exist.
 
-**Choice**: Render commands under `opm rel` accept `--module <path>` flag. When provided, the CLI loads the module from the local directory and fills `#module` via `FillPath`, exactly as today's builder does. When not provided, `#module` must be filled via CUE import in the release file — if it's still open, CUE's concreteness check will report the error.
+**Choice**: Add `LoadModulePackage(ctx *cue.Context, dirPath string) (cue.Value, error)` to `pkg/loader/release_file.go`. This loads a module CUE package from a directory and returns the raw `cue.Value` for `FillPath` injection. It is the successor to `loader.LoadModule()` for this specific use case.
 
-**Rationale**: Enables local development without publishing modules to a registry. Same mechanism as today's builder, just exposed as a flag.
+**Rationale**: The `pkg/loader/` package already handles all CUE loading. This is a small, focused addition that keeps the loading concern in one place.
 
-#### FillPath injection for --module
+#### New function signature
 
 ```go
-// In the release render path (new cmdutil.RenderFromReleaseFile):
-if moduleFlag != "" {
-    // Load module from local directory (same as pipeline.prepare)
-    mod, err := loader.LoadModule(cueCtx, moduleFlag, registry)
+// LoadModulePackage loads a module CUE package from a directory and returns
+// the raw cue.Value. Used by the --module flag to inject a local module into
+// a release file that does not import one from a registry.
+func LoadModulePackage(ctx *cue.Context, dirPath string) (cue.Value, error)
+```
+
+#### FillPath injection for `--module` in `RenderFromReleaseFile()`
+
+```go
+// In RenderFromReleaseFile (internal/cmdutil/render.go):
+if opts.ModulePath != "" {
+    modVal, err := loader.LoadModulePackage(cueCtx, opts.ModulePath)
     if err != nil {
-        return nil, err
+        return nil, &oerrors.ExitError{..., Err: fmt.Errorf("loading module from --module: %w", err)}
     }
-    if err := mod.Validate(); err != nil {
-        return nil, err
-    }
-    // Inject #module into the release CUE value
-    releaseVal = releaseVal.FillPath(cue.MakePath(cue.Def("module")), mod.Raw)
+    releaseVal = releaseVal.FillPath(cue.MakePath(cue.Def("module")), modVal)
     if err := releaseVal.Err(); err != nil {
-        return nil, fmt.Errorf("filling #module from --module: %w", err)
+        return nil, &oerrors.ExitError{..., Err: fmt.Errorf("filling #module from --module: %w", err)}
     }
 }
 ```
 
 ### Decision 7: Command migration strategy
 
-**Choice**: Migrate cluster-query commands (status, tree, events, delete, list) to `opm release`. Keep `opm mod` versions as aliases that delegate to `opm release` during a deprecation period, printing a notice suggesting the `release` equivalent.
-
-**Alternatives considered**:
-
-- *Immediate removal from `mod`*: Breaking change, violates SemVer MINOR commitment.
-- *Keep in both permanently*: Confusing — two paths to the same thing with no signal about the canonical one.
+**Choice**: Migrate cluster-query commands (status, tree, events, delete, list) to `opm release`. Keep `opm mod` versions as deprecated aliases that delegate to `opm release` during a deprecation period.
 
 **Rationale**: Gradual migration. Users discover `opm release` naturally. Aliases prevent breakage.
 
@@ -388,7 +392,6 @@ func NewModStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
         Short:      "Show status of a deployed release (use 'opm release status' instead)",
         Deprecated: "use 'opm release status <name>' instead",
         RunE: func(c *cobra.Command, args []string) error {
-            // Delegate to the same logic as opm release status
             return runRelStatus(args, cfg, &rsf, &kf)
         },
     }
@@ -400,9 +403,20 @@ func NewModStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
 
 Cobra's built-in `Deprecated` field prints `Command "status" is deprecated, use 'opm release status <name>' instead` and still executes the command.
 
-### Decision 8: New package structure
+### Decision 8: `RenderFromReleaseFile()` is a parallel orchestration function — no pipeline extension needed
+
+**Context**: The original design proposed extending `Pipeline.Render()` with a `ReleaseValue *cue.Value` field to skip certain phases. The `Pipeline` interface no longer exists. The orchestration layer is `internal/cmdutil/render.go`.
+
+**Choice**: Add `RenderFromReleaseFile(ctx, opts) (*RenderResult, error)` to `internal/cmdutil/render.go` as a parallel function to `RenderRelease()`. It calls the same `pkg/` functions but with a different loading entry point.
+
+**Rationale**: The phase-skipping complexity was the entire motivation for the Option A/Option B debate in the original design. Without a pipeline, it evaporates. The two orchestration functions differ only in step 1 (how the CUE value is loaded) and step 3 (optional `--module` injection). Steps 2, 4, 5, 6, and 7 are identical and can share helpers.
+
+#### New package structure
 
 ```
+pkg/loader/
+    release_file.go     # LoadReleaseFile() + LoadModulePackage() — NEW
+
 internal/cmd/release/
     release.go          # NewReleaseCmd() — group container (Use: "release", Aliases: ["rel"])
     vet.go              # opm release vet <release.cue>
@@ -415,12 +429,9 @@ internal/cmd/release/
     delete.go           # opm release delete <name|uuid>
     list.go             # opm release list
 
-internal/loader/
-    release.go          # LoadRelease() — load #ModuleRelease from .cue file
-
 internal/cmdutil/
-    flags.go            # ReleaseFileFlags (--module), updated ReleaseSelectorFlags
-    release.go          # RenderFromReleaseFile() — shared release render preamble
+    flags.go            # ReleaseFileFlags (--module) — UPDATED
+    render.go           # RenderFromReleaseFile() + DebugValues in RenderReleaseOpts — UPDATED
 ```
 
 #### New flag group
@@ -440,9 +451,7 @@ func (f *ReleaseFileFlags) AddTo(cmd *cobra.Command) {
 }
 ```
 
-#### Shared release render preamble
-
-New function in `internal/cmdutil/release.go`:
+#### `RenderFromReleaseFile()` — the new orchestration function
 
 ```go
 // RenderFromReleaseFileOpts holds inputs for RenderFromReleaseFile.
@@ -457,110 +466,39 @@ type RenderFromReleaseFileOpts struct {
     Config *config.GlobalConfig
 }
 
-// RenderFromReleaseFile loads a release file, optionally injects a local
-// module, and executes the render pipeline. This is the release-file
-// equivalent of RenderRelease (which does module-based rendering).
-func RenderFromReleaseFile(ctx context.Context, opts RenderFromReleaseFileOpts) (*pipeline.RenderResult, error)
-```
-
-#### Pipeline integration
-
-The new `RenderFromReleaseFile` function needs to interface with the existing pipeline. Two approaches:
-
-**Option A: Extend Pipeline.Render() with a new RenderOptions field**
-
-```go
-type RenderOptions struct {
-    // ... existing fields ...
-
-    // ReleaseValue is a pre-evaluated #ModuleRelease CUE value.
-    // When set, the pipeline skips PREPARATION and BUILD phases
-    // and uses this value directly.
-    ReleaseValue *cue.Value
-}
-```
-
-**Option B: Build the ModuleRelease outside the pipeline, then call Match+Generate**
-
-```go
-// In RenderFromReleaseFile:
-// 1. Load release file
-releaseVal, resolveDir, err := loader.LoadRelease(cueCtx, filePath, registry)
-// 2. Optionally fill #module
-if modulePath != "" { /* FillPath */ }
-// 3. Build ModuleRelease from the pre-filled CUE value
-rel, err := builder.BuildFromRelease(cueCtx, releaseVal, resolveDir)
-// 4. Load provider
-provider, err := loader.LoadProvider(cueCtx, providerName, providers)
-// 5. Match + Generate (same as pipeline phases 4+5)
-matchPlan := provider.Match(rel.Components)
-resources, errs := matchPlan.Execute(ctx, rel)
-```
-
-**Choice: Option A.** Extending `RenderOptions` keeps the pipeline as the single orchestrator. Option B duplicates phase orchestration logic. With Option A, `pipeline.Render()` checks if `ReleaseValue` is set and skips phases 1+3, but still runs provider load (phase 2), matching (phase 4), and generate (phase 5) through the same code path.
-
-The modified pipeline flow:
-
-```
-pipeline.Render(ctx, opts)
-│
-├── opts.ReleaseValue != nil ?
-│   │
-│   ├── YES (release-file path):
-│   │   ├── Detect release type (ModuleRelease or BundleRelease)
-│   │   ├── BundleRelease → error "bundle releases not yet supported"
-│   │   ├── ModuleRelease:
-│   │   │   ├── Skip Phase 1 (PREPARATION)
-│   │   │   ├── Phase 2: PROVIDER LOAD
-│   │   │   ├── Phase 3 alt: builder.BuildFromRelease(ctx, *opts.ReleaseValue, opts.ModulePath)
-│   │   │   │     → validates concreteness
-│   │   │   │     → extracts metadata, components, autoSecrets
-│   │   │   │     → returns *modulerelease.ModuleRelease
-│   │   │   ├── Phase 4: MATCHING
-│   │   │   └── Phase 5: GENERATE
-│   │
-│   └── NO (module-directory path, existing behavior):
-│       ├── Phase 1: PREPARATION (loader.LoadModule)
-│       ├── Phase 2: PROVIDER LOAD
-│       ├── Phase 3: BUILD (builder.Build with FillPath)
-│       ├── Phase 4: MATCHING
-│       └── Phase 5: GENERATE
-```
-
-#### Builder changes
-
-New function in `internal/builder/builder.go`:
-
-```go
-// BuildFromRelease creates a *modulerelease.ModuleRelease from a pre-evaluated
-// #ModuleRelease CUE value (loaded from a release file).
+// RenderFromReleaseFile loads a release file, optionally injects a local module,
+// and executes the render pipeline. This is the release-file equivalent of
+// RenderRelease() (which does module-directory rendering).
 //
-// Unlike Build(), this does NOT construct the #ModuleRelease via FillPath.
-// The release value is expected to already have #module, metadata, and values
-// filled (either by CUE import or by the caller via FillPath for --module).
-//
-// The function:
-//  1. Validates full concreteness of the release value
-//  2. Extracts release metadata (uuid, labels, annotations)
-//  3. Extracts components via component.ExtractComponents()
-//  4. Injects auto-secrets if autoSecrets is non-empty
-//  5. Extracts module metadata for the ModuleRelease.Module field
-//  6. Returns *modulerelease.ModuleRelease
-//
-// resolveDir is the directory containing the release file's cue.mod/,
-// needed for loading opmodel.dev/resources/config@v1 during auto-secrets injection.
-func BuildFromRelease(ctx *cue.Context, releaseVal cue.Value, resolveDir string) (*modulerelease.ModuleRelease, error)
+// Pipeline:
+//   1. loader.LoadReleaseFile()              load .cue file with import resolution
+//   2. loader.DetectReleaseKind()            error on BundleRelease (not yet supported)
+//   3. [optional] loader.LoadModulePackage() + FillPath for --module flag
+//   4. loader.LoadModuleReleaseFromValue()   validate + extract *ModuleRelease
+//   5. loader.LoadProvider()                 wrap provider CUE value
+//   6. engine.ModuleRenderer.Render()        CUE-native match + execute
+//   7. Resource.ToUnstructured()             convert at cmdutil boundary
+func RenderFromReleaseFile(ctx context.Context, opts RenderFromReleaseFileOpts) (*RenderResult, error)
 ```
 
-This reuses steps 6-8 from the existing `Build()` function. The shared code can be extracted into internal helpers:
+#### How it compares to `RenderRelease()`
 
-```go
-// Shared between Build() and BuildFromRelease():
-func validateConcreteness(result cue.Value) error
-func extractReleaseMetadata(result cue.Value, opts Options) (*modulerelease.ReleaseMetadata, error)  // already exists
-func extractModuleMetadata(result cue.Value) (*module.ModuleMetadata, error)  // new: reads from #module in release
-func injectAutoSecrets(ctx *cue.Context, result cue.Value, resolveDir string, components map[string]*component.Component) error  // already exists
 ```
+RenderRelease()                          RenderFromReleaseFile()
+───────────────────────────────────      ─────────────────────────────────────────
+1. resolve module path (args[0] or ".")  1. use ReleaseFilePath directly
+2. LoadReleasePackage(dir, valuesFile)   2. LoadReleaseFile(filePath, registry)
+   (dir contains release.cue+values.cue)    (standalone .cue with CUE imports)
+   [debugValues: load module + extract]  3. [optional] LoadModulePackage()+FillPath
+3. DetectReleaseKind()                   4. DetectReleaseKind()
+4. LoadModuleReleaseFromValue()          5. LoadModuleReleaseFromValue()
+5. LoadProvider()                        6. LoadProvider()
+6. ModuleRenderer.Render()               7. ModuleRenderer.Render()
+7. Resource.ToUnstructured()             8. Resource.ToUnstructured()
+─── returns *RenderResult ────────────   ─── returns *RenderResult ──────────────
+```
+
+Steps 4–7 / 5–8 are identical. Only the loading entry point differs.
 
 ### Decision 9: `opm mod vet` vs `opm rel vet` — distinct validation semantics
 
@@ -582,7 +520,7 @@ These serve different audiences with different questions:
 │  Module source:                  Module source:                      │
 │    local directory [path]          registry import or --module       │
 │                                                                      │
-│  Pipeline path:                  Pipeline path:                      │
+│  Orchestration:                  Orchestration:                      │
 │    RenderRelease() with            RenderFromReleaseFile()           │
 │    DebugValues: true                                                 │
 │                                                                      │
@@ -595,14 +533,24 @@ These serve different audiences with different questions:
 
 ### Decision 10: Polymorphic release type detection
 
-**Choice**: `opm release` is designed as a polymorphic command surface that handles both `#ModuleRelease` and `#BundleRelease` release files. This change implements `ModuleRelease` only. `BundleRelease` files are detected and return a clear "not yet supported" error, establishing the extensibility contract for when bundle CLI support is added.
+**Choice**: `opm release` handles both `#ModuleRelease` and `#BundleRelease` files. This change implements `ModuleRelease` only. `BundleRelease` files are detected and return a clear "not yet supported" error.
 
-**Alternatives considered**:
+**Type detection**: `pkg/loader.DetectReleaseKind()` already exists and reads the `kind` field. No new code needed for detection — just enforce the guard at the command layer:
 
-- *Separate `opm release` and `opm bundle-release` groups*: Unambiguous, but creates a two-top-level-commands problem — users would need to know which command to use before opening a file. The file itself describes its type; the command shouldn't require pre-knowledge.
-- *Single monolithic `rel` command (original design)*: `rel` is ambiguous once bundles arrive — no indication whether the group handles one or both release types.
-
-**Rationale**: The command group name `release` is the right abstraction level — it describes *what you're managing* (releases), not *which kind*. The CUE file is self-describing; the loader detects the type and routes accordingly. This aligns with Principle I (Type Safety First) — the CUE type system determines behavior, not flags or command names.
+```go
+releaseVal, resolveDir, err := loader.LoadReleaseFile(cueCtx, filePath, registry)
+if err != nil {
+    return err
+}
+kind, err := loader.DetectReleaseKind(releaseVal)
+if err != nil {
+    return err
+}
+if kind == "BundleRelease" {
+    return fmt.Errorf("bundle releases are not yet supported — use a #ModuleRelease file")
+}
+// continue with ModuleRelease path...
+```
 
 #### Cobra command definition
 
@@ -616,85 +564,28 @@ c := &cobra.Command{
 }
 ```
 
-#### Type detection mechanism
-
-After loading the CUE file via `load.Instances()`, the loader unifies the evaluated value against the catalog's `#ModuleRelease` and `#BundleRelease` definitions to determine the release type:
-
-```go
-// ReleaseType identifies the kind of release loaded from a .cue file.
-type ReleaseType int
-
-const (
-    ModuleRelease ReleaseType = iota
-    BundleRelease
-)
-
-// LoadRelease loads a release file and returns the evaluated CUE value
-// along with the detected release type.
-func LoadRelease(ctx *cue.Context, filePath string, registry string) (cue.Value, ReleaseType, string, error) {
-    // ... load.Instances(), evaluate ...
-
-    // Detect type by checking kind field (fastest path — no schema load needed)
-    kindVal := val.LookupPath(cue.ParsePath("kind"))
-    if kindVal.Exists() {
-        kind, _ := kindVal.String()
-        switch kind {
-        case "ModuleRelease":
-            return val, ModuleRelease, resolveDir, nil
-        case "BundleRelease":
-            return val, BundleRelease, resolveDir, nil
-        }
-    }
-
-    return cue.Value{}, 0, "", fmt.Errorf("release file does not define a recognised release type (expected ModuleRelease or BundleRelease)")
-}
-```
-
-The `kind` field is the most direct discriminator — both `#ModuleRelease` and `#BundleRelease` in the OPM catalog define `kind` as a concrete string literal, making this a reliable and cheap check.
-
-#### Command-layer enforcement (ModuleRelease only)
-
-All render commands check the returned `ReleaseType` before proceeding:
-
-```go
-releaseVal, releaseType, resolveDir, err := loader.LoadRelease(cueCtx, filePath, registry)
-if err != nil {
-    return err
-}
-if releaseType == loader.BundleRelease {
-    return fmt.Errorf("bundle releases are not yet supported — use a #ModuleRelease file")
-}
-// continue with ModuleRelease path...
-```
-
-The `--module` flag is also gated: if `releaseType == BundleRelease`, return an error early rather than silently ignoring the flag.
-
 #### Extensibility contract for future bundle support
 
-When bundle CLI support is added, the `BundleRelease` path in each command is the extension point:
-
-- **Render commands**: The `BundleRelease` path will resolve the bundle into N `ModuleRelease` CUE values and run N pipeline executions. The `--module` flag does not apply (bundle modules are always registry-imported or defined inline).
-- **Cluster-query commands**: Will add a bundle inventory lookup alongside the existing module release inventory lookup. Output format will differ (aggregate view for bundles, single-release view for modules). The positional arg auto-detection (`name` vs `UUID`) is already shared logic — the bundle path extends it with a second inventory search.
+When bundle CLI support is added, the `kind == "BundleRelease"` branch is the extension point. The `pkg/loader.DetectReleaseKind()` function already handles both kinds — only the command-layer guard needs to be replaced with actual bundle handling.
 
 ## Risks / Trade-offs
 
-**[CUE registry resolution complexity]** → Loading release files with `load.Instances()` requires a `cue.mod/` directory with proper dependency declarations. Deployment repos need their own `cue.mod/module.cue` with module dependencies. Mitigation: document the deployment repo setup pattern clearly. Consider a future `opm rel init` command that scaffolds a deployment repo.
+**[CUE registry resolution complexity]** → Loading release files with `load.Instances()` requires a `cue.mod/` directory with proper dependency declarations. Deployment repos need their own `cue.mod/module.cue` with module dependencies. Mitigation: document the deployment repo setup pattern clearly. Consider a future `opm rel init` command.
 
-**[Module publishing must exclude values.cue]** → Per `experiments/module-import/` findings, modules published to a CUE registry must not include `values.cue` at package root — the extra `values` field violates `#Module` closedness on import. Mitigation: this is already the v1alpha1 convention (defaults live in `#config`, test values in `debugValues`). Document clearly in module authoring guidelines. The `--module` flag (local dev path) uses FillPath injection which bypasses this constraint entirely.
+**[Module publishing must exclude values.cue]** → Per `experiments/module-import/` findings, published modules must not include `values.cue` at package root. Mitigation: this is already the v1alpha1 convention. The `--module` flag (local dev path) uses FillPath injection which bypasses this constraint entirely.
 
 **[Two ways to do the same thing]** → `opm mod apply` and `opm rel apply <file>` both deploy releases. Mitigation: clear documentation that `mod` is the quick-start path, `rel` is the production/GitOps path. Deprecation notices guide migration for cluster-query commands.
 
-**[debugValues may not cover all validation paths]** → A module author's `debugValues` might not exercise secrets, optional fields, or edge cases. Mitigation: `debugValues` is the default but `-f` still works for thorough validation. `debugValues` is "does my module compile" not "is my production config correct."
+**[debugValues may not cover all validation paths]** → A module author's `debugValues` might not exercise secrets, optional fields, or edge cases. Mitigation: `debugValues` is the default but `-f` still works for thorough validation.
 
 **[Positional arg requires release name uniqueness per namespace]** → Release name lookup via label scan may return multiple matches if names aren't unique. Mitigation: the inventory system already enforces name+namespace uniqueness via the Secret naming convention.
 
-**[Pipeline interface expansion]** → Adding `ReleaseValue` to `RenderOptions` changes the pipeline interface. Mitigation: the field is optional — existing callers are unaffected. The `Pipeline` interface itself doesn't change (still `Render(ctx, RenderOptions)`), only the options struct gains a new optional field.
+**[Polymorphic surface may confuse users]** → Users might not know whether a given command behaves differently for bundle vs module release files. Mitigation: clear error messages when a `BundleRelease` file is detected.
 
-**[Polymorphic surface may confuse users]** → Users might not know whether a given command behaves differently for bundle vs module release files. Mitigation: clear error messages when a `BundleRelease` file is detected ("bundle releases are not yet supported — use a `#ModuleRelease` file"), preventing silent misbehaviour. Future docs will explain the behavioral differences between module and bundle releases.
-
-**[BuildFromRelease code duplication]** → The new function shares logic with `Build()`. Mitigation: extract shared steps (concreteness validation, metadata extraction, auto-secrets injection) into internal helpers used by both functions.
+**[debugValues implementation detail: values injection mechanism]** → `RenderRelease()` currently passes a `valuesFile` path to `LoadReleasePackage()`. To inject `debugValues`, we either write a temp file (fragile) or add a `LoadReleasePackageWithValue()` variant that accepts a `cue.Value` directly. This implementation detail is deferred to the task itself. The CUE-value-based variant is preferred — it avoids temp files and keeps everything in-memory.
 
 ## Open Questions
 
-- **`opm rel init`?** Should there be a scaffold command for deployment repos (creates `cue.mod/`, example release file)? Deferred to a future change.
-- **Release file validation without provider?** `opm rel vet` currently needs a provider for matching. Should there be a `--skip-matching` flag that only validates the release CUE structure and values? Deferred — evaluate after initial implementation.
+- **`opm rel init`?** Should there be a scaffold command for deployment repos? Deferred to a future change.
+- **Release file validation without provider?** `opm rel vet` needs a provider for matching. Should there be a `--skip-matching` flag? Deferred — evaluate after initial implementation.
+- **debugValues values injection mechanism**: Pass `cue.Value` directly into a new `LoadReleasePackageWithValue()` variant, or serialize to temp file? To be resolved during task 2 implementation.
