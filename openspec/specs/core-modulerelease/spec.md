@@ -2,40 +2,23 @@
 
 ## Purpose
 
-Defines the `ModuleRelease` and `ReleaseMetadata` types in `internal/core/modulerelease`, mirroring `module_release.cue` in the CUE catalog. Provides the Go representation of a built module release, including CUE value validation and concreteness checking.
+Defines the `ModuleRelease` and `ReleaseMetadata` types in `pkg/modulerelease/`. `ModuleRelease` exposes components via typed accessor methods rather than raw public fields.
 
 ---
 
 ## Requirements
 
-### Requirement: ModuleRelease types live in a dedicated subpackage
+### Requirement: ModuleRelease type location and structure
+The `ModuleRelease` and `ReleaseMetadata` types SHALL be defined in `pkg/modulerelease/` (moved from `internal/core/modulerelease/`). `ModuleRelease` SHALL expose components via typed accessor methods instead of raw public fields.
 
-`ModuleRelease` and `ReleaseMetadata` SHALL be defined in `internal/core/modulerelease` (package `modulerelease`), mirroring `module_release.cue` in the CUE catalog. The package SHALL only import `internal/core`, `internal/core/component`, `internal/core/module`, CUE SDK, and stdlib.
+#### Scenario: ModuleRelease is importable from pkg/modulerelease
+- **WHEN** code imports `github.com/opmodel/cli/pkg/modulerelease`
+- **THEN** `modulerelease.ModuleRelease` and `modulerelease.ReleaseMetadata` are accessible
 
-#### Scenario: Package compiles with correct import path
-- **WHEN** a consumer imports `github.com/opmodel/cli/internal/core/modulerelease`
-- **THEN** `ModuleRelease` and `ReleaseMetadata` are accessible and the package compiles
+#### Scenario: Schema and DataComponents are not public fields
+- **WHEN** code accesses `release.Schema` or `release.DataComponents` directly
+- **THEN** compilation fails — use `release.MatchComponents()` or `release.ExecuteComponents()` instead
 
-#### Scenario: No circular imports
-- **WHEN** `internal/core/modulerelease` is loaded
-- **THEN** it SHALL NOT import `internal/core/transformer` or `internal/core/provider`
-
-### Requirement: CUE validation helpers are unexported
-
-`validateFieldsRecursive` and `pathRewrittenError` SHALL be unexported symbols within the `modulerelease` package, accessible only to `ModuleRelease.ValidateValues()`.
-
-#### Scenario: Helpers are not accessible to external packages
-- **WHEN** an external package imports `internal/core/modulerelease`
-- **THEN** `validateFieldsRecursive` and `pathRewrittenError` SHALL NOT be accessible
-
-### Requirement: ModuleRelease validation methods are preserved
-
-`ValidateValues` and `Validate` on `ModuleRelease` SHALL produce identical behavior after the move.
-
-#### Scenario: Value validation is unchanged
-- **WHEN** `ModuleRelease.ValidateValues()` is called with values that violate the `#config` schema
-- **THEN** a `ValidationError` with the same message and CUE error details is returned
-
-#### Scenario: Concreteness check is unchanged
-- **WHEN** `ModuleRelease.Validate()` is called with non-concrete component values
-- **THEN** the same validation error describing non-concrete components is returned
+#### Scenario: Consistent value/pointer embedding
+- **WHEN** `ModuleRelease` is constructed
+- **THEN** metadata fields use pointer convention (`*ReleaseMetadata`) and embedded types use value convention consistently

@@ -56,3 +56,12 @@ The system SHALL record which optional traits a matched transformer does not han
 #### Scenario: Trait unhandled by all matched transformers
 - **WHEN** a component has an optional trait and no matched transformer declares it
 - **THEN** the trait is reported as unhandled for that component
+
+---
+
+## Removed Requirements
+
+### Requirement: Go-side component-to-transformer matching
+**Reason**: Replaced by CUE-native `#MatchPlan` in `v1alpha1/core/matcher/matcher.cue`. The CUE matcher evaluates the full cartesian product of components x transformers with structured diagnostics. Go-side matching in `internal/core/provider/provider.go` is eliminated.
+
+**Migration**: The engine calls `buildMatchPlan()` which fills `#MatchPlan.#provider` and `#MatchPlan.#components` and decodes the CUE result. See `engine-rendering` spec.

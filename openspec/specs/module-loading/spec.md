@@ -1,6 +1,8 @@
 ## Purpose
 
-Defines the contract for loading a CUE module from disk into a fully-populated `*core.Module`. The loader is the PREPARATION phase of the render pipeline: given a path and optional registry, it resolves the module, evaluates its CUE, extracts all fields, and returns a ready `*core.Module` that subsequent pipeline phases (BUILD, GENERATE) can consume.
+**Superseded.** This spec described the old directory-based module loader (`loader.LoadModule`). The loader has been replaced by a release-centric approach in `pkg/loader`. See `loader-api` spec for current loading contracts.
+
+~~Defines the contract for loading a CUE module from disk into a fully-populated `*core.Module`. The loader is the PREPARATION phase of the render pipeline: given a path and optional registry, it resolves the module, evaluates its CUE, extracts all fields, and returns a ready `*core.Module` that subsequent pipeline phases (BUILD, GENERATE) can consume.~~
 
 ## Requirements
 
@@ -102,3 +104,12 @@ The loader SHALL return a `*core.Module` that passes `mod.Validate()` — meanin
 #### Scenario: Loaded module is valid
 - **WHEN** loading succeeds
 - **THEN** the returned `*core.Module` passes `mod.Validate()` without error
+
+---
+
+## Removed Requirements
+
+### Requirement: LoadModule function
+**Reason**: `loader.LoadModule(cueCtx, modulePath, registry)` which loaded a module directory, filtered values files, and built a `*Module` is replaced by release-centric loading. The new loader operates on release packages (`release.cue + values.cue`) not module directories. Module metadata is extracted from the `#module` hidden field within the release.
+
+**Migration**: Replace `loader.LoadModule()` with `loader.LoadReleasePackage()` + `loader.LoadModuleReleaseFromValue()`, which extracts module info from the release's `#module` field. See `loader-api` spec.

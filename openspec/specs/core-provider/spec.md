@@ -2,32 +2,19 @@
 
 ## Purpose
 
-Defines provider types and matching logic in `internal/core/provider`, mirroring `provider.cue` in the CUE catalog. Moves `Provider`, `ProviderMetadata`, and `Match()` out of `internal/core` into a dedicated subpackage.
+Defines provider types in `pkg/provider/`. `Provider` is a thin CUE value wrapper — matching is performed via CUE-native `#MatchPlan` in `pkg/engine`, not Go-side.
 
 ---
 
 ## Requirements
 
-### Requirement: Provider types live in a dedicated subpackage
+### Requirement: Provider type location and interface
+The `Provider` and `ProviderMetadata` types SHALL be defined in `pkg/provider/` (moved from `internal/core/provider/`). `Provider` SHALL be a thin CUE value wrapper with NO Go-side `Match()` method.
 
-`Provider`, `ProviderMetadata`, and `Requirements()` SHALL be defined in `internal/core/provider` (package `provider`), mirroring `provider.cue` in the CUE catalog. The package SHALL only import `internal/core`, `internal/core/component`, `internal/core/transformer`, CUE SDK, and stdlib.
+#### Scenario: Provider is importable from pkg/provider
+- **WHEN** code imports `github.com/opmodel/cli/pkg/provider`
+- **THEN** `provider.Provider` and `provider.ProviderMetadata` are accessible
 
-#### Scenario: Package compiles with correct import path
-- **WHEN** a consumer imports `github.com/opmodel/cli/internal/core/provider`
-- **THEN** `Provider`, `ProviderMetadata`, and `Match()` are accessible
-
-#### Scenario: No circular imports
-- **WHEN** `internal/core/provider` is loaded
-- **THEN** it imports nothing from `internal/loader`, `internal/builder`, or `internal/pipeline`
-
-### Requirement: Provider matching behavior is preserved
-
-`Provider.Match()` SHALL produce an identical `*TransformerMatchPlan` for identical inputs after the move.
-
-#### Scenario: Matched components are unchanged
-- **WHEN** `Match()` is called with a provider and component map
-- **THEN** the resulting match plan contains the same matches and unmatched components as before
-
-#### Scenario: Match output is deterministic
-- **WHEN** `Match()` is called multiple times with the same inputs
-- **THEN** the match plan is identical each time (sorted component and transformer names)
+#### Scenario: No Match method on Provider
+- **WHEN** code calls `provider.Match(components)`
+- **THEN** compilation fails — matching is done via CUE `#MatchPlan` in the engine

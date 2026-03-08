@@ -78,3 +78,12 @@ The `Executor` struct and `ExecuteWithTransformers()` function in `internal/buil
 - **WHEN** a module that previously rendered successfully is rendered after the executor is removed
 - **THEN** `RenderResult.Resources` SHALL contain byte-identical resources
 - **AND** `RenderResult.Errors` SHALL be identical to before
+
+---
+
+## Removed Requirements
+
+### Requirement: TransformerMatchPlan.Execute() method
+**Reason**: The standalone `Execute(ctx, rel) ([]*Resource, []error)` method on `TransformerMatchPlan` is replaced by `pkg/engine/executeTransforms()`. The engine handles the full execution pipeline internally: pair iteration, component/context injection, output decoding.
+
+**Migration**: Replace `matchPlan.Execute(ctx, rel)` with `engine.ModuleRenderer.Render(ctx, release)` which handles both matching and execution.

@@ -2,36 +2,19 @@
 
 ## Purpose
 
-Defines the `Module` and `ModuleMetadata` types in `internal/core/module`, mirroring `module.cue` in the CUE catalog. Provides the Go representation of a loaded OPM module, including path resolution, CUE value storage, and structural validation.
+Defines the `Module` and `ModuleMetadata` types in `pkg/module/`. The dead `pkgName` field and stale comments have been removed.
 
 ---
 
 ## Requirements
 
-### Requirement: Module types live in a dedicated subpackage
+### Requirement: Module type location
+The `Module` and `ModuleMetadata` types SHALL be defined in `pkg/module/` (moved from `internal/core/module/`). The dead `pkgName` field and its stale comment SHALL be removed.
 
-`Module` and `ModuleMetadata` SHALL be defined in `internal/core/module` (package `module`), mirroring `module.cue` in the CUE catalog. The `Module` struct SHALL contain: `Metadata`, `Components`, `Config`, `ModulePath`, `Raw`, and `pkgName`. The struct SHALL NOT contain `Values`, `HasValuesCue`, or `SkippedValuesFiles` fields.
+#### Scenario: Module is importable from pkg/module
+- **WHEN** code imports `github.com/opmodel/cli/pkg/module`
+- **THEN** `module.Module` and `module.ModuleMetadata` are accessible
 
-#### Scenario: Package compiles with correct import path
-- **WHEN** a consumer imports `github.com/opmodel/cli/internal/core/module`
-- **THEN** `Module` and `ModuleMetadata` are accessible and the package compiles without referencing `internal/core` for these types
-
-#### Scenario: No circular imports
-- **WHEN** `internal/core/module` is loaded
-- **THEN** it SHALL NOT import any package higher in the chain (`modulerelease`, `transformer`, `provider`)
-
-#### Scenario: Module struct does not carry values
-- **WHEN** a `Module` is constructed by the loader
-- **THEN** the struct SHALL NOT have a `Values` field, a `HasValuesCue` field, or a `SkippedValuesFiles` field
-
-### Requirement: Module receiver methods are preserved
-
-All receiver methods on `Module` (`Validate`, `ResolvePath`, `SetPkgName`, `PkgName`) SHALL be defined in the same package and produce identical behavior.
-
-#### Scenario: Module validation is unchanged
-- **WHEN** `module.Validate()` is called on a fully populated `Module`
-- **THEN** the same validation rules apply and the same errors are returned as before the move
-
-#### Scenario: Module path resolution is unchanged
-- **WHEN** `module.ResolvePath()` is called
-- **THEN** the path resolution and cue.mod validation behave identically to the previous implementation
+#### Scenario: Dead pkgName field removed
+- **WHEN** code accesses `module.Module.pkgName`
+- **THEN** compilation fails — the field no longer exists
