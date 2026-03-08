@@ -29,15 +29,25 @@ func NewReleaseStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use:   "status <name|uuid>",
+		Use:   "status <file|name|uuid>",
 		Short: "Show resource status for a release",
 		Long: `Show status of resources deployed by an OPM release.
 
 Arguments:
-  name|uuid    Release name or UUID (required)
+  file         Path to a release.cue file or directory containing one.
+               The release name and namespace are read from the file's metadata.
+               --namespace overrides the namespace found in the file.
+  name         Release name (use -n / --namespace to scope by namespace).
+  uuid         Release UUID.
 
 Examples:
-  # Show status by release name
+  # Identify by release.cue file in the current directory
+  opm release status .
+
+  # Identify by release.cue file path
+  opm release status ./releases/jellyfin/release.cue
+
+  # Identify by name
   opm release status jellyfin -n media
 
   # Watch status continuously
@@ -63,12 +73,11 @@ Examples:
 func runReleaseStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag, outputFmt string, watch, verbose bool) error {
 	ctx := context.Background()
 
-	name, uuid := cmdutil.ResolveReleaseIdentifier(identifier)
-	rsf := &cmdutil.ReleaseSelectorFlags{
-		ReleaseName: name,
-		ReleaseID:   uuid,
-		Namespace:   namespaceFlag,
+	ra, err := cmdutil.ResolveReleaseArg(identifier, cfg)
+	if err != nil {
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
 	}
+	rsf := ra.ToSelectorFlags(namespaceFlag)
 
 	if err := rsf.Validate(); err != nil {
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
@@ -78,7 +87,7 @@ func runReleaseStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 		Config:         cfg,
 		KubeconfigFlag: kf.Kubeconfig,
 		ContextFlag:    kf.Context,
-		NamespaceFlag:  namespaceFlag,
+		NamespaceFlag:  ra.EffectiveNamespace(namespaceFlag),
 	})
 	if err != nil {
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}

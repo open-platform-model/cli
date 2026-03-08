@@ -21,15 +21,25 @@ func NewReleaseTreeCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var outputFlag string
 
 	c := &cobra.Command{
-		Use:   "tree <name|uuid>",
+		Use:   "tree <file|name|uuid>",
 		Short: "Show resource hierarchy for a release",
 		Long: `Show the component and resource hierarchy of a deployed OPM release.
 
 Arguments:
-  name|uuid    Release name or UUID (required)
+  file         Path to a release.cue file or directory containing one.
+               The release name and namespace are read from the file's metadata.
+               --namespace overrides the namespace found in the file.
+  name         Release name (use -n / --namespace to scope by namespace).
+  uuid         Release UUID.
 
 Examples:
-  # Full tree (default depth=2)
+  # Identify by release.cue file in the current directory
+  opm release tree .
+
+  # Identify by release.cue file path
+  opm release tree ./releases/jellyfin/release.cue
+
+  # Identify by name, full tree (default depth=2)
   opm release tree jellyfin -n media
 
   # Component summary only
@@ -66,12 +76,11 @@ func runReleaseTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8s
 		}
 	}
 
-	name, uuid := cmdutil.ResolveReleaseIdentifier(identifier)
-	rsf := &cmdutil.ReleaseSelectorFlags{
-		ReleaseName: name,
-		ReleaseID:   uuid,
-		Namespace:   namespaceFlag,
+	ra, err := cmdutil.ResolveReleaseArg(identifier, cfg)
+	if err != nil {
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
 	}
+	rsf := ra.ToSelectorFlags(namespaceFlag)
 
 	if err := rsf.Validate(); err != nil {
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
@@ -81,7 +90,7 @@ func runReleaseTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8s
 		Config:         cfg,
 		KubeconfigFlag: kf.Kubeconfig,
 		ContextFlag:    kf.Context,
-		NamespaceFlag:  namespaceFlag,
+		NamespaceFlag:  ra.EffectiveNamespace(namespaceFlag),
 	})
 	if err != nil {
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}

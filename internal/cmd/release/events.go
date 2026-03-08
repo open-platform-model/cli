@@ -33,15 +33,25 @@ func NewReleaseEventsCmd(cfg *config.GlobalConfig) *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use:   "events <name|uuid>",
+		Use:   "events <file|name|uuid>",
 		Short: "Show events for a release",
 		Long: `Show Kubernetes events for all resources belonging to an OPM release.
 
 Arguments:
-  name|uuid    Release name or UUID (required)
+  file         Path to a release.cue file or directory containing one.
+               The release name and namespace are read from the file's metadata.
+               --namespace overrides the namespace found in the file.
+  name         Release name (use -n / --namespace to scope by namespace).
+  uuid         Release UUID.
 
 Examples:
-  # Show events from the last hour (default)
+  # Identify by release.cue file in the current directory
+  opm release events .
+
+  # Identify by release.cue file path
+  opm release events ./releases/jellyfin/release.cue -n media
+
+  # Identify by name
   opm release events jellyfin -n media
 
   # Stream events in real-time
@@ -85,12 +95,11 @@ func runReleaseEvents(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
 	}
 
-	name, uuid := cmdutil.ResolveReleaseIdentifier(identifier)
-	rsf := &cmdutil.ReleaseSelectorFlags{
-		ReleaseName: name,
-		ReleaseID:   uuid,
-		Namespace:   namespaceFlag,
+	ra, err := cmdutil.ResolveReleaseArg(identifier, cfg)
+	if err != nil {
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
 	}
+	rsf := ra.ToSelectorFlags(namespaceFlag)
 
 	if err := rsf.Validate(); err != nil {
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
@@ -100,7 +109,7 @@ func runReleaseEvents(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 		Config:         cfg,
 		KubeconfigFlag: kf.Kubeconfig,
 		ContextFlag:    kf.Context,
-		NamespaceFlag:  namespaceFlag,
+		NamespaceFlag:  ra.EffectiveNamespace(namespaceFlag),
 	})
 	if err != nil {
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}

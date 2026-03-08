@@ -64,9 +64,21 @@ func TestNewReleaseDiffCmd(t *testing.T) {
 
 func TestNewReleaseStatusCmd(t *testing.T) {
 	cmd := NewReleaseStatusCmd(&config.GlobalConfig{})
-	assert.Equal(t, "status <name|uuid>", cmd.Use)
+	assert.Equal(t, "status <file|name|uuid>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotNil(t, cmd.Args, "should require exactly 1 positional arg")
+}
+
+func TestNewReleaseTreeCmd(t *testing.T) {
+	cmd := NewReleaseTreeCmd(&config.GlobalConfig{})
+	assert.Equal(t, "tree <file|name|uuid>", cmd.Use)
+	assert.NotEmpty(t, cmd.Short)
+}
+
+func TestNewReleaseEventsCmd(t *testing.T) {
+	cmd := NewReleaseEventsCmd(&config.GlobalConfig{})
+	assert.Equal(t, "events <file|name|uuid>", cmd.Use)
+	assert.NotEmpty(t, cmd.Short)
 }
 
 func TestNewReleaseStatusCmd_Flags(t *testing.T) {
@@ -74,18 +86,6 @@ func TestNewReleaseStatusCmd_Flags(t *testing.T) {
 	assert.NotNil(t, cmd.Flags().Lookup("namespace"), "--namespace/-n flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("output"), "--output/-o flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("watch"), "--watch flag should be registered")
-}
-
-func TestNewReleaseTreeCmd(t *testing.T) {
-	cmd := NewReleaseTreeCmd(&config.GlobalConfig{})
-	assert.Equal(t, "tree <name|uuid>", cmd.Use)
-	assert.NotEmpty(t, cmd.Short)
-}
-
-func TestNewReleaseEventsCmd(t *testing.T) {
-	cmd := NewReleaseEventsCmd(&config.GlobalConfig{})
-	assert.Equal(t, "events <name|uuid>", cmd.Use)
-	assert.NotEmpty(t, cmd.Short)
 }
 
 func TestNewReleaseDeleteCmd(t *testing.T) {
