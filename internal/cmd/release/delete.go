@@ -28,15 +28,25 @@ func NewReleaseDeleteCmd(cfg *config.GlobalConfig) *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use:   "delete <name|uuid>",
+		Use:   "delete <file|name|uuid>",
 		Short: "Delete release resources from cluster",
 		Long: `Delete all resources belonging to an OPM release from a Kubernetes cluster.
 
 Arguments:
-  name|uuid    Release name or UUID (required)
+  file         Path to a release.cue file or directory containing one.
+               The release name and namespace are read from the file's metadata.
+               --namespace overrides the namespace found in the file.
+  name         Release name (use -n / --namespace to scope by namespace).
+  uuid         Release UUID.
 
 Examples:
-  # Delete release by name
+  # Delete by release.cue file in the current directory
+  opm release delete .
+
+  # Delete by release.cue file path
+  opm release delete ./releases/jellyfin/release.cue -n media
+
+  # Delete by name
   opm release delete jellyfin -n media
 
   # Preview what would be deleted
@@ -61,12 +71,11 @@ Examples:
 func runReleaseDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, force, dryRun bool) error {
 	ctx := context.Background()
 
-	name, uuid := cmdutil.ResolveReleaseIdentifier(identifier)
-	rsf := &cmdutil.ReleaseSelectorFlags{
-		ReleaseName: name,
-		ReleaseID:   uuid,
-		Namespace:   namespaceFlag,
+	ra, err := cmdutil.ResolveReleaseArg(identifier, cfg)
+	if err != nil {
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
 	}
+	rsf := ra.ToSelectorFlags(namespaceFlag)
 
 	if err := rsf.Validate(); err != nil {
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
@@ -76,7 +85,7 @@ func runReleaseDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 		Config:         cfg,
 		KubeconfigFlag: kf.Kubeconfig,
 		ContextFlag:    kf.Context,
-		NamespaceFlag:  namespaceFlag,
+		NamespaceFlag:  ra.EffectiveNamespace(namespaceFlag),
 	})
 	if err != nil {
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}

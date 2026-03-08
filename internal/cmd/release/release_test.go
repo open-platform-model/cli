@@ -90,7 +90,7 @@ func TestNewReleaseStatusCmd_Flags(t *testing.T) {
 
 func TestNewReleaseDeleteCmd(t *testing.T) {
 	cmd := NewReleaseDeleteCmd(&config.GlobalConfig{})
-	assert.Equal(t, "delete <name|uuid>", cmd.Use)
+	assert.Equal(t, "delete <file|name|uuid>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotNil(t, cmd.Flags().Lookup("dry-run"), "--dry-run flag should be registered")
 }
