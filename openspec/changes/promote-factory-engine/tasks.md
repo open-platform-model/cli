@@ -1,36 +1,36 @@
 ## 1. Foundation — pkg/ Type Packages
 
-- [ ] 1.1 Create `pkg/core/resource.go`: Resource struct with `cue.Value`, provenance fields (`Release`, `Component`, `Transformer`), accessor methods (`Kind()`, `Name()`, `Namespace()`, `APIVersion()`, `GVK()`, `Labels()`, `Annotations()`)
-- [ ] 1.2 Create `pkg/core/convert.go`: Conversion methods on Resource — `MarshalJSON()`, `MarshalYAML()`, `ToUnstructured()`, `ToMap()`
-- [ ] 1.3 Create `pkg/core/labels.go`: Move all label constants from `internal/core/labels.go` (identical values)
-- [ ] 1.4 Create `pkg/core/weights.go`: Move `GetWeight()` and GVK weight map from `internal/core/weights.go` (identical values)
-- [ ] 1.5 Create `pkg/module/module.go`: Promote from `experiments/factory/pkg/module/module.go`; remove dead `pkgName` field (DEBT.md #4)
-- [ ] 1.6 Create `pkg/modulerelease/release.go`: Promote from factory; make `schema` and `dataComponents` unexported with typed accessors `MatchComponents()` and `ExecuteComponents()` (DEBT.md #8); fix value/pointer embedding inconsistency (DEBT.md #12)
-- [ ] 1.7 Create `pkg/bundle/bundle.go`: Promote from `experiments/factory/pkg/bundle/bundle.go` as-is
-- [ ] 1.8 Create `pkg/bundlerelease/release.go`: Promote from factory; remove unused `Schema` field (DEBT.md #14)
-- [ ] 1.9 Create `pkg/provider/provider.go`: Promote from factory — thin CUE wrapper, no `Match()` method
-- [ ] 1.10 Write unit tests for `pkg/core/` — test all accessor methods and conversion methods with a test CUE value representing a K8s Deployment
+- [x] 1.1 Create `pkg/core/resource.go`: Resource struct with `cue.Value`, provenance fields (`Release`, `Component`, `Transformer`), accessor methods (`Kind()`, `Name()`, `Namespace()`, `APIVersion()`, `GVK()`, `Labels()`, `Annotations()`)
+- [x] 1.2 Create `pkg/core/convert.go`: Conversion methods on Resource — `MarshalJSON()`, `MarshalYAML()`, `ToUnstructured()`, `ToMap()`
+- [x] 1.3 Create `pkg/core/labels.go`: Move all label constants from `internal/core/labels.go` (identical values)
+- [x] 1.4 Create `pkg/core/weights.go`: Move `GetWeight()` and GVK weight map from `internal/core/weights.go` (identical values)
+- [x] 1.5 Create `pkg/module/module.go`: Promote from `experiments/factory/pkg/module/module.go`; remove dead `pkgName` field (DEBT.md #4)
+- [x] 1.6 Create `pkg/modulerelease/release.go`: Promote from factory; make `schema` and `dataComponents` unexported with typed accessors `MatchComponents()` and `ExecuteComponents()` (DEBT.md #8); fix value/pointer embedding inconsistency (DEBT.md #12)
+- [x] 1.7 Create `pkg/bundle/bundle.go`: Promote from `experiments/factory/pkg/bundle/bundle.go` as-is
+- [x] 1.8 Create `pkg/bundlerelease/release.go`: Promote from factory; remove unused `Schema` field (DEBT.md #14)
+- [x] 1.9 Create `pkg/provider/provider.go`: Promote from factory — thin CUE wrapper, no `Match()` method
+- [x] 1.10 Write unit tests for `pkg/core/` — test all accessor methods and conversion methods with a test CUE value representing a K8s Deployment
 
 ## 2. Error Types — pkg/errors/
 
-- [ ] 2.1 Move `internal/errors/errors.go` to `pkg/errors/errors.go`: `DetailError`, `ExitError`, exit code constants, helper functions — no behavior changes
-- [ ] 2.2 Move `internal/errors/domain.go` to `pkg/errors/domain.go`: `TransformError`, `ValidationError`, `ValuesValidationError`, `FieldError`, `ConflictError` — no behavior changes
-- [ ] 2.3 Move `internal/errors/sentinel.go` to `pkg/errors/sentinel.go`: `ErrValidation`, `ErrConnectivity`, `ErrPermission`, `ErrNotFound` — no behavior changes
-- [ ] 2.4 Add `ConfigError` type to `pkg/errors/`: carry `Context`, `Name`, `RawError`; implement `Error()`, `Unwrap()`, `FieldErrors() []FieldError` (merge factory `ConfigError` with CLI error parsing from `builder/validation.go`)
-- [ ] 2.5 Move `internal/errors/errors_test.go` to `pkg/errors/errors_test.go` — update import paths, ensure all tests pass
-- [ ] 2.6 Verify: `go test ./pkg/errors/...` passes
+- [x] 2.1 Move `internal/errors/errors.go` to `pkg/errors/errors.go`: `DetailError`, `ExitError`, exit code constants, helper functions — no behavior changes
+- [x] 2.2 Move `internal/errors/domain.go` to `pkg/errors/domain.go`: `TransformError`, `ValidationError`, `ValuesValidationError`, `FieldError`, `ConflictError` — no behavior changes
+- [x] 2.3 Move `internal/errors/sentinel.go` to `pkg/errors/sentinel.go`: `ErrValidation`, `ErrConnectivity`, `ErrPermission`, `ErrNotFound` — no behavior changes
+- [x] 2.4 Add `ConfigError` type to `pkg/errors/`: carry `Context`, `Name`, `RawError`; implement `Error()`, `Unwrap()`, `FieldErrors() []FieldError` (merge factory `ConfigError` with CLI error parsing from `builder/validation.go`)
+- [x] 2.5 Move `internal/errors/errors_test.go` to `pkg/errors/errors_test.go` — update import paths, ensure all tests pass
+- [x] 2.6 Verify: `go test ./pkg/errors/...` passes
 
 ## 3. Loader — pkg/loader/
 
-- [ ] 3.1 Create `pkg/loader/module_release.go`: Promote from factory — `LoadReleasePackage()`, `DetectReleaseKind()`, `LoadModuleReleaseFromValue()`; fix: use `os.Stat()` + `IsDir()` in `resolveReleaseFile()` instead of extension check (DEBT.md #10); remove dead `LoadRelease()` function (DEBT.md #9)
-- [ ] 3.2 Create `pkg/loader/finalize.go`: Extract `finalizeValue()` from factory `module_release.go` — `Syntax(cue.Final()) + BuildExpr` with clear error for non-expr result
-- [ ] 3.3 Create `pkg/loader/bundle_release.go`: Promote from factory — `LoadBundleReleaseFromValue()`, `extractBundleReleases()`; unify duplicated extract pattern into single `extractReleaseMetadata()` (DEBT.md #13)
-- [ ] 3.4 Create `pkg/loader/provider.go`: Promote from factory — `LoadProvider()` with auto-selection for single provider
-- [ ] 3.5 Create `pkg/loader/validate.go`: Merge factory `validateConfig()` with CLI error parsing — return `*errors.ConfigError` that supports `FieldErrors()` for structured output; integrate CUE `errors.Errors()` walking with `FieldError` construction from `builder/validation.go`
-- [ ] 3.6 Write unit tests for `pkg/loader/validate.go` — test Module Gate with valid values, type mismatch, missing required field; verify `FieldErrors()` returns structured output
-- [ ] 3.7 Write unit tests for `pkg/loader/module_release.go` — test `LoadReleasePackage()` with valid module, `DetectReleaseKind()`, `resolveReleaseFile()` with directory vs file vs nonexistent path
-- [ ] 3.8 Write unit tests for `pkg/loader/provider.go` — test named loading and auto-selection
-- [ ] 3.9 Verify: `go test ./pkg/loader/...` passes
+- [x] 3.1 Create `pkg/loader/module_release.go`: Promote from factory — `LoadReleasePackage()`, `DetectReleaseKind()`, `LoadModuleReleaseFromValue()`; fix: use `os.Stat()` + `IsDir()` in `resolveReleaseFile()` instead of extension check (DEBT.md #10); remove dead `LoadRelease()` function (DEBT.md #9)
+- [x] 3.2 Create `pkg/loader/finalize.go`: Extract `finalizeValue()` from factory `module_release.go` — `Syntax(cue.Final()) + BuildExpr` with clear error for non-expr result
+- [x] 3.3 Create `pkg/loader/bundle_release.go`: Promote from factory — `LoadBundleReleaseFromValue()`, `extractBundleReleases()`; unify duplicated extract pattern into single `extractReleaseMetadata()` (DEBT.md #13)
+- [x] 3.4 Create `pkg/loader/provider.go`: Promote from factory — `LoadProvider()` with auto-selection for single provider
+- [x] 3.5 Create `pkg/loader/validate.go`: Merge factory `validateConfig()` with CLI error parsing — return `*errors.ConfigError` that supports `FieldErrors()` for structured output; integrate CUE `errors.Errors()` walking with `FieldError` construction from `builder/validation.go`
+- [x] 3.6 Write unit tests for `pkg/loader/validate.go` — test Module Gate with valid values, type mismatch, missing required field; verify `FieldErrors()` returns structured output
+- [x] 3.7 Write unit tests for `pkg/loader/module_release.go` — test `LoadReleasePackage()` with valid module, `DetectReleaseKind()`, `resolveReleaseFile()` with directory vs file vs nonexistent path
+- [x] 3.8 Write unit tests for `pkg/loader/provider.go` — test named loading and auto-selection
+- [x] 3.9 Verify: `go test ./pkg/loader/...` passes
 
 ## 4. Engine — pkg/engine/
 
