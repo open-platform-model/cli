@@ -9,7 +9,7 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
-	oerrors "github.com/opmodel/cli/internal/errors"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
@@ -243,7 +243,7 @@ func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 
 	var applyResult *kubernetes.ApplyResult
 	if len(result.Resources) > 0 {
-		applyResult, err = kubernetes.Apply(ctx, k8sClient, result.Resources, result.Release, kubernetes.ApplyOptions{
+		applyResult, err = kubernetes.Apply(ctx, k8sClient, result.Resources, result.Release.Name, kubernetes.ApplyOptions{
 			DryRun: dryRun,
 		})
 		if err != nil {

@@ -10,7 +10,7 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
-	oerrors "github.com/opmodel/cli/internal/errors"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -106,7 +106,7 @@ func runVet(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags) er
 	// Print per-resource validation lines (skip when --verbose already showed them)
 	if !cfg.Flags.Verbose {
 		for _, res := range result.Resources {
-			line := output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), output.StatusValid)
+			line := output.FormatResourceLine(res.GetKind(), res.GetNamespace(), res.GetName(), output.StatusValid)
 			releaseLog.Info(line)
 		}
 	}

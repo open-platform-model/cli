@@ -9,7 +9,7 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
-	oerrors "github.com/opmodel/cli/internal/errors"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -114,12 +114,6 @@ func runBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 
 	// --- Build-specific output logic below ---
 
-	// Convert resources to ResourceInfo interface
-	resourceInfos := make([]output.ResourceInfo, len(result.Resources))
-	for i, r := range result.Resources {
-		resourceInfos[i] = r
-	}
-
 	// Create scoped module logger
 	releaseLog := output.ReleaseLogger(result.Release.Name)
 
@@ -130,7 +124,7 @@ func runBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 			OutDir: outDir,
 			Format: outputFormat,
 		}
-		if err := output.WriteSplitManifests(resourceInfos, splitOpts); err != nil {
+		if err := output.WriteSplitManifests(result.Resources, splitOpts); err != nil {
 			return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("writing split manifests: %w", err)}
 		}
 		releaseLog.Info(fmt.Sprintf("wrote %d resources to %s", len(result.Resources), outDir))
@@ -140,7 +134,7 @@ func runBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 			Format: outputFormat,
 			Writer: os.Stdout,
 		}
-		if err := output.WriteManifests(resourceInfos, manifestOpts); err != nil {
+		if err := output.WriteManifests(result.Resources, manifestOpts); err != nil {
 			return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("writing manifests: %w", err)}
 		}
 	}

@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/config"
-	oerrors "github.com/opmodel/cli/internal/errors"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/internal/output"
 )
 

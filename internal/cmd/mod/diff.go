@@ -8,7 +8,7 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
-	oerrors "github.com/opmodel/cli/internal/errors"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
@@ -97,7 +97,7 @@ func runDiff(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, k
 		}
 	}
 
-	if len(result.Resources) == 0 && !result.HasErrors() {
+	if len(result.Resources) == 0 {
 		releaseLog.Info("no resources to diff")
 		return nil
 	}
@@ -132,13 +132,9 @@ func runDiff(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, k
 		// inv == nil means nothing previously deployed; diffOpts.InventoryLive stays nil.
 	}
 
-	// Run diff — handle partial render results
+	// Run diff — render always succeeds or returns error, so no partial state.
 	var diffResult *kubernetes.DiffResult
-	if result.HasErrors() {
-		diffResult, err = kubernetes.DiffPartial(ctx, k8sClient, result.Resources, result.Errors, result.Release, comparer, diffOpts)
-	} else {
-		diffResult, err = kubernetes.Diff(ctx, k8sClient, result.Resources, result.Release, comparer, diffOpts)
-	}
+	diffResult, err = kubernetes.Diff(ctx, k8sClient, result.Resources, result.Release.Name, comparer, diffOpts)
 	if err != nil {
 		releaseLog.Error("diff failed", "error", err)
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err, Printed: true}
