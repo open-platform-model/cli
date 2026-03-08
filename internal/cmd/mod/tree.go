@@ -24,8 +24,9 @@ func NewModTreeCmd(cfg *config.GlobalConfig) *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use:   "tree",
-		Short: "Show module resource hierarchy",
+		Use:        "tree",
+		Deprecated: "use 'opm release tree <name>' instead",
+		Short:      "Show module resource hierarchy",
 		Long: `Show the component and resource hierarchy of a deployed OPM release.
 
 Resources are grouped by component and displayed as a tree. Kubernetes ownership

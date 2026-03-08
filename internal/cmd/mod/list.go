@@ -33,8 +33,9 @@ func NewModListCmd(cfg *config.GlobalConfig) *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use:   "list",
-		Short: "List deployed module releases",
+		Use:        "list",
+		Deprecated: "use 'opm release list' instead",
+		Short:      "List deployed module releases",
 		Long: `List all deployed module releases in a namespace.
 
 Releases are discovered via inventory Secrets. Health status is evaluated

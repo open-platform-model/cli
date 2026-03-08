@@ -33,8 +33,9 @@ func NewModEventsCmd(cfg *config.GlobalConfig) *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use:   "events",
-		Short: "Show events for a release",
+		Use:        "events",
+		Deprecated: "use 'opm release events <name>' instead",
+		Short:      "Show events for a release",
 		Long: `Show Kubernetes events for all resources belonging to an OPM release.
 
 Events are collected from OPM-managed resources and their Kubernetes-owned

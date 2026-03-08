@@ -29,8 +29,9 @@ func NewModDeleteCmd(cfg *config.GlobalConfig) *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use:   "delete",
-		Short: "Delete release resources from cluster",
+		Use:        "delete",
+		Deprecated: "use 'opm release delete <name>' instead",
+		Short:      "Delete release resources from cluster",
 		Long: `Delete all resources belonging to an OPM release from a Kubernetes cluster.
 
 Resources are discovered via the release inventory Secret, so the original

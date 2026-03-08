@@ -66,13 +66,15 @@ func runVet(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags) er
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
-	// Render module via shared pipeline
+	// Render module via shared pipeline.
+	// When no -f flag is provided, use the module's debugValues field as the values source.
 	result, err := cmdutil.RenderRelease(ctx, cmdutil.RenderReleaseOpts{
 		Args:        args,
 		Values:      rf.Values,
 		ReleaseName: rf.ReleaseName,
 		K8sConfig:   k8sConfig,
 		Config:      cfg,
+		DebugValues: len(rf.Values) == 0,
 	})
 	if err != nil {
 		return err
@@ -99,7 +101,7 @@ func runVet(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags) er
 		}
 		valuesDetail = strings.Join(basenames, ", ")
 	} else {
-		valuesDetail = "values.cue"
+		valuesDetail = "debugValues"
 	}
 	releaseLog.Info(output.FormatVetCheck("Values satisfy #config", valuesDetail))
 

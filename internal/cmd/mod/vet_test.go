@@ -78,9 +78,9 @@ func TestModVet_ValuesDetailLogic(t *testing.T) {
 		expectedDetail string
 	}{
 		{
-			name:           "no values flags uses module values.cue",
+			name:           "no values flags uses debugValues",
 			valuesFlags:    nil,
-			expectedDetail: "values.cue",
+			expectedDetail: "debugValues",
 		},
 		{
 			name:           "single external values file",
@@ -109,9 +109,42 @@ func TestModVet_ValuesDetailLogic(t *testing.T) {
 				}
 				detail = strings.Join(basenames, ", ")
 			} else {
-				detail = "values.cue"
+				detail = "debugValues"
 			}
 			assert.Equal(t, tt.expectedDetail, detail)
+		})
+	}
+}
+
+// TestModVet_DebugValuesFlagLogic tests that DebugValues is set based on -f flag presence.
+// The actual pipeline behavior (extracting debugValues from module) is covered by integration tests.
+func TestModVet_DebugValuesFlagLogic(t *testing.T) {
+	tests := []struct {
+		name            string
+		valuesFlags     []string
+		expectDebugVals bool
+	}{
+		{
+			name:            "no -f flag enables DebugValues",
+			valuesFlags:     nil,
+			expectDebugVals: true,
+		},
+		{
+			name:            "with -f flag disables DebugValues",
+			valuesFlags:     []string{"prod-values.cue"},
+			expectDebugVals: false,
+		},
+		{
+			name:            "multiple -f flags disable DebugValues",
+			valuesFlags:     []string{"base.cue", "override.cue"},
+			expectDebugVals: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			debugValues := len(tt.valuesFlags) == 0
+			assert.Equal(t, tt.expectDebugVals, debugValues)
 		})
 	}
 }

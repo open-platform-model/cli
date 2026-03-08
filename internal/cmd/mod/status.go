@@ -30,8 +30,9 @@ func NewModStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use:   "status",
-		Short: "Show resource status",
+		Use:        "status",
+		Deprecated: "use 'opm release status <name>' instead",
+		Short:      "Show resource status",
 		Long: `Show status of resources deployed by an OPM release.
 
 Resources are discovered via the release inventory Secret, so the original
