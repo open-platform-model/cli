@@ -29,10 +29,6 @@ import (
 }
 
 #Secrets: component.#Component & {
-	metadata: annotations: {
-		"transformer.opmodel.dev/list-output": true
-	}
-
 	#resources: {(#SecretsResource.metadata.fqn): #SecretsResource}
 }
 
