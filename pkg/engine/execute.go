@@ -232,7 +232,7 @@ func injectContext(
 }
 
 // isSingleResource reports whether a CUE struct value is a single Kubernetes resource.
-// 
+//
 // Transformer output must conform to one of three forms:
 //   - list of resources    (cue.ListKind)
 //   - single resource      (cue.StructKind with apiVersion + kind)

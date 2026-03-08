@@ -91,9 +91,29 @@ type RenderFromReleaseFileOpts struct {
 	Config *config.GlobalConfig
 }
 
+// hasReleaseFile reports whether a release.cue file exists inside modulePath.
+// modulePath may be a directory (checked directly) or a file path (its parent
+// directory is checked). Returns false on any stat error.
+func hasReleaseFile(modulePath string) bool {
+	// Determine the candidate directory.
+	dir := modulePath
+	info, err := os.Stat(modulePath)
+	if err == nil && !info.IsDir() {
+		dir = filepath.Dir(modulePath)
+	}
+	_, statErr := os.Stat(filepath.Join(dir, "release.cue"))
+	return statErr == nil
+}
+
 // RenderRelease executes the common render pipeline shared by build, vet, and apply
-// commands. It loads the release package, detects its kind, loads the
-// module release, loads the provider, and runs the engine renderer.
+// commands. It loads the release (or synthesizes one from the module), loads the
+// provider, and runs the engine renderer.
+//
+// When release.cue is present, the existing LoadReleasePackage path is used.
+// When release.cue is absent, a synthesis path is taken:
+//   - If DebugValues is true and no -f flag is given, debugValues is extracted from the module.
+//   - If -f is given, values are loaded from the first -f file.
+//   - SynthesizeModuleRelease builds a *ModuleRelease without a release file.
 //
 // On success it returns the RenderResult. On failure it returns an
 // *ExitError with the appropriate exit code and Printed flag.
@@ -136,78 +156,161 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*RenderResult, 
 		"provider", providerName,
 	)
 
-	// Load the CUE release package.
-	// When DebugValues is set and no -f flag is provided, extract the module's
-	// debugValues field and inject it as the values source.
-	var pkg cue.Value
-	if opts.DebugValues && len(opts.Values) == 0 {
-		// Load module package to extract debugValues.
+	// rel is populated by either the synthesis path or the normal release path.
+	var rel *modulerelease.ModuleRelease
+
+	if !hasReleaseFile(modulePath) {
+		// ── Synthesis path: no release.cue present ────────────────────────────
+		// Load the module package directly.
 		modVal, modErr := loader.LoadModulePackage(cueCtx, modulePath)
 		if modErr != nil {
-			return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("loading module for debugValues: %w", modErr)}
+			return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("loading module: %w", modErr)}
 		}
-		debugVal := modVal.LookupPath(cue.ParsePath("debugValues"))
-		if !debugVal.Exists() {
-			return nil, &oerrors.ExitError{
-				Code: oerrors.ExitGeneralError,
-				Err:  fmt.Errorf("module does not define debugValues — add a debugValues field or provide a values file with -f"),
+
+		// Resolve values: -f flag takes precedence over debugValues.
+		var valuesVal cue.Value
+		if len(opts.Values) > 0 {
+			// Task 3.4: load values from the first -f file.
+			var loadErr error
+			valuesVal, loadErr = loader.LoadValuesFile(cueCtx, opts.Values[0])
+			if loadErr != nil {
+				return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("loading values file: %w", loadErr)}
+			}
+		} else {
+			// Task 3.3: DebugValues path — extract debugValues from the module.
+			// When DebugValues is false and no -f is given we still try debugValues
+			// so that "opm mod build ." without any flag works the same way.
+			debugVal := modVal.LookupPath(cue.ParsePath("debugValues"))
+			if !debugVal.Exists() {
+				return nil, &oerrors.ExitError{
+					Code: oerrors.ExitGeneralError,
+					Err:  fmt.Errorf("no release.cue found — add debugValues to module or use -f <values-file>"),
+				}
+			}
+			if err := debugVal.Validate(cue.Concrete(true)); err != nil {
+				PrintValidationError("debugValues not concrete", err)
+				return nil, &oerrors.ExitError{
+					Code:    oerrors.ExitValidationError,
+					Err:     fmt.Errorf("debugValues is not concrete — module must provide complete test values"),
+					Printed: true,
+				}
+			}
+			valuesVal = debugVal
+		}
+
+		// Task 3.5: Resolve releaseName.
+		// Priority: opts.ReleaseName → module.metadata.name → filepath.Base(modulePath)
+		releaseName := opts.ReleaseName
+		if releaseName == "" {
+			if nameVal := modVal.LookupPath(cue.ParsePath("metadata.name")); nameVal.Exists() {
+				if n, strErr := nameVal.String(); strErr == nil && n != "" {
+					releaseName = n
+				}
 			}
 		}
-		if err := debugVal.Validate(cue.Concrete(true)); err != nil {
-			PrintValidationError("debugValues not concrete", err)
-			return nil, &oerrors.ExitError{
-				Code:    oerrors.ExitValidationError,
-				Err:     fmt.Errorf("debugValues is not concrete — module must provide complete test values"),
-				Printed: true,
+		if releaseName == "" {
+			releaseName = filepath.Base(modulePath)
+		}
+
+		// Task 3.6: Resolve moduleNamespace.
+		// Use module.metadata.defaultNamespace when namespace is not from flag/env.
+		// Flag/env override is applied post-synthesis (task 3.9).
+		moduleNamespace := namespace // default: whatever was resolved
+		s := opts.K8sConfig.Namespace.Source
+		if s != config.SourceFlag && s != config.SourceEnv {
+			if nsVal := modVal.LookupPath(cue.ParsePath("metadata.defaultNamespace")); nsVal.Exists() {
+				if ns, strErr := nsVal.String(); strErr == nil && ns != "" {
+					moduleNamespace = ns
+				}
 			}
 		}
-		var loadErr error
-		pkg, _, loadErr = loader.LoadReleasePackageWithValue(cueCtx, modulePath, debugVal)
-		if loadErr != nil {
-			PrintValidationError("render failed", loadErr)
-			return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: loadErr, Printed: true}
+
+		// Task 3.7: Call SynthesizeModuleRelease.
+		var synthErr error
+		rel, synthErr = loader.SynthesizeModuleRelease(cueCtx, modVal, valuesVal, releaseName, moduleNamespace)
+		if synthErr != nil {
+			PrintValidationError("render failed", synthErr)
+			return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: synthErr, Printed: true}
 		}
 	} else {
-		// Resolve values file: use first -f flag value if provided, else empty
-		// (loader will fall back to values.cue in the module directory).
-		var valuesFile string
-		if len(opts.Values) > 0 {
-			valuesFile = opts.Values[0]
+		// ── Normal path: release.cue is present ───────────────────────────────
+		// Load the CUE release package.
+		// When DebugValues is set and no -f flag is provided, extract the module's
+		// debugValues field and inject it as the values source.
+		var pkg cue.Value
+		if opts.DebugValues && len(opts.Values) == 0 {
+			// Load module package to extract debugValues.
+			modVal, modErr := loader.LoadModulePackage(cueCtx, modulePath)
+			if modErr != nil {
+				return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("loading module for debugValues: %w", modErr)}
+			}
+			debugVal := modVal.LookupPath(cue.ParsePath("debugValues"))
+			if !debugVal.Exists() {
+				return nil, &oerrors.ExitError{
+					Code: oerrors.ExitGeneralError,
+					Err:  fmt.Errorf("module does not define debugValues — add a debugValues field or provide a values file with -f"),
+				}
+			}
+			if err := debugVal.Validate(cue.Concrete(true)); err != nil {
+				PrintValidationError("debugValues not concrete", err)
+				return nil, &oerrors.ExitError{
+					Code:    oerrors.ExitValidationError,
+					Err:     fmt.Errorf("debugValues is not concrete — module must provide complete test values"),
+					Printed: true,
+				}
+			}
+			var loadErr error
+			pkg, _, loadErr = loader.LoadReleasePackageWithValue(cueCtx, modulePath, debugVal)
+			if loadErr != nil {
+				PrintValidationError("render failed", loadErr)
+				return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: loadErr, Printed: true}
+			}
+		} else {
+			// Resolve values file: use first -f flag value if provided, else empty
+			// (loader will fall back to values.cue in the module directory).
+			var valuesFile string
+			if len(opts.Values) > 0 {
+				valuesFile = opts.Values[0]
+			}
+			var loadErr error
+			pkg, _, loadErr = loader.LoadReleasePackage(cueCtx, modulePath, valuesFile)
+			if loadErr != nil {
+				PrintValidationError("render failed", loadErr)
+				return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: loadErr, Printed: true}
+			}
+		}
+
+		// Detect release kind (ModuleRelease or BundleRelease).
+		kind, err := loader.DetectReleaseKind(pkg)
+		if err != nil {
+			return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
+		}
+		if kind != "ModuleRelease" {
+			return nil, &oerrors.ExitError{
+				Code: oerrors.ExitGeneralError,
+				Err:  fmt.Errorf("unsupported release kind %q (use bundle commands for BundleRelease)", kind),
+			}
+		}
+
+		// Load the ModuleRelease from the evaluated package.
+		fallbackName := filepath.Base(modulePath)
+		if opts.ReleaseName != "" {
+			fallbackName = opts.ReleaseName
 		}
 		var loadErr error
-		pkg, _, loadErr = loader.LoadReleasePackage(cueCtx, modulePath, valuesFile)
+		rel, loadErr = loader.LoadModuleReleaseFromValue(cueCtx, pkg, fallbackName)
 		if loadErr != nil {
 			PrintValidationError("render failed", loadErr)
 			return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: loadErr, Printed: true}
 		}
 	}
 
-	// Detect release kind (ModuleRelease or BundleRelease).
-	kind, err := loader.DetectReleaseKind(pkg)
-	if err != nil {
-		return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
-	}
-	if kind != "ModuleRelease" {
-		return nil, &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
-			Err:  fmt.Errorf("unsupported release kind %q (use bundle commands for BundleRelease)", kind),
-		}
-	}
+	// ── Common tail: shared by both synthesis and normal paths ─────────────────
 
-	// Load the ModuleRelease from the evaluated package.
-	fallbackName := filepath.Base(modulePath)
-	if opts.ReleaseName != "" {
-		fallbackName = opts.ReleaseName
-	}
-	rel, err := loader.LoadModuleReleaseFromValue(cueCtx, pkg, fallbackName)
-	if err != nil {
-		PrintValidationError("render failed", err)
-		return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: err, Printed: true}
-	}
-
-	// Override namespace only when the user explicitly provided one via flag or
-	// env var. Config file and built-in default are transparent to the release:
-	// the release definition owns its target namespace.
+	// Task 3.9 / existing behavior: override namespace only when the user
+	// explicitly provided one via flag or env var. Config file and built-in
+	// default are transparent to the release; the release definition owns its
+	// target namespace.
 	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
 		rel.Metadata.Namespace = namespace
 	}

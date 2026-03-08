@@ -93,13 +93,16 @@ func runBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
-	// Render module via shared pipeline
+	// Render module via shared pipeline.
+	// DebugValues: when no -f flag is given, use the module's debugValues field
+	// as the values source (consistent with how opm mod vet works in release mode).
 	result, err := cmdutil.RenderRelease(ctx, cmdutil.RenderReleaseOpts{
 		Args:        args,
 		Values:      rf.Values,
 		ReleaseName: rf.ReleaseName,
 		K8sConfig:   k8sConfig,
 		Config:      cfg,
+		DebugValues: len(rf.Values) == 0,
 	})
 	if err != nil {
 		return err
