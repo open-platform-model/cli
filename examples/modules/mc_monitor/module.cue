@@ -10,7 +10,7 @@
 // Can monitor multiple Java and Bedrock servers from a single deployment.
 // In a bundle context, `javaServers` is typically auto-generated from the
 // bundle's server map rather than set manually.
-package mcmonitor
+package mc_monitor
 
 import (
 	m "opmodel.dev/core/module@v1"

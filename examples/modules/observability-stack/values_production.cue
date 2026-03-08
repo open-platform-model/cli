@@ -7,7 +7,7 @@
 // - Faster scrape intervals (15s)
 // - External labels for multi-cluster identification
 // - Higher resource allocations across the board
-package main
+package observability
 
 values: {
 

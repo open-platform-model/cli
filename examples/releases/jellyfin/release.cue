@@ -9,7 +9,7 @@ import (
 mr.#ModuleRelease
 
 metadata: {
-	name:      "jellyfin-release"
+	name:      "jf"
 	namespace: "jellyfin"
 }
 

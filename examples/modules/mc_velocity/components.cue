@@ -1,6 +1,6 @@
 // Components defines the Velocity proxy workload.
 // Single stateless container — no persistent storage needed.
-package velocity
+package mc_velocity
 
 import (
 	resources_workload "opmodel.dev/resources/workload@v1"

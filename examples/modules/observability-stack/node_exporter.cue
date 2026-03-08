@@ -3,7 +3,7 @@
 // Uses container volumeMounts for host filesystem access (/proc, /sys, /).
 // Note: hostPath volumes are handled by the provider/transformer at render time;
 // the OPM volume schema does not model hostPath directly.
-package main
+package observability
 
 import (
 	resources_workload "opmodel.dev/resources/workload@v1"

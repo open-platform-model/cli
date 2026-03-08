@@ -41,11 +41,11 @@ package gamestack
 import (
 	"list"
 
-	bundle  "opmodel.dev/core/bundle@v1"
+	b  "opmodel.dev/core/bundle@v1"
 	schemas "opmodel.dev/schemas@v1"
-	mc      "opmodel.dev/examples/modules/minecraft@v1"
-	vel     "opmodel.dev/examples/modules/velocity@v1"
-	rtr     "opmodel.dev/examples/modules/mc-router@v1:mcrouter"
+	mc      "opmodel.dev/examples/modules/mc_java@v1"
+	vel     "opmodel.dev/examples/modules/mc_velocity@v1"
+	rtr     "opmodel.dev/examples/modules/mc_router@v1"
 )
 
 _#portSchema: uint & >0 & <=65535
@@ -88,7 +88,7 @@ _#pluginsConfig: {
 }
 
 // Bundle definition
-bundle.#Bundle
+b.#Bundle
 
 // Bundle metadata
 metadata: {

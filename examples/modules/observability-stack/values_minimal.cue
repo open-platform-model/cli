@@ -7,7 +7,7 @@
 // - Config reload sidecar disabled (not needed for ephemeral environments)
 // - Short retention (2d) to minimize resource usage
 // - Minimal resource allocations
-package main
+package observability
 
 values: {
 

@@ -8,15 +8,15 @@
 // - Sidecar containers (configmap-reload)
 // - Multiple value overlays (default, production, minimal)
 // - Security hardening, health checks, persistent storage
-package main
+package observability
 
 import (
-	"opmodel.dev/core@v1"
+	m "opmodel.dev/core/module@v1"
 	schemas "opmodel.dev/schemas@v1"
 )
 
 // Module definition
-core.#Module
+m.#Module
 
 // Module metadata
 metadata: {

@@ -5,7 +5,7 @@
 // This minimal module covers:
 //   - module.cue: metadata and config schema
 //   - components.cue: stateless proxy container with network exposure
-package velocity
+package mc_velocity
 
 import (
 	m "opmodel.dev/core/module@v1"

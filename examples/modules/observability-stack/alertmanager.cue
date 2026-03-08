@@ -1,7 +1,7 @@
 // Alertmanager component: alert deduplication, grouping, routing, and silencing.
 // Conditional StatefulSet with persistent storage for alert state and notification log.
 // Configuration generated from pure CUE via encoding/yaml.
-package main
+package observability
 
 import (
 	"encoding/yaml"

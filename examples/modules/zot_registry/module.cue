@@ -1,11 +1,11 @@
-package main
+package zot_registry
 
 import (
-	core "opmodel.dev/core@v1"
+	m "opmodel.dev/core/module@v1"
 	schemas "opmodel.dev/schemas@v1"
 )
 
-core.#Module
+m.#Module
 
 metadata: {
 	modulePath:  "opmodel.dev/modules"

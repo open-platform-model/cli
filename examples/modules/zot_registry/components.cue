@@ -1,4 +1,4 @@
-package main
+package zot_registry
 
 import (
 	"encoding/json"
@@ -49,14 +49,14 @@ import (
 		let _zotConfig = {
 			storage: {
 				rootDirectory: #config.storage.rootDir
-				
+
 				if #config.storage.dedupe != _|_ {
 					dedupe: #config.storage.dedupe
 				}
-				
+
 				if #config.storage.gc != _|_ {
-					gc: #config.storage.gc.enabled
-					gcDelay: #config.storage.gc.delay
+					gc:         #config.storage.gc.enabled
+					gcDelay:    #config.storage.gc.delay
 					gcInterval: #config.storage.gc.interval
 				}
 			}
@@ -64,19 +64,19 @@ import (
 			http: {
 				address: #config.http.address
 				port:    "\(#config.http.port)" // Zot expects string!
-				
+
 				if #config.auth != _|_ {
 					auth: {
 						htpasswd: {
 							path: "/secret/htpasswd"
 						}
 					}
-					
+
 					if #config.auth.accessControl != _|_ {
 						accessControl: {
 							repositories: #config.auth.accessControl.repositories
 							adminPolicy: {
-								users:   #config.auth.accessControl.adminUsers
+								users: #config.auth.accessControl.adminUsers
 								actions: ["read", "create", "update", "delete"]
 							}
 						}
@@ -86,7 +86,7 @@ import (
 
 			log: {
 				level: #config.log.level
-				
+
 				if #config.log.audit != _|_ {
 					audit: #config.log.audit.enabled
 				}
@@ -103,14 +103,14 @@ import (
 							}
 						}
 					}
-					
+
 					if #config.storage.scrub != _|_ {
 						scrub: {
 							enable:   #config.storage.scrub.enabled
 							interval: #config.storage.scrub.interval
 						}
 					}
-					
+
 					if #config.sync != _|_ {
 						sync: {
 							registries: [
@@ -141,13 +141,13 @@ import (
 					pullPolicy: #config.image.pullPolicy
 				}
 
-			ports: {
-				api: {
-					name:       "api"
-					targetPort: #config.http.port
-					protocol:   "TCP"
+				ports: {
+					api: {
+						name:       "api"
+						targetPort: #config.http.port
+						protocol:   "TCP"
+					}
 				}
-			}
 
 				env: {}
 
@@ -273,13 +273,13 @@ import (
 				terminationGracePeriodSeconds: 30
 			}
 
-		// Network exposure
-		expose: {
-			type: "ClusterIP"
-			ports: {
-				api: container.ports.api
+			// Network exposure
+			expose: {
+				type: "ClusterIP"
+				ports: {
+					api: container.ports.api
+				}
 			}
-		}
 
 			// Optional HTTPRoute
 			if #config.httpRoute != _|_ {

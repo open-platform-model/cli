@@ -2,7 +2,7 @@
 // Two components:
 //   - router: stateless TCP hostname router container
 //   - rbac:   ClusterRole + ClusterRoleBinding for K8s service discovery and auto-scale
-package mcrouter
+package mc_router
 
 import (
 	resources_workload "opmodel.dev/resources/workload@v1"

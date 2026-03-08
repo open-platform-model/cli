@@ -1,7 +1,7 @@
 // Prometheus server component: the core metrics collection and storage engine.
 // StatefulSet with TSDB persistent storage, configmap-reload sidecar,
 // prometheus.yml ConfigMap generated from pure CUE, and optional Ingress.
-package main
+package observability
 
 import (
 	"encoding/yaml"

@@ -1,4 +1,4 @@
-module: "example.com/modules/mc-router@v0"
+module: "example.com/modules/mc_router@v0"
 language: {
 	version: "v0.15.0"
 }

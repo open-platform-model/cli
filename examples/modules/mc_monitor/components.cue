@@ -1,7 +1,7 @@
 // Components defines the mc-monitor workload.
 // Single stateless component that polls Minecraft server status and
 // exports metrics via Prometheus HTTP scrape or OpenTelemetry gRPC push.
-package mcmonitor
+package mc_monitor
 
 import (
 	"strings"

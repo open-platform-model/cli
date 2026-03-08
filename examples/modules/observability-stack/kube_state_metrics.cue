@@ -1,7 +1,7 @@
 // Kube State Metrics component: Kubernetes object state exporter.
 // Conditional stateless Deployment that queries the K8s API to generate metrics
 // about the state of objects (pods, deployments, nodes, etc.).
-package main
+package observability
 
 import (
 	resources_workload "opmodel.dev/resources/workload@v1"

@@ -1,7 +1,7 @@
 // Pushgateway component: metrics push endpoint for batch and ephemeral jobs.
 // Conditional stateless Deployment that accepts pushed metrics and exposes them
 // for Prometheus scraping. Useful for short-lived jobs that cannot be scraped.
-package main
+package observability
 
 import (
 	resources_workload "opmodel.dev/resources/workload@v1"
