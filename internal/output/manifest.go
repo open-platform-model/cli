@@ -8,44 +8,19 @@ import (
 
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/core"
+	pkgcore "github.com/opmodel/cli/pkg/core"
 )
-
-// Compile-time assertion: *core.Resource satisfies ResourceInfo.
-var _ ResourceInfo = (*core.Resource)(nil)
-
-// ManifestOptions controls manifest output formatting.
-type ManifestOptions struct {
-	// Format specifies output format: "yaml" or "json"
-	Format Format
-	// Writer is the output destination
-	Writer io.Writer
-}
-
-// ResourceInfo provides information about a resource for output formatting.
-// This interface allows the output package to work with resources without
-// importing the build package.
-type ResourceInfo interface {
-	GetObject() *unstructured.Unstructured
-	GetGVK() schema.GroupVersionKind
-	GetKind() string
-	GetName() string
-	GetNamespace() string
-	GetComponent() string
-	GetTransformer() string
-}
 
 // WriteManifests writes resources to the writer in the specified format.
 // Resources are sorted by weight for consistent output.
-func WriteManifests(resources []ResourceInfo, opts ManifestOptions) error {
+func WriteManifests(resources []*unstructured.Unstructured, opts ManifestOptions) error {
 	if len(resources) == 0 {
 		return nil
 	}
 
-	// Sort resources by weight then by name for deterministic output
-	sortResourceInfos(resources)
+	// Sort resources by weight then by name for deterministic output.
+	sortResources(resources)
 
 	switch opts.Format {
 	case FormatJSON:
@@ -58,15 +33,23 @@ func WriteManifests(resources []ResourceInfo, opts ManifestOptions) error {
 	return writeYAML(resources, opts.Writer) // Default to YAML
 }
 
-// sortResourceInfos sorts resources by weight, then by namespace, then by name.
+// ManifestOptions controls manifest output formatting.
+type ManifestOptions struct {
+	// Format specifies output format: "yaml" or "json"
+	Format Format
+	// Writer is the output destination
+	Writer io.Writer
+}
+
+// sortResources sorts resources by weight, then by namespace, then by name.
 // Intentional 3-key sort for display purposes (weight → namespace → name).
 // Does not need to match the 5-key apply order (weight → group → kind → namespace → name)
 // since this function only controls output file and table ordering.
-func sortResourceInfos(resources []ResourceInfo) {
+func sortResources(resources []*unstructured.Unstructured) {
 	sort.Slice(resources, func(i, j int) bool {
 		// Primary: sort by weight
-		wi := core.GetWeight(resources[i].GetGVK())
-		wj := core.GetWeight(resources[j].GetGVK())
+		wi := pkgcore.GetWeight(resources[i].GroupVersionKind())
+		wj := pkgcore.GetWeight(resources[j].GroupVersionKind())
 		if wi != wj {
 			return wi < wj
 		}
@@ -84,26 +67,33 @@ func sortResourceInfos(resources []ResourceInfo) {
 }
 
 // writeYAML writes resources as YAML documents separated by ---.
-// The yaml.v3 encoder automatically adds document separators between documents.
-func writeYAML(resources []ResourceInfo, w io.Writer) error {
-	encoder := yaml.NewEncoder(w)
-	encoder.SetIndent(2)
-
-	for _, res := range resources {
-		if err := encoder.Encode(res.GetObject().Object); err != nil {
-			return fmt.Errorf("encoding resource %s/%s: %w",
-				res.GetKind(), res.GetName(), err)
+func writeYAML(resources []*unstructured.Unstructured, w io.Writer) error {
+	for i, res := range resources {
+		if i > 0 {
+			if _, err := fmt.Fprint(w, "---\n"); err != nil {
+				return fmt.Errorf("writing separator: %w", err)
+			}
+		}
+		yamlBytes, err := marshalYAML(res)
+		if err != nil {
+			return fmt.Errorf("encoding resource %s/%s: %w", res.GetKind(), res.GetName(), err)
+		}
+		if _, err := w.Write(yamlBytes); err != nil {
+			return fmt.Errorf("writing resource %s/%s: %w", res.GetKind(), res.GetName(), err)
 		}
 	}
-
-	return encoder.Close()
+	return nil
 }
 
 // writeJSON writes resources as a JSON array.
-func writeJSON(resources []ResourceInfo, w io.Writer) error {
-	objects := make([]map[string]any, len(resources))
+func writeJSON(resources []*unstructured.Unstructured, w io.Writer) error {
+	objects := make([]json.RawMessage, len(resources))
 	for i, res := range resources {
-		objects[i] = res.GetObject().Object
+		j, err := json.Marshal(res.Object)
+		if err != nil {
+			return fmt.Errorf("encoding resource %s/%s: %w", res.GetKind(), res.GetName(), err)
+		}
+		objects[i] = j
 	}
 
 	encoder := json.NewEncoder(w)
@@ -116,30 +106,31 @@ func writeJSON(resources []ResourceInfo, w io.Writer) error {
 	return nil
 }
 
+// marshalYAML serializes an Unstructured resource to YAML bytes.
+func marshalYAML(res *unstructured.Unstructured) ([]byte, error) {
+	return yaml.Marshal(res.Object)
+}
+
 // writeResource writes a single resource to the writer.
-func writeResource(resource *unstructured.Unstructured, format Format, w io.Writer) error {
+func writeResource(res *unstructured.Unstructured, format Format, w io.Writer) error {
 	switch format {
 	case FormatJSON:
+		j, err := json.Marshal(res.Object)
+		if err != nil {
+			return err
+		}
+		var obj json.RawMessage = j
 		encoder := json.NewEncoder(w)
 		encoder.SetIndent("", "  ")
-		return encoder.Encode(resource.Object)
-	case FormatYAML:
-		encoder := yaml.NewEncoder(w)
-		encoder.SetIndent(2)
-		err := encoder.Encode(resource.Object)
-		if closeErr := encoder.Close(); closeErr != nil && err == nil {
-			err = closeErr
-		}
-		return err
+		return encoder.Encode(obj)
 	case FormatTable, FormatDir, FormatWide:
 		return fmt.Errorf("format %s not supported for single resource output", format)
 	}
-	// Default to YAML
-	encoder := yaml.NewEncoder(w)
-	encoder.SetIndent(2)
-	err := encoder.Encode(resource.Object)
-	if closeErr := encoder.Close(); closeErr != nil && err == nil {
-		err = closeErr
+	// Default to YAML (covers FormatYAML and any unrecognized format)
+	y, err := marshalYAML(res)
+	if err != nil {
+		return err
 	}
+	_, err = w.Write(y)
 	return err
 }

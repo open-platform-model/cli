@@ -9,9 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
-	"github.com/opmodel/cli/internal/core"
-	"github.com/opmodel/cli/internal/core/modulerelease"
 )
 
 // --- 8.1 / 8.2: Integration test for diff showing modifications ---
@@ -36,16 +33,10 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 		"key": "original-value",
 	}
 
-	resources := []*core.Resource{
-		{Object: cm, Component: "test-component"},
-	}
-	meta := modulerelease.ReleaseMetadata{
-		Name:      releaseName,
-		Namespace: namespace,
-	}
+	resources := []*unstructured.Unstructured{cm}
 
 	// Apply the original resource
-	applyResult, err := Apply(ctx, client, resources, meta, ApplyOptions{})
+	applyResult, err := Apply(ctx, client, resources, releaseName, ApplyOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, 1, applyResult.Applied)
 
@@ -54,12 +45,10 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 	modifiedCM.Object["data"] = map[string]interface{}{
 		"key": "modified-value",
 	}
-	modifiedResources := []*core.Resource{
-		{Object: modifiedCM, Component: "test-component"},
-	}
+	modifiedResources := []*unstructured.Unstructured{modifiedCM}
 
 	// Diff should show modifications
-	diffResult, err := Diff(ctx, client, modifiedResources, meta, comparer)
+	diffResult, err := Diff(ctx, client, modifiedResources, releaseName, comparer)
 	require.NoError(t, err)
 	assert.Equal(t, 1, diffResult.Modified, "should detect 1 modified resource")
 	assert.Equal(t, 0, diffResult.Added)
@@ -95,21 +84,15 @@ func TestDiffIntegration_ApplyThenDiffShowsNoDifferences(t *testing.T) {
 		"key": "value",
 	}
 
-	resources := []*core.Resource{
-		{Object: cm, Component: "test-component"},
-	}
-	meta := modulerelease.ReleaseMetadata{
-		Name:      releaseName,
-		Namespace: namespace,
-	}
+	resources := []*unstructured.Unstructured{cm}
 
 	// Apply
-	applyResult, err := Apply(ctx, client, resources, meta, ApplyOptions{})
+	applyResult, err := Apply(ctx, client, resources, releaseName, ApplyOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, 1, applyResult.Applied)
 
 	// Diff immediately — with field projection, should show "No differences found"
-	diffResult, err := Diff(ctx, client, resources, meta, comparer)
+	diffResult, err := Diff(ctx, client, resources, releaseName, comparer)
 	require.NoError(t, err)
 	assert.Equal(t, 0, diffResult.Modified, "apply-then-diff with no changes should report 0 modified")
 	assert.Equal(t, 0, diffResult.Added, "apply-then-diff with no changes should report 0 added")
@@ -145,16 +128,10 @@ func TestStatusIntegration_ReportsHealth(t *testing.T) {
 		"key": "value",
 	}
 
-	resources := []*core.Resource{
-		{Object: cm, Component: "test-component"},
-	}
-	meta := modulerelease.ReleaseMetadata{
-		Name:      releaseName,
-		Namespace: namespace,
-	}
+	resources := []*unstructured.Unstructured{cm}
 
 	// Apply
-	applyResult, err := Apply(ctx, client, resources, meta, ApplyOptions{})
+	applyResult, err := Apply(ctx, client, resources, releaseName, ApplyOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, 1, applyResult.Applied)
 
@@ -197,16 +174,10 @@ func TestDiffIntegration_AllAdditions(t *testing.T) {
 		"key": "value",
 	}
 
-	resources := []*core.Resource{
-		{Object: cm, Component: "test-component"},
-	}
-	meta := modulerelease.ReleaseMetadata{
-		Name:      releaseName,
-		Namespace: namespace,
-	}
+	resources := []*unstructured.Unstructured{cm}
 
 	// Diff without prior deployment — all should be additions
-	diffResult, err := Diff(ctx, client, resources, meta, comparer)
+	diffResult, err := Diff(ctx, client, resources, releaseName, comparer)
 	require.NoError(t, err)
 	assert.Equal(t, 0, diffResult.Modified)
 	assert.Equal(t, 1, diffResult.Added, "resource should show as added")

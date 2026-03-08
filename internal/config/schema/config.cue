@@ -25,6 +25,10 @@ package schema
 	// Loaded from registry via CUE imports.
 	providers?: [string]: _
 
+	// matcher is the pre-loaded CUE #MatchPlan definition.
+	// Loaded from registry via CUE imports (e.g. matcher.#MatchPlan).
+	matcher?: _
+
 	// kubernetes contains Kubernetes-specific settings.
 	kubernetes?: #KubernetesConfig
 

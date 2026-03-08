@@ -8,7 +8,8 @@ const DefaultConfigTemplate = `// OPM CLI Configuration
 package config
 
 import (
-	provs "opmodel.dev/providers@v1"
+	provs   "opmodel.dev/providers@v1"
+	matcher "opmodel.dev/core/matcher@v1"
 )
 
 config: {
@@ -21,6 +22,9 @@ config: {
 	providers: {
 		kubernetes: provs.#Registry["kubernetes"]
 	}
+
+	// matcher is the #MatchPlan definition used to match components to transformers.
+	matcher: matcher.#MatchPlan
 
 	kubernetes: {
 		// kubeconfig is the path to the kubeconfig file.

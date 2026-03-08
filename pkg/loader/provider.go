@@ -5,72 +5,36 @@ package loader
 
 import (
 	"fmt"
+	"sort"
 
 	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/load"
 
 	"github.com/opmodel/cli/pkg/provider"
 )
 
-// LoadProvider loads a named provider from the OPM provider registry.
+// LoadProvider selects and wraps a provider from the pre-loaded config providers map.
 //
-// cueModuleDir must be the absolute path to the CUE module root
-// (the directory containing cue.mod/). This is the same directory that is passed
-// to engine.NewModuleRenderer.
-//
-// providerName selects the provider from the #Registry map (e.g. "kubernetes").
-// If providerName is empty and the registry contains exactly one provider, that
-// provider is selected automatically.
-func LoadProvider(cueCtx *cue.Context, cueModuleDir string, providerName string) (*provider.Provider, error) {
-	// Load the providers package, which defines #Registry.
-	cfg := &load.Config{Dir: cueModuleDir}
-	instances := load.Instances([]string{"./providers"}, cfg)
-	if len(instances) == 0 {
-		return nil, fmt.Errorf("providers package not found in %s", cueModuleDir)
-	}
-	if instances[0].Err != nil {
-		return nil, fmt.Errorf("loading providers package: %w", instances[0].Err)
+// providers is the map of provider CUE values loaded from config (GlobalConfig.Providers).
+// providerName selects which provider to use. If empty, defaults to "kubernetes".
+// If the named provider is not found, an error listing available names is returned.
+func LoadProvider(providerName string, providers map[string]cue.Value) (*provider.Provider, error) {
+	if len(providers) == 0 {
+		return nil, fmt.Errorf("no providers configured — add a providers block to config.cue")
 	}
 
-	providersPkg := cueCtx.BuildInstance(instances[0])
-	if err := providersPkg.Err(); err != nil {
-		return nil, fmt.Errorf("building providers package: %w", err)
-	}
-
-	// Look up the #Registry definition.
-	registry := providersPkg.LookupPath(cue.MakePath(cue.Def("Registry")))
-	if err := registry.Err(); err != nil {
-		return nil, fmt.Errorf("looking up #Registry: %w", err)
-	}
-
-	// Auto-select when providerName is empty and there is exactly one entry.
 	if providerName == "" {
-		names, err := registryKeys(registry)
-		if err != nil {
-			return nil, err
-		}
-		if len(names) == 1 {
-			providerName = names[0]
-		} else {
-			return nil, fmt.Errorf("provider name required (available: %v)", names)
-		}
+		providerName = "kubernetes"
 	}
 
-	// Look up the specific provider entry.
-	providerVal := registry.LookupPath(cue.MakePath(cue.Str(providerName)))
-	if !providerVal.Exists() {
-		names, _ := registryKeys(registry)
-		return nil, fmt.Errorf("provider %q not found in #Registry (available: %v)", providerName, names)
-	}
-	if err := providerVal.Err(); err != nil {
-		return nil, fmt.Errorf("evaluating provider %q: %w", providerName, err)
+	providerVal, ok := providers[providerName]
+	if !ok {
+		available := sortedKeys(providers)
+		return nil, fmt.Errorf("provider %q not found (available: %v)", providerName, available)
 	}
 
-	// Extract display metadata — we read only the minimal fields needed for logging
-	// and provider selection. All transformer and schema data stays in Raw.
 	meta, err := extractProviderMetadata(providerVal, providerName)
 	if err != nil {
-		return nil, fmt.Errorf("extracting provider metadata: %w", err)
+		return nil, fmt.Errorf("extracting provider metadata for %q: %w", providerName, err)
 	}
 
 	return &provider.Provider{
@@ -99,15 +63,12 @@ func extractProviderMetadata(v cue.Value, configKeyName string) (*provider.Provi
 	return meta, nil
 }
 
-// registryKeys returns the sorted keys of a #Registry struct.
-func registryKeys(registry cue.Value) ([]string, error) {
-	iter, err := registry.Fields()
-	if err != nil {
-		return nil, fmt.Errorf("reading #Registry fields: %w", err)
+// sortedKeys returns the sorted keys of a map[string]cue.Value.
+func sortedKeys(m map[string]cue.Value) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
 	}
-	var names []string
-	for iter.Next() {
-		names = append(names, iter.Selector().Unquoted())
-	}
-	return names, nil
+	sort.Strings(keys)
+	return keys
 }

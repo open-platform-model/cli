@@ -9,22 +9,36 @@ const (
 	// LabelManagedByValue is the value for the LabelManagedBy label.
 	LabelManagedByValue = "open-platform-model"
 
-	// LabelReleaseName is the release name label.
-	LabelReleaseName = "module-release.opmodel.dev/name"
-
-	// LabelReleaseNamespace is the release namespace label.
-	LabelReleaseNamespace = "module-release.opmodel.dev/namespace"
-
 	// LabelComponent is the OPM infrastructure label that categorizes the type
 	// of OPM-managed object (e.g., "inventory"). Distinct from component names
 	// set by CUE transformers on application resources.
 	LabelComponent = "opmodel.dev/component"
 
+	// LabelComponentName is the label injected by the CUE catalog on all application
+	// resources to record which component produced them. Value is the component name.
+	// Set by module.cue in the v1alpha1 catalog:
+	//   labels: "component.opmodel.dev/name": name
+	// Used by inventory to track provenance for component-rename safety checks.
+	LabelComponentName = "component.opmodel.dev/name"
+
+	// LabelModuleName is the label injected by the CUE catalog on all application
+	// resources to record which module produced them. Value is the module name.
+	LabelModuleName = "module.opmodel.dev/name"
+
 	// LabelModuleUUID is the module identity UUID label for resource discovery.
 	LabelModuleUUID = "module.opmodel.dev/uuid"
 
+	// LabelReleaseName is the release name label.
+	LabelModuleReleaseName = "module-release.opmodel.dev/name"
+	LabelReleaseName = LabelModuleReleaseName
+
+	// LabelReleaseNamespace is the release namespace label.
+	LabelModuleReleaseNamespace = "module-release.opmodel.dev/namespace"
+	LabelReleaseNamespace = LabelModuleReleaseNamespace
+
 	// LabelReleaseUUID is the release identity UUID label for resource discovery.
-	LabelReleaseUUID = "module-release.opmodel.dev/uuid"
+	LabelModuleReleaseUUID = "module-release.opmodel.dev/uuid"
+	LabelReleaseUUID = LabelModuleReleaseUUID
 
 	// LabelWorkloadType is the v1alpha1 label for workload type classification.
 	// Required on components using #Container resource.

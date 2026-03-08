@@ -7,9 +7,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
+	pkgcore "github.com/opmodel/cli/pkg/core"
 )
 
 // GetInventory reads the inventory Secret for a release.
@@ -41,8 +41,8 @@ func GetInventory(ctx context.Context, client *kubernetes.Client, releaseName, n
 		"name", secretName, "releaseID", releaseID)
 
 	labelSelector := fmt.Sprintf("%s=%s,%s=%s",
-		core.LabelReleaseUUID, releaseID,
-		core.LabelComponent, "inventory",
+		pkgcore.LabelReleaseUUID, releaseID,
+		pkgcore.LabelComponent, "inventory",
 	)
 	list, err := client.Clientset.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
@@ -122,8 +122,8 @@ func WriteInventory(ctx context.Context, client *kubernetes.Client, inv *Invento
 // Returns an error if multiple inventory Secrets are found (unexpected state).
 func FindInventoryByReleaseName(ctx context.Context, client *kubernetes.Client, releaseName, namespace string) (*InventorySecret, error) {
 	labelSelector := fmt.Sprintf("%s=%s,%s=%s",
-		core.LabelReleaseName, releaseName,
-		core.LabelComponent, "inventory",
+		pkgcore.LabelReleaseName, releaseName,
+		pkgcore.LabelComponent, "inventory",
 	)
 	list, err := client.Clientset.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,

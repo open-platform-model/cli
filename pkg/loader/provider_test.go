@@ -28,10 +28,7 @@ func TestExtractProviderMetadata_WithMetadata(t *testing.T) {
 func TestExtractProviderMetadata_NoMetadataBlock(t *testing.T) {
 	ctx := cuecontext.New()
 
-	// Provider value with no metadata block — should use config key name.
-	v := ctx.CompileString(`{
-		transformers: {}
-	}`)
+	v := ctx.CompileString(`{ transformers: {} }`)
 	require.NoError(t, v.Err())
 
 	meta, err := extractProviderMetadata(v, "my-provider")
@@ -42,12 +39,7 @@ func TestExtractProviderMetadata_NoMetadataBlock(t *testing.T) {
 func TestExtractProviderMetadata_EmptyNameFallback(t *testing.T) {
 	ctx := cuecontext.New()
 
-	// metadata.name is empty string — should fall back to configKeyName.
-	v := ctx.CompileString(`{
-		metadata: {
-			name: ""
-		}
-	}`)
+	v := ctx.CompileString(`{ metadata: { name: "" } }`)
 	require.NoError(t, v.Err())
 
 	meta, err := extractProviderMetadata(v, "fallback")
@@ -55,100 +47,66 @@ func TestExtractProviderMetadata_EmptyNameFallback(t *testing.T) {
 	assert.Equal(t, "fallback", meta.Name)
 }
 
-func TestRegistryKeys(t *testing.T) {
+func TestLoadProvider_ExplicitName(t *testing.T) {
 	ctx := cuecontext.New()
 
-	registry := ctx.CompileString(`{
-		kubernetes: { metadata: name: "kubernetes" }
-		helm:       { metadata: name: "helm" }
-	}`)
-	require.NoError(t, registry.Err())
+	k8s := ctx.CompileString(`{ metadata: { name: "kubernetes" } }`)
+	require.NoError(t, k8s.Err())
 
-	keys, err := registryKeys(registry)
+	providers := map[string]cue.Value{"kubernetes": k8s}
+
+	prov, err := LoadProvider("kubernetes", providers)
 	require.NoError(t, err)
-	assert.ElementsMatch(t, []string{"kubernetes", "helm"}, keys)
+	assert.Equal(t, "kubernetes", prov.Metadata.Name)
+	assert.True(t, prov.Data.Exists())
 }
 
-func TestRegistryKeys_Empty(t *testing.T) {
+func TestLoadProvider_DefaultsToKubernetes(t *testing.T) {
 	ctx := cuecontext.New()
 
-	registry := ctx.CompileString(`{}`)
-	require.NoError(t, registry.Err())
+	k8s := ctx.CompileString(`{ metadata: { name: "kubernetes" } }`)
+	require.NoError(t, k8s.Err())
 
-	keys, err := registryKeys(registry)
+	providers := map[string]cue.Value{"kubernetes": k8s}
+
+	// Empty name → defaults to "kubernetes"
+	prov, err := LoadProvider("", providers)
 	require.NoError(t, err)
-	assert.Empty(t, keys)
+	assert.Equal(t, "kubernetes", prov.Metadata.Name)
 }
 
-func TestRegistryKeys_Single(t *testing.T) {
+func TestLoadProvider_MultipleProviders_ExplicitRequired(t *testing.T) {
 	ctx := cuecontext.New()
 
-	registry := ctx.CompileString(`{
-		kubernetes: { metadata: name: "kubernetes" }
-	}`)
-	require.NoError(t, registry.Err())
+	k8s := ctx.CompileString(`{ metadata: { name: "kubernetes" } }`)
+	helm := ctx.CompileString(`{ metadata: { name: "helm" } }`)
+	require.NoError(t, k8s.Err())
+	require.NoError(t, helm.Err())
 
-	keys, err := registryKeys(registry)
+	providers := map[string]cue.Value{"kubernetes": k8s, "helm": helm}
+
+	// Explicit name works fine with multiple providers
+	prov, err := LoadProvider("helm", providers)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"kubernetes"}, keys)
+	assert.Equal(t, "helm", prov.Metadata.Name)
 }
 
-// TestLoadProvider_AutoSelect verifies auto-selection logic using an
-// in-memory registry value (bypasses CUE module loading).
-func TestRegistryKeys_AutoSelectLogic(t *testing.T) {
-	ctx := cuecontext.New()
-
-	// Single-provider registry.
-	registry := ctx.CompileString(`{
-		kubernetes: {}
-	}`)
-	require.NoError(t, registry.Err())
-
-	names, err := registryKeys(registry)
-	require.NoError(t, err)
-	require.Len(t, names, 1)
-
-	// Simulate auto-selection: if len==1, use names[0].
-	providerName := ""
-	if len(names) == 1 {
-		providerName = names[0]
-	}
-	assert.Equal(t, "kubernetes", providerName)
-}
-
-// TestLoadProvider_AutoSelectRequiresName verifies the multi-provider case
-// requires explicit name selection.
-func TestRegistryKeys_MultiProviderRequiresName(t *testing.T) {
-	ctx := cuecontext.New()
-
-	registry := ctx.CompileString(`{
-		kubernetes: {}
-		helm:       {}
-	}`)
-	require.NoError(t, registry.Err())
-
-	names, err := registryKeys(registry)
-	require.NoError(t, err)
-
-	// With multiple providers and empty name, auto-select should fail.
-	providerName := ""
-	var selected string
-	if len(names) == 1 {
-		selected = names[0]
-	}
-	assert.Empty(t, selected, "should not auto-select with multiple providers and empty name")
-	assert.Empty(t, providerName)
-}
-
-// TestLoadProvider_NotFound verifies the not-found lookup path using cue.Value directly.
 func TestLoadProvider_NotFound(t *testing.T) {
 	ctx := cuecontext.New()
 
-	registry := ctx.CompileString(`{
-		kubernetes: { metadata: name: "kubernetes" }
-	}`)
-	require.NoError(t, registry.Err())
+	k8s := ctx.CompileString(`{ metadata: { name: "kubernetes" } }`)
+	require.NoError(t, k8s.Err())
 
-	providerVal := registry.LookupPath(cue.MakePath(cue.Str("nonexistent")))
-	assert.False(t, providerVal.Exists(), "non-existent provider should not be found")
+	providers := map[string]cue.Value{"kubernetes": k8s}
+
+	_, err := LoadProvider("nonexistent", providers)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "nonexistent")
+	assert.Contains(t, err.Error(), "available")
+}
+
+func TestLoadProvider_EmptyProviders(t *testing.T) {
+	_, err := LoadProvider("kubernetes", map[string]cue.Value{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no providers configured")
 }

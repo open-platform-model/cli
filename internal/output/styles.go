@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	opmerrors "github.com/opmodel/cli/internal/errors"
+	opmerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // Color palette — named constants for all ANSI 256 colors used in the CLI.

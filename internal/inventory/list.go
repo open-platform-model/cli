@@ -7,9 +7,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/opmodel/cli/internal/core"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
+	pkgcore "github.com/opmodel/cli/pkg/core"
 )
 
 // ListInventories discovers all inventory Secrets in the given namespace.
@@ -24,8 +24,8 @@ import (
 // Corrupt Secrets that fail to unmarshal are logged and skipped.
 func ListInventories(ctx context.Context, client *kubernetes.Client, namespace string) ([]*InventorySecret, error) {
 	labelSelector := fmt.Sprintf("%s=%s,%s=%s",
-		core.LabelManagedBy, core.LabelManagedByValue,
-		core.LabelComponent, "inventory",
+		pkgcore.LabelManagedBy, pkgcore.LabelManagedByValue,
+		pkgcore.LabelComponent, "inventory",
 	)
 
 	list, err := client.Clientset.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{
