@@ -38,6 +38,16 @@ type MatchedPair struct {
 	TransformerFQN string
 }
 
+// NonMatchedPair is a (component, transformer) pair that was evaluated but did
+// not match, together with the reasons why matching failed.
+type NonMatchedPair struct {
+	ComponentName    string
+	TransformerFQN   string
+	MissingLabels    []string
+	MissingResources []string
+	MissingTraits    []string
+}
+
 // MatchedPairs returns all (component, transformer) pairs where matched == true,
 // sorted deterministically: by component name first, then transformer FQN.
 func (p *MatchPlan) MatchedPairs() []MatchedPair {
@@ -53,6 +63,33 @@ func (p *MatchPlan) MatchedPairs() []MatchedPair {
 		}
 	}
 	sortMatchedPairs(pairs)
+	return pairs
+}
+
+// NonMatchedPairs returns all (component, transformer) pairs where matched == false,
+// sorted deterministically: by component name first, then transformer FQN.
+// Each entry includes the reasons the match failed (missing labels, resources, traits).
+func (p *MatchPlan) NonMatchedPairs() []NonMatchedPair {
+	pairs := make([]NonMatchedPair, 0)
+	for compName, tfResults := range p.Matches {
+		for tfFQN, result := range tfResults {
+			if !result.Matched {
+				pairs = append(pairs, NonMatchedPair{
+					ComponentName:    compName,
+					TransformerFQN:   tfFQN,
+					MissingLabels:    result.MissingLabels,
+					MissingResources: result.MissingResources,
+					MissingTraits:    result.MissingTraits,
+				})
+			}
+		}
+	}
+	sort.Slice(pairs, func(i, j int) bool {
+		if pairs[i].ComponentName != pairs[j].ComponentName {
+			return pairs[i].ComponentName < pairs[j].ComponentName
+		}
+		return pairs[i].TransformerFQN < pairs[j].TransformerFQN
+	})
 	return pairs
 }
 

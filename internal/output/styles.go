@@ -38,6 +38,9 @@ var (
 	// styleNoun styles identifiable nouns (module paths, resource names, namespaces).
 	styleNoun = lipgloss.NewStyle().Foreground(ColorCyan)
 
+	// styleTransformer styles transformer names in match output.
+	styleTransformer = lipgloss.NewStyle().Foreground(ColorYellow)
+
 	// styleDim styles structural chrome (scope prefixes, separators, timestamps).
 	styleDim = lipgloss.NewStyle().Faint(true)
 
@@ -154,6 +157,42 @@ func FormatFQN(fqn string) string {
 	return strings.Replace(fqn, "#", " - ", 1)
 }
 
+// styledFQN renders a fully-qualified transformer path with the transformer
+// name highlighted in the noun style (cyan) and the surrounding path dim.
+//
+// For module-path FQNs like "opmodel.dev/providers/kubernetes/transformers/hpa-transformer@v1":
+//
+//	dim("opmodel.dev/providers/kubernetes/transformers/") + cyan("hpa-transformer") + dim("@v1")
+//
+// For simple "#"-separated FQNs like "kubernetes#statefulset-transformer":
+// the "#" is replaced with " - " and the transformer name (after the separator) is cyan.
+//
+// Falls back to plain dim rendering when no recognisable separator is found.
+func styledFQN(fqn string) string {
+	// Handle module-path style: last "/" segment is "name@version".
+	if idx := strings.LastIndex(fqn, "/"); idx >= 0 {
+		prefix := fqn[:idx+1]  // "opmodel.dev/.../transformers/"
+		nameVer := fqn[idx+1:] // "hpa-transformer@v1"
+		name := nameVer
+		ver := ""
+		if at := strings.LastIndex(nameVer, "@"); at >= 0 {
+			name = nameVer[:at] // "hpa-transformer"
+			ver = nameVer[at:]  // "@v1"
+		}
+		return styleDim.Render(prefix) + styleTransformer.Render(name) + styleDim.Render(ver)
+	}
+
+	// Handle "#"-separated style: "provider#transformer-name".
+	if idx := strings.Index(fqn, "#"); idx >= 0 {
+		provider := fqn[:idx] // "kubernetes"
+		name := fqn[idx+1:]   // "statefulset-transformer"
+		return styleDim.Render(provider+" - ") + styleTransformer.Render(name)
+	}
+
+	// No separator — render the whole thing dim.
+	return styleDim.Render(fqn)
+}
+
 // FormatTransformerMatch renders a matched transformer line.
 //
 // Format: ▸ <component> ← <provider> - <fqn>
@@ -163,8 +202,7 @@ func FormatTransformerMatch(component, fqn string) string {
 	bullet := styleNoun.Render("▸")
 	comp := styleNoun.Render(component)
 	arrow := styleDim.Render("←")
-	styledFQN := styleDim.Render(FormatFQN(fqn))
-	return bullet + " " + comp + " " + arrow + " " + styledFQN
+	return bullet + " " + comp + " " + arrow + " " + styledFQN(fqn)
 }
 
 // FormatTransformerMatchVerbose renders a matched transformer line with reason.
@@ -184,6 +222,19 @@ func FormatTransformerMatchVerbose(component, fqn, reason string) string {
 	indent := "     "
 	styledReason := styleDim.Render(reason)
 	return firstLine + "\n" + indent + styledReason
+}
+
+// FormatTransformerSkipped renders a non-matching transformer line for debug output.
+//
+// Format: ✗ <component> ↛ <provider> - <fqn>
+//
+// The cross and component name are dim. The arrow and FQN are dim.
+// Use with Debug-level logging and structured key-value pairs for the reasons.
+func FormatTransformerSkipped(component, fqn string) string {
+	cross := styleDim.Render("✗")
+	comp := styleDim.Render(component)
+	arrow := styleDim.Render("↛")
+	return cross + " " + comp + " " + arrow + " " + styledFQN(fqn)
 }
 
 // FormatTransformerUnmatched renders an unmatched component line.
