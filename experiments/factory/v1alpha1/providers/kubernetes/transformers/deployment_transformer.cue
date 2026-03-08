@@ -86,8 +86,25 @@ import (
 			}
 		}
 
-		// Build main container: base conversion via helper, unified with trait fields
-		_mainContainer: (#ToK8sContainer & {"in": _container, #releasePrefix: #context.#moduleReleaseMetadata.name}).out
+		// Build main container: base conversion via helper, unified with container-level security context
+		_mainContainer: (#ToK8sContainer & {"in": _container, #releasePrefix: #context.#moduleReleaseMetadata.name}).out & {
+			if #component.spec.securityContext != _|_ {
+				let _sc = #component.spec.securityContext
+				if _sc.readOnlyRootFilesystem != _|_ || _sc.allowPrivilegeEscalation != _|_ || _sc.capabilities != _|_ {
+					securityContext: {
+						if _sc.readOnlyRootFilesystem != _|_ {
+							readOnlyRootFilesystem: _sc.readOnlyRootFilesystem
+						}
+						if _sc.allowPrivilegeEscalation != _|_ {
+							allowPrivilegeEscalation: _sc.allowPrivilegeEscalation
+						}
+						if _sc.capabilities != _|_ {
+							capabilities: _sc.capabilities
+						}
+					}
+				}
+			}
+		}
 
 		// Build container list (main container + optional sidecars)
 		_sidecarContainers: *optionalTraits["opmodel.dev/traits/workload/sidecar-containers@v1"].#defaults | [...]
@@ -129,23 +146,26 @@ import (
 
 						restartPolicy: _restartPolicy
 
-						// SecurityContext: pod-level fields
-						if #component.spec.securityContext != _|_ {
-							let _sc = #component.spec.securityContext
-							if _sc.runAsNonRoot != _|_ || _sc.runAsUser != _|_ || _sc.runAsGroup != _|_ {
-								securityContext: {
-									if _sc.runAsNonRoot != _|_ {
-										runAsNonRoot: _sc.runAsNonRoot
-									}
-									if _sc.runAsUser != _|_ {
-										runAsUser: _sc.runAsUser
-									}
-									if _sc.runAsGroup != _|_ {
-										runAsGroup: _sc.runAsGroup
-									}
+					// SecurityContext: pod-level fields (runAsNonRoot, runAsUser, runAsGroup, fsGroup)
+					if #component.spec.securityContext != _|_ {
+						let _sc = #component.spec.securityContext
+						if _sc.runAsNonRoot != _|_ || _sc.runAsUser != _|_ || _sc.runAsGroup != _|_ || _sc.fsGroup != _|_ {
+							securityContext: {
+								if _sc.runAsNonRoot != _|_ {
+									runAsNonRoot: _sc.runAsNonRoot
+								}
+								if _sc.runAsUser != _|_ {
+									runAsUser: _sc.runAsUser
+								}
+								if _sc.runAsGroup != _|_ {
+									runAsGroup: _sc.runAsGroup
+								}
+								if _sc.fsGroup != _|_ {
+									fsGroup: _sc.fsGroup
 								}
 							}
 						}
+					}
 
 						// ServiceAccount reference
 						if #component.spec.workloadIdentity != _|_ {

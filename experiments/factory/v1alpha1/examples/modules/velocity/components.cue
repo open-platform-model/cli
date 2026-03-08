@@ -4,6 +4,7 @@ package velocity
 
 import (
 	resources_workload "opmodel.dev/resources/workload@v1"
+	resources_storage "opmodel.dev/resources/storage@v1"
 	traits_workload "opmodel.dev/traits/workload@v1"
 	traits_network "opmodel.dev/traits/network@v1"
 	traits_security "opmodel.dev/traits/security@v1"
@@ -19,6 +20,7 @@ import (
 
 	proxy: {
 		resources_workload.#Container
+		resources_storage.#Volumes
 		traits_workload.#Scaling
 		traits_workload.#RestartPolicy
 		traits_workload.#UpdateStrategy
@@ -39,11 +41,14 @@ import (
 			// Allow in-flight connections to drain before termination
 			gracefulShutdown: terminationGracePeriodSeconds: 30
 
-			// Non-root security context
+			// Non-root security context.
+			// fsGroup: 3000 sets group ownership on mounted volumes so the
+			// process (GID 3000) can write to the /server emptyDir at startup.
 			securityContext: {
 				runAsNonRoot:             true
 				runAsUser:                1000
 				runAsGroup:               3000
+				fsGroup:                  3000
 				readOnlyRootFilesystem:   true
 				allowPrivilegeEscalation: false
 				capabilities: drop: ["ALL"]
@@ -82,17 +87,33 @@ import (
 						name:  "VELOCITY_FORWARDING_MODE"
 						value: #config.forwardingMode
 					}
-					if #config.forwardingSecret != _|_ {
-						VELOCITY_FORWARDING_SECRET: {
-							name:  "VELOCITY_FORWARDING_SECRET"
-							value: #config.forwardingSecret
-						}
+				if #config.forwardingSecret != _|_ {
+					VELOCITY_FORWARDING_SECRET: {
+						name:  "VELOCITY_FORWARDING_SECRET"
+						value: #config.forwardingSecret
 					}
 				}
 			}
 
-			// === Network Exposure ===
-			expose: {
+			// Mount the writable emptyDir so the Velocity JAR can be downloaded
+			// into /server at startup (image working directory, owned by root by default).
+			volumeMounts: {
+				"server-data": volumes["server-data"] & {
+					mountPath: "/server"
+				}
+			}
+		}
+
+		// === Volumes ===
+		volumes: {
+			"server-data": {
+				name:     "server-data"
+				emptyDir: {}
+			}
+		}
+
+		// === Network Exposure ===
+		expose: {
 				ports: minecraft: {
 					targetPort:  #config.bindPort
 					protocol:    "TCP"

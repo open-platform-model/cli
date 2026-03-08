@@ -17,6 +17,8 @@ package schemas
 	runAsUser?: int
 	// Specific group ID to run as
 	runAsGroup?: int
+	// Group ID applied to all mounted volumes (pod-level; makes volumes writable by the group)
+	fsGroup?: int
 	// Mount the root filesystem as read-only
 	readOnlyRootFilesystem: bool
 	// Prevent privilege escalation
