@@ -205,8 +205,10 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*RenderResult, 
 		return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: err, Printed: true}
 	}
 
-	// Override namespace if provided (flag takes precedence over module default).
-	if namespace != "" {
+	// Override namespace only when the user explicitly provided one via flag or
+	// env var. Config file and built-in default are transparent to the release:
+	// the release definition owns its target namespace.
+	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
 		rel.Metadata.Namespace = namespace
 	}
 
@@ -345,8 +347,10 @@ func RenderFromReleaseFile(ctx context.Context, opts RenderFromReleaseFileOpts) 
 		return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: err, Printed: true}
 	}
 
-	// Override namespace if provided.
-	if namespace != "" {
+	// Override namespace only when the user explicitly provided one via flag or
+	// env var. Config file and built-in default are transparent to the release:
+	// the release definition owns its target namespace.
+	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
 		rel.Metadata.Namespace = namespace
 	}
 

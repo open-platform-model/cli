@@ -79,6 +79,10 @@ func runReleaseList(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFla
 	targetNamespace := k8sConfig.Namespace.Value
 	if allNamespaces {
 		targetNamespace = ""
+	} else {
+		if err := cmdutil.RequireNamespace(k8sConfig); err != nil {
+			return err
+		}
 	}
 
 	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)

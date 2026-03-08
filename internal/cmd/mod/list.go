@@ -116,6 +116,10 @@ func runList(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag strin
 	targetNamespace := k8sConfig.Namespace.Value
 	if allNamespaces {
 		targetNamespace = "" // K8s convention: empty = all namespaces
+	} else {
+		if err := cmdutil.RequireNamespace(k8sConfig); err != nil {
+			return err
+		}
 	}
 
 	// Create Kubernetes client

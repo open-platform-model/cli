@@ -132,6 +132,9 @@ func runEvents(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 	if err != nil {
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
+	if err := cmdutil.RequireNamespace(k8sConfig); err != nil {
+		return err
+	}
 
 	namespace := k8sConfig.Namespace.Value
 

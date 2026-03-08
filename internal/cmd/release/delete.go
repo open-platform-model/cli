@@ -81,6 +81,9 @@ func runReleaseDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 	if err != nil {
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
+	if err := cmdutil.RequireNamespace(k8sConfig); err != nil {
+		return err
+	}
 
 	namespace := k8sConfig.Namespace.Value
 	output.Debug("resolved kubernetes config",
