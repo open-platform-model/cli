@@ -109,11 +109,11 @@
 
 ## 11. Validation Gates
 
-- [ ] 11.1 Run `task fmt` — all Go files formatted
-- [ ] 11.2 Run `task vet` — go vet passes
-- [ ] 11.3 Run `task lint` — golangci-lint passes
-- [ ] 11.4 Run `task test:unit` — all unit tests pass
-- [ ] 11.5 Run `task test:e2e` — all e2e tests pass
+- [x] 11.1 Run `task fmt` — all Go files formatted
+- [x] 11.2 Run `task vet` — go vet passes
+- [x] 11.3 Run `task lint` — golangci-lint passes
+- [x] 11.4 Run `task test:unit` — all unit tests pass
+- [x] 11.5 Run `task test:e2e` — all e2e tests pass
 - [ ] 11.6 Run `task cluster:create` then `task test:integration` — all integration tests pass
-- [ ] 11.7 Run `task build` — binary compiles successfully
-- [ ] 11.8 Smoke test: `./bin/opm mod build` on an example module produces identical YAML output as before migration
+- [x] 11.7 Run `task build` — binary compiles successfully
+- [x] 11.8 Smoke test: `./bin/opm mod build` on an example module produces identical YAML output as before migration
