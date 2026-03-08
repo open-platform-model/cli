@@ -34,78 +34,78 @@
 
 ## 4. Engine — pkg/engine/
 
-- [ ] 4.1 Create `pkg/engine/matchplan.go`: Promote from factory — `MatchPlan`, `MatchResult`, `MatchedPair`, `buildMatchPlan()`, `sortMatchedPairs()`; fix: sort keys in `Warnings()` for deterministic output (DEBT.md #3)
-- [ ] 4.2 Create `pkg/engine/execute.go`: Promote from factory — `executeTransforms()`, `executePair()`, `injectContext()`, `collectResourceList()`, `collectResourceMap()`; fix: propagate metadata decode errors instead of silent discard (DEBT.md #1) — log at WARN level or return error in strict mode; fix: define explicit output contract for `isSingleResource` (DEBT.md #6)
-- [ ] 4.3 Create `pkg/engine/module_renderer.go`: Promote from factory — `ModuleRenderer`, `NewModuleRenderer()`, `Render()`, `RenderResult`, `UnmatchedComponentsError`; use `errors.Join` (already fixed in factory, DEBT.md #2)
-- [ ] 4.4 Create `pkg/engine/bundle_renderer.go`: Promote from factory — `BundleRenderer`, `BundleRenderResult`; fix: fail-slow at bundle level — collect all release errors instead of stopping on first (DEBT.md #5)
-- [ ] 4.5 Create `pkg/engine/errors.go`: Engine-specific error types — `UnmatchedComponentsError` with structured diagnostics, integrate with `pkg/errors.TransformError` wrapping
-- [ ] 4.6 Write unit tests for `pkg/engine/matchplan.go` — test `MatchedPairs()` sorting, `Warnings()` deterministic output
-- [ ] 4.7 Write unit tests for `pkg/engine/execute.go` — test three output forms (list, single resource, map), metadata decode error propagation
-- [ ] 4.8 Verify: `go test ./pkg/engine/...` passes
+- [x] 4.1 Create `pkg/engine/matchplan.go`: Promote from factory — `MatchPlan`, `MatchResult`, `MatchedPair`, `buildMatchPlan()`, `sortMatchedPairs()`; fix: sort keys in `Warnings()` for deterministic output (DEBT.md #3)
+- [x] 4.2 Create `pkg/engine/execute.go`: Promote from factory — `executeTransforms()`, `executePair()`, `injectContext()`, `collectResourceList()`, `collectResourceMap()`; fix: propagate metadata decode errors instead of silent discard (DEBT.md #1) — log at WARN level or return error in strict mode; fix: define explicit output contract for `isSingleResource` (DEBT.md #6)
+- [x] 4.3 Create `pkg/engine/module_renderer.go`: Promote from factory — `ModuleRenderer`, `NewModuleRenderer()`, `Render()`, `RenderResult`, `UnmatchedComponentsError`; use `errors.Join` (already fixed in factory, DEBT.md #2)
+- [x] 4.4 Create `pkg/engine/bundle_renderer.go`: Promote from factory — `BundleRenderer`, `BundleRenderResult`; fix: fail-slow at bundle level — collect all release errors instead of stopping on first (DEBT.md #5)
+- [x] 4.5 Create `pkg/engine/errors.go`: Engine-specific error types — `UnmatchedComponentsError` with structured diagnostics, integrate with `pkg/errors.TransformError` wrapping
+- [x] 4.6 Write unit tests for `pkg/engine/matchplan.go` — test `MatchedPairs()` sorting, `Warnings()` deterministic output
+- [x] 4.7 Write unit tests for `pkg/engine/execute.go` — test three output forms (list, single resource, map), metadata decode error propagation
+- [x] 4.8 Verify: `go test ./pkg/engine/...` passes
 
 ## 5. Adapt internal/output/
 
-- [ ] 5.1 Update `internal/output/manifest.go`: Replace `ResourceInfo` interface — use `*core.Resource` methods directly (`MarshalYAML()` for YAML output, `Kind()`, `Name()`, `Namespace()` for display); update compile-time assertions; replace `core.GetWeight()` import to `pkg/core`
-- [ ] 5.2 Update `internal/output/split.go` if it references old core types
-- [ ] 5.3 Verify: `go build ./internal/output/...` compiles
+- [x] 5.1 Update `internal/output/manifest.go`: Replace `ResourceInfo` interface — use `*core.Resource` methods directly (`MarshalYAML()` for YAML output, `Kind()`, `Name()`, `Namespace()` for display); update compile-time assertions; replace `core.GetWeight()` import to `pkg/core`
+- [x] 5.2 Update `internal/output/split.go` if it references old core types
+- [x] 5.3 Verify: `go build ./internal/output/...` compiles
 
 ## 6. Adapt internal/inventory/
 
-- [ ] 6.1 Update `internal/inventory/entry.go`: Change `NewEntryFromResource()` to accept `*unstructured.Unstructured` instead of `*core.Resource`
-- [ ] 6.2 Update `internal/inventory/digest.go`: Change `ComputeManifestDigest()` to accept `[]*unstructured.Unstructured` instead of `[]*core.Resource`
-- [ ] 6.3 Update `internal/inventory/crud.go`, `secret.go`, `list.go`, `stale.go`: Change label constant imports from `internal/core` to `pkg/core`
-- [ ] 6.4 Update `internal/inventory/digest_test.go`, `types_test.go`: Rewrite struct literals to use `*unstructured.Unstructured` instead of `*core.Resource`
-- [ ] 6.5 Verify: `go test ./internal/inventory/...` passes
+- [x] 6.1 Update `internal/inventory/entry.go`: Change `NewEntryFromResource()` to accept `*unstructured.Unstructured` instead of `*core.Resource`
+- [x] 6.2 Update `internal/inventory/digest.go`: Change `ComputeManifestDigest()` to accept `[]*unstructured.Unstructured` instead of `[]*core.Resource`
+- [x] 6.3 Update `internal/inventory/crud.go`, `secret.go`, `list.go`, `stale.go`: Change label constant imports from `internal/core` to `pkg/core`
+- [x] 6.4 Update `internal/inventory/digest_test.go`, `types_test.go`: Rewrite struct literals to use `*unstructured.Unstructured` instead of `*core.Resource`
+- [x] 6.5 Verify: `go test ./internal/inventory/...` passes
 
 ## 7. Adapt internal/kubernetes/
 
-- [ ] 7.1 Update `internal/kubernetes/apply.go`: Change signatures to accept `[]*unstructured.Unstructured` and simple strings (name, namespace) instead of `[]*core.Resource` and `modulerelease.ReleaseMetadata`
-- [ ] 7.2 Update `internal/kubernetes/diff.go`: Same signature changes as apply.go
-- [ ] 7.3 Update `internal/kubernetes/delete.go`: Change `GetWeight` import to `pkg/core`
-- [ ] 7.4 Update `internal/kubernetes/diff_integration_test.go`: Rewrite struct literals
-- [ ] 7.5 Verify: `go build ./internal/kubernetes/...` compiles (integration tests need cluster)
+- [x] 7.1 Update `internal/kubernetes/apply.go`: Change signatures to accept `[]*unstructured.Unstructured` and simple strings (name, namespace) instead of `[]*core.Resource` and `modulerelease.ReleaseMetadata`
+- [x] 7.2 Update `internal/kubernetes/diff.go`: Same signature changes as apply.go
+- [x] 7.3 Update `internal/kubernetes/delete.go`: Change `GetWeight` import to `pkg/core`
+- [x] 7.4 Update `internal/kubernetes/diff_integration_test.go`: Rewrite struct literals
+- [x] 7.5 Verify: `go build ./internal/kubernetes/...` compiles (integration tests need cluster)
 
 ## 8. Adapt internal/cmdutil/ — The Integration Point
 
-- [ ] 8.1 Rewrite `internal/cmdutil/render.go`: Replace `pipeline.NewPipeline().Render()` with new orchestration — call `loader.LoadReleasePackage()`, `loader.DetectReleaseKind()`, `loader.LoadModuleReleaseFromValue()`, `engine.NewModuleRenderer().Render()`; convert `[]*core.Resource` to `[]*unstructured.Unstructured` at this layer; keep values file resolution logic
-- [ ] 8.2 Rewrite `internal/cmdutil/output.go`: Replace `TransformerMatchPlan` references with `engine.MatchPlan`; replace `ComponentSummary` construction (derive from MatchPlan or CUE iteration); update `UnmatchedComponentError` handling to use `engine.UnmatchedComponentsError`; replace `TransformerRequirements` interface usage with `engine.MatchResult` fields
-- [ ] 8.3 Update `internal/cmdutil/flags.go`: Update import paths if needed
-- [ ] 8.4 Update `internal/cmdutil/inventory.go`: Update import paths for label constants
-- [ ] 8.5 Update `internal/cmdutil/k8s.go`: Update import paths if needed
-- [ ] 8.6 Rewrite `internal/cmdutil/render_test.go`: Full rewrite of struct literals — use new types from `pkg/`
-- [ ] 8.7 Rewrite `internal/cmdutil/output_test.go`: Update mock types and struct literals for new engine types
-- [ ] 8.8 Verify: `go test ./internal/cmdutil/...` passes
+- [x] 8.1 Rewrite `internal/cmdutil/render.go`: Replace `pipeline.NewPipeline().Render()` with new orchestration — call `loader.LoadReleasePackage()`, `loader.DetectReleaseKind()`, `loader.LoadModuleReleaseFromValue()`, `engine.NewModuleRenderer().Render()`; convert `[]*core.Resource` to `[]*unstructured.Unstructured` at this layer; keep values file resolution logic
+- [x] 8.2 Rewrite `internal/cmdutil/output.go`: Replace `TransformerMatchPlan` references with `engine.MatchPlan`; replace `ComponentSummary` construction (derive from MatchPlan or CUE iteration); update `UnmatchedComponentError` handling to use `engine.UnmatchedComponentsError`; replace `TransformerRequirements` interface usage with `engine.MatchResult` fields
+- [x] 8.3 Update `internal/cmdutil/flags.go`: Update import paths if needed
+- [x] 8.4 Update `internal/cmdutil/inventory.go`: Update import paths for label constants
+- [x] 8.5 Update `internal/cmdutil/k8s.go`: Update import paths if needed
+- [x] 8.6 Rewrite `internal/cmdutil/render_test.go`: Full rewrite of struct literals — use new types from `pkg/`
+- [x] 8.7 Rewrite `internal/cmdutil/output_test.go`: Update mock types and struct literals for new engine types
+- [x] 8.8 Verify: `go test ./internal/cmdutil/...` passes
 
 ## 9. Adapt internal/cmd/mod/ — Commands
 
-- [ ] 9.1 Update `internal/cmd/mod/apply.go`: Adapt to new RenderResult; convert resources before K8s calls; update metadata field accesses (`result.Release.Name`, `.UUID`, etc.)
-- [ ] 9.2 Update `internal/cmd/mod/build.go`: Adapt to new RenderResult; use `r.MarshalYAML()` for output
-- [ ] 9.3 Update `internal/cmd/mod/diff.go`: Adapt to new RenderResult; convert resources before K8s calls
-- [ ] 9.4 Update `internal/cmd/mod/vet.go`: Update method calls on Resource
-- [ ] 9.5 Update `internal/cmd/mod/delete.go`: Update import paths for label constants
-- [ ] 9.6 Update `internal/cmd/mod/status.go`: Update import paths
-- [ ] 9.7 Update `internal/cmd/mod/list.go`: Update import paths
-- [ ] 9.8 Update `internal/cmd/mod/events.go`: Update import paths if needed
-- [ ] 9.9 Update `internal/cmd/mod/tree.go`: Update import paths if needed
-- [ ] 9.10 Rewrite `internal/cmd/mod/verbose_output_test.go`: Full rewrite of struct literals for new types
-- [ ] 9.11 Update remaining test files in `internal/cmd/mod/`: adapt to new types where needed
-- [ ] 9.12 Verify: `go test ./internal/cmd/mod/...` passes
+- [x] 9.1 Update `internal/cmd/mod/apply.go`: Adapt to new RenderResult; convert resources before K8s calls; update metadata field accesses (`result.Release.Name`, `.UUID`, etc.)
+- [x] 9.2 Update `internal/cmd/mod/build.go`: Adapt to new RenderResult; use `r.MarshalYAML()` for output
+- [x] 9.3 Update `internal/cmd/mod/diff.go`: Adapt to new RenderResult; convert resources before K8s calls
+- [x] 9.4 Update `internal/cmd/mod/vet.go`: Update method calls on Resource
+- [x] 9.5 Update `internal/cmd/mod/delete.go`: Update import paths for label constants
+- [x] 9.6 Update `internal/cmd/mod/status.go`: Update import paths
+- [x] 9.7 Update `internal/cmd/mod/list.go`: Update import paths
+- [x] 9.8 Update `internal/cmd/mod/events.go`: Update import paths if needed
+- [x] 9.9 Update `internal/cmd/mod/tree.go`: Update import paths if needed
+- [x] 9.10 Rewrite `internal/cmd/mod/verbose_output_test.go`: Full rewrite of struct literals for new types
+- [x] 9.11 Update remaining test files in `internal/cmd/mod/`: adapt to new types where needed
+- [x] 9.12 Verify: `go test ./internal/cmd/mod/...` passes
 
 ## 10. Cleanup — Remove Old Packages
 
-- [ ] 10.1 Delete `internal/builder/` (entire directory)
-- [ ] 10.2 Delete `internal/pipeline/` (entire directory)
-- [ ] 10.3 Delete `internal/loader/` (entire directory)
-- [ ] 10.4 Delete `internal/core/component/` (entire directory)
-- [ ] 10.5 Delete `internal/core/transformer/` (entire directory)
-- [ ] 10.6 Delete `internal/core/provider/` (entire directory)
-- [ ] 10.7 Delete `internal/core/module/` (entire directory)
-- [ ] 10.8 Delete `internal/core/modulerelease/` (entire directory)
-- [ ] 10.9 Delete `internal/core/resource.go`
-- [ ] 10.10 Delete `internal/core/labels.go` (moved to `pkg/core/`)
-- [ ] 10.11 Delete `internal/core/weights.go` (moved to `pkg/core/`)
-- [ ] 10.12 Delete `internal/errors/` (moved to `pkg/errors/`)
-- [ ] 10.13 Run `go mod tidy`
+- [x] 10.1 Delete `internal/builder/` (entire directory)
+- [x] 10.2 Delete `internal/pipeline/` (entire directory)
+- [x] 10.3 Delete `internal/loader/` (entire directory)
+- [x] 10.4 Delete `internal/core/component/` (entire directory)
+- [x] 10.5 Delete `internal/core/transformer/` (entire directory)
+- [x] 10.6 Delete `internal/core/provider/` (entire directory)
+- [x] 10.7 Delete `internal/core/module/` (entire directory)
+- [x] 10.8 Delete `internal/core/modulerelease/` (entire directory)
+- [x] 10.9 Delete `internal/core/resource.go`
+- [x] 10.10 Delete `internal/core/labels.go` (moved to `pkg/core/`)
+- [x] 10.11 Delete `internal/core/weights.go` (moved to `pkg/core/`)
+- [x] 10.12 Delete `internal/errors/` (moved to `pkg/errors/`)
+- [x] 10.13 Run `go mod tidy`
 
 ## 11. Validation Gates
 
