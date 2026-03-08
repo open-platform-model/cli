@@ -10,7 +10,7 @@ mr.#ModuleRelease
 
 metadata: {
 	name:      "minecraft"
-	namespace: "minecraft"
+	namespace: "default"
 }
 
 #module: mc
