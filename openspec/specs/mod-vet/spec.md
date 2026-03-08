@@ -12,13 +12,29 @@ The `opm mod vet` command SHALL build the module via the render pipeline and rep
 
 The command SHALL accept a module path argument (default: current directory) and a subset of `mod build` flags for values, namespace, name, and provider resolution.
 
-#### Scenario: Valid module passes validation with per-resource output
+When no `-f`/`--values` flag is provided, `opm mod vet` SHALL use the module's `debugValues` field as the values source. If `-f` is provided, it SHALL override `debugValues` and use the specified values files instead. If neither `debugValues` nor `-f` exists, the command SHALL return an error indicating that values must be provided via `debugValues` in the module or via `-f`.
 
-- **WHEN** `opm mod vet .` is run on a valid module
-- **THEN** the command SHALL call `pipeline.Render()` to build the module
-- **THEN** each generated resource SHALL be printed as a `FormatResourceLine` with `"valid"` status
-- **THEN** a final summary line SHALL be printed: `FormatCheckmark("Module valid (<N> resources)")`
-- **THEN** the command SHALL exit with code 0
+#### Scenario: Valid module passes validation using debugValues
+
+- **WHEN** `opm mod vet .` is run on a module that defines `debugValues`
+- **AND** no `-f` flag is provided
+- **THEN** the command SHALL use `debugValues` as the values source for the render pipeline
+- **AND** each generated resource SHALL be printed as a `FormatResourceLine` with `"valid"` status
+- **AND** a final summary line SHALL be printed: `FormatCheckmark("Module valid (<N> resources)")`
+- **AND** the command SHALL exit with code 0
+
+#### Scenario: -f flag overrides debugValues
+
+- **WHEN** `opm mod vet . -f prod-values.cue` is run on a module that defines `debugValues`
+- **THEN** the command SHALL use `prod-values.cue` as the values source
+- **AND** `debugValues` SHALL be ignored
+
+#### Scenario: No debugValues and no -f flag
+
+- **WHEN** `opm mod vet .` is run on a module that does not define `debugValues` (or `debugValues` is `_`)
+- **AND** no `-f` flag is provided
+- **THEN** the command SHALL return an error indicating values must be provided
+- **AND** the exit code SHALL be 2
 
 #### Scenario: Module with CUE validation errors fails with details
 
