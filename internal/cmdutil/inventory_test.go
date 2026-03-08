@@ -14,9 +14,9 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/opmodel/cli/internal/cmdutil"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // makeTestK8sClient creates a fake kubernetes.Client for unit tests.

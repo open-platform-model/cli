@@ -12,7 +12,7 @@ import (
 )
 
 // mustReleaseMetadata creates a ReleaseMetadata for tests.
-func mustReleaseMetadata(name, namespace string) modulerelease.ReleaseMetadata {
+func mustReleaseMetadata(name, namespace string) modulerelease.ReleaseMetadata { //nolint:unparam // namespace param kept for test clarity
 	return modulerelease.ReleaseMetadata{Name: name, Namespace: namespace}
 }
 

@@ -26,6 +26,10 @@ const (
 // conditionStatusTrue is the Kubernetes condition status value representing "true".
 const conditionStatusTrue = "True"
 
+// conditionTypeReady is the Kubernetes condition type for readiness.
+// Distinct from HealthStatus "Ready" — this is the .conditions[].type field value.
+const conditionTypeReady = "Ready"
+
 // workloadKinds are resources that use the Available/Ready condition for health.
 // Note: StatefulSet is intentionally excluded — it does not emit conditions
 // and must be evaluated via readyReplicas instead.
@@ -86,7 +90,7 @@ func EvaluateHealth(resource *unstructured.Unstructured) HealthStatus {
 	}
 
 	// PersistentVolumeClaim: has a lifecycle phase (Pending → Bound → Lost).
-	if kind == "PersistentVolumeClaim" {
+	if kind == kindPersistentVolumeClaim {
 		return evaluatePVCHealth(resource)
 	}
 
@@ -143,7 +147,7 @@ func evaluatePVCHealth(resource *unstructured.Unstructured) HealthStatus {
 func evaluateWorkloadHealth(resource *unstructured.Unstructured) HealthStatus {
 	conditions := getConditions(resource)
 	for _, c := range conditions {
-		if c.Type == "Available" || c.Type == "Ready" {
+		if c.Type == "Available" || c.Type == conditionTypeReady {
 			if c.Status == conditionStatusTrue {
 				return HealthReady
 			}

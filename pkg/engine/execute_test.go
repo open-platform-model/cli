@@ -8,15 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// cueValue is a test helper that compiles a CUE expression into a cue.Value.
-func cueValue(t *testing.T, expr string) interface{ Exists() bool } {
-	t.Helper()
-	ctx := cuecontext.New()
-	v := ctx.CompileString(expr)
-	require.NoError(t, v.Err(), "compiling CUE expression %q", expr)
-	return v
-}
-
 // TestIsSingleResource tests the isSingleResource heuristic.
 // A resource is "single" when it has both "apiVersion" AND "kind" at the top level.
 func TestIsSingleResource(t *testing.T) {

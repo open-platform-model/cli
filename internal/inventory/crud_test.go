@@ -18,7 +18,7 @@ import (
 // makeTestClient creates a fake kubernetes.Client for unit tests.
 func makeTestClient(objects ...runtime.Object) *kubernetes.Client {
 	return &kubernetes.Client{
-		Clientset: fake.NewClientset(objects...), //nolint:staticcheck // fake.NewSimpleClientset alternative
+		Clientset: fake.NewClientset(objects...),
 	}
 }
 

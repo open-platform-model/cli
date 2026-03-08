@@ -14,7 +14,7 @@ import (
 
 // makeResourceWithContent builds a *unstructured.Unstructured with the given object fields.
 // The component label (component.opmodel.dev/name) is set to the component parameter.
-func makeResourceWithContent(group, version, kind, namespace, name, component string, extra map[string]interface{}) *unstructured.Unstructured {
+func makeResourceWithContent(group, version, kind, namespace, name, component string, extra map[string]interface{}) *unstructured.Unstructured { //nolint:unparam // version param kept for test flexibility
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{
 		"apiVersion": group + "/" + version,
 		"kind":       kind,

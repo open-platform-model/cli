@@ -100,7 +100,7 @@ func NewModuleRenderer(p *provider.Provider, matcherDef cue.Value) *ModuleRender
 //  3. Go executes each matched pair: injects #context, evaluates #transform, decodes output.
 //  4. Warnings for unhandled traits are collected and returned.
 //
-// The returned error summarises all per-pair execution failures; execution continues
+// The returned error summarizes all per-pair execution failures; execution continues
 // past individual pair errors so all matches are attempted.
 func (r *ModuleRenderer) Render(ctx context.Context, rel *modulerelease.ModuleRelease) (*RenderResult, error) {
 	// Extract the components CUE values from the ModuleRelease.
@@ -165,7 +165,7 @@ func extractComponentSummaries(schemaComponents cue.Value) []ComponentSummary {
 
 	var summaries []ComponentSummary
 	for iter.Next() {
-		compName := iter.Label()
+		compName := iter.Selector().Unquoted()
 		compVal := iter.Value()
 
 		summary := ComponentSummary{Name: compName}
@@ -184,7 +184,7 @@ func extractComponentSummaries(schemaComponents cue.Value) []ComponentSummary {
 			ri, err := resourcesVal.Fields()
 			if err == nil {
 				for ri.Next() {
-					fqns = append(fqns, ri.Label())
+					fqns = append(fqns, ri.Selector().Unquoted())
 				}
 			}
 			sort.Strings(fqns)
@@ -197,7 +197,7 @@ func extractComponentSummaries(schemaComponents cue.Value) []ComponentSummary {
 			ti, err := traitsVal.Fields()
 			if err == nil {
 				for ti.Next() {
-					fqns = append(fqns, ti.Label())
+					fqns = append(fqns, ti.Selector().Unquoted())
 				}
 			}
 			sort.Strings(fqns)

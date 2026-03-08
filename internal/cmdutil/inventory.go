@@ -7,9 +7,9 @@ import (
 	"github.com/charmbracelet/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // ResolveInventory resolves the inventory Secret and discovers live resources

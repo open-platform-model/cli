@@ -10,7 +10,7 @@ import (
 // finalizeValue produces a constraint-free data value from a CUE value by
 // stripping schema constraints and taking defaults.
 //
-// It uses Syntax(cue.Final()) to materialise the value into an ast.Expr, then
+// It uses Syntax(cue.Final()) to materialize the value into an ast.Expr, then
 // recompiles it with BuildExpr. This removes matchN validators, close()
 // enforcement, and definition fields, leaving a plain data value suitable for
 // FillPath injection into transformers.

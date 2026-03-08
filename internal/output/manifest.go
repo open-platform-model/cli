@@ -123,10 +123,12 @@ func writeResource(res *unstructured.Unstructured, format Format, w io.Writer) e
 		encoder := json.NewEncoder(w)
 		encoder.SetIndent("", "  ")
 		return encoder.Encode(obj)
+	case FormatYAML:
+		// handled below
 	case FormatTable, FormatDir, FormatWide:
 		return fmt.Errorf("format %s not supported for single resource output", format)
 	}
-	// Default to YAML (covers FormatYAML and any unrecognized format)
+	// Default/YAML path
 	y, err := marshalYAML(res)
 	if err != nil {
 		return err

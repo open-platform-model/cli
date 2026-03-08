@@ -21,6 +21,8 @@ type Provider struct {
 }
 
 // ProviderMetadata holds identity metadata for a provider.
+//
+//nolint:revive // stutter intentional: provider.ProviderMetadata reads clearly at call sites
 type ProviderMetadata struct {
 	// Name is the provider name (e.g., "kubernetes").
 	Name string `json:"name"`

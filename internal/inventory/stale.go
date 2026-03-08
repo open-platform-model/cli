@@ -170,7 +170,7 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("pruning stale resources: %d error(s): %v", len(errs), errs[0])
+		return fmt.Errorf("pruning stale resources: %d error(s): %w", len(errs), errs[0])
 	}
 	return nil
 }

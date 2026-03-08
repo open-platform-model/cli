@@ -10,8 +10,8 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/internal/output"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewModVetCmd creates the mod vet command.

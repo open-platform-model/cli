@@ -773,14 +773,15 @@ func TestFormatPlainTree_StatusBeforeReplicas(t *testing.T) {
 
 	// Find the Deployment line and check "Ready" comes before "3/3".
 	for _, line := range strings.Split(out, "\n") {
-		if strings.Contains(line, "Deployment/web") {
-			readyIdx := strings.Index(line, "Ready")
-			replicasIdx := strings.Index(line, "3/3")
-			require.True(t, readyIdx >= 0, "Ready not found in line: %q", line)
-			require.True(t, replicasIdx >= 0, "3/3 not found in line: %q", line)
-			assert.Less(t, readyIdx, replicasIdx, "Ready should appear before 3/3 in: %q", line)
-			return
+		if !strings.Contains(line, "Deployment/web") {
+			continue
 		}
+		readyIdx := strings.Index(line, "Ready")
+		replicasIdx := strings.Index(line, "3/3")
+		require.True(t, readyIdx >= 0, "Ready not found in line: %q", line)
+		require.True(t, replicasIdx >= 0, "3/3 not found in line: %q", line)
+		assert.Less(t, readyIdx, replicasIdx, "Ready should appear before 3/3 in: %q", line)
+		return
 	}
 	t.Fatal("Deployment/web line not found in output")
 }
@@ -865,14 +866,15 @@ func TestFormatPlainTree_Col3Aligned(t *testing.T) {
 	}
 	out := formatPlainTree(result)
 
-	var col3Cols []int
+	col3Cols := make([]int, 0, 2)
 	for _, line := range strings.Split(out, "\n") {
 		var col3Val string
-		if strings.Contains(line, "PVC/config") {
+		switch {
+		case strings.Contains(line, "PVC/config"):
 			col3Val = "15Gi"
-		} else if strings.Contains(line, "StatefulSet/db") {
+		case strings.Contains(line, "StatefulSet/db"):
 			col3Val = "0/1"
-		} else {
+		default:
 			continue
 		}
 		idx := strings.Index(line, col3Val)

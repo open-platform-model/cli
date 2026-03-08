@@ -59,7 +59,7 @@ func NewBundleRenderer(p *provider.Provider, matcherDef cue.Value) *BundleRender
 // Fix for DEBT.md #5: Fail-slow at bundle level — all releases are attempted even
 // if earlier ones fail. Errors from all failed releases are collected and returned
 // together so the operator can see all failures in one pass. This matches the
-// fail-slow behaviour of executeTransforms at the pair level.
+// fail-slow behavior of executeTransforms at the pair level.
 func (br *BundleRenderer) Render(ctx context.Context, rel *bundlerelease.BundleRelease) (*BundleRenderResult, error) {
 	// Sort release keys for deterministic ordering.
 	keys := make([]string, 0, len(rel.Releases))

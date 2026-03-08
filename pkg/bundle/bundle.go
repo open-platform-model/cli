@@ -21,6 +21,8 @@ type Bundle struct {
 }
 
 // BundleMetadata holds identity metadata for a bundle.
+//
+//nolint:revive // stutter intentional: bundle.BundleMetadata reads clearly at call sites
 type BundleMetadata struct {
 	// Name is the bundle name (kebab-case).
 	Name string `json:"name"`

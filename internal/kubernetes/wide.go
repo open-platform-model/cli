@@ -19,7 +19,7 @@ func extractWideInfo(resource *unstructured.Unstructured) *wideInfo {
 		return extractWorkloadWideInfo(resource)
 	case kindDaemonSet:
 		return extractDaemonSetWideInfo(resource)
-	case "PersistentVolumeClaim":
+	case kindPersistentVolumeClaim:
 		return extractPVCWideInfo(resource)
 	case "Ingress":
 		return extractIngressWideInfo(resource)

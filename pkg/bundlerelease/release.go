@@ -27,6 +27,8 @@ type BundleRelease struct {
 // BundleReleaseMetadata contains release-level identity information.
 // Parallel to modulerelease.ReleaseMetadata but without Namespace —
 // bundles do not have a single target namespace.
+//
+//nolint:revive // stutter intentional: bundlerelease.BundleReleaseMetadata reads clearly at call sites
 type BundleReleaseMetadata struct {
 	// Name is the bundle release name.
 	Name string `json:"name"`

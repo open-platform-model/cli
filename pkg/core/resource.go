@@ -41,41 +41,25 @@ type Resource struct {
 
 // Kind returns the resource kind (e.g. "Deployment").
 func (r *Resource) Kind() string {
-	v := r.Value.LookupPath(cue.ParsePath("kind"))
-	if !v.Exists() {
-		return ""
-	}
-	s, _ := v.String()
+	s, _ := r.Value.LookupPath(cue.ParsePath("kind")).String() //nolint:errcheck // best-effort; empty on non-concrete
 	return s
 }
 
 // Name returns the resource name from metadata.name.
 func (r *Resource) Name() string {
-	v := r.Value.LookupPath(cue.ParsePath("metadata.name"))
-	if !v.Exists() {
-		return ""
-	}
-	s, _ := v.String()
+	s, _ := r.Value.LookupPath(cue.ParsePath("metadata.name")).String() //nolint:errcheck // best-effort
 	return s
 }
 
 // Namespace returns the resource namespace. Empty for cluster-scoped resources.
 func (r *Resource) Namespace() string {
-	v := r.Value.LookupPath(cue.ParsePath("metadata.namespace"))
-	if !v.Exists() {
-		return ""
-	}
-	s, _ := v.String()
+	s, _ := r.Value.LookupPath(cue.ParsePath("metadata.namespace")).String() //nolint:errcheck // best-effort
 	return s
 }
 
 // APIVersion returns the resource apiVersion (e.g. "apps/v1").
 func (r *Resource) APIVersion() string {
-	v := r.Value.LookupPath(cue.ParsePath("apiVersion"))
-	if !v.Exists() {
-		return ""
-	}
-	s, _ := v.String()
+	s, _ := r.Value.LookupPath(cue.ParsePath("apiVersion")).String() //nolint:errcheck // best-effort
 	return s
 }
 

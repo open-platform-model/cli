@@ -8,9 +8,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/opmodel/cli/internal/config"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/pkg/engine"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/pkg/loader"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/modulerelease"
@@ -73,7 +73,7 @@ type RenderReleaseOpts struct {
 //
 // On success it returns the RenderResult. On failure it returns an
 // *ExitError with the appropriate exit code and Printed flag.
-func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*RenderResult, error) {
+func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*RenderResult, error) { //nolint:gocyclo // orchestration function; complexity is inherent
 	modulePath := ResolveModulePath(opts.Args)
 
 	// Validate config is loaded

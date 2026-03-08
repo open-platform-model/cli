@@ -29,7 +29,7 @@ import (
 // on errors that propagated through the CUE comprehension. This gives us a
 // clean, isolated error rooted at the values/schema boundary — not a deeply
 // nested error from the comprehension output that is hard to attribute.
-func validateConfig(schema cue.Value, values cue.Value, context string, name string) *oerrors.ConfigError {
+func validateConfig(schema, values cue.Value, context, name string) *oerrors.ConfigError {
 	// Check that both values are accessible before attempting unification.
 	if !schema.Exists() || !values.Exists() {
 		// Either the #config or values field is missing — not a user config error,

@@ -30,15 +30,15 @@ const (
 
 	// LabelReleaseName is the release name label.
 	LabelModuleReleaseName = "module-release.opmodel.dev/name"
-	LabelReleaseName = LabelModuleReleaseName
+	LabelReleaseName       = LabelModuleReleaseName
 
 	// LabelReleaseNamespace is the release namespace label.
 	LabelModuleReleaseNamespace = "module-release.opmodel.dev/namespace"
-	LabelReleaseNamespace = LabelModuleReleaseNamespace
+	LabelReleaseNamespace       = LabelModuleReleaseNamespace
 
 	// LabelReleaseUUID is the release identity UUID label for resource discovery.
 	LabelModuleReleaseUUID = "module-release.opmodel.dev/uuid"
-	LabelReleaseUUID = LabelModuleReleaseUUID
+	LabelReleaseUUID       = LabelModuleReleaseUUID
 
 	// LabelWorkloadType is the v1alpha1 label for workload type classification.
 	// Required on components using #Container resource.

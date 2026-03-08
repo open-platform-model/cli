@@ -23,7 +23,7 @@ import (
 //
 // valuesFile is the path to the values CUE file to load alongside release.cue.
 // If empty, values.cue in the same directory as the release file is used.
-func LoadReleasePackage(cueCtx *cue.Context, releaseFile string, valuesFile string) (cue.Value, string, error) {
+func LoadReleasePackage(cueCtx *cue.Context, releaseFile, valuesFile string) (cue.Value, string, error) {
 	// Resolve release file path: allow directory as shorthand.
 	releaseFile, err := resolveReleaseFile(releaseFile)
 	if err != nil {

@@ -25,6 +25,8 @@ type Module struct {
 
 // ModuleMetadata contains module-level identity and version information.
 // This is the module's canonical metadata, distinct from the release it is deployed as.
+//
+//nolint:revive // stutter intentional: module.ModuleMetadata reads clearly at call sites
 type ModuleMetadata struct {
 	// Name is the canonical module name from module.metadata.name (kebab-case).
 	Name string `json:"name"`

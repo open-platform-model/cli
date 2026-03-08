@@ -336,7 +336,7 @@ func FormatValuesValidationError(e *opmerrors.ValuesValidationError) string {
 			if fe.Line > 0 {
 				loc := styleLoc.Render(fmt.Sprintf("%d:%d", fe.Line, fe.Column))
 				path := stylePath.Render(fe.Path)
-				sb.WriteString(fmt.Sprintf("  %s  %s\n", loc, path))
+				fmt.Fprintf(&sb, "  %s  %s\n", loc, path)
 			} else if fe.Path != "" {
 				sb.WriteString("  ")
 				sb.WriteString(stylePath.Render(fe.Path))

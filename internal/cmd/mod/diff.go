@@ -8,10 +8,10 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewModDiffCmd creates the mod diff command.
@@ -57,7 +57,7 @@ Examples:
 }
 
 // runDiff executes the diff command.
-func runDiff(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, kf *cmdutil.K8sFlags) error {
+func runDiff(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, kf *cmdutil.K8sFlags) error { //nolint:gocyclo // orchestration function; complexity is inherent
 	ctx := context.Background()
 
 	// Resolve all Kubernetes configuration once (flag > env > config > default).

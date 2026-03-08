@@ -5,6 +5,10 @@ import (
 	"cuelang.org/go/cue"
 )
 
+// APIWarningsWarn is the default value for LogKubernetesConfig.APIWarnings.
+// It causes Kubernetes API deprecation warnings to be logged at WARN level.
+const APIWarningsWarn = "warn"
+
 // KubernetesConfig contains Kubernetes-specific settings.
 type KubernetesConfig struct {
 	// Kubeconfig is the path to the kubeconfig file.

@@ -330,8 +330,8 @@ func TestReleaseMetadata_JSONFieldNames(t *testing.T) {
 	assert.Equal(t, "default", raw["namespace"])
 	_, hasReleaseName := raw["releaseName"]
 	assert.False(t, hasReleaseName, `"releaseName" field must not be present`)
-	_, hasReleaseId := raw["releaseId"]
-	assert.False(t, hasReleaseId, `"releaseId" field must not be present`)
+	_, hasReleaseID := raw["releaseId"]
+	assert.False(t, hasReleaseID, `"releaseId" field must not be present`)
 }
 
 // --- ModuleMetadata JSON field names ---
