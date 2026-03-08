@@ -93,8 +93,8 @@ A developer wants to control how rendered manifests are output.
 
 | ID | Requirement |
 |----|-------------|
-| FR-B-030 | ModuleLoader MUST require `values.cue` at module root. |
-| FR-B-031 | ModuleLoader MUST unify `values.cue` with `--values` files in order. |
+| FR-B-030 | ModuleLoader SHALL check for `values.cue` at module root; if absent, fall back to `debugValues` from the module; error only when neither source is available. *(supersedes: previously required `values.cue`)* |
+| FR-B-031 | When `--values` files are provided, ModuleLoader MUST use ONLY those files; `values.cue` and `debugValues` SHALL both be ignored. *(supersedes: previously unified `values.cue` with `--values` files)* |
 | FR-B-032 | ModuleLoader MUST extract metadata (name, namespace, version) from module. |
 | FR-B-033 | `--namespace` MUST take precedence over `module.metadata.defaultNamespace`. |
 | FR-B-034 | `--name` MUST take precedence over `module.metadata.name`. |
@@ -121,6 +121,29 @@ The pipeline SHALL extract all module metadata (`name`, `defaultNamespace`, `fqn
 
 - **WHEN** a module directory is loaded via `load.Instances()`
 - **THEN** `mod.PkgName()` SHALL be populated from `inst.PkgName`
+
+##### Scenario: Synthesis mode decodes module metadata from module value
+
+- **WHEN** `opm mod build .` runs in synthesis mode (no `release.cue`)
+- **AND** the module defines `metadata.name: "jellyfin"` and `metadata.defaultNamespace: "jellyfin"`
+- **THEN** the synthesized `ModuleRelease.Module.Metadata.Name` SHALL be `"jellyfin"`
+- **AND** the synthesized `ModuleRelease.Metadata.Namespace` SHALL be `"jellyfin"`
+
+### Requirement: mod build defaults to debugValues when no -f flag is given
+When `opm mod build` is invoked without a `-f` / `--values` flag, the command SHALL automatically use the module's `debugValues` field as the values source. This applies in both synthesis mode (no `release.cue`) and release mode (has `release.cue`).
+
+#### Scenario: No -f flag, debugValues present — build succeeds
+
+- **WHEN** `opm mod build .` is run with no `-f` flag
+- **AND** the module defines `debugValues`
+- **THEN** the build SHALL succeed using those values
+
+#### Scenario: No -f flag, no debugValues — build fails with actionable error
+
+- **WHEN** `opm mod build .` is run with no `-f` flag
+- **AND** the module has no `debugValues` field
+- **AND** no `release.cue` is present
+- **THEN** the command SHALL fail with a message directing the user to add `debugValues` or use `-f`
 
 ### ReleaseBuilder
 
@@ -362,6 +385,12 @@ This replaces the current plain-text resource listing in verbose output.
 - **WHEN** `opm mod build . -f values.cue` fails due to a disallowed field in values
 - **THEN** the error details SHALL show paths rooted at `values.` (e.g., `values."extra-field"`)
 - **AND** the error details SHALL include file:line:col positions from the values file
+
+#### Scenario: Verbose output works in synthesis mode
+
+- **WHEN** `opm mod build . --verbose` is run with no `release.cue` using `debugValues`
+- **THEN** the verbose output SHALL include per-resource validation lines
+- **AND** the output format SHALL be identical to release-backed builds
 
 ---
 
