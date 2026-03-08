@@ -1,6 +1,6 @@
 module: "example.com/modules/minecraft-java@v0"
 language: {
-	version: "v0.11.1"
+	version: "v0.15.0"
 }
 deps: {
 	"opmodel.dev@v1": {
