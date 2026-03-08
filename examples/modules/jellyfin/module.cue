@@ -6,19 +6,19 @@
 package main
 
 import (
-	"opmodel.dev/core@v1"
+	m "opmodel.dev/core/module@v1"
 	schemas "opmodel.dev/schemas@v1"
 )
 
 // Module definition
-core.#Module
+m.#Module
 
 // Module metadata
 metadata: {
 	modulePath:       "opmodel.dev/modules"
 	name:             "jellyfin"
 	version:          "0.1.0"
-	description:      string | *"Jellyfin media server - a free software media system"
+	description:      "Jellyfin media server - a free software media system"
 	defaultNamespace: "jellyfin"
 }
 
@@ -52,5 +52,30 @@ metadata: {
 		mountPath: string
 		type:      "pvc" | *"emptyDir"
 		size:      string
+	}
+}
+
+debugValues: {
+	image: {
+		repository: "linuxserver/jellyfin"
+		tag:        "latest"
+		digest:     ""
+	}
+	port:              8096
+	puid:              1000
+	pgid:              1000
+	timezone:          "Etc/UTC"
+	configStorageSize: "10Gi"
+	media: {
+		movies: {
+			mountPath: "/media/movies"
+			type:      "pvc"
+			size:      "1Gi"
+		}
+		tvshows: {
+			mountPath: "/media/tvshows"
+			type:      "pvc"
+			size:      "1Gi"
+		}
 	}
 }
