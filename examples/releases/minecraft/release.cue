@@ -9,7 +9,7 @@ import (
 mr.#ModuleRelease
 
 metadata: {
-	name:      "minecraft-java-release"
+	name:      "minecraft"
 	namespace: "minecraft"
 }
 

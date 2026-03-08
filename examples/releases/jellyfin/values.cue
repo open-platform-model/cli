@@ -19,7 +19,7 @@ values: {
 	pgid: 1000
 
 	// Container timezone
-	timezone: "Etc/UTC"
+	timezone: "Europe/Stockholm"
 
 	// PVC size for Jellyfin config/metadata directory.
 	// Can grow to 50GB+ for large collections (thumbnails, metadata cache).
