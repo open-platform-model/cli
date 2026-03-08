@@ -175,6 +175,51 @@ func LoadModulePackage(ctx *cue.Context, dirPath string) (cue.Value, error) {
 	return val, nil
 }
 
+// LoadValuesFile loads a standalone CUE values file and returns the concrete
+// values as a cue.Value. The function first tries to extract a "values" field
+// from the loaded file (the standard OPM values file shape); if no such field
+// exists the whole evaluated file value is returned instead.
+//
+// This is used by module-only vet validation when -f is provided but there is
+// no release.cue in the module directory.
+func LoadValuesFile(ctx *cue.Context, path string) (cue.Value, error) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return cue.Value{}, fmt.Errorf("resolving values file path: %w", err)
+	}
+	if _, statErr := os.Stat(absPath); statErr != nil {
+		if os.IsNotExist(statErr) {
+			return cue.Value{}, fmt.Errorf("values file %q not found", path)
+		}
+		return cue.Value{}, fmt.Errorf("accessing values file %q: %w", path, statErr)
+	}
+
+	parentDir := filepath.Dir(absPath)
+	cfg := &load.Config{
+		Dir: parentDir,
+	}
+	instances := load.Instances([]string{filepath.Base(absPath)}, cfg)
+	if len(instances) == 0 {
+		return cue.Value{}, fmt.Errorf("no CUE instances found for %s", path)
+	}
+	if instances[0].Err != nil {
+		return cue.Value{}, fmt.Errorf("loading values file: %w", instances[0].Err)
+	}
+
+	val := ctx.BuildInstance(instances[0])
+	if err := val.Err(); err != nil {
+		return cue.Value{}, fmt.Errorf("building values file: %w", err)
+	}
+
+	// Standard OPM values files wrap values in a "values" field.
+	// Return that field when it exists so the caller gets the raw config value.
+	if valuesField := val.LookupPath(cue.ParsePath("values")); valuesField.Exists() && valuesField.Err() == nil {
+		return valuesField, nil
+	}
+
+	return val, nil
+}
+
 // LoadReleasePackageWithValue loads a release CUE package (release.cue) and
 // unifies it with a pre-loaded CUE value (e.g. debugValues). This is used by
 // the debugValues path to avoid writing a temp file.

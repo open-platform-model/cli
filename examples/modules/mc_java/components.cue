@@ -1,6 +1,6 @@
 // Components defines the Minecraft server workload with backup sidecar.
 // Single stateful component with persistent data, optional backup, and health checks.
-package minecraft
+package mc_java
 
 import (
 	"list"

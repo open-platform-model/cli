@@ -5,7 +5,7 @@
 // - values.cue: default values
 //
 // Config schema mirrors the itzg/minecraft-server Helm chart values.yaml surface area.
-package minecraft
+package mc_java
 
 import (
 	m "opmodel.dev/core/module@v1"

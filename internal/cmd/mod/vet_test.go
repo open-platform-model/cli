@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -31,14 +32,27 @@ func TestNewModVetCmd_NoLocalVerboseFlag(t *testing.T) {
 	assert.Nil(t, localFlag, "--verbose should not be a local flag (should use root persistent flag)")
 }
 
+func TestIsModuleOnlyDir(t *testing.T) {
+	t.Run("dir without release.cue is module-only", func(t *testing.T) {
+		dir := t.TempDir()
+		assert.True(t, isModuleOnlyDir(dir))
+	})
+
+	t.Run("dir with release.cue is NOT module-only", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "release.cue"), []byte("package x\n"), 0o644))
+		assert.False(t, isModuleOnlyDir(dir))
+	})
+}
+
+// TestModVet_ValidModule exercises the module-only vet path with the
+// simple-module fixture (no release.cue, no debugValues → schema-only pass).
 func TestModVet_ValidModule(t *testing.T) {
-	// Use a test fixture — assumes tests/fixtures/simple-module exists
-	fixtureDir := filepath.Join("..", "..", "..", "tests", "fixtures", "simple-module")
+	fixtureDir := filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "simple-module")
 	if _, err := os.Stat(fixtureDir); os.IsNotExist(err) {
 		t.Skip("Test fixture not found:", fixtureDir)
 	}
 
-	// Set up minimal config in temp directory
 	tmpHome, cleanup := setupTestConfig(t)
 	defer cleanup()
 
@@ -46,16 +60,18 @@ func TestModVet_ValidModule(t *testing.T) {
 	os.Setenv("HOME", tmpHome)
 	defer os.Setenv("HOME", origHome)
 
-	// Clear registry override for test
 	os.Unsetenv("OPM_REGISTRY")
 
-	cmd := NewModVetCmd(&config.GlobalConfig{})
+	cfg := &config.GlobalConfig{
+		CueContext: cuecontext.New(),
+	}
+	cmd := NewModVetCmd(cfg)
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{fixtureDir})
 
 	err := cmd.Execute()
-	require.NoError(t, err, "valid module should exit with code 0")
+	require.NoError(t, err, "valid module without release.cue should pass in module-only mode")
 }
 
 func TestModVet_CUEValidationError(t *testing.T) {
@@ -71,6 +87,8 @@ func TestModVet_UnmatchedComponent(t *testing.T) {
 	// any transformers in the provider, which requires a more complex test fixture.
 }
 
+// TestModVet_ValuesDetailLogic checks the display detail string assembled
+// for the "Values satisfy #config" vet check line in release mode.
 func TestModVet_ValuesDetailLogic(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -116,8 +134,9 @@ func TestModVet_ValuesDetailLogic(t *testing.T) {
 	}
 }
 
-// TestModVet_DebugValuesFlagLogic tests that DebugValues is set based on -f flag presence.
-// The actual pipeline behavior (extracting debugValues from module) is covered by integration tests.
+// TestModVet_DebugValuesFlagLogic tests that DebugValues is set based on -f
+// flag presence. This logic applies to release mode only (when release.cue
+// is present). Module-only mode does not use the DebugValues field.
 func TestModVet_DebugValuesFlagLogic(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -125,17 +144,17 @@ func TestModVet_DebugValuesFlagLogic(t *testing.T) {
 		expectDebugVals bool
 	}{
 		{
-			name:            "no -f flag enables DebugValues",
+			name:            "no -f flag enables DebugValues (release mode)",
 			valuesFlags:     nil,
 			expectDebugVals: true,
 		},
 		{
-			name:            "with -f flag disables DebugValues",
+			name:            "with -f flag disables DebugValues (release mode)",
 			valuesFlags:     []string{"prod-values.cue"},
 			expectDebugVals: false,
 		},
 		{
-			name:            "multiple -f flags disable DebugValues",
+			name:            "multiple -f flags disable DebugValues (release mode)",
 			valuesFlags:     []string{"base.cue", "override.cue"},
 			expectDebugVals: false,
 		},
