@@ -33,7 +33,7 @@ OPM's CLI foundation has been built over the first iteration of development. The
 - `opm mod vet` — native CUE SDK validation with custom error formatting
 - `opm mod apply` — server-side apply with inventory tracking and stale resource pruning
 - `opm mod delete` — inventory-based or label-based discovery with `--name` or `--release-id`
-- `opm mod diff` — semantic diff of local vs live state (via dyff)
+
 - `opm mod status` — health and readiness status (table/yaml/json, watch mode)
 - `opm mod tree` — tree view of module structure and resource hierarchy
 - `opm mod events` — Kubernetes events for module resources

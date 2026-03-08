@@ -63,15 +63,3 @@ func TestModStatusCmd_OutputFlagAcceptsWide(t *testing.T) {
 	// The default is table; verify the flag accepts "wide" (no validation at flag level, validated in runStatus)
 	assert.Equal(t, "table", f.DefValue)
 }
-
-func TestModDiffCmd_FlagsExist(t *testing.T) {
-	cmd := NewModDiffCmd(&config.GlobalConfig{})
-	assert.Equal(t, "diff [path]", cmd.Use)
-
-	f := cmd.Flags()
-	assert.NotNil(t, f.Lookup("values"))
-	assert.NotNil(t, f.Lookup("namespace"))
-	assert.NotNil(t, f.Lookup("release-name"))
-	assert.NotNil(t, f.Lookup("kubeconfig"))
-	assert.NotNil(t, f.Lookup("context"))
-}

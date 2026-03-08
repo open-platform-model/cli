@@ -78,7 +78,7 @@ Examples:
 
 // runTree executes the tree command.
 //
-//nolint:gocyclo // complexity mirrors runDiff which also uses the same nolint
+//nolint:gocyclo // orchestration function; complexity is inherent
 func runTree(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, depth int, outputFmt string) error {
 	ctx := context.Background()
 

@@ -7,8 +7,7 @@
 - [ ] Add "opm mod vet" to validate an OPM module. Take inspiration from how Timoni solved it.
   - Include a "-c or --concrete" flag to force concreteness during validation
 - [ ] Add "opm mod eval" to evaluate the module printing the raw CUE code of the module.
-- [ ] Rework "opm mod diff" to ignore fields not "owned" by the OPM cli. For example the "managedFields"
-  - This filtering has to be done on both manifests before comparing.
+
 - [x] ~~Ensure "opm config init" also run "cue mod tidy" or similar to discover and download all dependencies.~~
   - **Resolved:** Added prominent yellow-arrow notice reminding users to run `cue mod tidy` after init. Auto-running was rejected to maintain explicit user control (no shell-outs to `cue` binary).
 - [ ] Rework all tests to use cue.AST() instead of strings for test data and comparison.

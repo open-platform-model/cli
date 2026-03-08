@@ -126,7 +126,7 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 │   ├── builder/           # BUILD phase of the render pipeline
 │   ├── cmd/               # Command implementations
 │   │   ├── config/        # config init, vet commands
-│   │   └── mod/           # mod apply, build, delete, diff, init, status, vet commands
+│   │   └── mod/           # mod apply, build, delete, init, status, vet commands
 │   ├── cmdutil/           # Shared command utilities (flag groups, K8s client, output)
 │   ├── config/            # Config loading and validation
 │   │   └── schema/        # CUE schema for config validation

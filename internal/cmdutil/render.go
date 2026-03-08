@@ -91,8 +91,8 @@ type RenderFromReleaseFileOpts struct {
 	Config *config.GlobalConfig
 }
 
-// RenderRelease executes the common render pipeline shared by build, vet, apply,
-// and diff commands. It loads the release package, detects its kind, loads the
+// RenderRelease executes the common render pipeline shared by build, vet, and apply
+// commands. It loads the release package, detects its kind, loads the
 // module release, loads the provider, and runs the engine renderer.
 //
 // On success it returns the RenderResult. On failure it returns an

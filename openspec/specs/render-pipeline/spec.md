@@ -45,18 +45,6 @@ The apply command needs to render a module and deploy to Kubernetes.
 2. **Given** RenderResult.Resources, **When** apply calls kubernetes.Apply(), **Then** resources are deployed in order.
 3. **Given** RenderResult with Errors, **When** apply processes result, **Then** it can decide whether to proceed or abort.
 
-### User Story 3 - Diff Command Uses Pipeline (Priority: P2)
-
-The diff command needs to compare rendered resources with live cluster state.
-
-**Independent Test**: Diff command calls Pipeline.Render() and compares RenderResult.Resources with cluster.
-
-**Acceptance Scenarios**:
-
-1. **Given** a valid module, **When** diff calls Pipeline.Render(), **Then** it receives resources for comparison.
-2. **Given** RenderResult.Resources, **When** diff fetches live state, **Then** it can compare each resource.
-3. **Given** partial RenderResult (some errors), **When** diff processes, **Then** it can still compare successful resources.
-
 ---
 
 ## Functional Requirements

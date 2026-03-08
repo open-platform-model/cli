@@ -222,11 +222,6 @@ After refactoring to use `cmdutil`, each mod command SHALL produce identical out
 - **WHEN** `opm mod delete --release-name my-app -n production` is run before and after the refactoring
 - **THEN** the confirmation prompt text SHALL be identical
 
-#### Scenario: mod diff output is identical after refactoring
-
-- **WHEN** `opm mod diff` is run with identical inputs and cluster state before and after the refactoring
-- **THEN** the diff output (summary line, per-resource diffs) SHALL be identical
-
 #### Scenario: mod status table output is identical after refactoring
 
 - **WHEN** `opm mod status --release-name my-app -n production` is run before and after the refactoring

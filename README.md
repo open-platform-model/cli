@@ -37,7 +37,7 @@ task build
 | `mod apply` | Deploy module to cluster |
 | `mod status` | Show resource status |
 | `mod tree` | Show module resource hierarchy (component → resource → K8s children) |
-| `mod diff` | Show differences with cluster |
+
 | `mod delete` | Delete release resources from cluster |
 | `mod list` | List deployed module releases |
 | `mod events` | Show events for a release |

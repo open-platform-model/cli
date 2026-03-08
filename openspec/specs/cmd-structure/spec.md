@@ -27,7 +27,7 @@ The `internal/cmd/` package SHALL be split into sub-packages that mirror the cob
 #### Scenario: mod commands are in their own package
 
 - **WHEN** the `internal/cmd/mod/` directory is inspected
-- **THEN** it contains all `mod` sub-command implementations (`init`, `build`, `vet`, `apply`, `diff`, `delete`, `status`)
+- **THEN** it contains all `mod` sub-command implementations (`init`, `build`, `vet`, `apply`, `delete`, `status`)
 
 #### Scenario: config commands are in their own package
 

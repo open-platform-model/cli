@@ -143,16 +143,6 @@ opm mod apply ./examples/jellyfin -n default --release-name jellyfin-media
 
 Applies resources to the cluster using server-side apply.
 
-### Diff (compare local vs. live state)
-
-```bash
-opm mod diff ./examples/jellyfin -n default
-```
-
-Shows semantic differences between your local definition and what's running in the cluster.
-
-> **Note:** The diff command is currently broken and shows excessive differences.
-
 ### Status (check resource health)
 
 ```bash

@@ -267,48 +267,6 @@ The most complex path — render + 8-step inventory-aware cluster apply.
 
 ---
 
-### `opm mod diff`
-
-Render + semantic cluster comparison — no writes.
-
-```text
-  cobra.Command
-       │
-       ├── config.ResolveKubernetes()      kubeconfig + context + ns + provider
-       │
-       ├── cmdutil.RenderRelease()         [shared] all 5 render phases
-       │   NOTE: does NOT call ShowRenderOutput — diff handles errors itself
-       │         via DiffPartial (best-effort diff even on partial render)
-       │
-       ├── cmdutil.NewK8sClient()          connect to cluster
-       │
-       ├── inventory.GetInventory()        read inventory for orphan detection
-       │   internal/inventory/crud.go
-       │
-       ├── inventory.DiscoverResourcesFromInventory()
-       │   fetch live resources referenced by the inventory
-       │   internal/inventory/discover.go
-       │
-       ├── kubernetes.Diff()               semantic diff via dyff
-       │   kubernetes.DiffPartial()        (if render had errors, partial)
-       │   internal/kubernetes/diff.go
-       │       └── for each resource:
-       │             GET live state from cluster
-       │             compare with local render via dyff
-       │             categorize: modified / added / orphaned / unchanged
-       │
-       └── print diff output
-               --- kind/name [modified]
-               +++ kind/name [new resource]
-               ~~~ kind/name [orphaned]
-
-  Packages: config, cmdutil, pipeline, loader, builder, core/*,
-            inventory, kubernetes, output
-  Cluster:  [x] connected (read only)
-```
-
----
-
 ### `opm mod delete`
 
 Inventory-first — no render pipeline involved.

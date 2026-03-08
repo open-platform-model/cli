@@ -11,7 +11,7 @@ import (
 )
 
 // RenderFlags holds flags common to commands that render modules
-// (apply, build, vet, diff).
+// (apply, build, vet).
 type RenderFlags struct {
 	Values      []string
 	Namespace   string
@@ -32,7 +32,7 @@ func (f *RenderFlags) AddTo(cmd *cobra.Command) {
 }
 
 // K8sFlags holds flags for Kubernetes cluster connection
-// (apply, diff, delete, status).
+// (apply, delete, status).
 type K8sFlags struct {
 	Kubeconfig string
 	Context    string
