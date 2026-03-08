@@ -141,35 +141,35 @@ values: {
 
 	// ── Proxied network ───────────────────────────────────────────────────────
 	// Players connect at: play.mc.example.com → my-game-stack-proxy → lobby / survival
-	// network: {
-	// 	hostname: "play"
+	network: {
+		hostname: "play"
 
-	// 	proxy: {
-	// 		motd:             "Welcome to My Minecraft Network!"
-	// 		maxPlayers:       200
-	// 		forwardingMode:   "MODERN"
-	// 		forwardingSecret: "change-me-in-production"
-	// 	}
+		proxy: {
+			motd:             "Welcome to My Minecraft Network!"
+			maxPlayers:       200
+			forwardingMode:   "MODERN"
+			forwardingSecret: "change-me-in-production"
+		}
 
-	// 	servers: {
-	// 		lobby: {
-	// 			motd:       "Hub — Welcome!"
-	// 			maxPlayers: 100
-	// 			mode:       "adventure"
-	// 			pvp:        false
-	// 			difficulty: "peaceful"
-	// 			paper: {}
-	// 			storage: data: { type: "pvc", size: "10Gi" }
-	// 		}
-	// 		survival: {
-	// 			motd:       "Survival — Good Luck!"
-	// 			maxPlayers: 50
-	// 			difficulty: "hard"
-	// 			paper: {}
-	// 			storage: data: { type: "pvc", size: "20Gi" }
-	// 		}
-	// 	}
-	// }
+		servers: {
+			lobby: {
+				motd:       "Hub — Welcome!"
+				maxPlayers: 100
+				mode:       "adventure"
+				pvp:        false
+				difficulty: "peaceful"
+				paper: {}
+				storage: data: { type: "pvc", size: "10Gi" }
+			}
+			survival: {
+				motd:       "Survival — Good Luck!"
+				maxPlayers: 50
+				difficulty: "hard"
+				paper: {}
+				storage: data: { type: "pvc", size: "20Gi" }
+			}
+		}
+	}
 
 	// RCON password applied to all Minecraft instances.
 	// Use secretName+remoteKey to reference an existing K8s Secret:

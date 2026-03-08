@@ -1,5 +1,5 @@
 
---- # 9 resources rendered from 2 release(s)
+--- # 19 resources rendered from 5 release(s)
 # release: my-game-stack-creative
 # component: opm-secrets
 # transformer: opmodel.dev/providers/kubernetes/transformers/secret-transformer@v1
@@ -264,6 +264,364 @@ spec:
           persistentVolumeClaim:
             claimName: my-game-stack-creative-data
 ---
+# release: my-game-stack-lobby
+# component: opm-secrets
+# transformer: opmodel.dev/providers/kubernetes/transformers/secret-transformer@v1
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    app.kubernetes.io/name: opm-secrets
+    app.kubernetes.io/managed-by: open-platform-model
+    module-release.opmodel.dev/name: my-game-stack-lobby
+    module-release.opmodel.dev/uuid: 3d7d2b5b-f122-5513-bcca-b1e5c1f04653
+    module.opmodel.dev/name: minecraft-java
+    component.opmodel.dev/name: opm-secrets
+    resource.opmodel.dev/category: config
+    module.opmodel.dev/uuid: a477d8d4-72d0-5217-b7f3-2193e6bf3d4c
+    app.kubernetes.io/instance: opm-secrets
+    module.opmodel.dev/version: 0.3.0
+  name: my-game-stack-lobby-server-secrets
+  namespace: game-stack
+stringData:
+  rcon-password: change-me-in-production
+type: Opaque
+---
+# release: my-game-stack-lobby
+# component: server
+# transformer: opmodel.dev/providers/kubernetes/transformers/pvc-transformer@v1
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app.kubernetes.io/name: server
+    app.kubernetes.io/managed-by: open-platform-model
+    module-release.opmodel.dev/name: my-game-stack-lobby
+    module-release.opmodel.dev/uuid: 3d7d2b5b-f122-5513-bcca-b1e5c1f04653
+    module.opmodel.dev/name: minecraft-java
+    component.opmodel.dev/name: server
+    core.opmodel.dev/workload-type: stateful
+    module.opmodel.dev/uuid: a477d8d4-72d0-5217-b7f3-2193e6bf3d4c
+    app.kubernetes.io/instance: server
+    module.opmodel.dev/version: 0.3.0
+  name: my-game-stack-lobby-data
+  namespace: game-stack
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+---
+# release: my-game-stack-lobby
+# component: server
+# transformer: opmodel.dev/providers/kubernetes/transformers/service-transformer@v1
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: server
+    app.kubernetes.io/managed-by: open-platform-model
+    module-release.opmodel.dev/name: my-game-stack-lobby
+    module-release.opmodel.dev/uuid: 3d7d2b5b-f122-5513-bcca-b1e5c1f04653
+    module.opmodel.dev/name: minecraft-java
+    component.opmodel.dev/name: server
+    core.opmodel.dev/workload-type: stateful
+    module.opmodel.dev/uuid: a477d8d4-72d0-5217-b7f3-2193e6bf3d4c
+    app.kubernetes.io/instance: server
+    module.opmodel.dev/version: 0.3.0
+  name: my-game-stack-lobby-server
+  namespace: game-stack
+spec:
+  ports:
+    - name: metrics
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    - name: minecraft
+      port: 25565
+      protocol: TCP
+      targetPort: 25565
+  selector:
+    app.kubernetes.io/name: server
+    module-release.opmodel.dev/name: my-game-stack-lobby
+    component.opmodel.dev/name: server
+    core.opmodel.dev/workload-type: stateful
+  type: ClusterIP
+---
+# release: my-game-stack-lobby
+# component: server
+# transformer: opmodel.dev/providers/kubernetes/transformers/statefulset-transformer@v1
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/name: server
+    app.kubernetes.io/managed-by: open-platform-model
+    module-release.opmodel.dev/name: my-game-stack-lobby
+    module-release.opmodel.dev/uuid: 3d7d2b5b-f122-5513-bcca-b1e5c1f04653
+    module.opmodel.dev/name: minecraft-java
+    component.opmodel.dev/name: server
+    core.opmodel.dev/workload-type: stateful
+    module.opmodel.dev/uuid: a477d8d4-72d0-5217-b7f3-2193e6bf3d4c
+    app.kubernetes.io/instance: server
+    module.opmodel.dev/version: 0.3.0
+  name: my-game-stack-lobby-server
+  namespace: game-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: server
+      module-release.opmodel.dev/name: my-game-stack-lobby
+      component.opmodel.dev/name: server
+      core.opmodel.dev/workload-type: stateful
+  serviceName: my-game-stack-lobby-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: server
+        module-release.opmodel.dev/name: my-game-stack-lobby
+        component.opmodel.dev/name: server
+        core.opmodel.dev/workload-type: stateful
+    spec:
+      containers:
+        - env:
+            - name: ENABLE_RCON
+              value: "true"
+            - name: EULA
+              value: "true"
+            - name: RCON_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: rcon-password
+                  name: my-game-stack-lobby-server-secrets
+            - name: RCON_PORT
+              value: "25575"
+            - name: TYPE
+              value: PAPER
+            - name: USE_AIKAR_FLAGS
+              value: "true"
+            - name: VERSION
+              value: LATEST
+            - name: MAX_PLAYERS
+              value: "10"
+            - name: DIFFICULTY
+              value: normal
+            - name: MODE
+              value: survival
+            - name: PVP
+              value: "true"
+            - name: ENABLE_COMMAND_BLOCK
+              value: "false"
+            - name: VIEW_DISTANCE
+              value: "10"
+            - name: ALLOW_NETHER
+              value: "true"
+            - name: ANNOUNCE_PLAYER_ACHIEVEMENTS
+              value: "true"
+            - name: FORCE_GAMEMODE
+              value: "false"
+            - name: GENERATE_STRUCTURES
+              value: "true"
+            - name: HARDCORE
+              value: "false"
+            - name: MAX_BUILD_HEIGHT
+              value: "256"
+            - name: MAX_TICK_TIME
+              value: "60000"
+            - name: SPAWN_ANIMALS
+              value: "true"
+            - name: SPAWN_MONSTERS
+              value: "true"
+            - name: SPAWN_NPCS
+              value: "true"
+            - name: SPAWN_PROTECTION
+              value: "0"
+            - name: LEVEL_TYPE
+              value: DEFAULT
+            - name: LEVEL
+              value: world
+            - name: ONLINE_MODE
+              value: "false"
+            - name: ENFORCE_SECURE_PROFILE
+              value: "true"
+            - name: OVERRIDE_SERVER_PROPERTIES
+              value: "true"
+            - name: MEMORY
+              value: 2G
+          image: itzg/minecraft-server:java21
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            exec:
+              command:
+                - mc-monitor
+                - status
+                - --port
+                - "25565"
+            failureThreshold: 3
+            periodSeconds: 30
+            timeoutSeconds: 5
+          name: server
+          ports:
+            - containerPort: 25565
+              name: minecraft
+              protocol: TCP
+            - containerPort: 25575
+              name: rcon
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - mc-monitor
+                - status
+                - --port
+                - "25565"
+            failureThreshold: 3
+            periodSeconds: 10
+            timeoutSeconds: 3
+          startupProbe:
+            exec:
+              command:
+                - mc-monitor
+                - status
+                - --port
+                - "25565"
+            failureThreshold: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - mountPath: /data
+              name: data
+        - command:
+            - /mc-monitor
+            - export-for-prometheus
+          env:
+            - name: EXPORT_SERVERS
+              value: my-game-stack-lobby-server:25565
+            - name: EXPORT_PORT
+              value: "8080"
+            - name: TIMEOUT
+              value: 1m0s
+          image: itzg/mc-monitor:0.16.1
+          imagePullPolicy: IfNotPresent
+          name: mc-monitor
+          ports:
+            - containerPort: 8080
+              name: metrics
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 100m
+              memory: 64Mi
+            requests:
+              cpu: 10m
+              memory: 32Mi
+      restartPolicy: Always
+      securityContext:
+        runAsGroup: 3000
+        runAsNonRoot: true
+        runAsUser: 1000
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: my-game-stack-lobby-data
+---
+# release: my-game-stack-proxy
+# component: proxy
+# transformer: opmodel.dev/providers/kubernetes/transformers/deployment-transformer@v1
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: proxy
+    app.kubernetes.io/managed-by: open-platform-model
+    module-release.opmodel.dev/name: my-game-stack-proxy
+    module-release.opmodel.dev/uuid: a52acf1e-062f-52a2-97c8-c2b4993d7b08
+    module.opmodel.dev/name: velocity-proxy
+    component.opmodel.dev/name: proxy
+    core.opmodel.dev/workload-type: stateless
+    module.opmodel.dev/uuid: 2478353c-9c9a-5224-ba7b-83f1a1bfc3b1
+    app.kubernetes.io/instance: proxy
+    module.opmodel.dev/version: 0.1.0
+  name: my-game-stack-proxy-proxy
+  namespace: game-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: proxy
+      module-release.opmodel.dev/name: my-game-stack-proxy
+      component.opmodel.dev/name: proxy
+      core.opmodel.dev/workload-type: stateless
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: proxy
+        module-release.opmodel.dev/name: my-game-stack-proxy
+        component.opmodel.dev/name: proxy
+        core.opmodel.dev/workload-type: stateless
+    spec:
+      containers:
+        - env:
+            - name: TYPE
+              value: VELOCITY
+            - name: MOTD
+              value: Welcome to My Minecraft Network!
+            - name: ONLINE_MODE
+              value: "true"
+            - name: MAX_PLAYERS
+              value: "200"
+            - name: VELOCITY_FORWARDING_MODE
+              value: MODERN
+            - name: VELOCITY_FORWARDING_SECRET
+              value: change-me-in-production
+          image: itzg/mc-proxy:latest
+          imagePullPolicy: IfNotPresent
+          name: proxy
+          ports:
+            - containerPort: 25577
+              name: minecraft
+              protocol: TCP
+      restartPolicy: Always
+      securityContext:
+        runAsGroup: 3000
+        runAsNonRoot: true
+        runAsUser: 1000
+---
+# release: my-game-stack-proxy
+# component: proxy
+# transformer: opmodel.dev/providers/kubernetes/transformers/service-transformer@v1
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: proxy
+    app.kubernetes.io/managed-by: open-platform-model
+    module-release.opmodel.dev/name: my-game-stack-proxy
+    module-release.opmodel.dev/uuid: a52acf1e-062f-52a2-97c8-c2b4993d7b08
+    module.opmodel.dev/name: velocity-proxy
+    component.opmodel.dev/name: proxy
+    core.opmodel.dev/workload-type: stateless
+    module.opmodel.dev/uuid: 2478353c-9c9a-5224-ba7b-83f1a1bfc3b1
+    app.kubernetes.io/instance: proxy
+    module.opmodel.dev/version: 0.1.0
+  name: my-game-stack-proxy-proxy
+  namespace: game-stack
+spec:
+  ports:
+    - name: minecraft
+      port: 25577
+      protocol: TCP
+      targetPort: 25577
+  selector:
+    app.kubernetes.io/name: proxy
+    module-release.opmodel.dev/name: my-game-stack-proxy
+    component.opmodel.dev/name: proxy
+    core.opmodel.dev/workload-type: stateless
+  type: LoadBalancer
+---
 # release: my-game-stack-router
 # component: rbac
 # transformer: opmodel.dev/providers/kubernetes/transformers/role-transformer@v1
@@ -365,6 +723,7 @@ spec:
       containers:
         - args:
             - -mapping=creative.mc.example.com=my-game-stack-creative-server.game-stack.svc:25565
+            - -mapping=play.mc.example.com=my-game-stack-proxy-proxy.game-stack.svc:25577
           env:
             - name: PORT
               value: "25565"
@@ -434,4 +793,268 @@ metadata:
     module.opmodel.dev/version: 0.1.0
   name: mc-router
   namespace: game-stack
+---
+# release: my-game-stack-survival
+# component: opm-secrets
+# transformer: opmodel.dev/providers/kubernetes/transformers/secret-transformer@v1
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    app.kubernetes.io/name: opm-secrets
+    app.kubernetes.io/managed-by: open-platform-model
+    module-release.opmodel.dev/name: my-game-stack-survival
+    module-release.opmodel.dev/uuid: b4797730-f377-507d-8907-68b8c08039d1
+    module.opmodel.dev/name: minecraft-java
+    component.opmodel.dev/name: opm-secrets
+    resource.opmodel.dev/category: config
+    module.opmodel.dev/uuid: a477d8d4-72d0-5217-b7f3-2193e6bf3d4c
+    app.kubernetes.io/instance: opm-secrets
+    module.opmodel.dev/version: 0.3.0
+  name: my-game-stack-survival-server-secrets
+  namespace: game-stack
+stringData:
+  rcon-password: change-me-in-production
+type: Opaque
+---
+# release: my-game-stack-survival
+# component: server
+# transformer: opmodel.dev/providers/kubernetes/transformers/pvc-transformer@v1
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app.kubernetes.io/name: server
+    app.kubernetes.io/managed-by: open-platform-model
+    module-release.opmodel.dev/name: my-game-stack-survival
+    module-release.opmodel.dev/uuid: b4797730-f377-507d-8907-68b8c08039d1
+    module.opmodel.dev/name: minecraft-java
+    component.opmodel.dev/name: server
+    core.opmodel.dev/workload-type: stateful
+    module.opmodel.dev/uuid: a477d8d4-72d0-5217-b7f3-2193e6bf3d4c
+    app.kubernetes.io/instance: server
+    module.opmodel.dev/version: 0.3.0
+  name: my-game-stack-survival-data
+  namespace: game-stack
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard
+---
+# release: my-game-stack-survival
+# component: server
+# transformer: opmodel.dev/providers/kubernetes/transformers/service-transformer@v1
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: server
+    app.kubernetes.io/managed-by: open-platform-model
+    module-release.opmodel.dev/name: my-game-stack-survival
+    module-release.opmodel.dev/uuid: b4797730-f377-507d-8907-68b8c08039d1
+    module.opmodel.dev/name: minecraft-java
+    component.opmodel.dev/name: server
+    core.opmodel.dev/workload-type: stateful
+    module.opmodel.dev/uuid: a477d8d4-72d0-5217-b7f3-2193e6bf3d4c
+    app.kubernetes.io/instance: server
+    module.opmodel.dev/version: 0.3.0
+  name: my-game-stack-survival-server
+  namespace: game-stack
+spec:
+  ports:
+    - name: metrics
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    - name: minecraft
+      port: 25565
+      protocol: TCP
+      targetPort: 25565
+  selector:
+    app.kubernetes.io/name: server
+    module-release.opmodel.dev/name: my-game-stack-survival
+    component.opmodel.dev/name: server
+    core.opmodel.dev/workload-type: stateful
+  type: ClusterIP
+---
+# release: my-game-stack-survival
+# component: server
+# transformer: opmodel.dev/providers/kubernetes/transformers/statefulset-transformer@v1
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/name: server
+    app.kubernetes.io/managed-by: open-platform-model
+    module-release.opmodel.dev/name: my-game-stack-survival
+    module-release.opmodel.dev/uuid: b4797730-f377-507d-8907-68b8c08039d1
+    module.opmodel.dev/name: minecraft-java
+    component.opmodel.dev/name: server
+    core.opmodel.dev/workload-type: stateful
+    module.opmodel.dev/uuid: a477d8d4-72d0-5217-b7f3-2193e6bf3d4c
+    app.kubernetes.io/instance: server
+    module.opmodel.dev/version: 0.3.0
+  name: my-game-stack-survival-server
+  namespace: game-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: server
+      module-release.opmodel.dev/name: my-game-stack-survival
+      component.opmodel.dev/name: server
+      core.opmodel.dev/workload-type: stateful
+  serviceName: my-game-stack-survival-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: server
+        module-release.opmodel.dev/name: my-game-stack-survival
+        component.opmodel.dev/name: server
+        core.opmodel.dev/workload-type: stateful
+    spec:
+      containers:
+        - env:
+            - name: ENABLE_RCON
+              value: "true"
+            - name: EULA
+              value: "true"
+            - name: RCON_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: rcon-password
+                  name: my-game-stack-survival-server-secrets
+            - name: RCON_PORT
+              value: "25575"
+            - name: TYPE
+              value: PAPER
+            - name: USE_AIKAR_FLAGS
+              value: "true"
+            - name: VERSION
+              value: LATEST
+            - name: MAX_PLAYERS
+              value: "10"
+            - name: DIFFICULTY
+              value: normal
+            - name: MODE
+              value: survival
+            - name: PVP
+              value: "true"
+            - name: ENABLE_COMMAND_BLOCK
+              value: "false"
+            - name: VIEW_DISTANCE
+              value: "10"
+            - name: ALLOW_NETHER
+              value: "true"
+            - name: ANNOUNCE_PLAYER_ACHIEVEMENTS
+              value: "true"
+            - name: FORCE_GAMEMODE
+              value: "false"
+            - name: GENERATE_STRUCTURES
+              value: "true"
+            - name: HARDCORE
+              value: "false"
+            - name: MAX_BUILD_HEIGHT
+              value: "256"
+            - name: MAX_TICK_TIME
+              value: "60000"
+            - name: SPAWN_ANIMALS
+              value: "true"
+            - name: SPAWN_MONSTERS
+              value: "true"
+            - name: SPAWN_NPCS
+              value: "true"
+            - name: SPAWN_PROTECTION
+              value: "0"
+            - name: LEVEL_TYPE
+              value: DEFAULT
+            - name: LEVEL
+              value: world
+            - name: ONLINE_MODE
+              value: "false"
+            - name: ENFORCE_SECURE_PROFILE
+              value: "true"
+            - name: OVERRIDE_SERVER_PROPERTIES
+              value: "true"
+            - name: MEMORY
+              value: 2G
+          image: itzg/minecraft-server:java21
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            exec:
+              command:
+                - mc-monitor
+                - status
+                - --port
+                - "25565"
+            failureThreshold: 3
+            periodSeconds: 30
+            timeoutSeconds: 5
+          name: server
+          ports:
+            - containerPort: 25565
+              name: minecraft
+              protocol: TCP
+            - containerPort: 25575
+              name: rcon
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - mc-monitor
+                - status
+                - --port
+                - "25565"
+            failureThreshold: 3
+            periodSeconds: 10
+            timeoutSeconds: 3
+          startupProbe:
+            exec:
+              command:
+                - mc-monitor
+                - status
+                - --port
+                - "25565"
+            failureThreshold: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - mountPath: /data
+              name: data
+        - command:
+            - /mc-monitor
+            - export-for-prometheus
+          env:
+            - name: EXPORT_SERVERS
+              value: my-game-stack-survival-server:25565
+            - name: EXPORT_PORT
+              value: "8080"
+            - name: TIMEOUT
+              value: 1m0s
+          image: itzg/mc-monitor:0.16.1
+          imagePullPolicy: IfNotPresent
+          name: mc-monitor
+          ports:
+            - containerPort: 8080
+              name: metrics
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 100m
+              memory: 64Mi
+            requests:
+              cpu: 10m
+              memory: 32Mi
+      restartPolicy: Always
+      securityContext:
+        runAsGroup: 3000
+        runAsNonRoot: true
+        runAsUser: 1000
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: my-game-stack-survival-data
 ---
