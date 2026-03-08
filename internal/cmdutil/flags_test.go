@@ -143,6 +143,80 @@ func TestReleaseSelectorFlags_LogName(t *testing.T) {
 	}
 }
 
+func TestReleaseFileFlags_AddTo(t *testing.T) {
+	var rff ReleaseFileFlags
+	cmd := &cobra.Command{Use: "test"}
+	rff.AddTo(cmd)
+
+	modFlag := cmd.Flags().Lookup("module")
+	require.NotNil(t, modFlag)
+	assert.Equal(t, "", modFlag.DefValue)
+
+	provFlag := cmd.Flags().Lookup("provider")
+	require.NotNil(t, provFlag)
+	assert.Equal(t, "", provFlag.DefValue)
+}
+
+func TestResolveReleaseIdentifier(t *testing.T) {
+	tests := []struct {
+		name     string
+		arg      string
+		wantName string
+		wantUUID string
+	}{
+		{
+			name:     "plain release name",
+			arg:      "jellyfin",
+			wantName: "jellyfin",
+			wantUUID: "",
+		},
+		{
+			name:     "release name with hyphens",
+			arg:      "my-app-prod",
+			wantName: "my-app-prod",
+			wantUUID: "",
+		},
+		{
+			name:     "valid UUID",
+			arg:      "550e8400-e29b-41d4-a716-446655440000",
+			wantName: "",
+			wantUUID: "550e8400-e29b-41d4-a716-446655440000",
+		},
+		{
+			name:     "UUID with all hex chars",
+			arg:      "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+			wantName: "",
+			wantUUID: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		},
+		{
+			name:     "uppercase UUID is treated as name (pattern is lowercase only)",
+			arg:      "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+			wantName: "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+			wantUUID: "",
+		},
+		{
+			name:     "partial UUID-like string is treated as name",
+			arg:      "550e8400-e29b-41d4",
+			wantName: "550e8400-e29b-41d4",
+			wantUUID: "",
+		},
+		{
+			name:     "empty string is treated as name",
+			arg:      "",
+			wantName: "",
+			wantUUID: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			name, uuid := ResolveReleaseIdentifier(tt.arg)
+			assert.Equal(t, tt.wantName, name)
+			assert.Equal(t, tt.wantUUID, uuid)
+		})
+	}
+}
+
 func TestFlagGroupComposition(t *testing.T) {
 	// Verify RenderFlags + K8sFlags can coexist on the same command
 	var rf RenderFlags

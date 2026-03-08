@@ -8,6 +8,7 @@ import (
 
 	cmdconfig "github.com/opmodel/cli/internal/cmd/config"
 	cmdmod "github.com/opmodel/cli/internal/cmd/mod"
+	cmdrelease "github.com/opmodel/cli/internal/cmd/release"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -45,6 +46,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(NewVersionCmd(&cfg))
 	rootCmd.AddCommand(cmdmod.NewModCmd(&cfg))
 	rootCmd.AddCommand(cmdconfig.NewConfigCmd(&cfg))
+	rootCmd.AddCommand(cmdrelease.NewReleaseCmd(&cfg))
 
 	return rootCmd
 }

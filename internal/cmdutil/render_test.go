@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/opmodel/cli/internal/config"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/pkg/modulerelease"
 	"github.com/stretchr/testify/assert"
@@ -75,4 +76,31 @@ func TestRenderResult_HasWarnings(t *testing.T) {
 func TestRenderResult_ResourceCount(t *testing.T) {
 	r := &RenderResult{}
 	assert.Equal(t, 0, r.ResourceCount())
+}
+
+func TestRenderFromReleaseFile_NilConfig(t *testing.T) {
+	_, err := RenderFromReleaseFile(context.Background(), RenderFromReleaseFileOpts{
+		ReleaseFilePath: "release.cue",
+		Config:          nil,
+		K8sConfig:       nil,
+	})
+	require.Error(t, err)
+	var exitErr *oerrors.ExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, oerrors.ExitGeneralError, exitErr.Code)
+	assert.Contains(t, exitErr.Error(), "configuration not loaded")
+}
+
+func TestRenderFromReleaseFile_NilK8sConfig(t *testing.T) {
+	// Config set but K8sConfig nil — should fail with kubernetes config error.
+	_, err := RenderFromReleaseFile(context.Background(), RenderFromReleaseFileOpts{
+		ReleaseFilePath: "release.cue",
+		Config:          &config.GlobalConfig{},
+		K8sConfig:       nil,
+	})
+	require.Error(t, err)
+	var exitErr *oerrors.ExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, oerrors.ExitGeneralError, exitErr.Code)
+	assert.Contains(t, exitErr.Error(), "kubernetes config not resolved")
 }
