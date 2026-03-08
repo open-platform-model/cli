@@ -50,7 +50,6 @@ func TestModStatusCmd_FlagsExist(t *testing.T) {
 	assert.NotNil(t, f.Lookup("release-name"))
 	assert.NotNil(t, f.Lookup("release-id"))
 	assert.NotNil(t, f.Lookup("output"))
-	assert.NotNil(t, f.Lookup("watch"))
 	assert.NotNil(t, f.Lookup("kubeconfig"))
 	assert.NotNil(t, f.Lookup("context"))
 	assert.NotNil(t, f.Lookup("verbose"), "--verbose flag should exist")

@@ -85,7 +85,6 @@ func TestNewReleaseStatusCmd_Flags(t *testing.T) {
 	cmd := NewReleaseStatusCmd(&config.GlobalConfig{})
 	assert.NotNil(t, cmd.Flags().Lookup("namespace"), "--namespace/-n flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("output"), "--output/-o flag should be registered")
-	assert.NotNil(t, cmd.Flags().Lookup("watch"), "--watch flag should be registered")
 }
 
 func TestNewReleaseDeleteCmd(t *testing.T) {

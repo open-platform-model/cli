@@ -3,10 +3,6 @@ package mod
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -25,7 +21,6 @@ func NewModStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
 	// Status-specific flags (local to this command)
 	var (
 		outputFlag  string
-		watchFlag   bool
 		verboseFlag bool
 	)
 
@@ -64,12 +59,9 @@ Examples:
   opm mod status --release-name my-app -n production --verbose
 
   # Show status in JSON format
-  opm mod status --release-name my-app -n production -o json
-
-  # Watch status continuously
-  opm mod status --release-name my-app -n production --watch`,
+  opm mod status --release-name my-app -n production -o json`,
 		RunE: func(c *cobra.Command, args []string) error {
-			return runStatus(args, cfg, &rsf, &kf, outputFlag, watchFlag, verboseFlag)
+			return runStatus(args, cfg, &rsf, &kf, outputFlag, verboseFlag)
 		},
 	}
 
@@ -79,8 +71,6 @@ Examples:
 	// Status-specific flags
 	c.Flags().StringVarP(&outputFlag, "output", "o", "table",
 		"Output format (table, wide, yaml, json)")
-	c.Flags().BoolVar(&watchFlag, "watch", false,
-		"Watch status continuously (poll every 2s)")
 	c.Flags().BoolVar(&verboseFlag, "verbose", false,
 		"Show pod-level diagnostics for unhealthy workloads")
 
@@ -88,7 +78,7 @@ Examples:
 }
 
 // runStatus executes the status command.
-func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, outputFmt string, watch, verbose bool) error {
+func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, outputFmt string, verbose bool) error {
 	ctx := context.Background()
 
 	// Validate release selector flags
@@ -185,18 +175,11 @@ func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 		})
 	}
 
-	// If watch mode, run in loop
-	if watch {
-		return runStatusWatch(ctx, k8sClient, statusOpts, logName)
-	}
-
-	// Single run
-	return fetchAndPrintStatus(ctx, k8sClient, statusOpts, logName, false)
+	return fetchAndPrintStatus(ctx, k8sClient, statusOpts, logName)
 }
 
 // fetchAndPrintStatus fetches and displays the current status.
-// forWatch controls whether table format is forced (true in watch mode).
-func fetchAndPrintStatus(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string, forWatch bool) error {
+func fetchAndPrintStatus(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string) error {
 	releaseLog := output.ReleaseLogger(logName)
 
 	result, err := kubernetes.GetReleaseStatus(ctx, client, opts)
@@ -209,16 +192,10 @@ func fetchAndPrintStatus(ctx context.Context, client *kubernetes.Client, opts ku
 		return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
-	var formatted string
-	if forWatch {
-		// In watch mode, always use table format
-		formatted = kubernetes.FormatStatusTable(result)
-	} else {
-		formatted, err = kubernetes.FormatStatus(result, opts.OutputFormat)
-		if err != nil {
-			releaseLog.Error("formatting status", "error", err)
-			return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err, Printed: true}
-		}
+	formatted, err := kubernetes.FormatStatus(result, opts.OutputFormat)
+	if err != nil {
+		releaseLog.Error("formatting status", "error", err)
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err, Printed: true}
 	}
 
 	output.Println(formatted)
@@ -229,39 +206,4 @@ func fetchAndPrintStatus(ctx context.Context, client *kubernetes.Client, opts ku
 	}
 
 	return nil
-}
-
-// runStatusWatch runs status in continuous watch mode, polling every 2 seconds.
-func runStatusWatch(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string) error {
-	// Set up signal handling for clean exit
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-sigCh
-		cancel()
-	}()
-
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-
-	// Initial display
-	if err := fetchAndPrintStatus(ctx, client, opts, logName, true); err != nil {
-		return err
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-ticker.C:
-			// Clear screen
-			output.ClearScreen()
-			if err := fetchAndPrintStatus(ctx, client, opts, logName, true); err != nil {
-				return err
-			}
-		}
-	}
 }

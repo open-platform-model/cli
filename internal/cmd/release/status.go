@@ -3,10 +3,6 @@ package release
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -24,7 +20,6 @@ func NewReleaseStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
 
 	var (
 		outputFlag  string
-		watchFlag   bool
 		verboseFlag bool
 	)
 
@@ -50,27 +45,23 @@ Examples:
   # Identify by name
   opm release status jellyfin -n media
 
-  # Watch status continuously
-  opm release status jellyfin -n media --watch
-
   # Wide output
   opm release status jellyfin -n media -o wide`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runReleaseStatus(args[0], cfg, &kf, namespace, outputFlag, watchFlag, verboseFlag)
+			return runReleaseStatus(args[0], cfg, &kf, namespace, outputFlag, verboseFlag)
 		},
 	}
 
 	kf.AddTo(c)
 	c.Flags().StringVarP(&namespace, "namespace", "n", "", "Target namespace (default: from config)")
 	c.Flags().StringVarP(&outputFlag, "output", "o", "table", "Output format (table, wide, yaml, json)")
-	c.Flags().BoolVar(&watchFlag, "watch", false, "Watch status continuously (poll every 2s)")
 	c.Flags().BoolVar(&verboseFlag, "verbose", false, "Show pod-level diagnostics for unhealthy workloads")
 
 	return c
 }
 
-func runReleaseStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag, outputFmt string, watch, verbose bool) error {
+func runReleaseStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag, outputFmt string, verbose bool) error {
 	ctx := context.Background()
 
 	ra, err := cmdutil.ResolveReleaseArg(identifier, cfg)
@@ -162,13 +153,10 @@ func runReleaseStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 		})
 	}
 
-	if watch {
-		return runReleaseStatusWatch(ctx, k8sClient, statusOpts, logName)
-	}
-	return fetchAndPrintReleaseStatus(ctx, k8sClient, statusOpts, logName, false)
+	return fetchAndPrintReleaseStatus(ctx, k8sClient, statusOpts, logName)
 }
 
-func fetchAndPrintReleaseStatus(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string, forWatch bool) error {
+func fetchAndPrintReleaseStatus(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string) error {
 	releaseLog := output.ReleaseLogger(logName)
 
 	result, err := kubernetes.GetReleaseStatus(ctx, client, opts)
@@ -181,15 +169,10 @@ func fetchAndPrintReleaseStatus(ctx context.Context, client *kubernetes.Client, 
 		return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
-	var formatted string
-	if forWatch {
-		formatted = kubernetes.FormatStatusTable(result)
-	} else {
-		formatted, err = kubernetes.FormatStatus(result, opts.OutputFormat)
-		if err != nil {
-			releaseLog.Error("formatting status", "error", err)
-			return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err, Printed: true}
-		}
+	formatted, err := kubernetes.FormatStatus(result, opts.OutputFormat)
+	if err != nil {
+		releaseLog.Error("formatting status", "error", err)
+		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err, Printed: true}
 	}
 	output.Println(formatted)
 
@@ -197,31 +180,4 @@ func fetchAndPrintReleaseStatus(ctx context.Context, client *kubernetes.Client, 
 		return &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: fmt.Errorf("release %q: %d resource(s) not ready", opts.ReleaseName, result.Summary.NotReady), Printed: true}
 	}
 	return nil
-}
-
-func runReleaseStatusWatch(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	go func() { <-sigCh; cancel() }()
-
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-
-	if err := fetchAndPrintReleaseStatus(ctx, client, opts, logName, true); err != nil {
-		return err
-	}
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-ticker.C:
-			output.ClearScreen()
-			if err := fetchAndPrintReleaseStatus(ctx, client, opts, logName, true); err != nil {
-				return err
-			}
-		}
-	}
 }
