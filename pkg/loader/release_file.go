@@ -1,0 +1,214 @@
+package loader
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/load"
+)
+
+// LoadReleaseFile loads a #ModuleRelease or #BundleRelease from a standalone
+// .cue file. CUE imports (including registry module references) are resolved
+// via load.Instances() using the file's parent directory for cue.mod resolution.
+//
+// The returned cue.Value may have #module unfilled if the release file does not
+// import a module. The caller is responsible for filling #module via FillPath
+// when --module is provided.
+//
+// Returns the evaluated CUE value and the directory used for CUE resolution.
+func LoadReleaseFile(ctx *cue.Context, filePath, registry string) (cue.Value, string, error) {
+	var err error
+	filePath, err = resolveReleaseFile(filePath)
+	if err != nil {
+		return cue.Value{}, "", err
+	}
+
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return cue.Value{}, "", fmt.Errorf("resolving release file path: %w", err)
+	}
+
+	parentDir := filepath.Dir(absPath)
+
+	// Set CUE_REGISTRY env var if registry is non-empty, restoring original after.
+	if registry != "" {
+		orig, hadOrig := os.LookupEnv("CUE_REGISTRY")
+		if err := os.Setenv("CUE_REGISTRY", registry); err != nil {
+			return cue.Value{}, "", fmt.Errorf("setting CUE_REGISTRY: %w", err)
+		}
+		defer func() {
+			if hadOrig {
+				_ = os.Setenv("CUE_REGISTRY", orig)
+			} else {
+				_ = os.Unsetenv("CUE_REGISTRY")
+			}
+		}()
+	}
+
+	cfg := &load.Config{
+		Dir: parentDir,
+	}
+	instances := load.Instances([]string{filepath.Base(absPath)}, cfg)
+	if len(instances) == 0 {
+		return cue.Value{}, "", fmt.Errorf("no CUE instances found for %s", absPath)
+	}
+	if instances[0].Err != nil {
+		return cue.Value{}, "", fmt.Errorf("loading release file: %w", instances[0].Err)
+	}
+
+	val := ctx.BuildInstance(instances[0])
+	if err := val.Err(); err != nil {
+		return cue.Value{}, "", fmt.Errorf("building release file: %w", err)
+	}
+
+	return val, parentDir, nil
+}
+
+// LoadReleaseFileWithValues loads a #ModuleRelease or #BundleRelease from a
+// release .cue file and a separate values file, combining them as a single CUE
+// instance. This is the directory/split-files variant of LoadReleaseFile.
+//
+// filePath may be a directory (release.cue is assumed) or a direct .cue path.
+// valuesFile is the path to the values CUE file. If empty, values.cue in the
+// same directory as the release file is used; an error is returned if it does
+// not exist.
+//
+// registry behaviour is identical to LoadReleaseFile.
+func LoadReleaseFileWithValues(ctx *cue.Context, filePath, valuesFile, registry string) (cue.Value, string, error) {
+	var err error
+	filePath, err = resolveReleaseFile(filePath)
+	if err != nil {
+		return cue.Value{}, "", err
+	}
+
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return cue.Value{}, "", fmt.Errorf("resolving release file path: %w", err)
+	}
+	parentDir := filepath.Dir(absPath)
+
+	// Resolve values file — default to values.cue next to the release file.
+	if valuesFile == "" {
+		valuesFile = filepath.Join(parentDir, "values.cue")
+	}
+	absValues, err := filepath.Abs(valuesFile)
+	if err != nil {
+		return cue.Value{}, "", fmt.Errorf("resolving values file path: %w", err)
+	}
+	if _, statErr := os.Stat(absValues); os.IsNotExist(statErr) {
+		return cue.Value{}, "", fmt.Errorf("values file %q not found", valuesFile)
+	} else if statErr != nil {
+		return cue.Value{}, "", fmt.Errorf("accessing values file %q: %w", valuesFile, statErr)
+	}
+
+	// Set CUE_REGISTRY env var if registry is non-empty, restoring original after.
+	if registry != "" {
+		orig, hadOrig := os.LookupEnv("CUE_REGISTRY")
+		if err := os.Setenv("CUE_REGISTRY", registry); err != nil {
+			return cue.Value{}, "", fmt.Errorf("setting CUE_REGISTRY: %w", err)
+		}
+		defer func() {
+			if hadOrig {
+				_ = os.Setenv("CUE_REGISTRY", orig)
+			} else {
+				_ = os.Unsetenv("CUE_REGISTRY")
+			}
+		}()
+	}
+
+	cfg := &load.Config{
+		Dir: parentDir,
+	}
+	releaseBase := filepath.Base(absPath)
+	valuesBase := filepath.Base(absValues)
+	instances := load.Instances([]string{releaseBase, valuesBase}, cfg)
+	if len(instances) == 0 {
+		return cue.Value{}, "", fmt.Errorf("no CUE instances found for %s + %s", releaseBase, valuesBase)
+	}
+	if instances[0].Err != nil {
+		return cue.Value{}, "", fmt.Errorf("loading release package: %w", instances[0].Err)
+	}
+
+	val := ctx.BuildInstance(instances[0])
+	if err := val.Err(); err != nil {
+		return cue.Value{}, "", fmt.Errorf("building release package: %w", err)
+	}
+
+	return val, parentDir, nil
+}
+
+// LoadModulePackage loads a module CUE package from a directory and returns
+// the raw cue.Value. Used by the --module flag to inject a local module into
+// a release file that does not import one from a registry.
+func LoadModulePackage(ctx *cue.Context, dirPath string) (cue.Value, error) {
+	absDir, err := filepath.Abs(dirPath)
+	if err != nil {
+		return cue.Value{}, fmt.Errorf("resolving module directory: %w", err)
+	}
+
+	info, err := os.Stat(absDir)
+	if err != nil {
+		return cue.Value{}, fmt.Errorf("accessing module directory %q: %w", absDir, err)
+	}
+	if !info.IsDir() {
+		return cue.Value{}, fmt.Errorf("module path %q is not a directory", absDir)
+	}
+
+	cfg := &load.Config{
+		Dir: absDir,
+	}
+	instances := load.Instances([]string{"."}, cfg)
+	if len(instances) == 0 {
+		return cue.Value{}, fmt.Errorf("no CUE instances found in %s", absDir)
+	}
+	if instances[0].Err != nil {
+		return cue.Value{}, fmt.Errorf("loading module package from %s: %w", absDir, instances[0].Err)
+	}
+
+	val := ctx.BuildInstance(instances[0])
+	if err := val.Err(); err != nil {
+		return cue.Value{}, fmt.Errorf("building module package from %s: %w", absDir, err)
+	}
+
+	return val, nil
+}
+
+// LoadReleasePackageWithValue loads a release CUE package (release.cue) and
+// unifies it with a pre-loaded CUE value (e.g. debugValues). This is used by
+// the debugValues path to avoid writing a temp file.
+//
+// The valuesVal is unified into the "values" path of the loaded release package.
+func LoadReleasePackageWithValue(ctx *cue.Context, releaseFile string, valuesVal cue.Value) (cue.Value, string, error) {
+	releaseFile, err := resolveReleaseFile(releaseFile)
+	if err != nil {
+		return cue.Value{}, "", err
+	}
+	releaseDir := filepath.Dir(releaseFile)
+	releaseBase := filepath.Base(releaseFile)
+
+	cfg := &load.Config{
+		Dir: releaseDir,
+	}
+	instances := load.Instances([]string{releaseBase}, cfg)
+	if len(instances) == 0 {
+		return cue.Value{}, "", fmt.Errorf("no CUE instances found for %s", releaseBase)
+	}
+	if instances[0].Err != nil {
+		return cue.Value{}, "", fmt.Errorf("loading release package: %w", instances[0].Err)
+	}
+
+	pkg := ctx.BuildInstance(instances[0])
+	if err := pkg.Err(); err != nil {
+		return cue.Value{}, "", fmt.Errorf("building release package: %w", err)
+	}
+
+	// Unify the release package with the provided values at the "values" path.
+	pkg = pkg.FillPath(cue.ParsePath("values"), valuesVal)
+	if err := pkg.Err(); err != nil {
+		return cue.Value{}, "", fmt.Errorf("filling values into release package: %w", err)
+	}
+
+	return pkg, releaseDir, nil
+}

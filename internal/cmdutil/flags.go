@@ -5,6 +5,7 @@ package cmdutil
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/spf13/cobra"
 )
@@ -93,4 +94,43 @@ func ResolveModulePath(args []string) string {
 		return args[0]
 	}
 	return "."
+}
+
+// ReleaseFileFlags holds flags specific to release-file-based rendering.
+type ReleaseFileFlags struct {
+	// Module is the path to a local module directory (--module flag).
+	// Used to fill #module in the release file when not imported from a registry.
+	Module string
+	// Provider is the provider name to use (--provider flag).
+	Provider string
+	// ValuesFile is the path to the values CUE file (-f/--values flag).
+	// When empty, values.cue next to the release file is used if it exists.
+	ValuesFile string
+}
+
+// AddTo registers the release file flags on the given cobra command.
+func (f *ReleaseFileFlags) AddTo(cmd *cobra.Command) {
+	cmd.Flags().StringVar(&f.Module, "module", "",
+		"Path to local module directory (fills #module in the release file)")
+	cmd.Flags().StringVar(&f.Provider, "provider", "",
+		"Provider to use (default: from config)")
+	cmd.Flags().StringVarP(&f.ValuesFile, "values", "f", "",
+		"Path to values file (default: values.cue next to the release file)")
+}
+
+// uuidPattern matches a UUID v4/v5: 8-4-4-4-12 lowercase hex digits.
+var uuidPattern = regexp.MustCompile(
+	`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`,
+)
+
+// ResolveReleaseIdentifier inspects a positional argument and returns either
+// a release name or a release UUID. Detection is based on the UUID v4/v5
+// pattern: 8-4-4-4-12 lowercase hex digits separated by dashes.
+//
+// Exactly one of the returned values will be non-empty.
+func ResolveReleaseIdentifier(arg string) (name, uuid string) {
+	if uuidPattern.MatchString(arg) {
+		return "", arg
+	}
+	return arg, ""
 }
