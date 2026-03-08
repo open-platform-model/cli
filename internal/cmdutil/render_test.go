@@ -5,15 +5,16 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/opmodel/cli/internal/core"
-	"github.com/opmodel/cli/internal/core/module"
-	"github.com/opmodel/cli/internal/core/modulerelease"
-	"github.com/opmodel/cli/internal/core/transformer"
-	oerrors "github.com/opmodel/cli/internal/errors"
-	"github.com/opmodel/cli/internal/pipeline"
+	oerrors "github.com/opmodel/cli/pkg/errors"
+	"github.com/opmodel/cli/pkg/modulerelease"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// mustReleaseMetadata creates a ReleaseMetadata for tests.
+func mustReleaseMetadata(name, namespace string) modulerelease.ReleaseMetadata {
+	return modulerelease.ReleaseMetadata{Name: name, Namespace: namespace}
+}
 
 func TestRenderModule_NilConfig(t *testing.T) {
 	_, err := RenderRelease(context.Background(), RenderReleaseOpts{
@@ -37,86 +38,41 @@ func TestResolveModulePath_Arg(t *testing.T) {
 	assert.Equal(t, "./my-module", ResolveModulePath([]string{"./my-module"}))
 }
 
-func TestShowRenderOutput_WithErrors(t *testing.T) {
-	// Create a RenderResult with errors
-	result := &pipeline.RenderResult{
-		Release: modulerelease.ReleaseMetadata{
-			Name:      "test-module",
-			Namespace: "default",
-		},
-		Module: module.ModuleMetadata{
-			Name: "test-module",
-		},
-		Errors: []error{
-			&pipeline.UnmatchedComponentError{
-				ComponentName: "web",
-			},
-		},
-	}
-
-	err := ShowRenderOutput(result, ShowOutputOpts{})
-
-	// Should return ExitError with ValidationError code
-	require.Error(t, err)
-	var exitErr *oerrors.ExitError
-	require.True(t, errors.As(err, &exitErr))
-	assert.Equal(t, oerrors.ExitValidationError, exitErr.Code)
-	assert.True(t, exitErr.Printed, "error should be marked as printed")
-}
-
 func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
-	// Create a RenderResult with no errors
-	result := &pipeline.RenderResult{
-		Release: modulerelease.ReleaseMetadata{
-			Name:      "test-module",
-			Namespace: "default",
-		},
-		Module: module.ModuleMetadata{
-			Name: "test-module",
-		},
-		MatchPlan: &transformer.TransformerMatchPlan{
-			Matches: []*transformer.TransformerMatch{
-				{
-					Matched: true,
-					Detail: &transformer.TransformerMatchDetail{
-						ComponentName:  "web",
-						TransformerFQN: "example.com/transformers@v1#DeploymentTransformer",
-						Reason:         "Matched: requiredResources[Container]",
-					},
-				},
-			},
-		},
-		Resources: []*core.Resource{},
-		Errors:    []error{},
+	// Create a RenderResult with no errors — ShowRenderOutput should succeed.
+	result := &RenderResult{
+		Release:  mustReleaseMetadata("test-module", "default"),
+		Warnings: []string{},
 	}
 
 	err := ShowRenderOutput(result, ShowOutputOpts{Verbose: false})
 
-	// Should not return an error
+	// Should not return an error.
 	assert.NoError(t, err)
 }
 
 func TestShowRenderOutput_Warnings(t *testing.T) {
-	// Create a RenderResult with warnings
-	result := &pipeline.RenderResult{
-		Release: modulerelease.ReleaseMetadata{
-			Name:      "test-module",
-			Namespace: "default",
-		},
-		Module: module.ModuleMetadata{
-			Name: "test-module",
-		},
-		MatchPlan: &transformer.TransformerMatchPlan{
-			Matches: []*transformer.TransformerMatch{},
-		},
-		Resources: []*core.Resource{},
-		Errors:    []error{},
-		Warnings:  []string{"deprecated transformer used", "unused values"},
+	// Create a RenderResult with warnings — should succeed (warnings are non-fatal).
+	result := &RenderResult{
+		Release:  mustReleaseMetadata("test-module", "default"),
+		Warnings: []string{"deprecated transformer used", "unused values"},
 	}
 
 	err := ShowRenderOutput(result, ShowOutputOpts{})
 
-	// Should not return an error (warnings are non-fatal)
+	// Should not return an error.
 	assert.NoError(t, err)
-	// Note: we don't capture the log output here, but the warning logging path is exercised
+}
+
+func TestRenderResult_HasWarnings(t *testing.T) {
+	r := &RenderResult{}
+	assert.False(t, r.HasWarnings())
+
+	r.Warnings = []string{"a warning"}
+	assert.True(t, r.HasWarnings())
+}
+
+func TestRenderResult_ResourceCount(t *testing.T) {
+	r := &RenderResult{}
+	assert.Equal(t, 0, r.ResourceCount())
 }

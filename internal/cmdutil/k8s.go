@@ -2,7 +2,7 @@ package cmdutil
 
 import (
 	"github.com/opmodel/cli/internal/config"
-	oerrors "github.com/opmodel/cli/internal/errors"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/internal/kubernetes"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )

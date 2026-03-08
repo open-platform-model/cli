@@ -3,250 +3,90 @@ package cmdutil
 import (
 	"bytes"
 	"fmt"
-	"io"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/core/transformer"
-	opmerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/internal/pipeline"
+	pkgerrors "github.com/opmodel/cli/pkg/errors"
 )
 
-// testTransformerRequirements is a simple implementation of transformer.TransformerRequirements for tests.
-type testTransformerRequirements struct {
-	fqn               string
-	requiredLabels    map[string]string
-	requiredResources []string
-	requiredTraits    []string
-}
-
-func (t *testTransformerRequirements) GetFQN() string                       { return t.fqn }
-func (t *testTransformerRequirements) GetRequiredLabels() map[string]string { return t.requiredLabels }
-func (t *testTransformerRequirements) GetRequiredResources() []string       { return t.requiredResources }
-func (t *testTransformerRequirements) GetRequiredTraits() []string          { return t.requiredTraits }
-
-func TestPrintValidationError_ReleaseValidationWithDetails(t *testing.T) {
-	// Setup: capture both log output and stderr
-	var logBuf bytes.Buffer
-	output.SetupLogging(output.LogConfig{})
-	output.SetLogWriter(&logBuf)
-
-	// Capture stderr (Details writes directly to stderr)
-	oldStderr := os.Stderr
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	os.Stderr = w
-
-	// Create a ValidationError with CUE details
-	relErr := &opmerrors.ValidationError{
-		Message: "value not concrete",
-		Details: "path.to.field:\n    conflicting values \"foo\" and \"bar\"",
-	}
-
-	PrintValidationError("render failed", relErr)
-
-	// Restore stderr and read captured output
-	w.Close()
-	os.Stderr = oldStderr
-	var stderrBuf bytes.Buffer
-	io.Copy(&stderrBuf, r)
-
-	logOutput := logBuf.String()
-	stderrOutput := stderrBuf.String()
-
-	// Should contain summary line in log output
-	assert.Contains(t, logOutput, "render failed", "should contain message")
-	assert.Contains(t, logOutput, "value not concrete", "should contain error message")
-
-	// Should contain CUE details in stderr
-	assert.Contains(t, stderrOutput, "path.to.field", "should contain CUE path")
-	assert.Contains(t, stderrOutput, "conflicting values", "should contain CUE error details")
-}
-
-func TestPrintValidationError_ReleaseValidationWithoutDetails(t *testing.T) {
-	// Setup: capture stderr output
+func TestPrintValidationError_ConfigError(t *testing.T) {
+	// Setup: capture log output.
 	var buf bytes.Buffer
 	output.SetupLogging(output.LogConfig{})
 	output.SetLogWriter(&buf)
 
-	// Create a ValidationError without CUE details
-	err := &opmerrors.ValidationError{
-		Message: "value not concrete",
-		Details: "", // empty details
+	// Create a ConfigError (with a nil RawError — simulates a gate error without CUE tree).
+	err := &pkgerrors.ConfigError{
+		Context: "module gate",
+		Name:    "test-module",
 	}
 
 	PrintValidationError("render failed", err)
 
 	got := buf.String()
-
-	// Should fall through to key-value format
 	assert.Contains(t, got, "render failed", "should contain message")
-	assert.Contains(t, got, "error", "should contain error key in key-value format")
 }
 
-func TestPrintValidationError_GenericError(t *testing.T) {
-	// Setup: capture stderr output
+func TestPrintValidationError_ValidationError(t *testing.T) {
+	// Setup: capture log output.
 	var buf bytes.Buffer
 	output.SetupLogging(output.LogConfig{})
 	output.SetLogWriter(&buf)
 
-	// Create a generic error
+	err := &pkgerrors.ValidationError{
+		Message: "value not concrete",
+		Details: "path.to.field:\n    conflicting values",
+	}
+
+	PrintValidationError("render failed", err)
+
+	got := buf.String()
+	assert.Contains(t, got, "render failed", "should contain message")
+	assert.Contains(t, got, "value not concrete", "should contain error message")
+}
+
+func TestPrintValidationError_GenericError(t *testing.T) {
+	// Setup: capture log output.
+	var buf bytes.Buffer
+	output.SetupLogging(output.LogConfig{})
+	output.SetLogWriter(&buf)
+
 	err := fmt.Errorf("something went wrong")
 
 	PrintValidationError("render failed", err)
 
 	got := buf.String()
-
-	// Should use key-value format
 	assert.Contains(t, got, "render failed", "should contain message")
-	assert.Contains(t, got, "error", "should contain error key")
 	assert.Contains(t, got, "something went wrong", "should contain error message")
 }
 
-func TestPrintRenderErrors_UnmatchedWithAvailable(t *testing.T) {
-	// Setup: capture stderr output
-	var buf bytes.Buffer
-	output.SetupLogging(output.LogConfig{})
-	output.SetLogWriter(&buf)
-
-	// Create an UnmatchedComponentError with Available transformers
-	errs := []error{
-		&pipeline.UnmatchedComponentError{
-			ComponentName: "database",
-			Available: []transformer.TransformerRequirements{
-				&testTransformerRequirements{
-					fqn:               "example.com/transformers@v1#PostgresTransformer",
-					requiredLabels:    map[string]string{"db-type": "postgres"},
-					requiredResources: []string{"opmodel.dev/resources/workload/database@v1"},
-					requiredTraits:    []string{"opmodel.dev/traits/workload/persistence@v1"},
-				},
-			},
-		},
+func TestWriteTransformerMatches_NilMatchPlan(t *testing.T) {
+	// Should not panic when MatchPlan is nil.
+	result := &RenderResult{
+		Release: mustReleaseMetadata("test", "default"),
 	}
-
-	PrintRenderErrors(errs)
-
-	got := buf.String()
-
-	// Should contain component name
-	assert.Contains(t, got, "database", "should contain component name")
-	assert.Contains(t, got, "no matching transformer", "should contain error message")
-
-	// Should list available transformers
-	assert.Contains(t, got, "Available transformers", "should show available transformers header")
-	assert.Contains(t, got, "PostgresTransformer", "should show transformer FQN")
-	assert.Contains(t, got, "requiredLabels", "should show required labels")
-	assert.Contains(t, got, "db-type", "should show label key")
-	assert.Contains(t, got, "requiredResources", "should show required resources")
-	assert.Contains(t, got, "database", "should show resource name")
-	assert.Contains(t, got, "requiredTraits", "should show required traits")
-	assert.Contains(t, got, "persistence", "should show trait name")
+	// No panic expected.
+	WriteTransformerMatches(result)
 }
 
-func TestPrintRenderErrors_UnmatchedWithoutAvailable(t *testing.T) {
-	// Setup: capture stderr output
-	var buf bytes.Buffer
-	output.SetupLogging(output.LogConfig{})
-	output.SetLogWriter(&buf)
-
-	// Create an UnmatchedComponentError without Available transformers
-	errs := []error{
-		&pipeline.UnmatchedComponentError{
-			ComponentName: "cache",
-			Available:     nil,
-		},
+func TestWriteVerboseMatchLog_NilMatchPlan(t *testing.T) {
+	// Should not panic when MatchPlan is nil.
+	result := &RenderResult{
+		Release: mustReleaseMetadata("test", "default"),
 	}
-
-	PrintRenderErrors(errs)
-
-	got := buf.String()
-
-	// Should contain component name and error
-	assert.Contains(t, got, "cache", "should contain component name")
-	assert.Contains(t, got, "no matching transformer", "should contain error message")
-
-	// Should NOT show available transformers section
-	assert.NotContains(t, got, "Available transformers", "should not show available section when none exist")
+	// No panic expected.
+	WriteVerboseMatchLog(result)
 }
 
-func TestPrintRenderErrors_TransformError(t *testing.T) {
-	// Setup: capture stderr output
-	var buf bytes.Buffer
-	output.SetupLogging(output.LogConfig{})
-	output.SetLogWriter(&buf)
-
-	// Create a TransformError
-	errs := []error{
-		&opmerrors.TransformError{
-			ComponentName:  "api",
-			TransformerFQN: "example.com/transformers@v1#APITransformer",
-			Cause:          fmt.Errorf("missing required field: port"),
-		},
-	}
-
-	PrintRenderErrors(errs)
-
-	got := buf.String()
-
-	// Should contain component name, transformer FQN, and cause
-	assert.Contains(t, got, "api", "should contain component name")
-	assert.Contains(t, got, "transform failed", "should contain transform failed message")
-	assert.Contains(t, got, "APITransformer", "should contain transformer FQN")
-	assert.Contains(t, got, "missing required field: port", "should contain cause error")
+func TestFormatFQNList_Empty(t *testing.T) {
+	assert.Equal(t, "", formatFQNList(nil))
+	assert.Equal(t, "", formatFQNList([]string{}))
 }
 
-func TestPrintRenderErrors_GenericError(t *testing.T) {
-	// Setup: capture stderr output
-	var buf bytes.Buffer
-	output.SetupLogging(output.LogConfig{})
-	output.SetLogWriter(&buf)
-
-	// Create a generic error
-	errs := []error{
-		fmt.Errorf("unexpected render failure"),
-	}
-
-	PrintRenderErrors(errs)
-
-	got := buf.String()
-
-	// Should contain raw error string
-	assert.Contains(t, got, "unexpected render failure", "should contain generic error message")
-}
-
-func TestPrintRenderErrors_MultipleErrors(t *testing.T) {
-	// Setup: capture stderr output
-	var buf bytes.Buffer
-	output.SetupLogging(output.LogConfig{})
-	output.SetLogWriter(&buf)
-
-	// Create multiple errors
-	errs := []error{
-		&pipeline.UnmatchedComponentError{
-			ComponentName: "worker",
-			Available:     nil,
-		},
-		&opmerrors.TransformError{
-			ComponentName:  "api",
-			TransformerFQN: "example.com/transformers@v1#APITransformer",
-			Cause:          fmt.Errorf("validation failed"),
-		},
-	}
-
-	PrintRenderErrors(errs)
-
-	got := buf.String()
-
-	// Should contain summary line
-	assert.Contains(t, got, "render completed with errors", "should contain summary")
-
-	// Should contain both error details
-	assert.Contains(t, got, "worker", "should contain first component")
-	assert.Contains(t, got, "api", "should contain second component")
-	assert.Contains(t, got, "no matching transformer", "should contain unmatched error")
-	assert.Contains(t, got, "transform failed", "should contain transform error")
+func TestFormatFQNList_Single(t *testing.T) {
+	result := formatFQNList([]string{"example.com/resources/workload/container@v1"})
+	assert.NotEmpty(t, result)
+	assert.Contains(t, result, "container")
 }
