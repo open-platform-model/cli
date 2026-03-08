@@ -3,7 +3,7 @@
 // - module.cue: metadata and config schema
 // - components.cue: component definitions
 // - values.cue: default values
-package main
+package jellyfin
 
 import (
 	m "opmodel.dev/core/module@v1"

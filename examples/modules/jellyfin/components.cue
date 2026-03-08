@@ -1,6 +1,6 @@
 // Components defines the Jellyfin workload.
 // Single stateful component with persistent config, media mounts, and health checks.
-package main
+package jellyfin
 
 import (
 	resources_workload "opmodel.dev/resources/workload@v1"
