@@ -95,17 +95,9 @@ The `opm mod vet` command SHALL support `--verbose` / `-v` flag to show transfor
 - **THEN** the output SHALL include transformer matching details per component
 - **THEN** the output SHALL include per-resource validation lines
 
-### Requirement: mod vet supports strict trait handling
+### Requirement: mod vet warns on unhandled traits
 
-The `opm mod vet` command SHALL support the `--strict` flag for strict trait handling, matching the behavior of `mod build --strict`. When enabled, unhandled traits cause errors instead of warnings.
-
-#### Scenario: Strict mode errors on unhandled traits
-
-- **WHEN** `opm mod vet . --strict` is run on a module with unhandled traits
-- **THEN** the command SHALL fail with an error listing the unhandled traits
-- **THEN** the command SHALL exit with code 2
-
-#### Scenario: Default mode warns on unhandled traits
+#### Scenario: Unhandled traits produce warnings
 
 - **WHEN** `opm mod vet .` is run on a module with unhandled traits
 - **THEN** warnings SHALL be printed to stderr via the module logger
@@ -125,7 +117,6 @@ Flags:
   -n, --namespace string    Target namespace
       --name string         Release name (default: module name)
       --provider string     Provider to use (default: from config)
-      --strict              Error on unhandled traits
   -v, --verbose             Show matching decisions and module metadata
   -h, --help                Help for vet
 ```
@@ -134,7 +125,6 @@ Flags:
 
 - **WHEN** `opm mod vet` is run without any flags
 - **THEN** path SHALL default to `"."`
-- **THEN** strict SHALL default to `false`
 - **THEN** verbose SHALL default to `false`
 
 ### Requirement: mod vet exit codes

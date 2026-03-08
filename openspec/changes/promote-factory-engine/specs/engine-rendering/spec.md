@@ -66,7 +66,7 @@ The engine SHALL execute each matched pair by: (1) looking up `#transform` from 
 
 #### Scenario: Metadata decode errors are propagated
 - **WHEN** `metadata.labels` or `metadata.annotations` on a schema component cannot be decoded
-- **THEN** the error MUST be logged at WARN level (non-strict mode) or returned as an error (strict mode), NOT silently discarded
+- **THEN** the error MUST be logged at WARN level, NOT silently discarded
 
 ### Requirement: RenderResult contract
 The `RenderResult` struct SHALL contain `Resources []*core.Resource` and `Warnings []string`. Both fields MUST be non-nil (empty slice, not nil). There is no `Pipeline` interface — consumers call `ModuleRenderer.Render()` or `BundleRenderer.Render()` directly.

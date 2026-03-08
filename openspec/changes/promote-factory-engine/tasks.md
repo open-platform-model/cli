@@ -35,7 +35,7 @@
 ## 4. Engine — pkg/engine/
 
 - [x] 4.1 Create `pkg/engine/matchplan.go`: Promote from factory — `MatchPlan`, `MatchResult`, `MatchedPair`, `buildMatchPlan()`, `sortMatchedPairs()`; fix: sort keys in `Warnings()` for deterministic output (DEBT.md #3)
-- [x] 4.2 Create `pkg/engine/execute.go`: Promote from factory — `executeTransforms()`, `executePair()`, `injectContext()`, `collectResourceList()`, `collectResourceMap()`; fix: propagate metadata decode errors instead of silent discard (DEBT.md #1) — log at WARN level or return error in strict mode; fix: define explicit output contract for `isSingleResource` (DEBT.md #6)
+- [x] 4.2 Create `pkg/engine/execute.go`: Promote from factory — `executeTransforms()`, `executePair()`, `injectContext()`, `collectResourceList()`, `collectResourceMap()`; fix: propagate metadata decode errors instead of silent discard (DEBT.md #1) — log at WARN level; fix: define explicit output contract for `isSingleResource` (DEBT.md #6)
 - [x] 4.3 Create `pkg/engine/module_renderer.go`: Promote from factory — `ModuleRenderer`, `NewModuleRenderer()`, `Render()`, `RenderResult`, `UnmatchedComponentsError`; use `errors.Join` (already fixed in factory, DEBT.md #2)
 - [x] 4.4 Create `pkg/engine/bundle_renderer.go`: Promote from factory — `BundleRenderer`, `BundleRenderResult`; fix: fail-slow at bundle level — collect all release errors instead of stopping on first (DEBT.md #5)
 - [x] 4.5 Create `pkg/engine/errors.go`: Engine-specific error types — `UnmatchedComponentsError` with structured diagnostics, integrate with `pkg/errors.TransformError` wrapping

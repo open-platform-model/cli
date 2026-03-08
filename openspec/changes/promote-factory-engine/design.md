@@ -220,7 +220,7 @@ All 15 items from `experiments/factory/DEBT.md` MUST be fixed during promotion:
 
 | # | Item | Fix |
 |---|------|-----|
-| 1 | Silent metadata decode errors | Propagate error; log at WARN in non-strict, return error in strict mode |
+| 1 | Silent metadata decode errors | Propagate error; log at WARN level |
 | 2 | `joinErrors` loses identity | Already fixed in factory (uses `errors.Join`) — carry forward |
 | 3 | Non-deterministic Warnings() | Sort map keys and inner trait slices before iteration |
 | 4 | Dead `pkgName` field | Remove field and stale comment from `pkg/module/` |

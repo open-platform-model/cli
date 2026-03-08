@@ -169,7 +169,7 @@ func executePair(
 // compVal should be the schema component (from rel.MatchComponents()) so that
 // metadata.labels and metadata.annotations are accessible even after finalization.
 //
-// Fix for DEBT.md #1: Metadata decode errors are now logged at WARN level instead
+// Fix for DEBT.md #1: Metadata decode errors are logged at WARN level instead
 // of being silently discarded. If a CUE value exists but cannot be decoded, the
 // operator is informed with the component name and field path.
 func injectContext(
@@ -201,7 +201,7 @@ func injectContext(
 	// Encode() for writing back.
 	//
 	// Fix for DEBT.md #1: Decode errors are logged at WARN level so malformed
-	// metadata fields are surfaced to the operator rather than producing silently
+	// metadata fields are surfaced to the operator rather than silently producing
 	// empty labels/annotations in generated manifests.
 	compMeta := componentContextData{Name: compName}
 	if labelsVal := compVal.LookupPath(cue.ParsePath("metadata.labels")); labelsVal.Exists() {

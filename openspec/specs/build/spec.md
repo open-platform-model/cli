@@ -50,7 +50,6 @@ A developer has a component that doesn't match any transformer.
 **Acceptance Scenarios**:
 
 1. **Given** a component with no matching transformers, **When** `opm mod build` runs, **Then** it errors with list of available transformers and their requirements.
-2. **Given** `--strict` mode enabled, **When** a component has unhandled traits, **Then** the CLI errors with the list of unhandled traits.
 
 ### User Story 4 - Output Format Control (Priority: P3)
 
@@ -78,7 +77,6 @@ A developer wants to control how rendered manifests are output.
 | FR-B-006 | `mod build` MUST support `--output` / `-o` flag (yaml, json). |
 | FR-B-007 | `mod build` MUST support `--split` flag for separate files. |
 | FR-B-008 | `mod build` MUST support `--out-dir` flag for split output directory. |
-| FR-B-009 | `mod build` MUST support `--strict` flag for strict trait handling. |
 | FR-B-010 | `mod build` MUST support `--verbose` flag for matching decisions. |
 
 ### Pipeline Implementation
@@ -206,8 +204,7 @@ The generated overlay SHALL produce byte-identical CUE output compared to the pr
 | ID | Requirement |
 |----|-------------|
 | FR-B-060 | Unmatched components MUST include list of available transformers. |
-| FR-B-061 | Unhandled traits in `--strict` mode MUST cause error. |
-| FR-B-062 | Unhandled traits in normal mode MUST cause warning. |
+| FR-B-062 | Unhandled traits MUST cause warning. |
 | FR-B-063 | Values file conflicts MUST return CUE's native unification error. |
 | FR-B-064 | Non-concrete component after release building MUST fail with ReleaseValidationError. |
 | FR-B-065 | Module missing `values` field MUST fail with descriptive error. |
@@ -421,7 +418,6 @@ Flags:
   -o, --output string       Output format: yaml, json (default: yaml)
       --split               Write separate files per resource
       --out-dir string      Directory for split output (default: ./manifests)
-      --strict              Error on unhandled traits
   -v, --verbose             Show matching decisions
   -h, --help                Help for build
 ```
