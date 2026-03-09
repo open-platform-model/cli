@@ -327,105 +327,43 @@ func FormatReadyRatio(ready, total int) string {
 	}
 }
 
-// FormatValuesValidationError renders a *opmerrors.ValuesValidationError as a
-// colored, human-readable string for terminal output.
+// FormatGroupedErrors renders a slice of GroupedError values as a colored,
+// human-readable string for terminal output.
 //
 // Output format:
 //
-//	<file>: N errors                              ← file group header
+//	<message>                     ← bold error message
+//	  <file>:<line>:<col> -> <path>  ← yellow loc, arrow, then path
+//	  <file>:<line>:<col> -> <path>  ← additional locations (e.g. conflict)
 //
-//	  <line>:<col>  <path>                        ← yellow loc, bold path
-//	               <message>                      ← indented below path
-//
-//	Cross-file conflicts: N conflicts             ← section header (if any)
-//
-//	  <path>                                      ← bold path
-//	    <file>:<line>:<col> vs <file>:<line>:<col> ← yellow locations
-//	    <message>                                 ← indented below
-func FormatValuesValidationError(e *opmerrors.ValuesValidationError) string {
+// Errors with multiple locations (CUE value conflicts) appear as a single
+// message block with one line per contributing source position, making
+// cross-file conflicts immediately readable without a separate section.
+func FormatGroupedErrors(groups []opmerrors.GroupedError) string {
 	styleLoc := lipgloss.NewStyle().Foreground(ColorYellow)
-	stylePath := lipgloss.NewStyle().Bold(true)
-	styleHeader := lipgloss.NewStyle().Bold(true)
+	styleMsg := lipgloss.NewStyle().Bold(true)
 
 	var sb strings.Builder
 
-	// Group FieldErrors by file, preserving insertion order.
-	type fileGroup struct {
-		file   string
-		errors []opmerrors.FieldError
-	}
-	var groups []fileGroup
-	groupIdx := make(map[string]int)
-	for _, fe := range e.Errors {
-		file := fe.File
-		if file == "" {
-			file = "(unknown)"
-		}
-		idx, ok := groupIdx[file]
-		if !ok {
-			idx = len(groups)
-			groups = append(groups, fileGroup{file: file})
-			groupIdx[file] = idx
-		}
-		groups[idx].errors = append(groups[idx].errors, fe)
-	}
-
-	// Render per-file groups.
 	for gi, g := range groups {
 		if gi > 0 {
 			sb.WriteByte('\n')
 		}
-		n := len(g.errors)
-		noun := "errors"
-		if n == 1 {
-			noun = "error"
-		}
-		sb.WriteString(styleHeader.Render(fmt.Sprintf("%s: %d %s", g.file, n, noun)))
+		sb.WriteString(styleMsg.Render(g.Message))
 		sb.WriteByte('\n')
-		for _, fe := range g.errors {
-			sb.WriteByte('\n')
-			if fe.Line > 0 {
-				loc := styleLoc.Render(fmt.Sprintf("%d:%d", fe.Line, fe.Column))
-				path := stylePath.Render(fe.Path)
-				fmt.Fprintf(&sb, "  %s  %s\n", loc, path)
-			} else if fe.Path != "" {
+		for _, loc := range g.Locations {
+			if loc.Line > 0 {
+				locStr := styleLoc.Render(fmt.Sprintf("%s:%d:%d", loc.File, loc.Line, loc.Column))
 				sb.WriteString("  ")
-				sb.WriteString(stylePath.Render(fe.Path))
-				sb.WriteByte('\n')
+				sb.WriteString(locStr)
+				if loc.Path != "" {
+					sb.WriteString(" -> ")
+					sb.WriteString(loc.Path)
+				}
+			} else if loc.Path != "" {
+				sb.WriteString("  ")
+				sb.WriteString(loc.Path)
 			}
-			sb.WriteString("        ")
-			sb.WriteString(fe.Message)
-			sb.WriteByte('\n')
-		}
-	}
-
-	// Render cross-file conflicts section.
-	if len(e.Conflicts) > 0 {
-		if len(groups) > 0 {
-			sb.WriteByte('\n')
-		}
-		n := len(e.Conflicts)
-		noun := "conflicts"
-		if n == 1 {
-			noun = "conflict"
-		}
-		sb.WriteString(styleHeader.Render(fmt.Sprintf("Cross-file conflicts: %d %s", n, noun)))
-		sb.WriteByte('\n')
-		for _, ce := range e.Conflicts {
-			sb.WriteByte('\n')
-			sb.WriteString("  ")
-			sb.WriteString(stylePath.Render(ce.Path))
-			sb.WriteByte('\n')
-			// Render all locations joined with " vs "
-			locParts := make([]string, 0, len(ce.Locations))
-			for _, l := range ce.Locations {
-				locParts = append(locParts, styleLoc.Render(fmt.Sprintf("%s:%d:%d", l.File, l.Line, l.Column)))
-			}
-			sb.WriteString("    ")
-			sb.WriteString(strings.Join(locParts, " vs "))
-			sb.WriteByte('\n')
-			sb.WriteString("    ")
-			sb.WriteString(ce.Message)
 			sb.WriteByte('\n')
 		}
 	}

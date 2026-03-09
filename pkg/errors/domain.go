@@ -2,7 +2,6 @@ package errors
 
 import (
 	"fmt"
-	"strings"
 )
 
 // TransformError indicates transformer execution failed.
@@ -68,60 +67,31 @@ type FieldError struct {
 	Message string
 }
 
-// ConflictLocation is a source position for one side of a cross-file conflict.
-type ConflictLocation struct {
-	File   string
-	Line   int
+// ErrorLocation is a source position paired with its CUE field path.
+// Used in GroupedError to record every location where an error message appears.
+type ErrorLocation struct {
+	// File is the values file name (basename only).
+	File string
+
+	// Line is the 1-based line number. Zero means no position information.
+	Line int
+
+	// Column is the 1-based column number.
 	Column int
+
+	// Path is the dot-joined CUE field path at this position (e.g. "values.db.port").
+	// May be empty when the error has no associated path.
+	Path string
 }
 
-// ConflictError represents a conflict between values in two or more files for
-// the same field.
-type ConflictError struct {
-	// Path is the dot-joined field path.
-	Path string
-
-	// Message is the human-readable conflict description.
+// GroupedError collects all source locations where the same error message
+// appears. CUE can report the same logical error at multiple positions (e.g.
+// both sides of a value conflict), so grouping by message collapses duplicates
+// and makes conflicts immediately readable.
+type GroupedError struct {
+	// Message is the human-readable error description shared by all locations.
 	Message string
 
-	// Locations holds one entry per conflicting source position.
-	Locations []ConflictLocation
-}
-
-// ValuesValidationError is returned when one or more fields in a values file
-// violate the module's #config schema. It collects all errors rather than
-// stopping at the first.
-type ValuesValidationError struct {
-	Errors    []FieldError
-	Conflicts []ConflictError
-}
-
-func (e *ValuesValidationError) Error() string {
-	n := len(e.Errors) + len(e.Conflicts)
-	if n == 1 {
-		return "values validation failed: 1 error"
-	}
-	return fmt.Sprintf("values validation failed: %d errors", n)
-}
-
-// Lines returns all errors and conflicts formatted as plain text.
-func (e *ValuesValidationError) Lines() []string {
-	lines := make([]string, 0, (len(e.Errors)+len(e.Conflicts))*2)
-	for _, fe := range e.Errors {
-		loc := fmt.Sprintf("%s:%d:%d", fe.File, fe.Line, fe.Column)
-		lines = append(lines, loc, "  "+fe.Path+": "+fe.Message)
-	}
-	for _, ce := range e.Conflicts {
-		locs := make([]string, len(ce.Locations))
-		for i, l := range ce.Locations {
-			locs[i] = fmt.Sprintf("%s:%d:%d", l.File, l.Line, l.Column)
-		}
-		lines = append(lines, strings.Join(locs, " vs "), "  "+ce.Path+": "+ce.Message)
-	}
-	return lines
-}
-
-// PlainText returns all errors as a single plain-text string.
-func (e *ValuesValidationError) PlainText() string {
-	return strings.Join(e.Lines(), "\n")
+	// Locations holds one entry per distinct source position reporting this error.
+	Locations []ErrorLocation
 }

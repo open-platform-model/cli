@@ -25,24 +25,27 @@ func formatFQNList(fqns []string) string {
 
 // PrintValidationError prints a render/validation error in a user-friendly format.
 //
-// For ConfigError (values schema failures), it prints a summary header followed by
-// colored per-error blocks with file, position, path, and message.
+// For ConfigError (values schema failures), it prints a summary header with the
+// total location count, then a grouped block where each distinct error message
+// appears once followed by all source positions that report it. This naturally
+// surfaces conflicts (same message, multiple files) as a single entry.
 //
 // For generic errors, it falls back to the standard key-value log format.
 func PrintValidationError(msg string, err error) {
 	var configErr *pkgerrors.ConfigError
 	if errors.As(err, &configErr) {
-		fieldErrs := configErr.FieldErrors()
-		n := len(fieldErrs)
+		groups := configErr.GroupedErrors()
+		// Count total locations across all groups for the header.
+		n := 0
+		for _, g := range groups {
+			n += len(g.Locations)
+		}
 		noun := "error"
 		if n != 1 {
 			noun = "errors"
 		}
 		output.Error(fmt.Sprintf("%s: %d %s", msg, n, noun))
-		// Format each field error block similar to old ValuesValidationError output.
-		for _, fe := range fieldErrs {
-			output.Details(fmt.Sprintf("  %s: %s", fe.Path, fe.Message))
-		}
+		output.Details(output.FormatGroupedErrors(groups))
 		return
 	}
 
