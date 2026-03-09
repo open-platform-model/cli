@@ -6,7 +6,7 @@ import (
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
-// validateConfig is the shared implementation for the Bundle Gate and Module Gate.
+// ValidateConfig is the shared implementation for the Bundle Gate and Module Gate.
 //
 // It performs two checks:
 //
@@ -29,7 +29,7 @@ import (
 // on errors that propagated through the CUE comprehension. This gives us a
 // clean, isolated error rooted at the values/schema boundary — not a deeply
 // nested error from the comprehension output that is hard to attribute.
-func validateConfig(schema, values cue.Value, context, name string) *oerrors.ConfigError {
+func ValidateConfig(schema, values cue.Value, context, name string) *oerrors.ConfigError {
 	// Check that both values are accessible before attempting unification.
 	if !schema.Exists() || !values.Exists() {
 		// Either the #config or values field is missing — not a user config error,

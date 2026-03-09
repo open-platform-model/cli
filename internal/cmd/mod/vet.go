@@ -208,25 +208,17 @@ func runVetModuleOnly(ctx context.Context, modulePath string, cfg *config.Global
 		}
 	}
 
-	// Validate values against the module's #config schema via CUE unification.
-	// This is equivalent to the Module Gate check in LoadModuleReleaseFromValue,
-	// but done directly on the module value without needing a release wrapper.
+	// Validate values against the module's #config schema.
+	// Delegates to loader.ValidateConfig — the same gate used by all release
+	// loading paths — so errors are always surfaced as *ConfigError with
+	// structured positions and the grouped display format.
 	configVal := modVal.LookupPath(cue.ParsePath("#config"))
 	if configVal.Exists() {
-		unified := configVal.Unify(valuesVal)
-		if err := unified.Err(); err != nil {
-			cmdutil.PrintValidationError("values do not satisfy #config", err)
+		if cfgErr := loader.ValidateConfig(configVal, valuesVal, "module", modName); cfgErr != nil {
+			cmdutil.PrintValidationError("values do not satisfy #config", cfgErr)
 			return &oerrors.ExitError{
 				Code:    oerrors.ExitValidationError,
-				Err:     fmt.Errorf("%s values do not satisfy #config", valuesDetail),
-				Printed: true,
-			}
-		}
-		if err := unified.Validate(cue.Concrete(true)); err != nil {
-			cmdutil.PrintValidationError("values incomplete — missing required #config fields", err)
-			return &oerrors.ExitError{
-				Code:    oerrors.ExitValidationError,
-				Err:     fmt.Errorf("%s values do not fully satisfy #config (missing required fields)", valuesDetail),
+				Err:     cfgErr,
 				Printed: true,
 			}
 		}

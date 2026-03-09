@@ -98,13 +98,38 @@ func (e *ConfigError) GroupedErrors() []GroupedError {
 	if e.RawError == nil {
 		return nil
 	}
+	return groupCUEErrors(e.RawError)
+}
+
+// GroupedErrorsFromError attempts to extract CUE errors from any error
+// (including wrapped ones such as fmt.Errorf("...: %w", cueErr)) and group
+// them by message. This handles cases where CUE errors are wrapped before
+// reaching the display layer.
+//
+// Returns nil if no CUE error information can be extracted.
+func GroupedErrorsFromError(err error) []GroupedError {
+	if err == nil {
+		return nil
+	}
+	return groupCUEErrors(err)
+}
+
+// groupCUEErrors is the shared implementation for GroupedErrors and
+// GroupedErrorsFromError. It walks the CUE error tree obtained from err and
+// groups errors by message, collecting all source positions (primary +
+// contributing via InputPositions) per group.
+func groupCUEErrors(err error) []GroupedError {
+	cueErrs := cueerrors.Errors(err)
+	if len(cueErrs) == 0 {
+		return nil
+	}
 
 	// groupOrder preserves insertion order of first-seen messages.
 	type groupKey struct{ msg string }
 	var groupOrder []groupKey
 	groupMap := make(map[groupKey]*GroupedError)
 
-	for _, ce := range cueerrors.Errors(e.RawError) {
+	for _, ce := range cueErrs {
 		format, args := ce.Msg()
 		var msg string
 		if len(args) == 0 {
@@ -126,7 +151,9 @@ func (e *ConfigError) GroupedErrors() []GroupedError {
 			groupOrder = append(groupOrder, key)
 		}
 
-		// Collect all positions: primary + contributing (e.g. both sides of a conflict).
+		// Collect all positions: primary + contributing (e.g. both sides of a
+		// conflict). cueerrors.Positions returns Position() + InputPositions()
+		// deduped and sorted.
 		path := strings.Join(ce.Path(), ".")
 		seen := make(map[string]bool, len(ge.Locations))
 		for _, loc := range ge.Locations {

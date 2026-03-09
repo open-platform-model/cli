@@ -67,8 +67,16 @@ func LoadReleaseFile(ctx *cue.Context, filePath, registry string) (cue.Value, st
 }
 
 // LoadReleaseFileWithValues loads a #ModuleRelease or #BundleRelease from a
-// release .cue file and a separate values file, combining them as a single CUE
-// instance. This is the directory/split-files variant of LoadReleaseFile.
+// release .cue file and a separate values file.
+//
+// The loading follows a gate-first pattern:
+//  1. Load release.cue alone (values stay abstract — no eager conflict evaluation).
+//  2. Load values file separately.
+//  3. Gate: validate values against #module.#config before filling.
+//  4. Fill values into the release via FillPath.
+//
+// This ensures any schema violation is caught by the gate and surfaced as a
+// *ConfigError with structured positions, rather than as a raw CUE build error.
 //
 // filePath may be a directory (release.cue is assumed) or a direct .cue path.
 // valuesFile is the path to the values CUE file. If empty, values.cue in the
@@ -77,66 +85,61 @@ func LoadReleaseFile(ctx *cue.Context, filePath, registry string) (cue.Value, st
 //
 // registry behaviour is identical to LoadReleaseFile.
 func LoadReleaseFileWithValues(ctx *cue.Context, filePath, valuesFile, registry string) (cue.Value, string, error) {
+	// Resolve values file path before calling LoadReleaseFile so we can error
+	// early if it is missing.
 	var err error
 	filePath, err = resolveReleaseFile(filePath)
 	if err != nil {
 		return cue.Value{}, "", err
 	}
-
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
 		return cue.Value{}, "", fmt.Errorf("resolving release file path: %w", err)
 	}
 	parentDir := filepath.Dir(absPath)
 
-	// Resolve values file — default to values.cue next to the release file.
 	if valuesFile == "" {
 		valuesFile = filepath.Join(parentDir, "values.cue")
 	}
-	absValues, err := filepath.Abs(valuesFile)
-	if err != nil {
-		return cue.Value{}, "", fmt.Errorf("resolving values file path: %w", err)
-	}
-	if _, statErr := os.Stat(absValues); os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(valuesFile); os.IsNotExist(statErr) {
 		return cue.Value{}, "", fmt.Errorf("values file %q not found", valuesFile)
 	} else if statErr != nil {
 		return cue.Value{}, "", fmt.Errorf("accessing values file %q: %w", valuesFile, statErr)
 	}
 
-	// Set CUE_REGISTRY env var if registry is non-empty, restoring original after.
-	if registry != "" {
-		orig, hadOrig := os.LookupEnv("CUE_REGISTRY")
-		if err := os.Setenv("CUE_REGISTRY", registry); err != nil {
-			return cue.Value{}, "", fmt.Errorf("setting CUE_REGISTRY: %w", err)
+	// Step 1: Load release.cue alone. values: _ stays abstract, so BuildInstance
+	// does not evaluate the module schema against the values yet.
+	releaseVal, dir, err := LoadReleaseFile(ctx, filePath, registry)
+	if err != nil {
+		return cue.Value{}, "", err
+	}
+
+	// Step 2: Load values file separately (returns the "values" field if present).
+	valuesVal, err := LoadValuesFile(ctx, valuesFile)
+	if err != nil {
+		return cue.Value{}, "", err
+	}
+
+	// Step 3: Gate — validate values against #module.#config.
+	// Extract release name for error context; fall back to directory name.
+	releaseName := filepath.Base(dir)
+	if nameVal := releaseVal.LookupPath(cue.ParsePath("metadata.name")); nameVal.Exists() {
+		if n, strErr := nameVal.String(); strErr == nil && n != "" {
+			releaseName = n
 		}
-		defer func() {
-			if hadOrig {
-				_ = os.Setenv("CUE_REGISTRY", orig)
-			} else {
-				_ = os.Unsetenv("CUE_REGISTRY")
-			}
-		}()
+	}
+	configSchema := releaseVal.LookupPath(cue.ParsePath("#module.#config"))
+	if cfgErr := ValidateConfig(configSchema, valuesVal, "module", releaseName); cfgErr != nil {
+		return cue.Value{}, "", cfgErr
 	}
 
-	cfg := &load.Config{
-		Dir: parentDir,
-	}
-	releaseBase := filepath.Base(absPath)
-	valuesBase := filepath.Base(absValues)
-	instances := load.Instances([]string{releaseBase, valuesBase}, cfg)
-	if len(instances) == 0 {
-		return cue.Value{}, "", fmt.Errorf("no CUE instances found for %s + %s", releaseBase, valuesBase)
-	}
-	if instances[0].Err != nil {
-		return cue.Value{}, "", fmt.Errorf("loading release package: %w", instances[0].Err)
+	// Step 4: Fill values into the release.
+	releaseVal = releaseVal.FillPath(cue.ParsePath("values"), valuesVal)
+	if err := releaseVal.Err(); err != nil {
+		return cue.Value{}, "", fmt.Errorf("filling values into release: %w", err)
 	}
 
-	val := ctx.BuildInstance(instances[0])
-	if err := val.Err(); err != nil {
-		return cue.Value{}, "", fmt.Errorf("building release package: %w", err)
-	}
-
-	return val, parentDir, nil
+	return releaseVal, dir, nil
 }
 
 // LoadModulePackage loads a module CUE package from a directory and returns
@@ -224,7 +227,9 @@ func LoadValuesFile(ctx *cue.Context, path string) (cue.Value, error) {
 // unifies it with a pre-loaded CUE value (e.g. debugValues). This is used by
 // the debugValues path to avoid writing a temp file.
 //
-// The valuesVal is unified into the "values" path of the loaded release package.
+// The gate is applied before filling: values are validated against
+// #module.#config so that schema violations are surfaced as *ConfigError rather
+// than as raw CUE fill errors.
 func LoadReleasePackageWithValue(ctx *cue.Context, releaseFile string, valuesVal cue.Value) (cue.Value, string, error) {
 	releaseFile, err := resolveReleaseFile(releaseFile)
 	if err != nil {
@@ -249,7 +254,19 @@ func LoadReleasePackageWithValue(ctx *cue.Context, releaseFile string, valuesVal
 		return cue.Value{}, "", fmt.Errorf("building release package: %w", err)
 	}
 
-	// Unify the release package with the provided values at the "values" path.
+	// Gate — validate values against #module.#config before filling.
+	releaseName := filepath.Base(releaseDir)
+	if nameVal := pkg.LookupPath(cue.ParsePath("metadata.name")); nameVal.Exists() {
+		if n, strErr := nameVal.String(); strErr == nil && n != "" {
+			releaseName = n
+		}
+	}
+	configSchema := pkg.LookupPath(cue.ParsePath("#module.#config"))
+	if cfgErr := ValidateConfig(configSchema, valuesVal, "module", releaseName); cfgErr != nil {
+		return cue.Value{}, "", cfgErr
+	}
+
+	// Fill values into the release package.
 	pkg = pkg.FillPath(cue.ParsePath("values"), valuesVal)
 	if err := pkg.Err(); err != nil {
 		return cue.Value{}, "", fmt.Errorf("filling values into release package: %w", err)

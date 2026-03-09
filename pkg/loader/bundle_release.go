@@ -55,7 +55,7 @@ func LoadBundleReleaseFromValue(cueCtx *cue.Context, pkg cue.Value) (*bundlerele
 	// nested CUE unification error from the comprehension output.
 	bundleConfigVal := pkg.LookupPath(cue.ParsePath("#bundle.#config"))
 	bundleValuesVal := pkg.LookupPath(cue.ParsePath("values"))
-	if cfgErr := validateConfig(bundleConfigVal, bundleValuesVal, "bundle", brMeta.Name); cfgErr != nil {
+	if cfgErr := ValidateConfig(bundleConfigVal, bundleValuesVal, "bundle", brMeta.Name); cfgErr != nil {
 		return nil, cfgErr
 	}
 
@@ -133,7 +133,7 @@ func extractBundleInfo(releaseVal cue.Value) (*bundle.BundleMetadata, cue.Value,
 //
 // For each release entry the Module Gate runs before finalization:
 //
-//   - Module Gate: validateConfig(#module.#config, values) — validates the
+//   - Module Gate: ValidateConfig(#module.#config, values) — validates the
 //     instance values against the module's #config schema. Catches type
 //     mismatches and missing required fields at the module boundary, producing
 //     a clear per-release error before any finalization is attempted.
@@ -178,7 +178,7 @@ func extractBundleReleases(cueCtx *cue.Context, schemaPkg cue.Value) (map[string
 		// release entry. The instance name is used as the display name.
 		moduleConfigVal := schemaEntry.LookupPath(cue.ParsePath("#module.#config"))
 		moduleValuesVal := schemaEntry.LookupPath(cue.ParsePath("values"))
-		if cfgErr := validateConfig(moduleConfigVal, moduleValuesVal, "module", key); cfgErr != nil {
+		if cfgErr := ValidateConfig(moduleConfigVal, moduleValuesVal, "module", key); cfgErr != nil {
 			return nil, fmt.Errorf("release %q: %w", key, cfgErr)
 		}
 

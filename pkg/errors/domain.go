@@ -87,7 +87,7 @@ type ErrorLocation struct {
 // GroupedError collects all source locations where the same error message
 // appears. CUE can report the same logical error at multiple positions (e.g.
 // both sides of a value conflict), so grouping by message collapses duplicates
-// and makes conflicts immediately readable.
+// and makes conflicts immediately readable without a separate section.
 type GroupedError struct {
 	// Message is the human-readable error description shared by all locations.
 	Message string

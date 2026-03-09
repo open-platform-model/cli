@@ -36,7 +36,7 @@ func SynthesizeModuleRelease(cueCtx *cue.Context, modVal, valuesVal cue.Value, r
 	// Mirrors the Module Gate in LoadModuleReleaseFromValue, but uses modVal
 	// directly instead of reaching through a release value.
 	moduleConfigVal := modVal.LookupPath(cue.ParsePath("#config"))
-	if cfgErr := validateConfig(moduleConfigVal, valuesVal, "module", releaseName); cfgErr != nil {
+	if cfgErr := ValidateConfig(moduleConfigVal, valuesVal, "module", releaseName); cfgErr != nil {
 		return nil, cfgErr
 	}
 

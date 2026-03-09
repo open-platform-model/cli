@@ -18,6 +18,15 @@ import (
 // This is the shared entry point for both ModuleRelease and BundleRelease loading.
 // The caller inspects the `kind` field to determine which decode path to take.
 //
+// The loading follows a gate-first pattern:
+//  1. Load release.cue alone (values stay abstract — no eager conflict evaluation).
+//  2. Load values.cue separately.
+//  3. Gate: validate values against #module.#config before filling.
+//  4. Fill values into the release via FillPath.
+//
+// This ensures any schema violation is caught by the gate and surfaced as a
+// *ConfigError with structured positions, rather than as a raw CUE build error.
+//
 // releaseFile is the path to the release.cue file (or a directory, in which
 // case release.cue is assumed to live inside it).
 //
@@ -36,28 +45,45 @@ func LoadReleasePackage(cueCtx *cue.Context, releaseFile, valuesFile string) (cu
 		valuesFile = filepath.Join(releaseDir, "values.cue")
 	}
 
-	// Load only the two explicit files as one CUE instance.
-	// Using explicit filenames prevents other values_*.cue files in the same
-	// directory from being included and causing conflicts.
+	// Step 1: Load release.cue alone so BuildInstance does not see the values
+	// yet — keeps evaluation abstract and prevents eager conflict detection.
 	releaseBase := filepath.Base(releaseFile)
-	valuesBase := filepath.Base(valuesFile)
-
-	cfg := &load.Config{
-		Dir: releaseDir,
-		// LoadFromFiles restricts the package to the named files only.
-		// This is the key mechanism that lets us select a specific values file.
-	}
-	instances := load.Instances([]string{releaseBase, valuesBase}, cfg)
+	cfg := &load.Config{Dir: releaseDir}
+	instances := load.Instances([]string{releaseBase}, cfg)
 	if len(instances) == 0 {
-		return cue.Value{}, "", fmt.Errorf("no CUE instances found for %s + %s", releaseBase, valuesBase)
+		return cue.Value{}, "", fmt.Errorf("no CUE instances found for %s", releaseBase)
 	}
 	if instances[0].Err != nil {
 		return cue.Value{}, "", fmt.Errorf("loading release package: %w", instances[0].Err)
 	}
-
 	pkg := cueCtx.BuildInstance(instances[0])
 	if err := pkg.Err(); err != nil {
 		return cue.Value{}, "", fmt.Errorf("building release package: %w", err)
+	}
+
+	// Step 2: Load values file separately.
+	valuesVal, err := LoadValuesFile(cueCtx, valuesFile)
+	if err != nil {
+		return cue.Value{}, "", err
+	}
+
+	// Step 3: Gate — validate values against #module.#config before evaluation.
+	// Extract release name for error context; fall back to directory name.
+	releaseName := releaseDir
+	if nameVal := pkg.LookupPath(cue.ParsePath("metadata.name")); nameVal.Exists() {
+		if n, strErr := nameVal.String(); strErr == nil && n != "" {
+			releaseName = n
+		}
+	}
+	configSchema := pkg.LookupPath(cue.ParsePath("#module.#config"))
+	if cfgErr := ValidateConfig(configSchema, valuesVal, "module", releaseName); cfgErr != nil {
+		return cue.Value{}, "", cfgErr
+	}
+
+	// Step 4: Fill values into the release.
+	pkg = pkg.FillPath(cue.ParsePath("values"), valuesVal)
+	if err := pkg.Err(); err != nil {
+		return cue.Value{}, "", fmt.Errorf("filling values into release package: %w", err)
 	}
 
 	return pkg, releaseDir, nil
@@ -88,6 +114,11 @@ func DetectReleaseKind(pkg cue.Value) (string, error) {
 //
 // This is called directly when the package has already been loaded for kind
 // detection (avoiding a double-load of the CUE package).
+//
+// The Module Gate (values vs #config validation) is performed upstream in the
+// loader functions (LoadReleasePackage, LoadReleaseFileWithValues,
+// LoadReleasePackageWithValue) before values are filled into the release value.
+// By the time this function is called, values are already validated.
 func LoadModuleReleaseFromValue(cueCtx *cue.Context, pkg cue.Value, fallbackName string) (*modulerelease.ModuleRelease, error) {
 	releaseVal := pkg
 
@@ -95,18 +126,8 @@ func LoadModuleReleaseFromValue(cueCtx *cue.Context, pkg cue.Value, fallbackName
 		return nil, fmt.Errorf("evaluating release: %w", err)
 	}
 
-	// Module Gate: validate consumer values against #module.#config before any
-	// further processing. Catches type mismatches and missing required fields at
-	// the values/schema boundary — produces a clear, attributed error rather than
-	// a CUE unification error buried in finalization.
-	moduleConfigVal := releaseVal.LookupPath(cue.ParsePath("#module.#config"))
-	moduleValuesVal := releaseVal.LookupPath(cue.ParsePath("values"))
-	if cfgErr := validateConfig(moduleConfigVal, moduleValuesVal, "module", fallbackName); cfgErr != nil {
-		return nil, cfgErr
-	}
-
 	// Concreteness check on the whole release value.
-	// Module Gate already validated the values/schema boundary. This catches any
+	// The gate already validated the values/schema boundary. This catches any
 	// remaining open fields (e.g. uuid interpolations, label constraints) that
 	// are not part of the consumer-facing #config.
 	if err := releaseVal.Validate(cue.Concrete(true)); err != nil {
