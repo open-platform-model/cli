@@ -21,8 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/core"
-	"github.com/opmodel/cli/internal/core/modulerelease"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 )
@@ -70,7 +68,7 @@ func main() {
 	res65svc := buildServiceResources([]string{"svc-a"})
 	res65all := append(res65cm, res65svc...)
 
-	_, err = kubernetes.Apply(ctx, client, res65all, moduleMeta(), kubernetes.ApplyOptions{})
+	_, err = kubernetes.Apply(ctx, client, res65all, releaseName, kubernetes.ApplyOptions{})
 	check("applying resources for 6.5", err)
 	fmt.Println("   OK: cm-a and svc-a applied")
 
@@ -93,7 +91,7 @@ func main() {
 	fmt.Println("   OK: discovered 2 live resources from inventory")
 
 	// Diff: local render has only cm-a; svc-a is an orphan.
-	diffResult65, err := kubernetes.Diff(ctx, client, res65cm, moduleMeta(), comparer,
+	diffResult65, err := kubernetes.Diff(ctx, client, res65cm, releaseName, comparer,
 		kubernetes.DiffOptions{InventoryLive: liveResources65})
 	check("diffing with inventory for 6.5", err)
 	if diffResult65.Orphaned != 1 {
@@ -117,7 +115,7 @@ func main() {
 	res67svc := buildServiceResources([]string{"svc-a"})
 	res67all := append(res67cm, res67svc...)
 
-	_, err = kubernetes.Apply(ctx, client, res67all, moduleMeta(), kubernetes.ApplyOptions{})
+	_, err = kubernetes.Apply(ctx, client, res67all, releaseName, kubernetes.ApplyOptions{})
 	check("applying resources for 6.7", err)
 	fmt.Println("   OK: cm-a and svc-a applied")
 
@@ -170,7 +168,7 @@ func main() {
 	res68svc := buildServiceResources([]string{"svc-a"})
 	res68all := append(res68cm, res68svc...)
 
-	_, err = kubernetes.Apply(ctx, client, res68all, moduleMeta(), kubernetes.ApplyOptions{})
+	_, err = kubernetes.Apply(ctx, client, res68all, releaseName, kubernetes.ApplyOptions{})
 	check("applying resources for 6.8", err)
 	fmt.Println("   OK: cm-a and svc-a applied")
 
@@ -271,62 +269,56 @@ func opmLabels() map[string]interface{} {
 	}
 }
 
-// buildCM builds a single ConfigMap core.Resource.
-func buildCM(name string) *core.Resource {
+// buildCM builds a single ConfigMap *unstructured.Unstructured.
+func buildCM(name string) *unstructured.Unstructured {
 	labels := opmLabels()
 	labels["component.opmodel.dev/name"] = "config"
 
-	return &core.Resource{
-		Object: &unstructured.Unstructured{Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": namespace,
-				"labels":    labels,
-			},
-			"data": map[string]interface{}{
-				"key": fmt.Sprintf("value-%s", name),
-			},
-		}},
-		Component: "config",
-	}
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name":      name,
+			"namespace": namespace,
+			"labels":    labels,
+		},
+		"data": map[string]interface{}{
+			"key": fmt.Sprintf("value-%s", name),
+		},
+	}}
 }
 
-// buildSvc builds a single Service core.Resource.
-func buildSvc(name string) *core.Resource {
+// buildSvc builds a single Service *unstructured.Unstructured.
+func buildSvc(name string) *unstructured.Unstructured {
 	labels := opmLabels()
 	labels["component.opmodel.dev/name"] = "web"
 
-	return &core.Resource{
-		Object: &unstructured.Unstructured{Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Service",
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": namespace,
-				"labels":    labels,
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Service",
+		"metadata": map[string]interface{}{
+			"name":      name,
+			"namespace": namespace,
+			"labels":    labels,
+		},
+		"spec": map[string]interface{}{
+			"selector": map[string]interface{}{
+				"app": releaseName,
 			},
-			"spec": map[string]interface{}{
-				"selector": map[string]interface{}{
-					"app": releaseName,
-				},
-				"ports": []interface{}{
-					map[string]interface{}{
-						"port":       int64(80),
-						"targetPort": int64(8080),
-						"protocol":   "TCP",
-					},
+			"ports": []interface{}{
+				map[string]interface{}{
+					"port":       int64(80),
+					"targetPort": int64(8080),
+					"protocol":   "TCP",
 				},
 			},
-		}},
-		Component: "web",
-	}
+		},
+	}}
 }
 
 // buildResources builds ConfigMap resources.
-func buildResources(names []string) []*core.Resource {
-	res := make([]*core.Resource, len(names))
+func buildResources(names []string) []*unstructured.Unstructured {
+	res := make([]*unstructured.Unstructured, len(names))
 	for i, name := range names {
 		res[i] = buildCM(name)
 	}
@@ -334,25 +326,16 @@ func buildResources(names []string) []*core.Resource {
 }
 
 // buildServiceResources builds Service resources.
-func buildServiceResources(names []string) []*core.Resource {
-	res := make([]*core.Resource, len(names))
+func buildServiceResources(names []string) []*unstructured.Unstructured {
+	res := make([]*unstructured.Unstructured, len(names))
 	for i, name := range names {
 		res[i] = buildSvc(name)
 	}
 	return res
 }
 
-// moduleMeta returns the ReleaseMetadata for the test release.
-func moduleMeta() modulerelease.ReleaseMetadata {
-	return modulerelease.ReleaseMetadata{
-		Name:      releaseName,
-		Namespace: namespace,
-		UUID:      releaseID,
-	}
-}
-
 // buildInventory creates a new InventorySecret from the given resources.
-func buildInventory(resources []*core.Resource) *inventory.InventorySecret {
+func buildInventory(resources []*unstructured.Unstructured) *inventory.InventorySecret {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)

@@ -1,6 +1,6 @@
 //go:build ignore
 
-// Integration test for opm mod tree — tree building with real cluster resources.
+// Integration test for opm rel tree — tree building with real cluster resources.
 //
 // Tests covered:
 //   - 14.1: Deploy test module with multiple components (Deployment, StatefulSet, Services, ConfigMaps)
@@ -13,7 +13,7 @@
 //   - 14.8: Verify StatefulSet→Pod chain at depth=2
 //
 // Requires a running kind cluster at context "kind-opm-dev".
-// Run with: go run tests/integration/mod-tree/main.go
+// Run with: go run tests/integration/rel-tree/main.go
 package main
 
 import (
@@ -27,8 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/core"
-	"github.com/opmodel/cli/internal/core/modulerelease"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
@@ -43,7 +41,7 @@ const (
 
 	moduleName    = "tree-test-module"
 	moduleVersion = "1.0.0"
-	modulePath    = "tests/integration/mod-tree"
+	modulePath    = "tests/integration/rel-tree"
 )
 
 var (
@@ -56,7 +54,7 @@ var (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== OPM Mod Tree Integration Test ===")
+	fmt.Println("=== OPM Release Tree Integration Test ===")
 	fmt.Println()
 
 	// ── Create Kubernetes client ─────────────────────────────────────────────
@@ -79,7 +77,7 @@ func main() {
 
 	resources := buildAllResources()
 
-	result, err := kubernetes.Apply(ctx, client, resources, moduleMeta(), kubernetes.ApplyOptions{})
+	result, err := kubernetes.Apply(ctx, client, resources, releaseName, kubernetes.ApplyOptions{})
 	check("applying resources", err)
 	if len(result.Errors) > 0 {
 		failf("apply errors: %v", result.Errors[0])
@@ -447,6 +445,8 @@ func opmLabels(component string) map[string]interface{} {
 		"app.kubernetes.io/managed-by":    "open-platform-model",
 		"module-release.opmodel.dev/name": releaseName,
 		"module-release.opmodel.dev/uuid": releaseID,
+		"module.opmodel.dev/name":         moduleName,
+		"module.opmodel.dev/version":      moduleVersion,
 	}
 	if component != "" {
 		labels["component.opmodel.dev/name"] = component
@@ -456,8 +456,8 @@ func opmLabels(component string) map[string]interface{} {
 
 // buildAllResources constructs the full set of test resources.
 // Order: database component, server component, then orphan (no component).
-func buildAllResources() []*core.Resource {
-	return []*core.Resource{
+func buildAllResources() []*unstructured.Unstructured {
+	return []*unstructured.Unstructured{
 		// database component
 		buildStatefulSet("tree-db", "database"),
 		buildHeadlessService("tree-db-headless", "database", "tree-db"),
@@ -470,169 +470,146 @@ func buildAllResources() []*core.Resource {
 	}
 }
 
-func buildConfigMap(name, component string) *core.Resource {
-	return &core.Resource{
-		Object: &unstructured.Unstructured{Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": namespace,
-				"labels":    opmLabels(component),
-			},
-			"data": map[string]interface{}{
-				"key": fmt.Sprintf("value-%s", name),
-			},
-		}},
-		Component: component,
-	}
+func buildConfigMap(name, component string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name":      name,
+			"namespace": namespace,
+			"labels":    opmLabels(component),
+		},
+		"data": map[string]interface{}{
+			"key": fmt.Sprintf("value-%s", name),
+		},
+	}}
 }
 
-func buildService(name, component string) *core.Resource {
-	return &core.Resource{
-		Object: &unstructured.Unstructured{Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Service",
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": namespace,
-				"labels":    opmLabels(component),
+func buildService(name, component string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Service",
+		"metadata": map[string]interface{}{
+			"name":      name,
+			"namespace": namespace,
+			"labels":    opmLabels(component),
+		},
+		"spec": map[string]interface{}{
+			"selector": map[string]interface{}{
+				"app": "tree-server",
 			},
-			"spec": map[string]interface{}{
-				"selector": map[string]interface{}{
-					"app": "tree-server",
-				},
-				"ports": []interface{}{
-					map[string]interface{}{
-						"port":       int64(80),
-						"targetPort": int64(8080),
-						"protocol":   "TCP",
-					},
+			"ports": []interface{}{
+				map[string]interface{}{
+					"port":       int64(80),
+					"targetPort": int64(8080),
+					"protocol":   "TCP",
 				},
 			},
-		}},
-		Component: component,
-	}
+		},
+	}}
 }
 
-func buildHeadlessService(name, component, stsName string) *core.Resource {
-	return &core.Resource{
-		Object: &unstructured.Unstructured{Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Service",
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": namespace,
-				"labels":    opmLabels(component),
+func buildHeadlessService(name, component, stsName string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Service",
+		"metadata": map[string]interface{}{
+			"name":      name,
+			"namespace": namespace,
+			"labels":    opmLabels(component),
+		},
+		"spec": map[string]interface{}{
+			"clusterIP": "None",
+			"selector": map[string]interface{}{
+				"app": stsName,
 			},
-			"spec": map[string]interface{}{
-				"clusterIP": "None",
-				"selector": map[string]interface{}{
-					"app": stsName,
-				},
-				"ports": []interface{}{
-					map[string]interface{}{
-						"port":       int64(80),
-						"targetPort": int64(80),
-						"protocol":   "TCP",
-					},
+			"ports": []interface{}{
+				map[string]interface{}{
+					"port":       int64(80),
+					"targetPort": int64(80),
+					"protocol":   "TCP",
 				},
 			},
-		}},
-		Component: component,
-	}
+		},
+	}}
 }
 
-func buildDeployment(name, component string) *core.Resource {
-	return &core.Resource{
-		Object: &unstructured.Unstructured{Object: map[string]interface{}{
-			"apiVersion": "apps/v1",
-			"kind":       "Deployment",
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": namespace,
-				"labels":    opmLabels(component),
+func buildDeployment(name, component string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "apps/v1",
+		"kind":       "Deployment",
+		"metadata": map[string]interface{}{
+			"name":      name,
+			"namespace": namespace,
+			"labels":    opmLabels(component),
+		},
+		"spec": map[string]interface{}{
+			"replicas": int64(1),
+			"selector": map[string]interface{}{
+				"matchLabels": map[string]interface{}{
+					"app": name,
+				},
 			},
-			"spec": map[string]interface{}{
-				"replicas": int64(1),
-				"selector": map[string]interface{}{
-					"matchLabels": map[string]interface{}{
+			"template": map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"labels": map[string]interface{}{
 						"app": name,
 					},
 				},
-				"template": map[string]interface{}{
-					"metadata": map[string]interface{}{
-						"labels": map[string]interface{}{
-							"app": name,
-						},
-					},
-					"spec": map[string]interface{}{
-						"containers": []interface{}{
-							map[string]interface{}{
-								"name":  "pause",
-								"image": "registry.k8s.io/pause:3.9",
-							},
+				"spec": map[string]interface{}{
+					"containers": []interface{}{
+						map[string]interface{}{
+							"name":  "pause",
+							"image": "registry.k8s.io/pause:3.9",
 						},
 					},
 				},
 			},
-		}},
-		Component: component,
-	}
+		},
+	}}
 }
 
-func buildStatefulSet(name, component string) *core.Resource {
-	return &core.Resource{
-		Object: &unstructured.Unstructured{Object: map[string]interface{}{
-			"apiVersion": "apps/v1",
-			"kind":       "StatefulSet",
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": namespace,
-				"labels":    opmLabels(component),
+func buildStatefulSet(name, component string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "apps/v1",
+		"kind":       "StatefulSet",
+		"metadata": map[string]interface{}{
+			"name":      name,
+			"namespace": namespace,
+			"labels":    opmLabels(component),
+		},
+		"spec": map[string]interface{}{
+			"serviceName": "tree-db-headless",
+			"replicas":    int64(1),
+			"selector": map[string]interface{}{
+				"matchLabels": map[string]interface{}{
+					"app": name,
+				},
 			},
-			"spec": map[string]interface{}{
-				"serviceName": "tree-db-headless",
-				"replicas":    int64(1),
-				"selector": map[string]interface{}{
-					"matchLabels": map[string]interface{}{
+			"template": map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"labels": map[string]interface{}{
 						"app": name,
 					},
 				},
-				"template": map[string]interface{}{
-					"metadata": map[string]interface{}{
-						"labels": map[string]interface{}{
-							"app": name,
-						},
-					},
-					"spec": map[string]interface{}{
-						"containers": []interface{}{
-							map[string]interface{}{
-								"name":  "pause",
-								"image": "registry.k8s.io/pause:3.9",
-							},
+				"spec": map[string]interface{}{
+					"containers": []interface{}{
+						map[string]interface{}{
+							"name":  "pause",
+							"image": "registry.k8s.io/pause:3.9",
 						},
 					},
 				},
 			},
-		}},
-		Component: component,
-	}
+		},
+	}}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Inventory
 // ─────────────────────────────────────────────────────────────────────────────
 
-func moduleMeta() modulerelease.ReleaseMetadata {
-	return modulerelease.ReleaseMetadata{
-		Name:      releaseName,
-		Namespace: namespace,
-		UUID:      releaseID,
-	}
-}
-
-func buildInventory(resources []*core.Resource) *inventory.InventorySecret {
+func buildInventory(resources []*unstructured.Unstructured) *inventory.InventorySecret {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)

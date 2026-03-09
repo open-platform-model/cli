@@ -1,6 +1,6 @@
 //go:build ignore
 
-// Integration test for opm mod list — inventory listing and health evaluation.
+// Integration test for opm rel list — inventory listing and health evaluation.
 //
 // Tests covered:
 //   - Scenario 1: List in specific namespace returns correct releases
@@ -10,7 +10,7 @@
 //   - Scenario 5: Metadata correctness — module name, version, release ID
 //
 // Requires a running kind cluster at context "kind-opm-dev".
-// Run with: go run tests/integration/mod-list/main.go
+// Run with: go run tests/integration/rel-list/main.go
 package main
 
 import (
@@ -23,8 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/core"
-	"github.com/opmodel/cli/internal/core/modulerelease"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 )
@@ -54,7 +52,7 @@ var serviceGVR = schema.GroupVersionResource{Group: "", Version: "v1", Resource:
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== OPM Mod List Integration Test ===")
+	fmt.Println("=== OPM Release List Integration Test ===")
 	fmt.Println()
 
 	client, err := kubernetes.NewClient(kubernetes.ClientOptions{
@@ -253,14 +251,9 @@ func ensureNamespaces(ctx context.Context, client *kubernetes.Client) {
 // deployRelease creates ConfigMap resources and an inventory Secret for a release.
 func deployRelease(ctx context.Context, client *kubernetes.Client, name, ns, releaseID string, cmNames []string) {
 	resources := buildResources(name, ns, releaseID, cmNames)
-	meta := modulerelease.ReleaseMetadata{
-		Name:      name,
-		Namespace: ns,
-		UUID:      releaseID,
-	}
 
 	// Apply resources
-	result, err := kubernetes.Apply(ctx, client, resources, meta, kubernetes.ApplyOptions{})
+	result, err := kubernetes.Apply(ctx, client, resources, name, kubernetes.ApplyOptions{})
 	check(fmt.Sprintf("applying resources for %s", name), err)
 	if len(result.Errors) > 0 {
 		failf("apply errors for %s: %v", name, result.Errors[0])
@@ -274,7 +267,7 @@ func deployRelease(ctx context.Context, client *kubernetes.Client, name, ns, rel
 
 	digest := inventory.ComputeManifestDigest(resources)
 	source := inventory.ChangeSource{
-		Path:        fmt.Sprintf("tests/integration/mod-list/%s", name),
+		Path:        fmt.Sprintf("tests/integration/rel-list/%s", name),
 		Version:     moduleVersion,
 		ReleaseName: name,
 	}
@@ -289,6 +282,11 @@ func deployRelease(ctx context.Context, client *kubernetes.Client, name, ns, rel
 			ReleaseID:          releaseID,
 			LastTransitionTime: time.Now().UTC().Format(time.RFC3339),
 		},
+		ModuleMetadata: inventory.ModuleMetadata{
+			Kind:       "Module",
+			APIVersion: "core.opmodel.dev/v1alpha1",
+			Name:       moduleName,
+		},
 		Index:   []string{changeID},
 		Changes: map[string]*inventory.ChangeEntry{changeID: changeEntry},
 	}
@@ -297,29 +295,26 @@ func deployRelease(ctx context.Context, client *kubernetes.Client, name, ns, rel
 	check(fmt.Sprintf("writing inventory for %s", name), err)
 }
 
-func buildResources(relName, ns, releaseID string, cmNames []string) []*core.Resource {
-	resources := make([]*core.Resource, len(cmNames))
+func buildResources(relName, ns, releaseID string, cmNames []string) []*unstructured.Unstructured {
+	resources := make([]*unstructured.Unstructured, len(cmNames))
 	for i, cmName := range cmNames {
 		labels := map[string]interface{}{
 			"app.kubernetes.io/managed-by":    "open-platform-model",
 			"module-release.opmodel.dev/name": relName,
 			"module-release.opmodel.dev/uuid": releaseID,
 		}
-		resources[i] = &core.Resource{
-			Object: &unstructured.Unstructured{Object: map[string]interface{}{
-				"apiVersion": "v1",
-				"kind":       "ConfigMap",
-				"metadata": map[string]interface{}{
-					"name":      cmName,
-					"namespace": ns,
-					"labels":    labels,
-				},
-				"data": map[string]interface{}{
-					"key": fmt.Sprintf("value-%s", cmName),
-				},
-			}},
-			Component: "config",
-		}
+		resources[i] = &unstructured.Unstructured{Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]interface{}{
+				"name":      cmName,
+				"namespace": ns,
+				"labels":    labels,
+			},
+			"data": map[string]interface{}{
+				"key": fmt.Sprintf("value-%s", cmName),
+			},
+		}}
 	}
 	return resources
 }

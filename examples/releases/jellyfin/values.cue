@@ -20,6 +20,7 @@ values: {
 
 	// Container timezone
 	timezone: "Europe/Stockholm"
+	test: "test"
 
 	// PVC size for Jellyfin config/metadata directory.
 	// Can grow to 50GB+ for large collections (thumbnails, metadata cache).
@@ -28,6 +29,7 @@ values: {
 	// Media library mount points with persistent storage.
 	// Operators can override sizes at ModuleRelease time.
 	media: {
+		test: "test"
 		tvshows: {
 			mountPath: "/data/tvshows"
 			size:      "10Gi"
