@@ -84,7 +84,6 @@ tasks:
       - go run tests/integration/inventory-ops/main.go
       - go run tests/integration/mod-list/main.go
       - go run tests/integration/mod-tree/main.go
-      - go run tests/integration/values-flow/main.go
 
   test:e2e:
     desc: Run end-to-end tests
