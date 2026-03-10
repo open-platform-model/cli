@@ -8,6 +8,7 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
+	"github.com/opmodel/cli/internal/workflow/render"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
@@ -64,7 +65,7 @@ Examples:
 func runReleaseBuild(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, namespaceFlag, outputFmt string, split bool, outDir string) error {
 	ctx := context.Background()
 
-	outputFormat, err := cmdutil.ParseManifestOutputFormat(outputFmt)
+	outputFormat, err := render.ParseManifestOutputFormat(outputFmt)
 	if err != nil {
 		return err
 	}
@@ -78,7 +79,7 @@ func runReleaseBuild(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
-	result, err := cmdutil.RenderFromReleaseFile(ctx, cmdutil.RenderFromReleaseFileOpts{
+	result, err := render.ReleaseFile(ctx, render.ReleaseFileOpts{
 		ReleaseFilePath: releaseFile,
 		ValuesFiles:     rff.Values,
 		ModulePath:      rff.Module,
@@ -89,7 +90,7 @@ func runReleaseBuild(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 		return err
 	}
 
-	cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
+	render.ShowOutput(result, render.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
 
-	return cmdutil.WriteManifestOutput(result.Resources, outputFormat, split, outDir, result.Release.Name)
+	return render.WriteManifestOutput(result.Resources, outputFormat, split, outDir, result.Release.Name)
 }

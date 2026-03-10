@@ -8,9 +8,9 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
-	"github.com/opmodel/cli/internal/inventory"
-	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
+	workflowapply "github.com/opmodel/cli/internal/workflow/apply"
+	"github.com/opmodel/cli/internal/workflow/render"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
@@ -64,7 +64,7 @@ Examples:
 }
 
 // runReleaseApply executes the release apply command.
-func runReleaseApply(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, kf *cmdutil.K8sFlags, namespaceFlag string, //nolint:gocyclo // orchestration function; complexity is inherent
+func runReleaseApply(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, kf *cmdutil.K8sFlags, namespaceFlag string,
 	dryRun, createNS, noPrune bool, maxHistory int, force bool) error {
 	ctx := context.Background()
 
@@ -79,7 +79,7 @@ func runReleaseApply(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
-	result, err := cmdutil.RenderFromReleaseFile(ctx, cmdutil.RenderFromReleaseFileOpts{
+	result, err := render.ReleaseFile(ctx, render.ReleaseFileOpts{
 		ReleaseFilePath: releaseFile,
 		ValuesFiles:     rff.Values,
 		ModulePath:      rff.Module,
@@ -90,7 +90,7 @@ func runReleaseApply(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 		return err
 	}
 
-	cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
+	render.ShowOutput(result, render.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
 
 	releaseLog := output.ReleaseLogger(result.Release.Name)
 
@@ -100,142 +100,28 @@ func runReleaseApply(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 		return err
 	}
 
-	namespace := result.Release.Namespace
-
-	if err := cmdutil.EnsureNamespaceIfRequested(ctx, k8sClient, namespace, createNS, dryRun, releaseLog); err != nil {
-		return err
-	}
-
-	manifestDigest := inventory.ComputeManifestDigest(result.Resources)
-	output.Debug("manifest digest computed", "digest", manifestDigest)
-
 	valuesStr := ""
-	changeID := inventory.ComputeChangeID(releaseFile, result.Module.Version, valuesStr, manifestDigest)
-	output.Debug("change ID computed", "changeID", changeID)
 
-	releaseID := result.Release.UUID
-	prevInventory := cmdutil.LoadPreviousInventory(ctx, k8sClient, result.Release.Name, namespace, releaseID, dryRun, releaseLog)
-
-	prevEntries := cmdutil.PreviousInventoryEntries(prevInventory)
-
-	currentEntries := cmdutil.CurrentInventoryEntries(result.Resources)
-
-	staleSet := cmdutil.ComputeStaleInventorySet(prevEntries, currentEntries)
-
-	if err := cmdutil.GuardEmptyRender(len(result.Resources), prevEntries, force, releaseLog); err != nil {
-		return err
-	}
-	if len(result.Resources) == 0 && len(prevEntries) == 0 {
-		return nil
-	}
-
-	if err := cmdutil.RunPreApplyExistenceCheck(ctx, k8sClient, prevInventory, dryRun, currentEntries); err != nil {
-		return err
-	}
-
-	if dryRun {
-		releaseLog.Info("dry run - no changes will be made")
-	}
-	if len(result.Resources) > 0 {
-		releaseLog.Info(fmt.Sprintf("applying %d resources", len(result.Resources)))
-	}
-
-	var applyResult *kubernetes.ApplyResult
-	if len(result.Resources) > 0 {
-		applyResult, err = kubernetes.Apply(ctx, k8sClient, result.Resources, result.Release.Name, kubernetes.ApplyOptions{
-			DryRun: dryRun,
-		})
-		if err != nil {
-			releaseLog.Error("apply failed", "error", err)
-			return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
-		}
-
-		if len(applyResult.Errors) > 0 {
-			releaseLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(applyResult.Errors)))
-			for _, e := range applyResult.Errors {
-				releaseLog.Error(e.Error())
-			}
-		}
-
-		if dryRun {
-			releaseLog.Info(fmt.Sprintf("dry run complete: %d resources would be applied", applyResult.Applied))
-		} else {
-			releaseLog.Info(cmdutil.FormatApplySummary(applyResult))
-		}
-	}
-
-	if !dryRun && releaseID != "" {
-		applyHadErrors := applyResult != nil && len(applyResult.Errors) > 0
-		if applyHadErrors {
-			releaseLog.Warn("apply had errors — skipping pruning and inventory write")
-			return &oerrors.ExitError{
-				Code:    oerrors.ExitGeneralError,
-				Err:     fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)),
-				Printed: true,
-			}
-		}
-
-		if len(staleSet) > 0 && !noPrune {
-			releaseLog.Info(fmt.Sprintf("pruning %d stale resource(s)", len(staleSet)))
-			if err := inventory.PruneStaleResources(ctx, k8sClient, staleSet); err != nil {
-				releaseLog.Warn("pruning stale resources failed", "error", err)
-			}
-		}
-
-		alreadyCurrent := prevInventory != nil &&
-			len(prevInventory.Index) > 0 &&
-			prevInventory.Index[0] == changeID
-
-		if !alreadyCurrent {
-			newOrUpdatedInventory := prevInventory
-			if newOrUpdatedInventory == nil {
-				newOrUpdatedInventory = &inventory.InventorySecret{
-					ReleaseMetadata: inventory.ReleaseMetadata{
-						Kind:             "ModuleRelease",
-						APIVersion:       "core.opmodel.dev/v1alpha1",
-						ReleaseName:      result.Release.Name,
-						ReleaseNamespace: namespace,
-						ReleaseID:        releaseID,
-					},
-					Index:   []string{},
-					Changes: map[string]*inventory.ChangeEntry{},
-				}
-			}
-
-			source := inventory.ChangeSource{
-				Path:        releaseFile,
-				Version:     result.Module.Version,
-				ReleaseName: result.Release.Name,
-				Local:       result.Module.Version == "",
-			}
-
-			computedChangeID, changeEntry := inventory.PrepareChange(source, valuesStr, manifestDigest, currentEntries)
-			newOrUpdatedInventory.Changes[computedChangeID] = changeEntry
-			newOrUpdatedInventory.Index = inventory.UpdateIndex(newOrUpdatedInventory.Index, computedChangeID)
-			newOrUpdatedInventory.ReleaseMetadata.LastTransitionTime = changeEntry.Timestamp
-			inventory.PruneHistory(newOrUpdatedInventory, maxHistory)
-
-			if err := inventory.WriteInventory(ctx, k8sClient, newOrUpdatedInventory, result.Module.Name, result.Module.UUID); err != nil {
-				releaseLog.Warn("failed to write inventory Secret", "error", err)
-			}
-		}
-	}
-
-	if applyResult != nil && len(applyResult.Errors) == 0 && !dryRun {
-		if applyResult.Unchanged == applyResult.Applied {
-			output.Println(output.FormatCheckmark("Release up to date"))
-		} else {
-			output.Println(output.FormatCheckmark("Release applied"))
-		}
-	}
-
-	if applyResult != nil && len(applyResult.Errors) > 0 {
-		return &oerrors.ExitError{
-			Code:    oerrors.ExitGeneralError,
-			Err:     fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)),
-			Printed: true,
-		}
-	}
-
-	return nil
+	return workflowapply.Execute(ctx, workflowapply.Request{
+		Result:    result,
+		K8sClient: k8sClient,
+		Log:       releaseLog,
+		Options: workflowapply.Options{
+			DryRun:                 dryRun,
+			CreateNS:               createNS,
+			NoPrune:                noPrune,
+			MaxHistory:             maxHistory,
+			Force:                  force,
+			SuccessUpToDateMessage: "Release up to date",
+			SuccessAppliedMessage:  "Release applied",
+		},
+		Change: workflowapply.ChangeDescriptor{
+			Path:      releaseFile,
+			ValuesStr: valuesStr,
+			Version:   result.Module.Version,
+			Local:     result.Module.Version == "",
+		},
+		ModuleName: result.Module.Name,
+		ModuleUUID: result.Module.UUID,
+	})
 }

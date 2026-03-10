@@ -1,6 +1,6 @@
-// Package cmdutil provides shared command utilities for mod subcommands.
-// It centralizes flag group management, render pipeline orchestration,
-// Kubernetes client creation, and output formatting helpers.
+// Package cmdutil provides small CLI helpers shared across command packages.
+// It holds reusable flag groups, annotations, release targeting, and a few
+// command-facing utility functions that are not full workflow orchestration.
 package cmdutil
 
 import (

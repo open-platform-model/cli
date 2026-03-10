@@ -36,6 +36,7 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
+	"github.com/opmodel/cli/internal/workflow/query"
 )
 
 const (
@@ -453,7 +454,7 @@ func main() {
 
 	nameRSF := nameArg.ToSelectorFlags("")
 	nameRSF.Namespace = namespace
-	nameInv, nameLive, _, err := cmdutil.ResolveInventory(ctx, client, nameRSF, namespace, silentLog)
+	nameInv, nameLive, _, err := query.ResolveInventory(ctx, client, nameRSF, namespace, silentLog)
 	check("ResolveInventory(name)", err)
 	if nameInv == nil {
 		failf("15.1: ResolveInventory returned nil inventory")
@@ -475,7 +476,7 @@ func main() {
 
 	uuidRSF := uuidArg.ToSelectorFlags("")
 	uuidRSF.Namespace = namespace
-	uuidInv, uuidLive, _, err := cmdutil.ResolveInventory(ctx, client, uuidRSF, namespace, silentLog)
+	uuidInv, uuidLive, _, err := query.ResolveInventory(ctx, client, uuidRSF, namespace, silentLog)
 	check("ResolveInventory(uuid)", err)
 	if uuidInv == nil {
 		failf("15.2: ResolveInventory returned nil inventory")
@@ -503,7 +504,7 @@ func main() {
 	fmt.Printf("   OK: ResolveReleaseArg extracted Name=%q Namespace=%q from file\n", pathArg.Name, pathArg.Namespace)
 
 	pathRSF := pathArg.ToSelectorFlags("")
-	pathInv, pathLive, _, err := cmdutil.ResolveInventory(ctx, client, pathRSF, namespace, silentLog)
+	pathInv, pathLive, _, err := query.ResolveInventory(ctx, client, pathRSF, namespace, silentLog)
 	check("ResolveInventory(path)", err)
 	if pathInv == nil {
 		failf("15.3: ResolveInventory returned nil inventory")

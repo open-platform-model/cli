@@ -8,6 +8,7 @@ import (
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
+	"github.com/opmodel/cli/internal/workflow/query"
 )
 
 // NewReleaseEventsCmd creates the release events command.
@@ -65,7 +66,7 @@ Examples:
 func runReleaseEvents(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag, since, eventType string, watchMode bool, outputFmt string) error { //nolint:gocyclo // linear validation + dispatch
 	ctx := context.Background()
 
-	eventsOpts, err := cmdutil.ParseEventsOptions(since, eventType, outputFmt, watchMode)
+	eventsOpts, err := query.ParseEventsOptions(since, eventType, outputFmt, watchMode)
 	if err != nil {
 		return err
 	}
@@ -84,7 +85,7 @@ func runReleaseEvents(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 		return err
 	}
 
-	_, liveResources, _, err := cmdutil.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, releaseLog)
+	_, liveResources, _, err := query.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, releaseLog)
 	if err != nil {
 		return err
 	}
@@ -95,7 +96,7 @@ func runReleaseEvents(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 	eventsOpts.InventoryLive = liveResources
 
 	if watchMode {
-		return cmdutil.WatchEvents(ctx, k8sClient, eventsOpts, logName)
+		return query.WatchEvents(ctx, k8sClient, eventsOpts, logName)
 	}
-	return cmdutil.PrintEvents(ctx, k8sClient, eventsOpts, logName)
+	return query.PrintEvents(ctx, k8sClient, eventsOpts, logName)
 }

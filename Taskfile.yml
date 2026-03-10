@@ -62,6 +62,7 @@ tasks:
     desc: Run unit tests only
     cmds:
       - go test ./internal/...
+      - go test ./pkg/...
 
   test:integration:
     desc: Run integration tests (requires cluster)

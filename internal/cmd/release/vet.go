@@ -9,6 +9,7 @@ import (
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
+	"github.com/opmodel/cli/internal/workflow/render"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
@@ -63,7 +64,7 @@ func runReleaseVet(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.Re
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
-	result, err := cmdutil.RenderFromReleaseFile(ctx, cmdutil.RenderFromReleaseFileOpts{
+	result, err := render.ReleaseFile(ctx, render.ReleaseFileOpts{
 		ReleaseFilePath: releaseFile,
 		ValuesFiles:     rff.Values,
 		ModulePath:      rff.Module,
@@ -74,7 +75,7 @@ func runReleaseVet(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.Re
 		return err
 	}
 
-	cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
+	render.ShowOutput(result, render.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
 
 	releaseLog := output.ReleaseLogger(result.Release.Name)
 

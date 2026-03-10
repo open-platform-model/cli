@@ -62,54 +62,19 @@ func TestPrintValidationError_GenericError(t *testing.T) {
 	assert.Contains(t, got, "something went wrong", "should contain error message")
 }
 
-func TestPrintValidationError_GroupedCountsIssues(t *testing.T) {
+func TestPrintValidationError_GroupedConfigError(t *testing.T) {
 	var buf bytes.Buffer
 	output.SetupLogging(output.LogConfig{})
 	output.SetLogWriter(&buf)
 
-	groups := []pkgerrors.GroupedError{
-		{
-			Message:   "field not allowed",
-			Locations: []pkgerrors.ErrorLocation{{Path: "values.test", File: "values.cue", Line: 10, Column: 2}, {Path: "values.test", File: "values2.cue", Line: 12, Column: 2}},
-		},
-		{
-			Message:   "conflicting values",
-			Locations: []pkgerrors.ErrorLocation{{Path: "values.media.test", File: "values.cue", Line: 20, Column: 3}},
-		},
+	configErr := &pkgerrors.ConfigError{
+		Context:  "module gate",
+		Name:     "demo",
+		RawError: fmt.Errorf("field not allowed\nconflicting values"),
 	}
 
-	printGrouped("render failed", groups)
+	PrintValidationError("render failed", configErr)
 
 	got := buf.String()
-	assert.Contains(t, got, "render failed: 2 issues")
-	assert.NotContains(t, got, "3 errors")
-}
-
-func TestWriteTransformerMatches_NilMatchPlan(t *testing.T) {
-	// Should not panic when MatchPlan is nil.
-	result := &RenderResult{
-		Release: mustReleaseMetadata("test", "default"),
-	}
-	// No panic expected.
-	WriteTransformerMatches(result)
-}
-
-func TestWriteVerboseMatchLog_NilMatchPlan(t *testing.T) {
-	// Should not panic when MatchPlan is nil.
-	result := &RenderResult{
-		Release: mustReleaseMetadata("test", "default"),
-	}
-	// No panic expected.
-	WriteVerboseMatchLog(result)
-}
-
-func TestFormatFQNList_Empty(t *testing.T) {
-	assert.Equal(t, "", formatFQNList(nil))
-	assert.Equal(t, "", formatFQNList([]string{}))
-}
-
-func TestFormatFQNList_Single(t *testing.T) {
-	result := formatFQNList([]string{"example.com/resources/workload/container@v1"})
-	assert.NotEmpty(t, result)
-	assert.Contains(t, result, "container")
+	assert.Contains(t, got, "render failed")
 }

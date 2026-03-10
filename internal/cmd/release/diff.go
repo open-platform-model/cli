@@ -11,6 +11,7 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
+	"github.com/opmodel/cli/internal/workflow/render"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
@@ -62,7 +63,7 @@ func runReleaseDiff(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.R
 		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
-	result, err := cmdutil.RenderFromReleaseFile(ctx, cmdutil.RenderFromReleaseFileOpts{
+	result, err := render.ReleaseFile(ctx, render.ReleaseFileOpts{
 		ReleaseFilePath: releaseFile,
 		ValuesFiles:     rff.Values,
 		ModulePath:      rff.Module,

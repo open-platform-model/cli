@@ -10,6 +10,7 @@ import (
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
+	"github.com/opmodel/cli/internal/workflow/query"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
@@ -91,7 +92,7 @@ func runReleaseTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8s
 		return err
 	}
 
-	inv, liveResources, _, err := cmdutil.ResolveInventory(ctx, k8sClient, target.Selector, namespace, releaseLog)
+	inv, liveResources, _, err := query.ResolveInventory(ctx, k8sClient, target.Selector, namespace, releaseLog)
 	if err != nil {
 		return err
 	}

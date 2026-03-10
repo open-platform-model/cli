@@ -10,6 +10,7 @@ import (
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/output"
+	"github.com/opmodel/cli/internal/workflow/query"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
@@ -98,6 +99,6 @@ func runReleaseList(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFla
 		return nil
 	}
 
-	summaries := cmdutil.EvaluateReleaseHealth(ctx, k8sClient, inventories, releaseListConcurrency, false)
-	return cmdutil.RenderReleaseListOutput(summaries, outputFormat, allNamespaces)
+	summaries := query.EvaluateReleaseHealth(ctx, k8sClient, inventories, releaseListConcurrency, false)
+	return query.RenderReleaseListOutput(summaries, outputFormat, allNamespaces)
 }

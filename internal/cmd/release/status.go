@@ -8,6 +8,7 @@ import (
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
+	"github.com/opmodel/cli/internal/workflow/query"
 )
 
 // NewReleaseStatusCmd creates the release status command.
@@ -71,7 +72,7 @@ func runReleaseStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 	logName := target.LogName
 	releaseLog := output.ReleaseLogger(logName)
 
-	outputFormat, err := cmdutil.ParseStatusOutputFormat(outputFmt)
+	outputFormat, err := query.ParseStatusOutputFormat(outputFmt)
 	if err != nil {
 		return err
 	}
@@ -82,11 +83,11 @@ func runReleaseStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 		return err
 	}
 
-	inv, liveResources, missingEntries, err := cmdutil.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, releaseLog)
+	inv, liveResources, missingEntries, err := query.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, releaseLog)
 	if err != nil {
 		return err
 	}
 
-	statusOpts := cmdutil.BuildStatusOptions(target.Namespace, target.Selector, outputFormat, verbose, inv, liveResources, missingEntries)
-	return cmdutil.PrintReleaseStatus(ctx, k8sClient, statusOpts, logName)
+	statusOpts := query.BuildStatusOptions(target.Namespace, target.Selector, outputFormat, verbose, inv, liveResources, missingEntries)
+	return query.PrintReleaseStatus(ctx, k8sClient, statusOpts, logName)
 }

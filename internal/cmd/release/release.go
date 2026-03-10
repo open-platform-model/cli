@@ -12,8 +12,13 @@ func NewReleaseCmd(cfg *config.GlobalConfig) *cobra.Command {
 	c := &cobra.Command{
 		Use:     "release",
 		Aliases: []string{"rel"},
-		Short:   "Release operations",
-		Long:    `Release operations for OPM releases.`,
+		Short:   "Work with release files and deployed releases",
+		Long: `Work with OPM release files.
+
+Use this command group when you are starting from a release definition: render
+it, validate it, diff it, apply it, or inspect an already deployed release.
+
+For operations that start from module source, use 'opm module'.`,
 	}
 
 	// Render commands (positional arg = release file path)
