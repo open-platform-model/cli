@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	oerrors "github.com/opmodel/cli/pkg/errors"
+	"github.com/opmodel/cli/pkg/releaseprocess"
 )
 
 func TestValidateConfig_Valid(t *testing.T) {
@@ -27,7 +28,7 @@ func TestValidateConfig_Valid(t *testing.T) {
 	}`)
 	require.NoError(t, values.Err())
 
-	err := ValidateConfig(schema, values, "module", "test-release")
+	_, err := releaseprocess.ValidateConfig(schema, []cue.Value{values}, "module", "test-release")
 	assert.Nil(t, err, "valid values should produce no error")
 }
 
@@ -45,7 +46,7 @@ func TestValidateConfig_TypeMismatch(t *testing.T) {
 	}`)
 	require.NoError(t, values.Err())
 
-	cfgErr := ValidateConfig(schema, values, "module", "my-release")
+	_, cfgErr := releaseprocess.ValidateConfig(schema, []cue.Value{values}, "module", "my-release")
 	require.NotNil(t, cfgErr, "type mismatch should produce ConfigError")
 	assert.IsType(t, &oerrors.ConfigError{}, cfgErr)
 	assert.Equal(t, "module", cfgErr.Context)
@@ -69,7 +70,7 @@ func TestValidateConfig_MissingRequired(t *testing.T) {
 	}`)
 	require.NoError(t, values.Err())
 
-	cfgErr := ValidateConfig(schema, values, "module", "incomplete-release")
+	_, cfgErr := releaseprocess.ValidateConfig(schema, []cue.Value{values}, "module", "incomplete-release")
 	require.NotNil(t, cfgErr, "missing required field should produce ConfigError")
 	assert.Equal(t, "incomplete-release", cfgErr.Name)
 }
@@ -84,7 +85,7 @@ func TestValidateConfig_MissingSchema(t *testing.T) {
 	root := ctx.CompileString(`{}`)
 	nonExistent := root.LookupPath(cue.ParsePath("nonexistent"))
 
-	result := ValidateConfig(nonExistent, values, "module", "test")
+	_, result := releaseprocess.ValidateConfig(nonExistent, []cue.Value{values}, "module", "test")
 	assert.Nil(t, result, "missing schema should return nil")
 }
 
@@ -97,7 +98,7 @@ func TestValidateConfig_BundleContext(t *testing.T) {
 	values := ctx.CompileString(`{ count: "bad" }`)
 	require.NoError(t, values.Err())
 
-	cfgErr := ValidateConfig(schema, values, "bundle", "my-bundle")
+	_, cfgErr := releaseprocess.ValidateConfig(schema, []cue.Value{values}, "bundle", "my-bundle")
 	require.NotNil(t, cfgErr)
 	assert.Equal(t, "bundle", cfgErr.Context)
 	assert.Equal(t, "my-bundle", cfgErr.Name)

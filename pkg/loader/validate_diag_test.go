@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/opmodel/cli/pkg/releaseprocess"
 )
 
 // TestValidateConfig_FieldNotAllowed_FileLoaded exercises the two-pass
@@ -52,7 +54,7 @@ func TestValidateConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
 	require.True(t, configSchema.IsClosed(), "#module.#config must be a closed struct")
 
 	// Call ValidateConfig and assert the result.
-	cfgErr := ValidateConfig(configSchema, valuesVal, "module", "jellyfin")
+	_, cfgErr := releaseprocess.ValidateConfig(configSchema, []cue.Value{valuesVal}, "module", "jellyfin")
 	require.NotNil(t, cfgErr, "values with extra fields should produce a ConfigError")
 
 	// Collect all individual CUE errors.
@@ -131,7 +133,7 @@ func TestValidateConfig_FieldNotAllowed_Inline(t *testing.T) {
 }`, cue.Filename("values.cue"))
 	require.NoError(t, values.Err())
 
-	cfgErr := ValidateConfig(configSchema, values, "module", "test")
+	_, cfgErr := releaseprocess.ValidateConfig(configSchema, []cue.Value{values}, "module", "test")
 	require.NotNil(t, cfgErr, "extra field should produce a ConfigError")
 
 	errs := cueerrors.Errors(cfgErr.RawError)

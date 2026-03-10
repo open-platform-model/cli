@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -103,26 +102,4 @@ func TestResolveReleaseFile(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "does not contain release.cue")
 	})
-}
-
-// TestFinalizeValue tests constraint stripping via finalizeValue.
-func TestFinalizeValue(t *testing.T) {
-	ctx := cuecontext.New()
-
-	// A concrete value with no schema constraints.
-	v := ctx.CompileString(`{
-		apiVersion: "apps/v1"
-		kind:       "Deployment"
-		metadata: name: "my-app"
-	}`)
-	require.NoError(t, v.Err())
-
-	out, err := finalizeValue(ctx, v)
-	require.NoError(t, err)
-	assert.NoError(t, out.Err())
-
-	// The finalized value should still contain the same data.
-	name, err := out.LookupPath(cue.ParsePath("metadata.name")).String()
-	require.NoError(t, err)
-	assert.Equal(t, "my-app", name)
 }
