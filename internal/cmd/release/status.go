@@ -8,7 +8,6 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
-	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
@@ -88,21 +87,14 @@ func runReleaseStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 	}
 
 	namespace := k8sConfig.Namespace.Value
-	output.Debug("resolved kubernetes config",
-		"kubeconfig", k8sConfig.Kubeconfig.Value,
-		"context", k8sConfig.Context.Value,
-		"namespace", namespace,
-	)
+	cmdutil.LogResolvedKubernetesConfig(namespace, k8sConfig.Kubeconfig.Value, k8sConfig.Context.Value)
 
 	logName := rsf.LogName()
 	releaseLog := output.ReleaseLogger(logName)
 
-	outputFormat, valid := output.ParseFormat(outputFmt)
-	if !valid || outputFormat == output.FormatDir {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
-			Err:  fmt.Errorf("invalid output format %q (valid: table, wide, yaml, json)", outputFmt),
-		}
+	outputFormat, err := cmdutil.ParseStatusOutputFormat(outputFmt)
+	if err != nil {
+		return err
 	}
 
 	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
@@ -116,68 +108,6 @@ func runReleaseStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 		return err
 	}
 
-	componentMap := make(map[string]string)
-	if len(inv.Index) > 0 {
-		if change, ok := inv.Changes[inv.Index[0]]; ok {
-			for _, entry := range change.Inventory.Entries {
-				key := entry.Kind + "/" + entry.Namespace + "/" + entry.Name
-				componentMap[key] = entry.Component
-			}
-		}
-	}
-
-	var version string
-	if len(inv.Index) > 0 {
-		if change, ok := inv.Changes[inv.Index[0]]; ok {
-			version = change.Source.Version
-		}
-	}
-
-	wideMode := outputFormat == output.FormatWide
-	statusOpts := kubernetes.StatusOptions{
-		Namespace:     namespace,
-		ReleaseName:   rsf.ReleaseName,
-		ReleaseID:     rsf.ReleaseID,
-		Version:       version,
-		ComponentMap:  componentMap,
-		OutputFormat:  outputFormat,
-		InventoryLive: liveResources,
-		Wide:          wideMode,
-		Verbose:       verbose,
-	}
-	for _, m := range missingEntries {
-		statusOpts.MissingResources = append(statusOpts.MissingResources, kubernetes.MissingResource{
-			Kind:      m.Kind,
-			Namespace: m.Namespace,
-			Name:      m.Name,
-		})
-	}
-
-	return fetchAndPrintReleaseStatus(ctx, k8sClient, statusOpts, logName)
-}
-
-func fetchAndPrintReleaseStatus(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string) error {
-	releaseLog := output.ReleaseLogger(logName)
-
-	result, err := kubernetes.GetReleaseStatus(ctx, client, opts)
-	if err != nil {
-		if kubernetes.IsNoResourcesFound(err) {
-			releaseLog.Error("getting status", "error", err)
-			return &oerrors.ExitError{Code: oerrors.ExitNotFound, Err: err, Printed: true}
-		}
-		releaseLog.Error("getting status", "error", err)
-		return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
-	}
-
-	formatted, err := kubernetes.FormatStatus(result, opts.OutputFormat)
-	if err != nil {
-		releaseLog.Error("formatting status", "error", err)
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err, Printed: true}
-	}
-	output.Println(formatted)
-
-	if result.AggregateStatus != "Ready" && result.AggregateStatus != "Complete" {
-		return &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: fmt.Errorf("release %q: %d resource(s) not ready", opts.ReleaseName, result.Summary.NotReady), Printed: true}
-	}
-	return nil
+	statusOpts := cmdutil.BuildStatusOptions(namespace, rsf, outputFormat, verbose, inv, liveResources, missingEntries)
+	return cmdutil.PrintReleaseStatus(ctx, k8sClient, statusOpts, logName)
 }

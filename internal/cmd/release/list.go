@@ -2,19 +2,13 @@ package release
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/inventory"
-	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
@@ -104,161 +98,6 @@ func runReleaseList(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFla
 		return nil
 	}
 
-	summaries := evalReleaseHealth(ctx, k8sClient, inventories)
-	return renderRelListOutput(summaries, outputFormat, allNamespaces)
-}
-
-type relReleaseSummary struct {
-	Name        string `json:"name" yaml:"name"`
-	Module      string `json:"module" yaml:"module"`
-	Namespace   string `json:"namespace" yaml:"namespace"`
-	Version     string `json:"version" yaml:"version"`
-	Status      string `json:"status" yaml:"status"`
-	ReadyCount  int    `json:"readyCount" yaml:"readyCount"`
-	TotalCount  int    `json:"totalCount" yaml:"totalCount"`
-	ReleaseID   string `json:"releaseId" yaml:"releaseId"`
-	LastApplied string `json:"lastApplied" yaml:"lastApplied"`
-	Age         string `json:"age" yaml:"age"`
-}
-
-type relHealthResult struct {
-	index  int
-	status kubernetes.HealthStatus
-	ready  int
-	total  int
-}
-
-func evalReleaseHealth(ctx context.Context, client *kubernetes.Client, inventories []*inventory.InventorySecret) []relReleaseSummary {
-	summaries := make([]relReleaseSummary, len(inventories))
-	for i, inv := range inventories {
-		summaries[i] = buildRelSummary(inv)
-	}
-
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, releaseListConcurrency)
-	results := make([]relHealthResult, len(inventories))
-
-	for i, inv := range inventories {
-		wg.Add(1)
-		go func(idx int, inv *inventory.InventorySecret) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			live, missing, err := inventory.DiscoverResourcesFromInventory(ctx, client, inv)
-			if err != nil {
-				results[idx] = relHealthResult{index: idx, status: kubernetes.HealthUnknown}
-				return
-			}
-			status, ready, total := kubernetes.QuickReleaseHealth(live, len(missing))
-			results[idx] = relHealthResult{index: idx, status: status, ready: ready, total: total}
-		}(i, inv)
-	}
-	wg.Wait()
-
-	for _, r := range results {
-		summaries[r.index].Status = string(r.status)
-		summaries[r.index].ReadyCount = r.ready
-		summaries[r.index].TotalCount = r.total
-	}
-	return summaries
-}
-
-func buildRelSummary(inv *inventory.InventorySecret) relReleaseSummary {
-	s := relReleaseSummary{
-		Name:      inv.ReleaseMetadata.ReleaseName,
-		Module:    inv.ModuleMetadata.Name,
-		Namespace: inv.ReleaseMetadata.ReleaseNamespace,
-		ReleaseID: inv.ReleaseMetadata.ReleaseID,
-	}
-	if len(inv.Index) > 0 {
-		if change, ok := inv.Changes[inv.Index[0]]; ok {
-			s.Version = change.Source.Version
-			s.LastApplied = change.Timestamp
-		}
-	}
-	if inv.ReleaseMetadata.LastTransitionTime != "" {
-		if t, err := time.Parse(time.RFC3339, inv.ReleaseMetadata.LastTransitionTime); err == nil {
-			s.Age = kubernetes.FormatDuration(time.Since(t))
-		}
-	}
-	if s.Version == "" {
-		s.Version = "-"
-	}
-	if s.Module == "" {
-		s.Module = "-"
-	}
-	if s.Age == "" {
-		s.Age = "<unknown>"
-	}
-	return s
-}
-
-func renderRelListOutput(summaries []relReleaseSummary, format output.Format, allNamespaces bool) error {
-	switch format { //nolint:exhaustive // only JSON, YAML, wide are distinct; table is default
-	case output.FormatJSON:
-		data, err := json.MarshalIndent(summaries, "", "  ")
-		if err != nil {
-			return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("marshaling to JSON: %w", err)}
-		}
-		output.Println(string(data))
-		return nil
-	case output.FormatYAML:
-		data, err := yaml.Marshal(summaries)
-		if err != nil {
-			return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("marshaling to YAML: %w", err)}
-		}
-		output.Println(strings.TrimSpace(string(data)))
-		return nil
-	case output.FormatWide:
-		renderRelListWide(summaries, allNamespaces)
-		return nil
-	default:
-		renderRelListTable(summaries, allNamespaces)
-		return nil
-	}
-}
-
-func formatRelStatusColumn(status string, ready, total int) string {
-	return fmt.Sprintf("%s (%d/%d)", output.FormatHealthStatus(status), ready, total)
-}
-
-func renderRelListTable(summaries []relReleaseSummary, allNamespaces bool) {
-	var headers []string
-	if allNamespaces {
-		headers = []string{"NAMESPACE", "NAME", "MODULE", "VERSION", "STATUS", "AGE"}
-	} else {
-		headers = []string{"NAME", "MODULE", "VERSION", "STATUS", "AGE"}
-	}
-	tbl := output.NewTable(headers...)
-	for i := range summaries {
-		s := &summaries[i]
-		status := formatRelStatusColumn(s.Status, s.ReadyCount, s.TotalCount)
-		if allNamespaces {
-			tbl.Row(s.Namespace, s.Name, s.Module, s.Version, status, s.Age)
-		} else {
-			tbl.Row(s.Name, s.Module, s.Version, status, s.Age)
-		}
-	}
-	output.Println(tbl.String())
-}
-
-func renderRelListWide(summaries []relReleaseSummary, allNamespaces bool) {
-	var headers []string
-	if allNamespaces {
-		headers = []string{"NAMESPACE", "NAME", "MODULE", "VERSION", "STATUS", "AGE", "RELEASE-ID", "LAST-APPLIED"}
-	} else {
-		headers = []string{"NAME", "MODULE", "VERSION", "STATUS", "AGE", "RELEASE-ID", "LAST-APPLIED"}
-	}
-	tbl := output.NewTable(headers...)
-	for i := range summaries {
-		s := &summaries[i]
-		status := formatRelStatusColumn(s.Status, s.ReadyCount, s.TotalCount)
-		if allNamespaces {
-			tbl.Row(s.Namespace, s.Name, s.Module, s.Version, status, s.Age, s.ReleaseID, s.LastApplied)
-		} else {
-			tbl.Row(s.Name, s.Module, s.Version, status, s.Age, s.ReleaseID, s.LastApplied)
-		}
-	}
-	output.Println(tbl.String())
+	summaries := cmdutil.EvaluateReleaseHealth(ctx, k8sClient, inventories, releaseListConcurrency, false)
+	return cmdutil.RenderReleaseListOutput(summaries, outputFormat, allNamespaces)
 }
