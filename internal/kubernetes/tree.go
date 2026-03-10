@@ -36,11 +36,6 @@ const (
 	treeConnLast = "└── "
 )
 
-// treeMinStatusGap is the minimum number of spaces between the end of a
-// resource name and its status token. The longest name in the tree is the
-// anchor; all other names get more padding to reach the same column.
-const treeMinStatusGap = 6 //nolint:unused // reserved for future column alignment
-
 // Kubernetes workload kind constants shared across the kubernetes package.
 const (
 	kindDeployment            = "Deployment"
@@ -734,14 +729,6 @@ func renderDepth0Components(sb *strings.Builder, components []Component, colored
 		fmt.Fprintf(sb, "%s%s   %d %s   %s\n",
 			chrome, name, comp.ResourceCount, resourceWord, status)
 	}
-}
-
-// formatPlainTree renders the tree without any ANSI color codes.
-// Primarily used in unit tests to assert tree structure without dealing with
-// escape sequences. In production, color stripping is handled automatically
-// by termenv (see FormatTree); this function is not called on the hot path.
-func formatPlainTree(result *TreeResult) string {
-	return formatTreeTable(result, false)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -46,11 +46,11 @@ func SecretName(releaseName, releaseID string) string {
 //nolint:revive // Inventory prefix is intentional for cross-package clarity
 func InventoryLabels(releaseName, releaseNamespace, releaseID string) map[string]string {
 	return map[string]string{
-		pkgcore.LabelManagedBy:        pkgcore.LabelManagedByValue,
-		pkgcore.LabelReleaseName:      releaseName,
-		pkgcore.LabelReleaseNamespace: releaseNamespace,
-		pkgcore.LabelReleaseUUID:      releaseID,
-		pkgcore.LabelComponent:        "inventory",
+		pkgcore.LabelManagedBy:              pkgcore.LabelManagedByValue,
+		pkgcore.LabelModuleReleaseName:      releaseName,
+		pkgcore.LabelModuleReleaseNamespace: releaseNamespace,
+		pkgcore.LabelModuleReleaseUUID:      releaseID,
+		pkgcore.LabelComponent:              "inventory",
 	}
 }
 

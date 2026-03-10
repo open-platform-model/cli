@@ -20,6 +20,12 @@ import (
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+// formatPlainTree renders the tree without any ANSI color codes.
+// Test helper — moved from tree.go since it has no production callers.
+func formatPlainTree(result *TreeResult) string {
+	return formatTreeTable(result, false)
+}
+
 func makeRes(kind, ns, name string) *unstructured.Unstructured {
 	u := &unstructured.Unstructured{}
 	u.SetKind(kind)

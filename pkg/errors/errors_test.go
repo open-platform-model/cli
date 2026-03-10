@@ -108,8 +108,3 @@ func TestConfigError_Unwrap(t *testing.T) {
 	assert.Equal(t, raw, ce.Unwrap())
 	assert.True(t, errors.Is(ce, raw))
 }
-
-func TestConfigError_FieldErrors_Nil(t *testing.T) {
-	ce := &oerrors.ConfigError{Context: "module", Name: "x", RawError: nil}
-	assert.Nil(t, ce.FieldErrors())
-}

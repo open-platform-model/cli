@@ -214,6 +214,10 @@ func FormatTransformerMatch(component, fqn string) string {
 //
 // The first line is identical to FormatTransformerMatch. The reason is indented
 // and dim-styled on the second line.
+//
+// TODO: This function has no callers yet. Decide where verbose transformer match
+// output should be surfaced (e.g. a --verbose flag on mod apply/build) and wire
+// it up, or remove it if the use case is covered another way.
 func FormatTransformerMatchVerbose(component, fqn, reason string) string {
 	firstLine := FormatTransformerMatch(component, fqn)
 	if reason == "" {

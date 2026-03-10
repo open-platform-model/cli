@@ -21,27 +21,12 @@ const (
 	// Used by inventory to track provenance for component-rename safety checks.
 	LabelComponentName = "component.opmodel.dev/name"
 
-	// LabelModuleName is the label injected by the CUE catalog on all application
-	// resources to record which module produced them. Value is the module name.
-	LabelModuleName = "module.opmodel.dev/name"
-
-	// LabelModuleUUID is the module identity UUID label for resource discovery.
-	LabelModuleUUID = "module.opmodel.dev/uuid"
-
-	// LabelReleaseName is the release name label.
+	// LabelModuleReleaseName is the release name label.
 	LabelModuleReleaseName = "module-release.opmodel.dev/name"
-	LabelReleaseName       = LabelModuleReleaseName
 
-	// LabelReleaseNamespace is the release namespace label.
+	// LabelModuleReleaseNamespace is the release namespace label.
 	LabelModuleReleaseNamespace = "module-release.opmodel.dev/namespace"
-	LabelReleaseNamespace       = LabelModuleReleaseNamespace
 
-	// LabelReleaseUUID is the release identity UUID label for resource discovery.
+	// LabelModuleReleaseUUID is the release identity UUID label for resource discovery.
 	LabelModuleReleaseUUID = "module-release.opmodel.dev/uuid"
-	LabelReleaseUUID       = LabelModuleReleaseUUID
-
-	// LabelWorkloadType is the v1alpha1 label for workload type classification.
-	// Required on components using #Container resource.
-	// Values: "stateless", "stateful", "daemon", "task", "scheduled-task".
-	LabelWorkloadType = "core.opmodel.dev/workload-type"
 )

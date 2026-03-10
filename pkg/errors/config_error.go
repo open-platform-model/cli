@@ -11,8 +11,8 @@ import (
 // ConfigError is a structured validation error produced by the Bundle Gate or
 // Module Gate when supplied values do not satisfy a #config schema.
 //
-// It carries the raw CUE error tree so callers can obtain either a human-readable
-// summary (Error()) or structured per-field diagnostics (FieldErrors()).
+// It carries the raw CUE error tree so callers can obtain a human-readable
+// summary via Error() or grouped diagnostics via GroupedErrors().
 type ConfigError struct {
 	// Context is "bundle" or "module" — identifies which gate produced the error.
 	Context string
@@ -21,7 +21,6 @@ type ConfigError struct {
 	Name string
 
 	// RawError is the original CUE unification or concreteness error.
-	// Preserved so FieldErrors() can walk cue/errors.Errors() for per-field output.
 	RawError error
 }
 
@@ -45,48 +44,6 @@ func (e *ConfigError) Error() string {
 
 // Unwrap returns the underlying CUE error for errors.Is/As compatibility.
 func (e *ConfigError) Unwrap() error { return e.RawError }
-
-// FieldErrors walks the raw CUE error tree and returns structured per-field
-// diagnostics. Each entry contains the source file, line, column, field path,
-// and a human-readable message — suitable for rich terminal output.
-//
-// Returns nil if RawError is nil or produces no parseable positions.
-func (e *ConfigError) FieldErrors() []FieldError {
-	if e.RawError == nil {
-		return nil
-	}
-
-	var out []FieldError
-	for _, ce := range cueerrors.Errors(e.RawError) {
-		pos := ce.Position()
-		file := ""
-		if pos.IsValid() {
-			file = filepath.Base(pos.Filename())
-		}
-
-		format, args := ce.Msg()
-		var msg string
-		if len(args) == 0 {
-			msg = format
-		} else {
-			msg = fmt.Sprintf(format, args...)
-		}
-
-		// Skip disjunction summary lines — they add noise without actionable info.
-		if strings.Contains(msg, "errors in empty disjunction") {
-			continue
-		}
-
-		out = append(out, FieldError{
-			File:    file,
-			Line:    pos.Line(),
-			Column:  pos.Column(),
-			Path:    strings.Join(ce.Path(), "."),
-			Message: msg,
-		})
-	}
-	return out
-}
 
 // GroupedErrors walks the raw CUE error tree and returns errors grouped by
 // message. Each GroupedError holds the message and all distinct source

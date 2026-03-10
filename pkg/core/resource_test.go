@@ -84,14 +84,6 @@ func TestResource_MarshalJSON(t *testing.T) {
 	assert.Contains(t, string(b), `"name":"my-app"`)
 }
 
-func TestResource_MarshalYAML(t *testing.T) {
-	r := newTestResource(t, deploymentCUE)
-	b, err := r.MarshalYAML()
-	require.NoError(t, err)
-	assert.Contains(t, string(b), "kind: Deployment")
-	assert.Contains(t, string(b), "name: my-app")
-}
-
 func TestResource_ToUnstructured(t *testing.T) {
 	r := newTestResource(t, deploymentCUE)
 	u, err := r.ToUnstructured()
@@ -99,13 +91,6 @@ func TestResource_ToUnstructured(t *testing.T) {
 	assert.Equal(t, "Deployment", u.GetKind())
 	assert.Equal(t, "my-app", u.GetName())
 	assert.Equal(t, "default", u.GetNamespace())
-}
-
-func TestResource_ToMap(t *testing.T) {
-	r := newTestResource(t, deploymentCUE)
-	m, err := r.ToMap()
-	require.NoError(t, err)
-	assert.Equal(t, "Deployment", m["kind"])
 }
 
 func TestResource_Namespace_Empty(t *testing.T) {

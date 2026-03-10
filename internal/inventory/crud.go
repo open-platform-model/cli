@@ -41,7 +41,7 @@ func GetInventory(ctx context.Context, client *kubernetes.Client, releaseName, n
 		"name", secretName, "releaseID", releaseID)
 
 	labelSelector := fmt.Sprintf("%s=%s,%s=%s",
-		pkgcore.LabelReleaseUUID, releaseID,
+		pkgcore.LabelModuleReleaseUUID, releaseID,
 		pkgcore.LabelComponent, "inventory",
 	)
 	list, err := client.Clientset.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{
@@ -122,7 +122,7 @@ func WriteInventory(ctx context.Context, client *kubernetes.Client, inv *Invento
 // Returns an error if multiple inventory Secrets are found (unexpected state).
 func FindInventoryByReleaseName(ctx context.Context, client *kubernetes.Client, releaseName, namespace string) (*InventorySecret, error) {
 	labelSelector := fmt.Sprintf("%s=%s,%s=%s",
-		pkgcore.LabelReleaseName, releaseName,
+		pkgcore.LabelModuleReleaseName, releaseName,
 		pkgcore.LabelComponent, "inventory",
 	)
 	list, err := client.Clientset.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{

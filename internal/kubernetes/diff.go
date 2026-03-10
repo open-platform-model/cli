@@ -402,23 +402,6 @@ func Diff(ctx context.Context, client *Client, resources []*unstructured.Unstruc
 	return result, nil
 }
 
-// DiffPartial compares rendered resources against live state, handling partial render results.
-// Successfully rendered resources are compared; render errors produce warnings.
-// releaseName is passed through to Diff for logging context.
-func DiffPartial(ctx context.Context, client *Client, resources []*unstructured.Unstructured, renderErrors []error, releaseName string, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
-	result, err := Diff(ctx, client, resources, releaseName, comparer, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add render errors as warnings
-	for _, renderErr := range renderErrors {
-		result.Warnings = append(result.Warnings, fmt.Sprintf("render error: %v", renderErr))
-	}
-
-	return result, nil
-}
-
 // findOrphans returns resources that exist in inventoryLive but are not present
 // in the rendered resource set. When inventoryLive is nil the set is empty and
 // no orphans are reported (first-time diff where no release has been deployed yet).
