@@ -15,6 +15,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -146,13 +147,12 @@ func main() {
 	if deleteResult67.Deleted != 2 {
 		failf("6.7: expected 2 deleted resources (cm-a + svc-a), got %d", deleteResult67.Deleted)
 	}
+	waitForConfigMapDeleted(ctx, client, "cm-a")
+	waitForServiceDeleted(ctx, client, "svc-a")
 	fmt.Printf("   OK: %d resources deleted (no Endpoints)\n", deleteResult67.Deleted)
 
 	// Verify the inventory Secret is gone (deleted last).
-	_, errInvGet := client.Clientset.CoreV1().Secrets(namespace).Get(ctx, invSecretName67, metav1.GetOptions{})
-	if !apierrors.IsNotFound(errInvGet) {
-		failf("6.7: expected inventory Secret to be deleted, but got: %v", errInvGet)
-	}
+	waitForSecretDeleted(ctx, client, invSecretName67)
 	fmt.Println("   OK: inventory Secret deleted last (404 confirmed)")
 
 	// cleanup is no-op here since delete already removed everything
@@ -180,6 +180,7 @@ func main() {
 	// Manually delete svc-a to simulate a missing resource.
 	err = client.ResourceClient(serviceGVR, namespace).Delete(ctx, "svc-a", metav1.DeleteOptions{})
 	check("manually deleting svc-a for 6.8", err)
+	waitForServiceDeleted(ctx, client, "svc-a")
 	fmt.Println("   OK: svc-a manually deleted (simulating missing resource)")
 
 	// Discover resources from inventory — svc-a should be in missing list.
@@ -371,12 +372,66 @@ func buildInventory(resources []*unstructured.Unstructured) *inventory.Inventory
 func cleanup(ctx context.Context, client *kubernetes.Client) {
 	for _, name := range []string{"cm-a", "cm-b"} {
 		_ = client.ResourceClient(configMapGVR, namespace).Delete(ctx, name, metav1.DeleteOptions{})
+		waitForConfigMapDeleted(ctx, client, name)
 	}
 	for _, name := range []string{"svc-a", "svc-b"} {
 		_ = client.ResourceClient(serviceGVR, namespace).Delete(ctx, name, metav1.DeleteOptions{})
+		waitForServiceDeleted(ctx, client, name)
 	}
 	secretName := inventory.SecretName(releaseName, releaseID)
 	_ = client.Clientset.CoreV1().Secrets(namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
+	waitForSecretDeleted(ctx, client, secretName)
+}
+
+func waitForConfigMapDeleted(ctx context.Context, client *kubernetes.Client, name string) {
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		_, err := client.ResourceClient(configMapGVR, namespace).Get(ctx, name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return
+		}
+		if err != nil {
+			failf("waiting for ConfigMap/%s deletion: %v", name, err)
+		}
+		if time.Now().After(deadline) {
+			failf("timed out waiting for ConfigMap/%s deletion", name)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+func waitForServiceDeleted(ctx context.Context, client *kubernetes.Client, name string) {
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		_, err := client.ResourceClient(serviceGVR, namespace).Get(ctx, name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return
+		}
+		if err != nil {
+			failf("waiting for Service/%s deletion: %v", name, err)
+		}
+		if time.Now().After(deadline) {
+			failf("timed out waiting for Service/%s deletion", name)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+func waitForSecretDeleted(ctx context.Context, client *kubernetes.Client, name string) {
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		_, err := client.Clientset.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return
+		}
+		if err != nil {
+			failf("waiting for Secret/%s deletion: %v", name, err)
+		}
+		if time.Now().After(deadline) {
+			failf("timed out waiting for Secret/%s deletion", name)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
 }
 
 // step prints a numbered step header.

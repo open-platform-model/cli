@@ -16,6 +16,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -221,10 +222,7 @@ func main() {
 	fmt.Println("   OK: pruning complete")
 
 	// Verify cm-b is gone.
-	_, errGet := client.ResourceClient(configMapGVR, namespace).Get(ctx, "cm-b", metav1.GetOptions{})
-	if !apierrors.IsNotFound(errGet) {
-		failf("expected cm-b to be deleted (404), but got: %v", errGet)
-	}
+	waitForConfigMapState(ctx, client, "cm-b", false)
 	fmt.Println("   OK: cm-b is deleted (404)")
 
 	// Write updated inventory.
@@ -299,10 +297,8 @@ func main() {
 		fmt.Println("   OK: inventory unchanged after partial failure")
 
 		// Verify stale resources were NOT pruned: cm-a and cm-c still exist.
-		_, errA := client.ResourceClient(configMapGVR, namespace).Get(ctx, "cm-a", metav1.GetOptions{})
-		check("verifying cm-a still exists after partial failure", errA)
-		_, errC := client.ResourceClient(configMapGVR, namespace).Get(ctx, "cm-c", metav1.GetOptions{})
-		check("verifying cm-c still exists after partial failure", errC)
+		waitForConfigMapState(ctx, client, "cm-a", true)
+		waitForConfigMapState(ctx, client, "cm-c", true)
 		fmt.Println("   OK: existing resources not pruned after partial failure")
 	}
 
@@ -374,9 +370,52 @@ func entriesToWrite(resources []*unstructured.Unstructured) []inventory.Inventor
 func cleanup(ctx context.Context, client *kubernetes.Client) {
 	for _, name := range []string{"cm-a", "cm-b", "cm-c"} {
 		_ = client.ResourceClient(configMapGVR, namespace).Delete(ctx, name, metav1.DeleteOptions{})
+		waitForConfigMapState(ctx, client, name, false)
 	}
 	secretName := inventory.SecretName(releaseName, releaseID)
 	_ = client.Clientset.CoreV1().Secrets(namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
+	waitForSecretDeleted(ctx, client, secretName)
+}
+
+func waitForConfigMapState(ctx context.Context, client *kubernetes.Client, name string, wantPresent bool) {
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		_, err := client.ResourceClient(configMapGVR, namespace).Get(ctx, name, metav1.GetOptions{})
+		if wantPresent && err == nil {
+			return
+		}
+		if !wantPresent && apierrors.IsNotFound(err) {
+			return
+		}
+		if err != nil && !apierrors.IsNotFound(err) {
+			failf("waiting for ConfigMap/%s state: %v", name, err)
+		}
+		if time.Now().After(deadline) {
+			state := "present"
+			if !wantPresent {
+				state = "deleted"
+			}
+			failf("timed out waiting for ConfigMap/%s to become %s", name, state)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+func waitForSecretDeleted(ctx context.Context, client *kubernetes.Client, name string) {
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		_, err := client.Clientset.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return
+		}
+		if err != nil {
+			failf("waiting for Secret/%s deletion: %v", name, err)
+		}
+		if time.Now().After(deadline) {
+			failf("timed out waiting for Secret/%s deletion", name)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
 }
 
 // step prints a numbered step header.
