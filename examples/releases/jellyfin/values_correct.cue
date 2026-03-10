@@ -29,10 +29,12 @@ values: {
 	// Operators can override sizes at ModuleRelease time.
 	media: {
 		tvshows: {
+			type: "pvc"
 			mountPath: "/data/tvshows"
 			size:      "10Gi"
 		}
 		movies: {
+			type: "pvc"
 			mountPath: "/data/movies"
 			size:      "10Gi"
 		}
