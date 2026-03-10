@@ -3,13 +3,11 @@ package release
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
-	"github.com/opmodel/cli/internal/output"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
@@ -66,12 +64,9 @@ Examples:
 func runReleaseBuild(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, namespaceFlag, outputFmt string, split bool, outDir string) error {
 	ctx := context.Background()
 
-	outputFormat, valid := output.ParseFormat(outputFmt)
-	if !valid {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
-			Err:  fmt.Errorf("invalid output format %q (valid: yaml, json)", outputFmt),
-		}
+	outputFormat, err := cmdutil.ParseManifestOutputFormat(outputFmt)
+	if err != nil {
+		return err
 	}
 
 	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
@@ -94,32 +89,7 @@ func runReleaseBuild(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 		return err
 	}
 
-	if err := cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{
-		Verbose: cfg.Flags.Verbose,
-	}); err != nil {
-		return err
-	}
+	cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
 
-	releaseLog := output.ReleaseLogger(result.Release.Name)
-
-	if split {
-		splitOpts := output.SplitOptions{
-			OutDir: outDir,
-			Format: outputFormat,
-		}
-		if err := output.WriteSplitManifests(result.Resources, splitOpts); err != nil {
-			return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("writing split manifests: %w", err)}
-		}
-		releaseLog.Info(fmt.Sprintf("wrote %d resources to %s", len(result.Resources), outDir))
-	} else {
-		manifestOpts := output.ManifestOptions{
-			Format: outputFormat,
-			Writer: os.Stdout,
-		}
-		if err := output.WriteManifests(result.Resources, manifestOpts); err != nil {
-			return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("writing manifests: %w", err)}
-		}
-	}
-
-	return nil
+	return cmdutil.WriteManifestOutput(result.Resources, outputFormat, split, outDir, result.Release.Name)
 }

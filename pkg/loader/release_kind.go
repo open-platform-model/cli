@@ -34,12 +34,19 @@ func resolveReleaseFile(path string) (string, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return path, nil
+			return "", fmt.Errorf("release path %q not found", path)
 		}
 		return "", fmt.Errorf("stat release path: %w", err)
 	}
 	if info.IsDir() {
-		return filepath.Join(path, "release.cue"), nil
+		releasePath := filepath.Join(path, "release.cue")
+		if _, err := os.Stat(releasePath); err != nil {
+			if os.IsNotExist(err) {
+				return "", fmt.Errorf("release path %q does not contain release.cue", path)
+			}
+			return "", fmt.Errorf("stat release file: %w", err)
+		}
+		return releasePath, nil
 	}
 	return path, nil
 }

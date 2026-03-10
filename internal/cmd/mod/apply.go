@@ -100,7 +100,7 @@ Examples:
 //     7b. Skip prune and inventory write if any apply failed
 //  8. Write inventory Secret with new change entry
 func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, kf *cmdutil.K8sFlags, //nolint:gocyclo // orchestration function; complexity is inherent
-	dryRun, createNS, noProbe bool, maxHistory int, force bool) error {
+	dryRun, createNS, noPrune bool, maxHistory int, force bool) error {
 	ctx := context.Background()
 
 	// Resolve all Kubernetes configuration once (flag > env > config > default).
@@ -133,11 +133,7 @@ func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 	}
 
 	// Post-render: check errors, show matches, log warnings
-	if err := cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{
-		Verbose: cfg.Flags.Verbose,
-	}); err != nil {
-		return err
-	}
+	cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
 
 	// Create scoped module logger
 	releaseLog := output.ReleaseLogger(result.Release.Name)
@@ -230,7 +226,7 @@ func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 	}
 
 	// Step 5c: Pre-apply existence check (first-time only, skip for dry-run)
-	if prevInventory == nil && !dryRun && !noProbe {
+	if prevInventory == nil && !dryRun {
 		if err := inventory.PreApplyExistenceCheck(ctx, k8sClient, currentEntries); err != nil {
 			return fmt.Errorf("pre-apply existence check failed: %w", err)
 		}
@@ -265,7 +261,7 @@ func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 		if dryRun {
 			releaseLog.Info(fmt.Sprintf("dry run complete: %d resources would be applied", applyResult.Applied))
 		} else {
-			releaseLog.Info(formatApplySummary(applyResult))
+			releaseLog.Info(cmdutil.FormatApplySummary(applyResult))
 		}
 	}
 
@@ -284,7 +280,7 @@ func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 		}
 
 		// Step 7a: Prune stale resources (unless --no-prune)
-		if len(staleSet) > 0 && !noProbe {
+		if len(staleSet) > 0 && !noPrune {
 			releaseLog.Info(fmt.Sprintf("pruning %d stale resource(s)", len(staleSet)))
 			if err := inventory.PruneStaleResources(ctx, k8sClient, staleSet); err != nil {
 				releaseLog.Warn("pruning stale resources failed", "error", err)
@@ -360,25 +356,4 @@ func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, 
 	}
 
 	return nil
-}
-
-// formatApplySummary builds a human-readable summary of apply results with
-// per-status breakdown (e.g., "applied 5 resources (2 created, 1 configured, 2 unchanged)").
-func formatApplySummary(r *kubernetes.ApplyResult) string {
-	var parts []string
-	if r.Created > 0 {
-		parts = append(parts, fmt.Sprintf("%d created", r.Created))
-	}
-	if r.Configured > 0 {
-		parts = append(parts, fmt.Sprintf("%d configured", r.Configured))
-	}
-	if r.Unchanged > 0 {
-		parts = append(parts, fmt.Sprintf("%d unchanged", r.Unchanged))
-	}
-
-	summary := fmt.Sprintf("applied %d resources successfully", r.Applied)
-	if len(parts) > 0 {
-		summary += fmt.Sprintf(" (%s)", strings.Join(parts, ", "))
-	}
-	return summary
 }

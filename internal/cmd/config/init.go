@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 	oerrors "github.com/opmodel/cli/pkg/errors"
@@ -38,6 +39,9 @@ Examples:
   opm config init --force`,
 		RunE: func(c *cobra.Command, args []string) error {
 			return runConfigInit(args, forceFlag)
+		},
+		Annotations: map[string]string{
+			cmdutil.SkipConfigLoadAnnotation: "true",
 		},
 	}
 

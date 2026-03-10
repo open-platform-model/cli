@@ -3,19 +3,11 @@ package release
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/spf13/cobra"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
-	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
@@ -75,24 +67,9 @@ Examples:
 func runReleaseEvents(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag, since, eventType string, watchMode bool, outputFmt string) error { //nolint:gocyclo // linear validation + dispatch
 	ctx := context.Background()
 
-	if eventType != "" && eventType != "Normal" && eventType != "Warning" {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
-			Err:  fmt.Errorf("invalid --type %q (valid: Normal, Warning)", eventType),
-		}
-	}
-
-	outputFormat, valid := output.ParseFormat(outputFmt)
-	if !valid || outputFormat == output.FormatWide || outputFormat == output.FormatDir {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
-			Err:  fmt.Errorf("invalid output format %q (valid: table, json, yaml)", outputFmt),
-		}
-	}
-
-	sinceCutoff, err := kubernetes.ParseSince(since)
+	eventsOpts, err := cmdutil.ParseEventsOptions(since, eventType, outputFmt, watchMode)
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
+		return err
 	}
 
 	ra, err := cmdutil.ResolveReleaseArg(identifier, cfg)
@@ -133,102 +110,13 @@ func runReleaseEvents(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 		return err
 	}
 
-	eventsOpts := kubernetes.EventsOptions{
-		Namespace:     namespace,
-		ReleaseName:   rsf.ReleaseName,
-		ReleaseID:     rsf.ReleaseID,
-		Since:         sinceCutoff,
-		EventType:     eventType,
-		OutputFormat:  outputFormat,
-		InventoryLive: liveResources,
-	}
+	eventsOpts.Namespace = namespace
+	eventsOpts.ReleaseName = rsf.ReleaseName
+	eventsOpts.ReleaseID = rsf.ReleaseID
+	eventsOpts.InventoryLive = liveResources
 
 	if watchMode {
-		return runReleaseEventsWatch(ctx, k8sClient, eventsOpts, logName)
+		return cmdutil.WatchEvents(ctx, k8sClient, eventsOpts, logName)
 	}
-
-	result, err := kubernetes.GetModuleEvents(ctx, k8sClient, eventsOpts)
-	if err != nil {
-		if kubernetes.IsNoResourcesFound(err) {
-			releaseLog.Error("getting events", "error", err)
-			return &oerrors.ExitError{Code: oerrors.ExitNotFound, Err: err, Printed: true}
-		}
-		releaseLog.Error("getting events", "error", err)
-		return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
-	}
-
-	formatted, err := kubernetes.FormatEvents(result, outputFormat)
-	if err != nil {
-		releaseLog.Error("formatting events", "error", err)
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err, Printed: true}
-	}
-
-	output.Println(formatted)
-	return nil
-}
-
-func runReleaseEventsWatch(ctx context.Context, client *kubernetes.Client, opts kubernetes.EventsOptions, logName string) error { //nolint:gocyclo // watch loop with multiple filter branches
-	releaseLog := output.ReleaseLogger(logName)
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	go func() { <-sigCh; cancel() }()
-
-	children, err := kubernetes.DiscoverChildren(ctx, client, opts.InventoryLive, opts.Namespace)
-	if err != nil {
-		releaseLog.Error("discovering children", "error", err)
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("discovering children: %w", err)}
-	}
-
-	uidSet := make(map[types.UID]bool)
-	for _, res := range opts.InventoryLive {
-		uidSet[res.GetUID()] = true
-	}
-	for _, child := range children {
-		uidSet[child.GetUID()] = true
-	}
-
-	watcher, err := client.Clientset.CoreV1().Events(opts.Namespace).Watch(ctx, metav1.ListOptions{})
-	if err != nil {
-		releaseLog.Error("starting event watch", "error", err)
-		return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: fmt.Errorf("starting event watch: %w", err)}
-	}
-	defer watcher.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case event, ok := <-watcher.ResultChan():
-			if !ok {
-				return nil
-			}
-			if event.Type != watch.Added && event.Type != watch.Modified {
-				continue
-			}
-			ev, ok := event.Object.(*corev1.Event)
-			if !ok {
-				continue
-			}
-			if !uidSet[ev.InvolvedObject.UID] {
-				continue
-			}
-			if opts.EventType != "" && ev.Type != opts.EventType {
-				continue
-			}
-			if !opts.Since.IsZero() {
-				evTime := ev.LastTimestamp.Time
-				if evTime.IsZero() {
-					evTime = ev.CreationTimestamp.Time
-				}
-				if evTime.Before(opts.Since) {
-					continue
-				}
-			}
-			output.Println(kubernetes.FormatSingleEventLine(ev))
-		}
-	}
+	return cmdutil.PrintEvents(ctx, k8sClient, eventsOpts, logName)
 }

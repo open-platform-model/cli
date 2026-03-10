@@ -9,6 +9,7 @@ import (
 	cmdconfig "github.com/opmodel/cli/internal/cmd/config"
 	cmdmod "github.com/opmodel/cli/internal/cmd/mod"
 	cmdrelease "github.com/opmodel/cli/internal/cmd/release"
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -32,6 +33,10 @@ func NewRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Annotations[cmdutil.SkipConfigLoadAnnotation] == "true" {
+				output.SetupLogging(output.LogConfig{Verbose: verboseFlag})
+				return nil
+			}
 			return initializeConfig(cmd, &cfg, configFlag, registryFlag, verboseFlag, timestampsFlag)
 		},
 	}

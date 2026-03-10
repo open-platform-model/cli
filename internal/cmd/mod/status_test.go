@@ -52,7 +52,7 @@ func TestModStatusCmd_FlagsExist(t *testing.T) {
 	assert.NotNil(t, f.Lookup("output"))
 	assert.NotNil(t, f.Lookup("kubeconfig"))
 	assert.NotNil(t, f.Lookup("context"))
-	assert.NotNil(t, f.Lookup("verbose"), "--verbose flag should exist")
+	assert.NotNil(t, f.Lookup("details"), "--details flag should exist")
 }
 
 func TestModStatusCmd_OutputFlagAcceptsWide(t *testing.T) {

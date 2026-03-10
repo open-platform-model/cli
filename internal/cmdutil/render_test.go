@@ -23,6 +23,20 @@ func mustReleaseMetadata(name, namespace string) modulerelease.ReleaseMetadata {
 	return modulerelease.ReleaseMetadata{Name: name, Namespace: namespace}
 }
 
+func makeReleaseFileFixture(t *testing.T, filename, content string) string {
+	t.Helper()
+	dir := t.TempDir()
+	modDir := filepath.Join(dir, "cue.mod")
+	require.NoError(t, os.MkdirAll(modDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(modDir, "module.cue"), []byte(`module: "test.example.com/releases@v0"
+language: version: "v0.15.0"
+`), 0o644))
+
+	filePath := filepath.Join(dir, filename)
+	require.NoError(t, os.WriteFile(filePath, []byte(content), 0o644))
+	return filePath
+}
+
 func TestRenderModule_NilConfig(t *testing.T) {
 	_, err := RenderRelease(context.Background(), RenderReleaseOpts{
 		Config:    nil,
@@ -52,10 +66,7 @@ func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 		Warnings: []string{},
 	}
 
-	err := ShowRenderOutput(result, ShowOutputOpts{Verbose: false})
-
-	// Should not return an error.
-	assert.NoError(t, err)
+	ShowRenderOutput(result, ShowOutputOpts{Verbose: false})
 }
 
 func TestShowRenderOutput_Warnings(t *testing.T) {
@@ -65,10 +76,7 @@ func TestShowRenderOutput_Warnings(t *testing.T) {
 		Warnings: []string{"deprecated transformer used", "unused values"},
 	}
 
-	err := ShowRenderOutput(result, ShowOutputOpts{})
-
-	// Should not return an error.
-	assert.NoError(t, err)
+	ShowRenderOutput(result, ShowOutputOpts{})
 }
 
 func TestRenderResult_HasWarnings(t *testing.T) {
@@ -146,6 +154,23 @@ values: {
 	assert.Equal(t, "override-name", rel.Metadata.Name)
 	require.Len(t, values, 1)
 	assert.True(t, values[0].Exists())
+}
+
+func TestRenderFromReleaseFile_RejectsBundleRelease(t *testing.T) {
+	ctx := cuecontext.New()
+	filePath := makeReleaseFileFixture(t, "bundle_release.cue", `package releases
+
+kind: "BundleRelease"
+metadata: name: "my-bundle"
+`)
+
+	_, err := RenderFromReleaseFile(context.Background(), RenderFromReleaseFileOpts{
+		ReleaseFilePath: filePath,
+		Config:          &config.GlobalConfig{CueContext: ctx, Providers: map[string]cue.Value{}},
+		K8sConfig:       &config.ResolvedKubernetesConfig{},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bundle releases are not yet supported")
 }
 
 func TestRenderFromReleaseFile_ValidValuesDoNotPanicAcrossRuntimes(t *testing.T) {

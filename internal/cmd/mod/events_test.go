@@ -85,6 +85,12 @@ func TestRunEvents_ValidationErrors(t *testing.T) {
 			expectErr: "invalid output format",
 		},
 		{
+			name:      "watch requires table output",
+			rsf:       cmdutil.ReleaseSelectorFlags{ReleaseName: "app", Namespace: "ns"},
+			output:    "json",
+			expectErr: "watch mode only supports table output",
+		},
+		{
 			name:      "invalid --since",
 			rsf:       cmdutil.ReleaseSelectorFlags{ReleaseName: "app", Namespace: "ns"},
 			since:     "foo",
@@ -102,7 +108,8 @@ func TestRunEvents_ValidationErrors(t *testing.T) {
 			if sinceFmt == "" {
 				sinceFmt = "1h"
 			}
-			err := runEvents(nil, cfg, &tt.rsf, kf, sinceFmt, tt.typeFlag, false, outputFmt)
+			watchMode := tt.name == "watch requires table output"
+			err := runEvents(nil, cfg, &tt.rsf, kf, sinceFmt, tt.typeFlag, watchMode, outputFmt)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.expectErr)
 		})
@@ -124,6 +131,6 @@ func TestRunEventsWatch_ContextCancellation(t *testing.T) {
 		InventoryLive: nil, // no resources — watch will start on empty set
 	}
 
-	err := runEventsWatch(ctx, client, opts, "test")
+	err := cmdutil.WatchEvents(ctx, client, opts, "test")
 	assert.NoError(t, err, "runEventsWatch should return nil on context cancellation")
 }

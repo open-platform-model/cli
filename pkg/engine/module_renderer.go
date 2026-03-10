@@ -45,8 +45,8 @@ type ModuleRenderer struct {
 	provider *provider.Provider
 }
 
-// RenderResult holds the output of a successful Render call.
-type RenderResult struct {
+// ModuleRenderResult holds the output of a successful Render call.
+type ModuleRenderResult struct {
 	// Resources is the ordered list of rendered Kubernetes resources.
 	// Each resource carries Component and Transformer provenance for inventory tracking.
 	Resources []*core.Resource
@@ -69,7 +69,7 @@ func NewModuleRenderer(p *provider.Provider) *ModuleRenderer {
 }
 
 // Render executes matched transforms for the given module release.
-func (r *ModuleRenderer) Render(ctx context.Context, rel *modulerelease.ModuleRelease, plan *match.MatchPlan) (*RenderResult, error) {
+func (r *ModuleRenderer) Render(ctx context.Context, rel *modulerelease.ModuleRelease, plan *match.MatchPlan) (*ModuleRenderResult, error) {
 	// Extract the components CUE values from the ModuleRelease.
 	schemaComponents := rel.MatchComponents()
 	if !schemaComponents.Exists() {
@@ -103,7 +103,7 @@ func (r *ModuleRenderer) Render(ctx context.Context, rel *modulerelease.ModuleRe
 		return nil, fmt.Errorf("executing transforms: %w", errors.Join(errs...))
 	}
 
-	return &RenderResult{
+	return &ModuleRenderResult{
 		Resources:  nonNilResources(resources),
 		MatchPlan:  plan,
 		Components: nonNilComponentSummaries(extractComponentSummaries(schemaComponents)),

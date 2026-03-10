@@ -4,6 +4,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/version"
@@ -20,6 +21,9 @@ Displays:
   - OPM CLI version, commit, and build date
   - CUE SDK version (embedded in CLI)`,
 		RunE: runVersion,
+		Annotations: map[string]string{
+			cmdutil.SkipConfigLoadAnnotation: "true",
+		},
 	}
 }
 

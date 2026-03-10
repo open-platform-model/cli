@@ -20,7 +20,7 @@ func NewReleaseStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
 
 	var (
 		outputFlag  string
-		verboseFlag bool
+		detailsFlag bool
 	)
 
 	c := &cobra.Command{
@@ -49,14 +49,14 @@ Examples:
   opm release status jellyfin -n media -o wide`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runReleaseStatus(args[0], cfg, &kf, namespace, outputFlag, verboseFlag)
+			return runReleaseStatus(args[0], cfg, &kf, namespace, outputFlag, detailsFlag)
 		},
 	}
 
 	kf.AddTo(c)
 	c.Flags().StringVarP(&namespace, "namespace", "n", "", "Target namespace (default: from config)")
 	c.Flags().StringVarP(&outputFlag, "output", "o", "table", "Output format (table, wide, yaml, json)")
-	c.Flags().BoolVar(&verboseFlag, "verbose", false, "Show pod-level diagnostics for unhealthy workloads")
+	c.Flags().BoolVar(&detailsFlag, "details", false, "Show pod-level diagnostics for unhealthy workloads")
 
 	return c
 }

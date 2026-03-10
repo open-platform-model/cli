@@ -21,7 +21,7 @@ func NewModStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
 	// Status-specific flags (local to this command)
 	var (
 		outputFlag  string
-		verboseFlag bool
+		detailsFlag bool
 	)
 
 	c := &cobra.Command{
@@ -56,12 +56,12 @@ Examples:
   opm mod status --release-name my-app -n production -o wide
 
   # Show pod-level diagnostics for unhealthy workloads
-  opm mod status --release-name my-app -n production --verbose
+  opm mod status --release-name my-app -n production --details
 
   # Show status in JSON format
   opm mod status --release-name my-app -n production -o json`,
 		RunE: func(c *cobra.Command, args []string) error {
-			return runStatus(args, cfg, &rsf, &kf, outputFlag, verboseFlag)
+			return runStatus(args, cfg, &rsf, &kf, outputFlag, detailsFlag)
 		},
 	}
 
@@ -71,7 +71,7 @@ Examples:
 	// Status-specific flags
 	c.Flags().StringVarP(&outputFlag, "output", "o", "table",
 		"Output format (table, wide, yaml, json)")
-	c.Flags().BoolVar(&verboseFlag, "verbose", false,
+	c.Flags().BoolVar(&detailsFlag, "details", false,
 		"Show pod-level diagnostics for unhealthy workloads")
 
 	return c

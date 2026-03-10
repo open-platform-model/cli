@@ -46,7 +46,7 @@ func TestValidateConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
 		valuesVal = vf
 	}
 
-	// Extract the config schema (mirrors LoadReleaseFileWithValues).
+	// Extract the config schema (mirrors release file validation flow).
 	configSchema := releaseVal.LookupPath(cue.ParsePath("#module.#config"))
 	require.True(t, configSchema.Exists(), "#module.#config must exist in release")
 	require.True(t, configSchema.IsClosed(), "#module.#config must be a closed struct")

@@ -145,36 +145,3 @@ func TestLoadModulePackage(t *testing.T) {
 		assert.Contains(t, err.Error(), "not a directory")
 	})
 }
-
-// TestLoadReleasePackageWithValue tests merging a cue.Value into a release package.
-func TestLoadReleasePackageWithValue(t *testing.T) {
-	ctx := cuecontext.New()
-
-	t.Run("values merged into release package", func(t *testing.T) {
-		// Create a temp module dir with release.cue (no values.cue).
-		dir := t.TempDir()
-		modDir := filepath.Join(dir, "cue.mod")
-		require.NoError(t, os.MkdirAll(modDir, 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(modDir, "module.cue"), []byte(`module: "example.com/test@v0"
-language: version: "v0.15.0"
-`), 0o644))
-		releaseFile := filepath.Join(dir, "release.cue")
-		require.NoError(t, os.WriteFile(releaseFile, []byte(`package test
-
-kind: "ModuleRelease"
-values: replicas: _
-`), 0o644))
-
-		injectedValues := ctx.CompileString(`{ replicas: 3 }`)
-		require.NoError(t, injectedValues.Err())
-
-		pkg, pkgDir, err := LoadReleasePackageWithValue(ctx, releaseFile, injectedValues)
-		require.NoError(t, err)
-		assert.NotEmpty(t, pkgDir)
-		assert.NoError(t, pkg.Err())
-
-		replicas, replicasErr := pkg.LookupPath(cue.ParsePath("values.replicas")).Int64()
-		require.NoError(t, replicasErr)
-		assert.Equal(t, int64(3), replicas)
-	})
-}

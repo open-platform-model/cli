@@ -1,6 +1,7 @@
 package release
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -85,6 +86,7 @@ func TestNewReleaseStatusCmd_Flags(t *testing.T) {
 	cmd := NewReleaseStatusCmd(&config.GlobalConfig{})
 	assert.NotNil(t, cmd.Flags().Lookup("namespace"), "--namespace/-n flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("output"), "--output/-o flag should be registered")
+	assert.NotNil(t, cmd.Flags().Lookup("details"), "--details flag should be registered")
 }
 
 func TestNewReleaseDeleteCmd(t *testing.T) {
@@ -141,6 +143,12 @@ func TestReleaseVetCmd_RejectsBundleRelease(t *testing.T) {
 
 	err := cmd.Execute()
 	require.Error(t, err, "vet command should fail without a release file arg")
+}
+
+func TestRunReleaseBuild_RejectsNonManifestOutput(t *testing.T) {
+	err := runReleaseBuild("release.cue", &config.GlobalConfig{}, &cmdutil.ReleaseFileFlags{}, "", "wide", false, "")
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "invalid output format"))
 }
 
 // TestReleaseGroup verifies the release command group is correctly configured.

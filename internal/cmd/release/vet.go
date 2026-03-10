@@ -74,11 +74,7 @@ func runReleaseVet(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.Re
 		return err
 	}
 
-	if err := cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{
-		Verbose: cfg.Flags.Verbose,
-	}); err != nil {
-		return err
-	}
+	cmdutil.ShowRenderOutput(result, cmdutil.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
 
 	releaseLog := output.ReleaseLogger(result.Release.Name)
 

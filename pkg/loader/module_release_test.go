@@ -90,11 +90,18 @@ func TestResolveReleaseFile(t *testing.T) {
 		assert.Contains(t, err.Error(), "must not be empty")
 	})
 
-	t.Run("non-existent path returned as-is", func(t *testing.T) {
+	t.Run("non-existent path returns error", func(t *testing.T) {
 		nonExistent := filepath.Join(tmpDir, "doesnotexist.cue")
-		got, err := resolveReleaseFile(nonExistent)
-		require.NoError(t, err)
-		assert.Equal(t, nonExistent, got)
+		_, err := resolveReleaseFile(nonExistent)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+	})
+
+	t.Run("directory without release file returns error", func(t *testing.T) {
+		emptyDir := t.TempDir()
+		_, err := resolveReleaseFile(emptyDir)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "does not contain release.cue")
 	})
 }
 

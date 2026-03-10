@@ -12,7 +12,7 @@ import (
 	"github.com/opmodel/cli/pkg/provider"
 )
 
-func ProcessModuleRelease(ctx context.Context, mr *modulerelease.ModuleRelease, values []cue.Value, p *provider.Provider) (*engine.RenderResult, error) {
+func ProcessModuleRelease(ctx context.Context, mr *modulerelease.ModuleRelease, values []cue.Value, p *provider.Provider) (*engine.ModuleRenderResult, error) {
 	merged, cfgErr := ValidateConfig(mr.Config, values, "module", mr.Metadata.Name)
 	if cfgErr != nil {
 		return nil, cfgErr
