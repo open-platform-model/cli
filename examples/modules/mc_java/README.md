@@ -293,10 +293,10 @@ When you build this module, OPM generates:
 
 ## Related Modules
 
-- [minecraft-bedrock](../minecraft-bedrock/) -- Bedrock Edition server (UDP, XUID auth)
-- [minecraft-proxy](../minecraft-proxy/) -- BungeeCord/Waterfall/Velocity proxy
+- [mc_bedrock](../mc_bedrock/) -- Bedrock Edition server (UDP, XUID auth)
+- [mc_velocity](../mc_velocity/) -- BungeeCord/Waterfall/Velocity proxy
 - [mc-router](../mc-router/) -- Hostname-based Minecraft routing
-- [rcon-web-admin](../rcon-web-admin/) -- Web-based RCON administration
+- [rcon_web_admin](../rcon_web_admin/) -- Web-based RCON administration
 
 ## Related Resources
 
