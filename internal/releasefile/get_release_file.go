@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/cuecontext"
 
 	"github.com/opmodel/cli/pkg/bundle"
 	"github.com/opmodel/cli/pkg/bundlerelease"
@@ -28,8 +27,7 @@ type FileRelease struct {
 	Bundle *bundlerelease.BundleRelease
 }
 
-func GetReleaseFile(filePath string) (*FileRelease, error) {
-	ctx := cuecontext.New()
+func GetReleaseFile(ctx *cue.Context, filePath string) (*FileRelease, error) {
 	val, _, err := loader.LoadReleaseFile(ctx, filePath, os.Getenv("CUE_REGISTRY"))
 	if err != nil {
 		return nil, err

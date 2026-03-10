@@ -340,7 +340,7 @@ func RenderFromReleaseFile(ctx context.Context, opts RenderFromReleaseFileOpts) 
 	)
 
 	cueCtx := opts.Config.CueContext
-	fileRelease, err := internalreleasefile.GetReleaseFile(opts.ReleaseFilePath)
+	fileRelease, err := internalreleasefile.GetReleaseFile(cueCtx, opts.ReleaseFilePath)
 	if err != nil {
 		PrintValidationError("render failed", err)
 		return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: err, Printed: true}
@@ -476,7 +476,7 @@ func resolveReleaseValues(cueCtx *cue.Context, rawRelease cue.Value, releaseFile
 
 //nolint:gocyclo // release loading combines debug-values, inline-values, and file-values cases
 func loadModuleReleaseForRender(cueCtx *cue.Context, modulePath string, valuesFiles []string, debugValues bool, releaseName string) (*modulerelease.ModuleRelease, []cue.Value, error) {
-	fileRelease, err := internalreleasefile.GetReleaseFile(modulePath)
+	fileRelease, err := internalreleasefile.GetReleaseFile(cueCtx, modulePath)
 	if err != nil {
 		return nil, nil, err
 	}

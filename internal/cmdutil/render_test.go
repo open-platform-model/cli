@@ -7,10 +7,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/opmodel/cli/internal/config"
+	internalreleasefile "github.com/opmodel/cli/internal/releasefile"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/pkg/modulerelease"
+	"github.com/opmodel/cli/pkg/releaseprocess"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -143,4 +146,53 @@ values: {
 	assert.Equal(t, "override-name", rel.Metadata.Name)
 	require.Len(t, values, 1)
 	assert.True(t, values[0].Exists())
+}
+
+func TestRenderFromReleaseFile_ValidValuesDoNotPanicAcrossRuntimes(t *testing.T) {
+	ctx := cuecontext.New()
+	dir := t.TempDir()
+	releaseFile := filepath.Join(dir, "release.cue")
+	valuesFile := filepath.Join(dir, "values.cue")
+
+	require.NoError(t, os.WriteFile(releaseFile, []byte(`package test
+
+kind: "ModuleRelease"
+metadata: {
+	name: "demo"
+	namespace: "apps"
+}
+#module: {
+	metadata: {
+		name: "demo"
+		version: "0.1.0"
+		modulePath: "example.com/demo"
+	}
+	#config: close({
+		replicas: int
+	})
+}
+components: {}
+`), 0o644))
+	require.NoError(t, os.WriteFile(valuesFile, []byte(`package test
+
+values: {
+	replicas: 2
+}
+`), 0o644))
+
+	values, err := resolveReleaseValues(ctx, ctx.CompileString(`{}`), releaseFile, []string{valuesFile})
+	require.NoError(t, err)
+	require.Len(t, values, 1)
+
+	fileRelease, err := internalreleasefile.GetReleaseFile(ctx, releaseFile)
+	require.NoError(t, err)
+	require.NotNil(t, fileRelease.Module)
+
+	merged, cfgErr := releaseprocess.ValidateConfig(fileRelease.Module.Config, values, "module", "demo")
+	require.Nil(t, cfgErr)
+
+	assert.NotPanics(t, func() {
+		filled := fileRelease.Module.RawCUE.FillPath(cue.ParsePath("values"), merged)
+		require.NoError(t, filled.Err())
+	})
 }

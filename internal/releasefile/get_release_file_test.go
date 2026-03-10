@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +26,7 @@ values: {
 }
 `), 0o644))
 
-	rel, err := GetReleaseFile(path)
+	rel, err := GetReleaseFile(cuecontext.New(), path)
 	require.NoError(t, err)
 	require.NotNil(t, rel.Module)
 	assert.Equal(t, KindModuleRelease, rel.Kind)
@@ -51,7 +52,7 @@ values: {
 }
 `), 0o644))
 
-	rel, err := GetReleaseFile(path)
+	rel, err := GetReleaseFile(cuecontext.New(), path)
 	require.NoError(t, err)
 	require.NotNil(t, rel.Bundle)
 	assert.Equal(t, KindBundleRelease, rel.Kind)
@@ -68,7 +69,7 @@ func TestGetReleaseFile_UnknownKind(t *testing.T) {
 kind: "MysteryRelease"
 `), 0o644))
 
-	_, err := GetReleaseFile(path)
+	_, err := GetReleaseFile(cuecontext.New(), path)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown release kind")
 }
@@ -85,7 +86,7 @@ metadata: {
 }
 `), 0o644))
 
-	_, err := GetReleaseFile(path)
+	_, err := GetReleaseFile(cuecontext.New(), path)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "metadata must be concrete")
 }
@@ -101,7 +102,7 @@ metadata: {
 }
 `), 0o644))
 
-	_, err := GetReleaseFile(path)
+	_, err := GetReleaseFile(cuecontext.New(), path)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "metadata must be concrete")
 }
