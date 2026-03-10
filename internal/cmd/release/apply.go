@@ -102,19 +102,8 @@ func runReleaseApply(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 
 	namespace := result.Release.Namespace
 
-	if createNS && namespace != "" {
-		created, nsErr := k8sClient.EnsureNamespace(ctx, namespace, dryRun)
-		if nsErr != nil {
-			releaseLog.Error("ensuring namespace", "error", nsErr)
-			return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(nsErr), Err: nsErr, Printed: true}
-		}
-		if created {
-			if dryRun {
-				releaseLog.Info(fmt.Sprintf("namespace %q would be created", namespace))
-			} else {
-				releaseLog.Info(fmt.Sprintf("namespace %q created", namespace))
-			}
-		}
+	if err := cmdutil.EnsureNamespaceIfRequested(ctx, k8sClient, namespace, createNS, dryRun, releaseLog); err != nil {
+		return err
 	}
 
 	manifestDigest := inventory.ComputeManifestDigest(result.Resources)
@@ -125,47 +114,23 @@ func runReleaseApply(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 	output.Debug("change ID computed", "changeID", changeID)
 
 	releaseID := result.Release.UUID
-	var prevInventory *inventory.InventorySecret
-	if releaseID != "" && !dryRun {
-		prevInventory, err = inventory.GetInventory(ctx, k8sClient, result.Release.Name, namespace, releaseID)
-		if err != nil {
-			releaseLog.Warn("could not read inventory, proceeding without it", "error", err)
-		}
+	prevInventory := cmdutil.LoadPreviousInventory(ctx, k8sClient, result.Release.Name, namespace, releaseID, dryRun, releaseLog)
+
+	prevEntries := cmdutil.PreviousInventoryEntries(prevInventory)
+
+	currentEntries := cmdutil.CurrentInventoryEntries(result.Resources)
+
+	staleSet := cmdutil.ComputeStaleInventorySet(prevEntries, currentEntries)
+
+	if err := cmdutil.GuardEmptyRender(len(result.Resources), prevEntries, force, releaseLog); err != nil {
+		return err
+	}
+	if len(result.Resources) == 0 && len(prevEntries) == 0 {
+		return nil
 	}
 
-	var prevEntries []inventory.InventoryEntry
-	if prevInventory != nil && len(prevInventory.Index) > 0 {
-		if latestChangeID := prevInventory.Index[0]; latestChangeID != "" {
-			if latestChange := prevInventory.Changes[latestChangeID]; latestChange != nil {
-				prevEntries = latestChange.Inventory.Entries
-			}
-		}
-	}
-
-	currentEntries := make([]inventory.InventoryEntry, 0, len(result.Resources))
-	for _, r := range result.Resources {
-		currentEntries = append(currentEntries, inventory.NewEntryFromResource(r))
-	}
-
-	staleSet := inventory.ComputeStaleSet(prevEntries, currentEntries)
-	staleSet = inventory.ApplyComponentRenameSafetyCheck(staleSet, currentEntries)
-
-	if len(result.Resources) == 0 {
-		if len(prevEntries) > 0 && !force {
-			return fmt.Errorf("render produced 0 resources but previous inventory has %d entries — "+
-				"this would prune all resources; use --force to proceed or --no-prune to skip pruning",
-				len(prevEntries))
-		}
-		if len(prevEntries) == 0 {
-			releaseLog.Info("no resources to apply")
-			return nil
-		}
-	}
-
-	if prevInventory == nil && !dryRun {
-		if err := inventory.PreApplyExistenceCheck(ctx, k8sClient, currentEntries); err != nil {
-			return fmt.Errorf("pre-apply existence check failed: %w", err)
-		}
+	if err := cmdutil.RunPreApplyExistenceCheck(ctx, k8sClient, prevInventory, dryRun, currentEntries); err != nil {
+		return err
 	}
 
 	if dryRun {
