@@ -9,9 +9,9 @@ import (
 	"github.com/opmodel/cli/pkg/modulerelease"
 )
 
-func SynthesizeModuleRelease(cueCtx *cue.Context, modVal, valuesVal cue.Value, releaseName, namespace string) (*modulerelease.ModuleRelease, error) {
+func SynthesizeModuleRelease(cueCtx *cue.Context, modVal cue.Value, values []cue.Value, releaseName, namespace string) (*modulerelease.ModuleRelease, error) {
 	moduleConfigVal := modVal.LookupPath(cue.ParsePath("#config"))
-	mergedValues, cfgErr := ValidateConfig(moduleConfigVal, []cue.Value{valuesVal}, "module", releaseName)
+	mergedValues, cfgErr := ValidateConfig(moduleConfigVal, values, "module", releaseName)
 	if cfgErr != nil {
 		return nil, cfgErr
 	}

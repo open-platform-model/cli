@@ -118,8 +118,9 @@ func TestResolveReleaseValues_UsesInlineValues(t *testing.T) {
 
 	values, err := resolveReleaseValues(ctx, raw, "./release.cue", nil)
 	require.NoError(t, err)
-	assert.True(t, values.Exists())
-	assert.NoError(t, values.Validate())
+	require.Len(t, values, 1)
+	assert.True(t, values[0].Exists())
+	assert.NoError(t, values[0].Validate())
 }
 
 func TestLoadModuleReleaseForRender_UsesReleaseNameOverride(t *testing.T) {
@@ -137,8 +138,9 @@ values: {
 }
 `), 0o644))
 
-	rel, err := loadModuleReleaseForRender(ctx, dir, nil, false, "override-name")
+	rel, values, err := loadModuleReleaseForRender(ctx, dir, nil, false, "override-name")
 	require.NoError(t, err)
 	assert.Equal(t, "override-name", rel.Metadata.Name)
-	assert.True(t, rel.Values.Exists())
+	require.Len(t, values, 1)
+	assert.True(t, values[0].Exists())
 }

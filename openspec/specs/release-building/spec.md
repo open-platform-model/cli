@@ -161,33 +161,32 @@ func LoadModulePackage(ctx *cue.Context, dirPath string) (cue.Value, error)
 
 ### Requirement: `opm mod vet` uses `debugValues` by default
 
-The `opm mod vet` command SHALL use the module's `debugValues` field as the values source when no `-f` flag is provided. The extraction SHALL happen in `internal/cmdutil/render.go` via the `DebugValues bool` field on `RenderReleaseOpts`. The loader SHALL expose a `LoadReleasePackageWithValue()` variant that accepts a pre-loaded `cue.Value` instead of a values file path.
+The `opm mod vet` command SHALL use the module's `debugValues` field as the values source when no `-f` flag is provided. This validation SHALL happen in the module vet command itself rather than through `cmdutil.RenderRelease()`.
 
 #### Scenario: `debugValues` used when no `-f` flag
 
 - **WHEN** `opm mod vet` is run without `-f` flags
-- **THEN** `RenderRelease()` is called with `DebugValues: true`
-- **AND** the module's `debugValues` field is extracted and used as the values source
+- **THEN** the module's `debugValues` field is extracted and used as the values source
 - **AND** the vet output shows "debugValues" as the values source
 
 #### Scenario: `-f` flag overrides `debugValues`
 
 - **WHEN** `opm mod vet` is run with one or more `-f` flags
-- **THEN** `DebugValues` is `false` and the explicit values files are used
+- **THEN** the explicit values files are used
 - **AND** `debugValues` is ignored
 
 #### Scenario: `debugValues` is `_` (unconstrained)
 
 - **WHEN** `opm mod vet` is run without `-f` flags
 - **AND** the module's `debugValues` field is `_` (open/unconstrained, not filled by the author)
-- **THEN** `RenderRelease()` returns an error: "debugValues is not concrete — module must provide complete test values"
+- **THEN** `opm mod vet` returns an error: "debugValues is not concrete — module must provide complete test values"
 
 ### Requirement: SynthesizeModuleRelease builds a ModuleRelease without a release.cue file
-The loader SHALL provide a `SynthesizeModuleRelease` function that constructs a `*modulerelease.ModuleRelease` from a loaded module CUE value and a concrete values CUE value, without requiring a `release.cue` file.
+The release-processing layer SHALL provide a `SynthesizeModuleRelease` function that constructs a `*modulerelease.ModuleRelease` from a loaded module CUE value and one or more concrete values CUE values, without requiring a `release.cue` file.
 
 The function SHALL:
-1. Run the Module Gate: validate `valuesVal` against `modVal.LookupPath("#config")` using the shared `validateConfig` function
-2. Fill `#config` with the provided values: `filledMod := modVal.FillPath(cue.ParsePath("#config"), valuesVal)`
+1. Run the Module Gate: validate the supplied values against `modVal.LookupPath("#config")` using the shared `ValidateConfig` function
+2. Fill `#config` with the merged validated values: `filledMod := modVal.FillPath(cue.ParsePath("#config"), mergedValues)`
 3. Extract schema components from `filledMod.LookupPath("#components")` (preserves `#resources`, `#traits` definition fields required by the CUE match plan evaluator)
 4. Create a synthetic schema value by wrapping the components under a regular `components` field (so `ModuleRelease.MatchComponents()` can look up `"components"`, not `"#components"`)
 5. Finalize components via `finalizeValue` for constraint-free execution
@@ -195,8 +194,8 @@ The function SHALL:
 7. Construct `ReleaseMetadata` with the provided `releaseName` and `namespace`; leave UUID empty
 8. Return `NewModuleRelease(relMeta, module.Module{Metadata: modMeta, Raw: modVal}, syntheticSchema, dataComponents)`
 
-#### Scenario: SynthesizeModuleRelease succeeds with valid module and debugValues
-- **WHEN** `SynthesizeModuleRelease` is called with a loaded module value and its concrete `debugValues`
+#### Scenario: SynthesizeModuleRelease succeeds with valid module and concrete values
+- **WHEN** `SynthesizeModuleRelease` is called with a loaded module value and concrete values satisfying `#config`
 - **THEN** the returned `*ModuleRelease` SHALL have non-nil `Metadata`, `Module.Metadata`, and non-empty `dataComponents`
 - **AND** `MatchComponents()` SHALL return a value with `components` that can be iterated by the match plan
 
@@ -206,7 +205,7 @@ The function SHALL:
 - **AND** the error SHALL be formatted identically to the Module Gate error from the normal release path
 
 #### Scenario: SynthesizeModuleRelease produces concrete components
-- **WHEN** `SynthesizeModuleRelease` is called with concrete `debugValues` satisfying `#config`
+- **WHEN** `SynthesizeModuleRelease` is called with concrete merged values satisfying `#config`
 - **THEN** `ExecuteComponents()` SHALL return a fully concrete, constraint-free CUE value
 - **AND** `dataComponents.Validate(cue.Concrete(true))` SHALL return nil
 

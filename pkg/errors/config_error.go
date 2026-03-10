@@ -81,12 +81,17 @@ func groupCUEErrors(err error) []GroupedError {
 		return nil
 	}
 
-	// groupOrder preserves insertion order of first-seen messages.
-	type groupKey struct{ msg string }
+	// groupOrder preserves insertion order of first-seen message/path pairs.
+	type groupKey struct {
+		msg  string
+		path string
+	}
 	var groupOrder []groupKey
 	groupMap := make(map[groupKey]*GroupedError)
 
 	for _, ce := range cueErrs {
+		path := normalizeCUEPath(ce.Path())
+
 		format, args := ce.Msg()
 		var msg string
 		if len(args) == 0 {
@@ -100,7 +105,7 @@ func groupCUEErrors(err error) []GroupedError {
 			continue
 		}
 
-		key := groupKey{msg: msg}
+		key := groupKey{msg: msg, path: path}
 		ge, exists := groupMap[key]
 		if !exists {
 			ge = &GroupedError{Message: msg}
@@ -111,7 +116,6 @@ func groupCUEErrors(err error) []GroupedError {
 		// Collect all positions: primary + contributing (e.g. both sides of a
 		// conflict). cueerrors.Positions returns Position() + InputPositions()
 		// deduped and sorted.
-		path := normalizeCUEPath(ce.Path())
 		seen := make(map[string]bool, len(ge.Locations))
 		for _, loc := range ge.Locations {
 			seen[fmt.Sprintf("%s:%d:%d", loc.File, loc.Line, loc.Column)] = true

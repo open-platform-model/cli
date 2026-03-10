@@ -49,7 +49,7 @@ func TestSynthesizeModuleRelease_Success(t *testing.T) {
 	}`)
 	require.NoError(t, debugValues.Err())
 
-	rel, err := SynthesizeModuleRelease(ctx, modVal, debugValues, "my-release", "my-namespace")
+	rel, err := SynthesizeModuleRelease(ctx, modVal, []cue.Value{debugValues}, "my-release", "my-namespace")
 	require.NoError(t, err)
 	require.NotNil(t, rel)
 	require.NotNil(t, rel.Metadata)
@@ -81,7 +81,7 @@ func TestSynthesizeModuleRelease_ModuleGateFailure(t *testing.T) {
 		replicas: "not-a-number"
 		image:    "myapp:v1"
 	}`)
-	_, err := SynthesizeModuleRelease(ctx, modVal, invalidValues, "test-release", "test-ns")
+	_, err := SynthesizeModuleRelease(ctx, modVal, []cue.Value{invalidValues}, "test-release", "test-ns")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "test-release")
 }
@@ -100,7 +100,7 @@ func TestSynthesizeModuleRelease_NoComponents(t *testing.T) {
 		}
 	}`)
 	values := ctx.CompileString(`{ image: "nginx:1.25" }`)
-	_, err := SynthesizeModuleRelease(ctx, modVal, values, "bare-release", "default")
+	_, err := SynthesizeModuleRelease(ctx, modVal, []cue.Value{values}, "bare-release", "default")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "#components")
 }

@@ -39,22 +39,28 @@ The `modulerelease.ModuleRelease` type SHALL expose the fields needed for explic
 - **AND** `RawCUE` SHALL represent the concrete release value after values have been filled
 - **AND** `DataComponents` SHALL contain the finalized data-only `components` field used for transformer execution
 
-### Requirement: ValidateConfig merges values before schema validation
-The public release-processing API SHALL provide `ValidateConfig(schema cue.Value, values []cue.Value)` that first unifies all provided values together without the schema, then validates the merged values against the supplied schema, and returns structured config errors when validation fails.
+### Requirement: ValidateConfig returns merged concrete values or combined diagnostics
+The public release-processing API SHALL provide `ValidateConfig(schema cue.Value, values []cue.Value)` that validates each supplied values input against the schema, checks merge conflicts across all inputs, and returns structured config errors when validation fails.
 
 #### Scenario: Multiple value files are unified before validation
 - **WHEN** `ValidateConfig` is called with two or more `cue.Value` inputs
-- **THEN** it SHALL unify them together before applying the schema
+- **THEN** it SHALL return the unified concrete value when validation succeeds
 - **AND** the returned merged value SHALL be the concrete value used by later processing stages
 
-#### Scenario: Conflicting value files fail before schema validation
+#### Scenario: Conflicting value files are reported alongside schema diagnostics
 - **WHEN** two input value files contain conflicting assignments
 - **THEN** `ValidateConfig` SHALL return a structured config error describing the value conflict
-- **AND** it SHALL NOT continue to schema validation
+- **AND** it SHALL still include any per-file schema violations found in the supplied values inputs
+- **AND** it SHALL return an empty `cue.Value`
 
 #### Scenario: Schema mismatch returns structured diagnostics
-- **WHEN** the merged values do not satisfy the supplied schema
+- **WHEN** one or more supplied values inputs do not satisfy the supplied schema
 - **THEN** `ValidateConfig` SHALL return a structured config error suitable for grouped CLI display
+
+#### Scenario: Validation failure does not return partial merged values
+- **WHEN** `ValidateConfig` detects any schema error or merge conflict
+- **THEN** it SHALL return an empty `cue.Value`
+- **AND** the caller SHALL rely on the returned `ConfigError` for all user-facing diagnostics
 
 ### Requirement: ProcessModuleRelease owns the module-release processing flow
 The public release-processing API SHALL provide `ProcessModuleRelease` that validates values, fills them into the release, derives concrete and finalized component views, computes a match plan, renders the release with the given provider, and returns the module render result.
