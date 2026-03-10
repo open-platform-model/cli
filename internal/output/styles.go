@@ -167,7 +167,7 @@ func FormatFQN(fqn string) string {
 // For simple "#"-separated FQNs like "kubernetes#statefulset-transformer":
 // the "#" is replaced with " - " and the transformer name (after the separator) is cyan.
 //
-// Falls back to plain dim rendering when no recognisable separator is found.
+// Falls back to plain dim rendering when no recognizable separator is found.
 func styledFQN(fqn string) string {
 	// Handle module-path style: last "/" segment is "name@version".
 	if idx := strings.LastIndex(fqn, "/"); idx >= 0 {
@@ -355,20 +355,23 @@ func FormatGroupedErrors(groups []opmerrors.GroupedError) string {
 		}
 		sb.WriteString(styleMsg.Render(g.Message))
 		sb.WriteByte('\n')
+		pathPrinted := false
 		for _, loc := range g.Locations {
-			if loc.Line > 0 {
-				locStr := styleLoc.Render(fmt.Sprintf("%s:%d:%d", loc.File, loc.Line, loc.Column))
-				sb.WriteString("  ")
-				sb.WriteString(locStr)
-				if loc.Path != "" {
-					sb.WriteString(" -> ")
-					sb.WriteString(loc.Path)
-				}
-			} else if loc.Path != "" {
+			if !pathPrinted && loc.Path != "" {
 				sb.WriteString("  ")
 				sb.WriteString(loc.Path)
+				sb.WriteByte('\n')
+				pathPrinted = true
 			}
-			sb.WriteByte('\n')
+			if loc.Line > 0 {
+				locStr := styleLoc.Render(fmt.Sprintf("%s:%d:%d", loc.File, loc.Line, loc.Column))
+				sb.WriteString("    ")
+				sb.WriteString(locStr)
+				sb.WriteByte('\n')
+			}
+		}
+		if !pathPrinted && len(g.Locations) == 0 {
+			sb.WriteString("  values\n")
 		}
 	}
 

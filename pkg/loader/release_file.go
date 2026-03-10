@@ -83,7 +83,7 @@ func LoadReleaseFile(ctx *cue.Context, filePath, registry string) (cue.Value, st
 // same directory as the release file is used; an error is returned if it does
 // not exist.
 //
-// registry behaviour is identical to LoadReleaseFile.
+// registry behavior is identical to LoadReleaseFile.
 func LoadReleaseFileWithValues(ctx *cue.Context, filePath, valuesFile, registry string) (cue.Value, string, error) {
 	// Resolve values file path before calling LoadReleaseFile so we can error
 	// early if it is missing.

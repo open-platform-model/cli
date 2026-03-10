@@ -31,6 +31,7 @@ func TestRenderFlags_AddTo(t *testing.T) {
 	provFlag := cmd.Flags().Lookup("provider")
 	require.NotNil(t, provFlag)
 	assert.Equal(t, "", provFlag.DefValue)
+
 }
 
 func TestK8sFlags_AddTo(t *testing.T) {
@@ -155,6 +156,10 @@ func TestReleaseFileFlags_AddTo(t *testing.T) {
 	provFlag := cmd.Flags().Lookup("provider")
 	require.NotNil(t, provFlag)
 	assert.Equal(t, "", provFlag.DefValue)
+
+	valuesFlag := cmd.Flags().Lookup("values")
+	require.NotNil(t, valuesFlag)
+	assert.Equal(t, "stringArray", valuesFlag.Value.Type())
 }
 
 func TestResolveReleaseIdentifier(t *testing.T) {

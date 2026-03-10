@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"sort"
 
-	"cuelang.org/go/cue"
-
 	"github.com/opmodel/cli/pkg/bundlerelease"
 	"github.com/opmodel/cli/pkg/core"
+	"github.com/opmodel/cli/pkg/match"
 	"github.com/opmodel/cli/pkg/provider"
 )
 
@@ -42,12 +41,9 @@ type BundleRenderResult struct {
 }
 
 // NewBundleRenderer creates a BundleRenderer for the given provider.
-//
-// matcherDef is the pre-evaluated #MatchPlan cue.Value from config,
-// passed through to the underlying ModuleRenderer.
-func NewBundleRenderer(p *provider.Provider, matcherDef cue.Value) *BundleRenderer {
+func NewBundleRenderer(p *provider.Provider) *BundleRenderer {
 	return &BundleRenderer{
-		moduleRenderer: NewModuleRenderer(p, matcherDef),
+		moduleRenderer: NewModuleRenderer(p),
 	}
 }
 
@@ -69,6 +65,8 @@ func (br *BundleRenderer) Render(ctx context.Context, rel *bundlerelease.BundleR
 	sort.Strings(keys)
 
 	result := &BundleRenderResult{
+		Resources:    []*core.Resource{},
+		Warnings:     []string{},
 		ReleaseOrder: keys,
 	}
 
@@ -83,7 +81,14 @@ func (br *BundleRenderer) Render(ctx context.Context, rel *bundlerelease.BundleR
 
 		modRel := rel.Releases[key]
 
-		modResult, err := br.moduleRenderer.Render(ctx, modRel)
+		plan, err := match.Match(modRel.MatchComponents(), br.moduleRenderer.provider)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("matching release %q (module %s): %w",
+				key, modRel.Module.Metadata.FQN, err))
+			continue
+		}
+
+		modResult, err := br.moduleRenderer.Render(ctx, modRel, plan)
 		if err != nil {
 			// Collect the error and continue — fail-slow so all releases are attempted.
 			errs = append(errs, fmt.Errorf("rendering release %q (module %s): %w",

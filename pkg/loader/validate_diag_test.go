@@ -60,14 +60,11 @@ func TestValidateConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
 	require.NotEmpty(t, errs)
 
 	// Build a string of all error messages for assertion.
-	var msgs []string
+	msgs := make([]string, 0, len(errs))
 	for _, ce := range errs {
 		f, args := ce.Msg()
-		if len(args) == 0 {
-			msgs = append(msgs, f)
-		} else {
-			msgs = append(msgs, f)
-		}
+		_ = args
+		msgs = append(msgs, f)
 	}
 	combined := strings.Join(msgs, "\n")
 

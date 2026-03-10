@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/log"
 
 	"github.com/opmodel/cli/pkg/core"
+	"github.com/opmodel/cli/pkg/match"
 	"github.com/opmodel/cli/pkg/modulerelease"
 )
 
@@ -44,7 +45,7 @@ type componentContextData struct {
 func executeTransforms(
 	ctx context.Context,
 	cueCtx *cue.Context,
-	plan *MatchPlan,
+	plan *match.MatchPlan,
 	providerVal cue.Value,
 	schemaComponents cue.Value,
 	dataComponents cue.Value,
@@ -86,7 +87,7 @@ func executePair(
 	schemaComponents cue.Value,
 	dataComponents cue.Value,
 	rel *modulerelease.ModuleRelease,
-	pair MatchedPair,
+	pair match.MatchedPair,
 ) ([]*core.Resource, error) {
 	compName := pair.ComponentName
 	tfFQN := pair.TransformerFQN

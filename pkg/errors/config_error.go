@@ -111,7 +111,7 @@ func groupCUEErrors(err error) []GroupedError {
 		// Collect all positions: primary + contributing (e.g. both sides of a
 		// conflict). cueerrors.Positions returns Position() + InputPositions()
 		// deduped and sorted.
-		path := strings.Join(ce.Path(), ".")
+		path := normalizeCUEPath(ce.Path())
 		seen := make(map[string]bool, len(ge.Locations))
 		for _, loc := range ge.Locations {
 			seen[fmt.Sprintf("%s:%d:%d", loc.File, loc.Line, loc.Column)] = true
@@ -146,4 +146,24 @@ func groupCUEErrors(err error) []GroupedError {
 		out = append(out, *groupMap[key])
 	}
 	return out
+}
+
+func normalizeCUEPath(parts []string) string {
+	if len(parts) == 0 {
+		return ""
+	}
+
+	path := strings.Join(parts, ".")
+	path = strings.TrimPrefix(path, "#module.#config.")
+	path = strings.TrimPrefix(path, "#module.#config")
+	path = strings.TrimPrefix(path, "#config.")
+	path = strings.TrimPrefix(path, "#config")
+	path = strings.TrimPrefix(path, ".")
+	if path == "" {
+		return "values"
+	}
+	if strings.HasPrefix(path, "values.") || path == "values" {
+		return path
+	}
+	return "values." + path
 }

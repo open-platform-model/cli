@@ -1,7 +1,4 @@
 // Package modulerelease defines the ModuleRelease and ReleaseMetadata types.
-// A ModuleRelease is the concrete deployment instance of a module after values
-// are merged. CUE handles all component resolution, matching, and transformation;
-// Go only owns the release-level identity needed for inventory and K8s operations.
 package modulerelease
 
 import (
@@ -10,15 +7,8 @@ import (
 	"github.com/opmodel/cli/pkg/module"
 )
 
-// ModuleRelease is the built module release, ready for pipeline evaluation.
-//
-// Two CUE representations are kept internally:
-//   - schema: the original evaluated value — preserves definition fields
-//     (#resources, #traits, etc.) needed for CUE-native #MatchPlan matching.
-//   - dataComponents: finalized, constraint-free components — safe for FillPath
-//     injection into transformer #transform definitions.
-//
-// Access them via MatchComponents() and ExecuteComponents() respectively.
+// ModuleRelease is the concrete deployment instance of a module as it moves
+// through parse, process, and render stages.
 type ModuleRelease struct {
 	// Metadata is extracted for Go-side operations: inventory, K8s labeling, display.
 	Metadata *ReleaseMetadata
@@ -26,47 +16,43 @@ type ModuleRelease struct {
 	// Module is the original module, preserved for reference.
 	Module module.Module
 
-	// schema is the original CUE value as evaluated by BuildInstance.
-	// Preserves definition fields (#resources, #traits, #config, etc.)
-	// required for transformer matching and component introspection.
-	schema cue.Value
+	// RawCUE is the whole ModuleRelease CUE value.
+	// It is initially the parse-only raw value, then replaced with the concrete
+	// processed value after successful value filling.
+	RawCUE cue.Value
 
-	// dataComponents is the finalized, constraint-free components value.
-	// Produced by finalizing only the `components` field of the release,
-	// which avoids problematic fields (values, #config) that carry schema
-	// validators like matchN. Safe for FillPath injection into transformers.
-	dataComponents cue.Value
+	// DataComponents is the finalized, constraint-free components value.
+	// Safe for FillPath injection into transformer #transform definitions.
+	DataComponents cue.Value
+
+	// Config is the #config schema extracted from the release's module view.
+	Config cue.Value
+
+	// Values is the merged, validated concrete values supplied by the caller.
+	Values cue.Value
 }
 
-// NewModuleRelease constructs a ModuleRelease with both CUE representations.
-// schema must preserve definition fields; dataComponents must be finalized.
-func NewModuleRelease(metadata *ReleaseMetadata, mod module.Module, schema, dataComponents cue.Value) *ModuleRelease {
+// NewModuleRelease constructs a ModuleRelease.
+func NewModuleRelease(metadata *ReleaseMetadata, mod module.Module, rawCUE, dataComponents, config, values cue.Value) *ModuleRelease {
 	return &ModuleRelease{
 		Metadata:       metadata,
 		Module:         mod,
-		schema:         schema,
-		dataComponents: dataComponents,
+		RawCUE:         rawCUE,
+		DataComponents: dataComponents,
+		Config:         config,
+		Values:         values,
 	}
 }
 
-// MatchComponents returns the schema CUE value that preserves #resources,
-// #traits, and #blueprints definition fields needed for CUE-native #MatchPlan
-// evaluation.
+// MatchComponents returns the concrete component view used for matching.
+// This must preserve definition fields such as #resources and #traits.
 func (r *ModuleRelease) MatchComponents() cue.Value {
-	return r.schema.LookupPath(cue.ParsePath("components"))
+	return r.RawCUE.LookupPath(cue.ParsePath("components"))
 }
 
-// Schema returns the full schema CUE value (the original evaluated release).
-// Used by the engine to pass to buildMatchPlan.
-func (r *ModuleRelease) Schema() cue.Value {
-	return r.schema
-}
-
-// ExecuteComponents returns the finalized, constraint-free CUE value of the
-// components. Safe for FillPath injection into transformer #transform definitions
-// without schema constraint conflicts.
+// ExecuteComponents returns the finalized, constraint-free component view.
 func (r *ModuleRelease) ExecuteComponents() cue.Value {
-	return r.dataComponents
+	return r.DataComponents
 }
 
 // ReleaseMetadata contains release-level identity information.

@@ -228,9 +228,8 @@ func loadFullConfig(cfg *GlobalConfig, configPath, registry string) error {
 		cfg.Log.Kubernetes.APIWarnings = APIWarningsWarn
 	}
 
-	// Extract providers and matcher
+	// Extract providers
 	cfg.Providers = extractProviders(value)
-	cfg.Matcher = extractMatcher(value)
 	cfg.CueContext = ctx
 
 	return nil
@@ -298,23 +297,6 @@ func extractProviders(value cue.Value) map[string]cue.Value {
 	}
 
 	return providers
-}
-
-// extractMatcher extracts the matcher #MatchPlan definition from the CUE config value.
-// Returns the zero cue.Value if no matcher is configured (commands will fail at render time).
-func extractMatcher(value cue.Value) cue.Value {
-	configValue := value.LookupPath(cue.ParsePath("config"))
-	if !configValue.Exists() {
-		configValue = value
-	}
-
-	matcherValue := configValue.LookupPath(cue.ParsePath("matcher"))
-	if !matcherValue.Exists() {
-		output.Debug("no matcher found in config")
-		return cue.Value{}
-	}
-
-	return matcherValue
 }
 
 // extractConfigInto populates cfg fields from the CUE value.

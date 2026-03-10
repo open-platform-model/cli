@@ -62,6 +62,29 @@ func TestPrintValidationError_GenericError(t *testing.T) {
 	assert.Contains(t, got, "something went wrong", "should contain error message")
 }
 
+func TestPrintValidationError_GroupedCountsIssues(t *testing.T) {
+	var buf bytes.Buffer
+	output.SetupLogging(output.LogConfig{})
+	output.SetLogWriter(&buf)
+
+	groups := []pkgerrors.GroupedError{
+		{
+			Message:   "field not allowed",
+			Locations: []pkgerrors.ErrorLocation{{Path: "values.test", File: "values.cue", Line: 10, Column: 2}, {Path: "values.test", File: "values2.cue", Line: 12, Column: 2}},
+		},
+		{
+			Message:   "conflicting values",
+			Locations: []pkgerrors.ErrorLocation{{Path: "values.media.test", File: "values.cue", Line: 20, Column: 3}},
+		},
+	}
+
+	printGrouped("render failed", groups)
+
+	got := buf.String()
+	assert.Contains(t, got, "render failed: 2 issues")
+	assert.NotContains(t, got, "3 errors")
+}
+
 func TestWriteTransformerMatches_NilMatchPlan(t *testing.T) {
 	// Should not panic when MatchPlan is nil.
 	result := &RenderResult{

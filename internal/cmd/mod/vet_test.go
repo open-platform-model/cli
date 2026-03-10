@@ -32,21 +32,8 @@ func TestNewModVetCmd_NoLocalVerboseFlag(t *testing.T) {
 	assert.Nil(t, localFlag, "--verbose should not be a local flag (should use root persistent flag)")
 }
 
-func TestIsModuleOnlyDir(t *testing.T) {
-	t.Run("dir without release.cue is module-only", func(t *testing.T) {
-		dir := t.TempDir()
-		assert.True(t, isModuleOnlyDir(dir))
-	})
-
-	t.Run("dir with release.cue is NOT module-only", func(t *testing.T) {
-		dir := t.TempDir()
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "release.cue"), []byte("package x\n"), 0o644))
-		assert.False(t, isModuleOnlyDir(dir))
-	})
-}
-
-// TestModVet_ValidModule exercises the module-only vet path with the
-// simple-module fixture (no release.cue, no debugValues → schema-only pass).
+// TestModVet_ValidModule exercises the module vet path with the simple-module
+// fixture (no release.cue, no debugValues).
 func TestModVet_ValidModule(t *testing.T) {
 	fixtureDir := filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "simple-module")
 	if _, err := os.Stat(fixtureDir); os.IsNotExist(err) {
@@ -71,7 +58,8 @@ func TestModVet_ValidModule(t *testing.T) {
 	cmd.SetArgs([]string{fixtureDir})
 
 	err := cmd.Execute()
-	require.NoError(t, err, "valid module without release.cue should pass in module-only mode")
+	require.Error(t, err, "module without debugValues should fail")
+	assert.Contains(t, err.Error(), "module does not define debugValues")
 }
 
 func TestModVet_CUEValidationError(t *testing.T) {
@@ -88,7 +76,7 @@ func TestModVet_UnmatchedComponent(t *testing.T) {
 }
 
 // TestModVet_ValuesDetailLogic checks the display detail string assembled
-// for the "Values satisfy #config" vet check line in release mode.
+// for the "Values satisfy #config" vet check line.
 func TestModVet_ValuesDetailLogic(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -134,36 +122,31 @@ func TestModVet_ValuesDetailLogic(t *testing.T) {
 	}
 }
 
-// TestModVet_DebugValuesFlagLogic tests that DebugValues is set based on -f
-// flag presence. This logic applies to release mode only (when release.cue
-// is present). Module-only mode does not use the DebugValues field.
-func TestModVet_DebugValuesFlagLogic(t *testing.T) {
+func TestModVet_MultipleValuesAreMergedForValidation(t *testing.T) {
 	tests := []struct {
-		name            string
-		valuesFlags     []string
-		expectDebugVals bool
+		name           string
+		valuesFlags    []string
+		expectedDetail string
 	}{
 		{
-			name:            "no -f flag enables DebugValues (release mode)",
-			valuesFlags:     nil,
-			expectDebugVals: true,
+			name:           "single file",
+			valuesFlags:    []string{"prod-values.cue"},
+			expectedDetail: "prod-values.cue",
 		},
 		{
-			name:            "with -f flag disables DebugValues (release mode)",
-			valuesFlags:     []string{"prod-values.cue"},
-			expectDebugVals: false,
-		},
-		{
-			name:            "multiple -f flags disable DebugValues (release mode)",
-			valuesFlags:     []string{"base.cue", "override.cue"},
-			expectDebugVals: false,
+			name:           "multiple files",
+			valuesFlags:    []string{"base.cue", "override.cue"},
+			expectedDetail: "base.cue, override.cue",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			debugValues := len(tt.valuesFlags) == 0
-			assert.Equal(t, tt.expectDebugVals, debugValues)
+			basenames := make([]string, 0, len(tt.valuesFlags))
+			for _, vf := range tt.valuesFlags {
+				basenames = append(basenames, filepath.Base(vf))
+			}
+			assert.Equal(t, tt.expectedDetail, strings.Join(basenames, ", "))
 		})
 	}
 }

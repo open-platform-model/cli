@@ -9,7 +9,6 @@ package config
 
 import (
 	provs   "opmodel.dev/providers@v1"
-	match "opmodel.dev/core/matcher@v1"
 )
 
 config: {
@@ -22,9 +21,6 @@ config: {
 	providers: {
 		kubernetes: provs.#Registry["kubernetes"]
 	}
-
-	// matcher is the #MatchPlan definition used to match components to transformers.
-	matcher: match.#MatchPlan
 
 	kubernetes: {
 		// kubeconfig is the path to the kubeconfig file.

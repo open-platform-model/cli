@@ -198,7 +198,7 @@ func evaluateJobHealth(resource *unstructured.Unstructured) HealthStatus {
 func evaluateCustomHealth(resource *unstructured.Unstructured) HealthStatus {
 	conditions := getConditions(resource)
 	for _, c := range conditions {
-		if c.Type == "Ready" {
+		if c.Type == conditionTypeReady {
 			if c.Status == conditionStatusTrue {
 				return HealthReady
 			}

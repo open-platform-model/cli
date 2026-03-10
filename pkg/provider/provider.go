@@ -1,7 +1,6 @@
 // Package provider defines the Provider type.
-// A Provider holds a CUE transformer registry. Matching logic and transformer
-// execution live entirely in CUE; Go only carries the raw CUE value and the
-// metadata needed for display and selection.
+// A Provider holds a CUE transformer registry. Go performs component-to-
+// transformer matching while CUE still executes each matched transformer.
 package provider
 
 import (
@@ -10,7 +9,7 @@ import (
 
 // Provider holds a loaded provider definition.
 // Data is the complete CUE value (including #transformers).
-// Matching against components happens in CUE via #MatchPlan, not in Go.
+// Matching against components happens in Go via pkg/match.
 type Provider struct {
 	// Metadata is extracted for display and provider selection.
 	Metadata *ProviderMetadata

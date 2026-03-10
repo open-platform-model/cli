@@ -85,7 +85,7 @@ func runReleaseBuild(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 
 	result, err := cmdutil.RenderFromReleaseFile(ctx, cmdutil.RenderFromReleaseFileOpts{
 		ReleaseFilePath: releaseFile,
-		ValuesFile:      rff.ValuesFile,
+		ValuesFiles:     rff.Values,
 		ModulePath:      rff.Module,
 		K8sConfig:       k8sConfig,
 		Config:          cfg,

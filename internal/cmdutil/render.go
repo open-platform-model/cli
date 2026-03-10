@@ -2,6 +2,7 @@ package cmdutil
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,11 +12,13 @@ import (
 
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
+	internalreleasefile "github.com/opmodel/cli/internal/releasefile"
 	"github.com/opmodel/cli/pkg/engine"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/pkg/loader"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/modulerelease"
+	"github.com/opmodel/cli/pkg/releaseprocess"
 )
 
 // RenderResult is the output of RenderRelease, combining engine output with
@@ -78,11 +81,11 @@ type RenderFromReleaseFileOpts struct {
 	// ReleaseFilePath is the path to the .cue release file (required).
 	// May be a directory, in which case release.cue inside it is used.
 	ReleaseFilePath string
-	// ValuesFile is the path to the values CUE file (optional, from --values/-f).
+	// ValuesFiles are values CUE files (optional, from --values/-f).
 	// When empty, values.cue next to the release file is used if it exists.
 	// If neither is found and the release package has no concrete values field,
 	// an error is returned.
-	ValuesFile string
+	ValuesFiles []string
 	// ModulePath is the path to a local module directory (optional, from --module).
 	ModulePath string
 	// K8sConfig is the pre-resolved Kubernetes configuration.
@@ -251,79 +254,20 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*RenderResult, 
 
 		// Task 3.7: Call SynthesizeModuleRelease.
 		var synthErr error
-		rel, synthErr = loader.SynthesizeModuleRelease(cueCtx, modVal, valuesVal, releaseName, moduleNamespace)
+		rel, synthErr = releaseprocess.SynthesizeModuleRelease(cueCtx, modVal, valuesVal, releaseName, moduleNamespace)
 		if synthErr != nil {
 			PrintValidationError("render failed", synthErr)
 			return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: synthErr, Printed: true}
 		}
 	} else {
 		// ── Normal path: release.cue is present ───────────────────────────────
-		// Load the CUE release package.
-		// When DebugValues is set and no -f flag is provided, extract the module's
-		// debugValues field and inject it as the values source.
-		var pkg cue.Value
-		if opts.DebugValues && len(opts.Values) == 0 {
-			// Load module package to extract debugValues.
-			modVal, modErr := loader.LoadModulePackage(cueCtx, modulePath)
-			if modErr != nil {
-				return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("loading module for debugValues: %w", modErr)}
-			}
-			debugVal := modVal.LookupPath(cue.ParsePath("debugValues"))
-			if !debugVal.Exists() {
-				return nil, &oerrors.ExitError{
-					Code: oerrors.ExitGeneralError,
-					Err:  fmt.Errorf("module does not define debugValues — add a debugValues field or provide a values file with -f"),
-				}
-			}
-			if err := debugVal.Validate(cue.Concrete(true)); err != nil {
-				PrintValidationError("debugValues not concrete", err)
-				return nil, &oerrors.ExitError{
-					Code:    oerrors.ExitValidationError,
-					Err:     fmt.Errorf("debugValues is not concrete — module must provide complete test values"),
-					Printed: true,
-				}
-			}
-			var loadErr error
-			pkg, _, loadErr = loader.LoadReleasePackageWithValue(cueCtx, modulePath, debugVal)
-			if loadErr != nil {
-				PrintValidationError("render failed", loadErr)
-				return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: loadErr, Printed: true}
-			}
-		} else {
-			// Resolve values file: use first -f flag value if provided, else empty
-			// (loader will fall back to values.cue in the module directory).
-			var valuesFile string
-			if len(opts.Values) > 0 {
-				valuesFile = opts.Values[0]
-			}
-			var loadErr error
-			pkg, _, loadErr = loader.LoadReleasePackage(cueCtx, modulePath, valuesFile)
-			if loadErr != nil {
-				PrintValidationError("render failed", loadErr)
-				return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: loadErr, Printed: true}
-			}
-		}
-
-		// Detect release kind (ModuleRelease or BundleRelease).
-		kind, err := loader.DetectReleaseKind(pkg)
-		if err != nil {
-			return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
-		}
-		if kind != "ModuleRelease" {
-			return nil, &oerrors.ExitError{
-				Code: oerrors.ExitGeneralError,
-				Err:  fmt.Errorf("unsupported release kind %q (use bundle commands for BundleRelease)", kind),
-			}
-		}
-
-		// Load the ModuleRelease from the evaluated package.
-		fallbackName := filepath.Base(modulePath)
-		if opts.ReleaseName != "" {
-			fallbackName = opts.ReleaseName
-		}
 		var loadErr error
-		rel, loadErr = loader.LoadModuleReleaseFromValue(cueCtx, pkg, fallbackName)
+		rel, loadErr = loadModuleReleaseForRender(cueCtx, modulePath, opts.Values, opts.DebugValues, opts.ReleaseName)
 		if loadErr != nil {
+			var exitErr *oerrors.ExitError
+			if ok := errors.As(loadErr, &exitErr); ok {
+				return nil, exitErr
+			}
 			PrintValidationError("render failed", loadErr)
 			return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: loadErr, Printed: true}
 		}
@@ -345,9 +289,8 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*RenderResult, 
 		return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
 	}
 
-	// Run the engine renderer.
-	renderer := engine.NewModuleRenderer(p, opts.Config.Matcher)
-	engineResult, err := renderer.Render(ctx, rel)
+	// Run the release-processing pipeline.
+	engineResult, err := releaseprocess.ProcessModuleRelease(ctx, rel, []cue.Value{rel.Values}, p)
 	if err != nil {
 		PrintValidationError("render failed", err)
 		return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: err, Printed: true}
@@ -381,14 +324,11 @@ func RenderRelease(ctx context.Context, opts RenderReleaseOpts) (*RenderResult, 
 // RenderRelease() (which does module-directory rendering).
 //
 // Pipeline:
-//
-//  1. loader.LoadReleaseFile()              load .cue file with import resolution
-//  2. loader.DetectReleaseKind()            error on BundleRelease (not yet supported)
-//  3. [optional] loader.LoadModulePackage() + FillPath for --module flag
-//  4. loader.LoadModuleReleaseFromValue()   validate + extract *ModuleRelease
-//  5. loader.LoadProvider()                 wrap provider CUE value
-//  6. engine.ModuleRenderer.Render()        CUE-native match + execute
-//  7. Resource.ToUnstructured()             convert at cmdutil boundary
+//  1. parse release file into a barebones release
+//  2. optionally inject a local module via --module
+//  3. resolve values from file or inline release values
+//  4. process the release into concrete components and a render result
+//  5. convert resources at the cmdutil boundary
 func RenderFromReleaseFile(ctx context.Context, opts RenderFromReleaseFileOpts) (*RenderResult, error) { //nolint:gocyclo // orchestration function; complexity is inherent
 	if opts.Config == nil {
 		return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
@@ -410,34 +350,20 @@ func RenderFromReleaseFile(ctx context.Context, opts RenderFromReleaseFileOpts) 
 	)
 
 	cueCtx := opts.Config.CueContext
-	registry := opts.Config.Registry
-
-	// Step 1: Load the release file, merging a values file when appropriate.
-	//
-	// Resolution order:
-	//   a. --values flag provided → load release + that file.
-	//   b. values.cue exists next to the release file → load release + values.cue.
-	//   c. Neither → load the release file alone and check for an inline
-	//      concrete values field; error if none found.
-	releaseVal, _, err := loadReleaseWithValues(cueCtx, opts.ReleaseFilePath, opts.ValuesFile, registry)
+	fileRelease, err := internalreleasefile.GetReleaseFile(opts.ReleaseFilePath)
 	if err != nil {
 		PrintValidationError("render failed", err)
 		return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: err, Printed: true}
 	}
-
-	// Step 2: Detect release kind — reject BundleRelease (not yet supported).
-	kind, err := loader.DetectReleaseKind(releaseVal)
-	if err != nil {
-		return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
-	}
-	if kind == "BundleRelease" {
+	if fileRelease.Kind == internalreleasefile.KindBundleRelease {
 		return nil, &oerrors.ExitError{
 			Code: oerrors.ExitGeneralError,
 			Err:  fmt.Errorf("bundle releases are not yet supported — use a #ModuleRelease file"),
 		}
 	}
+	rel := fileRelease.Module
 
-	// Step 3: Optionally inject local module via --module flag.
+	// Step 2: Optionally inject local module via --module flag.
 	if opts.ModulePath != "" {
 		modVal, modErr := loader.LoadModulePackage(cueCtx, opts.ModulePath)
 		if modErr != nil {
@@ -446,8 +372,17 @@ func RenderFromReleaseFile(ctx context.Context, opts RenderFromReleaseFileOpts) 
 				Err:  fmt.Errorf("loading module from --module: %w", modErr),
 			}
 		}
-		releaseVal = releaseVal.FillPath(cue.MakePath(cue.Def("module")), modVal)
-		if err := releaseVal.Err(); err != nil {
+		rel.RawCUE = rel.RawCUE.FillPath(cue.MakePath(cue.Def("module")), modVal)
+		rel.Module.Raw = modVal
+		rel.Module.Config = modVal.LookupPath(cue.ParsePath("#config"))
+		rel.Config = rel.RawCUE.LookupPath(cue.ParsePath("#module.#config"))
+		if modMeta := rel.Module.Metadata; modMeta == nil {
+			rel.Module.Metadata = &pkgmodule.ModuleMetadata{}
+			if err := modVal.LookupPath(cue.ParsePath("metadata")).Decode(rel.Module.Metadata); err != nil {
+				return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("decoding module metadata from --module: %w", err)}
+			}
+		}
+		if err := rel.RawCUE.Err(); err != nil {
 			return nil, &oerrors.ExitError{
 				Code: oerrors.ExitGeneralError,
 				Err:  fmt.Errorf("filling #module from --module: %w", err),
@@ -456,7 +391,7 @@ func RenderFromReleaseFile(ctx context.Context, opts RenderFromReleaseFileOpts) 
 	}
 
 	// Check that #module is filled before proceeding.
-	moduleVal := releaseVal.LookupPath(cue.MakePath(cue.Def("module")))
+	moduleVal := rel.RawCUE.LookupPath(cue.MakePath(cue.Def("module")))
 	if !moduleVal.Exists() || moduleVal.Validate(cue.Concrete(true)) != nil {
 		if opts.ModulePath == "" {
 			return nil, &oerrors.ExitError{
@@ -466,9 +401,7 @@ func RenderFromReleaseFile(ctx context.Context, opts RenderFromReleaseFileOpts) 
 		}
 	}
 
-	// Step 4: Load the ModuleRelease from the evaluated value.
-	fallbackName := filepath.Base(opts.ReleaseFilePath)
-	rel, err := loader.LoadModuleReleaseFromValue(cueCtx, releaseVal, fallbackName)
+	valuesVal, err := resolveReleaseValues(cueCtx, rel.RawCUE, opts.ReleaseFilePath, opts.ValuesFiles)
 	if err != nil {
 		PrintValidationError("render failed", err)
 		return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: err, Printed: true}
@@ -481,21 +414,20 @@ func RenderFromReleaseFile(ctx context.Context, opts RenderFromReleaseFileOpts) 
 		rel.Metadata.Namespace = namespace
 	}
 
-	// Step 5: Load provider.
+	// Step 3: Load provider.
 	p, err := loader.LoadProvider(providerName, opts.Config.Providers)
 	if err != nil {
 		return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
 	}
 
-	// Step 6: Run the engine renderer.
-	renderer := engine.NewModuleRenderer(p, opts.Config.Matcher)
-	engineResult, err := renderer.Render(ctx, rel)
+	// Step 4: Process and render.
+	engineResult, err := releaseprocess.ProcessModuleRelease(ctx, rel, []cue.Value{valuesVal}, p)
 	if err != nil {
 		PrintValidationError("render failed", err)
 		return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: err, Printed: true}
 	}
 
-	// Step 7: Convert resources to Unstructured.
+	// Step 5: Convert resources to Unstructured.
 	resources := make([]*unstructured.Unstructured, 0, len(engineResult.Resources))
 	for _, r := range engineResult.Resources {
 		u, convErr := r.ToUnstructured()
@@ -527,38 +459,106 @@ func RenderFromReleaseFile(ctx context.Context, opts RenderFromReleaseFileOpts) 
 //  2. values.cue exists next to the release file → LoadReleaseFileWithValues.
 //  3. Neither → LoadReleaseFile; then check that the loaded package already
 //     contains a concrete values field. If not, return an actionable error.
-func loadReleaseWithValues(cueCtx *cue.Context, releaseFilePath, valuesFile, registry string) (cue.Value, string, error) {
-	// Case 1: explicit --values flag.
-	if valuesFile != "" {
-		return loader.LoadReleaseFileWithValues(cueCtx, releaseFilePath, valuesFile, registry)
+func resolveReleaseValues(cueCtx *cue.Context, rawRelease cue.Value, releaseFilePath string, valuesFiles []string) (cue.Value, error) {
+	if len(valuesFiles) > 0 {
+		first, err := loader.LoadValuesFile(cueCtx, valuesFiles[0])
+		if err != nil {
+			return cue.Value{}, err
+		}
+
+		merged := first
+		for _, valuesFile := range valuesFiles[1:] {
+			next, err := loader.LoadValuesFile(cueCtx, valuesFile)
+			if err != nil {
+				return cue.Value{}, err
+			}
+			merged = merged.Unify(next)
+			if unifyErr := merged.Err(); unifyErr != nil {
+				return cue.Value{}, fmt.Errorf("unifying values files: %w", unifyErr)
+			}
+		}
+
+		return merged, nil
 	}
 
-	// Case 2: auto-discover values.cue next to the release file.
-	// resolveReleaseFile handles directory → release.cue expansion; we replicate
-	// the directory detection here to find the sibling values.cue.
 	releaseDir, err := resolveReleaseDir(releaseFilePath)
 	if err != nil {
-		return cue.Value{}, "", err
+		return cue.Value{}, err
 	}
 	autoValues := filepath.Join(releaseDir, "values.cue")
 	if _, statErr := os.Stat(autoValues); statErr == nil {
-		return loader.LoadReleaseFileWithValues(cueCtx, releaseFilePath, autoValues, registry)
+		return loader.LoadValuesFile(cueCtx, autoValues)
 	}
 
-	// Case 3: no values file — load release file alone and verify inline values.
-	val, dir, loadErr := loader.LoadReleaseFile(cueCtx, releaseFilePath, registry)
-	if loadErr != nil {
-		return cue.Value{}, "", loadErr
-	}
-
-	valuesVal := val.LookupPath(cue.ParsePath("values"))
+	valuesVal := rawRelease.LookupPath(cue.ParsePath("values"))
 	if !valuesVal.Exists() || valuesVal.Validate(cue.Concrete(true)) != nil {
-		return cue.Value{}, "", fmt.Errorf(
-			"release has no concrete values — provide --values <file> or add a values.cue to the release directory",
-		)
+		return cue.Value{}, fmt.Errorf("release has no concrete values - provide --values <file> or add a values.cue to the release directory")
+	}
+	return valuesVal, nil
+}
+
+//nolint:gocyclo // release loading combines debug-values, inline-values, and file-values cases
+func loadModuleReleaseForRender(cueCtx *cue.Context, modulePath string, valuesFiles []string, debugValues bool, releaseName string) (*modulerelease.ModuleRelease, error) {
+	fileRelease, err := internalreleasefile.GetReleaseFile(modulePath)
+	if err != nil {
+		return nil, err
+	}
+	if fileRelease.Kind != internalreleasefile.KindModuleRelease || fileRelease.Module == nil {
+		return nil, &oerrors.ExitError{
+			Code: oerrors.ExitGeneralError,
+			Err:  fmt.Errorf("unsupported release kind %q (use bundle commands for BundleRelease)", fileRelease.Kind),
+		}
+	}
+	rel := fileRelease.Module
+
+	var valuesVal cue.Value
+	switch {
+	case debugValues && len(valuesFiles) == 0:
+		modVal, modErr := loader.LoadModulePackage(cueCtx, modulePath)
+		if modErr != nil {
+			return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("loading module for debugValues: %w", modErr)}
+		}
+		debugVal := modVal.LookupPath(cue.ParsePath("debugValues"))
+		if !debugVal.Exists() {
+			return nil, &oerrors.ExitError{
+				Code: oerrors.ExitGeneralError,
+				Err:  fmt.Errorf("module does not define debugValues - add a debugValues field or provide a values file with -f"),
+			}
+		}
+		if err := debugVal.Validate(cue.Concrete(true)); err != nil {
+			PrintValidationError("debugValues not concrete", err)
+			return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: fmt.Errorf("debugValues is not concrete - module must provide complete test values"), Printed: true}
+		}
+		valuesVal = debugVal
+	case len(valuesFiles) > 0:
+		first, loadErr := loader.LoadValuesFile(cueCtx, valuesFiles[0])
+		if loadErr != nil {
+			return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("loading values file %q: %w", valuesFiles[0], loadErr)}
+		}
+		valuesVal = first
+		for _, vf := range valuesFiles[1:] {
+			next, loadErr := loader.LoadValuesFile(cueCtx, vf)
+			if loadErr != nil {
+				return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("loading values file %q: %w", vf, loadErr)}
+			}
+			valuesVal = valuesVal.Unify(next)
+			if err := valuesVal.Err(); err != nil {
+				return nil, &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: fmt.Errorf("unifying values files: %w", err)}
+			}
+		}
+	default:
+		inlineValues := rel.RawCUE.LookupPath(cue.ParsePath("values"))
+		if !inlineValues.Exists() || inlineValues.Validate(cue.Concrete(true)) != nil {
+			return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("release has no concrete values - provide -f <values-file> or enable debugValues")}
+		}
+		valuesVal = inlineValues
 	}
 
-	return val, dir, nil
+	if releaseName != "" {
+		rel.Metadata.Name = releaseName
+	}
+	rel.Values = valuesVal
+	return rel, nil
 }
 
 // resolveReleaseDir returns the directory containing the release file.

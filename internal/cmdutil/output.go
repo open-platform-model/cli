@@ -26,7 +26,7 @@ func formatFQNList(fqns []string) string {
 // PrintValidationError prints a render/validation error in a user-friendly format.
 //
 // For ConfigError (values schema failures), it prints a summary header with the
-// total location count, then a grouped block where each distinct error message
+// total grouped issue count, then a grouped block where each distinct error message
 // appears once followed by all source positions that report it. This naturally
 // surfaces conflicts (same message, multiple files) as a single entry.
 //
@@ -76,13 +76,10 @@ func hasPositions(groups []pkgerrors.GroupedError) bool {
 
 // printGrouped prints a grouped-error summary header and formatted body.
 func printGrouped(msg string, groups []pkgerrors.GroupedError) {
-	n := 0
-	for _, g := range groups {
-		n += len(g.Locations)
-	}
-	noun := "error"
+	n := len(groups)
+	noun := "issue"
 	if n != 1 {
-		noun = "errors"
+		noun = "issues"
 	}
 	output.Error(fmt.Sprintf("%s: %d %s", msg, n, noun))
 	output.Details(output.FormatGroupedErrors(groups))
@@ -109,6 +106,8 @@ func WriteTransformerMatches(result *RenderResult) {
 
 // WriteVerboseMatchLog writes detailed verbose output with release metadata,
 // per-component properties, match reasons, and per-resource validation lines (--verbose only).
+//
+//nolint:gocyclo // verbose formatting intentionally gathers several output sections in one place
 func WriteVerboseMatchLog(result *RenderResult) {
 	if result.MatchPlan == nil {
 		return

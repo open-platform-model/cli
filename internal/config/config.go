@@ -80,12 +80,7 @@ type GlobalConfig struct {
 	// Value: loaded CUE value referencing the provider's #Provider definition
 	Providers map[string]cue.Value
 
-	// Matcher is the pre-loaded CUE #MatchPlan definition from config.
-	// Used by the engine to match components against provider transformers.
-	// Populated from config.matcher (e.g. matcher.#MatchPlan imported from the registry).
-	Matcher cue.Value
-
-	// CueContext is the CUE context used to load providers and the matcher.
+	// CueContext is the CUE context used to load providers and other CUE-backed inputs.
 	// Shared with module loader to ensure all values are from the same runtime.
 	CueContext *cue.Context
 

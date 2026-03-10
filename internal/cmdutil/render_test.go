@@ -3,8 +3,11 @@ package cmdutil
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/opmodel/cli/internal/config"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/opmodel/cli/pkg/modulerelease"
@@ -103,4 +106,39 @@ func TestRenderFromReleaseFile_NilK8sConfig(t *testing.T) {
 	require.True(t, errors.As(err, &exitErr))
 	assert.Equal(t, oerrors.ExitGeneralError, exitErr.Code)
 	assert.Contains(t, exitErr.Error(), "kubernetes config not resolved")
+}
+
+func TestResolveReleaseValues_UsesInlineValues(t *testing.T) {
+	ctx := cuecontext.New()
+	raw := ctx.CompileString(`{
+		values: {
+			replicas: 2
+		}
+	}`)
+
+	values, err := resolveReleaseValues(ctx, raw, "./release.cue", nil)
+	require.NoError(t, err)
+	assert.True(t, values.Exists())
+	assert.NoError(t, values.Validate())
+}
+
+func TestLoadModuleReleaseForRender_UsesReleaseNameOverride(t *testing.T) {
+	ctx := cuecontext.New()
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "release.cue"), []byte(`package test
+
+kind: "ModuleRelease"
+metadata: {
+	name: "from-file"
+	namespace: "apps"
+}
+values: {
+	replicas: 2
+}
+`), 0o644))
+
+	rel, err := loadModuleReleaseForRender(ctx, dir, nil, false, "override-name")
+	require.NoError(t, err)
+	assert.Equal(t, "override-name", rel.Metadata.Name)
+	assert.True(t, rel.Values.Exists())
 }

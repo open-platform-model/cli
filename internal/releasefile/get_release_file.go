@@ -1,0 +1,159 @@
+package releasefile
+
+import (
+	"fmt"
+	"os"
+
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
+
+	"github.com/opmodel/cli/pkg/bundle"
+	"github.com/opmodel/cli/pkg/bundlerelease"
+	"github.com/opmodel/cli/pkg/loader"
+	"github.com/opmodel/cli/pkg/module"
+	"github.com/opmodel/cli/pkg/modulerelease"
+)
+
+type Kind string
+
+const (
+	KindModuleRelease Kind = "ModuleRelease"
+	KindBundleRelease Kind = "BundleRelease"
+)
+
+type FileRelease struct {
+	Path   string
+	Kind   Kind
+	Module *modulerelease.ModuleRelease
+	Bundle *bundlerelease.BundleRelease
+}
+
+func GetReleaseFile(filePath string) (*FileRelease, error) {
+	ctx := cuecontext.New()
+	val, _, err := loader.LoadReleaseFile(ctx, filePath, os.Getenv("CUE_REGISTRY"))
+	if err != nil {
+		return nil, err
+	}
+
+	kind, err := loader.DetectReleaseKind(val)
+	if err != nil {
+		return nil, err
+	}
+
+	switch kind {
+	case string(KindModuleRelease):
+		moduleRelease, err := bareModuleRelease(val, filePath)
+		if err != nil {
+			return nil, err
+		}
+		return &FileRelease{
+			Path:   filePath,
+			Kind:   KindModuleRelease,
+			Module: moduleRelease,
+		}, nil
+	case string(KindBundleRelease):
+		bundleRelease, err := bareBundleRelease(val)
+		if err != nil {
+			return nil, err
+		}
+		return &FileRelease{
+			Path:   filePath,
+			Kind:   KindBundleRelease,
+			Bundle: bundleRelease,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported release kind %q", kind)
+	}
+}
+
+func bareModuleRelease(v cue.Value, fallbackName string) (*modulerelease.ModuleRelease, error) {
+	moduleVal := v.LookupPath(cue.ParsePath("#module"))
+	moduleConfig := v.LookupPath(cue.ParsePath("#module.#config"))
+	releaseMeta, err := mustModuleReleaseMetadata(v, fallbackName)
+	if err != nil {
+		return nil, err
+	}
+
+	return modulerelease.NewModuleRelease(
+		releaseMeta,
+		module.Module{
+			Metadata: bestEffortModuleMetadata(moduleVal),
+			Config:   moduleConfig,
+			Raw:      moduleVal,
+		},
+		v,
+		cue.Value{},
+		moduleConfig,
+		cue.Value{},
+	), nil
+}
+
+func bareBundleRelease(v cue.Value) (*bundlerelease.BundleRelease, error) {
+	bundleVal := v.LookupPath(cue.ParsePath("#bundle"))
+	bundleConfig := v.LookupPath(cue.ParsePath("#bundle.#config"))
+	releaseMeta, err := mustBundleReleaseMetadata(v)
+	if err != nil {
+		return nil, err
+	}
+
+	return &bundlerelease.BundleRelease{
+		Metadata: releaseMeta,
+		Bundle: bundle.Bundle{
+			Metadata: bestEffortBundleMetadata(bundleVal),
+			Data:     bundleVal,
+		},
+		RawCUE:   v,
+		Releases: map[string]*modulerelease.ModuleRelease{},
+		Config:   bundleConfig,
+	}, nil
+}
+
+func mustModuleReleaseMetadata(v cue.Value, fallbackName string) (*modulerelease.ReleaseMetadata, error) {
+	metaVal := v.LookupPath(cue.ParsePath("metadata"))
+	if !metaVal.Exists() {
+		return nil, fmt.Errorf("module release metadata is required for %q", fallbackName)
+	}
+	if err := metaVal.Validate(cue.Concrete(true)); err != nil {
+		return nil, fmt.Errorf("module release metadata must be concrete for %q: %w", fallbackName, err)
+	}
+	meta := &modulerelease.ReleaseMetadata{}
+	if err := metaVal.Decode(meta); err != nil {
+		return nil, fmt.Errorf("decoding module release metadata for %q: %w", fallbackName, err)
+	}
+	return meta, nil
+}
+
+func bestEffortModuleMetadata(v cue.Value) *module.ModuleMetadata {
+	meta := &module.ModuleMetadata{}
+	if mv := v.LookupPath(cue.ParsePath("metadata")); mv.Exists() {
+		if err := mv.Decode(meta); err != nil {
+			return meta
+		}
+	}
+	return meta
+}
+
+func mustBundleReleaseMetadata(v cue.Value) (*bundlerelease.BundleReleaseMetadata, error) {
+	metaVal := v.LookupPath(cue.ParsePath("metadata"))
+	if !metaVal.Exists() {
+		return nil, fmt.Errorf("bundle release metadata is required")
+	}
+	if err := metaVal.Validate(cue.Concrete(true)); err != nil {
+		return nil, fmt.Errorf("bundle release metadata must be concrete: %w", err)
+	}
+	meta := &bundlerelease.BundleReleaseMetadata{}
+	if err := metaVal.Decode(meta); err != nil {
+		return nil, fmt.Errorf("decoding bundle release metadata: %w", err)
+	}
+	return meta, nil
+}
+
+func bestEffortBundleMetadata(v cue.Value) *bundle.BundleMetadata {
+	meta := &bundle.BundleMetadata{}
+	if mv := v.LookupPath(cue.ParsePath("metadata")); mv.Exists() {
+		if err := mv.Decode(meta); err != nil {
+			return meta
+		}
+	}
+	return meta
+}

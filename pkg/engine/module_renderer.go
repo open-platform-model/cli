@@ -1,23 +1,4 @@
-// Package engine implements the OPM render pipeline using CUE-native matching.
-//
-// The pipeline has two phases:
-//  1. Match — CUE evaluates matcher.#MatchPlan to determine which transformers
-//     apply to which components. Go decodes the structured result.
-//  2. Execute — For each matched (component, transformer) pair, Go calls back into
-//     CUE to run the #transform function and decodes the output resources.
-//
-// This package is intentionally minimal: no Kubernetes apply logic, no CLI output.
-// It is designed to be embedded in other tools that need OPM rendering.
-//
-// Basic usage:
-//
-//	r := engine.NewModuleRenderer(provider, matcherDef)
-//
-//	result, err := r.Render(ctx, release)
-//	// result.Resources   — decoded Kubernetes resources with provenance
-//	// result.MatchPlan   — which transformers matched which components
-//	// result.Components  — per-component summary for verbose output
-//	// result.Warnings    — unhandled trait warnings
+// Package engine executes matched transforms and decodes rendered resources.
 package engine
 
 import (
@@ -29,6 +10,7 @@ import (
 	"cuelang.org/go/cue"
 
 	"github.com/opmodel/cli/pkg/core"
+	"github.com/opmodel/cli/pkg/match"
 	"github.com/opmodel/cli/pkg/modulerelease"
 	"github.com/opmodel/cli/pkg/provider"
 )
@@ -60,8 +42,7 @@ type ComponentSummary struct {
 // A ModuleRenderer is constructed once per provider and reused across multiple
 // Render calls. It is not safe for concurrent use (CUE context is single-threaded).
 type ModuleRenderer struct {
-	provider   *provider.Provider
-	matcherDef cue.Value // pre-evaluated #MatchPlan definition from config
+	provider *provider.Provider
 }
 
 // RenderResult holds the output of a successful Render call.
@@ -72,7 +53,7 @@ type RenderResult struct {
 
 	// MatchPlan is the decoded result of matching components against transformers.
 	// Nil if matching was not performed (e.g. no components).
-	MatchPlan *MatchPlan
+	MatchPlan *match.MatchPlan
 
 	// Components is a per-component summary for verbose output, sorted by name.
 	Components []ComponentSummary
@@ -83,31 +64,13 @@ type RenderResult struct {
 }
 
 // NewModuleRenderer creates a ModuleRenderer for the given provider.
-//
-// matcherDef must be the pre-evaluated #MatchPlan cue.Value loaded from config
-// (via internal/config.extractMatcher). The CUE context is derived from
-// provider.Data.Context() — no separate cueCtx parameter is needed.
-func NewModuleRenderer(p *provider.Provider, matcherDef cue.Value) *ModuleRenderer {
-	return &ModuleRenderer{
-		provider:   p,
-		matcherDef: matcherDef,
-	}
+func NewModuleRenderer(p *provider.Provider) *ModuleRenderer {
+	return &ModuleRenderer{provider: p}
 }
 
-// Render executes the full OPM pipeline for the given module release:
-//  1. CUE evaluates #MatchPlan to determine which transformers apply to which components.
-//  2. Go checks for unmatched components — returns an error if any are found.
-//  3. Go executes each matched pair: injects #context, evaluates #transform, decodes output.
-//  4. Warnings for unhandled traits are collected and returned.
-//
-// The returned error summarizes all per-pair execution failures; execution continues
-// past individual pair errors so all matches are attempted.
-func (r *ModuleRenderer) Render(ctx context.Context, rel *modulerelease.ModuleRelease) (*RenderResult, error) {
+// Render executes matched transforms for the given module release.
+func (r *ModuleRenderer) Render(ctx context.Context, rel *modulerelease.ModuleRelease, plan *match.MatchPlan) (*RenderResult, error) {
 	// Extract the components CUE values from the ModuleRelease.
-	// MatchComponents() returns the schema value (preserves #resources, #traits
-	// definition fields required by the match plan).
-	// ExecuteComponents() returns the finalized, constraint-free components value
-	// safe for FillPath injection into transformer #transform definitions.
 	schemaComponents := rel.MatchComponents()
 	if !schemaComponents.Exists() {
 		return nil, fmt.Errorf("release %q: no components field in schema CUE value", rel.Metadata.Name)
@@ -120,12 +83,8 @@ func (r *ModuleRenderer) Render(ctx context.Context, rel *modulerelease.ModuleRe
 	// The CUE context lives on each cue.Value — extract it from the provider.
 	cueCtx := r.provider.Data.Context()
 
-	// Phase 1 — matching (CUE #MatchPlan evaluation).
-	// Uses schemaComponents so that definition fields (#resources, #traits) are
-	// preserved for the CUE matcher's comprehension logic.
-	plan, err := buildMatchPlan(r.matcherDef, r.provider.Data, schemaComponents)
-	if err != nil {
-		return nil, fmt.Errorf("building match plan: %w", err)
+	if plan == nil {
+		return nil, fmt.Errorf("match plan is required")
 	}
 
 	// Error on unmatched components — these cannot be rendered.
@@ -145,11 +104,32 @@ func (r *ModuleRenderer) Render(ctx context.Context, rel *modulerelease.ModuleRe
 	}
 
 	return &RenderResult{
-		Resources:  resources,
+		Resources:  nonNilResources(resources),
 		MatchPlan:  plan,
-		Components: extractComponentSummaries(schemaComponents),
-		Warnings:   plan.Warnings(),
+		Components: nonNilComponentSummaries(extractComponentSummaries(schemaComponents)),
+		Warnings:   nonNilWarnings(plan.Warnings()),
 	}, nil
+}
+
+func nonNilResources(resources []*core.Resource) []*core.Resource {
+	if resources == nil {
+		return []*core.Resource{}
+	}
+	return resources
+}
+
+func nonNilComponentSummaries(components []ComponentSummary) []ComponentSummary {
+	if components == nil {
+		return []ComponentSummary{}
+	}
+	return components
+}
+
+func nonNilWarnings(warnings []string) []string {
+	if warnings == nil {
+		return []string{}
+	}
+	return warnings
 }
 
 // extractComponentSummaries iterates the schemaComponents CUE value and builds
