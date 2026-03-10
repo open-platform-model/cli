@@ -15,6 +15,12 @@ task build
 
 # Apply a module
 ./bin/opm module apply ./my-module
+
+# Validate a release file
+./bin/opm release vet ./release.cue
+
+# Apply a release file
+./bin/opm release apply ./release.cue
 ```
 
 ## Features
@@ -31,18 +37,32 @@ task build
 
 `opm mod` remains available as a compatibility alias.
 
+Use `opm module` when you are starting from module source. For inspecting or operating on deployed releases, use `opm release`.
+
 | Command | Description |
 |---------|-------------|
 | `module init` | Create a new module from template |
 | `module build` | Render module to manifests |
 | `module vet` | Validate module without generating manifests |
 | `module apply` | Deploy module to cluster |
-| `module status` | Show resource status |
-| `module tree` | Show module resource hierarchy (component → resource → K8s children) |
 
-| `module delete` | Delete release resources from cluster |
-| `module list` | List deployed module releases |
-| `module events` | Show events for a release |
+### Release Operations (`opm release`)
+
+`opm rel` remains available as a compatibility alias.
+
+Use `opm release` when you are starting from a release file or when you want to inspect, list, or delete deployed releases.
+
+| Command | Description |
+|---------|-------------|
+| `release vet` | Validate a release file without generating manifests |
+| `release build` | Render a release file to manifests |
+| `release apply` | Deploy a release file to a cluster |
+| `release diff` | Compare a release file with live cluster state |
+| `release status` | Show resource status for a deployed release |
+| `release tree` | Show release resource hierarchy (component → resource → K8s children) |
+| `release delete` | Delete release resources from cluster |
+| `release list` | List deployed releases |
+| `release events` | Show events for a release |
 
 ### Configuration (`opm config`)
 
@@ -51,28 +71,50 @@ task build
 | `config init` | Initialize OPM configuration |
 | `config vet` | Validate configuration |
 
-### `opm module tree`
+### `opm release tree`
 
 Show the component and resource hierarchy of a deployed release.
 
 ```bash
 # Full tree (default depth=2: components → resources → K8s children)
-opm module tree --release-name my-app -n production
+opm release tree my-app -n production
 
 # Component summary only (depth=0)
-opm module tree --release-name my-app -n production --depth 0
+opm release tree my-app -n production --depth 0
 
 # Resources without K8s children (depth=1)
-opm module tree --release-name my-app -n production --depth 1
+opm release tree my-app -n production --depth 1
 
 # JSON output for scripting
-opm module tree --release-name my-app -n production -o json
+opm release tree my-app -n production -o json
 ```
 
 Depth levels:
+
 - **0** — Component summary (resource counts and aggregate status)
 - **1** — OPM-managed resources grouped by component
 - **2** — Full tree with Kubernetes-owned children (Deployment→ReplicaSet→Pod, StatefulSet→Pod)
+
+### Release Workflow
+
+Use `opm release` when you are starting from a release definition instead of module source.
+
+```bash
+# Validate a release file
+opm release vet ./releases/jellyfin/release.cue
+
+# Render manifests from a release file
+opm release build ./releases/jellyfin/release.cue
+
+# Apply a release file to the cluster
+opm release apply ./releases/jellyfin/release.cue
+
+# Inspect deployed state by file, name, or UUID
+opm release status ./releases/jellyfin/release.cue
+opm release status jellyfin -n media
+```
+
+Legacy compatibility note: `opm module status`, `opm module tree`, `opm module delete`, `opm module list`, and `opm module events` still exist, but `opm release` is the preferred interface for deployed release operations.
 
 ## Documentation
 
@@ -86,6 +128,9 @@ task check
 
 # Build binary
 task build
+
+# Install binary
+task install
 
 # Run tests
 task test
