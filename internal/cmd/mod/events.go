@@ -62,7 +62,7 @@ Examples:
   # JSON output for tooling
   opm mod events --release-name jellyfin -n media -o json`,
 		RunE: func(c *cobra.Command, args []string) error {
-			return runEvents(args, cfg, &rsf, &kf, sinceFlag, typeFlag, watchFlag, outputFlag)
+			return runModEvents(args, cfg, &rsf, &kf, sinceFlag, typeFlag, watchFlag, outputFlag)
 		},
 	}
 
@@ -83,7 +83,7 @@ Examples:
 // runEvents executes the events command.
 //
 //nolint:gocyclo // linear validation + dispatch; each branch is distinct
-func runEvents(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, since, eventType string, watchMode bool, outputFmt string) error {
+func runModEvents(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, since, eventType string, watchMode bool, outputFmt string) error {
 	ctx := context.Background()
 
 	// Validate release selector flags.

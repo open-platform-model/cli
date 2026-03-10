@@ -71,39 +71,17 @@ Examples:
 func runReleaseDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, force, dryRun bool) error {
 	ctx := context.Background()
 
-	ra, err := cmdutil.ResolveReleaseArg(identifier, cfg)
+	target, err := cmdutil.ResolveReleaseTarget(identifier, cfg, kf, namespaceFlag)
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
-	}
-	rsf := ra.ToSelectorFlags(namespaceFlag)
-
-	if err := rsf.Validate(); err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
-	}
-
-	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
-		Config:         cfg,
-		KubeconfigFlag: kf.Kubeconfig,
-		ContextFlag:    kf.Context,
-		NamespaceFlag:  ra.EffectiveNamespace(namespaceFlag),
-	})
-	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
-	}
-	if err := cmdutil.RequireNamespace(k8sConfig); err != nil {
 		return err
 	}
+	cmdutil.LogResolvedKubernetesConfig(target.Namespace, target.K8sConfig.Kubeconfig.Value, target.K8sConfig.Context.Value)
 
-	namespace := k8sConfig.Namespace.Value
-	output.Debug("resolved kubernetes config",
-		"kubeconfig", k8sConfig.Kubeconfig.Value,
-		"context", k8sConfig.Context.Value,
-		"namespace", namespace,
-	)
+	rsf := target.Selector
+	namespace := target.Namespace
+	releaseLog := output.ReleaseLogger(target.LogName)
 
-	releaseLog := output.ReleaseLogger(rsf.LogName())
-
-	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
+	k8sClient, err := cmdutil.NewK8sClient(target.K8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
 		releaseLog.Error("connecting to cluster", "error", err)
 		return err

@@ -2,14 +2,12 @@ package release
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewReleaseEventsCmd creates the release events command.
@@ -72,47 +70,28 @@ func runReleaseEvents(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 		return err
 	}
 
-	ra, err := cmdutil.ResolveReleaseArg(identifier, cfg)
+	target, err := cmdutil.ResolveReleaseTarget(identifier, cfg, kf, namespaceFlag)
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
-	}
-	rsf := ra.ToSelectorFlags(namespaceFlag)
-
-	if err := rsf.Validate(); err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
-	}
-
-	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
-		Config:         cfg,
-		KubeconfigFlag: kf.Kubeconfig,
-		ContextFlag:    kf.Context,
-		NamespaceFlag:  ra.EffectiveNamespace(namespaceFlag),
-	})
-	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
-	}
-	if err := cmdutil.RequireNamespace(k8sConfig); err != nil {
 		return err
 	}
 
-	namespace := k8sConfig.Namespace.Value
-	logName := rsf.LogName()
+	logName := target.LogName
 	releaseLog := output.ReleaseLogger(logName)
 
-	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
+	k8sClient, err := cmdutil.NewK8sClient(target.K8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
 		releaseLog.Error("connecting to cluster", "error", err)
 		return err
 	}
 
-	_, liveResources, _, err := cmdutil.ResolveInventory(ctx, k8sClient, rsf, namespace, releaseLog)
+	_, liveResources, _, err := cmdutil.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, releaseLog)
 	if err != nil {
 		return err
 	}
 
-	eventsOpts.Namespace = namespace
-	eventsOpts.ReleaseName = rsf.ReleaseName
-	eventsOpts.ReleaseID = rsf.ReleaseID
+	eventsOpts.Namespace = target.Namespace
+	eventsOpts.ReleaseName = target.Selector.ReleaseName
+	eventsOpts.ReleaseID = target.Selector.ReleaseID
 	eventsOpts.InventoryLive = liveResources
 
 	if watchMode {

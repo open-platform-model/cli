@@ -109,7 +109,7 @@ func TestRunEvents_ValidationErrors(t *testing.T) {
 				sinceFmt = "1h"
 			}
 			watchMode := tt.name == "watch requires table output"
-			err := runEvents(nil, cfg, &tt.rsf, kf, sinceFmt, tt.typeFlag, watchMode, outputFmt)
+			err := runModEvents(nil, cfg, &tt.rsf, kf, sinceFmt, tt.typeFlag, watchMode, outputFmt)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.expectErr)
 		})

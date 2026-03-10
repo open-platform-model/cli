@@ -64,7 +64,7 @@ Examples:
   opm mod apply --verbose`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runApply(args, cfg, &rf, &kf, dryRunFlag, createNSFlag, noPruneFlag, maxHistoryFlag, forceFlag)
+			return runModApply(args, cfg, &rf, &kf, dryRunFlag, createNSFlag, noPruneFlag, maxHistoryFlag, forceFlag)
 		},
 	}
 
@@ -99,7 +99,7 @@ Examples:
 //     7a. Prune stale resources (if all applied successfully and --no-prune not set)
 //     7b. Skip prune and inventory write if any apply failed
 //  8. Write inventory Secret with new change entry
-func runApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, kf *cmdutil.K8sFlags, //nolint:gocyclo // orchestration function; complexity is inherent
+func runModApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, kf *cmdutil.K8sFlags, //nolint:gocyclo // orchestration function; complexity is inherent
 	dryRun, createNS, noPrune bool, maxHistory int, force bool) error {
 	ctx := context.Background()
 

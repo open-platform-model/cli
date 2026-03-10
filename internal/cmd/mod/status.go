@@ -60,7 +60,7 @@ Examples:
   # Show status in JSON format
   opm mod status --release-name my-app -n production -o json`,
 		RunE: func(c *cobra.Command, args []string) error {
-			return runStatus(args, cfg, &rsf, &kf, outputFlag, detailsFlag)
+			return runModStatus(args, cfg, &rsf, &kf, outputFlag, detailsFlag)
 		},
 	}
 
@@ -77,7 +77,7 @@ Examples:
 }
 
 // runStatus executes the status command.
-func runStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, outputFmt string, verbose bool) error {
+func runModStatus(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorFlags, kf *cmdutil.K8sFlags, outputFmt string, verbose bool) error {
 	ctx := context.Background()
 
 	// Validate release selector flags

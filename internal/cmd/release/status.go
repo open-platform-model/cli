@@ -2,14 +2,12 @@ package release
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewReleaseStatusCmd creates the release status command.
@@ -63,33 +61,14 @@ Examples:
 func runReleaseStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag, outputFmt string, verbose bool) error {
 	ctx := context.Background()
 
-	ra, err := cmdutil.ResolveReleaseArg(identifier, cfg)
+	target, err := cmdutil.ResolveReleaseTarget(identifier, cfg, kf, namespaceFlag)
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
-	}
-	rsf := ra.ToSelectorFlags(namespaceFlag)
-
-	if err := rsf.Validate(); err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
-	}
-
-	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
-		Config:         cfg,
-		KubeconfigFlag: kf.Kubeconfig,
-		ContextFlag:    kf.Context,
-		NamespaceFlag:  ra.EffectiveNamespace(namespaceFlag),
-	})
-	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
-	}
-	if err := cmdutil.RequireNamespace(k8sConfig); err != nil {
 		return err
 	}
 
-	namespace := k8sConfig.Namespace.Value
-	cmdutil.LogResolvedKubernetesConfig(namespace, k8sConfig.Kubeconfig.Value, k8sConfig.Context.Value)
+	cmdutil.LogResolvedKubernetesConfig(target.Namespace, target.K8sConfig.Kubeconfig.Value, target.K8sConfig.Context.Value)
 
-	logName := rsf.LogName()
+	logName := target.LogName
 	releaseLog := output.ReleaseLogger(logName)
 
 	outputFormat, err := cmdutil.ParseStatusOutputFormat(outputFmt)
@@ -97,17 +76,17 @@ func runReleaseStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 		return err
 	}
 
-	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
+	k8sClient, err := cmdutil.NewK8sClient(target.K8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
 		releaseLog.Error("connecting to cluster", "error", err)
 		return err
 	}
 
-	inv, liveResources, missingEntries, err := cmdutil.ResolveInventory(ctx, k8sClient, rsf, namespace, releaseLog)
+	inv, liveResources, missingEntries, err := cmdutil.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, releaseLog)
 	if err != nil {
 		return err
 	}
 
-	statusOpts := cmdutil.BuildStatusOptions(namespace, rsf, outputFormat, verbose, inv, liveResources, missingEntries)
+	statusOpts := cmdutil.BuildStatusOptions(target.Namespace, target.Selector, outputFormat, verbose, inv, liveResources, missingEntries)
 	return cmdutil.PrintReleaseStatus(ctx, k8sClient, statusOpts, logName)
 }

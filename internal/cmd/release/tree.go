@@ -76,40 +76,22 @@ func runReleaseTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8s
 		}
 	}
 
-	ra, err := cmdutil.ResolveReleaseArg(identifier, cfg)
+	target, err := cmdutil.ResolveReleaseTarget(identifier, cfg, kf, namespaceFlag)
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
-	}
-	rsf := ra.ToSelectorFlags(namespaceFlag)
-
-	if err := rsf.Validate(); err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
-	}
-
-	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
-		Config:         cfg,
-		KubeconfigFlag: kf.Kubeconfig,
-		ContextFlag:    kf.Context,
-		NamespaceFlag:  ra.EffectiveNamespace(namespaceFlag),
-	})
-	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
-	}
-	if err := cmdutil.RequireNamespace(k8sConfig); err != nil {
 		return err
 	}
 
-	namespace := k8sConfig.Namespace.Value
-	logName := rsf.LogName()
+	namespace := target.Namespace
+	logName := target.LogName
 	releaseLog := output.ReleaseLogger(logName)
 
-	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
+	k8sClient, err := cmdutil.NewK8sClient(target.K8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
 		releaseLog.Error("connecting to cluster", "error", err)
 		return err
 	}
 
-	inv, liveResources, _, err := cmdutil.ResolveInventory(ctx, k8sClient, rsf, namespace, releaseLog)
+	inv, liveResources, _, err := cmdutil.ResolveInventory(ctx, k8sClient, target.Selector, namespace, releaseLog)
 	if err != nil {
 		return err
 	}

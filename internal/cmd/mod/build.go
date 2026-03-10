@@ -50,7 +50,7 @@ Examples:
   opm mod build ./my-module -o json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runBuild(args, cfg, &rf, outputFlag, splitFlag, outDirFlag)
+			return runModBuild(args, cfg, &rf, outputFlag, splitFlag, outDirFlag)
 		},
 	}
 
@@ -67,7 +67,7 @@ Examples:
 }
 
 // runBuild executes the build command.
-func runBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, outputFmt string, split bool, outDir string) error {
+func runModBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, outputFmt string, split bool, outDir string) error {
 	ctx := context.Background()
 
 	// Validate output format

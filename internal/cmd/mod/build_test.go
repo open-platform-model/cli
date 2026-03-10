@@ -28,7 +28,7 @@ func TestNewModBuildCmd_NoLocalVerboseFlag(t *testing.T) {
 }
 
 func TestRunBuild_RejectsNonManifestOutput(t *testing.T) {
-	err := runBuild(nil, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, "table", false, "")
+	err := runModBuild(nil, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, "table", false, "")
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "invalid output format"))
 }

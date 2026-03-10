@@ -55,7 +55,7 @@ Examples:
   opm mod list -o json
   opm mod list -o yaml`,
 		RunE: func(c *cobra.Command, args []string) error {
-			return runList(cfg, &kf, namespace, allNamespaces, outputFlag)
+			return runModList(cfg, &kf, namespace, allNamespaces, outputFlag)
 		},
 	}
 
@@ -69,7 +69,7 @@ Examples:
 }
 
 // runList executes the list command.
-func runList(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, allNamespaces bool, outputFmt string) error {
+func runModList(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, allNamespaces bool, outputFmt string) error {
 	ctx := context.Background()
 
 	// Validate output format
