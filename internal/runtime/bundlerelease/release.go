@@ -7,8 +7,8 @@ package bundlerelease
 import (
 	"cuelang.org/go/cue"
 
+	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/bundle"
-	"github.com/opmodel/cli/pkg/modulerelease"
 )
 
 // BundleRelease is the concrete deployment instance of a bundle as it moves

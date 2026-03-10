@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/pkg/releaseprocess"
+	"github.com/opmodel/cli/internal/releaseprocess"
 )
 
 // TestValidateConfig_FieldNotAllowed_FileLoaded exercises the two-pass

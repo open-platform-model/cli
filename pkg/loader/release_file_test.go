@@ -63,7 +63,7 @@ func TestLoadReleaseFile(t *testing.T) {
 kind: "ModuleRelease"
 metadata: name: "my-release"
 `)
-		val, dir, err := LoadReleaseFile(ctx, filePath, "")
+		val, dir, err := LoadReleaseFile(ctx, filePath, LoadOptions{})
 		require.NoError(t, err)
 		assert.NotEmpty(t, dir)
 		assert.NoError(t, val.Err())
@@ -79,7 +79,7 @@ metadata: name: "my-release"
 kind: "BundleRelease"
 metadata: name: "my-bundle"
 `)
-		val, dir, err := LoadReleaseFile(ctx, filePath, "")
+		val, dir, err := LoadReleaseFile(ctx, filePath, LoadOptions{})
 		require.NoError(t, err)
 		assert.NotEmpty(t, dir)
 		assert.NoError(t, val.Err())
@@ -93,12 +93,12 @@ metadata: name: "my-bundle"
 		filePath := makeReleaseFileFixture(t, "bad.cue", `package releases
 
 this is not valid CUE !!!`)
-		_, _, err := LoadReleaseFile(ctx, filePath, "")
+		_, _, err := LoadReleaseFile(ctx, filePath, LoadOptions{})
 		require.Error(t, err)
 	})
 
 	t.Run("file not found", func(t *testing.T) {
-		_, _, err := LoadReleaseFile(ctx, "/nonexistent/path/release.cue", "")
+		_, _, err := LoadReleaseFile(ctx, "/nonexistent/path/release.cue", LoadOptions{})
 		require.Error(t, err)
 	})
 
@@ -107,7 +107,7 @@ this is not valid CUE !!!`)
 
 kind: "ModuleRelease"
 `)
-		_, dir, err := LoadReleaseFile(ctx, filePath, "")
+		_, dir, err := LoadReleaseFile(ctx, filePath, LoadOptions{})
 		require.NoError(t, err)
 		assert.Equal(t, filepath.Dir(filePath), dir)
 	})

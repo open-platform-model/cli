@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
@@ -12,7 +14,6 @@ import (
 	"github.com/opmodel/cli/internal/output"
 	workflowapply "github.com/opmodel/cli/internal/workflow/apply"
 	"github.com/opmodel/cli/internal/workflow/render"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewModuleApplyCmd creates the module apply command.
@@ -114,7 +115,7 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 		ProviderFlag:   rf.Provider,
 	})
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
 	// Step 1: Render module via shared pipeline.

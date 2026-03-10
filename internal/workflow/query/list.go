@@ -8,10 +8,11 @@ import (
 	"sync"
 	"time"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 	"gopkg.in/yaml.v3"
 )
 
@@ -111,7 +112,7 @@ func RenderReleaseListOutput(summaries []ReleaseSummary, format output.Format, a
 	case output.FormatJSON:
 		data, err := json.MarshalIndent(summaries, "", "  ")
 		if err != nil {
-			return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("marshaling to JSON: %w", err)}
+			return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("marshaling to JSON: %w", err)}
 		}
 		output.Println(string(data))
 		return nil
@@ -134,7 +135,7 @@ func RenderReleaseListOutput(summaries []ReleaseSummary, format output.Format, a
 func outputYAMLMarshal(v any) ([]byte, error) {
 	data, err := yaml.Marshal(v)
 	if err != nil {
-		return nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("marshaling to YAML: %w", err)}
+		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("marshaling to YAML: %w", err)}
 	}
 	return data, nil
 }

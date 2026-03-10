@@ -5,9 +5,10 @@ import (
 	"os"
 	"strings"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -15,8 +16,8 @@ import (
 func ParseManifestOutputFormat(outputFmt string) (output.Format, error) {
 	outputFormat, valid := output.ParseFormat(outputFmt)
 	if !valid || !output.IsManifestFormat(outputFormat) {
-		return "", &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
+		return "", &opmexit.ExitError{
+			Code: opmexit.ExitGeneralError,
 			Err:  fmt.Errorf("invalid output format %q (valid: yaml, json)", outputFmt),
 		}
 	}
@@ -29,7 +30,7 @@ func WriteManifestOutput(resources []*unstructured.Unstructured, outputFormat ou
 	if split {
 		splitOpts := output.SplitOptions{OutDir: outDir, Format: outputFormat}
 		if err := output.WriteSplitManifests(resources, splitOpts); err != nil {
-			return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("writing split manifests: %w", err)}
+			return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("writing split manifests: %w", err)}
 		}
 		releaseLog.Info(fmt.Sprintf("wrote %d resources to %s", len(resources), outDir))
 		return nil
@@ -37,7 +38,7 @@ func WriteManifestOutput(resources []*unstructured.Unstructured, outputFormat ou
 
 	manifestOpts := output.ManifestOptions{Format: outputFormat, Writer: os.Stdout}
 	if err := output.WriteManifests(resources, manifestOpts); err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("writing manifests: %w", err)}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("writing manifests: %w", err)}
 	}
 	return nil
 }

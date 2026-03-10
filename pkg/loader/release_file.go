@@ -9,6 +9,13 @@ import (
 	"cuelang.org/go/cue/load"
 )
 
+// LoadOptions configures release-file loading behavior.
+type LoadOptions struct {
+	// Registry overrides the CUE registry used while loading a release file.
+	// Empty means use the current process environment.
+	Registry string
+}
+
 // LoadReleaseFile loads a #ModuleRelease or #BundleRelease from a standalone
 // .cue file. CUE imports (including registry module references) are resolved
 // via load.Instances() using the file's parent directory for cue.mod resolution.
@@ -18,7 +25,7 @@ import (
 // when --module is provided.
 //
 // Returns the evaluated CUE value and the directory used for CUE resolution.
-func LoadReleaseFile(ctx *cue.Context, filePath, registry string) (cue.Value, string, error) {
+func LoadReleaseFile(ctx *cue.Context, filePath string, opts LoadOptions) (cue.Value, string, error) {
 	var err error
 	filePath, err = resolveReleaseFile(filePath)
 	if err != nil {
@@ -32,10 +39,10 @@ func LoadReleaseFile(ctx *cue.Context, filePath, registry string) (cue.Value, st
 
 	parentDir := filepath.Dir(absPath)
 
-	// Set CUE_REGISTRY env var if registry is non-empty, restoring original after.
-	if registry != "" {
+	// Set CUE_REGISTRY env var if Registry is non-empty, restoring original after.
+	if opts.Registry != "" {
 		orig, hadOrig := os.LookupEnv("CUE_REGISTRY")
-		if err := os.Setenv("CUE_REGISTRY", registry); err != nil {
+		if err := os.Setenv("CUE_REGISTRY", opts.Registry); err != nil {
 			return cue.Value{}, "", fmt.Errorf("setting CUE_REGISTRY: %w", err)
 		}
 		defer func() {

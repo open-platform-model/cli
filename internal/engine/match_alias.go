@@ -3,7 +3,7 @@ package engine
 import (
 	"sort"
 
-	pmatch "github.com/opmodel/cli/pkg/match"
+	pmatch "github.com/opmodel/cli/internal/match"
 )
 
 type MatchResult = pmatch.MatchResult

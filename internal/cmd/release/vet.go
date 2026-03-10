@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/workflow/render"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewReleaseVetCmd creates the release vet command.
@@ -61,7 +62,7 @@ func runReleaseVet(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.Re
 		ProviderFlag:  rff.Provider,
 	})
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
 	result, err := render.ReleaseFile(ctx, render.ReleaseFileOpts{

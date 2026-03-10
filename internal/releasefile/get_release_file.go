@@ -6,11 +6,11 @@ import (
 
 	"cuelang.org/go/cue"
 
+	"github.com/opmodel/cli/internal/runtime/bundlerelease"
+	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/bundle"
-	"github.com/opmodel/cli/pkg/bundlerelease"
 	"github.com/opmodel/cli/pkg/loader"
 	"github.com/opmodel/cli/pkg/module"
-	"github.com/opmodel/cli/pkg/modulerelease"
 )
 
 type Kind string
@@ -28,7 +28,7 @@ type FileRelease struct {
 }
 
 func GetReleaseFile(ctx *cue.Context, filePath string) (*FileRelease, error) {
-	val, _, err := loader.LoadReleaseFile(ctx, filePath, os.Getenv("CUE_REGISTRY"))
+	val, _, err := loader.LoadReleaseFile(ctx, filePath, loader.LoadOptions{Registry: os.Getenv("CUE_REGISTRY")})
 	if err != nil {
 		return nil, err
 	}

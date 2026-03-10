@@ -1,4 +1,4 @@
-package core
+package resourceorder
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"

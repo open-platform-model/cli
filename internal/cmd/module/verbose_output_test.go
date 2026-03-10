@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/opmodel/cli/internal/engine"
 	"github.com/opmodel/cli/internal/output"
+	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/internal/workflow/render"
-	"github.com/opmodel/cli/pkg/engine"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
-	"github.com/opmodel/cli/pkg/modulerelease"
 )
 
 // buildTestResult constructs a minimal *render.Result suitable for

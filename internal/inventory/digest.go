@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sort"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	resourceorder "github.com/opmodel/cli/internal/resourceorder"
 
-	pkgcore "github.com/opmodel/cli/pkg/core"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // SortResources sorts a slice of *unstructured.Unstructured with a deterministic 5-key total ordering:
@@ -20,8 +20,8 @@ func SortResources(resources []*unstructured.Unstructured) {
 	sort.SliceStable(resources, func(i, j int) bool {
 		ri, rj := resources[i], resources[j]
 
-		wi := pkgcore.GetWeight(ri.GroupVersionKind())
-		wj := pkgcore.GetWeight(rj.GroupVersionKind())
+		wi := resourceorder.GetWeight(ri.GroupVersionKind())
+		wj := resourceorder.GetWeight(rj.GroupVersionKind())
 		if wi != wj {
 			return wi < wj
 		}

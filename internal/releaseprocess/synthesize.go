@@ -5,8 +5,8 @@ import (
 
 	"cuelang.org/go/cue"
 
+	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/module"
-	"github.com/opmodel/cli/pkg/modulerelease"
 )
 
 func SynthesizeModuleRelease(cueCtx *cue.Context, modVal cue.Value, values []cue.Value, releaseName, namespace string) (*modulerelease.ModuleRelease, error) {

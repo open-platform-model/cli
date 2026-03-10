@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
@@ -11,7 +13,6 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/workflow/query"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // listConcurrency is the maximum number of concurrent release health evaluations.
@@ -75,8 +76,8 @@ func runModuleList(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag
 	// Validate output format
 	outputFormat, valid := output.ParseFormat(outputFmt)
 	if !valid || outputFormat == output.FormatDir {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitGeneralError,
 			Err:  fmt.Errorf("invalid output format %q (valid: table, wide, yaml, json)", outputFmt),
 		}
 	}
@@ -89,7 +90,7 @@ func runModuleList(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag
 		NamespaceFlag:  namespaceFlag,
 	})
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
 	// Determine target namespace
@@ -111,7 +112,7 @@ func runModuleList(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag
 	// Discover all inventory Secrets
 	inventories, err := inventory.ListInventories(ctx, k8sClient, targetNamespace)
 	if err != nil {
-		return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: fmt.Errorf("listing releases: %w", err)}
+		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: fmt.Errorf("listing releases: %w", err)}
 	}
 
 	if len(inventories) == 0 {

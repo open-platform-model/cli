@@ -6,7 +6,6 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/opmodel/cli/pkg/core"
 )
@@ -100,30 +99,4 @@ func TestResource_Namespace_Empty(t *testing.T) {
 		metadata: name: "foos.example.com"
 	}`)
 	assert.Equal(t, "", r.Namespace())
-}
-
-func TestGetWeight_KnownGVK(t *testing.T) {
-	gvk := schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}
-	assert.Equal(t, core.WeightDeployment, core.GetWeight(gvk))
-}
-
-func TestGetWeight_CoreService(t *testing.T) {
-	gvk := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}
-	assert.Equal(t, core.WeightService, core.GetWeight(gvk))
-}
-
-func TestGetWeight_CRD(t *testing.T) {
-	gvk := schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1", Kind: "CustomResourceDefinition"}
-	assert.Equal(t, core.WeightCRD, core.GetWeight(gvk))
-}
-
-func TestGetWeight_Unknown(t *testing.T) {
-	gvk := schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "Foo"}
-	assert.Equal(t, core.WeightDefault, core.GetWeight(gvk))
-}
-
-func TestGetWeight_KindFallback(t *testing.T) {
-	// Kind-only fallback when group/version don't match exactly.
-	gvk := schema.GroupVersionKind{Group: "unknown.io", Version: "v99", Kind: "Deployment"}
-	assert.Equal(t, core.WeightDeployment, core.GetWeight(gvk))
 }

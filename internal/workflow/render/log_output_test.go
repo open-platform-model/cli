@@ -3,7 +3,7 @@ package render
 import (
 	"testing"
 
-	"github.com/opmodel/cli/pkg/modulerelease"
+	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/stretchr/testify/assert"
 )
 

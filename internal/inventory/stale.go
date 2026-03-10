@@ -11,6 +11,7 @@ import (
 
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
+	"github.com/opmodel/cli/internal/resourceorder"
 	pkgcore "github.com/opmodel/cli/pkg/core"
 )
 
@@ -135,8 +136,8 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 	sorted := make([]InventoryEntry, len(stale))
 	copy(sorted, stale)
 	sort.SliceStable(sorted, func(i, j int) bool {
-		wi := pkgcore.GetWeight(schema.GroupVersionKind{Group: sorted[i].Group, Version: sorted[i].Version, Kind: sorted[i].Kind})
-		wj := pkgcore.GetWeight(schema.GroupVersionKind{Group: sorted[j].Group, Version: sorted[j].Version, Kind: sorted[j].Kind})
+		wi := resourceorder.GetWeight(schema.GroupVersionKind{Group: sorted[i].Group, Version: sorted[i].Version, Kind: sorted[i].Kind})
+		wj := resourceorder.GetWeight(schema.GroupVersionKind{Group: sorted[j].Group, Version: sorted[j].Version, Kind: sorted[j].Kind})
 		return wi > wj // descending
 	})
 

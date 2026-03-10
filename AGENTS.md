@@ -129,25 +129,28 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 │   │   └── release/       # release/apply, build, delete, diff, events, list, status, tree, vet
 │   ├── cmdutil/           # Small CLI helpers (flag groups, annotations, release targeting)
 │   ├── config/            # Config loading and validation
+│   ├── engine/            # Internal render execution and bundle/module renderers
+│   ├── exit/              # CLI exit codes and exit error wrapper
 │   ├── inventory/         # Release inventory: secret CRUD, digest, stale detection
 │   ├── kubernetes/        # K8s client, apply, delete, discovery, health, status
+│   ├── match/             # Internal component-to-transformer matching
 │   ├── output/            # Terminal output: spinner, table, log, styles, format
 │   ├── releasefile/       # Release file parsing and kind detection
+│   ├── releaseprocess/    # Internal validation, synthesis, and render orchestration
+│   ├── resourceorder/     # Resource apply/delete ordering policy
+│   ├── runtime/           # Internal mutable release runtime state
+│   │   ├── bundlerelease/ # Bundle release runtime state
+│   │   └── modulerelease/ # Module release runtime state
 │   ├── templates/         # Module templates (simple, standard, advanced)
 │   ├── version/           # Version info
 │   └── workflow/          # Shared command workflows (render, apply, query)
 ├── pkg/
-│   ├── bundle/            # Bundle domain types
-│   ├── bundlerelease/     # BundleRelease domain types
-│   ├── core/              # Rendered resource primitives and shared helpers
-│   ├── engine/            # Render execution and bundle/module renderers
-│   ├── errors/            # Shared structured errors and exit wrappers
+│   ├── bundle/            # Bundle domain model
+│   ├── core/              # Rendered resource primitives and label helpers
+│   ├── errors/            # Shared structured library errors
 │   ├── loader/            # CUE loading for modules, providers, and releases
-│   ├── match/             # Component-to-transformer matching
 │   ├── module/            # Module domain model
-│   ├── modulerelease/     # ModuleRelease domain model
-│   ├── provider/          # Provider domain model
-│   └── releaseprocess/    # Validation, synthesis, and render pipeline orchestration
+│   └── provider/          # Provider domain model
 ├── tests/
 │   ├── e2e/               # End-to-end tests
 │   ├── fixtures/
@@ -173,16 +176,20 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 - `internal/cmdutil/` - Small CLI helpers shared across commands
 - `internal/workflow/` - Shared application workflows used by multiple commands
 - `internal/config/` - Config loading, precedence resolution, and validation
+- `internal/engine/` - Internal module and bundle render execution
+- `internal/exit/` - CLI exit codes and exit error wrapper
 - `internal/inventory/` - Inventory persistence, change tracking, stale detection
 - `internal/kubernetes/` - Kubernetes client and cluster operations
+- `internal/match/` - Internal component-to-transformer matching
 - `internal/output/` - Terminal formatting and log styling
+- `internal/releaseprocess/` - Internal validation, synthesis, and render orchestration
+- `internal/resourceorder/` - Shared resource apply/delete ordering policy
+- `internal/runtime/` - Internal mutable release runtime state
 - `pkg/loader/` - CUE loading for modules, providers, and release files
-- `pkg/releaseprocess/` - Value validation, synthesis, and render pipeline orchestration
-- `pkg/match/` - Component-to-transformer matching
-- `pkg/engine/` - Module and bundle render execution
-- `pkg/core/` - Shared rendered resource primitives
+- `pkg/core/` - Shared rendered resource primitives and labels
+- `pkg/bundle/` - Bundle domain model
 - `pkg/module/` - Module domain model
-- `pkg/modulerelease/` - ModuleRelease domain model
+- `pkg/errors/` - Shared structured library errors
 - `pkg/provider/` - Provider domain model
 - `internal/version/` - Version info
 

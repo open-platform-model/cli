@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
@@ -11,7 +13,6 @@ import (
 	"github.com/opmodel/cli/internal/output"
 	workflowapply "github.com/opmodel/cli/internal/workflow/apply"
 	"github.com/opmodel/cli/internal/workflow/render"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewReleaseApplyCmd creates the release apply command.
@@ -76,7 +77,7 @@ func runReleaseApply(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 		ProviderFlag:   rff.Provider,
 	})
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
 	result, err := render.ReleaseFile(ctx, render.ReleaseFileOpts{

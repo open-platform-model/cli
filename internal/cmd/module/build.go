@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/workflow/render"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewModuleBuildCmd creates the module build command.
@@ -86,7 +87,7 @@ func runModuleBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 		ProviderFlag:  rf.Provider,
 	})
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
 	// Render module via shared pipeline.

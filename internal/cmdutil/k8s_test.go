@@ -4,8 +4,9 @@ import (
 	"errors"
 	"testing"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/opmodel/cli/internal/config"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +20,7 @@ func TestNewK8sClient_InvalidKubeconfig(t *testing.T) {
 	_, err := NewK8sClient(k8sConfig, "")
 
 	require.Error(t, err)
-	var exitErr *oerrors.ExitError
+	var exitErr *opmexit.ExitError
 	require.True(t, errors.As(err, &exitErr))
-	assert.Equal(t, oerrors.ExitConnectivityError, exitErr.Code)
+	assert.Equal(t, opmexit.ExitConnectivityError, exitErr.Code)
 }

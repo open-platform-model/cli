@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
@@ -15,7 +17,6 @@ import (
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/workflow/query"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewModuleDeleteCmd creates the module delete command.
@@ -75,7 +76,7 @@ func runDelete(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 
 	// Validate release selector flags
 	if err := rsf.Validate(); err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}
 
 	// Resolve Kubernetes configuration with local flags
@@ -86,7 +87,7 @@ func runDelete(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 		NamespaceFlag:  rsf.Namespace,
 	})
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 	if err := cmdutil.RequireNamespace(k8sConfig); err != nil {
 		return err
@@ -146,7 +147,7 @@ func runDelete(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 	deleteResult, err := kubernetes.Delete(ctx, k8sClient, deleteOpts)
 	if err != nil {
 		releaseLog.Error("delete failed", "error", err)
-		return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
+		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
 	// Report results
@@ -165,8 +166,8 @@ func runDelete(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelecto
 	}
 
 	if len(deleteResult.Errors) > 0 {
-		return &oerrors.ExitError{
-			Code:    oerrors.ExitGeneralError,
+		return &opmexit.ExitError{
+			Code:    opmexit.ExitGeneralError,
 			Err:     fmt.Errorf("%d resource(s) failed to delete", len(deleteResult.Errors)),
 			Printed: true,
 		}

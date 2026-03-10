@@ -6,8 +6,8 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/pkg/bundlerelease"
-	"github.com/opmodel/cli/pkg/engine"
+	"github.com/opmodel/cli/internal/engine"
+	"github.com/opmodel/cli/internal/runtime/bundlerelease"
 	"github.com/opmodel/cli/pkg/provider"
 )
 

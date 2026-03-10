@@ -4,20 +4,21 @@ import (
 	"context"
 	"fmt"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/charmbracelet/log"
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func ParseStatusOutputFormat(outputFmt string) (output.Format, error) {
 	outputFormat, valid := output.ParseFormat(outputFmt)
 	if !valid || outputFormat == output.FormatDir {
-		return "", &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
+		return "", &opmexit.ExitError{
+			Code: opmexit.ExitGeneralError,
 			Err:  fmt.Errorf("invalid output format %q (valid: table, wide, yaml, json)", outputFmt),
 		}
 	}
@@ -46,7 +47,7 @@ func ResolveInventory(
 
 	if invErr != nil {
 		releaseLog.Error("reading inventory", "error", invErr)
-		return nil, nil, nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("reading inventory: %w", invErr)}
+		return nil, nil, nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("reading inventory: %w", invErr)}
 	}
 
 	if inv == nil {
@@ -56,13 +57,13 @@ func ResolveInventory(
 		}
 		notFound := &kubernetes.ReleaseNotFoundError{Name: name, Namespace: namespace}
 		releaseLog.Error("release not found", "name", name, "namespace", namespace)
-		return nil, nil, nil, &oerrors.ExitError{Code: oerrors.ExitNotFound, Err: notFound, Printed: true}
+		return nil, nil, nil, &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: notFound, Printed: true}
 	}
 
 	liveResources, missingEntries, discoverErr := inventory.DiscoverResourcesFromInventory(ctx, client, inv)
 	if discoverErr != nil {
 		releaseLog.Error("discovering resources from inventory", "error", discoverErr)
-		return nil, nil, nil, &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("discovering resources: %w", discoverErr)}
+		return nil, nil, nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("discovering resources: %w", discoverErr)}
 	}
 
 	return inv, liveResources, missingEntries, nil
@@ -109,21 +110,21 @@ func PrintReleaseStatus(ctx context.Context, client *kubernetes.Client, opts kub
 	if err != nil {
 		if kubernetes.IsNoResourcesFound(err) {
 			releaseLog.Error("getting status", "error", err)
-			return &oerrors.ExitError{Code: oerrors.ExitNotFound, Err: err, Printed: true}
+			return &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: err, Printed: true}
 		}
 		releaseLog.Error("getting status", "error", err)
-		return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
+		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
 	formatted, err := kubernetes.FormatStatus(result, opts.OutputFormat)
 	if err != nil {
 		releaseLog.Error("formatting status", "error", err)
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err, Printed: true}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
 	}
 	output.Println(formatted)
 
 	if result.AggregateStatus != "Ready" && result.AggregateStatus != "Complete" {
-		return &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: fmt.Errorf("release %q: %d resource(s) not ready", opts.ReleaseName, result.Summary.NotReady), Printed: true}
+		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: fmt.Errorf("release %q: %d resource(s) not ready", opts.ReleaseName, result.Summary.NotReady), Printed: true}
 	}
 	return nil
 }

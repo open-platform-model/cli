@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/opmodel/cli/pkg/bundlerelease"
+	"github.com/opmodel/cli/internal/match"
+	"github.com/opmodel/cli/internal/runtime/bundlerelease"
 	"github.com/opmodel/cli/pkg/core"
-	"github.com/opmodel/cli/pkg/match"
 	"github.com/opmodel/cli/pkg/provider"
 )
 

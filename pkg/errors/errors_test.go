@@ -75,19 +75,6 @@ func TestWrap(t *testing.T) {
 	assert.Contains(t, wrapped.Error(), "schema check failed")
 }
 
-func TestExitError(t *testing.T) {
-	inner := fmt.Errorf("something failed")
-	e := &oerrors.ExitError{Code: oerrors.ExitValidationError, Err: inner}
-
-	assert.Equal(t, "something failed", e.Error())
-	assert.Equal(t, inner, e.Unwrap())
-}
-
-func TestExitError_NoInner(t *testing.T) {
-	e := &oerrors.ExitError{Code: oerrors.ExitGeneralError}
-	assert.Contains(t, e.Error(), "exit code 1")
-}
-
 func TestConfigError_Error(t *testing.T) {
 	raw := fmt.Errorf("cannot use value 42 (type int) as string")
 	ce := &oerrors.ConfigError{

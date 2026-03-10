@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"os"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/opmodel/cli/internal/cmd"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 func main() {
@@ -15,7 +16,7 @@ func main() {
 
 	if err := rootCmd.Execute(); err != nil {
 		// Check if the error contains an ExitError with a specific code
-		var exitErr *oerrors.ExitError
+		var exitErr *opmexit.ExitError
 		if errors.As(err, &exitErr) {
 			// Only print if the command layer hasn't already printed it
 			if !exitErr.Printed {

@@ -6,10 +6,10 @@ import (
 	"io"
 	"sort"
 
+	resourceorder "github.com/opmodel/cli/internal/resourceorder"
+
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
-	pkgcore "github.com/opmodel/cli/pkg/core"
 )
 
 // WriteManifests writes resources to the writer in the specified format.
@@ -48,8 +48,8 @@ type ManifestOptions struct {
 func sortResources(resources []*unstructured.Unstructured) {
 	sort.Slice(resources, func(i, j int) bool {
 		// Primary: sort by weight
-		wi := pkgcore.GetWeight(resources[i].GroupVersionKind())
-		wj := pkgcore.GetWeight(resources[j].GroupVersionKind())
+		wi := resourceorder.GetWeight(resources[i].GroupVersionKind())
+		wj := resourceorder.GetWeight(resources[j].GroupVersionKind())
 		if wi != wj {
 			return wi < wj
 		}

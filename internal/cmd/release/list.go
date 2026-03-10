@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
@@ -11,7 +13,6 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/workflow/query"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 const releaseListConcurrency = 5
@@ -55,8 +56,8 @@ func runReleaseList(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFla
 
 	outputFormat, valid := output.ParseFormat(outputFmt)
 	if !valid || outputFormat == output.FormatDir {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitGeneralError,
 			Err:  fmt.Errorf("invalid output format %q (valid: table, wide, yaml, json)", outputFmt),
 		}
 	}
@@ -68,7 +69,7 @@ func runReleaseList(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFla
 		NamespaceFlag:  namespaceFlag,
 	})
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
 	targetNamespace := k8sConfig.Namespace.Value
@@ -87,7 +88,7 @@ func runReleaseList(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFla
 
 	inventories, err := inventory.ListInventories(ctx, k8sClient, targetNamespace)
 	if err != nil {
-		return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: fmt.Errorf("listing releases: %w", err)}
+		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: fmt.Errorf("listing releases: %w", err)}
 	}
 
 	if len(inventories) == 0 {

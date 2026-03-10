@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/config"
@@ -58,8 +60,8 @@ func runModuleInit(args []string, templateName, dir string) error {
 
 	// Validate template name
 	if !templates.IsValidTemplate(templateName) {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitValidationError,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitValidationError,
 			Err: &oerrors.DetailError{
 				Type:    "validation failed",
 				Message: fmt.Sprintf("unknown template: %s", templateName),
@@ -77,8 +79,8 @@ func runModuleInit(args []string, templateName, dir string) error {
 
 	// Check if directory already exists
 	if _, err := os.Stat(targetDir); err == nil {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitValidationError,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitValidationError,
 			Err: &oerrors.DetailError{
 				Type:     "validation failed",
 				Message:  fmt.Sprintf("directory already exists: %s", targetDir),
@@ -91,8 +93,8 @@ func runModuleInit(args []string, templateName, dir string) error {
 
 	// Create the target directory
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitGeneralError,
 			Err:  fmt.Errorf("creating directory %s: %w", targetDir, err),
 		}
 	}
@@ -100,8 +102,8 @@ func runModuleInit(args []string, templateName, dir string) error {
 	// Prepare template data
 	absDir, err := filepath.Abs(targetDir)
 	if err != nil {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitGeneralError,
 			Err:  fmt.Errorf("getting absolute path: %w", err),
 		}
 	}
@@ -118,8 +120,8 @@ func runModuleInit(args []string, templateName, dir string) error {
 	if err != nil {
 		// Clean up on failure
 		_ = os.RemoveAll(targetDir)
-		return &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitGeneralError,
 			Err:  fmt.Errorf("rendering template: %w", err),
 		}
 	}

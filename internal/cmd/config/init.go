@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
@@ -55,16 +57,16 @@ func runConfigInit(_ []string, force bool) error {
 	// Get paths
 	paths, err := config.DefaultPaths()
 	if err != nil {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitNotFound,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitNotFound,
 			Err:  oerrors.Wrap(oerrors.ErrNotFound, "could not determine home directory"),
 		}
 	}
 
 	// Check if config exists
 	if _, err := os.Stat(paths.ConfigFile); err == nil && !force {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitValidationError,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitValidationError,
 			Err: &oerrors.DetailError{
 				Type:     "validation failed",
 				Message:  "configuration already exists",
@@ -77,24 +79,24 @@ func runConfigInit(_ []string, force bool) error {
 
 	// Create directories with secure permissions (0700)
 	if err := os.MkdirAll(paths.HomeDir, 0o700); err != nil {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitPermissionDenied,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitPermissionDenied,
 			Err:  oerrors.Wrap(oerrors.ErrPermission, "could not create ~/.opm directory"),
 		}
 	}
 
 	cueModDir := filepath.Join(paths.HomeDir, "cue.mod")
 	if err := os.MkdirAll(cueModDir, 0o700); err != nil {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitPermissionDenied,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitPermissionDenied,
 			Err:  oerrors.Wrap(oerrors.ErrPermission, "could not create ~/.opm/cue.mod directory"),
 		}
 	}
 
 	// Write config.cue with secure permissions (0600)
 	if err := os.WriteFile(paths.ConfigFile, []byte(config.DefaultConfigTemplate), 0o600); err != nil {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitPermissionDenied,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitPermissionDenied,
 			Err:  oerrors.Wrap(oerrors.ErrPermission, "could not write config.cue"),
 		}
 	}
@@ -102,8 +104,8 @@ func runConfigInit(_ []string, force bool) error {
 	// Write cue.mod/module.cue with secure permissions (0600)
 	moduleFile := filepath.Join(cueModDir, "module.cue")
 	if err := os.WriteFile(moduleFile, []byte(config.DefaultModuleTemplate), 0o600); err != nil {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitPermissionDenied,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitPermissionDenied,
 			Err:  oerrors.Wrap(oerrors.ErrPermission, "could not write cue.mod/module.cue"),
 		}
 	}

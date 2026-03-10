@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"strings"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/charmbracelet/log"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 	workflowrender "github.com/opmodel/cli/internal/workflow/render"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -87,7 +88,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo
 		applyResult, err = kubernetes.Apply(ctx, req.K8sClient, result.Resources, result.Release.Name, kubernetes.ApplyOptions{DryRun: req.Options.DryRun})
 		if err != nil {
 			releaseLog.Error("apply failed", "error", err)
-			return &oerrors.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
+			return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 		}
 
 		if len(applyResult.Errors) > 0 {
@@ -108,7 +109,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo
 		applyHadErrors := applyResult != nil && len(applyResult.Errors) > 0
 		if applyHadErrors {
 			releaseLog.Warn("apply had errors — skipping pruning and inventory write")
-			return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)), Printed: true}
+			return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)), Printed: true}
 		}
 
 		if len(staleSet) > 0 && !req.Options.NoPrune {
@@ -167,7 +168,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo
 	}
 
 	if applyResult != nil && len(applyResult.Errors) > 0 {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)), Printed: true}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)), Printed: true}
 	}
 
 	return nil
@@ -181,7 +182,7 @@ func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Clien
 	created, err := k8sClient.EnsureNamespace(ctx, namespace, dryRun)
 	if err != nil {
 		releaseLog.Error("ensuring namespace", "error", err)
-		return &oerrors.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
+		return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 	if created {
 		if dryRun {
@@ -278,12 +279,12 @@ func FormatApplySummary(r *kubernetes.ApplyResult) string {
 func exitCodeFromK8sError(err error) int {
 	switch {
 	case apierrors.IsNotFound(err):
-		return oerrors.ExitNotFound
+		return opmexit.ExitNotFound
 	case apierrors.IsForbidden(err), apierrors.IsUnauthorized(err):
-		return oerrors.ExitPermissionDenied
+		return opmexit.ExitPermissionDenied
 	case apierrors.IsServerTimeout(err), apierrors.IsServiceUnavailable(err):
-		return oerrors.ExitConnectivityError
+		return opmexit.ExitConnectivityError
 	default:
-		return oerrors.ExitGeneralError
+		return opmexit.ExitGeneralError
 	}
 }

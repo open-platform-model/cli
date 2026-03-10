@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/workflow/query"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewModuleEventsCmd creates the module events command.
@@ -88,7 +89,7 @@ func runModuleEvents(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseS
 
 	// Validate release selector flags.
 	if err := rsf.Validate(); err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}
 
 	eventsOpts, err := query.ParseEventsOptions(since, eventType, outputFmt, watchMode)
@@ -104,7 +105,7 @@ func runModuleEvents(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseS
 		NamespaceFlag:  rsf.Namespace,
 	})
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 	if err := cmdutil.RequireNamespace(k8sConfig); err != nil {
 		return err

@@ -6,9 +6,9 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/pkg/engine"
-	"github.com/opmodel/cli/pkg/match"
-	"github.com/opmodel/cli/pkg/modulerelease"
+	"github.com/opmodel/cli/internal/engine"
+	"github.com/opmodel/cli/internal/match"
+	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/provider"
 )
 

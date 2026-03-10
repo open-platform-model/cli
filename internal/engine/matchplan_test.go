@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/pkg/bundlerelease"
-	"github.com/opmodel/cli/pkg/modulerelease"
+	"github.com/opmodel/cli/internal/runtime/bundlerelease"
+	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/provider"
 )
 

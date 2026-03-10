@@ -7,9 +7,9 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/charmbracelet/log"
 
+	"github.com/opmodel/cli/internal/match"
+	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/core"
-	"github.com/opmodel/cli/pkg/match"
-	"github.com/opmodel/cli/pkg/modulerelease"
 )
 
 // moduleReleaseContextData is the Go-side mirror of #TransformerContext.#moduleReleaseMetadata.

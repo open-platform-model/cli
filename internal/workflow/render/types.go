@@ -7,9 +7,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/opmodel/cli/internal/config"
-	"github.com/opmodel/cli/pkg/engine"
+	"github.com/opmodel/cli/internal/engine"
+	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
-	"github.com/opmodel/cli/pkg/modulerelease"
 )
 
 // Result is the output of the shared render workflow.

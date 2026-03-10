@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
@@ -15,7 +17,6 @@ import (
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/workflow/query"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewReleaseDeleteCmd creates the release delete command.
@@ -117,7 +118,7 @@ func runReleaseDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 	deleteResult, err := kubernetes.Delete(ctx, k8sClient, deleteOpts)
 	if err != nil {
 		releaseLog.Error("delete failed", "error", err)
-		return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
+		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
 	if len(deleteResult.Errors) > 0 {
@@ -135,8 +136,8 @@ func runReleaseDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 	}
 
 	if len(deleteResult.Errors) > 0 {
-		return &oerrors.ExitError{
-			Code:    oerrors.ExitGeneralError,
+		return &opmexit.ExitError{
+			Code:    opmexit.ExitGeneralError,
 			Err:     fmt.Errorf("%d resource(s) failed to delete", len(deleteResult.Errors)),
 			Printed: true,
 		}

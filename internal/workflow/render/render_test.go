@@ -7,13 +7,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/opmodel/cli/internal/config"
 	internalreleasefile "github.com/opmodel/cli/internal/releasefile"
-	oerrors "github.com/opmodel/cli/pkg/errors"
-	"github.com/opmodel/cli/pkg/modulerelease"
-	"github.com/opmodel/cli/pkg/releaseprocess"
+	"github.com/opmodel/cli/internal/releaseprocess"
+	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -39,9 +40,9 @@ language: version: "v0.15.0"
 func TestRenderModule_NilConfig(t *testing.T) {
 	_, err := Release(context.Background(), ReleaseOpts{Config: nil, K8sConfig: nil})
 	require.Error(t, err)
-	var exitErr *oerrors.ExitError
+	var exitErr *opmexit.ExitError
 	require.True(t, errors.As(err, &exitErr))
-	assert.Equal(t, oerrors.ExitGeneralError, exitErr.Code)
+	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
 	assert.Contains(t, exitErr.Error(), "configuration not loaded")
 }
 
@@ -70,18 +71,18 @@ func TestRenderResult_ResourceCount(t *testing.T) {
 func TestRenderFromReleaseFile_NilConfig(t *testing.T) {
 	_, err := ReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: "release.cue", Config: nil, K8sConfig: nil})
 	require.Error(t, err)
-	var exitErr *oerrors.ExitError
+	var exitErr *opmexit.ExitError
 	require.True(t, errors.As(err, &exitErr))
-	assert.Equal(t, oerrors.ExitGeneralError, exitErr.Code)
+	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
 	assert.Contains(t, exitErr.Error(), "configuration not loaded")
 }
 
 func TestRenderFromReleaseFile_NilK8sConfig(t *testing.T) {
 	_, err := ReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: "release.cue", Config: &config.GlobalConfig{}, K8sConfig: nil})
 	require.Error(t, err)
-	var exitErr *oerrors.ExitError
+	var exitErr *opmexit.ExitError
 	require.True(t, errors.As(err, &exitErr))
-	assert.Equal(t, oerrors.ExitGeneralError, exitErr.Code)
+	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
 	assert.Contains(t, exitErr.Error(), "kubernetes config not resolved")
 }
 

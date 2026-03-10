@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
@@ -11,7 +13,6 @@ import (
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/workflow/query"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewModuleTreeCmd creates the module tree command.
@@ -84,23 +85,23 @@ func runTree(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorF
 
 	// Validate depth and output format first (fast, no I/O).
 	if depth < 0 || depth > 2 {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitGeneralError,
 			Err:  fmt.Errorf("invalid --depth %d: must be 0, 1, or 2", depth),
 		}
 	}
 
 	outputFormat, valid := output.ParseFormat(outputFmt)
 	if !valid || outputFormat == output.FormatWide || outputFormat == output.FormatDir {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitGeneralError,
 			Err:  fmt.Errorf("invalid output format %q (valid: table, json, yaml)", outputFmt),
 		}
 	}
 
 	// Validate release selector flags.
 	if err := rsf.Validate(); err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}
 
 	// Resolve Kubernetes configuration.
@@ -111,7 +112,7 @@ func runTree(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorF
 		NamespaceFlag:  rsf.Namespace,
 	})
 	if err != nil {
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 	if err := cmdutil.RequireNamespace(k8sConfig); err != nil {
 		return err
@@ -177,17 +178,17 @@ func runTree(_ []string, cfg *config.GlobalConfig, rsf *cmdutil.ReleaseSelectorF
 	if err != nil {
 		if kubernetes.IsNoResourcesFound(err) {
 			releaseLog.Error("no resources found", "release", logName, "namespace", namespace)
-			return &oerrors.ExitError{Code: oerrors.ExitNotFound, Err: err, Printed: true}
+			return &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: err, Printed: true}
 		}
 		releaseLog.Error("getting tree", "error", err)
-		return &oerrors.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
+		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
 	// Format and print.
 	formatted, err := kubernetes.FormatTree(result, outputFormat)
 	if err != nil {
 		releaseLog.Error("formatting tree", "error", err)
-		return &oerrors.ExitError{Code: oerrors.ExitGeneralError, Err: err, Printed: true}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
 	}
 
 	output.Println(formatted)

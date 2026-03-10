@@ -5,11 +5,12 @@ import (
 	"errors"
 	"testing"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/charmbracelet/log"
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -80,9 +81,9 @@ func TestResolveInventory_NotFound(t *testing.T) {
 	assert.Nil(t, inv)
 	assert.Nil(t, live)
 	assert.Nil(t, missing)
-	var exitErr *oerrors.ExitError
+	var exitErr *opmexit.ExitError
 	require.True(t, errors.As(err, &exitErr))
-	assert.Equal(t, oerrors.ExitNotFound, exitErr.Code)
+	assert.Equal(t, opmexit.ExitNotFound, exitErr.Code)
 }
 
 func TestResolveInventory_K8sError_LookupFails(t *testing.T) {
@@ -95,7 +96,7 @@ func TestResolveInventory_K8sError_LookupFails(t *testing.T) {
 	assert.Nil(t, inv)
 	assert.Nil(t, live)
 	assert.Nil(t, missing)
-	var exitErr *oerrors.ExitError
+	var exitErr *opmexit.ExitError
 	require.True(t, errors.As(err, &exitErr))
-	assert.Equal(t, oerrors.ExitGeneralError, exitErr.Code)
+	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
 }

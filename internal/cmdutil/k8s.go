@@ -3,9 +3,10 @@ package cmdutil
 import (
 	"fmt"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/kubernetes"
-	oerrors "github.com/opmodel/cli/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -20,7 +21,7 @@ func NewK8sClient(k8sConfig *config.ResolvedKubernetesConfig, apiWarnings string
 		APIWarnings: apiWarnings,
 	})
 	if err != nil {
-		return nil, &oerrors.ExitError{Code: oerrors.ExitConnectivityError, Err: err}
+		return nil, &opmexit.ExitError{Code: opmexit.ExitConnectivityError, Err: err}
 	}
 	return client, nil
 }
@@ -31,8 +32,8 @@ func NewK8sClient(k8sConfig *config.ResolvedKubernetesConfig, apiWarnings string
 // definition (list, status, tree, events, delete).
 func RequireNamespace(k8sConfig *config.ResolvedKubernetesConfig) error {
 	if k8sConfig.Namespace.Value == "" {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitGeneralError,
 			Err:  fmt.Errorf("namespace is required: use -n flag, OPM_NAMESPACE env var, or set kubernetes.namespace in ~/.opm/config.cue"),
 		}
 	}
@@ -43,12 +44,12 @@ func RequireNamespace(k8sConfig *config.ResolvedKubernetesConfig) error {
 func ExitCodeFromK8sError(err error) int {
 	switch {
 	case apierrors.IsNotFound(err):
-		return oerrors.ExitNotFound
+		return opmexit.ExitNotFound
 	case apierrors.IsForbidden(err), apierrors.IsUnauthorized(err):
-		return oerrors.ExitPermissionDenied
+		return opmexit.ExitPermissionDenied
 	case apierrors.IsServerTimeout(err), apierrors.IsServiceUnavailable(err):
-		return oerrors.ExitConnectivityError
+		return opmexit.ExitConnectivityError
 	default:
-		return oerrors.ExitGeneralError
+		return opmexit.ExitGeneralError
 	}
 }

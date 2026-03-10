@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/opmodel/cli/internal/releaseprocess"
 	oerrors "github.com/opmodel/cli/pkg/errors"
-	"github.com/opmodel/cli/pkg/releaseprocess"
 )
 
 func TestValidateConfig_Valid(t *testing.T) {

@@ -5,15 +5,16 @@ import (
 	"path/filepath"
 	"strings"
 
+	opmexit "github.com/opmodel/cli/internal/exit"
+
 	"cuelang.org/go/cue"
 	"github.com/spf13/cobra"
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
-	oerrors "github.com/opmodel/cli/pkg/errors"
+	"github.com/opmodel/cli/internal/releaseprocess"
 	"github.com/opmodel/cli/pkg/loader"
-	"github.com/opmodel/cli/pkg/releaseprocess"
 )
 
 // NewModuleVetCmd creates the module vet command.
@@ -67,8 +68,8 @@ func runVetModuleOnly(modulePath string, cfg *config.GlobalConfig, rf *cmdutil.R
 	// Load and structurally validate the module CUE package.
 	modVal, err := loader.LoadModulePackage(cueCtx, modulePath)
 	if err != nil {
-		return &oerrors.ExitError{
-			Code: oerrors.ExitGeneralError,
+		return &opmexit.ExitError{
+			Code: opmexit.ExitGeneralError,
 			Err:  fmt.Errorf("loading module: %w", err),
 		}
 	}
@@ -91,8 +92,8 @@ func runVetModuleOnly(modulePath string, cfg *config.GlobalConfig, rf *cmdutil.R
 		for _, valuesFile := range rf.Values {
 			valuesVal, loadErr := loader.LoadValuesFile(cueCtx, valuesFile)
 			if loadErr != nil {
-				return &oerrors.ExitError{
-					Code: oerrors.ExitGeneralError,
+				return &opmexit.ExitError{
+					Code: opmexit.ExitGeneralError,
 					Err:  fmt.Errorf("loading values file %q: %w", valuesFile, loadErr),
 				}
 			}
@@ -103,8 +104,8 @@ func runVetModuleOnly(modulePath string, cfg *config.GlobalConfig, rf *cmdutil.R
 	} else {
 		debugVal := modVal.LookupPath(cue.ParsePath("debugValues"))
 		if !debugVal.Exists() {
-			return &oerrors.ExitError{
-				Code: oerrors.ExitValidationError,
+			return &opmexit.ExitError{
+				Code: opmexit.ExitValidationError,
 				Err:  fmt.Errorf("module does not define debugValues - add debugValues or provide values with -f"),
 			}
 		}
@@ -115,8 +116,8 @@ func runVetModuleOnly(modulePath string, cfg *config.GlobalConfig, rf *cmdutil.R
 	for _, valuesVal := range valuesVals {
 		if err := valuesVal.Validate(cue.Concrete(true)); err != nil {
 			cmdutil.PrintValidationError(valuesDetail+" not concrete", err)
-			return &oerrors.ExitError{
-				Code:    oerrors.ExitValidationError,
+			return &opmexit.ExitError{
+				Code:    opmexit.ExitValidationError,
 				Err:     fmt.Errorf("%s values are not fully concrete", valuesDetail),
 				Printed: true,
 			}
@@ -127,8 +128,8 @@ func runVetModuleOnly(modulePath string, cfg *config.GlobalConfig, rf *cmdutil.R
 	if configVal.Exists() {
 		if _, cfgErr := releaseprocess.ValidateConfig(configVal, valuesVals, "module", modName); cfgErr != nil {
 			cmdutil.PrintValidationError("values do not satisfy #config", cfgErr)
-			return &oerrors.ExitError{
-				Code:    oerrors.ExitValidationError,
+			return &opmexit.ExitError{
+				Code:    opmexit.ExitValidationError,
 				Err:     cfgErr,
 				Printed: true,
 			}
