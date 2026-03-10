@@ -66,10 +66,11 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 	if logName == "" {
 		logName = fmt.Sprintf("release-id:%s", opts.ReleaseID)
 	}
+	releaseLog := output.ReleaseLogger(logName)
 
 	resources := opts.InventoryLive
 
-	output.Debug("deleting release resources from inventory",
+	releaseLog.Debug("deleting release resources from inventory",
 		"release", logName,
 		"namespace", opts.Namespace,
 		"count", len(resources),
@@ -86,7 +87,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 		}
 	}
 
-	output.Debug("resources to delete", "count", len(resources))
+	releaseLog.Debug("resources to delete", "count", len(resources))
 
 	// Sort in reverse weight order (highest weight first = delete webhooks before deployments)
 	sortByWeightDescending(resources)
@@ -98,13 +99,13 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 		ns := res.GetNamespace()
 
 		if opts.DryRun {
-			output.Info(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
+			releaseLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
 			result.Deleted++
 			continue
 		}
 
 		if err := deleteResource(ctx, client, res); err != nil {
-			output.Warn(fmt.Sprintf("deleting %s/%s: %v", kind, name, err))
+			releaseLog.Warn(fmt.Sprintf("deleting %s/%s: %v", kind, name, err))
 			result.Errors = append(result.Errors, resourceError{
 				Kind:      kind,
 				Name:      name,
@@ -114,7 +115,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 			continue
 		}
 
-		output.Info(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
+		releaseLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
 		result.Deleted++
 	}
 
@@ -127,10 +128,10 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 		}
 		if err := client.Clientset.CoreV1().Secrets(invSecretNS).Delete(ctx, opts.InventorySecretName, metav1.DeleteOptions{}); err != nil {
 			if !apierrors.IsNotFound(err) {
-				output.Debug("could not delete inventory Secret", "name", opts.InventorySecretName, "err", err)
+				releaseLog.Debug("could not delete inventory Secret", "name", opts.InventorySecretName, "err", err)
 			}
 		} else {
-			output.Debug("deleted inventory Secret", "name", opts.InventorySecretName, "namespace", invSecretNS)
+			releaseLog.Debug("deleted inventory Secret", "name", opts.InventorySecretName, "namespace", invSecretNS)
 		}
 	}
 

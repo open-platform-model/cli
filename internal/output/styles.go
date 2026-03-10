@@ -148,6 +148,24 @@ func FormatNotice(msg string) string {
 	return arrow + " " + msg
 }
 
+// FormatEventType renders an event type label with semantic color.
+// Warning is yellow, Normal is dim, and unknown values are left unstyled.
+func FormatEventType(eventType string) string {
+	switch eventType {
+	case "Warning":
+		return lipgloss.NewStyle().Foreground(ColorYellow).Render(eventType)
+	case "Normal":
+		return Dim(eventType)
+	default:
+		return eventType
+	}
+}
+
+// FormatEventResource renders an event resource identity in noun style.
+func FormatEventResource(kind, name string) string {
+	return StyleNoun(kind + "/" + name)
+}
+
 // FormatFQN formats a fully qualified name for display by replacing the
 // first "#" (provider#path separator) with " - " for readability.
 // Any "#" inside the path is preserved.
@@ -203,29 +221,6 @@ func FormatTransformerMatch(component, fqn string) string {
 	comp := styleNoun.Render(component)
 	arrow := styleDim.Render("←")
 	return bullet + " " + comp + " " + arrow + " " + styledFQN(fqn)
-}
-
-// FormatTransformerMatchVerbose renders a matched transformer line with reason.
-//
-// Format:
-//
-//	▸ <component> ← <provider> - <fqn>
-//	     <reason>
-//
-// The first line is identical to FormatTransformerMatch. The reason is indented
-// and dim-styled on the second line.
-//
-// TODO: This function has no callers yet. Decide where verbose transformer match
-// output should be surfaced (e.g. a --verbose flag on mod apply/build) and wire
-// it up, or remove it if the use case is covered another way.
-func FormatTransformerMatchVerbose(component, fqn, reason string) string {
-	firstLine := FormatTransformerMatch(component, fqn)
-	if reason == "" {
-		return firstLine
-	}
-	indent := "     "
-	styledReason := styleDim.Render(reason)
-	return firstLine + "\n" + indent + styledReason
 }
 
 // FormatTransformerSkipped renders a non-matching transformer line for debug output.

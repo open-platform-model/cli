@@ -105,3 +105,14 @@ func TestFormatRestartCount(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatEventType(t *testing.T) {
+	assert.Contains(t, FormatEventType("Warning"), "Warning")
+	assert.Contains(t, FormatEventType("Normal"), "Normal")
+	assert.Equal(t, "Custom", FormatEventType("Custom"))
+}
+
+func TestFormatEventResource(t *testing.T) {
+	styled := FormatEventResource("Pod", "api-0")
+	assert.Contains(t, styled, "Pod/api-0")
+}

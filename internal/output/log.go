@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 )
 
@@ -59,7 +58,7 @@ func SetupLogging(cfg LogConfig) {
 func ReleaseLogger(name string) *log.Logger {
 	prefix := fmt.Sprintf("%s%s",
 		styleDim.Render("m:"),
-		lipgloss.NewStyle().Foreground(ColorCyan).Render(name),
+		StyleNoun(name),
 	)
 
 	return logger.WithPrefix(prefix)

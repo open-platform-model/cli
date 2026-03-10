@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -242,8 +241,6 @@ func FormatEventsTable(result *EventsResult) string {
 
 	tbl := output.NewTable("LAST SEEN", "TYPE", "RESOURCE", "REASON", "MESSAGE")
 
-	warningStyle := lipgloss.NewStyle().Foreground(output.ColorYellow)
-
 	for _, ev := range result.Events {
 		// Parse the RFC3339 lastSeen to compute relative duration.
 		lastSeen := ev.LastSeen
@@ -252,16 +249,9 @@ func FormatEventsTable(result *EventsResult) string {
 		}
 
 		// Color the TYPE column.
-		typeStr := ev.Type
-		switch ev.Type {
-		case "Warning":
-			typeStr = warningStyle.Render(ev.Type)
-		case "Normal":
-			typeStr = output.Dim(ev.Type)
-		}
+		typeStr := output.FormatEventType(ev.Type)
 
-		// Color the RESOURCE column (cyan).
-		resource := output.StyleNoun(ev.Kind + "/" + ev.Name)
+		resource := output.FormatEventResource(ev.Kind, ev.Name)
 
 		tbl.Row(lastSeen, typeStr, resource, ev.Reason, ev.Message)
 	}
@@ -292,17 +282,9 @@ func FormatEventsYAML(result *EventsResult) (string, error) {
 func FormatSingleEventLine(ev *corev1.Event) string {
 	lastSeen := FormatDuration(time.Since(eventLastTimestamp(ev)))
 
-	warningStyle := lipgloss.NewStyle().Foreground(output.ColorYellow)
+	typeStr := output.FormatEventType(ev.Type)
 
-	typeStr := ev.Type
-	switch ev.Type {
-	case "Warning":
-		typeStr = warningStyle.Render(ev.Type)
-	case "Normal":
-		typeStr = output.Dim(ev.Type)
-	}
-
-	resource := output.StyleNoun(ev.InvolvedObject.Kind + "/" + ev.InvolvedObject.Name)
+	resource := output.FormatEventResource(ev.InvolvedObject.Kind, ev.InvolvedObject.Name)
 
 	// Use the same table renderer for ANSI-aware column alignment.
 	tbl := output.NewTable("LAST SEEN", "TYPE", "RESOURCE", "REASON", "MESSAGE")
