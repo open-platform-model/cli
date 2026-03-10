@@ -27,7 +27,7 @@ func TestValidateConfig_Valid(t *testing.T) {
 	}`)
 	require.NoError(t, values.Err())
 
-	err := validateConfig(schema, values, "module", "test-release")
+	err := ValidateConfig(schema, values, "module", "test-release")
 	assert.Nil(t, err, "valid values should produce no error")
 }
 
@@ -45,7 +45,7 @@ func TestValidateConfig_TypeMismatch(t *testing.T) {
 	}`)
 	require.NoError(t, values.Err())
 
-	cfgErr := validateConfig(schema, values, "module", "my-release")
+	cfgErr := ValidateConfig(schema, values, "module", "my-release")
 	require.NotNil(t, cfgErr, "type mismatch should produce ConfigError")
 	assert.IsType(t, &oerrors.ConfigError{}, cfgErr)
 	assert.Equal(t, "module", cfgErr.Context)
@@ -69,7 +69,7 @@ func TestValidateConfig_MissingRequired(t *testing.T) {
 	}`)
 	require.NoError(t, values.Err())
 
-	cfgErr := validateConfig(schema, values, "module", "incomplete-release")
+	cfgErr := ValidateConfig(schema, values, "module", "incomplete-release")
 	require.NotNil(t, cfgErr, "missing required field should produce ConfigError")
 	assert.Equal(t, "incomplete-release", cfgErr.Name)
 }
@@ -84,7 +84,7 @@ func TestValidateConfig_MissingSchema(t *testing.T) {
 	root := ctx.CompileString(`{}`)
 	nonExistent := root.LookupPath(cue.ParsePath("nonexistent"))
 
-	result := validateConfig(nonExistent, values, "module", "test")
+	result := ValidateConfig(nonExistent, values, "module", "test")
 	assert.Nil(t, result, "missing schema should return nil")
 }
 
@@ -97,7 +97,7 @@ func TestValidateConfig_BundleContext(t *testing.T) {
 	values := ctx.CompileString(`{ count: "bad" }`)
 	require.NoError(t, values.Err())
 
-	cfgErr := validateConfig(schema, values, "bundle", "my-bundle")
+	cfgErr := ValidateConfig(schema, values, "bundle", "my-bundle")
 	require.NotNil(t, cfgErr)
 	assert.Equal(t, "bundle", cfgErr.Context)
 	assert.Equal(t, "my-bundle", cfgErr.Name)
