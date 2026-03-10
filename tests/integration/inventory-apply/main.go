@@ -16,14 +16,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/core"
-	"github.com/opmodel/cli/internal/core/modulerelease"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 )
@@ -64,9 +63,8 @@ func main() {
 	step(1, "5.10: First-time apply — inventory created")
 
 	resources := buildResources([]string{"cm-a", "cm-b"})
-	meta := moduleMeta()
 
-	applyResult, err := kubernetes.Apply(ctx, client, resources, meta, kubernetes.ApplyOptions{})
+	applyResult, err := kubernetes.Apply(ctx, client, resources, releaseName, kubernetes.ApplyOptions{})
 	check("applying resources", err)
 	if len(applyResult.Errors) > 0 {
 		failf("apply had errors: %v", applyResult.Errors[0])
@@ -153,7 +151,7 @@ func main() {
 	step(2, "5.11: Idempotent re-apply — same change ID, no stale")
 
 	// Re-apply the same resources.
-	applyResult2, err := kubernetes.Apply(ctx, client, resources, meta, kubernetes.ApplyOptions{})
+	applyResult2, err := kubernetes.Apply(ctx, client, resources, releaseName, kubernetes.ApplyOptions{})
 	check("re-applying resources", err)
 	if len(applyResult2.Errors) > 0 {
 		failf("re-apply had errors: %v", applyResult2.Errors[0])
@@ -211,7 +209,7 @@ func main() {
 	fmt.Println("   OK: stale set = [cm-b]")
 
 	// Apply new resources.
-	applyResult3, err := kubernetes.Apply(ctx, client, newResources, meta, kubernetes.ApplyOptions{})
+	applyResult3, err := kubernetes.Apply(ctx, client, newResources, releaseName, kubernetes.ApplyOptions{})
 	check("applying renamed resources", err)
 	if len(applyResult3.Errors) > 0 {
 		failf("apply had errors: %v", applyResult3.Errors[0])
@@ -224,10 +222,7 @@ func main() {
 	fmt.Println("   OK: pruning complete")
 
 	// Verify cm-b is gone.
-	_, errGet := client.ResourceClient(configMapGVR, namespace).Get(ctx, "cm-b", metav1.GetOptions{})
-	if !apierrors.IsNotFound(errGet) {
-		failf("expected cm-b to be deleted (404), but got: %v", errGet)
-	}
+	waitForConfigMapState(ctx, client, "cm-b", false)
 	fmt.Println("   OK: cm-b is deleted (404)")
 
 	// Write updated inventory.
@@ -269,9 +264,9 @@ func main() {
 	badNS := "nonexistent-ns-opm-test"
 	goodResource := buildCM("cm-a", namespace)
 	badResource := buildCM("cm-bad", badNS)
-	mixedResources := []*core.Resource{goodResource, badResource}
+	mixedResources := []*unstructured.Unstructured{goodResource, badResource}
 
-	applyResult59, applyErr59 := kubernetes.Apply(ctx, client, mixedResources, meta, kubernetes.ApplyOptions{})
+	applyResult59, applyErr59 := kubernetes.Apply(ctx, client, mixedResources, releaseName, kubernetes.ApplyOptions{})
 	// Either the call itself errors or individual resources in Errors slice.
 	applyHadErrors := applyErr59 != nil || (applyResult59 != nil && len(applyResult59.Errors) > 0)
 	if !applyHadErrors {
@@ -302,10 +297,8 @@ func main() {
 		fmt.Println("   OK: inventory unchanged after partial failure")
 
 		// Verify stale resources were NOT pruned: cm-a and cm-c still exist.
-		_, errA := client.ResourceClient(configMapGVR, namespace).Get(ctx, "cm-a", metav1.GetOptions{})
-		check("verifying cm-a still exists after partial failure", errA)
-		_, errC := client.ResourceClient(configMapGVR, namespace).Get(ctx, "cm-c", metav1.GetOptions{})
-		check("verifying cm-c still exists after partial failure", errC)
+		waitForConfigMapState(ctx, client, "cm-a", true)
+		waitForConfigMapState(ctx, client, "cm-c", true)
 		fmt.Println("   OK: existing resources not pruned after partial failure")
 	}
 
@@ -336,48 +329,36 @@ func opmLabels() map[string]interface{} {
 	}
 }
 
-// buildCM builds a single ConfigMap core.Resource.
-func buildCM(name, ns string) *core.Resource {
+// buildCM builds a single ConfigMap *unstructured.Unstructured.
+func buildCM(name, ns string) *unstructured.Unstructured {
 	labels := opmLabels()
 	labels["component.opmodel.dev/name"] = "config"
 
-	return &core.Resource{
-		Object: &unstructured.Unstructured{Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": ns,
-				"labels":    labels,
-			},
-			"data": map[string]interface{}{
-				"key": fmt.Sprintf("value-%s", name),
-			},
-		}},
-		Component: "config",
-	}
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name":      name,
+			"namespace": ns,
+			"labels":    labels,
+		},
+		"data": map[string]interface{}{
+			"key": fmt.Sprintf("value-%s", name),
+		},
+	}}
 }
 
 // buildResources builds a slice of ConfigMap resources in the test namespace.
-func buildResources(names []string) []*core.Resource {
-	res := make([]*core.Resource, len(names))
+func buildResources(names []string) []*unstructured.Unstructured {
+	res := make([]*unstructured.Unstructured, len(names))
 	for i, name := range names {
 		res[i] = buildCM(name, namespace)
 	}
 	return res
 }
 
-// moduleMeta returns the ReleaseMetadata for the test release.
-func moduleMeta() modulerelease.ReleaseMetadata {
-	return modulerelease.ReleaseMetadata{
-		Name:      releaseName,
-		Namespace: namespace,
-		UUID:      releaseID,
-	}
-}
-
-// entriesToWrite converts core.Resources to InventoryEntry slice.
-func entriesToWrite(resources []*core.Resource) []inventory.InventoryEntry {
+// entriesToWrite converts *unstructured.Unstructured resources to InventoryEntry slice.
+func entriesToWrite(resources []*unstructured.Unstructured) []inventory.InventoryEntry {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
@@ -389,9 +370,52 @@ func entriesToWrite(resources []*core.Resource) []inventory.InventoryEntry {
 func cleanup(ctx context.Context, client *kubernetes.Client) {
 	for _, name := range []string{"cm-a", "cm-b", "cm-c"} {
 		_ = client.ResourceClient(configMapGVR, namespace).Delete(ctx, name, metav1.DeleteOptions{})
+		waitForConfigMapState(ctx, client, name, false)
 	}
 	secretName := inventory.SecretName(releaseName, releaseID)
 	_ = client.Clientset.CoreV1().Secrets(namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
+	waitForSecretDeleted(ctx, client, secretName)
+}
+
+func waitForConfigMapState(ctx context.Context, client *kubernetes.Client, name string, wantPresent bool) {
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		_, err := client.ResourceClient(configMapGVR, namespace).Get(ctx, name, metav1.GetOptions{})
+		if wantPresent && err == nil {
+			return
+		}
+		if !wantPresent && apierrors.IsNotFound(err) {
+			return
+		}
+		if err != nil && !apierrors.IsNotFound(err) {
+			failf("waiting for ConfigMap/%s state: %v", name, err)
+		}
+		if time.Now().After(deadline) {
+			state := "present"
+			if !wantPresent {
+				state = "deleted"
+			}
+			failf("timed out waiting for ConfigMap/%s to become %s", name, state)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+func waitForSecretDeleted(ctx context.Context, client *kubernetes.Client, name string) {
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		_, err := client.Clientset.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return
+		}
+		if err != nil {
+			failf("waiting for Secret/%s deletion: %v", name, err)
+		}
+		if time.Now().After(deadline) {
+			failf("timed out waiting for Secret/%s deletion", name)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
 }
 
 // step prints a numbered step header.

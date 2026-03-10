@@ -1,0 +1,43 @@
+// Values provide concrete configuration for the Jellyfin module.
+// These satisfy the #config schema defined in module.cue.
+package jellyfin
+
+// Concrete default values
+values: {
+	// LinuxServer.io Jellyfin image
+	image: {
+		repository: "lscr.io/linuxserver/jellyfin"
+		tag:        "latest"
+		digest:     ""
+	}
+
+	// Web UI exposed port
+	port: 8096
+
+	// LinuxServer.io user/group identity (default: 1000)
+	puid: 1000
+	pgid: 1000
+
+	// Container timezone
+	timezone: "Europe/Stockholm"
+	test: "test"
+
+	// PVC size for Jellyfin config/metadata directory.
+	// Can grow to 50GB+ for large collections (thumbnails, metadata cache).
+	configStorageSize: "15Gi"
+
+	// Media library mount points with persistent storage.
+	// Operators can override sizes at ModuleRelease time.
+	media: {
+		test: "test"
+		tvshows: {
+			mountPath: "/data/tvshows"
+			size:      "10Gi"
+		}
+		movies: {
+			mountPath: "/data/movies"
+			size:      "10Gi"
+		}
+	}
+	invalidField: "This field is not defined in the #config schema and will be ignored."
+}

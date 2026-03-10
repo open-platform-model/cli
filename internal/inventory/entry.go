@@ -1,21 +1,25 @@
 package inventory
 
 import (
-	"github.com/opmodel/cli/internal/core"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	pkgcore "github.com/opmodel/cli/pkg/core"
 )
 
-// NewEntryFromResource constructs an InventoryEntry from a rendered *core.Resource.
-// Group and Kind come from the GVK, Version from the GVK's Version field,
-// Namespace and Name from the resource metadata, Component from core.Resource.Component.
-func NewEntryFromResource(r *core.Resource) InventoryEntry {
-	gvk := r.GVK()
+// NewEntryFromResource constructs an InventoryEntry from a rendered *unstructured.Unstructured.
+// Group, Kind, and Version come from the GVK, Namespace and Name from the object metadata.
+// Component is read from the "component.opmodel.dev/name" label injected by the CUE catalog.
+func NewEntryFromResource(r *unstructured.Unstructured) InventoryEntry {
+	gvk := r.GroupVersionKind()
+	labels := r.GetLabels()
+	component := labels[pkgcore.LabelComponentName]
 	return InventoryEntry{
 		Group:     gvk.Group,
 		Kind:      gvk.Kind,
-		Namespace: r.Namespace(),
-		Name:      r.Name(),
+		Namespace: r.GetNamespace(),
+		Name:      r.GetName(),
 		Version:   gvk.Version,
-		Component: r.Component,
+		Component: component,
 	}
 }
 

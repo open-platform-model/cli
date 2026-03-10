@@ -24,7 +24,7 @@ const noComponentLabel = "(no component)"
 // PersistentVolumeClaim is shortened to PVC to keep tree lines compact.
 // The full kind is preserved in ResourceNode.Kind for JSON/YAML output.
 func displayKind(kind string) string {
-	if kind == "PersistentVolumeClaim" {
+	if kind == kindPersistentVolumeClaim {
 		return "PVC"
 	}
 	return kind
@@ -36,18 +36,14 @@ const (
 	treeConnLast = "└── "
 )
 
-// treeMinStatusGap is the minimum number of spaces between the end of a
-// resource name and its status token. The longest name in the tree is the
-// anchor; all other names get more padding to reach the same column.
-const treeMinStatusGap = 6
-
 // Kubernetes workload kind constants shared across the kubernetes package.
 const (
-	kindDeployment  = "Deployment"
-	kindStatefulSet = "StatefulSet"
-	kindDaemonSet   = "DaemonSet"
-	kindReplicaSet  = "ReplicaSet"
-	kindJob         = "Job"
+	kindDeployment            = "Deployment"
+	kindStatefulSet           = "StatefulSet"
+	kindDaemonSet             = "DaemonSet"
+	kindReplicaSet            = "ReplicaSet"
+	kindJob                   = "Job"
+	kindPersistentVolumeClaim = "PersistentVolumeClaim"
 )
 
 // ReleaseInfo holds release metadata for tree display.
@@ -269,13 +265,13 @@ func getReplicaCount(res *unstructured.Unstructured) string {
 		completions, _, _ := unstructured.NestedInt64(res.Object, "spec", "completions") //nolint:errcheck // best-effort replica display
 		succeeded, _, _ := unstructured.NestedInt64(res.Object, "status", "succeeded")   //nolint:errcheck // best-effort replica display
 		return fmt.Sprintf("%d/%d", succeeded, completions)
-	case "PersistentVolumeClaim":
+	case kindPersistentVolumeClaim:
 		// Prefer the actual provisioned capacity; fall back to the requested size.
-		if cap, found, _ := unstructured.NestedString(res.Object, "status", "capacity", "storage"); found && cap != "" { //nolint:errcheck // best-effort capacity display
-			return cap
+		if storCap, found, _ := unstructured.NestedString(res.Object, "status", "capacity", "storage"); found && storCap != "" { //nolint:errcheck // best-effort capacity display
+			return storCap
 		}
-		cap, _, _ := unstructured.NestedString(res.Object, "spec", "resources", "requests", "storage") //nolint:errcheck // best-effort capacity display
-		return cap
+		storCap, _, _ := unstructured.NestedString(res.Object, "spec", "resources", "requests", "storage") //nolint:errcheck // best-effort capacity display
+		return storCap
 	}
 	return ""
 }
@@ -442,7 +438,7 @@ const treeMinColGap = 2
 
 // treeRow is a single rendered line in the terminal tree.
 //
-// Rows come in two flavours:
+// Rows come in two flavors:
 //   - isResource=false: literal lines (header, │ separators, component names).
 //     These are emitted verbatim; they do not participate in column measurement.
 //   - isResource=true: columnar resource lines. col1/col2/col3 are kept separate
@@ -620,11 +616,11 @@ func collectResourceRows(node ResourceNode, prefix string, isLast, isChild, colo
 	//   Everything → col2=status,               col3=replicas (if any)
 	var col2, col3 string
 	var col2Width int
-	switch {
-	case node.Kind == kindReplicaSet || node.Kind == kindDaemonSet:
+	switch node.Kind {
+	case kindReplicaSet, kindDaemonSet:
 		col2 = replicasColored
 		col2Width = len(rawReplicas)
-	case node.Kind == "Pod":
+	case "Pod":
 		col2 = statusColored
 		col2Width = len(rawStatus)
 	default:
@@ -633,14 +629,15 @@ func collectResourceRows(node ResourceNode, prefix string, isLast, isChild, colo
 		col3 = replicasColored
 	}
 
-	rows := []treeRow{{
+	rows := make([]treeRow, 0, 1+len(node.Children))
+	rows = append(rows, treeRow{
 		col1:       col1,
 		col1Width:  col1Width,
 		col2:       col2,
 		col2Width:  col2Width,
 		col3:       col3,
 		isResource: true,
-	}}
+	})
 
 	// Recurse into K8s-owned children (isChild=true from here down).
 	childPrefix := prefix + "│   "
@@ -732,14 +729,6 @@ func renderDepth0Components(sb *strings.Builder, components []Component, colored
 		fmt.Fprintf(sb, "%s%s   %d %s   %s\n",
 			chrome, name, comp.ResourceCount, resourceWord, status)
 	}
-}
-
-// formatPlainTree renders the tree without any ANSI color codes.
-// Primarily used in unit tests to assert tree structure without dealing with
-// escape sequences. In production, color stripping is handled automatically
-// by termenv (see FormatTree); this function is not called on the hot path.
-func formatPlainTree(result *TreeResult) string {
-	return formatTreeTable(result, false)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

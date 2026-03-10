@@ -9,8 +9,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/opmodel/cli/internal/core"
-	"github.com/opmodel/cli/internal/core/modulerelease"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 )
@@ -18,7 +16,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== OPM Deploy Integration Test ===")
+	fmt.Println("=== OPM Release Deploy Integration Test ===")
 	fmt.Println()
 
 	// 1. Create client targeting kind-opm-dev
@@ -86,21 +84,13 @@ func main() {
 		},
 	}}
 
-	resources := []*core.Resource{
-		{Object: cm, Component: "config"},
-		{Object: svc, Component: "web"},
-	}
-	meta := modulerelease.ReleaseMetadata{
-		Name:      releaseName,
-		Namespace: namespace,
-		UUID:      releaseID,
-	}
+	resources := []*unstructured.Unstructured{cm, svc}
 	fmt.Printf("   OK: %d resources built (ConfigMap, Service)\n", len(resources))
 
 	// 3. Dry-run apply
 	fmt.Println()
 	fmt.Println("3. Testing dry-run apply...")
-	dryResult, err := kubernetes.Apply(ctx, client, resources, meta, kubernetes.ApplyOptions{
+	dryResult, err := kubernetes.Apply(ctx, client, resources, releaseName, kubernetes.ApplyOptions{
 		DryRun: true,
 	})
 	if err != nil {
@@ -118,7 +108,7 @@ func main() {
 	// 4. Real apply
 	fmt.Println()
 	fmt.Println("4. Applying resources to cluster...")
-	applyResult, err := kubernetes.Apply(ctx, client, resources, meta, kubernetes.ApplyOptions{})
+	applyResult, err := kubernetes.Apply(ctx, client, resources, releaseName, kubernetes.ApplyOptions{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: apply: %v\n", err)
 		os.Exit(1)
@@ -161,8 +151,8 @@ func main() {
 		labels := r.GetLabels()
 		fmt.Printf("   - %s/%s (managed-by=%s, release=%s)\n",
 			r.GetKind(), r.GetName(),
-			labels[core.LabelManagedBy],
-			labels[core.LabelReleaseName],
+			labels["app.kubernetes.io/managed-by"],
+			labels["module-release.opmodel.dev/name"],
 		)
 	}
 	if len(discovered) < 2 {
@@ -173,7 +163,7 @@ func main() {
 	// 6. Idempotency test - apply again
 	fmt.Println()
 	fmt.Println("6. Testing idempotency (second apply)...")
-	applyResult2, err := kubernetes.Apply(ctx, client, resources, meta, kubernetes.ApplyOptions{})
+	applyResult2, err := kubernetes.Apply(ctx, client, resources, releaseName, kubernetes.ApplyOptions{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: second apply: %v\n", err)
 		os.Exit(1)
@@ -276,7 +266,7 @@ func main() {
 }
 
 // buildInventory creates an InventorySecret from the given resources.
-func buildInventory(resources []*core.Resource, releaseName, namespace, releaseID string) *inventory.InventorySecret {
+func buildInventory(resources []*unstructured.Unstructured, releaseName, namespace, releaseID string) *inventory.InventorySecret {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)

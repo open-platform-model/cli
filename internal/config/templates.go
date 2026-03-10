@@ -8,7 +8,7 @@ const DefaultConfigTemplate = `// OPM CLI Configuration
 package config
 
 import (
-	provs "opmodel.dev/providers@v1"
+	provs   "opmodel.dev/providers@v1"
 )
 
 config: {

@@ -55,7 +55,6 @@ tasks:
     desc: Run all tests
     cmds:
       - task: test:unit
-      - task: test:registry
       - task: test:integration
       - task: test:e2e
 
@@ -63,6 +62,7 @@ tasks:
     desc: Run unit tests only
     cmds:
       - go test ./internal/...
+      - go test ./pkg/...
 
   test:integration:
     desc: Run integration tests (requires cluster)
@@ -83,25 +83,8 @@ tasks:
       - go run tests/integration/deploy/main.go
       - go run tests/integration/inventory-apply/main.go
       - go run tests/integration/inventory-ops/main.go
-      - go run tests/integration/mod-list/main.go
-      - go run tests/integration/mod-tree/main.go
-      - go run tests/integration/values-flow/main.go
-
-  test:registry:
-    desc: Run registry-dependent tests
-    summary: |
-      Run tests that require a CUE registry to resolve opmodel.dev/core@v1.
-
-      Defaults to the canonical dev registry. Override by exporting OPM_REGISTRY:
-        export OPM_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
-        task test:registry
-
-      Covers:
-        - internal/builder: Build phase tests (FillPath, values, UUID)
-    env:
-      OPM_REGISTRY: "{{.OPM_REGISTRY}}"
-    cmds:
-      - go test ./internal/builder/... -v
+      - go run tests/integration/rel-list/main.go
+      - go run tests/integration/rel-tree/main.go
 
   test:e2e:
     desc: Run end-to-end tests

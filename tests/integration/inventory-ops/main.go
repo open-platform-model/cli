@@ -15,14 +15,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/core"
-	"github.com/opmodel/cli/internal/core/modulerelease"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 )
@@ -70,7 +69,7 @@ func main() {
 	res65svc := buildServiceResources([]string{"svc-a"})
 	res65all := append(res65cm, res65svc...)
 
-	_, err = kubernetes.Apply(ctx, client, res65all, moduleMeta(), kubernetes.ApplyOptions{})
+	_, err = kubernetes.Apply(ctx, client, res65all, releaseName, kubernetes.ApplyOptions{})
 	check("applying resources for 6.5", err)
 	fmt.Println("   OK: cm-a and svc-a applied")
 
@@ -93,7 +92,7 @@ func main() {
 	fmt.Println("   OK: discovered 2 live resources from inventory")
 
 	// Diff: local render has only cm-a; svc-a is an orphan.
-	diffResult65, err := kubernetes.Diff(ctx, client, res65cm, moduleMeta(), comparer,
+	diffResult65, err := kubernetes.Diff(ctx, client, res65cm, releaseName, comparer,
 		kubernetes.DiffOptions{InventoryLive: liveResources65})
 	check("diffing with inventory for 6.5", err)
 	if diffResult65.Orphaned != 1 {
@@ -117,7 +116,7 @@ func main() {
 	res67svc := buildServiceResources([]string{"svc-a"})
 	res67all := append(res67cm, res67svc...)
 
-	_, err = kubernetes.Apply(ctx, client, res67all, moduleMeta(), kubernetes.ApplyOptions{})
+	_, err = kubernetes.Apply(ctx, client, res67all, releaseName, kubernetes.ApplyOptions{})
 	check("applying resources for 6.7", err)
 	fmt.Println("   OK: cm-a and svc-a applied")
 
@@ -148,13 +147,12 @@ func main() {
 	if deleteResult67.Deleted != 2 {
 		failf("6.7: expected 2 deleted resources (cm-a + svc-a), got %d", deleteResult67.Deleted)
 	}
+	waitForConfigMapDeleted(ctx, client, "cm-a")
+	waitForServiceDeleted(ctx, client, "svc-a")
 	fmt.Printf("   OK: %d resources deleted (no Endpoints)\n", deleteResult67.Deleted)
 
 	// Verify the inventory Secret is gone (deleted last).
-	_, errInvGet := client.Clientset.CoreV1().Secrets(namespace).Get(ctx, invSecretName67, metav1.GetOptions{})
-	if !apierrors.IsNotFound(errInvGet) {
-		failf("6.7: expected inventory Secret to be deleted, but got: %v", errInvGet)
-	}
+	waitForSecretDeleted(ctx, client, invSecretName67)
 	fmt.Println("   OK: inventory Secret deleted last (404 confirmed)")
 
 	// cleanup is no-op here since delete already removed everything
@@ -170,7 +168,7 @@ func main() {
 	res68svc := buildServiceResources([]string{"svc-a"})
 	res68all := append(res68cm, res68svc...)
 
-	_, err = kubernetes.Apply(ctx, client, res68all, moduleMeta(), kubernetes.ApplyOptions{})
+	_, err = kubernetes.Apply(ctx, client, res68all, releaseName, kubernetes.ApplyOptions{})
 	check("applying resources for 6.8", err)
 	fmt.Println("   OK: cm-a and svc-a applied")
 
@@ -182,6 +180,7 @@ func main() {
 	// Manually delete svc-a to simulate a missing resource.
 	err = client.ResourceClient(serviceGVR, namespace).Delete(ctx, "svc-a", metav1.DeleteOptions{})
 	check("manually deleting svc-a for 6.8", err)
+	waitForServiceDeleted(ctx, client, "svc-a")
 	fmt.Println("   OK: svc-a manually deleted (simulating missing resource)")
 
 	// Discover resources from inventory — svc-a should be in missing list.
@@ -271,62 +270,56 @@ func opmLabels() map[string]interface{} {
 	}
 }
 
-// buildCM builds a single ConfigMap core.Resource.
-func buildCM(name string) *core.Resource {
+// buildCM builds a single ConfigMap *unstructured.Unstructured.
+func buildCM(name string) *unstructured.Unstructured {
 	labels := opmLabels()
 	labels["component.opmodel.dev/name"] = "config"
 
-	return &core.Resource{
-		Object: &unstructured.Unstructured{Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": namespace,
-				"labels":    labels,
-			},
-			"data": map[string]interface{}{
-				"key": fmt.Sprintf("value-%s", name),
-			},
-		}},
-		Component: "config",
-	}
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name":      name,
+			"namespace": namespace,
+			"labels":    labels,
+		},
+		"data": map[string]interface{}{
+			"key": fmt.Sprintf("value-%s", name),
+		},
+	}}
 }
 
-// buildSvc builds a single Service core.Resource.
-func buildSvc(name string) *core.Resource {
+// buildSvc builds a single Service *unstructured.Unstructured.
+func buildSvc(name string) *unstructured.Unstructured {
 	labels := opmLabels()
 	labels["component.opmodel.dev/name"] = "web"
 
-	return &core.Resource{
-		Object: &unstructured.Unstructured{Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Service",
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": namespace,
-				"labels":    labels,
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Service",
+		"metadata": map[string]interface{}{
+			"name":      name,
+			"namespace": namespace,
+			"labels":    labels,
+		},
+		"spec": map[string]interface{}{
+			"selector": map[string]interface{}{
+				"app": releaseName,
 			},
-			"spec": map[string]interface{}{
-				"selector": map[string]interface{}{
-					"app": releaseName,
-				},
-				"ports": []interface{}{
-					map[string]interface{}{
-						"port":       int64(80),
-						"targetPort": int64(8080),
-						"protocol":   "TCP",
-					},
+			"ports": []interface{}{
+				map[string]interface{}{
+					"port":       int64(80),
+					"targetPort": int64(8080),
+					"protocol":   "TCP",
 				},
 			},
-		}},
-		Component: "web",
-	}
+		},
+	}}
 }
 
 // buildResources builds ConfigMap resources.
-func buildResources(names []string) []*core.Resource {
-	res := make([]*core.Resource, len(names))
+func buildResources(names []string) []*unstructured.Unstructured {
+	res := make([]*unstructured.Unstructured, len(names))
 	for i, name := range names {
 		res[i] = buildCM(name)
 	}
@@ -334,25 +327,16 @@ func buildResources(names []string) []*core.Resource {
 }
 
 // buildServiceResources builds Service resources.
-func buildServiceResources(names []string) []*core.Resource {
-	res := make([]*core.Resource, len(names))
+func buildServiceResources(names []string) []*unstructured.Unstructured {
+	res := make([]*unstructured.Unstructured, len(names))
 	for i, name := range names {
 		res[i] = buildSvc(name)
 	}
 	return res
 }
 
-// moduleMeta returns the ReleaseMetadata for the test release.
-func moduleMeta() modulerelease.ReleaseMetadata {
-	return modulerelease.ReleaseMetadata{
-		Name:      releaseName,
-		Namespace: namespace,
-		UUID:      releaseID,
-	}
-}
-
 // buildInventory creates a new InventorySecret from the given resources.
-func buildInventory(resources []*core.Resource) *inventory.InventorySecret {
+func buildInventory(resources []*unstructured.Unstructured) *inventory.InventorySecret {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
@@ -388,12 +372,66 @@ func buildInventory(resources []*core.Resource) *inventory.InventorySecret {
 func cleanup(ctx context.Context, client *kubernetes.Client) {
 	for _, name := range []string{"cm-a", "cm-b"} {
 		_ = client.ResourceClient(configMapGVR, namespace).Delete(ctx, name, metav1.DeleteOptions{})
+		waitForConfigMapDeleted(ctx, client, name)
 	}
 	for _, name := range []string{"svc-a", "svc-b"} {
 		_ = client.ResourceClient(serviceGVR, namespace).Delete(ctx, name, metav1.DeleteOptions{})
+		waitForServiceDeleted(ctx, client, name)
 	}
 	secretName := inventory.SecretName(releaseName, releaseID)
 	_ = client.Clientset.CoreV1().Secrets(namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
+	waitForSecretDeleted(ctx, client, secretName)
+}
+
+func waitForConfigMapDeleted(ctx context.Context, client *kubernetes.Client, name string) {
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		_, err := client.ResourceClient(configMapGVR, namespace).Get(ctx, name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return
+		}
+		if err != nil {
+			failf("waiting for ConfigMap/%s deletion: %v", name, err)
+		}
+		if time.Now().After(deadline) {
+			failf("timed out waiting for ConfigMap/%s deletion", name)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+func waitForServiceDeleted(ctx context.Context, client *kubernetes.Client, name string) {
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		_, err := client.ResourceClient(serviceGVR, namespace).Get(ctx, name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return
+		}
+		if err != nil {
+			failf("waiting for Service/%s deletion: %v", name, err)
+		}
+		if time.Now().After(deadline) {
+			failf("timed out waiting for Service/%s deletion", name)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+func waitForSecretDeleted(ctx context.Context, client *kubernetes.Client, name string) {
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		_, err := client.Clientset.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return
+		}
+		if err != nil {
+			failf("waiting for Secret/%s deletion: %v", name, err)
+		}
+		if time.Now().After(deadline) {
+			failf("timed out waiting for Secret/%s deletion", name)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
 }
 
 // step prints a numbered step header.

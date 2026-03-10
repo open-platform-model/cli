@@ -14,8 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/core"
-	"github.com/opmodel/cli/internal/core/modulerelease"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -316,7 +314,8 @@ type DiffOptions struct {
 }
 
 // Diff compares rendered resources against the live cluster state and returns categorized results.
-func Diff(ctx context.Context, client *Client, resources []*core.Resource, meta modulerelease.ReleaseMetadata, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
+// releaseName is unused but kept for caller context (logging reserved for future use).
+func Diff(ctx context.Context, client *Client, resources []*unstructured.Unstructured, releaseName string, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
 	var diffOpts DiffOptions
 	if len(opts) > 0 {
 		diffOpts = opts[0]
@@ -327,18 +326,17 @@ func Diff(ctx context.Context, client *Client, resources []*core.Resource, meta 
 	// Build a set of rendered resource keys for orphan detection
 	renderedKeys := make(map[string]bool)
 	for _, res := range resources {
-		key := resourceKey(res.Object.GroupVersionKind(), res.Object.GetNamespace(), res.Object.GetName())
+		key := resourceKey(res.GroupVersionKind(), res.GetNamespace(), res.GetName())
 		renderedKeys[key] = true
 	}
 
 	// Compare each rendered resource against live state
 	for _, res := range resources {
-		obj := res.Object
-		kind := obj.GetKind()
-		name := obj.GetName()
-		ns := obj.GetNamespace()
+		kind := res.GetKind()
+		name := res.GetName()
+		ns := res.GetNamespace()
 
-		live, err := fetchLiveState(ctx, client, obj)
+		live, err := fetchLiveState(ctx, client, res)
 		if err != nil {
 			// Resource not found on cluster -> added
 			if apierrors.IsNotFound(err) {
@@ -359,10 +357,10 @@ func Diff(ctx context.Context, client *Client, resources []*core.Resource, meta 
 		// Filter live object to only contain fields present in rendered output.
 		// Two-layer filtering: strip server metadata, then project to rendered paths.
 		stripServerManagedFields(live.Object)
-		live.Object = projectLiveToRendered(obj.Object, live.Object)
+		live.Object = projectLiveToRendered(res.Object, live.Object)
 
 		// Resource exists on both sides — compare
-		diffOutput, err := comparer.Compare(obj, live)
+		diffOutput, err := comparer.Compare(res, live)
 		if err != nil {
 			result.Warnings = append(result.Warnings, fmt.Sprintf("comparing %s/%s: %v", kind, name, err))
 			continue
@@ -399,22 +397,6 @@ func Diff(ctx context.Context, client *Client, resources []*core.Resource, meta 
 			State:     ResourceOrphaned,
 		})
 		result.Orphaned++
-	}
-
-	return result, nil
-}
-
-// DiffPartial compares rendered resources against live state, handling partial render results.
-// Successfully rendered resources are compared; render errors produce warnings.
-func DiffPartial(ctx context.Context, client *Client, resources []*core.Resource, renderErrors []error, meta modulerelease.ReleaseMetadata, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
-	result, err := Diff(ctx, client, resources, meta, comparer, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add render errors as warnings
-	for _, renderErr := range renderErrors {
-		result.Warnings = append(result.Warnings, fmt.Sprintf("render error: %v", renderErr))
 	}
 
 	return result, nil

@@ -11,8 +11,8 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/load"
 
-	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // LoaderOptions contains options for loading configuration.
@@ -161,7 +161,7 @@ func loadFullConfig(cfg *GlobalConfig, configPath, registry string) error {
 			Kubeconfig: "~/.kube/config",
 			Namespace:  "default",
 		}
-		cfg.Log.Kubernetes.APIWarnings = "warn"
+		cfg.Log.Kubernetes.APIWarnings = APIWarningsWarn
 		cfg.CueContext = cuecontext.New()
 		return nil
 	}
@@ -225,7 +225,7 @@ func loadFullConfig(cfg *GlobalConfig, configPath, registry string) error {
 
 	// Set default for APIWarnings if not specified
 	if cfg.Log.Kubernetes.APIWarnings == "" {
-		cfg.Log.Kubernetes.APIWarnings = "warn"
+		cfg.Log.Kubernetes.APIWarnings = APIWarningsWarn
 	}
 
 	// Extract providers
@@ -300,8 +300,6 @@ func extractProviders(value cue.Value) map[string]cue.Value {
 }
 
 // extractConfigInto populates cfg fields from the CUE value.
-//
-//nolint:unparam // error return allows for future validation
 func extractConfigInto(cfg *GlobalConfig, value cue.Value) {
 	// Apply defaults first
 	cfg.Kubernetes = KubernetesConfig{

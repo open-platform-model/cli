@@ -1,16 +1,17 @@
-// Package cmdutil provides shared command utilities for mod subcommands.
-// It centralizes flag group management, render pipeline orchestration,
-// Kubernetes client creation, and output formatting helpers.
+// Package cmdutil provides small CLI helpers shared across command packages.
+// It holds reusable flag groups, annotations, release targeting, and a few
+// command-facing utility functions that are not full workflow orchestration.
 package cmdutil
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/spf13/cobra"
 )
 
 // RenderFlags holds flags common to commands that render modules
-// (apply, build, vet, diff).
+// (apply, build, vet).
 type RenderFlags struct {
 	Values      []string
 	Namespace   string
@@ -31,7 +32,7 @@ func (f *RenderFlags) AddTo(cmd *cobra.Command) {
 }
 
 // K8sFlags holds flags for Kubernetes cluster connection
-// (apply, diff, delete, status).
+// (apply, delete, status).
 type K8sFlags struct {
 	Kubeconfig string
 	Context    string
@@ -93,4 +94,43 @@ func ResolveModulePath(args []string) string {
 		return args[0]
 	}
 	return "."
+}
+
+// ReleaseFileFlags holds flags specific to release-file-based rendering.
+type ReleaseFileFlags struct {
+	// Module is the path to a local module directory (--module flag).
+	// Used to fill #module in the release file when not imported from a registry.
+	Module string
+	// Provider is the provider name to use (--provider flag).
+	Provider string
+	// Values are additional values CUE files (-f/--values flag).
+	// When empty, values.cue next to the release file is used if it exists.
+	Values []string
+}
+
+// AddTo registers the release file flags on the given cobra command.
+func (f *ReleaseFileFlags) AddTo(cmd *cobra.Command) {
+	cmd.Flags().StringVar(&f.Module, "module", "",
+		"Path to local module directory (fills #module in the release file)")
+	cmd.Flags().StringVar(&f.Provider, "provider", "",
+		"Provider to use (default: from config)")
+	cmd.Flags().StringArrayVarP(&f.Values, "values", "f", nil,
+		"Additional values files (can be repeated; default: values.cue next to the release file)")
+}
+
+// uuidPattern matches a UUID v4/v5: 8-4-4-4-12 lowercase hex digits.
+var uuidPattern = regexp.MustCompile(
+	`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`,
+)
+
+// ResolveReleaseIdentifier inspects a positional argument and returns either
+// a release name or a release UUID. Detection is based on the UUID v4/v5
+// pattern: 8-4-4-4-12 lowercase hex digits separated by dashes.
+//
+// Exactly one of the returned values will be non-empty.
+func ResolveReleaseIdentifier(arg string) (name, uuid string) {
+	if uuidPattern.MatchString(arg) {
+		return "", arg
+	}
+	return arg, ""
 }

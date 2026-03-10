@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Shared utility functions in `internal/kubernetes/` that eliminate duplication across K8s operations (apply, delete, diff). Provides unified GVR resolution, a `ResourceClient` abstraction for namespace-vs-cluster scoping, and consolidates path utilities to a single source of truth.
+Shared utility functions in `internal/kubernetes/` that eliminate duplication across K8s operations (apply, delete). Provides unified GVR resolution, a `ResourceClient` abstraction for namespace-vs-cluster scoping, and consolidates path utilities to a single source of truth.
 
 ---
 
@@ -10,7 +10,7 @@ Shared utility functions in `internal/kubernetes/` that eliminate duplication ac
 
 ### Requirement: Unified GVR resolution from unstructured objects
 
-The `internal/kubernetes` package SHALL provide a single `gvrFromUnstructured` function that derives a `schema.GroupVersionResource` from an `*unstructured.Unstructured` object. This function SHALL be used by all operations that need to resolve a dynamic resource client (apply, delete, diff). There SHALL NOT be duplicate implementations of this logic.
+The `internal/kubernetes` package SHALL provide a single `gvrFromUnstructured` function that derives a `schema.GroupVersionResource` from an `*unstructured.Unstructured` object. This function SHALL be used by all operations that need to resolve a dynamic resource client (apply, delete). There SHALL NOT be duplicate implementations of this logic.
 
 #### Scenario: GVR resolution for namespaced core resource
 
@@ -29,7 +29,7 @@ The `internal/kubernetes` package SHALL provide a single `gvrFromUnstructured` f
 
 ### Requirement: ResourceClient method eliminates namespaced-vs-cluster-scoped branching
 
-The `*Client` type SHALL provide a `ResourceClient` method that accepts a `schema.GroupVersionResource` and a namespace string, and returns the appropriate `dynamic.ResourceInterface`. When namespace is non-empty, it SHALL return a namespace-scoped client. When namespace is empty, it SHALL return a cluster-scoped client. All K8s operations (apply, delete, diff) SHALL use this method instead of inline branching.
+The `*Client` type SHALL provide a `ResourceClient` method that accepts a `schema.GroupVersionResource` and a namespace string, and returns the appropriate `dynamic.ResourceInterface`. When namespace is non-empty, it SHALL return a namespace-scoped client. When namespace is empty, it SHALL return a cluster-scoped client. All K8s operations (apply, delete) SHALL use this method instead of inline branching.
 
 #### Scenario: Namespaced resource client
 
@@ -50,11 +50,6 @@ The `*Client` type SHALL provide a `ResourceClient` method that accepts a `schem
 
 - **WHEN** `deleteResource` deletes a resource
 - **THEN** it SHALL use `client.ResourceClient(gvr, ns).Delete(...)` instead of inline branching
-
-#### Scenario: Diff uses ResourceClient for live state fetch
-
-- **WHEN** `fetchLiveState` fetches a resource from the cluster
-- **THEN** it SHALL use `client.ResourceClient(gvr, ns).Get(...)` instead of inline branching
 
 ### Requirement: Single expandTilde implementation across the codebase
 

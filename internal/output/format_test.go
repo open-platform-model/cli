@@ -59,3 +59,11 @@ func TestParseFormat(t *testing.T) {
 		})
 	}
 }
+
+func TestIsManifestFormat(t *testing.T) {
+	assert.True(t, IsManifestFormat(FormatYAML))
+	assert.True(t, IsManifestFormat(FormatJSON))
+	assert.False(t, IsManifestFormat(FormatTable))
+	assert.False(t, IsManifestFormat(FormatWide))
+	assert.False(t, IsManifestFormat(FormatDir))
+}

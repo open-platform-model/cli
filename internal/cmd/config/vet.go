@@ -6,9 +6,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
-	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewConfigVetCmd creates the config vet command.
@@ -36,6 +37,9 @@ Examples:
   opm config vet --config /path/to/config.cue`,
 		RunE: func(c *cobra.Command, args []string) error {
 			return runConfigVet(args, cfg)
+		},
+		Annotations: map[string]string{
+			cmdutil.SkipConfigLoadAnnotation: "true",
 		},
 	}
 

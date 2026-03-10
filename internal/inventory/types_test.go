@@ -8,14 +8,15 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/opmodel/cli/internal/core"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	pkgcore "github.com/opmodel/cli/pkg/core"
 )
 
-// makeResource is a test helper that builds a *core.Resource with the given GVK/metadata.
-func makeResource(group, version, kind, namespace, name, component string) *core.Resource {
+// makeResource is a test helper that builds a *unstructured.Unstructured with the given GVK/metadata.
+// The component name is stored in the "component.opmodel.dev/name" label as the CUE catalog does.
+func makeResource(group, version, kind, namespace, name, component string) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   group,
@@ -24,10 +25,10 @@ func makeResource(group, version, kind, namespace, name, component string) *core
 	})
 	obj.SetNamespace(namespace)
 	obj.SetName(name)
-	return &core.Resource{
-		Object:    obj,
-		Component: component,
-	}
+	obj.SetLabels(map[string]string{
+		pkgcore.LabelComponentName: component,
+	})
+	return obj
 }
 
 // makeInventorySecret builds a minimal InventorySecret for testing.
@@ -329,8 +330,8 @@ func TestReleaseMetadata_JSONFieldNames(t *testing.T) {
 	assert.Equal(t, "default", raw["namespace"])
 	_, hasReleaseName := raw["releaseName"]
 	assert.False(t, hasReleaseName, `"releaseName" field must not be present`)
-	_, hasReleaseId := raw["releaseId"]
-	assert.False(t, hasReleaseId, `"releaseId" field must not be present`)
+	_, hasReleaseID := raw["releaseId"]
+	assert.False(t, hasReleaseID, `"releaseId" field must not be present`)
 }
 
 // --- ModuleMetadata JSON field names ---

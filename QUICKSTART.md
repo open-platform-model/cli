@@ -1,16 +1,16 @@
 # Quickstart
 
-Get up and running with OPM in 5 minutes.
+Get up and running with OPM in a few minutes using the example release files.
 
 ## Prerequisites
 
-- **Go 1.23+** — for building the CLI
-- **[Task](https://taskfile.dev)** — task runner (`go install github.com/go-task/task/v3/cmd/task@latest`)
-- **[CUE](https://cuelang.org)** — for module publishing (`go install cuelang.org/go/cmd/cue@latest`)
-- **Docker** — for running the local OCI registry
-- **kind** — local Kubernetes (`go install sigs.k8s.io/kind@latest`)
-- **kubectl** — Kubernetes CLI
-- **jq** — JSON processor (optional, for `task registry:status`)
+- **Go 1.23+** - for building the CLI
+- **[Task](https://taskfile.dev)** - task runner (`go install github.com/go-task/task/v3/cmd/task@latest`)
+- **[CUE](https://cuelang.org)** - for module publishing (`go install cuelang.org/go/cmd/cue@latest`)
+- **Docker** - for running the local OCI registry
+- **kind** - local Kubernetes (`go install sigs.k8s.io/kind@latest`)
+- **kubectl** - Kubernetes CLI
+- **jq** - optional, for `task registry:status`
 
 ## Clone Repositories
 
@@ -37,40 +37,25 @@ cd catalog
 task registry:start
 ```
 
-This creates and starts a Docker container running a local OCI registry at `localhost:5000`.
-
-**Registry tasks available:**
-
-| Task | Description |
-|------|-------------|
-| `task registry:start` | Start the registry |
-| `task registry:stop` | Stop the registry (preserves data) |
-| `task registry:status` | Show status and published modules |
-| `task registry:health` | Check registry health |
-| `task registry:list` | List all published modules |
-| `task registry:cleanup` | Remove registry and all data |
+This starts a local OCI registry at `localhost:5000`.
 
 ## Configure Environment
 
-Set the registry environment variables to use the local registry:
+Point CUE and OPM at the local registry:
 
 ```bash
 export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 export OPM_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 ```
 
-Add these to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.) for persistence.
-
 ## Publish CUE Modules
 
-Publish the OPM CUE modules to your local registry:
+Publish the catalog modules to your local registry:
 
 ```bash
 cd catalog
 task publish:all:local
 ```
-
-This publishes all catalog modules (`core`, `schemas`, `resources`, `traits`, etc.) in dependency order.
 
 Verify with:
 
@@ -78,20 +63,16 @@ Verify with:
 task registry:status
 ```
 
-## Build & Install
-
-Build and install the CLI:
+## Build and Install the CLI
 
 ```bash
 cd cli
 task build && task install
 ```
 
-This builds the `opm` binary to `./bin/opm` and installs it to `$GOPATH/bin/opm`.
+This builds `./bin/opm` and installs `opm` into `$GOPATH/bin`.
 
 ## Initialize Configuration
-
-Initialize the OPM configuration for first-time use:
 
 ```bash
 opm config init
@@ -105,119 +86,131 @@ This creates `~/.opm/config.cue` with default settings.
 task cluster:create
 ```
 
-Creates a kind cluster named `opm-dev` with Kubernetes v1.34.0.
+This creates a local kind cluster named `opm-dev`.
 
-## Example: Jellyfin Module
+## Release-Based Workflow
 
-The `examples/jellyfin` module demonstrates a stateful single-container application with persistent storage.
+This quickstart uses the example release files under `examples/releases/`.
 
-### Build (render manifests locally)
+- Jellyfin release: `examples/releases/jellyfin/release.cue`
+- Minecraft release: `examples/releases/minecraft/release.cue`
+- Referenced example modules:
+  - `examples/modules/jellyfin`
+  - `examples/modules/mc_java`
 
-Without `--release-name` (defaults to the module name):
+`opm module` is still useful for authoring and direct module workflows, but for this quickstart we start from release definitions.
 
-```bash
-opm mod build ./examples/jellyfin -n default
-```
+## Example: Jellyfin Release
 
-With a custom release name:
+The Jellyfin example release lives in `examples/releases/jellyfin/release.cue` and references the module in `examples/modules/jellyfin`.
 
-```bash
-opm mod build ./examples/jellyfin -n default --release-name jellyfin-media
-```
-
-Renders Kubernetes manifests from the module definition.
-
-### Apply (deploy to cluster)
-
-Without `--release-name` (defaults to the module name):
+### Build
 
 ```bash
-opm mod apply ./examples/jellyfin -n default
+opm release build ./examples/releases/jellyfin/release.cue
 ```
 
-With a custom release name:
+Build with explicit values:
 
 ```bash
-opm mod apply ./examples/jellyfin -n default --release-name jellyfin-media
+opm release build ./examples/releases/jellyfin/release.cue -f ./examples/releases/jellyfin/values.cue
 ```
 
-Applies resources to the cluster using server-side apply.
-
-### Diff (compare local vs. live state)
+### Apply
 
 ```bash
-opm mod diff ./examples/jellyfin -n default
+opm release apply ./examples/releases/jellyfin/release.cue --create-namespace
 ```
 
-Shows semantic differences between your local definition and what's running in the cluster.
-
-> **Note:** The diff command is currently broken and shows excessive differences.
-
-### Status (check resource health)
+Apply with explicit values:
 
 ```bash
-opm mod status --name jellyfin -n default
+opm release apply ./examples/releases/jellyfin/release.cue -f ./examples/releases/jellyfin/values.cue --create-namespace
 ```
 
-Displays health and readiness of all module resources.
+### Status
 
-> **Note:** The status command is not particularly useful at the moment.
-
-### Delete (remove from cluster)
+The Jellyfin release file uses release name `jf` in namespace `jellyfin`.
 
 ```bash
-opm mod delete --name jellyfin -n default --force
+opm release status jf -n jellyfin
 ```
 
-Deletes all module resources in reverse weight order.
-
-## Other Examples
-
-**Blog** — two-tier stateless application (web frontend + API backend):
+### Tree
 
 ```bash
-opm mod build ./examples/blog -n default
-opm mod apply ./examples/blog -n default
-opm mod status --name Blog -n default
-opm mod delete --name Blog -n default --force
+opm release tree jf -n jellyfin
 ```
 
-With a custom release name:
+### Events
 
 ```bash
-opm mod build ./examples/blog -n default --release-name my-blog
-opm mod apply ./examples/blog -n default --release-name my-blog
-opm mod status --name my-blog -n default
-opm mod delete --name my-blog -n default --force
+opm release events jf -n jellyfin
 ```
 
-**Multi-tier** — demonstrates all four workload types (stateful, daemon, task, scheduled-task):
+### Delete
 
 ```bash
-opm mod build ./examples/multi-tier-module -n default
-opm mod apply ./examples/multi-tier-module -n default
-opm mod status --name multi-tier-module -n default
-opm mod delete --name multi-tier-module -n default --force
+opm release delete jf -n jellyfin --force
 ```
 
-With a custom release name:
+## Example: Minecraft Release
+
+The Minecraft example release lives in `examples/releases/minecraft/release.cue` and references the module in `examples/modules/mc_java`.
+
+### Build
 
 ```bash
-opm mod build ./examples/multi-tier-module -n default --release-name my-app
-opm mod apply ./examples/multi-tier-module -n default --release-name my-app
-opm mod status --name my-app -n default
-opm mod delete --name my-app -n default --force
+opm release build ./examples/releases/minecraft/release.cue
 ```
+
+Build with one of the example values files:
+
+```bash
+opm release build ./examples/releases/minecraft/release.cue -f ./examples/releases/minecraft/values_forge.cue
+```
+
+Other example values files:
+
+- `examples/releases/minecraft/values.cue`
+- `examples/releases/minecraft/values_fabric_modrinth.cue`
+- `examples/releases/minecraft/values_paper_restic.cue`
+
+### Apply
+
+```bash
+opm release apply ./examples/releases/minecraft/release.cue -f ./examples/releases/minecraft/values_forge.cue
+```
+
+### Status
+
+The Minecraft release file uses release name `minecraft` in namespace `default`.
+
+```bash
+opm release status minecraft -n default
+```
+
+### Delete
+
+```bash
+opm release delete minecraft -n default --force
+```
+
+## Notes
+
+- `opm release` is the canonical workflow when you already have a release definition.
+- `opm module` remains the canonical workflow when you are starting from module source.
+- `opm mod` still works as an alias for `opm module`.
 
 ## Cleanup
+
+Delete the cluster:
 
 ```bash
 task cluster:delete
 ```
 
-Deletes the `opm-dev` kind cluster.
-
-To also stop the registry:
+Stop the registry if needed:
 
 ```bash
 cd catalog
@@ -226,6 +219,6 @@ task registry:stop
 
 ## Next Steps
 
-- Run `opm --help` to explore all commands
-- See [README.md](./README.md) for detailed documentation
-- Check [AGENTS.md](./AGENTS.md) for CLI architecture and development guidelines
+- Run `opm release --help` and `opm module --help`
+- See `README.md` for command overview
+- See `AGENTS.md` for architecture and development guidance

@@ -71,7 +71,7 @@ Registry and config path resolution SHALL be performed by `config.Load` during `
 
 #### Scenario: Configuration loaded once per CLI invocation
 
-- **WHEN** any subcommand is executed (apply, build, diff, delete, status)
+- **WHEN** any subcommand is executed (apply, build, delete, status)
 - **THEN** `config.Load()` SHALL be called exactly once in `PersistentPreRunE`
 - **THEN** subcommands SHALL access the pre-loaded config via the `*config.GlobalConfig` pointer
 

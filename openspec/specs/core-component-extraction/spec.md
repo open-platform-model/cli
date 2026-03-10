@@ -54,3 +54,12 @@ The `TestLoad_ValidModule` test SHALL assert that `mod.Metadata.UUID` is non-emp
 - **WHEN** a module defines `metadata: identity: "some-uuid-string"`
 - **THEN** `mod.Metadata.UUID` SHALL equal `"some-uuid-string"` after `module.Load()`
 - **AND** `TestLoad_ValidModule` SHALL assert this value is non-empty
+
+---
+
+## Removed Requirements
+
+### Requirement: Component extraction from CUE values
+**Reason**: Superseded by CUE-native matching. The engine passes raw CUE component values to `#MatchPlan` and `#transform` without extracting them into Go structs first.
+
+**Migration**: No direct replacement needed — component data stays in CUE throughout the pipeline.

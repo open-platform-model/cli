@@ -19,7 +19,6 @@ body:
         - mod apply
         - mod build
         - mod delete
-        - mod diff
         - mod init
         - mod status
         - mod template

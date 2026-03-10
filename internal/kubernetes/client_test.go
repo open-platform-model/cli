@@ -14,7 +14,7 @@ func TestEnsureNamespace(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("creates namespace when missing", func(t *testing.T) {
-		fakeClientset := fake.NewSimpleClientset()
+		fakeClientset := fake.NewSimpleClientset() //nolint:staticcheck // NewClientset requires generated apply configs; NewSimpleClientset is appropriate here
 		client := &Client{Clientset: fakeClientset}
 
 		created, err := client.EnsureNamespace(ctx, "my-ns", false)
@@ -28,7 +28,7 @@ func TestEnsureNamespace(t *testing.T) {
 	})
 
 	t.Run("returns false when namespace exists", func(t *testing.T) {
-		fakeClientset := fake.NewSimpleClientset(&corev1.Namespace{
+		fakeClientset := fake.NewSimpleClientset(&corev1.Namespace{ //nolint:staticcheck // NewClientset requires generated apply configs; NewSimpleClientset is appropriate here
 			ObjectMeta: metav1.ObjectMeta{Name: "existing-ns"},
 		})
 		client := &Client{Clientset: fakeClientset}
@@ -39,7 +39,7 @@ func TestEnsureNamespace(t *testing.T) {
 	})
 
 	t.Run("dry run does not create namespace", func(t *testing.T) {
-		fakeClientset := fake.NewSimpleClientset()
+		fakeClientset := fake.NewSimpleClientset() //nolint:staticcheck // NewClientset requires generated apply configs; NewSimpleClientset is appropriate here
 		client := &Client{Clientset: fakeClientset}
 
 		created, err := client.EnsureNamespace(ctx, "my-ns", true)

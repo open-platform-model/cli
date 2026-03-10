@@ -1,0 +1,139 @@
+// Components defines the Jellyfin workload.
+// Single stateful component with persistent config, media mounts, and health checks.
+package jellyfin
+
+import (
+	resources_workload "opmodel.dev/resources/workload@v1"
+	resources_storage "opmodel.dev/resources/storage@v1"
+	traits_workload "opmodel.dev/traits/workload@v1"
+	traits_network "opmodel.dev/traits/network@v1"
+)
+
+// #components contains component definitions.
+// Components reference #config which gets resolved to concrete values at build time.
+#components: {
+
+	/////////////////////////////////////////////////////////////////
+	//// Jellyfin - Stateful Media Server
+	/////////////////////////////////////////////////////////////////
+
+	jellyfin: {
+		resources_workload.#Container
+		resources_storage.#Volumes
+		traits_workload.#Scaling
+		traits_workload.#RestartPolicy
+		traits_network.#Expose
+
+		metadata: name: "jellyfin"
+		metadata: labels: "core.opmodel.dev/workload-type": "stateful"
+
+		_volumes: spec.volumes
+
+		spec: {
+			// Single replica - Jellyfin does not support horizontal scaling
+			scaling: count: 1
+
+			restartPolicy: "Always"
+
+			container: {
+				name:  "jellyfin"
+				image: #config.image
+				ports: http: {
+					name:       "http"
+					targetPort: 8096
+				}
+				env: {
+					PUID: {
+						name:  "PUID"
+						value: "\(#config.puid)"
+					}
+					PGID: {
+						name:  "PGID"
+						value: "\(#config.pgid)"
+					}
+					TZ: {
+						name:  "TZ"
+						value: #config.timezone
+					}
+					if #config.publishedServerUrl != _|_ {
+						JELLYFIN_PublishedServerUrl: {
+							name:  "JELLYFIN_PublishedServerUrl"
+							value: #config.publishedServerUrl
+						}
+					}
+				}
+				livenessProbe: {
+					httpGet: {
+						path: "/health"
+						port: 8096
+					}
+					initialDelaySeconds: 30
+					periodSeconds:       10
+					timeoutSeconds:      5
+					failureThreshold:    3
+				}
+				readinessProbe: {
+					httpGet: {
+						path: "/health"
+						port: 8096
+					}
+					initialDelaySeconds: 10
+					periodSeconds:       10
+					timeoutSeconds:      3
+					failureThreshold:    3
+				}
+				resources: {
+					requests: {
+						cpu:    "500m"
+						memory: "1Gi"
+					}
+					limits: {
+						cpu:    "4000m"
+						memory: "4Gi"
+					}
+				}
+			volumeMounts: {
+				config: _volumes.config & {
+					mountPath: "/config"
+				}
+				if #config.media != _|_ {
+					for vName, lib in #config.media {
+						(vName): _volumes[vName] & {
+							mountPath: lib.mountPath
+						}
+					}
+				}
+			}
+			}
+
+			// Expose the web UI
+			expose: {
+				ports: http: container.ports.http & {
+					exposedPort: #config.port
+				}
+				type: "ClusterIP"
+			}
+
+			// Volumes: persistent config + media mounts
+			volumes: {
+				config: {
+					name: "config"
+					persistentClaim: size: #config.configStorageSize
+				}
+				if #config.media != _|_ {
+					for name, lib in #config.media {
+						(name): {
+							"name": name
+							if lib.type == "pvc" {
+								persistentClaim: size: lib.size
+							}
+							if lib.type == "emptyDir" {
+								emptyDir: {}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

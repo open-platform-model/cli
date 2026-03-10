@@ -75,53 +75,71 @@ The `ReleaseSelectorFlags` struct SHALL provide a `LogName()` method that return
 - **WHEN** `LogName()` is called with `ReleaseName` set to `""` and `ReleaseID` set to `"a1b2c3d4-e5f6-7890-abcd"`
 - **THEN** it SHALL return `"release:a1b2c3d4"`
 
-### Requirement: RenderModule executes the common render pipeline and returns a result or ExitError
+### Requirement: RenderRelease orchestration
 
-The `RenderModule` function SHALL accept a context, a `RenderModuleOpts` struct (containing args, RenderFlags, optional K8sFlags, `*config.GlobalConfig`, and verbose flag), and SHALL execute the full render pipeline preamble: resolve module path from args, validate config is loaded, resolve Kubernetes config (namespace/provider) via `config.ResolveKubernetes`, build `build.RenderOptions`, validate options, create `build.NewPipeline`, and call `pipeline.Render()`.
+`cmdutil.RenderRelease()` SHALL inspect whether `release.cue` is present in the module path and branch accordingly:
 
-The `RenderModuleOpts` struct SHALL contain a `Config *config.GlobalConfig` field. It SHALL NOT contain separate `OPMConfig` and `Registry` fields. The pipeline SHALL read the registry from `Config.Registry`.
+**When `release.cue` is present** (existing behavior, unchanged):
+- Call `loader.LoadReleasePackage()`, `loader.DetectReleaseKind()`, `loader.LoadModuleReleaseFromValue()` (or bundle equivalent), then `engine.ModuleRenderer.Render()`.
 
-On success, it SHALL return the `*build.RenderResult`. On failure at any step, it SHALL return an `*ExitError` with the appropriate exit code.
+**When `release.cue` is absent** (synthesis path):
+- Load the module package directly.
+- Extract `debugValues` when `DebugValues: true` and no `-f` flag, or load the `-f` values file.
+- Resolve the release name from `opts.ReleaseName` → `module.metadata.name` → `filepath.Base(modulePath)`.
+- Call `loader.SynthesizeModuleRelease()` to build the `*ModuleRelease`.
+- Continue on the common tail: provider loading, engine rendering, resource conversion.
 
-#### Scenario: RenderModule succeeds with valid module
+In both paths, resources are converted to `[]*unstructured.Unstructured` before passing to downstream packages. No CUE types cross this boundary.
 
-- **WHEN** `RenderModule` is called with a valid module path, loaded GlobalConfig, and valid RenderFlags
-- **THEN** it SHALL return a non-nil `*build.RenderResult`
-- **AND** the error SHALL be `nil`
+#### Scenario: RenderRelease takes synthesis path when no release.cue
+- **WHEN** `RenderRelease` is called with a module path that has no `release.cue`
+- **AND** `DebugValues: true`
+- **THEN** `RenderRelease` SHALL call `loader.SynthesizeModuleRelease` instead of `loader.LoadReleasePackage`
+- **AND** the returned `*RenderResult` SHALL be populated identically to a release-backed render
 
-#### Scenario: RenderModule fails when Config is nil
+#### Scenario: RenderRelease takes normal path when release.cue present
+- **WHEN** `RenderRelease` is called with a module path that has a `release.cue`
+- **THEN** `RenderRelease` SHALL use the existing `LoadReleasePackage` path
+- **AND** behavior SHALL be unchanged from before this change
 
-- **WHEN** `RenderModule` is called with a nil Config
-- **THEN** it SHALL return an `*ExitError` with `Code` equal to `ExitGeneralError`
-- **THEN** the error message SHALL contain `"configuration not loaded"`
+#### Scenario: CUE boundary enforcement (unchanged)
+- **WHEN** `RenderRelease()` passes resources to `internal/kubernetes/` or `internal/inventory/`
+- **THEN** resources are `[]*unstructured.Unstructured` — no CUE types cross this boundary
 
-#### Scenario: RenderModule fails on render validation error
+### Requirement: Values file resolution stays in cmdutil
 
-- **WHEN** `pipeline.Render()` returns a `*build.ReleaseValidationError`
-- **THEN** `RenderModule` SHALL call the validation error formatter before returning
-- **AND** it SHALL return an `*ExitError` with `Code` equal to `ExitValidationError` and `Printed` set to `true`
+Values file resolution SHALL remain in `internal/cmdutil/` as a CLI-layer concern. The resolution logic accounts for the synthesis path:
 
-#### Scenario: RenderModule defaults module path to current directory
+- When `--values` files are provided: pass them to the appropriate loader function regardless of whether `release.cue` exists.
+- When no `--values` files are provided and `release.cue` is present: pass empty string to `LoadReleasePackage()`, which defaults to `values.cue` in the release directory (existing behavior).
+- When no `--values` files are provided and `release.cue` is absent: set `DebugValues: true` in `RenderReleaseOpts`, which causes the synthesis path to extract `debugValues` from the module.
 
-- **WHEN** `RenderModule` is called with an empty args slice
-- **THEN** the module path used for `build.RenderOptions.ModulePath` SHALL be `"."`
+#### Scenario: Values flag resolution (unchanged)
+- **WHEN** the user provides `--values custom-values.cue`
+- **THEN** cmdutil resolves the path and passes it to the appropriate loader (release or synthesis path)
 
-#### Scenario: RenderModule uses first arg as module path
+#### Scenario: Default values fallback with release.cue present
+- **WHEN** no `--values` flag is provided
+- **AND** `release.cue` is present
+- **THEN** cmdutil passes empty string to `LoadReleasePackage()`, which defaults to `values.cue` in the release directory
 
-- **WHEN** `RenderModule` is called with args `["./my-module"]`
-- **THEN** the module path used for `build.RenderOptions.ModulePath` SHALL be `"./my-module"`
+#### Scenario: Default values fallback without release.cue
+- **WHEN** no `--values` flag is provided
+- **AND** no `release.cue` is present
+- **THEN** cmdutil sets `DebugValues: true` in `RenderReleaseOpts`
+- **AND** the synthesis path extracts `debugValues` from the module as the values source
 
 ### Requirement: ShowRenderOutput checks for errors, shows transformer matches, and logs warnings
 
-The `ShowRenderOutput` function SHALL accept a `*build.RenderResult` and output options (verbose flag). It SHALL:
+The `ShowRenderOutput` function SHALL accept a render result and output options (verbose flag). It SHALL:
 
-1. Check `result.HasErrors()` — if true, format and print render errors via `PrintRenderErrors`, then return an `*ExitError` with `ExitValidationError`.
+1. Check for render errors — if present, format and print render errors via `PrintRenderErrors`, then return an `*ExitError` with `ExitValidationError`.
 2. Show transformer match output — verbose mode shows module metadata and match reasons; default mode shows compact match lines.
 3. Log any warnings from the render result via the module-scoped logger.
 
 #### Scenario: ShowRenderOutput returns error when render has errors
 
-- **WHEN** `ShowRenderOutput` is called with a `RenderResult` where `HasErrors()` returns `true`
+- **WHEN** `ShowRenderOutput` is called with a result containing errors
 - **THEN** it SHALL call `PrintRenderErrors` with the errors
 - **AND** it SHALL return an `*ExitError` with `Code` equal to `ExitValidationError`
 
@@ -140,7 +158,7 @@ The `ShowRenderOutput` function SHALL accept a `*build.RenderResult` and output 
 
 #### Scenario: ShowRenderOutput logs warnings
 
-- **WHEN** `ShowRenderOutput` is called with a `RenderResult` where `HasWarnings()` returns `true`
+- **WHEN** `ShowRenderOutput` is called with a result that has warnings
 - **THEN** each warning SHALL be logged via the module-scoped logger at warn level
 
 ### Requirement: NewK8sClient creates a Kubernetes client or returns a connectivity ExitError
@@ -180,11 +198,11 @@ Multiple flag group structs SHALL be usable on the same cobra command without fl
 
 ### Requirement: PrintValidationError formats render validation errors consistently
 
-The `PrintValidationError` function SHALL accept a message string and an error. When the error is a `*build.ReleaseValidationError` with non-empty `Details`, it SHALL print a summary line followed by the CUE error details. For other errors, it SHALL use the standard key-value log format.
+The `PrintValidationError` function SHALL accept a message string and an error. When the error is a `*errors.ConfigError` with field errors, it SHALL print a summary line followed by the CUE error details. For other errors, it SHALL use the standard key-value log format.
 
-#### Scenario: ReleaseValidationError with CUE details
+#### Scenario: ConfigError with CUE details
 
-- **WHEN** `PrintValidationError` is called with a `*build.ReleaseValidationError` that has `Details` set
+- **WHEN** `PrintValidationError` is called with a `*errors.ConfigError` that has field errors
 - **THEN** the output SHALL include the summary message
 - **AND** the output SHALL include the CUE details as plain text on stderr
 
@@ -195,17 +213,17 @@ The `PrintValidationError` function SHALL accept a message string and an error. 
 
 ### Requirement: PrintRenderErrors formats render errors with diagnostic detail
 
-The `PrintRenderErrors` function SHALL accept a slice of errors and print each one with appropriate diagnostic information. For `*build.UnmatchedComponentError`, it SHALL print the component name and list available transformers with their requirements. For `*build.TransformError`, it SHALL print the component name, transformer FQN, and cause.
+The `PrintRenderErrors` function SHALL accept a slice of errors and print each one with appropriate diagnostic information. For `*engine.UnmatchedComponentsError`, it SHALL print the component names and per-transformer diagnostics (missing labels, resources, traits). For transform errors, it SHALL print the component name, transformer FQN, and cause.
 
-#### Scenario: Unmatched component error with available transformers
+#### Scenario: Unmatched components error with diagnostics
 
-- **WHEN** `PrintRenderErrors` is called with an `UnmatchedComponentError` that has available transformers
-- **THEN** the output SHALL include the component name
-- **AND** the output SHALL list each available transformer with its FQN, requiredLabels, requiredResources, and requiredTraits
+- **WHEN** `PrintRenderErrors` is called with an `UnmatchedComponentsError`
+- **THEN** the output SHALL include the unmatched component names
+- **AND** the output SHALL list per-transformer diagnostics (missing labels, resources, traits)
 
 #### Scenario: Transform error
 
-- **WHEN** `PrintRenderErrors` is called with a `TransformError`
+- **WHEN** `PrintRenderErrors` is called with a transform error
 - **THEN** the output SHALL include the component name, transformer FQN, and the cause error
 
 ### Requirement: Refactored mod commands preserve exact behavioral equivalence
@@ -235,11 +253,6 @@ After refactoring to use `cmdutil`, each mod command SHALL produce identical out
 
 - **WHEN** `opm mod delete --release-name my-app -n production` is run before and after the refactoring
 - **THEN** the confirmation prompt text SHALL be identical
-
-#### Scenario: mod diff output is identical after refactoring
-
-- **WHEN** `opm mod diff` is run with identical inputs and cluster state before and after the refactoring
-- **THEN** the diff output (summary line, per-resource diffs) SHALL be identical
 
 #### Scenario: mod status table output is identical after refactoring
 

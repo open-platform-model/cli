@@ -11,10 +11,10 @@ Command-line interface for the Open Platform Model (OPM). Build, deploy, and man
 task build
 
 # Initialize a new module
-./bin/opm mod init ./my-module
+./bin/opm module init ./my-module
 
 # Apply a module
-./bin/opm mod apply ./my-module
+./bin/opm module apply ./my-module
 ```
 
 ## Features
@@ -27,20 +27,22 @@ task build
 
 ## Commands
 
-### Module Operations (`opm mod`)
+### Module Operations (`opm module`)
+
+`opm mod` remains available as a compatibility alias.
 
 | Command | Description |
 |---------|-------------|
-| `mod init` | Create a new module from template |
-| `mod build` | Render module to manifests |
-| `mod vet` | Validate module without generating manifests |
-| `mod apply` | Deploy module to cluster |
-| `mod status` | Show resource status |
-| `mod tree` | Show module resource hierarchy (component → resource → K8s children) |
-| `mod diff` | Show differences with cluster |
-| `mod delete` | Delete release resources from cluster |
-| `mod list` | List deployed module releases |
-| `mod events` | Show events for a release |
+| `module init` | Create a new module from template |
+| `module build` | Render module to manifests |
+| `module vet` | Validate module without generating manifests |
+| `module apply` | Deploy module to cluster |
+| `module status` | Show resource status |
+| `module tree` | Show module resource hierarchy (component → resource → K8s children) |
+
+| `module delete` | Delete release resources from cluster |
+| `module list` | List deployed module releases |
+| `module events` | Show events for a release |
 
 ### Configuration (`opm config`)
 
@@ -49,22 +51,22 @@ task build
 | `config init` | Initialize OPM configuration |
 | `config vet` | Validate configuration |
 
-### `opm mod tree`
+### `opm module tree`
 
 Show the component and resource hierarchy of a deployed release.
 
 ```bash
 # Full tree (default depth=2: components → resources → K8s children)
-opm mod tree --release-name my-app -n production
+opm module tree --release-name my-app -n production
 
 # Component summary only (depth=0)
-opm mod tree --release-name my-app -n production --depth 0
+opm module tree --release-name my-app -n production --depth 0
 
 # Resources without K8s children (depth=1)
-opm mod tree --release-name my-app -n production --depth 1
+opm module tree --release-name my-app -n production --depth 1
 
 # JSON output for scripting
-opm mod tree --release-name my-app -n production -o json
+opm module tree --release-name my-app -n production -o json
 ```
 
 Depth levels:

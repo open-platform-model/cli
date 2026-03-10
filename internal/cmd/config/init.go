@@ -6,9 +6,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
-	oerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewConfigInitCmd creates the config init command.
@@ -38,6 +39,9 @@ Examples:
   opm config init --force`,
 		RunE: func(c *cobra.Command, args []string) error {
 			return runConfigInit(args, forceFlag)
+		},
+		Annotations: map[string]string{
+			cmdutil.SkipConfigLoadAnnotation: "true",
 		},
 	}
 

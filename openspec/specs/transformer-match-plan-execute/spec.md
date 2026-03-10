@@ -1,80 +1,46 @@
-# TransformerMatchPlan Execution
-
 ## Purpose
 
-This spec defines the requirements for `core.TransformerMatchPlan.Execute()` — the receiver method that runs the GENERATE phase of the render pipeline. It also specifies how the CUE evaluation context is carried from construction time into execution, and how `TransformerContext` is structured in the `core` package.
-
----
+Defines the contract for Go-side component-to-transformer matching and match-plan diagnostics.
 
 ## Requirements
 
-### Requirement: TransformerMatchPlan owns resource generation
+### Requirement: Go matcher reproduces the current CUE match-plan semantics
+The system SHALL provide a public Go `match.Match(components, provider)` API that reproduces the matching behavior currently defined in `catalog/v1alpha1/core/matcher/matcher.cue`.
 
-`core.TransformerMatchPlan` SHALL provide an `Execute(ctx context.Context, rel *ModuleRelease) ([]*Resource, []error)` receiver method that sequentially processes all transformer-component matches and returns the generated resources.
+#### Scenario: Match result captures missing labels, resources, and traits
+- **WHEN** a transformer is evaluated against a component
+- **THEN** the match result SHALL include `MissingLabels`, `MissingResources`, and `MissingTraits`
+- **AND** the pair SHALL be marked as matched only when all three lists are empty
 
-#### Scenario: Execute runs all matches and returns resources
+#### Scenario: Unmatched components are detected
+- **WHEN** a component has zero matching transformers
+- **THEN** the returned match plan SHALL include that component name in `Unmatched`
 
-- **WHEN** `Execute` is called on a `TransformerMatchPlan` with one or more matches
-- **THEN** each match SHALL be processed in sequence (component × transformer)
-- **AND** the returned `[]*Resource` SHALL contain all successfully generated resources
-- **AND** any per-match errors SHALL be returned in the `[]error` slice
+#### Scenario: Unhandled traits are detected from matched transformers only
+- **WHEN** a component includes traits that are not covered by any matched transformer's `requiredTraits` or `optionalTraits`
+- **THEN** the returned match plan SHALL include those trait FQNs in `UnhandledTraits`
 
-#### Scenario: Execute respects context cancellation
+#### Scenario: Match output is deterministic
+- **WHEN** `MatchedPairs()`, `NonMatchedPairs()`, or `Warnings()` is called on the match plan
+- **THEN** the returned output SHALL be deterministic across runs
+- **AND** component names, transformer FQNs, and trait diagnostics SHALL be sorted consistently
 
-- **WHEN** the context passed to `Execute` is cancelled mid-execution
-- **THEN** execution SHALL stop after the current match completes
-- **AND** `Execute` SHALL return the resources generated so far and a cancellation error
+### Requirement: MatchPlan provides structured diagnostics
+The render pipeline SHALL provide a match plan structure with `Matches`, `Unmatched`, and `UnhandledTraits` that can be consumed by the engine and command output. Match-plan diagnostics SHALL be produced by Go matching logic rather than by evaluating a CUE `#MatchPlan` definition.
 
-#### Scenario: Execute with no matches returns empty resources
+#### Scenario: Go match plan evaluation
+- **WHEN** matching is performed for a provider and a concrete component map
+- **THEN** Go code SHALL build the match plan directly from provider transformers and component metadata
+- **AND** the resulting match plan SHALL contain `Matches`, `Unmatched`, and `UnhandledTraits`
 
-- **WHEN** `Execute` is called on a `TransformerMatchPlan` with no matches
-- **THEN** the returned `[]*Resource` SHALL be an empty (non-nil) slice
-- **AND** the returned `[]error` SHALL be empty
+#### Scenario: MatchPlan provides structured diagnostics
+- **WHEN** a transformer does not match a component
+- **THEN** the `MatchResult` for that pair SHALL contain `Matched: false` and non-empty missing-label, missing-resource, or missing-trait lists identifying exactly what was missing
 
----
+#### Scenario: MatchedPairs are deterministically sorted
+- **WHEN** `MatchPlan.MatchedPairs()` is called
+- **THEN** the returned pairs SHALL be sorted by component name ascending, then transformer FQN ascending
 
-### Requirement: TransformerMatchPlan carries CUE context from construction
-
-`core.TransformerMatchPlan` SHALL hold an unexported `*cue.Context` field set by `core.Provider.Match()` at construction time. This context SHALL be used internally by `Execute()` for CUE encoding operations.
-
-#### Scenario: CUE context set when Match produces a plan
-
-- **WHEN** `provider.Match(components)` is called
-- **THEN** the returned `*TransformerMatchPlan` SHALL have its internal `cueCtx` set to the same `*cue.Context` that was stored on the `Provider`
-- **AND** no external caller SHALL need to pass a `*cue.Context` to `Execute()`
-
----
-
-### Requirement: TransformerContext resides in core package
-
-The `TransformerContext` type, its constructor, and its `ToMap()` method SHALL reside in `internal/core/` so they are accessible from `TransformerMatchPlan.Execute()` without creating an import cycle.
-
-#### Scenario: TransformerContext constructed from ModuleRelease and Component
-
-- **WHEN** the transformer context is built for a matched pair inside `Execute()`
-- **THEN** it SHALL be constructed using the `ModuleRelease.Metadata` and `ModuleRelease.Module.Metadata` fields
-- **AND** component name, labels, and annotations SHALL be populated from the matched `*Component`
-
-#### Scenario: No import cycle introduced
-
-- **WHEN** `internal/core/` is compiled
-- **THEN** it SHALL NOT import any package under `internal/build/`
-- **AND** `internal/build/` packages MAY continue to import `internal/core/`
-
----
-
-### Requirement: Executor service removed from build/transform
-
-The `Executor` struct and `ExecuteWithTransformers()` function in `internal/build/transform/executor.go` SHALL be removed once `TransformerMatchPlan.Execute()` is implemented. No duplicate execution path SHALL exist.
-
-#### Scenario: Pipeline uses Execute() exclusively
-
-- **WHEN** `build/pipeline.go` processes the GENERATE phase
-- **THEN** it SHALL call `matchPlan.Execute(ctx, rel)` directly
-- **AND** it SHALL NOT construct or call an `Executor` service
-
-#### Scenario: Removal does not change observable output
-
-- **WHEN** a module that previously rendered successfully is rendered after the executor is removed
-- **THEN** `RenderResult.Resources` SHALL contain byte-identical resources
-- **AND** `RenderResult.Errors` SHALL be identical to before
+#### Scenario: Warnings are deterministically sorted
+- **WHEN** `MatchPlan.Warnings()` is called
+- **THEN** the returned warning strings SHALL be sorted by component name then trait FQN

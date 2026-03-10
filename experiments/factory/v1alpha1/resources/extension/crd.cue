@@ -29,10 +29,6 @@ import (
 }
 
 #CRDs: component.#Component & {
-	metadata: annotations: {
-		"transformer.opmodel.dev/list-output": true
-	}
-
 	#resources: {(#CRDsResource.metadata.fqn): #CRDsResource}
 }
 

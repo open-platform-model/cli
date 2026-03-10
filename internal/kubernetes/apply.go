@@ -9,8 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/opmodel/cli/internal/core"
-	"github.com/opmodel/cli/internal/core/modulerelease"
 	"github.com/opmodel/cli/internal/output"
 )
 
@@ -58,19 +56,24 @@ func (e *resourceError) Error() string {
 
 // Apply performs server-side apply for a set of rendered resources.
 // Resources are assumed to be already ordered by weight (from RenderResult).
-func Apply(ctx context.Context, client *Client, resources []*core.Resource, meta modulerelease.ReleaseMetadata, opts ApplyOptions) (*ApplyResult, error) {
+// releaseName is used for logging only.
+func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstructured, releaseName string, opts ApplyOptions) (*ApplyResult, error) {
 	result := &ApplyResult{}
-	releaseLog := output.ReleaseLogger(meta.Name)
+	releaseLog := output.ReleaseLogger(releaseName)
 
 	for _, res := range resources {
+		kind := res.GetKind()
+		name := res.GetName()
+		ns := res.GetNamespace()
+
 		// Apply the resource
-		status, err := applyResource(ctx, client, res.Object, opts)
+		status, err := applyResource(ctx, client, res, opts)
 		if err != nil {
-			releaseLog.Warn(fmt.Sprintf("applying %s/%s: %v", res.Kind(), res.Name(), err))
+			releaseLog.Warn(fmt.Sprintf("applying %s/%s: %v", kind, name, err))
 			result.Errors = append(result.Errors, resourceError{
-				Kind:      res.Kind(),
-				Name:      res.Name(),
-				Namespace: res.Namespace(),
+				Kind:      kind,
+				Name:      name,
+				Namespace: ns,
 				Err:       err,
 			})
 			continue
@@ -85,7 +88,7 @@ func Apply(ctx context.Context, client *Client, resources []*core.Resource, meta
 		case output.StatusUnchanged:
 			result.Unchanged++
 		}
-		releaseLog.Info(output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), status))
+		releaseLog.Info(output.FormatResourceLine(kind, ns, name, status))
 	}
 
 	return result, nil

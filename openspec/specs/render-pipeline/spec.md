@@ -45,18 +45,6 @@ The apply command needs to render a module and deploy to Kubernetes.
 2. **Given** RenderResult.Resources, **When** apply calls kubernetes.Apply(), **Then** resources are deployed in order.
 3. **Given** RenderResult with Errors, **When** apply processes result, **Then** it can decide whether to proceed or abort.
 
-### User Story 3 - Diff Command Uses Pipeline (Priority: P2)
-
-The diff command needs to compare rendered resources with live cluster state.
-
-**Independent Test**: Diff command calls Pipeline.Render() and compares RenderResult.Resources with cluster.
-
-**Acceptance Scenarios**:
-
-1. **Given** a valid module, **When** diff calls Pipeline.Render(), **Then** it receives resources for comparison.
-2. **Given** RenderResult.Resources, **When** diff fetches live state, **Then** it can compare each resource.
-3. **Given** partial RenderResult (some errors), **When** diff processes, **Then** it can still compare successful resources.
-
 ---
 
 ## Functional Requirements
@@ -69,17 +57,6 @@ The diff command needs to compare rendered resources with live cluster state.
 | FR-RP-002 | Pipeline MUST return fatal errors (module not found, config invalid) as the error return value. |
 | FR-RP-003 | Pipeline MUST return render errors (unmatched components, transform failures) in `RenderResult.Errors`. |
 | FR-RP-004 | Pipeline MUST support context cancellation for long-running operations. |
-
-### RenderOptions
-
-| ID | Requirement |
-|----|-------------|
-| FR-RP-010 | RenderOptions MUST support `ModulePath` for the module directory. |
-| FR-RP-011 | RenderOptions MUST support `Values` for additional values files. |
-| FR-RP-012 | RenderOptions MUST support `Name` to override module name. |
-| FR-RP-013 | RenderOptions MUST support `Namespace` to override default namespace. |
-| FR-RP-014 | RenderOptions MUST support `Provider` to select the provider. |
-| FR-RP-015 | RenderOptions MUST support `Strict` for strict trait handling. |
 
 ### RenderResult
 
@@ -279,7 +256,6 @@ functions that bypass these receiver methods.
 | ID | Requirement |
 |----|-------------|
 | FR-RP-040 | UnmatchedComponentError MUST include available transformers list. |
-| FR-RP-041 | UnhandledTraitError MUST indicate whether strict mode is enabled. |
 | FR-RP-042 | TransformError MUST include both component and transformer identification. |
 
 ### Output Consistency
@@ -392,23 +368,14 @@ phase SHALL be called. Only `matchPlan.Execute()` errors are render errors
 
 After the MATCHING phase, the pipeline SHALL collect unhandled-trait warnings by
 inspecting `core.TransformerMatchPlan.Matches`. Each component match entry that
-contains unhandled traits SHALL produce a warning string in `RenderResult.Warnings`
-(non-strict mode) or an error in `RenderResult.Errors` (strict mode). The pipeline
-SHALL NOT read warnings from any legacy `MatchResult.Details` slice.
+contains unhandled traits SHALL produce a warning string in `RenderResult.Warnings`.
+The pipeline SHALL NOT read warnings from any legacy `MatchResult.Details` slice.
 
-##### Scenario: Unhandled trait produces warning in non-strict mode
+##### Scenario: Unhandled trait produces warning
 
 - **WHEN** a component has a trait that no transformer handles
-- **AND** `RenderOptions.Strict` is `false`
 - **THEN** `RenderResult.Warnings` SHALL contain an entry naming the component and trait FQN
 - **AND** `RenderResult.Errors` SHALL NOT contain an error for that unhandled trait
-
-##### Scenario: Unhandled trait produces error in strict mode
-
-- **WHEN** a component has a trait that no transformer handles
-- **AND** `RenderOptions.Strict` is `true`
-- **THEN** `RenderResult.Errors` SHALL contain an error naming the component and trait FQN
-- **AND** `RenderResult.Warnings` SHALL NOT contain a warning for that unhandled trait
 
 ##### Scenario: No warnings when all traits are handled
 
@@ -518,3 +485,27 @@ are available at the new import path with identical signatures.
 - **WHEN** the pipeline orchestration change is fully applied
 - **THEN** no Go source file in the repository SHALL import `github.com/opmodel/cli/internal/legacy`
 - **AND** the `internal/legacy/` directory SHALL NOT exist in the repository
+
+---
+
+## Removed Requirements (promote-factory-engine)
+
+### Requirement: Pipeline interface
+**Reason**: Replaced by concrete `ModuleRenderer` and `BundleRenderer` structs in `pkg/engine/`. The interface provided no value with only one implementation.
+
+**Migration**: Replace `pipeline.NewPipeline().Render()` calls with `engine.NewModuleRenderer().Render()` or `engine.NewBundleRenderer().Render()`.
+
+### Requirement: RenderOptions struct
+**Reason**: Loading is no longer driven by the pipeline — the loader handles release loading separately, and the engine receives a pre-loaded `*ModuleRelease`.
+
+**Migration**: Callers load the release via `pkg/loader/` and pass it to the engine. CLI flags and values resolution stay in `internal/cmdutil/`.
+
+### Requirement: Five-phase pipeline orchestration
+**Reason**: The five phases (preparation, provider load, build, matching, generate) are replaced by two distinct steps: load (via `pkg/loader/`) and render (via `pkg/engine/`). Orchestration moves to `internal/cmdutil/render.go`.
+
+**Migration**: `cmdutil.RenderRelease()` calls `loader.LoadReleasePackage()`, `loader.LoadModuleReleaseFromValue()`, then `engine.ModuleRenderer.Render()`.
+
+### Requirement: RenderResult with Unstructured resources
+**Reason**: `RenderResult.Resources` changes from `[]*core.Resource` wrapping `*unstructured.Unstructured` to `[]*core.Resource` wrapping `cue.Value`. The new `Resource` has conversion methods.
+
+**Migration**: Call `resource.ToUnstructured()` at the cmdutil boundary before passing to K8s or inventory packages.

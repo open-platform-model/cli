@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	opmerrors "github.com/opmodel/cli/internal/errors"
+	opmerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // Color palette — named constants for all ANSI 256 colors used in the CLI.
@@ -37,6 +37,9 @@ var (
 var (
 	// styleNoun styles identifiable nouns (module paths, resource names, namespaces).
 	styleNoun = lipgloss.NewStyle().Foreground(ColorCyan)
+
+	// styleTransformer styles transformer names in match output.
+	styleTransformer = lipgloss.NewStyle().Foreground(ColorYellow)
 
 	// styleDim styles structural chrome (scope prefixes, separators, timestamps).
 	styleDim = lipgloss.NewStyle().Faint(true)
@@ -145,6 +148,24 @@ func FormatNotice(msg string) string {
 	return arrow + " " + msg
 }
 
+// FormatEventType renders an event type label with semantic color.
+// Warning is yellow, Normal is dim, and unknown values are left unstyled.
+func FormatEventType(eventType string) string {
+	switch eventType {
+	case "Warning":
+		return lipgloss.NewStyle().Foreground(ColorYellow).Render(eventType)
+	case "Normal":
+		return Dim(eventType)
+	default:
+		return eventType
+	}
+}
+
+// FormatEventResource renders an event resource identity in noun style.
+func FormatEventResource(kind, name string) string {
+	return StyleNoun(kind + "/" + name)
+}
+
 // FormatFQN formats a fully qualified name for display by replacing the
 // first "#" (provider#path separator) with " - " for readability.
 // Any "#" inside the path is preserved.
@@ -152,6 +173,42 @@ func FormatNotice(msg string) string {
 // Example: "kubernetes#deployment-transformer" → "kubernetes - deployment-transformer"
 func FormatFQN(fqn string) string {
 	return strings.Replace(fqn, "#", " - ", 1)
+}
+
+// styledFQN renders a fully-qualified transformer path with the transformer
+// name highlighted in the noun style (cyan) and the surrounding path dim.
+//
+// For module-path FQNs like "opmodel.dev/providers/kubernetes/transformers/hpa-transformer@v1":
+//
+//	dim("opmodel.dev/providers/kubernetes/transformers/") + cyan("hpa-transformer") + dim("@v1")
+//
+// For simple "#"-separated FQNs like "kubernetes#statefulset-transformer":
+// the "#" is replaced with " - " and the transformer name (after the separator) is cyan.
+//
+// Falls back to plain dim rendering when no recognizable separator is found.
+func styledFQN(fqn string) string {
+	// Handle module-path style: last "/" segment is "name@version".
+	if idx := strings.LastIndex(fqn, "/"); idx >= 0 {
+		prefix := fqn[:idx+1]  // "opmodel.dev/.../transformers/"
+		nameVer := fqn[idx+1:] // "hpa-transformer@v1"
+		name := nameVer
+		ver := ""
+		if at := strings.LastIndex(nameVer, "@"); at >= 0 {
+			name = nameVer[:at] // "hpa-transformer"
+			ver = nameVer[at:]  // "@v1"
+		}
+		return styleDim.Render(prefix) + styleTransformer.Render(name) + styleDim.Render(ver)
+	}
+
+	// Handle "#"-separated style: "provider#transformer-name".
+	if idx := strings.Index(fqn, "#"); idx >= 0 {
+		provider := fqn[:idx] // "kubernetes"
+		name := fqn[idx+1:]   // "statefulset-transformer"
+		return styleDim.Render(provider+" - ") + styleTransformer.Render(name)
+	}
+
+	// No separator — render the whole thing dim.
+	return styleDim.Render(fqn)
 }
 
 // FormatTransformerMatch renders a matched transformer line.
@@ -163,27 +220,20 @@ func FormatTransformerMatch(component, fqn string) string {
 	bullet := styleNoun.Render("▸")
 	comp := styleNoun.Render(component)
 	arrow := styleDim.Render("←")
-	styledFQN := styleDim.Render(FormatFQN(fqn))
-	return bullet + " " + comp + " " + arrow + " " + styledFQN
+	return bullet + " " + comp + " " + arrow + " " + styledFQN(fqn)
 }
 
-// FormatTransformerMatchVerbose renders a matched transformer line with reason.
+// FormatTransformerSkipped renders a non-matching transformer line for debug output.
 //
-// Format:
+// Format: ✗ <component> ↛ <provider> - <fqn>
 //
-//	▸ <component> ← <provider> - <fqn>
-//	     <reason>
-//
-// The first line is identical to FormatTransformerMatch. The reason is indented
-// and dim-styled on the second line.
-func FormatTransformerMatchVerbose(component, fqn, reason string) string {
-	firstLine := FormatTransformerMatch(component, fqn)
-	if reason == "" {
-		return firstLine
-	}
-	indent := "     "
-	styledReason := styleDim.Render(reason)
-	return firstLine + "\n" + indent + styledReason
+// The cross and component name are dim. The arrow and FQN are dim.
+// Use with Debug-level logging and structured key-value pairs for the reasons.
+func FormatTransformerSkipped(component, fqn string) string {
+	cross := styleDim.Render("✗")
+	comp := styleDim.Render(component)
+	arrow := styleDim.Render("↛")
+	return cross + " " + comp + " " + arrow + " " + styledFQN(fqn)
 }
 
 // FormatTransformerUnmatched renders an unmatched component line.
@@ -276,106 +326,47 @@ func FormatReadyRatio(ready, total int) string {
 	}
 }
 
-// FormatValuesValidationError renders a *opmerrors.ValuesValidationError as a
-// colored, human-readable string for terminal output.
+// FormatGroupedErrors renders a slice of GroupedError values as a colored,
+// human-readable string for terminal output.
 //
 // Output format:
 //
-//	<file>: N errors                              ← file group header
+//	<message>                     ← bold error message
+//	  <file>:<line>:<col> -> <path>  ← yellow loc, arrow, then path
+//	  <file>:<line>:<col> -> <path>  ← additional locations (e.g. conflict)
 //
-//	  <line>:<col>  <path>                        ← yellow loc, bold path
-//	               <message>                      ← indented below path
-//
-//	Cross-file conflicts: N conflicts             ← section header (if any)
-//
-//	  <path>                                      ← bold path
-//	    <file>:<line>:<col> vs <file>:<line>:<col> ← yellow locations
-//	    <message>                                 ← indented below
-func FormatValuesValidationError(e *opmerrors.ValuesValidationError) string {
+// Errors with multiple locations (CUE value conflicts) appear as a single
+// message block with one line per contributing source position, making
+// cross-file conflicts immediately readable without a separate section.
+func FormatGroupedErrors(groups []opmerrors.GroupedError) string {
 	styleLoc := lipgloss.NewStyle().Foreground(ColorYellow)
-	stylePath := lipgloss.NewStyle().Bold(true)
-	styleHeader := lipgloss.NewStyle().Bold(true)
+	styleMsg := lipgloss.NewStyle().Bold(true)
 
 	var sb strings.Builder
 
-	// Group FieldErrors by file, preserving insertion order.
-	type fileGroup struct {
-		file   string
-		errors []opmerrors.FieldError
-	}
-	var groups []fileGroup
-	groupIdx := make(map[string]int)
-	for _, fe := range e.Errors {
-		file := fe.File
-		if file == "" {
-			file = "(unknown)"
-		}
-		idx, ok := groupIdx[file]
-		if !ok {
-			idx = len(groups)
-			groups = append(groups, fileGroup{file: file})
-			groupIdx[file] = idx
-		}
-		groups[idx].errors = append(groups[idx].errors, fe)
-	}
-
-	// Render per-file groups.
 	for gi, g := range groups {
 		if gi > 0 {
 			sb.WriteByte('\n')
 		}
-		n := len(g.errors)
-		noun := "errors"
-		if n == 1 {
-			noun = "error"
-		}
-		sb.WriteString(styleHeader.Render(fmt.Sprintf("%s: %d %s", g.file, n, noun)))
+		sb.WriteString(styleMsg.Render(g.Message))
 		sb.WriteByte('\n')
-		for _, fe := range g.errors {
-			sb.WriteByte('\n')
-			if fe.Line > 0 {
-				loc := styleLoc.Render(fmt.Sprintf("%d:%d", fe.Line, fe.Column))
-				path := stylePath.Render(fe.Path)
-				sb.WriteString(fmt.Sprintf("  %s  %s\n", loc, path))
-			} else if fe.Path != "" {
+		pathPrinted := false
+		for _, loc := range g.Locations {
+			if !pathPrinted && loc.Path != "" {
 				sb.WriteString("  ")
-				sb.WriteString(stylePath.Render(fe.Path))
+				sb.WriteString(loc.Path)
+				sb.WriteByte('\n')
+				pathPrinted = true
+			}
+			if loc.Line > 0 {
+				locStr := styleLoc.Render(fmt.Sprintf("%s:%d:%d", loc.File, loc.Line, loc.Column))
+				sb.WriteString("    ")
+				sb.WriteString(locStr)
 				sb.WriteByte('\n')
 			}
-			sb.WriteString("        ")
-			sb.WriteString(fe.Message)
-			sb.WriteByte('\n')
 		}
-	}
-
-	// Render cross-file conflicts section.
-	if len(e.Conflicts) > 0 {
-		if len(groups) > 0 {
-			sb.WriteByte('\n')
-		}
-		n := len(e.Conflicts)
-		noun := "conflicts"
-		if n == 1 {
-			noun = "conflict"
-		}
-		sb.WriteString(styleHeader.Render(fmt.Sprintf("Cross-file conflicts: %d %s", n, noun)))
-		sb.WriteByte('\n')
-		for _, ce := range e.Conflicts {
-			sb.WriteByte('\n')
-			sb.WriteString("  ")
-			sb.WriteString(stylePath.Render(ce.Path))
-			sb.WriteByte('\n')
-			// Render all locations joined with " vs "
-			locParts := make([]string, 0, len(ce.Locations))
-			for _, l := range ce.Locations {
-				locParts = append(locParts, styleLoc.Render(fmt.Sprintf("%s:%d:%d", l.File, l.Line, l.Column)))
-			}
-			sb.WriteString("    ")
-			sb.WriteString(strings.Join(locParts, " vs "))
-			sb.WriteByte('\n')
-			sb.WriteString("    ")
-			sb.WriteString(ce.Message)
-			sb.WriteByte('\n')
+		if !pathPrinted && len(g.Locations) == 0 {
+			sb.WriteString("  values\n")
 		}
 	}
 

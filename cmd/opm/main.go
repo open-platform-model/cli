@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/opmodel/cli/internal/cmd"
-	oerrors "github.com/opmodel/cli/internal/errors"
+	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 func main() {

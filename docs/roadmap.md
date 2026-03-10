@@ -28,15 +28,15 @@ OPM's CLI foundation has been built over the first iteration of development. The
 
 **CLI commands:**
 
-- `opm mod init` — scaffold a new module (simple, standard, advanced templates)
-- `opm mod build` — render Kubernetes manifests from CUE definitions
-- `opm mod vet` — native CUE SDK validation with custom error formatting
-- `opm mod apply` — server-side apply with inventory tracking and stale resource pruning
-- `opm mod delete` — inventory-based or label-based discovery with `--name` or `--release-id`
-- `opm mod diff` — semantic diff of local vs live state (via dyff)
-- `opm mod status` — health and readiness status (table/yaml/json, watch mode)
-- `opm mod tree` — tree view of module structure and resource hierarchy
-- `opm mod events` — Kubernetes events for module resources
+- `opm module init` — scaffold a new module (simple, standard, advanced templates)
+- `opm module build` — render Kubernetes manifests from CUE definitions
+- `opm module vet` — native CUE SDK validation with custom error formatting
+- `opm module apply` — server-side apply with inventory tracking and stale resource pruning
+- `opm module delete` — inventory-based or label-based discovery with `--name` or `--release-id`
+
+- `opm module status` — health and readiness status (table/yaml/json, watch mode)
+- `opm module tree` — tree view of module structure and resource hierarchy
+- `opm module events` — Kubernetes events for module resources
 - `opm config init` — initialize `~/.opm/config.cue`
 - `opm config vet` — native CUE SDK config validation
 
@@ -96,23 +96,23 @@ The foundation must be solid before adding new capabilities. This milestone focu
 
 **Major deliverables:**
 
-- ~~**Native validation** — Replace the stub `opm mod vet` and `opm config vet` commands with native Go CUE SDK implementations. 4-phase validation pipeline with custom error formatting, entity summaries, `--debug`/`--values`/`--package`/`--concrete` flags.~~ (done)
+- ~~**Native validation** — Replace the stub `opm module vet` and `opm config vet` commands with native Go CUE SDK implementations. 4-phase validation pipeline with custom error formatting, entity summaries, `--debug`/`--values`/`--package`/`--concrete` flags.~~ (done)
 
 - ~~**`#ModuleRelease.values` validation against `#Module.#config`** — During processing, validate that the values provided in a ModuleRelease satisfy the schema defined by the Module's `#config`. Leverages CUE's evaluator to support mandatory (`!`), optional (`?`), and default (`*`) fields.~~ (done)
 
-- **Atomic apply** — An incorrectly configured module must not partially apply. Today, `opm mod apply` renders all resources and validates before applying, but a failure mid-apply does not roll back previously-applied resources. Investigate dry-run validation or rollback strategies.
+- **Atomic apply** — An incorrectly configured module must not partially apply. Today, `opm module apply` renders all resources and validates before applying, but a failure mid-apply does not roll back previously-applied resources. Investigate dry-run validation or rollback strategies.
 
-- ~~**Unchanged apply detection** — When `opm mod apply` is run against an already-applied module with no changes, the output indicates that no changes were made instead of displaying "Module applied."~~ (done)
+- ~~**Unchanged apply detection** — When `opm module apply` is run against an already-applied module with no changes, the output indicates that no changes were made instead of displaying "Module applied."~~ (done)
 
 **Additional deliverables:**
 
-- `opm mod eval` — print the raw CUE evaluation of a module
-- `opm mod list` — list deployed modules in a namespace (`-A` for all namespaces), leveraging `release-id` labels for discovery
-- ~~`opm mod tree` — tree view of module structure and resource hierarchy~~ (done)
-- ~~`opm mod events` — Kubernetes events for module resources~~ (done)
-- ~~`opm mod status` v2 — improved health reporting, inventory-aware~~ (done)
-- ~~`--ignore-not-found` flag for `opm mod delete` and `opm mod status` for idempotent operations (exit 0 when no resources match)~~ (done)
-- ~~`--create-namespace` flag for `opm mod apply`~~ (done)
+- `opm module eval` — print the raw CUE evaluation of a module
+- `opm module list` — list deployed modules in a namespace (`-A` for all namespaces), leveraging `release-id` labels for discovery
+- ~~`opm module tree` — tree view of module structure and resource hierarchy~~ (done)
+- ~~`opm module events` — Kubernetes events for module resources~~ (done)
+- ~~`opm module status` v2 — improved health reporting, inventory-aware~~ (done)
+- ~~`--ignore-not-found` flag for `opm module delete` and `opm module status` for idempotent operations (exit 0 when no resources match)~~ (done)
+- ~~`--create-namespace` flag for `opm module apply`~~ (done)
 - ~~Remove `injectLabels()` — redundant with transformer-based label injection~~ (done)
 
 ### M2: Secrets and Config Lifecycle
@@ -121,7 +121,7 @@ Full lifecycle management of configuration and sensitive data. This is the criti
 
 **Major deliverables:**
 
-- ~~**Release Inventory** — A lightweight Kubernetes Secret that tracks which resources belong to a ModuleRelease. Enables automatic pruning of stale resources during `opm mod apply` and provides a precise source of truth for `diff`, `delete`, and `status`. Maintains change history for future rollback.~~ (done)
+- ~~**Release Inventory** — A lightweight Kubernetes Secret that tracks which resources belong to a ModuleRelease. Enables automatic pruning of stale resources during `opm module apply` and provides a precise source of truth for `diff`, `delete`, and `status`. Maintains change history for future rollback.~~ (done)
 
 - **Sensitive Data Model** — Introduce `#Secret` as a first-class type that tags fields as sensitive at the schema level. This single annotation propagates through every layer — module definition, release fulfillment, transformer output — enabling the toolchain to redact, encrypt, and dispatch secrets to platform-appropriate resources (K8s Secrets, ExternalSecrets, CSI volumes). Supports literal values, external references, and CLI `@` tag injection.
 
@@ -135,7 +135,7 @@ OCI-native module distribution — the ability to publish, discover, and consume
 
 **Major deliverables:**
 
-- **Module distribution** — `opm mod publish` (push module to OCI registry), `opm mod get` (pull module), `opm mod update` (update dependencies), `opm mod tidy` (tidy CUE module dependencies without the external `cue` binary). Uses oras-go for OCI, Docker `config.json` for auth. Strict SemVer only — no `@latest`. *(openspec change: distribution-v1)*
+- **Module distribution** — `opm module publish` (push module to OCI registry), `opm module get` (pull module), `opm module update` (update dependencies), `opm module tidy` (tidy CUE module dependencies without the external `cue` binary). Uses oras-go for OCI, Docker `config.json` for auth. Strict SemVer only — no `@latest`. *(openspec change: distribution-v1)*
 
 - **Template distribution** — `opm template list`, `get`, `show`, `validate`, `publish`. Replaces the V1 embedded templates with registry-distributed templates. V1 templates remain during transition. *(openspec change: templates-v2)*
 

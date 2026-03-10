@@ -23,9 +23,6 @@ import (
 				"component.opmodel.dev/name":    "opm-secrets"
 				"resource.opmodel.dev/category": "config"
 			}
-			annotations: {
-				"transformer.opmodel.dev/list-output": "true"
-			}
 		}
 
 		// #resources provides the FQN key needed for transformer matching.

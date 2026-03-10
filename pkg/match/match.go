@@ -1,0 +1,238 @@
+package match
+
+import (
+	"fmt"
+	"sort"
+
+	"cuelang.org/go/cue"
+
+	"github.com/opmodel/cli/pkg/provider"
+)
+
+//nolint:revive // stutter is intentional for API clarity
+type MatchResult struct {
+	Matched          bool     `json:"matched"`
+	MissingLabels    []string `json:"missingLabels"`
+	MissingResources []string `json:"missingResources"`
+	MissingTraits    []string `json:"missingTraits"`
+}
+
+//nolint:revive // stutter is intentional for API clarity
+type MatchPlan struct {
+	Matches         map[string]map[string]MatchResult
+	Unmatched       []string
+	UnhandledTraits map[string][]string
+}
+
+type MatchedPair struct {
+	ComponentName  string
+	TransformerFQN string
+}
+
+type NonMatchedPair struct {
+	ComponentName    string
+	TransformerFQN   string
+	MissingLabels    []string
+	MissingResources []string
+	MissingTraits    []string
+}
+
+//nolint:gocyclo // matching is naturally branchy but kept in one place for parity with matcher.cue
+func Match(components cue.Value, p *provider.Provider) (*MatchPlan, error) {
+	if p == nil {
+		return nil, fmt.Errorf("provider is required")
+	}
+	plan := &MatchPlan{Matches: map[string]map[string]MatchResult{}, UnhandledTraits: map[string][]string{}}
+
+	compIter, err := components.Fields()
+	if err != nil {
+		return nil, fmt.Errorf("iterating components: %w", err)
+	}
+
+	transformers := p.Data.LookupPath(cue.ParsePath("#transformers"))
+	if !transformers.Exists() {
+		return plan, nil
+	}
+
+	for compIter.Next() {
+		compName := compIter.Selector().Unquoted()
+		compVal := compIter.Value()
+		labels := labelPairs(compVal.LookupPath(cue.ParsePath("metadata.labels")))
+		resources := fieldKeys(compVal.LookupPath(cue.MakePath(cue.Def("resources"))))
+		traits := fieldKeys(compVal.LookupPath(cue.MakePath(cue.Def("traits"))))
+
+		plan.Matches[compName] = map[string]MatchResult{}
+		tfIter, err := transformers.Fields()
+		if err != nil {
+			return nil, fmt.Errorf("iterating transformers: %w", err)
+		}
+		matchedTFs := []string{}
+		for tfIter.Next() {
+			tfFQN := tfIter.Selector().Unquoted()
+			tfVal := tfIter.Value()
+			missingLabels := missingMapLabels(tfVal.LookupPath(cue.ParsePath("requiredLabels")), labels)
+			missingResources := missingKeys(tfVal.LookupPath(cue.ParsePath("requiredResources")), resources)
+			missingTraits := missingKeys(tfVal.LookupPath(cue.ParsePath("requiredTraits")), traits)
+
+			result := MatchResult{
+				Matched:          len(missingLabels) == 0 && len(missingResources) == 0 && len(missingTraits) == 0,
+				MissingLabels:    missingLabels,
+				MissingResources: missingResources,
+				MissingTraits:    missingTraits,
+			}
+			plan.Matches[compName][tfFQN] = result
+			if result.Matched {
+				matchedTFs = append(matchedTFs, tfFQN)
+			}
+		}
+
+		if len(matchedTFs) == 0 {
+			plan.Unmatched = append(plan.Unmatched, compName)
+		}
+
+		handled := map[string]struct{}{}
+		for _, tfFQN := range matchedTFs {
+			tfVal := transformers.LookupPath(cue.MakePath(cue.Str(tfFQN)))
+			for _, fqn := range fieldKeys(tfVal.LookupPath(cue.ParsePath("requiredTraits"))) {
+				handled[fqn] = struct{}{}
+			}
+			for _, fqn := range fieldKeys(tfVal.LookupPath(cue.ParsePath("optionalTraits"))) {
+				handled[fqn] = struct{}{}
+			}
+		}
+		for _, fqn := range traits {
+			if _, ok := handled[fqn]; !ok {
+				plan.UnhandledTraits[compName] = append(plan.UnhandledTraits[compName], fqn)
+			}
+		}
+		sort.Strings(plan.UnhandledTraits[compName])
+	}
+
+	sort.Strings(plan.Unmatched)
+	return plan, nil
+}
+
+func (p *MatchPlan) MatchedPairs() []MatchedPair {
+	pairs := make([]MatchedPair, 0)
+	for compName, tfResults := range p.Matches {
+		for tfFQN, result := range tfResults {
+			if result.Matched {
+				pairs = append(pairs, MatchedPair{ComponentName: compName, TransformerFQN: tfFQN})
+			}
+		}
+	}
+	sort.Slice(pairs, func(i, j int) bool {
+		if pairs[i].ComponentName != pairs[j].ComponentName {
+			return pairs[i].ComponentName < pairs[j].ComponentName
+		}
+		return pairs[i].TransformerFQN < pairs[j].TransformerFQN
+	})
+	return pairs
+}
+
+func (p *MatchPlan) NonMatchedPairs() []NonMatchedPair {
+	pairs := make([]NonMatchedPair, 0)
+	for compName, tfResults := range p.Matches {
+		for tfFQN, result := range tfResults {
+			if !result.Matched {
+				pairs = append(pairs, NonMatchedPair{ComponentName: compName, TransformerFQN: tfFQN, MissingLabels: result.MissingLabels, MissingResources: result.MissingResources, MissingTraits: result.MissingTraits})
+			}
+		}
+	}
+	sort.Slice(pairs, func(i, j int) bool {
+		if pairs[i].ComponentName != pairs[j].ComponentName {
+			return pairs[i].ComponentName < pairs[j].ComponentName
+		}
+		return pairs[i].TransformerFQN < pairs[j].TransformerFQN
+	})
+	return pairs
+}
+
+func (p *MatchPlan) Warnings() []string {
+	if len(p.UnhandledTraits) == 0 {
+		return nil
+	}
+	compNames := make([]string, 0, len(p.UnhandledTraits))
+	for compName := range p.UnhandledTraits {
+		compNames = append(compNames, compName)
+	}
+	sort.Strings(compNames)
+	var warnings []string
+	for _, compName := range compNames {
+		traits := append([]string(nil), p.UnhandledTraits[compName]...)
+		sort.Strings(traits)
+		for _, fqn := range traits {
+			warnings = append(warnings, fmt.Sprintf("component %q: trait %q is not handled by any matched transformer (values will be ignored)", compName, fqn))
+		}
+	}
+	return warnings
+}
+
+func labelPairs(v cue.Value) map[string]struct{} {
+	pairs := map[string]struct{}{}
+	iter, err := v.Fields(cue.Optional(true))
+	if err != nil {
+		return pairs
+	}
+	for iter.Next() {
+		str, err := iter.Value().String()
+		if err != nil {
+			continue
+		}
+		pairs[fmt.Sprintf("%s=%s", iter.Selector().Unquoted(), str)] = struct{}{}
+	}
+	return pairs
+}
+
+func fieldKeys(v cue.Value) []string {
+	iter, err := v.Fields(cue.Optional(true))
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for iter.Next() {
+		out = append(out, iter.Selector().Unquoted())
+	}
+	sort.Strings(out)
+	return out
+}
+
+func missingMapLabels(required cue.Value, have map[string]struct{}) []string {
+	iter, err := required.Fields(cue.Optional(true))
+	if err != nil {
+		return nil
+	}
+	var missing []string
+	for iter.Next() {
+		str, err := iter.Value().String()
+		if err != nil {
+			continue
+		}
+		pair := fmt.Sprintf("%s=%s", iter.Selector().Unquoted(), str)
+		if _, ok := have[pair]; !ok {
+			missing = append(missing, pair)
+		}
+	}
+	sort.Strings(missing)
+	return missing
+}
+
+func missingKeys(required cue.Value, have []string) []string {
+	haveSet := map[string]struct{}{}
+	for _, k := range have {
+		haveSet[k] = struct{}{}
+	}
+	iter, err := required.Fields(cue.Optional(true))
+	if err != nil {
+		return nil
+	}
+	var missing []string
+	for iter.Next() {
+		key := iter.Selector().Unquoted()
+		if _, ok := haveSet[key]; !ok {
+			missing = append(missing, key)
+		}
+	}
+	sort.Strings(missing)
+	return missing
+}

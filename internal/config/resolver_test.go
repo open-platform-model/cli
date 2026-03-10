@@ -201,8 +201,8 @@ func TestResolveKubernetes_DefaultsUsedWhenNothingSet(t *testing.T) {
 
 	assert.Equal(t, expectedKubeconfig, result.Kubeconfig.Value)
 	assert.Equal(t, SourceDefault, result.Kubeconfig.Source)
-	assert.Equal(t, "", result.Context.Value) // no default for context
-	assert.Equal(t, "default", result.Namespace.Value)
+	assert.Equal(t, "", result.Context.Value)   // no default for context
+	assert.Equal(t, "", result.Namespace.Value) // no built-in default; must be explicit
 	assert.Equal(t, SourceDefault, result.Namespace.Source)
 }
 
@@ -277,7 +277,7 @@ func TestResolveKubernetes_Defaults(t *testing.T) {
 	assert.Equal(t, expectedKubeconfig, result.Kubeconfig.Value)
 	assert.Equal(t, SourceDefault, result.Kubeconfig.Source)
 	assert.Equal(t, "", result.Context.Value)
-	assert.Equal(t, "default", result.Namespace.Value)
+	assert.Equal(t, "", result.Namespace.Value) // no built-in default; must be explicit
 	assert.Equal(t, SourceDefault, result.Namespace.Source)
 }
 

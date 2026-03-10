@@ -7,7 +7,9 @@ import (
 	"github.com/spf13/cobra"
 
 	cmdconfig "github.com/opmodel/cli/internal/cmd/config"
-	cmdmod "github.com/opmodel/cli/internal/cmd/mod"
+	cmdmodule "github.com/opmodel/cli/internal/cmd/module"
+	cmdrelease "github.com/opmodel/cli/internal/cmd/release"
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 )
@@ -31,6 +33,10 @@ func NewRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Annotations[cmdutil.SkipConfigLoadAnnotation] == "true" {
+				output.SetupLogging(output.LogConfig{Verbose: verboseFlag})
+				return nil
+			}
 			return initializeConfig(cmd, &cfg, configFlag, registryFlag, verboseFlag, timestampsFlag)
 		},
 	}
@@ -43,8 +49,9 @@ func NewRootCmd() *cobra.Command {
 
 	// Add subcommands — sub-packages receive *config.GlobalConfig for dependency injection.
 	rootCmd.AddCommand(NewVersionCmd(&cfg))
-	rootCmd.AddCommand(cmdmod.NewModCmd(&cfg))
+	rootCmd.AddCommand(cmdmodule.NewModuleCmd(&cfg))
 	rootCmd.AddCommand(cmdconfig.NewConfigCmd(&cfg))
+	rootCmd.AddCommand(cmdrelease.NewReleaseCmd(&cfg))
 
 	return rootCmd
 }

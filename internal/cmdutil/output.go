@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	opmerrors "github.com/opmodel/cli/internal/errors"
 	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/internal/pipeline"
+	pkgerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // formatFQNList formats a slice of FQN strings into a compact comma-separated
@@ -25,136 +24,62 @@ func formatFQNList(fqns []string) string {
 
 // PrintValidationError prints a render/validation error in a user-friendly format.
 //
-// For ValuesValidationError (values schema failures), it prints a summary
-// header followed by colored per-error blocks with file, position, path, and
-// message — one block per field error.
+// For ConfigError (values schema failures), it prints a summary header with the
+// total grouped issue count, then a grouped block where each distinct error message
+// appears once followed by all source positions that report it. This naturally
+// surfaces conflicts (same message, multiple files) as a single entry.
 //
-// For generic ValidationError with CUE details, it prints a summary line
-// followed by the structured CUE output.
+// For any error wrapping a CUE error (e.g. raw build errors), the same grouped
+// format is applied via GroupedErrorsFromError.
 //
-// All other errors fall back to the standard key-value log format.
+// For generic errors, it falls back to the standard key-value log format.
 func PrintValidationError(msg string, err error) {
-	var valuesErr *opmerrors.ValuesValidationError
-	if errors.As(err, &valuesErr) {
-		n := len(valuesErr.Errors) + len(valuesErr.Conflicts)
-		noun := "error"
-		if n != 1 {
-			noun = "errors"
-		}
-		output.Error(fmt.Sprintf("%s: %d %s", msg, n, noun))
-		output.Details(output.FormatValuesValidationError(valuesErr))
+	var configErr *pkgerrors.ConfigError
+	if errors.As(err, &configErr) {
+		printGrouped(msg, configErr.GroupedErrors())
 		return
 	}
 
-	var releaseErr *opmerrors.ValidationError
-	if errors.As(err, &releaseErr) && releaseErr.Details != "" {
-		output.Error(fmt.Sprintf("%s: %s", msg, releaseErr.Message))
-		output.Details(releaseErr.Details)
+	var valErr *pkgerrors.ValidationError
+	if errors.As(err, &valErr) && valErr.Details != "" {
+		output.Error(fmt.Sprintf("%s: %s", msg, valErr.Message))
+		output.Details(valErr.Details)
 		return
 	}
+
+	// Try to extract CUE errors from any wrapped error chain before falling back
+	// to the raw key-value format. Only use grouped display when at least one
+	// location has a valid source position — plain errors promoted by CUE have
+	// no position and should not trigger this path.
+	if groups := pkgerrors.GroupedErrorsFromError(err); hasPositions(groups) {
+		printGrouped(msg, groups)
+		return
+	}
+
 	output.Error(msg, "error", err)
 }
 
-// PrintRenderErrors prints render errors in a user-friendly format.
-func PrintRenderErrors(errs []error) {
-	output.Error("render completed with errors")
-	for _, err := range errs {
-		var unmatchedErr *pipeline.UnmatchedComponentError
-		var transformErr *opmerrors.TransformError
-
-		switch {
-		case errors.As(err, &unmatchedErr):
-			output.Error(fmt.Sprintf("component %q: no matching transformer", unmatchedErr.ComponentName))
-			if len(unmatchedErr.Available) > 0 {
-				output.Info("Available transformers:")
-				for _, t := range unmatchedErr.Available {
-					output.Info(fmt.Sprintf("  %s", output.FormatFQN(t.GetFQN())))
-					if len(t.GetRequiredLabels()) > 0 {
-						output.Info(fmt.Sprintf("    requiredLabels: %v", t.GetRequiredLabels()))
-					}
-					if len(t.GetRequiredResources()) > 0 {
-						output.Info(fmt.Sprintf("    requiredResources: %v", t.GetRequiredResources()))
-					}
-					if len(t.GetRequiredTraits()) > 0 {
-						output.Info(fmt.Sprintf("    requiredTraits: %v", t.GetRequiredTraits()))
-					}
-				}
+// hasPositions reports whether any location in any group has a valid source
+// position (Line > 0). Used to distinguish genuine CUE structural errors from
+// plain errors promoted by cueerrors.Promote.
+func hasPositions(groups []pkgerrors.GroupedError) bool {
+	for _, g := range groups {
+		for _, loc := range g.Locations {
+			if loc.Line > 0 {
+				return true
 			}
-		case errors.As(err, &transformErr):
-			output.Error(fmt.Sprintf("component %q: transform failed with %s: %v",
-				transformErr.ComponentName, output.FormatFQN(transformErr.TransformerFQN), transformErr.Cause))
-		default:
-			output.Error(err.Error())
 		}
 	}
+	return false
 }
 
-// WriteTransformerMatches writes compact transformer match output (always shown).
-// Format: component <- provider - transformer
-func WriteTransformerMatches(result *pipeline.RenderResult) {
-	if result.MatchPlan == nil {
-		return
+// printGrouped prints a grouped-error summary header and formatted body.
+func printGrouped(msg string, groups []pkgerrors.GroupedError) {
+	n := len(groups)
+	noun := "issue"
+	if n != 1 {
+		noun = "issues"
 	}
-	releaseLog := output.ReleaseLogger(result.Release.Name)
-
-	// Transformer matching — one line per successful match
-	for _, m := range result.MatchPlan.Matches {
-		if !m.Matched || m.Detail == nil {
-			continue
-		}
-		releaseLog.Info(output.FormatTransformerMatch(m.Detail.ComponentName, m.Detail.TransformerFQN))
-	}
-
-	// Unmatched components
-	for _, comp := range result.MatchPlan.Unmatched {
-		releaseLog.Warn(output.FormatTransformerUnmatched(comp))
-	}
-}
-
-// WriteVerboseMatchLog writes detailed verbose output with release metadata,
-// per-component properties, match reasons, and per-resource validation lines (--verbose only).
-func WriteVerboseMatchLog(result *pipeline.RenderResult) {
-	if result.MatchPlan == nil {
-		return
-	}
-	releaseLog := output.ReleaseLogger(result.Release.Name)
-
-	// Release info — single line with key-value pairs
-	releaseLog.Info("release",
-		"namespace", result.Release.Namespace,
-		"version", result.Module.Version,
-	)
-
-	// Per-component summary — one line per component with its properties
-	for _, comp := range result.Components {
-		attrs := []any{}
-		if resources := formatFQNList(comp.ResourceFQNs); resources != "" {
-			attrs = append(attrs, "resources", resources)
-		}
-		if traits := formatFQNList(comp.TraitFQNs); traits != "" {
-			attrs = append(attrs, "traits", traits)
-		}
-		for k, v := range comp.Labels {
-			attrs = append(attrs, k, v)
-		}
-		releaseLog.Info(fmt.Sprintf("component: %s", comp.Name), attrs...)
-	}
-
-	// Transformer matching — one line per successful match with reason
-	for _, m := range result.MatchPlan.Matches {
-		if !m.Matched || m.Detail == nil {
-			continue
-		}
-		releaseLog.Info(output.FormatTransformerMatchVerbose(m.Detail.ComponentName, m.Detail.TransformerFQN, m.Detail.Reason))
-	}
-
-	// Unmatched components
-	for _, comp := range result.MatchPlan.Unmatched {
-		releaseLog.Warn(output.FormatTransformerUnmatched(comp))
-	}
-
-	// Generated resources
-	for _, res := range result.Resources {
-		releaseLog.Info(output.FormatResourceLine(res.Kind(), res.Namespace(), res.Name(), output.StatusValid))
-	}
+	output.Error(fmt.Sprintf("%s: %d %s", msg, n, noun))
+	output.Details(output.FormatGroupedErrors(groups))
 }

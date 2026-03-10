@@ -8,7 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/opmodel/cli/internal/core"
+	pkgcore "github.com/opmodel/cli/pkg/core"
 )
 
 const (
@@ -46,11 +46,11 @@ func SecretName(releaseName, releaseID string) string {
 //nolint:revive // Inventory prefix is intentional for cross-package clarity
 func InventoryLabels(releaseName, releaseNamespace, releaseID string) map[string]string {
 	return map[string]string{
-		core.LabelManagedBy:        core.LabelManagedByValue,
-		core.LabelReleaseName:      releaseName,
-		core.LabelReleaseNamespace: releaseNamespace,
-		core.LabelReleaseUUID:      releaseID,
-		core.LabelComponent:        "inventory",
+		pkgcore.LabelManagedBy:              pkgcore.LabelManagedByValue,
+		pkgcore.LabelModuleReleaseName:      releaseName,
+		pkgcore.LabelModuleReleaseNamespace: releaseNamespace,
+		pkgcore.LabelModuleReleaseUUID:      releaseID,
+		pkgcore.LabelComponent:              "inventory",
 	}
 }
 

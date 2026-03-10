@@ -49,8 +49,6 @@ type InventoryList struct {
 // ReleaseMetadata is the release-level metadata stored in the inventory Secret
 // under the "releaseMetadata" key. Using kind/apiVersion matching a future CRD
 // schema enables migration from Secret to CRD without changing the data model.
-//
-//nolint:revive // Inventory prefix is intentional for cross-package clarity
 type ReleaseMetadata struct {
 	Kind               string `json:"kind"`               // "ModuleRelease"
 	APIVersion         string `json:"apiVersion"`         // "core.opmodel.dev/v1alpha1"
@@ -63,8 +61,6 @@ type ReleaseMetadata struct {
 // ModuleMetadata is the module-level metadata stored in the inventory Secret
 // under the "moduleMetadata" key. Using kind/apiVersion matching a future CRD
 // schema enables migration from Secret to CRD without changing the data model.
-//
-//nolint:revive // Inventory prefix is intentional for cross-package clarity
 type ModuleMetadata struct {
 	Kind       string `json:"kind"`           // "Module"
 	APIVersion string `json:"apiVersion"`     // "core.opmodel.dev/v1alpha1"

@@ -50,7 +50,6 @@ A developer has a component that doesn't match any transformer.
 **Acceptance Scenarios**:
 
 1. **Given** a component with no matching transformers, **When** `opm mod build` runs, **Then** it errors with list of available transformers and their requirements.
-2. **Given** `--strict` mode enabled, **When** a component has unhandled traits, **Then** the CLI errors with the list of unhandled traits.
 
 ### User Story 4 - Output Format Control (Priority: P3)
 
@@ -78,7 +77,6 @@ A developer wants to control how rendered manifests are output.
 | FR-B-006 | `mod build` MUST support `--output` / `-o` flag (yaml, json). |
 | FR-B-007 | `mod build` MUST support `--split` flag for separate files. |
 | FR-B-008 | `mod build` MUST support `--out-dir` flag for split output directory. |
-| FR-B-009 | `mod build` MUST support `--strict` flag for strict trait handling. |
 | FR-B-010 | `mod build` MUST support `--verbose` flag for matching decisions. |
 
 ### Pipeline Implementation
@@ -95,8 +93,8 @@ A developer wants to control how rendered manifests are output.
 
 | ID | Requirement |
 |----|-------------|
-| FR-B-030 | ModuleLoader MUST require `values.cue` at module root. |
-| FR-B-031 | ModuleLoader MUST unify `values.cue` with `--values` files in order. |
+| FR-B-030 | ModuleLoader SHALL check for `values.cue` at module root; if absent, fall back to `debugValues` from the module; error only when neither source is available. *(supersedes: previously required `values.cue`)* |
+| FR-B-031 | When `--values` files are provided, ModuleLoader MUST use ONLY those files; `values.cue` and `debugValues` SHALL both be ignored. *(supersedes: previously unified `values.cue` with `--values` files)* |
 | FR-B-032 | ModuleLoader MUST extract metadata (name, namespace, version) from module. |
 | FR-B-033 | `--namespace` MUST take precedence over `module.metadata.defaultNamespace`. |
 | FR-B-034 | `--name` MUST take precedence over `module.metadata.name`. |
@@ -123,6 +121,29 @@ The pipeline SHALL extract all module metadata (`name`, `defaultNamespace`, `fqn
 
 - **WHEN** a module directory is loaded via `load.Instances()`
 - **THEN** `mod.PkgName()` SHALL be populated from `inst.PkgName`
+
+##### Scenario: Synthesis mode decodes module metadata from module value
+
+- **WHEN** `opm mod build .` runs in synthesis mode (no `release.cue`)
+- **AND** the module defines `metadata.name: "jellyfin"` and `metadata.defaultNamespace: "jellyfin"`
+- **THEN** the synthesized `ModuleRelease.Module.Metadata.Name` SHALL be `"jellyfin"`
+- **AND** the synthesized `ModuleRelease.Metadata.Namespace` SHALL be `"jellyfin"`
+
+### Requirement: mod build defaults to debugValues when no -f flag is given
+When `opm mod build` is invoked without a `-f` / `--values` flag, the command SHALL automatically use the module's `debugValues` field as the values source. This applies in both synthesis mode (no `release.cue`) and release mode (has `release.cue`).
+
+#### Scenario: No -f flag, debugValues present — build succeeds
+
+- **WHEN** `opm mod build .` is run with no `-f` flag
+- **AND** the module defines `debugValues`
+- **THEN** the build SHALL succeed using those values
+
+#### Scenario: No -f flag, no debugValues — build fails with actionable error
+
+- **WHEN** `opm mod build .` is run with no `-f` flag
+- **AND** the module has no `debugValues` field
+- **AND** no `release.cue` is present
+- **THEN** the command SHALL fail with a message directing the user to add `debugValues` or use `-f`
 
 ### ReleaseBuilder
 
@@ -206,8 +227,7 @@ The generated overlay SHALL produce byte-identical CUE output compared to the pr
 | ID | Requirement |
 |----|-------------|
 | FR-B-060 | Unmatched components MUST include list of available transformers. |
-| FR-B-061 | Unhandled traits in `--strict` mode MUST cause error. |
-| FR-B-062 | Unhandled traits in normal mode MUST cause warning. |
+| FR-B-062 | Unhandled traits MUST cause warning. |
 | FR-B-063 | Values file conflicts MUST return CUE's native unification error. |
 | FR-B-064 | Non-concrete component after release building MUST fail with ReleaseValidationError. |
 | FR-B-065 | Module missing `values` field MUST fail with descriptive error. |
@@ -366,6 +386,12 @@ This replaces the current plain-text resource listing in verbose output.
 - **THEN** the error details SHALL show paths rooted at `values.` (e.g., `values."extra-field"`)
 - **AND** the error details SHALL include file:line:col positions from the values file
 
+#### Scenario: Verbose output works in synthesis mode
+
+- **WHEN** `opm mod build . --verbose` is run with no `release.cue` using `debugValues`
+- **THEN** the verbose output SHALL include per-resource validation lines
+- **AND** the output format SHALL be identical to release-backed builds
+
 ---
 
 ## Non-Functional Requirements
@@ -421,7 +447,6 @@ Flags:
   -o, --output string       Output format: yaml, json (default: yaml)
       --split               Write separate files per resource
       --out-dir string      Directory for split output (default: ./manifests)
-      --strict              Error on unhandled traits
   -v, --verbose             Show matching decisions
   -h, --help                Help for build
 ```
@@ -456,3 +481,27 @@ opm mod build ./my-module --verbose
 # Build as JSON
 opm mod build ./my-module -o json
 ```
+
+---
+
+## Removed Requirements
+
+### Requirement: Builder.Build() function
+**Reason**: The separate build phase is eliminated. Loading IS building — `pkg/loader/LoadModuleReleaseFromValue()` handles value unification, gate validation, finalization, and metadata extraction in one pass. CUE evaluation naturally handles what the builder did imperatively.
+
+**Migration**: Replace `builder.Build(ctx, mod, opts, valuesFiles)` calls with `loader.LoadReleasePackage()` + `loader.LoadModuleReleaseFromValue()`.
+
+### Requirement: Values file resolution in builder
+**Reason**: Values file resolution (--values flags, fallback to values.cue) moves to `internal/cmdutil/` as a CLI-layer concern. The loader accepts explicit file paths.
+
+**Migration**: `cmdutil` resolves values file paths from flags and passes them to `loader.LoadReleasePackage()`.
+
+### Requirement: Auto-secrets injection in builder
+**Reason**: Go-side auto-secrets injection (`autosecrets.go`) is eliminated. The CUE layer handles secret discovery, grouping, and component injection via `#AutoSecrets` and `#OpmSecretsComponent` in `v1alpha1/core/`.
+
+**Migration**: No Go-side migration needed — the CUE definitions handle this declaratively when `#ModuleRelease` is evaluated.
+
+### Requirement: Values validation against #config in builder
+**Reason**: Values validation moves into the gate system in `pkg/loader/validate.go`. The Module Gate validates consumer values against `#module.#config` during loading.
+
+**Migration**: The loader's Module Gate replaces `builder.ValidateValues()`. Structured `FieldError` output is preserved via `ConfigError.FieldErrors()`.

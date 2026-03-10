@@ -123,27 +123,31 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 ├── examples/              # Example OPM modules (jellyfin, minecraft, webapp, etc.)
 ├── experiments/           # Experimental pipeline explorations (not production)
 ├── internal/
-│   ├── builder/           # BUILD phase of the render pipeline
 │   ├── cmd/               # Command implementations
 │   │   ├── config/        # config init, vet commands
-│   │   └── mod/           # mod apply, build, delete, diff, init, status, vet commands
-│   ├── cmdutil/           # Shared command utilities (flag groups, K8s client, output)
+│   │   ├── module/        # module/apply, build, delete, init, list, status, tree, vet
+│   │   └── release/       # release/apply, build, delete, diff, events, list, status, tree, vet
+│   ├── cmdutil/           # Small CLI helpers (flag groups, annotations, release targeting)
 │   ├── config/            # Config loading and validation
-│   │   └── schema/        # CUE schema for config validation
-│   ├── core/              # Shared primitives: Resource, labels, UUID helpers, weights
-│   │   ├── component/     # Component and ComponentMetadata types
-│   │   ├── module/        # Module and ModuleMetadata types
-│   │   ├── modulerelease/ # ModuleRelease, ReleaseMetadata, and release validation
-│   │   ├── provider/      # Provider, ProviderMetadata, and match logic
-│   │   └── transformer/   # Transformer types, context, match plans, execute, warnings
-│   ├── errors/            # Error types and handling
 │   ├── inventory/         # Release inventory: secret CRUD, digest, stale detection
 │   ├── kubernetes/        # K8s client, apply, delete, discovery, health, status
-│   ├── loader/            # CUE module loading
 │   ├── output/            # Terminal output: spinner, table, log, styles, format
-│   ├── pipeline/          # Render pipeline interface and shared types
+│   ├── releasefile/       # Release file parsing and kind detection
 │   ├── templates/         # Module templates (simple, standard, advanced)
-│   └── version/           # Version info
+│   ├── version/           # Version info
+│   └── workflow/          # Shared command workflows (render, apply, query)
+├── pkg/
+│   ├── bundle/            # Bundle domain types
+│   ├── bundlerelease/     # BundleRelease domain types
+│   ├── core/              # Rendered resource primitives and shared helpers
+│   ├── engine/            # Render execution and bundle/module renderers
+│   ├── errors/            # Shared structured errors and exit wrappers
+│   ├── loader/            # CUE loading for modules, providers, and releases
+│   ├── match/             # Component-to-transformer matching
+│   ├── module/            # Module domain model
+│   ├── modulerelease/     # ModuleRelease domain model
+│   ├── provider/          # Provider domain model
+│   └── releaseprocess/    # Validation, synthesis, and render pipeline orchestration
 ├── tests/
 │   ├── e2e/               # End-to-end tests
 │   ├── fixtures/
@@ -165,13 +169,21 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 ## Key Packages
 
 - `cmd/opm/` - Entry point
-- `internal/loader/` - CUE module loading
-- `internal/pipeline/` - Render pipeline interface and shared types
-- `internal/builder/` - BUILD phase of the render pipeline
-- `internal/core/transformer/` - Transformer types, context, match plans, execute, warnings
-- `internal/core/provider/` - Provider, ProviderMetadata, and match logic
-- `internal/cmd/` - Command implementations (root, mod/, config/)
-- `internal/cmdutil/` - Shared command utilities (flag groups, K8s client, output)
+- `internal/cmd/` - Cobra command implementations (`config/`, `module/`, `release/`)
+- `internal/cmdutil/` - Small CLI helpers shared across commands
+- `internal/workflow/` - Shared application workflows used by multiple commands
+- `internal/config/` - Config loading, precedence resolution, and validation
+- `internal/inventory/` - Inventory persistence, change tracking, stale detection
+- `internal/kubernetes/` - Kubernetes client and cluster operations
+- `internal/output/` - Terminal formatting and log styling
+- `pkg/loader/` - CUE loading for modules, providers, and release files
+- `pkg/releaseprocess/` - Value validation, synthesis, and render pipeline orchestration
+- `pkg/match/` - Component-to-transformer matching
+- `pkg/engine/` - Module and bundle render execution
+- `pkg/core/` - Shared rendered resource primitives
+- `pkg/module/` - Module domain model
+- `pkg/modulerelease/` - ModuleRelease domain model
+- `pkg/provider/` - Provider domain model
 - `internal/version/` - Version info
 
 ## Patterns

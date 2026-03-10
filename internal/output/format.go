@@ -48,3 +48,8 @@ func ParseFormat(s string) (Format, bool) {
 	f := Format(strings.ToLower(s))
 	return f, f.Valid()
 }
+
+// IsManifestFormat reports whether the format is supported by manifest writers.
+func IsManifestFormat(f Format) bool {
+	return f == FormatYAML || f == FormatJSON
+}

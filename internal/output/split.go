@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // SplitOptions controls split file output.
@@ -17,7 +19,7 @@ type SplitOptions struct {
 
 // WriteSplitManifests writes each resource to a separate file.
 // Files are named <lowercase-kind>-<resource-name>.<ext>
-func WriteSplitManifests(resources []ResourceInfo, opts SplitOptions) error {
+func WriteSplitManifests(resources []*unstructured.Unstructured, opts SplitOptions) error {
 	if len(resources) == 0 {
 		return nil
 	}
@@ -31,10 +33,10 @@ func WriteSplitManifests(resources []ResourceInfo, opts SplitOptions) error {
 	usedNames := make(map[string]int)
 
 	for _, res := range resources {
-		filename := buildFilenameFromInfo(res, opts.Format, usedNames)
+		filename := buildFilename(res, opts.Format, usedNames)
 		path := filepath.Join(opts.OutDir, filename)
 
-		if err := writeResourceFileFromInfo(res, path, opts.Format); err != nil {
+		if err := writeResourceFile(res, path, opts.Format); err != nil {
 			return fmt.Errorf("writing %s: %w", path, err)
 		}
 
@@ -48,8 +50,8 @@ func WriteSplitManifests(resources []ResourceInfo, opts SplitOptions) error {
 	return nil
 }
 
-// buildFilenameFromInfo creates a filename for a resource.
-func buildFilenameFromInfo(res ResourceInfo, format Format, usedNames map[string]int) string {
+// buildFilename creates a filename for a resource.
+func buildFilename(res *unstructured.Unstructured, format Format, usedNames map[string]int) string {
 	ext := ".yaml"
 	if format == FormatJSON {
 		ext = ".json"
@@ -85,13 +87,13 @@ func sanitizeName(name string) string {
 	return replacer.Replace(name)
 }
 
-// writeResourceFileFromInfo writes a single resource to a file.
-func writeResourceFileFromInfo(res ResourceInfo, destPath string, format Format) error {
+// writeResourceFile writes a single resource to a file.
+func writeResourceFile(res *unstructured.Unstructured, destPath string, format Format) error {
 	f, err := os.Create(destPath)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	return writeResource(res.GetObject(), format, f)
+	return writeResource(res, format, f)
 }

@@ -210,7 +210,7 @@ func ResolveKubernetes(opts ResolveKubernetesOptions) (*ResolvedKubernetesConfig
 			}
 			return ""
 		},
-		"default",
+		"", // no built-in default: namespace must be explicit or come from the release definition
 	)
 
 	// Extract provider names from config
