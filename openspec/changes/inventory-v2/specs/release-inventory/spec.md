@@ -48,6 +48,26 @@ The public inventory contract MUST NOT require or embed:
 - **THEN** those fields SHALL describe the current inventory set only
 - **AND** they SHALL NOT imply a retained change history
 
+### Requirement: Persisted release inventory record preserves release and module metadata
+
+The CLI persisted release inventory record SHALL preserve `releaseMetadata` and `moduleMetadata` alongside the ownership-only inventory so the CLI can identify the release, identify the module, and report deployed module version without retaining inventory change history.
+
+#### Scenario: Persisted record includes module version without change history
+
+- **WHEN** a release is persisted using the v2 record shape
+- **THEN** the record SHALL contain `moduleMetadata.version` for the deployed module version
+- **AND** that version SHALL NOT require a latest history entry to be read
+
+### Requirement: Persisted release inventory record stores creator provenance at the top level
+
+The CLI persisted release inventory record SHALL store `createdBy` as a top-level field rather than nesting it inside `releaseMetadata`.
+
+#### Scenario: Top-level creator provenance
+
+- **WHEN** a persisted release inventory record is read
+- **THEN** the CLI SHALL be able to determine whether it is CLI-managed or controller-managed from the top-level `createdBy` field
+- **AND** that determination SHALL NOT depend on inventory history
+
 ### Requirement: Kubernetes identity equality
 
 A separate K8s identity comparison SHALL compare entries by Group, Kind, Namespace, and Name only (excluding both Version and Component). This SHALL be used by the component-rename safety check to detect when the same Kubernetes resource appears under a different component name.

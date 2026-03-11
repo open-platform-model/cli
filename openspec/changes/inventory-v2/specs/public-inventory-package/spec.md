@@ -16,6 +16,14 @@ The public inventory package SHALL expose ownership inventory types, identity he
 - **WHEN** a consumer imports `pkg/inventory`
 - **THEN** it SHALL NOT be required to import change-history types, storage codecs, or source/version metadata types to use the ownership contract
 
+### Requirement: Persisted release record may keep metadata outside the public ownership contract
+
+The CLI MAY persist a release inventory record that includes top-level `createdBy`, `releaseMetadata`, and `moduleMetadata` around the ownership-only inventory payload. Those persisted metadata fields SHALL NOT expand the public ownership contract exposed by `pkg/inventory`.
+
+#### Scenario: Persisted record keeps CLI metadata while public inventory stays small
+- **WHEN** the CLI persists release/module metadata alongside the current owned resource set
+- **THEN** a consumer importing `pkg/inventory` SHALL still see only the reusable ownership types/helpers
+
 ### Requirement: Storage representation does not define the public contract
 
 Inventory persistence MAY use a Secret or another storage mechanism, but the storage representation SHALL NOT define the core public inventory API.

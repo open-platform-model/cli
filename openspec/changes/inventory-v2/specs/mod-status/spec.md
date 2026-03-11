@@ -12,9 +12,14 @@ The `opm mod status` command SHALL use the persisted ownership inventory for the
 
 ### Requirement: Status header does not depend on inventory change history
 
-The status header SHALL NOT require inventory change-history metadata such as source version, raw values, or per-change timestamps. Release metadata shown in the header SHALL come from release-specific state or be omitted until such state exists.
+The status header SHALL NOT require inventory change-history metadata such as source version, raw values, or per-change timestamps. Release metadata shown in the header SHALL come from the persisted release inventory record (`releaseMetadata`, `moduleMetadata`, `createdBy`) or be omitted until richer release status exists.
 
 #### Scenario: Status remains functional with ownership-only inventory
 
 - **WHEN** a release has ownership-only inventory and no history-bearing inventory fields
 - **THEN** `opm mod status` SHALL still be able to enumerate resources and show their health
+
+#### Scenario: Status reads deployed module version from module metadata
+
+- **WHEN** a persisted release inventory record includes `moduleMetadata.version`
+- **THEN** `opm mod status` SHALL use that field for deployed module version display instead of inventory change history

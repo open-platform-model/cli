@@ -6,6 +6,7 @@ That was a useful intermediate step, but it is not the contract we want controll
 
 - inventory should represent current ownership only
 - source/config/render/history state should live in release status
+- the CLI should still keep a lightweight persisted release record with release/module metadata and creator provenance
 - storage should be treated as an implementation detail, not the shape of the public inventory API
 
 The CLI still needs inventory for apply/prune and inventory-scoped discovery, but it does not need the public inventory package to keep exposing history and Secret-specific concepts forever.
@@ -17,6 +18,7 @@ The CLI still needs inventory for apply/prune and inventory-scoped discovery, bu
 - Make the public `pkg/inventory` package model current owned resources only.
 - Keep the inventory contract suitable for embedding in future `ModuleRelease.status.inventory` and `BundleRelease.status.inventory`.
 - Preserve the identity and stale-set semantics the CLI already depends on.
+- Preserve persisted release/module metadata and `createdBy` so the CLI can keep identifying releases and reporting deployed module version without inventory history.
 - Simplify inventory persistence to match the new ownership-only public contract.
 - Update CLI workflows so they no longer depend on inventory change-history fields for core behavior.
 
@@ -51,11 +53,11 @@ The CLI still needs inventory for apply/prune and inventory-scoped discovery, bu
 - remediation counters
 - history index and change map
 
-### 2. Release/source/history state moves out of inventory
+### 2. The persisted release record keeps release/module metadata, but not history
 
-**Decision:** Public inventory no longer carries change history or source metadata. The CLI must be prepared to read source/version/history from release status later, not from `pkg/inventory` itself.
+**Decision:** The persisted CLI release inventory record keeps `releaseMetadata`, `moduleMetadata`, and a top-level `createdBy` field. Public inventory no longer carries change history. Deployed module version moves into `moduleMetadata` instead of the old per-change source metadata.
 
-**Why:** Inventory answers "what do I own?". It should not also answer "what happened?" and "what source produced this?".
+**Why:** The CLI still needs to answer "what release is this?", "what module/version is deployed?", and "who created this record?" without retaining a history log. Those concerns belong in the persisted release record, not in the ownership inventory payload itself.
 
 **Rationale:** This split aligns the CLI with the future controller design where:
 
@@ -63,16 +65,24 @@ The CLI still needs inventory for apply/prune and inventory-scoped discovery, bu
 - `status.lastAttempted*` / `status.lastApplied*` answer reconcile state
 - `status.history` answers what happened recently
 
+The persisted CLI record therefore becomes an envelope around the ownership inventory:
+
+- top-level `createdBy`
+- `releaseMetadata`
+- `moduleMetadata`
+- ownership-only `inventory`
+
 ### 3. Storage stops defining the public contract
 
-**Decision:** Secret naming, labels, and codec behavior are implementation details of inventory persistence, not the shape of the core inventory contract.
+**Decision:** Secret naming, labels, and codec behavior are implementation details of inventory persistence, not the shape of the core public inventory contract. The persisted CLI record should be stored as a single JSON document rather than a set of per-field or per-change Secret fragments.
 
-**Why:** The future controller may embed inventory directly in CR status. The public package should model ownership, not a specific storage representation.
+**Why:** The future controller may embed inventory directly in CR status. The public package should model ownership, not a specific storage representation. A single persisted JSON record also better matches the logical release inventory envelope than the current multi-key history Secret.
 
 **Alternatives considered:**
 
 - **Keep Secret codec in `pkg/inventory` indefinitely**: rejected because it keeps the public package centered on one storage mechanism instead of the reusable contract.
 - **Preserve the old history-bearing storage shape in parallel**: rejected because the CLI is still under heavy development and can adopt the cleaner ownership-only shape now.
+- **Keep `createdBy` nested under `releaseMetadata`**: rejected because `createdBy` is provenance for the persisted record and mutability policy, not release identity.
 
 ### 4. CLI workflows continue to use inventory for prune and scoped discovery
 
@@ -84,13 +94,19 @@ The CLI still needs inventory for apply/prune and inventory-scoped discovery, bu
 
 - `apply` uses ownership inventory to compute stale resources
 - `delete` and `status` use ownership inventory to enumerate tracked resources
-- display metadata that previously came from inventory history must move to release-specific state or be dropped until release status exists
+- display metadata that previously came from inventory history must move to `releaseMetadata` / `moduleMetadata` or be dropped until release status exists
 
 ### 5. Inventory v2 should be embeddable in CR status unchanged
 
 **Decision:** The inventory shape defined by this change should be valid both as a public Go type and as a future CR `status.inventory` payload.
 
 **Why:** This is the main preparation step for controller work. We want one ownership model, not one for Secrets and another for CR status.
+
+### 6. Public inventory and persisted release record are separate shapes
+
+**Decision:** The public `pkg/inventory` package should expose only ownership types and helpers. The CLI persistence layer should define a separate release inventory record envelope that contains `createdBy`, `releaseMetadata`, `moduleMetadata`, and the ownership-only `inventory` payload.
+
+**Why:** The future controller should embed only the ownership inventory shape under CR status. Release/module metadata and creator provenance are still useful to the CLI, but they are not part of the embeddable ownership contract itself.
 
 ## Example APIs
 
@@ -130,6 +146,25 @@ func ComputeStaleSet(previous, current []InventoryEntry) []InventoryEntry
 func ComputeDigest(entries []InventoryEntry) string
 ```
 
+The CLI persistence layer should wrap that public ownership contract in a separate record shape:
+
+```go
+type ReleaseInventoryRecord struct {
+	CreatedBy       CreatedBy       `json:"createdBy,omitempty"`
+	ReleaseMetadata ReleaseMetadata `json:"releaseMetadata"`
+	ModuleMetadata  ModuleMetadata  `json:"moduleMetadata"`
+	Inventory       Inventory       `json:"inventory"`
+}
+
+type ModuleMetadata struct {
+	Kind       string `json:"kind"`
+	APIVersion string `json:"apiVersion"`
+	Name       string `json:"name"`
+	UUID       string `json:"uuid,omitempty"`
+	Version    string `json:"version,omitempty"`
+}
+```
+
 The old history-bearing API is what this change is explicitly moving away from:
 
 ```go
@@ -145,39 +180,57 @@ func PrepareChange(...)
 
 ### Example persisted inventory document
 
-If inventory persistence still uses a Secret for the CLI, the stored payload should reflect the same ownership-only shape directly:
+If inventory persistence still uses a Secret for the CLI, the stored payload should be a single JSON release inventory record containing top-level provenance, release/module metadata, and the ownership-only inventory payload:
 
 ```json
 {
-  "revision": 7,
-  "digest": "sha256:aa22d4a6d8d0c7a6a4e8a6c9b52d0d3b7c1b5c56d1e1f9b622f0d7288f2e6abc",
-  "count": 3,
-  "entries": [
-    {
-      "group": "apps",
-      "kind": "Deployment",
-      "namespace": "apps",
-      "name": "jellyfin",
-      "v": "v1",
-      "component": "server"
-    },
-    {
-      "group": "",
-      "kind": "Service",
-      "namespace": "apps",
-      "name": "jellyfin",
-      "v": "v1",
-      "component": "server"
-    },
-    {
-      "group": "networking.k8s.io",
-      "kind": "Ingress",
-      "namespace": "apps",
-      "name": "jellyfin",
-      "v": "v1",
-      "component": "server"
-    }
-  ]
+  "createdBy": "cli",
+  "releaseMetadata": {
+    "kind": "ModuleRelease",
+    "apiVersion": "core.opmodel.dev/v1alpha1",
+    "name": "jellyfin",
+    "namespace": "apps",
+    "uuid": "3f4e2a8d-6c4d-5b1a-9e77-2d7b4d5c9a10",
+    "lastTransitionTime": "2026-03-11T15:10:00Z"
+  },
+  "moduleMetadata": {
+    "kind": "Module",
+    "apiVersion": "core.opmodel.dev/v1alpha1",
+    "name": "jellyfin",
+    "uuid": "8f11a5b2-2d55-4e8c-9a11-c8b0b0d2d111",
+    "version": "1.2.3"
+  },
+  "inventory": {
+    "revision": 7,
+    "digest": "sha256:aa22d4a6d8d0c7a6a4e8a6c9b52d0d3b7c1b5c56d1e1f9b622f0d7288f2e6abc",
+    "count": 3,
+    "entries": [
+      {
+        "group": "apps",
+        "kind": "Deployment",
+        "namespace": "apps",
+        "name": "jellyfin",
+        "v": "v1",
+        "component": "server"
+      },
+      {
+        "group": "",
+        "kind": "Service",
+        "namespace": "apps",
+        "name": "jellyfin",
+        "v": "v1",
+        "component": "server"
+      },
+      {
+        "group": "networking.k8s.io",
+        "kind": "Ingress",
+        "namespace": "apps",
+        "name": "jellyfin",
+        "v": "v1",
+        "component": "server"
+      }
+    ]
+  }
 }
 ```
 
@@ -308,17 +361,19 @@ The key point is that the controller should embed the same ownership inventory s
 - **[Public API churn]** -> Consumers of the newly-public package may need updates. Mitigation: do this now, before external controller code is built on the older shape.
 - **[Status metadata gap]** -> If the CLI stops reading version/history from inventory before replacement fields exist, output can regress. Mitigation: capture the dependency in modified `mod-list` and `mod-status` specs now.
 - **[Hidden storage coupling]** -> If storage helpers remain mixed into the core package, the change only renames the problem. Mitigation: separate ownership types/helpers from persistence responsibilities.
+- **[Envelope creep]** -> If release/module metadata keeps expanding, the persisted record can become another catch-all. Mitigation: keep the public inventory contract small and treat the CLI record as a narrow envelope around it.
 
 ## Migration Plan
 
 1. Introduce ownership-only inventory types in `pkg/inventory`.
-2. Redesign inventory persistence to store the ownership-only shape directly.
-3. Update CLI apply/delete/status/list workflows to consume ownership inventory rather than history-bearing types.
-4. Remove change-history assumptions from the CLI code paths touched by inventory.
-5. Add tests covering ownership-only inventory semantics and persistence behavior.
+2. Introduce a separate persisted release inventory record envelope containing top-level `createdBy`, `releaseMetadata`, `moduleMetadata`, and `inventory`.
+3. Redesign inventory persistence to store that envelope as a single JSON record.
+4. Update CLI apply/delete/status/list workflows to consume ownership inventory rather than history-bearing types.
+5. Remove change-history assumptions from the CLI code paths touched by inventory.
+6. Add tests covering ownership-only inventory semantics and persistence behavior.
 
 ## Open Questions
 
-- Should release metadata (`release name`, `release ID`, `module name`) remain colocated with persisted inventory, or move into a separate public release summary package in a follow-up change?
 - Should inventory `revision` be controller/CLI managed everywhere, or omitted until release status exists?
 - Should `component` remain part of inventory identity long term, or become purely informational once status/history is richer?
+- Should deployed module provenance stop at `moduleMetadata.version`, or should a future follow-up add artifact/source digest fields there too?
