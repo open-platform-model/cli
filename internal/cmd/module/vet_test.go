@@ -62,6 +62,37 @@ func TestModVet_ValidModule(t *testing.T) {
 	assert.Contains(t, err.Error(), "module does not define debugValues")
 }
 
+func TestModVet_RejectsReleasePackage(t *testing.T) {
+	tmpHome, cleanup := setupTestConfig(t)
+	defer cleanup()
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", origHome)
+
+	os.Unsetenv("OPM_REGISTRY")
+
+	releaseDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(releaseDir, "release.cue"), []byte(`package jellyfin
+
+kind: "ModuleRelease"
+metadata: name: "jf"
+`), 0o600))
+
+	cfg := &config.GlobalConfig{
+		CueContext: cuecontext.New(),
+	}
+	cmd := NewModuleVetCmd(cfg)
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{releaseDir})
+
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "is a release package, not a module")
+	assert.Contains(t, err.Error(), "opm release")
+}
+
 func TestModVet_CUEValidationError(t *testing.T) {
 	t.Skip("Requires valid OPM module fixture with CUE errors — skipping for now")
 	// This test requires a module that triggers CUE validation errors during render.

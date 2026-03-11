@@ -65,6 +65,13 @@ func runVet(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags) er
 func runVetModuleOnly(modulePath string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags) error {
 	cueCtx := cfg.CueContext
 
+	if err := cmdutil.ValidateModuleInputPath(modulePath); err != nil {
+		return &opmexit.ExitError{
+			Code: opmexit.ExitGeneralError,
+			Err:  err,
+		}
+	}
+
 	// Load and structurally validate the module CUE package.
 	modVal, err := loader.LoadModulePackage(cueCtx, modulePath)
 	if err != nil {

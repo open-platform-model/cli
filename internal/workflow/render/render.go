@@ -11,6 +11,7 @@ import (
 	"cuelang.org/go/cue"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 	internalreleasefile "github.com/opmodel/cli/internal/releasefile"
@@ -46,6 +47,9 @@ func Release(ctx context.Context, opts ReleaseOpts) (*Result, error) { //nolint:
 
 	cueCtx := opts.Config.CueContext
 	output.Debug("rendering release", "module-path", modulePath, "namespace", namespace, "provider", providerName)
+	if pathErr := cmdutil.ValidateModuleInputPath(modulePath); pathErr != nil {
+		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: pathErr}
+	}
 
 	var (
 		rel        *modulerelease.ModuleRelease
@@ -171,6 +175,9 @@ func ReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error) { /
 	output.Debug("rendering from release file", "file", opts.ReleaseFilePath, "namespace", namespace, "provider", providerName)
 
 	cueCtx := opts.Config.CueContext
+	if pathErr := cmdutil.ValidateReleaseInputPath(opts.ReleaseFilePath); pathErr != nil {
+		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: pathErr}
+	}
 	fileRelease, err := internalreleasefile.GetReleaseFile(cueCtx, opts.ReleaseFilePath)
 	if err != nil {
 		printValidationError("render failed", err)
@@ -182,6 +189,9 @@ func ReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error) { /
 	rel := fileRelease.Module
 
 	if opts.ModulePath != "" {
+		if pathErr := cmdutil.ValidateModuleInputPath(opts.ModulePath); pathErr != nil {
+			return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading module from --module: %w", pathErr)}
+		}
 		modVal, modErr := loader.LoadModulePackage(cueCtx, opts.ModulePath)
 		if modErr != nil {
 			return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading module from --module: %w", modErr)}

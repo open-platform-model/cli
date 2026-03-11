@@ -94,6 +94,10 @@ func isReleasePath(arg string) bool {
 // resolveReleaseArgFromFile loads a release.cue file (or a directory containing
 // one) and extracts the release name and namespace from its metadata.
 func resolveReleaseArgFromFile(arg string, cfg *config.GlobalConfig) (ReleaseArg, error) {
+	if err := ValidateReleaseInputPath(arg); err != nil {
+		return ReleaseArg{}, err
+	}
+
 	cueCtx := cfg.CueContext
 	if cueCtx == nil {
 		cueCtx = cuecontext.New()

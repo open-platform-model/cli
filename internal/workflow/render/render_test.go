@@ -46,6 +46,19 @@ func TestRenderModule_NilConfig(t *testing.T) {
 	assert.Contains(t, exitErr.Error(), "configuration not loaded")
 }
 
+func TestRenderModule_RejectsReleasePackagePath(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "release.cue"), []byte("package test\n"), 0o644))
+
+	_, err := Release(context.Background(), ReleaseOpts{
+		Args:      []string{dir},
+		Config:    &config.GlobalConfig{CueContext: cuecontext.New()},
+		K8sConfig: &config.ResolvedKubernetesConfig{},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "release package, not a module")
+}
+
 func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 	result := &Result{Release: mustReleaseMetadata("test-module", "default"), Warnings: []string{}}
 	ShowOutput(result, ShowOutputOpts{Verbose: false})
@@ -84,6 +97,38 @@ func TestRenderFromReleaseFile_NilK8sConfig(t *testing.T) {
 	require.True(t, errors.As(err, &exitErr))
 	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
 	assert.Contains(t, exitErr.Error(), "kubernetes config not resolved")
+}
+
+func TestRenderFromReleaseFile_RejectsModulePackagePath(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "module.cue"), []byte("package test\n"), 0o644))
+
+	_, err := ReleaseFile(context.Background(), ReleaseFileOpts{
+		ReleaseFilePath: dir,
+		Config:          &config.GlobalConfig{CueContext: cuecontext.New()},
+		K8sConfig:       &config.ResolvedKubernetesConfig{},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "module package, not a release")
+}
+
+func TestRenderFromReleaseFile_RejectsReleasePackageAsModuleOverride(t *testing.T) {
+	dir := t.TempDir()
+	releaseFile := filepath.Join(dir, "release.cue")
+	require.NoError(t, os.WriteFile(releaseFile, []byte("package test\nkind: \"ModuleRelease\"\nmetadata: {name: \"demo\", namespace: \"apps\"}\nvalues: {replicas: 2}\n"), 0o644))
+
+	moduleDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(moduleDir, "release.cue"), []byte("package test\n"), 0o644))
+
+	_, err := ReleaseFile(context.Background(), ReleaseFileOpts{
+		ReleaseFilePath: releaseFile,
+		ModulePath:      moduleDir,
+		Config:          &config.GlobalConfig{CueContext: cuecontext.New(), Providers: map[string]cue.Value{}},
+		K8sConfig:       &config.ResolvedKubernetesConfig{},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "loading module from --module")
+	assert.Contains(t, err.Error(), "release package, not a module")
 }
 
 func TestResolveReleaseValues_UsesInlineValues(t *testing.T) {
