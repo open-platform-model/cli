@@ -5,6 +5,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   OPM_REGISTRY: 'opmodel.dev=localhost:5000+insecure,registry.cue.works'
   CUE_REGISTRY: 'opmodel.dev=localhost:5000+insecure,registry.cue.works'
@@ -14,16 +17,16 @@ jobs:
     name: Full Test Suite
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version: '1.25.0'
-          
+
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
         with:
-          version: latest
+          version: v2.11.3
           args: --timeout=5m
 
       - name: Run unit tests
@@ -34,13 +37,15 @@ jobs:
 
       - name: Install kind
         run: |
-          curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
+          KIND_VERSION="v0.31.0"
+          curl -Lo ./kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          echo "eb244cbafcc157dff60cf68693c14c9a75c4e6e6fedaf9cd71c58117cb93e3fa  ./kind" | sha256sum -c -
           chmod +x ./kind
           sudo mv ./kind /usr/local/bin/kind
-          
+
       - name: Create kind cluster
-        run: kind create cluster --name opm-dev --config hack/kind-config.yaml --image kindest/node:v1.34.0
-        
+        run: kind create cluster --name opm-dev --config hack/kind-config.yaml --image kindest/node:v1.34.3@sha256:08497ee19eace7b4b5348db5c6a1591d7752b164530a36f855cb0f2bdcbadd48
+
       - name: Run integration scripts
         run: |
           go run tests/integration/deploy/main.go
@@ -48,7 +53,7 @@ jobs:
           go run tests/integration/inventory-ops/main.go
           go run tests/integration/mod-list/main.go
           go run tests/integration/values-flow/main.go
-          
+
       - name: Delete kind cluster
         if: always()
         run: kind delete cluster --name opm-dev || true
@@ -60,17 +65,20 @@ jobs:
     name: Goreleaser Release
     needs: [test]
     runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-          
-      - uses: actions/setup-go@v5
+
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version: '1.25.0'
-          
+
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7.0.0
         with:
           args: release --clean
         env:
