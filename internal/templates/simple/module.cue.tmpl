@@ -1,16 +1,20 @@
-// Package main defines the {{.ModuleName}} module.
+// Package {{.PackageName}} defines the {{.ModuleName}} module.
 // This is a simple single-file module with inline components.
-package main
+package {{.PackageName}}
 
 import (
-	"opmodel.dev/core@v1"
+	m "opmodel.dev/core/module@v1"
 	"opmodel.dev/schemas@v1"
 	resources_workload "opmodel.dev/resources/workload@v1"
+	traits_network "opmodel.dev/traits/network@v1"
 	traits_workload "opmodel.dev/traits/workload@v1"
 )
 
 // Module definition
-core.#Module
+m.#Module
+
+// #workloadComponent is the name of the primary workload component in this module.
+#workloadComponent: "app"
 
 // Module metadata
 metadata: {
@@ -29,16 +33,28 @@ metadata: {
 
 		resources_workload.#Container
 		traits_workload.#Scaling
+		traits_workload.#RestartPolicy
+		traits_workload.#UpdateStrategy
+		traits_network.#Expose
 
 		spec: {
+			restartPolicy: "Always"
+			updateStrategy: type: "RollingUpdate"
 			container: {
 				name:  "app"
 				image: #config.image
 				ports: http: {
 					targetPort: #config.port
 				}
+				resources: #config.resources
 			}
 			scaling: count: #config.scaling
+			expose: {
+				ports: http: container.ports.http & {
+					exposedPort: #config.port
+				}
+				type: "ClusterIP"
+			}
 		}
 	}
 }
@@ -58,4 +74,36 @@ metadata: {
 
 	// Port to expose
 	port: int & >0 & <=65535 | *8080
+
+	// Resource requirements for the workload
+	resources: schemas.#ResourceRequirementsSchema | *{
+		requests: {
+			cpu:    "100m"
+			memory: "128Mi"
+		}
+		limits: {
+			cpu:    "500m"
+			memory: "512Mi"
+		}
+	}
+}
+
+debugValues: {
+	image: {
+		repository: "busybox"
+		tag:        "latest"
+		digest:     ""
+	}
+	scaling: 1
+	port:    8080
+	resources: {
+		requests: {
+			cpu:    "100m"
+			memory: "128Mi"
+		}
+		limits: {
+			cpu:    "500m"
+			memory: "512Mi"
+		}
+	}
 }

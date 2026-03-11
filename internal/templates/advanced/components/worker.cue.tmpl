@@ -3,6 +3,7 @@ package components
 
 import (
 	resources_workload "opmodel.dev/resources/workload@v1"
+	traits_security "opmodel.dev/traits/security@v1"
 	traits_workload "opmodel.dev/traits/workload@v1"
 )
 
@@ -12,8 +13,13 @@ import (
 
 	resources_workload.#Container
 	traits_workload.#Scaling
+	traits_workload.#RestartPolicy
+	traits_workload.#UpdateStrategy
+	traits_security.#SecurityContext
 
 	spec: {
+		restartPolicy: "Always"
+		updateStrategy: type: "RollingUpdate"
 		container: {
 			name:  "worker"
 			image: _

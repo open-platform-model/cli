@@ -1,9 +1,10 @@
 // Components defines the workloads for this module.
 // Separated from module.cue for better maintainability.
-package main
+package {{.PackageName}}
 
 import (
 	resources_workload "opmodel.dev/resources/workload@v1"
+	traits_security "opmodel.dev/traits/security@v1"
 	traits_workload "opmodel.dev/traits/workload@v1"
 	traits_network "opmodel.dev/traits/network@v1"
 )
@@ -16,16 +17,24 @@ import (
 
 		resources_workload.#Container
 		traits_workload.#Scaling
+		traits_workload.#RestartPolicy
+		traits_workload.#UpdateStrategy
 		traits_network.#Expose
+		traits_security.#SecurityContext
 
 		spec: {
+			restartPolicy: "Always"
+			updateStrategy: type: "RollingUpdate"
+			if #config.securityContext != _|_ {
+				securityContext: #config.securityContext
+			}
 			container: {
 				name:  "web"
 				image: #config.web.image
 				ports: http: {
 					targetPort: 80
 				}
-				env: apiUrl: {
+				env: API_URL: {
 					name:  "API_URL"
 					value: "http://api:\(#config.api.port)"
 				}
@@ -46,13 +55,31 @@ import (
 
 		resources_workload.#Container
 		traits_workload.#Scaling
+		traits_workload.#RestartPolicy
+		traits_workload.#UpdateStrategy
+		traits_security.#SecurityContext
 
 		spec: {
+			restartPolicy: "Always"
+			updateStrategy: type: "RollingUpdate"
+			if #config.securityContext != _|_ {
+				securityContext: #config.securityContext
+			}
 			container: {
 				name:  "api"
 				image: #config.api.image
 				ports: http: {
 					targetPort: #config.api.port
+				}
+				resources: {
+					requests: {
+						cpu:    "100m"
+						memory: "128Mi"
+					}
+					limits: {
+						cpu:    "500m"
+						memory: "512Mi"
+					}
 				}
 			}
 			scaling: count: #config.api.scaling

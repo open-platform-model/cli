@@ -238,3 +238,25 @@ func TestToPascalCase(t *testing.T) {
 		})
 	}
 }
+
+func TestToPackageName(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"my-app", "my_app"},
+		{"my_app", "my_app"},
+		{"MY-APP", "my_app"},
+		{"api.server", "api_server"},
+		{"123-app", "module_123_app"},
+		{"---", "module"},
+		{"hello world", "hello_world"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := toPackageName(tt.input)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

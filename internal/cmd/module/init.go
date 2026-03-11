@@ -110,6 +110,7 @@ func runModuleInit(args []string, templateName, dir string) error {
 
 	data := templates.TemplateData{
 		ModuleName:       moduleName,
+		PackageName:      toPackageName(moduleName),
 		ModuleNamePascal: toPascalCase(moduleName),
 		ModulePath:       fmt.Sprintf("example.com/%s", moduleName),
 		Version:          "0.1.0",
@@ -199,4 +200,32 @@ func toPascalCase(s string) string {
 	}
 
 	return result.String()
+}
+
+// toPackageName converts a module name to a valid CUE package name.
+func toPackageName(s string) string {
+	var result strings.Builder
+	lastUnderscore := false
+
+	for _, r := range s {
+		switch {
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			result.WriteRune(unicode.ToLower(r))
+			lastUnderscore = false
+		case !lastUnderscore:
+			result.WriteRune('_')
+			lastUnderscore = true
+		}
+	}
+
+	name := strings.Trim(result.String(), "_")
+	if name == "" {
+		return "module"
+	}
+
+	if name[0] >= '0' && name[0] <= '9' {
+		return "module_" + name
+	}
+
+	return name
 }

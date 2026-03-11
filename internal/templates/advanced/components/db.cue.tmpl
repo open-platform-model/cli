@@ -4,6 +4,7 @@ package components
 import (
 	resources_workload "opmodel.dev/resources/workload@v1"
 	resources_storage "opmodel.dev/resources/storage@v1"
+	traits_workload "opmodel.dev/traits/workload@v1"
 )
 
 // #db is a reusable database component template.
@@ -12,8 +13,12 @@ import (
 
 	resources_workload.#Container
 	resources_storage.#Volumes
+	traits_workload.#RestartPolicy
+	traits_workload.#UpdateStrategy
 
 	spec: {
+		restartPolicy: "Always"
+		updateStrategy: type: "Recreate"
 		container: {
 			name:  "db"
 			image: _
@@ -30,10 +35,10 @@ import (
 					memory: "2Gi"
 				}
 			}
-			volumeMounts: [{
+			volumeMounts: data: {
 				name:      "data"
 				mountPath: "/var/lib/postgresql/data"
-			}]
+			}
 		}
 		volumes: data: persistentClaim: {
 			size: string | *"10Gi"

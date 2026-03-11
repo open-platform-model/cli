@@ -1,8 +1,8 @@
 // Components composes the component templates from the components/ subpackage.
-package main
+package {{.PackageName}}
 
 import (
-	comps "{{.ModulePath}}@v0/components"
+	comps "{{.ModulePath}}/components@v0"
 )
 
 // #components extends the component templates with module-specific configuration.
@@ -12,6 +12,10 @@ import (
 		spec: {
 			container: image: #config.web.image
 			scaling: count: #config.web.scaling
+			expose: ports: http: exposedPort: #config.web.port
+			if #config.securityContext != _|_ {
+				securityContext: #config.securityContext
+			}
 		}
 	}
 
@@ -20,6 +24,10 @@ import (
 		spec: {
 			container: image: #config.api.image
 			scaling: count: #config.api.scaling
+			container: ports: http: targetPort: #config.api.port
+			if #config.securityContext != _|_ {
+				securityContext: #config.securityContext
+			}
 		}
 	}
 
@@ -28,6 +36,9 @@ import (
 		spec: {
 			container: image: #config.worker.image
 			scaling: count: #config.worker.scaling
+			if #config.securityContext != _|_ {
+				securityContext: #config.securityContext
+			}
 		}
 	}
 
@@ -35,6 +46,7 @@ import (
 	db: comps.#db & {
 		spec: {
 			container: image: #config.db.image
+			container: ports: db: targetPort: #config.db.port
 			volumes: data: persistentClaim: size: #config.db.storageSize
 		}
 	}

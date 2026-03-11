@@ -55,6 +55,7 @@ func TestRender(t *testing.T) {
 			template: Simple,
 			data: TemplateData{
 				ModuleName:       "test-app",
+				PackageName:      "test_app",
 				ModuleNamePascal: "TestApp",
 				ModulePath:       "example.com/test-app",
 				Version:          "0.1.0",
@@ -64,7 +65,7 @@ func TestRender(t *testing.T) {
 				"cue.mod/module.cue",
 			},
 			wantContains: map[string]string{
-				"module.cue":         "test-app",
+				"module.cue":         "package test_app",
 				"cue.mod/module.cue": "example.com/test-app@v0",
 			},
 		},
@@ -73,6 +74,7 @@ func TestRender(t *testing.T) {
 			template: Standard,
 			data: TemplateData{
 				ModuleName:       "my-service",
+				PackageName:      "my_service",
 				ModuleNamePascal: "MyService",
 				ModulePath:       "mycompany.com/my-service",
 				Version:          "1.0.0",
@@ -83,7 +85,7 @@ func TestRender(t *testing.T) {
 				"cue.mod/module.cue",
 			},
 			wantContains: map[string]string{
-				"module.cue":         "my-service",
+				"module.cue":         "package my_service",
 				"cue.mod/module.cue": "mycompany.com/my-service@v0",
 			},
 		},
@@ -127,6 +129,10 @@ func TestRender(t *testing.T) {
 					"file %s should contain %q", file, wantContent)
 			}
 
+			moduleContent, err := os.ReadFile(filepath.Join(tmpDir, "module.cue"))
+			require.NoError(t, err)
+			assert.Contains(t, string(moduleContent), "debugValues:")
+
 			// Verify no .tmpl files in output
 			err = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
 				if err != nil {
@@ -152,6 +158,7 @@ func TestRender_DirectoryExists(t *testing.T) {
 	// Rendering to an existing directory should work (files get overwritten)
 	data := TemplateData{
 		ModuleName:       "test-app",
+		PackageName:      "test_app",
 		ModuleNamePascal: "TestApp",
 		ModulePath:       "example.com/test-app",
 		Version:          "0.1.0",
@@ -168,6 +175,7 @@ func TestRender_AdvancedTemplate(t *testing.T) {
 
 	data := TemplateData{
 		ModuleName:       "platform-app",
+		PackageName:      "platform_app",
 		ModuleNamePascal: "PlatformApp",
 		ModulePath:       "platform.io/platform-app",
 		Version:          "0.1.0",

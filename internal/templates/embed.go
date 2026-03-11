@@ -58,6 +58,9 @@ type TemplateData struct {
 	// ModuleName is the name of the module in kebab-case (e.g., "my-app").
 	ModuleName string
 
+	// PackageName is the CUE package name for the module files.
+	PackageName string
+
 	// ModuleNamePascal is the PascalCase version of the module name (e.g., "MyApp").
 	// Used for the FQN name field which requires uppercase first letter.
 	ModuleNamePascal string
