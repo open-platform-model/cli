@@ -361,6 +361,7 @@ func FormatGroupedErrors(groups []opmerrors.GroupedError) string {
 			if loc.Line > 0 {
 				locStr := styleLoc.Render(fmt.Sprintf("%s:%d:%d", loc.File, loc.Line, loc.Column))
 				sb.WriteString("    ")
+				sb.WriteString(styleDim.Render("> "))
 				sb.WriteString(locStr)
 				sb.WriteByte('\n')
 			}

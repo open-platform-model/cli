@@ -53,6 +53,8 @@ func TestPrintValidationError_UsesGroupedFormatting(t *testing.T) {
 	assert.Contains(t, logBuf.String(), "render failed: 2 issues")
 	assert.Contains(t, string(details), "field not allowed")
 	assert.Contains(t, string(details), "values.test")
+	assert.Contains(t, string(details), "> values.cue:2:3")
+	assert.Contains(t, string(details), "> values.cue:4:10")
 	assert.Contains(t, string(details), "conflicting values \"test\"")
 	assert.NotContains(t, logBuf.String(), "values do not satisfy #config")
 }

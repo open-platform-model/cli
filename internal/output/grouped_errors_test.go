@@ -14,5 +14,7 @@ func TestFormatGroupedErrors(t *testing.T) {
 	})
 	assert.Contains(t, formatted, "field not allowed")
 	assert.Contains(t, formatted, "conflicting values")
+	assert.Contains(t, formatted, "> values.cue:10:2")
+	assert.Contains(t, formatted, "> values2.cue:12:2")
 	assert.NotContains(t, formatted, "3 errors")
 }
