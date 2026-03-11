@@ -23,7 +23,6 @@ type Options struct {
 	DryRun                 bool
 	CreateNS               bool
 	NoPrune                bool
-	MaxHistory             int
 	Force                  bool
 	SuccessUpToDateMessage string
 	SuccessAppliedMessage  string
