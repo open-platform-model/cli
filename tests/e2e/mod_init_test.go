@@ -15,6 +15,7 @@ import (
 )
 
 var opmBinary string
+var homeDir string
 
 func TestMain(m *testing.M) {
 	// Build the binary once for all tests
@@ -24,6 +25,7 @@ func TestMain(m *testing.M) {
 	}
 
 	opmBinary = filepath.Join(tmpDir, "opm")
+	homeDir = tmpDir
 
 	// Build the binary
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -35,6 +37,28 @@ func TestMain(m *testing.M) {
 		panic("failed to build opm binary: " + err.Error())
 	}
 	cancel() // Call cancel explicitly before os.Exit
+
+	// Write a dummy config.cue directly to avoid external CUE resolution issues
+	// We only want a stub provider definition for vet tests, without importing anything from registry
+	opmDir := filepath.Join(homeDir, ".opm")
+	if err := os.MkdirAll(opmDir, 0755); err != nil {
+		os.RemoveAll(tmpDir)
+		panic("failed to create .opm dir: " + err.Error())
+	}
+
+	dummyConfig := `package config
+config: {
+	registry: "localhost:5000"
+	providers: kubernetes: {
+		context: "kind-opm-dev"
+		kubeconfig: "~/.kube/config"
+		namespace: "default"
+	}
+}`
+	if err := os.WriteFile(filepath.Join(opmDir, "config.cue"), []byte(dummyConfig), 0644); err != nil {
+		os.RemoveAll(tmpDir)
+		panic("failed to write dummy config.cue: " + err.Error())
+	}
 
 	code := m.Run()
 	os.RemoveAll(tmpDir)
@@ -50,6 +74,7 @@ func runOPM(t *testing.T, workDir string, args ...string) (stdout, stderr string
 
 	cmd := exec.CommandContext(ctx, opmBinary, args...)
 	cmd.Dir = workDir
+	cmd.Env = append(os.Environ(), "HOME="+homeDir)
 
 	stdoutBytes, err := cmd.Output()
 	var stderrBytes []byte
