@@ -85,26 +85,6 @@ opm mod build ./examples/jellyfin
 opm mod build --split ./examples/jellyfin
 ```
 
-### Apply to Kubernetes
-
-```bash
-# Apply with defaults (uses namespace "jellyfin" from module metadata)
-opm mod apply ./examples/jellyfin
-
-# Apply to custom namespace
-opm mod apply --namespace media ./examples/jellyfin
-```
-
-### Check Status
-
-```bash
-# Watch deployment status
-opm mod status --watch ./examples/jellyfin
-
-# Get detailed status (YAML)
-opm mod status --output yaml ./examples/jellyfin
-```
-
 ### Customize Values
 
 Create a custom values file for your environment:
