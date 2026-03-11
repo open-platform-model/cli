@@ -31,12 +31,14 @@ OPM's CLI foundation has been built over the first iteration of development. The
 - `opm module init` — scaffold a new module (simple, standard, advanced templates)
 - `opm module build` — render Kubernetes manifests from CUE definitions
 - `opm module vet` — native CUE SDK validation with custom error formatting
-- `opm module apply` — server-side apply with inventory tracking and stale resource pruning
-- `opm module delete` — inventory-based or label-based discovery with `--name` or `--release-id`
-
-- `opm module status` — health and readiness status (table/yaml/json, watch mode)
-- `opm module tree` — tree view of module structure and resource hierarchy
-- `opm module events` — Kubernetes events for module resources
+- `opm release build` — render a release file to manifests
+- `opm release apply` — server-side apply with inventory tracking and stale resource pruning
+- `opm release delete` — inventory-based or label-based discovery with release name or UUID
+- `opm release diff` — compare a release file against live cluster state
+- `opm release status` — health and readiness status (table/yaml/json, watch mode)
+- `opm release tree` — tree view of release resources and hierarchy
+- `opm release events` — Kubernetes events for release resources
+- `opm release list` — list deployed releases in a namespace (`-A` for all namespaces)
 - `opm config init` — initialize `~/.opm/config.cue`
 - `opm config vet` — native CUE SDK config validation
 
@@ -100,19 +102,19 @@ The foundation must be solid before adding new capabilities. This milestone focu
 
 - ~~**`#ModuleRelease.values` validation against `#Module.#config`** — During processing, validate that the values provided in a ModuleRelease satisfy the schema defined by the Module's `#config`. Leverages CUE's evaluator to support mandatory (`!`), optional (`?`), and default (`*`) fields.~~ (done)
 
-- **Atomic apply** — An incorrectly configured module must not partially apply. Today, `opm module apply` renders all resources and validates before applying, but a failure mid-apply does not roll back previously-applied resources. Investigate dry-run validation or rollback strategies.
+- **Atomic apply** — An incorrectly configured release must not partially apply. Today, `opm release apply` renders all resources and validates before applying, but a failure mid-apply does not roll back previously-applied resources. Investigate dry-run validation or rollback strategies.
 
-- ~~**Unchanged apply detection** — When `opm module apply` is run against an already-applied module with no changes, the output indicates that no changes were made instead of displaying "Module applied."~~ (done)
+- ~~**Unchanged apply detection** — When `opm release apply` is run against an already-applied release with no changes, the output indicates that no changes were made instead of displaying "Release applied."~~ (done)
 
 **Additional deliverables:**
 
 - `opm module eval` — print the raw CUE evaluation of a module
-- `opm module list` — list deployed modules in a namespace (`-A` for all namespaces), leveraging `release-id` labels for discovery
-- ~~`opm module tree` — tree view of module structure and resource hierarchy~~ (done)
-- ~~`opm module events` — Kubernetes events for module resources~~ (done)
-- ~~`opm module status` v2 — improved health reporting, inventory-aware~~ (done)
-- ~~`--ignore-not-found` flag for `opm module delete` and `opm module status` for idempotent operations (exit 0 when no resources match)~~ (done)
-- ~~`--create-namespace` flag for `opm module apply`~~ (done)
+- ~~`opm release list` — list deployed releases in a namespace (`-A` for all namespaces), leveraging inventory for discovery~~ (done)
+- ~~`opm release tree` — tree view of release resources and resource hierarchy~~ (done)
+- ~~`opm release events` — Kubernetes events for release resources~~ (done)
+- ~~`opm release status` v2 — improved health reporting, inventory-aware~~ (done)
+- ~~`--ignore-not-found` flag for `opm release delete` and `opm release status` for idempotent operations (exit 0 when no resources match)~~ (done)
+- ~~`--create-namespace` flag for `opm release apply`~~ (done)
 - ~~Remove `injectLabels()` — redundant with transformer-based label injection~~ (done)
 
 ### M2: Secrets and Config Lifecycle
@@ -121,7 +123,7 @@ Full lifecycle management of configuration and sensitive data. This is the criti
 
 **Major deliverables:**
 
-- ~~**Release Inventory** — A lightweight Kubernetes Secret that tracks which resources belong to a ModuleRelease. Enables automatic pruning of stale resources during `opm module apply` and provides a precise source of truth for `diff`, `delete`, and `status`. Maintains change history for future rollback.~~ (done)
+- ~~**Release Inventory** — A lightweight Kubernetes Secret that tracks which resources belong to a ModuleRelease. Enables automatic pruning of stale resources during `opm release apply` and provides a precise source of truth for `diff`, `delete`, and `status`. Maintains change history for future rollback.~~ (done)
 
 - **Sensitive Data Model** — Introduce `#Secret` as a first-class type that tags fields as sensitive at the schema level. This single annotation propagates through every layer — module definition, release fulfillment, transformer output — enabling the toolchain to redact, encrypt, and dispatch secrets to platform-appropriate resources (K8s Secrets, ExternalSecrets, CSI volumes). Supports literal values, external references, and CLI `@` tag injection.
 

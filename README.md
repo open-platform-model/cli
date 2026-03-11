@@ -13,8 +13,8 @@ task build
 # Initialize a new module
 ./bin/opm module init ./my-module
 
-# Apply a module
-./bin/opm module apply ./my-module
+# Render a module
+./bin/opm module build ./my-module
 
 # Validate a release file
 ./bin/opm release vet ./release.cue
@@ -37,14 +37,13 @@ task build
 
 `opm mod` remains available as a compatibility alias.
 
-Use `opm module` when you are starting from module source. For inspecting or operating on deployed releases, use `opm release`.
+Use `opm module` when you are starting from module source. For all deployed release operations, use `opm release`.
 
 | Command | Description |
 |---------|-------------|
 | `module init` | Create a new module from template |
 | `module build` | Render module to manifests |
 | `module vet` | Validate module without generating manifests |
-| `module apply` | Deploy module to cluster |
 
 ### Release Operations (`opm release`)
 
@@ -113,8 +112,6 @@ opm release apply ./releases/jellyfin/release.cue
 opm release status ./releases/jellyfin/release.cue
 opm release status jellyfin -n media
 ```
-
-Legacy compatibility note: `opm module status`, `opm module tree`, `opm module delete`, `opm module list`, and `opm module events` still exist, but `opm release` is the preferred interface for deployed release operations.
 
 ## Documentation
 
