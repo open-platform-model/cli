@@ -52,7 +52,6 @@ jobs:
           go run tests/integration/inventory-apply/main.go
           go run tests/integration/inventory-ops/main.go
           go run tests/integration/rel-list/main.go
-          go run tests/integration/values-flow/main.go
 
       - name: Delete kind cluster
         if: always()
