@@ -2,12 +2,12 @@
 
 ## Purpose
 
-The `opm mod apply` and `opm mod delete` commands manage the deployment lifecycle of OPM modules on Kubernetes clusters. `mod apply` renders the module via the Pipeline interface and applies resources using server-side apply. `mod delete` discovers and removes module resources via OPM labels without requiring the original source.
+The `opm mod apply` and `opm mod delete` commands manage the deployment lifecycle of OPM modules on Kubernetes clusters. `mod apply` renders the module via the Pipeline interface and applies resources using server-side apply. `mod delete` discovers and removes module resources from the persisted release inventory record when available, falling back to OPM labels without requiring the original source.
 
 ## Design Rationale
 
 1. **Go API integration**: Commands call `build.NewPipeline().Render()` directly, not subprocess.
-2. **Label-based discovery**: `mod delete` discovers resources via labels, not re-rendering.
+2. **Inventory-first discovery**: `mod delete` discovers resources via the persisted release inventory record when available, falling back to labels instead of re-rendering.
 3. **Server-side apply**: Use SSA with force for idempotent operations.
 4. **Weighted ordering**: Resources applied/deleted in weight order for dependency handling.
 
@@ -68,7 +68,7 @@ A developer wants to delete a deployed module after deleting the source files.
 
 | ID | Requirement |
 |----|-------------|
-| FR-D-020 | `mod delete` MUST discover resources via inventory Secret when available, falling back to OPM labels when no inventory exists. |
+| FR-D-020 | `mod delete` MUST discover resources via the persisted release inventory record when available, falling back to OPM labels when no inventory exists. |
 | FR-D-021 | `mod delete` MUST NOT require module source. |
 | FR-D-022 | `mod delete` MUST delete in descending weight order. |
 | FR-D-023 | `mod delete` MUST support `--force` to skip confirmation. |
@@ -76,24 +76,44 @@ A developer wants to delete a deployed module after deleting the source files.
 | FR-D-025 | `mod delete` MUST require at least one of `--name` or `--release-id` for identification. The `--namespace` / `-n` flag remains required in all cases. |
 | FR-D-026 | `mod delete` MUST prompt for confirmation (unless --force). |
 | FR-D-027 | `mod delete` MUST support `--release-id` flag for discovery by release identity UUID. |
-| FR-D-028 | `mod delete` MUST use inventory-based enumeration when an inventory Secret exists. When no inventory exists, it MUST fall back to label-based discovery. Dual-strategy discovery (both release-id and name+namespace selectors) applies only in the label-based fallback path. |
+| FR-D-028 | `mod delete` MUST use ownership-inventory-based enumeration when a persisted release inventory record exists. When no inventory exists, it MUST fall back to label-based discovery. Dual-strategy discovery (both release-id and name+namespace selectors) applies only in the label-based fallback path. |
 
 ### Inventory Integration
 
-#### Requirement: mod apply writes inventory Secret after successful apply
+#### Requirement: mod apply uses ownership inventory for pruning
 
-After all resources are successfully applied, `opm mod apply` SHALL write an inventory Secret to the same namespace as the release. The Secret SHALL contain the current change entry (module ref, values, manifest digest, timestamp, inventory entries) and maintain a history index. The inventory SHALL only be written when all resources apply without error.
+`opm mod apply` SHALL use the current ownership inventory to compute stale resources (previous owned set minus current rendered set). It SHALL NOT require inventory change-history fields to perform stale-set computation or pruning.
 
-#### Scenario: Successful apply writes inventory
+#### Scenario: Apply computes stale set from ownership inventory
+
+- **WHEN** a previous ownership inventory tracks resources `A`, `B`, and `C`
+- **AND** the current render contains `A` and `B`
+- **THEN** `C` SHALL be considered stale and eligible for pruning
+
+#### Requirement: mod apply writes current release inventory record after successful apply
+
+After all resources are successfully applied, `opm mod apply` SHALL persist the current release inventory record for the release. The persisted form SHALL store top-level `createdBy`, `releaseMetadata`, `moduleMetadata`, and the current owned resource set directly instead of a history-bearing inventory shape.
+
+#### Scenario: Successful apply persists current release inventory record
 
 - **WHEN** `opm mod apply` successfully applies all rendered resources
-- **THEN** an inventory Secret SHALL be created or updated in the release namespace
-- **AND** the Secret SHALL contain the current change entry with all rendered resource entries
+- **THEN** the persisted release inventory record SHALL record the current owned resource entries for that release
+- **AND** the record SHALL preserve top-level `createdBy`, `releaseMetadata`, and `moduleMetadata`
+- **AND** the ownership inventory in that record SHALL be sufficient for later prune and resource enumeration
 
 #### Scenario: Failed apply does not write inventory
 
 - **WHEN** `opm mod apply` fails to apply one or more resources
-- **THEN** the inventory Secret SHALL NOT be written or updated
+- **THEN** the persisted release inventory record SHALL NOT be written or updated
+
+#### Requirement: mod apply stores deployed module version in module metadata
+
+When `opm mod apply` persists the release inventory record, it SHALL store the deployed module version in `moduleMetadata.version` rather than relying on inventory change history.
+
+#### Scenario: Apply persists deployed module version in module metadata
+
+- **WHEN** `opm mod apply` persists a release inventory record for a versioned module
+- **THEN** the persisted record SHALL contain that deployed module version under `moduleMetadata.version`
 
 #### Requirement: mod apply supports --no-prune flag
 
@@ -103,24 +123,15 @@ The `--no-prune` flag SHALL skip the stale resource pruning step. Default is `fa
 
 - **WHEN** running `opm mod apply --no-prune`
 - **THEN** stale resources SHALL NOT be deleted
-- **AND** the inventory SHALL still be written
-
-#### Requirement: mod apply supports --max-history flag
-
-The `--max-history` flag SHALL set the maximum number of change entries in the inventory. Default SHALL be 10.
-
-#### Scenario: Default max-history
-
-- **WHEN** running `opm mod apply` without `--max-history`
-- **THEN** the inventory SHALL retain at most 10 change entries
+- **AND** the persisted release inventory record SHALL still be written
 
 #### Requirement: mod apply supports --force for empty render
 
-The `--force` flag SHALL allow `opm mod apply` to proceed when the render produces zero resources and a previous inventory exists. Without `--force`, this situation SHALL fail with an error.
+The `--force` flag SHALL allow `opm mod apply` to proceed when the render produces zero resources and a previous ownership inventory exists. Without `--force`, this situation SHALL fail with an error.
 
 #### Scenario: Empty render blocked without --force
 
-- **WHEN** running `opm mod apply` and the render produces 0 resources with a non-empty previous inventory
+- **WHEN** running `opm mod apply` and the render produces 0 resources with a non-empty previous ownership inventory
 - **THEN** the command SHALL fail with an error indicating all resources would be pruned
 
 #### Scenario: Empty render allowed with --force
@@ -128,14 +139,14 @@ The `--force` flag SHALL allow `opm mod apply` to proceed when the render produc
 - **WHEN** running `opm mod apply --force` and the render produces 0 resources
 - **THEN** all previously tracked resources SHALL be pruned
 
-#### Requirement: mod delete uses inventory for resource enumeration
+#### Requirement: mod delete uses ownership inventory for resource enumeration
 
-`opm mod delete` SHALL first attempt to read the inventory Secret to enumerate resources for deletion. If an inventory exists, only resources tracked in the inventory SHALL be deleted (no label-scan). The inventory Secret itself SHALL be deleted last. If no inventory exists, the command SHALL fall back to label-based discovery.
+`opm mod delete` SHALL use the ownership inventory stored in the persisted release inventory record to enumerate resources for deletion when it exists. If an inventory exists, only resources tracked in that ownership inventory SHALL be deleted (no label-scan), and the inventory Secret itself SHALL be deleted last. If no inventory exists, the command SHALL fall back to label-based discovery.
 
-#### Scenario: Delete with inventory
+#### Scenario: Delete with ownership inventory
 
-- **WHEN** running `opm mod delete` and an inventory Secret exists
-- **THEN** only resources listed in the inventory SHALL be deleted
+- **WHEN** running `opm mod delete` and a persisted release inventory record exists
+- **THEN** only resources listed in that record's ownership inventory SHALL be deleted
 - **AND** the inventory Secret SHALL be deleted after all tracked resources
 
 #### Scenario: Delete without inventory (fallback)
@@ -145,7 +156,7 @@ The `--force` flag SHALL allow `opm mod apply` to proceed when the render produc
 
 #### Scenario: Delete does not remove derived resources
 
-- **WHEN** running `opm mod delete` with an inventory
+- **WHEN** running `opm mod delete` with ownership inventory
 - **AND** derived resources (e.g., Endpoints) exist with OPM labels but are not in the inventory
 - **THEN** the derived resources SHALL NOT be deleted
 
@@ -249,7 +260,6 @@ Flags:
       --wait                Wait for resources to be ready
       --timeout duration    Wait timeout (default: 5m)
       --no-prune            Skip stale resource pruning
-      --max-history int     Maximum change history entries (default: 10)
       --force               Allow empty render to prune all resources
       --kubeconfig string   Path to kubeconfig
       --context string      Kubernetes context

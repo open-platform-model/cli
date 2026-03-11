@@ -29,20 +29,20 @@ The CI workflow SHALL run the lint and unit jobs concurrently with no dependency
 - **WHEN** the CI workflow triggers
 - **THEN** both jobs start simultaneously without waiting for the other
 
-### Requirement: Workflow targets self-hosted runner
-The CI workflow SHALL specify `runs-on: self-hosted` for all jobs.
+### Requirement: Workflow targets GitHub-hosted runner
+The CI workflow SHALL specify `runs-on: ubuntu-latest` for all jobs.
 
-#### Scenario: Self-hosted runner assignment
+#### Scenario: GitHub-hosted runner assignment
 - **WHEN** the workflow triggers
-- **THEN** all jobs are assigned to the self-hosted runner pool
+- **THEN** all jobs are assigned to the `ubuntu-latest` runner pool
 
-### Requirement: Workflow is initially disabled
-The CI workflow SHALL use only `workflow_dispatch` as an active trigger. Push triggers SHALL be present but commented out.
+### Requirement: Workflow is active immediately
+The CI workflow SHALL use `push` to any branch and `workflow_dispatch` as active triggers.
 
 #### Scenario: Manual trigger works
 - **WHEN** a user manually dispatches the workflow from the GitHub UI
 - **THEN** the workflow runs lint and unit jobs
 
-#### Scenario: Push does not trigger workflow
-- **WHEN** a commit is pushed before the self-hosted runner is available
-- **THEN** the workflow does not run automatically
+#### Scenario: Push triggers workflow
+- **WHEN** a commit is pushed
+- **THEN** the workflow runs automatically

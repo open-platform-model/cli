@@ -36,20 +36,20 @@ The registry test job SHALL set the `OPM_REGISTRY` environment variable to allow
 - **WHEN** the registry job runs `go test ./internal/builder/...`
 - **THEN** `OPM_REGISTRY` is set to the configured registry value
 
-### Requirement: Workflow targets self-hosted runner
-The PR workflow SHALL specify `runs-on: self-hosted` for all jobs.
+### Requirement: Workflow targets GitHub-hosted runner
+The PR workflow SHALL specify `runs-on: ubuntu-latest` for all jobs.
 
-#### Scenario: Self-hosted runner assignment
+#### Scenario: GitHub-hosted runner assignment
 - **WHEN** the PR workflow triggers
-- **THEN** all jobs are assigned to the self-hosted runner pool
+- **THEN** all jobs are assigned to the `ubuntu-latest` runner pool
 
-### Requirement: Workflow is initially disabled
-The PR workflow SHALL use only `workflow_dispatch` as an active trigger. Pull request triggers SHALL be present but commented out.
+### Requirement: Workflow is active immediately
+The PR workflow SHALL use `pull_request` (targeting main) and `workflow_dispatch` as active triggers.
 
 #### Scenario: Manual trigger works
 - **WHEN** a user manually dispatches the workflow
 - **THEN** all test jobs run
 
-#### Scenario: PR does not trigger workflow automatically
-- **WHEN** a pull request is opened before the self-hosted runner is available
-- **THEN** the workflow does not run automatically
+#### Scenario: PR triggers workflow automatically
+- **WHEN** a pull request is opened or synchronized
+- **THEN** the workflow runs automatically

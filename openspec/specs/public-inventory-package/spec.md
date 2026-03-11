@@ -1,32 +1,41 @@
 ## Purpose
 
-Defines the public reusable inventory package boundary so non-CLI components can consume the same inventory contract as the CLI.
+Defines the public reusable inventory package boundary so non-CLI components can consume the same ownership inventory contract as the CLI.
 
 ## Requirements
 
 ### Requirement: Inventory contract is exposed as a public package
 
-The reusable inventory contract SHALL be available from a public `pkg/inventory` package so non-CLI components can consume the same inventory types and Secret serialization contract as the CLI.
+The reusable inventory contract SHALL be available from a public `pkg/inventory` package so non-CLI components can consume the same ownership inventory types and helpers as the CLI.
 
 #### Scenario: Controller imports public inventory package
 
-- **WHEN** a future controller needs to read or write OPM inventory Secrets
-- **THEN** it SHALL be able to import `pkg/inventory` without importing CLI command packages
+- **WHEN** a future controller needs to compute stale resources or persist current owned resources in release status
+- **THEN** it SHALL be able to import `pkg/inventory` without importing CLI command packages or storage-specific history types
 
-### Requirement: Public inventory package contains only reusable contract concerns
+### Requirement: Public inventory package contains only reusable ownership concerns
 
-The public inventory package SHALL expose the inventory model, naming helpers, serialization helpers, provenance helpers, and pure change-history or identity helpers. It MUST NOT require CLI output packages or CLI-specific command dependencies.
+The public inventory package SHALL expose ownership inventory types, identity helpers, stale-set helpers, and any pure digest or sort helpers needed to reason about the current owned resource set. It MUST NOT require CLI output packages, CLI-specific command dependencies, or history-bearing storage types.
 
-#### Scenario: Public inventory package stays decoupled from CLI output
+#### Scenario: Public inventory package stays decoupled from storage history
 
 - **WHEN** a consumer imports `pkg/inventory`
-- **THEN** it SHALL NOT be required to import CLI output or command packages
+- **THEN** it SHALL NOT be required to import change-history types, storage codecs, or source/version metadata types to use the ownership contract
 
-### Requirement: Public inventory package preserves the existing wire contract
+### Requirement: Persisted release record may keep metadata outside the public ownership contract
 
-Moving inventory helpers to `pkg/inventory` SHALL NOT change the inventory Secret name format, label selector contract, serialized data keys, or JSON field names used by existing inventories.
+The CLI MAY persist a release inventory record that includes top-level `createdBy`, `releaseMetadata`, and `moduleMetadata` around the ownership-only inventory payload. Those persisted metadata fields SHALL NOT expand the public ownership contract exposed by `pkg/inventory`.
 
-#### Scenario: Existing inventory remains readable after package move
+#### Scenario: Persisted record keeps CLI metadata while public inventory stays small
 
-- **WHEN** an inventory Secret written before the package move is read through `pkg/inventory`
-- **THEN** it SHALL deserialize successfully without migration
+- **WHEN** the CLI persists release or module metadata alongside the current owned resource set
+- **THEN** a consumer importing `pkg/inventory` SHALL still see only the reusable ownership types and helpers
+
+### Requirement: Storage representation does not define the public contract
+
+Inventory persistence MAY use a Secret or another storage mechanism, but the storage representation SHALL NOT define the core public inventory API.
+
+#### Scenario: Persisted inventory remains independent from storage shape
+
+- **WHEN** the CLI or a future controller persists an ownership inventory
+- **THEN** the public ownership inventory API SHALL remain independent from the details of that storage representation

@@ -19,7 +19,7 @@ Three distinct test tiers exist, each with different infrastructure requirements
 
 Lint tooling: `golangci-lint run ./...` (config in `.golangci.yml`).
 
-A self-hosted runner will be provided later. All workflows are pre-wired but disabled until then.
+All workflows target standard GitHub-hosted runners (`ubuntu-latest`) and are fully active.
 
 ## Goals / Non-Goals
 
@@ -28,7 +28,7 @@ A self-hosted runner will be provided later. All workflows are pre-wired but dis
 - Automated lint + unit tests on every push
 - Full test suite gating PRs (lint, unit, registry, integration, e2e)
 - Goreleaser-based release pipeline on `v*` tags producing raw binaries + checksums + changelog
-- All workflows pre-wired but initially disabled (self-hosted runner not yet available)
+- All workflows target GitHub-hosted runners (`ubuntu-latest`) and are fully active.
 
 **Non-Goals:**
 
@@ -53,7 +53,7 @@ A self-hosted runner will be provided later. All workflows are pre-wired but dis
 ### ci.yml — Commit Checks
 
 ```text
-Trigger: push to any branch (disabled: workflow_dispatch only)
+Trigger: push to any branch and workflow_dispatch
 
 ┌──────────────────────────────────────────────┐
 │ ci.yml                                       │
@@ -85,7 +85,7 @@ Trigger: push to any branch (disabled: workflow_dispatch only)
 ### pr.yml — Pull Request Checks
 
 ```text
-Trigger: pull_request targeting main (disabled: workflow_dispatch only)
+Trigger: pull_request targeting main and workflow_dispatch
 
 ┌──────────────────────────────────────────────────────────────────┐
 │ pr.yml                                                           │
@@ -142,7 +142,7 @@ E2e tests build the `opm` binary internally via `TestMain` and shell out to it. 
 ### release.yml — Tag Release
 
 ```text
-Trigger: push tags v* (disabled: workflow_dispatch only)
+Trigger: push tags v* and workflow_dispatch
 
 ┌───────────────────────────────────────────────────────────┐
 │ release.yml                                               │
@@ -269,23 +269,19 @@ changelog:
 
 **Changelog groups** map directly to the project's conventional commit types defined in AGENTS.md. The `Other` catch-all captures anything that passes the exclude filter but doesn't match a named group.
 
-## Disablement and Activation
+## Workflow Triggers
 
-All three workflows follow the same pattern:
+All three workflows are fully active:
 
 ```yaml
 on:
   workflow_dispatch:  # Manual trigger for testing
-  # Uncomment when self-hosted runner is available:
-  # push:
-  #   branches: ['**']
+  push:
+    branches: ['**']
 ```
 
-**To activate** (when the self-hosted runner is registered):
-
-1. Uncomment the real trigger block in each file
-2. Keep `workflow_dispatch` alongside for manual runs
-3. No other changes needed — `runs-on: self-hosted` is already set
+**To use them**:
+No extra configuration is needed. They run automatically on standard GitHub-hosted `ubuntu-latest` runners.
 
 ## Environment Variables and Secrets
 
@@ -304,21 +300,21 @@ on:
 
 `OPM_REGISTRY` and `CUE_REGISTRY` should both be set — the CUE SDK reads `CUE_REGISTRY` while some project code reads `OPM_REGISTRY`.
 
-## Self-Hosted Runner Requirements
+## Runner Requirements
 
-The runner must have the following available (either pre-installed or via setup actions in workflows):
+The GitHub-hosted `ubuntu-latest` runner provides most of what we need (Docker, Go, Git), but we install specific tools explicitly in the workflows:
 
 ```text
 ┌──────────────────┬────────────┬─────────────────────────────────────────┐
 │ Tool             │ Used by    │ Notes                                   │
 ├──────────────────┼────────────┼─────────────────────────────────────────┤
-│ Go 1.25+         │ all        │ Or installed via actions/setup-go       │
-│ golangci-lint    │ lint jobs  │ Must match .golangci.yml expectations   │
-│ kind             │ integration│ For ephemeral cluster creation          │
-│ kubectl          │ integration│ Usually bundled with kind               │
-│ Docker           │ integration│ Required by kind for node containers    │
-│ goreleaser       │ release    │ Or via goreleaser/goreleaser-action     │
-│ git              │ all        │ Full clone support for changelog        │
+│ Go 1.25+         │ all        │ Installed via actions/setup-go          │
+│ golangci-lint    │ lint jobs  │ Installed via golangci-lint-action      │
+│ kind             │ integration│ Installed via curl during the job       │
+│ kubectl          │ integration│ Not explicitly used, kind handles it    │
+│ Docker           │ integration│ Pre-installed on ubuntu-latest          │
+│ goreleaser       │ release    │ Installed via goreleaser-action         │
+│ git              │ all        │ Pre-installed, fetch-depth:0 for release│
 └──────────────────┴────────────┴─────────────────────────────────────────┘
 ```
 
@@ -330,11 +326,11 @@ Split `ci.yml` (commits), `pr.yml` (PRs), `release.yml` (tags) into separate fil
 
 Alternative considered: One workflow with `if: github.event_name == 'pull_request'` guards. Rejected: harder to read, conditional chains become unwieldy.
 
-### workflow_dispatch-only triggers while disabled
+### Active Triggers
 
-Real triggers are commented out. Only `workflow_dispatch` is active. This keeps the workflow file accurate (the real triggers are visible and documented) while preventing accidental runs. Uncomment triggers when the self-hosted runner is registered.
+All triggers (`push`, `pull_request`, `tags`) are fully active along with `workflow_dispatch`. This ensures continuous testing and automatic releases upon tagging, relying on GitHub-hosted `ubuntu-latest` runners.
 
-Alternative considered: `if: false` on all jobs. Rejected: requires editing every job to re-enable, more fragile.
+Alternative considered: using a self-hosted runner and disabling triggers initially. Rejected: GitHub-hosted runners are ready immediately, avoiding queued blocks and reducing setup overhead.
 
 ### Goreleaser for release artifacts
 
@@ -373,8 +369,6 @@ Use the official `goreleaser/goreleaser-action@v6` rather than installing gorele
 ## Risks / Trade-offs
 
 - [Integration test duration] kind cluster creation adds ~60-90s minimum to every PR → Acceptable; integration tests must run somewhere and this is self-contained.
-- [Self-hosted runner availability] Workflows are inert until the runner is registered → Intentional; workflows are pre-wired and ready to activate.
 - [Goreleaser version drift] The goreleaser-action version should be pinned to prevent surprise breakage → Pin to `@v6`.
 - [Changelog quality] Auto-generated changelog depends on conventional commit discipline → The project already mandates conventional commits (AGENTS.md). Poor commit messages produce poor changelogs.
-- [Registry access in CI] `test:registry` and integration tests require CUE registry reachable from the runner → Document runner requirements; fail clearly if unreachable.
-- [kind + Docker on self-hosted] Integration tests need Docker running on the self-hosted runner for kind → This is a runner setup prerequisite, not a workflow concern.
+- [Registry access in CI] `test:registry` and integration tests require CUE registry reachable from the runner → Handled via environment fallback.

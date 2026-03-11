@@ -57,20 +57,20 @@ The release job SHALL perform a full git checkout (`fetch-depth: 0`) to enable a
 - **WHEN** goreleaser generates the changelog
 - **THEN** it compares against the previous tag correctly using full git history
 
-### Requirement: Workflow targets self-hosted runner
-The release workflow SHALL specify `runs-on: self-hosted` for all jobs.
+### Requirement: Workflow targets GitHub-hosted runner
+The release workflow SHALL specify `runs-on: ubuntu-latest` for all jobs.
 
-#### Scenario: Self-hosted runner assignment
+#### Scenario: GitHub-hosted runner assignment
 - **WHEN** the release workflow triggers
-- **THEN** all jobs are assigned to the self-hosted runner pool
+- **THEN** all jobs are assigned to the `ubuntu-latest` runner pool
 
-### Requirement: Workflow is initially disabled
-The release workflow SHALL use only `workflow_dispatch` as an active trigger. Tag push triggers SHALL be present but commented out.
+### Requirement: Workflow is active immediately
+The release workflow SHALL use tags matching `v*` and `workflow_dispatch` as active triggers.
 
 #### Scenario: Manual trigger works
 - **WHEN** a user manually dispatches the release workflow
 - **THEN** tests run and goreleaser executes
 
-#### Scenario: Tag push does not trigger workflow automatically
-- **WHEN** a version tag is pushed before the self-hosted runner is available
-- **THEN** the workflow does not run automatically
+#### Scenario: Tag push triggers workflow automatically
+- **WHEN** a version tag is pushed
+- **THEN** the workflow runs automatically

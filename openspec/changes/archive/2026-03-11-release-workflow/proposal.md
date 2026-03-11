@@ -8,7 +8,7 @@ The CLI has no CI/CD pipeline. There is no automated testing on commits or PRs, 
 - Add GitHub Actions workflow (`pr.yml`) that runs the full test suite (lint, unit, registry, integration, e2e) on pull requests
 - Add GitHub Actions workflow (`release.yml`) that runs the full test suite then builds and publishes a GitHub Release via goreleaser on tag pushes
 - Add `.goreleaser.yml` to define build targets, binary artifacts, checksums, and changelog generation
-- All workflows target a self-hosted runner and are initially disabled (triggers commented out, `workflow_dispatch` only)
+- All workflows target GitHub-hosted runners (`ubuntu-latest`) and are active immediately (using `push`, `pull_request`, and `tags` triggers, plus `workflow_dispatch`).
 
 ## Capabilities
 
@@ -24,7 +24,7 @@ The CLI has no CI/CD pipeline. There is no automated testing on commits or PRs, 
 
 - New files: `.github/workflows/ci.yml`, `.github/workflows/pr.yml`, `.github/workflows/release.yml`, `.goreleaser.yml`
 - No changes to application source code
-- Requires a self-hosted GitHub Actions runner (to be configured separately)
-- Requires goreleaser installed on the runner, or via `goreleaser/goreleaser-action`
-- Requires `kind` and `kubectl` on the runner for integration tests
+- Uses GitHub-hosted GitHub Actions runners (`ubuntu-latest`)
+- Uses `goreleaser/goreleaser-action`
+- Uses `curl` to install `kind` for integration tests on the runner
 - SemVer impact: MINOR (new tooling, no breaking changes)

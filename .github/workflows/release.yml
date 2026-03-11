@@ -1,0 +1,77 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  OPM_REGISTRY: 'opmodel.dev=localhost:5000+insecure,registry.cue.works'
+  CUE_REGISTRY: 'opmodel.dev=localhost:5000+insecure,registry.cue.works'
+
+jobs:
+  test:
+    name: Full Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+          
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+      - name: Run unit tests
+        run: go test ./internal/...
+
+      - name: Run registry tests
+        run: go test ./internal/builder/... -v
+
+      - name: Install kind
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+          
+      - name: Create kind cluster
+        run: kind create cluster --name opm-dev --config hack/kind-config.yaml --image kindest/node:v1.34.0
+        
+      - name: Run integration scripts
+        run: |
+          go run tests/integration/deploy/main.go
+          go run tests/integration/inventory-apply/main.go
+          go run tests/integration/inventory-ops/main.go
+          go run tests/integration/mod-list/main.go
+          go run tests/integration/values-flow/main.go
+          
+      - name: Delete kind cluster
+        if: always()
+        run: kind delete cluster --name opm-dev || true
+
+      - name: Run E2E tests
+        run: go test ./tests/e2e/... -v
+
+  release:
+    name: Goreleaser Release
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+          
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

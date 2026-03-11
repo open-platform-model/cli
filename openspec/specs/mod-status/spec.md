@@ -1,27 +1,30 @@
+## Purpose
+
+Defines how `opm mod status` discovers tracked resources from persisted release inventory records and reports release health without requiring module source.
 
 ## Requirements
 
-### Requirement: Status discovers resources via inventory
+### Requirement: Status discovers resources via ownership inventory
 
-The `opm mod status` command SHALL read the inventory Secret for the release to discover its resources. If `--release-id` is provided, it SHALL use `inventory.GetInventory` (direct GET by name, with UUID label fallback). If only `--release-name` is provided, it SHALL use `inventory.FindInventoryByReleaseName` (label scan on inventory Secrets only). Once the inventory is found, it SHALL perform one targeted GET per tracked entry via `inventory.DiscoverResourcesFromInventory`. It MUST NOT require module source or re-rendering. It MUST NOT use a cluster-wide label-scan to discover workload resources.
+The `opm mod status` command SHALL read the persisted release inventory record for the release to discover its tracked resources. If `--release-id` is provided, it SHALL use `inventory.GetInventory` (direct GET by name, with UUID label fallback). If only `--release-name` is provided, it SHALL use `inventory.FindInventoryByReleaseName` (inventory-record lookup by release-name label). Once the inventory is found, it SHALL perform one targeted GET per tracked entry via `inventory.DiscoverResourcesFromInventory`. It MUST NOT require module source or re-rendering. It MUST NOT use a cluster-wide label-scan to discover workload resources.
 
-#### Scenario: Status shows deployed resources via inventory (release-name path)
+#### Scenario: Status shows deployed resources via ownership inventory (release-name path)
 
 - **WHEN** the user runs `opm mod status --release-name my-app -n production`
-- **AND** an inventory Secret exists labeled `module-release.opmodel.dev/name=my-app`
+- **AND** a persisted release inventory record exists labeled `module-release.opmodel.dev/name=my-app`
 - **THEN** the command SHALL fetch each tracked resource via targeted GET
-- **AND** only resources explicitly tracked in the inventory SHALL appear in the output
+- **AND** only resources explicitly tracked in the ownership inventory SHALL appear in the output
 
-#### Scenario: Status shows deployed resources via inventory (release-id path)
+#### Scenario: Status shows deployed resources via ownership inventory (release-id path)
 
 - **WHEN** the user runs `opm mod status --release-id <uuid> -n production`
-- **AND** an inventory Secret exists with that UUID
+- **AND** a persisted release inventory record exists with that UUID
 - **THEN** the command SHALL fetch each tracked resource via targeted GET
 
 #### Scenario: Release not found
 
 - **WHEN** the user runs `opm mod status --release-name my-app -n production`
-- **AND** no inventory Secret exists for that release name in that namespace
+- **AND** no persisted release inventory record exists for that release name in that namespace
 - **THEN** the command SHALL exit with error: `"release 'my-app' not found in namespace 'production'"`
 
 #### Scenario: Kubernetes-generated children not shown
@@ -86,26 +89,36 @@ The `--output`/`-o` flag SHALL accept `wide` as a valid value in addition to `ta
 - **WHEN** the user runs `opm mod status --release-name my-app -n production -o wide`
 - **THEN** the command SHALL render a table with additional columns beyond the default format
 
-### Requirement: Status displays metadata header
+### Requirement: Status header does not depend on inventory change history
 
-The status output SHALL display a metadata header above the resource table containing: release name, module version, namespace, aggregate health status, and a resource summary. All metadata SHALL be sourced from the release inventory — the command MUST NOT require module source or re-rendering.
+The status output SHALL display a metadata header above the resource table containing release name, namespace, aggregate health status, and a resource summary. Module version and ownership metadata SHALL come from the persisted release inventory record (`releaseMetadata`, `moduleMetadata`, `createdBy`) when present. The command SHALL NOT require inventory change-history metadata such as source version, raw values, or per-change timestamps, and it MUST NOT require module source or re-rendering.
 
 The header SHALL include:
-- **Release**: from the release name (resolved from inventory)
-- **Version**: from the latest inventory change source version (omitted if not present, e.g. local modules)
+- **Release**: from the release name resolved from the persisted release inventory record
+- **Version**: from `moduleMetadata.version` when present (omitted when not recorded)
 - **Namespace**: from the resolved Kubernetes configuration
 - **Status**: the aggregate health status (Ready, NotReady, Unknown)
 - **Resources**: total count with breakdown (e.g., "6 total (6 ready)" or "6 total (5 ready, 1 not ready)")
 
+#### Scenario: Status remains functional with ownership-only inventory
+
+- **WHEN** a release has ownership-only inventory and no history-bearing inventory fields
+- **THEN** `opm mod status` SHALL still be able to enumerate resources and show their health
+
+#### Scenario: Status reads deployed module version from module metadata
+
+- **WHEN** a persisted release inventory record includes `moduleMetadata.version`
+- **THEN** the metadata header SHALL use that field for deployed module version display
+
 #### Scenario: Header shows release metadata
 
 - **WHEN** the user runs `opm mod status --release-name jellyfin -n media`
-- **AND** the release inventory records version `1.2.0`
+- **AND** the persisted release inventory record includes `moduleMetadata.version: "1.2.0"`
 - **THEN** the output SHALL begin with a header showing `Release: jellyfin`, `Version: 1.2.0`, `Namespace: media`, the aggregate status, and a resource count summary
 
 #### Scenario: Header omits version when not recorded in inventory
 
-- **WHEN** the release was applied from a local module (no registry version)
+- **WHEN** the persisted release inventory record omits `moduleMetadata.version`
 - **THEN** the header SHALL omit the Version line entirely
 
 #### Scenario: Header shows not ready count
@@ -230,15 +243,15 @@ The command SHALL fail immediately with a clear error message if the Kubernetes 
 
 ### Requirement: Status groups resources by component from inventory
 
-When an inventory Secret is available, the `opm mod status` command SHALL group resources by the `component` field from inventory entries. This eliminates the need to read `component.opmodel.dev/name` labels from the cluster.
+When a persisted release inventory record is available, the `opm mod status` command SHALL group resources by the `component` field from inventory entries. This eliminates the need to read `component.opmodel.dev/name` labels from the cluster.
 
 #### Scenario: Resources grouped by component
 
-- **WHEN** the user runs `opm mod status` and an inventory exists
-- **AND** the inventory tracks 3 resources under component `app` and 2 under component `cache`
+- **WHEN** the user runs `opm mod status` and a persisted release inventory record exists
+- **AND** the ownership inventory tracks 3 resources under component `app` and 2 under component `cache`
 - **THEN** the output SHALL group the resources by component name
 
 #### Scenario: Missing resource shown in status
 
-- **WHEN** the inventory tracks a resource that no longer exists on the cluster
+- **WHEN** the ownership inventory tracks a resource that no longer exists on the cluster
 - **THEN** the status output SHALL show the resource with status "Missing" or equivalent
