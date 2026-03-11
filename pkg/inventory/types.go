@@ -1,9 +1,27 @@
+package inventory
+
+// CreatedBy identifies which tool originally created a release inventory.
+type CreatedBy string
+
+const (
+	CreatedByCLI        CreatedBy = "cli"
+	CreatedByController CreatedBy = "controller"
+)
+
+// NormalizeCreatedBy converts the stored provenance to a supported value.
+// Missing or unknown values are treated as legacy CLI-owned inventories.
+func NormalizeCreatedBy(createdBy CreatedBy) CreatedBy {
+	if createdBy == CreatedByController {
+		return CreatedByController
+	}
+	return CreatedByCLI
+}
+
 // Package inventory provides the release inventory data model, serialization,
-// and Kubernetes CRUD operations for the OPM inventory Secret.
+// naming, provenance, and change history helpers for the OPM inventory Secret.
 //
 // The inventory Secret records the exact set of resources applied per release,
 // enabling automatic pruning, fast discovery, and change history.
-package inventory
 
 // InventoryEntry represents a single tracked Kubernetes resource.
 // Version is excluded from identity comparison to prevent false orphans
@@ -50,22 +68,29 @@ type InventoryList struct {
 // under the "releaseMetadata" key. Using kind/apiVersion matching a future CRD
 // schema enables migration from Secret to CRD without changing the data model.
 type ReleaseMetadata struct {
-	Kind               string `json:"kind"`               // "ModuleRelease"
-	APIVersion         string `json:"apiVersion"`         // "core.opmodel.dev/v1alpha1"
-	ReleaseName        string `json:"name"`               // release name (from --release-name), e.g. "mc"
-	ReleaseNamespace   string `json:"namespace"`          // Kubernetes namespace of the release
-	ReleaseID          string `json:"uuid"`               // deterministic UUID v5 release identity
-	LastTransitionTime string `json:"lastTransitionTime"` // RFC 3339
+	Kind               string    `json:"kind"`               // "ModuleRelease"
+	APIVersion         string    `json:"apiVersion"`         // "core.opmodel.dev/v1alpha1"
+	ReleaseName        string    `json:"name"`               // release name (from --release-name), e.g. "mc"
+	ReleaseNamespace   string    `json:"namespace"`          // Kubernetes namespace of the release
+	ReleaseID          string    `json:"uuid"`               // deterministic UUID v5 release identity
+	LastTransitionTime string    `json:"lastTransitionTime"` // RFC 3339
+	CreatedBy          CreatedBy `json:"createdBy,omitempty"`
+}
+
+// NormalizedCreatedBy returns the effective creator, defaulting legacy
+// inventories without the field to CLI ownership.
+func (m ReleaseMetadata) NormalizedCreatedBy() CreatedBy {
+	return NormalizeCreatedBy(m.CreatedBy)
 }
 
 // ModuleMetadata is the module-level metadata stored in the inventory Secret
 // under the "moduleMetadata" key. Using kind/apiVersion matching a future CRD
 // schema enables migration from Secret to CRD without changing the data model.
 type ModuleMetadata struct {
-	Kind       string `json:"kind"`           // "Module"
-	APIVersion string `json:"apiVersion"`     // "core.opmodel.dev/v1alpha1"
-	Name       string `json:"name"`           // canonical module name, e.g. "minecraft"
-	UUID       string `json:"uuid,omitempty"` // module identity UUID (omitted if empty)
+	Kind       string `json:"kind"`
+	APIVersion string `json:"apiVersion"`
+	Name       string `json:"name"`
+	UUID       string `json:"uuid,omitempty"`
 }
 
 // InventorySecret is the full in-memory representation of an inventory Secret.
@@ -75,11 +100,9 @@ type ModuleMetadata struct {
 type InventorySecret struct {
 	ReleaseMetadata ReleaseMetadata
 	ModuleMetadata  ModuleMetadata
-	Index           []string                // ordered change IDs (newest first)
-	Changes         map[string]*ChangeEntry // keyed by "change-sha1-<8chars>"
+	Index           []string
+	Changes         map[string]*ChangeEntry
 
-	// resourceVersion holds the K8s resourceVersion from the last read,
-	// used for optimistic concurrency on writes. Only set by UnmarshalFromSecret.
 	resourceVersion string
 }
 
@@ -87,4 +110,9 @@ type InventorySecret struct {
 // This is populated by UnmarshalFromSecret and used by WriteInventory.
 func (s *InventorySecret) ResourceVersion() string {
 	return s.resourceVersion
+}
+
+// SetResourceVersion stores the Kubernetes resourceVersion for optimistic concurrency.
+func (s *InventorySecret) SetResourceVersion(resourceVersion string) {
+	s.resourceVersion = resourceVersion
 }

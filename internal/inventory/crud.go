@@ -10,6 +10,7 @@ import (
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 	pkgcore "github.com/opmodel/cli/pkg/core"
+	pkginventory "github.com/opmodel/cli/pkg/inventory"
 )
 
 // GetInventory reads the inventory Secret for a release.
@@ -71,9 +72,10 @@ func GetInventory(ctx context.Context, client *kubernetes.Client, releaseName, n
 // with optimistic concurrency — a concurrent write will cause a conflict error.
 //
 // moduleName and moduleUUID are the canonical module name and identity UUID.
-// They are only used when constructing a new InventorySecret (inv.ReleaseMetadata is zero),
-// and are ignored on updates where metadata is preserved from the previous Secret.
-func WriteInventory(ctx context.Context, client *kubernetes.Client, inv *InventorySecret, moduleName, moduleUUID string) error {
+// createdBy records the original creator for newly created inventories.
+// These values are only used when constructing a new InventorySecret and are
+// ignored on updates where metadata is preserved from the previous Secret.
+func WriteInventory(ctx context.Context, client *kubernetes.Client, inv *InventorySecret, moduleName, moduleUUID string, createdBy pkginventory.CreatedBy) error {
 	// On first write (no resourceVersion), populate ModuleMetadata from caller-supplied values.
 	// On updates, ModuleMetadata is already populated from UnmarshalFromSecret — preserve it.
 	if inv.ResourceVersion() == "" && inv.ModuleMetadata.Name == "" {
@@ -83,6 +85,9 @@ func WriteInventory(ctx context.Context, client *kubernetes.Client, inv *Invento
 			Name:       moduleName,
 			UUID:       moduleUUID,
 		}
+	}
+	if inv.ResourceVersion() == "" {
+		inv.ReleaseMetadata.CreatedBy = pkginventory.NormalizeCreatedBy(createdBy)
 	}
 
 	secret, err := MarshalToSecret(inv)

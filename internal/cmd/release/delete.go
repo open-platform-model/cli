@@ -16,6 +16,7 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
+	workflowownership "github.com/opmodel/cli/internal/workflow/ownership"
 	"github.com/opmodel/cli/internal/workflow/query"
 )
 
@@ -102,6 +103,9 @@ func runReleaseDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 	if err != nil {
 		return err
 	}
+	if err := ensureDeleteAllowed(inv); err != nil {
+		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+	}
 
 	releaseLog.Info(fmt.Sprintf("deleting resources in namespace %q", namespace))
 
@@ -143,6 +147,10 @@ func runReleaseDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 		}
 	}
 	return nil
+}
+
+func ensureDeleteAllowed(inv *inventory.InventorySecret) error {
+	return workflowownership.EnsureCLIMutable(inv)
 }
 
 func confirmReleaseDelete(releaseName, releaseID, namespace string) bool {

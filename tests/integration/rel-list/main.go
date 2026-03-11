@@ -25,6 +25,7 @@ import (
 
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
+	"github.com/opmodel/cli/internal/workflow/query"
 )
 
 const (
@@ -134,9 +135,43 @@ func main() {
 	fmt.Println("   OK: namespace correctly populated on each release")
 
 	// ----------------------------------------------------------------
+	// Scenario 2b: Ownership visibility in summaries
+	// ----------------------------------------------------------------
+	step(3, "Ownership visibility - controller and legacy inventories resolve correctly")
+
+	controllerInv, err := inventory.GetInventory(ctx, client, releaseThree, nsB, releaseIDThree)
+	check("reading inventory for controller scenario", err)
+	controllerInv.ReleaseMetadata.CreatedBy = inventory.CreatedByController
+	err = inventory.WriteInventory(ctx, client, controllerInv, moduleName, "", inventory.CreatedByCLI)
+	check("rewriting controller-owned inventory", err)
+
+	legacyInv, err := inventory.GetInventory(ctx, client, releaseTwo, nsA, releaseIDTwo)
+	check("reading inventory for legacy scenario", err)
+	legacyInv.ReleaseMetadata.CreatedBy = ""
+	legacySecret, err := inventory.MarshalToSecret(legacyInv)
+	check("marshaling legacy inventory", err)
+	_, err = client.Clientset.CoreV1().Secrets(nsA).Update(ctx, legacySecret, metav1.UpdateOptions{})
+	check("writing legacy inventory", err)
+
+	controllerRead, err := inventory.GetInventory(ctx, client, releaseThree, nsB, releaseIDThree)
+	check("reading controller-owned inventory", err)
+	legacyRead, err := inventory.GetInventory(ctx, client, releaseTwo, nsA, releaseIDTwo)
+	check("reading legacy inventory", err)
+
+	controllerSummary := query.BuildReleaseSummary(controllerRead)
+	legacySummary := query.BuildReleaseSummary(legacyRead)
+	if controllerSummary.Owner != "controller" {
+		failf("expected controller-owned summary owner, got %q", controllerSummary.Owner)
+	}
+	if legacySummary.Owner != "cli" {
+		failf("expected legacy summary owner cli, got %q", legacySummary.Owner)
+	}
+	fmt.Println("   OK: controller-owned releases show owner=controller and legacy inventories resolve to owner=cli")
+
+	// ----------------------------------------------------------------
 	// Scenario 3: Empty namespace
 	// ----------------------------------------------------------------
-	step(3, "List in empty namespace returns zero results")
+	step(4, "List in empty namespace returns zero results")
 
 	listEmpty, err := inventory.ListInventories(ctx, client, nsEmpty)
 	check("listing inventories in empty namespace", err)
@@ -148,7 +183,7 @@ func main() {
 	// ----------------------------------------------------------------
 	// Scenario 4: Health status accuracy
 	// ----------------------------------------------------------------
-	step(4, "Health status accuracy — delete a resource, verify NotReady")
+	step(5, "Health status accuracy — delete a resource, verify NotReady")
 
 	// All resources are ConfigMaps (passive) so they should all be Ready initially
 	live, missing, err := inventory.DiscoverResourcesFromInventory(ctx, client, listA[0])
@@ -192,7 +227,7 @@ func main() {
 	// ----------------------------------------------------------------
 	// Scenario 5: Metadata correctness
 	// ----------------------------------------------------------------
-	step(5, "Metadata correctness — module name, version, release ID")
+	step(6, "Metadata correctness — module name, version, release ID")
 
 	for _, inv := range listA {
 		// Module name
@@ -250,7 +285,12 @@ func ensureNamespaces(ctx context.Context, client *kubernetes.Client) {
 
 // deployRelease creates ConfigMap resources and an inventory Secret for a release.
 func deployRelease(ctx context.Context, client *kubernetes.Client, name, ns, releaseID string, cmNames []string) {
-	resources := buildResources(name, ns, releaseID, cmNames)
+	inv := buildInventory(name, ns, releaseID, cmNames, inventory.CreatedByCLI)
+	writeRelease(ctx, client, name, ns, inv, cmNames)
+}
+
+func writeRelease(ctx context.Context, client *kubernetes.Client, name, ns string, inv *inventory.InventorySecret, cmNames []string) {
+	resources := buildResources(name, ns, inv.ReleaseMetadata.ReleaseID, cmNames)
 
 	// Apply resources
 	result, err := kubernetes.Apply(ctx, client, resources, name, kubernetes.ApplyOptions{})
@@ -259,7 +299,14 @@ func deployRelease(ctx context.Context, client *kubernetes.Client, name, ns, rel
 		failf("apply errors for %s: %v", name, result.Errors[0])
 	}
 
-	// Build and write inventory
+	inv.ReleaseMetadata.LastTransitionTime = time.Now().UTC().Format(time.RFC3339)
+
+	err = inventory.WriteInventory(ctx, client, inv, moduleName, "", inventory.CreatedByCLI)
+	check(fmt.Sprintf("writing inventory for %s", name), err)
+}
+
+func buildInventory(name, ns, releaseID string, cmNames []string, createdBy inventory.CreatedBy) *inventory.InventorySecret {
+	resources := buildResources(name, ns, releaseID, cmNames)
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
@@ -275,12 +322,12 @@ func deployRelease(ctx context.Context, client *kubernetes.Client, name, ns, rel
 
 	inv := &inventory.InventorySecret{
 		ReleaseMetadata: inventory.ReleaseMetadata{
-			Kind:               "ModuleRelease",
-			APIVersion:         "core.opmodel.dev/v1alpha1",
-			ReleaseName:        name,
-			ReleaseNamespace:   ns,
-			ReleaseID:          releaseID,
-			LastTransitionTime: time.Now().UTC().Format(time.RFC3339),
+			Kind:             "ModuleRelease",
+			APIVersion:       "core.opmodel.dev/v1alpha1",
+			ReleaseName:      name,
+			ReleaseNamespace: ns,
+			ReleaseID:        releaseID,
+			CreatedBy:        createdBy,
 		},
 		ModuleMetadata: inventory.ModuleMetadata{
 			Kind:       "Module",
@@ -290,9 +337,7 @@ func deployRelease(ctx context.Context, client *kubernetes.Client, name, ns, rel
 		Index:   []string{changeID},
 		Changes: map[string]*inventory.ChangeEntry{changeID: changeEntry},
 	}
-
-	err = inventory.WriteInventory(ctx, client, inv, moduleName, "")
-	check(fmt.Sprintf("writing inventory for %s", name), err)
+	return inv
 }
 
 func buildResources(relName, ns, releaseID string, cmNames []string) []*unstructured.Unstructured {

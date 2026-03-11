@@ -123,7 +123,7 @@ func main() {
 
 	// Write inventory after apply so subsequent operations use inventory-first path.
 	inv := buildInventory(resources, releaseName, namespace, releaseID)
-	if err := inventory.WriteInventory(ctx, client, inv, "", ""); err != nil {
+	if err := inventory.WriteInventory(ctx, client, inv, "", "", inventory.CreatedByCLI); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: writing inventory: %v\n", err)
 		os.Exit(1)
 	}

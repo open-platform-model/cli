@@ -11,7 +11,9 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
+	workflowownership "github.com/opmodel/cli/internal/workflow/ownership"
 	workflowrender "github.com/opmodel/cli/internal/workflow/render"
+	pkginventory "github.com/opmodel/cli/pkg/inventory"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -43,7 +45,7 @@ type Request struct {
 	ModuleUUID string
 }
 
-func Execute(ctx context.Context, req Request) error { //nolint:gocyclo
+func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orchestration for apply flow spans validation, apply, prune, and inventory write
 	result := req.Result
 	releaseLog := req.Log
 	namespace := result.Release.Namespace
@@ -60,6 +62,9 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo
 
 	releaseID := result.Release.UUID
 	prevInventory := LoadPreviousInventory(ctx, req.K8sClient, result.Release.Name, namespace, releaseID, req.Options.DryRun, releaseLog)
+	if err := workflowownership.EnsureCLIMutable(prevInventory); err != nil {
+		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+	}
 	prevEntries := PreviousInventoryEntries(prevInventory)
 	currentEntries := CurrentInventoryEntries(result.Resources)
 	staleSet := ComputeStaleInventorySet(prevEntries, currentEntries)
@@ -151,7 +156,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo
 			newOrUpdatedInventory.ReleaseMetadata.LastTransitionTime = changeEntry.Timestamp
 			inventory.PruneHistory(newOrUpdatedInventory, req.Options.MaxHistory)
 
-			if err := inventory.WriteInventory(ctx, req.K8sClient, newOrUpdatedInventory, req.ModuleName, req.ModuleUUID); err != nil {
+			if err := inventory.WriteInventory(ctx, req.K8sClient, newOrUpdatedInventory, req.ModuleName, req.ModuleUUID, pkginventory.CreatedByCLI); err != nil {
 				releaseLog.Warn("failed to write inventory Secret", "error", err)
 			} else {
 				output.Debug("inventory written", "changeID", changeID)

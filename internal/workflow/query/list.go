@@ -13,6 +13,7 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
+	pkginventory "github.com/opmodel/cli/pkg/inventory"
 	"gopkg.in/yaml.v3"
 )
 
@@ -27,6 +28,7 @@ type ReleaseSummary struct {
 	ReleaseID   string `json:"releaseId" yaml:"releaseId"`
 	LastApplied string `json:"lastApplied" yaml:"lastApplied"`
 	Age         string `json:"age" yaml:"age"`
+	Owner       string `json:"owner" yaml:"owner"`
 }
 
 type releaseHealthResult struct {
@@ -83,6 +85,7 @@ func BuildReleaseSummary(inv *inventory.InventorySecret) ReleaseSummary {
 		Module:    inv.ModuleMetadata.Name,
 		Namespace: inv.ReleaseMetadata.ReleaseNamespace,
 		ReleaseID: inv.ReleaseMetadata.ReleaseID,
+		Owner:     string(pkginventory.NormalizeCreatedBy(inv.ReleaseMetadata.CreatedBy)),
 	}
 	if len(inv.Index) > 0 {
 		if change, ok := inv.Changes[inv.Index[0]]; ok {
@@ -108,7 +111,7 @@ func BuildReleaseSummary(inv *inventory.InventorySecret) ReleaseSummary {
 }
 
 func RenderReleaseListOutput(summaries []ReleaseSummary, format output.Format, allNamespaces bool) error {
-	switch format { //nolint:exhaustive
+	switch format { //nolint:exhaustive // output.ParseFormat constrains values before this switch
 	case output.FormatJSON:
 		data, err := json.MarshalIndent(summaries, "", "  ")
 		if err != nil {
@@ -148,13 +151,13 @@ func renderReleaseListTable(summaries []ReleaseSummary, allNamespaces, wide bool
 	var headers []string
 	switch {
 	case allNamespaces && wide:
-		headers = []string{"NAMESPACE", "NAME", "MODULE", "VERSION", "STATUS", "AGE", "RELEASE-ID", "LAST-APPLIED"}
+		headers = []string{"NAMESPACE", "NAME", "MODULE", "OWNER", "VERSION", "STATUS", "AGE", "RELEASE-ID", "LAST-APPLIED"}
 	case allNamespaces:
-		headers = []string{"NAMESPACE", "NAME", "MODULE", "VERSION", "STATUS", "AGE"}
+		headers = []string{"NAMESPACE", "NAME", "MODULE", "OWNER", "VERSION", "STATUS", "AGE"}
 	case wide:
-		headers = []string{"NAME", "MODULE", "VERSION", "STATUS", "AGE", "RELEASE-ID", "LAST-APPLIED"}
+		headers = []string{"NAME", "MODULE", "OWNER", "VERSION", "STATUS", "AGE", "RELEASE-ID", "LAST-APPLIED"}
 	default:
-		headers = []string{"NAME", "MODULE", "VERSION", "STATUS", "AGE"}
+		headers = []string{"NAME", "MODULE", "OWNER", "VERSION", "STATUS", "AGE"}
 	}
 
 	tbl := output.NewTable(headers...)
@@ -163,13 +166,13 @@ func renderReleaseListTable(summaries []ReleaseSummary, allNamespaces, wide bool
 		status := formatStatusColumn(s.Status, s.ReadyCount, s.TotalCount)
 		switch {
 		case allNamespaces && wide:
-			tbl.Row(s.Namespace, s.Name, s.Module, s.Version, status, s.Age, s.ReleaseID, s.LastApplied)
+			tbl.Row(s.Namespace, s.Name, s.Module, s.Owner, s.Version, status, s.Age, s.ReleaseID, s.LastApplied)
 		case allNamespaces:
-			tbl.Row(s.Namespace, s.Name, s.Module, s.Version, status, s.Age)
+			tbl.Row(s.Namespace, s.Name, s.Module, s.Owner, s.Version, status, s.Age)
 		case wide:
-			tbl.Row(s.Name, s.Module, s.Version, status, s.Age, s.ReleaseID, s.LastApplied)
+			tbl.Row(s.Name, s.Module, s.Owner, s.Version, status, s.Age, s.ReleaseID, s.LastApplied)
 		default:
-			tbl.Row(s.Name, s.Module, s.Version, status, s.Age)
+			tbl.Row(s.Name, s.Module, s.Owner, s.Version, status, s.Age)
 		}
 	}
 	output.Println(tbl.String())

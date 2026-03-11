@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/opmodel/cli/internal/inventory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -94,6 +95,12 @@ func TestNewReleaseDeleteCmd(t *testing.T) {
 	assert.Equal(t, "delete <file|name|uuid>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotNil(t, cmd.Flags().Lookup("dry-run"), "--dry-run flag should be registered")
+}
+
+func TestEnsureDeleteAllowed_BlocksControllerManagedRelease(t *testing.T) {
+	err := ensureDeleteAllowed(&inventory.InventorySecret{ReleaseMetadata: inventory.ReleaseMetadata{ReleaseName: "demo", ReleaseNamespace: "apps", CreatedBy: inventory.CreatedByController}})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "controller-managed")
 }
 
 func TestNewReleaseListCmd(t *testing.T) {

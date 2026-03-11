@@ -96,7 +96,7 @@ func main() {
 	inv.Changes[computedID] = changeEntry
 	inv.Index = inventory.UpdateIndex(inv.Index, computedID)
 
-	err = inventory.WriteInventory(ctx, client, inv, "", "")
+	err = inventory.WriteInventory(ctx, client, inv, "", "", inventory.CreatedByCLI)
 	check("writing inventory", err)
 	fmt.Println("   OK: inventory written")
 
@@ -179,7 +179,7 @@ func main() {
 	_, changeEntry2 := inventory.PrepareChange(source, "", digest, currentEntries)
 	readInv2.Changes[computedID] = changeEntry2
 	readInv2.Index = inventory.UpdateIndex(readInv2.Index, computedID)
-	err = inventory.WriteInventory(ctx, client, readInv2, "", "")
+	err = inventory.WriteInventory(ctx, client, readInv2, "", "", inventory.CreatedByCLI)
 	check("writing inventory on re-apply", err)
 
 	readInv3, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
@@ -232,7 +232,7 @@ func main() {
 	newID, newChange := inventory.PrepareChange(source, "", newDigest, newEntries)
 	readInv4.Changes[newID] = newChange
 	readInv4.Index = inventory.UpdateIndex(readInv4.Index, newID)
-	err = inventory.WriteInventory(ctx, client, readInv4, "", "")
+	err = inventory.WriteInventory(ctx, client, readInv4, "", "", inventory.CreatedByCLI)
 	check("writing inventory after rename", err)
 
 	// Verify inventory now tracks [cm-a, cm-c].

@@ -92,7 +92,7 @@ func main() {
 	fmt.Printf("   OK: %d resources applied\n", len(resources))
 
 	inv := buildInventory(resources)
-	err = inventory.WriteInventory(ctx, client, inv, moduleName, "")
+	err = inventory.WriteInventory(ctx, client, inv, moduleName, "", inventory.CreatedByCLI)
 	check("writing inventory", err)
 	fmt.Println("   OK: inventory written")
 

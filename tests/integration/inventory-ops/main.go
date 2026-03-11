@@ -15,6 +15,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -22,8 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
+	workflowquery "github.com/opmodel/cli/internal/workflow/query"
+	pkginventory "github.com/opmodel/cli/pkg/inventory"
 )
 
 const (
@@ -74,7 +78,7 @@ func main() {
 	fmt.Println("   OK: cm-a and svc-a applied")
 
 	inv65 := buildInventory(res65all)
-	err = inventory.WriteInventory(ctx, client, inv65, "", "")
+	err = inventory.WriteInventory(ctx, client, inv65, "", "", inventory.CreatedByCLI)
 	check("writing inventory for 6.5", err)
 	fmt.Println("   OK: inventory written tracking [cm-a, svc-a]")
 
@@ -121,7 +125,7 @@ func main() {
 	fmt.Println("   OK: cm-a and svc-a applied")
 
 	inv67 := buildInventory(res67all)
-	err = inventory.WriteInventory(ctx, client, inv67, "", "")
+	err = inventory.WriteInventory(ctx, client, inv67, "", "", inventory.CreatedByCLI)
 	check("writing inventory for 6.7", err)
 	fmt.Println("   OK: inventory written")
 
@@ -173,7 +177,7 @@ func main() {
 	fmt.Println("   OK: cm-a and svc-a applied")
 
 	inv68 := buildInventory(res68all)
-	err = inventory.WriteInventory(ctx, client, inv68, "", "")
+	err = inventory.WriteInventory(ctx, client, inv68, "", "", inventory.CreatedByCLI)
 	check("writing inventory for 6.8", err)
 	fmt.Println("   OK: inventory written")
 
@@ -244,6 +248,19 @@ func main() {
 		failf("6.8: expected AggregateStatus to be non-Ready due to missing resource, got Ready")
 	}
 	fmt.Printf("   OK: AggregateStatus = %q (not Ready)\n", statusResult.AggregateStatus)
+
+	readInv68.ReleaseMetadata.CreatedBy = pkginventory.CreatedByController
+	statusOpts := workflowquery.BuildStatusOptions(namespace, &cmdutil.ReleaseSelectorFlags{ReleaseName: releaseName, ReleaseID: releaseID}, "table", false, readInv68, liveResources68, missingResources68)
+	statusResult.Owner = statusOpts.Owner
+	formatted, err := kubernetes.FormatStatus(statusResult, "table")
+	check("formatting controller-managed status", err)
+	if !contains(formatted, "Owner:      controller") {
+		failf("6.8: expected formatted status to show controller owner, got: %s", formatted)
+	}
+	if !contains(formatted, "controller-managed release") {
+		failf("6.8: expected formatted status warning for controller-managed release")
+	}
+	fmt.Println("   OK: status formatting shows owner and controller-managed warning")
 
 	// Cleanup.
 	fmt.Println()
@@ -451,4 +468,8 @@ func check(label string, err error) {
 func failf(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, "FAIL: "+format+"\n", args...)
 	os.Exit(1)
+}
+
+func contains(s, want string) bool {
+	return strings.Contains(s, want)
 }

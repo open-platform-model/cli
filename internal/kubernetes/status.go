@@ -39,6 +39,9 @@ type StatusOptions struct {
 	// Empty for local modules.
 	Version string
 
+	// Owner is the effective owner of the release from inventory provenance.
+	Owner string
+
 	// ComponentMap maps "Kind/Namespace/Name" to component name, built from inventory entries.
 	ComponentMap map[string]string
 
@@ -114,6 +117,8 @@ type StatusResult struct {
 	ReleaseName string `json:"releaseName" yaml:"releaseName"`
 	// Version is the module version (empty for local modules).
 	Version string `json:"version,omitempty" yaml:"version,omitempty"`
+	// Owner is the effective owner of the release.
+	Owner string `json:"owner" yaml:"owner"`
 	// Namespace is the Kubernetes namespace.
 	Namespace string `json:"namespace" yaml:"namespace"`
 	// Resources is the list of resource health statuses.
@@ -151,6 +156,7 @@ func GetReleaseStatus(ctx context.Context, client *Client, opts StatusOptions) (
 	result := &StatusResult{
 		ReleaseName: opts.ReleaseName,
 		Version:     opts.Version,
+		Owner:       opts.Owner,
 		Namespace:   opts.Namespace,
 	}
 	allReady := true
@@ -296,6 +302,9 @@ func formatStatusHeader(result *StatusResult) string {
 	if result.Version != "" {
 		fmt.Fprintf(&sb, "Version:    %s\n", result.Version)
 	}
+	if result.Owner != "" {
+		fmt.Fprintf(&sb, "Owner:      %s\n", result.Owner)
+	}
 	fmt.Fprintf(&sb, "Namespace:  %s\n", output.StyleNoun(result.Namespace))
 	fmt.Fprintf(&sb, "Status:     %s\n", output.FormatHealthStatus(string(result.AggregateStatus)))
 	fmt.Fprintf(&sb, "Resources:  %d total (%d ready", result.Summary.Total, result.Summary.Ready)
@@ -303,6 +312,9 @@ func formatStatusHeader(result *StatusResult) string {
 		fmt.Fprintf(&sb, ", %d not ready", result.Summary.NotReady)
 	}
 	sb.WriteString(")\n")
+	if result.Owner == "controller" {
+		sb.WriteString("Warning:   controller-managed release; the CLI can inspect it but cannot mutate it\n")
+	}
 	return sb.String()
 }
 

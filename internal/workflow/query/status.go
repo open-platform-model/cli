@@ -11,6 +11,7 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
+	pkginventory "github.com/opmodel/cli/pkg/inventory"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -31,8 +32,7 @@ func ResolveInventory(
 	rsf *cmdutil.ReleaseSelectorFlags,
 	namespace string,
 	releaseLog *log.Logger,
-) (*inventory.InventorySecret, []*unstructured.Unstructured, []inventory.InventoryEntry, error) {
-	var inv *inventory.InventorySecret
+) (inv *inventory.InventorySecret, live []*unstructured.Unstructured, missing []inventory.InventoryEntry, err error) {
 	var invErr error
 	switch {
 	case rsf.ReleaseID != "":
@@ -47,7 +47,8 @@ func ResolveInventory(
 
 	if invErr != nil {
 		releaseLog.Error("reading inventory", "error", invErr)
-		return nil, nil, nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("reading inventory: %w", invErr)}
+		err = &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("reading inventory: %w", invErr)}
+		return nil, nil, nil, err
 	}
 
 	if inv == nil {
@@ -57,16 +58,20 @@ func ResolveInventory(
 		}
 		notFound := &kubernetes.ReleaseNotFoundError{Name: name, Namespace: namespace}
 		releaseLog.Error("release not found", "name", name, "namespace", namespace)
-		return nil, nil, nil, &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: notFound, Printed: true}
+		err = &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: notFound, Printed: true}
+		return nil, nil, nil, err
 	}
 
 	liveResources, missingEntries, discoverErr := inventory.DiscoverResourcesFromInventory(ctx, client, inv)
 	if discoverErr != nil {
 		releaseLog.Error("discovering resources from inventory", "error", discoverErr)
-		return nil, nil, nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("discovering resources: %w", discoverErr)}
+		err = &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("discovering resources: %w", discoverErr)}
+		return nil, nil, nil, err
 	}
 
-	return inv, liveResources, missingEntries, nil
+	live = liveResources
+	missing = missingEntries
+	return inv, live, missing, nil
 }
 
 func BuildStatusOptions(namespace string, rsf *cmdutil.ReleaseSelectorFlags, outputFormat output.Format, verbose bool, inv *inventory.InventorySecret, liveResources []*unstructured.Unstructured, missingEntries []inventory.InventoryEntry) kubernetes.StatusOptions {
@@ -87,6 +92,7 @@ func BuildStatusOptions(namespace string, rsf *cmdutil.ReleaseSelectorFlags, out
 		ReleaseName:   rsf.ReleaseName,
 		ReleaseID:     rsf.ReleaseID,
 		Version:       version,
+		Owner:         string(pkginventory.NormalizeCreatedBy(inv.ReleaseMetadata.CreatedBy)),
 		ComponentMap:  componentMap,
 		OutputFormat:  outputFormat,
 		InventoryLive: liveResources,

@@ -40,6 +40,7 @@ func makeTestInventoryWithModuleName(moduleName, releaseName, namespace, release
 			ReleaseNamespace:   namespace,
 			ReleaseID:          releaseID,
 			LastTransitionTime: "2026-01-01T00:00:00Z",
+			CreatedBy:          inventory.CreatedByCLI,
 		},
 		ModuleMetadata: inventory.ModuleMetadata{
 			Kind:       "Module",
@@ -118,7 +119,7 @@ func TestWriteInventory_Create_NewSecret(t *testing.T) {
 
 	testInv := makeTestInventory("myapp", "default", "uuid-new")
 	// No resourceVersion = this is a Create
-	err := inventory.WriteInventory(ctx, client, testInv, "myapp-module", "")
+	err := inventory.WriteInventory(ctx, client, testInv, "myapp-module", "", inventory.CreatedByCLI)
 	require.NoError(t, err)
 
 	// Verify the Secret was created
@@ -151,7 +152,7 @@ func TestWriteInventory_Update_ExistingSecret(t *testing.T) {
 		Timestamp: "2026-01-02T00:00:00Z",
 	}
 
-	err = inventory.WriteInventory(ctx, client, inv, "", "")
+	err = inventory.WriteInventory(ctx, client, inv, "", "", inventory.CreatedByCLI)
 	require.NoError(t, err)
 
 	// Verify the update was applied
@@ -275,7 +276,7 @@ func TestWriteInventory_ModuleMetadata_SetAtCreate(t *testing.T) {
 		Changes: map[string]*inventory.ChangeEntry{},
 	}
 
-	err := inventory.WriteInventory(ctx, client, inv, "minecraft", "mod-uuid-abc")
+	err := inventory.WriteInventory(ctx, client, inv, "minecraft", "mod-uuid-abc", inventory.CreatedByCLI)
 	require.NoError(t, err)
 
 	// Read back and verify ModuleMetadata was populated
@@ -285,6 +286,7 @@ func TestWriteInventory_ModuleMetadata_SetAtCreate(t *testing.T) {
 	assert.Equal(t, "minecraft", result.ModuleMetadata.Name)
 	assert.Equal(t, "Module", result.ModuleMetadata.Kind)
 	assert.Equal(t, "mod-uuid-abc", result.ModuleMetadata.UUID)
+	assert.Equal(t, inventory.CreatedByCLI, result.ReleaseMetadata.NormalizedCreatedBy())
 }
 
 func TestWriteInventory_ModuleMetadata_PreservedOnUpdate(t *testing.T) {
@@ -323,7 +325,7 @@ func TestWriteInventory_ModuleMetadata_PreservedOnUpdate(t *testing.T) {
 	existing.Index = []string{"change-sha1-aabbccdd"}
 	existing.Changes["change-sha1-aabbccdd"] = &inventory.ChangeEntry{Timestamp: "2026-02-01T00:00:00Z"}
 
-	err = inventory.WriteInventory(ctx, client, existing, "", "")
+	err = inventory.WriteInventory(ctx, client, existing, "", "", inventory.CreatedByCLI)
 	require.NoError(t, err)
 
 	// Verify ModuleMetadata is still intact
@@ -332,4 +334,37 @@ func TestWriteInventory_ModuleMetadata_PreservedOnUpdate(t *testing.T) {
 	require.NotNil(t, updated)
 	assert.Equal(t, "minecraft", updated.ModuleMetadata.Name, "module name must be preserved on update")
 	assert.Equal(t, "mod-uuid-abc", updated.ModuleMetadata.UUID, "module UUID must be preserved on update")
+	assert.Equal(t, inventory.CreatedByCLI, updated.ReleaseMetadata.NormalizedCreatedBy(), "createdBy must be preserved on update")
+}
+
+func TestWriteInventory_SetsCreatedByOnCreate(t *testing.T) {
+	client := makeTestClient()
+	ctx := context.Background()
+
+	inv := &inventory.InventorySecret{
+		ReleaseMetadata: inventory.ReleaseMetadata{
+			Kind:             "ModuleRelease",
+			APIVersion:       "core.opmodel.dev/v1alpha1",
+			ReleaseName:      "demo",
+			ReleaseNamespace: "default",
+			ReleaseID:        "uuid-created-by",
+		},
+		Index:   []string{},
+		Changes: map[string]*inventory.ChangeEntry{},
+	}
+
+	err := inventory.WriteInventory(ctx, client, inv, "demo-module", "", inventory.CreatedByController)
+	require.NoError(t, err)
+
+	stored, err := inventory.GetInventory(ctx, client, "demo", "default", "uuid-created-by")
+	require.NoError(t, err)
+	require.NotNil(t, stored)
+	assert.Equal(t, inventory.CreatedByController, stored.ReleaseMetadata.CreatedBy)
+	assert.Equal(t, inventory.CreatedByController, stored.ReleaseMetadata.NormalizedCreatedBy())
+}
+
+func TestLegacyInventoryCreatedByDefaultsToCLI(t *testing.T) {
+	legacy := makeTestInventory("demo", "default", "uuid-legacy")
+	legacy.ReleaseMetadata.CreatedBy = ""
+	assert.Equal(t, inventory.CreatedByCLI, legacy.ReleaseMetadata.NormalizedCreatedBy())
 }
