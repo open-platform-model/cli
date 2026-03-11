@@ -41,7 +41,7 @@ func TestMain(m *testing.M) {
 	// Write a dummy config.cue directly to avoid external CUE resolution issues
 	// We only want a stub provider definition for vet tests, without importing anything from registry
 	opmDir := filepath.Join(homeDir, ".opm")
-	if err := os.MkdirAll(opmDir, 0755); err != nil {
+	if err := os.MkdirAll(opmDir, 0o755); err != nil {
 		os.RemoveAll(tmpDir)
 		panic("failed to create .opm dir: " + err.Error())
 	}
@@ -55,7 +55,7 @@ config: {
 		namespace: "default"
 	}
 }`
-	if err := os.WriteFile(filepath.Join(opmDir, "config.cue"), []byte(dummyConfig), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(opmDir, "config.cue"), []byte(dummyConfig), 0o644); err != nil {
 		os.RemoveAll(tmpDir)
 		panic("failed to write dummy config.cue: " + err.Error())
 	}
