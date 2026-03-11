@@ -36,8 +36,8 @@ func TestValidateConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
 	releaseVal := ctx.BuildInstance(releaseInsts[0])
 	require.NoError(t, releaseVal.Err())
 
-	// Load values.cue alone and extract the "values" field (mirrors LoadValuesFile).
-	valuesInsts := load.Instances([]string{"values.cue"}, &load.Config{
+	// Load the invalid values fixture alone and extract the "values" field (mirrors LoadValuesFile).
+	valuesInsts := load.Instances([]string{"values_invalid_1.cue"}, &load.Config{
 		Dir: "../../examples/releases/jellyfin",
 	})
 	require.Len(t, valuesInsts, 1)
@@ -102,7 +102,7 @@ func TestValidateConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
 		assert.NotEmpty(t, positions, "field not allowed errors should have source positions")
 		if len(positions) > 0 {
 			assert.True(t, positions[0].IsValid(), "position should be valid")
-			assert.Contains(t, positions[0].Filename(), "values.cue",
+			assert.Contains(t, positions[0].Filename(), "values_invalid_1.cue",
 				"position should point to values.cue")
 		}
 	}

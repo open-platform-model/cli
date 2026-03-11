@@ -70,7 +70,7 @@ func PrintEvents(ctx context.Context, client *kubernetes.Client, opts kubernetes
 	return nil
 }
 
-func WatchEvents(ctx context.Context, client *kubernetes.Client, opts kubernetes.EventsOptions, logName string) error { //nolint:gocyclo
+func WatchEvents(ctx context.Context, client *kubernetes.Client, opts kubernetes.EventsOptions, logName string) error { //nolint:gocyclo // watch setup, child discovery, and event streaming are coordinated here
 	releaseLog := output.ReleaseLogger(logName)
 
 	ctx, cancel := context.WithCancel(ctx)

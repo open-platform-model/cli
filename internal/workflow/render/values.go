@@ -39,7 +39,6 @@ func resolveReleaseValues(cueCtx *cue.Context, rawRelease cue.Value, releaseFile
 	return []cue.Value{valuesVal}, nil
 }
 
-//nolint:gocyclo
 func loadModuleReleaseForRender(cueCtx *cue.Context, modulePath string, valuesFiles []string, debugValues bool, releaseName string) (*modulerelease.ModuleRelease, []cue.Value, error) {
 	fileRelease, err := internalreleasefile.GetReleaseFile(cueCtx, modulePath)
 	if err != nil {

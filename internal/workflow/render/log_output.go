@@ -32,7 +32,6 @@ func writeTransformerMatches(result *Result) {
 	}
 }
 
-//nolint:gocyclo
 func writeVerboseMatchLog(result *Result) {
 	if result.MatchPlan == nil {
 		return

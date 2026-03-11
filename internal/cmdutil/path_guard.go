@@ -14,7 +14,10 @@ func ValidateModuleInputPath(path string) error {
 
 	info, err := os.Stat(absPath)
 	if err != nil {
-		return nil
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("checking module path %q: %w", absPath, err)
 	}
 
 	if info.IsDir() {
@@ -39,7 +42,10 @@ func ValidateReleaseInputPath(path string) error {
 
 	info, err := os.Stat(absPath)
 	if err != nil {
-		return nil
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("checking release path %q: %w", absPath, err)
 	}
 
 	if info.IsDir() {

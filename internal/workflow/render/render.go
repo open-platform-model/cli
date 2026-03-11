@@ -21,7 +21,7 @@ import (
 	pkgmodule "github.com/opmodel/cli/pkg/module"
 )
 
-func Release(ctx context.Context, opts ReleaseOpts) (*Result, error) { //nolint:gocyclo
+func Release(ctx context.Context, opts ReleaseOpts) (*Result, error) { //nolint:gocyclo // release rendering coordinates multiple validation and load branches
 	modulePath := resolveModulePath(opts.Args)
 
 	if opts.Config == nil {
@@ -158,7 +158,7 @@ func Release(ctx context.Context, opts ReleaseOpts) (*Result, error) { //nolint:
 	}, nil
 }
 
-func ReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error) { //nolint:gocyclo
+func ReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error) { //nolint:gocyclo // release-file rendering coordinates validation, loading, and conversion branches
 	if opts.Config == nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
 	}

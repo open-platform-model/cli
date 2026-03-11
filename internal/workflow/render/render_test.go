@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func mustReleaseMetadata(name, namespace string) modulerelease.ReleaseMetadata { //nolint:unparam
+func mustReleaseMetadata(name, namespace string) modulerelease.ReleaseMetadata {
 	return modulerelease.ReleaseMetadata{Name: name, Namespace: namespace}
 }
 

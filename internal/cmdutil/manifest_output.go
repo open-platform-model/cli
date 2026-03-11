@@ -25,7 +25,7 @@ func ParseManifestOutputFormat(outputFmt string) (output.Format, error) {
 }
 
 // WriteManifestOutput writes manifests either to stdout or split files.
-func WriteManifestOutput(resources []*unstructured.Unstructured, outputFormat output.Format, split bool, outDir string, releaseName string) error {
+func WriteManifestOutput(resources []*unstructured.Unstructured, outputFormat output.Format, split bool, outDir, releaseName string) error {
 	releaseLog := output.ReleaseLogger(releaseName)
 	if split {
 		splitOpts := output.SplitOptions{OutDir: outDir, Format: outputFormat}

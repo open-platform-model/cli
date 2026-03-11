@@ -3,24 +3,10 @@ package cmdutil
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/opmodel/cli/internal/output"
 	pkgerrors "github.com/opmodel/cli/pkg/errors"
 )
-
-// formatFQNList formats a slice of FQN strings into a compact comma-separated
-// list using output.FormatFQN for each entry.
-func formatFQNList(fqns []string) string {
-	if len(fqns) == 0 {
-		return ""
-	}
-	formatted := make([]string, len(fqns))
-	for i, fqn := range fqns {
-		formatted[i] = output.FormatFQN(fqn)
-	}
-	return strings.Join(formatted, ", ")
-}
 
 // PrintValidationError prints a render/validation error in a user-friendly format.
 //

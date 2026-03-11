@@ -14,6 +14,8 @@ const (
 
 // ExitError wraps an error with an exit code.
 // Used by commands to signal specific exit codes to the CLI runner.
+//
+//nolint:revive // exported name is intentionally explicit at package call sites
 type ExitError struct {
 	Code    int
 	Err     error

@@ -31,7 +31,6 @@ func TestRenderFlags_AddTo(t *testing.T) {
 	provFlag := cmd.Flags().Lookup("provider")
 	require.NotNil(t, provFlag)
 	assert.Equal(t, "", provFlag.DefValue)
-
 }
 
 func TestK8sFlags_AddTo(t *testing.T) {

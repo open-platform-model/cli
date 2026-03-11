@@ -63,7 +63,7 @@ Examples:
 	return c
 }
 
-func runReleaseEvents(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag, since, eventType string, watchMode bool, outputFmt string) error { //nolint:gocyclo // linear validation + dispatch
+func runReleaseEvents(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag, since, eventType string, watchMode bool, outputFmt string) error {
 	ctx := context.Background()
 
 	eventsOpts, err := query.ParseEventsOptions(since, eventType, outputFmt, watchMode)
