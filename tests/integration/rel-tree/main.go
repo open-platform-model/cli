@@ -92,7 +92,7 @@ func main() {
 	fmt.Printf("   OK: %d resources applied\n", len(resources))
 
 	inv := buildInventory(resources)
-	err = inventory.WriteInventory(ctx, client, inv, moduleName, "", inventory.CreatedByCLI)
+	err = inventory.WriteInventory(ctx, client, inv, moduleName, "", inv.ModuleMetadata.Version, inventory.CreatedByCLI)
 	check("writing inventory", err)
 	fmt.Println("   OK: inventory written")
 
@@ -116,7 +116,7 @@ func main() {
 	fmt.Printf("   OK: %d live resources discovered from inventory\n", len(liveResources))
 
 	// Build ComponentMap from inventory entries (mirrors command layer logic).
-	entries := readInv.Changes[readInv.Index[0]].Inventory.Entries
+	entries := readInv.Inventory.Entries
 	componentMap := make(map[string]string, len(entries))
 	for _, e := range entries {
 		key := e.Kind + "/" + e.Namespace + "/" + e.Name
@@ -698,20 +698,14 @@ func buildStatefulSet(name, component string) *unstructured.Unstructured {
 // Inventory
 // ─────────────────────────────────────────────────────────────────────────────
 
-func buildInventory(resources []*unstructured.Unstructured) *inventory.InventorySecret {
+func buildInventory(resources []*unstructured.Unstructured) *inventory.ReleaseInventoryRecord {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
 	}
 
-	digest := inventory.ComputeManifestDigest(resources)
-	source := inventory.ChangeSource{
-		Path:        modulePath,
-		Version:     moduleVersion,
-		ReleaseName: releaseName,
-	}
-
-	inv := &inventory.InventorySecret{
+	inv := &inventory.ReleaseInventoryRecord{
+		CreatedBy: inventory.CreatedByCLI,
 		ReleaseMetadata: inventory.ReleaseMetadata{
 			Kind:               "ModuleRelease",
 			APIVersion:         "core.opmodel.dev/v1alpha1",
@@ -724,14 +718,10 @@ func buildInventory(resources []*unstructured.Unstructured) *inventory.Inventory
 			Kind:       "Module",
 			APIVersion: "core.opmodel.dev/v1alpha1",
 			Name:       moduleName,
+			Version:    moduleVersion,
 		},
-		Index:   []string{},
-		Changes: map[string]*inventory.ChangeEntry{},
+		Inventory: inventory.Inventory{Revision: 1, Digest: inventory.ComputeDigest(entries), Count: len(entries), Entries: entries},
 	}
-
-	changeID, changeEntry := inventory.PrepareChange(source, "", digest, entries)
-	inv.Changes[changeID] = changeEntry
-	inv.Index = inventory.UpdateIndex(inv.Index, changeID)
 	return inv
 }
 

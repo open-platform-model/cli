@@ -60,7 +60,7 @@ Examples:
 	return c
 }
 
-func runReleaseTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, depth int, outputFmt string) error { //nolint:gocyclo // mirrors runTree complexity
+func runReleaseTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, depth int, outputFmt string) error {
 	ctx := context.Background()
 
 	if depth < 0 || depth > 2 {
@@ -99,24 +99,16 @@ func runReleaseTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8s
 	}
 
 	componentMap := make(map[string]string)
-	if len(inv.Index) > 0 {
-		if change, ok := inv.Changes[inv.Index[0]]; ok {
-			for _, entry := range change.Inventory.Entries {
-				key := entry.Kind + "/" + entry.Namespace + "/" + entry.Name
-				componentMap[key] = entry.Component
-			}
-		}
+	for _, entry := range inv.Inventory.Entries {
+		key := entry.Kind + "/" + entry.Namespace + "/" + entry.Name
+		componentMap[key] = entry.Component
 	}
 
 	releaseInfo := kubernetes.ReleaseInfo{
 		Name:      inv.ReleaseMetadata.ReleaseName,
 		Namespace: inv.ReleaseMetadata.ReleaseNamespace,
 		Module:    inv.ModuleMetadata.Name,
-	}
-	if len(inv.Index) > 0 {
-		if change, ok := inv.Changes[inv.Index[0]]; ok {
-			releaseInfo.Version = change.Source.Version
-		}
+		Version:   inv.ModuleMetadata.Version,
 	}
 
 	treeOpts := kubernetes.TreeOptions{

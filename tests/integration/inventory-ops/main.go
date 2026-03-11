@@ -27,7 +27,6 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	workflowquery "github.com/opmodel/cli/internal/workflow/query"
-	pkginventory "github.com/opmodel/cli/pkg/inventory"
 )
 
 const (
@@ -78,7 +77,7 @@ func main() {
 	fmt.Println("   OK: cm-a and svc-a applied")
 
 	inv65 := buildInventory(res65all)
-	err = inventory.WriteInventory(ctx, client, inv65, "", "", inventory.CreatedByCLI)
+	err = inventory.WriteInventory(ctx, client, inv65, "", "", inv65.ModuleMetadata.Version, inventory.CreatedByCLI)
 	check("writing inventory for 6.5", err)
 	fmt.Println("   OK: inventory written tracking [cm-a, svc-a]")
 
@@ -125,7 +124,7 @@ func main() {
 	fmt.Println("   OK: cm-a and svc-a applied")
 
 	inv67 := buildInventory(res67all)
-	err = inventory.WriteInventory(ctx, client, inv67, "", "", inventory.CreatedByCLI)
+	err = inventory.WriteInventory(ctx, client, inv67, "", "", inv67.ModuleMetadata.Version, inventory.CreatedByCLI)
 	check("writing inventory for 6.7", err)
 	fmt.Println("   OK: inventory written")
 
@@ -177,7 +176,7 @@ func main() {
 	fmt.Println("   OK: cm-a and svc-a applied")
 
 	inv68 := buildInventory(res68all)
-	err = inventory.WriteInventory(ctx, client, inv68, "", "", inventory.CreatedByCLI)
+	err = inventory.WriteInventory(ctx, client, inv68, "", "", inv68.ModuleMetadata.Version, inventory.CreatedByCLI)
 	check("writing inventory for 6.8", err)
 	fmt.Println("   OK: inventory written")
 
@@ -249,7 +248,7 @@ func main() {
 	}
 	fmt.Printf("   OK: AggregateStatus = %q (not Ready)\n", statusResult.AggregateStatus)
 
-	readInv68.ReleaseMetadata.CreatedBy = pkginventory.CreatedByController
+	readInv68.CreatedBy = inventory.CreatedByController
 	statusOpts := workflowquery.BuildStatusOptions(namespace, &cmdutil.ReleaseSelectorFlags{ReleaseName: releaseName, ReleaseID: releaseID}, "table", false, readInv68, liveResources68, missingResources68)
 	statusResult.Owner = statusOpts.Owner
 	formatted, err := kubernetes.FormatStatus(statusResult, "table")
@@ -352,17 +351,15 @@ func buildServiceResources(names []string) []*unstructured.Unstructured {
 	return res
 }
 
-// buildInventory creates a new InventorySecret from the given resources.
-func buildInventory(resources []*unstructured.Unstructured) *inventory.InventorySecret {
+// buildInventory creates a new release inventory record from the given resources.
+func buildInventory(resources []*unstructured.Unstructured) *inventory.ReleaseInventoryRecord {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
 	}
 
-	digest := inventory.ComputeManifestDigest(resources)
-	source := inventory.ChangeSource{Path: modulePath, Version: moduleVersion, ReleaseName: releaseName}
-
-	inv := &inventory.InventorySecret{
+	inv := &inventory.ReleaseInventoryRecord{
+		CreatedBy: inventory.CreatedByCLI,
 		ReleaseMetadata: inventory.ReleaseMetadata{
 			Kind:             "ModuleRelease",
 			APIVersion:       "core.opmodel.dev/v1alpha1",
@@ -374,14 +371,10 @@ func buildInventory(resources []*unstructured.Unstructured) *inventory.Inventory
 			Kind:       "Module",
 			APIVersion: "core.opmodel.dev/v1alpha1",
 			Name:       releaseName, // module name (same as release name in this test)
+			Version:    moduleVersion,
 		},
-		Index:   []string{},
-		Changes: map[string]*inventory.ChangeEntry{},
+		Inventory: inventory.Inventory{Revision: 1, Digest: inventory.ComputeDigest(entries), Count: len(entries), Entries: entries},
 	}
-
-	changeID, changeEntry := inventory.PrepareChange(source, "", digest, entries)
-	inv.Changes[changeID] = changeEntry
-	inv.Index = inventory.UpdateIndex(inv.Index, changeID)
 	return inv
 }
 

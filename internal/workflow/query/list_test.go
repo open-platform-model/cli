@@ -4,14 +4,14 @@ import (
 	"testing"
 	"time"
 
-	pkginventory "github.com/opmodel/cli/pkg/inventory"
+	"github.com/opmodel/cli/internal/inventory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBuildReleaseSummary(t *testing.T) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	inv := &pkginventory.InventorySecret{ReleaseMetadata: pkginventory.ReleaseMetadata{ReleaseName: "demo", ReleaseNamespace: "apps", ReleaseID: "uuid-1", LastTransitionTime: now}, ModuleMetadata: pkginventory.ModuleMetadata{Name: "module-a"}, Index: []string{"change-1"}, Changes: map[string]*pkginventory.ChangeEntry{"change-1": {Source: pkginventory.ChangeSource{Version: "0.1.0"}, Timestamp: now}}}
+	inv := &inventory.ReleaseInventoryRecord{ReleaseMetadata: inventory.ReleaseMetadata{ReleaseName: "demo", ReleaseNamespace: "apps", ReleaseID: "uuid-1", LastTransitionTime: now}, ModuleMetadata: inventory.ModuleMetadata{Name: "module-a", Version: "0.1.0"}}
 	summary := BuildReleaseSummary(inv)
 	assert.Equal(t, "demo", summary.Name)
 	assert.Equal(t, "module-a", summary.Module)

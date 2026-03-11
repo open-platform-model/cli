@@ -123,7 +123,7 @@ func main() {
 
 	// Write inventory after apply so subsequent operations use inventory-first path.
 	inv := buildInventory(resources, releaseName, namespace, releaseID)
-	if err := inventory.WriteInventory(ctx, client, inv, "", "", inventory.CreatedByCLI); err != nil {
+	if err := inventory.WriteInventory(ctx, client, inv, "", "", inv.ModuleMetadata.Version, inventory.CreatedByCLI); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: writing inventory: %v\n", err)
 		os.Exit(1)
 	}
@@ -265,21 +265,15 @@ func main() {
 	fmt.Println("=== ALL TESTS PASSED ===")
 }
 
-// buildInventory creates an InventorySecret from the given resources.
-func buildInventory(resources []*unstructured.Unstructured, releaseName, namespace, releaseID string) *inventory.InventorySecret {
+// buildInventory creates a release inventory record from the given resources.
+func buildInventory(resources []*unstructured.Unstructured, releaseName, namespace, releaseID string) *inventory.ReleaseInventoryRecord {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
 	}
 
-	digest := inventory.ComputeManifestDigest(resources)
-	source := inventory.ChangeSource{
-		Path:        "tests/integration/deploy",
-		Version:     "0.1.0",
-		ReleaseName: releaseName,
-	}
-
-	inv := &inventory.InventorySecret{
+	inv := &inventory.ReleaseInventoryRecord{
+		CreatedBy: inventory.CreatedByCLI,
 		ReleaseMetadata: inventory.ReleaseMetadata{
 			Kind:             "ModuleRelease",
 			APIVersion:       "core.opmodel.dev/v1alpha1",
@@ -291,13 +285,9 @@ func buildInventory(resources []*unstructured.Unstructured, releaseName, namespa
 			Kind:       "Module",
 			APIVersion: "core.opmodel.dev/v1alpha1",
 			Name:       releaseName,
+			Version:    "0.1.0",
 		},
-		Index:   []string{},
-		Changes: map[string]*inventory.ChangeEntry{},
+		Inventory: inventory.Inventory{Revision: 1, Digest: inventory.ComputeDigest(entries), Count: len(entries), Entries: entries},
 	}
-
-	changeID, changeEntry := inventory.PrepareChange(source, "", digest, entries)
-	inv.Changes[changeID] = changeEntry
-	inv.Index = inventory.UpdateIndex(inv.Index, changeID)
 	return inv
 }

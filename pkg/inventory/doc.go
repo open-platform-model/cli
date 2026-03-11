@@ -1,6 +1,6 @@
-// Package inventory provides the reusable release inventory contract shared by
+// Package inventory provides the reusable ownership inventory contract shared by
 // the CLI and other OPM components.
 //
-// It contains the inventory data model, Secret serialization, naming helpers,
-// provenance metadata, and pure change-history / identity helpers.
+// It contains only ownership-focused data types and pure helpers for reasoning
+// about the current set of Kubernetes resources owned by a release.
 package inventory

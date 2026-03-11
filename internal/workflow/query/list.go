@@ -13,7 +13,6 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
-	pkginventory "github.com/opmodel/cli/pkg/inventory"
 	"gopkg.in/yaml.v3"
 )
 
@@ -38,7 +37,7 @@ type releaseHealthResult struct {
 	total  int
 }
 
-func EvaluateReleaseHealth(ctx context.Context, client *kubernetes.Client, inventories []*inventory.InventorySecret, concurrency int, logDiscoveryFailures bool) []ReleaseSummary {
+func EvaluateReleaseHealth(ctx context.Context, client *kubernetes.Client, inventories []*inventory.ReleaseInventoryRecord, concurrency int, logDiscoveryFailures bool) []ReleaseSummary {
 	summaries := make([]ReleaseSummary, len(inventories))
 	for i, inv := range inventories {
 		summaries[i] = BuildReleaseSummary(inv)
@@ -50,7 +49,7 @@ func EvaluateReleaseHealth(ctx context.Context, client *kubernetes.Client, inven
 
 	for i, inv := range inventories {
 		wg.Add(1)
-		go func(idx int, inv *inventory.InventorySecret) {
+		go func(idx int, inv *inventory.ReleaseInventoryRecord) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -79,20 +78,18 @@ func EvaluateReleaseHealth(ctx context.Context, client *kubernetes.Client, inven
 	return summaries
 }
 
-func BuildReleaseSummary(inv *inventory.InventorySecret) ReleaseSummary {
+func BuildReleaseSummary(inv *inventory.ReleaseInventoryRecord) ReleaseSummary {
 	s := ReleaseSummary{
 		Name:      inv.ReleaseMetadata.ReleaseName,
 		Module:    inv.ModuleMetadata.Name,
 		Namespace: inv.ReleaseMetadata.ReleaseNamespace,
 		ReleaseID: inv.ReleaseMetadata.ReleaseID,
-		Owner:     string(pkginventory.NormalizeCreatedBy(inv.ReleaseMetadata.CreatedBy)),
+		Owner:     string(inventory.NormalizeCreatedBy(inv.CreatedBy)),
 	}
-	if len(inv.Index) > 0 {
-		if change, ok := inv.Changes[inv.Index[0]]; ok {
-			s.Version = change.Source.Version
-			s.LastApplied = change.Timestamp
-		}
+	if inv.ModuleMetadata.Version != "" {
+		s.Version = inv.ModuleMetadata.Version
 	}
+	s.LastApplied = inv.ReleaseMetadata.LastTransitionTime
 	if inv.ReleaseMetadata.LastTransitionTime != "" {
 		if t, err := time.Parse(time.RFC3339, inv.ReleaseMetadata.LastTransitionTime); err == nil {
 			s.Age = kubernetes.FormatDuration(time.Since(t))

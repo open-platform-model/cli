@@ -10,7 +10,6 @@ import (
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 	pkgcore "github.com/opmodel/cli/pkg/core"
-	pkginventory "github.com/opmodel/cli/pkg/inventory"
 )
 
 // GetInventory reads the inventory Secret for a release.
@@ -20,7 +19,7 @@ import (
 //  2. Fallback: list Secrets with label module-release.opmodel.dev/uuid=<releaseID>
 //
 // Returns (nil, nil) on first-time apply when no inventory exists.
-func GetInventory(ctx context.Context, client *kubernetes.Client, releaseName, namespace, releaseID string) (*InventorySecret, error) {
+func GetInventory(ctx context.Context, client *kubernetes.Client, releaseName, namespace, releaseID string) (*ReleaseInventoryRecord, error) {
 	secretName := SecretName(releaseName, releaseID)
 
 	// Primary: direct GET by name
@@ -72,10 +71,11 @@ func GetInventory(ctx context.Context, client *kubernetes.Client, releaseName, n
 // with optimistic concurrency — a concurrent write will cause a conflict error.
 //
 // moduleName and moduleUUID are the canonical module name and identity UUID.
+// moduleVersion is the deployed module version for versioned modules.
 // createdBy records the original creator for newly created inventories.
-// These values are only used when constructing a new InventorySecret and are
+// These values are only used when constructing a new release inventory record and are
 // ignored on updates where metadata is preserved from the previous Secret.
-func WriteInventory(ctx context.Context, client *kubernetes.Client, inv *InventorySecret, moduleName, moduleUUID string, createdBy pkginventory.CreatedBy) error {
+func WriteInventory(ctx context.Context, client *kubernetes.Client, inv *ReleaseInventoryRecord, moduleName, moduleUUID, moduleVersion string, createdBy CreatedBy) error {
 	// On first write (no resourceVersion), populate ModuleMetadata from caller-supplied values.
 	// On updates, ModuleMetadata is already populated from UnmarshalFromSecret — preserve it.
 	if inv.ResourceVersion() == "" && inv.ModuleMetadata.Name == "" {
@@ -84,10 +84,16 @@ func WriteInventory(ctx context.Context, client *kubernetes.Client, inv *Invento
 			APIVersion: "core.opmodel.dev/v1alpha1",
 			Name:       moduleName,
 			UUID:       moduleUUID,
+			Version:    moduleVersion,
 		}
 	}
+	if moduleVersion != "" {
+		inv.ModuleMetadata.Version = moduleVersion
+	}
 	if inv.ResourceVersion() == "" {
-		inv.ReleaseMetadata.CreatedBy = pkginventory.NormalizeCreatedBy(createdBy)
+		inv.CreatedBy = NormalizeCreatedBy(createdBy)
+	} else {
+		inv.CreatedBy = NormalizeCreatedBy(inv.CreatedBy)
 	}
 
 	secret, err := MarshalToSecret(inv)
@@ -125,7 +131,7 @@ func WriteInventory(ctx context.Context, client *kubernetes.Client, inv *Invento
 //
 // Returns (nil, nil) if no inventory Secret exists for the release.
 // Returns an error if multiple inventory Secrets are found (unexpected state).
-func FindInventoryByReleaseName(ctx context.Context, client *kubernetes.Client, releaseName, namespace string) (*InventorySecret, error) {
+func FindInventoryByReleaseName(ctx context.Context, client *kubernetes.Client, releaseName, namespace string) (*ReleaseInventoryRecord, error) {
 	labelSelector := fmt.Sprintf("%s=%s,%s=%s",
 		pkgcore.LabelModuleReleaseName, releaseName,
 		pkgcore.LabelComponent, "inventory",

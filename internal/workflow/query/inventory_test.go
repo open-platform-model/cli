@@ -25,7 +25,7 @@ func makeTestK8sClient(objects ...runtime.Object) *kubernetes.Client {
 
 func makeTestInventorySecret(t *testing.T, releaseName, namespace, releaseID string) *corev1.Secret {
 	t.Helper()
-	inv := &inventory.InventorySecret{ReleaseMetadata: inventory.ReleaseMetadata{Kind: "ModuleRelease", APIVersion: "core.opmodel.dev/v1alpha1", ReleaseName: releaseName, ReleaseNamespace: namespace, ReleaseID: releaseID, LastTransitionTime: "2026-01-01T00:00:00Z"}, ModuleMetadata: inventory.ModuleMetadata{Kind: "Module", APIVersion: "core.opmodel.dev/v1alpha1", Name: releaseName}, Index: []string{}, Changes: map[string]*inventory.ChangeEntry{}}
+	inv := &inventory.ReleaseInventoryRecord{ReleaseMetadata: inventory.ReleaseMetadata{Kind: "ModuleRelease", APIVersion: "core.opmodel.dev/v1alpha1", ReleaseName: releaseName, ReleaseNamespace: namespace, ReleaseID: releaseID, LastTransitionTime: "2026-01-01T00:00:00Z"}, ModuleMetadata: inventory.ModuleMetadata{Kind: "Module", APIVersion: "core.opmodel.dev/v1alpha1", Name: releaseName}, Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{}}}
 	secret, err := inventory.MarshalToSecret(inv)
 	require.NoError(t, err)
 	secret.Namespace = namespace

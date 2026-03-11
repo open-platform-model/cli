@@ -22,7 +22,7 @@ import (
 //
 // Results are sorted alphabetically by ReleaseMetadata.ReleaseName.
 // Corrupt Secrets that fail to unmarshal are logged and skipped.
-func ListInventories(ctx context.Context, client *kubernetes.Client, namespace string) ([]*InventorySecret, error) {
+func ListInventories(ctx context.Context, client *kubernetes.Client, namespace string) ([]*ReleaseInventoryRecord, error) {
 	labelSelector := fmt.Sprintf("%s=%s,%s=%s",
 		pkgcore.LabelManagedBy, pkgcore.LabelManagedByValue,
 		pkgcore.LabelComponent, "inventory",
@@ -35,7 +35,7 @@ func ListInventories(ctx context.Context, client *kubernetes.Client, namespace s
 		return nil, fmt.Errorf("listing inventory Secrets: %w", err)
 	}
 
-	var inventories []*InventorySecret
+	var inventories []*ReleaseInventoryRecord
 	for i := range list.Items {
 		inv, unmarshalErr := UnmarshalFromSecret(&list.Items[i])
 		if unmarshalErr != nil {

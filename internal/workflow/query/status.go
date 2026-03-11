@@ -11,7 +11,6 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
-	pkginventory "github.com/opmodel/cli/pkg/inventory"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -32,7 +31,7 @@ func ResolveInventory(
 	rsf *cmdutil.ReleaseSelectorFlags,
 	namespace string,
 	releaseLog *log.Logger,
-) (inv *inventory.InventorySecret, live []*unstructured.Unstructured, missing []inventory.InventoryEntry, err error) {
+) (inv *inventory.ReleaseInventoryRecord, live []*unstructured.Unstructured, missing []inventory.InventoryEntry, err error) {
 	var invErr error
 	switch {
 	case rsf.ReleaseID != "":
@@ -74,25 +73,19 @@ func ResolveInventory(
 	return inv, live, missing, nil
 }
 
-func BuildStatusOptions(namespace string, rsf *cmdutil.ReleaseSelectorFlags, outputFormat output.Format, verbose bool, inv *inventory.InventorySecret, liveResources []*unstructured.Unstructured, missingEntries []inventory.InventoryEntry) kubernetes.StatusOptions {
+func BuildStatusOptions(namespace string, rsf *cmdutil.ReleaseSelectorFlags, outputFormat output.Format, verbose bool, inv *inventory.ReleaseInventoryRecord, liveResources []*unstructured.Unstructured, missingEntries []inventory.InventoryEntry) kubernetes.StatusOptions {
 	componentMap := make(map[string]string)
-	var version string
-	if len(inv.Index) > 0 {
-		if change, ok := inv.Changes[inv.Index[0]]; ok {
-			version = change.Source.Version
-			for _, entry := range change.Inventory.Entries {
-				key := entry.Kind + "/" + entry.Namespace + "/" + entry.Name
-				componentMap[key] = entry.Component
-			}
-		}
+	for _, entry := range inv.Inventory.Entries {
+		key := entry.Kind + "/" + entry.Namespace + "/" + entry.Name
+		componentMap[key] = entry.Component
 	}
 
 	statusOpts := kubernetes.StatusOptions{
 		Namespace:     namespace,
 		ReleaseName:   rsf.ReleaseName,
 		ReleaseID:     rsf.ReleaseID,
-		Version:       version,
-		Owner:         string(pkginventory.NormalizeCreatedBy(inv.ReleaseMetadata.CreatedBy)),
+		Version:       inv.ModuleMetadata.Version,
+		Owner:         string(inventory.NormalizeCreatedBy(inv.CreatedBy)),
 		ComponentMap:  componentMap,
 		OutputFormat:  outputFormat,
 		InventoryLive: liveResources,

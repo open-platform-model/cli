@@ -141,13 +141,13 @@ func main() {
 
 	controllerInv, err := inventory.GetInventory(ctx, client, releaseThree, nsB, releaseIDThree)
 	check("reading inventory for controller scenario", err)
-	controllerInv.ReleaseMetadata.CreatedBy = inventory.CreatedByController
-	err = inventory.WriteInventory(ctx, client, controllerInv, moduleName, "", inventory.CreatedByCLI)
+	controllerInv.CreatedBy = inventory.CreatedByController
+	err = inventory.WriteInventory(ctx, client, controllerInv, moduleName, "", controllerInv.ModuleMetadata.Version, inventory.CreatedByCLI)
 	check("rewriting controller-owned inventory", err)
 
 	legacyInv, err := inventory.GetInventory(ctx, client, releaseTwo, nsA, releaseIDTwo)
 	check("reading inventory for legacy scenario", err)
-	legacyInv.ReleaseMetadata.CreatedBy = ""
+	legacyInv.CreatedBy = ""
 	legacySecret, err := inventory.MarshalToSecret(legacyInv)
 	check("marshaling legacy inventory", err)
 	_, err = client.Clientset.CoreV1().Secrets(nsA).Update(ctx, legacySecret, metav1.UpdateOptions{})
@@ -247,15 +247,8 @@ func main() {
 			}
 		}
 
-		// Version from latest change
-		if len(inv.Index) > 0 {
-			change := inv.Changes[inv.Index[0]]
-			if change == nil {
-				failf("latest change entry is nil for %s", inv.ReleaseMetadata.ReleaseName)
-			}
-			if change.Source.Version != moduleVersion {
-				failf("expected version %q for %s, got %q", moduleVersion, inv.ReleaseMetadata.ReleaseName, change.Source.Version)
-			}
+		if inv.ModuleMetadata.Version != moduleVersion {
+			failf("expected version %q for %s, got %q", moduleVersion, inv.ReleaseMetadata.ReleaseName, inv.ModuleMetadata.Version)
 		}
 	}
 	fmt.Println("   OK: module name, release ID, and version all correct")
@@ -289,7 +282,7 @@ func deployRelease(ctx context.Context, client *kubernetes.Client, name, ns, rel
 	writeRelease(ctx, client, name, ns, inv, cmNames)
 }
 
-func writeRelease(ctx context.Context, client *kubernetes.Client, name, ns string, inv *inventory.InventorySecret, cmNames []string) {
+func writeRelease(ctx context.Context, client *kubernetes.Client, name, ns string, inv *inventory.ReleaseInventoryRecord, cmNames []string) {
 	resources := buildResources(name, ns, inv.ReleaseMetadata.ReleaseID, cmNames)
 
 	// Apply resources
@@ -301,41 +294,38 @@ func writeRelease(ctx context.Context, client *kubernetes.Client, name, ns strin
 
 	inv.ReleaseMetadata.LastTransitionTime = time.Now().UTC().Format(time.RFC3339)
 
-	err = inventory.WriteInventory(ctx, client, inv, moduleName, "", inventory.CreatedByCLI)
+	err = inventory.WriteInventory(ctx, client, inv, moduleName, "", inv.ModuleMetadata.Version, inventory.CreatedByCLI)
 	check(fmt.Sprintf("writing inventory for %s", name), err)
 }
 
-func buildInventory(name, ns, releaseID string, cmNames []string, createdBy inventory.CreatedBy) *inventory.InventorySecret {
+func buildInventory(name, ns, releaseID string, cmNames []string, createdBy inventory.CreatedBy) *inventory.ReleaseInventoryRecord {
 	resources := buildResources(name, ns, releaseID, cmNames)
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
 	}
 
-	digest := inventory.ComputeManifestDigest(resources)
-	source := inventory.ChangeSource{
-		Path:        fmt.Sprintf("tests/integration/rel-list/%s", name),
-		Version:     moduleVersion,
-		ReleaseName: name,
-	}
-	changeID, changeEntry := inventory.PrepareChange(source, "", digest, entries)
-
-	inv := &inventory.InventorySecret{
+	inv := &inventory.ReleaseInventoryRecord{
+		CreatedBy: createdBy,
 		ReleaseMetadata: inventory.ReleaseMetadata{
 			Kind:             "ModuleRelease",
 			APIVersion:       "core.opmodel.dev/v1alpha1",
 			ReleaseName:      name,
 			ReleaseNamespace: ns,
 			ReleaseID:        releaseID,
-			CreatedBy:        createdBy,
 		},
 		ModuleMetadata: inventory.ModuleMetadata{
 			Kind:       "Module",
 			APIVersion: "core.opmodel.dev/v1alpha1",
 			Name:       moduleName,
+			Version:    moduleVersion,
 		},
-		Index:   []string{changeID},
-		Changes: map[string]*inventory.ChangeEntry{changeID: changeEntry},
+		Inventory: inventory.Inventory{
+			Revision: 1,
+			Digest:   inventory.ComputeDigest(entries),
+			Count:    len(entries),
+			Entries:  entries,
+		},
 	}
 	return inv
 }
