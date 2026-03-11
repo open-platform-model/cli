@@ -137,6 +137,7 @@ The `ReleaseMetadata` JSON stored under `data.releaseMetadata` SHALL use the fol
 | `namespace` | `ReleaseNamespace` | The Kubernetes namespace of the release |
 | `uuid` | `ReleaseID` | Deterministic UUID v5 release identity |
 | `lastTransitionTime` | `LastTransitionTime` | RFC 3339 timestamp of last change |
+| `createdBy` | `CreatedBy` | Original release creator: `cli` or `controller`; omitted only for legacy inventories |
 
 #### Scenario: ReleaseMetadata name field holds release name
 
@@ -144,6 +145,16 @@ The `ReleaseMetadata` JSON stored under `data.releaseMetadata` SHALL use the fol
 - **THEN** the JSON `"name"` field SHALL be `"mc"`
 - **AND** there SHALL be no `"releaseName"` field in the JSON
 - **AND** the JSON `"uuid"` field SHALL hold the release identity UUID
+
+#### Scenario: ReleaseMetadata createdBy records creator
+
+- **WHEN** serializing release metadata for a newly created CLI-managed release
+- **THEN** the JSON `"createdBy"` field SHALL be `"cli"`
+
+#### Scenario: Legacy release metadata omits createdBy
+
+- **WHEN** deserializing a pre-existing inventory Secret with no `createdBy` field
+- **THEN** deserialization SHALL succeed without migration
 
 ### Requirement: Module metadata data key structure
 
@@ -181,8 +192,18 @@ The `ReleaseMetadata` and `ModuleMetadata` fields of an `InventorySecret` SHALL 
 
 - **WHEN** `WriteInventory` is called for a release with no existing inventory Secret
 - **THEN** `ReleaseMetadata.ReleaseName` SHALL be set from the release name
+- **AND** `ReleaseMetadata.CreatedBy` SHALL be set from the creator parameter
 - **AND** `ModuleMetadata.Name` SHALL be set from the `moduleName` parameter
 - **AND** `ModuleMetadata.UUID` SHALL be set from the `moduleUUID` parameter (may be empty)
+
+### Requirement: Inventory labels remain unchanged when provenance is added
+
+Adding provenance support SHALL NOT change the inventory Secret label set. Inventory Secrets SHALL continue to use the existing five-label selector contract.
+
+#### Scenario: Provenance does not add new label
+
+- **WHEN** an inventory Secret includes `createdBy`
+- **THEN** the Secret SHALL still have exactly the existing five labels used for inventory discovery
 
 ### Requirement: Deterministic manifest digest
 

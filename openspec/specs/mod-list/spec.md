@@ -56,19 +56,35 @@ The command SHALL evaluate the health of each release by discovering its tracked
 - **WHEN** a release inventory has no tracked resources in its latest change entry
 - **THEN** the STATUS column SHALL display `Unknown (0/0)`
 
+### Requirement: List command displays release ownership
+
+The `opm mod list` command SHALL expose release ownership derived from inventory provenance. Table outputs SHALL include an OWNER column, and structured outputs SHALL include an `owner` field.
+
+#### Scenario: Table output shows controller ownership
+
+- **WHEN** the user runs `opm mod list`
+- **AND** a release inventory records `createdBy: "controller"`
+- **THEN** the release row SHALL display `controller` in the OWNER column
+
+#### Scenario: Legacy inventory shows CLI ownership
+
+- **WHEN** the user runs `opm mod list`
+- **AND** a release inventory has no `createdBy`
+- **THEN** the release row SHALL display `cli` in the OWNER column
+
 ### Requirement: List command default table output
 
-The default output format SHALL be a table with columns: NAME, MODULE, VERSION, STATUS, AGE. When `-A` is used, a NAMESPACE column SHALL be prepended. Results SHALL be sorted alphabetically by release name. The table SHALL use space-padded columns consistent with kubectl output conventions.
+The default output format SHALL be a table with columns: NAME, MODULE, OWNER, VERSION, STATUS, AGE. When `-A` is used, a NAMESPACE column SHALL be prepended. Results SHALL be sorted alphabetically by release name. The table SHALL use space-padded columns consistent with kubectl output conventions.
 
 #### Scenario: Default table columns
 
 - **WHEN** the user runs `opm mod list -n production`
-- **THEN** the table SHALL have columns: NAME, MODULE, VERSION, STATUS, AGE
+- **THEN** the table SHALL have columns: NAME, MODULE, OWNER, VERSION, STATUS, AGE
 
 #### Scenario: All-namespaces table columns
 
 - **WHEN** the user runs `opm mod list -A`
-- **THEN** the table SHALL have columns: NAMESPACE, NAME, MODULE, VERSION, STATUS, AGE
+- **THEN** the table SHALL have columns: NAMESPACE, NAME, MODULE, OWNER, VERSION, STATUS, AGE
 
 #### Scenario: Sorted by name
 
@@ -82,16 +98,16 @@ When `--output wide` / `-o wide` is specified, the table SHALL include additiona
 #### Scenario: Wide output columns without -A
 
 - **WHEN** the user runs `opm mod list -n production -o wide`
-- **THEN** the table SHALL have columns: NAME, MODULE, VERSION, STATUS, AGE, RELEASE-ID, LAST-APPLIED
+- **THEN** the table SHALL have columns: NAME, MODULE, OWNER, VERSION, STATUS, AGE, RELEASE-ID, LAST-APPLIED
 
 #### Scenario: Wide output columns with -A
 
 - **WHEN** the user runs `opm mod list -A -o wide`
-- **THEN** the table SHALL have columns: NAMESPACE, NAME, MODULE, VERSION, STATUS, AGE, RELEASE-ID, LAST-APPLIED
+- **THEN** the table SHALL have columns: NAMESPACE, NAME, MODULE, OWNER, VERSION, STATUS, AGE, RELEASE-ID, LAST-APPLIED
 
 ### Requirement: List command supports structured output formats
 
-The command SHALL support `--output`/`-o` with values `json` and `yaml` for machine-readable output. The structured output SHALL include all fields: name, module, namespace, version, status, readyCount, totalCount, releaseID, lastApplied.
+The command SHALL support `--output`/`-o` with values `json` and `yaml` for machine-readable output. The structured output SHALL include all fields: name, module, namespace, owner, version, status, readyCount, totalCount, releaseID, lastApplied.
 
 #### Scenario: JSON output
 
