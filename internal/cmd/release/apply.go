@@ -22,11 +22,10 @@ func NewReleaseApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var namespace string
 
 	var (
-		dryRunFlag     bool
-		createNSFlag   bool
-		noPruneFlag    bool
-		maxHistoryFlag int
-		forceFlag      bool
+		dryRunFlag   bool
+		createNSFlag bool
+		noPruneFlag  bool
+		forceFlag    bool
 	)
 
 	c := &cobra.Command{
@@ -48,7 +47,7 @@ Examples:
   opm release apply ./jellyfin_release.cue --dry-run`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runReleaseApply(args[0], cfg, &rff, &kf, namespace, dryRunFlag, createNSFlag, noPruneFlag, maxHistoryFlag, forceFlag)
+			return runReleaseApply(args[0], cfg, &rff, &kf, namespace, dryRunFlag, createNSFlag, noPruneFlag, forceFlag)
 		},
 	}
 
@@ -58,7 +57,6 @@ Examples:
 	c.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Server-side dry run (no changes made)")
 	c.Flags().BoolVar(&createNSFlag, "create-namespace", false, "Create target namespace if it does not exist")
 	c.Flags().BoolVar(&noPruneFlag, "no-prune", false, "Skip stale resource pruning")
-	c.Flags().IntVar(&maxHistoryFlag, "max-history", 10, "Maximum number of change history entries to retain")
 	c.Flags().BoolVar(&forceFlag, "force", false, "Allow empty render to prune all previously tracked resources")
 
 	return c
@@ -66,7 +64,7 @@ Examples:
 
 // runReleaseApply executes the release apply command.
 func runReleaseApply(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, kf *cmdutil.K8sFlags, namespaceFlag string,
-	dryRun, createNS, noPrune bool, maxHistory int, force bool) error {
+	dryRun, createNS, noPrune, force bool) error {
 	ctx := context.Background()
 
 	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
@@ -111,7 +109,6 @@ func runReleaseApply(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 			DryRun:                 dryRun,
 			CreateNS:               createNS,
 			NoPrune:                noPrune,
-			MaxHistory:             maxHistory,
 			Force:                  force,
 			SuccessUpToDateMessage: "Release up to date",
 			SuccessAppliedMessage:  "Release applied",

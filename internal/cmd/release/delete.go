@@ -149,7 +149,7 @@ func runReleaseDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 	return nil
 }
 
-func ensureDeleteAllowed(inv *inventory.InventorySecret) error {
+func ensureDeleteAllowed(inv *inventory.ReleaseInventoryRecord) error {
 	return workflowownership.EnsureCLIMutable(inv)
 }
 

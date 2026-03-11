@@ -19,19 +19,12 @@ import (
 // Returns:
 //   - live: resources that currently exist on the cluster
 //   - missing: inventory entries whose resources no longer exist on the cluster
-func DiscoverResourcesFromInventory(ctx context.Context, client *kubernetes.Client, inv *InventorySecret) (live []*unstructured.Unstructured, missing []InventoryEntry, err error) {
-	if inv == nil || len(inv.Index) == 0 {
+func DiscoverResourcesFromInventory(ctx context.Context, client *kubernetes.Client, inv *ReleaseInventoryRecord) (live []*unstructured.Unstructured, missing []InventoryEntry, err error) {
+	if inv == nil || len(inv.Inventory.Entries) == 0 {
 		return nil, nil, nil
 	}
 
-	// Get entries from the latest change
-	latestChangeID := inv.Index[0]
-	latestChange, ok := inv.Changes[latestChangeID]
-	if !ok || latestChange == nil {
-		return nil, nil, nil
-	}
-
-	entries := latestChange.Inventory.Entries
+	entries := inv.Inventory.Entries
 
 	for _, entry := range entries {
 		gvr := schema.GroupVersionResource{

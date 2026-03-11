@@ -15,36 +15,6 @@ import (
 	pkgcore "github.com/opmodel/cli/pkg/core"
 )
 
-// ComputeStaleSet computes the set of resources that were in the previous inventory
-// but are not in the current inventory (set difference: previous - current).
-// Identity comparison uses IdentityEqual (Group + Kind + Namespace + Name + Component).
-//
-// Returns an empty slice when previous is nil or empty (first-time apply).
-func ComputeStaleSet(previous, current []InventoryEntry) []InventoryEntry {
-	if len(previous) == 0 {
-		return []InventoryEntry{}
-	}
-
-	var stale []InventoryEntry
-	for _, prev := range previous {
-		found := false
-		for _, cur := range current {
-			if IdentityEqual(prev, cur) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			stale = append(stale, prev)
-		}
-	}
-
-	if stale == nil {
-		return []InventoryEntry{}
-	}
-	return stale
-}
-
 // ApplyComponentRenameSafetyCheck filters the stale set to remove entries
 // where the current set contains the same K8s resource (same Group, Kind, Namespace, Name)
 // but under a different Component name.

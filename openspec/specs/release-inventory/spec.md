@@ -1,12 +1,12 @@
 ## Purpose
 
-Defines the release inventory data model, serialization format, and CRUD semantics. The inventory is a Kubernetes Secret that records the exact set of resources applied per release, enabling automatic pruning, fast resource discovery, and change history.
+Defines the ownership-focused release inventory data model, persisted release record envelope, serialization format, and CRUD semantics used by the CLI for pruning, discovery, and release metadata.
 
 ## Requirements
 
 ### Requirement: Inventory entry identity
 
-An `InventoryEntry` SHALL represent a single tracked Kubernetes resource. Two entries SHALL be considered identity-equal when their Group, Kind, Namespace, Name, and Component fields all match. The Version field SHALL be excluded from identity comparison to prevent false orphans during Kubernetes API version migrations.
+An `InventoryEntry` SHALL represent a single currently owned Kubernetes resource. Two entries SHALL be considered identity-equal when their Group, Kind, Namespace, Name, and Component fields all match. The Version field SHALL be excluded from identity comparison to prevent false orphans during Kubernetes API version migrations.
 
 #### Scenario: Same resource with different API version
 
@@ -34,16 +34,16 @@ A separate K8s identity comparison SHALL compare entries by Group, Kind, Namespa
 
 ### Requirement: Entry construction from rendered resource
 
-The system SHALL construct an `InventoryEntry` from a `*build.Resource` by extracting Group and Kind from the resource's GVK, Version from the GVK's Version field, Namespace and Name from the resource's metadata, and Component from the `build.Resource.Component` field.
+The system SHALL construct an `InventoryEntry` from a rendered Kubernetes resource by extracting Group and Kind from the resource's GVK, Version from the GVK's Version field, Namespace and Name from the resource's metadata, and Component from the OPM component label when present.
 
 #### Scenario: Build entry from a namespaced Deployment
 
-- **WHEN** constructing an entry from a `*build.Resource` with GVK `apps/v1/Deployment`, name `my-app`, namespace `production`, component `app`
+- **WHEN** constructing an entry from a resource with GVK `apps/v1/Deployment`, name `my-app`, namespace `production`, component `app`
 - **THEN** the entry SHALL have Group=`apps`, Kind=`Deployment`, Namespace=`production`, Name=`my-app`, Version=`v1`, Component=`app`
 
 #### Scenario: Build entry from a cluster-scoped ClusterRole
 
-- **WHEN** constructing an entry from a `*build.Resource` with GVK `rbac.authorization.k8s.io/v1/ClusterRole`, name `my-role`, empty namespace, component `rbac`
+- **WHEN** constructing an entry from a resource with GVK `rbac.authorization.k8s.io/v1/ClusterRole`, name `my-role`, empty namespace, component `rbac`
 - **THEN** the entry SHALL have Group=`rbac.authorization.k8s.io`, Kind=`ClusterRole`, Namespace=`""`, Name=`my-role`, Version=`v1`, Component=`rbac`
 
 ### Requirement: Inventory Secret name convention
@@ -67,7 +67,7 @@ The inventory Secret SHALL carry the following five labels:
 | `module-release.opmodel.dev/uuid` | release UUID | Deterministic UUID v5 release identity |
 | `opmodel.dev/component` | `inventory` | Distinguishes the inventory Secret from application resources |
 
-The `module.opmodel.dev/name` and `module.opmodel.dev/namespace` labels SHALL NOT be present on the inventory Secret. Module identity is carried in `data.moduleMetadata` instead.
+The `module.opmodel.dev/name` and `module.opmodel.dev/namespace` labels SHALL NOT be present on the inventory Secret. Module identity is carried in the persisted release inventory record's `moduleMetadata` instead.
 
 #### Scenario: Inventory Secret has correct labels
 
@@ -82,36 +82,75 @@ The `module.opmodel.dev/name` and `module.opmodel.dev/namespace` labels SHALL NO
 - **AND** the Secret SHALL NOT have label `module.opmodel.dev/name`
 - **AND** the Secret SHALL NOT have label `module.opmodel.dev/namespace`
 
+### Requirement: Inventory represents current ownership only
+
+The public inventory contract SHALL represent the current set of resources owned by a release. It SHALL contain the current `entries` list and MAY include ownership summary fields such as `revision`, `digest`, and `count`.
+
+The public inventory contract MUST NOT require or embed:
+
+- raw values
+- source path or source version metadata
+- per-change timestamps
+- history index
+- change map
+- remediation counters
+
+#### Scenario: Ownership-only inventory contains current resource refs
+
+- **WHEN** a release currently owns a Deployment, Service, and Ingress
+- **THEN** the inventory SHALL contain exactly three entries representing those resources
+- **AND** no history entries SHALL be required to determine current ownership
+
+#### Scenario: Inventory exposes summary metadata without history
+
+- **WHEN** an inventory includes `revision`, `digest`, and `count`
+- **THEN** those fields SHALL describe the current inventory set only
+- **AND** they SHALL NOT imply a retained change history
+
+### Requirement: Persisted release inventory record preserves release and module metadata
+
+The CLI persisted release inventory record SHALL preserve `releaseMetadata` and `moduleMetadata` alongside the ownership-only inventory so the CLI can identify the release, identify the module, and report deployed module version without retaining inventory change history.
+
+#### Scenario: Persisted record includes module version without change history
+
+- **WHEN** a release is persisted using the v2 record shape
+- **THEN** the record SHALL contain `moduleMetadata.version` for the deployed module version
+- **AND** that version SHALL NOT require a latest history entry to be read
+
+### Requirement: Persisted release inventory record stores creator provenance at the top level
+
+The CLI persisted release inventory record SHALL store `createdBy` as a top-level field rather than nesting it inside `releaseMetadata`.
+
+#### Scenario: Top-level creator provenance
+
+- **WHEN** a persisted release inventory record is read
+- **THEN** the CLI SHALL be able to determine whether it is CLI-managed or controller-managed from the top-level `createdBy` field
+- **AND** that determination SHALL NOT depend on inventory history
+
 ### Requirement: Inventory Secret serialization roundtrip
 
-`MarshalToSecret` SHALL serialize an `InventorySecret` to a typed `corev1.Secret` using `stringData` keys: `releaseMetadata` (JSON-encoded `ReleaseMetadata`), `moduleMetadata` (JSON-encoded `ModuleMetadata`), `index` (JSON-encoded `[]string` of change IDs), and one key per change entry (`change-sha1-<8hex>` with JSON-encoded `ChangeEntry`). `UnmarshalFromSecret` SHALL deserialize a `corev1.Secret` back into an `InventorySecret`, handling both `stringData` and `data` (base64-encoded) fields. The `moduleMetadata` key is optional — if absent, the resulting `ModuleMetadata` SHALL be a zero value (no error). The `resourceVersion` from the Secret SHALL be preserved as an unexported field for optimistic concurrency.
+`MarshalToSecret` SHALL serialize a `ReleaseInventoryRecord` to a typed `corev1.Secret` using a single JSON-encoded document stored under `data.inventory`. `UnmarshalFromSecret` SHALL deserialize a `corev1.Secret` back into a `ReleaseInventoryRecord`, handling both `stringData` and `data` (base64-encoded) forms. If the decoded record omits `inventory.entries`, deserialization SHALL normalize that field to an empty list. The `resourceVersion` from the Secret SHALL be preserved as an unexported field for optimistic concurrency.
 
 #### Scenario: Marshal and unmarshal roundtrip
 
-- **WHEN** marshaling an `InventorySecret` with release metadata, module metadata, 2 change entries, and an index
+- **WHEN** marshaling a `ReleaseInventoryRecord` with top-level `createdBy`, release metadata, module metadata, and an ownership inventory
 - **AND** unmarshaling the resulting `corev1.Secret`
-- **THEN** the resulting `InventorySecret` SHALL be identical to the original
+- **THEN** the resulting `ReleaseInventoryRecord` SHALL be identical to the original
 
 #### Scenario: Unmarshal from Kubernetes GET response
 
 - **WHEN** unmarshaling a Secret returned by the Kubernetes API (base64-encoded `data` field)
-- **THEN** the resulting `InventorySecret` SHALL contain correct values
+- **THEN** the resulting `ReleaseInventoryRecord` SHALL contain correct values
 - **AND** the `resourceVersion` SHALL be preserved from the Secret's metadata
 
-#### Scenario: Empty inventory with no changes
+#### Scenario: Missing inventory key is an error
 
-- **WHEN** marshaling an `InventorySecret` with empty index and no change entries
-- **THEN** the resulting Secret SHALL be valid with an empty JSON array for index
-
-#### Scenario: Missing moduleMetadata key is not an error
-
-- **WHEN** unmarshaling a Secret that has no `moduleMetadata` key in its data
-- **THEN** the resulting `InventorySecret.ModuleMetadata` SHALL be a zero-value struct
-- **AND** no error SHALL be returned
+- **WHEN** unmarshaling a Secret that has no `inventory` key in its data
+- **THEN** deserialization SHALL fail with a clear error
 
 ### Requirement: Inventory metadata enables future CRD migration
 
-The `ReleaseMetadata` SHALL include `kind: "ModuleRelease"` and `apiVersion: "core.opmodel.dev/v1alpha1"` fields. The `ModuleMetadata` SHALL include `kind: "Module"` and `apiVersion: "core.opmodel.dev/v1alpha1"` fields. Both enable future migration from Secrets to CRDs without changing the data model.
+The `ReleaseMetadata` SHALL include `kind: "ModuleRelease"` and `apiVersion: "core.opmodel.dev/v1alpha1"` fields. The `ModuleMetadata` SHALL include `kind: "Module"` and `apiVersion: "core.opmodel.dev/v1alpha1"` fields. Both enable future migration from Secrets to CRDs without changing the persisted release inventory record shape.
 
 #### Scenario: ReleaseMetadata kind and apiVersion
 
@@ -127,7 +166,7 @@ The `ReleaseMetadata` SHALL include `kind: "ModuleRelease"` and `apiVersion: "co
 
 ### Requirement: Release metadata data key structure
 
-The `ReleaseMetadata` JSON stored under `data.releaseMetadata` SHALL use the following field names:
+The `releaseMetadata` object inside the persisted release inventory record SHALL use the following JSON field names:
 
 | JSON key | Go field | Description |
 |---|---|---|
@@ -137,7 +176,6 @@ The `ReleaseMetadata` JSON stored under `data.releaseMetadata` SHALL use the fol
 | `namespace` | `ReleaseNamespace` | The Kubernetes namespace of the release |
 | `uuid` | `ReleaseID` | Deterministic UUID v5 release identity |
 | `lastTransitionTime` | `LastTransitionTime` | RFC 3339 timestamp of last change |
-| `createdBy` | `CreatedBy` | Original release creator: `cli` or `controller`; omitted only for legacy inventories |
 
 #### Scenario: ReleaseMetadata name field holds release name
 
@@ -146,19 +184,14 @@ The `ReleaseMetadata` JSON stored under `data.releaseMetadata` SHALL use the fol
 - **AND** there SHALL be no `"releaseName"` field in the JSON
 - **AND** the JSON `"uuid"` field SHALL hold the release identity UUID
 
-#### Scenario: ReleaseMetadata createdBy records creator
+#### Scenario: ReleaseMetadata omits createdBy
 
-- **WHEN** serializing release metadata for a newly created CLI-managed release
-- **THEN** the JSON `"createdBy"` field SHALL be `"cli"`
-
-#### Scenario: Legacy release metadata omits createdBy
-
-- **WHEN** deserializing a pre-existing inventory Secret with no `createdBy` field
-- **THEN** deserialization SHALL succeed without migration
+- **WHEN** serializing a persisted release inventory record
+- **THEN** the `releaseMetadata` object SHALL NOT contain a `"createdBy"` field
 
 ### Requirement: Module metadata data key structure
 
-The `ModuleMetadata` JSON stored under `data.moduleMetadata` SHALL use the following field names:
+The `moduleMetadata` object inside the persisted release inventory record SHALL use the following JSON field names:
 
 | JSON key | Go field | Description |
 |---|---|---|
@@ -166,6 +199,7 @@ The `ModuleMetadata` JSON stored under `data.moduleMetadata` SHALL use the follo
 | `apiVersion` | `APIVersion` | Always `"core.opmodel.dev/v1alpha1"` |
 | `name` | `Name` | The canonical module name (e.g. `"minecraft"`) |
 | `uuid` | `UUID` | Module identity UUID (omitted if empty) |
+| `version` | `Version` | Deployed module version (omitted if empty) |
 
 #### Scenario: ModuleMetadata name field holds module name
 
@@ -178,115 +212,14 @@ The `ModuleMetadata` JSON stored under `data.moduleMetadata` SHALL use the follo
 - **WHEN** serializing a `ModuleMetadata` with an empty UUID
 - **THEN** the JSON SHALL NOT contain a `"uuid"` field
 
-### Requirement: Inventory metadata is write-once
+#### Scenario: ModuleMetadata version recorded when present
 
-The `ReleaseMetadata` and `ModuleMetadata` fields of an `InventorySecret` SHALL be set only at create time (when no previous inventory exists). On subsequent updates, the metadata fields SHALL be preserved verbatim from the previously unmarshaled Secret. `WriteInventory` SHALL accept `moduleName` and `moduleUUID` parameters that are used only when constructing a new inventory; on update they SHALL be ignored.
-
-#### Scenario: Metadata preserved on re-apply
-
-- **WHEN** `WriteInventory` is called for a release that already has an inventory Secret
-- **THEN** the `ReleaseMetadata` and `ModuleMetadata` in the written Secret SHALL be identical to those in the existing Secret
-- **AND** only the change history (index and change entries) SHALL be updated
-
-#### Scenario: Metadata set from parameters on first apply
-
-- **WHEN** `WriteInventory` is called for a release with no existing inventory Secret
-- **THEN** `ReleaseMetadata.ReleaseName` SHALL be set from the release name
-- **AND** `ReleaseMetadata.CreatedBy` SHALL be set from the creator parameter
-- **AND** `ModuleMetadata.Name` SHALL be set from the `moduleName` parameter
-- **AND** `ModuleMetadata.UUID` SHALL be set from the `moduleUUID` parameter (may be empty)
-
-### Requirement: Inventory labels remain unchanged when provenance is added
-
-Adding provenance support SHALL NOT change the inventory Secret label set. Inventory Secrets SHALL continue to use the existing five-label selector contract.
-
-#### Scenario: Provenance does not add new label
-
-- **WHEN** an inventory Secret includes `createdBy`
-- **THEN** the Secret SHALL still have exactly the existing five labels used for inventory discovery
-
-### Requirement: Deterministic manifest digest
-
-The system SHALL compute a SHA256 digest of rendered resources that is deterministic regardless of input order. Resources SHALL be sorted with a 5-key total ordering: weight (ascending via `pkg/weights`), API group (alphabetical), Kind (alphabetical), Namespace (alphabetical), Name (alphabetical). Each resource SHALL be serialized independently via `json.Marshal` (which sorts map keys alphabetically). Serialized bytes SHALL be concatenated with newline separators and hashed with SHA256. The result SHALL be formatted as `sha256:<hex>`.
-
-#### Scenario: Same resources in different input order produce same digest
-
-- **WHEN** computing the digest of resources [Deployment/app, Service/app, ConfigMap/config]
-- **AND** computing the digest of resources [ConfigMap/config, Deployment/app, Service/app]
-- **THEN** both digests SHALL be identical
-
-#### Scenario: Content change produces different digest
-
-- **WHEN** computing the digest of a resource set
-- **AND** modifying any field in any resource
-- **THEN** the new digest SHALL differ from the original
-
-#### Scenario: Added or removed resource changes digest
-
-- **WHEN** computing the digest of a resource set with 3 resources
-- **AND** computing the digest with one resource removed
-- **THEN** the digests SHALL differ
-
-### Requirement: Change ID computation
-
-The system SHALL compute a change ID as `change-sha1-<8hex>` where the hash input is the concatenation of module path, module version, resolved values string, and manifest digest. This ensures that module upgrades, value changes, and content changes all produce distinct change IDs.
-
-#### Scenario: Same inputs produce same change ID
-
-- **WHEN** computing the change ID with path=`opmodel.dev/modules/jellyfin@v1`, version=`1.0.0`, values=`{port: 8096}`, digest=`sha256:abc123`
-- **AND** computing again with identical inputs
-- **THEN** both change IDs SHALL be identical
-
-#### Scenario: Version bump with identical output produces different change ID
-
-- **WHEN** computing the change ID with version=`1.0.0` and a given digest
-- **AND** computing with version=`1.1.0` and the same digest
-- **THEN** the change IDs SHALL differ
-
-#### Scenario: Local module uses empty version string
-
-- **WHEN** computing the change ID for a local module (no version)
-- **THEN** the version input SHALL be empty string
-- **AND** the `ModuleRef.Local` field SHALL be `true`
-
-### Requirement: Change history management
-
-The index SHALL be an ordered list of change IDs with newest first. When a change ID already exists in the index (idempotent re-apply), it SHALL be moved to the front. The index SHALL NOT grow when the same inputs are re-applied.
-
-#### Scenario: New change appended to front
-
-- **WHEN** applying a new change with ID `change-sha1-aaa11111`
-- **AND** the current index is `[change-sha1-bbb22222]`
-- **THEN** the index SHALL become `[change-sha1-aaa11111, change-sha1-bbb22222]`
-
-#### Scenario: Idempotent re-apply moves to front
-
-- **WHEN** re-applying with the same inputs producing `change-sha1-bbb22222`
-- **AND** the current index is `[change-sha1-aaa11111, change-sha1-bbb22222]`
-- **THEN** the index SHALL become `[change-sha1-bbb22222, change-sha1-aaa11111]`
-
-#### Scenario: Identical re-apply at head skips inventory write and preserves original timestamp
-
-- **WHEN** re-applying with inputs that produce `change-sha1-bbb22222`
-- **AND** the current index is already `[change-sha1-bbb22222, ...]` (the computed change ID is already at the front)
-- **THEN** the inventory Secret write SHALL be skipped entirely
-- **AND** the original timestamp of the first apply SHALL be preserved
-- **AND** the index SHALL remain unchanged
-
-### Requirement: History pruning
-
-When the index exceeds the maximum history size, the oldest entries (at the tail) SHALL be removed from both the index and the changes map. The default maximum history SHALL be 10.
-
-#### Scenario: Pruning removes oldest entry
-
-- **WHEN** the index has 10 entries and a new change is added
-- **AND** `maxHistory` is 10
-- **THEN** the oldest entry SHALL be removed from both index and changes map
-- **AND** the index length SHALL remain 10
+- **WHEN** serializing a `ModuleMetadata` with version `1.2.3`
+- **THEN** the JSON SHALL contain `"version": "1.2.3"`
 
 ### Requirement: Inventory Secret CRUD operations
 
-`GetInventory` SHALL first attempt a direct GET by constructed Secret name (`opm.<releaseName>.<releaseID>`). If the Secret is not found, it SHALL fall back to listing Secrets with label `module-release.opmodel.dev/uuid=<releaseID>`. If no inventory is found (first-time apply), it SHALL return `nil, nil`. `WriteInventory` SHALL use full PUT semantics (create or replace) with optimistic concurrency via `resourceVersion`. `DeleteInventory` SHALL delete the inventory Secret and treat 404 as success (idempotent).
+`GetInventory` SHALL first attempt a direct GET by constructed Secret name (`opm.<releaseName>.<releaseID>`). If the Secret is not found, it SHALL fall back to listing Secrets with label `module-release.opmodel.dev/uuid=<releaseID>`. If no inventory is found (first-time apply), it SHALL return `nil, nil`. `WriteInventory` SHALL use full PUT semantics (create or replace) with optimistic concurrency via `resourceVersion`, preserving release identity metadata and creator provenance from previously read records while updating the ownership inventory and deployed module version. `DeleteInventory` SHALL delete the inventory Secret and treat 404 as success (idempotent).
 
 #### Scenario: First-time apply returns nil inventory
 
@@ -315,7 +248,46 @@ When the index exceeds the maximum history size, the oldest entries (at the tail
 - **THEN** the Secret SHALL be replaced using the `resourceVersion` for conflict detection
 - **AND** a concurrent modification SHALL cause a conflict error
 
+#### Scenario: Existing creator provenance is preserved on update
+
+- **WHEN** `WriteInventory` updates an existing persisted release inventory record
+- **THEN** `createdBy` SHALL remain the normalized value from the existing record rather than being overwritten by a new creator hint
+
+#### Scenario: Deployed module version is refreshed on update
+
+- **WHEN** `WriteInventory` is called with a non-empty deployed module version for an existing record
+- **THEN** `moduleMetadata.version` SHALL be updated to that deployed version
+
 #### Scenario: Delete is idempotent
 
 - **WHEN** calling `DeleteInventory` and the Secret does not exist
 - **THEN** the operation SHALL succeed without error
+
+### Requirement: Inventory labels remain unchanged when provenance is added
+
+Adding provenance support SHALL NOT change the inventory Secret label set. Inventory Secrets SHALL continue to use the existing five-label selector contract.
+
+#### Scenario: Provenance does not add new label
+
+- **WHEN** an inventory Secret includes top-level `createdBy`
+- **THEN** the Secret SHALL still have exactly the existing five labels used for inventory discovery
+
+### Requirement: Deterministic inventory digest
+
+When the system computes an inventory digest, it SHALL do so deterministically from the current owned resource set regardless of input order.
+
+#### Scenario: Same entries in different order produce same digest
+
+- **WHEN** computing the digest for the same ownership set in two different slice orders
+- **THEN** the digest SHALL be identical
+
+#### Scenario: Added or removed resource changes digest
+
+- **WHEN** computing the digest of an ownership set with 3 resources
+- **AND** computing the digest with one resource removed
+- **THEN** the digests SHALL differ
+
+#### Scenario: Component rename changes digest
+
+- **WHEN** two ownership sets differ only by the `component` field of an entry
+- **THEN** the digests SHALL differ because inventory identity includes component ownership

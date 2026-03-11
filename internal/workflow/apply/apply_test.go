@@ -10,7 +10,6 @@ import (
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	workflowrender "github.com/opmodel/cli/internal/workflow/render"
-	pkginventory "github.com/opmodel/cli/pkg/inventory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -27,7 +26,7 @@ func TestCurrentInventoryEntries(t *testing.T) {
 }
 
 func TestPreviousInventoryEntries(t *testing.T) {
-	prevInventory := &pkginventory.InventorySecret{Index: []string{"change-1"}, Changes: map[string]*pkginventory.ChangeEntry{"change-1": {Inventory: pkginventory.InventoryList{Entries: []pkginventory.InventoryEntry{{Kind: "Service", Name: "web"}}}}}}
+	prevInventory := &inventory.ReleaseInventoryRecord{Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{{Kind: "Service", Name: "web"}}}}
 	entries := PreviousInventoryEntries(prevInventory)
 	require.Len(t, entries, 1)
 	assert.Equal(t, "Service", entries[0].Kind)
@@ -36,7 +35,7 @@ func TestPreviousInventoryEntries(t *testing.T) {
 
 func TestGuardEmptyRender(t *testing.T) {
 	releaseLog := output.ReleaseLogger("test")
-	err := GuardEmptyRender(0, []pkginventory.InventoryEntry{{Kind: "ConfigMap"}}, false, releaseLog)
+	err := GuardEmptyRender(0, []inventory.InventoryEntry{{Kind: "ConfigMap"}}, false, releaseLog)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "render produced 0 resources")
 }
@@ -48,18 +47,17 @@ func TestFormatApplySummary(t *testing.T) {
 
 func TestExecute_BlocksControllerManagedRelease(t *testing.T) {
 	ctx := context.Background()
-	inv := &inventory.InventorySecret{
+	inv := &inventory.ReleaseInventoryRecord{
+		CreatedBy: inventory.CreatedByController,
 		ReleaseMetadata: inventory.ReleaseMetadata{
 			Kind:             "ModuleRelease",
 			APIVersion:       "core.opmodel.dev/v1alpha1",
 			ReleaseName:      "demo",
 			ReleaseNamespace: "apps",
 			ReleaseID:        "uuid-1",
-			CreatedBy:        inventory.CreatedByController,
 		},
 		ModuleMetadata: inventory.ModuleMetadata{Kind: "Module", APIVersion: "core.opmodel.dev/v1alpha1", Name: "demo-module"},
-		Index:          []string{},
-		Changes:        map[string]*inventory.ChangeEntry{},
+		Inventory:      inventory.Inventory{},
 	}
 	secret, err := inventory.MarshalToSecret(inv)
 	require.NoError(t, err)

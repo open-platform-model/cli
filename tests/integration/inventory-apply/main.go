@@ -73,9 +73,9 @@ func main() {
 
 	// Build and write inventory after apply.
 	currentEntries := entriesToWrite(resources)
-	digest := inventory.ComputeManifestDigest(resources)
 
-	inv := &inventory.InventorySecret{
+	inv := &inventory.ReleaseInventoryRecord{
+		CreatedBy: inventory.CreatedByCLI,
 		ReleaseMetadata: inventory.ReleaseMetadata{
 			Kind:             "ModuleRelease",
 			APIVersion:       "core.opmodel.dev/v1alpha1",
@@ -87,16 +87,12 @@ func main() {
 			Kind:       "Module",
 			APIVersion: "core.opmodel.dev/v1alpha1",
 			Name:       releaseName, // module name (same as release name in this test)
+			Version:    moduleVersion,
 		},
-		Index:   []string{},
-		Changes: map[string]*inventory.ChangeEntry{},
+		Inventory: inventory.Inventory{Revision: 1, Digest: inventory.ComputeDigest(currentEntries), Count: len(currentEntries), Entries: currentEntries},
 	}
-	source := inventory.ChangeSource{Path: modulePath, Version: moduleVersion, ReleaseName: releaseName}
-	computedID, changeEntry := inventory.PrepareChange(source, "", digest, currentEntries)
-	inv.Changes[computedID] = changeEntry
-	inv.Index = inventory.UpdateIndex(inv.Index, computedID)
 
-	err = inventory.WriteInventory(ctx, client, inv, "", "", inventory.CreatedByCLI)
+	err = inventory.WriteInventory(ctx, client, inv, "", "", inv.ModuleMetadata.Version, inventory.CreatedByCLI)
 	check("writing inventory", err)
 	fmt.Println("   OK: inventory written")
 
@@ -106,16 +102,10 @@ func main() {
 	if readInv == nil {
 		failf("expected non-nil inventory after first-time apply")
 	}
-	if len(readInv.Index) == 0 {
-		failf("expected at least one change entry in index")
+	if len(readInv.Inventory.Entries) != 2 {
+		failf("expected 2 inventory entries, got %d", len(readInv.Inventory.Entries))
 	}
-	latestChange := readInv.Changes[readInv.Index[0]]
-	if latestChange == nil {
-		failf("latest change entry is nil")
-	}
-	if len(latestChange.Inventory.Entries) != 2 {
-		failf("expected 2 inventory entries, got %d", len(latestChange.Inventory.Entries))
-	}
+	latestEntries := readInv.Inventory.Entries
 
 	// Verify inventory Secret labels — exactly 5, all release-scoped (no module.opmodel.dev/* labels).
 	secretName := inventory.SecretName(releaseName, releaseID)
@@ -158,36 +148,26 @@ func main() {
 	}
 
 	// Verify stale set is empty.
-	prevEntries := latestChange.Inventory.Entries
+	prevEntries := latestEntries
 	stale := inventory.ComputeStaleSet(prevEntries, currentEntries)
 	if len(stale) != 0 {
 		failf("expected empty stale set on idempotent re-apply, got %d entries", len(stale))
 	}
 	fmt.Println("   OK: stale set is empty")
 
-	// Verify change ID is the same.
-	recomputedDigest := inventory.ComputeManifestDigest(resources)
-	recomputedID := inventory.ComputeChangeID(modulePath, moduleVersion, "", recomputedDigest)
-	if recomputedID != computedID {
-		failf("expected same change ID on idempotent re-apply: got %q, want %q", recomputedID, computedID)
-	}
-	fmt.Println("   OK: change ID is identical")
-
-	// Update inventory — index should remain length 1 (move-to-front idempotency).
+	// Update inventory — digest and tracked entries should remain stable on idempotent re-apply.
 	readInv2, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
 	check("reading inventory before re-apply write", err)
-	_, changeEntry2 := inventory.PrepareChange(source, "", digest, currentEntries)
-	readInv2.Changes[computedID] = changeEntry2
-	readInv2.Index = inventory.UpdateIndex(readInv2.Index, computedID)
-	err = inventory.WriteInventory(ctx, client, readInv2, "", "", inventory.CreatedByCLI)
+	readInv2.Inventory = inventory.Inventory{Revision: readInv2.Inventory.Revision + 1, Digest: inventory.ComputeDigest(currentEntries), Count: len(currentEntries), Entries: currentEntries}
+	err = inventory.WriteInventory(ctx, client, readInv2, "", "", readInv2.ModuleMetadata.Version, inventory.CreatedByCLI)
 	check("writing inventory on re-apply", err)
 
 	readInv3, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
 	check("reading inventory after re-apply write", err)
-	if len(readInv3.Index) != 1 {
-		failf("expected index length 1 after idempotent re-apply, got %d", len(readInv3.Index))
+	if len(readInv3.Inventory.Entries) != 2 {
+		failf("expected 2 inventory entries after idempotent re-apply, got %d", len(readInv3.Inventory.Entries))
 	}
-	fmt.Println("   OK: index length remains 1 (move-to-front)")
+	fmt.Println("   OK: inventory remains stable on idempotent re-apply")
 
 	// ----------------------------------------------------------------
 	// Scenario 5.8: Rename — cm-b removed, cm-c added; cm-b pruned
@@ -198,7 +178,7 @@ func main() {
 	newEntries := entriesToWrite(newResources)
 
 	// Compute stale set from previous [cm-a, cm-b] → current [cm-a, cm-c].
-	stale58 := inventory.ComputeStaleSet(latestChange.Inventory.Entries, newEntries)
+	stale58 := inventory.ComputeStaleSet(latestEntries, newEntries)
 	stale58 = inventory.ApplyComponentRenameSafetyCheck(stale58, newEntries)
 	if len(stale58) != 1 {
 		failf("expected 1 stale entry (cm-b), got %d", len(stale58))
@@ -228,25 +208,18 @@ func main() {
 	// Write updated inventory.
 	readInv4, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
 	check("reading inventory before rename write", err)
-	newDigest := inventory.ComputeManifestDigest(newResources)
-	newID, newChange := inventory.PrepareChange(source, "", newDigest, newEntries)
-	readInv4.Changes[newID] = newChange
-	readInv4.Index = inventory.UpdateIndex(readInv4.Index, newID)
-	err = inventory.WriteInventory(ctx, client, readInv4, "", "", inventory.CreatedByCLI)
+	readInv4.Inventory = inventory.Inventory{Revision: readInv4.Inventory.Revision + 1, Digest: inventory.ComputeDigest(newEntries), Count: len(newEntries), Entries: newEntries}
+	err = inventory.WriteInventory(ctx, client, readInv4, "", "", readInv4.ModuleMetadata.Version, inventory.CreatedByCLI)
 	check("writing inventory after rename", err)
 
 	// Verify inventory now tracks [cm-a, cm-c].
 	readInv5, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
 	check("reading inventory after rename", err)
-	latestChange5 := readInv5.Changes[readInv5.Index[0]]
-	if latestChange5 == nil {
-		failf("latest change after rename is nil")
-	}
-	if len(latestChange5.Inventory.Entries) != 2 {
-		failf("expected 2 inventory entries after rename, got %d", len(latestChange5.Inventory.Entries))
+	if len(readInv5.Inventory.Entries) != 2 {
+		failf("expected 2 inventory entries after rename, got %d", len(readInv5.Inventory.Entries))
 	}
 	entryNames := map[string]bool{}
-	for _, e := range latestChange5.Inventory.Entries {
+	for _, e := range readInv5.Inventory.Entries {
 		entryNames[e.Name] = true
 	}
 	if !entryNames["cm-a"] || !entryNames["cm-c"] {
@@ -279,19 +252,19 @@ func main() {
 		// NOT calling WriteInventory, then verify the inventory is unchanged.
 		invBefore, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
 		check("reading inventory to verify no write", err)
-		indexBefore := make([]string, len(invBefore.Index))
-		copy(indexBefore, invBefore.Index)
+		entriesBefore := make([]inventory.InventoryEntry, len(invBefore.Inventory.Entries))
+		copy(entriesBefore, invBefore.Inventory.Entries)
 
 		// (We deliberately do not call WriteInventory here — testing the invariant.)
 		invAfter, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
 		check("reading inventory after failed apply", err)
 
-		if len(invAfter.Index) != len(indexBefore) {
-			failf("inventory index changed after failed apply: before=%v after=%v", indexBefore, invAfter.Index)
+		if len(invAfter.Inventory.Entries) != len(entriesBefore) {
+			failf("inventory entries changed after failed apply: before=%v after=%v", entriesBefore, invAfter.Inventory.Entries)
 		}
-		for i, id := range indexBefore {
-			if invAfter.Index[i] != id {
-				failf("inventory index[%d] changed: before=%q after=%q", i, id, invAfter.Index[i])
+		for i, e := range entriesBefore {
+			if invAfter.Inventory.Entries[i] != e {
+				failf("inventory entry[%d] changed: before=%v after=%v", i, e, invAfter.Inventory.Entries[i])
 			}
 		}
 		fmt.Println("   OK: inventory unchanged after partial failure")

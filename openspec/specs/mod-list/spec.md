@@ -1,20 +1,29 @@
-## ADDED Requirements
+## Purpose
 
-### Requirement: List command discovers releases via inventory Secrets
+Defines how `opm mod list` discovers deployed releases from persisted release inventory records and reports release metadata and health without requiring module source.
 
-The `opm mod list` command SHALL discover all deployed module releases by listing inventory Secrets in the target namespace. It SHALL use the `ListInventories` function from the inventory package. It MUST NOT require module source, re-rendering, or knowledge of specific release names.
+## Requirements
+
+### Requirement: List command discovers releases via persisted ownership inventory
+
+The `opm mod list` command SHALL discover all deployed module releases by listing persisted release inventory records in the target namespace. It SHALL use the `ListInventories` function from the inventory package. It MUST NOT require module source, re-rendering, knowledge of specific release names, or inventory change-history fields to identify the current owned resource set for a release.
 
 #### Scenario: List releases in a namespace
 
 - **WHEN** the user runs `opm mod list -n production`
-- **AND** 3 inventory Secrets exist in the `production` namespace
+- **AND** 3 persisted release inventory records exist in the `production` namespace
 - **THEN** the command SHALL display all 3 releases
 
 #### Scenario: No releases found
 
 - **WHEN** the user runs `opm mod list -n empty-namespace`
-- **AND** no inventory Secrets exist in that namespace
+- **AND** no persisted release inventory records exist in that namespace
 - **THEN** the command SHALL print `No releases found in namespace "empty-namespace"` and exit with code 0
+
+#### Scenario: List works with ownership-only inventory
+
+- **WHEN** the user runs `opm mod list` in a namespace containing releases with ownership-only inventory
+- **THEN** the command SHALL still discover those releases and evaluate their health from the tracked resource set
 
 ### Requirement: List command supports all-namespaces flag
 
@@ -53,7 +62,7 @@ The command SHALL evaluate the health of each release by discovering its tracked
 
 #### Scenario: Zero resources
 
-- **WHEN** a release inventory has no tracked resources in its latest change entry
+- **WHEN** a release inventory record has no tracked resources in its ownership inventory
 - **THEN** the STATUS column SHALL display `Unknown (0/0)`
 
 ### Requirement: List command displays release ownership
@@ -152,16 +161,21 @@ The command SHALL evaluate release health concurrently using a bounded worker po
 - **WHEN** 10 releases exist in a namespace
 - **THEN** the command SHALL discover resources and evaluate health for multiple releases concurrently, not sequentially
 
-### Requirement: List command metadata extraction
+### Requirement: List metadata extraction does not depend on inventory change history
 
-The command SHALL extract display metadata from each inventory Secret: release name from `ReleaseMetadata.ReleaseName`, module name from `ModuleMetadata.Name`, version from the latest `ChangeEntry.Source.Version`, release ID from `ReleaseMetadata.ReleaseID`, last applied time from `ReleaseMetadata.LastTransitionTime`, and age computed from `LastTransitionTime`.
+The command SHALL extract display metadata from each persisted release inventory record: release name from `releaseMetadata.name`, module name from `moduleMetadata.name`, version from `moduleMetadata.version`, release ID from `releaseMetadata.uuid`, last applied time from `releaseMetadata.lastTransitionTime`, and age computed from `lastTransitionTime`. Owner display metadata SHALL come from the top-level `createdBy` field, defaulting to `cli` when that field is omitted for legacy inventories. The command SHALL NOT require inventory change-history metadata such as latest change source version, raw values, or per-change timestamps.
 
-#### Scenario: Version from latest change
+#### Scenario: List remains functional with ownership-only inventory
 
-- **WHEN** an inventory Secret has two change entries and the latest has `Source.Version: "2.0.0"`
-- **THEN** the VERSION column SHALL display `2.0.0`
+- **WHEN** a release has ownership-only inventory and no latest change entry
+- **THEN** `opm mod list` SHALL still be able to display the release and compute health from tracked resources
+
+#### Scenario: List reads deployed module version from module metadata
+
+- **WHEN** a persisted release inventory record includes `moduleMetadata.version`
+- **THEN** the VERSION column SHALL display that value
 
 #### Scenario: No version recorded
 
-- **WHEN** a release was applied from a local module with no version
+- **WHEN** a persisted release inventory record omits `moduleMetadata.version`
 - **THEN** the VERSION column SHALL display `-`

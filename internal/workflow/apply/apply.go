@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	opmexit "github.com/opmodel/cli/internal/exit"
 
@@ -22,7 +23,6 @@ type Options struct {
 	DryRun                 bool
 	CreateNS               bool
 	NoPrune                bool
-	MaxHistory             int
 	Force                  bool
 	SuccessUpToDateMessage string
 	SuccessAppliedMessage  string
@@ -56,9 +56,6 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 	manifestDigest := inventory.ComputeManifestDigest(result.Resources)
 	output.Debug("manifest digest computed", "digest", manifestDigest)
-
-	changeID := inventory.ComputeChangeID(req.Change.Path, req.Change.Version, req.Change.ValuesStr, manifestDigest)
-	output.Debug("change ID computed", "changeID", changeID)
 
 	releaseID := result.Release.UUID
 	prevInventory := LoadPreviousInventory(ctx, req.K8sClient, result.Release.Name, namespace, releaseID, req.Options.DryRun, releaseLog)
@@ -124,43 +121,35 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			}
 		}
 
-		alreadyCurrent := prevInventory != nil && len(prevInventory.Index) > 0 && prevInventory.Index[0] == changeID
-		if alreadyCurrent {
-			output.Debug("inventory unchanged, skipping write", "changeID", changeID)
+		newOrUpdatedInventory := prevInventory
+		if newOrUpdatedInventory == nil {
+			newOrUpdatedInventory = &inventory.ReleaseInventoryRecord{
+				ReleaseMetadata: inventory.ReleaseMetadata{
+					Kind:             "ModuleRelease",
+					APIVersion:       "core.opmodel.dev/v1alpha1",
+					ReleaseName:      result.Release.Name,
+					ReleaseNamespace: namespace,
+					ReleaseID:        releaseID,
+				},
+			}
+		}
+
+		revision := 1
+		if prevInventory != nil && prevInventory.Inventory.Revision > 0 {
+			revision = prevInventory.Inventory.Revision + 1
+		}
+		newOrUpdatedInventory.ReleaseMetadata.LastTransitionTime = time.Now().UTC().Format(time.RFC3339)
+		newOrUpdatedInventory.Inventory = pkginventory.Inventory{
+			Revision: revision,
+			Digest:   inventory.ComputeDigest(currentEntries),
+			Count:    len(currentEntries),
+			Entries:  currentEntries,
+		}
+
+		if err := inventory.WriteInventory(ctx, req.K8sClient, newOrUpdatedInventory, req.ModuleName, req.ModuleUUID, req.Change.Version, inventory.CreatedByCLI); err != nil {
+			releaseLog.Warn("failed to write inventory Secret", "error", err)
 		} else {
-			newOrUpdatedInventory := prevInventory
-			if newOrUpdatedInventory == nil {
-				newOrUpdatedInventory = &inventory.InventorySecret{
-					ReleaseMetadata: inventory.ReleaseMetadata{
-						Kind:             "ModuleRelease",
-						APIVersion:       "core.opmodel.dev/v1alpha1",
-						ReleaseName:      result.Release.Name,
-						ReleaseNamespace: namespace,
-						ReleaseID:        releaseID,
-					},
-					Index:   []string{},
-					Changes: map[string]*inventory.ChangeEntry{},
-				}
-			}
-
-			source := inventory.ChangeSource{
-				Path:        req.Change.Path,
-				Version:     req.Change.Version,
-				ReleaseName: result.Release.Name,
-				Local:       req.Change.Local,
-			}
-
-			computedChangeID, changeEntry := inventory.PrepareChange(source, req.Change.ValuesStr, manifestDigest, currentEntries)
-			newOrUpdatedInventory.Changes[computedChangeID] = changeEntry
-			newOrUpdatedInventory.Index = inventory.UpdateIndex(newOrUpdatedInventory.Index, computedChangeID)
-			newOrUpdatedInventory.ReleaseMetadata.LastTransitionTime = changeEntry.Timestamp
-			inventory.PruneHistory(newOrUpdatedInventory, req.Options.MaxHistory)
-
-			if err := inventory.WriteInventory(ctx, req.K8sClient, newOrUpdatedInventory, req.ModuleName, req.ModuleUUID, pkginventory.CreatedByCLI); err != nil {
-				releaseLog.Warn("failed to write inventory Secret", "error", err)
-			} else {
-				output.Debug("inventory written", "changeID", changeID)
-			}
+			output.Debug("inventory written", "revision", revision)
 		}
 	}
 
@@ -199,7 +188,7 @@ func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Clien
 	return nil
 }
 
-func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, releaseName, namespace, releaseID string, dryRun bool, releaseLog *log.Logger) *inventory.InventorySecret {
+func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, releaseName, namespace, releaseID string, dryRun bool, releaseLog *log.Logger) *inventory.ReleaseInventoryRecord {
 	if releaseID == "" || dryRun {
 		return nil
 	}
@@ -212,19 +201,11 @@ func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, re
 	return prevInventory
 }
 
-func PreviousInventoryEntries(prevInventory *inventory.InventorySecret) []inventory.InventoryEntry {
-	if prevInventory == nil || len(prevInventory.Index) == 0 {
+func PreviousInventoryEntries(prevInventory *inventory.ReleaseInventoryRecord) []inventory.InventoryEntry {
+	if prevInventory == nil {
 		return nil
 	}
-	latestChangeID := prevInventory.Index[0]
-	if latestChangeID == "" {
-		return nil
-	}
-	latestChange := prevInventory.Changes[latestChangeID]
-	if latestChange == nil {
-		return nil
-	}
-	return latestChange.Inventory.Entries
+	return prevInventory.Inventory.Entries
 }
 
 func CurrentInventoryEntries(resources []*unstructured.Unstructured) []inventory.InventoryEntry {
@@ -253,7 +234,7 @@ func GuardEmptyRender(resourceCount int, prevEntries []inventory.InventoryEntry,
 	return nil
 }
 
-func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, prevInventory *inventory.InventorySecret, dryRun bool, currentEntries []inventory.InventoryEntry) error {
+func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, prevInventory *inventory.ReleaseInventoryRecord, dryRun bool, currentEntries []inventory.InventoryEntry) error {
 	if prevInventory != nil || dryRun {
 		return nil
 	}

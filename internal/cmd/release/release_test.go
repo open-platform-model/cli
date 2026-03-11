@@ -98,7 +98,7 @@ func TestNewReleaseDeleteCmd(t *testing.T) {
 }
 
 func TestEnsureDeleteAllowed_BlocksControllerManagedRelease(t *testing.T) {
-	err := ensureDeleteAllowed(&inventory.InventorySecret{ReleaseMetadata: inventory.ReleaseMetadata{ReleaseName: "demo", ReleaseNamespace: "apps", CreatedBy: inventory.CreatedByController}})
+	err := ensureDeleteAllowed(&inventory.ReleaseInventoryRecord{CreatedBy: inventory.CreatedByController, ReleaseMetadata: inventory.ReleaseMetadata{ReleaseName: "demo", ReleaseNamespace: "apps"}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "controller-managed")
 }
