@@ -69,8 +69,9 @@ metadata: {
 		htpasswd: {
 			// htpasswd file content as a secret
 			credentials: schemas.#Secret & {
-				$secretName: string | *"zot-htpasswd"
-				$dataKey:    string | *"htpasswd"
+				$secretName: "zot-htpasswd"
+				$dataKey:    "htpasswd"
+				$description: "htpasswd file with bcrypt-hashed passwords. Replace the hash below with your own using 'htpasswd -B -n admin'."
 			}
 		}
 		accessControl?: {
@@ -162,5 +163,84 @@ metadata: {
 		capabilities: {
 			drop: ["ALL"]
 		}
+	}
+}
+
+// debugValues exercises the full #config surface for local cue vet / cue eval.
+debugValues: {
+	image: {
+		variant:    "full"
+		tag:        "latest"
+		digest:     ""
+		pullPolicy: "IfNotPresent"
+	}
+	storage: {
+		type:         "pvc"
+		rootDir:      "/var/lib/registry"
+		size:         "20Gi"
+		storageClass: "standard"
+		dedupe:       true
+		gc: {
+			enabled:  true
+			delay:    "1h"
+			interval: "24h"
+		}
+		scrub: {
+			enabled:  true
+			interval: "24h"
+		}
+	}
+	http: {
+		port:    5000
+		address: "0.0.0.0"
+	}
+	log: {
+		level: "info"
+		audit: enabled: true
+	}
+	auth: {
+		htpasswd: credentials: {
+			$opm:         "secret"
+			$secretName:  "zot-htpasswd"
+			$dataKey:     "htpasswd"
+			value:        "admin:hashed"
+		}
+		accessControl: {
+			adminUsers: ["admin"]
+			repositories: "**": {
+				policies: [{
+					users:   ["user"]
+					actions: ["read"]
+				}]
+				defaultPolicy: ["read"]
+			}
+		}
+	}
+	metrics: enabled: true
+	httpRoute: {
+		hostnames: ["registry.local"]
+		gatewayRef: {
+			name:      "gateway"
+			namespace: "default"
+		}
+	}
+	replicas: 1
+	resources: {
+		requests: {
+			memory: "256Mi"
+			cpu:    "100m"
+		}
+		limits: {
+			memory: "1Gi"
+			cpu:    "500m"
+		}
+	}
+	security: {
+		runAsNonRoot:             true
+		runAsUser:                1000
+		runAsGroup:               1000
+		readOnlyRootFilesystem:   false
+		allowPrivilegeEscalation: false
+		capabilities: drop: ["ALL"]
 	}
 }
