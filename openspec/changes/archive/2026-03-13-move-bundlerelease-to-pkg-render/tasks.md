@@ -24,4 +24,4 @@
 
 ## 5. Commits
 
-- [ ] 5.1 Commit tasks 1.1, 2.1–2.5, 3.1–3.2: `refactor(render): move BundleRelease types to pkg/render`
+- [x] 5.1 Commit tasks 1.1, 2.1–2.5, 3.1–3.2: `refactor(render): move BundleRelease types to pkg/render`
