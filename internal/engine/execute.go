@@ -226,6 +226,19 @@ func injectContext(
 		cueCtx.Encode(compMeta),
 	)
 
+	// #runtimeLabels — runtime-owned labels supplied by the executing actor.
+	// These take highest precedence in the label merge and are enforced by CUE
+	// unification: if a module or component label conflicts with a runtime label,
+	// CUE evaluation will error rather than silently overriding.
+	runtimeLabels := map[string]string{
+		core.LabelManagedBy:              core.LabelManagedByValue,
+		core.LabelModuleReleaseNamespace: rel.Metadata.Namespace,
+	}
+	unified = unified.FillPath(
+		cue.MakePath(cue.Def("context"), cue.Def("runtimeLabels")),
+		cueCtx.Encode(runtimeLabels),
+	)
+
 	if err := unified.Err(); err != nil {
 		return cue.Value{}, err
 	}

@@ -98,13 +98,29 @@ import (
 		annotations?: t.#LabelsAnnotationsType
 	}
 
-	// Labels and annotations. These are inherited from the component and module metadata.
-	// 
+	// Runtime-owned labels supplied by the executing actor (CLI or controller).
+	// These labels are operationally significant and take highest precedence in
+	// the final label merge. CUE unification ensures that if any other label set
+	// contains a key also present here with a different value, evaluation fails —
+	// this is the enforcement mechanism for reserved labels.
+	//
+	// Required keys:
+	//   - app.kubernetes.io/managed-by: identifies the runtime actor (e.g. "opm-cli", "opm-controller")
+	//   - module-release.opmodel.dev/namespace: the release's target namespace
+	#runtimeLabels: {
+		"app.kubernetes.io/managed-by"!:         string
+		"module-release.opmodel.dev/namespace"!: string
+		[string]:                                string
+	}
+
+	// Labels and annotations inherited from module and component metadata.
+	//
 	// - moduleLabels: labels from #moduleReleaseMetadata.labels (if defined)
 	// - moduleAnnotations: annotations from #moduleReleaseMetadata.annotations (if defined)
 	// - componentLabels: labels from #componentMetadata.labels (if defined) + "app.kubernetes.io/name" = component name
 	// - componentAnnotations: annotations from #componentMetadata.annotations (if defined)
-	// - controllerLabels: standard controller labels based on component and module metadata
+	// - identityLabels: standard resource identity labels derived from component metadata
+	// - #runtimeLabels: runtime-owned labels supplied by the executing actor (highest precedence)
 	moduleLabels: {
 		if #moduleReleaseMetadata.labels != _|_ {
 			for k, v in #moduleReleaseMetadata.labels {
@@ -122,8 +138,8 @@ import (
 	}
 
 	componentLabels: {
-		"app.kubernetes.io/name":                  #componentMetadata.name
-		"module-release.opmodel.dev/name":         #moduleReleaseMetadata.name
+		"app.kubernetes.io/name":          #componentMetadata.name
+		"module-release.opmodel.dev/name": #moduleReleaseMetadata.name
 		if #componentMetadata.labels != _|_ {
 			for k, v in #componentMetadata.labels {
 				if !strings.HasPrefix(k, "transformer.opmodel.dev/") {
@@ -143,13 +159,16 @@ import (
 		}
 	}
 
-	controllerLabels: {
-		"app.kubernetes.io/managed-by": "open-platform-model"
-		"app.kubernetes.io/name":       #componentMetadata.name
-		"app.kubernetes.io/instance":   #componentMetadata.name
+	// Identity labels for resource identification. These are derived from
+	// component metadata and are always present on rendered resources.
+	identityLabels: {
+		"app.kubernetes.io/name":     #componentMetadata.name
+		"app.kubernetes.io/instance": #componentMetadata.name
 	}
 
-	// Final labels and annotations applied to the output resource
+	// Final labels and annotations applied to the output resource.
+	// Merge order (lowest to highest precedence):
+	//   moduleLabels < componentLabels < identityLabels < #runtimeLabels
 	labels: {[string]: string}
 	labels: {
 		for k, v in moduleLabels {
@@ -158,7 +177,10 @@ import (
 		for k, v in componentLabels {
 			(k): "\(v)"
 		}
-		for k, v in controllerLabels {
+		for k, v in identityLabels {
+			(k): "\(v)"
+		}
+		for k, v in #runtimeLabels {
 			(k): "\(v)"
 		}
 		...

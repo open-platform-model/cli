@@ -83,9 +83,11 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 				entry.Kind, entry.Name, entry.Namespace)
 		}
 
-		// Check for untracked resources (not managed by OPM)
+		// Check for untracked resources (not managed by OPM).
+		// Accepts any known OPM actor value (opm-cli, opm-controller, or
+		// legacy open-platform-model) for backward compatibility.
 		labels := unstrObj.GetLabels()
-		if labels[pkgcore.LabelManagedBy] != pkgcore.LabelManagedByValue {
+		if !pkgcore.IsOPMManagedBy(labels[pkgcore.LabelManagedBy]) {
 			return fmt.Errorf("resource %s/%s in namespace %q already exists and is not managed by OPM — use --force to proceed",
 				entry.Kind, entry.Name, entry.Namespace)
 		}
