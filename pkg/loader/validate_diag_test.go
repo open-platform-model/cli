@@ -16,9 +16,9 @@ import (
 )
 
 // TestValidateConfig_FieldNotAllowed_FileLoaded exercises the two-pass
-// validation path against the real jellyfin example. The values.cue file
-// deliberately contains two extra top-level fields ("test", "invalidField")
-// and one type-conflicting nested field ("media.test").
+// validation path using a self-contained test fixture. The values_invalid.cue
+// file deliberately contains two extra top-level fields ("test", "invalidField")
+// and one type-conflicting nested field (settings.debug: string vs bool).
 //
 // The test asserts that all three violations are reported — verifying that
 // walkDisallowed catches "field not allowed" errors that schema.Unify()
@@ -27,18 +27,20 @@ import (
 func TestValidateConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
 	ctx := cuecontext.New()
 
-	// Load release.cue alone (mirrors LoadReleaseFile).
-	releaseInsts := load.Instances([]string{"release.cue"}, &load.Config{
-		Dir: "../../examples/releases/jellyfin",
-	})
-	require.Len(t, releaseInsts, 1)
-	require.NoError(t, releaseInsts[0].Err)
-	releaseVal := ctx.BuildInstance(releaseInsts[0])
-	require.NoError(t, releaseVal.Err())
+	const fixtureDir = "testdata/validate_diag"
 
-	// Load the invalid values fixture alone and extract the "values" field (mirrors LoadValuesFile).
-	valuesInsts := load.Instances([]string{"values_invalid_1.cue"}, &load.Config{
-		Dir: "../../examples/releases/jellyfin",
+	// Load schema.cue (mirrors LoadReleaseFile — file-loaded via BuildInstance).
+	schemaInsts := load.Instances([]string{"schema.cue"}, &load.Config{
+		Dir: fixtureDir,
+	})
+	require.Len(t, schemaInsts, 1)
+	require.NoError(t, schemaInsts[0].Err)
+	schemaVal := ctx.BuildInstance(schemaInsts[0])
+	require.NoError(t, schemaVal.Err())
+
+	// Load the invalid values fixture and extract the "values" field (mirrors LoadValuesFile).
+	valuesInsts := load.Instances([]string{"values_invalid.cue"}, &load.Config{
+		Dir: fixtureDir,
 	})
 	require.Len(t, valuesInsts, 1)
 	require.NoError(t, valuesInsts[0].Err)
@@ -48,13 +50,13 @@ func TestValidateConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
 		valuesVal = vf
 	}
 
-	// Extract the config schema (mirrors release file validation flow).
-	configSchema := releaseVal.LookupPath(cue.ParsePath("#module.#config"))
-	require.True(t, configSchema.Exists(), "#module.#config must exist in release")
-	require.True(t, configSchema.IsClosed(), "#module.#config must be a closed struct")
+	// Extract the config schema.
+	configSchema := schemaVal.LookupPath(cue.ParsePath("#config"))
+	require.True(t, configSchema.Exists(), "#config must exist in schema")
+	require.True(t, configSchema.IsClosed(), "#config must be a closed struct")
 
 	// Call ValidateConfig and assert the result.
-	_, cfgErr := releaseprocess.ValidateConfig(configSchema, []cue.Value{valuesVal}, "module", "jellyfin")
+	_, cfgErr := releaseprocess.ValidateConfig(configSchema, []cue.Value{valuesVal}, "module", "test")
 	require.NotNil(t, cfgErr, "values with extra fields should produce a ConfigError")
 
 	// Collect all individual CUE errors.
@@ -74,10 +76,10 @@ func TestValidateConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
 	assert.Contains(t, combined, "field not allowed",
 		"extra top-level fields (test, invalidField) should produce 'field not allowed'")
 	assert.Contains(t, combined, "conflicting values",
-		"media.test type conflict should produce 'conflicting values'")
+		"settings.timeout type conflict should produce 'conflicting values'")
 
 	// Assert exactly three errors: test, invalidField (field not allowed x2)
-	// + media.test (conflicting values x1).
+	// + settings.debug (conflicting values x1).
 	fieldNotAllowedCount := 0
 	conflictingCount := 0
 	for _, ce := range errs {
@@ -90,7 +92,7 @@ func TestValidateConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 2, fieldNotAllowedCount, "expected 2 'field not allowed' errors (test + invalidField)")
-	assert.Equal(t, 1, conflictingCount, "expected 1 'conflicting values' error (media.test)")
+	assert.Equal(t, 1, conflictingCount, "expected 1 'conflicting values' error (settings.timeout)")
 
 	// Assert positions are present (file:line:col) for "field not allowed" errors.
 	for _, ce := range errs {
@@ -102,8 +104,8 @@ func TestValidateConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
 		assert.NotEmpty(t, positions, "field not allowed errors should have source positions")
 		if len(positions) > 0 {
 			assert.True(t, positions[0].IsValid(), "position should be valid")
-			assert.Contains(t, positions[0].Filename(), "values_invalid_1.cue",
-				"position should point to values.cue")
+			assert.Contains(t, positions[0].Filename(), "values_invalid.cue",
+				"position should point to values_invalid.cue")
 		}
 	}
 }
