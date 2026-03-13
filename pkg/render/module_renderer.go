@@ -10,6 +10,7 @@ import (
 	"cuelang.org/go/cue"
 
 	"github.com/opmodel/cli/pkg/core"
+	"github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/provider"
 )
 
@@ -67,7 +68,7 @@ func NewModule(p *provider.Provider) *Module {
 }
 
 // Execute executes matched transforms for the given module release.
-func (r *Module) Execute(ctx context.Context, rel *ModuleRelease, plan *MatchPlan) (*ModuleResult, error) {
+func (r *Module) Execute(ctx context.Context, rel *module.Release, plan *MatchPlan) (*ModuleResult, error) {
 	// Extract the components CUE values from the ModuleRelease.
 	schemaComponents := rel.MatchComponents()
 	if !schemaComponents.Exists() {

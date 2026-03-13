@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/opmodel/cli/pkg/bundle"
 	"github.com/opmodel/cli/pkg/core"
 	"github.com/opmodel/cli/pkg/provider"
 )
@@ -54,7 +55,7 @@ func NewBundle(p *provider.Provider) *Bundle {
 // if earlier ones fail. Errors from all failed releases are collected and returned
 // together so the operator can see all failures in one pass. This matches the
 // fail-slow behavior of executeTransforms at the pair level.
-func (br *Bundle) Execute(ctx context.Context, rel *BundleRelease) (*BundleResult, error) {
+func (br *Bundle) Execute(ctx context.Context, rel *bundle.Release) (*BundleResult, error) {
 	// Sort release keys for deterministic ordering.
 	keys := make([]string, 0, len(rel.Releases))
 	for k := range rel.Releases {

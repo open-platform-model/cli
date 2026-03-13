@@ -1,21 +1,19 @@
-package render
+package module
 
 import (
 	"cuelang.org/go/cue"
-
-	"github.com/opmodel/cli/pkg/module"
 )
 
-// ModuleRelease is the concrete deployment instance of a module as it moves
+// Release is the concrete deployment instance of a module as it moves
 // through parse, process, and render stages.
-type ModuleRelease struct {
+type Release struct {
 	// Metadata is extracted for Go-side operations: inventory, K8s labeling, display.
-	Metadata *ModuleReleaseMetadata
+	Metadata *ReleaseMetadata
 
 	// Module is the original module, preserved for reference.
-	Module module.Module
+	Module Module
 
-	// RawCUE is the whole ModuleRelease CUE value.
+	// RawCUE is the whole Release CUE value.
 	// It is initially the parse-only raw value, then replaced with the concrete
 	// processed value after successful value filling.
 	RawCUE cue.Value
@@ -31,9 +29,9 @@ type ModuleRelease struct {
 	Values cue.Value
 }
 
-// NewModuleRelease constructs a ModuleRelease.
-func NewModuleRelease(metadata *ModuleReleaseMetadata, mod module.Module, rawCUE, dataComponents, config, values cue.Value) *ModuleRelease {
-	return &ModuleRelease{
+// NewRelease constructs a Release.
+func NewRelease(metadata *ReleaseMetadata, mod Module, rawCUE, dataComponents, config, values cue.Value) *Release {
+	return &Release{
 		Metadata:       metadata,
 		Module:         mod,
 		RawCUE:         rawCUE,
@@ -45,18 +43,18 @@ func NewModuleRelease(metadata *ModuleReleaseMetadata, mod module.Module, rawCUE
 
 // MatchComponents returns the concrete component view used for matching.
 // This must preserve definition fields such as #resources and #traits.
-func (r *ModuleRelease) MatchComponents() cue.Value {
+func (r *Release) MatchComponents() cue.Value {
 	return r.RawCUE.LookupPath(cue.ParsePath("components"))
 }
 
 // ExecuteComponents returns the finalized, constraint-free component view.
-func (r *ModuleRelease) ExecuteComponents() cue.Value {
+func (r *Release) ExecuteComponents() cue.Value {
 	return r.DataComponents
 }
 
-// ModuleReleaseMetadata contains release-level identity information.
+// ReleaseMetadata contains release-level identity information.
 // Used for K8s inventory tracking, resource labeling, and CLI output.
-type ModuleReleaseMetadata struct {
+type ReleaseMetadata struct {
 	// Name is the release name (from --name or module.metadata.name).
 	Name string `json:"name"`
 

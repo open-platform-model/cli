@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/opmodel/cli/pkg/bundle"
+	"github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/provider"
 	"github.com/opmodel/cli/pkg/render"
 )
@@ -19,8 +21,8 @@ func TestModuleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {
 	data := ctx.CompileString(`{}`)
 
 	renderer := render.NewModule(&provider.Provider{Data: providerVal})
-	result, err := renderer.Execute(context.Background(), &render.ModuleRelease{
-		Metadata:       &render.ModuleReleaseMetadata{Name: "demo"},
+	result, err := renderer.Execute(context.Background(), &module.Release{
+		Metadata:       &module.ReleaseMetadata{Name: "demo"},
 		RawCUE:         raw,
 		DataComponents: data,
 	}, &render.MatchPlan{Matches: map[string]map[string]render.MatchResult{}, UnhandledTraits: map[string][]string{}})
@@ -38,7 +40,7 @@ func TestBundleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {
 	ctx := cuecontext.New()
 	providerVal := ctx.CompileString(`{#transformers:{}}`)
 	renderer := render.NewBundle(&provider.Provider{Data: providerVal})
-	result, err := renderer.Execute(context.Background(), &render.BundleRelease{Releases: map[string]*render.ModuleRelease{}})
+	result, err := renderer.Execute(context.Background(), &bundle.Release{Releases: map[string]*module.Release{}})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.NotNil(t, result.Resources)

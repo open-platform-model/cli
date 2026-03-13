@@ -14,7 +14,7 @@ import (
 // Result is the output of the shared render workflow.
 type Result struct {
 	Resources  []*unstructured.Unstructured
-	Release    pkgrender.ModuleReleaseMetadata
+	Release    pkgmodule.ReleaseMetadata
 	Module     pkgmodule.ModuleMetadata
 	Components []pkgrender.ComponentSummary
 	MatchPlan  *pkgrender.MatchPlan

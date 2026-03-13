@@ -8,7 +8,7 @@ import (
 	"github.com/opmodel/cli/pkg/module"
 )
 
-func SynthesizeModule(cueCtx *cue.Context, modVal cue.Value, values []cue.Value, releaseName, namespace string) (*ModuleRelease, error) {
+func SynthesizeModule(cueCtx *cue.Context, modVal cue.Value, values []cue.Value, releaseName, namespace string) (*module.Release, error) {
 	moduleConfigVal := modVal.LookupPath(cue.ParsePath("#config"))
 	mergedValues, cfgErr := ValidateConfig(moduleConfigVal, values, "module", releaseName)
 	if cfgErr != nil {
@@ -48,12 +48,12 @@ func SynthesizeModule(cueCtx *cue.Context, modVal cue.Value, values []cue.Value,
 		return nil, fmt.Errorf("decoding module metadata: %w", err)
 	}
 
-	relMeta := &ModuleReleaseMetadata{
+	relMeta := &module.ReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 	}
 
-	return NewModuleRelease(relMeta, module.Module{
+	return module.NewRelease(relMeta, module.Module{
 		Metadata: modMeta,
 		Config:   moduleConfigVal,
 		Raw:      modVal,

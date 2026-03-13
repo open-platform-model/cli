@@ -51,7 +51,7 @@ func Release(ctx context.Context, opts ReleaseOpts) (*Result, error) { //nolint:
 	}
 
 	var (
-		rel        *pkgrender.ModuleRelease
+		rel        *pkgmodule.Release
 		valuesVals []cue.Value
 	)
 

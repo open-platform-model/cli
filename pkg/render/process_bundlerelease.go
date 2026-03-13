@@ -6,10 +6,11 @@ import (
 
 	"cuelang.org/go/cue"
 
+	"github.com/opmodel/cli/pkg/bundle"
 	"github.com/opmodel/cli/pkg/provider"
 )
 
-func ProcessBundleRelease(ctx context.Context, br *BundleRelease, values []cue.Value, p *provider.Provider) (*BundleResult, error) {
+func ProcessBundleRelease(ctx context.Context, br *bundle.Release, values []cue.Value, p *provider.Provider) (*BundleResult, error) {
 	_ = ctx
 	_ = p
 	_, _ = cuecontextMarker(br.RawCUE)

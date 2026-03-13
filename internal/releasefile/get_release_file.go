@@ -9,7 +9,6 @@ import (
 	"github.com/opmodel/cli/pkg/bundle"
 	"github.com/opmodel/cli/pkg/loader"
 	"github.com/opmodel/cli/pkg/module"
-	"github.com/opmodel/cli/pkg/render"
 )
 
 type Kind string
@@ -22,8 +21,8 @@ const (
 type FileRelease struct {
 	Path   string
 	Kind   Kind
-	Module *render.ModuleRelease
-	Bundle *render.BundleRelease
+	Module *module.Release
+	Bundle *bundle.Release
 }
 
 func GetReleaseFile(ctx *cue.Context, filePath string) (*FileRelease, error) {
@@ -63,7 +62,7 @@ func GetReleaseFile(ctx *cue.Context, filePath string) (*FileRelease, error) {
 	}
 }
 
-func bareModuleRelease(v cue.Value, fallbackName string) (*render.ModuleRelease, error) {
+func bareModuleRelease(v cue.Value, fallbackName string) (*module.Release, error) {
 	moduleVal := v.LookupPath(cue.ParsePath("#module"))
 	moduleConfig := v.LookupPath(cue.ParsePath("#module.#config"))
 	releaseMeta, err := mustModuleReleaseMetadata(v, fallbackName)
@@ -71,7 +70,7 @@ func bareModuleRelease(v cue.Value, fallbackName string) (*render.ModuleRelease,
 		return nil, err
 	}
 
-	return render.NewModuleRelease(
+	return module.NewRelease(
 		releaseMeta,
 		module.Module{
 			Metadata: bestEffortModuleMetadata(moduleVal),
@@ -85,7 +84,7 @@ func bareModuleRelease(v cue.Value, fallbackName string) (*render.ModuleRelease,
 	), nil
 }
 
-func bareBundleRelease(v cue.Value) (*render.BundleRelease, error) {
+func bareBundleRelease(v cue.Value) (*bundle.Release, error) {
 	bundleVal := v.LookupPath(cue.ParsePath("#bundle"))
 	bundleConfig := v.LookupPath(cue.ParsePath("#bundle.#config"))
 	releaseMeta, err := mustBundleReleaseMetadata(v)
@@ -93,19 +92,19 @@ func bareBundleRelease(v cue.Value) (*render.BundleRelease, error) {
 		return nil, err
 	}
 
-	return &render.BundleRelease{
+	return &bundle.Release{
 		Metadata: releaseMeta,
 		Bundle: bundle.Bundle{
 			Metadata: bestEffortBundleMetadata(bundleVal),
 			Data:     bundleVal,
 		},
 		RawCUE:   v,
-		Releases: map[string]*render.ModuleRelease{},
+		Releases: map[string]*module.Release{},
 		Config:   bundleConfig,
 	}, nil
 }
 
-func mustModuleReleaseMetadata(v cue.Value, fallbackName string) (*render.ModuleReleaseMetadata, error) {
+func mustModuleReleaseMetadata(v cue.Value, fallbackName string) (*module.ReleaseMetadata, error) {
 	metaVal := v.LookupPath(cue.ParsePath("metadata"))
 	if !metaVal.Exists() {
 		return nil, fmt.Errorf("module release metadata is required for %q", fallbackName)
@@ -113,7 +112,7 @@ func mustModuleReleaseMetadata(v cue.Value, fallbackName string) (*render.Module
 	if err := metaVal.Validate(cue.Concrete(true)); err != nil {
 		return nil, fmt.Errorf("module release metadata must be concrete for %q: %w", fallbackName, err)
 	}
-	meta := &render.ModuleReleaseMetadata{}
+	meta := &module.ReleaseMetadata{}
 	if err := metaVal.Decode(meta); err != nil {
 		return nil, fmt.Errorf("decoding module release metadata for %q: %w", fallbackName, err)
 	}
@@ -130,7 +129,7 @@ func bestEffortModuleMetadata(v cue.Value) *module.ModuleMetadata {
 	return meta
 }
 
-func mustBundleReleaseMetadata(v cue.Value) (*render.BundleReleaseMetadata, error) {
+func mustBundleReleaseMetadata(v cue.Value) (*bundle.ReleaseMetadata, error) {
 	metaVal := v.LookupPath(cue.ParsePath("metadata"))
 	if !metaVal.Exists() {
 		return nil, fmt.Errorf("bundle release metadata is required")
@@ -138,7 +137,7 @@ func mustBundleReleaseMetadata(v cue.Value) (*render.BundleReleaseMetadata, erro
 	if err := metaVal.Validate(cue.Concrete(true)); err != nil {
 		return nil, fmt.Errorf("bundle release metadata must be concrete: %w", err)
 	}
-	meta := &render.BundleReleaseMetadata{}
+	meta := &bundle.ReleaseMetadata{}
 	if err := metaVal.Decode(meta); err != nil {
 		return nil, fmt.Errorf("decoding bundle release metadata: %w", err)
 	}

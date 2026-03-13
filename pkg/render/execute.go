@@ -7,6 +7,7 @@ import (
 	"cuelang.org/go/cue"
 
 	"github.com/opmodel/cli/pkg/core"
+	"github.com/opmodel/cli/pkg/module"
 )
 
 // moduleReleaseContextData is the Go-side mirror of #TransformerContext.#moduleReleaseMetadata.
@@ -46,7 +47,7 @@ func executeTransforms(
 	providerVal cue.Value,
 	schemaComponents cue.Value,
 	dataComponents cue.Value,
-	rel *ModuleRelease,
+	rel *module.Release,
 ) ([]*core.Resource, []string, []error) {
 	resources := make([]*core.Resource, 0)
 	var warnings []string
@@ -85,7 +86,7 @@ func executePair(
 	providerVal cue.Value,
 	schemaComponents cue.Value,
 	dataComponents cue.Value,
-	rel *ModuleRelease,
+	rel *module.Release,
 	pair MatchedPair,
 ) ([]*core.Resource, []string, error) {
 	compName := pair.ComponentName
@@ -177,7 +178,7 @@ func executePair(
 func injectContext(
 	cueCtx *cue.Context,
 	unified cue.Value,
-	rel *ModuleRelease,
+	rel *module.Release,
 	compName string,
 	compVal cue.Value,
 ) (cue.Value, []string, error) {
