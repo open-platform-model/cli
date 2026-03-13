@@ -1,5 +1,4 @@
-// Package modulerelease defines the ModuleRelease and ReleaseMetadata types.
-package modulerelease
+package render
 
 import (
 	"cuelang.org/go/cue"
@@ -11,7 +10,7 @@ import (
 // through parse, process, and render stages.
 type ModuleRelease struct {
 	// Metadata is extracted for Go-side operations: inventory, K8s labeling, display.
-	Metadata *ReleaseMetadata
+	Metadata *ModuleReleaseMetadata
 
 	// Module is the original module, preserved for reference.
 	Module module.Module
@@ -33,7 +32,7 @@ type ModuleRelease struct {
 }
 
 // NewModuleRelease constructs a ModuleRelease.
-func NewModuleRelease(metadata *ReleaseMetadata, mod module.Module, rawCUE, dataComponents, config, values cue.Value) *ModuleRelease {
+func NewModuleRelease(metadata *ModuleReleaseMetadata, mod module.Module, rawCUE, dataComponents, config, values cue.Value) *ModuleRelease {
 	return &ModuleRelease{
 		Metadata:       metadata,
 		Module:         mod,
@@ -55,9 +54,9 @@ func (r *ModuleRelease) ExecuteComponents() cue.Value {
 	return r.DataComponents
 }
 
-// ReleaseMetadata contains release-level identity information.
+// ModuleReleaseMetadata contains release-level identity information.
 // Used for K8s inventory tracking, resource labeling, and CLI output.
-type ReleaseMetadata struct {
+type ModuleReleaseMetadata struct {
 	// Name is the release name (from --name or module.metadata.name).
 	Name string `json:"name"`
 

@@ -7,12 +7,11 @@ import (
 	"cuelang.org/go/cue"
 
 	"github.com/opmodel/cli/internal/engine"
-	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/provider"
 	"github.com/opmodel/cli/pkg/render"
 )
 
-func ProcessModuleRelease(ctx context.Context, mr *modulerelease.ModuleRelease, values []cue.Value, p *provider.Provider) (*engine.ModuleRenderResult, error) {
+func ProcessModuleRelease(ctx context.Context, mr *render.ModuleRelease, values []cue.Value, p *provider.Provider) (*engine.ModuleRenderResult, error) {
 	merged, cfgErr := ValidateConfig(mr.Config, values, "module", mr.Metadata.Name)
 	if cfgErr != nil {
 		return nil, cfgErr

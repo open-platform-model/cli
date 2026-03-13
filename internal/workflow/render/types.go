@@ -8,7 +8,6 @@ import (
 
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/engine"
-	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
 	pkgrender "github.com/opmodel/cli/pkg/render"
 )
@@ -16,7 +15,7 @@ import (
 // Result is the output of the shared render workflow.
 type Result struct {
 	Resources  []*unstructured.Unstructured
-	Release    modulerelease.ReleaseMetadata
+	Release    pkgrender.ModuleReleaseMetadata
 	Module     pkgmodule.ModuleMetadata
 	Components []engine.ComponentSummary
 	MatchPlan  *pkgrender.MatchPlan

@@ -14,13 +14,13 @@ import (
 	"github.com/opmodel/cli/internal/config"
 	internalreleasefile "github.com/opmodel/cli/internal/releasefile"
 	"github.com/opmodel/cli/internal/releaseprocess"
-	"github.com/opmodel/cli/internal/runtime/modulerelease"
+	pkgrender "github.com/opmodel/cli/pkg/render"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func mustReleaseMetadata(name, namespace string) modulerelease.ReleaseMetadata {
-	return modulerelease.ReleaseMetadata{Name: name, Namespace: namespace}
+func mustReleaseMetadata(name, namespace string) pkgrender.ModuleReleaseMetadata {
+	return pkgrender.ModuleReleaseMetadata{Name: name, Namespace: namespace}
 }
 
 func makeReleaseFileFixture(t *testing.T, filename, content string) string {

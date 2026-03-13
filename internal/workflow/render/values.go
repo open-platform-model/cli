@@ -10,8 +10,8 @@ import (
 	"cuelang.org/go/cue"
 
 	internalreleasefile "github.com/opmodel/cli/internal/releasefile"
-	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/loader"
+	pkgrender "github.com/opmodel/cli/pkg/render"
 )
 
 func resolveReleaseValues(cueCtx *cue.Context, rawRelease cue.Value, releaseFilePath string, valuesFiles []string) ([]cue.Value, error) {
@@ -39,7 +39,7 @@ func resolveReleaseValues(cueCtx *cue.Context, rawRelease cue.Value, releaseFile
 	return []cue.Value{valuesVal}, nil
 }
 
-func loadModuleReleaseForRender(cueCtx *cue.Context, modulePath string, valuesFiles []string, debugValues bool, releaseName string) (*modulerelease.ModuleRelease, []cue.Value, error) {
+func loadModuleReleaseForRender(cueCtx *cue.Context, modulePath string, valuesFiles []string, debugValues bool, releaseName string) (*pkgrender.ModuleRelease, []cue.Value, error) {
 	fileRelease, err := internalreleasefile.GetReleaseFile(cueCtx, modulePath)
 	if err != nil {
 		return nil, nil, err
@@ -115,6 +115,6 @@ func ResolveReleaseValuesForTest(cueCtx *cue.Context, rawRelease cue.Value, rele
 	return resolveReleaseValues(cueCtx, rawRelease, releaseFilePath, valuesFiles)
 }
 
-func LoadModuleReleaseForTest(cueCtx *cue.Context, modulePath string, valuesFiles []string, debugValues bool, releaseName string) (*modulerelease.ModuleRelease, []cue.Value, error) {
+func LoadModuleReleaseForTest(cueCtx *cue.Context, modulePath string, valuesFiles []string, debugValues bool, releaseName string) (*pkgrender.ModuleRelease, []cue.Value, error) {
 	return loadModuleReleaseForRender(cueCtx, modulePath, valuesFiles, debugValues, releaseName)
 }

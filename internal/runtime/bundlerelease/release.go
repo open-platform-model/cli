@@ -7,8 +7,8 @@ package bundlerelease
 import (
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/bundle"
+	"github.com/opmodel/cli/pkg/render"
 )
 
 // BundleRelease is the concrete deployment instance of a bundle as it moves
@@ -24,7 +24,7 @@ type BundleRelease struct {
 	RawCUE cue.Value
 
 	// Releases is the map of ModuleReleases produced during bundle processing.
-	Releases map[string]*modulerelease.ModuleRelease
+	Releases map[string]*render.ModuleRelease
 
 	// Config is the #config schema extracted from the release's bundle view.
 	Config cue.Value
@@ -34,7 +34,7 @@ type BundleRelease struct {
 }
 
 // BundleReleaseMetadata contains release-level identity information.
-// Parallel to modulerelease.ReleaseMetadata but without Namespace —
+// Parallel to render.ModuleReleaseMetadata but without Namespace —
 // bundles do not have a single target namespace.
 //
 //nolint:revive // stutter intentional: bundlerelease.BundleReleaseMetadata reads clearly at call sites

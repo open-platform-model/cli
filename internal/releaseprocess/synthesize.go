@@ -5,11 +5,11 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/module"
+	"github.com/opmodel/cli/pkg/render"
 )
 
-func SynthesizeModuleRelease(cueCtx *cue.Context, modVal cue.Value, values []cue.Value, releaseName, namespace string) (*modulerelease.ModuleRelease, error) {
+func SynthesizeModuleRelease(cueCtx *cue.Context, modVal cue.Value, values []cue.Value, releaseName, namespace string) (*render.ModuleRelease, error) {
 	moduleConfigVal := modVal.LookupPath(cue.ParsePath("#config"))
 	mergedValues, cfgErr := ValidateConfig(moduleConfigVal, values, "module", releaseName)
 	if cfgErr != nil {
@@ -49,12 +49,12 @@ func SynthesizeModuleRelease(cueCtx *cue.Context, modVal cue.Value, values []cue
 		return nil, fmt.Errorf("decoding module metadata: %w", err)
 	}
 
-	relMeta := &modulerelease.ReleaseMetadata{
+	relMeta := &render.ModuleReleaseMetadata{
 		Name:      releaseName,
 		Namespace: namespace,
 	}
 
-	return modulerelease.NewModuleRelease(relMeta, module.Module{
+	return render.NewModuleRelease(relMeta, module.Module{
 		Metadata: modMeta,
 		Config:   moduleConfigVal,
 		Raw:      modVal,

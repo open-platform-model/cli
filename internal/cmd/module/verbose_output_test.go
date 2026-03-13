@@ -9,7 +9,6 @@ import (
 
 	"github.com/opmodel/cli/internal/engine"
 	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/internal/workflow/render"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
 	pkgrender "github.com/opmodel/cli/pkg/render"
@@ -19,7 +18,7 @@ import (
 // testing output formatting without requiring a registry or real module render.
 func buildTestResult() *render.Result {
 	return &render.Result{
-		Release: modulerelease.ReleaseMetadata{
+		Release: pkgrender.ModuleReleaseMetadata{
 			Name:      "test-release",
 			Namespace: "default",
 		},

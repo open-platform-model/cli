@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/opmodel/cli/internal/runtime/bundlerelease"
-	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/provider"
+	"github.com/opmodel/cli/pkg/render"
 )
 
 func TestProcessModuleRelease_Success(t *testing.T) {
@@ -77,8 +77,8 @@ func TestProcessModuleRelease_Success(t *testing.T) {
 		}
 	}`)
 
-	mr := &modulerelease.ModuleRelease{
-		Metadata: &modulerelease.ReleaseMetadata{Name: "demo", Namespace: "apps"},
+	mr := &render.ModuleRelease{
+		Metadata: &render.ModuleReleaseMetadata{Name: "demo", Namespace: "apps"},
 		Module:   module.Module{Metadata: &module.ModuleMetadata{FQN: "example.com/modules/demo@v1", Version: "v1"}},
 		RawCUE:   raw,
 		Config:   raw.LookupPath(cue.ParsePath("#module.#config")),
@@ -107,7 +107,7 @@ func TestProcessBundleRelease_StubAfterValidation(t *testing.T) {
 		Metadata: &bundlerelease.BundleReleaseMetadata{Name: "stack"},
 		RawCUE:   raw,
 		Config:   raw.LookupPath(cue.ParsePath("#bundle.#config")),
-		Releases: map[string]*modulerelease.ModuleRelease{},
+		Releases: map[string]*render.ModuleRelease{},
 	}
 
 	_, err := ProcessBundleRelease(context.Background(), br, []cue.Value{ctx.CompileString(`{replicas: 1}`)}, &provider.Provider{Data: ctx.CompileString(`{}`)})

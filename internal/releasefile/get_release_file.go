@@ -7,10 +7,10 @@ import (
 	"cuelang.org/go/cue"
 
 	"github.com/opmodel/cli/internal/runtime/bundlerelease"
-	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/bundle"
 	"github.com/opmodel/cli/pkg/loader"
 	"github.com/opmodel/cli/pkg/module"
+	"github.com/opmodel/cli/pkg/render"
 )
 
 type Kind string
@@ -23,7 +23,7 @@ const (
 type FileRelease struct {
 	Path   string
 	Kind   Kind
-	Module *modulerelease.ModuleRelease
+	Module *render.ModuleRelease
 	Bundle *bundlerelease.BundleRelease
 }
 
@@ -64,7 +64,7 @@ func GetReleaseFile(ctx *cue.Context, filePath string) (*FileRelease, error) {
 	}
 }
 
-func bareModuleRelease(v cue.Value, fallbackName string) (*modulerelease.ModuleRelease, error) {
+func bareModuleRelease(v cue.Value, fallbackName string) (*render.ModuleRelease, error) {
 	moduleVal := v.LookupPath(cue.ParsePath("#module"))
 	moduleConfig := v.LookupPath(cue.ParsePath("#module.#config"))
 	releaseMeta, err := mustModuleReleaseMetadata(v, fallbackName)
@@ -72,7 +72,7 @@ func bareModuleRelease(v cue.Value, fallbackName string) (*modulerelease.ModuleR
 		return nil, err
 	}
 
-	return modulerelease.NewModuleRelease(
+	return render.NewModuleRelease(
 		releaseMeta,
 		module.Module{
 			Metadata: bestEffortModuleMetadata(moduleVal),
@@ -101,12 +101,12 @@ func bareBundleRelease(v cue.Value) (*bundlerelease.BundleRelease, error) {
 			Data:     bundleVal,
 		},
 		RawCUE:   v,
-		Releases: map[string]*modulerelease.ModuleRelease{},
+		Releases: map[string]*render.ModuleRelease{},
 		Config:   bundleConfig,
 	}, nil
 }
 
-func mustModuleReleaseMetadata(v cue.Value, fallbackName string) (*modulerelease.ReleaseMetadata, error) {
+func mustModuleReleaseMetadata(v cue.Value, fallbackName string) (*render.ModuleReleaseMetadata, error) {
 	metaVal := v.LookupPath(cue.ParsePath("metadata"))
 	if !metaVal.Exists() {
 		return nil, fmt.Errorf("module release metadata is required for %q", fallbackName)
@@ -114,7 +114,7 @@ func mustModuleReleaseMetadata(v cue.Value, fallbackName string) (*modulerelease
 	if err := metaVal.Validate(cue.Concrete(true)); err != nil {
 		return nil, fmt.Errorf("module release metadata must be concrete for %q: %w", fallbackName, err)
 	}
-	meta := &modulerelease.ReleaseMetadata{}
+	meta := &render.ModuleReleaseMetadata{}
 	if err := metaVal.Decode(meta); err != nil {
 		return nil, fmt.Errorf("decoding module release metadata for %q: %w", fallbackName, err)
 	}

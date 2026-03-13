@@ -7,7 +7,6 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/charmbracelet/log"
 
-	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/core"
 	"github.com/opmodel/cli/pkg/render"
 )
@@ -49,7 +48,7 @@ func executeTransforms(
 	providerVal cue.Value,
 	schemaComponents cue.Value,
 	dataComponents cue.Value,
-	rel *modulerelease.ModuleRelease,
+	rel *render.ModuleRelease,
 ) ([]*core.Resource, []error) {
 	resources := make([]*core.Resource, 0)
 	var errs []error
@@ -86,7 +85,7 @@ func executePair(
 	providerVal cue.Value,
 	schemaComponents cue.Value,
 	dataComponents cue.Value,
-	rel *modulerelease.ModuleRelease,
+	rel *render.ModuleRelease,
 	pair render.MatchedPair,
 ) ([]*core.Resource, error) {
 	compName := pair.ComponentName
@@ -176,7 +175,7 @@ func executePair(
 func injectContext(
 	cueCtx *cue.Context,
 	unified cue.Value,
-	rel *modulerelease.ModuleRelease,
+	rel *render.ModuleRelease,
 	compName string,
 	compVal cue.Value,
 ) (cue.Value, error) {

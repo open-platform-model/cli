@@ -16,9 +16,9 @@ import (
 	"github.com/opmodel/cli/internal/output"
 	internalreleasefile "github.com/opmodel/cli/internal/releasefile"
 	"github.com/opmodel/cli/internal/releaseprocess"
-	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/loader"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
+	pkgrender "github.com/opmodel/cli/pkg/render"
 )
 
 func Release(ctx context.Context, opts ReleaseOpts) (*Result, error) { //nolint:gocyclo // release rendering coordinates multiple validation and load branches
@@ -52,7 +52,7 @@ func Release(ctx context.Context, opts ReleaseOpts) (*Result, error) { //nolint:
 	}
 
 	var (
-		rel        *modulerelease.ModuleRelease
+		rel        *pkgrender.ModuleRelease
 		valuesVals []cue.Value
 	)
 
