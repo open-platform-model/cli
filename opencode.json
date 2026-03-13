@@ -5,10 +5,12 @@
             "~/Dev/open-platform-model/local/**": "allow",
             "~/Dev/open-platform-model/catalog/**": "allow",
             "~/Dev/open-platform-model/opm/**": "allow",
+            "~/Dev/open-platform-model/poc-controller/**": "allow",
             "~/Dev/open-platform-model/opmodel.dev/**": "allow",
             "../local/**": "allow",
             "../catalog/**": "allow",
             "../opm/**": "allow",
+            "../poc-controller/**": "allow",
             "../opmodel.dev/**": "allow"
         },
         "read": {
