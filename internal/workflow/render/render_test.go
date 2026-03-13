@@ -37,28 +37,6 @@ language: version: "v0.15.0"
 	return filePath
 }
 
-func TestRenderModule_NilConfig(t *testing.T) {
-	_, err := FromModule(context.Background(), ReleaseOpts{Config: nil, K8sConfig: nil})
-	require.Error(t, err)
-	var exitErr *opmexit.ExitError
-	require.True(t, errors.As(err, &exitErr))
-	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
-	assert.Contains(t, exitErr.Error(), "configuration not loaded")
-}
-
-func TestRenderModule_RejectsReleasePackagePath(t *testing.T) {
-	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "release.cue"), []byte("package test\n"), 0o644))
-
-	_, err := FromModule(context.Background(), ReleaseOpts{
-		Args:      []string{dir},
-		Config:    &config.GlobalConfig{CueContext: cuecontext.New()},
-		K8sConfig: &config.ResolvedKubernetesConfig{},
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "release package, not a module")
-}
-
 func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
 	result := &Result{Release: mustReleaseMetadata("test-module", "default"), Warnings: []string{}}
 	ShowOutput(result, ShowOutputOpts{Verbose: false})
@@ -148,17 +126,6 @@ func TestResolveReleaseValues_UsesValuesFile(t *testing.T) {
 	require.NoError(t, os.WriteFile(valuesFile, []byte("package test\nvalues: {replicas: 3}\n"), 0o644))
 	values, err := resolveReleaseValues(ctx, ctx.CompileString(`{}`), filepath.Join(dir, "release.cue"), []string{valuesFile})
 	require.NoError(t, err)
-	require.Len(t, values, 1)
-	assert.True(t, values[0].Exists())
-}
-
-func TestLoadModuleReleaseForRender_UsesReleaseNameOverride(t *testing.T) {
-	ctx := cuecontext.New()
-	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "release.cue"), []byte("package test\nkind: \"ModuleRelease\"\nmetadata: {name: \"from-file\", namespace: \"apps\"}\nvalues: {replicas: 2}\n"), 0o644))
-	rel, values, err := loadModuleReleaseForRender(ctx, dir, nil, false, "override-name")
-	require.NoError(t, err)
-	assert.Equal(t, "override-name", rel.Metadata.Name)
 	require.Len(t, values, 1)
 	assert.True(t, values[0].Exists())
 }

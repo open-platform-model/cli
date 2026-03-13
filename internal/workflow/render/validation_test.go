@@ -43,7 +43,7 @@ func TestPrintValidationError_UsesGroupedFormatting(t *testing.T) {
 	os.Stderr = w
 	defer func() { os.Stderr = oldStderr }()
 
-	printValidationError("render failed", cfgErr)
+	printValidationError(cfgErr)
 	require.NoError(t, w.Close())
 
 	details, err := io.ReadAll(r)

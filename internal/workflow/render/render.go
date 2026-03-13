@@ -2,9 +2,7 @@ package render
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"path/filepath"
 
 	opmexit "github.com/opmodel/cli/internal/exit"
 
@@ -20,126 +18,6 @@ import (
 	"github.com/opmodel/cli/pkg/provider"
 	pkgrender "github.com/opmodel/cli/pkg/render"
 )
-
-// FromModule prepares and renders a release directly from an OPM module source directory.
-// It synthesizes a ModuleRelease on the fly by combining the module's CUE templates
-// with the provided values. This is typically used by module authors to validate and
-// test their modules locally (e.g., via "opm release build ./my-module").
-func FromModule(ctx context.Context, opts ReleaseOpts) (*Result, error) { //nolint:gocyclo // release rendering coordinates multiple validation and load branches
-	modulePath := resolveModulePath(opts.Args)
-
-	if opts.Config == nil {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
-	}
-	if opts.K8sConfig == nil {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("kubernetes config not resolved")}
-	}
-
-	namespace := opts.K8sConfig.Namespace.Value
-	providerName := opts.K8sConfig.Provider.Value
-
-	if opts.K8sConfig.Kubeconfig.Value != "" || opts.K8sConfig.Context.Value != "" {
-		output.Debug("resolved kubernetes config",
-			"kubeconfig", opts.K8sConfig.Kubeconfig.Value,
-			"context", opts.K8sConfig.Context.Value,
-			"namespace", namespace,
-			"provider", providerName,
-		)
-	} else {
-		output.Debug("resolved config", "namespace", namespace, "provider", providerName)
-	}
-
-	cueCtx := opts.Config.CueContext
-	output.Debug("rendering release", "module-path", modulePath, "namespace", namespace, "provider", providerName)
-	if pathErr := cmdutil.ValidateModuleInputPath(modulePath); pathErr != nil {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: pathErr}
-	}
-
-	var (
-		rel        *pkgmodule.Release
-		valuesVals []cue.Value
-	)
-
-	if !hasReleaseFile(modulePath) {
-		modVal, modErr := loader.LoadModulePackage(cueCtx, modulePath)
-		if modErr != nil {
-			return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading module: %w", modErr)}
-		}
-
-		switch {
-		case len(opts.Values) > 0:
-			var loadErr error
-			valuesVals, loadErr = loadValuesFiles(cueCtx, opts.Values)
-			if loadErr != nil {
-				return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: loadErr}
-			}
-		case opts.DebugValues:
-			debugVal := modVal.LookupPath(cue.ParsePath("debugValues"))
-			if !debugVal.Exists() {
-				return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("no release.cue found - add debugValues to module or use -f <values-file>")}
-			}
-			if err := debugVal.Validate(cue.Concrete(true)); err != nil {
-				printValidationError("debugValues not concrete", err)
-				return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: fmt.Errorf("debugValues is not concrete - module must provide complete test values"), Printed: true}
-			}
-			valuesVals = []cue.Value{debugVal}
-		default:
-			return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("no release.cue found - use -f <values-file> to provide values")}
-		}
-
-		releaseName := opts.ReleaseName
-		if releaseName == "" {
-			if nameVal := modVal.LookupPath(cue.ParsePath("metadata.name")); nameVal.Exists() {
-				if n, strErr := nameVal.String(); strErr == nil && n != "" {
-					releaseName = n
-				}
-			}
-		}
-		if releaseName == "" {
-			releaseName = filepath.Base(modulePath)
-		}
-
-		moduleNamespace := namespace
-		s := opts.K8sConfig.Namespace.Source
-		if s != config.SourceFlag && s != config.SourceEnv {
-			if nsVal := modVal.LookupPath(cue.ParsePath("metadata.defaultNamespace")); nsVal.Exists() {
-				if ns, strErr := nsVal.String(); strErr == nil && ns != "" {
-					moduleNamespace = ns
-				}
-			}
-		}
-
-		var synthErr error
-		rel, synthErr = pkgrender.SynthesizeModule(cueCtx, modVal, valuesVals, releaseName, moduleNamespace)
-		if synthErr != nil {
-			printValidationError("render failed", synthErr)
-			return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: synthErr, Printed: true}
-		}
-	} else {
-		var loadErr error
-		rel, valuesVals, loadErr = loadModuleReleaseForRender(cueCtx, modulePath, opts.Values, opts.DebugValues, opts.ReleaseName)
-		if loadErr != nil {
-			var exitErr *opmexit.ExitError
-			if ok := errors.As(loadErr, &exitErr); ok {
-				return nil, exitErr
-			}
-			printValidationError("render failed", loadErr)
-			return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: loadErr, Printed: true}
-		}
-	}
-
-	var namespaceOverride string
-	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
-		namespaceOverride = namespace
-	}
-
-	p, err := loader.LoadProvider(providerName, opts.Config.Providers)
-	if err != nil {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
-	}
-
-	return renderPreparedModuleRelease(ctx, rel, valuesVals, p, namespaceOverride)
-}
 
 // FromReleaseFile prepares and renders a release from a declarative #ModuleRelease CUE file.
 // It parses the release file, applies any local module overrides (if --module is provided),
@@ -167,7 +45,7 @@ func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error)
 	}
 	fileRelease, err := internalreleasefile.GetReleaseFile(cueCtx, opts.ReleaseFilePath)
 	if err != nil {
-		printValidationError("render failed", err)
+		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 	if fileRelease.Kind == internalreleasefile.KindBundleRelease {
@@ -207,7 +85,7 @@ func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error)
 
 	valuesVals, err := resolveReleaseValues(cueCtx, rel.RawCUE, opts.ReleaseFilePath, opts.ValuesFiles)
 	if err != nil {
-		printValidationError("render failed", err)
+		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
@@ -224,7 +102,7 @@ func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error)
 	return renderPreparedModuleRelease(ctx, rel, valuesVals, p, namespaceOverride)
 }
 
-// renderPreparedModuleRelease is the shared execution tail for both FromModule and FromReleaseFile.
+// renderPreparedModuleRelease is the execution tail for FromReleaseFile.
 // It applies the namespace override, runs the render engine, and converts the result to unstructured resources.
 func renderPreparedModuleRelease(
 	ctx context.Context,
@@ -239,7 +117,7 @@ func renderPreparedModuleRelease(
 
 	engineResult, err := pkgrender.ProcessModuleRelease(ctx, rel, valuesVals, p)
 	if err != nil {
-		printValidationError("render failed", err)
+		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
@@ -264,11 +142,4 @@ func renderPreparedModuleRelease(
 
 func ShowOutput(result *Result, opts ShowOutputOpts) {
 	showOutput(result, opts)
-}
-
-func resolveModulePath(args []string) string {
-	if len(args) == 0 {
-		return "."
-	}
-	return args[0]
 }
