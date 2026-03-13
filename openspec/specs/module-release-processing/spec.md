@@ -5,29 +5,26 @@ Defines the parse-stage and process-stage contract for `ModuleRelease` handling 
 ## Requirements
 
 ### Requirement: Internal release parsing returns a barebones ModuleRelease without validation
-The system SHALL provide an internal `GetReleaseFile` release-parsing API that accepts an absolute path to a release file, detects when the file contains a `ModuleRelease`, and returns a barebones `modulerelease.ModuleRelease` without validating values or requiring a filled `#module` reference.
+The system SHALL provide an internal `GetReleaseFile` release-parsing API that accepts an absolute path to a release file, detects when the file contains a `ModuleRelease`, and returns a barebones `render.ModuleRelease` without validating values or requiring a filled `#module` reference. The `ModuleRelease` and `ModuleReleaseMetadata` types SHALL reside in `pkg/render`.
 
 #### Scenario: Parse module release file with unresolved module reference
 - **WHEN** `GetReleaseFile` is called with an absolute `release.cue` path containing a `ModuleRelease`
 - **AND** the release expects later `#module` injection
-- **THEN** it SHALL return a barebones `modulerelease.ModuleRelease`
+- **THEN** it SHALL return a barebones `render.ModuleRelease`
 - **AND** the returned release SHALL contain `RawCUE`
-- **AND** the returned release SHALL contain concrete decoded `Metadata`
+- **AND** the returned release SHALL contain concrete decoded `Metadata` of type `*render.ModuleReleaseMetadata`
 - **AND** the returned release SHALL contain `Config` extracted from the release's `#module.#config` view when available
 - **AND** it SHALL NOT validate values
 
 #### Scenario: Parse module release file with filled module reference
 - **WHEN** `GetReleaseFile` is called with a `ModuleRelease` file whose `#module` reference is already concrete
-- **THEN** it SHALL return a barebones `modulerelease.ModuleRelease`
-- **AND** the returned `Module` field SHALL contain module metadata and raw module data when those values are decodable
-- **AND** it SHALL NOT populate `Values`
-- **AND** it SHALL NOT populate `DataComponents`
+- **THEN** it SHALL return a barebones `render.ModuleRelease` with the same guarantees as above
 
 ### Requirement: ModuleRelease exposes processing-stage fields
-The `modulerelease.ModuleRelease` type SHALL expose the fields needed for explicit processing stages: `Metadata`, `Module`, `RawCUE`, `DataComponents`, `Config`, and `Values`.
+The `render.ModuleRelease` type SHALL expose the fields needed for explicit processing stages: `Metadata`, `Module`, `RawCUE`, `DataComponents`, `Config`, and `Values`.
 
 #### Scenario: Barebones release contains only parse-stage fields
-- **WHEN** a `modulerelease.ModuleRelease` is returned from `GetReleaseFile`
+- **WHEN** a `render.ModuleRelease` is returned from `GetReleaseFile`
 - **THEN** `Metadata` SHALL be concrete and decoded
 - **AND** `Module`, `RawCUE`, and `Config` SHALL be set when decodable from the parse-stage release value
 - **AND** `Values` SHALL be empty
