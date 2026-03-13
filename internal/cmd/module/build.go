@@ -93,7 +93,7 @@ func runModuleBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 	// Render module via shared pipeline.
 	// DebugValues: when no -f flag is given, use the module's debugValues field
 	// as the values source (consistent with how opm module vet works in release mode).
-	result, err := render.Release(ctx, render.ReleaseOpts{
+	result, err := render.FromModule(ctx, render.ReleaseOpts{
 		Args:        args,
 		Values:      rf.Values,
 		ReleaseName: rf.ReleaseName,

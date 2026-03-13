@@ -38,7 +38,7 @@ language: version: "v0.15.0"
 }
 
 func TestRenderModule_NilConfig(t *testing.T) {
-	_, err := Release(context.Background(), ReleaseOpts{Config: nil, K8sConfig: nil})
+	_, err := FromModule(context.Background(), ReleaseOpts{Config: nil, K8sConfig: nil})
 	require.Error(t, err)
 	var exitErr *opmexit.ExitError
 	require.True(t, errors.As(err, &exitErr))
@@ -50,7 +50,7 @@ func TestRenderModule_RejectsReleasePackagePath(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "release.cue"), []byte("package test\n"), 0o644))
 
-	_, err := Release(context.Background(), ReleaseOpts{
+	_, err := FromModule(context.Background(), ReleaseOpts{
 		Args:      []string{dir},
 		Config:    &config.GlobalConfig{CueContext: cuecontext.New()},
 		K8sConfig: &config.ResolvedKubernetesConfig{},
@@ -82,7 +82,7 @@ func TestRenderResult_ResourceCount(t *testing.T) {
 }
 
 func TestRenderFromReleaseFile_NilConfig(t *testing.T) {
-	_, err := ReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: "release.cue", Config: nil, K8sConfig: nil})
+	_, err := FromReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: "release.cue", Config: nil, K8sConfig: nil})
 	require.Error(t, err)
 	var exitErr *opmexit.ExitError
 	require.True(t, errors.As(err, &exitErr))
@@ -91,7 +91,7 @@ func TestRenderFromReleaseFile_NilConfig(t *testing.T) {
 }
 
 func TestRenderFromReleaseFile_NilK8sConfig(t *testing.T) {
-	_, err := ReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: "release.cue", Config: &config.GlobalConfig{}, K8sConfig: nil})
+	_, err := FromReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: "release.cue", Config: &config.GlobalConfig{}, K8sConfig: nil})
 	require.Error(t, err)
 	var exitErr *opmexit.ExitError
 	require.True(t, errors.As(err, &exitErr))
@@ -103,7 +103,7 @@ func TestRenderFromReleaseFile_RejectsModulePackagePath(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "module.cue"), []byte("package test\n"), 0o644))
 
-	_, err := ReleaseFile(context.Background(), ReleaseFileOpts{
+	_, err := FromReleaseFile(context.Background(), ReleaseFileOpts{
 		ReleaseFilePath: dir,
 		Config:          &config.GlobalConfig{CueContext: cuecontext.New()},
 		K8sConfig:       &config.ResolvedKubernetesConfig{},
@@ -120,7 +120,7 @@ func TestRenderFromReleaseFile_RejectsReleasePackageAsModuleOverride(t *testing.
 	moduleDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(moduleDir, "release.cue"), []byte("package test\n"), 0o644))
 
-	_, err := ReleaseFile(context.Background(), ReleaseFileOpts{
+	_, err := FromReleaseFile(context.Background(), ReleaseFileOpts{
 		ReleaseFilePath: releaseFile,
 		ModulePath:      moduleDir,
 		Config:          &config.GlobalConfig{CueContext: cuecontext.New(), Providers: map[string]cue.Value{}},
@@ -166,7 +166,7 @@ func TestLoadModuleReleaseForRender_UsesReleaseNameOverride(t *testing.T) {
 func TestRenderFromReleaseFile_RejectsBundleRelease(t *testing.T) {
 	ctx := cuecontext.New()
 	filePath := makeReleaseFileFixture(t, "bundle_release.cue", "package releases\nkind: \"BundleRelease\"\nmetadata: name: \"my-bundle\"\n")
-	_, err := ReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: filePath, Config: &config.GlobalConfig{CueContext: ctx, Providers: map[string]cue.Value{}}, K8sConfig: &config.ResolvedKubernetesConfig{}})
+	_, err := FromReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: filePath, Config: &config.GlobalConfig{CueContext: ctx, Providers: map[string]cue.Value{}}, K8sConfig: &config.ResolvedKubernetesConfig{}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bundle releases are not yet supported")
 }

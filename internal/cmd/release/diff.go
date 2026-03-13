@@ -64,7 +64,7 @@ func runReleaseDiff(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.R
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
-	result, err := render.ReleaseFile(ctx, render.ReleaseFileOpts{
+	result, err := render.FromReleaseFile(ctx, render.ReleaseFileOpts{
 		ReleaseFilePath: releaseFile,
 		ValuesFiles:     rff.Values,
 		ModulePath:      rff.Module,

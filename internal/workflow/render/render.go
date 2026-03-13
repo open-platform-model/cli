@@ -17,10 +17,15 @@ import (
 	internalreleasefile "github.com/opmodel/cli/internal/releasefile"
 	"github.com/opmodel/cli/pkg/loader"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
+	"github.com/opmodel/cli/pkg/provider"
 	pkgrender "github.com/opmodel/cli/pkg/render"
 )
 
-func Release(ctx context.Context, opts ReleaseOpts) (*Result, error) { //nolint:gocyclo // release rendering coordinates multiple validation and load branches
+// FromModule prepares and renders a release directly from an OPM module source directory.
+// It synthesizes a ModuleRelease on the fly by combining the module's CUE templates
+// with the provided values. This is typically used by module authors to validate and
+// test their modules locally (e.g., via "opm release build ./my-module").
+func FromModule(ctx context.Context, opts ReleaseOpts) (*Result, error) { //nolint:gocyclo // release rendering coordinates multiple validation and load branches
 	modulePath := resolveModulePath(opts.Args)
 
 	if opts.Config == nil {
@@ -123,8 +128,9 @@ func Release(ctx context.Context, opts ReleaseOpts) (*Result, error) { //nolint:
 		}
 	}
 
+	var namespaceOverride string
 	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
-		rel.Metadata.Namespace = namespace
+		namespaceOverride = namespace
 	}
 
 	p, err := loader.LoadProvider(providerName, opts.Config.Providers)
@@ -132,32 +138,14 @@ func Release(ctx context.Context, opts ReleaseOpts) (*Result, error) { //nolint:
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
 	}
 
-	engineResult, err := pkgrender.ProcessModuleRelease(ctx, rel, valuesVals, p)
-	if err != nil {
-		printValidationError("render failed", err)
-		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
-	}
-
-	resources := make([]*unstructured.Unstructured, 0, len(engineResult.Resources))
-	for _, r := range engineResult.Resources {
-		u, convErr := r.ToUnstructured()
-		if convErr != nil {
-			return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("converting resource %s/%s to unstructured: %w", r.Kind(), r.Name(), convErr)}
-		}
-		resources = append(resources, u)
-	}
-
-	return &Result{
-		Resources:  resources,
-		Release:    *rel.Metadata,
-		Module:     *rel.Module.Metadata,
-		Components: engineResult.Components,
-		MatchPlan:  engineResult.MatchPlan,
-		Warnings:   engineResult.Warnings,
-	}, nil
+	return renderPreparedModuleRelease(ctx, rel, valuesVals, p, namespaceOverride)
 }
 
-func ReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error) { //nolint:gocyclo // release-file rendering coordinates validation, loading, and conversion branches
+// FromReleaseFile prepares and renders a release from a declarative #ModuleRelease CUE file.
+// It parses the release file, applies any local module overrides (if --module is provided),
+// and extracts values. This is typically used by platform operators to deploy configured
+// instances of modules (e.g., via "opm release apply my-app-release.cue").
+func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error) { //nolint:gocyclo // release-file rendering coordinates validation, loading, and conversion branches
 	if opts.Config == nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
 	}
@@ -223,13 +211,30 @@ func ReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error) { /
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
+	var namespaceOverride string
 	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
-		rel.Metadata.Namespace = namespace
+		namespaceOverride = namespace
 	}
 
 	p, err := loader.LoadProvider(providerName, opts.Config.Providers)
 	if err != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
+	}
+
+	return renderPreparedModuleRelease(ctx, rel, valuesVals, p, namespaceOverride)
+}
+
+// renderPreparedModuleRelease is the shared execution tail for both FromModule and FromReleaseFile.
+// It applies the namespace override, runs the render engine, and converts the result to unstructured resources.
+func renderPreparedModuleRelease(
+	ctx context.Context,
+	rel *pkgmodule.Release,
+	valuesVals []cue.Value,
+	p *provider.Provider,
+	namespaceOverride string,
+) (*Result, error) {
+	if namespaceOverride != "" {
+		rel.Metadata.Namespace = namespaceOverride
 	}
 
 	engineResult, err := pkgrender.ProcessModuleRelease(ctx, rel, valuesVals, p)
