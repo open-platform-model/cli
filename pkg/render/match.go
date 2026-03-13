@@ -110,6 +110,7 @@ func Match(components cue.Value, p *provider.Provider) (*MatchPlan, error) {
 	return plan, nil
 }
 
+// MatchedPairs returns a list of all component-transformer pairs that matched, sorted by component name and then transformer FQN.
 func (p *MatchPlan) MatchedPairs() []MatchedPair {
 	pairs := make([]MatchedPair, 0)
 	for compName, tfResults := range p.Matches {
@@ -128,6 +129,7 @@ func (p *MatchPlan) MatchedPairs() []MatchedPair {
 	return pairs
 }
 
+// NonMatchedPairs returns a list of all component-transformer pairs that did not match, along with the specific missing labels, resources, and traits for each pair, sorted by component name and then transformer FQN.
 func (p *MatchPlan) NonMatchedPairs() []NonMatchedPair {
 	pairs := make([]NonMatchedPair, 0)
 	for compName, tfResults := range p.Matches {
@@ -146,6 +148,7 @@ func (p *MatchPlan) NonMatchedPairs() []NonMatchedPair {
 	return pairs
 }
 
+// Warnings returns a list of warnings for any traits present in components that are not handled by any matched transformer, which means those trait values will be ignored in rendering.
 func (p *MatchPlan) Warnings() []string {
 	if len(p.UnhandledTraits) == 0 {
 		return nil
@@ -166,6 +169,7 @@ func (p *MatchPlan) Warnings() []string {
 	return warnings
 }
 
+// labelPairs converts a cue struct of string fields into a set of "key=value" pairs for easy matching against required labels in transformers.
 func labelPairs(v cue.Value) map[string]struct{} {
 	pairs := map[string]struct{}{}
 	iter, err := v.Fields(cue.Optional(true))
@@ -182,6 +186,7 @@ func labelPairs(v cue.Value) map[string]struct{} {
 	return pairs
 }
 
+// fieldKeys returns the sorted list of field keys in the given cue struct value, treating all fields as optional (i.e. not erroring if some are missing).
 func fieldKeys(v cue.Value) []string {
 	iter, err := v.Fields(cue.Optional(true))
 	if err != nil {
@@ -195,6 +200,7 @@ func fieldKeys(v cue.Value) []string {
 	return out
 }
 
+// missingMapLabels compares the required labels in a transformer against the "key=value" pairs present in a component's metadata.labels, returning any missing pairs.
 func missingMapLabels(required cue.Value, have map[string]struct{}) []string {
 	iter, err := required.Fields(cue.Optional(true))
 	if err != nil {
@@ -215,6 +221,7 @@ func missingMapLabels(required cue.Value, have map[string]struct{}) []string {
 	return missing
 }
 
+// missingKeys compares the required keys in a transformer against the list of keys present in a component, returning any missing keys.
 func missingKeys(required cue.Value, have []string) []string {
 	haveSet := map[string]struct{}{}
 	for _, k := range have {
