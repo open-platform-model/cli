@@ -1,14 +1,12 @@
-package engine
+package render
 
 import (
 	"context"
 	"fmt"
 
 	"cuelang.org/go/cue"
-	"github.com/charmbracelet/log"
 
 	"github.com/opmodel/cli/pkg/core"
-	"github.com/opmodel/cli/pkg/render"
 )
 
 // moduleReleaseContextData is the Go-side mirror of #TransformerContext.#moduleReleaseMetadata.
@@ -44,31 +42,33 @@ type componentContextData struct {
 func executeTransforms(
 	ctx context.Context,
 	cueCtx *cue.Context,
-	plan *render.MatchPlan,
+	plan *MatchPlan,
 	providerVal cue.Value,
 	schemaComponents cue.Value,
 	dataComponents cue.Value,
-	rel *render.ModuleRelease,
-) ([]*core.Resource, []error) {
+	rel *ModuleRelease,
+) ([]*core.Resource, []string, []error) {
 	resources := make([]*core.Resource, 0)
+	var warnings []string
 	var errs []error
 
 	for _, pair := range plan.MatchedPairs() {
 		select {
 		case <-ctx.Done():
-			return resources, append(errs, ctx.Err())
+			return resources, warnings, append(errs, ctx.Err())
 		default:
 		}
 
-		res, err := executePair(cueCtx, providerVal, schemaComponents, dataComponents, rel, pair)
+		res, pairWarnings, err := executePair(cueCtx, providerVal, schemaComponents, dataComponents, rel, pair)
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
 		resources = append(resources, res...)
+		warnings = append(warnings, pairWarnings...)
 	}
 
-	return resources, errs
+	return resources, warnings, errs
 }
 
 // executePair runs the CUE #transform for a single (component, transformer) matched pair.
@@ -85,9 +85,9 @@ func executePair(
 	providerVal cue.Value,
 	schemaComponents cue.Value,
 	dataComponents cue.Value,
-	rel *render.ModuleRelease,
-	pair render.MatchedPair,
-) ([]*core.Resource, error) {
+	rel *ModuleRelease,
+	pair MatchedPair,
+) ([]*core.Resource, []string, error) {
 	compName := pair.ComponentName
 	tfFQN := pair.TransformerFQN
 
@@ -98,17 +98,17 @@ func executePair(
 		LookupPath(cue.ParsePath("#transform"))
 
 	if !transformVal.Exists() {
-		return nil, fmt.Errorf("component %q / transformer %q: #transform not found in provider", compName, tfFQN)
+		return nil, nil, fmt.Errorf("component %q / transformer %q: #transform not found in provider", compName, tfFQN)
 	}
 	if err := transformVal.Err(); err != nil {
-		return nil, fmt.Errorf("component %q / transformer %q: #transform error: %w", compName, tfFQN, err)
+		return nil, nil, fmt.Errorf("component %q / transformer %q: #transform error: %w", compName, tfFQN, err)
 	}
 
 	// Retrieve the finalized (constraint-free) component value from dataComponents.
 	// No materialize() round-trip needed — components were finalized at load time.
 	dataComp := dataComponents.LookupPath(cue.MakePath(cue.Str(compName)))
 	if !dataComp.Exists() {
-		return nil, fmt.Errorf("component %q not found in data components value", compName)
+		return nil, nil, fmt.Errorf("component %q not found in data components value", compName)
 	}
 
 	// Retrieve the schema component value for metadata extraction (#context injection).
@@ -119,22 +119,23 @@ func executePair(
 	// schema constraint conflicts.
 	unified := transformVal.FillPath(cue.ParsePath("#component"), dataComp)
 	if err := unified.Err(); err != nil {
-		return nil, fmt.Errorf("component %q / transformer %q: filling #component: %w", compName, tfFQN, err)
+		return nil, nil, fmt.Errorf("component %q / transformer %q: filling #component: %w", compName, tfFQN, err)
 	}
 
 	// Build and inject #context. Reads metadata from schemaComp (has definitions).
-	unified, err := injectContext(cueCtx, unified, rel, compName, schemaComp)
+	var warnings []string
+	unified, warnings, err := injectContext(cueCtx, unified, rel, compName, schemaComp)
 	if err != nil {
-		return nil, fmt.Errorf("component %q / transformer %q: injecting #context: %w", compName, tfFQN, err)
+		return nil, nil, fmt.Errorf("component %q / transformer %q: injecting #context: %w", compName, tfFQN, err)
 	}
 
 	// Extract the output field.
 	outputVal := unified.LookupPath(cue.ParsePath("output"))
 	if !outputVal.Exists() {
-		return []*core.Resource{}, nil
+		return []*core.Resource{}, warnings, nil
 	}
 	if err := outputVal.Err(); err != nil {
-		return nil, fmt.Errorf("component %q / transformer %q: evaluating output: %w", compName, tfFQN, err)
+		return nil, nil, fmt.Errorf("component %q / transformer %q: evaluating output: %w", compName, tfFQN, err)
 	}
 
 	releaseName := rel.Metadata.Name
@@ -149,14 +150,16 @@ func executePair(
 	// Transformer authors MUST ensure output conforms to one of these three forms.
 	switch outputVal.Kind() {
 	case cue.ListKind:
-		return collectResourceList(outputVal, releaseName, compName, tfFQN)
+		res, err := collectResourceList(outputVal, releaseName, compName, tfFQN)
+		return res, warnings, err
 	case cue.StructKind:
 		if isSingleResource(outputVal) {
-			return []*core.Resource{{Value: outputVal, Release: releaseName, Component: compName, Transformer: tfFQN}}, nil
+			return []*core.Resource{{Value: outputVal, Release: releaseName, Component: compName, Transformer: tfFQN}}, warnings, nil
 		}
-		return collectResourceMap(outputVal, releaseName, compName, tfFQN)
+		res, err := collectResourceMap(outputVal, releaseName, compName, tfFQN)
+		return res, warnings, err
 	default:
-		return nil, fmt.Errorf("component %q / transformer %q: unexpected output kind %s", compName, tfFQN, outputVal.Kind())
+		return nil, nil, fmt.Errorf("component %q / transformer %q: unexpected output kind %s", compName, tfFQN, outputVal.Kind())
 	}
 }
 
@@ -169,16 +172,17 @@ func executePair(
 // compVal should be the schema component (from rel.MatchComponents()) so that
 // metadata.labels and metadata.annotations are accessible even after finalization.
 //
-// Fix for DEBT.md #1: Metadata decode errors are logged at WARN level instead
-// of being silently discarded. If a CUE value exists but cannot be decoded, the
-// operator is informed with the component name and field path.
+// Metadata decode errors are appended to the returned warnings slice instead of
+// being logged directly. The caller decides how to surface warnings.
 func injectContext(
 	cueCtx *cue.Context,
 	unified cue.Value,
-	rel *render.ModuleRelease,
+	rel *ModuleRelease,
 	compName string,
 	compVal cue.Value,
-) (cue.Value, error) {
+) (cue.Value, []string, error) {
+	var warnings []string
+
 	// #moduleReleaseMetadata — encode the typed struct directly.
 	// Combines fields from both ReleaseMetadata and ModuleMetadata to mirror
 	// the #TransformerContext.#moduleReleaseMetadata CUE schema.
@@ -200,24 +204,24 @@ func injectContext(
 	// back as a typed struct. Stays entirely in CUE-land: Decode() for reading,
 	// Encode() for writing back.
 	//
-	// Fix for DEBT.md #1: Decode errors are logged at WARN level so malformed
-	// metadata fields are surfaced to the operator rather than silently producing
-	// empty labels/annotations in generated manifests.
+	// Decode errors are appended to the warnings slice so malformed metadata
+	// fields are surfaced to the caller rather than silently producing empty
+	// labels/annotations in generated manifests.
 	compMeta := componentContextData{Name: compName}
 	if labelsVal := compVal.LookupPath(cue.ParsePath("metadata.labels")); labelsVal.Exists() {
 		if err := labelsVal.Decode(&compMeta.Labels); err != nil {
-			log.Warn("component metadata.labels could not be decoded; labels will be empty in transformer context",
-				"component", compName,
-				"err", err,
-			)
+			warnings = append(warnings, fmt.Sprintf(
+				"component %q: metadata.labels could not be decoded; labels will be empty in transformer context: %v",
+				compName, err,
+			))
 		}
 	}
 	if annotationsVal := compVal.LookupPath(cue.ParsePath("metadata.annotations")); annotationsVal.Exists() {
 		if err := annotationsVal.Decode(&compMeta.Annotations); err != nil {
-			log.Warn("component metadata.annotations could not be decoded; annotations will be empty in transformer context",
-				"component", compName,
-				"err", err,
-			)
+			warnings = append(warnings, fmt.Sprintf(
+				"component %q: metadata.annotations could not be decoded; annotations will be empty in transformer context: %v",
+				compName, err,
+			))
 		}
 	}
 	unified = unified.FillPath(
@@ -239,9 +243,9 @@ func injectContext(
 	)
 
 	if err := unified.Err(); err != nil {
-		return cue.Value{}, err
+		return cue.Value{}, nil, err
 	}
-	return unified, nil
+	return unified, warnings, nil
 }
 
 // isSingleResource reports whether a CUE struct value is a single Kubernetes resource.

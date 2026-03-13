@@ -1,4 +1,4 @@
-package engine
+package render_test
 
 import (
 	"context"
@@ -18,8 +18,8 @@ func TestModuleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {
 	raw := ctx.CompileString(`{components:{}}`)
 	data := ctx.CompileString(`{}`)
 
-	renderer := NewModuleRenderer(&provider.Provider{Data: providerVal})
-	result, err := renderer.Render(context.Background(), &render.ModuleRelease{
+	renderer := render.NewModule(&provider.Provider{Data: providerVal})
+	result, err := renderer.Execute(context.Background(), &render.ModuleRelease{
 		Metadata:       &render.ModuleReleaseMetadata{Name: "demo"},
 		RawCUE:         raw,
 		DataComponents: data,
@@ -37,8 +37,8 @@ func TestModuleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {
 func TestBundleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {
 	ctx := cuecontext.New()
 	providerVal := ctx.CompileString(`{#transformers:{}}`)
-	renderer := NewBundleRenderer(&provider.Provider{Data: providerVal})
-	result, err := renderer.Render(context.Background(), &render.BundleRelease{Releases: map[string]*render.ModuleRelease{}})
+	renderer := render.NewBundle(&provider.Provider{Data: providerVal})
+	result, err := renderer.Execute(context.Background(), &render.BundleRelease{Releases: map[string]*render.ModuleRelease{}})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.NotNil(t, result.Resources)

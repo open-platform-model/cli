@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/opmodel/cli/internal/engine"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/workflow/render"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
@@ -25,7 +24,7 @@ func buildTestResult() *render.Result {
 		Module: pkgmodule.ModuleMetadata{
 			Version: "1.0.0",
 		},
-		Components: []engine.ComponentSummary{
+		Components: []pkgrender.ComponentSummary{
 			{
 				Name:         "web",
 				Labels:       map[string]string{"core.opmodel.dev/workload-type": "stateless"},

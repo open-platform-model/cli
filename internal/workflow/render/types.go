@@ -7,7 +7,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/opmodel/cli/internal/config"
-	"github.com/opmodel/cli/internal/engine"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
 	pkgrender "github.com/opmodel/cli/pkg/render"
 )
@@ -17,7 +16,7 @@ type Result struct {
 	Resources  []*unstructured.Unstructured
 	Release    pkgrender.ModuleReleaseMetadata
 	Module     pkgmodule.ModuleMetadata
-	Components []engine.ComponentSummary
+	Components []pkgrender.ComponentSummary
 	MatchPlan  *pkgrender.MatchPlan
 	Warnings   []string
 }

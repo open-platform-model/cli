@@ -1,4 +1,4 @@
-package engine
+package render
 
 import (
 	"context"
@@ -8,23 +8,22 @@ import (
 
 	"github.com/opmodel/cli/pkg/core"
 	"github.com/opmodel/cli/pkg/provider"
-	"github.com/opmodel/cli/pkg/render"
 )
 
-// BundleRenderer drives the OPM render pipeline for a BundleRelease.
+// Bundle drives the OPM render pipeline for a BundleRelease.
 //
 // It iterates the releases map (produced by CUE's #BundleRelease comprehension,
-// one entry per #BundleInstance) and calls ModuleRenderer.Render() for each
+// one entry per #BundleInstance) and calls Module.Execute() for each
 // ModuleRelease entry. Resources from all releases are collected into a single
 // result with provenance tracking via the Resource.Release field.
 //
-// A BundleRenderer is not safe for concurrent use (CUE context is single-threaded).
-type BundleRenderer struct {
-	moduleRenderer *ModuleRenderer
+// A Bundle is not safe for concurrent use (CUE context is single-threaded).
+type Bundle struct {
+	moduleRenderer *Module
 }
 
-// BundleRenderResult holds the output of a successful BundleRenderer.Render call.
-type BundleRenderResult struct {
+// BundleResult holds the output of a successful Bundle.Execute call.
+type BundleResult struct {
 	// Resources is the ordered list of rendered Kubernetes resources from all
 	// module releases in the bundle. Each resource carries Release, Component,
 	// and Transformer provenance.
@@ -39,23 +38,23 @@ type BundleRenderResult struct {
 	ReleaseOrder []string
 }
 
-// NewBundleRenderer creates a BundleRenderer for the given provider.
-func NewBundleRenderer(p *provider.Provider) *BundleRenderer {
-	return &BundleRenderer{
-		moduleRenderer: NewModuleRenderer(p),
+// NewBundle creates a Bundle for the given provider.
+func NewBundle(p *provider.Provider) *Bundle {
+	return &Bundle{
+		moduleRenderer: NewModule(p),
 	}
 }
 
-// Render executes the full OPM pipeline for each module release in the bundle.
+// Execute executes the full OPM pipeline for each module release in the bundle.
 //
 // Releases are processed in sorted key order for deterministic output.
-// Each release is rendered independently via ModuleRenderer.Render().
+// Each release is rendered independently via Module.Execute().
 //
 // Fix for DEBT.md #5: Fail-slow at bundle level — all releases are attempted even
 // if earlier ones fail. Errors from all failed releases are collected and returned
 // together so the operator can see all failures in one pass. This matches the
 // fail-slow behavior of executeTransforms at the pair level.
-func (br *BundleRenderer) Render(ctx context.Context, rel *render.BundleRelease) (*BundleRenderResult, error) {
+func (br *Bundle) Execute(ctx context.Context, rel *BundleRelease) (*BundleResult, error) {
 	// Sort release keys for deterministic ordering.
 	keys := make([]string, 0, len(rel.Releases))
 	for k := range rel.Releases {
@@ -63,7 +62,7 @@ func (br *BundleRenderer) Render(ctx context.Context, rel *render.BundleRelease)
 	}
 	sort.Strings(keys)
 
-	result := &BundleRenderResult{
+	result := &BundleResult{
 		Resources:    []*core.Resource{},
 		Warnings:     []string{},
 		ReleaseOrder: keys,
@@ -80,14 +79,14 @@ func (br *BundleRenderer) Render(ctx context.Context, rel *render.BundleRelease)
 
 		modRel := rel.Releases[key]
 
-		plan, err := render.Match(modRel.MatchComponents(), br.moduleRenderer.provider)
+		plan, err := Match(modRel.MatchComponents(), br.moduleRenderer.provider)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("matching release %q (module %s): %w",
 				key, modRel.Module.Metadata.FQN, err))
 			continue
 		}
 
-		modResult, err := br.moduleRenderer.Render(ctx, modRel, plan)
+		modResult, err := br.moduleRenderer.Execute(ctx, modRel, plan)
 		if err != nil {
 			// Collect the error and continue — fail-slow so all releases are attempted.
 			errs = append(errs, fmt.Errorf("rendering release %q (module %s): %w",

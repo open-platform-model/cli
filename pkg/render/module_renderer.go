@@ -1,5 +1,5 @@
-// Package engine executes matched transforms and decodes rendered resources.
-package engine
+// Package render executes matched transforms and decodes rendered resources.
+package render
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/opmodel/cli/pkg/core"
 	"github.com/opmodel/cli/pkg/provider"
-	"github.com/opmodel/cli/pkg/render"
 )
 
 // ComponentSummary contains display-oriented summary data extracted from a component
@@ -36,23 +35,23 @@ type ComponentSummary struct {
 	TraitFQNs []string
 }
 
-// ModuleRenderer drives the OPM render pipeline for a single ModuleRelease.
+// Module drives the OPM render pipeline for a single ModuleRelease.
 //
-// A ModuleRenderer is constructed once per provider and reused across multiple
-// Render calls. It is not safe for concurrent use (CUE context is single-threaded).
-type ModuleRenderer struct {
+// A Module is constructed once per provider and reused across multiple
+// Execute calls. It is not safe for concurrent use (CUE context is single-threaded).
+type Module struct {
 	provider *provider.Provider
 }
 
-// ModuleRenderResult holds the output of a successful Render call.
-type ModuleRenderResult struct {
+// ModuleResult holds the output of a successful Execute call.
+type ModuleResult struct {
 	// Resources is the ordered list of rendered Kubernetes resources.
 	// Each resource carries Component and Transformer provenance for inventory tracking.
 	Resources []*core.Resource
 
 	// MatchPlan is the decoded result of matching components against transformers.
 	// Nil if matching was not performed (e.g. no components).
-	MatchPlan *render.MatchPlan
+	MatchPlan *MatchPlan
 
 	// Components is a per-component summary for verbose output, sorted by name.
 	Components []ComponentSummary
@@ -62,13 +61,13 @@ type ModuleRenderResult struct {
 	Warnings []string
 }
 
-// NewModuleRenderer creates a ModuleRenderer for the given provider.
-func NewModuleRenderer(p *provider.Provider) *ModuleRenderer {
-	return &ModuleRenderer{provider: p}
+// NewModule creates a Module for the given provider.
+func NewModule(p *provider.Provider) *Module {
+	return &Module{provider: p}
 }
 
-// Render executes matched transforms for the given module release.
-func (r *ModuleRenderer) Render(ctx context.Context, rel *render.ModuleRelease, plan *render.MatchPlan) (*ModuleRenderResult, error) {
+// Execute executes matched transforms for the given module release.
+func (r *Module) Execute(ctx context.Context, rel *ModuleRelease, plan *MatchPlan) (*ModuleResult, error) {
 	// Extract the components CUE values from the ModuleRelease.
 	schemaComponents := rel.MatchComponents()
 	if !schemaComponents.Exists() {
@@ -97,16 +96,19 @@ func (r *ModuleRenderer) Render(ctx context.Context, rel *render.ModuleRelease, 
 	// Phase 2 — execution (CUE #transform per pair).
 	// Passes both schemaComponents (for metadata extraction) and dataComponents
 	// (from rel.ExecuteComponents() — already finalized, no materialize() needed).
-	resources, errs := executeTransforms(ctx, cueCtx, plan, r.provider.Data, schemaComponents, dataComponents, rel)
+	resources, warnings, errs := executeTransforms(ctx, cueCtx, plan, r.provider.Data, schemaComponents, dataComponents, rel)
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("executing transforms: %w", errors.Join(errs...))
 	}
 
-	return &ModuleRenderResult{
+	allWarnings := nonNilWarnings(plan.Warnings())
+	allWarnings = append(allWarnings, warnings...)
+
+	return &ModuleResult{
 		Resources:  nonNilResources(resources),
 		MatchPlan:  plan,
 		Components: nonNilComponentSummaries(extractComponentSummaries(schemaComponents)),
-		Warnings:   nonNilWarnings(plan.Warnings()),
+		Warnings:   allWarnings,
 	}, nil
 }
 
