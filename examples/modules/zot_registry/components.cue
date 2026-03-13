@@ -153,17 +153,17 @@ import (
 
 				volumeMounts: {
 					data: {
-						volumes["data"]
+						name:      "data"
 						mountPath: #config.storage.rootDir
 					}
 					"zot-config": {
-						volumes["zot-config"]
+						name:      "zot-config"
 						mountPath: "/etc/zot"
 						readOnly:  true
 					}
 					if #config.auth != _|_ {
 						"zot-secret": {
-							volumes["zot-secret"]
+							name:      "zot-secret"
 							mountPath: "/secret"
 							readOnly:  true
 						}
@@ -224,16 +224,14 @@ import (
 
 				"zot-config": {
 					name: "zot-config"
-					configMap: {
-						name: "zot-config"
-					}
+					configMap: configMaps["zot-config"]
 				}
 
 				if #config.auth != _|_ {
 					"zot-secret": {
 						name: "zot-secret"
 						secret: {
-							name: "zot-secret"
+							from: #config.auth.htpasswd.credentials
 						}
 					}
 				}
@@ -288,7 +286,7 @@ import (
 					rules: [{
 						matches: [{
 							path: {
-								type:  "PathPrefix"
+								type:  "Prefix"
 								value: "/"
 							}
 						}]

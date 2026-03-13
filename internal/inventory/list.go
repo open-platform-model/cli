@@ -15,16 +15,19 @@ import (
 // ListInventories discovers all inventory Secrets in the given namespace.
 // Pass namespace="" to list across all namespaces (K8s convention).
 //
-// Discovery uses label selectors:
+// Discovery uses the label selector:
 //
-//	app.kubernetes.io/managed-by = open-platform-model
 //	opmodel.dev/component = inventory
+//
+// The selector intentionally omits app.kubernetes.io/managed-by so that
+// inventory Secrets created with any OPM actor value (opm-cli, opm-controller,
+// or legacy open-platform-model) are discovered during the transition to
+// runtime-owned labels.
 //
 // Results are sorted alphabetically by ReleaseMetadata.ReleaseName.
 // Corrupt Secrets that fail to unmarshal are logged and skipped.
 func ListInventories(ctx context.Context, client *kubernetes.Client, namespace string) ([]*ReleaseInventoryRecord, error) {
-	labelSelector := fmt.Sprintf("%s=%s,%s=%s",
-		pkgcore.LabelManagedBy, pkgcore.LabelManagedByValue,
+	labelSelector := fmt.Sprintf("%s=%s",
 		pkgcore.LabelComponent, "inventory",
 	)
 

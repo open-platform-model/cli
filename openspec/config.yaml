@@ -56,7 +56,17 @@ context: |
   - Prefer explicit configuration over magic inference
   - If a feature isn't requested, don't build it
   Rationale: Every flag is a maintenance burden and UX complexity.
-  
+
+  ### VIII. Small Batch Sizes (Iterative & Incremental Delivery)
+  All changes MUST be kept TINY. Small, incremental, independently verifiable steps are required.
+  - **WARNING & BLOCK**: If a user requests a change that is too large (e.g., implementing an entire controller, refactoring multiple packages at once, or designing + implementing + testing a major feature in one go), the Agent MUST warn the user, block the execution, and suggest a way to split the request into smaller, sequential tasks.
+  - **Commit Quality**: Tiny changes lead to focused, atomic commits. A single commit should ideally touch one specific concern (e.g., scaffolding an API, adding one reconcile phase, or writing tests for one package).
+
+  ## Execution Gate (Agent Directive)
+  Before beginning ANY implementation, the Agent MUST evaluate the scope of the request against the "Small Batch Sizes" principle.
+  If the request is too large, the Agent MUST reply with:
+  "🛑 **Scope Warning**: This request is too large for a single safe iteration. I suggest we split it into the following smaller steps: [list 2-3 logical, tiny steps]. Should we start with step 1?"
+
   ## Technology Standards
   
   Can be found in [AGENTS.md](../AGENTS.md)
@@ -134,7 +144,8 @@ rules:
   tasks:
     - "Focus: STEPS to take for implementation"
     - "Updates when: Tasks complete, new tasks discovered, blockers identified"
-    - Break tasks into chunks of max 2 hours
+    - "CRITICAL: Break tasks into TINY chunks (max 1-2 hours)."
+    - "CRITICAL: If the task list grows too long (>10 items) or spans multiple distinct features, suggest splitting into a new OpenSpec change."
     - Each task should be independently testable
     - Group implementation tasks by package
     - Include validation gates as final tasks (task lint, task test)
