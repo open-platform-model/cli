@@ -48,4 +48,4 @@
 
 ## 10. Commits
 
-- [ ] 10.1 Commit tasks 1.1–1.2, 2.1–2.3, 3.1, 4.1, 5.1–5.3, 6.1–6.6, 7.1, 8.1: `refactor(render): move ModuleRelease types to pkg/render, rename ReleaseMetadata to ModuleReleaseMetadata`
+- [x] 10.1 Commit tasks 1.1–1.2, 2.1–2.3, 3.1, 4.1, 5.1–5.3, 6.1–6.6, 7.1, 8.1: `refactor(render): move ModuleRelease types to pkg/render, rename ReleaseMetadata to ModuleReleaseMetadata`

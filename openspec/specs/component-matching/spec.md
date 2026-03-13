@@ -5,7 +5,7 @@ Defines how module release components are matched against transformer definition
 ## Requirements
 
 ### Requirement: Match components against transformer definitions
-The system SHALL evaluate each component in a `*core.ModuleRelease` against every transformer definition in a `*provider.LoadedProvider`, producing a `MatchPlan` that records which transformers matched each component and why unmatched components failed to match.
+The system SHALL evaluate each component in a module release against every transformer definition in a `*provider.Provider`, producing a `*render.MatchPlan` that records which transformers matched each component and why unmatched components failed to match. The implementation SHALL reside in `pkg/render` (previously `internal/match`).
 
 #### Scenario: Component satisfies all required labels
 - **WHEN** a component's labels include all labels declared as required by a transformer
@@ -25,11 +25,11 @@ The system SHALL evaluate each component in a `*core.ModuleRelease` against ever
 
 #### Scenario: Component matches no transformer
 - **WHEN** a component does not satisfy the requirements of any transformer in the provider
-- **THEN** the component's name is returned in the unmatched slice alongside the `*core.TransformerMatchPlan`
+- **THEN** the component's name is returned in the unmatched slice of the `*render.MatchPlan`
 
 #### Scenario: Component matches multiple transformers
 - **WHEN** a component satisfies the requirements of more than one transformer
-- **THEN** all matching transformers are recorded in the `*core.TransformerMatchPlan` for that component
+- **THEN** all matching transformers are recorded in the `*render.MatchPlan` for that component
 
 ### Requirement: Match details recorded for rejection reporting
 The system SHALL include a detail entry for every (component, transformer) pair evaluated, regardless of whether the pair matched, so that callers can report which transformers were considered for an unmatched component and why each was rejected.
