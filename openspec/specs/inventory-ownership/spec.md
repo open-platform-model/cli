@@ -6,16 +6,16 @@ Defines release ownership semantics derived from inventory provenance so the CLI
 
 ### Requirement: Inventory provenance defines release ownership
 
-The inventory contract SHALL define release ownership through a `createdBy` field with allowed values `cli` and `controller`. This field SHALL represent the original creator of the release and SHALL be used by tooling to determine whether a release may be mutated.
+The inventory contract SHALL define release ownership through a `createdBy` field with allowed values matching `ownership.CreatedByCLI` and `ownership.CreatedByController` constants from `pkg/ownership`. The ownership enforcement function SHALL reside in `pkg/ownership` (previously `internal/workflow/ownership`).
 
 #### Scenario: CLI-owned release
 
-- **WHEN** an inventory records `createdBy: "cli"`
+- **WHEN** an inventory records `createdBy` matching `ownership.CreatedByCLI`
 - **THEN** the release SHALL be treated as CLI-managed
 
 #### Scenario: Controller-owned release
 
-- **WHEN** an inventory records `createdBy: "controller"`
+- **WHEN** an inventory records `createdBy` matching `ownership.CreatedByController`
 - **THEN** the release SHALL be treated as controller-managed
 
 ### Requirement: Legacy inventories are treated as CLI-owned
