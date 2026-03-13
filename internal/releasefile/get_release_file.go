@@ -6,7 +6,6 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/internal/runtime/bundlerelease"
 	"github.com/opmodel/cli/pkg/bundle"
 	"github.com/opmodel/cli/pkg/loader"
 	"github.com/opmodel/cli/pkg/module"
@@ -24,7 +23,7 @@ type FileRelease struct {
 	Path   string
 	Kind   Kind
 	Module *render.ModuleRelease
-	Bundle *bundlerelease.BundleRelease
+	Bundle *render.BundleRelease
 }
 
 func GetReleaseFile(ctx *cue.Context, filePath string) (*FileRelease, error) {
@@ -86,7 +85,7 @@ func bareModuleRelease(v cue.Value, fallbackName string) (*render.ModuleRelease,
 	), nil
 }
 
-func bareBundleRelease(v cue.Value) (*bundlerelease.BundleRelease, error) {
+func bareBundleRelease(v cue.Value) (*render.BundleRelease, error) {
 	bundleVal := v.LookupPath(cue.ParsePath("#bundle"))
 	bundleConfig := v.LookupPath(cue.ParsePath("#bundle.#config"))
 	releaseMeta, err := mustBundleReleaseMetadata(v)
@@ -94,7 +93,7 @@ func bareBundleRelease(v cue.Value) (*bundlerelease.BundleRelease, error) {
 		return nil, err
 	}
 
-	return &bundlerelease.BundleRelease{
+	return &render.BundleRelease{
 		Metadata: releaseMeta,
 		Bundle: bundle.Bundle{
 			Metadata: bestEffortBundleMetadata(bundleVal),
@@ -131,7 +130,7 @@ func bestEffortModuleMetadata(v cue.Value) *module.ModuleMetadata {
 	return meta
 }
 
-func mustBundleReleaseMetadata(v cue.Value) (*bundlerelease.BundleReleaseMetadata, error) {
+func mustBundleReleaseMetadata(v cue.Value) (*render.BundleReleaseMetadata, error) {
 	metaVal := v.LookupPath(cue.ParsePath("metadata"))
 	if !metaVal.Exists() {
 		return nil, fmt.Errorf("bundle release metadata is required")
@@ -139,7 +138,7 @@ func mustBundleReleaseMetadata(v cue.Value) (*bundlerelease.BundleReleaseMetadat
 	if err := metaVal.Validate(cue.Concrete(true)); err != nil {
 		return nil, fmt.Errorf("bundle release metadata must be concrete: %w", err)
 	}
-	meta := &bundlerelease.BundleReleaseMetadata{}
+	meta := &render.BundleReleaseMetadata{}
 	if err := metaVal.Decode(meta); err != nil {
 		return nil, fmt.Errorf("decoding bundle release metadata: %w", err)
 	}

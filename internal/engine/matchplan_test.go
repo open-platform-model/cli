@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/runtime/bundlerelease"
 	"github.com/opmodel/cli/pkg/provider"
 	"github.com/opmodel/cli/pkg/render"
 )
@@ -39,7 +38,7 @@ func TestBundleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {
 	ctx := cuecontext.New()
 	providerVal := ctx.CompileString(`{#transformers:{}}`)
 	renderer := NewBundleRenderer(&provider.Provider{Data: providerVal})
-	result, err := renderer.Render(context.Background(), &bundlerelease.BundleRelease{Releases: map[string]*render.ModuleRelease{}})
+	result, err := renderer.Render(context.Background(), &render.BundleRelease{Releases: map[string]*render.ModuleRelease{}})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.NotNil(t, result.Resources)

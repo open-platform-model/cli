@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/opmodel/cli/internal/runtime/bundlerelease"
 	"github.com/opmodel/cli/pkg/core"
 	"github.com/opmodel/cli/pkg/provider"
 	"github.com/opmodel/cli/pkg/render"
@@ -56,7 +55,7 @@ func NewBundleRenderer(p *provider.Provider) *BundleRenderer {
 // if earlier ones fail. Errors from all failed releases are collected and returned
 // together so the operator can see all failures in one pass. This matches the
 // fail-slow behavior of executeTransforms at the pair level.
-func (br *BundleRenderer) Render(ctx context.Context, rel *bundlerelease.BundleRelease) (*BundleRenderResult, error) {
+func (br *BundleRenderer) Render(ctx context.Context, rel *render.BundleRelease) (*BundleRenderResult, error) {
 	// Sort release keys for deterministic ordering.
 	keys := make([]string, 0, len(rel.Releases))
 	for k := range rel.Releases {

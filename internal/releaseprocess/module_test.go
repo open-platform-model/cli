@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/runtime/bundlerelease"
 	"github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/provider"
 	"github.com/opmodel/cli/pkg/render"
@@ -103,8 +102,8 @@ func TestProcessBundleRelease_StubAfterValidation(t *testing.T) {
 			}
 		}
 	}`)
-	br := &bundlerelease.BundleRelease{
-		Metadata: &bundlerelease.BundleReleaseMetadata{Name: "stack"},
+	br := &render.BundleRelease{
+		Metadata: &render.BundleReleaseMetadata{Name: "stack"},
 		RawCUE:   raw,
 		Config:   raw.LookupPath(cue.ParsePath("#bundle.#config")),
 		Releases: map[string]*render.ModuleRelease{},

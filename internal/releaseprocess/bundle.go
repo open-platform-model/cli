@@ -7,11 +7,11 @@ import (
 	"cuelang.org/go/cue"
 
 	"github.com/opmodel/cli/internal/engine"
-	"github.com/opmodel/cli/internal/runtime/bundlerelease"
 	"github.com/opmodel/cli/pkg/provider"
+	"github.com/opmodel/cli/pkg/render"
 )
 
-func ProcessBundleRelease(ctx context.Context, br *bundlerelease.BundleRelease, values []cue.Value, p *provider.Provider) (*engine.BundleRenderResult, error) {
+func ProcessBundleRelease(ctx context.Context, br *render.BundleRelease, values []cue.Value, p *provider.Provider) (*engine.BundleRenderResult, error) {
 	_ = ctx
 	_ = p
 	_, _ = cuecontextMarker(br.RawCUE)
