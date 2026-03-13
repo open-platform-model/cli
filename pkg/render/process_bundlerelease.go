@@ -1,4 +1,4 @@
-package releaseprocess
+package render
 
 import (
 	"context"
@@ -7,10 +7,9 @@ import (
 	"cuelang.org/go/cue"
 
 	"github.com/opmodel/cli/pkg/provider"
-	"github.com/opmodel/cli/pkg/render"
 )
 
-func ProcessBundleRelease(ctx context.Context, br *render.BundleRelease, values []cue.Value, p *provider.Provider) (*render.BundleResult, error) {
+func ProcessBundleRelease(ctx context.Context, br *BundleRelease, values []cue.Value, p *provider.Provider) (*BundleResult, error) {
 	_ = ctx
 	_ = p
 	_, _ = cuecontextMarker(br.RawCUE)

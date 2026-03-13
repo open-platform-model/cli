@@ -9,7 +9,7 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/internal/releaseprocess"
+	pkgrender "github.com/opmodel/cli/pkg/render"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +30,7 @@ func TestPrintValidationError_UsesGroupedFormatting(t *testing.T) {
 		}
 	}`, cue.Filename("values.cue"))
 
-	_, cfgErr := releaseprocess.ValidateConfig(schema, []cue.Value{values}, "module", "demo")
+	_, cfgErr := pkgrender.ValidateConfig(schema, []cue.Value{values}, "module", "demo")
 	require.NotNil(t, cfgErr)
 
 	var logBuf bytes.Buffer

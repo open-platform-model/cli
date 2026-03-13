@@ -1,4 +1,4 @@
-package releaseprocess
+package render
 
 import (
 	"context"
@@ -7,10 +7,9 @@ import (
 	"cuelang.org/go/cue"
 
 	"github.com/opmodel/cli/pkg/provider"
-	"github.com/opmodel/cli/pkg/render"
 )
 
-func ProcessModuleRelease(ctx context.Context, mr *render.ModuleRelease, values []cue.Value, p *provider.Provider) (*render.ModuleResult, error) {
+func ProcessModuleRelease(ctx context.Context, mr *ModuleRelease, values []cue.Value, p *provider.Provider) (*ModuleResult, error) {
 	merged, cfgErr := ValidateConfig(mr.Config, values, "module", mr.Metadata.Name)
 	if cfgErr != nil {
 		return nil, cfgErr
@@ -34,11 +33,11 @@ func ProcessModuleRelease(ctx context.Context, mr *render.ModuleRelease, values 
 	}
 	mr.DataComponents = dataComponents
 
-	plan, err := render.Match(schemaComponents, p)
+	plan, err := Match(schemaComponents, p)
 	if err != nil {
 		return nil, err
 	}
 
-	renderer := render.NewModule(p)
+	renderer := NewModule(p)
 	return renderer.Execute(ctx, mr, plan)
 }

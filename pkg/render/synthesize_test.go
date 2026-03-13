@@ -1,4 +1,4 @@
-package releaseprocess
+package render
 
 import (
 	"testing"
@@ -10,7 +10,7 @@ import (
 )
 
 // makeModuleWithComponents creates an in-memory CUE module value with #config
-// and #components for use in SynthesizeModuleRelease tests.
+// and #components for use in SynthesizeModule tests.
 func makeModuleWithComponents(ctx *cue.Context) cue.Value {
 	return ctx.CompileString(`{
 		metadata: {
@@ -37,7 +37,7 @@ func makeModuleWithComponents(ctx *cue.Context) cue.Value {
 	}`)
 }
 
-func TestSynthesizeModuleRelease_Success(t *testing.T) {
+func TestSynthesizeModule_Success(t *testing.T) {
 	ctx := cuecontext.New()
 
 	modVal := makeModuleWithComponents(ctx)
@@ -49,7 +49,7 @@ func TestSynthesizeModuleRelease_Success(t *testing.T) {
 	}`)
 	require.NoError(t, debugValues.Err())
 
-	rel, err := SynthesizeModuleRelease(ctx, modVal, []cue.Value{debugValues}, "my-release", "my-namespace")
+	rel, err := SynthesizeModule(ctx, modVal, []cue.Value{debugValues}, "my-release", "my-namespace")
 	require.NoError(t, err)
 	require.NotNil(t, rel)
 	require.NotNil(t, rel.Metadata)
@@ -74,19 +74,19 @@ func TestSynthesizeModuleRelease_Success(t *testing.T) {
 	assert.Equal(t, "myapp", iter.Selector().String())
 }
 
-func TestSynthesizeModuleRelease_ModuleGateFailure(t *testing.T) {
+func TestSynthesizeModule_ModuleGateFailure(t *testing.T) {
 	ctx := cuecontext.New()
 	modVal := makeModuleWithComponents(ctx)
 	invalidValues := ctx.CompileString(`{
 		replicas: "not-a-number"
 		image:    "myapp:v1"
 	}`)
-	_, err := SynthesizeModuleRelease(ctx, modVal, []cue.Value{invalidValues}, "test-release", "test-ns")
+	_, err := SynthesizeModule(ctx, modVal, []cue.Value{invalidValues}, "test-release", "test-ns")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "test-release")
 }
 
-func TestSynthesizeModuleRelease_NoComponents(t *testing.T) {
+func TestSynthesizeModule_NoComponents(t *testing.T) {
 	ctx := cuecontext.New()
 	modVal := ctx.CompileString(`{
 		metadata: {
@@ -100,7 +100,7 @@ func TestSynthesizeModuleRelease_NoComponents(t *testing.T) {
 		}
 	}`)
 	values := ctx.CompileString(`{ image: "nginx:1.25" }`)
-	_, err := SynthesizeModuleRelease(ctx, modVal, []cue.Value{values}, "bare-release", "default")
+	_, err := SynthesizeModule(ctx, modVal, []cue.Value{values}, "bare-release", "default")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "#components")
 }

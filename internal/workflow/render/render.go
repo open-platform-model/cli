@@ -15,7 +15,6 @@ import (
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 	internalreleasefile "github.com/opmodel/cli/internal/releasefile"
-	"github.com/opmodel/cli/internal/releaseprocess"
 	"github.com/opmodel/cli/pkg/loader"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
 	pkgrender "github.com/opmodel/cli/pkg/render"
@@ -106,7 +105,7 @@ func Release(ctx context.Context, opts ReleaseOpts) (*Result, error) { //nolint:
 		}
 
 		var synthErr error
-		rel, synthErr = releaseprocess.SynthesizeModuleRelease(cueCtx, modVal, valuesVals, releaseName, moduleNamespace)
+		rel, synthErr = pkgrender.SynthesizeModule(cueCtx, modVal, valuesVals, releaseName, moduleNamespace)
 		if synthErr != nil {
 			printValidationError("render failed", synthErr)
 			return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: synthErr, Printed: true}
@@ -133,7 +132,7 @@ func Release(ctx context.Context, opts ReleaseOpts) (*Result, error) { //nolint:
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
 	}
 
-	engineResult, err := releaseprocess.ProcessModuleRelease(ctx, rel, valuesVals, p)
+	engineResult, err := pkgrender.ProcessModuleRelease(ctx, rel, valuesVals, p)
 	if err != nil {
 		printValidationError("render failed", err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
@@ -233,7 +232,7 @@ func ReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error) { /
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
 	}
 
-	engineResult, err := releaseprocess.ProcessModuleRelease(ctx, rel, valuesVals, p)
+	engineResult, err := pkgrender.ProcessModuleRelease(ctx, rel, valuesVals, p)
 	if err != nil {
 		printValidationError("render failed", err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}

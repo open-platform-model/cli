@@ -13,7 +13,6 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/opmodel/cli/internal/config"
 	internalreleasefile "github.com/opmodel/cli/internal/releasefile"
-	"github.com/opmodel/cli/internal/releaseprocess"
 	pkgrender "github.com/opmodel/cli/pkg/render"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -184,7 +183,7 @@ func TestRenderFromReleaseFile_ValidValuesDoNotPanicAcrossRuntimes(t *testing.T)
 	fileRelease, err := internalreleasefile.GetReleaseFile(ctx, releaseFile)
 	require.NoError(t, err)
 	require.NotNil(t, fileRelease.Module)
-	merged, cfgErr := releaseprocess.ValidateConfig(fileRelease.Module.Config, values, "module", "demo")
+	merged, cfgErr := pkgrender.ValidateConfig(fileRelease.Module.Config, values, "module", "demo")
 	require.Nil(t, cfgErr)
 	assert.NotPanics(t, func() {
 		filled := fileRelease.Module.RawCUE.FillPath(cue.ParsePath("values"), merged)

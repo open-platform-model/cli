@@ -1,4 +1,4 @@
-package releaseprocess
+package render
 
 import (
 	"testing"
