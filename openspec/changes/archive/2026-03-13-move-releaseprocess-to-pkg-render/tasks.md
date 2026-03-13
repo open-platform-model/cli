@@ -31,4 +31,4 @@
 
 ## 5. Commits
 
-- [ ] 5.1 Commit tasks 1.1–1.9, 2.1–2.6, 3.1: `refactor(render): move release processing to pkg/render, rename SynthesizeModuleRelease to SynthesizeModule`
+- [x] 5.1 Commit tasks 1.1–1.9, 2.1–2.6, 3.1: `refactor(render): move release processing to pkg/render, rename SynthesizeModuleRelease to SynthesizeModule`
