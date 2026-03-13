@@ -242,6 +242,15 @@ functions that bypass these receiver methods.
 - **AND** `RenderResult.Module` and `RenderResult.Release` SHALL contain the same metadata values
 - **AND** `RenderResult.Errors` and `RenderResult.Warnings` SHALL be identical
 
+#### Requirement: Render workflow execution
+
+The CLI MUST share the same execution tail for module-source and release-file rendering.
+
+##### Scenario: Shared render tail execution
+
+- **WHEN** the `FromModule` or `FromReleaseFile` entrypoints are executed
+- **THEN** they MUST eventually call `renderPreparedModuleRelease` with a fully resolved `*provider.Provider` and namespace override to process the release and build the workflow `Result`
+
 ### Resource
 
 | ID | Requirement |
