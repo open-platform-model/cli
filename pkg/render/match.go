@@ -35,6 +35,11 @@ type NonMatchedPair struct {
 	MissingTraits    []string
 }
 
+// Match compares each component against all transformers in the provider, returning a MatchPlan
+// that details which transformers matched which components and what was missing for non-matches.
+// It also identifies any traits present in components that are not handled by any matched transformer,
+// which will be ignored in rendering and should be surfaced as warnings to the user.
+//
 //nolint:gocyclo // matching is naturally branchy but kept in one place for parity with matcher.cue
 func Match(components cue.Value, p *provider.Provider) (*MatchPlan, error) {
 	if p == nil {
