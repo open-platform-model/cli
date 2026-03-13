@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/opmodel/cli/internal/resourceorder"
+	"github.com/opmodel/cli/pkg/resourceorder"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
