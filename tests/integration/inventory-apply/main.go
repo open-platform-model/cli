@@ -25,6 +25,7 @@ import (
 
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
+	pkgcore "github.com/opmodel/cli/pkg/core"
 )
 
 const (
@@ -115,8 +116,8 @@ func main() {
 	if len(labels) != 5 {
 		failf("inventory Secret must have exactly 5 labels, got %d: %v", len(labels), labels)
 	}
-	if labels["app.kubernetes.io/managed-by"] != "open-platform-model" {
-		failf("inventory Secret missing app.kubernetes.io/managed-by label")
+	if labels[pkgcore.LabelManagedBy] != pkgcore.LabelManagedByValue {
+		failf("inventory Secret missing %s label", pkgcore.LabelManagedBy)
 	}
 	if labels["module-release.opmodel.dev/name"] != releaseName {
 		failf("inventory Secret module-release.opmodel.dev/name: want %q, got %q", releaseName, labels["module-release.opmodel.dev/name"])
@@ -294,7 +295,7 @@ func main() {
 // opmLabels returns the standard OPM labels for test resources.
 func opmLabels() map[string]interface{} {
 	return map[string]interface{}{
-		"app.kubernetes.io/managed-by":    "open-platform-model",
+		pkgcore.LabelManagedBy:            pkgcore.LabelManagedByValue,
 		"module-release.opmodel.dev/name": releaseName,
 		"module-release.opmodel.dev/uuid": releaseID,
 		"module.opmodel.dev/name":         releaseName,

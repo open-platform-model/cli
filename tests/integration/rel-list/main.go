@@ -26,6 +26,7 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/workflow/query"
+	pkgcore "github.com/opmodel/cli/pkg/core"
 )
 
 const (
@@ -334,7 +335,7 @@ func buildResources(relName, ns, releaseID string, cmNames []string) []*unstruct
 	resources := make([]*unstructured.Unstructured, len(cmNames))
 	for i, cmName := range cmNames {
 		labels := map[string]interface{}{
-			"app.kubernetes.io/managed-by":    "open-platform-model",
+			pkgcore.LabelManagedBy:            pkgcore.LabelManagedByValue,
 			"module-release.opmodel.dev/name": relName,
 			"module-release.opmodel.dev/uuid": releaseID,
 		}

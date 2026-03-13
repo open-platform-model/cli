@@ -37,6 +37,7 @@ import (
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/internal/workflow/query"
+	pkgcore "github.com/opmodel/cli/pkg/core"
 )
 
 const (
@@ -531,7 +532,7 @@ func main() {
 // opmLabels returns the standard OPM labels for test resources.
 func opmLabels(component string) map[string]interface{} {
 	labels := map[string]interface{}{
-		"app.kubernetes.io/managed-by":    "open-platform-model",
+		pkgcore.LabelManagedBy:            pkgcore.LabelManagedByValue,
 		"module-release.opmodel.dev/name": releaseName,
 		"module-release.opmodel.dev/uuid": releaseID,
 		"module.opmodel.dev/name":         moduleName,
