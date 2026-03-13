@@ -90,13 +90,6 @@ The `pkg/render` package SHALL export `ProcessModuleRelease` and `ProcessBundleR
 - **WHEN** `render.ProcessBundleRelease(ctx, release, values, provider)` is called
 - **THEN** it SHALL process each child module release and return a `*render.BundleResult`
 
-### Requirement: Public module release synthesis
-The `pkg/render` package SHALL export `SynthesizeModule` (previously `SynthesizeModuleRelease`) that constructs a `*render.ModuleRelease` from a raw module CUE value plus values.
-
-#### Scenario: Synthesize a module release from raw values
-- **WHEN** `render.SynthesizeModule(cueCtx, modVal, values, name, namespace)` is called
-- **THEN** it SHALL return a `*render.ModuleRelease` with metadata, config, and data components populated
-
 ### Requirement: ProcessModuleRelease owns the module-release processing flow
 The public release-processing API SHALL provide `ProcessModuleRelease` that validates values, fills them into the release, derives concrete and finalized component views, computes a match plan, renders the release with the given provider, and returns the module render result.
 

@@ -244,12 +244,12 @@ functions that bypass these receiver methods.
 
 #### Requirement: Render workflow execution
 
-The CLI MUST share the same execution tail for module-source and release-file rendering.
+The CLI MUST share the same execution tail for release-file rendering via `renderPreparedModuleRelease`.
 
 ##### Scenario: Shared render tail execution
 
-- **WHEN** the `FromModule` or `FromReleaseFile` entrypoints are executed
-- **THEN** they MUST eventually call `renderPreparedModuleRelease` with a fully resolved `*provider.Provider` and namespace override to process the release and build the workflow `Result`
+- **WHEN** the `FromReleaseFile` entrypoint is executed
+- **THEN** it MUST call `renderPreparedModuleRelease` with a fully resolved `*provider.Provider` and namespace override to process the release and build the workflow `Result`
 
 ### Resource
 

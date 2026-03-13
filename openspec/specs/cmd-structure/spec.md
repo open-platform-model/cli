@@ -27,8 +27,8 @@ The `internal/cmd/` package SHALL be split into sub-packages that mirror the cob
 #### Scenario: mod commands are in their own package
 
 - **WHEN** the `internal/cmd/mod/` directory is inspected
-- **THEN** it SHALL contain module authoring commands: `init`, `build`, `vet`
-- **AND** `build` and `apply` SHALL be thin aliases that delegate to the release render pipeline
+- **THEN** it SHALL contain module authoring commands: `init`, `vet`
+- **AND** it SHALL NOT contain a `build` command
 
 #### Scenario: config commands are in their own package
 
@@ -65,17 +65,4 @@ The cluster-query commands (`status`, `tree`, `events`, `delete`, `list`) SHALL 
 - **THEN** the CLI SHALL print a deprecation notice suggesting `opm release delete jellyfin`
 - **AND** execute the same logic as `opm release delete jellyfin`
 
-### Requirement: mod build and mod apply alias the release pipeline
 
-`opm mod build` and `opm mod apply` SHALL internally construct an ephemeral `#ModuleRelease` from their flags (`--values`, `--namespace`, `--release-name`) and execute it through the same release render pipeline used by `opm release`. They SHALL NOT print deprecation notices — they remain the canonical module-author workflow.
-
-#### Scenario: opm mod build uses release pipeline
-
-- **WHEN** `opm mod build . -f values.cue -n production --release-name my-app` is run
-- **THEN** the CLI SHALL construct an ephemeral release from the module at `.` with the provided flags
-- **AND** render it through the same pipeline as `opm release build`
-
-#### Scenario: opm mod apply uses release pipeline
-
-- **WHEN** `opm mod apply . -f values.cue -n production` is run
-- **THEN** the CLI SHALL construct an ephemeral release and apply it via the release pipeline

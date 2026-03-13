@@ -77,30 +77,12 @@ The `ReleaseSelectorFlags` struct SHALL provide a `LogName()` method that return
 
 ### Requirement: RenderRelease orchestration
 
-`cmdutil.RenderRelease()` SHALL inspect whether `release.cue` is present in the module path and branch accordingly:
+`cmdutil.RenderRelease()` SHALL use the release-file loading path exclusively. There is no synthesis branch.
 
-**When `release.cue` is present** (existing behavior, unchanged):
+**When `release.cue` is present** (unchanged):
 - Call `loader.LoadReleasePackage()`, `loader.DetectReleaseKind()`, `loader.LoadModuleReleaseFromValue()` (or bundle equivalent), then `engine.ModuleRenderer.Render()`.
 
-**When `release.cue` is absent** (synthesis path):
-- Load the module package directly.
-- Extract `debugValues` when `DebugValues: true` and no `-f` flag, or load the `-f` values file.
-- Resolve the release name from `opts.ReleaseName` → `module.metadata.name` → `filepath.Base(modulePath)`.
-- Call `loader.SynthesizeModuleRelease()` to build the `*ModuleRelease`.
-- Continue on the common tail: provider loading, engine rendering, resource conversion.
-
-In both paths, resources are converted to `[]*unstructured.Unstructured` before passing to downstream packages. No CUE types cross this boundary.
-
-#### Scenario: RenderRelease takes synthesis path when no release.cue
-- **WHEN** `RenderRelease` is called with a module path that has no `release.cue`
-- **AND** `DebugValues: true`
-- **THEN** `RenderRelease` SHALL call `loader.SynthesizeModuleRelease` instead of `loader.LoadReleasePackage`
-- **AND** the returned `*RenderResult` SHALL be populated identically to a release-backed render
-
-#### Scenario: RenderRelease takes normal path when release.cue present
-- **WHEN** `RenderRelease` is called with a module path that has a `release.cue`
-- **THEN** `RenderRelease` SHALL use the existing `LoadReleasePackage` path
-- **AND** behavior SHALL be unchanged from before this change
+In all cases, resources are converted to `[]*unstructured.Unstructured` before passing to downstream packages. No CUE types cross this boundary.
 
 #### Scenario: CUE boundary enforcement (unchanged)
 - **WHEN** `RenderRelease()` passes resources to `internal/kubernetes/` or `internal/inventory/`
@@ -108,26 +90,19 @@ In both paths, resources are converted to `[]*unstructured.Unstructured` before 
 
 ### Requirement: Values file resolution stays in cmdutil
 
-Values file resolution SHALL remain in `internal/cmdutil/` as a CLI-layer concern. The resolution logic accounts for the synthesis path:
+Values file resolution SHALL remain in `internal/cmdutil/` as a CLI-layer concern. With the synthesis path removed, the resolution simplifies:
 
-- When `--values` files are provided: pass them to the appropriate loader function regardless of whether `release.cue` exists.
-- When no `--values` files are provided and `release.cue` is present: pass empty string to `LoadReleasePackage()`, which defaults to `values.cue` in the release directory (existing behavior).
-- When no `--values` files are provided and `release.cue` is absent: set `DebugValues: true` in `RenderReleaseOpts`, which causes the synthesis path to extract `debugValues` from the module.
+- When `--values` files are provided: pass them to `LoadReleasePackage`.
+- When no `--values` files are provided: pass empty string to `LoadReleasePackage()`, which defaults to `values.cue` in the release directory (existing behavior).
 
 #### Scenario: Values flag resolution (unchanged)
 - **WHEN** the user provides `--values custom-values.cue`
-- **THEN** cmdutil resolves the path and passes it to the appropriate loader (release or synthesis path)
+- **THEN** cmdutil resolves the path and passes it to `LoadReleasePackage`
 
 #### Scenario: Default values fallback with release.cue present
 - **WHEN** no `--values` flag is provided
 - **AND** `release.cue` is present
 - **THEN** cmdutil passes empty string to `LoadReleasePackage()`, which defaults to `values.cue` in the release directory
-
-#### Scenario: Default values fallback without release.cue
-- **WHEN** no `--values` flag is provided
-- **AND** no `release.cue` is present
-- **THEN** cmdutil sets `DebugValues: true` in `RenderReleaseOpts`
-- **AND** the synthesis path extracts `debugValues` from the module as the values source
 
 ### Requirement: ShowRenderOutput checks for errors, shows transformer matches, and logs warnings
 
@@ -229,19 +204,6 @@ The `PrintRenderErrors` function SHALL accept a slice of errors and print each o
 ### Requirement: Refactored mod commands preserve exact behavioral equivalence
 
 After refactoring to use `cmdutil`, each mod command SHALL produce identical output, exit codes, error messages, and flag behavior compared to the pre-refactoring implementation. No user-observable change SHALL occur.
-
-#### Scenario: mod build output is identical after refactoring
-
-- **WHEN** `opm mod build` is run with identical inputs before and after the refactoring
-- **THEN** the stdout output (rendered manifests) SHALL be byte-identical
-- **AND** the stderr output (logs, warnings, verbose) SHALL be semantically identical
-- **AND** the exit code SHALL be identical
-
-#### Scenario: mod apply error handling is identical after refactoring
-
-- **WHEN** `opm mod apply` encounters a render error, connectivity error, or apply error before and after the refactoring
-- **THEN** the error message format SHALL be identical
-- **AND** the exit code SHALL be identical
 
 #### Scenario: mod vet validation output is identical after refactoring
 
