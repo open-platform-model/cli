@@ -29,7 +29,6 @@ OPM's CLI foundation has been built over the first iteration of development. The
 **CLI commands:**
 
 - `opm module init` — scaffold a new module (simple, standard, advanced templates)
-- `opm module build` — render Kubernetes manifests from CUE definitions
 - `opm module vet` — native CUE SDK validation with custom error formatting
 - `opm release build` — render a release file to manifests
 - `opm release apply` — server-side apply with inventory tracking and stale resource pruning

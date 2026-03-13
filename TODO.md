@@ -31,32 +31,6 @@
 - [x] ~~"opm mod delete --name blog --namespace default --verbose" proceeds but with no change, 0 resources deleted. We should add validation to first look for the module and inform the caller if not found.~~
   - **Resolved:** Implemented in `refine-resource-discovery` change. Commands now return `NoResourcesFoundError` when no resources match the selector.
 - [x] ~~Add a flag to "opm mod apply" that will create the namespace if missing.~~
-- [ ] Refactor and align the log output of "opm mod build" with the one from "opm mod apply"
-
-  ```bash
-  ❯ opm mod build . --verbose
-  Module:
-    Name:      jellyfin
-    Namespace: jellyfin
-    Version:   0.1.0
-    Components: jellyfin
-
-  Transformer Matching:
-    jellyfin:
-      ✓ kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#StatefulsetTransformer
-        Matched: requiredLabels[core.opmodel.dev/workload-type=stateful], requiredResources[opmodel.dev/resources/workload@v0#Container]
-      ✓ kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#ServiceTransformer
-        Matched: requiredResources[opmodel.dev/resources/workload@v0#Container], requiredTraits[opmodel.dev/traits/network@v0#Expose]
-      ✓ kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#PvcTransformer
-        Matched: requiredResources[opmodel.dev/resources/storage@v0#Volumes]
-      ✓ kubernetes#opmodel.dev/providers/kubernetes/transformers@v0#HpaTransformer
-        Matched: requiredTraits[opmodel.dev/traits/workload@v0#Scaling]
-
-  Generated Resources:
-    PersistentVolumeClaim/config [default] from jellyfin
-    Service/jellyfin [default] from jellyfin
-    StatefulSet/jellyfin [default] from jellyfin
-  ```
 
 ## Chore
 
@@ -115,20 +89,6 @@
     r:StatefulSet/default/jellyfin                    unchanged
     10:56:47 INFO m:jellyfin >: applied 5 resources successfully
     ✔ Module applied
-    ```
-
-- [ ] `opm mod build`/`opm mod apply` unconditionally requires `values.cue` in the module directory, even when `--values` (`-f`) flags are provided.
-  - **Root cause:** `resolveModulePath()` in `internal/build/pipeline.go:194-197` checks for `values.cue` existence before the render pipeline considers `--values` flags.
-  - **Expected behavior:** When `--values` flags are provided, `values.cue` on disk should be completely ignored. The external values files are unified (CUE merge) with `#config` from the Module, producing a concrete `values` struct for the ModuleRelease. When no `--values` flags are provided, `values.cue` remains required.
-  - **Required changes:**
-    1. `internal/build/pipeline.go:resolveModulePath()` — Remove `values.cue` existence check; move it into `Render()` conditioned on `len(opts.Values) == 0`.
-    2. `internal/build/release_builder.go:Build()` — When `valuesFiles` is non-empty and `values.cue` exists on disk, overlay it with a minimal stub (`package <pkgName>`) to prevent default values from conflicting with provided values via CUE unification.
-    3. `internal/build/release_builder.go:Build()` step 5 — Improve error message: "module missing 'values' field — provide values via values.cue or --values flag".
-  - **Reproduction:**
-
-    ```bash
-    opm mod build . -f val.cue
-    # ERROR: values.cue required but not found in ...
     ```
 
 - [ ] `#config` injection in `release_builder.go:163-169` only surfaces the first CUE error when values have extra or invalid fields. CUE natively produces multi-error output with file, line, and row for each issue, but `concreteModule.Err()` is wrapped into a single `ReleaseValidationError` with a generic message. The same single-error pattern applies at the concreteness validation step (`release_builder.go:179-186`).
