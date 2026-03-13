@@ -9,14 +9,12 @@ Defines the exported `pkg/` package structure that makes all shared domain types
 ### Requirement: Core types exported in pkg/
 All shared domain types SHALL be exported under `pkg/` for reuse by external tools. The package structure SHALL be:
 - `pkg/core/` — `Resource`, label constants, GVK weights
-- `pkg/module/` — `Module`, `ModuleMetadata`
-- `pkg/modulerelease/` — `ModuleRelease`, `ReleaseMetadata`
-- `pkg/bundle/` — `Bundle`, `BundleMetadata`
-- `pkg/bundlerelease/` — `BundleRelease`, `BundleReleaseMetadata`
+- `pkg/module/` — `Module`, `ModuleMetadata`, `Release`, `ReleaseMetadata`
+- `pkg/bundle/` — `Bundle`, `BundleMetadata`, `Release`, `ReleaseMetadata`
 - `pkg/provider/` — `Provider`, `ProviderMetadata`
 - `pkg/errors/` — all error types
 - `pkg/loader/` — loading functions
-- `pkg/engine/` — rendering engine
+- `pkg/render/` — rendering engine (matching, execution, validation)
 
 #### Scenario: External tool imports pkg/core
 - **WHEN** an external Go module imports `github.com/opmodel/cli/pkg/core`
@@ -24,7 +22,11 @@ All shared domain types SHALL be exported under `pkg/` for reuse by external too
 
 #### Scenario: External tool imports pkg/module
 - **WHEN** an external Go module imports `github.com/opmodel/cli/pkg/module`
-- **THEN** it can access `Module` and `ModuleMetadata` types
+- **THEN** it can access `Module`, `ModuleMetadata`, `Release`, and `ReleaseMetadata` types
+
+#### Scenario: External tool imports pkg/bundle
+- **WHEN** an external Go module imports `github.com/opmodel/cli/pkg/bundle`
+- **THEN** it can access `Bundle`, `BundleMetadata`, `Release`, and `ReleaseMetadata` types
 
 ### Requirement: ModuleRelease has typed component accessors
 `ModuleRelease` SHALL expose components via typed accessor methods, NOT raw public fields.
@@ -37,12 +39,17 @@ All shared domain types SHALL be exported under `pkg/` for reuse by external too
 - **WHEN** `release.ExecuteComponents()` is called
 - **THEN** it returns the finalized, constraint-free CUE value suitable for `FillPath` injection into transformers
 
-### Requirement: Bundle and BundleRelease types
-`pkg/bundle/` SHALL export `Bundle` and `BundleMetadata`. `pkg/bundlerelease/` SHALL export `BundleRelease` and `BundleReleaseMetadata`. `BundleRelease` SHALL carry a `Releases map[string]*modulerelease.ModuleRelease` field.
+### Requirement: Bundle and Release types
+`pkg/bundle/` SHALL export `Bundle`, `BundleMetadata`, `Release`, and `ReleaseMetadata`. `Release` SHALL carry a `Releases map[string]*module.Release` field, importing `pkg/module`.
 
-#### Scenario: BundleRelease carries per-instance releases
-- **WHEN** a `BundleRelease` is loaded from a CUE bundle release definition
-- **THEN** `BundleRelease.Releases` contains one `*ModuleRelease` per instance, keyed by instance name
+#### Scenario: bundle.Release carries per-instance releases
+- **WHEN** a `bundle.Release` is loaded from a CUE bundle release definition
+- **THEN** `bundle.Release.Releases` contains one `*module.Release` per instance, keyed by instance name
+
+#### Scenario: pkg/bundle imports pkg/module
+- **WHEN** `pkg/bundle/` is compiled
+- **THEN** it imports `pkg/module/` for the `Release` type reference in `bundle.Release.Releases`
+- **THEN** no circular dependency exists
 
 ### Requirement: Provider is a thin CUE wrapper
 `pkg/provider.Provider` SHALL carry `*ProviderMetadata` and a `Data cue.Value` field. It SHALL NOT have a Go-side `Match()` method.
