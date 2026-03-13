@@ -1,6 +1,7 @@
 ## 1. Move bundlerelease types to pkg/render
 
 - [ ] 1.1 Create `pkg/render/bundlerelease.go` from `internal/runtime/bundlerelease/release.go`: change package to `render`, update `Releases` field type from `*modulerelease.ModuleRelease` to `*ModuleRelease` (same package now), remove `//nolint:revive` stutter comment, remove the `modulerelease` import
+- [ ] 1.2 Note: `internal/runtime/bundlerelease/` has no test files — no tests to move
 
 ## 2. Update internal callers
 

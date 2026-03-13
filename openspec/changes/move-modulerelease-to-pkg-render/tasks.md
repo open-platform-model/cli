@@ -1,7 +1,7 @@
 ## 1. Move modulerelease types to pkg/render
 
 - [ ] 1.1 Create `pkg/render/modulerelease.go` from `internal/runtime/modulerelease/release.go`: change package to `render`, rename `ReleaseMetadata` to `ModuleReleaseMetadata`, update `NewModuleRelease` parameter type, update `ModuleRelease.Metadata` field type
-- [ ] 1.2 Move any tests from `internal/runtime/modulerelease/` to `pkg/render/` (if they exist as separate test files)
+- [ ] 1.2 Note: `internal/runtime/modulerelease/` has no test files — no tests to move
 
 ## 2. Update internal callers — engine package
 

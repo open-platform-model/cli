@@ -5,8 +5,9 @@
 - [ ] 1.3 Move `internal/engine/execute.go` → `pkg/render/execute.go`: change package to `render`, replace the 2 `log.Warn` calls with appending to a warnings accumulator, remove `charmbracelet/log` import, thread warnings back into `ModuleResult.Warnings`
 - [ ] 1.4 Move `internal/engine/context.go` → `pkg/render/context.go` (if exists): change package to `render`
 - [ ] 1.5 Move `internal/engine/component.go` → `pkg/render/component.go` (if exists): change package to `render`
-- [ ] 1.6 Move engine test files to `pkg/render/`, update package declarations and imports
-- [ ] 1.7 Note: `match_alias.go` was already deleted in change 1 — nothing to do here
+- [ ] 1.6 Move `internal/engine/matchplan_test.go` → `pkg/render/matchplan_test.go`: change package to `render_test` (external test), remove `render.` prefixes on types now in the same package (`MatchPlan`, `MatchResult`, `MatchedPair`, `ModuleRelease`, `ModuleReleaseMetadata`, `BundleRelease`), rename `NewModuleRenderer` → `NewModule`, `NewBundleRenderer` → `NewBundle`, `.Render(` → `.Execute(`, update `modulerelease.ReleaseMetadata` → `ModuleReleaseMetadata` (already done by change 2 — verify), remove stale `internal/` imports. Note: by this point only 2 tests remain (`TestModuleRenderer_RenderReturnsNonNilEmptySlices`, `TestBundleRenderer_RenderReturnsNonNilEmptySlices`) — the 6 match tests and `TestSortMatchedPairs` were already moved/deleted in change 1
+- [ ] 1.7 Move `internal/engine/execute_test.go` → `pkg/render/execute_test.go`: change package to `render` (internal test — tests unexported `isSingleResource`, `collectResourceList`, `collectResourceMap`), no type renames needed (all unexported helpers), remove any stale imports
+- [ ] 1.8 Note: `match_alias.go` was already deleted in change 1 — nothing to do here
 
 ## 2. Update external callers
 
@@ -29,5 +30,5 @@
 
 ## 5. Commits
 
-- [ ] 5.1 Commit tasks 1.1–1.2, 1.4–1.7, 2.1–2.5, 3.1: `refactor(render): move engine renderers to pkg/render with type renames`
+- [ ] 5.1 Commit tasks 1.1–1.2, 1.4–1.8, 2.1–2.5, 3.1: `refactor(render): move engine renderers to pkg/render with type renames`
 - [ ] 5.2 Commit task 1.3: `refactor(render): replace charmbracelet/log with warnings slice in execute`
