@@ -10,6 +10,7 @@ import (
 	"github.com/opmodel/cli/internal/engine"
 	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
+	pkgrender "github.com/opmodel/cli/pkg/render"
 )
 
 // Result is the output of the shared render workflow.
@@ -18,7 +19,7 @@ type Result struct {
 	Release    modulerelease.ReleaseMetadata
 	Module     pkgmodule.ModuleMetadata
 	Components []engine.ComponentSummary
-	MatchPlan  *engine.MatchPlan
+	MatchPlan  *pkgrender.MatchPlan
 	Warnings   []string
 }
 

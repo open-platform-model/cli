@@ -1,4 +1,4 @@
-package match
+package render
 
 import (
 	"fmt"
@@ -9,7 +9,6 @@ import (
 	"github.com/opmodel/cli/pkg/provider"
 )
 
-//nolint:revive // stutter is intentional for API clarity
 type MatchResult struct {
 	Matched          bool     `json:"matched"`
 	MissingLabels    []string `json:"missingLabels"`
@@ -17,7 +16,6 @@ type MatchResult struct {
 	MissingTraits    []string `json:"missingTraits"`
 }
 
-//nolint:revive // stutter is intentional for API clarity
 type MatchPlan struct {
 	Matches         map[string]map[string]MatchResult
 	Unmatched       []string

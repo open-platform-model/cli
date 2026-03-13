@@ -9,10 +9,10 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/internal/match"
 	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/core"
 	"github.com/opmodel/cli/pkg/provider"
+	"github.com/opmodel/cli/pkg/render"
 )
 
 // ComponentSummary contains display-oriented summary data extracted from a component
@@ -53,7 +53,7 @@ type ModuleRenderResult struct {
 
 	// MatchPlan is the decoded result of matching components against transformers.
 	// Nil if matching was not performed (e.g. no components).
-	MatchPlan *match.MatchPlan
+	MatchPlan *render.MatchPlan
 
 	// Components is a per-component summary for verbose output, sorted by name.
 	Components []ComponentSummary
@@ -69,7 +69,7 @@ func NewModuleRenderer(p *provider.Provider) *ModuleRenderer {
 }
 
 // Render executes matched transforms for the given module release.
-func (r *ModuleRenderer) Render(ctx context.Context, rel *modulerelease.ModuleRelease, plan *match.MatchPlan) (*ModuleRenderResult, error) {
+func (r *ModuleRenderer) Render(ctx context.Context, rel *modulerelease.ModuleRelease, plan *render.MatchPlan) (*ModuleRenderResult, error) {
 	// Extract the components CUE values from the ModuleRelease.
 	schemaComponents := rel.MatchComponents()
 	if !schemaComponents.Exists() {

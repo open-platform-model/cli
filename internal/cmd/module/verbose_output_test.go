@@ -12,6 +12,7 @@ import (
 	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/internal/workflow/render"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
+	pkgrender "github.com/opmodel/cli/pkg/render"
 )
 
 // buildTestResult constructs a minimal *render.Result suitable for
@@ -33,8 +34,8 @@ func buildTestResult() *render.Result {
 				TraitFQNs:    []string{"opmodel.dev/traits/network/expose@v1"},
 			},
 		},
-		MatchPlan: &engine.MatchPlan{
-			Matches: map[string]map[string]engine.MatchResult{
+		MatchPlan: &pkgrender.MatchPlan{
+			Matches: map[string]map[string]pkgrender.MatchResult{
 				"web": {
 					"test#DeploymentTransformer": {Matched: true},
 					"test#ServiceTransformer":    {Matched: true},

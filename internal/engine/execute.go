@@ -7,9 +7,9 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/charmbracelet/log"
 
-	"github.com/opmodel/cli/internal/match"
 	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/core"
+	"github.com/opmodel/cli/pkg/render"
 )
 
 // moduleReleaseContextData is the Go-side mirror of #TransformerContext.#moduleReleaseMetadata.
@@ -45,7 +45,7 @@ type componentContextData struct {
 func executeTransforms(
 	ctx context.Context,
 	cueCtx *cue.Context,
-	plan *match.MatchPlan,
+	plan *render.MatchPlan,
 	providerVal cue.Value,
 	schemaComponents cue.Value,
 	dataComponents cue.Value,
@@ -87,7 +87,7 @@ func executePair(
 	schemaComponents cue.Value,
 	dataComponents cue.Value,
 	rel *modulerelease.ModuleRelease,
-	pair match.MatchedPair,
+	pair render.MatchedPair,
 ) ([]*core.Resource, error) {
 	compName := pair.ComponentName
 	tfFQN := pair.TransformerFQN

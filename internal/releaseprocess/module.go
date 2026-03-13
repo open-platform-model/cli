@@ -7,9 +7,9 @@ import (
 	"cuelang.org/go/cue"
 
 	"github.com/opmodel/cli/internal/engine"
-	"github.com/opmodel/cli/internal/match"
 	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/pkg/provider"
+	"github.com/opmodel/cli/pkg/render"
 )
 
 func ProcessModuleRelease(ctx context.Context, mr *modulerelease.ModuleRelease, values []cue.Value, p *provider.Provider) (*engine.ModuleRenderResult, error) {
@@ -36,7 +36,7 @@ func ProcessModuleRelease(ctx context.Context, mr *modulerelease.ModuleRelease, 
 	}
 	mr.DataComponents = dataComponents
 
-	plan, err := match.Match(schemaComponents, p)
+	plan, err := render.Match(schemaComponents, p)
 	if err != nil {
 		return nil, err
 	}

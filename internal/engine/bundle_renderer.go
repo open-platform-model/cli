@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/opmodel/cli/internal/match"
 	"github.com/opmodel/cli/internal/runtime/bundlerelease"
 	"github.com/opmodel/cli/pkg/core"
 	"github.com/opmodel/cli/pkg/provider"
+	"github.com/opmodel/cli/pkg/render"
 )
 
 // BundleRenderer drives the OPM render pipeline for a BundleRelease.
@@ -81,7 +81,7 @@ func (br *BundleRenderer) Render(ctx context.Context, rel *bundlerelease.BundleR
 
 		modRel := rel.Releases[key]
 
-		plan, err := match.Match(modRel.MatchComponents(), br.moduleRenderer.provider)
+		plan, err := render.Match(modRel.MatchComponents(), br.moduleRenderer.provider)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("matching release %q (module %s): %w",
 				key, modRel.Module.Metadata.FQN, err))

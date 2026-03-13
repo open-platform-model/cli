@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	oerrors "github.com/opmodel/cli/pkg/errors"
+	"github.com/opmodel/cli/pkg/render"
 )
 
 // UnmatchedComponentsError is returned when one or more components have no
@@ -18,7 +19,7 @@ type UnmatchedComponentsError struct {
 	Components []string
 
 	// Matches is the full match result matrix, used to build per-component diagnostics.
-	Matches map[string]map[string]MatchResult
+	Matches map[string]map[string]render.MatchResult
 }
 
 func (e *UnmatchedComponentsError) Error() string {
@@ -75,7 +76,7 @@ func (e *UnmatchedComponentsError) Unwrap() []error {
 			TransformerFQN: tfFQN,
 			Cause: &UnmatchedComponentsError{
 				Components: []string{compName},
-				Matches:    map[string]map[string]MatchResult{compName: compMatches},
+				Matches:    map[string]map[string]render.MatchResult{compName: compMatches},
 			},
 		})
 	}
