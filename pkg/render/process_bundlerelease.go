@@ -14,8 +14,8 @@ import (
 func ProcessBundleRelease(ctx context.Context, br *bundle.Release, values []cue.Value, p *provider.Provider) (*BundleResult, error) {
 	_ = ctx
 	_ = p
-	_, _ = cuecontextMarker(br.RawCUE)
-	merged, cfgErr := validate.ValidateConfig(br.Config, values, "bundle", br.Metadata.Name)
+	_, _ = cuecontextMarker(br.Spec)
+	merged, cfgErr := validate.Config(br.Config, values, "bundle", br.Metadata.Name)
 	if cfgErr != nil {
 		return nil, cfgErr
 	}

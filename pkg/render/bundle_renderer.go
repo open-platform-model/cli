@@ -80,14 +80,22 @@ func (br *Bundle) Execute(ctx context.Context, rel *bundle.Release) (*BundleResu
 
 		modRel := rel.Releases[key]
 
-		plan, err := Match(modRel.MatchComponents(), br.moduleRenderer.provider)
+		schemaComponents := modRel.MatchComponents()
+		dataComponents, err := finalizeValue(br.moduleRenderer.provider.Data.Context(), schemaComponents)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("finalizing components for release %q (module %s): %w",
+				key, modRel.Module.Metadata.FQN, err))
+			continue
+		}
+
+		plan, err := Match(schemaComponents, br.moduleRenderer.provider)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("matching release %q (module %s): %w",
 				key, modRel.Module.Metadata.FQN, err))
 			continue
 		}
 
-		modResult, err := br.moduleRenderer.Execute(ctx, modRel, plan)
+		modResult, err := br.moduleRenderer.Execute(ctx, modRel, schemaComponents, dataComponents, plan)
 		if err != nil {
 			// Collect the error and continue — fail-slow so all releases are attempted.
 			errs = append(errs, fmt.Errorf("rendering release %q (module %s): %w",

@@ -18,8 +18,8 @@ type Release struct {
 	// Bundle is the original bundle definition, preserved for reference.
 	Bundle Bundle
 
-	// RawCUE is the whole Release CUE value.
-	RawCUE cue.Value
+	// Spec is the whole Release CUE value.
+	Spec cue.Value
 
 	// Releases is the map of ModuleReleases produced during bundle processing.
 	Releases map[string]*module.Release
