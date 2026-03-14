@@ -190,6 +190,9 @@ Start with Option A first. It gives most of the readability gain at lower risk.
 
 ## Improvement 4: Simplify the release-file layer
 
+I want to discuss improvement nr 4.
+Based on the change for improvement nr 3 (release-phase-split) we have to adapt this change.
+
 ### What it is
 
 `internal/releasefile/get_release_file.go` currently parses a release file and directly constructs a partially initialized `render.ModuleRelease` or `render.BundleRelease`.
