@@ -14,7 +14,7 @@ import (
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 	"github.com/opmodel/cli/pkg/loader"
-	pkgrender "github.com/opmodel/cli/pkg/render"
+	"github.com/opmodel/cli/pkg/validate"
 )
 
 // NewModuleVetCmd creates the module vet command.
@@ -133,7 +133,7 @@ func runVetModuleOnly(modulePath string, cfg *config.GlobalConfig, rf *cmdutil.R
 
 	configVal := modVal.LookupPath(cue.ParsePath("#config"))
 	if configVal.Exists() {
-		if _, cfgErr := pkgrender.ValidateConfig(configVal, valuesVals, "module", modName); cfgErr != nil {
+		if _, cfgErr := validate.ValidateConfig(configVal, valuesVals, "module", modName); cfgErr != nil {
 			cmdutil.PrintValidationError("values do not satisfy #config", cfgErr)
 			return &opmexit.ExitError{
 				Code:    opmexit.ExitValidationError,

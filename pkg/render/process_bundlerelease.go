@@ -8,13 +8,14 @@ import (
 
 	"github.com/opmodel/cli/pkg/bundle"
 	"github.com/opmodel/cli/pkg/provider"
+	"github.com/opmodel/cli/pkg/validate"
 )
 
 func ProcessBundleRelease(ctx context.Context, br *bundle.Release, values []cue.Value, p *provider.Provider) (*BundleResult, error) {
 	_ = ctx
 	_ = p
 	_, _ = cuecontextMarker(br.RawCUE)
-	merged, cfgErr := ValidateConfig(br.Config, values, "bundle", br.Metadata.Name)
+	merged, cfgErr := validate.ValidateConfig(br.Config, values, "bundle", br.Metadata.Name)
 	if cfgErr != nil {
 		return nil, cfgErr
 	}

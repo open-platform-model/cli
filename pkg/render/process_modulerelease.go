@@ -8,10 +8,11 @@ import (
 
 	"github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/provider"
+	"github.com/opmodel/cli/pkg/validate"
 )
 
 func ProcessModuleRelease(ctx context.Context, mr *module.Release, values []cue.Value, p *provider.Provider) (*ModuleResult, error) {
-	merged, cfgErr := ValidateConfig(mr.Config, values, "module", mr.Metadata.Name)
+	merged, cfgErr := validate.ValidateConfig(mr.Config, values, "module", mr.Metadata.Name)
 	if cfgErr != nil {
 		return nil, cfgErr
 	}
