@@ -51,22 +51,31 @@ func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error)
 	if fileRelease.Kind == internalreleasefile.KindBundleRelease {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("bundle releases are not yet supported - use a #ModuleRelease file")}
 	}
-	rel := fileRelease.Module
+	parseData := fileRelease.Module
 
-	moduleVal := rel.RawCUE.LookupPath(cue.MakePath(cue.Def("module")))
+	// Verify #module is filled in the release file.
+	moduleVal := parseData.Spec.LookupPath(cue.MakePath(cue.Def("module")))
 	if !moduleVal.Exists() || moduleVal.Validate(cue.Concrete(true)) != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("#module is not filled in the release file — import a module to fill it")}
 	}
 
-	valuesVals, err := resolveReleaseValues(cueCtx, rel.RawCUE, opts.ReleaseFilePath, opts.ValuesFiles)
+	// Resolve values from --values files, auto-discovered values.cue, or inline values.
+	valuesVals, err := resolveReleaseValues(cueCtx, parseData.Spec, opts.ReleaseFilePath, opts.ValuesFiles)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	var namespaceOverride string
+	// Prepare the release: validate values, fill, check concreteness, decode metadata.
+	rel, err := pkgmodule.ParseModuleRelease(ctx, parseData.Spec, parseData.Module, valuesVals)
+	if err != nil {
+		printValidationError(err)
+		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+	}
+
+	// Apply namespace override from --namespace flag or env.
 	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
-		namespaceOverride = namespace
+		rel.Metadata.Namespace = namespace
 	}
 
 	p, err := loader.LoadProvider(providerName, opts.Config.Providers)
@@ -74,23 +83,17 @@ func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
 	}
 
-	return renderPreparedModuleRelease(ctx, rel, valuesVals, p, namespaceOverride)
+	return renderPreparedModuleRelease(ctx, rel, p)
 }
 
-// renderPreparedModuleRelease is the execution tail for FromReleaseFile.
-// It applies the namespace override, runs the render engine, and converts the result to unstructured resources.
+// renderPreparedModuleRelease runs the render engine on a fully prepared release
+// and converts the result to unstructured resources.
 func renderPreparedModuleRelease(
 	ctx context.Context,
 	rel *pkgmodule.Release,
-	valuesVals []cue.Value,
 	p *provider.Provider,
-	namespaceOverride string,
 ) (*Result, error) {
-	if namespaceOverride != "" {
-		rel.Metadata.Namespace = namespaceOverride
-	}
-
-	engineResult, err := pkgrender.ProcessModuleRelease(ctx, rel, valuesVals, p)
+	engineResult, err := pkgrender.ProcessModuleRelease(ctx, rel, p)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}

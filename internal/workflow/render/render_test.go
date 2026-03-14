@@ -132,10 +132,10 @@ func TestRenderFromReleaseFile_ValidValuesDoNotPanicAcrossRuntimes(t *testing.T)
 	fileRelease, err := internalreleasefile.GetReleaseFile(ctx, releaseFile)
 	require.NoError(t, err)
 	require.NotNil(t, fileRelease.Module)
-	merged, cfgErr := validate.ValidateConfig(fileRelease.Module.Config, values, "module", "demo")
+	merged, cfgErr := validate.Config(fileRelease.Module.Module.Config, values, "module", "demo")
 	require.Nil(t, cfgErr)
 	assert.NotPanics(t, func() {
-		filled := fileRelease.Module.RawCUE.FillPath(cue.ParsePath("values"), merged)
+		filled := fileRelease.Module.Spec.FillPath(cue.ParsePath("values"), merged)
 		require.NoError(t, filled.Err())
 	})
 }

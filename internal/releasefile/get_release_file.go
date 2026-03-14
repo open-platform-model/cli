@@ -18,10 +18,25 @@ const (
 	KindBundleRelease Kind = "BundleRelease"
 )
 
+// ModuleParseData holds the raw parse data from a module release file.
+// This is the pre-preparation state — values have not been validated or filled.
+// Use module.ParseModuleRelease to construct a fully prepared *module.Release.
+type ModuleParseData struct {
+	// Spec is the raw release spec CUE value (before values filling).
+	Spec cue.Value
+
+	// Module is the best-effort module info extracted from #module.
+	Module module.Module
+
+	// Metadata is the best-effort release metadata decoded from the spec.
+	// Available for early display and error messages before values are applied.
+	Metadata *module.ReleaseMetadata
+}
+
 type FileRelease struct {
 	Path   string
 	Kind   Kind
-	Module *module.Release
+	Module *ModuleParseData
 	Bundle *bundle.Release
 }
 
@@ -38,14 +53,14 @@ func GetReleaseFile(ctx *cue.Context, filePath string) (*FileRelease, error) {
 
 	switch kind {
 	case string(KindModuleRelease):
-		moduleRelease, err := bareModuleRelease(val, filePath)
+		parseData, err := bareModuleRelease(val, filePath)
 		if err != nil {
 			return nil, err
 		}
 		return &FileRelease{
 			Path:   filePath,
 			Kind:   KindModuleRelease,
-			Module: moduleRelease,
+			Module: parseData,
 		}, nil
 	case string(KindBundleRelease):
 		bundleRelease, err := bareBundleRelease(val)
@@ -62,7 +77,7 @@ func GetReleaseFile(ctx *cue.Context, filePath string) (*FileRelease, error) {
 	}
 }
 
-func bareModuleRelease(v cue.Value, fallbackName string) (*module.Release, error) {
+func bareModuleRelease(v cue.Value, fallbackName string) (*ModuleParseData, error) {
 	moduleVal := v.LookupPath(cue.ParsePath("#module"))
 	moduleConfig := v.LookupPath(cue.ParsePath("#module.#config"))
 	releaseMeta, err := mustModuleReleaseMetadata(v, fallbackName)
@@ -70,18 +85,15 @@ func bareModuleRelease(v cue.Value, fallbackName string) (*module.Release, error
 		return nil, err
 	}
 
-	return module.NewRelease(
-		releaseMeta,
-		module.Module{
+	return &ModuleParseData{
+		Spec: v,
+		Module: module.Module{
 			Metadata: bestEffortModuleMetadata(moduleVal),
 			Config:   moduleConfig,
 			Raw:      moduleVal,
 		},
-		v,
-		cue.Value{},
-		moduleConfig,
-		cue.Value{},
-	), nil
+		Metadata: releaseMeta,
+	}, nil
 }
 
 func bareBundleRelease(v cue.Value) (*bundle.Release, error) {
@@ -98,7 +110,7 @@ func bareBundleRelease(v cue.Value) (*bundle.Release, error) {
 			Metadata: bestEffortBundleMetadata(bundleVal),
 			Data:     bundleVal,
 		},
-		RawCUE:   v,
+		Spec:     v,
 		Releases: map[string]*module.Release{},
 		Config:   bundleConfig,
 	}, nil
