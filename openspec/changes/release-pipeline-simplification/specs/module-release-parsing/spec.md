@@ -9,7 +9,7 @@ func ParseModuleRelease(ctx context.Context, spec cue.Value, mod Module, values 
 
 #### Scenario: Successful preparation with valid values
 - **WHEN** `ParseModuleRelease` is called with a raw release spec, a module with a valid `Config`, and values that satisfy the config schema
-- **THEN** it SHALL validate the values against `mod.Config` using `render.ValidateConfig`
+- **THEN** it SHALL validate the values against `mod.Config` using `validate.Config`
 - **AND** it SHALL merge all values into a single concrete `cue.Value`
 - **AND** it SHALL fill the merged values into `spec` at the `values` path
 - **AND** it SHALL validate that the filled spec is fully concrete (`cue.Concrete(true)`)

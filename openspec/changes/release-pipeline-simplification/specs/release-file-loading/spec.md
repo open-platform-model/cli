@@ -30,33 +30,17 @@ func GetReleaseFile(ctx *cue.Context, filePath string) (*FileRelease, error)
 - **THEN** `FileRelease.Kind` SHALL be `KindBundleRelease`
 - **AND** `FileRelease.Bundle` SHALL be a `*bundle.Release`
 
-### Requirement: Module injection via `--module` flag uses `LoadModulePackage()` + FillPath
-
-When the `--module` flag is provided, the CLI SHALL load the module from the specified directory using `pkg/loader.LoadModulePackage()` and inject it into the raw release spec via `FillPath` at the `#module` path before calling `module.ParseModuleRelease`.
-
-#### Scenario: FillPath injection with `--module`
-- **WHEN** a release file has `#module` unfilled
-- **AND** `--module ./jellyfin` is provided
-- **THEN** the CLI SHALL call `loader.LoadModulePackage("./jellyfin")`
-- **AND** fill `#module` on the raw release spec before calling `ParseModuleRelease`
-
-#### Scenario: Module already imported, `--module` flag provided
-- **WHEN** a release file imports and fills `#module` from a registry
-- **AND** `--module ./jellyfin` is also provided
-- **THEN** the `--module` flag SHALL take precedence by overwriting the raw release spec at the `#module` path before calling `ParseModuleRelease`
-
 ### Requirement: Workflow orchestration calls ParseModuleRelease then ProcessModuleRelease
 
 The `internal/workflow/render.FromReleaseFile` function SHALL orchestrate the pipeline as:
 1. Load the release file via `GetReleaseFile`
-2. Apply `--module` injection if needed (on the raw spec)
-3. Resolve values from release file and `--values` flags
-4. Build a `module.Module` from available module data
-5. Call `module.ParseModuleRelease(ctx, spec, mod, values)` to get `*module.Release`
-6. Apply namespace override if needed (on `Release.Metadata.Namespace`)
-7. Load the provider
-8. Call `render.ProcessModuleRelease(ctx, release, provider)` to get `*render.ModuleResult`
-9. Convert to workflow result
+2. Resolve values from release file and `--values` flags
+3. Build a `module.Module` from available module data
+4. Call `module.ParseModuleRelease(ctx, spec, mod, values)` to get `*module.Release`
+5. Apply namespace override if needed (on `Release.Metadata.Namespace`)
+6. Load the provider
+7. Call `render.ProcessModuleRelease(ctx, release, provider)` to get `*render.ModuleResult`
+8. Convert to workflow result
 
 #### Scenario: Full pipeline from release file
 - **WHEN** `FromReleaseFile` is called with valid options
