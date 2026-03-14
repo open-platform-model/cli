@@ -4,52 +4,32 @@ import (
 	"cuelang.org/go/cue"
 )
 
-// Release is the concrete deployment instance of a module as it moves
-// through parse, process, and render stages.
+// Release is a fully prepared module release ready for rendering.
+// When a *Release exists, all invariants hold: Spec is concrete and complete,
+// Values is concrete and merged, Metadata is decoded.
 type Release struct {
-	// Metadata is extracted for Go-side operations: inventory, K8s labeling, display.
+	// Metadata is the decoded release identity from the concrete release spec.
 	Metadata *ReleaseMetadata
 
-	// Module is the original module, preserved for reference.
+	// Module is the original module used to prepare the release.
 	Module Module
 
-	// RawCUE is the whole Release CUE value.
-	// It is initially the parse-only raw value, then replaced with the concrete
-	// processed value after successful value filling.
-	RawCUE cue.Value
+	// Spec is the concrete, values-filled #ModuleRelease CUE value.
+	// Concrete (all regular fields resolved) but NOT finalized — CUE definition
+	// fields (#resources, #traits, #blueprints) are preserved. Required by
+	// MatchComponents() for component-transformer matching.
+	// MUST NOT be passed to finalizeValue or v.Syntax(cue.Final()).
+	Spec cue.Value
 
-	// DataComponents is the finalized, constraint-free components value.
-	// Safe for FillPath injection into transformer #transform definitions.
-	DataComponents cue.Value
-
-	// Config is the #config schema extracted from the release's module view.
-	Config cue.Value
-
-	// Values is the merged, validated concrete values supplied by the caller.
+	// Values is the concrete, merged values applied to the release.
 	Values cue.Value
 }
 
-// NewRelease constructs a Release.
-func NewRelease(metadata *ReleaseMetadata, mod Module, rawCUE, dataComponents, config, values cue.Value) *Release {
-	return &Release{
-		Metadata:       metadata,
-		Module:         mod,
-		RawCUE:         rawCUE,
-		DataComponents: dataComponents,
-		Config:         config,
-		Values:         values,
-	}
-}
-
-// MatchComponents returns the concrete component view used for matching.
-// This must preserve definition fields such as #resources and #traits.
+// MatchComponents returns the schema-preserving components value used for
+// matching. The returned value keeps definition fields such as #resources,
+// #traits, and #blueprints.
 func (r *Release) MatchComponents() cue.Value {
-	return r.RawCUE.LookupPath(cue.ParsePath("components"))
-}
-
-// ExecuteComponents returns the finalized, constraint-free component view.
-func (r *Release) ExecuteComponents() cue.Value {
-	return r.DataComponents
+	return r.Spec.LookupPath(cue.ParsePath("components"))
 }
 
 // ReleaseMetadata contains release-level identity information.

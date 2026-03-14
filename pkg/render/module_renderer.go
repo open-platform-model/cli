@@ -67,18 +67,19 @@ func NewModule(p *provider.Provider) *Module {
 	return &Module{provider: p}
 }
 
-// Execute executes matched transforms for the given module release.
-func (r *Module) Execute(ctx context.Context, rel *module.Release, plan *MatchPlan) (*ModuleResult, error) {
-	// Extract the components CUE values from the ModuleRelease.
-	schemaComponents := rel.MatchComponents()
-	if !schemaComponents.Exists() {
-		return nil, fmt.Errorf("release %q: no components field in schema CUE value", rel.Metadata.Name)
-	}
-	dataComponents := rel.ExecuteComponents()
-	if !dataComponents.Exists() {
-		return nil, fmt.Errorf("release %q: no finalized data components value", rel.Metadata.Name)
-	}
-
+// Execute runs matched transformers against the provided component views and
+// returns rendered resources, component summaries, and warnings.
+//
+// schemaComponents is the non-finalized components value (from rel.MatchComponents())
+// preserving CUE definition fields needed for metadata extraction.
+// dataComponents is the finalized, constraint-free components value for FillPath injection.
+func (r *Module) Execute(
+	ctx context.Context,
+	rel *module.Release,
+	schemaComponents cue.Value,
+	dataComponents cue.Value,
+	plan *MatchPlan,
+) (*ModuleResult, error) {
 	// The CUE context lives on each cue.Value — extract it from the provider.
 	cueCtx := r.provider.Data.Context()
 
@@ -96,7 +97,7 @@ func (r *Module) Execute(ctx context.Context, rel *module.Release, plan *MatchPl
 
 	// Phase 2 — execution (CUE #transform per pair).
 	// Passes both schemaComponents (for metadata extraction) and dataComponents
-	// (from rel.ExecuteComponents() — already finalized, no materialize() needed).
+	// (already finalized, no materialize() needed).
 	resources, warnings, errs := executeTransforms(ctx, cueCtx, plan, r.provider.Data, schemaComponents, dataComponents, rel)
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("executing transforms: %w", errors.Join(errs...))

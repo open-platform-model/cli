@@ -4,36 +4,22 @@ import (
 	"context"
 	"fmt"
 
-	"cuelang.org/go/cue"
-
 	"github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/provider"
-	"github.com/opmodel/cli/pkg/validate"
 )
 
-func ProcessModuleRelease(ctx context.Context, mr *module.Release, values []cue.Value, p *provider.Provider) (*ModuleResult, error) {
-	merged, cfgErr := validate.ValidateConfig(mr.Config, values, "module", mr.Metadata.Name)
-	if cfgErr != nil {
-		return nil, cfgErr
-	}
-	mr.Values = merged
-	mr.RawCUE = mr.RawCUE.FillPath(cue.ParsePath("values"), merged)
-	if err := mr.RawCUE.Err(); err != nil {
-		return nil, fmt.Errorf("filling values into raw release: %w", err)
-	}
-	if err := mr.RawCUE.Validate(cue.Concrete(true)); err != nil {
-		return nil, fmt.Errorf("release %q: not fully concrete: %w", mr.Metadata.Name, err)
+// ProcessModuleRelease renders a prepared release with the given provider.
+// The release must already be fully prepared via module.ParseModuleRelease.
+func ProcessModuleRelease(ctx context.Context, rel *module.Release, p *provider.Provider) (*ModuleResult, error) {
+	schemaComponents := rel.MatchComponents()
+	if !schemaComponents.Exists() {
+		return nil, fmt.Errorf("release %q: no components field in release spec", rel.Metadata.Name)
 	}
 
-	schemaComponents := mr.MatchComponents()
-	if !schemaComponents.Exists() {
-		return nil, fmt.Errorf("release %q: no components field in raw release", mr.Metadata.Name)
-	}
 	dataComponents, err := finalizeValue(p.Data.Context(), schemaComponents)
 	if err != nil {
 		return nil, fmt.Errorf("finalizing components: %w", err)
 	}
-	mr.DataComponents = dataComponents
 
 	plan, err := Match(schemaComponents, p)
 	if err != nil {
@@ -41,5 +27,5 @@ func ProcessModuleRelease(ctx context.Context, mr *module.Release, values []cue.
 	}
 
 	renderer := NewModule(p)
-	return renderer.Execute(ctx, mr, plan)
+	return renderer.Execute(ctx, rel, schemaComponents, dataComponents, plan)
 }

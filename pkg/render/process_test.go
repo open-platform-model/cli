@@ -32,7 +32,9 @@ func TestProcessModuleRelease_Success(t *testing.T) {
 				replicas: int
 			}
 		}
-		values: _
+		values: {
+			replicas: 2
+		}
 		components: {
 			api: {
 				metadata: labels: {
@@ -47,7 +49,6 @@ func TestProcessModuleRelease_Success(t *testing.T) {
 			}
 		}
 	}`)
-	values := ctx.CompileString(`{replicas: 2}`)
 	pv := ctx.CompileString(`{
 		#transformers: {
 			"tf/deployment@v1": {
@@ -76,19 +77,18 @@ func TestProcessModuleRelease_Success(t *testing.T) {
 		}
 	}`)
 
-	mr := &module.Release{
+	// Construct a fully prepared release (as ParseModuleRelease would produce).
+	rel := &module.Release{
 		Metadata: &module.ReleaseMetadata{Name: "demo", Namespace: "apps"},
 		Module:   module.Module{Metadata: &module.ModuleMetadata{FQN: "example.com/modules/demo@v1", Version: "v1"}},
-		RawCUE:   raw,
-		Config:   raw.LookupPath(cue.ParsePath("#module.#config")),
+		Spec:     raw,
+		Values:   ctx.CompileString(`{replicas: 2}`),
 	}
 
-	result, err := ProcessModuleRelease(context.Background(), mr, []cue.Value{values}, &provider.Provider{Data: pv})
+	result, err := ProcessModuleRelease(context.Background(), rel, &provider.Provider{Data: pv})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Len(t, result.Resources, 1)
-	assert.True(t, mr.Values.Exists())
-	assert.True(t, mr.DataComponents.Exists())
 	assert.True(t, result.MatchPlan.Matches["api"]["tf/deployment@v1"].Matched)
 }
 
@@ -104,7 +104,7 @@ func TestProcessBundleRelease_StubAfterValidation(t *testing.T) {
 	}`)
 	br := &bundle.Release{
 		Metadata: &bundle.ReleaseMetadata{Name: "stack"},
-		RawCUE:   raw,
+		Spec:     raw,
 		Config:   raw.LookupPath(cue.ParsePath("#bundle.#config")),
 		Releases: map[string]*module.Release{},
 	}

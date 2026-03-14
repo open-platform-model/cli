@@ -21,11 +21,12 @@ func TestModuleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {
 	data := ctx.CompileString(`{}`)
 
 	renderer := render.NewModule(&provider.Provider{Data: providerVal})
-	result, err := renderer.Execute(context.Background(), &module.Release{
-		Metadata:       &module.ReleaseMetadata{Name: "demo"},
-		RawCUE:         raw,
-		DataComponents: data,
-	}, &render.MatchPlan{Matches: map[string]map[string]render.MatchResult{}, UnhandledTraits: map[string][]string{}})
+	rel := &module.Release{
+		Metadata: &module.ReleaseMetadata{Name: "demo"},
+		Spec:     raw,
+	}
+	schemaComponents := rel.MatchComponents()
+	result, err := renderer.Execute(context.Background(), rel, schemaComponents, data, &render.MatchPlan{Matches: map[string]map[string]render.MatchResult{}, UnhandledTraits: map[string][]string{}})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.NotNil(t, result.Resources)
