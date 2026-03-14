@@ -90,25 +90,6 @@ func TestRenderFromReleaseFile_RejectsModulePackagePath(t *testing.T) {
 	assert.Contains(t, err.Error(), "module package, not a release")
 }
 
-func TestRenderFromReleaseFile_RejectsReleasePackageAsModuleOverride(t *testing.T) {
-	dir := t.TempDir()
-	releaseFile := filepath.Join(dir, "release.cue")
-	require.NoError(t, os.WriteFile(releaseFile, []byte("package test\nkind: \"ModuleRelease\"\nmetadata: {name: \"demo\", namespace: \"apps\"}\nvalues: {replicas: 2}\n"), 0o644))
-
-	moduleDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(moduleDir, "release.cue"), []byte("package test\n"), 0o644))
-
-	_, err := FromReleaseFile(context.Background(), ReleaseFileOpts{
-		ReleaseFilePath: releaseFile,
-		ModulePath:      moduleDir,
-		Config:          &config.GlobalConfig{CueContext: cuecontext.New(), Providers: map[string]cue.Value{}},
-		K8sConfig:       &config.ResolvedKubernetesConfig{},
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "loading module from --module")
-	assert.Contains(t, err.Error(), "release package, not a module")
-}
-
 func TestResolveReleaseValues_UsesInlineValues(t *testing.T) {
 	ctx := cuecontext.New()
 	raw := ctx.CompileString(`{values: {replicas: 2}}`)

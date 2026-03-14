@@ -1,8 +1,12 @@
-## Purpose
+## REMOVED Requirements
 
-Defines the contract for loading standalone `.cue` release files and parsing them into barebones release objects for the release-processing pipeline.
+### Requirement: Module injection via `--module` flag uses `LoadModulePackage()` + FillPath
 
-## Requirements
+**Reason**: The `--module` flag created 4 field mutations on a partially-constructed `*module.Release` before rendering. Removing it eliminates this mutation path and enforces a single module resolution path (CUE imports). The CLI is pre-1.0.
+
+**Migration**: Use CUE imports in the release file to fill `#module`. For local development, set up a local CUE registry or use relative import paths.
+
+## MODIFIED Requirements
 
 ### Requirement: Release file loader lives in `pkg/loader/`
 
@@ -37,6 +41,7 @@ The CLI MAY call `LoadReleaseFile()` and `GetReleaseFile()` as separate stages, 
 
 #### Scenario: #module not filled produces error in render pipeline
 - **WHEN** the release file does not import or fill `#module`
+- **AND** no `--module` flag exists
 - **THEN** the render pipeline SHALL exit with an error indicating `#module` is not filled and the user must import a module
 
 #### Scenario: Load release file with invalid CUE
@@ -46,15 +51,3 @@ The CLI MAY call `LoadReleaseFile()` and `GetReleaseFile()` as separate stages, 
 #### Scenario: Release file with unrecognised kind
 - **WHEN** `GetReleaseFile()` is called for a release file whose kind is absent or unrecognised
 - **THEN** it SHALL return an error describing the unsupported release kind
-
-### Requirement: Release metadata must be concrete during parse-only extraction
-
-The release file's computed fields such as `metadata.uuid` and merged metadata labels SHALL be concrete and decodable during `GetReleaseFile()` so parse-time extraction can populate the authoritative Go metadata before later processing begins.
-
-#### Scenario: UUID is available during parse-only extraction
-- **WHEN** a module release is parsed from a release file whose metadata is fully concrete
-- **THEN** `GetReleaseFile()` SHALL decode the concrete `metadata` into the returned release object
-
-#### Scenario: Parse-only extraction fails when release metadata is not concrete
-- **WHEN** `GetReleaseFile()` parses a release file whose computed metadata depends on unresolved inputs and is therefore not concrete
-- **THEN** it SHALL return an error describing that release metadata must be concrete

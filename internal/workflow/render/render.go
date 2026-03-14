@@ -20,10 +20,10 @@ import (
 )
 
 // FromReleaseFile prepares and renders a release from a declarative #ModuleRelease CUE file.
-// It parses the release file, applies any local module overrides (if --module is provided),
-// and extracts values. This is typically used by platform operators to deploy configured
-// instances of modules (e.g., via "opm release apply my-app-release.cue").
-func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error) { //nolint:gocyclo // release-file rendering coordinates validation, loading, and conversion branches
+// It parses the release file, resolves values, and renders through the pipeline. The release
+// file must import a module to fill #module. This is typically used by platform operators to
+// deploy configured instances of modules (e.g., via "opm release apply my-app-release.cue").
+func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error) {
 	if opts.Config == nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
 	}
@@ -53,34 +53,9 @@ func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error)
 	}
 	rel := fileRelease.Module
 
-	if opts.ModulePath != "" {
-		if pathErr := cmdutil.ValidateModuleInputPath(opts.ModulePath); pathErr != nil {
-			return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading module from --module: %w", pathErr)}
-		}
-		modVal, modErr := loader.LoadModulePackage(cueCtx, opts.ModulePath)
-		if modErr != nil {
-			return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading module from --module: %w", modErr)}
-		}
-		rel.RawCUE = rel.RawCUE.FillPath(cue.MakePath(cue.Def("module")), modVal)
-		rel.Module.Raw = modVal
-		rel.Module.Config = modVal.LookupPath(cue.ParsePath("#config"))
-		rel.Config = rel.RawCUE.LookupPath(cue.ParsePath("#module.#config"))
-		if rel.Module.Metadata == nil {
-			rel.Module.Metadata = &pkgmodule.ModuleMetadata{}
-			if err := modVal.LookupPath(cue.ParsePath("metadata")).Decode(rel.Module.Metadata); err != nil {
-				return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("decoding module metadata from --module: %w", err)}
-			}
-		}
-		if err := rel.RawCUE.Err(); err != nil {
-			return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("filling #module from --module: %w", err)}
-		}
-	}
-
 	moduleVal := rel.RawCUE.LookupPath(cue.MakePath(cue.Def("module")))
 	if !moduleVal.Exists() || moduleVal.Validate(cue.Concrete(true)) != nil {
-		if opts.ModulePath == "" {
-			return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("#module is not filled in the release file - either import a module or use --module <path>")}
-		}
+		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("#module is not filled in the release file — import a module to fill it")}
 	}
 
 	valuesVals, err := resolveReleaseValues(cueCtx, rel.RawCUE, opts.ReleaseFilePath, opts.ValuesFiles)

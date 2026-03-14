@@ -32,10 +32,7 @@ Arguments:
 
 Examples:
   # Diff a release file against the cluster
-  opm release diff ./jellyfin_release.cue
-
-  # Diff with a local module
-  opm release diff ./jellyfin_release.cue --module ./my-module`,
+  opm release diff ./jellyfin_release.cue`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return runReleaseDiff(args[0], cfg, &rff, &kf, namespace)
@@ -67,7 +64,6 @@ func runReleaseDiff(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.R
 	result, err := render.FromReleaseFile(ctx, render.ReleaseFileOpts{
 		ReleaseFilePath: releaseFile,
 		ValuesFiles:     rff.Values,
-		ModulePath:      rff.Module,
 		K8sConfig:       k8sConfig,
 		Config:          cfg,
 	})

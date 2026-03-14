@@ -22,7 +22,6 @@ func TestE2E_ReleaseVet_Output(t *testing.T) {
 
 	_, stderr, err := runOPM(t, tmpDir, "rel", "vet",
 		filepath.Join(testdataDir, "release", "release.cue"),
-		"--module", filepath.Join(testdataDir, "module"),
 		"-f", filepath.Join(testdataDir, "release", "values.cue"))
 
 	// Assert exit code 2

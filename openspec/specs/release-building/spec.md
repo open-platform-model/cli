@@ -27,12 +27,6 @@ Both paths feed into the same `LoadModuleReleaseFromValue()` function which runs
 - **THEN** it returns a concrete `cue.Value`
 - **AND** `LoadModuleReleaseFromValue()` returns a `*ModuleRelease` with all fields populated (including auto-secrets handled by CUE `#AutoSecrets`)
 
-#### Scenario: Release file with `--module` override
-
-- **WHEN** `LoadReleaseFile()` returns a value where `#module` is not concrete
-- **AND** the caller fills `#module` via `FillPath` using `LoadModulePackage()`
-- **THEN** `LoadModuleReleaseFromValue()` successfully returns a `*ModuleRelease`
-
 #### Scenario: Module Gate catches type mismatch
 
 - **WHEN** consumer values contain a field with the wrong type
@@ -145,19 +139,19 @@ func LoadReleaseFile(ctx *cue.Context, filePath string, registry string) (cue.Va
 - **WHEN** `LoadReleaseFile()` is called with a `.cue` file in a directory with no `cue.mod/` ancestor
 - **THEN** the loader returns an error describing the missing module configuration
 
-### Requirement: `LoadModulePackage()` loads a local module for `--module` flag injection
+### Requirement: `LoadModulePackage()` loads a local module CUE package
 
-The `pkg/loader` package SHALL export `LoadModulePackage()` in `pkg/loader/release_file.go`. This function loads a module CUE package from a local directory and returns the raw `cue.Value` for `FillPath` injection into a release value. This replaces the deleted `internal/loader.LoadModule()` for this specific use case.
+The `pkg/loader` package SHALL export `LoadModulePackage()` in `pkg/loader/release_file.go`. This function loads a module CUE package from a local directory and returns the raw `cue.Value`. It is used by `opm module vet` to load a module from a directory path.
 
 ```go
 func LoadModulePackage(ctx *cue.Context, dirPath string) (cue.Value, error)
 ```
 
-#### Scenario: Local module loaded for `--module` injection
+#### Scenario: Local module loaded for module vet
 
 - **WHEN** `LoadModulePackage()` is called with a valid module directory
 - **THEN** it returns the evaluated `cue.Value` of the module package
-- **AND** the caller can inject it via `releaseVal.FillPath(cue.MakePath(cue.Def("module")), modVal)`
+- **AND** the caller can use it for module-level validation
 
 ### Requirement: `opm mod vet` uses `debugValues` by default
 

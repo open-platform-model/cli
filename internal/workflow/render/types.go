@@ -29,7 +29,6 @@ func (r *Result) ResourceCount() int {
 type ReleaseFileOpts struct {
 	ReleaseFilePath string
 	ValuesFiles     []string
-	ModulePath      string
 	K8sConfig       *config.ResolvedKubernetesConfig
 	Config          *config.GlobalConfig
 }

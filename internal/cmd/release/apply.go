@@ -40,9 +40,6 @@ Examples:
   # Apply a release file
   opm release apply ./jellyfin_release.cue
 
-  # Apply with a local module
-  opm release apply ./jellyfin_release.cue --module ./my-module
-
   # Dry run
   opm release apply ./jellyfin_release.cue --dry-run`,
 		Args: cobra.ExactArgs(1),
@@ -81,7 +78,6 @@ func runReleaseApply(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 	result, err := render.FromReleaseFile(ctx, render.ReleaseFileOpts{
 		ReleaseFilePath: releaseFile,
 		ValuesFiles:     rff.Values,
-		ModulePath:      rff.Module,
 		K8sConfig:       k8sConfig,
 		Config:          cfg,
 	})
