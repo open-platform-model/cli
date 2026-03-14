@@ -21,7 +21,7 @@
 
 ### Modified Capabilities
 
-- `module-release-type`: `module.Release` is simplified to four fields (`Metadata`, `Module`, `Spec`, `Values`) with a clear invariant: `Spec` is concrete and complete, `Values` is concrete and merged.
+- `module-release-type`: `module.Release` is simplified to four fields (`Metadata`, `Module`, `Spec`, `Values`) with a clear invariant: `Spec` is concrete and complete but NOT finalized (CUE definition fields like `#resources`, `#traits`, `#blueprints` are preserved for matching), `Values` is concrete and merged.
 - `module-release-processing`: `ProcessModuleRelease` accepts a prepared `*module.Release` and a `*provider.Provider`, returns `*render.ModuleResult`. Config validation is no longer its responsibility.
 - `engine-rendering`: `Module.Execute()` and internal execution functions (`executeTransforms`, `executePair`, `injectContext`) continue to accept `*module.Release`. Field access changes from `rel.RawCUE` to `rel.Spec`. Finalized components are passed as local arguments, not read from the release.
 - `release-file-loading`: `GetReleaseFile` returns raw release parse data suitable for input to `ParseModuleRelease`, not a fully constructed `*module.Release`.

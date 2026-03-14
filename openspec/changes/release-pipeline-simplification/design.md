@@ -56,7 +56,11 @@ type Release struct {
     // Module is the original module used to prepare the release.
     Module   Module
 
-    // Spec is the concrete, complete, values-filled #ModuleRelease CUE value.
+    // Spec is the concrete, values-filled #ModuleRelease CUE value.
+    // Concrete (all regular fields resolved) but NOT finalized — CUE definition
+    // fields (#resources, #traits, #blueprints) are preserved. Required by
+    // MatchComponents() for component-transformer matching.
+    // MUST NOT be passed to finalizeValue or v.Syntax(cue.Final()).
     Spec     cue.Value
 
     // Values is the concrete, merged values applied to the release.
@@ -129,6 +133,19 @@ The merged, validated, concrete values are stored as `Release.Values`. This fiel
 
 **Rationale**: `Values` is useful for downstream inspection, debugging, and potential future use in the rendering pipeline. It also makes the release self-describing — you can see exactly what values were applied.
 
+### Decision 8: `Spec` is concrete but NOT finalized
+
+`Release.Spec` passes `cue.Concrete(true)` validation but retains CUE definition fields (`#resources`, `#traits`, `#blueprints`). These are two distinct CUE concepts:
+
+- **Concrete** (`cue.Concrete(true)`) — all regular fields have definite values. Read-only check. Definitions survive.
+- **Finalized** (`cue.Final()` / `finalizeValue`) — constraints stripped, definitions removed, pure data. Definitions do NOT survive.
+
+`MatchComponents()` depends on definitions surviving in `Spec`. The matching pipeline (`match.go`) accesses `cue.Def("resources")` and `cue.Def("traits")` on each component to build the match plan. If `Spec` were finalized, these lookups would silently return nothing and matching would break — components would appear to have no resources or traits.
+
+**Rationale**: The constraint-free (finalized) component view is only needed for transformer execution — it is derived transiently inside `ProcessModuleRelease` via `finalizeValue(schemaComponents)` and passed as a local variable. It is never stored on `Release` and never derived from `Spec` directly. `Spec` must remain un-finalized for the lifetime of the `Release`.
+
+**Invariant**: `Release.Spec` MUST NOT be passed to `finalizeValue` or `v.Syntax(cue.Final())`.
+
 ## Risks / Trade-offs
 
 **[Risk: `--module` injection mutates raw spec before `ParseModuleRelease`]** → Accepted. The internal workflow layer fills `#module` into the raw spec via `FillPath` before calling `ParseModuleRelease`. This is a preparation-phase mutation on the raw `cue.Value`, not on a `*module.Release`. Once `ParseModuleRelease` constructs the release, no further mutations occur.
@@ -156,7 +173,11 @@ type Release struct {
     // Module is the original module used to prepare the release.
     Module   Module
 
-    // Spec is the concrete, complete, values-filled #ModuleRelease CUE value.
+    // Spec is the concrete, values-filled #ModuleRelease CUE value.
+    // Concrete (all regular fields resolved) but NOT finalized — CUE definition
+    // fields (#resources, #traits, #blueprints) are preserved. Required by
+    // MatchComponents() for component-transformer matching.
+    // MUST NOT be passed to finalizeValue or v.Syntax(cue.Final()).
     Spec     cue.Value
 
     // Values is the concrete, merged values applied to the release.

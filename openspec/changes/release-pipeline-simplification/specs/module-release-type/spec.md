@@ -10,6 +10,12 @@ The `Release` struct SHALL NOT contain `RawCUE`, `DataComponents`, or `Config` f
 - **THEN** `Release.Spec` SHALL be a fully concrete CUE value (passes `cue.Concrete(true)` validation)
 - **AND** `Release.Spec` SHALL contain the complete `#ModuleRelease` definition with `#module` filled and `values` filled
 
+#### Scenario: Release invariant — Spec is NOT finalized
+- **WHEN** a `*module.Release` exists
+- **THEN** `Release.Spec` SHALL preserve CUE definition fields (`#resources`, `#traits`, `#blueprints`) within its `components` subtree
+- **AND** `Release.Spec` SHALL NOT have been processed through `cue.Final()` or `finalizeValue`
+- **AND** code that needs constraint-free component data for transformer execution SHALL derive it transiently via `finalizeValue` during rendering, not from `Spec`
+
 #### Scenario: Release invariant — Values is concrete and merged
 - **WHEN** a `*module.Release` exists
 - **THEN** `Release.Values` SHALL be a concrete CUE value representing the merged result of all input values
