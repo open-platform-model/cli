@@ -30,7 +30,7 @@ func TestPrintValidationError_UsesGroupedFormatting(t *testing.T) {
 		}
 	}`, cue.Filename("values.cue"))
 
-	_, cfgErr := validate.ValidateConfig(schema, []cue.Value{values}, "module", "demo")
+	_, cfgErr := validate.Config(schema, []cue.Value{values}, "module", "demo")
 	require.NotNil(t, cfgErr)
 
 	var logBuf bytes.Buffer

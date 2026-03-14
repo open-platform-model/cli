@@ -12,7 +12,7 @@ import (
 
 const fieldNotAllowed = "field not allowed"
 
-func ValidateConfig(schema cue.Value, values []cue.Value, context, name string) (cue.Value, *oerrors.ConfigError) {
+func Config(schema cue.Value, values []cue.Value, context, name string) (cue.Value, *oerrors.ConfigError) {
 	if !schema.Exists() || len(values) == 0 {
 		return cue.Value{}, nil
 	}

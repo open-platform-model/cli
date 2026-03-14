@@ -11,7 +11,7 @@ import (
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
-func TestValidateConfig_MergesValues(t *testing.T) {
+func TestConfig_MergesValues(t *testing.T) {
 	ctx := cuecontext.New()
 	schema := ctx.CompileString(`{
 		name: string
@@ -20,7 +20,7 @@ func TestValidateConfig_MergesValues(t *testing.T) {
 	v1 := ctx.CompileString(`{name: "app"}`)
 	v2 := ctx.CompileString(`{replicas: 2}`)
 
-	merged, err := ValidateConfig(schema, []cue.Value{v1, v2}, "module", "demo")
+	merged, err := Config(schema, []cue.Value{v1, v2}, "module", "demo")
 	require.Nil(t, err)
 	require.True(t, merged.Exists())
 	assert.NoError(t, merged.Validate(cue.Concrete(true)))
@@ -28,18 +28,18 @@ func TestValidateConfig_MergesValues(t *testing.T) {
 	assert.Equal(t, "app", name)
 }
 
-func TestValidateConfig_ConflictingValues(t *testing.T) {
+func TestConfig_ConflictingValues(t *testing.T) {
 	ctx := cuecontext.New()
 	schema := ctx.CompileString(`{ replicas: int }`)
 	v1 := ctx.CompileString(`{replicas: 1}`)
 	v2 := ctx.CompileString(`{replicas: 2}`)
 
-	_, err := ValidateConfig(schema, []cue.Value{v1, v2}, "module", "demo")
+	_, err := Config(schema, []cue.Value{v1, v2}, "module", "demo")
 	require.NotNil(t, err)
 	assert.Contains(t, err.Error(), "demo")
 }
 
-func TestValidateConfig_CollectsSchemaErrorsAndMergeConflicts(t *testing.T) {
+func TestConfig_CollectsSchemaErrorsAndMergeConflicts(t *testing.T) {
 	ctx := cuecontext.New()
 	schema := ctx.CompileString(`close({
 		timezone: string
@@ -62,7 +62,7 @@ func TestValidateConfig_CollectsSchemaErrorsAndMergeConflicts(t *testing.T) {
 		timezone: "Etc/UTC"
 	}`, cue.Filename("values2.cue"))
 
-	merged, err := ValidateConfig(schema, []cue.Value{v1, v2}, "module", "demo")
+	merged, err := Config(schema, []cue.Value{v1, v2}, "module", "demo")
 	require.NotNil(t, err)
 	assert.False(t, merged.Exists())
 
@@ -85,7 +85,7 @@ func TestValidateConfig_CollectsSchemaErrorsAndMergeConflicts(t *testing.T) {
 	assert.Contains(t, files, "values2.cue")
 }
 
-func TestValidateConfig_Valid(t *testing.T) {
+func TestConfig_Valid(t *testing.T) {
 	ctx := cuecontext.New()
 
 	// schema: #config requires a string name and int replicas
@@ -101,11 +101,11 @@ func TestValidateConfig_Valid(t *testing.T) {
 	}`)
 	require.NoError(t, values.Err())
 
-	_, err := ValidateConfig(schema, []cue.Value{values}, "module", "test-release")
+	_, err := Config(schema, []cue.Value{values}, "module", "test-release")
 	assert.Nil(t, err, "valid values should produce no error")
 }
 
-func TestValidateConfig_TypeMismatch(t *testing.T) {
+func TestConfig_TypeMismatch(t *testing.T) {
 	ctx := cuecontext.New()
 
 	schema := ctx.CompileString(`{
@@ -119,7 +119,7 @@ func TestValidateConfig_TypeMismatch(t *testing.T) {
 	}`)
 	require.NoError(t, values.Err())
 
-	_, cfgErr := ValidateConfig(schema, []cue.Value{values}, "module", "my-release")
+	_, cfgErr := Config(schema, []cue.Value{values}, "module", "my-release")
 	require.NotNil(t, cfgErr, "type mismatch should produce ConfigError")
 	assert.IsType(t, &oerrors.ConfigError{}, cfgErr)
 	assert.Equal(t, "module", cfgErr.Context)
@@ -127,7 +127,7 @@ func TestValidateConfig_TypeMismatch(t *testing.T) {
 	assert.Contains(t, cfgErr.Error(), "my-release")
 }
 
-func TestValidateConfig_MissingRequired(t *testing.T) {
+func TestConfig_MissingRequired(t *testing.T) {
 	ctx := cuecontext.New()
 
 	// schema requires name but has no default
@@ -143,12 +143,12 @@ func TestValidateConfig_MissingRequired(t *testing.T) {
 	}`)
 	require.NoError(t, values.Err())
 
-	_, cfgErr := ValidateConfig(schema, []cue.Value{values}, "module", "incomplete-release")
+	_, cfgErr := Config(schema, []cue.Value{values}, "module", "incomplete-release")
 	require.NotNil(t, cfgErr, "missing required field should produce ConfigError")
 	assert.Equal(t, "incomplete-release", cfgErr.Name)
 }
 
-func TestValidateConfig_MissingSchema(t *testing.T) {
+func TestConfig_MissingSchema(t *testing.T) {
 	ctx := cuecontext.New()
 
 	values := ctx.CompileString(`{ name: "x" }`)
@@ -158,11 +158,11 @@ func TestValidateConfig_MissingSchema(t *testing.T) {
 	root := ctx.CompileString(`{}`)
 	nonExistent := root.LookupPath(cue.ParsePath("nonexistent"))
 
-	_, result := ValidateConfig(nonExistent, []cue.Value{values}, "module", "test")
+	_, result := Config(nonExistent, []cue.Value{values}, "module", "test")
 	assert.Nil(t, result, "missing schema should return nil")
 }
 
-func TestValidateConfig_BundleContext(t *testing.T) {
+func TestConfig_BundleContext(t *testing.T) {
 	ctx := cuecontext.New()
 
 	schema := ctx.CompileString(`{ count: int }`)
@@ -171,7 +171,7 @@ func TestValidateConfig_BundleContext(t *testing.T) {
 	values := ctx.CompileString(`{ count: "bad" }`)
 	require.NoError(t, values.Err())
 
-	_, cfgErr := ValidateConfig(schema, []cue.Value{values}, "bundle", "my-bundle")
+	_, cfgErr := Config(schema, []cue.Value{values}, "bundle", "my-bundle")
 	require.NotNil(t, cfgErr)
 	assert.Equal(t, "bundle", cfgErr.Context)
 	assert.Equal(t, "my-bundle", cfgErr.Name)

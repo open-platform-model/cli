@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestValidateConfig_FieldNotAllowed_FileLoaded exercises the two-pass
+// TestConfig_FieldNotAllowed_FileLoaded exercises the two-pass
 // validation path using a self-contained test fixture. The values_invalid.cue
 // file deliberately contains two extra top-level fields ("test", "invalidField")
 // and one type-conflicting nested field (settings.debug: string vs bool).
@@ -22,7 +22,7 @@ import (
 // walkDisallowed catches "field not allowed" errors that schema.Unify()
 // silently misses for BuildInstance-loaded schemas (close info is scoped to
 // the source package's evaluation context).
-func TestValidateConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
+func TestConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
 	ctx := cuecontext.New()
 
 	const fixtureDir = "testdata/validate_diag"
@@ -53,8 +53,8 @@ func TestValidateConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
 	require.True(t, configSchema.Exists(), "#config must exist in schema")
 	require.True(t, configSchema.IsClosed(), "#config must be a closed struct")
 
-	// Call ValidateConfig and assert the result.
-	_, cfgErr := ValidateConfig(configSchema, []cue.Value{valuesVal}, "module", "test")
+	// Call Config and assert the result.
+	_, cfgErr := Config(configSchema, []cue.Value{valuesVal}, "module", "test")
 	require.NotNil(t, cfgErr, "values with extra fields should produce a ConfigError")
 
 	// Collect all individual CUE errors.
@@ -108,10 +108,10 @@ func TestValidateConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
 	}
 }
 
-// TestValidateConfig_FieldNotAllowed_Inline verifies that the two-pass approach
+// TestConfig_FieldNotAllowed_Inline verifies that the two-pass approach
 // also works for inline (CompileString) schemas — specifically that walkDisallowed
 // does not double-count errors that schema.Unify() already catches.
-func TestValidateConfig_FieldNotAllowed_Inline(t *testing.T) {
+func TestConfig_FieldNotAllowed_Inline(t *testing.T) {
 	ctx := cuecontext.New()
 
 	schema := ctx.CompileString(`
@@ -133,7 +133,7 @@ func TestValidateConfig_FieldNotAllowed_Inline(t *testing.T) {
 }`, cue.Filename("values.cue"))
 	require.NoError(t, values.Err())
 
-	_, cfgErr := ValidateConfig(configSchema, []cue.Value{values}, "module", "test")
+	_, cfgErr := Config(configSchema, []cue.Value{values}, "module", "test")
 	require.NotNil(t, cfgErr, "extra field should produce a ConfigError")
 
 	errs := cueerrors.Errors(cfgErr.RawError)

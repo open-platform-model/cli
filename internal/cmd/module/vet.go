@@ -133,7 +133,7 @@ func runVetModuleOnly(modulePath string, cfg *config.GlobalConfig, rf *cmdutil.R
 
 	configVal := modVal.LookupPath(cue.ParsePath("#config"))
 	if configVal.Exists() {
-		if _, cfgErr := validate.ValidateConfig(configVal, valuesVals, "module", modName); cfgErr != nil {
+		if _, cfgErr := validate.Config(configVal, valuesVals, "module", modName); cfgErr != nil {
 			cmdutil.PrintValidationError("values do not satisfy #config", cfgErr)
 			return &opmexit.ExitError{
 				Code:    opmexit.ExitValidationError,
