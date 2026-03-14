@@ -12,9 +12,9 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
-	workflowownership "github.com/opmodel/cli/internal/workflow/ownership"
 	workflowrender "github.com/opmodel/cli/internal/workflow/render"
 	pkginventory "github.com/opmodel/cli/pkg/inventory"
+	"github.com/opmodel/cli/pkg/ownership"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -59,8 +59,10 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 	releaseID := result.Release.UUID
 	prevInventory := LoadPreviousInventory(ctx, req.K8sClient, result.Release.Name, namespace, releaseID, req.Options.DryRun, releaseLog)
-	if err := workflowownership.EnsureCLIMutable(prevInventory); err != nil {
-		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+	if prevInventory != nil {
+		if err := ownership.EnsureCLIMutable(string(prevInventory.NormalizedCreatedBy()), prevInventory.ReleaseMetadata.ReleaseName, prevInventory.ReleaseMetadata.ReleaseNamespace); err != nil {
+			return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+		}
 	}
 	prevEntries := PreviousInventoryEntries(prevInventory)
 	currentEntries := CurrentInventoryEntries(result.Resources)

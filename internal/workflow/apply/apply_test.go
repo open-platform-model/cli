@@ -8,8 +8,8 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	workflowrender "github.com/opmodel/cli/internal/workflow/render"
+	"github.com/opmodel/cli/pkg/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -66,7 +66,7 @@ func TestExecute_BlocksControllerManagedRelease(t *testing.T) {
 	client := &kubernetes.Client{Clientset: fake.NewClientset(secret)}
 	req := Request{
 		Result: &workflowrender.Result{
-			Release: modulerelease.ReleaseMetadata{Name: "demo", Namespace: "apps", UUID: "uuid-1"},
+			Release: module.ReleaseMetadata{Name: "demo", Namespace: "apps", UUID: "uuid-1"},
 		},
 		K8sClient: client,
 		Log:       log.New(nil),

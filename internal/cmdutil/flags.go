@@ -98,9 +98,6 @@ func ResolveModulePath(args []string) string {
 
 // ReleaseFileFlags holds flags specific to release-file-based rendering.
 type ReleaseFileFlags struct {
-	// Module is the path to a local module directory (--module flag).
-	// Used to fill #module in the release file when not imported from a registry.
-	Module string
 	// Provider is the provider name to use (--provider flag).
 	Provider string
 	// Values are additional values CUE files (-f/--values flag).
@@ -110,8 +107,6 @@ type ReleaseFileFlags struct {
 
 // AddTo registers the release file flags on the given cobra command.
 func (f *ReleaseFileFlags) AddTo(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&f.Module, "module", "",
-		"Path to local module directory (fills #module in the release file)")
 	cmd.Flags().StringVar(&f.Provider, "provider", "",
 		"Provider to use (default: from config)")
 	cmd.Flags().StringArrayVarP(&f.Values, "values", "f", nil,

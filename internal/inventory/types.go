@@ -1,12 +1,15 @@
 package inventory
 
-import pkginventory "github.com/opmodel/cli/pkg/inventory"
+import (
+	pkginventory "github.com/opmodel/cli/pkg/inventory"
+	"github.com/opmodel/cli/pkg/ownership"
+)
 
 type CreatedBy string
 
 const (
-	CreatedByCLI        CreatedBy = "cli"
-	CreatedByController CreatedBy = "controller"
+	CreatedByCLI        CreatedBy = CreatedBy(ownership.CreatedByCLI)
+	CreatedByController CreatedBy = CreatedBy(ownership.CreatedByController)
 )
 
 func NormalizeCreatedBy(createdBy CreatedBy) CreatedBy {

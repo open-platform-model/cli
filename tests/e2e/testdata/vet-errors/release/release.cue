@@ -3,12 +3,19 @@ package demo
 kind: "ModuleRelease"
 
 metadata: {
-	name: "demo-release"
+	name:      "demo-release"
 	namespace: "default"
 }
 
-#module: metadata: {
-    name: "demo"
-    modulePath: "test.example.com/demo"
-    version: "0.1.0"
+#module: {
+	metadata: {
+		name:       "demo"
+		modulePath: "test.example.com/demo"
+		version:    "0.1.0"
+	}
+	#config: {
+		media?: [Name=string]: {
+			type: "pvc" | *"emptyDir"
+		}
+	}
 }

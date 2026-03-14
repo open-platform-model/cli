@@ -11,8 +11,8 @@ import (
 
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/internal/resourceorder"
 	pkgcore "github.com/opmodel/cli/pkg/core"
+	"github.com/opmodel/cli/pkg/resourceorder"
 )
 
 // ApplyComponentRenameSafetyCheck filters the stale set to remove entries

@@ -29,8 +29,7 @@ func NewReleaseBuildCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Short: "Render release file to manifests",
 		Long: `Render an OPM release file to Kubernetes manifests.
 
-This command loads a release file, optionally injects a local module, and
-outputs platform-specific resources.
+This command loads a release file and outputs platform-specific resources.
 
 Arguments:
   release.cue    Path to the release .cue file (required)
@@ -38,9 +37,6 @@ Arguments:
 Examples:
   # Build a release file
   opm release build ./jellyfin_release.cue
-
-  # Build with a local module
-  opm release build ./jellyfin_release.cue --module ./my-module
 
   # Build with split output
   opm release build ./jellyfin_release.cue --split --out-dir ./manifests
@@ -80,10 +76,9 @@ func runReleaseBuild(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
-	result, err := render.ReleaseFile(ctx, render.ReleaseFileOpts{
+	result, err := render.FromReleaseFile(ctx, render.ReleaseFileOpts{
 		ReleaseFilePath: releaseFile,
 		ValuesFiles:     rff.Values,
-		ModulePath:      rff.Module,
 		K8sConfig:       k8sConfig,
 		Config:          cfg,
 	})

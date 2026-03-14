@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	resourceorder "github.com/opmodel/cli/internal/resourceorder"
+	resourceorder "github.com/opmodel/cli/pkg/resourceorder"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )

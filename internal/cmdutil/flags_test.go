@@ -148,10 +148,6 @@ func TestReleaseFileFlags_AddTo(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
 	rff.AddTo(cmd)
 
-	modFlag := cmd.Flags().Lookup("module")
-	require.NotNil(t, modFlag)
-	assert.Equal(t, "", modFlag.DefValue)
-
 	provFlag := cmd.Flags().Lookup("provider")
 	require.NotNil(t, provFlag)
 	assert.Equal(t, "", provFlag.DefValue)

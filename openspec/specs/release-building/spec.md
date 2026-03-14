@@ -27,12 +27,6 @@ Both paths feed into the same `LoadModuleReleaseFromValue()` function which runs
 - **THEN** it returns a concrete `cue.Value`
 - **AND** `LoadModuleReleaseFromValue()` returns a `*ModuleRelease` with all fields populated (including auto-secrets handled by CUE `#AutoSecrets`)
 
-#### Scenario: Release file with `--module` override
-
-- **WHEN** `LoadReleaseFile()` returns a value where `#module` is not concrete
-- **AND** the caller fills `#module` via `FillPath` using `LoadModulePackage()`
-- **THEN** `LoadModuleReleaseFromValue()` successfully returns a `*ModuleRelease`
-
 #### Scenario: Module Gate catches type mismatch
 
 - **WHEN** consumer values contain a field with the wrong type
@@ -145,19 +139,19 @@ func LoadReleaseFile(ctx *cue.Context, filePath string, registry string) (cue.Va
 - **WHEN** `LoadReleaseFile()` is called with a `.cue` file in a directory with no `cue.mod/` ancestor
 - **THEN** the loader returns an error describing the missing module configuration
 
-### Requirement: `LoadModulePackage()` loads a local module for `--module` flag injection
+### Requirement: `LoadModulePackage()` loads a local module CUE package
 
-The `pkg/loader` package SHALL export `LoadModulePackage()` in `pkg/loader/release_file.go`. This function loads a module CUE package from a local directory and returns the raw `cue.Value` for `FillPath` injection into a release value. This replaces the deleted `internal/loader.LoadModule()` for this specific use case.
+The `pkg/loader` package SHALL export `LoadModulePackage()` in `pkg/loader/release_file.go`. This function loads a module CUE package from a local directory and returns the raw `cue.Value`. It is used by `opm module vet` to load a module from a directory path.
 
 ```go
 func LoadModulePackage(ctx *cue.Context, dirPath string) (cue.Value, error)
 ```
 
-#### Scenario: Local module loaded for `--module` injection
+#### Scenario: Local module loaded for module vet
 
 - **WHEN** `LoadModulePackage()` is called with a valid module directory
 - **THEN** it returns the evaluated `cue.Value` of the module package
-- **AND** the caller can inject it via `releaseVal.FillPath(cue.MakePath(cue.Def("module")), modVal)`
+- **AND** the caller can use it for module-level validation
 
 ### Requirement: `opm mod vet` uses `debugValues` by default
 
@@ -180,66 +174,6 @@ The `opm mod vet` command SHALL use the module's `debugValues` field as the valu
 - **WHEN** `opm mod vet` is run without `-f` flags
 - **AND** the module's `debugValues` field is `_` (open/unconstrained, not filled by the author)
 - **THEN** `opm mod vet` returns an error: "debugValues is not concrete — module must provide complete test values"
-
-### Requirement: SynthesizeModuleRelease builds a ModuleRelease without a release.cue file
-The release-processing layer SHALL provide a `SynthesizeModuleRelease` function that constructs a `*modulerelease.ModuleRelease` from a loaded module CUE value and one or more concrete values CUE values, without requiring a `release.cue` file.
-
-The function SHALL:
-1. Run the Module Gate: validate the supplied values against `modVal.LookupPath("#config")` using the shared `ValidateConfig` function
-2. Fill `#config` with the merged validated values: `filledMod := modVal.FillPath(cue.ParsePath("#config"), mergedValues)`
-3. Extract schema components from `filledMod.LookupPath("#components")` (preserves `#resources`, `#traits` definition fields required by the CUE match plan evaluator)
-4. Create a synthetic schema value by wrapping the components under a regular `components` field (so `ModuleRelease.MatchComponents()` can look up `"components"`, not `"#components"`)
-5. Finalize components via `finalizeValue` for constraint-free execution
-6. Decode module metadata from `modVal.LookupPath("metadata")`
-7. Construct `ReleaseMetadata` with the provided `releaseName` and `namespace`; leave UUID empty
-8. Return `NewModuleRelease(relMeta, module.Module{Metadata: modMeta, Raw: modVal}, syntheticSchema, dataComponents)`
-
-#### Scenario: SynthesizeModuleRelease succeeds with valid module and concrete values
-- **WHEN** `SynthesizeModuleRelease` is called with a loaded module value and concrete values satisfying `#config`
-- **THEN** the returned `*ModuleRelease` SHALL have non-nil `Metadata`, `Module.Metadata`, and non-empty `dataComponents`
-- **AND** `MatchComponents()` SHALL return a value with `components` that can be iterated by the match plan
-
-#### Scenario: SynthesizeModuleRelease fails Module Gate on invalid values
-- **WHEN** `SynthesizeModuleRelease` is called with values that violate `#config` constraints
-- **THEN** the function SHALL return a non-nil error describing the constraint violation
-- **AND** the error SHALL be formatted identically to the Module Gate error from the normal release path
-
-#### Scenario: SynthesizeModuleRelease produces concrete components
-- **WHEN** `SynthesizeModuleRelease` is called with concrete merged values satisfying `#config`
-- **THEN** `ExecuteComponents()` SHALL return a fully concrete, constraint-free CUE value
-- **AND** `dataComponents.Validate(cue.Concrete(true))` SHALL return nil
-
-#### Scenario: Synthesized ModuleRelease UUID is empty
-- **WHEN** `SynthesizeModuleRelease` is called successfully
-- **THEN** `ModuleRelease.Metadata.UUID` SHALL be an empty string
-- **AND** the `apply` command SHALL skip inventory tracking when UUID is empty (existing behavior at `apply.go:187`)
-
-### Requirement: RenderRelease supports synthesis mode when release.cue is absent
-`cmdutil.RenderRelease` SHALL detect whether `release.cue` exists in the module path. When absent, it SHALL take a synthesis branch that:
-1. Loads the module package
-2. Extracts `debugValues` when `DebugValues: true` and no `-f` flag, or loads the `-f` values file
-3. Resolves the release name from `opts.ReleaseName`, then `module.metadata.name`, then `filepath.Base(modulePath)`
-4. Resolves the namespace from `module.metadata.defaultNamespace` (overridden post-synthesis by flag/env, identical to normal path)
-5. Calls `SynthesizeModuleRelease`
-6. Continues on the common tail: provider loading, engine rendering, resource conversion
-
-When `release.cue` is present, existing behavior is unchanged.
-
-#### Scenario: RenderRelease takes synthesis path when no release.cue
-- **WHEN** `RenderRelease` is called with a module path that has no `release.cue`
-- **AND** `DebugValues: true`
-- **THEN** `RenderRelease` SHALL call `SynthesizeModuleRelease` instead of `LoadReleasePackage`
-- **AND** the returned `*RenderResult` SHALL be populated identically to a release-backed render
-
-#### Scenario: RenderRelease takes normal path when release.cue present
-- **WHEN** `RenderRelease` is called with a module path that has a `release.cue`
-- **THEN** `RenderRelease` SHALL use the existing `LoadReleasePackage` / `LoadReleasePackageWithValue` path
-- **AND** behavior SHALL be unchanged from before this change
-
-#### Scenario: Synthesis mode with no debugValues and no -f returns actionable error
-- **WHEN** `RenderRelease` is called in synthesis mode
-- **AND** `DebugValues: true` but the module has no `debugValues` field
-- **THEN** `RenderRelease` SHALL return an error containing both remediation options: add `debugValues` to the module OR provide a values file with `-f`
 
 ---
 

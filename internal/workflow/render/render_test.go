@@ -13,14 +13,14 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/opmodel/cli/internal/config"
 	internalreleasefile "github.com/opmodel/cli/internal/releasefile"
-	"github.com/opmodel/cli/internal/releaseprocess"
-	"github.com/opmodel/cli/internal/runtime/modulerelease"
+	"github.com/opmodel/cli/pkg/module"
+	"github.com/opmodel/cli/pkg/validate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func mustReleaseMetadata(name, namespace string) modulerelease.ReleaseMetadata {
-	return modulerelease.ReleaseMetadata{Name: name, Namespace: namespace}
+func mustReleaseMetadata(name, namespace string) module.ReleaseMetadata {
+	return module.ReleaseMetadata{Name: name, Namespace: namespace}
 }
 
 func makeReleaseFileFixture(t *testing.T, filename, content string) string {
@@ -35,28 +35,6 @@ language: version: "v0.15.0"
 	filePath := filepath.Join(dir, filename)
 	require.NoError(t, os.WriteFile(filePath, []byte(content), 0o644))
 	return filePath
-}
-
-func TestRenderModule_NilConfig(t *testing.T) {
-	_, err := Release(context.Background(), ReleaseOpts{Config: nil, K8sConfig: nil})
-	require.Error(t, err)
-	var exitErr *opmexit.ExitError
-	require.True(t, errors.As(err, &exitErr))
-	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
-	assert.Contains(t, exitErr.Error(), "configuration not loaded")
-}
-
-func TestRenderModule_RejectsReleasePackagePath(t *testing.T) {
-	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "release.cue"), []byte("package test\n"), 0o644))
-
-	_, err := Release(context.Background(), ReleaseOpts{
-		Args:      []string{dir},
-		Config:    &config.GlobalConfig{CueContext: cuecontext.New()},
-		K8sConfig: &config.ResolvedKubernetesConfig{},
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "release package, not a module")
 }
 
 func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
@@ -82,7 +60,7 @@ func TestRenderResult_ResourceCount(t *testing.T) {
 }
 
 func TestRenderFromReleaseFile_NilConfig(t *testing.T) {
-	_, err := ReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: "release.cue", Config: nil, K8sConfig: nil})
+	_, err := FromReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: "release.cue", Config: nil, K8sConfig: nil})
 	require.Error(t, err)
 	var exitErr *opmexit.ExitError
 	require.True(t, errors.As(err, &exitErr))
@@ -91,7 +69,7 @@ func TestRenderFromReleaseFile_NilConfig(t *testing.T) {
 }
 
 func TestRenderFromReleaseFile_NilK8sConfig(t *testing.T) {
-	_, err := ReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: "release.cue", Config: &config.GlobalConfig{}, K8sConfig: nil})
+	_, err := FromReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: "release.cue", Config: &config.GlobalConfig{}, K8sConfig: nil})
 	require.Error(t, err)
 	var exitErr *opmexit.ExitError
 	require.True(t, errors.As(err, &exitErr))
@@ -103,32 +81,13 @@ func TestRenderFromReleaseFile_RejectsModulePackagePath(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "module.cue"), []byte("package test\n"), 0o644))
 
-	_, err := ReleaseFile(context.Background(), ReleaseFileOpts{
+	_, err := FromReleaseFile(context.Background(), ReleaseFileOpts{
 		ReleaseFilePath: dir,
 		Config:          &config.GlobalConfig{CueContext: cuecontext.New()},
 		K8sConfig:       &config.ResolvedKubernetesConfig{},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "module package, not a release")
-}
-
-func TestRenderFromReleaseFile_RejectsReleasePackageAsModuleOverride(t *testing.T) {
-	dir := t.TempDir()
-	releaseFile := filepath.Join(dir, "release.cue")
-	require.NoError(t, os.WriteFile(releaseFile, []byte("package test\nkind: \"ModuleRelease\"\nmetadata: {name: \"demo\", namespace: \"apps\"}\nvalues: {replicas: 2}\n"), 0o644))
-
-	moduleDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(moduleDir, "release.cue"), []byte("package test\n"), 0o644))
-
-	_, err := ReleaseFile(context.Background(), ReleaseFileOpts{
-		ReleaseFilePath: releaseFile,
-		ModulePath:      moduleDir,
-		Config:          &config.GlobalConfig{CueContext: cuecontext.New(), Providers: map[string]cue.Value{}},
-		K8sConfig:       &config.ResolvedKubernetesConfig{},
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "loading module from --module")
-	assert.Contains(t, err.Error(), "release package, not a module")
 }
 
 func TestResolveReleaseValues_UsesInlineValues(t *testing.T) {
@@ -152,21 +111,10 @@ func TestResolveReleaseValues_UsesValuesFile(t *testing.T) {
 	assert.True(t, values[0].Exists())
 }
 
-func TestLoadModuleReleaseForRender_UsesReleaseNameOverride(t *testing.T) {
-	ctx := cuecontext.New()
-	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "release.cue"), []byte("package test\nkind: \"ModuleRelease\"\nmetadata: {name: \"from-file\", namespace: \"apps\"}\nvalues: {replicas: 2}\n"), 0o644))
-	rel, values, err := loadModuleReleaseForRender(ctx, dir, nil, false, "override-name")
-	require.NoError(t, err)
-	assert.Equal(t, "override-name", rel.Metadata.Name)
-	require.Len(t, values, 1)
-	assert.True(t, values[0].Exists())
-}
-
 func TestRenderFromReleaseFile_RejectsBundleRelease(t *testing.T) {
 	ctx := cuecontext.New()
 	filePath := makeReleaseFileFixture(t, "bundle_release.cue", "package releases\nkind: \"BundleRelease\"\nmetadata: name: \"my-bundle\"\n")
-	_, err := ReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: filePath, Config: &config.GlobalConfig{CueContext: ctx, Providers: map[string]cue.Value{}}, K8sConfig: &config.ResolvedKubernetesConfig{}})
+	_, err := FromReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: filePath, Config: &config.GlobalConfig{CueContext: ctx, Providers: map[string]cue.Value{}}, K8sConfig: &config.ResolvedKubernetesConfig{}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bundle releases are not yet supported")
 }
@@ -184,10 +132,10 @@ func TestRenderFromReleaseFile_ValidValuesDoNotPanicAcrossRuntimes(t *testing.T)
 	fileRelease, err := internalreleasefile.GetReleaseFile(ctx, releaseFile)
 	require.NoError(t, err)
 	require.NotNil(t, fileRelease.Module)
-	merged, cfgErr := releaseprocess.ValidateConfig(fileRelease.Module.Config, values, "module", "demo")
+	merged, cfgErr := validate.Config(fileRelease.Module.Module.Config, values, "module", "demo")
 	require.Nil(t, cfgErr)
 	assert.NotPanics(t, func() {
-		filled := fileRelease.Module.RawCUE.FillPath(cue.ParsePath("values"), merged)
+		filled := fileRelease.Module.Spec.FillPath(cue.ParsePath("values"), merged)
 		require.NoError(t, filled.Err())
 	})
 }

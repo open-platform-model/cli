@@ -21,8 +21,7 @@ type LoadOptions struct {
 // via load.Instances() using the file's parent directory for cue.mod resolution.
 //
 // The returned cue.Value may have #module unfilled if the release file does not
-// import a module. The caller is responsible for filling #module via FillPath
-// when --module is provided.
+// import a module. The release file must import a module to fill #module.
 //
 // Returns the evaluated CUE value and the directory used for CUE resolution.
 func LoadReleaseFile(ctx *cue.Context, filePath string, opts LoadOptions) (cue.Value, string, error) {
@@ -74,8 +73,7 @@ func LoadReleaseFile(ctx *cue.Context, filePath string, opts LoadOptions) (cue.V
 }
 
 // LoadModulePackage loads a module CUE package from a directory and returns
-// the raw cue.Value. Used by the --module flag to inject a local module into
-// a release file that does not import one from a registry.
+// the raw cue.Value. Used by opm module vet to load a module for validation.
 func LoadModulePackage(ctx *cue.Context, dirPath string) (cue.Value, error) {
 	absDir, err := filepath.Abs(dirPath)
 	if err != nil {

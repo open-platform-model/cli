@@ -78,34 +78,12 @@ The render commands (`vet`, `build`, `apply`, `diff`) under `opm release` SHALL 
 - **WHEN** `opm release diff jellyfin_release.cue` is run
 - **THEN** the CLI SHALL render the release and compare against live cluster state
 
-### Requirement: release render commands accept --module flag for local module injection
-
-The render commands (`vet`, `build`, `apply`, `diff`) under `opm release` SHALL accept an optional `--module <path>` flag. When provided, the CLI SHALL load the module from the local directory and fill the `#module` field in the release via `FillPath`. When not provided, `#module` SHALL be resolved from CUE imports in the release file. The `--module` flag is only valid for `#ModuleRelease` files.
-
-#### Scenario: release build with --module flag
-
-- **WHEN** `opm release build release.cue --module ./jellyfin` is run
-- **THEN** the CLI SHALL load the module from `./jellyfin` and inject it as `#module`
-- **AND** the release file's `values` SHALL be validated against the loaded module's `#config`
-
-#### Scenario: release build without --module and #module not imported
+#### Scenario: release build without #module imported
 
 - **WHEN** `opm release build release.cue` is run
 - **AND** the release file does not import or fill `#module`
-- **THEN** CUE concreteness validation SHALL fail
-- **AND** the CLI SHALL exit with code 2 with an error indicating `#module` is incomplete
-
-#### Scenario: --module without a release file is invalid
-
-- **WHEN** `opm release build --module ./jellyfin` is run without a release file argument
-- **THEN** the CLI SHALL exit with code 1 and display a usage error
-
-#### Scenario: --module flag with a BundleRelease file is invalid
-
-- **WHEN** `opm release build bundle_release.cue --module ./mymodule` is run
-- **AND** `bundle_release.cue` contains `kind: "BundleRelease"`
 - **THEN** the CLI SHALL exit with code 1
-- **AND** display the error: `"--module flag is not supported for bundle releases"`
+- **AND** display an error indicating `#module` is not filled and the user must import a module
 
 ### Requirement: release cluster-query commands accept a release identifier as positional argument
 

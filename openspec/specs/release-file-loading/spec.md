@@ -1,29 +1,38 @@
 ## Purpose
 
-Defines the contract for loading standalone `.cue` release files and parsing them into barebones release objects for the release-processing pipeline.
+Defines the contract for loading standalone `.cue` release files and turning them into raw parse data for later module release preparation.
 
 ## Requirements
 
 ### Requirement: Release file loader lives in `pkg/loader/`
 
-A `LoadReleaseFile()` function in `pkg/loader/` (file: `pkg/loader/release_file.go`) SHALL load a `.cue` file, evaluate it with CUE import resolution, and return the evaluated CUE value plus the resolve directory. An internal parse-only `GetReleaseFile()` function SHALL load and inspect an absolute `release.cue` path, detect whether it represents a `ModuleRelease` or `BundleRelease`, and return a barebones release object without validating values. `GetReleaseFile()` SHALL require release metadata itself to be concrete, but it SHALL NOT require a concrete `#module` or `#bundle` reference unless the release metadata depends on it.
+A `LoadReleaseFile()` function in `pkg/loader/` (file: `pkg/loader/release_file.go`) SHALL load a `.cue` file, evaluate it with CUE import resolution, and return the evaluated CUE value plus the resolve directory.
 
 ```go
-func LoadReleaseFile(ctx *cue.Context, filePath string, registry string) (cue.Value, string, error)
-func GetReleaseFile(filePath string) (*FileRelease, error)
+func LoadReleaseFile(ctx *cue.Context, filePath string, opts LoadOptions) (cue.Value, string, error)
 ```
 
-The CLI MAY call `LoadReleaseFile()` and `GetReleaseFile()` as separate stages, but `GetReleaseFile()` is also allowed to perform its own file loading internally as part of parse-only release extraction.
+### Requirement: Internal release-file inspection returns raw parse data
 
-#### Scenario: Load ModuleRelease file
-- **WHEN** `LoadReleaseFile()` is called with a `.cue` file containing `kind: "ModuleRelease"`
-- **THEN** the loader SHALL return the evaluated value and resolve directory
-- **AND** `GetReleaseFile()` SHALL also be able to parse the same release file path into a barebones module release object
+An internal `GetReleaseFile()` function in `internal/releasefile/` SHALL load and inspect an absolute `release.cue` path, detect whether it represents a `ModuleRelease` or `BundleRelease`, and return raw parse data suitable for input to `module.ParseModuleRelease`. It SHALL NOT construct a fully prepared `*module.Release`.
+
+The `FileRelease` struct SHALL carry the raw release spec `cue.Value`, best-effort module metadata, and the detected kind. It SHALL NOT carry a `*module.Release` — release construction is the responsibility of `ParseModuleRelease` after the caller has resolved module information and values.
+
+```go
+func GetReleaseFile(ctx *cue.Context, filePath string) (*FileRelease, error)
+```
+
+#### Scenario: Load ModuleRelease file returns raw parse data
+- **WHEN** `GetReleaseFile()` is called with a `.cue` file containing `kind: "ModuleRelease"`
+- **THEN** `FileRelease.Kind` SHALL be `KindModuleRelease`
+- **AND** `FileRelease` SHALL carry the raw release spec `cue.Value`
+- **AND** `FileRelease` SHALL carry best-effort module info (metadata, config) extracted from the spec
+- **AND** `FileRelease` SHALL NOT carry a `*module.Release`
 
 #### Scenario: Load BundleRelease file
-- **WHEN** `LoadReleaseFile()` is called with a `.cue` file containing `kind: "BundleRelease"`
-- **THEN** the loader SHALL return the evaluated value
-- **AND** `GetReleaseFile()` SHALL also be able to parse the same release file path into a barebones bundle release object
+- **WHEN** `GetReleaseFile()` is called with a `.cue` file containing `kind: "BundleRelease"`
+- **THEN** `FileRelease.Kind` SHALL be `KindBundleRelease`
+- **AND** `FileRelease.Bundle` SHALL be a `*bundle.Release`
 
 #### Scenario: Load release file with registry import
 - **WHEN** `LoadReleaseFile()` is called with a `.cue` file that imports a module from a registry
@@ -33,8 +42,11 @@ The CLI MAY call `LoadReleaseFile()` and `GetReleaseFile()` as separate stages, 
 #### Scenario: Load release file without `#module` filled
 - **WHEN** `LoadReleaseFile()` is called with a `.cue` file where `#module` is not filled (left open)
 - **THEN** the loader SHALL return the partially evaluated release value without error
-- **AND** `GetReleaseFile()` SHALL still return a barebones module release object
-- **AND** the caller SHALL be responsible for later filling `#module` when required
+- **AND** `GetReleaseFile()` SHALL still return raw parse data
+
+#### Scenario: #module not filled produces error in render pipeline
+- **WHEN** the release file does not import or fill `#module`
+- **THEN** the render pipeline SHALL exit with an error indicating `#module` is not filled and the user must import a module
 
 #### Scenario: Load release file with invalid CUE
 - **WHEN** `LoadReleaseFile()` is called with a `.cue` file containing syntax errors
@@ -44,29 +56,32 @@ The CLI MAY call `LoadReleaseFile()` and `GetReleaseFile()` as separate stages, 
 - **WHEN** `GetReleaseFile()` is called for a release file whose kind is absent or unrecognised
 - **THEN** it SHALL return an error describing the unsupported release kind
 
-### Requirement: Module injection via `--module` flag uses `LoadModulePackage()` + FillPath
-
-When the `--module` flag is provided, the CLI SHALL load the module from the specified directory using `pkg/loader.LoadModulePackage()` and inject it into the module release's raw CUE value via `FillPath` at the `#module` path before module-release processing begins.
-
-#### Scenario: FillPath injection with `--module`
-- **WHEN** a release file has `#module` unfilled
-- **AND** `--module ./jellyfin` is provided
-- **THEN** the CLI SHALL call `loader.LoadModulePackage("./jellyfin")`
-- **AND** fill `#module` on the raw release CUE value before processing the release
-
-#### Scenario: Module already imported, `--module` flag provided
-- **WHEN** a release file imports and fills `#module` from a registry
-- **AND** `--module ./jellyfin` is also provided
-- **THEN** the `--module` flag SHALL take precedence by overwriting the raw `#module` value before processing
-
 ### Requirement: Release metadata must be concrete during parse-only extraction
 
 The release file's computed fields such as `metadata.uuid` and merged metadata labels SHALL be concrete and decodable during `GetReleaseFile()` so parse-time extraction can populate the authoritative Go metadata before later processing begins.
 
 #### Scenario: UUID is available during parse-only extraction
 - **WHEN** a module release is parsed from a release file whose metadata is fully concrete
-- **THEN** `GetReleaseFile()` SHALL decode the concrete `metadata` into the returned release object
+- **THEN** `GetReleaseFile()` SHALL decode the concrete `metadata` into the returned raw parse data
 
 #### Scenario: Parse-only extraction fails when release metadata is not concrete
 - **WHEN** `GetReleaseFile()` parses a release file whose computed metadata depends on unresolved inputs and is therefore not concrete
 - **THEN** it SHALL return an error describing that release metadata must be concrete
+
+### Requirement: Workflow orchestration calls ParseModuleRelease then ProcessModuleRelease
+
+The `internal/workflow/render.FromReleaseFile` function SHALL orchestrate the pipeline as:
+1. Load the release file via `GetReleaseFile`
+2. Resolve values from release file and `--values` flags
+3. Build a `module.Module` from available module data
+4. Call `module.ParseModuleRelease(ctx, spec, mod, values)` to get `*module.Release`
+5. Apply namespace override if needed (on `Release.Metadata.Namespace`)
+6. Load the provider
+7. Call `render.ProcessModuleRelease(ctx, release, provider)` to get `*render.ModuleResult`
+8. Convert to workflow result
+
+#### Scenario: Full pipeline from release file
+- **WHEN** `FromReleaseFile` is called with valid options
+- **THEN** it SHALL call `ParseModuleRelease` before `ProcessModuleRelease`
+- **AND** `ParseModuleRelease` SHALL receive the raw spec (with `#module` filled), the module, and resolved values
+- **AND** `ProcessModuleRelease` SHALL receive the prepared `*module.Release` and provider

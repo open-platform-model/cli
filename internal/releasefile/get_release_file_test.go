@@ -32,9 +32,7 @@ values: {
 	assert.Equal(t, KindModuleRelease, rel.Kind)
 	assert.Equal(t, "demo", rel.Module.Metadata.Name)
 	assert.Equal(t, "apps", rel.Module.Metadata.Namespace)
-	assert.True(t, rel.Module.RawCUE.Exists())
-	assert.False(t, rel.Module.Values.Exists())
-	assert.False(t, rel.Module.DataComponents.Exists())
+	assert.True(t, rel.Module.Spec.Exists())
 }
 
 func TestGetReleaseFile_BundleReleasePartial(t *testing.T) {
@@ -57,7 +55,7 @@ values: {
 	require.NotNil(t, rel.Bundle)
 	assert.Equal(t, KindBundleRelease, rel.Kind)
 	assert.Equal(t, "stack", rel.Bundle.Metadata.Name)
-	assert.True(t, rel.Bundle.RawCUE.Exists())
+	assert.True(t, rel.Bundle.Spec.Exists())
 	assert.Empty(t, rel.Bundle.Releases)
 	assert.False(t, rel.Bundle.Values.Exists())
 }

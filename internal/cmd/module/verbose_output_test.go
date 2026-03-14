@@ -7,25 +7,24 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/opmodel/cli/internal/engine"
 	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/internal/runtime/modulerelease"
 	"github.com/opmodel/cli/internal/workflow/render"
-	pkgmodule "github.com/opmodel/cli/pkg/module"
+	"github.com/opmodel/cli/pkg/module"
+	pkgrender "github.com/opmodel/cli/pkg/render"
 )
 
 // buildTestResult constructs a minimal *render.Result suitable for
 // testing output formatting without requiring a registry or real module render.
 func buildTestResult() *render.Result {
 	return &render.Result{
-		Release: modulerelease.ReleaseMetadata{
+		Release: module.ReleaseMetadata{
 			Name:      "test-release",
 			Namespace: "default",
 		},
-		Module: pkgmodule.ModuleMetadata{
+		Module: module.ModuleMetadata{
 			Version: "1.0.0",
 		},
-		Components: []engine.ComponentSummary{
+		Components: []pkgrender.ComponentSummary{
 			{
 				Name:         "web",
 				Labels:       map[string]string{"core.opmodel.dev/workload-type": "stateless"},
@@ -33,8 +32,8 @@ func buildTestResult() *render.Result {
 				TraitFQNs:    []string{"opmodel.dev/traits/network/expose@v1"},
 			},
 		},
-		MatchPlan: &engine.MatchPlan{
-			Matches: map[string]map[string]engine.MatchResult{
+		MatchPlan: &pkgrender.MatchPlan{
+			Matches: map[string]map[string]pkgrender.MatchResult{
 				"web": {
 					"test#DeploymentTransformer": {Matched: true},
 					"test#ServiceTransformer":    {Matched: true},

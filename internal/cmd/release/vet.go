@@ -24,8 +24,8 @@ func NewReleaseVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Short: "Validate release file without generating manifests",
 		Long: `Validate an OPM release file via the render pipeline.
 
-This command loads a release file, optionally injects a local module, matches
-components to transformers, and validates the release can be rendered successfully.
+This command loads a release file, matches components to transformers, and
+validates the release can be rendered successfully.
 No manifests are output — purely a pass/fail validation tool.
 
 Arguments:
@@ -34,9 +34,6 @@ Arguments:
 Examples:
   # Validate a release file
   opm release vet ./jellyfin_release.cue
-
-  # Validate with a local module (for development)
-  opm release vet ./jellyfin_release.cue --module ./my-module
 
   # Validate with a specific namespace
   opm release vet ./jellyfin_release.cue -n production`,
@@ -65,10 +62,9 @@ func runReleaseVet(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.Re
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
-	result, err := render.ReleaseFile(ctx, render.ReleaseFileOpts{
+	result, err := render.FromReleaseFile(ctx, render.ReleaseFileOpts{
 		ReleaseFilePath: releaseFile,
 		ValuesFiles:     rff.Values,
-		ModulePath:      rff.Module,
 		K8sConfig:       k8sConfig,
 		Config:          cfg,
 	})

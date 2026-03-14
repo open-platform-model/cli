@@ -16,8 +16,8 @@ import (
 	"github.com/opmodel/cli/internal/inventory"
 	"github.com/opmodel/cli/internal/kubernetes"
 	"github.com/opmodel/cli/internal/output"
-	workflowownership "github.com/opmodel/cli/internal/workflow/ownership"
 	"github.com/opmodel/cli/internal/workflow/query"
+	"github.com/opmodel/cli/pkg/ownership"
 )
 
 // NewReleaseDeleteCmd creates the release delete command.
@@ -150,7 +150,10 @@ func runReleaseDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 }
 
 func ensureDeleteAllowed(inv *inventory.ReleaseInventoryRecord) error {
-	return workflowownership.EnsureCLIMutable(inv)
+	if inv == nil {
+		return nil
+	}
+	return ownership.EnsureCLIMutable(string(inv.NormalizedCreatedBy()), inv.ReleaseMetadata.ReleaseName, inv.ReleaseMetadata.ReleaseNamespace)
 }
 
 func confirmReleaseDelete(releaseName, releaseID, namespace string) bool {

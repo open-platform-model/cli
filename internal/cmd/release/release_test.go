@@ -24,7 +24,6 @@ func TestNewReleaseVetCmd(t *testing.T) {
 
 func TestNewReleaseVetCmd_Flags(t *testing.T) {
 	cmd := NewReleaseVetCmd(&config.GlobalConfig{})
-	assert.NotNil(t, cmd.Flags().Lookup("module"), "--module flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("provider"), "--provider flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("namespace"), "--namespace/-n flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("values"), "--values/-f flag should be registered")
@@ -38,7 +37,6 @@ func TestNewReleaseBuildCmd(t *testing.T) {
 
 func TestNewReleaseBuildCmd_Flags(t *testing.T) {
 	cmd := NewReleaseBuildCmd(&config.GlobalConfig{})
-	assert.NotNil(t, cmd.Flags().Lookup("module"), "--module flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("output"), "--output/-o flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("values"), "--values/-f flag should be registered")
 }
@@ -51,7 +49,6 @@ func TestNewReleaseApplyCmd(t *testing.T) {
 
 func TestNewReleaseApplyCmd_Flags(t *testing.T) {
 	cmd := NewReleaseApplyCmd(&config.GlobalConfig{})
-	assert.NotNil(t, cmd.Flags().Lookup("module"), "--module flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("dry-run"), "--dry-run flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("values"), "--values/-f flag should be registered")
 }
