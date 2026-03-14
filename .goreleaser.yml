@@ -20,9 +20,14 @@ builds:
         goarch: arm64
 
 archives:
-  - format: binary
-    name_template: >-
+  - name_template: >-
       {{ .ProjectName }}-{{ .Os }}-{{ .Arch }}
+    files:
+      - LICENSE
+
+release:
+  extra_files:
+    - glob: LICENSE
 
 checksum:
   name_template: checksums.txt
