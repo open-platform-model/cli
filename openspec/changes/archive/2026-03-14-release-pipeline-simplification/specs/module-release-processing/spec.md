@@ -1,8 +1,4 @@
-## Purpose
-
-Defines the contract for processing a prepared module release into a render result.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: ProcessModuleRelease is the public rendering entrypoint
 The `pkg/render` package SHALL export `ProcessModuleRelease` that accepts a prepared `*module.Release` and a `*provider.Provider`, and returns `*ModuleResult`. It SHALL own the full rendering pipeline: component finalization, matching, and execution.
