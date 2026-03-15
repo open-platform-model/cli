@@ -1,0 +1,585 @@
+// Package mc_java_fleet defines a Minecraft Java server fleet module.
+//
+// Combines a dynamic fleet of Minecraft Java servers with a single shared
+// mc-router that routes player connections by hostname.
+//
+// ## Concept
+//
+// Define N servers in `servers` map — each gets its own StatefulSet and
+// Kubernetes Service. A single mc-router (LoadBalancer) routes incoming
+// TCP connections by hostname to the correct server:
+//
+//   lobby.mc.example.com    →  router  →  {releaseName}-server-lobby.{namespace}.svc
+//   survival.mc.example.com →  router  →  {releaseName}-server-survival.{namespace}.svc
+//
+// ## Auto-wiring
+//
+// Adding a server to the `servers` map automatically:
+//   - Creates a StatefulSet + Service for that server
+//   - Adds a --mapping entry to the shared mc-router
+//
+// ## Service DNS convention
+//
+// Set `releaseName` to exactly match the ModuleRelease `metadata.name`.
+// The K8s Service for each server is reachable at:
+//   {releaseName}-server-{serverName}.{namespace}.svc
+// The router Service:
+//   {releaseName}-router.{namespace}.svc
+//
+// ## RCON password
+//
+// A single `rconPassword` is shared across all servers. Define it once at
+// the module level; the components automatically inject it into each server.
+package mc_java_fleet
+
+import (
+	m "opmodel.dev/core/module@v1"
+	schemas "opmodel.dev/schemas@v1"
+)
+
+// Module definition
+m.#Module
+
+// Module metadata
+metadata: {
+	modulePath:       "example.com/modules"
+	name:             "mc-java-fleet"
+	version:          "0.1.0"
+	description:      "Dynamic Minecraft Java server fleet with a shared mc-router for hostname-based routing"
+	defaultNamespace: "default"
+}
+
+_#portSchema: uint & >0 & <=65535
+
+// Shared Modrinth auto-download config (works for both mods and plugins)
+_#modrinthConfig: {
+	projects: [...string]
+	downloadDependencies?: "none" | "required" | "optional"
+	allowedVersionType?:   "release" | "beta" | "alpha"
+}
+
+// Mods config — for mod-based server types (Forge, Fabric, FTB)
+_#modsConfig: {
+	// List of URLs to mod jar files
+	urls?: [...string]
+
+	// Modrinth project auto-download
+	modrinth?: _#modrinthConfig
+
+	// URL to a modpack zip to download at startup
+	modpackUrl?: string
+
+	// Remove old mods before installing new ones
+	removeOldMods: bool | *false
+}
+
+// Plugins config — for plugin-based server types (Paper, Spigot, Bukkit, Purpur)
+_#pluginsConfig: {
+	// List of URLs to plugin jar files
+	urls?: [...string]
+
+	// Spigot resource/plugin IDs for auto-download via Spiget
+	spigetResources?: [...int]
+
+	// Modrinth project auto-download
+	modrinth?: _#modrinthConfig
+
+	// Remove old plugins before installing new ones
+	removeOldMods: bool | *false
+}
+
+// _#config — full per-server configuration.
+// The rcon.password field is always provided at module level via #config.rconPassword
+// and injected into each server component — it is intentionally absent here.
+_#config: {
+	// name used so that router can reference this server in its defaultServer config when hostname doesn't match any server (e.g. lobby.mc.example.com → defaultServer)
+	name: string
+
+	// === Container Image ===
+	image: schemas.#Image & {
+		repository: string | *"itzg/minecraft-server"
+		tag:        string | *"java21"
+		digest:     string | *""
+	}
+
+	// === Game Version ===
+	// Minecraft version (e.g., "1.20.4", "LATEST", "SNAPSHOT")
+	version: string | *"LATEST"
+
+	// === EULA ===
+	eula: bool | *true
+
+	// === Server Type ===
+	// Set exactly ONE of the following to select your server software.
+	// Defaults to vanilla behaviour when none is set.
+
+	// VANILLA — unmodified Mojang server
+	vanilla?: {}
+
+	// PAPER — Paper server (high-performance Spigot fork)
+	paper?: {
+		downloadUrl?: string
+		plugins?:     _#pluginsConfig
+	}
+
+	// FORGE — Minecraft Forge modded server
+	forge?: {
+		version:       string
+		installerUrl?: string
+		mods?:         _#modsConfig
+	}
+
+	// FABRIC — Fabric modded server
+	fabric?: {
+		loaderVersion: string
+		installerUrl?: string
+		mods?:         _#modsConfig
+	}
+
+	// SPIGOT — Spigot server
+	spigot?: {
+		downloadUrl?: string
+		plugins?:     _#pluginsConfig
+	}
+
+	// BUKKIT — CraftBukkit server
+	bukkit?: {
+		downloadUrl?: string
+		plugins?:     _#pluginsConfig
+	}
+
+	// SPONGEVANILLA — SpongeVanilla server
+	sponge?: {
+		version: string
+	}
+
+	// PURPUR — Purpur server (Paper fork with extra features)
+	purpur?: {
+		plugins?: _#pluginsConfig
+	}
+
+	// MAGMA — Magma server (Forge + Bukkit/Spigot API hybrid)
+	magma?: {
+		mods?:    _#modsConfig
+		plugins?: _#pluginsConfig
+	}
+
+	// FTBA — Feed The Beast modpack server
+	ftba?: {
+		mods?: _#modsConfig
+	}
+
+	// AUTO_CURSEFORGE — CurseForge modpack server
+	autoCurseForge?: {
+		apiKey: schemas.#Secret & {
+			$secretName: "server-secrets"
+			$dataKey:    "cf-api-key"
+		}
+		pageUrl?:         string
+		slug?:            string
+		fileId?:          string
+		filenameMatcher?: string
+		excludeMods?: [...string]
+		includeMods?: [...string]
+		forceSynchronize?: bool
+		parallelDownloads: uint | *1
+	}
+
+	// MODRINTH — Modrinth modpack server (TYPE=MODRINTH)
+	// Installs a modpack from a Modrinth URL and optionally pins extra projects.
+	// Use `version` to pin a specific pack version; omit to use the latest release.
+	// `projects` adds extra mods/plugins on top of the modpack (format: "slug:versionId").
+	modrinth?: {
+		// Modrinth modpack page URL (e.g. "https://modrinth.com/modpack/my-pack")
+		modpack: string
+
+		// Specific modpack version ID to pin (e.g. "ZYF5kPnk"). Omit for latest.
+		version?: string
+
+		// Extra projects to install on top of the modpack.
+		// Format: "slug" or "slug:versionId" (e.g. "bluemap:lHRktt6S")
+		projects?: [...string]
+
+		// Whether to also download dependency projects
+		downloadDependencies?: "none" | "required" | "optional"
+	}
+
+	matchN(<=1, [
+		{vanilla!: _},
+		{paper!: _},
+		{forge!: _},
+		{fabric!: _},
+		{spigot!: _},
+		{bukkit!: _},
+		{sponge!: _},
+		{purpur!: _},
+		{magma!: _},
+		{ftba!: _},
+		{autoCurseForge!: _},
+		{modrinth!: _},
+	])
+
+	// === JVM Configuration ===
+	jvm: {
+		// Single heap size (MEMORY). When maxMemory is set, maxMemory is used as MEMORY
+		// and initMemory is used as INIT_MEMORY. Do not set both memory and maxMemory.
+		memory?: string | *"2G"
+
+		// Split heap: initial heap size (INIT_MEMORY). Only used when maxMemory is set.
+		initMemory?: string
+
+		// Split heap: maximum heap size (MAX_MEMORY → rendered as MEMORY env var).
+		// When set, memory field is ignored.
+		maxMemory?: string
+
+		opts?:         string
+		xxOpts?:       string
+		useAikarFlags: bool | *true
+	}
+
+	// === Server Properties ===
+	server: {
+		motd?:              string | *"OPM Minecraft Java Server"
+		maxPlayers:         uint & >0 & <=1000 | *10
+		difficulty:         "peaceful" | "easy" | *"normal" | "hard"
+		mode:               *"survival" | "creative" | "adventure" | "spectator"
+		pvp:                bool | *true
+		enableCommandBlock: bool | *false
+		ops?: [...string]
+		blocklist?: [...string]
+		seed?:                      string
+		maxWorldSize?:              uint
+		viewDistance:               uint & <=32 | *10
+		allowNether:                bool | *true
+		allowFlight:                bool | *false
+		announcePlayerAchievements: bool | *true
+		forceGameMode:              bool | *false
+		generateStructures:         bool | *true
+		hardcore:                   bool | *false
+		maxBuildHeight:             uint | *256
+		maxTickTime:                int | *60000
+		spawnAnimals:               bool | *true
+		spawnMonsters:              bool | *true
+		spawnNPCs:                  bool | *true
+		spawnProtection:            int & >=0 | *0
+
+		// levelType accepts standard values or the minecraft: namespaced format
+		// (e.g. "minecraft:normal", "minecraft:flat") used since 1.16+.
+		// Standard values: "DEFAULT", "FLAT", "LARGEBIOMES", "AMPLIFIED", "CUSTOMIZED"
+		levelType: string | *"DEFAULT"
+
+		worldSaveName:            string | *"world"
+		onlineMode:               bool | *true
+		enforceSecureProfile:     bool | *true
+		overrideServerProperties: bool | *true
+		resourcePackUrl?:         string
+		resourcePackSha?:         string
+		resourcePackEnforce?:     bool
+		vanillaTweaksShareCodes?: [...string]
+
+		// Optional server display name (SERVER_NAME env var)
+		serverName?: string
+
+		// Enable rolling log files (ENABLE_ROLLING_LOGS)
+		enableRollingLogs: bool | *true
+
+		// Container timezone (TZ env var, e.g. "Europe/Stockholm")
+		tz?: string
+	}
+
+	// === RCON Configuration ===
+	// Note: password is absent here — always injected from #config.rconPassword.
+	rcon: {
+		enabled: bool | *true
+		port:    _#portSchema | *25575
+	}
+
+	// === Query Port ===
+	query: {
+		enabled: bool | *false
+		port:    _#portSchema | *25565
+	}
+
+	// === World Data ===
+	downloadWorldUrl?: string
+
+	// === World Seeding ===
+	// When seed.url is set, an init container is added that downloads a tar.gz
+	// archive and extracts only directories containing a level.dat file into /data.
+	// A sentinel file (/data/.opm-world-seed-done) is written on success so that
+	// subsequent pod restarts skip the seed entirely.
+	seed: {
+		// URL to a tar.gz archive containing world directories.
+		// The init container only copies directories that contain level.dat —
+		// plugins, configs, jars, and other files in the archive are ignored.
+		url?: string
+
+		// Image for the world-seed init container.
+		// Must provide: sh, curl, tar, find, cp.
+		// Always present (defaults to alpine:3); override to pin a specific version.
+		image: schemas.#Image & {
+			repository: string | *"alpine"
+			tag:        string | *"3"
+			digest:     string | *""
+		}
+	}
+
+	// === Networking ===
+	port:        _#portSchema | *25565
+	serviceType: *"ClusterIP" | "LoadBalancer" | "NodePort"
+
+	extraPorts?: [...{
+		name:          string
+		containerPort: _#portSchema
+		protocol:      *"TCP" | "UDP" | "SCTP"
+	}]
+
+	// === Storage ===
+	storage: {
+		data: {
+			type:          *"pvc" | "hostPath" | "emptyDir"
+			size:          string | *"10Gi"
+			storageClass?: string
+			path?:         string
+			hostPathType?: "Directory" | "DirectoryOrCreate"
+		}
+		backups: {
+			type:          *"pvc" | "hostPath" | "emptyDir"
+			size:          string | *"10Gi"
+			storageClass?: string
+			path?:         string
+			hostPathType?: "Directory" | "DirectoryOrCreate"
+		}
+	}
+
+	// === Backup ===
+	backup: {
+		enabled: bool | *false
+		image: schemas.#Image & {
+			repository: string | *"itzg/mc-backup"
+			tag:        string | *"latest"
+			digest:     string | *""
+		}
+		method:           *"tar" | "rsync" | "restic" | "rclone"
+		interval:         string | *"24h"
+		initialDelay:     string | *"5m"
+		pruneBackupsDays: uint | *7
+		pauseIfNoPlayers: bool | *true
+
+		// Optional backup archive name (BACKUP_NAME)
+		backupName?: string
+
+		// Paths to exclude from backups, relative to SRC_DIR (EXCLUDES, comma-joined)
+		// Example: ["./bluemap/*", "./plugins/CoreProtect/*"]
+		excludes?: [...string]
+
+		tar?: {
+			compressMethod:      "gzip" | "bzip2" | "lzip" | "lzma" | "lzop" | *"xz" | "zstd"
+			compressParameters?: string
+			linkLatest:          bool | *false
+		}
+		rsync?: {
+			linkLatest: bool | *false
+			// When true, a backup volume (PVC/hostPath/emptyDir) is provisioned
+			// for rsync to stage archives locally before syncing to the remote.
+			useLocalStorage: bool | *false
+		}
+		restic?: {
+			repository: string
+			password: schemas.#Secret & {
+				$secretName: "backup-secrets-\(name)"
+				$dataKey:    "restic-password"
+			}
+			// S3-compatible storage credentials (e.g. SeaweedFS, MinIO, AWS S3).
+			// Maps to AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars.
+			accessKey?: schemas.#Secret & {
+				$secretName: "backup-secrets-\(name)"
+				$dataKey:    "restic-s3-access-key"
+			}
+			secretKey?: schemas.#Secret & {
+				$secretName: "backup-secrets-\(name)"
+				$dataKey:    "restic-s3-secret-key"
+			}
+			retention?:      string
+			hostname?:       string
+			verbose?:        bool
+			additionalTags?: string
+			limitUpload?:    uint
+			retryLock?:      string
+		}
+		rclone?: {
+			remote:         string
+			destDir:        string
+			compressMethod: "gzip" | "bzip2" | "lzip" | "lzma" | "lzop" | "xz" | "zstd"
+		}
+
+		if enabled {
+			matchN(1, [
+				{tar!: _},
+				{rsync!: _},
+				{restic!: _},
+				{rclone!: _},
+			])
+		}
+	}
+
+	// === Monitor Sidecar ===
+	monitor: {
+		enabled: bool | *true
+		image: schemas.#Image & {
+			repository: string | *"itzg/mc-monitor"
+			tag:        string | *"0.16.1"
+			digest:     string | *""
+		}
+		port:       uint & >0 & <=65535 | *8080
+		timeout:    string | *"1m0s"
+		serverHost: string | *"localhost"
+	}
+
+	// === Resource Limits ===
+	resources?: schemas.#ResourceRequirementsSchema
+
+	// === Security Context ===
+	securityContext?: schemas.#SecurityContextSchema
+}
+
+// Module config schema
+#config: {
+	// === Routing Identity ===
+
+	// Must match the ModuleRelease metadata.name exactly.
+	// Used to compute K8s Service DNS names:
+	//   {releaseName}-server-{serverName}.{namespace}.svc
+	releaseName: string
+
+	// Base domain for all server hostnames.
+	// Each server is accessible at {serverName}.{domain}.
+	// Example: domain: "mc.example.com" → lobby.mc.example.com
+	domain: string
+
+	// Kubernetes namespace for all components
+	namespace: string
+
+	// === Server Fleet ===
+	// Each entry produces one Minecraft server + auto-wires it into the router.
+	// Key = server name (e.g. "lobby", "survival"). Must be a valid DNS label.
+	servers: [sName=string]: _#config & {name: sName}
+
+	// === Router Configuration ===
+	router: {
+		// Container image for mc-router
+		image: schemas.#Image & {
+			repository: string | *"itzg/mc-router"
+			tag:        string | *"1.40.3"
+			digest:     string | *""
+		}
+
+		// Minecraft listening port on the router Service
+		port: _#portSchema | *25565
+
+		// Service type for the router (typically LoadBalancer for public access)
+		serviceType: *"LoadBalancer" | "ClusterIP" | "NodePort"
+
+		// Maximum connection rate per second
+		connectionRateLimit: int & >0 | *1
+
+		// Enable debug logging
+		debug: bool | *false
+
+		// Simplify SRV record lookup
+		simplifySrv: bool | *false
+
+		// Enable PROXY protocol for downstream servers
+		useProxyProtocol: bool | *false
+
+		// Default server when no hostname matches (optional)
+		defaultServer?: {
+			host: string
+			port: _#portSchema
+		}
+
+		// Auto-scale configuration (wake/sleep StatefulSets on player connect/disconnect)
+		autoScale?: {
+			up?: {
+				enabled: bool
+			}
+			down?: {
+				enabled: bool
+				after?:  string
+			}
+		}
+
+		// Metrics backend configuration
+		metrics?: {
+			backend: "discard" | "expvar" | "influxdb" | "prometheus"
+		}
+
+		// REST API configuration
+		api: {
+			enabled: bool | *false
+			port:    _#portSchema | *8080
+		}
+
+		// Resource limits for the router container
+		resources?: schemas.#ResourceRequirementsSchema
+	}
+
+	// === Shared RCON Secret ===
+	// Shared across all Minecraft server instances in the fleet.
+	rconPassword: schemas.#Secret & {
+		$secretName: "server-secrets"
+		$dataKey:    "rcon-password"
+	}
+}
+
+// debugValues exercises the full #config surface for local cue vet / cue eval.
+debugValues: {
+	releaseName: "my-fleet"
+	domain:      "mc.example.com"
+	namespace:   "minecraft"
+
+	servers: {
+		lobby: {
+			server: {
+				motd:       "Welcome to the Lobby!"
+				maxPlayers: 50
+				mode:       "adventure"
+				pvp:        false
+				difficulty: "peaceful"
+			}
+			paper: {}
+			jvm: memory: "1G"
+		}
+		survival: {
+			server: {
+				maxPlayers: 20
+				difficulty: "hard"
+			}
+			fabric: {
+				loaderVersion: "0.15.11"
+				mods: {
+					modrinth: {
+						projects: ["lithium", "starlight"]
+					}
+				}
+			}
+			jvm: maxMemory: "4G"
+			backup: {
+				enabled: true
+				method:  "tar"
+				tar: {}
+			}
+		}
+	}
+
+	router: {
+		port:        25565
+		serviceType: "LoadBalancer"
+		defaultServer: {
+			host: "my-fleet-server-lobby.minecraft.svc"
+			port: 25565
+		}
+	}
+
+	rconPassword: value: "debug-rcon-password"
+}
