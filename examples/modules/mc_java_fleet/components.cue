@@ -58,8 +58,13 @@ import (
 			metadata: labels: "core.opmodel.dev/workload-type": "stateful"
 
 			spec: {
-				// Single replica — Minecraft servers don't support horizontal scaling
-				scaling: count: 1
+				// Single replica when enabled; zero replicas when disabled (server stopped).
+				if _c.enabled {
+					scaling: count: 1
+				}
+				if !_c.enabled {
+					scaling: count: 0
+				}
 
 				restartPolicy: "Always"
 

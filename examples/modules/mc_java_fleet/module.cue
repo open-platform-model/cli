@@ -95,6 +95,10 @@ _#config: {
 	// name used so that router can reference this server in its defaultServer config when hostname doesn't match any server (e.g. lobby.mc.example.com → defaultServer)
 	name: string
 
+	// enabled controls whether the server is running (replicas=1) or stopped (replicas=0).
+	// Set to false to gracefully shut down a server without removing it from the fleet.
+	enabled: bool | *true
+
 	// === Container Image ===
 	image: schemas.#Image & {
 		repository: string | *"itzg/minecraft-server"
