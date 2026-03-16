@@ -1440,6 +1440,328 @@ import (
 		}
 	}
 
+	// ── code-server ────────────────────────────────────────────────────────────
+	// Optional single Deployment running code-server (VS Code in the browser).
+	// Mounts every server's data volume at /servers/{name} so all world files
+	// are accessible from one editor. Home directory is stored on a dedicated
+	// PVC so extensions and settings persist across restarts.
+	//
+	// hostPath volumes are shared by pointing at the same host path as the
+	// server StatefulSets — no PVC ownership conflicts.
+	// pvc storage: code-server gets a separate new PVC per server (data not shared).
+	if #config.codeServer != _|_ {
+		if #config.codeServer.enabled {
+			let _cs = #config.codeServer
+
+			"code-server": {
+				resources_workload.#Container
+				resources_storage.#Volumes
+				traits_workload.#Scaling
+				traits_workload.#RestartPolicy
+				traits_workload.#UpdateStrategy
+				traits_network.#Expose
+				traits_security.#SecurityContext
+
+				metadata: labels: "core.opmodel.dev/workload-type": "stateless"
+
+				spec: {
+					scaling:        count: 1
+					restartPolicy:  "Always"
+					updateStrategy: type: "Recreate"
+
+					// Run as the same UID/GID as the server containers so that
+					// files written by the servers are accessible in code-server.
+					// readOnlyRootFilesystem is false — code-server writes to /home/coder.
+					securityContext: {
+						runAsNonRoot:             true
+						runAsUser:                1000
+						runAsGroup:               3000
+						readOnlyRootFilesystem:   false
+						allowPrivilegeEscalation: false
+						capabilities: drop: ["ALL"]
+					}
+
+					container: {
+						name:  "code-server"
+						image: _cs.image
+
+						ports: http: {
+							targetPort: _cs.port
+							protocol:   "TCP"
+						}
+
+						env: {
+							PORT: {name: "PORT", value: "\(_cs.port)"}
+							if _cs.password != _|_ {
+								PASSWORD: {name: "PASSWORD", from: _cs.password}
+							}
+						}
+
+						volumeMounts: {
+							// Persistent home for extensions, settings, and workspace state.
+							// References volumes.home so the source type is carried through.
+							home: volumes.home & {
+								mountPath: "/home/coder"
+							}
+							// One mount per server — /servers/{serverName}
+							for _srvName, _ in #config.servers {
+								"\(_srvName)-data": volumes["\(_srvName)-data"] & {
+									mountPath: "/servers/\(_srvName)"
+								}
+							}
+						}
+
+						if _cs.resources != _|_ {
+							resources: _cs.resources
+						}
+					}
+
+					volumes: {
+						// Home PVC / hostPath / emptyDir
+						home: {
+							name: "home"
+							if _cs.storage.home.type == "pvc" {
+								persistentClaim: {
+									size: _cs.storage.home.size
+									if _cs.storage.home.storageClass != _|_ {
+										storageClass: _cs.storage.home.storageClass
+									}
+								}
+							}
+							if _cs.storage.home.type == "hostPath" {
+								hostPath: {
+									path: _cs.storage.home.path
+									type: _cs.storage.home.hostPathType
+								}
+							}
+							if _cs.storage.home.type == "emptyDir" {
+								emptyDir: {}
+							}
+						}
+						// Server data volumes — mirrors each server's storage config.
+						// hostPath: shares the host path directly (recommended).
+						// pvc/emptyDir: creates a separate volume (data not shared).
+						for _srvName, _srvCfg in #config.servers {
+							"\(_srvName)-data": {
+								name: "\(_srvName)-data"
+								if _srvCfg.storage.data.type == "pvc" {
+									persistentClaim: {
+										size: _srvCfg.storage.data.size
+										if _srvCfg.storage.data.storageClass != _|_ {
+											storageClass: _srvCfg.storage.data.storageClass
+										}
+									}
+								}
+								if _srvCfg.storage.data.type == "hostPath" {
+									hostPath: {
+										path: _srvCfg.storage.data.path
+										type: _srvCfg.storage.data.hostPathType
+									}
+								}
+								if _srvCfg.storage.data.type == "emptyDir" {
+									emptyDir: {}
+								}
+							}
+						}
+					}
+
+					expose: {
+						ports: http: {
+							targetPort:  _cs.port
+							protocol:    "TCP"
+							exposedPort: _cs.port
+						}
+						type: _cs.serviceType
+					}
+				}
+			}
+		}
+	}
+
+	// ── restic-gui ─────────────────────────────────────────────────────────────
+	// Optional Backrest deployment (https://github.com/garethgeorge/backrest)
+	// for browsing and restoring restic snapshots created by the backup sidecars.
+	//
+	// An init container (alpine + apache2-utils + jq) runs once on first deploy:
+	//   1. Generates a bcrypt hash of the configured password at runtime.
+	//   2. Loops over indexed env vars (RESTIC_REPO_URI_0, RESTIC_PASSWORD_0, …)
+	//      to build a repos array — one entry per restic-enabled server.
+	//   3. Writes /data/config.json and exits. Subsequent pod restarts skip it.
+	//
+	// Backrest connects to repos over S3/network only — no server data volumes
+	// are mounted. Prune and check schedules are disabled in pre-configured repos
+	// because the itzg/mc-backup sidecar already owns the backup schedule.
+	if #config.resticGui != _|_ {
+		if #config.resticGui.enabled {
+			let _rg = #config.resticGui
+
+			// Ordered list of restic-enabled servers (lexicographic by name — CUE
+			// struct iteration is deterministic, giving stable 0-based indices).
+			let _resticServers = [
+				for _name, _c in #config.servers
+				if _c.backup.enabled && _c.backup.restic != _|_ {
+					{name: _name, cfg: _c}
+				}
+			]
+
+			"restic-gui": {
+				resources_workload.#Container
+				resources_storage.#Volumes
+				traits_workload.#InitContainers
+				traits_workload.#Scaling
+				traits_workload.#RestartPolicy
+				traits_workload.#UpdateStrategy
+				traits_network.#Expose
+
+				metadata: labels: "core.opmodel.dev/workload-type": "stateless"
+
+				spec: {
+					scaling:        count: 1
+					restartPolicy:  "Always"
+					updateStrategy: type: "Recreate"
+
+					// === Init Container: Backrest Config Bootstrap ===
+					// Writes /data/config.json with all restic repos pre-configured.
+					// Idempotent — skips if the file already exists (e.g. on pod restart).
+					initContainers: [{
+						name: "backrest-init"
+						image: {
+							repository: "alpine"
+							tag:        "3"
+							digest:     ""
+						}
+						command: ["/bin/sh", "-c"]
+						args: ["""
+							set -e
+							CONFIG=/data/config.json
+							if [ -f "$CONFIG" ]; then
+							  echo "Backrest config already exists — skipping init."
+							  exit 0
+							fi
+							echo "Installing dependencies..."
+							apk add --no-cache apache2-utils jq > /dev/null
+							echo "Generating password hash..."
+							HASH=$(htpasswd -bnBC 10 "" "$BACKREST_PASSWORD" | tr -d ':\\n' | sed 's/$2y/$2a/' | base64 | tr -d '\\n')
+							echo "Building repo list..."
+							REPOS="[]"
+							i=0
+							while [ "$i" -lt "$BACKREST_REPO_COUNT" ]; do
+							  eval URI="\\$RESTIC_REPO_URI_$i"
+							  eval ID="\\$RESTIC_REPO_ID_$i"
+							  eval PASS="\\$RESTIC_PASSWORD_$i"
+							  eval AKEY="\\$AWS_ACCESS_KEY_$i"
+							  eval SKEY="\\$AWS_SECRET_KEY_$i"
+							  AWS_ENV="[]"
+							  [ -n "$AKEY" ] && AWS_ENV=$(echo "$AWS_ENV" | jq --arg v "AWS_ACCESS_KEY_ID=$AKEY" '. + [$v]')
+							  [ -n "$SKEY" ] && AWS_ENV=$(echo "$AWS_ENV" | jq --arg v "AWS_SECRET_ACCESS_KEY=$SKEY" '. + [$v]')
+							  REPO=$(jq -n --arg id "$ID" --arg uri "$URI" --arg pass "$PASS" --argjson env "$AWS_ENV" '{"id":$id,"uri":$uri,"password":$pass,"env":$env,"autoUnlock":true,"autoInitialize":true,"prunePolicy":{"schedule":{"disabled":true}},"checkPolicy":{"schedule":{"disabled":true}}}')
+							  REPOS=$(echo "$REPOS" | jq --argjson r "$REPO" '. + [$r]')
+							  i=$((i + 1))
+							done
+							mkdir -p /data/cache
+							echo "Writing config.json with $BACKREST_REPO_COUNT repo(s)..."
+							jq -n --arg inst "$BACKREST_INSTANCE" --arg user "$BACKREST_USERNAME" --arg hash "$HASH" --argjson repos "$REPOS" '{"modno":0,"version":6,"instance":$inst,"repos":$repos,"auth":{"users":[{"name":$user,"passwordBcrypt":$hash}]}}' > "$CONFIG"
+							echo "Done."
+							"""]
+
+						env: {
+							BACKREST_PASSWORD:   {name: "BACKREST_PASSWORD",   from: _rg.password}
+							BACKREST_USERNAME:   {name: "BACKREST_USERNAME",   value: _rg.username}
+							BACKREST_INSTANCE:   {name: "BACKREST_INSTANCE",   value: "\(_relName)-backrest"}
+							BACKREST_REPO_COUNT: {name: "BACKREST_REPO_COUNT", value: "\(len(_resticServers))"}
+							// Per-server indexed env vars: always-present fields.
+							for _i, _s in _resticServers {
+								"RESTIC_REPO_ID_\(_i)":  {name: "RESTIC_REPO_ID_\(_i)",  value: "\(_relName)-\(_s.name)"}
+								"RESTIC_REPO_URI_\(_i)": {name: "RESTIC_REPO_URI_\(_i)", value: _s.cfg.backup.restic.repository}
+								"RESTIC_PASSWORD_\(_i)": {name: "RESTIC_PASSWORD_\(_i)", from: _s.cfg.backup.restic.password}
+							}
+							// AWS credentials — emitted only when configured on the server.
+							for _i, _s in _resticServers if _s.cfg.backup.restic.accessKey != _|_ {
+								"AWS_ACCESS_KEY_\(_i)": {name: "AWS_ACCESS_KEY_\(_i)", from: _s.cfg.backup.restic.accessKey}
+							}
+							for _i, _s in _resticServers if _s.cfg.backup.restic.secretKey != _|_ {
+								"AWS_SECRET_KEY_\(_i)": {name: "AWS_SECRET_KEY_\(_i)", from: _s.cfg.backup.restic.secretKey}
+							}
+						}
+
+						volumeMounts: data: volumes.data & {
+							mountPath: "/data"
+						}
+					}]
+
+					// === Main Container: Backrest ===
+					// Reads /data/config.json written by the init container.
+					// Cache lives under /data/cache, tmp is a separate emptyDir.
+					container: {
+						name:  "backrest"
+						image: _rg.image
+
+						ports: http: {
+							targetPort: _rg.port
+							protocol:   "TCP"
+						}
+
+						env: {
+							BACKREST_PORT:   {name: "BACKREST_PORT",   value: "0.0.0.0:\(_rg.port)"}
+							BACKREST_DATA:   {name: "BACKREST_DATA",   value: "/data"}
+							BACKREST_CONFIG: {name: "BACKREST_CONFIG", value: "/data/config.json"}
+							XDG_CACHE_HOME:  {name: "XDG_CACHE_HOME", value: "/data/cache"}
+							TMPDIR:          {name: "TMPDIR",          value: "/tmp"}
+						}
+
+						volumeMounts: {
+							data: volumes.data & {mountPath: "/data"}
+							tmp:  volumes.tmp & {mountPath: "/tmp"}
+						}
+
+						if _rg.resources != _|_ {
+							resources: _rg.resources
+						}
+					}
+
+					volumes: {
+						// Single PVC/hostPath/emptyDir for config, state, and restic cache.
+						data: {
+							name: "data"
+							if _rg.storage.data.type == "pvc" {
+								persistentClaim: {
+									size: _rg.storage.data.size
+									if _rg.storage.data.storageClass != _|_ {
+										storageClass: _rg.storage.data.storageClass
+									}
+								}
+							}
+							if _rg.storage.data.type == "hostPath" {
+								hostPath: {
+									path: _rg.storage.data.path
+									type: _rg.storage.data.hostPathType
+								}
+							}
+							if _rg.storage.data.type == "emptyDir" {
+								emptyDir: {}
+							}
+						}
+						// Backrest and restic need a writable /tmp for staging downloads
+						// and restores regardless of root filesystem mutability.
+						tmp: {
+							name:     "tmp"
+							emptyDir: {}
+						}
+					}
+
+					expose: {
+						ports: http: {
+							targetPort:  _rg.port
+							protocol:    "TCP"
+							exposedPort: _rg.port
+						}
+						type: _rg.serviceType
+					}
+				}
+			}
+		}
+	}
+
 	// ── RBAC ──────────────────────────────────────────────────────────────────
 	// Grants mc-router permission to watch/list Services (service discovery)
 	// and manage StatefulSets (auto-scale wake/sleep).

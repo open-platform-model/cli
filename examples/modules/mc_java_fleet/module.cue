@@ -550,6 +550,84 @@ _#config: {
 		$secretName: "server-secrets"
 		$dataKey:    "rcon-password"
 	}
+
+	// === Code Server ===
+	// Optional single web-based editor (VS Code in the browser) that mounts
+	// all server data volumes at /servers/{name} for direct file access.
+	//
+	// Works best with hostPath storage — the code-server pod shares the same
+	// host paths as the server pods without PVC ownership conflicts.
+	// For pvc storage, code-server gets a separate (empty) PVC per server —
+	// data will NOT be shared with the running server.
+	codeServer?: {
+		enabled: bool | *false
+		image: schemas.#Image & {
+			repository: string | *"codercom/code-server"
+			tag:        string | *"latest"
+			digest:     string | *""
+		}
+		port:        _#portSchema | *8080
+		serviceType: *"ClusterIP" | "LoadBalancer" | "NodePort"
+		password?:   schemas.#Secret & {
+			$secretName: "code-server-secrets"
+			$dataKey:    "password"
+		}
+		// Home directory storage — persists extensions, settings, and workspace
+		// across pod restarts.
+		storage: {
+			home: {
+				type:          *"pvc" | "hostPath" | "emptyDir"
+				size:          string | *"1Gi"
+				storageClass?: string
+				path?:         string
+				hostPathType?: "Directory" | "DirectoryOrCreate"
+			}
+		}
+		resources?: schemas.#ResourceRequirementsSchema
+	}
+
+	// === Restic GUI ===
+	// Optional Backrest web UI (https://github.com/garethgeorge/backrest) for
+	// browsing and restoring restic snapshots created by the backup sidecars.
+	//
+	// On first deploy an init container writes /data/config.json with one repo
+	// pre-configured per server that has backup.method == "restic". The init
+	// container generates a bcrypt hash of the password at runtime so that no
+	// plaintext hash is baked into the module definition.
+	//
+	// Prune and check schedules are disabled in the pre-configured repos because
+	// the itzg/mc-backup sidecar already owns the backup schedule. Backrest is
+	// used purely for browsing and restoring.
+	//
+	// Storage: a single PVC (or hostPath/emptyDir) holds the Backrest config,
+	// internal state, and the restic cache under /data.
+	resticGui?: {
+		enabled:  bool | *false
+		image: schemas.#Image & {
+			repository: string | *"ghcr.io/garethgeorge/backrest"
+			tag:        string | *"latest"
+			digest:     string | *""
+		}
+		port:        _#portSchema | *9898
+		serviceType: *"ClusterIP" | "LoadBalancer" | "NodePort"
+		// Username for the Backrest web UI.
+		username: string | *"admin"
+		// Password for the Backrest web UI.
+		// OPM creates a k8s Secret named "restic-gui-secrets" with key "password".
+		password: schemas.#Secret & {
+			$secretName: "restic-gui-secrets"
+			$dataKey:    "password"
+		}
+		// Single PVC / hostPath / emptyDir holding config, state, and cache.
+		storage: data: {
+			type:          *"pvc" | "hostPath" | "emptyDir"
+			size:          string | *"5Gi"
+			storageClass?: string
+			path?:         string
+			hostPathType?: "Directory" | "DirectoryOrCreate"
+		}
+		resources?: schemas.#ResourceRequirementsSchema
+	}
 }
 
 // debugValues exercises the full #config surface for local cue vet / cue eval.
@@ -602,4 +680,26 @@ debugValues: {
 	}
 
 	rconPassword: value: "debug-rcon-password"
+
+	codeServer: {
+		enabled:     true
+		port:        8080
+		serviceType: "ClusterIP"
+		storage: home: {
+			type: "pvc"
+			size: "1Gi"
+		}
+	}
+
+	resticGui: {
+		enabled:     true
+		port:        9898
+		serviceType: "ClusterIP"
+		username:    "admin"
+		password: value: "debug-restic-gui-password"
+		storage: data: {
+			type: "pvc"
+			size: "5Gi"
+		}
+	}
 }
