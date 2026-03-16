@@ -1214,6 +1214,18 @@ import (
 						if _c.storage.data.type == "emptyDir" {
 							emptyDir: {}
 						}
+						if _c.storage.data.type == "nfs" {
+							nfs: {
+								server: _c.storage.data.nfsServer
+								path:   _c.storage.data.nfsPath
+							}
+						}
+						if _c.storage.data.type == "cifs" {
+							cifs: {
+								source:    _c.storage.data.cifsSource
+								secretRef: _c.storage.data.cifsSecretRef
+							}
+						}
 					}
 					if _c.backup.enabled && _c.backup.method == "tar" {
 						backups: {
@@ -1234,6 +1246,18 @@ import (
 							}
 							if _c.storage.backups.type == "emptyDir" {
 								emptyDir: {}
+							}
+							if _c.storage.backups.type == "nfs" {
+								nfs: {
+									server: _c.storage.backups.nfsServer
+									path:   _c.storage.backups.nfsPath
+								}
+							}
+							if _c.storage.backups.type == "cifs" {
+								cifs: {
+									source:    _c.storage.backups.cifsSource
+									secretRef: _c.storage.backups.cifsSecretRef
+								}
 							}
 						}
 					}
@@ -1257,6 +1281,18 @@ import (
 								}
 								if _c.storage.backups.type == "emptyDir" {
 									emptyDir: {}
+								}
+								if _c.storage.backups.type == "nfs" {
+									nfs: {
+										server: _c.storage.backups.nfsServer
+										path:   _c.storage.backups.nfsPath
+									}
+								}
+								if _c.storage.backups.type == "cifs" {
+									cifs: {
+										source:    _c.storage.backups.cifsSource
+										secretRef: _c.storage.backups.cifsSecretRef
+									}
 								}
 							}
 						}

@@ -341,18 +341,34 @@ _#config: {
 	// === Storage ===
 	storage: {
 		data: {
-			type:          *"pvc" | "hostPath" | "emptyDir"
+			type: *"pvc" | "hostPath" | "emptyDir" | "nfs" | "cifs"
+			// pvc fields
 			size:          string | *"10Gi"
 			storageClass?: string
+			// hostPath fields
 			path?:         string
 			hostPathType?: "Directory" | "DirectoryOrCreate"
+			// nfs fields
+			nfsServer?: string // NFS server hostname or IP (e.g. "10.10.0.2")
+			nfsPath?:   string // Exported NFS path (e.g. "/mnt/data/minecraft")
+			// cifs fields (requires smb.csi.k8s.io driver on cluster)
+			cifsSource?:    string // UNC path (e.g. "//10.10.0.2/minecraft")
+			cifsSecretRef?: string // K8s Secret name with keys: username, password
 		}
 		backups: {
-			type:          *"pvc" | "hostPath" | "emptyDir"
+			type: *"pvc" | "hostPath" | "emptyDir" | "nfs" | "cifs"
+			// pvc fields
 			size:          string | *"10Gi"
 			storageClass?: string
+			// hostPath fields
 			path?:         string
 			hostPathType?: "Directory" | "DirectoryOrCreate"
+			// nfs fields
+			nfsServer?: string
+			nfsPath?:   string
+			// cifs fields
+			cifsSource?:    string
+			cifsSecretRef?: string
 		}
 	}
 
