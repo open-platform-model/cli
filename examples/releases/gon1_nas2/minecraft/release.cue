@@ -1,4 +1,4 @@
-package create_dev
+package minecraft
 
 import (
 	mr "opmodel.dev/core/modulerelease@v1"
