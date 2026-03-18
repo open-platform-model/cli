@@ -42,7 +42,7 @@ import (
 		"server-\(_srvName)": {
 			resources_workload.#Container
 			resources_storage.#Volumes
-			if _c.seed.url != _|_ {
+			if _c.bootstrap != _|_ {
 				traits_workload.#InitContainers
 			}
 			if _c.backup.enabled || _c.monitor.enabled {
@@ -74,45 +74,98 @@ import (
 				// Graceful shutdown — allow time for world save
 				gracefulShutdown: terminationGracePeriodSeconds: 60
 
-				// === World Seed Init Container ===
-				// Only injected when seed.url is set.
-				// Downloads a tar.gz and extracts only world directories (level.dat-bearing)
-				// into /data. Writes a sentinel on success; subsequent pod restarts skip it.
-				if _c.seed.url != _|_ {
-					let _seedUrl = _c.seed.url
+				// === Bootstrap Init Container ===
+				// Only injected when bootstrap.url is set.
+				//
+				// Runs on every pod start (emptyDir staging volumes reset on pod recreation).
+				// Downloads the archive and:
+				//   worlds/*  → copied into /data (skips existing, unless FORCE=true)
+				//   plugins/* → staged at /staging/plugins (itzg syncs to /data/plugins)
+				//   mods/*    → staged at /staging/mods    (itzg syncs to /data/mods)
+				//   config/*  → staged at /staging/config  (itzg syncs to /data/config)
+				if _c.bootstrap != _|_ {
 					initContainers: [{
-						name:  "world-seed"
-						image: _c.seed.image
-						command: ["/bin/sh", "-c"]
+						name:  "bootstrap"
+						image: _c.bootstrap.image
+						command: ["python3", "-c"]
 						args: ["""
-							set -e
-							SENTINEL="/data/.opm-world-seed-done"
-							if [ -f "$SENTINEL" ]; then
-							  echo "World seed already applied (sentinel exists), skipping."
-							  exit 0
-							fi
-							TMPDIR="/data/._seed_tmp"
-							mkdir -p "$TMPDIR"
-							echo "Downloading world archive from \(_seedUrl) ..."
-							curl -fL "\(_seedUrl)" | tar -xz -C "$TMPDIR"
-							echo "Scanning archive for world directories (level.dat detection)..."
-							find "$TMPDIR" -maxdepth 2 -name "level.dat" | while read -r leveldat; do
-							  worlddir=$(dirname "$leveldat")
-							  worldname=$(basename "$worlddir")
-							  if [ -d "/data/$worldname" ]; then
-							    echo "Skip $worldname: already exists in /data"
-							  else
-							    echo "Seeding world: $worldname"
-							    cp -a "$worlddir" /data/
-							  fi
-							done
-							rm -rf "$TMPDIR"
-							echo "$(date -Iseconds) opm-world-seed complete" > "$SENTINEL"
-							echo "World seed complete."
+							import os, sys, shutil, tarfile, urllib.request
+
+							url   = os.environ["BOOTSTRAP_URL"]
+							force = os.environ.get("FORCE", "false").lower() == "true"
+							tmp   = "/tmp/_bootstrap"
+							arc   = "/tmp/_bootstrap.archive"
+
+							os.makedirs(tmp, exist_ok=True)
+
+							print(f"Downloading bootstrap archive from {url} ...", flush=True)
+							urllib.request.urlretrieve(url, arc)
+
+							print("Extracting archive...", flush=True)
+							with tarfile.open(arc) as tf:
+							    tf.extractall(tmp)
+							os.remove(arc)
+
+							# --- Worlds: copy level.dat-bearing dirs into /data ---
+							worlds_src = os.path.join(tmp, "worlds")
+							if os.path.isdir(worlds_src):
+							    print("Scanning for world directories...", flush=True)
+							    for entry in os.scandir(worlds_src):
+							        if not entry.is_dir():
+							            continue
+							        level_dat = os.path.join(entry.path, "level.dat")
+							        if not os.path.exists(level_dat):
+							            continue
+							        dest = os.path.join("/data", entry.name)
+							        if os.path.isdir(dest) and not force:
+							            print(f"  Skip world {entry.name}: already exists in /data", flush=True)
+							        else:
+							            print(f"  Seeding world: {entry.name}", flush=True)
+							            if os.path.exists(dest):
+							                shutil.rmtree(dest)
+							            shutil.copytree(entry.path, dest)
+
+							# --- Plugins, mods, config: always stage into emptyDirs ---
+							for cat in ("plugins", "mods", "config"):
+							    src = os.path.join(tmp, cat)
+							    dst = f"/staging/{cat}"
+							    if os.path.isdir(src):
+							        items = os.listdir(src)
+							        print(f"Staging {cat} ({len(items)} items)...", flush=True)
+							        for item in items:
+							            s = os.path.join(src, item)
+							            d = os.path.join(dst, item)
+							            if os.path.isdir(s):
+							                shutil.copytree(s, d, dirs_exist_ok=True)
+							            else:
+							                shutil.copy2(s, d)
+
+							shutil.rmtree(tmp)
+							print("Bootstrap complete.", flush=True)
 							"""]
-						volumeMounts: data: {
-							name:      "data"
-							mountPath: "/data"
+						env: {
+							BOOTSTRAP_URL: {
+								name:  "BOOTSTRAP_URL"
+								value: _c.bootstrap.url
+							}
+							FORCE: {
+								name:  "FORCE"
+								value: "\(_c.bootstrap.force)"
+							}
+						}
+						volumeMounts: {
+							data: volumes.data & {
+								mountPath: "/data"
+							}
+							"staging-plugins": volumes["staging-plugins"] & {
+								mountPath: "/staging/plugins"
+							}
+							"staging-mods": volumes["staging-mods"] & {
+								mountPath: "/staging/mods"
+							}
+							"staging-config": volumes["staging-config"] & {
+								mountPath: "/staging/config"
+							}
 						}
 					}]
 				}
@@ -869,11 +922,25 @@ import (
 							}
 						}
 
-						// === World Data ===
-						if _c.downloadWorldUrl != _|_ {
-							WORLD: {
-								name:  "WORLD"
-								value: _c.downloadWorldUrl
+						// === Bootstrap Staging ===
+						// Tell itzg where to find staged plugins/mods/config so it syncs
+						// them into /data on every server start.
+						if _c.bootstrap != _|_ {
+							COPY_PLUGINS_SRC: {
+								name:  "COPY_PLUGINS_SRC"
+								value: "/staging/plugins"
+							}
+							COPY_MODS_SRC: {
+								name:  "COPY_MODS_SRC"
+								value: "/staging/mods"
+							}
+							COPY_CONFIG_SRC: {
+								name:  "COPY_CONFIG_SRC"
+								value: "/staging/config"
+							}
+							SYNC_SKIP_NEWER_IN_DESTINATION: {
+								name:  "SYNC_SKIP_NEWER_IN_DESTINATION"
+								value: "\(_c.bootstrap.skipNewerInDestination)"
 							}
 						}
 
@@ -893,6 +960,17 @@ import (
 					volumeMounts: {
 						data: volumes.data & {
 							mountPath: "/data"
+						}
+						if _c.bootstrap != _|_ {
+							"staging-plugins": volumes["staging-plugins"] & {
+								mountPath: "/staging/plugins"
+							}
+							"staging-mods": volumes["staging-mods"] & {
+								mountPath: "/staging/mods"
+							}
+							"staging-config": volumes["staging-config"] & {
+								mountPath: "/staging/config"
+							}
 						}
 					}
 
@@ -1295,6 +1373,25 @@ import (
 									}
 								}
 							}
+						}
+					}
+
+					// === Bootstrap Staging Volumes ===
+					// Three ephemeral emptyDirs populated by the bootstrap init container.
+					// Re-populated on every pod start; itzg copies their contents into
+					// /data/plugins, /data/mods, and /data/config at server startup.
+					if _c.bootstrap != _|_ {
+						"staging-plugins": {
+							name: "staging-plugins"
+							emptyDir: {}
+						}
+						"staging-mods": {
+							name: "staging-mods"
+							emptyDir: {}
+						}
+						"staging-config": {
+							name: "staging-config"
+							emptyDir: {}
 						}
 					}
 				}

@@ -304,28 +304,60 @@ _#config: {
 		port:    _#portSchema | *25565
 	}
 
-	// === World Data ===
-	downloadWorldUrl?: string
+	// === Bootstrap ===
+	// Server bootstrapping from a tar archive containing worlds, plugins,
+	// mods, and/or config files. Runs as an init container before the server starts.
+	//
+	// REQUIRED archive layout — directories must be at the ROOT of the archive
+	// with no wrapper directory (all directories optional, but layout is mandatory):
+	//
+	//   worlds/             ← world directories, each containing level.dat
+	//   ├── world/
+	//   ├── world_nether/
+	//   └── world_the_end/
+	//   plugins/            ← plugin jars and config dirs
+	//   mods/               ← mod jars
+	//   config/             ← server config files
+	//
+	// Correct way to create the archive (from inside the server-data directory):
+	//   tar -cJf bootstrap.tar.xz worlds/ plugins/ mods/ config/
+	//   tar -czf bootstrap.tar.gz worlds/ plugins/ mods/ config/
+	//
+	// DO NOT wrap in a subdirectory:
+	//   tar -cJf bootstrap.tar.xz my-server/   ← WRONG, breaks extraction
+	//
+	// Supported formats: .tar.gz, .tar.xz, .tar.bz2, .tar.zst
+	//
+	// The init container always re-downloads and re-stages plugins/mods/config on
+	// every pod start (emptyDir volumes are ephemeral). Worlds are only copied when
+	// they don't already exist in /data, ensuring existing player progress is safe.
+	//
+	// Composes cleanly with Modrinth/CurseForge modpack auto-download:
+	// bootstrap provides the state (worlds, plugin configs), the registry
+	// provides the code (mod/plugin jars).
+	bootstrap?: {
+		// URL to the archive. Supported formats: .tar.gz .tar.xz .tar.bz2 .tar.zst
+		url: string
 
-	// === World Seeding ===
-	// When seed.url is set, an init container is added that downloads a tar.gz
-	// archive and extracts only directories containing a level.dat file into /data.
-	// A sentinel file (/data/.opm-world-seed-done) is written on success so that
-	// subsequent pod restarts skip the seed entirely.
-	seed: {
-		// URL to a tar.gz archive containing world directories.
-		// The init container only copies directories that contain level.dat —
-		// plugins, configs, jars, and other files in the archive are ignored.
-		url?: string
-
-		// Image for the world-seed init container.
-		// Must provide: sh, curl, tar, find, cp.
-		// Always present (defaults to alpine:3); override to pin a specific version.
+		// Image for the bootstrap init container.
+		// Must provide: sh, curl, tar (with xz support), find, cp.
+		// Defaults to the same itzg/minecraft-server image as the server container
+		// so no apk/apt installs are needed and uid matches the pod security context.
 		image: schemas.#Image & {
-			repository: string | *"alpine"
-			tag:        string | *"3"
+			repository: string | *"itzg/minecraft-server"
+			tag:        string | *"java21"
 			digest:     string | *""
 		}
+
+		// Force overwrite existing worlds in /data.
+		// Default false: existing worlds are never overwritten (player progress safe).
+		// Set true for intentional resets or disaster recovery.
+		force: bool | *false
+
+		// Controls itzg's SYNC_SKIP_NEWER_IN_DESTINATION for staged plugins/mods/config.
+		// true (default): files already newer in /data are preserved (server changes safe).
+		// false: archive files always overwrite destination.
+		skipNewerInDestination: bool | *true
 	}
 
 	// === Networking ===
@@ -646,7 +678,8 @@ debugValues: {
 				difficulty: "peaceful"
 			}
 			paper: {}
-			jvm: memory: "1G"
+			jvm: memory:    "1G"
+			bootstrap: url: "https://example.com/bootstrap/lobby.tar.gz"
 		}
 		survival: {
 			server: {
