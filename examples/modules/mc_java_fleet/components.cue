@@ -561,6 +561,32 @@ import (
 									value: _c.paper.downloadUrl
 								}
 							}
+							if _c.paper.build != _|_ {
+								PAPER_BUILD: {
+									name:  "PAPER_BUILD"
+									value: "\(_c.paper.build)"
+								}
+							}
+							if _c.paper.channel != _|_ {
+								PAPER_CHANNEL: {
+									name:  "PAPER_CHANNEL"
+									value: _c.paper.channel
+								}
+							}
+							if _c.paper.configRepo != _|_ {
+								PAPER_CONFIG_REPO: {
+									name:  "PAPER_CONFIG_REPO"
+									value: _c.paper.configRepo
+								}
+							}
+							if _c.paper.skipDownloadDefaults != _|_ {
+								if _c.paper.skipDownloadDefaults {
+									SKIP_DOWNLOAD_DEFAULTS: {
+										name:  "SKIP_DOWNLOAD_DEFAULTS"
+										value: "true"
+									}
+								}
+							}
 							if _c.paper.plugins != _|_ {
 								if _c.paper.plugins.urls != _|_ {
 									PLUGINS: {
@@ -591,6 +617,12 @@ import (
 											name:  "MODRINTH_ALLOWED_VERSION_TYPE"
 											value: _c.paper.plugins.modrinth.allowedVersionType
 										}
+									}
+								}
+								if _c.paper.plugins.modpackUrl != _|_ {
+									MODPACK: {
+										name:  "MODPACK"
+										value: _c.paper.plugins.modpackUrl
 									}
 								}
 								REMOVE_OLD_MODS: {
@@ -631,20 +663,26 @@ import (
 											value: _c.spigot.plugins.modrinth.downloadDependencies
 										}
 									}
-									if _c.spigot.plugins.modrinth.allowedVersionType != _|_ {
-										MODRINTH_ALLOWED_VERSION_TYPE: {
-											name:  "MODRINTH_ALLOWED_VERSION_TYPE"
-											value: _c.spigot.plugins.modrinth.allowedVersionType
-										}
-									}
-								}
-								REMOVE_OLD_MODS: {
-									name:  "REMOVE_OLD_MODS"
-									value: "\(_c.spigot.plugins.removeOldMods)"
+						if _c.spigot.plugins.modrinth.allowedVersionType != _|_ {
+								MODRINTH_ALLOWED_VERSION_TYPE: {
+									name:  "MODRINTH_ALLOWED_VERSION_TYPE"
+									value: _c.spigot.plugins.modrinth.allowedVersionType
 								}
 							}
 						}
-						if _c.bukkit != _|_ {
+						if _c.spigot.plugins.modpackUrl != _|_ {
+							MODPACK: {
+								name:  "MODPACK"
+								value: _c.spigot.plugins.modpackUrl
+							}
+						}
+						REMOVE_OLD_MODS: {
+							name:  "REMOVE_OLD_MODS"
+							value: "\(_c.spigot.plugins.removeOldMods)"
+						}
+					}
+				}
+					if _c.bukkit != _|_ {
 							if _c.bukkit.downloadUrl != _|_ {
 								BUKKIT_DOWNLOAD_URL: {
 									name:  "BUKKIT_DOWNLOAD_URL"
@@ -676,26 +714,38 @@ import (
 											value: _c.bukkit.plugins.modrinth.downloadDependencies
 										}
 									}
-									if _c.bukkit.plugins.modrinth.allowedVersionType != _|_ {
-										MODRINTH_ALLOWED_VERSION_TYPE: {
-											name:  "MODRINTH_ALLOWED_VERSION_TYPE"
-											value: _c.bukkit.plugins.modrinth.allowedVersionType
-										}
-									}
-								}
-								REMOVE_OLD_MODS: {
-									name:  "REMOVE_OLD_MODS"
-									value: "\(_c.bukkit.plugins.removeOldMods)"
+					if _c.bukkit.plugins.modrinth.allowedVersionType != _|_ {
+								MODRINTH_ALLOWED_VERSION_TYPE: {
+									name:  "MODRINTH_ALLOWED_VERSION_TYPE"
+									value: _c.bukkit.plugins.modrinth.allowedVersionType
 								}
 							}
 						}
-						if _c.sponge != _|_ {
+						if _c.bukkit.plugins.modpackUrl != _|_ {
+							MODPACK: {
+								name:  "MODPACK"
+								value: _c.bukkit.plugins.modpackUrl
+							}
+						}
+						REMOVE_OLD_MODS: {
+							name:  "REMOVE_OLD_MODS"
+							value: "\(_c.bukkit.plugins.removeOldMods)"
+						}
+					}
+				}
+					if _c.sponge != _|_ {
 							SPONGEVERSION: {
 								name:  "SPONGEVERSION"
 								value: _c.sponge.version
 							}
 						}
 						if _c.purpur != _|_ {
+							if _c.purpur.build != _|_ {
+								PURPUR_BUILD: {
+									name:  "PURPUR_BUILD"
+									value: "\(_c.purpur.build)"
+								}
+							}
 							if _c.purpur.plugins != _|_ {
 								if _c.purpur.plugins.urls != _|_ {
 									PLUGINS: {
@@ -721,19 +771,25 @@ import (
 											value: _c.purpur.plugins.modrinth.downloadDependencies
 										}
 									}
-									if _c.purpur.plugins.modrinth.allowedVersionType != _|_ {
-										MODRINTH_ALLOWED_VERSION_TYPE: {
-											name:  "MODRINTH_ALLOWED_VERSION_TYPE"
-											value: _c.purpur.plugins.modrinth.allowedVersionType
-										}
+								if _c.purpur.plugins.modrinth.allowedVersionType != _|_ {
+									MODRINTH_ALLOWED_VERSION_TYPE: {
+										name:  "MODRINTH_ALLOWED_VERSION_TYPE"
+										value: _c.purpur.plugins.modrinth.allowedVersionType
 									}
 								}
-								REMOVE_OLD_MODS: {
-									name:  "REMOVE_OLD_MODS"
-									value: "\(_c.purpur.plugins.removeOldMods)"
+							}
+							if _c.purpur.plugins.modpackUrl != _|_ {
+								MODPACK: {
+									name:  "MODPACK"
+									value: _c.purpur.plugins.modpackUrl
 								}
 							}
+							REMOVE_OLD_MODS: {
+								name:  "REMOVE_OLD_MODS"
+								value: "\(_c.purpur.plugins.removeOldMods)"
+							}
 						}
+					}
 						if _c.magma != _|_ {
 							if _c.magma.mods != _|_ {
 								if _c.magma.mods.urls != _|_ {

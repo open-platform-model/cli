@@ -75,16 +75,20 @@ _#modsConfig: {
 
 // Plugins config — for plugin-based server types (Paper, Spigot, Bukkit, Purpur)
 _#pluginsConfig: {
-	// List of URLs to plugin jar files
+	// List of URLs to plugin jar files (PLUGINS)
 	urls?: [...string]
 
-	// Spigot resource/plugin IDs for auto-download via Spiget
+	// Spigot resource/plugin IDs for auto-download via Spiget (SPIGET_RESOURCES)
 	spigetResources?: [...int]
 
-	// Modrinth project auto-download
+	// Modrinth project auto-download (MODRINTH_PROJECTS)
 	modrinth?: _#modrinthConfig
 
-	// Remove old plugins before installing new ones
+	// URL to a zip archive of plugin jars to download and install (MODPACK).
+	// The zip must contain jar files at its top level.
+	modpackUrl?: string
+
+	// Remove old plugins before installing new ones (REMOVE_OLD_MODS)
 	removeOldMods: bool | *false
 }
 
@@ -122,8 +126,27 @@ _#config: {
 
 	// PAPER — Paper server (high-performance Spigot fork)
 	paper?: {
+		// Custom download URL for self-hosted Paper builds (PAPER_DOWNLOAD_URL)
 		downloadUrl?: string
-		plugins?:     _#pluginsConfig
+
+		// Pin a specific Paper build number (PAPER_BUILD).
+		// Omit to always use the latest build for the selected VERSION.
+		build?: uint
+
+		// Set to "experimental" to allow experimental Paper builds (PAPER_CHANNEL).
+		// Required for some newer Minecraft versions before a stable build is released.
+		channel?: "experimental"
+
+		// URL to a repository of optimised config files (PAPER_CONFIG_REPO).
+		// The container appends /{VERSION}/{file} to download bukkit.yml,
+		// spigot.yml, paper-global.yml, etc. at startup.
+		configRepo?: string
+
+		// Skip downloading default Paper/Bukkit/Spigot config files (SKIP_DOWNLOAD_DEFAULTS).
+		// Set true when you manage all config files yourself via bootstrap.
+		skipDownloadDefaults?: bool
+
+		plugins?: _#pluginsConfig
 	}
 
 	// FORGE — Minecraft Forge modded server
@@ -159,6 +182,9 @@ _#config: {
 
 	// PURPUR — Purpur server (Paper fork with extra features)
 	purpur?: {
+		// Pin a specific Purpur build number (PURPUR_BUILD).
+		// Omit to always use the latest build for the selected VERSION.
+		build?:   uint
 		plugins?: _#pluginsConfig
 	}
 
