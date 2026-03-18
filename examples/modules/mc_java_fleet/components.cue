@@ -202,16 +202,25 @@ import (
 								protocol:   "TCP"
 							}
 						}
-						if _c.query.enabled {
-							query: {
-								name:       "query"
-								targetPort: _c.query.port
-								protocol:   "TCP"
+					if _c.query.enabled {
+						query: {
+							name:       "query"
+							targetPort: _c.query.port
+							protocol:   "TCP"
+						}
+					}
+					if _c.extraPorts != _|_ {
+						for _extraPort in _c.extraPorts {
+							"\(_extraPort.name)": {
+								name:       _extraPort.name
+								targetPort: _extraPort.containerPort
+								protocol:   _extraPort.protocol
 							}
 						}
 					}
+				}
 
-					env: {
+				env: {
 						EULA: {
 							name:  "EULA"
 							value: "\(_c.eula)"
@@ -1316,16 +1325,29 @@ import (
 							protocol:    "TCP"
 							exposedPort: _c.port
 						}
-						if _c.monitor.enabled {
-							metrics: {
-								targetPort:  _c.monitor.port
-								protocol:    "TCP"
-								exposedPort: _c.monitor.port
+					if _c.monitor.enabled {
+						metrics: {
+							targetPort:  _c.monitor.port
+							protocol:    "TCP"
+							exposedPort: _c.monitor.port
+						}
+					}
+					if _c.extraPorts != _|_ {
+						for _extraPort in _c.extraPorts if _extraPort.expose {
+							"\(_extraPort.name)": {
+								name:        _extraPort.name
+								targetPort:  _extraPort.containerPort
+								protocol:    _extraPort.protocol
+								exposedPort: _extraPort.containerPort
+								if _extraPort.exposedPort != _|_ {
+									exposedPort: _extraPort.exposedPort
+								}
 							}
 						}
 					}
-					type: _c.serviceType
 				}
+				type: _c.serviceType
+			}
 
 				// === Volumes ===
 				volumes: {

@@ -394,6 +394,8 @@ _#config: {
 		name:          string
 		containerPort: _#portSchema
 		protocol:      *"TCP" | "UDP" | "SCTP"
+		expose:        bool | *false
+		exposedPort?:  _#portSchema
 	}]
 
 	// === Storage ===
