@@ -29,9 +29,10 @@ import (
 
 	// Pre-computed shared bindings to avoid repeating #config.xxx in every comprehension
 	// and ensure string interpolation has concrete values.
-	let _domain = #config.domain
-	let _relName = #config.releaseName
-	let _ns = #config.namespace
+	let _domain     = #config.domain
+	let _relName    = #config.releaseName
+	let _ns         = #config.namespace
+	let _routerName = "\(_relName)-router"
 
 	// ── Dynamic Minecraft server components ──────────────────────────────────────
 	// One StatefulSet + Service per entry in #config.servers.
@@ -1498,12 +1499,12 @@ import (
 			updateStrategy: type: "Recreate"
 
 			workloadIdentity: {
-				name:           "mc-router"
+				name:           _routerName
 				automountToken: true
 			}
 
 			container: {
-				name:  "mc-router"
+				name:  _routerName
 				image: #config.router.image
 
 				ports: {
@@ -1953,7 +1954,7 @@ import (
 		resources_security.#Role
 
 		spec: role: {
-			name:  "mc-router"
+			name:  _routerName
 			scope: "cluster"
 
 			rules: [
@@ -1970,7 +1971,7 @@ import (
 			]
 
 			subjects: [{
-				name: "mc-router"
+				name: _routerName
 			}]
 		}
 	}
