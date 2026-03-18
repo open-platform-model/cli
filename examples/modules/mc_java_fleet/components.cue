@@ -1584,11 +1584,20 @@ import (
 					}
 				}
 
-				// Auto-build --mapping args from the servers map.
-				// Format: -mapping={serverName}.{domain}={releaseName}-server-{serverName}.{namespace}.svc:{port}
-				args: [for _srvName, _srvCfg in #config.servers {
-					"-mapping=\(_srvName).\(_domain)=\(_relName)-server-\(_srvName).\(_ns).svc:\(_srvCfg.port)"
-				}]
+			// Auto-build --mapping args from the servers map.
+			// Primary:  -mapping={serverName}.{domain}={releaseName}-server-{serverName}.{namespace}.svc:{port}
+			// Aliases:  one extra -mapping per entry in server.aliases
+			let _primaryMappings = [for _srvName, _srvCfg in #config.servers {
+				"-mapping=\(_srvName).\(_domain)=\(_relName)-server-\(_srvName).\(_ns).svc:\(_srvCfg.port)"
+			}]
+			let _aliasMappings = [
+				for _srvName, _srvCfg in #config.servers
+				if _srvCfg.aliases != _|_
+				for _alias in _srvCfg.aliases {
+					"-mapping=\(_alias)=\(_relName)-server-\(_srvName).\(_ns).svc:\(_srvCfg.port)"
+				},
+			]
+			args: list.Concat([_primaryMappings, _aliasMappings])
 
 				if #config.router.resources != _|_ {
 					resources: #config.router.resources

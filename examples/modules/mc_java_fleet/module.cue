@@ -398,6 +398,12 @@ _#config: {
 		exposedPort?:  _#portSchema
 	}]
 
+	// Additional hostnames the router maps to this server.
+	// Each alias produces an extra --mapping arg pointing to the same
+	// backend as the primary {serverName}.{domain} mapping.
+	// Example: ["vanilla.larnet.eu", "mc.larnet.eu"]
+	aliases?: [...string]
+
 	// === Storage ===
 	storage: {
 		data: {
