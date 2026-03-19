@@ -21,10 +21,10 @@
 //   wolf-config   PVC/hostPath/NFS   → /etc/wolf       (wolf + dind)
 //   docker-data   PVC/emptyDir       → /var/lib/docker  (dind only)
 //   docker-socket emptyDir           → /run/dind        (wolf + dind)  ← shared socket
-//   wolf-api      emptyDir           → /run/wolf        (wolf only)    ← wolf.sock
-//   xdg-sockets   emptyDir           → /tmp/wolf-sockets (wolf + dind) ← PulseAudio/Wayland
+//   wolf-api      emptyDir           → /run/wolf        (wolf + dind)  ← wolf.sock (DinD needs it for Wolf-UI)
+//   xdg-sockets   emptyDir           → /run/wolf-sockets (wolf + dind) ← PulseAudio/Wayland
 //   dev           hostPath /dev      → /dev             (wolf + dind)
-//   udev          hostPath /run/udev → /run/udev        (wolf only)
+//   udev          hostPath /run/udev → /run/udev        (wolf + dind)
 //   nvidia-driver hostPath (nvidia)  → /usr/nvidia      (wolf only, nvidia only)
 //
 // Security note:
@@ -151,7 +151,20 @@ import (
 				args: [
 					"--host", "unix:///run/dind/docker.sock",
 					"--tls=false",
+					// Use traditional overlay2 storage driver instead of the default
+					// containerd-snapshotter (io.containerd.snapshotter.v1.overlayfs).
+					// In containerd-snapshotter mode, Docker 29+ backs child container
+					// bind mounts with a fresh tmpfs instead of real kernel bind mounts,
+					// so sockets written by PA/Wolf-UI into /tmp/wolf-sockets land in that
+					// tmpfs and are invisible to the wolf K8s container. overlay2 uses
+					// standard kernel bind mounts, correctly sharing the K8s emptyDir.
+					"--storage-driver", "overlay2",
 				]
+				// DinD requires privileged: true — Docker-in-Docker needs full
+				// kernel access to create network namespaces, cgroups, and mounts.
+				securityContext: {
+					privileged: true
+				}
 				env: {
 					// Empty string disables TLS certificate generation at startup
 					DOCKER_TLS_CERTDIR: {
@@ -169,11 +182,25 @@ import (
 					"docker-socket": volumes["docker-socket"] & {
 						mountPath: "/run/dind"
 					}
+					// Wolf REST API socket — DinD must be able to resolve /run/wolf/wolf.sock
+					// (and /var/run/wolf/wolf.sock via the /var/run→/run symlink) when
+					// bind-mounting it into Wolf-UI and other app containers.
+					"wolf-api": volumes["wolf-api"] & {
+						mountPath: "/run/wolf"
+					}
 					"xdg-sockets": volumes["xdg-sockets"] & {
-						mountPath: "/tmp/wolf-sockets"
+						// /run is NOT mounted as tmpfs in DinD; child containers correctly
+						// inherit this K8s emptyDir bind mount. /tmp IS tmpfs in DinD
+						// and would shadow the emptyDir, breaking socket sharing.
+						mountPath: "/run/wolf-sockets"
 					}
 					dev: volumes.dev & {
 						mountPath: "/dev"
+					}
+					// Host udev database — needed so DinD can resolve /run/udev bind mounts
+					// inside app containers (fake-udev and virtual device enumeration).
+					udev: volumes.udev & {
+						mountPath: "/run/udev"
 					}
 				}
 
@@ -280,17 +307,29 @@ import (
 						name:  "HOST_APPS_STATE_FOLDER"
 						value: "/etc/wolf"
 					}
-					// XDG_RUNTIME_DIR is used by Wolf for PulseAudio and Wayland
-					// compositor Unix sockets shared with app containers.
-					XDG_RUNTIME_DIR: {
-						name:  "XDG_RUNTIME_DIR"
-						value: "/tmp/wolf-sockets"
-					}
+				// XDG_RUNTIME_DIR is used by Wolf for PulseAudio and Wayland
+				// compositor Unix sockets shared with app containers.
+				// IMPORTANT: must be outside /tmp — DinD mounts /tmp as a tmpfs,
+				// so bind mounts from /tmp paths in DinD child containers resolve
+				// to DinD's tmpfs overlay rather than the K8s emptyDir, making
+				// sockets invisible to the wolf K8s container. /run is NOT tmpfs.
+				XDG_RUNTIME_DIR: {
+					name:  "XDG_RUNTIME_DIR"
+					value: "/run/wolf-sockets"
+				}
 					// Wolf REST API Unix socket path (used by Wolf UI internally)
 					WOLF_SOCKET_PATH: {
 						name:  "WOLF_SOCKET_PATH"
 						value: "/run/wolf/wolf.sock"
 					}
+				// PulseAudio socket path. The GOW pulseaudio image creates its socket
+				// at $XDG_RUNTIME_DIR/pulse-socket, not the libpulse default
+				// $XDG_RUNTIME_DIR/pulse/native. Setting PULSE_SERVER here ensures
+				// Wolf's own GStreamer pulsesrc pipeline connects to the right socket.
+				PULSE_SERVER: {
+					name:  "PULSE_SERVER"
+					value: "/run/wolf-sockets/pulse-socket"
+				}
 
 					// ── Port overrides (only emit when non-default) ────────────
 					if #config.networking.httpsPort != 47984 {
@@ -370,10 +409,11 @@ import (
 					"wolf-api": volumes["wolf-api"] & {
 						mountPath: "/run/wolf"
 					}
-					// PulseAudio and Wayland compositor sockets
-					"xdg-sockets": volumes["xdg-sockets"] & {
-						mountPath: "/tmp/wolf-sockets"
-					}
+				// PulseAudio and Wayland compositor sockets — mounted at /run, not /tmp,
+				// because DinD mounts /tmp as tmpfs which shadows K8s emptyDir bind mounts.
+				"xdg-sockets": volumes["xdg-sockets"] & {
+					mountPath: "/run/wolf-sockets"
+				}
 					// Host /dev — GPU, uinput, uhid device access
 					dev: volumes.dev & {
 						mountPath: "/dev"
