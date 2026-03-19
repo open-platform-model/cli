@@ -209,47 +209,70 @@ import (
 				}
 			}]
 
-			// ── Optional API proxy sidecar: nginx ──────────────────────────────
-			// nginx reverse proxy to expose the Wolf REST API (Unix socket) over TCP.
-			// Enabled only when #config.api is defined and api.enabled is true.
-			let _apiProxySidecar = [if #config.api != _|_ if #config.api.enabled {
+			// ── Optional management UI sidecar: WolfManager ──────────────────
+			// Blazor Server web UI for Wolf management — user accounts, device
+			// pairing, session monitoring, and profile management.
+			// Enabled only when #config.manager is defined and manager.enabled is true.
+			// Source: https://github.com/salty2011/wolfmanager
+			let _managerSidecar = [if #config.manager != _|_ if #config.manager.enabled {
 				{
-					name:  "api-proxy"
-					image: #config.api.image
-					command: ["sh", "-c"]
-					args: ["""
-						cat > /etc/nginx/conf.d/wolf.conf << 'EOF'
-						server {
-						    listen \(#config.api.port);
-						    location / {
-						        proxy_pass http://unix:/run/wolf/wolf.sock;
-						        proxy_http_version 1.0;
-						        proxy_set_header Host $host;
-						        proxy_set_header X-Real-IP $remote_addr;
-						    }
-						}
-						EOF
-						nginx -g 'daemon off;'
-						"""]
+					name:  "wolfmanager"
+					image: #config.manager.image
 					ports: {
-						api: {
-							targetPort: #config.api.port
+						http: {
+							targetPort: #config.manager.port
 							protocol:   "TCP"
 						}
 					}
+					env: {
+						// ASP.NET Core port binding
+						ASPNETCORE_URLS: {
+							name:  "ASPNETCORE_URLS"
+							value: "http://+:\(#config.manager.port)"
+						}
+						// SQLite database on the persistent wolf-config volume
+						ConnectionStrings__Default: {
+							name:  "ConnectionStrings__Default"
+							value: "Data Source=/etc/wolf/wolfmanager.db"
+						}
+						// Wolf Unix socket connection
+						Wolf__UseUnixSocket: {
+							name:  "Wolf__UseUnixSocket"
+							value: "true"
+						}
+						Wolf__UnixSocketPath: {
+							name:  "Wolf__UnixSocketPath"
+							value: "/run/wolf/wolf.sock"
+						}
+						// Admin account password (created on first start)
+						Admin__Password: {
+							name:  "Admin__Password"
+							value: #config.manager.adminPassword
+						}
+						// JWT signing key for API token authentication
+						Jwt__SecretKey: {
+							name:  "Jwt__SecretKey"
+							value: #config.manager.jwtSecretKey
+						}
+					}
 					volumeMounts: {
+						// Wolf REST API socket
 						"wolf-api": volumes["wolf-api"] & {
 							mountPath: "/run/wolf"
 							readOnly:  true
 						}
+						// Persistent storage for SQLite database (wolfmanager.db)
+						"wolf-config": volumes["wolf-config"] & {
+							mountPath: "/etc/wolf"
+						}
 					}
-					if #config.api.resources != _|_ {
-						resources: #config.api.resources
+					if #config.manager.resources != _|_ {
+						resources: #config.manager.resources
 					}
 				}
 			}]
 
-			sidecarContainers: list.Concat([_dindSidecar, _apiProxySidecar])
+			sidecarContainers: list.Concat([_dindSidecar, _managerSidecar])
 
 			// ── Main container: wolf ───────────────────────────────────────────
 			container: {
@@ -481,11 +504,11 @@ import (
 						protocol:    "UDP"
 						exposedPort: #config.networking.audioPort
 					}
-					if #config.api != _|_ if #config.api.enabled {
-						"api-proxy": {
-							targetPort:  #config.api.port
+					if #config.manager != _|_ if #config.manager.enabled {
+						manager: {
+							targetPort:  #config.manager.port
 							protocol:    "TCP"
-							exposedPort: #config.api.port
+							exposedPort: #config.manager.port
 						}
 					}
 				}

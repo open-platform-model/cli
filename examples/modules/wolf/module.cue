@@ -13,7 +13,7 @@
 //
 // ## Architecture
 //
-// A single StatefulSet is deployed with three containers:
+// A single StatefulSet is deployed with these containers:
 //
 //   initContainer: config-seed
 //     Seeds /etc/wolf/cfg/config.toml on first start only.
@@ -25,15 +25,22 @@
 //     host has no accessible Docker socket. Shares the config PVC and XDG socket
 //     emptyDir with Wolf so app containers can access the right paths.
 //
+//   sidecar: wolfmanager  (optional, ghcr.io/salty2011/wolfmanager)
+//     Web-based management UI for Wolf. Provides authenticated user management,
+//     Moonlight device pairing, session monitoring, and profile management.
+//     Communicates with Wolf via the Unix domain socket at /run/wolf/wolf.sock.
+//     Stores its SQLite database on the wolf-config volume.
+//     Source: https://github.com/salty2011/wolfmanager
+//
 //   main: wolf  (ghcr.io/games-on-whales/wolf:stable)
 //     The Wolf streaming server. Talks to DinD to manage app containers, streams
 //     GPU-encoded video/audio to Moonlight clients over RTP/UDP.
 //
 // ## Pairing
 //
-// Point Moonlight at the node IP. Wolf logs a URL with a PIN entry page.
-// Enter the PIN shown by Moonlight to complete pairing. Wolf UI (shown in
-// Moonlight after pairing) provides an app launcher and lobby management.
+// When WolfManager is enabled, use its web UI (default port 5000) to pair
+// Moonlight clients. It provides a PIN-entry form, user accounts, and device
+// tracking. Without WolfManager, Wolf logs a PIN entry URL to stdout.
 //
 // ## Ports
 //
@@ -213,28 +220,35 @@ _#portSchema: uint & >0 & <=65535
 		audioPort:   _#portSchema | *48200 // UDP — Opus audio
 	}
 
-	// === Wolf REST API proxy (optional) ===
-	// Wolf exposes its REST API only on a Unix socket at /run/wolf/wolf.sock.
-	// The Wolf UI (in Moonlight) uses this socket to manage apps and lobbies.
-	// Enable this section to add an nginx sidecar that proxies the socket to TCP,
-	// making the API reachable from outside the pod.
+	// === WolfManager (optional) ===
+	// Web-based management interface for Wolf. Provides authenticated user
+	// management, Moonlight device pairing UI, session monitoring, and
+	// profile management. Communicates with Wolf via the Unix domain socket
+	// at /run/wolf/wolf.sock. Stores its SQLite database on the wolf-config
+	// volume so it inherits the same persistence as Wolf's own state.
 	//
-	// WARNING: The API allows pairing Moonlight clients and launching arbitrary
-	// Docker containers. Secure the proxy with network policies or authentication
-	// before exposing it outside the cluster.
-	api?: {
-		// Enable the nginx API proxy sidecar
+	// Source: https://github.com/salty2011/wolfmanager
+	manager?: {
+		// Enable the WolfManager sidecar container
 		enabled: bool | *false
 
-		// TCP port for the API proxy (exposed via a separate ClusterIP Service)
-		port: _#portSchema | *8080
+		// TCP port for the WolfManager web UI
+		port: _#portSchema | *5000
 
-		// nginx image for the proxy sidecar
+		// WolfManager container image
 		image: schemas.#Image & {
-			repository: string | *"nginx"
-			tag:        string | *"alpine"
+			repository: string | *"ghcr.io/salty2011/wolfmanager"
+			tag:        string | *"main"
 			digest:     string | *""
 		}
+
+		// Default admin account password (created on first start).
+		// Change this before exposing WolfManager outside the cluster.
+		adminPassword: string | *"Admin123!"
+
+		// JWT signing key for API token authentication (min 32 characters).
+		// Change this before exposing WolfManager outside the cluster.
+		jwtSecretKey: string | *"wolf-manager-default-jwt-secret-key-change-me"
 
 		resources?: schemas.#ResourceRequirementsSchema
 	}
@@ -329,9 +343,9 @@ debugValues: {
 		audioPort:   48200
 	}
 
-	api: {
+	manager: {
 		enabled: true
-		port:    8080
+		port:    5000
 	}
 
 	storage: config: {
