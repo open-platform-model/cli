@@ -3,8 +3,8 @@
 // Streams GPU-accelerated desktops and games to Moonlight clients.
 // Multi-user: each paired client gets an isolated session.
 //
-// Target: bare-metal node with an Intel/AMD GPU running Talos/K8s.
-// Networking: LoadBalancer (MetalLB) for external Moonlight access.
+// Target: lnn1-mrspel — bare-metal Talos node, AMD Radeon 780M iGPU (renderD128).
+// Networking: hostNetwork on 192.168.11.224 — Moonlight connects on standard Wolf ports.
 package mr_spel
 
 import (
@@ -37,12 +37,11 @@ values: {
 		renderNode: "/dev/dri/renderD128"
 	}
 
-	// Docker-in-Docker: cache game images on a PVC to avoid slow re-pulls
+	// Docker-in-Docker: emptyDir for experimentation (layers rebuilt on pod restart).
+	// Switch to pvc + local-path once the Talos user volume is provisioned.
 	dind: {
 		storage: {
-			type:         "pvc"
-			size:         "100Gi"
-			storageClass: "local-path"
+			type: "emptyDir"
 		}
 		resources: {
 			requests: {cpu: "500m", memory: "512Mi"}
@@ -50,14 +49,18 @@ values: {
 		}
 	}
 
-	// LoadBalancer for external Moonlight access (requires MetalLB or equivalent)
-	networking: serviceType: "LoadBalancer"
+	// ClusterIP — Wolf uses hostNetwork: true so Moonlight connects directly to
+	// 192.168.11.224 on Wolf's standard ports. A ClusterIP Service still provides
+	// internal DNS for observability but carries no external traffic.
+	networking: serviceType: "ClusterIP"
 
-	// Persistent storage for Wolf config, paired clients, and per-user app state
+	// hostPath on the EPHEMERAL partition — no PVC needed.
+	// /var/lib is writable on Talos (EPHEMERAL, 498GB sdb4).
+	// Switch to pvc + local-path once the Talos user volume is provisioned.
 	storage: config: {
-		type:         "pvc"
-		size:         "50Gi"
-		storageClass: "local-path"
+		type:         "hostPath"
+		path:         "/var/lib/wolf"
+		hostPathType: "DirectoryOrCreate"
 	}
 
 	// Wolf container resource limits
