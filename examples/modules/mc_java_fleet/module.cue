@@ -634,7 +634,7 @@ _#config: {
 		}
 		port:        _#portSchema | *8080
 		serviceType: *"ClusterIP" | "LoadBalancer" | "NodePort"
-		password?:   schemas.#Secret & {
+		password?: schemas.#Secret & {
 			$secretName: "code-server-secrets"
 			$dataKey:    "password"
 		}
@@ -656,19 +656,22 @@ _#config: {
 	// Optional Backrest web UI (https://github.com/garethgeorge/backrest) for
 	// browsing and restoring restic snapshots created by the backup sidecars.
 	//
-	// On first deploy an init container writes /data/config.json with one repo
-	// pre-configured per server that has backup.method == "restic". The init
-	// container generates a bcrypt hash of the password at runtime so that no
-	// plaintext hash is baked into the module definition.
+	// Config is generated entirely in CUE and stored as an immutable K8s Secret
+	// (one repo pre-configured per server that has backup.restic set). The Secret
+	// is content-hash named so any config change triggers a new Secret and a pod
+	// rollout — no init container, no stale config.json on a PVC.
 	//
 	// Prune and check schedules are disabled in the pre-configured repos because
 	// the itzg/mc-backup sidecar already owns the backup schedule. Backrest is
 	// used purely for browsing and restoring.
 	//
-	// Storage: a single PVC (or hostPath/emptyDir) holds the Backrest config,
-	// internal state, and the restic cache under /data.
+	// Password: provide a pre-computed bcrypt hash (cost 10, $2a$ prefix).
+	// Generate with: htpasswd -bnBC 10 "" "yourpassword" | tr -d ':\n' | sed 's/$2y/$2a/'
+	//
+	// Storage: a single PVC (or hostPath/emptyDir) holds Backrest internal state
+	// and the restic cache under /data. Config is mounted read-only from the Secret.
 	resticGui?: {
-		enabled:  bool | *false
+		enabled: bool | *false
 		image: schemas.#Image & {
 			repository: string | *"ghcr.io/garethgeorge/backrest"
 			tag:        string | *"latest"
@@ -678,19 +681,23 @@ _#config: {
 		serviceType: *"ClusterIP" | "LoadBalancer" | "NodePort"
 		// Username for the Backrest web UI.
 		username: string | *"admin"
-		// Password for the Backrest web UI.
-		// OPM creates a k8s Secret named "restic-gui-secrets" with key "password".
-		password: schemas.#Secret & {
-			$secretName: "restic-gui-secrets"
-			$dataKey:    "password"
-		}
-		// Single PVC / hostPath / emptyDir holding config, state, and cache.
-		storage: data: {
-			type:          *"pvc" | "hostPath" | "emptyDir"
-			size:          string | *"5Gi"
-			storageClass?: string
-			path?:         string
-			hostPathType?: "Directory" | "DirectoryOrCreate"
+		// Base64-encoded bcrypt hash of the Backrest web UI password.
+		// Backrest decodes the stored value as base64 before bcrypt comparison.
+		// Generate with: htpasswd -bnBC 10 "" "yourpassword" | tr -d ':\n' | sed 's/$2y/$2a/' | base64 | tr -d '\n'
+		passwordBcryptHash: string
+		// Pre-generated ECDSA P-256 identity for Backrest's internal multihost feature.
+		// Required to prevent Backrest from writing config.json.bak.* on startup,
+		// which fails when the config is mounted read-only from a K8s Secret.
+		// Without this, PopulateRequiredFields mutates the config → triggers Update()
+		// → makeBackup() → write fails on read-only mount.
+		//
+		// Generate once with:
+		//   go run github.com/garethgeorge/backrest/cmd/backrest@latest gen-key
+		// Or use the helper script in the module tools directory.
+		multihostIdentity: {
+			keyId:   string // "ecdsa.<base64url(sha256(X+Y))>"
+			privKey: string // PEM "EC PRIVATE" (SEC1/x509.MarshalECPrivateKey)
+			pubKey:  string // PEM "EC PUBLIC"  (SPKI/x509.MarshalPKIXPublicKey)
 		}
 		resources?: schemas.#ResourceRequirementsSchema
 	}
@@ -759,14 +766,15 @@ debugValues: {
 	}
 
 	resticGui: {
-		enabled:     true
-		port:        9898
-		serviceType: "ClusterIP"
-		username:    "admin"
-		password: value: "debug-restic-gui-password"
-		storage: data: {
-			type: "pvc"
-			size: "5Gi"
+		enabled:            true
+		port:               9898
+		serviceType:        "ClusterIP"
+		username:           "admin"
+		passwordBcryptHash: "$2a$10$debugHashForCueVetOnlyNotRealxxxxxxxxxxxxxxxxxxxxxO"
+		multihostIdentity: {
+			keyId:   "ecdsa.debugKeyIdForCueVetOnlyNotReal"
+			privKey: "-----BEGIN EC PRIVATE-----\ndebug\n-----END EC PRIVATE-----\n"
+			pubKey:  "-----BEGIN EC PUBLIC-----\ndebug\n-----END EC PUBLIC-----\n"
 		}
 	}
 }

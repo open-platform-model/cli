@@ -12,11 +12,13 @@
 package mc_java_fleet
 
 import (
+	"encoding/json"
 	"list"
 	"strings"
 
 	resources_workload "opmodel.dev/resources/workload@v1"
 	resources_storage "opmodel.dev/resources/storage@v1"
+	resources_config "opmodel.dev/resources/config@v1"
 	resources_security "opmodel.dev/resources/security@v1"
 	traits_workload "opmodel.dev/traits/workload@v1"
 	traits_network "opmodel.dev/traits/network@v1"
@@ -29,9 +31,9 @@ import (
 
 	// Pre-computed shared bindings to avoid repeating #config.xxx in every comprehension
 	// and ensure string interpolation has concrete values.
-	let _domain     = #config.domain
-	let _relName    = #config.releaseName
-	let _ns         = #config.namespace
+	let _domain = #config.domain
+	let _relName = #config.releaseName
+	let _ns = #config.namespace
 	let _routerName = "\(_relName)-router"
 
 	// ── Dynamic Minecraft server components ──────────────────────────────────────
@@ -175,16 +177,17 @@ import (
 				if _c.securityContext != _|_ {
 					securityContext: _c.securityContext
 				}
-				if _c.securityContext == _|_ {
-					securityContext: {
-						runAsNonRoot:             true
-						runAsUser:                1000
-						runAsGroup:               3000
-						readOnlyRootFilesystem:   true
-						allowPrivilegeEscalation: false
-						capabilities: drop: ["ALL"]
-					}
+			if _c.securityContext == _|_ {
+				securityContext: {
+					runAsNonRoot:             true
+					runAsUser:                1000
+					runAsGroup:               3000
+					fsGroup:                  3000
+					readOnlyRootFilesystem:   true
+					allowPrivilegeEscalation: false
+					capabilities: drop: ["ALL"]
 				}
+			}
 
 				// === Main Container: Minecraft Server ===
 				container: {
@@ -203,25 +206,25 @@ import (
 								protocol:   "TCP"
 							}
 						}
-					if _c.query.enabled {
-						query: {
-							name:       "query"
-							targetPort: _c.query.port
-							protocol:   "TCP"
+						if _c.query.enabled {
+							query: {
+								name:       "query"
+								targetPort: _c.query.port
+								protocol:   "TCP"
+							}
 						}
-					}
-					if _c.extraPorts != _|_ {
-						for _extraPort in _c.extraPorts {
-							"\(_extraPort.name)": {
-								name:       _extraPort.name
-								targetPort: _extraPort.containerPort
-								protocol:   _extraPort.protocol
+						if _c.extraPorts != _|_ {
+							for _extraPort in _c.extraPorts {
+								"\(_extraPort.name)": {
+									name:       _extraPort.name
+									targetPort: _extraPort.containerPort
+									protocol:   _extraPort.protocol
+								}
 							}
 						}
 					}
-				}
 
-				env: {
+					env: {
 						EULA: {
 							name:  "EULA"
 							value: "\(_c.eula)"
@@ -673,26 +676,26 @@ import (
 											value: _c.spigot.plugins.modrinth.downloadDependencies
 										}
 									}
-						if _c.spigot.plugins.modrinth.allowedVersionType != _|_ {
-								MODRINTH_ALLOWED_VERSION_TYPE: {
-									name:  "MODRINTH_ALLOWED_VERSION_TYPE"
-									value: _c.spigot.plugins.modrinth.allowedVersionType
+									if _c.spigot.plugins.modrinth.allowedVersionType != _|_ {
+										MODRINTH_ALLOWED_VERSION_TYPE: {
+											name:  "MODRINTH_ALLOWED_VERSION_TYPE"
+											value: _c.spigot.plugins.modrinth.allowedVersionType
+										}
+									}
+								}
+								if _c.spigot.plugins.modpackUrl != _|_ {
+									MODPACK: {
+										name:  "MODPACK"
+										value: _c.spigot.plugins.modpackUrl
+									}
+								}
+								REMOVE_OLD_MODS: {
+									name:  "REMOVE_OLD_MODS"
+									value: "\(_c.spigot.plugins.removeOldMods)"
 								}
 							}
 						}
-						if _c.spigot.plugins.modpackUrl != _|_ {
-							MODPACK: {
-								name:  "MODPACK"
-								value: _c.spigot.plugins.modpackUrl
-							}
-						}
-						REMOVE_OLD_MODS: {
-							name:  "REMOVE_OLD_MODS"
-							value: "\(_c.spigot.plugins.removeOldMods)"
-						}
-					}
-				}
-					if _c.bukkit != _|_ {
+						if _c.bukkit != _|_ {
 							if _c.bukkit.downloadUrl != _|_ {
 								BUKKIT_DOWNLOAD_URL: {
 									name:  "BUKKIT_DOWNLOAD_URL"
@@ -724,26 +727,26 @@ import (
 											value: _c.bukkit.plugins.modrinth.downloadDependencies
 										}
 									}
-					if _c.bukkit.plugins.modrinth.allowedVersionType != _|_ {
-								MODRINTH_ALLOWED_VERSION_TYPE: {
-									name:  "MODRINTH_ALLOWED_VERSION_TYPE"
-									value: _c.bukkit.plugins.modrinth.allowedVersionType
+									if _c.bukkit.plugins.modrinth.allowedVersionType != _|_ {
+										MODRINTH_ALLOWED_VERSION_TYPE: {
+											name:  "MODRINTH_ALLOWED_VERSION_TYPE"
+											value: _c.bukkit.plugins.modrinth.allowedVersionType
+										}
+									}
+								}
+								if _c.bukkit.plugins.modpackUrl != _|_ {
+									MODPACK: {
+										name:  "MODPACK"
+										value: _c.bukkit.plugins.modpackUrl
+									}
+								}
+								REMOVE_OLD_MODS: {
+									name:  "REMOVE_OLD_MODS"
+									value: "\(_c.bukkit.plugins.removeOldMods)"
 								}
 							}
 						}
-						if _c.bukkit.plugins.modpackUrl != _|_ {
-							MODPACK: {
-								name:  "MODPACK"
-								value: _c.bukkit.plugins.modpackUrl
-							}
-						}
-						REMOVE_OLD_MODS: {
-							name:  "REMOVE_OLD_MODS"
-							value: "\(_c.bukkit.plugins.removeOldMods)"
-						}
-					}
-				}
-					if _c.sponge != _|_ {
+						if _c.sponge != _|_ {
 							SPONGEVERSION: {
 								name:  "SPONGEVERSION"
 								value: _c.sponge.version
@@ -781,25 +784,25 @@ import (
 											value: _c.purpur.plugins.modrinth.downloadDependencies
 										}
 									}
-								if _c.purpur.plugins.modrinth.allowedVersionType != _|_ {
-									MODRINTH_ALLOWED_VERSION_TYPE: {
-										name:  "MODRINTH_ALLOWED_VERSION_TYPE"
-										value: _c.purpur.plugins.modrinth.allowedVersionType
+									if _c.purpur.plugins.modrinth.allowedVersionType != _|_ {
+										MODRINTH_ALLOWED_VERSION_TYPE: {
+											name:  "MODRINTH_ALLOWED_VERSION_TYPE"
+											value: _c.purpur.plugins.modrinth.allowedVersionType
+										}
 									}
 								}
-							}
-							if _c.purpur.plugins.modpackUrl != _|_ {
-								MODPACK: {
-									name:  "MODPACK"
-									value: _c.purpur.plugins.modpackUrl
+								if _c.purpur.plugins.modpackUrl != _|_ {
+									MODPACK: {
+										name:  "MODPACK"
+										value: _c.purpur.plugins.modpackUrl
+									}
+								}
+								REMOVE_OLD_MODS: {
+									name:  "REMOVE_OLD_MODS"
+									value: "\(_c.purpur.plugins.removeOldMods)"
 								}
 							}
-							REMOVE_OLD_MODS: {
-								name:  "REMOVE_OLD_MODS"
-								value: "\(_c.purpur.plugins.removeOldMods)"
-							}
 						}
-					}
 						if _c.magma != _|_ {
 							if _c.magma.mods != _|_ {
 								if _c.magma.mods.urls != _|_ {
@@ -1226,31 +1229,7 @@ import (
 								mountPath: "/data"
 								readOnly:  true
 							}
-						if _c.backup.enabled && _c.backup.method == "tar" {
-							backups: {
-								name:      "backups"
-								mountPath: "/backups"
-								if _c.storage.backups.type == "pvc" {
-									persistentClaim: {
-										size: _c.storage.backups.size
-										if _c.storage.backups.storageClass != _|_ {
-											storageClass: _c.storage.backups.storageClass
-										}
-									}
-								}
-								if _c.storage.backups.type == "hostPath" {
-									hostPath: {
-										path: _c.storage.backups.path
-										type: _c.storage.backups.hostPathType
-									}
-								}
-								if _c.storage.backups.type == "emptyDir" {
-									emptyDir: {}
-								}
-							}
-						}
-						if _c.backup.enabled && _c.backup.method == "rsync" {
-							if _c.backup.rsync.useLocalStorage {
+							if _c.backup.enabled && _c.backup.method == "tar" {
 								backups: {
 									name:      "backups"
 									mountPath: "/backups"
@@ -1273,7 +1252,31 @@ import (
 									}
 								}
 							}
-						}
+							if _c.backup.enabled && _c.backup.method == "rsync" {
+								if _c.backup.rsync.useLocalStorage {
+									backups: {
+										name:      "backups"
+										mountPath: "/backups"
+										if _c.storage.backups.type == "pvc" {
+											persistentClaim: {
+												size: _c.storage.backups.size
+												if _c.storage.backups.storageClass != _|_ {
+													storageClass: _c.storage.backups.storageClass
+												}
+											}
+										}
+										if _c.storage.backups.type == "hostPath" {
+											hostPath: {
+												path: _c.storage.backups.path
+												type: _c.storage.backups.hostPathType
+											}
+										}
+										if _c.storage.backups.type == "emptyDir" {
+											emptyDir: {}
+										}
+									}
+								}
+							}
 						}
 
 						resources: {
@@ -1326,29 +1329,29 @@ import (
 							protocol:    "TCP"
 							exposedPort: _c.port
 						}
-					if _c.monitor.enabled {
-						metrics: {
-							targetPort:  _c.monitor.port
-							protocol:    "TCP"
-							exposedPort: _c.monitor.port
+						if _c.monitor.enabled {
+							metrics: {
+								targetPort:  _c.monitor.port
+								protocol:    "TCP"
+								exposedPort: _c.monitor.port
+							}
 						}
-					}
-					if _c.extraPorts != _|_ {
-						for _extraPort in _c.extraPorts if _extraPort.expose {
-							"\(_extraPort.name)": {
-								name:        _extraPort.name
-								targetPort:  _extraPort.containerPort
-								protocol:    _extraPort.protocol
-								exposedPort: _extraPort.containerPort
-								if _extraPort.exposedPort != _|_ {
-									exposedPort: _extraPort.exposedPort
+						if _c.extraPorts != _|_ {
+							for _extraPort in _c.extraPorts if _extraPort.expose {
+								"\(_extraPort.name)": {
+									name:        _extraPort.name
+									targetPort:  _extraPort.containerPort
+									protocol:    _extraPort.protocol
+									exposedPort: _extraPort.containerPort
+									if _extraPort.exposedPort != _|_ {
+										exposedPort: _extraPort.exposedPort
+									}
 								}
 							}
 						}
 					}
+					type: _c.serviceType
 				}
-				type: _c.serviceType
-			}
 
 				// === Volumes ===
 				volumes: {
@@ -1585,20 +1588,20 @@ import (
 					}
 				}
 
-			// Auto-build --mapping args from the servers map.
-			// Primary:  -mapping={serverName}.{domain}={releaseName}-server-{serverName}.{namespace}.svc:{port}
-			// Aliases:  one extra -mapping per entry in server.aliases
-			let _primaryMappings = [for _srvName, _srvCfg in #config.servers {
-				"-mapping=\(_srvName).\(_domain)=\(_relName)-server-\(_srvName).\(_ns).svc:\(_srvCfg.port)"
-			}]
-			let _aliasMappings = [
-				for _srvName, _srvCfg in #config.servers
-				if _srvCfg.aliases != _|_
-				for _alias in _srvCfg.aliases {
-					"-mapping=\(_alias)=\(_relName)-server-\(_srvName).\(_ns).svc:\(_srvCfg.port)"
-				},
-			]
-			args: list.Concat([_primaryMappings, _aliasMappings])
+				// Auto-build --mapping args from the servers map.
+				// Primary:  -mapping={serverName}.{domain}={releaseName}-server-{serverName}.{namespace}.svc:{port}
+				// Aliases:  one extra -mapping per entry in server.aliases
+				let _primaryMappings = [for _srvName, _srvCfg in #config.servers {
+					"-mapping=\(_srvName).\(_domain)=\(_relName)-server-\(_srvName).\(_ns).svc:\(_srvCfg.port)"
+				}]
+				let _aliasMappings = [
+					for _srvName, _srvCfg in #config.servers
+					if _srvCfg.aliases != _|_
+					for _alias in _srvCfg.aliases {
+						"-mapping=\(_alias)=\(_relName)-server-\(_srvName).\(_ns).svc:\(_srvCfg.port)"
+					},
+				]
+				args: list.Concat([_primaryMappings, _aliasMappings])
 
 				if #config.router.resources != _|_ {
 					resources: #config.router.resources
@@ -1650,8 +1653,8 @@ import (
 				metadata: labels: "core.opmodel.dev/workload-type": "stateless"
 
 				spec: {
-					scaling:        count: 1
-					restartPolicy:  "Always"
+					scaling: count: 1
+					restartPolicy: "Always"
 					updateStrategy: type: "Recreate"
 
 					// Run as the same UID/GID as the server containers so that
@@ -1767,11 +1770,10 @@ import (
 	// Optional Backrest deployment (https://github.com/garethgeorge/backrest)
 	// for browsing and restoring restic snapshots created by the backup sidecars.
 	//
-	// An init container (alpine + apache2-utils + jq) runs once on first deploy:
-	//   1. Generates a bcrypt hash of the configured password at runtime.
-	//   2. Loops over indexed env vars (RESTIC_REPO_URI_0, RESTIC_PASSWORD_0, …)
-	//      to build a repos array — one entry per restic-enabled server.
-	//   3. Writes /data/config.json and exits. Subsequent pod restarts skip it.
+	// Config is generated entirely in CUE and stored as an immutable K8s Secret
+	// (content-hash named). Any change to repos or credentials produces a new
+	// Secret and triggers a pod rollout automatically — no init container, no
+	// stale config.json on a PVC to worry about.
 	//
 	// Backrest connects to repos over S3/network only — no server data volumes
 	// are mounted. Prune and check schedules are disabled in pre-configured repos
@@ -1781,102 +1783,125 @@ import (
 			let _rg = #config.resticGui
 
 			// Ordered list of restic-enabled servers (lexicographic by name — CUE
-			// struct iteration is deterministic, giving stable 0-based indices).
+			// struct iteration is deterministic, giving stable indices).
 			let _resticServers = [
 				for _name, _c in #config.servers
 				if _c.backup.enabled && _c.backup.restic != _|_ {
 					{name: _name, cfg: _c}
-				}
+				},
 			]
+
+			// Build the full Backrest config.json as a CUE value and marshal to JSON.
+			// passwordBcrypt is a pre-computed bcrypt hash supplied in values.
+			let _backrestConfig = {
+				modno:    0
+				version:  6
+				instance: "\(_relName)-backrest"
+				repos: [for _, _s in _resticServers {
+					let _awsEnv = {
+						if _s.cfg.backup.restic.accessKey != _|_ {
+							accessKey: "AWS_ACCESS_KEY_ID=\(_s.cfg.backup.restic.accessKey.value)"
+						}
+						if _s.cfg.backup.restic.secretKey != _|_ {
+							secretKey: "AWS_SECRET_ACCESS_KEY=\(_s.cfg.backup.restic.secretKey.value)"
+						}
+					}
+					id:       "\(_relName)-\(_s.name)"
+					uri:      _s.cfg.backup.restic.repository
+					password: _s.cfg.backup.restic.password.value
+					env: [for _, v in _awsEnv {v}]
+					autoUnlock:     true
+					autoInitialize: true
+					prunePolicy: {schedule: {disabled: true}}
+					checkPolicy: {schedule: {disabled: true}}
+				}]
+				auth: {
+					users: [{
+						name:           _rg.username
+						passwordBcrypt: _rg.passwordBcryptHash
+					}]
+				}
+				// multihost.identity must be present so Backrest's PopulateRequiredFields
+				// returns mutated=false on startup. Without it, Backrest calls Update()
+				// to write the identity back, which triggers makeBackup() and fails
+				// because the config is mounted read-only from a K8s Secret.
+				multihost: {
+					identity: {
+						keyId:       _rg.multihostIdentity.keyId
+						ed25519priv: _rg.multihostIdentity.privKey
+						ed25519pub:  _rg.multihostIdentity.pubKey
+					}
+				}
+			}
+
+			let _configJSON = json.Marshal(_backrestConfig)
 
 			"restic-gui": {
 				resources_workload.#Container
 				resources_storage.#Volumes
+				resources_config.#Secrets
 				traits_workload.#InitContainers
 				traits_workload.#Scaling
 				traits_workload.#RestartPolicy
 				traits_workload.#UpdateStrategy
 				traits_network.#Expose
+				traits_security.#SecurityContext
 
 				metadata: labels: "core.opmodel.dev/workload-type": "stateless"
 
 				spec: {
-					scaling:        count: 1
-					restartPolicy:  "Always"
+					scaling: count: 1
+					restartPolicy: "Always"
 					updateStrategy: type: "Recreate"
 
-					// === Init Container: Backrest Config Bootstrap ===
-					// Writes /data/config.json with all restic repos pre-configured.
-					// Idempotent — skips if the file already exists (e.g. on pod restart).
+					// Run Backrest as the same UID/GID as the Minecraft and code-server
+					// containers so restored files and staging directories remain
+					// accessible from /servers/{name} without root-owned artifacts.
+					securityContext: {
+						runAsNonRoot:             true
+						runAsUser:                1000
+						runAsGroup:               1000
+						fsGroup:                  1000
+						readOnlyRootFilesystem:   false
+						allowPrivilegeEscalation: false
+						capabilities: drop: ["ALL"]
+					}
+
+					// === Config Secret ===
+					// CUE-generated Backrest config stored as an immutable K8s Secret.
+					// Mounted read-only at /config-template — the init container copies
+					// it to the writable /data emptyDir before Backrest starts.
+					// Backrest writes GUIDs, operation logs, and cache freely to /data.
+					secrets: backrestConfig: {
+						name:      "backrest-config"
+						type:      "Opaque"
+						immutable: true
+						data: {
+							"config.json": _configJSON
+						}
+					}
+
+					// === Init Container: Config Seed ===
+					// Copies the immutable Secret config into the writable emptyDir on
+					// every pod start so Backrest can write GUIDs and operation logs.
 					initContainers: [{
-						name: "backrest-init"
+						name: "config-seed"
 						image: {
-							repository: "alpine"
-							tag:        "3"
+							repository: "busybox"
+							tag:        "latest"
 							digest:     ""
 						}
-						command: ["/bin/sh", "-c"]
-						args: ["""
-							set -e
-							CONFIG=/data/config.json
-							if [ -f "$CONFIG" ]; then
-							  echo "Backrest config already exists — skipping init."
-							  exit 0
-							fi
-							echo "Installing dependencies..."
-							apk add --no-cache apache2-utils jq > /dev/null
-							echo "Generating password hash..."
-							HASH=$(htpasswd -bnBC 10 "" "$BACKREST_PASSWORD" | tr -d ':\\n' | sed 's/$2y/$2a/' | base64 | tr -d '\\n')
-							echo "Building repo list..."
-							REPOS="[]"
-							i=0
-							while [ "$i" -lt "$BACKREST_REPO_COUNT" ]; do
-							  eval URI="\\$RESTIC_REPO_URI_$i"
-							  eval ID="\\$RESTIC_REPO_ID_$i"
-							  eval PASS="\\$RESTIC_PASSWORD_$i"
-							  eval AKEY="\\$AWS_ACCESS_KEY_$i"
-							  eval SKEY="\\$AWS_SECRET_KEY_$i"
-							  AWS_ENV="[]"
-							  [ -n "$AKEY" ] && AWS_ENV=$(echo "$AWS_ENV" | jq --arg v "AWS_ACCESS_KEY_ID=$AKEY" '. + [$v]')
-							  [ -n "$SKEY" ] && AWS_ENV=$(echo "$AWS_ENV" | jq --arg v "AWS_SECRET_ACCESS_KEY=$SKEY" '. + [$v]')
-							  REPO=$(jq -n --arg id "$ID" --arg uri "$URI" --arg pass "$PASS" --argjson env "$AWS_ENV" '{"id":$id,"uri":$uri,"password":$pass,"env":$env,"autoUnlock":true,"autoInitialize":true,"prunePolicy":{"schedule":{"disabled":true}},"checkPolicy":{"schedule":{"disabled":true}}}')
-							  REPOS=$(echo "$REPOS" | jq --argjson r "$REPO" '. + [$r]')
-							  i=$((i + 1))
-							done
-							mkdir -p /data/cache
-							echo "Writing config.json with $BACKREST_REPO_COUNT repo(s)..."
-							jq -n --arg inst "$BACKREST_INSTANCE" --arg user "$BACKREST_USERNAME" --arg hash "$HASH" --argjson repos "$REPOS" '{"modno":0,"version":6,"instance":$inst,"repos":$repos,"auth":{"users":[{"name":$user,"passwordBcrypt":$hash}]}}' > "$CONFIG"
-							echo "Done."
-							"""]
-
-						env: {
-							BACKREST_PASSWORD:   {name: "BACKREST_PASSWORD",   from: _rg.password}
-							BACKREST_USERNAME:   {name: "BACKREST_USERNAME",   value: _rg.username}
-							BACKREST_INSTANCE:   {name: "BACKREST_INSTANCE",   value: "\(_relName)-backrest"}
-							BACKREST_REPO_COUNT: {name: "BACKREST_REPO_COUNT", value: "\(len(_resticServers))"}
-							// Per-server indexed env vars: always-present fields.
-							for _i, _s in _resticServers {
-								"RESTIC_REPO_ID_\(_i)":  {name: "RESTIC_REPO_ID_\(_i)",  value: "\(_relName)-\(_s.name)"}
-								"RESTIC_REPO_URI_\(_i)": {name: "RESTIC_REPO_URI_\(_i)", value: _s.cfg.backup.restic.repository}
-								"RESTIC_PASSWORD_\(_i)": {name: "RESTIC_PASSWORD_\(_i)", from: _s.cfg.backup.restic.password}
-							}
-							// AWS credentials — emitted only when configured on the server.
-							for _i, _s in _resticServers if _s.cfg.backup.restic.accessKey != _|_ {
-								"AWS_ACCESS_KEY_\(_i)": {name: "AWS_ACCESS_KEY_\(_i)", from: _s.cfg.backup.restic.accessKey}
-							}
-							for _i, _s in _resticServers if _s.cfg.backup.restic.secretKey != _|_ {
-								"AWS_SECRET_KEY_\(_i)": {name: "AWS_SECRET_KEY_\(_i)", from: _s.cfg.backup.restic.secretKey}
-							}
-						}
-
-						volumeMounts: data: volumes.data & {
-							mountPath: "/data"
+						command: ["cp", "/config-template/config.json", "/data/config.json"]
+						volumeMounts: {
+							"config-template": volumes["config-template"] & {mountPath: "/config-template", readOnly: true}
+							data:              volumes.data & {mountPath: "/data"}
 						}
 					}]
 
 					// === Main Container: Backrest ===
-					// Reads /data/config.json written by the init container.
-					// Cache lives under /data/cache, tmp is a separate emptyDir.
+					// Reads/writes config freely from the writable /data emptyDir.
+					// Server hostPath volumes are mounted writable at /servers/{name}
+					// so Backrest can restore snapshots directly into server data dirs.
 					container: {
 						name:  "backrest"
 						image: _rg.image
@@ -1897,6 +1922,14 @@ import (
 						volumeMounts: {
 							data: volumes.data & {mountPath: "/data"}
 							tmp:  volumes.tmp & {mountPath: "/tmp"}
+
+							// One writable mount per hostPath-backed restic server.
+							for _, _s in _resticServers
+							if _s.cfg.storage.data.type == "hostPath" {
+								"server-\(_s.name)": volumes["server-\(_s.name)"] & {
+									mountPath: "/servers/\(_s.name)"
+								}
+							}
 						}
 
 						if _rg.resources != _|_ {
@@ -1905,32 +1938,37 @@ import (
 					}
 
 					volumes: {
-						// Single PVC/hostPath/emptyDir for config, state, and restic cache.
+						// Writable emptyDir — holds config.json (seeded by init container),
+						// GUIDs written back by Backrest, operation logs, and restic cache.
+						// Ephemeral: reset on every pod restart (init container re-seeds).
 						data: {
-							name: "data"
-							if _rg.storage.data.type == "pvc" {
-								persistentClaim: {
-									size: _rg.storage.data.size
-									if _rg.storage.data.storageClass != _|_ {
-										storageClass: _rg.storage.data.storageClass
-									}
-								}
-							}
-							if _rg.storage.data.type == "hostPath" {
-								hostPath: {
-									path: _rg.storage.data.path
-									type: _rg.storage.data.hostPathType
-								}
-							}
-							if _rg.storage.data.type == "emptyDir" {
-								emptyDir: {}
-							}
+							name:     "data"
+							emptyDir: {}
 						}
-						// Backrest and restic need a writable /tmp for staging downloads
-						// and restores regardless of root filesystem mutability.
+						// Writable /tmp for restic staging.
 						tmp: {
 							name:     "tmp"
 							emptyDir: {}
+						}
+						// Read-only Secret mount — init container source only.
+						"config-template": {
+							name: "config-template"
+							secret: {
+								from: {secrets.backrestConfig}
+								items: [{key: "config.json", path: "config.json"}]
+							}
+						}
+						// One hostPath volume per restic-enabled server with hostPath storage.
+						// Mounted writable in Backrest for snapshot restore operations.
+						for _, _s in _resticServers
+						if _s.cfg.storage.data.type == "hostPath" {
+							"server-\(_s.name)": {
+								name: "server-\(_s.name)"
+								hostPath: {
+									path: _s.cfg.storage.data.path
+									type: _s.cfg.storage.data.hostPathType
+								}
+							}
 						}
 					}
 

@@ -29,7 +29,7 @@ values: {
 		// Source: create-survival-server in docker-compose
 		"create-survival": {
 			enabled: true
-			N=name: "create-survival"
+			N=name:  "create-survival"
 			image: {
 				repository: "itzg/minecraft-server"
 				tag:        "java21"
@@ -89,7 +89,7 @@ values: {
 			// }]
 
 			storage: data: {
-				type:         "hostPath"
+				type: "hostPath"
 				// This path is on the 240GB NVMe drive. TODO: migrate to 2TB ZFS later
 				path:         "/var/local-path-provisioner/minecraft/prod/create-survival"
 				hostPathType: "DirectoryOrCreate"
@@ -99,7 +99,7 @@ values: {
 				enabled:          true
 				method:           "restic"
 				interval:         "1h"
-				initialDelay:     "2m"
+				initialDelay:     "10m"
 				pruneBackupsDays: 20
 				pauseIfNoPlayers: true
 				backupName:       "\(releaseName)-\(N)-backup"
@@ -115,6 +115,11 @@ values: {
 			}
 
 			monitor: enabled: true
+
+			resources: {
+				requests: {cpu: "100m", memory: "5Gi"}
+				limits: {cpu: 2, memory: "5632Mi"}
+			}
 		}
 
 		// ── create-creative ──────────────────────────────────────────────────────────
@@ -122,7 +127,7 @@ values: {
 		// Source: create-creative-server in docker-compose
 		"create-creative": {
 			enabled: true
-			N=name: "create-creative"
+			N=name:  "create-creative"
 			image: {
 				repository: "itzg/minecraft-server"
 				tag:        "java21"
@@ -182,7 +187,7 @@ values: {
 			// }]
 
 			storage: data: {
-				type:         "hostPath"
+				type: "hostPath"
 				// This path is on the 240GB NVMe drive. TODO: migrate to 2TB ZFS later
 				path:         "/var/local-path-provisioner/minecraft/prod/create-creative"
 				hostPathType: "DirectoryOrCreate"
@@ -192,7 +197,7 @@ values: {
 				enabled:          true
 				method:           "restic"
 				interval:         "1h"
-				initialDelay:     "2m"
+				initialDelay:     "10m"
 				pruneBackupsDays: 20
 				pauseIfNoPlayers: true
 				backupName:       "\(releaseName)-\(N)-backup"
@@ -208,11 +213,16 @@ values: {
 			}
 
 			monitor: enabled: true
+
+			resources: {
+				requests: {cpu: "100m", memory: "5Gi"}
+				limits: {cpu: 2, memory: "5632Mi"}
+			}
 		}
 
-		// ── vanilla-prod ──────────────────────────────────────────────────────────
-		// Routes: vanilla-prod.mc-dev.larnet.eu → mc-dev-server-vanilla-prod.minecraft.svc
-		// Source: vanilla-prod-server in docker-compose
+		// ── vanilla ──────────────────────────────────────────────────────────
+		// Routes: vanilla.mc.larnet.eu → mc-server-vanilla.minecraft.svc
+		// Source: vanilla-server in docker-compose
 		"vanilla": {
 			enabled: true
 			N=name:  "vanilla"
@@ -303,7 +313,7 @@ values: {
 			aliases: ["vanilla.larnet.eu", "mc1.larnet.eu"]
 
 			storage: data: {
-				type:         "hostPath"
+				type: "hostPath"
 				// This path is on the 240GB NVMe drive. TODO: migrate to 2TB ZFS later
 				path:         "/var/local-path-provisioner/minecraft/prod/vanilla"
 				hostPathType: "DirectoryOrCreate"
@@ -313,7 +323,7 @@ values: {
 				enabled:          true
 				method:           "restic"
 				interval:         "1h"
-				initialDelay:     "2m"
+				initialDelay:     "10m"
 				pruneBackupsDays: 20
 				pauseIfNoPlayers: true
 				backupName:       "\(releaseName)-\(N)-backup"
@@ -329,24 +339,208 @@ values: {
 			}
 
 			monitor: enabled: true
+
+			resources: {
+				requests: {cpu: "100m", memory: "4Gi"}
+				limits: {cpu: 2, memory: "4608Mi"}
+			}
+		}
+
+		// ── cobblemon ──────────────────────────────────────────────────────────
+		// Routes: cobblemon.mc.larnet.eu → mc-server-cobblemon.minecraft.svc
+		//         map.cobblemon.larnet.eu → bluemap (port 8100)
+		// Source: cobblemon-server in docker-compose (cobblemon-fabric modpack)
+		"cobblemon": {
+			enabled: true
+			N=name:  "cobblemon"
+			image: {
+				repository: "itzg/minecraft-server"
+				tag:        "java21"
+				digest:     ""
+			}
+
+			version: "1.21.1"
+
+			modrinth: {
+				modpack:              "https://modrinth.com/modpack/cobblemon-fabric"
+				version:              "Lydu1ZNo"
+				downloadDependencies: "required"
+				// bluemap:Dr2hvJBc = pinned bluemap version for cobblemon-fabric
+				projects: ["bluemap:Dr2hvJBc"]
+			}
+
+			jvm: {
+				initMemory:    "2G"
+				maxMemory:     "4G"
+				useAikarFlags: true
+			}
+
+			server: {
+				motd:              "NorthByte Cobblemon Server"
+				serverName:        "NorthByte Cobblemon"
+				mode:              "survival"
+				maxPlayers:        20
+				difficulty:        "normal"
+				pvp:               true
+				allowFlight:       false
+				enableRollingLogs: true
+				seed:              "2055796538"
+				spawnProtection:   15
+				levelType:         "minecraft:normal"
+				worldSaveName:     "world"
+				allowNether:       true
+				onlineMode:        true
+				ops: [
+					"032bb8dd-c4e6-411e-bce7-54379e9819c5", // Emil
+				]
+				tz: "Europe/Stockholm"
+			}
+
+			rcon: {
+				enabled: true
+				port:    25575
+			}
+
+			port:        25565
+			serviceType: "ClusterIP"
+
+			// BlueMap web map (served by the bluemap mod inside the server container)
+			// Exposed via traefik at map.cobblemon.larnet.eu
+			extraPorts: [{
+				name:          "bluemap"
+				containerPort: 8100
+				protocol:      "TCP"
+				expose:        true
+			}]
+
+			aliases: ["cobblemon.larnet.eu"]
+
+			storage: data: {
+				type:         "hostPath"
+				path:         "/var/local-path-provisioner/minecraft/prod/cobblemon"
+				hostPathType: "DirectoryOrCreate"
+			}
+
+			backup: {
+				enabled:          true
+				method:           "restic"
+				interval:         "1h"
+				initialDelay:     "10m"
+				pruneBackupsDays: 20
+				pauseIfNoPlayers: true
+				backupName:       "\(releaseName)-\(N)-backup"
+				excludes: ["./bluemap/*", "./plugins/CoreProtect/*"]
+
+				restic: {
+					repository: "s3:http://10.10.0.2:30304/mc-backup/cobblemon"
+					password: value:  "9FphluY#^0XiEhaVb7H4urkaj0ZPS8"
+					accessKey: value: "ABIA0A4Y35DTP50LWJHV"
+					secretKey: value: "kxR3l1hNww1C2nLaPjIqZZMeYErKgi0RPpTSHXCz"
+					retention: "--keep-within 20d"
+				}
+			}
+
+			monitor: enabled: true
+
+			resources: {
+				requests: {cpu: "100m", memory: "2Gi"}
+				limits: {cpu: 2, memory: "4608Mi"}
+			}
+		}
+
+		// ── ron ──────────────────────────────────────────────────────────
+		// Routes: ron.mc.larnet.eu → mc-server-ron.minecraft.svc
+		//         map.ron.larnet.eu → bluemap (port 8100)
+		// Source: ron-server in docker-compose (ron-fabric modpack)
+		"ron": {
+			enabled: true
+			name:  "ron"
+			image: {
+				repository: "itzg/minecraft-server"
+				tag:        "java21"
+				digest:     ""
+			}
+
+			version: "1.20.1"
+
+			modrinth: {
+				modpack:              "https://modrinth.com/modpack/reign-of-nether-optimized"
+				version:              "r5qzFdYg"
+				downloadDependencies: "required"
+			}
+
+			jvm: {
+				initMemory:    "2G"
+				maxMemory:     "4G"
+				useAikarFlags: true
+			}
+
+			server: {
+				motd:              "NorthByte Reign of Nether Server"
+				serverName:        "NorthByte Reign of Nether"
+				mode:              "creative"
+				maxPlayers:        20
+				difficulty:        "normal"
+				pvp:               true
+				allowFlight:       false
+				enableRollingLogs: true
+				seed:              "a45n3546nas456na3456"
+				spawnProtection:   15
+				levelType:         "minecraft:normal"
+				worldSaveName:     "world"
+				allowNether:       true
+				onlineMode:        true
+				ops: [
+					"032bb8dd-c4e6-411e-bce7-54379e9819c5", // Emil
+				]
+				tz: "Europe/Stockholm"
+			}
+
+			rcon: {
+				enabled: true
+				port:    25575
+			}
+
+			port:        25565
+			serviceType: "ClusterIP"
+
+			// storage: data: {
+			// 	type:         "hostPath"
+			// 	path:         "/var/local-path-provisioner/minecraft/prod/ron"
+			// 	hostPathType: "DirectoryOrCreate"
+			// }
+			storage: data: {
+				type:         "emptyDir"
+			}
+
+			backup: {
+				enabled:          false
+			}
+
+			monitor: enabled: true
+
+			resources: {
+				requests: {cpu: "100m", memory: "2Gi"}
+				limits: {cpu: 2, memory: "4608Mi"}
+			}
 		}
 	}
 
 	// ── Restic GUI (Backrest) ─────────────────────────────────────────────────
-	// Backrest web UI pre-configured with both restic repos.
-	// First deploy writes /data/config.json via the init container.
-	// Access at http://<node-ip>:9898 — both create-creative and create-survival
-	// repos are pre-loaded; click "Index Snapshots" in the UI to populate them.
+	// Backrest web UI pre-configured with all restic repos (one per server with
+	// backup.restic configured). Config is generated in CUE and stored as an
+	// immutable K8s Secret — adding or removing servers automatically updates it.
+	// Access at http://<node-ip>:9898 and click "Index Snapshots" to populate.
 	resticGui: {
-		enabled:     true
-		port:        9898
-		serviceType: "ClusterIP"
-		username:    "admin"
-		password: value: "sustained-spendable-wrongly-capably-poise-task"
-		storage: data: {
-			type:         "pvc"
-			size:         "5Gi"
-			storageClass: "local-path"
+		enabled:            true
+		port:               9898
+		serviceType:        "ClusterIP"
+		username:           "admin"
+		passwordBcryptHash: "JDJhJDEwJENWRm9Nd1JSUmRqQ2NNR3NiTlJ1aGV3eGRKTDVrNTVBMUVDbzFjaHBZdlBCYjQyWFF1dzJt"
+		multihostIdentity: {
+			keyId:   "ecdsa.agbRJ8c5cciPFCT_3Yys1aRZQ_In9tb4bIO9lQV57Gs"
+			privKey: "-----BEGIN EC PRIVATE-----\nMHcCAQEEIHK7bYTV+1aKsjJ9Ni1fB8HanLoOCm4feEK77k8gmu2HoAoGCCqGSM49\nAwEHoUQDQgAE58W0BRx5LqfIQpXAK9NopSzbGlN+CUeTFGSRVRBjxLiZLPpuAutc\n2HJZxToxBrHDlHqTNF6z7jC6odsnD7Bl5g==\n-----END EC PRIVATE-----\n"
+			pubKey:  "-----BEGIN EC PUBLIC-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE58W0BRx5LqfIQpXAK9NopSzbGlN+\nCUeTFGSRVRBjxLiZLPpuAutc2HJZxToxBrHDlHqTNF6z7jC6odsnD7Bl5g==\n-----END EC PUBLIC-----\n"
 		}
 	}
 

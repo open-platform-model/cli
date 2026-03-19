@@ -7,6 +7,6 @@ source: {
 }
 deps: {
 	"opmodel.dev@v1": {
-		v: "v1.2.13"
+		v: "v1.2.17"
 	}
 }

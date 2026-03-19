@@ -359,26 +359,225 @@ and restoring restic snapshots created by the backup sidecars.
 
 ```cue
 resticGui: {
-    enabled:     true
-    port:        9898
-    serviceType: "ClusterIP"
-    username:    "admin"
-    password:    value: "my-password"
-    storage: data: {
-        type:         "pvc"
-        size:         "5Gi"
-        storageClass: "local-path"
+    enabled:            true
+    port:               9898
+    serviceType:        "ClusterIP"
+    username:           "admin"
+    passwordBcryptHash: "$2a$10$..."   // pre-computed bcrypt hash
+    multihostIdentity: {
+        keyId:   "ecdsa...."           // pre-generated ECDSA P-256 identity
+        privKey: "-----BEGIN EC PRIVATE-----\n...\n-----END EC PRIVATE-----\n"
+        pubKey:  "-----BEGIN EC PUBLIC-----\n...\n-----END EC PUBLIC-----\n"
     }
 }
 ```
 
-On first deploy, an init container writes `/data/config.json` with one restic repo
-pre-configured per server that has `backup.method == "restic"`. Click
-"Index Snapshots" in the Backrest UI to populate the snapshot list.
+The Backrest config is generated entirely in CUE and stored as an **immutable K8s
+Secret** (content-hash named). Every server with `backup.restic` configured gets
+a pre-wired repo entry. Adding or removing a server automatically produces a new
+Secret and triggers a pod rollout — no init container, no stale config to manage.
 
 Prune and check schedules are disabled in the pre-configured repos — the
 `itzg/mc-backup` sidecar owns the backup schedule. Backrest is used purely for
 browsing and restoring.
+
+Click **"Index Snapshots"** in the Backrest UI to populate the snapshot list after
+first deploy.
+
+### Restore guide
+
+> **⚠️ MANDATORY: shut down the server before restoring.**
+> Restoring to a running server causes world corruption and may permanently
+> damage player data. Never skip this step.
+
+The Backrest pod mounts each restic-enabled server's data directory (hostPath
+storage only) at `/servers/{name}`, writable. This gives Backrest direct access
+to restore snapshots into the live server data directories.
+
+**Prerequisites:**
+
+- Backrest UI accessible (port-forward or ClusterIP proxy)
+- `kubectl` access to the cluster
+- The server has at least one indexed snapshot in Backrest
+
+**Step 1 — Stop the server**
+
+```sh
+kubectl scale statefulset {releaseName}-server-{name} --replicas=0 \
+  -n {namespace} --context {context}
+
+# Example:
+kubectl scale statefulset mc-server-create-survival --replicas=0 \
+  -n minecraft --context admin@gon1-nas2
+```
+
+Wait until the pod is fully terminated before proceeding:
+
+```sh
+kubectl wait pod -l app.kubernetes.io/name=server-{name} \
+  --for=delete -n {namespace} --timeout=60s
+```
+
+**Step 2 — Open Backrest and index snapshots**
+
+1. Open the Backrest UI
+2. Select the repo for the server (e.g. `mc-create-survival`)
+3. Click **"Index Snapshots"** to ensure the snapshot list is current
+
+**Step 3 — Select a snapshot and restore**
+
+1. Click the repo → select the snapshot to restore from
+2. Click **"Restore"**
+3. In the snapshot file browser, navigate into the `/data/` directory
+   (this strips the `/data/` path prefix so files land directly in the server
+   data directory rather than a nested `data/` subdirectory)
+4. Set the **restore target** to `/servers/{name}` — e.g. `/servers/create-survival`
+5. Confirm and start the restore
+6. Monitor progress in the Backrest UI — large worlds may take several minutes
+
+Backrest stages restored files in a safety directory named
+`data-backrest-restore-<id>` under the target path instead of overwriting the
+server directory in place immediately.
+
+> **Note on restore paths:** itzg/mc-backup snapshots all content under `/data/`.
+> Selecting `/data/` as the source within the snapshot and `/servers/{name}` as
+> the target restores worlds, plugins, mods, and config directly into the server
+> data directory without a nested `data/` wrapper.
+
+**Step 4 — Finalize the staged restore**
+
+If code-server is enabled, open it and inspect the staged restore directory:
+
+```sh
+cd /servers/{name}
+ls -la
+```
+
+You should see a directory like `data-backrest-restore-9b04e220`.
+
+If you selected `/data/` inside Backrest before restoring, the staged directory
+should contain the server contents directly (`world/`, `plugins/`, `mods/`,
+etc.). Move the restored files into place only after reviewing them:
+
+```sh
+cd /servers/{name}
+
+# Example staged restore directory
+RESTORE_DIR=data-backrest-restore-9b04e220
+
+# Review first
+ls -la "$RESTORE_DIR"
+
+# Then move restored contents into place
+mv "$RESTORE_DIR"/* .
+rmdir "$RESTORE_DIR"
+```
+
+If the staged directory contains a nested `data/` directory instead, restore was
+started from the snapshot root rather than from `/data/`. In that case move the
+contents of `data/` into place instead:
+
+```sh
+mv "$RESTORE_DIR"/data/* .
+rmdir "$RESTORE_DIR"/data "$RESTORE_DIR"
+```
+
+Because the Backrest pod now runs as UID/GID `1000`, the staged restore
+directory should be writable from code-server and match the ownership used by
+the Minecraft server containers.
+
+**Step 5 — Restart the server**
+
+```sh
+kubectl scale statefulset {releaseName}-server-{name} --replicas=1 \
+  -n {namespace} --context {context}
+
+# Example:
+kubectl scale statefulset mc-server-create-survival --replicas=1 \
+  -n minecraft --context admin@gon1-nas2
+```
+
+**PVC storage limitation:** If a server uses `type: "pvc"` storage instead of
+`hostPath`, its volume cannot be mounted in the Backrest pod (PVC
+`ReadWriteOnce` access is held by the running StatefulSet). Restore for PVC
+servers requires `kubectl exec` into the backup sidecar container and running
+`restic restore` manually, or using a separate restore Job.
+
+### Generating the prerequisites
+
+#### `passwordBcryptHash`
+
+Backrest stores passwords as a **base64-encoded bcrypt hash**. Generate the value
+with:
+
+```sh
+htpasswd -bnBC 10 "" "yourpassword" | tr -d ':\n' | sed 's/$2y/$2a/' | base64 | tr -d '\n'
+```
+
+Store the base64-encoded output as `passwordBcryptHash` in your `values.cue`.
+
+#### `multihostIdentity`
+
+Backrest requires an ECDSA P-256 identity to be present in the config on startup.
+Without it, Backrest calls `Update()` to populate `multihost.identity` at startup,
+which writes a backup copy of the config file — this fails because the config is
+mounted read-only from a K8s Secret.
+
+Generate the identity once per deployment using the helper script:
+
+```sh
+cat > /tmp/gen_backrest_key.go << 'EOF'
+package main
+
+import (
+    "crypto/ecdsa"
+    "crypto/elliptic"
+    "crypto/rand"
+    "crypto/sha256"
+    "crypto/x509"
+    "encoding/base64"
+    "encoding/pem"
+    "fmt"
+    "os"
+)
+
+func main() {
+    privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+    if err != nil { fmt.Fprintln(os.Stderr, err); os.Exit(1) }
+
+    privateBytes, _ := x509.MarshalECPrivateKey(privKey)
+    pemPriv := string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE", Bytes: privateBytes}))
+
+    publicBytes, _ := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+    pemPub := string(pem.EncodeToMemory(&pem.Block{Type: "EC PUBLIC", Bytes: publicBytes}))
+
+    h := sha256.New()
+    h.Write(privKey.PublicKey.X.Bytes())
+    h.Write(privKey.PublicKey.Y.Bytes())
+    keyid := "ecdsa." + base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+
+    fmt.Printf("keyId:   %q\n", keyid)
+    fmt.Printf("privKey: %q\n", pemPriv)
+    fmt.Printf("pubKey:  %q\n", pemPub)
+}
+EOF
+go run /tmp/gen_backrest_key.go
+```
+
+Copy the three output values into your `values.cue`:
+
+```cue
+multihostIdentity: {
+    keyId:   "ecdsa.<generated>"
+    privKey: "-----BEGIN EC PRIVATE-----\n<generated>\n-----END EC PRIVATE-----\n"
+    pubKey:  "-----BEGIN EC PUBLIC-----\n<generated>\n-----END EC PUBLIC-----\n"
+}
+```
+
+The identity only matters for Backrest's peer-to-peer sync feature (not used here).
+It can be a fixed value per deployment — generate it once and commit it alongside
+your other values. The private key material is stored in the same K8s Secret as
+the restic repo passwords, protected by the same access controls.
 
 ## Router
 
@@ -532,12 +731,16 @@ values: {
     }
 
     resticGui: {
-        enabled:     true
-        port:        9898
-        serviceType: "ClusterIP"
-        username:    "admin"
-        password:    { value: "changeme" }
-        storage: data: { type: "pvc", size: "5Gi" }
+        enabled:            true
+        port:               9898
+        serviceType:        "ClusterIP"
+        username:           "admin"
+        passwordBcryptHash: "JDJh..."     // htpasswd -bnBC 10 "" "changeme" | tr -d ':\n' | sed 's/$2y/$2a/' | base64 | tr -d '\n'
+        multihostIdentity: {              // go run /tmp/gen_backrest_key.go
+            keyId:   "ecdsa...."
+            privKey: "-----BEGIN EC PRIVATE-----\n...\n-----END EC PRIVATE-----\n"
+            pubKey:  "-----BEGIN EC PUBLIC-----\n...\n-----END EC PUBLIC-----\n"
+        }
     }
 }
 ```
@@ -567,7 +770,7 @@ Service/my-fleet-code-server           (ClusterIP)
 
 Deployment/my-fleet-restic-gui
 Service/my-fleet-restic-gui            (ClusterIP)
-PersistentVolumeClaim/my-fleet-restic-gui-data
+Secret/my-fleet-restic-gui-backrest-config-<hash>  (immutable, content-hash named)
 ```
 
 ## Service DNS convention
