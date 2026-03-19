@@ -260,6 +260,27 @@ _#portSchema: uint & >0 & <=65535
 
 	// === Resource limits for the Wolf container ===
 	resources?: schemas.#ResourceRequirementsSchema
+
+	// === GPU scheduling (optional) ===
+	// Wolf renders via hostPath device passthrough (/dev/dri/*, /dev/nvidia*),
+	// not the Kubernetes device plugin. A GPU resource claim is still useful to
+	// ensure Kubernetes schedules the pod onto a node that has a physical GPU.
+	//
+	// Only set this if a compatible device plugin is installed on your cluster:
+	//   NVIDIA GPU Operator → resource: "nvidia.com/gpu"
+	//   AMD device plugin   → resource: "amd.com/gpu"
+	//   Intel i915 plugin   → resource: "gpu.intel.com/i915"
+	//   Intel Xe plugin     → resource: "gpu.intel.com/xe"
+	//
+	// Without a device plugin, use nodeSelector or node affinity in the
+	// ModuleRelease to pin the pod to a GPU node instead.
+	gpuScheduling?: {
+		// Extended resource key reported by the device plugin on the node.
+		resource: string // required — no default
+
+		// Number of GPUs to claim. Defaults to 1.
+		count: int & >=1 | *1
+	}
 }
 
 // debugValues exercises the full #config surface for `cue vet` / `cue eval`.
@@ -316,5 +337,10 @@ debugValues: {
 	resources: {
 		requests: {cpu: "1000m", memory: "2Gi"}
 		limits: {cpu: "8000m", memory: "8Gi"}
+	}
+
+	gpuScheduling: {
+		resource: "nvidia.com/gpu"
+		count:    1
 	}
 }

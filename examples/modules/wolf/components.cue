@@ -406,6 +406,15 @@ import (
 				if #config.resources != _|_ {
 					resources: #config.resources
 				}
+
+				// GPU scheduling claim: merged into resources.gpu so the transformer
+				// emits the extended resource to both requests and limits.
+				if #config.gpuScheduling != _|_ {
+					resources: gpu: {
+						resource: #config.gpuScheduling.resource
+						count:    #config.gpuScheduling.count
+					}
+				}
 			}
 
 			// ── Network exposure ───────────────────────────────────────────────
