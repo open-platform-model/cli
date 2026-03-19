@@ -37,11 +37,15 @@ values: {
 		renderNode: "/dev/dri/renderD128"
 	}
 
-	// Docker-in-Docker: emptyDir for experimentation (layers rebuilt on pod restart).
-	// Switch to pvc + local-path once the Talos user volume is provisioned.
+	// Docker-in-Docker: hostPath on the EPHEMERAL partition so image layers
+	// survive pod restarts. /var/lib is writable on Talos (EPHEMERAL, 498GB sdb4).
+	// TODO: switch to pvc + local-path once the Talos local-path UserVolume
+	// on nvme0n1 is provisioned.
 	dind: {
 		storage: {
-			type: "emptyDir"
+			type:         "hostPath"
+			path:         "/var/lib/wolf-docker"
+			hostPathType: "DirectoryOrCreate"
 		}
 		resources: {
 			requests: {cpu: "500m", memory: "512Mi"}
@@ -54,9 +58,10 @@ values: {
 	// internal DNS for observability but carries no external traffic.
 	networking: serviceType: "ClusterIP"
 
-	// hostPath on the EPHEMERAL partition — no PVC needed.
-	// /var/lib is writable on Talos (EPHEMERAL, 498GB sdb4).
-	// Switch to pvc + local-path once the Talos user volume is provisioned.
+	// hostPath on the EPHEMERAL partition — paired clients, per-user app state,
+	// and Wolf config all survive pod restarts here.
+	// TODO: switch to pvc + local-path once the Talos local-path UserVolume
+	// on nvme0n1 is provisioned.
 	storage: config: {
 		type:         "hostPath"
 		path:         "/var/lib/wolf"
