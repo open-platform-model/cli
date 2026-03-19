@@ -56,6 +56,7 @@ import (
 		traits_workload.#RestartPolicy
 		traits_workload.#UpdateStrategy
 		traits_workload.#GracefulShutdown
+		traits_network.#HostNetwork
 		traits_network.#Expose
 
 		// StatefulSet — Wolf stores paired client state on the config PVC
@@ -63,6 +64,13 @@ import (
 
 		spec: {
 			scaling: count: 1
+
+			// hostNetwork: true binds Wolf directly to the node's network stack.
+			// Wolf's streaming ports (47984/47989/48010 TCP, 47999/48100/48200 UDP)
+			// are in the 47000–48200 range which falls outside the Kubernetes
+			// NodePort range (30000–32767), so hostNetwork is required for clients
+			// to reach Wolf on its standard ports.
+			hostNetwork: true
 
 			restartPolicy: "Always"
 
@@ -221,39 +229,18 @@ import (
 				name:  "wolf"
 				image: #config.image
 
-				ports: {
-					// TCP ports — Moonlight pairing and RTSP stream setup
-					https: {
-						targetPort: #config.networking.httpsPort
-						protocol:   "TCP"
-					}
-					http: {
-						targetPort: #config.networking.httpPort
-						protocol:   "TCP"
-					}
-					rtsp: {
-						targetPort: #config.networking.rtspPort
-						protocol:   "TCP"
-					}
-					// UDP ports — control, video, audio streams
-					control: {
-						targetPort: #config.networking.controlPort
-						protocol:   "UDP"
-					}
-					video: {
-						targetPort: #config.networking.videoPort
-						protocol:   "UDP"
-					}
-					audio: {
-						targetPort: #config.networking.audioPort
-						protocol:   "UDP"
-					}
-					if #config.api != _|_ if #config.api.enabled {
-						"api-proxy": {
-							targetPort: #config.api.port
-							protocol:   "TCP"
-						}
-					}
+				// No containerPorts declared: Wolf uses hostNetwork: true and binds
+				// directly to the node's network interfaces. Declaring ports here
+				// triggers the Kubernetes scheduler's host-port conflict check, which
+				// can prevent scheduling if a stale pod entry is in the scheduler cache.
+				// The Service port mapping is driven entirely by the expose: spec below.
+
+				// Wolf requires privileged to:
+				//   - Open DRI GPU render nodes (/dev/dri/*)
+				//   - Create virtual input devices via uinput/uhid (mknod, device cgroups)
+				//   - Manage network namespaces for per-session app containers
+				securityContext: {
+					privileged: true
 				}
 
 				env: {
