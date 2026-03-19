@@ -174,12 +174,18 @@ _#portSchema: uint & >0 & <=65535
 		// A PVC is strongly recommended — app images (Steam, etc.) are 10–20 GB
 		// and re-pulling on every pod restart causes significant startup delay.
 		storage: {
-			type: *"pvc" | "emptyDir"
-			// PVC size. Tune to the number and size of app images you run.
+			type: *"pvc" | "emptyDir" | "hostPath"
+
+			// PVC fields (when type == "pvc")
+			// Tune size to the number and size of app images you run.
 			// A minimal setup (Wolf UI only) needs ~5 Gi.
 			// Steam requires ~20–30 Gi. Multiple games need 50–100 Gi.
 			size:          string | *"50Gi"
 			storageClass?: string
+
+			// hostPath fields (when type == "hostPath")
+			path?:         string
+			hostPathType?: *"Directory" | "DirectoryOrCreate"
 		}
 
 		resources?: schemas.#ResourceRequirementsSchema

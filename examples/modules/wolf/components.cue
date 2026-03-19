@@ -19,7 +19,7 @@
 // Volume layout:
 //
 //   wolf-config   PVC/hostPath/NFS   → /etc/wolf       (wolf + dind)
-//   docker-data   PVC/emptyDir       → /var/lib/docker  (dind only)
+//   docker-data   PVC/emptyDir/hostPath → /var/lib/docker  (dind only)
 //   docker-socket emptyDir           → /run/dind        (wolf + dind)  ← shared socket
 //   wolf-api      emptyDir           → /run/wolf        (wolf + dind)  ← wolf.sock (DinD needs it for Wolf-UI)
 //   xdg-sockets   emptyDir           → /run/wolf-sockets (wolf + dind) ← PulseAudio/Wayland
@@ -532,6 +532,12 @@ import (
 					}
 					if #config.dind.storage.type == "emptyDir" {
 						emptyDir: {}
+					}
+					if #config.dind.storage.type == "hostPath" {
+						hostPath: {
+							path: #config.dind.storage.path
+							type: #config.dind.storage.hostPathType
+						}
 					}
 				}
 
