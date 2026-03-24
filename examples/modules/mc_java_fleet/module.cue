@@ -33,8 +33,8 @@
 package mc_java_fleet
 
 import (
-	m "opmodel.dev/core/module@v1"
-	schemas "opmodel.dev/schemas@v1"
+	m "opmodel.dev/core/v1alpha1/module@v1"
+	schemas "opmodel.dev/opm/v1alpha1/schemas@v1"
 )
 
 // Module definition

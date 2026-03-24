@@ -1,7 +1,7 @@
 package jellyfin
 
 import (
-	mr "opmodel.dev/core/modulerelease@v1"
+	mr "opmodel.dev/core/v1alpha1/modulerelease@v1"
 	jf "opmodel.dev/examples/modules/jellyfin@v1"
 )
 

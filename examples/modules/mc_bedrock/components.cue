@@ -4,11 +4,11 @@
 package mc_bedrock
 
 import (
-	resources_workload "opmodel.dev/resources/workload@v1"
-	resources_storage "opmodel.dev/resources/storage@v1"
-	traits_workload "opmodel.dev/traits/workload@v1"
-	traits_network "opmodel.dev/traits/network@v1"
-	traits_security "opmodel.dev/traits/security@v1"
+	resources_workload "opmodel.dev/opm/v1alpha1/resources/workload@v1"
+	resources_storage "opmodel.dev/opm/v1alpha1/resources/storage@v1"
+	traits_workload "opmodel.dev/opm/v1alpha1/traits/workload@v1"
+	traits_network "opmodel.dev/opm/v1alpha1/traits/network@v1"
+	traits_security "opmodel.dev/opm/v1alpha1/traits/security@v1"
 )
 
 // #components contains component definitions.

@@ -620,7 +620,7 @@ router: {
 package main
 
 import (
-    m     "opmodel.dev/core/modulerelease@v1"
+    m     "opmodel.dev/core/v1alpha1/modulerelease@v1"
     fleet "example.com/modules/mc_java_fleet@v0.1.0"
 )
 
