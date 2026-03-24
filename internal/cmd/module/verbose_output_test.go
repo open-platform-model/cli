@@ -28,8 +28,8 @@ func buildTestResult() *render.Result {
 			{
 				Name:         "web",
 				Labels:       map[string]string{"core.opmodel.dev/workload-type": "stateless"},
-				ResourceFQNs: []string{"opmodel.dev/resources/workload/container@v1"},
-				TraitFQNs:    []string{"opmodel.dev/traits/network/expose@v1"},
+				ResourceFQNs: []string{"opmodel.dev/opm/v1alpha1/resources/workload/container@v1"},
+				TraitFQNs:    []string{"opmodel.dev/opm/v1alpha1/traits/network/expose@v1"},
 			},
 		},
 		MatchPlan: &pkgrender.MatchPlan{

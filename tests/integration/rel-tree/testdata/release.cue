@@ -1,6 +1,6 @@
 package reltreetest
 
-import mr "opmodel.dev/core/modulerelease@v1"
+import mr "opmodel.dev/core/v1alpha1/modulerelease@v1"
 
 mr.#ModuleRelease
 
