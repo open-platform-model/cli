@@ -238,8 +238,12 @@ func projectSlice(rendered, live []interface{}) []interface{} {
 		return live
 	}
 
-	// Build a lookup of live elements by name (if available)
+	// Build a lookup of live elements by name (if available).
+	// If any name appears more than once, name-based matching is unreliable
+	// (e.g., parentRefs with multiple refs to the same gateway) — fall back
+	// to index-based matching for the entire list.
 	liveByName := make(map[string]map[string]interface{})
+	nameUnique := true
 	for _, item := range live {
 		m, ok := item.(map[string]interface{})
 		if !ok {
@@ -247,8 +251,15 @@ func projectSlice(rendered, live []interface{}) []interface{} {
 		}
 		name, ok := m["name"].(string)
 		if ok {
+			if _, exists := liveByName[name]; exists {
+				nameUnique = false
+				break
+			}
 			liveByName[name] = m
 		}
+	}
+	if !nameUnique {
+		liveByName = nil // force index-based matching
 	}
 
 	result := make([]interface{}, 0, len(rendered))
