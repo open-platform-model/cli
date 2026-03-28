@@ -1,255 +1,179 @@
-# AGENTS.md - CLI Repository (Go Implementation)
+# AGENTS.md - OPM CLI repository guide
 
-> **⚠️ UNDER HEAVY DEVELOPMENT** - This project is actively being developed and APIs may change frequently.
+## Purpose
 
-## Overview
+This repository contains the OPM CLI, the command-line interface for Open
+Platform Model workflows. Its purpose is to let users build, validate,
+render, deploy, and inspect portable application releases defined with CUE,
+with a strong focus on type safety, clear command behavior, and Kubernetes-
+oriented workflows.
 
-Go CLI for OPM module operations. Uses cobra, CUE SDK, and charmbracelet/log.
+Primary stack: `cobra`, CUE Go SDK, Kubernetes `client-go`, `charmbracelet/log`, `testify`.
 
-## Related folders
+This file is for coding agents working in `cli/`.
 
-- catalog - catalog of definitions: `../catalog/`
-- v1alpha1 definitions: `../catalog/v1alpha1/`
-- v1alpha1 definition INDEX.md - Useful to get a quick overview: `../catalog/v1alpha1/INDEX.md`
-- opm - main repo and docs: `../opm/`
+## Repository Rules
 
-## Constitution
+- Keep changes small and independently verifiable; `CONSTITUTION.md` explicitly prefers tiny batches.
+- Prefer updating existing packages over introducing new abstractions unless duplication or coupling justifies it.
 
-This project follows the **Open Platform Model Constitution**.
-All agents MUST read and adhere to `openspec/config.yaml`.
+## Entrypoint
 
-**Core Principles:**
+Read these documents when entering `cli/`:
 
-1. **Type Safety First**: All definitions in CUE. Validation at definition time.
-2. **Separation of Concerns**: Module (Dev) -> ModuleRelease (Consumer). Clear ownership boundaries.
-3. **Composability**: Definitions compose without implicit coupling. Resources, Traits, Blueprints are independent.
-4. **Declarative Intent**: Express WHAT, not HOW. Provider-specific steps in ProviderDefinitions.
-5. **Portability by Design**: Definitions must be runtime-agnostic.
-6. **Semantic Versioning**: SemVer v2.0.0 and Conventional Commits v1 required.
-7. **Simplicity & YAGNI**: Justify complexity. Prefer explicit over implicit.
+- `CONSTITUTION.md` - repository principles and change-shaping constraints. Read `CONSTITUTION.md` for the full list of design principles.
+- `AGENTS.md` - repository-specific implementation guidance, commands, and package map.
+- `README.md` - product purpose, command groups, and user-facing workflows.
+- `docs/STYLE.md` - documentation prose style rules for this repo.
 
-**Governance**: The constitution supersedes this file in case of conflict.
+## Repository Layout
 
-## Commands
+- `cmd/opm/` - CLI entrypoint and root command wiring.
+- `internal/cmd/` - Cobra command implementations.
+- `internal/cmdutil/` - shared flags, annotations, and command-facing helpers.
+- `internal/config/` - config resolution, schema validation, defaults.
+- `internal/kubernetes/` - cluster operations, status, apply, delete, events.
+- `internal/output/` - terminal formatting, log output, tables, manifests.
+- `internal/releasefile/` - release file detection and loading.
+- `internal/workflow/` - shared render/apply/query orchestration.
+- `pkg/loader/` - CUE loading for modules, providers, and releases.
+- `pkg/render/` - render pipeline logic.
+- `pkg/errors/` - shared structured errors; alias this import as `oerrors`.
+- `tests/integration/` - integration programs run with `go run`.
+- `tests/e2e/` - end-to-end Go tests.
 
-### Build
+## Environment Notes
 
-- `task build` — build binary (output: `./bin/opm`)
-- `task build:all` — cross-compile for all platforms (linux, darwin, windows)
-- `task install` — install to `$GOPATH/bin`
-- `task clean` — remove build artifacts and coverage files
-
-### Testing
-
-- `task test` — run all tests (unit + integration + e2e)
-- `task test:unit` — unit tests only (`./internal/...`)
-- `task test:integration` — integration tests (requires `kind-opm-dev` cluster; run `task cluster:create` first)
-- `task test:e2e` — end-to-end tests
-- `task test:run TEST=TestName` — run a single test by name across all packages
-- `task test:verbose` — all tests with verbose output
-- `task test:coverage` — generate HTML coverage report
-
-### Code Quality
-
-- `task fmt` — format code (`go fmt` + `goimports`)
-- `task vet` — run `go vet`
-- `task lint` — run `golangci-lint`
-- `task lint:fix` — run linter with auto-fix
-- `task tidy` — run `go mod tidy`
-- `task check` — run all checks (fmt + vet + lint + test)
-
-### Cluster (for integration tests)
-
-- `task cluster:create` — create local `kind` cluster (`kind-opm-dev`)
-- `task cluster:delete` — delete local `kind` cluster
-- `task cluster:status` — show cluster status
-- `task cluster:recreate` — delete and recreate cluster
-
-## OPM and CUE
-
-Use these environment variables during development and validation. Commands like "cue mod tidy" or "cue vet ./..."
+- Go version in `go.mod`: `1.25.0`.
+- Integration and some CUE workflows rely on registry configuration.
+- Useful defaults during local development:
 
 ```bash
 export OPM_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 ```
 
-## Technology Standards
+## Build And Dev Commands
 
-### CLI Framework & UX
+### Core commands
 
-- spf13/cobra: Commands, auto-generated help, shell completion
-- charmbracelet/lipgloss: Terminal styling
-- charmbracelet/log: Structured logging with key-value output
+- `task build` - build `./bin/opm` from `./cmd/opm` with version ldflags.
+- `task build:all` - cross-compile for Linux, macOS, and Windows.
+- `task install` - install the CLI with version ldflags into `$GOPATH/bin`.
+- `task clean` - remove `bin/`, `coverage.out`, and `coverage.html`.
+- `task generate` - run `go generate ./...`.
 
-### Configuration
+### Formatting and static analysis
 
-- CUE-native config (~/.opm/config.cue) - NOT viper/yaml
-- Aligns with Principle I: config validated by CUE schema at load time
+- `task fmt` - run `go fmt ./...` and `goimports -w .`.
+- `task vet` - run `go vet ./...`.
+- `task lint` - run `golangci-lint run ./...`.
+- `task lint:fix` - run `golangci-lint run --fix ./...`.
+- `task tidy` - run `go mod tidy`.
+- `task check` - run `fmt`, `vet`, `lint`, and all tests.
 
-### CUE Integration
+### Tests
 
-- cuelang.org/go: Native CUE evaluation (no external cue binary)
-- Fresh CUE context per command (avoid memory bloat)
-- Directory-based module loading (not file paths)
+- `task test` - run unit, integration, and e2e suites.
+- `task test:unit` - run `go test ./internal/...` and `go test ./pkg/...`.
+- `task test:integration` - run integration programs; requires a live kind cluster.
+- `task test:e2e` - run `go test ./tests/e2e/... -v`.
+- `task test:verbose` - run `go test -v ./...`.
+- `task test:coverage` - run `go test -coverprofile=coverage.out ./...` then generate `coverage.html`.
 
-### Kubernetes
+### Running one test
 
-- k8s.io/client-go: Server-side apply, resource discovery
-- k8s.io/apimachinery: Unstructured types, version parsing
+- Preferred repo task: `task test:run TEST=TestName`.
+- Exact implementation: `go test -v ./... -run "TestName"`.
+- Narrow to one package when possible for speed, for example:
+  - `go test ./internal/config -run TestLoad -v`
+  - `go test ./pkg/render -run TestFinalize -v`
+- For a single subtest, use the full regexp name accepted by `go test -run`.
 
-### Diff & Comparison
+### Integration cluster helpers
 
-- homeport/dyff: Human-readable semantic diffs
+- `task cluster:create` - create local `kind` cluster `opm-dev`.
+- `task cluster:status` - check whether the cluster is running.
+- `task cluster:delete` - remove the local cluster.
+- `task cluster:recreate` - recreate the cluster from scratch.
+- `task test:integration` checks for context `kind-opm-dev` before it runs.
 
-### Testing
+## Coding Standards
 
-- stretchr/testify: Assertions and mocking
+### General
 
-## Code Style
+- Follow `gofmt` and `goimports`; do not hand-format imports.
+- Keep command packages thin; orchestration belongs in `internal/workflow` or focused internal/pkg packages.
+- Prefer explicit behavior over magic inference; `CONSTITUTION.md` favors clear inputs and early validation.
+- Preserve cross-platform behavior; avoid hardcoded Unix-only paths or shell assumptions.
 
-- **Go**: gofmt, golangci-lint compliant
-- **Imports**: stdlib first, then external, then internal
-- **Errors**: Wrap with context (`fmt.Errorf("loading module: %w", err)`)
-- **Interfaces**: Accept interfaces, return concrete structs
-- **Context**: Propagate context.Context in all APIs
-- **Tests**: Table-driven with testify assertions
+### Imports
 
-## Project Structure
+- Group imports in standard Go order: stdlib, third-party, internal project imports.
+- Use blank lines between groups exactly as `goimports` produces them.
+- Alias `github.com/opmodel/cli/pkg/errors` as `oerrors` when imported.
+- Avoid unnecessary aliases for other packages unless there is a collision or a strong clarity reason.
 
-```text
-├── cmd/opm/               # CLI entry point (main.go, root.go, version.go)
-├── docs/                  # Design docs, RFCs, comparisons, vision
-├── examples/              # Example OPM modules (jellyfin, minecraft, webapp, etc.)
-├── experiments/           # Experimental pipeline explorations (not production)
-├── internal/
-│   ├── cmd/               # Command implementations
-│   │   ├── config/        # config init, vet commands
-│   │   ├── module/        # module/apply, build, delete, init, list, status, tree, vet
-│   │   └── release/       # release/apply, build, delete, diff, events, list, status, tree, vet
-│   ├── cmdutil/           # Small CLI helpers (flag groups, annotations, release targeting)
-│   ├── config/            # Config loading and validation
-│   ├── engine/            # Internal render execution and bundle/module renderers
-│   ├── exit/              # CLI exit codes and exit error wrapper
-│   ├── inventory/         # Release inventory: secret CRUD, digest, stale detection
-│   ├── kubernetes/        # K8s client, apply, delete, discovery, health, status
-│   ├── match/             # Internal component-to-transformer matching
-│   ├── output/            # Terminal output: spinner, table, log, styles, format
-│   ├── releasefile/       # Release file parsing and kind detection
-│   ├── releaseprocess/    # Internal validation, synthesis, and render orchestration
-│   ├── resourceorder/     # Resource apply/delete ordering policy
-│   ├── runtime/           # Internal mutable release runtime state
-│   │   ├── bundlerelease/ # Bundle release runtime state
-│   │   └── modulerelease/ # Module release runtime state
-│   ├── templates/         # Module templates (simple, standard, advanced)
-│   ├── version/           # Version info
-│   └── workflow/          # Shared command workflows (render, apply, query)
-├── pkg/
-│   ├── bundle/            # Bundle domain model
-│   ├── core/              # Rendered resource primitives and label helpers
-│   ├── errors/            # Shared structured library errors
-│   ├── loader/            # CUE loading for modules, providers, and releases
-│   ├── module/            # Module domain model
-│   └── provider/          # Provider domain model
-├── tests/
-│   ├── e2e/               # End-to-end tests
-│   ├── fixtures/
-│   │   ├── valid/         # Valid test module fixtures
-│   │   └── invalid/       # Invalid test module fixtures
-│   └── integration/
-│       ├── deploy/
-│       ├── inventory-apply/
-│       ├── inventory-ops/
-│       └── values-flow/
-├── Taskfile.yml           # Build automation
-└── go.mod
-```
+### Types and APIs
 
-## Maintenance Notes
+- Prefer concrete structs as return values; accept interfaces at boundaries when they improve testability.
+- Avoid `interface{}` / `any` unless the API genuinely requires open-ended data.
+- Keep config, flags, and render inputs strongly typed.
+- Propagate `context.Context` through APIs that perform I/O, Kubernetes calls, or longer workflows.
+- This repo uses fresh CUE contexts per command/workflow rather than sharing one global mutable context.
 
-- **Project Structure Tree**: Update the tree above when adding new packages or directories.
+### Naming
 
-## Key Packages
+- Exported identifiers use Go's standard PascalCase; unexported identifiers use camelCase.
+- Use descriptive names tied to the domain: `ReleaseSelectorFlags`, `ResolveModulePath`, `BootstrapRegistry`.
+- Boolean helpers should read naturally, for example `HasWarnings` or `configHasProviders`.
+- Error sentinel names should follow Go conventions; the linter enables `errname` and revive naming rules.
+- Keep package names short, lowercase, and responsibility-focused.
 
-- `cmd/opm/` - Entry point
-- `internal/cmd/` - Cobra command implementations (`config/`, `module/`, `release/`)
-- `internal/cmdutil/` - Small CLI helpers shared across commands
-- `internal/workflow/` - Shared application workflows used by multiple commands
-- `internal/config/` - Config loading, precedence resolution, and validation
-- `internal/engine/` - Internal module and bundle render execution
-- `internal/exit/` - CLI exit codes and exit error wrapper
-- `internal/inventory/` - Inventory persistence, change tracking, stale detection
-- `internal/kubernetes/` - Kubernetes client and cluster operations
-- `internal/match/` - Internal component-to-transformer matching
-- `internal/output/` - Terminal formatting and log styling
-- `internal/releaseprocess/` - Internal validation, synthesis, and render orchestration
-- `internal/resourceorder/` - Shared resource apply/delete ordering policy
-- `internal/runtime/` - Internal mutable release runtime state
-- `pkg/loader/` - CUE loading for modules, providers, and release files
-- `pkg/core/` - Shared rendered resource primitives and labels
-- `pkg/bundle/` - Bundle domain model
-- `pkg/module/` - Module domain model
-- `pkg/errors/` - Shared structured library errors
-- `pkg/provider/` - Provider domain model
-- `internal/version/` - Version info
+### Error handling
 
-## Patterns
+- Validate early and fail before execution when flags, config, or inputs are invalid.
+- Wrap errors with context using `%w`, for example `fmt.Errorf("loading module: %w", err)`.
+- Prefer actionable user-facing errors with hints over raw internal failures.
+- Reuse structured error types in `pkg/errors` where appropriate, especially `DetailError` and validation helpers.
+- Commands should use `RunE` and return errors rather than printing-and-exiting inline.
+- Preserve sentinel errors with wrapping so callers can use `errors.Is` / `errors.As`.
 
-- Fresh CUE context per command (avoid memory bloat)
-- Directory-based module loading (not file paths)
-- Commands use `RunE` for error handling
+### Control flow and package boundaries
 
-## Glossary
+- Commands parse flags and delegate; they should not hold core business logic.
+- `internal/` packages may depend on `pkg/`; `pkg/` must stay reusable and command-agnostic.
+- Keep output formatting separate from data generation.
+- Prefer small functions with clear responsibilities over large multipurpose helpers.
 
-See [full glossary](../opm/docs/glossary.md) for detailed definitions.
+### Tests
 
-### Personas
+- Prefer table-driven tests when covering multiple scenarios.
+- Use `require` for setup and fatal preconditions; use `assert` for non-fatal expectations.
+- Use `t.Helper()` in test helpers.
+- Prefer `t.TempDir()` over manual fixture directories when practical.
+- Name tests `TestXxx` with behavior-oriented suffixes, matching existing patterns like `TestRenderFromReleaseFile_NilConfig`.
 
-- **Infrastructure Operator** - Operates underlying infrastructure (clusters, cloud, networking)
-- **Module Author** - Develops and maintains ModuleDefinitions with sane defaults
-- **Platform Operator** - Curates module catalog, bridges infrastructure and end-users
-- **End-user** - Consumes modules via ModuleRelease with concrete values
+## Lint Configuration Highlights
 
-## Documentation Style
+- `golangci-lint` runs in readonly module download mode.
+- Important enabled linters include `errorlint`, `errname`, `gocritic`, `gocyclo`, `gosec`, `revive`, `staticcheck`, and `tparallel`.
+- `nolint` comments must be specific and include an explanation.
+- `gocyclo` threshold is 15; refactor large branches before complexity grows.
+- Tests have some relaxed exclusions for `dupl`, `errcheck`, `goconst`, and `gosec`.
+- `examples/`, `experiments/`, `third_party/`, and `builtin/` are excluded from lint/format scopes.
 
-### Box-Drawing Diagrams and ASCII Art
+## Documentation And Output Conventions
 
-**Symbols for Yes/No in Tables and Diagrams**
+- Favor ASCII-safe output in docs, examples, and terminal-oriented text.
+- For box-drawing tables or diagrams, use `[x]` / `[ ]` instead of Unicode checkmarks.
+- When documenting CLI behavior, emphasize what happened and how to fix failures.
+- Follow SemVer and Conventional Commits for user-visible changes and commit messages.
 
-When creating box-drawing tables or ASCII art diagrams in markdown code blocks, use **monospace-safe** symbols that render consistently across all terminals, editors, and GitHub.
+## Agent Checklist
 
-**DO NOT USE** Unicode checkmarks (`✓` U+2713, `✗` U+2717) — these are ambiguous-width characters that break alignment in monospace fonts.
-
-**Recommended Replacements:**
-
-| Context | Yes | No | Example |
-|---------|-----|-----|---------|
-| **Box-drawing table cells** | `[x]` | `[ ]` | `│ No CRDs req. │  [x]   │  [ ]   │` |
-| **Bullet-style property lists** | `[x]` | `[ ]` | `│    [x] Same resources → same digest` |
-| **Inline after text** | `OK` | `FAIL` | `Apply: SS/jellyfin-media OK, Svc/jellyfin-media FAIL` |
-| **Section headings** | `[x]` | `[ ]` | `### Scenario A: Normal Rename [x]` |
-| **Parenthetical notes** | `ok` | `fail` | `Label check: "opm" (3 ok), name (≤63 ok)` |
-
-**Rationale:**
-
-1. **`[x]` / `[ ]`** - Checkbox-style brackets are exactly 3 ASCII characters wide, easy to align in tables
-2. **`OK` / `FAIL`** - More readable mid-sentence than brackets
-3. **`ok` / `fail`** - Lowercase variant for lightweight inline use
-
-**Table Alignment Example:**
-
-```text
-┌──────────────┬────────┬────────┬────────┐
-│ Feature      │ Secret │ CRD    │ DB     │
-├──────────────┼────────┼────────┼────────┤
-│ No CRDs req. │  [x]   │  [ ]   │  [x]   │  ← 3 chars each, properly aligned
-│ Inventory    │  [x]   │  [x]   │  [x]   │
-└──────────────┴────────┴────────┴────────┘
-```
-
-**Why This Matters:**
-
-- Unicode `✓` renders as 1 cell in some fonts, 2 cells in others (especially CJK locales)
-- Broken alignment makes diagrams unreadable in terminals
-- GitHub code blocks don't always match terminal rendering
-- ASCII/bracket combinations are universally safe
+- Read the touched package and nearby tests before editing.
+- Run targeted tests first, then broader checks if the change warrants it.
+- If you changed formatting-sensitive files, run `task fmt`.
+- If you changed behavior, run the smallest relevant `go test` command plus any affected task.
+- Before finishing substantial work, prefer `task lint` and the relevant test suite.

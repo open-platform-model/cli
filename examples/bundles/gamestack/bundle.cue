@@ -41,8 +41,8 @@ package gamestack
 import (
 	"list"
 
-	b  "opmodel.dev/core/bundle@v1"
-	schemas "opmodel.dev/schemas@v1"
+	b  "opmodel.dev/core/v1alpha1/bundle@v1"
+	schemas "opmodel.dev/opm/v1alpha1/schemas@v1"
 	mc      "opmodel.dev/examples/modules/mc_java@v1"
 	vel     "opmodel.dev/examples/modules/mc_velocity@v1"
 	rtr     "opmodel.dev/examples/modules/mc_router@v1"

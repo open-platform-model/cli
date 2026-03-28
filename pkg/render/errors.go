@@ -55,8 +55,10 @@ func (e *UnmatchedComponentsError) Error() string {
 // Unwrap returns a slice of *oerrors.TransformError — one per unmatched component —
 // so that callers can use errors.As to extract per-component failure details.
 //
-// The Cause of each TransformError is an *UnmatchedComponentsError scoped to the
-// single component, making the diagnosis locatable through standard error unwrapping.
+// Each TransformError carries the component name and the first non-matching
+// transformer FQN. Its Cause is a plain terminal error describing the failure,
+// not a nested UnmatchedComponentsError, to prevent infinite recursion when
+// errors.As traverses the chain.
 func (e *UnmatchedComponentsError) Unwrap() []error {
 	errs := make([]error, 0, len(e.Components))
 	for _, compName := range e.Components {
@@ -73,10 +75,7 @@ func (e *UnmatchedComponentsError) Unwrap() []error {
 		errs = append(errs, &oerrors.TransformError{
 			ComponentName:  compName,
 			TransformerFQN: tfFQN,
-			Cause: &UnmatchedComponentsError{
-				Components: []string{compName},
-				Matches:    map[string]map[string]MatchResult{compName: compMatches},
-			},
+			Cause:          fmt.Errorf("component %q has no matching transformer", compName),
 		})
 	}
 	return errs

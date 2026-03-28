@@ -1,7 +1,7 @@
 package gamestack
 
 import (
-	br "opmodel.dev/core/bundlerelease@v1"
+	br "opmodel.dev/core/v1alpha1/bundlerelease@v1"
 	gs "opmodel.dev/examples/bundles/gamestack@v1"
 )
 

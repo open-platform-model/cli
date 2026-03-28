@@ -191,9 +191,10 @@ func labelPairs(v cue.Value) map[string]struct{} {
 	return pairs
 }
 
-// fieldKeys returns the sorted list of field keys in the given cue struct value, treating all fields as optional (i.e. not erroring if some are missing).
+// fieldKeys returns the sorted list of field keys in the given cue struct value.
+// No options are passed so that definition fields (#resources, #traits) are returned correctly.
 func fieldKeys(v cue.Value) []string {
-	iter, err := v.Fields(cue.Optional(true))
+	iter, err := v.Fields()
 	if err != nil {
 		return nil
 	}

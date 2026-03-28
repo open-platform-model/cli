@@ -238,18 +238,7 @@ func projectSlice(rendered, live []interface{}) []interface{} {
 		return live
 	}
 
-	// Build a lookup of live elements by name (if available)
-	liveByName := make(map[string]map[string]interface{})
-	for _, item := range live {
-		m, ok := item.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		name, ok := m["name"].(string)
-		if ok {
-			liveByName[name] = m
-		}
-	}
+	liveByName := buildNameIndex(live)
 
 	result := make([]interface{}, 0, len(rendered))
 	for i, renderedItem := range rendered {
@@ -289,6 +278,28 @@ func projectSlice(rendered, live []interface{}) []interface{} {
 	}
 
 	return result
+}
+
+// buildNameIndex builds a lookup of live slice elements by their "name" field.
+// If any name appears more than once, name-based matching is unreliable
+// (e.g., parentRefs with multiple refs to the same gateway) so nil is returned
+// to force index-based matching for the entire list.
+func buildNameIndex(live []interface{}) map[string]map[string]interface{} {
+	index := make(map[string]map[string]interface{})
+	for _, item := range live {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, ok := m["name"].(string)
+		if ok {
+			if _, exists := index[name]; exists {
+				return nil
+			}
+			index[name] = m
+		}
+	}
+	return index
 }
 
 // FetchLiveState fetches a single resource from the cluster.
