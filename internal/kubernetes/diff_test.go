@@ -710,6 +710,30 @@ func TestProjectLiveToRendered(t *testing.T) {
 	}
 }
 
+func TestProjectSlice_DuplicateNames(t *testing.T) {
+	// When multiple list items share the same "name" field (e.g., parentRefs
+	// with multiple refs to the same gateway), projectSlice must fall back to
+	// index-based matching instead of name-based matching.
+	rendered := []interface{}{
+		map[string]interface{}{"name": "gw", "sectionName": "http-0"},
+		map[string]interface{}{"name": "gw", "sectionName": "http-1"},
+		map[string]interface{}{"name": "gw", "sectionName": "http-2"},
+	}
+	live := []interface{}{
+		map[string]interface{}{"name": "gw", "sectionName": "http-0", "group": "gateway.networking.k8s.io", "kind": "Gateway"},
+		map[string]interface{}{"name": "gw", "sectionName": "http-1", "group": "gateway.networking.k8s.io", "kind": "Gateway"},
+		map[string]interface{}{"name": "gw", "sectionName": "http-2", "group": "gateway.networking.k8s.io", "kind": "Gateway"},
+	}
+	expected := []interface{}{
+		map[string]interface{}{"name": "gw", "sectionName": "http-0"},
+		map[string]interface{}{"name": "gw", "sectionName": "http-1"},
+		map[string]interface{}{"name": "gw", "sectionName": "http-2"},
+	}
+
+	result := projectSlice(rendered, live)
+	assert.Equal(t, expected, result)
+}
+
 func TestDiffResult_IsEmpty(t *testing.T) {
 	tests := []struct {
 		name     string

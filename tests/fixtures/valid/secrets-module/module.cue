@@ -1,9 +1,9 @@
 package main
 
 import (
-	"opmodel.dev/core@v1"
-	schemas "opmodel.dev/schemas@v1"
-	resources_workload "opmodel.dev/resources/workload@v1"
+	core "opmodel.dev/core/v1alpha1@v1"
+	schemas "opmodel.dev/opm/v1alpha1/schemas@v1"
+	resources_workload "opmodel.dev/opm/v1alpha1/resources/workload@v1"
 )
 
 core.#Module

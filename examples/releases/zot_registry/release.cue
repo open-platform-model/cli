@@ -1,7 +1,7 @@
 package main
 
 import (
-	mr "opmodel.dev/core/modulerelease@v1"
+	mr "opmodel.dev/core/v1alpha1/modulerelease@v1"
 	zot "opmodel.dev/examples/modules/zot_registry@v1"
 )
 
