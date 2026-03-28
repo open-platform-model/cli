@@ -28,6 +28,7 @@ Read these documents when entering `cli/`:
 
 ## Repository Layout
 
+- `adr/` - Architecture Decision Records
 - `cmd/opm/` - CLI entrypoint and root command wiring.
 - `internal/cmd/` - Cobra command implementations.
 - `internal/cmdutil/` - shared flags, annotations, and command-facing helpers.
@@ -41,6 +42,28 @@ Read these documents when entering `cli/`:
 - `pkg/errors/` - shared structured errors; alias this import as `oerrors`.
 - `tests/integration/` - integration programs run with `go run`.
 - `tests/e2e/` - end-to-end Go tests.
+
+## Architecture Decision Records
+
+ADRs capture significant technical decisions with their context and consequences.
+
+- Location: `adr/`
+- Template: `adr/TEMPLATE.md`
+- Naming: `NNN-kebab-case-title.md` (three-digit, zero-padded)
+
+### Creating a new ADR
+
+1. Copy `adr/TEMPLATE.md` to `adr/NNN-title.md` using the next available number.
+2. Set status to `Proposed`.
+3. Fill in Context, Decision, and Consequences.
+4. Update status to `Accepted` once the decision is agreed on.
+
+### Updating an ADR
+
+- Never delete an ADR — update its status instead.
+- To retire a decision: set status to `Deprecated`.
+- To replace a decision: set status to `Superseded by ADR-NNN` and create the new ADR.
+- One decision per ADR.
 
 ## Environment Notes
 
