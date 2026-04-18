@@ -13,6 +13,7 @@ import (
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
 	internalreleasefile "github.com/opmodel/cli/internal/releasefile"
+	pkgcore "github.com/opmodel/cli/pkg/core"
 	"github.com/opmodel/cli/pkg/loader"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/provider"
@@ -93,7 +94,7 @@ func renderPreparedModuleRelease(
 	rel *pkgmodule.Release,
 	p *provider.Provider,
 ) (*Result, error) {
-	engineResult, err := pkgrender.ProcessModuleRelease(ctx, rel, p)
+	engineResult, err := pkgrender.ProcessModuleRelease(ctx, rel, p, pkgcore.LabelManagedByValue)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}

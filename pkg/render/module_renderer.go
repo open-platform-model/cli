@@ -41,7 +41,8 @@ type ComponentSummary struct {
 // A Module is constructed once per provider and reused across multiple
 // Execute calls. It is not safe for concurrent use (CUE context is single-threaded).
 type Module struct {
-	provider *provider.Provider
+	provider    *provider.Provider
+	runtimeName string // overrides default #context.#runtimeName if non-empty
 }
 
 // ModuleResult holds the output of a successful Execute call.
@@ -62,9 +63,12 @@ type ModuleResult struct {
 	Warnings []string
 }
 
-// NewModule creates a Module for the given provider.
-func NewModule(p *provider.Provider) *Module {
-	return &Module{provider: p}
+// NewModule creates a Module renderer for the given provider and runtime identity.
+// runtimeName is stamped onto every rendered resource as app.kubernetes.io/managed-by
+// via the catalog's controllerLabels block. Callers MUST pass a non-empty value;
+// ProcessModuleRelease validates this at the public boundary.
+func NewModule(p *provider.Provider, runtimeName string) *Module {
+	return &Module{provider: p, runtimeName: runtimeName}
 }
 
 // Execute runs matched transformers against the provided component views and
@@ -98,7 +102,7 @@ func (r *Module) Execute(
 	// Phase 2 — execution (CUE #transform per pair).
 	// Passes both schemaComponents (for metadata extraction) and dataComponents
 	// (already finalized, no materialize() needed).
-	resources, warnings, errs := executeTransforms(ctx, cueCtx, plan, r.provider.Data, schemaComponents, dataComponents, rel)
+	resources, warnings, errs := executeTransforms(ctx, cueCtx, plan, r.provider.Data, schemaComponents, dataComponents, rel, r.runtimeName)
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("executing transforms: %w", errors.Join(errs...))
 	}
