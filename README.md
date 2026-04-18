@@ -46,6 +46,7 @@ Use `opm module` when you are starting from module source. For rendering, deploy
 |---------|-------------|
 | `module init` | Create a new module from a template |
 | `module vet` | Validate a module without rendering manifests |
+| `module crd` | Generate a CustomResourceDefinition from a module's `#config` |
 
 ### Release Operations (`opm release`)
 
