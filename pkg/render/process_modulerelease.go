@@ -10,7 +10,13 @@ import (
 
 // ProcessModuleRelease renders a prepared release with the given provider.
 // The release must already be fully prepared via module.ParseModuleRelease.
-func ProcessModuleRelease(ctx context.Context, rel *module.Release, p *provider.Provider) (*ModuleResult, error) {
+// runtimeName identifies the runtime executing this render (e.g. "opm-cli");
+// it is stamped onto every rendered resource as app.kubernetes.io/managed-by
+// and MUST be non-empty.
+func ProcessModuleRelease(ctx context.Context, rel *module.Release, p *provider.Provider, runtimeName string) (*ModuleResult, error) {
+	if runtimeName == "" {
+		return nil, fmt.Errorf("runtimeName must be non-empty")
+	}
 	schemaComponents := rel.MatchComponents()
 	if !schemaComponents.Exists() {
 		return nil, fmt.Errorf("release %q: no components field in release spec", rel.Metadata.Name)
@@ -26,6 +32,5 @@ func ProcessModuleRelease(ctx context.Context, rel *module.Release, p *provider.
 		return nil, err
 	}
 
-	renderer := NewModule(p)
-	return renderer.Execute(ctx, rel, schemaComponents, dataComponents, plan)
+	return NewModule(p, runtimeName).Execute(ctx, rel, schemaComponents, dataComponents, plan)
 }

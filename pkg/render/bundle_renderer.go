@@ -39,10 +39,12 @@ type BundleResult struct {
 	ReleaseOrder []string
 }
 
-// NewBundle creates a Bundle for the given provider.
-func NewBundle(p *provider.Provider) *Bundle {
+// NewBundle creates a Bundle renderer for the given provider and runtime identity.
+// runtimeName is forwarded to the underlying Module renderer and stamped onto
+// every rendered resource as app.kubernetes.io/managed-by.
+func NewBundle(p *provider.Provider, runtimeName string) *Bundle {
 	return &Bundle{
-		moduleRenderer: NewModule(p),
+		moduleRenderer: NewModule(p, runtimeName),
 	}
 }
 

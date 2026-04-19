@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/opmodel/cli/pkg/bundle"
+	"github.com/opmodel/cli/pkg/core"
 	"github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/provider"
 	"github.com/opmodel/cli/pkg/render"
@@ -20,7 +21,7 @@ func TestModuleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {
 	raw := ctx.CompileString(`{components:{}}`)
 	data := ctx.CompileString(`{}`)
 
-	renderer := render.NewModule(&provider.Provider{Data: providerVal})
+	renderer := render.NewModule(&provider.Provider{Data: providerVal}, core.LabelManagedByValue)
 	rel := &module.Release{
 		Metadata: &module.ReleaseMetadata{Name: "demo"},
 		Spec:     raw,
@@ -40,7 +41,7 @@ func TestModuleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {
 func TestBundleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {
 	ctx := cuecontext.New()
 	providerVal := ctx.CompileString(`{#transformers:{}}`)
-	renderer := render.NewBundle(&provider.Provider{Data: providerVal})
+	renderer := render.NewBundle(&provider.Provider{Data: providerVal}, core.LabelManagedByValue)
 	result, err := renderer.Execute(context.Background(), &bundle.Release{Releases: map[string]*module.Release{}})
 	require.NoError(t, err)
 	require.NotNil(t, result)

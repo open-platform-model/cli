@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/opmodel/cli/pkg/bundle"
+	"github.com/opmodel/cli/pkg/core"
 	"github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/provider"
 )
@@ -69,6 +70,7 @@ func TestProcessModuleRelease_Success(t *testing.T) {
 						metadata: {
 							name: #context.#componentMetadata.name
 							namespace: #context.#moduleReleaseMetadata.namespace
+							labels: "app.kubernetes.io/managed-by": #context.#runtimeName
 						}
 						spec: replicas: #component.spec.replicas
 					}
@@ -85,11 +87,16 @@ func TestProcessModuleRelease_Success(t *testing.T) {
 		Values:   ctx.CompileString(`{replicas: 2}`),
 	}
 
-	result, err := ProcessModuleRelease(context.Background(), rel, &provider.Provider{Data: pv})
+	result, err := ProcessModuleRelease(context.Background(), rel, &provider.Provider{Data: pv}, core.LabelManagedByValue)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Len(t, result.Resources, 1)
 	assert.True(t, result.MatchPlan.Matches["api"]["tf/deployment@v1"].Matched)
+
+	labelsVal := result.Resources[0].Value.LookupPath(cue.ParsePath("metadata.labels"))
+	var labels map[string]string
+	require.NoError(t, labelsVal.Decode(&labels))
+	assert.Equal(t, core.LabelManagedByValue, labels[core.LabelManagedBy])
 }
 
 func TestProcessBundleRelease_StubAfterValidation(t *testing.T) {
