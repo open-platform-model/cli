@@ -2,12 +2,13 @@
 
 // Module-to-CRD integration test.
 //
-// Builds a CustomResourceDefinition from an OPM module via pkg/crd and
+// Builds a CustomResourceDefinition from an OPM module via pkg/k8sgen and
 // submits it to the kind-opm-dev cluster with server-side dry-run apply.
 // The API server validates the CRD's openAPIV3Schema as a structural schema;
-// a failure here means pkg/crd emitted something Kubernetes does not accept
-// (missing type, forbidden fields at root, etc.) even though pkg/crd's unit
-// tests pass. This is the only place in the test suite where we find out.
+// a failure here means pkg/k8sgen emitted something Kubernetes does not
+// accept (missing type, forbidden fields at root, etc.) even though
+// pkg/k8sgen's unit tests pass. This is the only place in the test suite
+// where we find out.
 package main
 
 import (
@@ -19,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/opmodel/cli/internal/kubernetes"
-	"github.com/opmodel/cli/pkg/crd"
+	"github.com/opmodel/cli/pkg/k8sgen"
 	"github.com/opmodel/cli/pkg/loader"
 )
 
@@ -45,7 +46,7 @@ func main() {
 	fmt.Println("   OK")
 
 	fmt.Println("2. Building CRD from #config...")
-	crdManifest, err := crd.BuildCRD(modVal, crd.Options{Group: crdGroup})
+	crdManifest, err := k8sgen.BuildCRD(modVal, k8sgen.Options{Group: crdGroup})
 	if err != nil {
 		die("building CRD: %v", err)
 	}

@@ -9,7 +9,7 @@ import (
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	opmexit "github.com/opmodel/cli/internal/exit"
-	"github.com/opmodel/cli/pkg/crd"
+	"github.com/opmodel/cli/pkg/k8sgen"
 	"github.com/opmodel/cli/pkg/loader"
 )
 
@@ -101,7 +101,7 @@ func runModuleCRD(args []string, cfg *config.GlobalConfig, groupFlag, outputFmt 
 		}
 	}
 
-	crdManifest, err := crd.BuildCRD(modVal, crd.Options{Group: groupFlag})
+	crdManifest, err := k8sgen.BuildCRD(modVal, k8sgen.Options{Group: groupFlag})
 	if err != nil {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitGeneralError,

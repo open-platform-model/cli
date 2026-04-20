@@ -1,4 +1,4 @@
-package crd
+package k8sgen
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuildCRD_FullAssembly(t *testing.T) {
+func TestBuildXRD_FullAssembly(t *testing.T) {
 	t.Parallel()
 
 	ctx := cuecontext.New()
@@ -26,17 +26,17 @@ debugValues: {name: "demo"}
 `)
 	require.NoError(t, modVal.Err())
 
-	crd, err := BuildCRD(modVal, Options{Group: "opmodel.dev"})
+	xrd, err := BuildXRD(modVal, XRDOptions{Group: "module.opmodel.dev"})
 	require.NoError(t, err)
 
 	// Top-level fields.
-	assert.Equal(t, "apiextensions.k8s.io/v1", crd.Object["apiVersion"])
-	assert.Equal(t, "CustomResourceDefinition", crd.Object["kind"])
+	assert.Equal(t, "apiextensions.crossplane.io/v2", xrd.Object["apiVersion"])
+	assert.Equal(t, "CompositeResourceDefinition", xrd.Object["kind"])
 
-	meta := crd.Object["metadata"].(map[string]any)
+	meta := xrd.Object["metadata"].(map[string]any)
 	assert.Equal(t, "myservices.module.opmodel.dev", meta["name"])
 
-	// Minimal provenance: managed-by + name/version labels are always present.
+	// Minimal provenance: managed-by + name/version labels always present.
 	labels := meta["labels"].(map[string]any)
 	assert.Equal(t, "opm-cli", labels["app.kubernetes.io/managed-by"])
 	assert.Equal(t, "my-service", labels["module.opmodel.dev/name"])
@@ -46,9 +46,9 @@ debugValues: {name: "demo"}
 	_, hasAnnotations := meta["annotations"]
 	assert.False(t, hasAnnotations)
 
-	spec := crd.Object["spec"].(map[string]any)
+	spec := xrd.Object["spec"].(map[string]any)
+	assert.Equal(t, "Namespaced", spec["scope"], "default scope is Namespaced in v2")
 	assert.Equal(t, "module.opmodel.dev", spec["group"])
-	assert.Equal(t, "Namespaced", spec["scope"])
 
 	names := spec["names"].(map[string]any)
 	assert.Equal(t, "MyService", names["kind"])
@@ -62,40 +62,96 @@ debugValues: {name: "demo"}
 	v0 := versions[0].(map[string]any)
 	assert.Equal(t, "v1alpha1", v0["name"])
 	assert.Equal(t, true, v0["served"])
+	assert.Equal(t, true, v0["referenceable"])
 	assert.Equal(t, true, v0["storage"])
-	_, hasSubresources := v0["subresources"]
-	assert.False(t, hasSubresources, "status subresource must not be emitted in POC")
 
 	schema := v0["schema"].(map[string]any)
 	openAPI := schema["openAPIV3Schema"].(map[string]any)
 	assert.Equal(t, "object", openAPI["type"])
 
+	// #config is wrapped under properties.spec; the root required list names
+	// "spec" so Crossplane accepts the schema.
+	assert.Equal(t, []any{"spec"}, openAPI["required"])
+
 	props := openAPI["properties"].(map[string]any)
-	assert.Contains(t, props, "name")
-	assert.Contains(t, props, "replicas")
-	assert.Contains(t, props, "tag")
+	require.Contains(t, props, "spec")
+	_, hasStatus := props["status"]
+	assert.False(t, hasStatus, "status is not emitted in POC scope")
+
+	specSchema := props["spec"].(map[string]any)
+	assert.Equal(t, "object", specSchema["type"])
+	specProps := specSchema["properties"].(map[string]any)
+	assert.Contains(t, specProps, "name")
+	assert.Contains(t, specProps, "replicas")
+	assert.Contains(t, specProps, "tag")
 }
 
-func TestBuildCRD_VersionMappingMajor2(t *testing.T) {
+// TestBuildXRD_SchemaWrappedUnderSpec pins the wrapping contract: the
+// extracted #config schema is placed verbatim under properties.spec, and
+// the #config's own required list travels with it under properties.spec.required.
+func TestBuildXRD_SchemaWrappedUnderSpec(t *testing.T) {
 	t.Parallel()
 
 	ctx := cuecontext.New()
 	modVal := ctx.CompileString(`
-metadata: {name: "my-service", version: "2.3.1"}
-#config: {name: string}
+metadata: {name: "svc", version: "1.0.0"}
+#config: {
+	mustHave: string
+	optional?: string
+}
 `)
 	require.NoError(t, modVal.Err())
 
-	crd, err := BuildCRD(modVal, Options{Group: "module.opmodel.dev"})
+	xrd, err := BuildXRD(modVal, XRDOptions{Group: "module.opmodel.dev"})
 	require.NoError(t, err)
 
-	spec := crd.Object["spec"].(map[string]any)
-	versions := spec["versions"].([]any)
-	v0 := versions[0].(map[string]any)
-	assert.Equal(t, "v2", v0["name"])
+	spec := xrd.Object["spec"].(map[string]any)
+	v0 := spec["versions"].([]any)[0].(map[string]any)
+	openAPI := v0["schema"].(map[string]any)["openAPIV3Schema"].(map[string]any)
+	specSchema := openAPI["properties"].(map[string]any)["spec"].(map[string]any)
+
+	required, ok := specSchema["required"].([]any)
+	require.True(t, ok, "spec schema must propagate the #config required list")
+	assert.ElementsMatch(t, []any{"mustHave"}, required)
 }
 
-func TestBuildCRD_CustomGroup(t *testing.T) {
+func TestBuildXRD_ScopeExplicit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		scope XRDScope
+		want  string
+	}{
+		{"cluster", XRDScopeCluster, "Cluster"},
+		{"legacy-cluster", XRDScopeLegacyCluster, "LegacyCluster"},
+		{"namespaced-explicit", XRDScopeNamespaced, "Namespaced"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := cuecontext.New()
+			modVal := ctx.CompileString(`
+metadata: {name: "svc", version: "1.0.0"}
+#config: {}
+`)
+			require.NoError(t, modVal.Err())
+
+			xrd, err := BuildXRD(modVal, XRDOptions{
+				Group: "module.opmodel.dev",
+				Scope: tt.scope,
+			})
+			require.NoError(t, err)
+
+			spec := xrd.Object["spec"].(map[string]any)
+			assert.Equal(t, tt.want, spec["scope"])
+		})
+	}
+}
+
+func TestBuildXRD_CustomGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := cuecontext.New()
@@ -105,20 +161,22 @@ metadata: {name: "widget", version: "1.0.0"}
 `)
 	require.NoError(t, modVal.Err())
 
-	crd, err := BuildCRD(modVal, Options{Group: "example.com"})
+	xrd, err := BuildXRD(modVal, XRDOptions{Group: "example.com"})
 	require.NoError(t, err)
 
-	meta := crd.Object["metadata"].(map[string]any)
+	meta := xrd.Object["metadata"].(map[string]any)
 	assert.Equal(t, "widgets.example.com", meta["name"])
 
-	spec := crd.Object["spec"].(map[string]any)
+	spec := xrd.Object["spec"].(map[string]any)
 	assert.Equal(t, "example.com", spec["group"])
 }
 
-// TestBuildCRD_ProvenanceFullMetadata exercises the path where the module
-// declares all optional metadata fields (description, modulePath, fqn, uuid,
-// labels, annotations). Mirrors the zot_registry style.
-func TestBuildCRD_ProvenanceFullMetadata(t *testing.T) {
+// TestBuildXRD_ProvenanceFullMetadata mirrors the CRD provenance test.
+// Labels and annotations stamped on the XRD must match the CRD behavior —
+// they're produced by the same shared buildProvenance helper, and regressions
+// there would also break CRD; pinning XRD independently makes the breakage
+// localized on its way to the fix.
+func TestBuildXRD_ProvenanceFullMetadata(t *testing.T) {
 	t.Parallel()
 
 	ctx := cuecontext.New()
@@ -141,34 +199,29 @@ metadata: {
 `)
 	require.NoError(t, modVal.Err())
 
-	crd, err := BuildCRD(modVal, Options{Group: "module.opmodel.dev"})
+	xrd, err := BuildXRD(modVal, XRDOptions{Group: "module.opmodel.dev"})
 	require.NoError(t, err)
 
-	meta := crd.Object["metadata"].(map[string]any)
+	meta := xrd.Object["metadata"].(map[string]any)
 
 	labels := meta["labels"].(map[string]any)
-	// Module-declared label passes through.
 	assert.Equal(t, "registry", labels["app.kubernetes.io/component"])
-	// OPM-owned labels are always present.
 	assert.Equal(t, "opm-cli", labels["app.kubernetes.io/managed-by"])
 	assert.Equal(t, "zot-registry", labels["module.opmodel.dev/name"])
 	assert.Equal(t, "0.1.0", labels["module.opmodel.dev/version"])
 
 	annotations := meta["annotations"].(map[string]any)
-	// Module-declared annotation passes through.
 	assert.Equal(t, "PROJ-42", annotations["example.com/ticket"])
-	// All optional provenance annotations are populated from metadata.*.
 	assert.Equal(t, "opmodel.dev/modules", annotations["module.opmodel.dev/path"])
 	assert.Equal(t, "opmodel.dev/modules/zot-registry:0.1.0", annotations["module.opmodel.dev/fqn"])
 	assert.Equal(t, "Production-ready Zot OCI registry", annotations["module.opmodel.dev/description"])
 	assert.Equal(t, "11111111-2222-3333-4444-555555555555", annotations["module.opmodel.dev/uuid"])
 }
 
-// TestBuildCRD_ProvenanceOPMKeysWinOnCollision guards the invariant that a
-// module author cannot shadow OPM-owned keys by declaring them in
-// metadata.labels or metadata.annotations — otherwise a module could, e.g.,
-// claim to be managed by something other than OPM.
-func TestBuildCRD_ProvenanceOPMKeysWinOnCollision(t *testing.T) {
+// TestBuildXRD_ProvenanceOPMKeysWinOnCollision mirrors the CRD invariant:
+// a module author cannot shadow OPM-owned keys by declaring them in
+// metadata.labels or metadata.annotations.
+func TestBuildXRD_ProvenanceOPMKeysWinOnCollision(t *testing.T) {
 	t.Parallel()
 
 	ctx := cuecontext.New()
@@ -190,10 +243,10 @@ metadata: {
 `)
 	require.NoError(t, modVal.Err())
 
-	crd, err := BuildCRD(modVal, Options{Group: "module.opmodel.dev"})
+	xrd, err := BuildXRD(modVal, XRDOptions{Group: "module.opmodel.dev"})
 	require.NoError(t, err)
 
-	meta := crd.Object["metadata"].(map[string]any)
+	meta := xrd.Object["metadata"].(map[string]any)
 
 	labels := meta["labels"].(map[string]any)
 	assert.Equal(t, "opm-cli", labels["app.kubernetes.io/managed-by"])
@@ -204,7 +257,29 @@ metadata: {
 	assert.Equal(t, "opmodel.dev/modules", annotations["module.opmodel.dev/path"])
 }
 
-func TestBuildCRD_Errors(t *testing.T) {
+// TestBuildXRD_ReservedCrossplaneField rejects a #config whose top-level
+// properties include "crossplane" — the field would collide with Crossplane
+// v2's own reserved spec.crossplane.*.
+func TestBuildXRD_ReservedCrossplaneField(t *testing.T) {
+	t.Parallel()
+
+	ctx := cuecontext.New()
+	modVal := ctx.CompileString(`
+metadata: {name: "svc", version: "1.0.0"}
+#config: {
+	crossplane: { foo: string }
+	other: string
+}
+`)
+	require.NoError(t, modVal.Err())
+
+	_, err := BuildXRD(modVal, XRDOptions{Group: "module.opmodel.dev"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "crossplane")
+	assert.Contains(t, err.Error(), "reserves")
+}
+
+func TestBuildXRD_Errors(t *testing.T) {
 	t.Parallel()
 
 	ctx := cuecontext.New()
@@ -212,7 +287,7 @@ func TestBuildCRD_Errors(t *testing.T) {
 	tests := []struct {
 		name    string
 		src     string
-		opts    Options
+		opts    XRDOptions
 		wantErr string
 	}{
 		{
@@ -221,8 +296,17 @@ func TestBuildCRD_Errors(t *testing.T) {
 metadata: {name: "svc", version: "1.0.0"}
 #config: {}
 `,
-			opts:    Options{},
-			wantErr: "CRD group is required",
+			opts:    XRDOptions{},
+			wantErr: "XRD group is required",
+		},
+		{
+			name: "invalid scope",
+			src: `
+metadata: {name: "svc", version: "1.0.0"}
+#config: {}
+`,
+			opts:    XRDOptions{Group: "module.opmodel.dev", Scope: XRDScope("Bogus")},
+			wantErr: "invalid XRD scope",
 		},
 		{
 			name: "missing metadata.name",
@@ -230,7 +314,7 @@ metadata: {name: "svc", version: "1.0.0"}
 metadata: {version: "1.0.0"}
 #config: {}
 `,
-			opts:    Options{Group: "module.opmodel.dev"},
+			opts:    XRDOptions{Group: "module.opmodel.dev"},
 			wantErr: "metadata.name is not set",
 		},
 		{
@@ -239,13 +323,13 @@ metadata: {version: "1.0.0"}
 metadata: {name: "svc"}
 #config: {}
 `,
-			opts:    Options{Group: "module.opmodel.dev"},
+			opts:    XRDOptions{Group: "module.opmodel.dev"},
 			wantErr: "metadata.version is not set",
 		},
 		{
 			name:    "missing #config",
 			src:     `metadata: {name: "svc", version: "1.0.0"}`,
-			opts:    Options{Group: "module.opmodel.dev"},
+			opts:    XRDOptions{Group: "module.opmodel.dev"},
 			wantErr: "no #config definition",
 		},
 		{
@@ -254,17 +338,8 @@ metadata: {name: "svc"}
 metadata: {name: "123svc", version: "1.0.0"}
 #config: {}
 `,
-			opts:    Options{Group: "module.opmodel.dev"},
+			opts:    XRDOptions{Group: "module.opmodel.dev"},
 			wantErr: "invalid CRD kind",
-		},
-		{
-			name: "invalid version",
-			src: `
-metadata: {name: "svc", version: "not-a-version"}
-#config: {}
-`,
-			opts:    Options{Group: "module.opmodel.dev"},
-			wantErr: "non-numeric major",
 		},
 	}
 
@@ -275,7 +350,7 @@ metadata: {name: "svc", version: "not-a-version"}
 			modVal := ctx.CompileString(tt.src)
 			require.NoError(t, modVal.Err())
 
-			_, err := BuildCRD(modVal, tt.opts)
+			_, err := BuildXRD(modVal, tt.opts)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantErr)
 		})

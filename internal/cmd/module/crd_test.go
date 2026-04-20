@@ -34,7 +34,7 @@ func TestNewModuleCRDCmd(t *testing.T) {
 // TestModCRD_SimpleModule runs the command against the simple-module fixture
 // and verifies the YAML on stdout looks like a CRD. End-to-end coverage of
 // flag → load → BuildCRD → output wiring; the schema/name details are
-// exercised by pkg/crd tests.
+// exercised by pkg/k8sgen tests.
 func TestModCRD_SimpleModule(t *testing.T) {
 	fixtureDir := filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "simple-module")
 	if _, err := os.Stat(fixtureDir); os.IsNotExist(err) {

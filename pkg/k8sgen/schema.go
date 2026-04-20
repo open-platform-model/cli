@@ -1,4 +1,4 @@
-package crd
+package k8sgen
 
 import (
 	"encoding/json"

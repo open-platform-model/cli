@@ -8,6 +8,8 @@ import (
 // Lower weights are applied first.
 const (
 	WeightCRD                = -100
+	WeightXRD                = -90
+	WeightComposition        = -80
 	WeightNamespace          = 0
 	WeightClusterRole        = 5
 	WeightClusterRoleBinding = 5
@@ -36,6 +38,12 @@ const (
 
 var gvkWeights = map[schema.GroupVersionKind]int{
 	{Group: "apiextensions.k8s.io", Version: "v1", Kind: "CustomResourceDefinition"}: WeightCRD,
+
+	// Crossplane v2 — XRD (v2) apply-orders before its matching Composition
+	// (still on v1 in v2). Webhook rejects Compositions whose compositeTypeRef
+	// names a not-yet-registered XR kind, so ordering matters.
+	{Group: "apiextensions.crossplane.io", Version: "v2", Kind: "CompositeResourceDefinition"}: WeightXRD,
+	{Group: "apiextensions.crossplane.io", Version: "v1", Kind: "Composition"}:                 WeightComposition,
 
 	{Group: "", Version: "v1", Kind: "Namespace"}:             WeightNamespace,
 	{Group: "", Version: "v1", Kind: "ServiceAccount"}:        WeightServiceAccount,
@@ -100,6 +108,8 @@ var kindWeights = map[string]int{
 	"ValidatingWebhookConfiguration": WeightWebhook,
 	"MutatingWebhookConfiguration":   WeightWebhook,
 	"CustomResourceDefinition":       WeightCRD,
+	"CompositeResourceDefinition":    WeightXRD,
+	"Composition":                    WeightComposition,
 }
 
 // GetWeight returns the ordering weight for a GVK. Lower weights are applied first.

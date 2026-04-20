@@ -1,9 +1,10 @@
-// Package crd builds Kubernetes CustomResourceDefinition manifests from
-// loaded OPM modules. The module's #config definition drives the CRD's
-// OpenAPI v3 schema; surrounding metadata (group, version, names) is derived
-// from the module's metadata.name and metadata.version plus caller-supplied
-// options.
-package crd
+// Package k8sgen builds Kubernetes resource-definition manifests from
+// loaded OPM modules: Kubernetes CustomResourceDefinition (CRD) and
+// Crossplane v2 CompositeResourceDefinition (XRD). The module's #config
+// definition drives the emitted OpenAPI v3 schema; surrounding metadata
+// (group, version, names) is derived from the module's metadata.name and
+// metadata.version plus caller-supplied options.
+package k8sgen
 
 import (
 	"fmt"
