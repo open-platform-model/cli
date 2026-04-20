@@ -141,7 +141,10 @@ func BuildXRD(modVal cue.Value, opts XRDOptions) (*unstructured.Unstructured, er
 						"name":          version,
 						"served":        true,
 						"referenceable": true,
-						"storage":       true,
+						// Note: `storage` is not emitted for XRD v2. The
+						// `referenceable` field subsumes it and Crossplane
+						// maps it onto the underlying CRD's
+						// spec.versions[*].storage internally.
 						"schema": map[string]any{
 							"openAPIV3Schema": openAPIV3Schema,
 						},

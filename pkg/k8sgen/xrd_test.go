@@ -63,7 +63,9 @@ debugValues: {name: "demo"}
 	assert.Equal(t, "v1alpha1", v0["name"])
 	assert.Equal(t, true, v0["served"])
 	assert.Equal(t, true, v0["referenceable"])
-	assert.Equal(t, true, v0["storage"])
+	// XRD v2 drops the `storage` field — `referenceable` subsumes it.
+	_, hasStorage := v0["storage"]
+	assert.False(t, hasStorage, "storage must not be emitted on XRD v2 versions")
 
 	schema := v0["schema"].(map[string]any)
 	openAPI := schema["openAPIV3Schema"].(map[string]any)

@@ -155,7 +155,7 @@ openAPIV3Schema:
 
 #### Per-version flags
 
-Exactly one version element, with `served: true`, `referenceable: true`, `storage: true`. Multi-version XRDs inherit the same deferral as multi-version CRDs.
+Exactly one version element, with `served: true` and `referenceable: true`. `storage` is deliberately **not** emitted — XRD v2 removed the field, and `referenceable` maps onto the underlying CRD's `spec.versions[*].storage` internally. Multi-version XRDs inherit the same deferral as multi-version CRDs.
 
 #### Reserved-field check
 
