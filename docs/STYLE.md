@@ -58,4 +58,4 @@ Canonical glossary: [`opm/docs/glossary.md`](../../opm/docs/glossary.md).
 
 - CUE schema definitions (those belong in `catalog/docs/`).
 - End-user quickstarts (those belong in `opm/docs/`).
-- Kubernetes operator procedures (those belong in `poc-controller/docs/`).
+- Kubernetes operator procedures (those belong in `opm-operator/docs/`).
