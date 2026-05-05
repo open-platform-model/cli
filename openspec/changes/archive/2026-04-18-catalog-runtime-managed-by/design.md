@@ -28,7 +28,7 @@ This change scope is narrow: pin the new catalog version, update `cli/pkg/render
 
 **Alternatives considered**:
 
-- *Path-replace the catalog locally for development*: works for local iteration but must be undone before merge. Use `task update-deps` from workspace root after the catalog publishes.
+- *Path-replace the catalog locally for development*: works for local iteration but must be undone before merge. Use `task deps:update` from workspace root after the catalog publishes.
 
 ### Decision 2: Mirror the controller's render-and-check test
 
@@ -50,7 +50,7 @@ This change scope is narrow: pin the new catalog version, update `cli/pkg/render
 
 - **Risk**: the CLI ships before the catalog version it depends on is available in the OCI registry. → **Mitigation**: task 1.x explicitly waits on the sister change's publish; CI will fail to resolve the new catalog version if attempted prematurely.
 - **Risk**: external tooling that matches CLI-applied resources by the legacy literal stops working. → **Mitigation**: documented in proposal Impact. Internal logic uses `core.IsOPMManagedBy` which accepts the legacy value indefinitely.
-- **Risk**: `task update-deps` updates more than just the catalog version. → **Mitigation**: review the diff before commit; restrict the commit to the catalog version bump if other deps changed unintentionally.
+- **Risk**: `task deps:update` updates more than just the catalog version. → **Mitigation**: review the diff before commit; restrict the commit to the catalog version bump if other deps changed unintentionally.
 
 ## Migration Plan
 

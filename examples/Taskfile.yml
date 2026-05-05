@@ -6,7 +6,7 @@ env:
   CUE_REGISTRY: "opmodel.dev=localhost:5000+insecure,registry.cue.works"
 
 tasks:
-  update-deps:
+  deps:update:
     desc: Update all CUE dependencies to latest versions across example modules
     cmds:
       - |

@@ -6,7 +6,7 @@ This change exists so the CLI's update lives next to its own tests, lint config,
 
 ## What Changes
 
-- **Pin new catalog version**: bump `cli/cue.mod/module.cue` (and any subpackage `cue.mod/` files) to the catalog version published by the sister change. Use the workspace `task update-deps` command from the workspace root to keep all CUE module pins consistent.
+- **Pin new catalog version**: bump `cli/cue.mod/module.cue` (and any subpackage `cue.mod/` files) to the catalog version published by the sister change. Use the workspace `task deps:update` command from the workspace root to keep all CUE module pins consistent.
 - **Update CLI render path**: in `cli/pkg/render/execute.go:233-243`, replace the existing `runtimeLabels` `map[string]string` injection with a single `runtimeName string` injection. The `FillPath` target moves from `cue.MakePath(cue.Def("context"), cue.Def("runtimeLabels"))` to `cue.MakePath(cue.Def("context"), cue.Def("runtimeName"))`. The value injected is `core.LabelManagedByValue` (`"opm-cli"`).
 - **Update `pkg/render/ProcessModuleRelease` signature** if needed to take a `runtimeName string` instead of (or in addition to) the existing `runtimeLabelsOverride` map. Trace the controller's matching change for the exact signature shape; the CLI's call site is `cli/cmd/...` (single call site, easy to update).
 - **Render-and-check test**: add a unit test in `cli/pkg/render/` that renders a minimal `#ModuleRelease` and asserts `metadata.labels["app.kubernetes.io/managed-by"] == core.LabelManagedByValue`. Mirrors the controller-side test; both runtimes get the same contract enforcement.

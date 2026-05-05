@@ -1,7 +1,7 @@
 ## 1. Wait for catalog publish + pin
 
 - [x] 1.1 Confirm the sister change (`poc-controller/openspec/changes/catalog-runtime-managed-by`) has published the new catalog version. Capture the version string.
-- [x] 1.2 From the workspace root, run `task update-deps` to bump all CUE module pins (`cli/cue.mod/module.cue`, any subpackage `cue.mod/`). Verify the diff is scoped to the catalog version.
+- [x] 1.2 From the workspace root, run `task deps:update` to bump all CUE module pins (`cli/cue.mod/module.cue`, any subpackage `cue.mod/`). Verify the diff is scoped to the catalog version.
 - [x] 1.3 Run `task fmt && task vet` in `cli/`. Render and CUE evaluation may break here because `#runtimeLabels` no longer exists on `#TransformerContext` and `#runtimeName` is mandatory. This is expected — task 2.x fixes it.
 
 ## 2. Update CLI render path
