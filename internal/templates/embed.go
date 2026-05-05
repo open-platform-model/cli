@@ -61,11 +61,8 @@ type TemplateData struct {
 	// PackageName is the CUE package name for the module files.
 	PackageName string
 
-	// ModuleNamePascal is the PascalCase version of the module name (e.g., "MyApp").
-	// Used for the FQN name field which requires uppercase first letter.
-	ModuleNamePascal string
-
-	// ModulePath is the module path without version (e.g., "example.com/my-app").
+	// ModulePath is the parent registry path (e.g., "example.com/modules").
+	// The full module path is constructed in templates as "{{.ModulePath}}/{{.ModuleName}}".
 	ModulePath string
 
 	// Version is the initial module version (e.g., "0.1.0").

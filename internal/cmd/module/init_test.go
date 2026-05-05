@@ -3,6 +3,7 @@ package modulecmd
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -94,6 +95,8 @@ func TestModInit_Simple(t *testing.T) {
 	assert.FileExists(t, filepath.Join(targetDir, "module.cue"))
 	assert.FileExists(t, filepath.Join(targetDir, "cue.mod", "module.cue"))
 	assert.NoFileExists(t, filepath.Join(targetDir, "values.cue"), "values.cue must not be generated — defaults live in #config")
+
+	assertScaffoldPaths(t, targetDir, "my-app")
 }
 
 func TestModInit_Standard(t *testing.T) {
@@ -117,6 +120,8 @@ func TestModInit_Standard(t *testing.T) {
 	assert.FileExists(t, filepath.Join(targetDir, "components.cue"))
 	assert.FileExists(t, filepath.Join(targetDir, "cue.mod", "module.cue"))
 	assert.NoFileExists(t, filepath.Join(targetDir, "values.cue"), "values.cue must not be generated — defaults live in #config")
+
+	assertScaffoldPaths(t, targetDir, "my-app")
 }
 
 func TestModInit_Advanced(t *testing.T) {
@@ -140,6 +145,14 @@ func TestModInit_Advanced(t *testing.T) {
 	assert.FileExists(t, filepath.Join(targetDir, "components.cue"))
 	assert.DirExists(t, filepath.Join(targetDir, "components"))
 	assert.NoFileExists(t, filepath.Join(targetDir, "values.cue"), "values.cue must not be generated — defaults live in #config")
+
+	assertScaffoldPaths(t, targetDir, "my-app")
+
+	// Advanced subpackage import must reference the module's full registry path.
+	componentsContent, err := os.ReadFile(filepath.Join(targetDir, "components.cue"))
+	require.NoError(t, err)
+	assert.Contains(t, string(componentsContent), `comps "example.com/modules/my-app/components@v0"`,
+		"advanced subpackage import must include module name segment")
 }
 
 func TestModInit_DefaultDir(t *testing.T) {
@@ -184,10 +197,69 @@ func TestModInit_ContentSubstitution(t *testing.T) {
 	err = cmd.Execute()
 	require.NoError(t, err)
 
-	// Check module path contains the module name
+	assertScaffoldPaths(t, targetDir, "my-special-app")
+}
+
+func TestModInit_InvalidName(t *testing.T) {
+	tests := []struct {
+		name       string
+		moduleName string
+	}{
+		{"spaces", "Bad Name"},
+		{"uppercase", "UPPER"},
+		{"mixed-case", "MixedCase"},
+		{"underscore", "under_score"},
+		{"leading-hyphen", "-leading"},
+		{"trailing-hyphen", "trailing-"},
+		{"numeric-start", "1numeric"},
+		{"dot", "with.dot"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			targetDir := filepath.Join(tmpDir, "out")
+
+			cmd := NewModuleInitCmd(&config.GlobalConfig{})
+			// "--" forces cobra to treat the next token as a positional, so
+			// names beginning with "-" reach our validation rather than being
+			// parsed as flags.
+			cmd.SetArgs([]string{"--template", "simple", "--dir", targetDir, "--", tt.moduleName})
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			err := cmd.Execute()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "invalid module name")
+			assert.NoDirExists(t, targetDir, "scaffold must not be created when name is invalid")
+		})
+	}
+}
+
+// assertScaffoldPaths verifies the rendered module has the correct registry-path
+// shape: cue.mod uses the full <parent>/<name>@v0 path, while metadata.modulePath
+// holds only the parent. The schema computes fqn = "<modulePath>/<name>:<version>",
+// so any duplication of the name segment would produce a malformed fqn.
+func assertScaffoldPaths(t *testing.T, targetDir, moduleName string) {
+	t.Helper()
+
 	cueModContent, err := os.ReadFile(filepath.Join(targetDir, "cue.mod", "module.cue"))
 	require.NoError(t, err)
-	assert.Contains(t, string(cueModContent), "my-special-app")
+	assert.Contains(t, string(cueModContent),
+		fmt.Sprintf(`module: "example.com/modules/%s@v0"`, moduleName),
+		"cue.mod must use full <parent>/<name>@v0 path")
+
+	moduleContent, err := os.ReadFile(filepath.Join(targetDir, "module.cue"))
+	require.NoError(t, err)
+	moduleStr := string(moduleContent)
+	assert.Contains(t, moduleStr, `modulePath:`, "module.cue must declare modulePath")
+	assert.Contains(t, moduleStr, `"example.com/modules"`,
+		"metadata.modulePath must be the parent only (no module name)")
+	assert.Contains(t, moduleStr, fmt.Sprintf(`name:        %q`, moduleName),
+		"metadata.name must be the module name")
+	assert.NotContains(t, moduleStr,
+		fmt.Sprintf(`"example.com/modules/%s"`, moduleName),
+		"metadata.modulePath must not include the module name segment (would double in fqn)")
 }
 
 func TestGetFileDescription(t *testing.T) {
@@ -209,31 +281,6 @@ func TestGetFileDescription(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
 			got := getFileDescription(tt.filename)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestToPascalCase(t *testing.T) {
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"my-app", "MyApp"},
-		{"my-special-app", "MySpecialApp"},
-		{"simple", "Simple"},
-		{"my_app", "MyApp"},
-		{"MY-APP", "MYAPP"},
-		{"a-b-c", "ABC"},
-		{"test", "Test"},
-		{"hello-world", "HelloWorld"},
-		{"api-server", "ApiServer"},
-		{"", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := toPascalCase(tt.input)
 			assert.Equal(t, tt.want, got)
 		})
 	}

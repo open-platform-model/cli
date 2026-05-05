@@ -54,11 +54,10 @@ func TestRender(t *testing.T) {
 			name:     "render simple template",
 			template: Simple,
 			data: TemplateData{
-				ModuleName:       "test-app",
-				PackageName:      "test_app",
-				ModuleNamePascal: "TestApp",
-				ModulePath:       "example.com/test-app",
-				Version:          "0.1.0",
+				ModuleName:  "test-app",
+				PackageName: "test_app",
+				ModulePath:  "example.com/modules",
+				Version:     "0.1.0",
 			},
 			wantFiles: []string{
 				"module.cue",
@@ -66,18 +65,17 @@ func TestRender(t *testing.T) {
 			},
 			wantContains: map[string]string{
 				"module.cue":         "package test_app",
-				"cue.mod/module.cue": "example.com/test-app@v0",
+				"cue.mod/module.cue": "example.com/modules/test-app@v0",
 			},
 		},
 		{
 			name:     "render standard template",
 			template: Standard,
 			data: TemplateData{
-				ModuleName:       "my-service",
-				PackageName:      "my_service",
-				ModuleNamePascal: "MyService",
-				ModulePath:       "mycompany.com/my-service",
-				Version:          "1.0.0",
+				ModuleName:  "my-service",
+				PackageName: "my_service",
+				ModulePath:  "mycompany.com/modules",
+				Version:     "1.0.0",
 			},
 			wantFiles: []string{
 				"module.cue",
@@ -86,7 +84,7 @@ func TestRender(t *testing.T) {
 			},
 			wantContains: map[string]string{
 				"module.cue":         "package my_service",
-				"cue.mod/module.cue": "mycompany.com/my-service@v0",
+				"cue.mod/module.cue": "mycompany.com/modules/my-service@v0",
 			},
 		},
 		{
@@ -157,11 +155,10 @@ func TestRender_DirectoryExists(t *testing.T) {
 
 	// Rendering to an existing directory should work (files get overwritten)
 	data := TemplateData{
-		ModuleName:       "test-app",
-		PackageName:      "test_app",
-		ModuleNamePascal: "TestApp",
-		ModulePath:       "example.com/test-app",
-		Version:          "0.1.0",
+		ModuleName:  "test-app",
+		PackageName: "test_app",
+		ModulePath:  "example.com/modules",
+		Version:     "0.1.0",
 	}
 
 	_, err = Render(Simple, tmpDir, data)
@@ -174,11 +171,10 @@ func TestRender_AdvancedTemplate(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	data := TemplateData{
-		ModuleName:       "platform-app",
-		PackageName:      "platform_app",
-		ModuleNamePascal: "PlatformApp",
-		ModulePath:       "platform.io/platform-app",
-		Version:          "0.1.0",
+		ModuleName:  "platform-app",
+		PackageName: "platform_app",
+		ModulePath:  "platform.io/modules",
+		Version:     "0.1.0",
 	}
 
 	createdFiles, err := Render(Advanced, tmpDir, data)

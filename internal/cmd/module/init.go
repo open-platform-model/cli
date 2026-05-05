@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -16,6 +17,13 @@ import (
 	"github.com/opmodel/cli/internal/templates"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
+
+// moduleNameRegex enforces a strict subset of the module-path segment grammar:
+// lowercase letters, digits, and hyphens; must start with a letter; must not
+// end with a hyphen. Matches the convention used by every module in modules/.
+var moduleNameRegex = regexp.MustCompile(`^[a-z]([a-z0-9-]*[a-z0-9])?$`)
+
+const validationFailedType = "validation failed"
 
 // NewModuleInitCmd creates the module init command.
 func NewModuleInitCmd(_ *config.GlobalConfig) *cobra.Command {
@@ -58,12 +66,25 @@ Examples:
 func runModuleInit(args []string, templateName, dir string) error {
 	moduleName := args[0]
 
+	// Validate module name
+	if !moduleNameRegex.MatchString(moduleName) {
+		return &opmexit.ExitError{
+			Code: opmexit.ExitValidationError,
+			Err: &oerrors.DetailError{
+				Type:    validationFailedType,
+				Message: fmt.Sprintf("invalid module name: %q", moduleName),
+				Hint:    `Module names must be lowercase letters, digits, and hyphens; must start with a letter and not end with a hyphen (e.g. "my-app", "cert-manager").`,
+				Cause:   oerrors.ErrValidation,
+			},
+		}
+	}
+
 	// Validate template name
 	if !templates.IsValidTemplate(templateName) {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitValidationError,
 			Err: &oerrors.DetailError{
-				Type:    "validation failed",
+				Type:    validationFailedType,
 				Message: fmt.Sprintf("unknown template: %s", templateName),
 				Hint:    fmt.Sprintf("Valid templates: %s", strings.Join(templates.ValidTemplates(), ", ")),
 				Cause:   oerrors.ErrValidation,
@@ -82,7 +103,7 @@ func runModuleInit(args []string, templateName, dir string) error {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitValidationError,
 			Err: &oerrors.DetailError{
-				Type:     "validation failed",
+				Type:     validationFailedType,
 				Message:  fmt.Sprintf("directory already exists: %s", targetDir),
 				Location: targetDir,
 				Hint:     "Choose a different directory or remove the existing one.",
@@ -109,11 +130,10 @@ func runModuleInit(args []string, templateName, dir string) error {
 	}
 
 	data := templates.TemplateData{
-		ModuleName:       moduleName,
-		PackageName:      toPackageName(moduleName),
-		ModuleNamePascal: toPascalCase(moduleName),
-		ModulePath:       fmt.Sprintf("example.com/%s", moduleName),
-		Version:          "0.1.0",
+		ModuleName:  moduleName,
+		PackageName: toPackageName(moduleName),
+		ModulePath:  "example.com/modules",
+		Version:     "0.1.0",
 	}
 
 	// Render the template
@@ -178,28 +198,6 @@ func getFileDescription(filename string) string {
 	}
 
 	return ""
-}
-
-// toPascalCase converts a kebab-case or snake_case string to PascalCase.
-// Examples: "my-app" -> "MyApp", "my_service" -> "MyService"
-func toPascalCase(s string) string {
-	var result strings.Builder
-	capitalizeNext := true
-
-	for _, r := range s {
-		if r == '-' || r == '_' {
-			capitalizeNext = true
-			continue
-		}
-		if capitalizeNext {
-			result.WriteRune(unicode.ToUpper(r))
-			capitalizeNext = false
-		} else {
-			result.WriteRune(r)
-		}
-	}
-
-	return result.String()
 }
 
 // toPackageName converts a module name to a valid CUE package name.
