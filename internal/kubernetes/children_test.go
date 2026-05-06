@@ -27,7 +27,7 @@ func makeParent(kind, name, namespace string, uid types.UID) *unstructured.Unstr
 // nil error even when the underlying client has no API resources registered.
 // The function logs warnings via output.Debug but never propagates errors.
 func TestDiscoverChildren_APIErrorNonFatal(t *testing.T) {
-	clientset := fake.NewSimpleClientset() //nolint:staticcheck // matches existing test patterns
+	clientset := fake.NewSimpleClientset()
 
 	// A Deployment parent with no corresponding ReplicaSets or Pods — the
 	// function should return empty children, not an error.
@@ -173,7 +173,7 @@ func TestDiscoverChildren(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clientset := fake.NewSimpleClientset() //nolint:staticcheck // matches existing test patterns
+			clientset := fake.NewSimpleClientset()
 
 			// Seed ReplicaSets.
 			for i := range tt.replicaSets {
