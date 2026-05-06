@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/open-platform-model/cli/compare/v0.3.0...v0.4.0) (2026-05-06)
+
+
+### Features
+
+* **config:** default registry to ghcr.io/open-platform-model ([1e54ea9](https://github.com/open-platform-model/cli/commit/1e54ea97cad99df8730efb030f018fc7d74d3d6a))
+
 ## [0.3.0](https://github.com/open-platform-model/cli/compare/v0.2.0...v0.3.0) (2026-05-05)
 
 
