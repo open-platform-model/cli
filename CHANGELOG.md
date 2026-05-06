@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/open-platform-model/cli/compare/v0.4.0...v0.5.0) (2026-05-06)
+
+
+### Features
+
+* **module:** add synthetic release build for module directories ([996cb9f](https://github.com/open-platform-model/cli/commit/996cb9f69c2c18b44f20583b51039d137ec59965))
+
 ## [0.4.0](https://github.com/open-platform-model/cli/compare/v0.3.0...v0.4.0) (2026-05-06)
 
 
