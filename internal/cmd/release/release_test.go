@@ -31,7 +31,7 @@ func TestNewReleaseVetCmd_Flags(t *testing.T) {
 
 func TestNewReleaseBuildCmd(t *testing.T) {
 	cmd := NewReleaseBuildCmd(&config.GlobalConfig{})
-	assert.Equal(t, "build <release.cue>", cmd.Use)
+	assert.Equal(t, "build <release.cue|module-dir>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 }
 
@@ -39,6 +39,7 @@ func TestNewReleaseBuildCmd_Flags(t *testing.T) {
 	cmd := NewReleaseBuildCmd(&config.GlobalConfig{})
 	assert.NotNil(t, cmd.Flags().Lookup("output"), "--output/-o flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("values"), "--values/-f flag should be registered")
+	assert.NotNil(t, cmd.Flags().Lookup("name"), "--name flag should be registered")
 }
 
 func TestNewReleaseApplyCmd(t *testing.T) {
@@ -150,9 +151,15 @@ func TestReleaseVetCmd_RejectsBundleRelease(t *testing.T) {
 }
 
 func TestRunReleaseBuild_RejectsNonManifestOutput(t *testing.T) {
-	err := runReleaseBuild("release.cue", &config.GlobalConfig{}, &cmdutil.ReleaseFileFlags{}, "", "wide", false, "")
+	err := runReleaseBuild("release.cue", &config.GlobalConfig{}, &cmdutil.ReleaseFileFlags{}, "", "", "wide", false, "")
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "invalid output format"))
+}
+
+func TestRunReleaseBuild_MissingPath(t *testing.T) {
+	err := runReleaseBuild("/nonexistent/release/path", &config.GlobalConfig{}, &cmdutil.ReleaseFileFlags{}, "", "", "yaml", false, "")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
 }
 
 // TestReleaseGroup verifies the release command group is correctly configured.

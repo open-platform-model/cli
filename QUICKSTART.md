@@ -196,6 +196,33 @@ opm release status minecraft -n default
 opm release delete minecraft -n default --force
 ```
 
+## Render a Module Without Writing a release.cue
+
+For inner-loop module development, you can render manifests directly from a
+module-package directory — no `release.cue` required. The CLI synthesizes a
+`#ModuleRelease` around the module using its `debugValues` (or `-f` overrides).
+
+```bash
+# From inside a module directory
+opm module build
+
+# Or from anywhere
+opm module build ./examples/modules/mc_router
+
+# Override the synthetic release name
+opm module build ./examples/modules/mc_router --name mc-debug
+
+# Provide explicit values instead of debugValues
+opm module build ./examples/modules/mc_router -f ./my-overrides.cue
+```
+
+`opm release build` accepts a directory too, so the same path is reachable as
+`opm release build <module-dir>` for symmetry with the file form.
+
+The module must declare `opmodel.dev/core/v1alpha1@v1` as a dependency in its
+`cue.mod/module.cue`; the synthesizer reuses that pin so the rendered output
+matches the catalog version the module already validates against.
+
 ## Notes
 
 - `opm release` is the canonical workflow when you already have a release definition.

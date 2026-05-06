@@ -16,3 +16,19 @@ Stateless hostname router for Minecraft traffic based on `itzg/mc-router`.
 ## Example release
 
 See `examples/releases/mc_router/` for a concrete `release.cue` and default `values.cue`.
+
+## Render without a release.cue
+
+For quick iteration, render manifests straight from this module using its
+`debugValues`:
+
+```bash
+opm module build ./examples/modules/mc_router
+```
+
+Override the synthetic name or supply your own values:
+
+```bash
+opm module build ./examples/modules/mc_router --name mc-router-debug
+opm module build ./examples/modules/mc_router -f my-overrides.cue
+```

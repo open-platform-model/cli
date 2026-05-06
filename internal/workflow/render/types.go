@@ -33,6 +33,23 @@ type ReleaseFileOpts struct {
 	Config          *config.GlobalConfig
 }
 
+// ModuleOpts configures rendering from a module-package directory through the
+// synthesis path (no release.cue on disk).
+type ModuleOpts struct {
+	// ModulePath is the directory containing the user's module CUE package.
+	ModulePath string
+
+	// ValuesFiles, when non-empty, override the module's debugValues.
+	ValuesFiles []string
+
+	// Name overrides the synthetic metadata.name. Empty falls back to
+	// "<module.metadata.name>-debug".
+	Name string
+
+	K8sConfig *config.ResolvedKubernetesConfig
+	Config    *config.GlobalConfig
+}
+
 type ShowOutputOpts struct {
 	Verbose bool
 }
