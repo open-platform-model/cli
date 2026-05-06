@@ -37,7 +37,7 @@ func makeRes(kind, ns, name string) *unstructured.Unstructured {
 }
 
 func makeTreeClient(objects ...runtime.Object) *Client {
-	return &Client{Clientset: fake.NewSimpleClientset(objects...)} //nolint:staticcheck // fake.NewClientset requires generated apply configs
+	return &Client{Clientset: fake.NewSimpleClientset(objects...)}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -96,7 +96,7 @@ func TestGetModuleEvents(t *testing.T) {
 		},
 	}
 
-	clientset := fake.NewSimpleClientset() //nolint:staticcheck // matches existing test patterns
+	clientset := fake.NewSimpleClientset()
 	for i := range events {
 		_, err := clientset.CoreV1().Events("default").Create(context.Background(), &events[i], metav1.CreateOptions{})
 		require.NoError(t, err)
