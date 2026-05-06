@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/open-platform-model/cli/compare/v0.5.0...v0.5.1) (2026-05-06)
+
+
+### Miscellaneous Chores
+
+* **openspec:** archive module-synthetic-build and sync specs ([b00aab5](https://github.com/open-platform-model/cli/commit/b00aab52f5c33408ac2f9df9c1f4bfd1e23ce8c1))
+
 ## [0.5.0](https://github.com/open-platform-model/cli/compare/v0.4.0...v0.5.0) (2026-05-06)
 
 
