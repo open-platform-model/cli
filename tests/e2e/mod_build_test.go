@@ -95,9 +95,9 @@ func TestE2E_ModBuild_FromExampleModule(t *testing.T) {
 
 	repoRoot, err := filepath.Abs("../..")
 	require.NoError(t, err)
-	modPath := filepath.Join(repoRoot, "examples", "modules", "mc_router")
+	modPath := filepath.Join(repoRoot, "tests", "fixtures", "valid", "module-with-debug-values")
 	if _, statErr := os.Stat(modPath); statErr != nil {
-		t.Skipf("examples/modules/mc_router not available: %v", statErr)
+		t.Skipf("tests/fixtures/valid/module-with-debug-values not available: %v", statErr)
 	}
 
 	tmpDir, err := os.MkdirTemp("", "e2e-mod-build-*")
@@ -107,12 +107,12 @@ func TestE2E_ModBuild_FromExampleModule(t *testing.T) {
 	customHome := makeBuildHome(t)
 	defer os.RemoveAll(customHome)
 
-	stdout, stderr, err := runOPMWithEnv(t, tmpDir, customHome, 120*time.Second, "module", "build", modPath, "--name", "e2e-mc-router")
+	stdout, stderr, err := runOPMWithEnv(t, tmpDir, customHome, 120*time.Second, "module", "build", modPath, "--name", "e2e-build-test")
 	if err != nil {
 		t.Skipf("opm module build failed (likely registry/provider unavailable): err=%v stderr=%s", err, stderr)
 	}
 	assert.Contains(t, stderr, "synthetic release")
-	assert.Contains(t, stderr, "e2e-mc-router")
+	assert.Contains(t, stderr, "e2e-build-test")
 	assert.NotEmpty(t, stdout, "expected manifest output on stdout")
 }
 

@@ -174,7 +174,7 @@ func tempEntriesMatching(t *testing.T, prefix string) []string {
 }
 
 // TestSynthesizeModuleReleaseFromPackage_RegistryE2E exercises the full path
-// against the real registry for each example module that defines debugValues.
+// against the real registry for each fixture module that defines debugValues.
 // Skipped if no registry is reachable (CI runs with a pre-warmed registry).
 func TestSynthesizeModuleReleaseFromPackage_RegistryE2E(t *testing.T) {
 	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
@@ -182,20 +182,20 @@ func TestSynthesizeModuleReleaseFromPackage_RegistryE2E(t *testing.T) {
 	}
 	ctx := cuecontext.New()
 
-	examplesRoot, err := filepath.Abs("../../examples/modules")
+	fixturesRoot, err := filepath.Abs("../../tests/fixtures/valid")
 	require.NoError(t, err)
-	if _, statErr := os.Stat(examplesRoot); statErr != nil {
-		t.Skip("examples/modules not available")
+	if _, statErr := os.Stat(fixturesRoot); statErr != nil {
+		t.Skip("tests/fixtures/valid not available")
 	}
 
-	entries, err := os.ReadDir(examplesRoot)
+	entries, err := os.ReadDir(fixturesRoot)
 	require.NoError(t, err)
 
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
-		modPath := filepath.Join(examplesRoot, entry.Name())
+		modPath := filepath.Join(fixturesRoot, entry.Name())
 		if _, statErr := os.Stat(filepath.Join(modPath, "module.cue")); statErr != nil {
 			continue
 		}
@@ -269,10 +269,10 @@ func TestSynthesizeModuleReleaseFromPackage_NameNamespaceOverride(t *testing.T) 
 	}
 	ctx := cuecontext.New()
 
-	modPath, err := filepath.Abs("../../examples/modules/zot_registry")
+	modPath, err := filepath.Abs("../../tests/fixtures/valid/module-with-debug-values")
 	require.NoError(t, err)
 	if _, statErr := os.Stat(modPath); statErr != nil {
-		t.Skip("examples/modules/zot_registry not available")
+		t.Skip("tests/fixtures/valid/module-with-debug-values not available")
 	}
 
 	result, err := SynthesizeModuleReleaseFromPackage(ctx, modPath, SynthesizeOptions{

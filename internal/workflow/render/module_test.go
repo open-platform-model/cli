@@ -98,10 +98,10 @@ func TestFromModule_RegistryE2E(t *testing.T) {
 		t.Skip("skipping registry-backed render tests")
 	}
 
-	modPath, err := filepath.Abs("../../../examples/modules/mc_router")
+	modPath, err := filepath.Abs("../../../tests/fixtures/valid/module-with-debug-values")
 	require.NoError(t, err)
 	if _, statErr := os.Stat(modPath); statErr != nil {
-		t.Skip("examples/modules/mc_router not available")
+		t.Skip("tests/fixtures/valid/module-with-debug-values not available")
 	}
 
 	cfg := &config.GlobalConfig{
@@ -111,7 +111,7 @@ func TestFromModule_RegistryE2E(t *testing.T) {
 
 	result, err := FromModule(context.Background(), ModuleOpts{
 		ModulePath: modPath,
-		Name:       "mc-router-test",
+		Name:       "render-test",
 		Config:     cfg,
 		K8sConfig:  k8sCfg,
 	})
@@ -119,5 +119,5 @@ func TestFromModule_RegistryE2E(t *testing.T) {
 		t.Skipf("FromModule failed (likely registry/provider unavailable): %v", err)
 	}
 	require.NotNil(t, result)
-	assert.Equal(t, "mc-router-test", result.Release.Name)
+	assert.Equal(t, "render-test", result.Release.Name)
 }
