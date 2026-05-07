@@ -1,76 +1,48 @@
 # Quickstart
 
-Get up and running with OPM in a few minutes using the example release files.
+Get up and running with OPM in a few minutes. The catalog and core modules
+are published to a public registry, so you only need the CLI and a CUE
+toolchain to start authoring and rendering your first module.
 
 ## Prerequisites
 
-- **Go 1.23+** - for building the CLI
+- **Go 1.25+** - for building the CLI
 - **[Task](https://taskfile.dev)** - task runner (`go install github.com/go-task/task/v3/cmd/task@latest`)
-- **[CUE](https://cuelang.org)** - for module publishing (`go install cuelang.org/go/cmd/cue@latest`)
-- **Docker** - for running the local OCI registry
+- **[CUE](https://cuelang.org)** - CUE toolchain (`go install cuelang.org/go/cmd/cue@latest`)
+
+The "Deploy to a Cluster" section additionally needs:
+
 - **kind** - local Kubernetes (`go install sigs.k8s.io/kind@latest`)
 - **kubectl** - Kubernetes CLI
-- **jq** - optional, for `task registry:status`
-
-## Clone Repositories
-
-Clone both the CLI and catalog repositories:
-
-```bash
-git clone https://github.com/open-platform-model/cli.git
-git clone https://github.com/open-platform-model/catalog.git
-```
-
-Expected layout:
-
-```text
-├── cli/        # CLI source code
-└── catalog/    # CUE module definitions
-```
-
-## Start the OCI Registry
-
-The catalog repository includes tasks for managing a local Docker OCI registry.
-
-```bash
-cd catalog
-task registry:start
-```
-
-This starts a local OCI registry at `localhost:5000`.
-
-## Configure Environment
-
-Point CUE and OPM at the local registry:
-
-```bash
-export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
-export OPM_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
-```
-
-## Publish CUE Modules
-
-Publish the catalog modules to your local registry:
-
-```bash
-cd catalog
-task publish:all:local
-```
-
-Verify with:
-
-```bash
-task registry:status
-```
 
 ## Build and Install the CLI
 
+Clone the CLI repo and install the binary:
+
 ```bash
+git clone https://github.com/open-platform-model/cli.git
 cd cli
 task build && task install
 ```
 
 This builds `./bin/opm` and installs `opm` into `$GOPATH/bin`.
+
+## Configure the Registry
+
+OPM resolves catalog schemas and modules via the CUE module proxy. Point
+both CUE and OPM at the public OPM registry on GHCR:
+
+```bash
+export CUE_REGISTRY='testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+export OPM_REGISTRY='testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+```
+
+`opmodel.dev` resolves the stable catalog and module releases.
+`testing.opmodel.dev` is reserved for prerelease testing artifacts and can
+be omitted if you do not need it. `registry.cue.works` is the upstream
+public CUE registry used as a fallback for non-OPM modules.
+
+Add these exports to your shell profile if you plan to use OPM regularly.
 
 ## Initialize Configuration
 
@@ -80,29 +52,99 @@ opm config init
 
 This creates `~/.opm/config.cue` with default settings.
 
-## Create a Dev Cluster
+Next you need to tidy to pull all dependencies down.
 
 ```bash
-task cluster:create
+cd ~/.opm/
+cue mod tidy
 ```
 
-This creates a local kind cluster named `opm-dev`.
+## Create Your First Module
 
-## Release-Based Workflow
+The fastest way to learn OPM is to scaffold a module, render it, and read
+the generated manifests.
 
-This quickstart uses the example release files under `examples/releases/`.
+### Scaffold
 
-- Jellyfin release: `examples/releases/jellyfin/release.cue`
-- Minecraft release: `examples/releases/minecraft/release.cue`
-- Referenced example modules:
-  - `examples/modules/jellyfin`
-  - `examples/modules/mc_java`
+```bash
+opm module init my-app
+```
 
-`opm module` is still useful for authoring and direct module workflows, but for this quickstart we start from release definitions.
+This creates `./my-app/` from the `standard` template:
 
-## Example: Jellyfin Release
+```text
+my-app/
+  cue.mod/module.cue        CUE module metadata
+  module.cue                Module definition (metadata + #config + debugValues)
+  components.cue            Component definitions
+```
 
-The Jellyfin example release lives in `examples/releases/jellyfin/release.cue` and references the module in `examples/modules/jellyfin`.
+Other templates are available via `--template`:
+
+- `simple` - single-file module, good for learning
+- `standard` - separated concerns (default)
+- `advanced` - multi-package architecture for complex platforms
+
+### Inspect
+
+Open `my-app/module.cue` and `my-app/components.cue`. The scaffold defines
+a minimal workload, a default `#config` schema, and `debugValues` that
+populate that schema with placeholder values.
+
+### Build
+
+Render the module to Kubernetes manifests using its `debugValues`:
+
+```bash
+cd my-app
+opm module build
+```
+
+`opm module build` synthesizes a `#ModuleRelease` around the module so you
+do not need a `release.cue` while iterating. The rendered YAML is written
+to stdout by default.
+
+Useful variants:
+
+```bash
+# Run from anywhere by passing a module directory
+opm module build ./my-app
+
+# Override the synthetic release name
+opm module build ./my-app --name my-app-debug
+
+# Provide explicit values instead of debugValues
+opm module build ./my-app -f ./my-overrides.cue
+
+# Write each resource to its own file under ./manifests
+opm module build ./my-app --split --out-dir ./manifests
+```
+
+`opm release build` accepts the same module-directory form, so
+`opm release build ./my-app` is equivalent for symmetry with the release
+workflow.
+
+`opm mod` is an alias for `opm module`, so all of the commands above also
+work as `opm mod init`, `opm mod build`, etc.
+
+## Working from a Release File
+
+When you already have a release definition, `opm release` is the canonical
+workflow. The example release files under `examples/releases/` are small
+release definitions that import published modules straight from the
+public catalog (`opmodel.dev/modules/<name>@v1`) — no local module sources
+required, no `task publish`.
+
+Available examples:
+
+- `examples/releases/jellyfin/` — single-container stateful app (storage,
+  optional gateway route, optional K8up backup). Used throughout this
+  guide.
+- `examples/releases/garage/` — stateless S3-compatible object store;
+  showcases the "required secret" pattern (`adminToken`, `rpcSecret`).
+- `examples/releases/mc_java_fleet/` — multi-instance Minecraft fleet
+  with a shared mc-router. Has a default single-server `values.cue` and
+  a multi-server `values_multi.cue`.
 
 ### Build
 
@@ -110,11 +152,48 @@ The Jellyfin example release lives in `examples/releases/jellyfin/release.cue` a
 opm release build ./examples/releases/jellyfin/release.cue
 ```
 
-Build with explicit values:
+The release directory contains a sibling `values.cue` which is loaded
+automatically. To use a different values file, pass it explicitly:
 
 ```bash
-opm release build ./examples/releases/jellyfin/release.cue -f ./examples/releases/jellyfin/values.cue
+opm release build ./examples/releases/mc_java_fleet/release.cue \
+  -f ./examples/releases/mc_java_fleet/values_multi.cue
 ```
+
+A release file pulling a public module looks like the `jellyfin` example:
+
+```cue
+package jellyfin
+
+import (
+    mr "opmodel.dev/core/v1alpha1/modulerelease@v1"
+    m  "opmodel.dev/modules/jellyfin@v1"
+)
+
+mr.#ModuleRelease
+
+metadata: {
+    name:      "jellyfin"
+    namespace: "default"
+}
+
+#module: m
+```
+
+With the public registry configured, `opm release build` and
+`opm release apply` resolve `opmodel.dev/modules/jellyfin@v1` from
+`ghcr.io/open-platform-model` automatically.
+
+## Deploy to a Cluster
+
+The remaining steps require a Kubernetes cluster. The fastest path is a
+local `kind` cluster, which the CLI repo provides a Task for:
+
+```bash
+task cluster:create
+```
+
+This creates a local kind cluster named `opm-dev`.
 
 ### Apply
 
@@ -122,126 +201,34 @@ opm release build ./examples/releases/jellyfin/release.cue -f ./examples/release
 opm release apply ./examples/releases/jellyfin/release.cue --create-namespace
 ```
 
-Apply with explicit values:
+The `garage` and `mc_java_fleet` examples follow the same pattern — point
+`opm release apply` at their `release.cue`. Note that `garage` requires
+you to replace the `adminToken` and `rpcSecret` placeholders in
+`values.cue` before applying.
+
+### Inspect
+
+The `jellyfin` example release uses release name `jellyfin` in namespace
+`default`.
 
 ```bash
-opm release apply ./examples/releases/jellyfin/release.cue -f ./examples/releases/jellyfin/values.cue --create-namespace
-```
-
-### Status
-
-The Jellyfin release file uses release name `jf` in namespace `jellyfin`.
-
-```bash
-opm release status jf -n jellyfin
-```
-
-### Tree
-
-```bash
-opm release tree jf -n jellyfin
-```
-
-### Events
-
-```bash
-opm release events jf -n jellyfin
+opm release status jellyfin -n default
+opm release tree   jellyfin -n default
+opm release events jellyfin -n default
 ```
 
 ### Delete
 
 ```bash
-opm release delete jf -n jellyfin --force
+opm release delete jellyfin -n default --force
 ```
-
-## Example: Minecraft Release
-
-The Minecraft example release lives in `examples/releases/minecraft/release.cue` and references the module in `examples/modules/mc_java`.
-
-### Build
-
-```bash
-opm release build ./examples/releases/minecraft/release.cue
-```
-
-Build with one of the example values files:
-
-```bash
-opm release build ./examples/releases/minecraft/release.cue -f ./examples/releases/minecraft/values_forge.cue
-```
-
-Other example values files:
-
-- `examples/releases/minecraft/values.cue`
-- `examples/releases/minecraft/values_fabric_modrinth.cue`
-- `examples/releases/minecraft/values_paper_restic.cue`
-
-### Apply
-
-```bash
-opm release apply ./examples/releases/minecraft/release.cue -f ./examples/releases/minecraft/values_forge.cue
-```
-
-### Status
-
-The Minecraft release file uses release name `minecraft` in namespace `default`.
-
-```bash
-opm release status minecraft -n default
-```
-
-### Delete
-
-```bash
-opm release delete minecraft -n default --force
-```
-
-## Render a Module Without Writing a release.cue
-
-For inner-loop module development, you can render manifests directly from a
-module-package directory — no `release.cue` required. The CLI synthesizes a
-`#ModuleRelease` around the module using its `debugValues` (or `-f` overrides).
-
-```bash
-# From inside a module directory
-opm module build
-
-# Or from anywhere
-opm module build ./examples/modules/mc_router
-
-# Override the synthetic release name
-opm module build ./examples/modules/mc_router --name mc-debug
-
-# Provide explicit values instead of debugValues
-opm module build ./examples/modules/mc_router -f ./my-overrides.cue
-```
-
-`opm release build` accepts a directory too, so the same path is reachable as
-`opm release build <module-dir>` for symmetry with the file form.
-
-The module must declare `opmodel.dev/core/v1alpha1@v1` as a dependency in its
-`cue.mod/module.cue`; the synthesizer reuses that pin so the rendered output
-matches the catalog version the module already validates against.
-
-## Notes
-
-- `opm release` is the canonical workflow when you already have a release definition.
-- `opm module` remains the canonical workflow when you are starting from module source.
-- `opm mod` still works as an alias for `opm module`.
 
 ## Cleanup
 
-Delete the cluster:
+Delete the kind cluster:
 
 ```bash
 task cluster:delete
-```
-
-Stop the registry if needed:
-
-```bash
-cd catalog
-task registry:stop
 ```
 
 ## Next Steps
@@ -249,3 +236,5 @@ task registry:stop
 - Run `opm release --help` and `opm module --help`
 - See `README.md` for command overview
 - See `AGENTS.md` for architecture and development guidance
+- Browse the public module catalog at
+  <https://github.com/open-platform-model/modules>
