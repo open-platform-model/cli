@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 
@@ -10,14 +11,18 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
+	"github.com/opmodel/cli/internal/cuetidy"
 	"github.com/opmodel/cli/internal/output"
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
 // NewConfigInitCmd creates the config init command.
 func NewConfigInitCmd(_ *config.GlobalConfig) *cobra.Command {
-	// Init-specific flag (local to this command)
-	var forceFlag bool
+	// Init-specific flags (local to this command)
+	var (
+		forceFlag  bool
+		noTidyFlag bool
+	)
 
 	c := &cobra.Command{
 		Use:   "init",
@@ -33,14 +38,23 @@ The configuration includes:
   - Kubernetes provider configuration
   - Cache directory settings
 
+After writing the files, opm runs the equivalent of 'cue mod tidy' in
+~/.opm to fetch the providers referenced by the default config so that
+'opm config vet' works without further setup. Disable with --no-tidy
+when working offline or against a registry that does not yet have the
+providers available.
+
 Examples:
-  # Initialize configuration
+  # Initialize configuration (resolves dependencies automatically)
   opm config init
 
   # Overwrite existing configuration
-  opm config init --force`,
+  opm config init --force
+
+  # Skip dependency resolution (offline / air-gapped use)
+  opm config init --no-tidy`,
 		RunE: func(c *cobra.Command, args []string) error {
-			return runConfigInit(args, forceFlag)
+			return runConfigInit(c.Context(), args, forceFlag, noTidyFlag)
 		},
 		Annotations: map[string]string{
 			cmdutil.SkipConfigLoadAnnotation: "true",
@@ -49,11 +63,13 @@ Examples:
 
 	c.Flags().BoolVarP(&forceFlag, "force", "f", false,
 		"Overwrite existing configuration")
+	c.Flags().BoolVar(&noTidyFlag, "no-tidy", false,
+		"Skip running 'cue mod tidy' after writing the config")
 
 	return c
 }
 
-func runConfigInit(_ []string, force bool) error {
+func runConfigInit(ctx context.Context, _ []string, force, noTidy bool) error {
 	// Get paths
 	paths, err := config.DefaultPaths()
 	if err != nil {
@@ -116,8 +132,48 @@ func runConfigInit(_ []string, force bool) error {
 	output.Println("  " + paths.ConfigFile)
 	output.Println("  " + moduleFile)
 	output.Println("")
-	output.Println(output.FormatNotice("Run 'cue mod tidy' in " + paths.HomeDir + " to resolve dependencies"))
+
+	if noTidy {
+		output.Println(output.FormatNotice("Run 'cue mod tidy' in " + paths.HomeDir + " to resolve dependencies (skipped: --no-tidy)"))
+		output.Println("Validate with: opm config vet")
+		return nil
+	}
+
+	if err := tidyConfigDir(ctx, paths.HomeDir); err != nil {
+		// Tidy failure is not fatal: the files are written. Surface the cause
+		// and fall back to the manual instructions so the user can recover.
+		output.Println(output.FormatNotice("Could not resolve dependencies automatically: " + err.Error()))
+		output.Println(output.FormatNotice("Run 'cue mod tidy' in " + paths.HomeDir + " once the issue is resolved"))
+		output.Println("Validate with: opm config vet")
+		return nil //nolint:nilerr // best-effort: files exist; tidy failure should not fail init
+	}
+
+	output.Println(output.FormatCheckmark("Dependencies resolved (cue.mod/module.cue updated)"))
 	output.Println("Validate with: opm config vet")
 
 	return nil
+}
+
+// tidyConfigDir runs the equivalent of `cue mod tidy` against dir. If the user
+// has not set CUE_REGISTRY, we provide the same default registry baked into the
+// config template so the providers referenced there can be resolved on a fresh
+// machine. The original env value is restored on return.
+func tidyConfigDir(ctx context.Context, dir string) error {
+	const cueRegistryEnv = "CUE_REGISTRY"
+
+	prev, hadPrev := os.LookupEnv(cueRegistryEnv)
+	if !hadPrev || prev == "" {
+		if err := os.Setenv(cueRegistryEnv, config.DefaultRegistry); err != nil {
+			return err
+		}
+		defer func() {
+			if hadPrev {
+				_ = os.Setenv(cueRegistryEnv, prev)
+			} else {
+				_ = os.Unsetenv(cueRegistryEnv)
+			}
+		}()
+	}
+
+	return cuetidy.Run(ctx, dir, os.Stderr)
 }
