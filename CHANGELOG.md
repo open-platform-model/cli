@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/open-platform-model/cli/compare/v0.5.1...v0.6.0) (2026-05-07)
+
+
+### Features
+
+* **config:** auto-resolve dependencies on `opm config init` ([f852b7b](https://github.com/open-platform-model/cli/commit/f852b7b460d5f59aa4e5a204367ddf6ffcca363f))
+* **config:** auto-resolve dependencies on `opm config init` ([d01944d](https://github.com/open-platform-model/cli/commit/d01944d47a261647bbf83346d716865fc253e5fd))
+
 ## [0.5.1](https://github.com/open-platform-model/cli/compare/v0.5.0...v0.5.1) (2026-05-06)
 
 
