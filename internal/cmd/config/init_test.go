@@ -20,8 +20,9 @@ func TestNewConfigInitCmd(t *testing.T) {
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotEmpty(t, cmd.Long)
 
-	// Check flag exists
+	// Check flags exist
 	assert.NotNil(t, cmd.Flags().Lookup("force"))
+	assert.NotNil(t, cmd.Flags().Lookup("no-tidy"))
 }
 
 func TestConfigInit_CreatesFiles(t *testing.T) {
@@ -36,6 +37,7 @@ func TestConfigInit_CreatesFiles(t *testing.T) {
 	defer os.Setenv("HOME", origHome)
 
 	cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
+	cmd.SetArgs([]string{"--no-tidy"})
 
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -60,6 +62,7 @@ func TestConfigInit_SecurePermissions(t *testing.T) {
 	defer os.Setenv("HOME", origHome)
 
 	cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
+	cmd.SetArgs([]string{"--no-tidy"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -119,7 +122,7 @@ func TestConfigInit_ForceOverwrite(t *testing.T) {
 	require.NoError(t, os.WriteFile(configFile, []byte("// old config"), 0o600))
 
 	cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
-	cmd.SetArgs([]string{"--force"})
+	cmd.SetArgs([]string{"--force", "--no-tidy"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -142,6 +145,7 @@ func TestConfigInit_ConfigContent(t *testing.T) {
 	defer os.Setenv("HOME", origHome)
 
 	cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
+	cmd.SetArgs([]string{"--no-tidy"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -176,6 +180,7 @@ func TestConfigInit_OutputMessage(t *testing.T) {
 	defer os.Setenv("HOME", origHome)
 
 	cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
+	cmd.SetArgs([]string{"--no-tidy"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
