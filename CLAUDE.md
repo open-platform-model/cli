@@ -39,28 +39,6 @@ Read when entering `cli/`:
 - `tests/integration/` - integration programs via `go run`.
 - `tests/e2e/` - end-to-end Go tests.
 
-## Architecture Decision Records
-
-ADRs capture significant technical decisions with context + consequences.
-
-- Location: `adr/`
-- Template: `adr/TEMPLATE.md`
-- Naming: `NNN-kebab-case-title.md` (three-digit, zero-padded)
-
-### Creating a new ADR
-
-1. Copy `adr/TEMPLATE.md` to `adr/NNN-title.md` with next available number.
-2. Set status to `Proposed`.
-3. Fill Context, Decision, Consequences.
-4. Update status to `Accepted` once agreed.
-
-### Updating an ADR
-
-- Never delete — update status instead.
-- Retire: set status `Deprecated`.
-- Replace: set status `Superseded by ADR-NNN`, create new ADR.
-- One decision per ADR.
-
 ## Environment Notes
 
 - Go version in `go.mod`: `1.25.0`.
