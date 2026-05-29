@@ -99,7 +99,7 @@ Commits: `type(scope): description`.
 - MAJOR: breaking command, flag, or behavior changes
 - MINOR: new commands or new flags with sensible defaults
 - PATCH: bug fixes, refinements, and performance improvements
-- Commit messages should be concise, scoped, and free of AI attribution
+- Commit messages should be concise, scoped, and end with `Co-Authored-By: Claude <noreply@anthropic.com>`
 
 Versioning communicates compatibility and upgrade risk to users and maintainers.
 
