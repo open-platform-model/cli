@@ -6,7 +6,7 @@ compatibility: Requires openspec CLI.
 metadata:
   author: openspec
   version: "1.0"
-  generatedBy: "1.0.2"
+  generatedBy: "1.3.1"
 ---
 
 Verify that an implementation matches the change artifacts (specs, tasks, design).
@@ -39,22 +39,22 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
    openspec instructions apply --change "<name>" --json
    ```
 
-   This returns the change directory and context files. Read all available artifacts from `contextFiles`.
+   This returns the change directory and `contextFiles` (artifact ID -> array of concrete file paths). Read all available artifacts from `contextFiles`.
 
 4. **Initialize verification report structure**
 
    Create a report structure with four dimensions:
-   - **Completeness**: Track tasks and spec coverage
-   - **Correctness**: Track requirement implementation and scenario coverage
-   - **Coherence**: Track design adherence and pattern consistency
-   - **Cleanliness**: Track dead code left behind by the change
+   1. **Completeness** — tasks and spec coverage
+   2. **Correctness** — requirement implementation and scenario coverage
+   3. **Coherence** — design adherence and pattern consistency
+   4. **Cleanliness** — dead code left behind by the change
 
    Each dimension can have CRITICAL, WARNING, or SUGGESTION issues.
 
 5. **Verify Completeness**
 
    **Task Completion**:
-   - If tasks.md exists in contextFiles, read it
+   - If `contextFiles.tasks` exists, read every file path in it
    - Parse checkboxes: `- [ ]` (incomplete) vs `- [x]` (complete)
    - Count complete vs total tasks
    - If incomplete tasks exist:
@@ -93,7 +93,7 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
 7. **Verify Coherence**
 
    **Design Adherence**:
-   - If design.md exists in contextFiles:
+   - If `contextFiles.design` exists:
      - Extract key decisions (look for sections like "Decision:", "Approach:", "Architecture:")
      - Verify implementation follows those decisions
      - If contradiction detected:
@@ -110,15 +110,15 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
 
 8. **Verify Cleanliness**
 
-   Load the **openspec-cleanup** skill in change-aware mode (pass the change name) and incorporate its report as the Cleanliness dimension.
+   Load the **openspec-cleanup-change** skill in change-aware mode (pass the change name) and incorporate its report as the Cleanliness dimension.
 
    Map cleanup findings to verification issues:
    - High-confidence candidates → WARNING: "Dead code candidate: `<symbol>` in `<file>:<line>` — <reason>"
    - Medium/low-confidence candidates → SUGGESTION with the same format
 
-   If cleanup reports no candidates: note "No dead code detected."
+   If cleanup reports no candidates: note "No dead code detected" in Summary.
 
-   **Skip condition**: If no code changes have been implemented yet (all tasks incomplete), skip this check and note: "Cleanliness check skipped — no implementation to analyze."
+   **Skip condition**: If no code changes have been implemented yet (all tasks incomplete), skip this check and note in Summary: "Cleanliness check skipped — no implementation to analyze."
 
 9. **Generate Verification Report**
 
@@ -132,7 +132,6 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
    | Completeness | X/Y tasks, N reqs|
    | Correctness  | M/N reqs covered |
    | Coherence    | Followed/Issues  |
-   | Cleanliness  | Clean/N warnings |
    ```
 
    **Issues by Priority**:
@@ -141,17 +140,19 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
       - Incomplete tasks
       - Missing requirement implementations
       - Each with specific, actionable recommendation
+      - Namingscheme C<number> (e.g. C1, C2)
 
    2. **WARNING** (Should fix):
       - Spec/design divergences
       - Missing scenario coverage
-      - Dead code candidates (from Cleanliness check)
       - Each with specific recommendation
+      - Namingscheme W<number> (e.g. W1, W2)
 
    3. **SUGGESTION** (Nice to fix):
       - Pattern inconsistencies
       - Minor improvements
       - Each with specific recommendation
+      - Namingscheme S<number> (e.g. S1, S2)
 
    **Final Assessment**:
    - If CRITICAL issues: "X critical issue(s) found. Fix before archiving."
@@ -168,10 +169,9 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
 
 **Graceful Degradation**
 
-- If only tasks.md exists: verify task completion only, skip spec/design/cleanliness checks
+- If only tasks.md exists: verify task completion only, skip spec/design checks
 - If tasks + specs exist: verify completeness and correctness, skip design
-- If full artifacts: verify all four dimensions
-- Cleanliness check requires implementation to exist — skip if no code changes detected
+- If full artifacts: verify all three dimensions
 - Always note which checks were skipped and why
 
 **Output Format**
