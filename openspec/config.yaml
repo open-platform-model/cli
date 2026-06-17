@@ -95,7 +95,7 @@ context: |
   - Types: feat, fix, refactor, docs, test, chore
   - Scope: cmd, cue, kubernetes, output, config, etc.
   - Keep descriptions concise
-  - No AI attribution in commit messages
+  - End commits with the `Co-Authored-By: Claude <noreply@anthropic.com>` trailer
 
 rules:
   proposal:
