@@ -34,3 +34,6 @@ Thumbs.db
 *.log
 /opm
 /testing
+
+# Claude Code local-only settings
+.claude/settings.local.json
