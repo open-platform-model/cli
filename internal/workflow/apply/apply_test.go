@@ -66,7 +66,7 @@ func TestExecute_BlocksControllerManagedRelease(t *testing.T) {
 	client := &kubernetes.Client{Clientset: fake.NewClientset(secret)}
 	req := Request{
 		Result: &workflowrender.Result{
-			Release: module.ReleaseMetadata{Name: "demo", Namespace: "apps", UUID: "uuid-1"},
+			Release: module.InstanceMetadata{Name: "demo", Namespace: "apps", UUID: "uuid-1"},
 		},
 		K8sClient: client,
 		Log:       log.New(nil),

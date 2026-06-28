@@ -1,4 +1,11 @@
-package releasefile
+// Package instancefile detects and loads an on-disk instance file
+// (a #ModuleInstance or #BundleRelease) into bare parse data.
+//
+// Was: package releasefile (enhancement 0002 D10 — package name carried the
+// `release` token). X1 renames the container and the module path; the bundle
+// path (KindBundleRelease, *bundle.Release, bare/must bundle helpers) is left
+// verbatim and reconciled by X2 in the same atomic PR.
+package instancefile
 
 import (
 	"fmt"
@@ -14,55 +21,62 @@ import (
 type Kind string
 
 const (
-	KindModuleRelease Kind = "ModuleRelease"
+	// KindModuleInstance was KindModuleRelease; value flips to the core@v1 wire
+	// string "ModuleInstance" (enhancement 0002 D-X1.1).
+	KindModuleInstance Kind = "ModuleInstance"
+	// KindBundleRelease is left untouched (0002 X2 renames the bundle path).
 	KindBundleRelease Kind = "BundleRelease"
 )
 
-// ModuleParseData holds the raw parse data from a module release file.
+// ModuleParseData holds the raw parse data from a module instance file.
 // This is the pre-preparation state — values have not been validated or filled.
-// Use module.ParseModuleRelease to construct a fully prepared *module.Release.
+// Use module.ParseModuleInstance to construct a fully prepared *module.Instance.
 type ModuleParseData struct {
-	// Spec is the raw release spec CUE value (before values filling).
+	// Spec is the raw instance spec CUE value (before values filling).
 	Spec cue.Value
 
 	// Module is the best-effort module info extracted from #module.
 	Module module.Module
 
-	// Metadata is the best-effort release metadata decoded from the spec.
+	// Metadata is the best-effort instance metadata decoded from the spec.
 	// Available for early display and error messages before values are applied.
-	Metadata *module.ReleaseMetadata
+	Metadata *module.InstanceMetadata
 }
 
+// FileRelease is the dual-purpose container returned by GetInstanceFile: it
+// holds either a module-instance parse-data or a bundle. The struct name is
+// kept verbatim (it doubles as an X3 workflow surface); X2 renames the bundle
+// path it carries.
 type FileRelease struct {
 	Path   string
 	Kind   Kind
 	Module *ModuleParseData
-	Bundle *bundle.Release
+	Bundle *bundle.Release // TODO(0002 X2): rename bundle path
 }
 
-func GetReleaseFile(ctx *cue.Context, filePath string) (*FileRelease, error) {
-	val, _, err := loader.LoadReleaseFile(ctx, filePath, loader.LoadOptions{Registry: os.Getenv("CUE_REGISTRY")})
+func GetInstanceFile(ctx *cue.Context, filePath string) (*FileRelease, error) {
+	val, _, err := loader.LoadInstanceFile(ctx, filePath, loader.LoadOptions{Registry: os.Getenv("CUE_REGISTRY")})
 	if err != nil {
 		return nil, err
 	}
 
-	kind, err := loader.DetectReleaseKind(val)
+	kind, err := loader.DetectInstanceKind(val)
 	if err != nil {
 		return nil, err
 	}
 
 	switch kind {
-	case string(KindModuleRelease):
-		parseData, err := bareModuleRelease(val, filePath)
+	case string(KindModuleInstance):
+		parseData, err := bareModuleInstance(val, filePath)
 		if err != nil {
 			return nil, err
 		}
 		return &FileRelease{
 			Path:   filePath,
-			Kind:   KindModuleRelease,
+			Kind:   KindModuleInstance,
 			Module: parseData,
 		}, nil
-	case string(KindBundleRelease):
+	case string(KindBundleRelease): // TODO(0002 X2): KindBundleInstance
 		bundleRelease, err := bareBundleRelease(val)
 		if err != nil {
 			return nil, err
@@ -73,14 +87,14 @@ func GetReleaseFile(ctx *cue.Context, filePath string) (*FileRelease, error) {
 			Bundle: bundleRelease,
 		}, nil
 	default:
-		return nil, fmt.Errorf("unsupported release kind %q", kind)
+		return nil, fmt.Errorf("unsupported instance kind %q", kind)
 	}
 }
 
-func bareModuleRelease(v cue.Value, fallbackName string) (*ModuleParseData, error) {
+func bareModuleInstance(v cue.Value, fallbackName string) (*ModuleParseData, error) {
 	moduleVal := v.LookupPath(cue.ParsePath("#module"))
 	moduleConfig := v.LookupPath(cue.ParsePath("#module.#config"))
-	releaseMeta, err := mustModuleReleaseMetadata(v, fallbackName)
+	instanceMeta, err := mustModuleInstanceMetadata(v, fallbackName)
 	if err != nil {
 		return nil, err
 	}
@@ -92,10 +106,12 @@ func bareModuleRelease(v cue.Value, fallbackName string) (*ModuleParseData, erro
 			Config:   moduleConfig,
 			Raw:      moduleVal,
 		},
-		Metadata: releaseMeta,
+		Metadata: instanceMeta,
 	}, nil
 }
 
+// bareBundleRelease is left verbatim for X2 (0002). TODO(0002 X2): rename to
+// bareBundleInstance and retype to the bundle-instance form.
 func bareBundleRelease(v cue.Value) (*bundle.Release, error) {
 	bundleVal := v.LookupPath(cue.ParsePath("#bundle"))
 	bundleConfig := v.LookupPath(cue.ParsePath("#bundle.#config"))
@@ -111,22 +127,22 @@ func bareBundleRelease(v cue.Value) (*bundle.Release, error) {
 			Data:     bundleVal,
 		},
 		Spec:     v,
-		Releases: map[string]*module.Release{},
+		Releases: map[string]*module.Instance{},
 		Config:   bundleConfig,
 	}, nil
 }
 
-func mustModuleReleaseMetadata(v cue.Value, fallbackName string) (*module.ReleaseMetadata, error) {
+func mustModuleInstanceMetadata(v cue.Value, fallbackName string) (*module.InstanceMetadata, error) {
 	metaVal := v.LookupPath(cue.ParsePath("metadata"))
 	if !metaVal.Exists() {
-		return nil, fmt.Errorf("module release metadata is required for %q", fallbackName)
+		return nil, fmt.Errorf("module instance metadata is required for %q", fallbackName)
 	}
 	if err := metaVal.Validate(cue.Concrete(true)); err != nil {
-		return nil, fmt.Errorf("module release metadata must be concrete for %q: %w", fallbackName, err)
+		return nil, fmt.Errorf("module instance metadata must be concrete for %q: %w", fallbackName, err)
 	}
-	meta := &module.ReleaseMetadata{}
+	meta := &module.InstanceMetadata{}
 	if err := metaVal.Decode(meta); err != nil {
-		return nil, fmt.Errorf("decoding module release metadata for %q: %w", fallbackName, err)
+		return nil, fmt.Errorf("decoding module instance metadata for %q: %w", fallbackName, err)
 	}
 	return meta, nil
 }
@@ -141,6 +157,7 @@ func bestEffortModuleMetadata(v cue.Value) *module.ModuleMetadata {
 	return meta
 }
 
+// mustBundleReleaseMetadata is left verbatim for X2 (0002).
 func mustBundleReleaseMetadata(v cue.Value) (*bundle.ReleaseMetadata, error) {
 	metaVal := v.LookupPath(cue.ParsePath("metadata"))
 	if !metaVal.Exists() {

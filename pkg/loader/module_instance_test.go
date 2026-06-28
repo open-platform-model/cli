@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestDetectReleaseKind tests kind detection from an in-memory CUE value.
-func TestDetectReleaseKind(t *testing.T) {
+// TestDetectInstanceKind tests kind detection from an in-memory CUE value.
+func TestDetectInstanceKind(t *testing.T) {
 	ctx := cuecontext.New()
 
 	tests := []struct {
@@ -22,11 +22,12 @@ func TestDetectReleaseKind(t *testing.T) {
 		errSubstr string
 	}{
 		{
-			name:     "ModuleRelease",
-			cue:      `{ kind: "ModuleRelease" }`,
-			wantKind: "ModuleRelease",
+			name:     "ModuleInstance",
+			cue:      `{ kind: "ModuleInstance" }`,
+			wantKind: "ModuleInstance",
 		},
 		{
+			// BundleRelease is still accepted (X2 flips it to BundleInstance).
 			name:     "BundleRelease",
 			cue:      `{ kind: "BundleRelease" }`,
 			wantKind: "BundleRelease",
@@ -35,7 +36,7 @@ func TestDetectReleaseKind(t *testing.T) {
 			name:      "unknown kind",
 			cue:       `{ kind: "FooBar" }`,
 			wantErr:   true,
-			errSubstr: "unknown release kind",
+			errSubstr: "unknown instance kind",
 		},
 		{
 			name:      "missing kind",
@@ -50,7 +51,7 @@ func TestDetectReleaseKind(t *testing.T) {
 			v := ctx.CompileString(tt.cue)
 			require.NoError(t, v.Err())
 
-			kind, err := DetectReleaseKind(v)
+			kind, err := DetectInstanceKind(v)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errSubstr)
@@ -62,44 +63,44 @@ func TestDetectReleaseKind(t *testing.T) {
 	}
 }
 
-// TestResolveReleaseFile tests directory detection via os.Stat (DEBT #10).
-func TestResolveReleaseFile(t *testing.T) {
+// TestResolveInstanceFile tests directory detection via os.Stat (DEBT #10).
+func TestResolveInstanceFile(t *testing.T) {
 	// Create a temp directory to test directory detection.
 	tmpDir := t.TempDir()
 
-	// Create a release.cue file inside the temp dir.
-	releasePath := filepath.Join(tmpDir, "release.cue")
-	require.NoError(t, os.WriteFile(releasePath, []byte(`kind: "ModuleRelease"`), 0o644))
+	// Create an instance.cue file inside the temp dir.
+	instancePath := filepath.Join(tmpDir, "instance.cue")
+	require.NoError(t, os.WriteFile(instancePath, []byte(`kind: "ModuleInstance"`), 0o644))
 
-	t.Run("directory resolves to release.cue", func(t *testing.T) {
-		got, err := resolveReleaseFile(tmpDir)
+	t.Run("directory resolves to instance.cue", func(t *testing.T) {
+		got, err := resolveInstanceFile(tmpDir)
 		require.NoError(t, err)
-		assert.Equal(t, releasePath, got)
+		assert.Equal(t, instancePath, got)
 	})
 
 	t.Run("file path returned as-is", func(t *testing.T) {
-		got, err := resolveReleaseFile(releasePath)
+		got, err := resolveInstanceFile(instancePath)
 		require.NoError(t, err)
-		assert.Equal(t, releasePath, got)
+		assert.Equal(t, instancePath, got)
 	})
 
 	t.Run("empty path returns error", func(t *testing.T) {
-		_, err := resolveReleaseFile("")
+		_, err := resolveInstanceFile("")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must not be empty")
 	})
 
 	t.Run("non-existent path returns error", func(t *testing.T) {
 		nonExistent := filepath.Join(tmpDir, "doesnotexist.cue")
-		_, err := resolveReleaseFile(nonExistent)
+		_, err := resolveInstanceFile(nonExistent)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
 
-	t.Run("directory without release file returns error", func(t *testing.T) {
+	t.Run("directory without instance file returns error", func(t *testing.T) {
 		emptyDir := t.TempDir()
-		_, err := resolveReleaseFile(emptyDir)
+		_, err := resolveInstanceFile(emptyDir)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "does not contain release.cue")
+		assert.Contains(t, err.Error(), "does not contain instance.cue")
 	})
 }

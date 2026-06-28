@@ -106,13 +106,13 @@ func TestReadModuleCatalogPin(t *testing.T) {
 	})
 }
 
-// TestSynthesizeModuleReleaseFromPackage_ErrorPaths exercises the synthesis
+// TestSynthesizeModuleInstanceFromPackage_ErrorPaths exercises the synthesis
 // failure modes that don't require registry resolution.
-func TestSynthesizeModuleReleaseFromPackage_ErrorPaths(t *testing.T) {
+func TestSynthesizeModuleInstanceFromPackage_ErrorPaths(t *testing.T) {
 	ctx := cuecontext.New()
 
 	t.Run("directory does not exist", func(t *testing.T) {
-		_, err := SynthesizeModuleReleaseFromPackage(ctx, "/nonexistent/module/dir", SynthesizeOptions{})
+		_, err := SynthesizeModuleInstanceFromPackage(ctx, "/nonexistent/module/dir", SynthesizeOptions{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
@@ -122,7 +122,7 @@ func TestSynthesizeModuleReleaseFromPackage_ErrorPaths(t *testing.T) {
 		filePath := filepath.Join(dir, "x.cue")
 		require.NoError(t, os.WriteFile(filePath, []byte("package x\n"), 0o644))
 
-		_, err := SynthesizeModuleReleaseFromPackage(ctx, filePath, SynthesizeOptions{})
+		_, err := SynthesizeModuleInstanceFromPackage(ctx, filePath, SynthesizeOptions{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not a directory")
 	})
@@ -132,7 +132,7 @@ func TestSynthesizeModuleReleaseFromPackage_ErrorPaths(t *testing.T) {
 			moduleSource:   localStubModule,
 			skipCatalogDep: true,
 		})
-		_, err := SynthesizeModuleReleaseFromPackage(ctx, dir, SynthesizeOptions{})
+		_, err := SynthesizeModuleInstanceFromPackage(ctx, dir, SynthesizeOptions{})
 		require.Error(t, err)
 		var detail *oerrors.DetailError
 		require.True(t, errors.As(err, &detail))
@@ -140,10 +140,10 @@ func TestSynthesizeModuleReleaseFromPackage_ErrorPaths(t *testing.T) {
 	})
 }
 
-// TestSynthesizeModuleReleaseFromPackage_AnchorCleanup verifies that the
+// TestSynthesizeModuleInstanceFromPackage_AnchorCleanup verifies that the
 // anchor temp directory is removed after both success and failure paths.
 // We assert by recording temp-dir entries before and after.
-func TestSynthesizeModuleReleaseFromPackage_AnchorCleanup(t *testing.T) {
+func TestSynthesizeModuleInstanceFromPackage_AnchorCleanup(t *testing.T) {
 	ctx := cuecontext.New()
 
 	dir := makeSynthFixture(t, synthFixtureOpts{
@@ -153,7 +153,7 @@ func TestSynthesizeModuleReleaseFromPackage_AnchorCleanup(t *testing.T) {
 	})
 
 	before := tempEntriesMatching(t, "opm-synth-")
-	_, err := SynthesizeModuleReleaseFromPackage(ctx, dir, SynthesizeOptions{})
+	_, err := SynthesizeModuleInstanceFromPackage(ctx, dir, SynthesizeOptions{})
 	// Either succeeds or fails — we only assert no anchor leak.
 	_ = err
 	after := tempEntriesMatching(t, "opm-synth-")
@@ -173,10 +173,10 @@ func tempEntriesMatching(t *testing.T, prefix string) []string {
 	return out
 }
 
-// TestSynthesizeModuleReleaseFromPackage_RegistryE2E exercises the full path
+// TestSynthesizeModuleInstanceFromPackage_RegistryE2E exercises the full path
 // against the real registry for each example module that defines debugValues.
 // Skipped if no registry is reachable (CI runs with a pre-warmed registry).
-func TestSynthesizeModuleReleaseFromPackage_RegistryE2E(t *testing.T) {
+func TestSynthesizeModuleInstanceFromPackage_RegistryE2E(t *testing.T) {
 	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
 		t.Skip("skipping registry-backed synth tests")
 	}
@@ -207,7 +207,7 @@ func TestSynthesizeModuleReleaseFromPackage_RegistryE2E(t *testing.T) {
 		}
 
 		t.Run(entry.Name(), func(t *testing.T) {
-			result, err := SynthesizeModuleReleaseFromPackage(ctx, modPath, SynthesizeOptions{
+			result, err := SynthesizeModuleInstanceFromPackage(ctx, modPath, SynthesizeOptions{
 				Name:      "test-debug",
 				Namespace: "test-ns",
 			})
@@ -239,10 +239,10 @@ func containsToken(data []byte, token string) bool {
 	return false
 }
 
-// TestSynthesizeModuleReleaseFromPackage_BundleRejected ensures a
+// TestSynthesizeModuleInstanceFromPackage_BundleRejected ensures a
 // #BundleRelease-shaped CUE package is rejected before synthesis attempts to
 // proceed.
-func TestSynthesizeModuleReleaseFromPackage_BundleRejected(t *testing.T) {
+func TestSynthesizeModuleInstanceFromPackage_BundleRejected(t *testing.T) {
 	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
 		t.Skip("skipping registry-backed synth tests")
 	}
@@ -256,14 +256,14 @@ metadata: name: "fake-bundle"
 `,
 	})
 
-	_, err := SynthesizeModuleReleaseFromPackage(ctx, dir, SynthesizeOptions{Name: "x"})
+	_, err := SynthesizeModuleInstanceFromPackage(ctx, dir, SynthesizeOptions{Name: "x"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bundle")
 }
 
-// TestSynthesizeModuleReleaseFromPackage_NameNamespaceOverride asserts the
+// TestSynthesizeModuleInstanceFromPackage_NameNamespaceOverride asserts the
 // caller's --name and --namespace overrides land on the synthesized spec.
-func TestSynthesizeModuleReleaseFromPackage_NameNamespaceOverride(t *testing.T) {
+func TestSynthesizeModuleInstanceFromPackage_NameNamespaceOverride(t *testing.T) {
 	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
 		t.Skip("skipping registry-backed synth tests")
 	}
@@ -275,7 +275,7 @@ func TestSynthesizeModuleReleaseFromPackage_NameNamespaceOverride(t *testing.T) 
 		t.Skip("examples/modules/zot_registry not available")
 	}
 
-	result, err := SynthesizeModuleReleaseFromPackage(ctx, modPath, SynthesizeOptions{
+	result, err := SynthesizeModuleInstanceFromPackage(ctx, modPath, SynthesizeOptions{
 		Name:      "custom-name",
 		Namespace: "custom-ns",
 	})

@@ -9,24 +9,25 @@ import (
 	"cuelang.org/go/cue/load"
 )
 
-// LoadOptions configures release-file loading behavior.
+// LoadOptions configures instance-file loading behavior.
 type LoadOptions struct {
-	// Registry overrides the CUE registry used while loading a release file.
+	// Registry overrides the CUE registry used while loading an instance file.
 	// Empty means use the current process environment.
 	Registry string
 }
 
-// LoadReleaseFile loads a #ModuleRelease or #BundleRelease from a standalone
+// LoadInstanceFile loads a #ModuleInstance or #BundleRelease from a standalone
 // .cue file. CUE imports (including registry module references) are resolved
 // via load.Instances() using the file's parent directory for cue.mod resolution.
+// ("#BundleRelease" stays until X2 flips the bundle path, 0002.)
 //
-// The returned cue.Value may have #module unfilled if the release file does not
-// import a module. The release file must import a module to fill #module.
+// The returned cue.Value may have #module unfilled if the instance file does not
+// import a module. The instance file must import a module to fill #module.
 //
 // Returns the evaluated CUE value and the directory used for CUE resolution.
-func LoadReleaseFile(ctx *cue.Context, filePath string, opts LoadOptions) (cue.Value, string, error) {
+func LoadInstanceFile(ctx *cue.Context, filePath string, opts LoadOptions) (cue.Value, string, error) {
 	var err error
-	filePath, err = resolveReleaseFile(filePath)
+	filePath, err = resolveInstanceFile(filePath)
 	if err != nil {
 		return cue.Value{}, "", err
 	}
@@ -113,7 +114,7 @@ func LoadModulePackage(ctx *cue.Context, dirPath string) (cue.Value, error) {
 // exists the whole evaluated file value is returned instead.
 //
 // This is used by module-only vet validation when -f is provided but there is
-// no release.cue in the module directory.
+// no instance.cue in the module directory.
 func LoadValuesFile(ctx *cue.Context, path string) (cue.Value, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {

@@ -12,15 +12,15 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/opmodel/cli/internal/config"
-	internalreleasefile "github.com/opmodel/cli/internal/releasefile"
+	internalinstancefile "github.com/opmodel/cli/internal/instancefile"
 	"github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/validate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func mustReleaseMetadata(name, namespace string) module.ReleaseMetadata {
-	return module.ReleaseMetadata{Name: name, Namespace: namespace}
+func mustReleaseMetadata(name, namespace string) module.InstanceMetadata {
+	return module.InstanceMetadata{Name: name, Namespace: namespace}
 }
 
 func makeReleaseFileFixture(t *testing.T, filename, content string) string {
@@ -129,7 +129,7 @@ func TestRenderFromReleaseFile_ValidValuesDoNotPanicAcrossRuntimes(t *testing.T)
 	values, err := resolveReleaseValues(ctx, ctx.CompileString(`{}`), releaseFile, []string{valuesFile})
 	require.NoError(t, err)
 	require.Len(t, values, 1)
-	fileRelease, err := internalreleasefile.GetReleaseFile(ctx, releaseFile)
+	fileRelease, err := internalinstancefile.GetInstanceFile(ctx, releaseFile)
 	require.NoError(t, err)
 	require.NotNil(t, fileRelease.Module)
 	merged, cfgErr := validate.Config(fileRelease.Module.Module.Config, values, "module", "demo")

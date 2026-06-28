@@ -22,7 +22,7 @@ type Release struct {
 	Spec cue.Value
 
 	// Releases is the map of ModuleReleases produced during bundle processing.
-	Releases map[string]*module.Release
+	Releases map[string]*module.Instance
 
 	// Config is the #config schema extracted from the release's bundle view.
 	Config cue.Value

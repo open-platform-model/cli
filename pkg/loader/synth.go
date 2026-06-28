@@ -15,10 +15,14 @@ import (
 
 const (
 	catalogModulePath = "opmodel.dev/core/v1alpha1@v1"
+	// kindModuleInstance is the core@v1 module-instance wire kind (was
+	// "ModuleRelease", enhancement 0002 D-X1.1).
+	kindModuleInstance = "ModuleInstance"
+	// kindBundleRelease is left as-is until X2 flips the bundle path.
 	kindBundleRelease = "BundleRelease"
 )
 
-// SynthesizeOptions configures synthesis of a #ModuleRelease wrapper from a
+// SynthesizeOptions configures synthesis of a #ModuleInstance wrapper from a
 // module-package directory.
 type SynthesizeOptions struct {
 	// Name overrides the synthetic metadata.name. When empty, the loader
@@ -30,13 +34,13 @@ type SynthesizeOptions struct {
 	Namespace string
 }
 
-// SynthesisResult is what SynthesizeModuleReleaseFromPackage returns. The
-// callers pass Spec into module.ParseModuleRelease together with values; Module
+// SynthesisResult is what SynthesizeModuleInstanceFromPackage returns. The
+// callers pass Spec into module.ParseModuleInstance together with values; Module
 // is exposed so callers can read debugValues without re-loading.
 type SynthesisResult struct {
-	// Spec is the synthesized cue.Value shaped like a #ModuleRelease, with
+	// Spec is the synthesized cue.Value shaped like a #ModuleInstance, with
 	// #module and metadata filled. values is left for downstream filling by
-	// module.ParseModuleRelease.
+	// module.ParseModuleInstance.
 	Spec cue.Value
 
 	// ModuleValue is the loaded user-module package value (for debugValues
@@ -47,12 +51,14 @@ type SynthesisResult struct {
 	ModuleName string
 }
 
-// SynthesizeModuleReleaseFromPackage loads the user's module CUE package and
-// composes a #ModuleRelease wrapper around it via a small synthetic CUE module
+// SynthesizeModuleInstanceFromPackage loads the user's module CUE package and
+// composes a #ModuleInstance wrapper around it via a small synthetic CUE module
 // that imports the catalog at the same version the user's modfile pins. The
-// returned spec is ready to feed into module.ParseModuleRelease together with
+// returned spec is ready to feed into module.ParseModuleInstance together with
 // values from -f files or the module's debugValues.
-func SynthesizeModuleReleaseFromPackage(ctx *cue.Context, modulePath string, opts SynthesizeOptions) (*SynthesisResult, error) {
+//
+// Was: SynthesizeModuleReleaseFromPackage (enhancement 0002 D8 hard-rename).
+func SynthesizeModuleInstanceFromPackage(ctx *cue.Context, modulePath string, opts SynthesizeOptions) (*SynthesisResult, error) {
 	absModule, err := filepath.Abs(modulePath)
 	if err != nil {
 		return nil, fmt.Errorf("resolving module directory: %w", err)
@@ -191,6 +197,12 @@ func loadUserModule(ctx *cue.Context, modulePath string) (cue.Value, error) {
 // loadSynthWrapper builds and loads the in-memory synth CUE module that imports
 // `opmodel.dev/core/v1alpha1/modulerelease@v1` and applies #ModuleRelease at
 // the top level. The temp anchor is removed before this function returns.
+//
+// FLAG (0002, out of X1 scope): the catalog import path
+// `opmodel.dev/core/v1alpha1/modulerelease@v1` and the `#ModuleRelease`
+// definition are the catalog-side wire contract. core@v1 ships a single `core`
+// package, so this path is pre-existing drift unrelated to this rename; it is
+// left verbatim here and tracked as a separate catalog-pin follow-up.
 func loadSynthWrapper(ctx *cue.Context, catalogVersion string) (cue.Value, error) {
 	anchor, err := os.MkdirTemp("", "opm-synth-")
 	if err != nil {

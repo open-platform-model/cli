@@ -1,4 +1,4 @@
-package releasefile
+package instancefile
 
 import (
 	"os"
@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetReleaseFile_ModuleReleasePartial(t *testing.T) {
+func TestGetInstanceFile_ModuleInstancePartial(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "release.cue")
+	path := filepath.Join(dir, "instance.cue")
 	require.NoError(t, os.WriteFile(path, []byte(`package test
 
 apiVersion: "opmodel.dev/core/v1alpha1"
-kind: "ModuleRelease"
+kind: "ModuleInstance"
 metadata: {
 	name: "demo"
 	namespace: "apps"
@@ -26,18 +26,19 @@ values: {
 }
 `), 0o644))
 
-	rel, err := GetReleaseFile(cuecontext.New(), path)
+	rel, err := GetInstanceFile(cuecontext.New(), path)
 	require.NoError(t, err)
 	require.NotNil(t, rel.Module)
-	assert.Equal(t, KindModuleRelease, rel.Kind)
+	assert.Equal(t, KindModuleInstance, rel.Kind)
 	assert.Equal(t, "demo", rel.Module.Metadata.Name)
 	assert.Equal(t, "apps", rel.Module.Metadata.Namespace)
 	assert.True(t, rel.Module.Spec.Exists())
 }
 
-func TestGetReleaseFile_BundleReleasePartial(t *testing.T) {
+// Bundle kind detection stays on "BundleRelease" until X2 flips the bundle path.
+func TestGetInstanceFile_BundleReleasePartial(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "release.cue")
+	path := filepath.Join(dir, "instance.cue")
 	require.NoError(t, os.WriteFile(path, []byte(`package test
 
 apiVersion: "opmodel.dev/core/v1alpha1"
@@ -50,7 +51,7 @@ values: {
 }
 `), 0o644))
 
-	rel, err := GetReleaseFile(cuecontext.New(), path)
+	rel, err := GetInstanceFile(cuecontext.New(), path)
 	require.NoError(t, err)
 	require.NotNil(t, rel.Bundle)
 	assert.Equal(t, KindBundleRelease, rel.Kind)
@@ -60,38 +61,38 @@ values: {
 	assert.False(t, rel.Bundle.Values.Exists())
 }
 
-func TestGetReleaseFile_UnknownKind(t *testing.T) {
+func TestGetInstanceFile_UnknownKind(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "release.cue")
+	path := filepath.Join(dir, "instance.cue")
 	require.NoError(t, os.WriteFile(path, []byte(`package test
 kind: "MysteryRelease"
 `), 0o644))
 
-	_, err := GetReleaseFile(cuecontext.New(), path)
+	_, err := GetInstanceFile(cuecontext.New(), path)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unknown release kind")
+	assert.Contains(t, err.Error(), "unknown instance kind")
 }
 
-func TestGetReleaseFile_FailsWhenModuleMetadataNotConcrete(t *testing.T) {
+func TestGetInstanceFile_FailsWhenModuleMetadataNotConcrete(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "release.cue")
+	path := filepath.Join(dir, "instance.cue")
 	require.NoError(t, os.WriteFile(path, []byte(`package test
 
-kind: "ModuleRelease"
+kind: "ModuleInstance"
 metadata: {
 	name: string
 	namespace: "apps"
 }
 `), 0o644))
 
-	_, err := GetReleaseFile(cuecontext.New(), path)
+	_, err := GetInstanceFile(cuecontext.New(), path)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "metadata must be concrete")
 }
 
-func TestGetReleaseFile_FailsWhenBundleMetadataNotConcrete(t *testing.T) {
+func TestGetInstanceFile_FailsWhenBundleMetadataNotConcrete(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "release.cue")
+	path := filepath.Join(dir, "instance.cue")
 	require.NoError(t, os.WriteFile(path, []byte(`package test
 
 kind: "BundleRelease"
@@ -100,7 +101,7 @@ metadata: {
 }
 `), 0o644))
 
-	_, err := GetReleaseFile(cuecontext.New(), path)
+	_, err := GetInstanceFile(cuecontext.New(), path)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "metadata must be concrete")
 }

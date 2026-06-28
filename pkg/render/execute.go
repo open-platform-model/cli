@@ -47,7 +47,7 @@ func executeTransforms(
 	providerVal cue.Value,
 	schemaComponents cue.Value,
 	dataComponents cue.Value,
-	rel *module.Release,
+	rel *module.Instance,
 	runtimeName string,
 ) ([]*core.Resource, []string, []error) {
 	resources := make([]*core.Resource, 0)
@@ -87,7 +87,7 @@ func executePair(
 	providerVal cue.Value,
 	schemaComponents cue.Value,
 	dataComponents cue.Value,
-	rel *module.Release,
+	rel *module.Instance,
 	pair MatchedPair,
 	runtimeName string,
 ) ([]*core.Resource, []string, error) {
@@ -180,7 +180,7 @@ func executePair(
 func injectContext(
 	cueCtx *cue.Context,
 	unified cue.Value,
-	rel *module.Release,
+	rel *module.Instance,
 	compName string,
 	compVal cue.Value,
 	runtimeName string,
@@ -237,7 +237,7 @@ func injectContext(
 	// verbatim onto every rendered resource as app.kubernetes.io/managed-by by
 	// the catalog's controllerLabels block. The catalog declares #runtimeName
 	// as mandatory (t.#NameType); CUE evaluation fails if empty. Callers must
-	// supply a non-empty value — ProcessModuleRelease enforces this at the
+	// supply a non-empty value — ProcessModuleInstance enforces this at the
 	// public boundary.
 	unified = unified.FillPath(
 		cue.MakePath(cue.Def("context"), cue.Def("runtimeName")),

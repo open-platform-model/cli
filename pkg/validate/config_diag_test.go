@@ -27,7 +27,7 @@ func TestConfig_FieldNotAllowed_FileLoaded(t *testing.T) {
 
 	const fixtureDir = "testdata/validate_diag"
 
-	// Load schema.cue (mirrors LoadReleaseFile — file-loaded via BuildInstance).
+	// Load schema.cue (mirrors LoadInstanceFile — file-loaded via BuildInstance).
 	schemaInsts := load.Instances([]string{"schema.cue"}, &load.Config{
 		Dir: fixtureDir,
 	})

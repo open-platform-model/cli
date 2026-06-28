@@ -22,8 +22,8 @@ func TestModuleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {
 	data := ctx.CompileString(`{}`)
 
 	renderer := render.NewModule(&provider.Provider{Data: providerVal}, core.LabelManagedByValue)
-	rel := &module.Release{
-		Metadata: &module.ReleaseMetadata{Name: "demo"},
+	rel := &module.Instance{
+		Metadata: &module.InstanceMetadata{Name: "demo"},
 		Spec:     raw,
 	}
 	schemaComponents := rel.MatchComponents()
@@ -42,7 +42,7 @@ func TestBundleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {
 	ctx := cuecontext.New()
 	providerVal := ctx.CompileString(`{#transformers:{}}`)
 	renderer := render.NewBundle(&provider.Provider{Data: providerVal}, core.LabelManagedByValue)
-	result, err := renderer.Execute(context.Background(), &bundle.Release{Releases: map[string]*module.Release{}})
+	result, err := renderer.Execute(context.Background(), &bundle.Release{Releases: map[string]*module.Instance{}})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.NotNil(t, result.Resources)

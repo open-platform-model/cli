@@ -8,18 +8,20 @@ import (
 	"github.com/opmodel/cli/pkg/provider"
 )
 
-// ProcessModuleRelease renders a prepared release with the given provider.
-// The release must already be fully prepared via module.ParseModuleRelease.
+// ProcessModuleInstance renders a prepared instance with the given provider.
+// The instance must already be fully prepared via module.ParseModuleInstance.
 // runtimeName identifies the runtime executing this render (e.g. "opm-cli");
 // it is stamped onto every rendered resource as app.kubernetes.io/managed-by
 // and MUST be non-empty.
-func ProcessModuleRelease(ctx context.Context, rel *module.Release, p *provider.Provider, runtimeName string) (*ModuleResult, error) {
+//
+// Was: ProcessModuleRelease (enhancement 0002 D8 hard-rename).
+func ProcessModuleInstance(ctx context.Context, rel *module.Instance, p *provider.Provider, runtimeName string) (*ModuleResult, error) {
 	if runtimeName == "" {
 		return nil, fmt.Errorf("runtimeName must be non-empty")
 	}
 	schemaComponents := rel.MatchComponents()
 	if !schemaComponents.Exists() {
-		return nil, fmt.Errorf("release %q: no components field in release spec", rel.Metadata.Name)
+		return nil, fmt.Errorf("instance %q: no components field in instance spec", rel.Metadata.Name)
 	}
 
 	dataComponents, err := finalizeValue(p.Data.Context(), schemaComponents)

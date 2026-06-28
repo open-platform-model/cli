@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// makeReleaseFileFixture creates a temp directory with a cue.mod and a release .cue file.
+// makeInstanceFileFixture creates a temp directory with a cue.mod and an instance .cue file.
 // Returns the path to the created .cue file.
-func makeReleaseFileFixture(t *testing.T, filename, content string) string {
+func makeInstanceFileFixture(t *testing.T, filename, content string) string {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -53,33 +53,33 @@ metadata: {
 	return dir
 }
 
-// TestLoadReleaseFile tests loading standalone .cue release files.
-func TestLoadReleaseFile(t *testing.T) {
+// TestLoadInstanceFile tests loading standalone .cue instance files.
+func TestLoadInstanceFile(t *testing.T) {
 	ctx := cuecontext.New()
 
-	t.Run("valid ModuleRelease file", func(t *testing.T) {
-		filePath := makeReleaseFileFixture(t, "release.cue", `package releases
+	t.Run("valid ModuleInstance file", func(t *testing.T) {
+		filePath := makeInstanceFileFixture(t, "instance.cue", `package releases
 
-kind: "ModuleRelease"
-metadata: name: "my-release"
+kind: "ModuleInstance"
+metadata: name: "my-instance"
 `)
-		val, dir, err := LoadReleaseFile(ctx, filePath, LoadOptions{})
+		val, dir, err := LoadInstanceFile(ctx, filePath, LoadOptions{})
 		require.NoError(t, err)
 		assert.NotEmpty(t, dir)
 		assert.NoError(t, val.Err())
 
 		kind, kindErr := val.LookupPath(cue.ParsePath("kind")).String()
 		require.NoError(t, kindErr)
-		assert.Equal(t, "ModuleRelease", kind)
+		assert.Equal(t, "ModuleInstance", kind)
 	})
 
 	t.Run("valid BundleRelease file", func(t *testing.T) {
-		filePath := makeReleaseFileFixture(t, "bundle_release.cue", `package releases
+		filePath := makeInstanceFileFixture(t, "bundle_release.cue", `package releases
 
 kind: "BundleRelease"
 metadata: name: "my-bundle"
 `)
-		val, dir, err := LoadReleaseFile(ctx, filePath, LoadOptions{})
+		val, dir, err := LoadInstanceFile(ctx, filePath, LoadOptions{})
 		require.NoError(t, err)
 		assert.NotEmpty(t, dir)
 		assert.NoError(t, val.Err())
@@ -90,24 +90,24 @@ metadata: name: "my-bundle"
 	})
 
 	t.Run("invalid CUE syntax", func(t *testing.T) {
-		filePath := makeReleaseFileFixture(t, "bad.cue", `package releases
+		filePath := makeInstanceFileFixture(t, "bad.cue", `package releases
 
 this is not valid CUE !!!`)
-		_, _, err := LoadReleaseFile(ctx, filePath, LoadOptions{})
+		_, _, err := LoadInstanceFile(ctx, filePath, LoadOptions{})
 		require.Error(t, err)
 	})
 
 	t.Run("file not found", func(t *testing.T) {
-		_, _, err := LoadReleaseFile(ctx, "/nonexistent/path/release.cue", LoadOptions{})
+		_, _, err := LoadInstanceFile(ctx, "/nonexistent/path/instance.cue", LoadOptions{})
 		require.Error(t, err)
 	})
 
 	t.Run("returns parent directory", func(t *testing.T) {
-		filePath := makeReleaseFileFixture(t, "my_release.cue", `package releases
+		filePath := makeInstanceFileFixture(t, "my_instance.cue", `package releases
 
-kind: "ModuleRelease"
+kind: "ModuleInstance"
 `)
-		_, dir, err := LoadReleaseFile(ctx, filePath, LoadOptions{})
+		_, dir, err := LoadInstanceFile(ctx, filePath, LoadOptions{})
 		require.NoError(t, err)
 		assert.Equal(t, filepath.Dir(filePath), dir)
 	})

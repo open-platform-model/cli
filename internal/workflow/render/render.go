@@ -11,8 +11,8 @@ import (
 
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
+	internalinstancefile "github.com/opmodel/cli/internal/instancefile"
 	"github.com/opmodel/cli/internal/output"
-	internalreleasefile "github.com/opmodel/cli/internal/releasefile"
 	pkgcore "github.com/opmodel/cli/pkg/core"
 	"github.com/opmodel/cli/pkg/loader"
 	pkgmodule "github.com/opmodel/cli/pkg/module"
@@ -44,12 +44,12 @@ func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error)
 	if pathErr := cmdutil.ValidateReleaseInputPath(opts.ReleaseFilePath); pathErr != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: pathErr}
 	}
-	fileRelease, err := internalreleasefile.GetReleaseFile(cueCtx, opts.ReleaseFilePath)
+	fileRelease, err := internalinstancefile.GetInstanceFile(cueCtx, opts.ReleaseFilePath)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
-	if fileRelease.Kind == internalreleasefile.KindBundleRelease {
+	if fileRelease.Kind == internalinstancefile.KindBundleRelease {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("bundle releases are not yet supported - use a #ModuleRelease file")}
 	}
 	parseData := fileRelease.Module
@@ -68,7 +68,7 @@ func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error)
 	}
 
 	// Prepare the release: validate values, fill, check concreteness, decode metadata.
-	rel, err := pkgmodule.ParseModuleRelease(ctx, parseData.Spec, parseData.Module, valuesVals)
+	rel, err := pkgmodule.ParseModuleInstance(ctx, parseData.Spec, parseData.Module, valuesVals)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
@@ -91,10 +91,10 @@ func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error)
 // and converts the result to unstructured resources.
 func renderPreparedModuleRelease(
 	ctx context.Context,
-	rel *pkgmodule.Release,
+	rel *pkgmodule.Instance,
 	p *provider.Provider,
 ) (*Result, error) {
-	engineResult, err := pkgrender.ProcessModuleRelease(ctx, rel, p, pkgcore.LabelManagedByValue)
+	engineResult, err := pkgrender.ProcessModuleInstance(ctx, rel, p, pkgcore.LabelManagedByValue)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}

@@ -17,7 +17,7 @@ import (
 // testing output formatting without requiring a registry or real module render.
 func buildTestResult() *render.Result {
 	return &render.Result{
-		Release: module.ReleaseMetadata{
+		Release: module.InstanceMetadata{
 			Name:      "test-release",
 			Namespace: "default",
 		},

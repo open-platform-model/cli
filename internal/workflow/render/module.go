@@ -45,7 +45,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 		synthOpts.Namespace = namespace
 	}
 
-	synth, err := loader.SynthesizeModuleReleaseFromPackage(cueCtx, opts.ModulePath, synthOpts)
+	synth, err := loader.SynthesizeModuleInstanceFromPackage(cueCtx, opts.ModulePath, synthOpts)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
@@ -67,7 +67,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	}
 	output.Info(fmt.Sprintf("Building synthetic release %q for module %q", synthName, modName))
 
-	rel, err := pkgmodule.ParseModuleRelease(ctx, synth.Spec, mod, values)
+	rel, err := pkgmodule.ParseModuleInstance(ctx, synth.Spec, mod, values)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
@@ -98,7 +98,7 @@ func resolveModuleValues(cueCtx *cue.Context, modVal cue.Value, valuesFiles []st
 }
 
 // buildModuleFromValue constructs a pkgmodule.Module from a loaded module
-// CUE value. Mirrors the bare-module side of internal/releasefile.bareModuleRelease
+// CUE value. Mirrors the bare-module side of internal/instancefile.bareModuleInstance
 // but for a directly-loaded module value (no #module wrapper yet).
 func buildModuleFromValue(modVal cue.Value, modulePath string) pkgmodule.Module {
 	meta := &pkgmodule.ModuleMetadata{}

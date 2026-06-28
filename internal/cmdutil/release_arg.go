@@ -103,7 +103,7 @@ func resolveReleaseArgFromFile(arg string, cfg *config.GlobalConfig) (ReleaseArg
 		cueCtx = cuecontext.New()
 	}
 
-	pkg, _, err := loader.LoadReleaseFile(cueCtx, arg, loader.LoadOptions{Registry: cfg.Registry})
+	pkg, _, err := loader.LoadInstanceFile(cueCtx, arg, loader.LoadOptions{Registry: cfg.Registry})
 	if err != nil {
 		return ReleaseArg{}, fmt.Errorf("loading release file %q: %w", arg, err)
 	}

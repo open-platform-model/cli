@@ -15,7 +15,7 @@ import (
 	"github.com/opmodel/cli/pkg/provider"
 )
 
-func TestProcessModuleRelease_Success(t *testing.T) {
+func TestProcessModuleInstance_Success(t *testing.T) {
 	ctx := cuecontext.New()
 	raw := ctx.CompileString(`{
 		metadata: {
@@ -79,15 +79,15 @@ func TestProcessModuleRelease_Success(t *testing.T) {
 		}
 	}`)
 
-	// Construct a fully prepared release (as ParseModuleRelease would produce).
-	rel := &module.Release{
-		Metadata: &module.ReleaseMetadata{Name: "demo", Namespace: "apps"},
+	// Construct a fully prepared release (as ParseModuleInstance would produce).
+	rel := &module.Instance{
+		Metadata: &module.InstanceMetadata{Name: "demo", Namespace: "apps"},
 		Module:   module.Module{Metadata: &module.ModuleMetadata{FQN: "example.com/modules/demo@v1", Version: "v1"}},
 		Spec:     raw,
 		Values:   ctx.CompileString(`{replicas: 2}`),
 	}
 
-	result, err := ProcessModuleRelease(context.Background(), rel, &provider.Provider{Data: pv}, core.LabelManagedByValue)
+	result, err := ProcessModuleInstance(context.Background(), rel, &provider.Provider{Data: pv}, core.LabelManagedByValue)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Len(t, result.Resources, 1)
@@ -113,7 +113,7 @@ func TestProcessBundleRelease_StubAfterValidation(t *testing.T) {
 		Metadata: &bundle.ReleaseMetadata{Name: "stack"},
 		Spec:     raw,
 		Config:   raw.LookupPath(cue.ParsePath("#bundle.#config")),
-		Releases: map[string]*module.Release{},
+		Releases: map[string]*module.Instance{},
 	}
 
 	_, err := ProcessBundleRelease(context.Background(), br, []cue.Value{ctx.CompileString(`{replicas: 1}`)}, &provider.Provider{Data: ctx.CompileString(`{}`)})
