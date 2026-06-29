@@ -10,7 +10,7 @@ Defines the gate-based validation system in `pkg/loader` that validates consumer
 The loader SHALL validate consumer-provided values against the module's `#config` schema before any further processing. This is called the Module Gate.
 
 #### Scenario: Valid values pass the Module Gate
-- **WHEN** `LoadModuleReleaseFromValue()` is called with values that satisfy `#module.#config`
+- **WHEN** `LoadModuleInstanceFromValue()` is called with values that satisfy `#module.#config`
 - **THEN** loading proceeds to finalization and metadata extraction
 
 #### Scenario: Type mismatch caught by Module Gate
@@ -20,17 +20,6 @@ The loader SHALL validate consumer-provided values against the module's `#config
 #### Scenario: Missing required field caught by Module Gate
 - **WHEN** consumer values omit a field that has no default in `#config`
 - **THEN** the Module Gate returns a `*ConfigError` with `Context: "module"` and the raw CUE concreteness error
-
-### Requirement: Bundle Gate validates consumer values against #bundle.#config
-The loader SHALL validate bundle-level consumer values against the bundle's `#config` schema before processing individual releases. This is called the Bundle Gate.
-
-#### Scenario: Valid bundle values pass the Bundle Gate
-- **WHEN** `LoadBundleReleaseFromValue()` is called with values that satisfy `#bundle.#config`
-- **THEN** loading proceeds to per-release Module Gate validation
-
-#### Scenario: Bundle Gate runs before individual Module Gates
-- **WHEN** bundle-level values fail the Bundle Gate
-- **THEN** the error is returned immediately without running per-release Module Gates
 
 ### Requirement: ConfigError provides structured field errors
 The `ConfigError` type SHALL carry the raw CUE error and provide a `FieldErrors()` method that parses the CUE error tree into `[]FieldError` with file, line, column, path, and message fields.

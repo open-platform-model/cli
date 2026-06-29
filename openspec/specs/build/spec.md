@@ -9,7 +9,7 @@ The `opm mod build` command renders OPM modules into platform-specific manifests
 1. **Implements Pipeline interface**: Core logic in `internal/build/` satisfies render-pipeline-v1 contract.
 2. **Separate output formatting**: CLI-specific formatting in `internal/output/`, not in Pipeline.
 3. **#config pattern**: Modules use `#config` for schema, `values` for defaults, enabling type-safe configuration.
-4. **Release building phase**: ReleaseBuilder injects values into #config before component extraction.
+4. **Instance building phase**: ReleaseBuilder injects values into #config before component extraction.
 5. **Parallel execution**: FillPath injection for #component and #context.
 
 ## Dependencies
@@ -72,7 +72,7 @@ A developer wants to control how rendered manifests are output.
 | FR-B-001 | `mod build` MUST accept a path argument (default: current directory). |
 | FR-B-002 | `mod build` MUST support `--values` / `-f` flag for additional values files (repeatable). |
 | FR-B-003 | `mod build` MUST support `--namespace` / `-n` flag to override namespace. |
-| FR-B-004 | `mod build` MUST support `--name` flag to override release name. |
+| FR-B-004 | `mod build` MUST support `--name` flag to override instance name. |
 | FR-B-005 | `mod build` MUST support `--provider` flag to select provider. |
 | FR-B-006 | `mod build` MUST support `--output` / `-o` flag (yaml, json). |
 | FR-B-007 | `mod build` MUST support `--split` flag for separate files. |
@@ -124,13 +124,13 @@ The pipeline SHALL extract all module metadata (`name`, `defaultNamespace`, `fqn
 
 ##### Scenario: Synthesis mode decodes module metadata from module value
 
-- **WHEN** `opm mod build .` runs in synthesis mode (no `release.cue`)
+- **WHEN** `opm mod build .` runs in synthesis mode (no `instance.cue`)
 - **AND** the module defines `metadata.name: "jellyfin"` and `metadata.defaultNamespace: "jellyfin"`
-- **THEN** the synthesized `ModuleRelease.Module.Metadata.Name` SHALL be `"jellyfin"`
-- **AND** the synthesized `ModuleRelease.Metadata.Namespace` SHALL be `"jellyfin"`
+- **THEN** the synthesized `ModuleInstance.Module.Metadata.Name` SHALL be `"jellyfin"`
+- **AND** the synthesized `ModuleInstance.Metadata.Namespace` SHALL be `"jellyfin"`
 
 ### Requirement: mod build defaults to debugValues when no -f flag is given
-When `opm mod build` is invoked without a `-f` / `--values` flag, the command SHALL automatically use the module's `debugValues` field as the values source. This applies in both synthesis mode (no `release.cue`) and release mode (has `release.cue`).
+When `opm mod build` is invoked without a `-f` / `--values` flag, the command SHALL automatically use the module's `debugValues` field as the values source. This applies in both synthesis mode (no `instance.cue`) and instance mode (has `instance.cue`).
 
 #### Scenario: No -f flag, debugValues present — build succeeds
 
@@ -142,7 +142,7 @@ When `opm mod build` is invoked without a `-f` / `--values` flag, the command SH
 
 - **WHEN** `opm mod build .` is run with no `-f` flag
 - **AND** the module has no `debugValues` field
-- **AND** no `release.cue` is present
+- **AND** no `instance.cue` is present
 - **THEN** the command SHALL fail with a message directing the user to add `debugValues` or use `-f`
 
 ### ReleaseBuilder
@@ -155,7 +155,7 @@ The generated overlay SHALL produce byte-identical CUE output compared to the pr
 
 ##### Scenario: AST overlay produces valid CUE
 
-- **WHEN** the ReleaseBuilder generates an overlay for a module with package name `testmodule`, release name `my-release`, and namespace `production`
+- **WHEN** the ReleaseBuilder generates an overlay for a module with package name `testmodule`, instance name `my-instance`, and namespace `production`
 - **THEN** the output SHALL be valid CUE that parses without errors via `parser.ParseFile`
 
 ##### Scenario: AST overlay contains required definitions
@@ -163,13 +163,13 @@ The generated overlay SHALL produce byte-identical CUE output compared to the pr
 - **WHEN** the ReleaseBuilder generates an overlay
 - **THEN** the output SHALL contain a `#opmReleaseMeta` definition with fields: `name`, `namespace`, `fqn`, `version`, `identity`, and `labels`
 - **AND** `identity` SHALL use `uuid.SHA1` with the OPM namespace UUID and an interpolation of `fqn`, `name`, and `namespace`
-- **AND** `labels` SHALL unify `metadata.labels` with the standard release labels (`module-release.opmodel.dev/name`, `module-release.opmodel.dev/version`, `module-release.opmodel.dev/uuid`)
+- **AND** `labels` SHALL unify `metadata.labels` with the standard instance labels (`module-instance.opmodel.dev/name`, `module-instance.opmodel.dev/version`, `module-instance.opmodel.dev/uuid`)
 
 ##### Scenario: AST overlay uses correct label types for scope resolution
 
 - **WHEN** the ReleaseBuilder constructs the overlay AST
 - **THEN** field labels that are referenced from nested scopes (`name`, `namespace`, `fqn`, `version`, `identity`) SHALL use unquoted identifier labels (`ast.NewIdent`)
-- **AND** field labels containing special characters (`module-release.opmodel.dev/*`) SHALL use quoted string labels (`ast.NewString`)
+- **AND** field labels containing special characters (`module-instance.opmodel.dev/*`) SHALL use quoted string labels (`ast.NewString`)
 - **AND** `astutil.Resolve` SHALL be called on the constructed `*ast.File` to wire up scope references
 
 ##### Scenario: AST overlay matches previous string template output
@@ -179,20 +179,20 @@ The generated overlay SHALL produce byte-identical CUE output compared to the pr
 
 #### Requirement: Build() gates on IsConcrete() per component
 
-`Build()` SHALL return a non-nil error if any component extracted from `#components` after `FillPath("#config", values)` is not concrete. The check SHALL be performed immediately after `core.ExtractComponents()` returns, before constructing the `ModuleRelease`. The error SHALL identify the component name.
+`Build()` SHALL return a non-nil error if any component extracted from `#components` after `FillPath("#config", values)` is not concrete. The check SHALL be performed immediately after `core.ExtractComponents()` returns, before constructing the `ModuleInstance`. The error SHALL identify the component name.
 
 ##### Scenario: All components concrete — Build() succeeds
 
 - **WHEN** `Build()` is called with values that satisfy all `#config` constraints
 - **AND** all components in `#components` are concrete after `FillPath`
-- **THEN** `Build()` SHALL return a non-nil `*core.ModuleRelease` and a nil error
+- **THEN** `Build()` SHALL return a non-nil `*core.ModuleInstance` and a nil error
 
 ##### Scenario: Non-concrete component — Build() returns error
 
 - **WHEN** after `FillPath("#config", values)` a component's `Value` is not concrete
 - **THEN** `Build()` SHALL return a non-nil error containing the component name
 - **AND** the error message SHALL indicate the component is not concrete after value injection
-- **AND** no `*core.ModuleRelease` SHALL be returned
+- **AND** no `*core.ModuleInstance` SHALL be returned
 
 ### Module Configuration Pattern
 
@@ -229,7 +229,7 @@ The generated overlay SHALL produce byte-identical CUE output compared to the pr
 | FR-B-060 | Unmatched components MUST include list of available transformers. |
 | FR-B-062 | Unhandled traits MUST cause warning. |
 | FR-B-063 | Values file conflicts MUST return CUE's native unification error. |
-| FR-B-064 | Non-concrete component after release building MUST fail with ReleaseValidationError. |
+| FR-B-064 | Non-concrete component after instance building MUST fail with ReleaseValidationError. |
 | FR-B-065 | Module missing `values` field MUST fail with descriptive error. |
 
 ### Requirement: Values validation uses recursive field walking with custom closedness checking
@@ -388,9 +388,9 @@ This replaces the current plain-text resource listing in verbose output.
 
 #### Scenario: Verbose output works in synthesis mode
 
-- **WHEN** `opm mod build . --verbose` is run with no `release.cue` using `debugValues`
+- **WHEN** `opm mod build . --verbose` is run with no `instance.cue` using `debugValues`
 - **THEN** the verbose output SHALL include per-resource validation lines
-- **AND** the output format SHALL be identical to release-backed builds
+- **AND** the output format SHALL be identical to instance-backed builds
 
 ---
 
@@ -425,7 +425,7 @@ This replaces the current plain-text resource listing in verbose output.
 | Values file conflict | Return CUE's native unification error |
 | No namespace provided (and no default) | Fail with "namespace required" error |
 | Empty module (no components) | Success with empty resources |
-| Non-concrete component after release building | Fail with ReleaseValidationError including component name |
+| Non-concrete component after instance building | Fail with ReleaseValidationError including component name |
 | Module missing `values` field | Fail with "module missing 'values' field" error |
 | Module missing `#components` field | Fail with "module missing '#components' field" error |
 
@@ -442,7 +442,7 @@ Arguments:
 Flags:
   -f, --values strings      Additional values files (can be repeated)
   -n, --namespace string    Target namespace
-      --name string         Release name (default: module name)
+      --name string         Instance name (default: module name)
       --provider string     Provider to use (default: from config)
   -o, --output string       Output format: yaml, json (default: yaml)
       --split               Write separate files per resource
@@ -487,19 +487,19 @@ opm mod build ./my-module -o json
 ## Removed Requirements
 
 ### Requirement: Builder.Build() function
-**Reason**: The separate build phase is eliminated. Loading IS building — `pkg/loader/LoadModuleReleaseFromValue()` handles value unification, gate validation, finalization, and metadata extraction in one pass. CUE evaluation naturally handles what the builder did imperatively.
+**Reason**: The separate build phase is eliminated. Loading IS building — `pkg/loader/LoadModuleInstanceFromValue()` handles value unification, gate validation, finalization, and metadata extraction in one pass. CUE evaluation naturally handles what the builder did imperatively.
 
-**Migration**: Replace `builder.Build(ctx, mod, opts, valuesFiles)` calls with `loader.LoadReleasePackage()` + `loader.LoadModuleReleaseFromValue()`.
+**Migration**: Replace `builder.Build(ctx, mod, opts, valuesFiles)` calls with `loader.LoadInstancePackage()` + `loader.LoadModuleInstanceFromValue()`.
 
 ### Requirement: Values file resolution in builder
 **Reason**: Values file resolution (--values flags, fallback to values.cue) moves to `internal/cmdutil/` as a CLI-layer concern. The loader accepts explicit file paths.
 
-**Migration**: `cmdutil` resolves values file paths from flags and passes them to `loader.LoadReleasePackage()`.
+**Migration**: `cmdutil` resolves values file paths from flags and passes them to `loader.LoadInstancePackage()`.
 
 ### Requirement: Auto-secrets injection in builder
 **Reason**: Go-side auto-secrets injection (`autosecrets.go`) is eliminated. The CUE layer handles secret discovery, grouping, and component injection via `#AutoSecrets` and `#OpmSecretsComponent` in `v1alpha1/core/`.
 
-**Migration**: No Go-side migration needed — the CUE definitions handle this declaratively when `#ModuleRelease` is evaluated.
+**Migration**: No Go-side migration needed — the CUE definitions handle this declaratively when `#ModuleInstance` is evaluated.
 
 ### Requirement: Values validation against #config in builder
 **Reason**: Values validation moves into the gate system in `pkg/loader/validate.go`. The Module Gate validates consumer values against `#module.#config` during loading.

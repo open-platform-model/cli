@@ -7,7 +7,7 @@ The command SHALL exit with code 0 (`ExitSuccess`) when all discovered resources
 
 #### Scenario: All resources healthy
 
-- **WHEN** the user runs `opm mod status --release-name my-app -n prod`
+- **WHEN** the user runs `opm mod status --instance-name my-app -n prod`
 - **AND** all discovered resources are healthy
 - **THEN** the command SHALL exit with code 0
 
@@ -17,23 +17,23 @@ The command SHALL exit with code 2 (`ExitValidationError`) when the command exec
 
 #### Scenario: Some resources not ready
 
-- **WHEN** the user runs `opm mod status --release-name my-app -n prod`
+- **WHEN** the user runs `opm mod status --instance-name my-app -n prod`
 - **AND** at least one resource has health status `NotReady`
 - **THEN** the command SHALL print the status table and exit with code 2
 
 #### Scenario: Exit code 2 in CI pipeline
 
-- **WHEN** a CI pipeline runs `opm mod status --release-name my-app -n prod`
+- **WHEN** a CI pipeline runs `opm mod status --instance-name my-app -n prod`
 - **AND** the Deployment is not yet ready
 - **THEN** the pipeline can distinguish this from a connectivity error by checking `$?` equals 2
 
 ### Requirement: Status exits with code 5 when no resources are found
 
-The command SHALL exit with code 5 (`ExitNotFound`) when no resources match the release selector in the given namespace.
+The command SHALL exit with code 5 (`ExitNotFound`) when no resources match the instance selector in the given namespace.
 
 #### Scenario: No resources found
 
-- **WHEN** the user runs `opm mod status --release-name nonexistent -n prod`
+- **WHEN** the user runs `opm mod status --instance-name nonexistent -n prod`
 - **AND** no resources match the selector
 - **THEN** the command SHALL print a "no resources found" message and exit with code 5
 
@@ -43,7 +43,7 @@ The command SHALL exit with code 1 (`ExitGeneralError`) for errors that prevent 
 
 #### Scenario: Invalid output format
 
-- **WHEN** the user runs `opm mod status --release-name my-app -n prod -o invalid`
+- **WHEN** the user runs `opm mod status --instance-name my-app -n prod -o invalid`
 - **THEN** the command SHALL exit with code 1 with an error message indicating the invalid format
 
 #### Scenario: Kubernetes API error

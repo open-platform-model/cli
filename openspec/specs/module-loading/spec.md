@@ -1,6 +1,6 @@
 ## Purpose
 
-**Superseded.** This spec described the old directory-based module loader (`loader.LoadModule`). The loader has been replaced by a release-centric approach in `pkg/loader`. See `loader-api` spec for current loading contracts.
+**Superseded.** This spec described the old directory-based module loader (`loader.LoadModule`). The loader has been replaced by a instance-centric approach in `pkg/loader`. See `loader-api` spec for current loading contracts.
 
 ~~Defines the contract for loading a CUE module from disk into a fully-populated `*core.Module`. The loader is the PREPARATION phase of the render pipeline: given a path and optional registry, it resolves the module, evaluates its CUE, extracts all fields, and returns a ready `*core.Module` that subsequent pipeline phases (BUILD, GENERATE) can consume.~~
 
@@ -90,7 +90,7 @@ The loader SHALL extract `#components` from the evaluated value and populate `co
 ---
 
 ### Requirement: Raw CUE value is stored on Module.Raw
-The loader SHALL store the fully evaluated `cue.Value` on `core.Module.Raw`. This value MUST be the complete evaluated module value, usable for injection into `#ModuleRelease` via `FillPath` in the BUILD phase.
+The loader SHALL store the fully evaluated `cue.Value` on `core.Module.Raw`. This value MUST be the complete evaluated module value, usable for injection into `#ModuleInstance` via `FillPath` in the BUILD phase.
 
 #### Scenario: Raw is set after successful load
 - **WHEN** the module is successfully loaded and evaluated
@@ -110,6 +110,6 @@ The loader SHALL return a `*core.Module` that passes `mod.Validate()` — meanin
 ## Removed Requirements
 
 ### Requirement: LoadModule function
-**Reason**: `loader.LoadModule(cueCtx, modulePath, registry)` which loaded a module directory, filtered values files, and built a `*Module` is replaced by release-centric loading. The new loader operates on release packages (`release.cue + values.cue`) not module directories. Module metadata is extracted from the `#module` hidden field within the release.
+**Reason**: `loader.LoadModule(cueCtx, modulePath, registry)` which loaded a module directory, filtered values files, and built a `*Module` is replaced by instance-centric loading. The new loader operates on instance packages (`instance.cue + values.cue`) not module directories. Module metadata is extracted from the `#module` hidden field within the instance.
 
-**Migration**: Replace `loader.LoadModule()` with `loader.LoadReleasePackage()` + `loader.LoadModuleReleaseFromValue()`, which extracts module info from the release's `#module` field. See `loader-api` spec.
+**Migration**: Replace `loader.LoadModule()` with `loader.LoadInstancePackage()` + `loader.LoadModuleInstanceFromValue()`, which extracts module info from the instance's `#module` field. See `loader-api` spec.

@@ -14,7 +14,7 @@ Pods SHALL be discovered by listing pods in the workload's namespace using the w
 
 #### Scenario: Verbose shows pod details for NotReady Deployment
 
-- **WHEN** the user runs `opm mod status --release-name my-app -n prod --verbose`
+- **WHEN** the user runs `opm mod status --instance-name my-app -n prod --verbose`
 - **AND** a Deployment `web` has health status `NotReady`
 - **AND** the Deployment has 3 pods: one Running/Ready, one in CrashLoopBackOff, one Pending
 - **THEN** the output SHALL include a pod detail block for `Deployment/web` showing all 3 pods with their phase and details
@@ -104,7 +104,7 @@ When `--verbose` is combined with `-o json` or `-o yaml`, the pod details SHALL 
 
 #### Scenario: Verbose JSON output includes pods
 
-- **WHEN** the user runs `opm mod status --release-name my-app -n prod --verbose -o json`
+- **WHEN** the user runs `opm mod status --instance-name my-app -n prod --verbose -o json`
 - **AND** a Deployment is NotReady with 2 pods
 - **THEN** the JSON output for that resource SHALL include a `verbose` object with a `pods` array containing 2 entries with `name`, `phase`, `ready`, `reason`, and `restarts` fields
 

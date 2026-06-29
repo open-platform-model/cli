@@ -4,48 +4,22 @@ Defines the behavior of the `opm module apply` (alias `opm mod apply`) subcomman
 
 ## Requirements
 
-### Requirement: `opm module apply` deploys a module package via the synthetic release flow
+### Requirement: `opm module apply` deploys a module package via the synthetic instance flow
 
-The CLI SHALL provide a `module apply` subcommand (with alias `mod apply`) under the `module` command group that accepts an optional positional argument (the module-package directory, defaulting to `"."`) and deploys the synthesized `#ModuleRelease` to a Kubernetes cluster. The subcommand SHALL accept only directory inputs.
+The CLI SHALL provide a `module apply` subcommand (with alias `mod apply`) under the `module` command group that accepts an optional positional argument (the module-package directory, defaulting to `"."`) and deploys the synthesized `#ModuleInstance` to a Kubernetes cluster. The subcommand SHALL accept only directory inputs. <!-- Was: synthetic release flow / #ModuleRelease (0002 D8) -->
 
-The subcommand SHALL produce the same cluster-side effects as `opm release apply` after the render stage: server-side apply of all rendered resources, inventory-secret read/write keyed on the release UUID, stale-resource pruning, ownership checks, and dry-run support.
+The subcommand SHALL produce the same cluster-side effects as `opm instance apply` after the render stage: server-side apply of all rendered resources, inventory-secret read/write keyed on the instance UUID, stale-resource pruning, ownership checks, and dry-run support. <!-- Was: opm release apply, release UUID -->
 
 #### Scenario: Default to current directory
 
 - **WHEN** the user runs `opm module apply` with no positional argument from inside a module package directory
-- **THEN** the subcommand SHALL synthesize a `#ModuleRelease` from that directory and apply the result to the cluster
-
-#### Scenario: Explicit module directory
-
-- **WHEN** the user runs `opm module apply ./my-module`
-- **THEN** the subcommand SHALL synthesize a `#ModuleRelease` from `./my-module` and apply the result to the cluster
+- **THEN** the subcommand SHALL synthesize a `#ModuleInstance` from that directory and apply the result to the cluster
 
 #### Scenario: File argument rejected
 
 - **WHEN** the user runs `opm module apply ./my-module/module.cue`
 - **THEN** the subcommand SHALL return an error stating that `module apply` expects a directory
-- **AND** SHALL point the user to `opm release apply <file>` for release files
-
-#### Scenario: Successful apply writes inventory
-
-- **WHEN** the user runs `opm module apply ./my-module` against a cluster
-- **AND** the apply succeeds
-- **THEN** an inventory Secret SHALL be written keyed on the synthesized release UUID
-- **AND** the inventory Secret SHALL record the module-directory absolute path, the resolved synthetic release name and namespace, and the module's metadata.version (when present)
-
-#### Scenario: Re-apply with same inputs reuses inventory
-
-- **WHEN** the user runs `opm module apply ./my-module` twice in succession with no source or flag changes
-- **THEN** the second invocation SHALL read the inventory written by the first invocation
-- **AND** SHALL skip any resources that are already up-to-date
-- **AND** SHALL increment the inventory revision
-
-#### Scenario: Re-apply after resource removal prunes
-
-- **WHEN** a previous `opm module apply ./my-module` recorded an inventory with N entries
-- **AND** the user modifies the module so that fewer resources render and runs `opm module apply ./my-module` again
-- **THEN** the subcommand SHALL prune the stale resources by default
-- **AND** SHALL update the inventory to reflect the new resource set
+- **AND** SHALL point the user to `opm instance apply <file>` for instance files
 
 ### Requirement: Flag surface matches `opm release apply` plus `--name`
 
@@ -114,21 +88,15 @@ The `module apply` subcommand SHALL accept the following flags with the listed b
 - **WHEN** the same conditions hold and `--force` IS provided
 - **THEN** the subcommand SHALL prune all previously tracked resources
 
-### Requirement: Release identity is derived in CUE, not the CLI
+### Requirement: Instance identity is derived in CUE, not the CLI
 
-The synthetic release's `metadata.uuid` SHALL be computed by the catalog's CUE schema (`SHA1(OPMNamespace, "<moduleUUID>:<name>:<namespace>")`) and SHALL NOT be generated, randomized, or persisted by the CLI itself. The CLI SHALL read the computed UUID from the rendered `ModuleRelease` and use it as the `releaseID` passed to the apply workflow.
+The synthetic instance's `metadata.uuid` SHALL be computed by the catalog's CUE schema (`SHA1(OPMNamespace, "<moduleUUID>:<name>:<namespace>")`) and SHALL NOT be generated, randomized, or persisted by the CLI itself. The CLI SHALL read the computed UUID from the rendered `ModuleInstance` and use it as the `instanceID` passed to the apply workflow. <!-- Was: synthetic release, ModuleRelease, releaseID (0002 D8/D9) -->
 
 #### Scenario: Stable UUID across runs
 
 - **WHEN** the user runs `opm module apply ./foo` twice with identical inputs
-- **THEN** both invocations SHALL produce the same release UUID
+- **THEN** both invocations SHALL produce the same instance UUID
 - **AND** SHALL access the same inventory record
-
-#### Scenario: UUID differs across `--name` values
-
-- **WHEN** the user runs `opm module apply ./foo --name a`
-- **AND** the user runs `opm module apply ./foo --name b`
-- **THEN** the two invocations SHALL produce different release UUIDs
 
 ### Requirement: Inventory ChangeDescriptor reflects module-directory provenance
 
@@ -144,18 +112,18 @@ When the subcommand writes an inventory record, the embedded `ChangeDescriptor` 
 - **THEN** the inventory Secret SHALL record `Path = "/workspace/my-module"`
 - **AND** SHALL record `Local = true`
 
-### Requirement: Apply log surfaces the synthetic release name
+### Requirement: Apply log surfaces the synthetic instance name
 
-The subcommand SHALL log the resolved synthetic release name (including the default `<module>-debug` suffix when applicable) prominently in the apply summary so the operator can recognise a synthetic-release deployment in command-line scrollback or CI logs.
+The subcommand SHALL log the resolved synthetic instance name (including the default `<module>-debug` suffix when applicable) prominently in the apply summary so the operator can recognise a synthetic-instance deployment in command-line scrollback or CI logs. <!-- Was: synthetic release name (0002 D9) -->
 
-#### Scenario: Synthetic release name in apply log
+#### Scenario: Synthetic instance name in apply log
 
 - **WHEN** the user runs `opm module apply ./my-module` against a cluster
-- **THEN** the apply log SHALL include a line identifying the release as `my-module-debug` (or the user-provided `--name` value)
+- **THEN** the apply log SHALL include a line identifying the instance as `my-module-debug` (or the user-provided `--name` value)
 
 ### Requirement: Failures surface validation errors before any cluster contact
 
-The subcommand SHALL validate and synthesize the `#ModuleRelease` before opening any connection to the Kubernetes cluster. Render-time errors SHALL exit with the validation-error exit code and SHALL NOT contact the apiserver.
+The subcommand SHALL validate and synthesize the `#ModuleInstance` before opening any connection to the Kubernetes cluster. Render-time errors SHALL exit with the validation-error exit code and SHALL NOT contact the apiserver. <!-- Was: #ModuleRelease (0002 D8) -->
 
 #### Scenario: Synthesis failure exits before cluster contact
 
@@ -163,10 +131,3 @@ The subcommand SHALL validate and synthesize the `#ModuleRelease` before opening
 - **AND** the user runs `opm module apply ./broken-module`
 - **THEN** the subcommand SHALL exit with the validation-error exit code
 - **AND** SHALL NOT issue any apiserver requests
-
-#### Scenario: Module without debugValues and no `-f` flag
-
-- **WHEN** the user runs `opm module apply ./no-debug-module` and the module defines no `debugValues`
-- **AND** no `-f` flag is provided
-- **THEN** the subcommand SHALL exit with an actionable error telling the user to define `debugValues` or supply values via `-f`
-- **AND** SHALL NOT contact the cluster

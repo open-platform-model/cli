@@ -1,14 +1,12 @@
-# Module Synthetic Release
-
 ## Purpose
 
-Defines how the CLI synthesizes a concrete `#ModuleRelease` directly from a module CUE package directory — without requiring an authored `release.cue`. The synthesis path lets module authors render their module to manifests using the module's own `debugValues` (or `-f` overrides), matching `cue eval` / `cue vet` ergonomics for the inner-loop.
+Defines how the CLI synthesizes a concrete `#ModuleInstance` directly from a module CUE package directory — without requiring an authored `instance.cue`. The synthesis path lets module authors render their module to manifests using the module's own `debugValues` (or `-f` overrides), matching `cue eval` / `cue vet` ergonomics for the inner-loop.
 
 ## Requirements
 
-### Requirement: Synthesize a `#ModuleRelease` from a module-package directory
+### Requirement: Synthesize a `#ModuleInstance` from a module-package directory
 
-The CLI SHALL synthesize a concrete `*ModuleRelease` from a module CUE package directory without requiring a `release.cue` file. The synthesis SHALL load the module as a whole CUE package (matching `cue eval`/`cue vet` semantics) and SHALL feed the produced `cue.Value` into the same downstream pipeline (`pkg/loader.LoadModuleReleaseFromValue`) used for release files and release packages.
+The CLI SHALL synthesize a concrete `*ModuleInstance` from a module CUE package directory without requiring an `instance.cue` file. The synthesis SHALL load the module as a whole CUE package (matching `cue eval`/`cue vet` semantics) and SHALL feed the produced `cue.Value` into the same downstream pipeline (`pkg/loader.LoadModuleInstanceFromValue`) used for instance files and instance packages.
 
 #### Scenario: Module directory loads as a whole CUE package
 
@@ -16,12 +14,12 @@ The CLI SHALL synthesize a concrete `*ModuleRelease` from a module CUE package d
 - **THEN** all files in the package SHALL be unified into a single CUE instance via `load.Instances(["."], &load.Config{Dir: modulePath})`
 - **AND** no individual file path SHALL be accepted as the synthesis input
 
-#### Scenario: `#ModuleRelease` schema is sourced via the registry
+#### Scenario: `#ModuleInstance` schema is sourced via the registry
 
 - **WHEN** the synthesis builds the wrapper
-- **THEN** `#ModuleRelease` (and its transitive `core/v1alpha1` packages) SHALL be obtained from the OPM catalog by importing `mr "opmodel.dev/core/v1alpha1/modulerelease@v1"` in a small synthetic CUE module
-- **AND** the wrapper SHALL apply `mr.#ModuleRelease` at the top level (the same shape used by real `releases/<env>/<module>/release.cue` files)
-- **AND** the catalog dep in the synthetic `cue.mod/module.cue` SHALL be `opmodel.dev/core/v1alpha1@v1` (whole module, matching the pin shape used by real release modfiles)
+- **THEN** `#ModuleInstance` (and its transitive `core/v1alpha1` packages) SHALL be obtained from the OPM catalog by importing `mr "opmodel.dev/core/v1alpha1/modulerelease@v1"` in a small synthetic CUE module
+- **AND** the wrapper SHALL apply `mr.#ModuleInstance` at the top level (the same shape used by real `releases/<env>/<module>/instance.cue` files)
+- **AND** the catalog dep in the synthetic `cue.mod/module.cue` SHALL be `opmodel.dev/core/v1alpha1@v1` (whole module, matching the pin shape used by real instance modfiles)
 - **AND** the catalog dep SHALL be resolved through CUE's standard registry/cache machinery (`CUE_REGISTRY` env + `~/.cache/cuelang/mod`)
 - **AND** the synthesis SHALL NOT require the user's module to declare `opmodel.dev/core/v1alpha1/modulerelease@v1` as a dependency
 - **AND** the synthesis SHALL NOT carry an embedded copy of the catalog schemas in the CLI binary
@@ -51,7 +49,7 @@ The synthesis SHALL select values to fill the module's `#config` from the same s
 
 - **WHEN** the user invokes synthesis with one or more `-f` files
 - **THEN** those files SHALL be loaded via `loader.LoadValuesFile` and unified in declaration order
-- **AND** the resulting value SHALL be passed to `LoadModuleReleaseFromValue` as the values to fill into `#config`
+- **AND** the resulting value SHALL be passed to `LoadModuleInstanceFromValue` as the values to fill into `#config`
 
 #### Scenario: `debugValues` fallback
 
@@ -63,9 +61,9 @@ The synthesis SHALL select values to fill the module's `#config` from the same s
 - **WHEN** the user invokes synthesis with no `-f` flag and the module does not define `debugValues`
 - **THEN** the CLI SHALL return an actionable error stating that the module must define `debugValues` or values must be supplied with `-f`
 
-### Requirement: Synthetic release metadata defaults
+### Requirement: Synthetic instance metadata defaults
 
-The synthesis SHALL produce a `metadata.name` and `metadata.namespace` for the synthetic `#ModuleRelease` even when the user has not supplied them.
+The synthesis SHALL produce a `metadata.name` and `metadata.namespace` for the synthetic `#ModuleInstance` even when the user has not supplied them.
 
 #### Scenario: Default name derived from module metadata
 
@@ -98,16 +96,16 @@ The synthesis SHALL require the user's module to declare `opmodel.dev/core/v1alp
 
 ### Requirement: Output banner distinguishes synthetic builds
 
-The render output for a synthetic-release build SHALL be visually distinguishable from a real release-file build.
+The render output for a synthetic-instance build SHALL be visually distinguishable from a real instance-file build.
 
 #### Scenario: Banner printed before render output
 
 - **WHEN** synthesis runs and proceeds to render
-- **THEN** the CLI SHALL print a banner naming the synthetic release and the source module before the render output (e.g., `Building synthetic release "<name>" for module "<module.metadata.name>"`)
+- **THEN** the CLI SHALL print a banner naming the synthetic instance and the source module before the render output (e.g., `Building synthetic instance "<name>" for module "<module.metadata.name>"`)
 
 ### Requirement: Bundle release synthesis is not supported
 
-The synthesis SHALL only produce `#ModuleRelease` values. Bundle directories or bundle-shaped inputs SHALL be rejected with a clear error.
+The synthesis SHALL only produce `#ModuleInstance` values. Bundle directories or bundle-shaped inputs SHALL be rejected with a clear error.
 
 #### Scenario: Bundle directory rejected
 

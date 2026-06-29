@@ -4,26 +4,15 @@ Defines how `opm mod list` discovers deployed releases from persisted release in
 
 ## Requirements
 
-### Requirement: List command discovers releases via persisted ownership inventory
+### Requirement: List command discovers instances via persisted ownership inventory
 
-The `opm mod list` command SHALL discover all deployed module releases by listing persisted release inventory records in the target namespace. It SHALL use the `ListInventories` function from the inventory package. It MUST NOT require module source, re-rendering, knowledge of specific release names, or inventory change-history fields to identify the current owned resource set for a release.
+The `opm mod list` command SHALL discover all deployed module instances by listing persisted instance inventory records in the target namespace. It SHALL use the `ListInventories` function from the inventory package. It MUST NOT require module source, re-rendering, knowledge of specific instance names, or inventory change-history fields to identify the current owned resource set for an instance. <!-- Was: "discovers releases", "release inventory records", "release names" (0002 D9) -->
 
-#### Scenario: List releases in a namespace
+#### Scenario: List discovers via ListInventories
 
 - **WHEN** the user runs `opm mod list -n production`
-- **AND** 3 persisted release inventory records exist in the `production` namespace
-- **THEN** the command SHALL display all 3 releases
-
-#### Scenario: No releases found
-
-- **WHEN** the user runs `opm mod list -n empty-namespace`
-- **AND** no persisted release inventory records exist in that namespace
-- **THEN** the command SHALL print `No releases found in namespace "empty-namespace"` and exit with code 0
-
-#### Scenario: List works with ownership-only inventory
-
-- **WHEN** the user runs `opm mod list` in a namespace containing releases with ownership-only inventory
-- **THEN** the command SHALL still discover those releases and evaluate their health from the tracked resource set
+- **THEN** the command SHALL list deployed module instances via `ListInventories` for `production`
+- **AND** SHALL NOT require module source or re-rendering
 
 ### Requirement: List command supports all-namespaces flag
 
@@ -163,19 +152,10 @@ The command SHALL evaluate release health concurrently using a bounded worker po
 
 ### Requirement: List metadata extraction does not depend on inventory change history
 
-The command SHALL extract display metadata from each persisted release inventory record: release name from `releaseMetadata.name`, module name from `moduleMetadata.name`, version from `moduleMetadata.version`, release ID from `releaseMetadata.uuid`, last applied time from `releaseMetadata.lastTransitionTime`, and age computed from `lastTransitionTime`. Owner display metadata SHALL come from the top-level `createdBy` field, defaulting to `cli` when that field is omitted for legacy inventories. The command SHALL NOT require inventory change-history metadata such as latest change source version, raw values, or per-change timestamps.
+The command SHALL extract display metadata from each persisted instance inventory record: instance name from `instanceMetadata.name`, module name from `moduleMetadata.name`, version from `moduleMetadata.version`, instance ID from `instanceMetadata.uuid`, last applied time from `instanceMetadata.lastTransitionTime`, and age computed from `lastTransitionTime`. Owner display metadata SHALL come from the top-level `createdBy` field, defaulting to `cli` when that field is omitted for legacy inventories. The command SHALL NOT require inventory change-history metadata such as latest change source version, raw values, or per-change timestamps. <!-- Was: release inventory record, releaseMetadata (0002 D8/D9) -->
 
-#### Scenario: List remains functional with ownership-only inventory
+#### Scenario: Display metadata sourced from persisted inventory
 
-- **WHEN** a release has ownership-only inventory and no latest change entry
-- **THEN** `opm mod list` SHALL still be able to display the release and compute health from tracked resources
-
-#### Scenario: List reads deployed module version from module metadata
-
-- **WHEN** a persisted release inventory record includes `moduleMetadata.version`
-- **THEN** the VERSION column SHALL display that value
-
-#### Scenario: No version recorded
-
-- **WHEN** a persisted release inventory record omits `moduleMetadata.version`
-- **THEN** the VERSION column SHALL display `-`
+- **WHEN** the user runs `opm mod list -n production`
+- **AND** a persisted instance inventory record exists
+- **THEN** each row SHALL source instance name from `instanceMetadata.name`, module name/version from `moduleMetadata`, and owner from top-level `createdBy` (defaulting to `cli` for legacy inventories)

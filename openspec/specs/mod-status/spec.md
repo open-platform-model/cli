@@ -6,32 +6,19 @@ Defines how `opm mod status` discovers tracked resources from persisted release 
 
 ### Requirement: Status discovers resources via ownership inventory
 
-The `opm mod status` command SHALL read the persisted release inventory record for the release to discover its tracked resources. If `--release-id` is provided, it SHALL use `inventory.GetInventory` (direct GET by name, with UUID label fallback). If only `--release-name` is provided, it SHALL use `inventory.FindInventoryByReleaseName` (inventory-record lookup by release-name label). Once the inventory is found, it SHALL perform one targeted GET per tracked entry via `inventory.DiscoverResourcesFromInventory`. It MUST NOT require module source or re-rendering. It MUST NOT use a cluster-wide label-scan to discover workload resources.
+The `opm mod status` command SHALL read the persisted instance inventory record for the instance to discover its tracked resources. If `--instance-id` is provided, it SHALL use `inventory.GetInventory` (direct GET by name, with UUID label fallback). If only `--instance-name` is provided, it SHALL use `inventory.FindInventoryByInstanceName` (inventory-record lookup by instance-name label). Once the inventory is found, it SHALL perform one targeted GET per tracked entry via `inventory.DiscoverResourcesFromInventory`. It MUST NOT require module source or re-rendering. It MUST NOT use a cluster-wide label-scan to discover workload resources. <!-- Was: release inventory record, --release-id/--instance-name (0002 D8/D-X4.2) -->
 
-#### Scenario: Status shows deployed resources via ownership inventory (release-name path)
+#### Scenario: Discover by instance ID
 
-- **WHEN** the user runs `opm mod status --release-name my-app -n production`
-- **AND** a persisted release inventory record exists labeled `module-release.opmodel.dev/name=my-app`
-- **THEN** the command SHALL fetch each tracked resource via targeted GET
-- **AND** only resources explicitly tracked in the ownership inventory SHALL appear in the output
+- **WHEN** the user runs `opm mod status --instance-id <uuid> -n production`
+- **THEN** the command SHALL resolve the instance inventory record via `inventory.GetInventory`
+- **AND** SHALL perform one targeted GET per tracked entry
 
-#### Scenario: Status shows deployed resources via ownership inventory (release-id path)
+#### Scenario: Discover by instance name
 
-- **WHEN** the user runs `opm mod status --release-id <uuid> -n production`
-- **AND** a persisted release inventory record exists with that UUID
-- **THEN** the command SHALL fetch each tracked resource via targeted GET
-
-#### Scenario: Release not found
-
-- **WHEN** the user runs `opm mod status --release-name my-app -n production`
-- **AND** no persisted release inventory record exists for that release name in that namespace
-- **THEN** the command SHALL exit with error: `"release 'my-app' not found in namespace 'production'"`
-
-#### Scenario: Kubernetes-generated children not shown
-
-- **WHEN** a release includes a Service that caused Kubernetes to create Endpoints and EndpointSlice resources
-- **AND** those child resources were not tracked by the inventory
-- **THEN** `opm mod status` SHALL NOT include Endpoints or EndpointSlice in the output
+- **WHEN** the user runs `opm mod status --instance-name my-app -n production`
+- **THEN** the command SHALL resolve the instance inventory record by instance-name label
+- **AND** SHALL NOT require module source or re-rendering
 
 ### Requirement: Status evaluates health per resource category
 
@@ -75,7 +62,7 @@ The `--output`/`-o` flag SHALL accept `wide` as a valid value in addition to `ta
 
 #### Scenario: Default table output includes component column
 
-- **WHEN** the user runs `opm mod status --release-name my-app -n production` without `--output`
+- **WHEN** the user runs `opm mod status --instance-name my-app -n production` without `--output`
 - **THEN** the output SHALL be a formatted table with KIND, NAME, COMPONENT, STATUS, and AGE columns
 - **AND** the COMPONENT column SHALL show the component name from the inventory entry for each resource
 
@@ -86,45 +73,18 @@ The `--output`/`-o` flag SHALL accept `wide` as a valid value in addition to `ta
 
 #### Scenario: Wide format accepted as output value
 
-- **WHEN** the user runs `opm mod status --release-name my-app -n production -o wide`
+- **WHEN** the user runs `opm mod status --instance-name my-app -n production -o wide`
 - **THEN** the command SHALL render a table with additional columns beyond the default format
 
 ### Requirement: Status header does not depend on inventory change history
 
-The status output SHALL display a metadata header above the resource table containing release name, namespace, aggregate health status, and a resource summary. Module version and ownership metadata SHALL come from the persisted release inventory record (`releaseMetadata`, `moduleMetadata`, `createdBy`) when present. The command SHALL NOT require inventory change-history metadata such as source version, raw values, or per-change timestamps, and it MUST NOT require module source or re-rendering.
+The status output SHALL display a metadata header above the resource table containing instance name, namespace, aggregate health status, and a resource summary. Module version and ownership metadata SHALL come from the persisted instance inventory record (`instanceMetadata`, `moduleMetadata`, `createdBy`) when present. The command SHALL NOT require inventory change-history metadata such as source version, raw values, or per-change timestamps, and it MUST NOT require module source or re-rendering. <!-- Was: release name, release inventory record, releaseMetadata (0002 D8/D9) -->
 
-The header SHALL include:
-- **Release**: from the release name resolved from the persisted release inventory record
-- **Version**: from `moduleMetadata.version` when present (omitted when not recorded)
-- **Namespace**: from the resolved Kubernetes configuration
-- **Status**: the aggregate health status (Ready, NotReady, Unknown)
-- **Resources**: total count with breakdown (e.g., "6 total (6 ready)" or "6 total (5 ready, 1 not ready)")
+#### Scenario: Header sourced from persisted inventory
 
-#### Scenario: Status remains functional with ownership-only inventory
-
-- **WHEN** a release has ownership-only inventory and no history-bearing inventory fields
-- **THEN** `opm mod status` SHALL still be able to enumerate resources and show their health
-
-#### Scenario: Status reads deployed module version from module metadata
-
-- **WHEN** a persisted release inventory record includes `moduleMetadata.version`
-- **THEN** the metadata header SHALL use that field for deployed module version display
-
-#### Scenario: Header shows release metadata
-
-- **WHEN** the user runs `opm mod status --release-name jellyfin -n media`
-- **AND** the persisted release inventory record includes `moduleMetadata.version: "1.2.0"`
-- **THEN** the output SHALL begin with a header showing `Release: jellyfin`, `Version: 1.2.0`, `Namespace: media`, the aggregate status, and a resource count summary
-
-#### Scenario: Header omits version when not recorded in inventory
-
-- **WHEN** the persisted release inventory record omits `moduleMetadata.version`
-- **THEN** the header SHALL omit the Version line entirely
-
-#### Scenario: Header shows not ready count
-
-- **WHEN** 2 out of 6 resources have a health status of NotReady
-- **THEN** the Resources line SHALL display "6 total (4 ready, 2 not ready)"
+- **WHEN** the user runs `opm mod status --instance-name my-app -n production`
+- **AND** a persisted instance inventory record exists
+- **THEN** the header SHALL display the instance name, namespace, aggregate health, and a resource summary sourced from `instanceMetadata`/`moduleMetadata`/`createdBy`
 
 ### Requirement: Status header displays release ownership
 
@@ -213,13 +173,13 @@ The `--namespace`/`-n` flag SHALL be optional for `opm mod status`. When omitted
 
 #### Scenario: Namespace omitted uses config default
 
-- **WHEN** the user runs `opm mod status --release-name my-app` without `-n`
+- **WHEN** the user runs `opm mod status --instance-name my-app` without `-n`
 - **AND** the config file sets `kubernetes: namespace: "production"`
 - **THEN** the command SHALL operate in the `production` namespace
 
 #### Scenario: Namespace omitted uses hardcoded default
 
-- **WHEN** the user runs `opm mod status --release-name my-app` without `-n`
+- **WHEN** the user runs `opm mod status --instance-name my-app` without `-n`
 - **AND** no config or env sets a namespace
 - **THEN** the command SHALL operate in the `default` namespace
 

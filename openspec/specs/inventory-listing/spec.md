@@ -2,19 +2,19 @@
 
 ### Requirement: ListInventories discovers all inventory Secrets in a namespace
 
-The inventory package SHALL provide a `ListInventories` function that discovers all inventory Secrets in a given namespace by listing Secrets matching the label selector `app.kubernetes.io/managed-by=open-platform-model` AND `opmodel.dev/component=inventory`. Each matching Secret SHALL be deserialized via `UnmarshalFromSecret`. The results SHALL be sorted alphabetically by `ReleaseMetadata.ReleaseName`.
+The inventory package SHALL provide a `ListInventories` function that discovers all inventory Secrets in a given namespace by listing Secrets matching the label selector `app.kubernetes.io/managed-by=open-platform-model` AND `opmodel.dev/component=inventory`. Each matching Secret SHALL be deserialized via `UnmarshalFromSecret`. The results SHALL be sorted alphabetically by `InstanceMetadata.InstanceName`.
 
 #### Scenario: List in a specific namespace
 
 - **WHEN** `ListInventories` is called with namespace `"production"`
 - **AND** 3 inventory Secrets exist in `production`
-- **THEN** it SHALL return 3 `*InventorySecret` values sorted by release name
+- **THEN** it SHALL return 3 `*InventorySecret` values sorted by instance name
 
 #### Scenario: List across all namespaces
 
 - **WHEN** `ListInventories` is called with namespace `""` (empty string)
 - **THEN** it SHALL list inventory Secrets across all namespaces
-- **AND** the results SHALL be sorted alphabetically by release name
+- **AND** the results SHALL be sorted alphabetically by instance name
 
 #### Scenario: Empty namespace returns empty slice
 

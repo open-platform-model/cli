@@ -70,16 +70,16 @@ The apply command needs to render a module and deploy to Kubernetes.
 
 ### RenderResult Metadata Structure
 
-#### Requirement: RenderResult carries both module and release metadata
+#### Requirement: RenderResult carries both module and instance metadata
 
 `RenderResult` SHALL carry two distinct metadata fields: `Module ModuleMetadata`
 for canonical module-level identity (name, FQN, version, module UUID) and
-`Release ReleaseMetadata` for release-level identity (release name, namespace,
-release UUID, labels). These correspond to FR-RP-021 in the base spec.
+`Instance InstanceMetadata` for instance-level identity (instance name, namespace,
+instance UUID, labels). These correspond to FR-RP-021 in the base spec.
 
 The `Module` field MUST reflect the canonical module name from
-`#Module.metadata.name`, which may differ from the release name when `--name`
-overrides the default. The `Release` field MUST reflect the deployed release
+`#Module.metadata.name`, which may differ from the instance name when `--name`
+overrides the default. The `Instance` field MUST reflect the deployed instance
 identity (name, namespace, computed UUID).
 
 ##### Scenario: Module metadata populated on RenderResult
@@ -87,34 +87,34 @@ identity (name, namespace, computed UUID).
 - **WHEN** the pipeline produces a `RenderResult`
 - **THEN** `RenderResult.Module` SHALL contain the module's canonical name, FQN, version, UUID (module identity), labels, and components
 
-##### Scenario: Release metadata populated on RenderResult
+##### Scenario: Instance metadata populated on RenderResult
 
 - **WHEN** the pipeline produces a `RenderResult`
-- **THEN** `RenderResult.Release` SHALL contain the release name, namespace, UUID (release identity), labels, and components
+- **THEN** `RenderResult.Instance` SHALL contain the instance name, namespace, UUID (instance identity), labels, and components
 
-##### Scenario: Module-level fields not duplicated on release metadata
+##### Scenario: Module-level fields not duplicated on instance metadata
 
-- **WHEN** a consumer accesses `RenderResult.Release`
-- **THEN** the `ReleaseMetadata` type SHALL NOT contain module-level fields (Version, FQN, ModuleName, module UUID)
+- **WHEN** a consumer accesses `RenderResult.Instance`
+- **THEN** the `InstanceMetadata` type SHALL NOT contain module-level fields (Version, FQN, ModuleName, module UUID)
 
-##### Scenario: Module and release names differ when --name is overridden
+##### Scenario: Module and instance names differ when --name is overridden
 
 - **WHEN** a module with `metadata.name: "my-app"` is rendered with `--name my-app-staging`
 - **THEN** `RenderResult.Module.Name` SHALL equal `"my-app"` (canonical module name)
-- **AND** `RenderResult.Release.Name` SHALL equal `"my-app-staging"` (release name)
+- **AND** `RenderResult.Instance.Name` SHALL equal `"my-app-staging"` (instance name)
 
-##### Scenario: Module UUID and release UUID are distinct
+##### Scenario: Module UUID and instance UUID are distinct
 
 - **WHEN** any module is rendered
 - **THEN** `RenderResult.Module.UUID` SHALL be the module identity UUID (from `metadata.identity`)
-- **AND** `RenderResult.Release.UUID` SHALL be the release UUID (deterministic UUID5 from FQN+name+namespace)
+- **AND** `RenderResult.Instance.UUID` SHALL be the instance UUID (deterministic UUID5 from FQN+name+namespace)
 - **AND** the two UUID values SHALL be different values
 
-##### Scenario: Release identity is preserved after refactor
+##### Scenario: Instance identity is preserved after refactor
 
 - **WHEN** a module is rendered with the same `--name` and `--namespace` flags before and after this change
-- **THEN** `RenderResult.Release.UUID` SHALL be the same value as before
-- **AND** all `module-release.opmodel.dev/*` labels SHALL have the same values
+- **THEN** `RenderResult.Instance.UUID` SHALL be the same value as before
+- **AND** all `module-instance.opmodel.dev/*` labels SHALL have the same values
 
 #### Requirement: ModuleMetadata type definition
 
@@ -130,7 +130,7 @@ The `module.ModuleMetadata` struct SHALL contain the following fields, each with
 
 ##### Scenario: ModuleMetadata populated from CUE evaluation
 
-- **WHEN** a release is built from a module
+- **WHEN** a instance is built from a module
 - **THEN** `ModuleMetadata.Name` SHALL be the canonical module name (from `module.metadata.name`)
 - **AND** `ModuleMetadata.FQN` SHALL be the fully qualified module name
 - **AND** `ModuleMetadata.Version` SHALL be the module semver version
@@ -143,91 +143,91 @@ The `module.ModuleMetadata` struct SHALL contain the following fields, each with
 - **WHEN** `ModuleMetadata` is marshaled to JSON
 - **THEN** all fields SHALL use their defined `json:"..."` tag names
 
-#### Requirement: ReleaseMetadata type definition
+#### Requirement: InstanceMetadata type definition
 
-The `release.ReleaseMetadata` struct SHALL contain the following fields, each with a corresponding `json:"..."` struct tag:
-- `Name string` — release name (from `--name` flag or module name)
+The `instance.InstanceMetadata` struct SHALL contain the following fields, each with a corresponding `json:"..."` struct tag:
+- `Name string` — instance name (from `--name` flag or module name)
 - `Namespace string` — target namespace
-- `UUID string` — release identity UUID (deterministic UUID5 computed from fqn+name+namespace)
-- `Labels map[string]string` — release labels
-- `Annotations map[string]string` — release annotations (may be empty)
-- `Components []string` — component names rendered in this release
+- `UUID string` — instance identity UUID (deterministic UUID5 computed from fqn+name+namespace)
+- `Labels map[string]string` — instance labels
+- `Annotations map[string]string` — instance annotations (may be empty)
+- `Components []string` — component names rendered in this instance
 
-##### Scenario: ReleaseMetadata populated from CUE evaluation
+##### Scenario: InstanceMetadata populated from CUE evaluation
 
-- **WHEN** a release is built from a module
-- **THEN** `ReleaseMetadata.Name` SHALL be the release name (from `--name` or module name)
-- **AND** `ReleaseMetadata.Namespace` SHALL be the target namespace
-- **AND** `ReleaseMetadata.UUID` SHALL be the deterministic release identity UUID
-- **AND** `ReleaseMetadata.Labels` SHALL contain the release labels
-- **AND** `ReleaseMetadata.Components` SHALL list the component names
+- **WHEN** a instance is built from a module
+- **THEN** `InstanceMetadata.Name` SHALL be the instance name (from `--name` or module name)
+- **AND** `InstanceMetadata.Namespace` SHALL be the target namespace
+- **AND** `InstanceMetadata.UUID` SHALL be the deterministic instance identity UUID
+- **AND** `InstanceMetadata.Labels` SHALL contain the instance labels
+- **AND** `InstanceMetadata.Components` SHALL list the component names
 
-##### Scenario: ReleaseMetadata JSON serialization
+##### Scenario: InstanceMetadata JSON serialization
 
-- **WHEN** `ReleaseMetadata` is marshaled to JSON
+- **WHEN** `InstanceMetadata` is marshaled to JSON
 - **THEN** all fields SHALL use their defined `json:"..."` tag names
 
-#### Requirement: TransformerContext uses ModuleMetadata and ReleaseMetadata
+#### Requirement: TransformerContext uses ModuleMetadata and InstanceMetadata
 
-The `TransformerContext` SHALL hold references to both `ModuleMetadata` and `ReleaseMetadata` instead of the former `TransformerModuleReleaseMetadata` type.
+The `TransformerContext` SHALL hold references to both `ModuleMetadata` and `InstanceMetadata` instead of the former `TransformerModuleReleaseMetadata` type.
 
 ##### Scenario: TransformerContext populated from both metadata types
 
-- **WHEN** `NewTransformerContext()` is called with a `*core.ModuleRelease` and `LoadedComponent`
+- **WHEN** `NewTransformerContext()` is called with a `*core.ModuleInstance` and `LoadedComponent`
 - **THEN** the resulting `TransformerContext` SHALL have `ModuleMetadata` populated with module-level fields (Name, FQN, Version, UUID, Labels)
-- **AND** `ReleaseMetadata` populated with release-level fields (Name, Namespace, UUID, Labels)
+- **AND** `InstanceMetadata` populated with instance-level fields (Name, Namespace, UUID, Labels)
 
 ##### Scenario: CUE output map unchanged
 
 - **WHEN** `TransformerContext.ToMap()` is called
 - **THEN** the resulting map SHALL contain a `#moduleReleaseMetadata` key with the same field names as before: `name`, `namespace`, `fqn`, `version`, `identity`, and optionally `labels`
-- **AND** the `identity` value SHALL be the release UUID (from `ReleaseMetadata.UUID`)
-- **AND** the `name` value SHALL be the release name (from `ReleaseMetadata.Name`)
+- **AND** the `identity` value SHALL be the instance UUID (from `InstanceMetadata.UUID`)
+- **AND** the `name` value SHALL be the instance name (from `InstanceMetadata.Name`)
 - **AND** the `fqn` value SHALL be the module FQN (from `ModuleMetadata.FQN`)
 - **AND** the `version` value SHALL be the module version (from `ModuleMetadata.Version`)
 
 #### Requirement: BuiltRelease carries typed metadata directly
 
-`Builder.Build()` SHALL return `*core.ModuleRelease` instead of the build-internal
-`BuiltRelease` type. The `core.ModuleRelease` type SHALL carry the same typed
-metadata fields (`Module ModuleMetadata`, `Metadata *ReleaseMetadata`,
+`Builder.Build()` SHALL return `*core.ModuleInstance` instead of the build-internal
+`BuiltRelease` type. The `core.ModuleInstance` type SHALL carry the same typed
+metadata fields (`Module ModuleMetadata`, `Metadata *InstanceMetadata`,
 `Components map[string]*Component`, `Values cue.Value`). The build-internal
 `BuiltRelease` type SHALL be removed.
 
-`TransformerContext` SHALL read module name from `core.ModuleRelease.Module.Metadata.Name`
-(the canonical module name) rather than from the release name field.
+`TransformerContext` SHALL read module name from `core.ModuleInstance.Module.Metadata.Name`
+(the canonical module name) rather than from the instance name field.
 
 ##### Scenario: Builder populates ModuleMetadata with FQN and version
 
-- **WHEN** `release.Build()` is called on a module that defines `metadata.fqn` and `metadata.version`
-- **THEN** the returned `core.ModuleRelease.Module.FQN` SHALL equal the module's `metadata.fqn` value
-- **AND** `core.ModuleRelease.Module.Version` SHALL equal the module's `metadata.version` value
-- **AND** `core.ModuleRelease.Module.DefaultNamespace` SHALL equal the module's `metadata.defaultNamespace` value
+- **WHEN** `instance.Build()` is called on a module that defines `metadata.fqn` and `metadata.version`
+- **THEN** the returned `core.ModuleInstance.Module.FQN` SHALL equal the module's `metadata.fqn` value
+- **AND** `core.ModuleInstance.Module.Version` SHALL equal the module's `metadata.version` value
+- **AND** `core.ModuleInstance.Module.DefaultNamespace` SHALL equal the module's `metadata.defaultNamespace` value
 
-##### Scenario: Builder populates ReleaseMetadata with release-level fields
+##### Scenario: Builder populates InstanceMetadata with instance-level fields
 
-- **WHEN** `release.Build()` is called with `Name: "my-release"` and `Namespace: "production"`
-- **THEN** `core.ModuleRelease.Metadata.Name` SHALL equal `"my-release"`
-- **AND** `core.ModuleRelease.Metadata.Namespace` SHALL equal `"production"`
-- **AND** `core.ModuleRelease.Metadata.UUID` SHALL be the computed release UUID
+- **WHEN** `instance.Build()` is called with `Name: "my-instance"` and `Namespace: "production"`
+- **THEN** `core.ModuleInstance.Metadata.Name` SHALL equal `"my-instance"`
+- **AND** `core.ModuleInstance.Metadata.Namespace` SHALL equal `"production"`
+- **AND** `core.ModuleInstance.Metadata.UUID` SHALL be the computed instance UUID
 
 ##### Scenario: TransformerContext uses canonical module name
 
 - **WHEN** a module with `metadata.name: "my-app"` is rendered with `--name my-app-staging`
 - **THEN** `TransformerContext.ModuleMetadata.Name` SHALL equal `"my-app"` (canonical module name)
-- **AND** `TransformerContext.ReleaseMetadata.Name` SHALL equal `"my-app-staging"` (release name)
+- **AND** `TransformerContext.InstanceMetadata.Name` SHALL equal `"my-app-staging"` (instance name)
 
-#### Requirement: Pipeline BUILD phase delegates validation to ModuleRelease receiver methods
+#### Requirement: Pipeline BUILD phase delegates validation to ModuleInstance receiver methods
 
 The `pipeline.Render()` BUILD phase SHALL call `rel.ValidateValues()` and then
-`rel.Validate()` on the returned `*core.ModuleRelease` rather than calling
+`rel.Validate()` on the returned `*core.ModuleInstance` rather than calling
 standalone validation functions directly. The pipeline SHALL NOT call validation
 functions that bypass these receiver methods.
 
 ##### Scenario: BUILD phase calls ValidateValues before Validate
 
 - **WHEN** `pipeline.Render()` executes the BUILD phase
-- **THEN** `rel.ValidateValues()` SHALL be called immediately after `release.Build()` returns
+- **THEN** `rel.ValidateValues()` SHALL be called immediately after `instance.Build()` returns
 - **AND** `rel.Validate()` SHALL be called immediately after `rel.ValidateValues()` returns `nil`
 
 ##### Scenario: Validation errors surfaced identically to previous behavior
@@ -235,21 +235,21 @@ functions that bypass these receiver methods.
 - **WHEN** user-supplied values fail schema validation after this change
 - **THEN** the error returned from `pipeline.Render()` SHALL be the same type and contain the same message as before this change
 
-##### Scenario: Release output is identical before and after this change
+##### Scenario: Instance output is identical before and after this change
 
 - **WHEN** a module that rendered successfully before this change is rendered after
 - **THEN** `RenderResult.Resources` SHALL contain the same resources with identical content
-- **AND** `RenderResult.Module` and `RenderResult.Release` SHALL contain the same metadata values
+- **AND** `RenderResult.Module` and `RenderResult.Instance` SHALL contain the same metadata values
 - **AND** `RenderResult.Errors` and `RenderResult.Warnings` SHALL be identical
 
 #### Requirement: Render workflow execution
 
-The CLI MUST share the same execution tail for release-file rendering via `renderPreparedModuleRelease`.
+The CLI MUST share the same execution tail for instance-file rendering via `renderPreparedModuleInstance`.
 
 ##### Scenario: Shared render tail execution
 
-- **WHEN** the `FromReleaseFile` entrypoint is executed
-- **THEN** it MUST call `renderPreparedModuleRelease` with a fully resolved `*provider.Provider` and namespace override to process the release and build the workflow `Result`
+- **WHEN** the `FromInstanceFile` entrypoint is executed
+- **THEN** it MUST call `renderPreparedModuleInstance` with a fully resolved `*provider.Provider` and namespace override to process the instance and build the workflow `Result`
 
 ### Resource
 
@@ -294,11 +294,11 @@ The render pipeline SHALL produce byte-identical `RenderResult` output after the
 - **AND** `RenderResult.Module` SHALL contain the same metadata values
 - **AND** `RenderResult.Errors` and `RenderResult.Warnings` SHALL be identical
 
-##### Scenario: Release identity is preserved
+##### Scenario: Instance identity is preserved
 
 - **WHEN** a module is rendered with the same `--name` and `--namespace` flags
-- **THEN** `RenderResult.Release.UUID` SHALL be the same UUID as before the refactor
-- **AND** all `module-release.opmodel.dev/*` labels SHALL have the same values
+- **THEN** `RenderResult.Instance.UUID` SHALL be the same UUID as before the refactor
+- **AND** all `module-instance.opmodel.dev/*` labels SHALL have the same values
 
 ##### Scenario: Matching phase produces identical results via Provider.Match
 
@@ -343,7 +343,7 @@ these packages in order:
 
 1. `loader.Load()` — PREPARATION → `*core.Module`
 2. `provider.Load()` — PROVIDER LOAD → loaded provider + transformers
-3. `builder.Build()` — BUILD → `*core.ModuleRelease`
+3. `builder.Build()` — BUILD → `*core.ModuleInstance`
 4. `coreProvider.Match(rel.Components)` — MATCHING → `*core.TransformerMatchPlan`
 5. `matchPlan.Execute(ctx, rel)` — GENERATE → `[]*core.Resource` + `[]error`
 
@@ -357,7 +357,7 @@ phase SHALL be called. Only `matchPlan.Execute()` errors are render errors
 - **THEN** `loader.Load()` is called first and its result passed to subsequent phases
 - **AND** `builder.Build()` is not called until `loader.Load()` succeeds
 - **AND** the MATCHING phase is not called until `builder.Build()` succeeds
-- **AND** `matchPlan.Execute(ctx, rel)` is called last with the built release
+- **AND** `matchPlan.Execute(ctx, rel)` is called last with the built instance
 
 ##### Scenario: Phase failure is immediately fatal
 
@@ -446,11 +446,11 @@ import `internal/legacy` to construct a pipeline.
 ## Component Annotation Propagation
 
 ### Requirement: LoadedComponent carries annotations
-The `LoadedComponent` struct SHALL include an `Annotations map[string]string` field that stores component-level annotations extracted during release building.
+The `LoadedComponent` struct SHALL include an `Annotations map[string]string` field that stores component-level annotations extracted during instance building.
 
 #### Scenario: Annotations field initialized for all components
 
-- **WHEN** the release builder creates a `LoadedComponent`
+- **WHEN** the instance builder creates a `LoadedComponent`
 - **THEN** the `Annotations` field SHALL be initialized to an empty map (not nil), regardless of whether the component has annotations
 
 ### Requirement: TransformerComponentMetadata carries annotations
@@ -505,14 +505,14 @@ are available at the new import path with identical signatures.
 **Migration**: Replace `pipeline.NewPipeline().Render()` calls with `engine.NewModuleRenderer().Render()` or `engine.NewBundleRenderer().Render()`.
 
 ### Requirement: RenderOptions struct
-**Reason**: Loading is no longer driven by the pipeline — the loader handles release loading separately, and the engine receives a pre-loaded `*ModuleRelease`.
+**Reason**: Loading is no longer driven by the pipeline — the loader handles instance loading separately, and the engine receives a pre-loaded `*ModuleInstance`.
 
-**Migration**: Callers load the release via `pkg/loader/` and pass it to the engine. CLI flags and values resolution stay in `internal/cmdutil/`.
+**Migration**: Callers load the instance via `pkg/loader/` and pass it to the engine. CLI flags and values resolution stay in `internal/cmdutil/`.
 
 ### Requirement: Five-phase pipeline orchestration
 **Reason**: The five phases (preparation, provider load, build, matching, generate) are replaced by two distinct steps: load (via `pkg/loader/`) and render (via `pkg/engine/`). Orchestration moves to `internal/cmdutil/render.go`.
 
-**Migration**: `cmdutil.RenderRelease()` calls `loader.LoadReleasePackage()`, `loader.LoadModuleReleaseFromValue()`, then `engine.ModuleRenderer.Render()`.
+**Migration**: `cmdutil.RenderRelease()` calls `loader.LoadInstancePackage()`, `loader.LoadModuleInstanceFromValue()`, then `engine.ModuleRenderer.Render()`.
 
 ### Requirement: RenderResult with Unstructured resources
 **Reason**: `RenderResult.Resources` changes from `[]*core.Resource` wrapping `*unstructured.Unstructured` to `[]*core.Resource` wrapping `cue.Value`. The new `Resource` has conversion methods.

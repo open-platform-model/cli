@@ -42,38 +42,38 @@ The `K8sFlags` struct SHALL provide an `AddTo(*cobra.Command)` method that regis
 - **THEN** `K8sFlags.Kubeconfig` SHALL equal `"/path/to/config"`
 - **AND** `K8sFlags.Context` SHALL equal `"staging"`
 
-### Requirement: ReleaseSelectorFlags struct registers and validates release identification flags
+### Requirement: InstanceSelectorFlags struct registers and validates instance identification flags
 
-The `ReleaseSelectorFlags` struct SHALL provide an `AddTo(*cobra.Command)` method that registers `--release-name` (string), `--release-id` (string), and `--namespace`/`-n` (string). It SHALL also provide a `Validate()` method that enforces mutual exclusivity between `--release-name` and `--release-id`, and requires exactly one to be present.
+The `InstanceSelectorFlags` struct SHALL provide an `AddTo(*cobra.Command)` method that registers `--instance-name` (string), `--instance-id` (string), and `--namespace`/`-n` (string). It SHALL also provide a `Validate()` method that enforces mutual exclusivity between `--instance-name` and `--instance-id`, and requires exactly one to be present. <!-- Was: ReleaseSelectorFlags, --release-name/--release-id (0002 D10/D-X4.2) -->
 
-#### Scenario: Validate rejects both release-name and release-id
+#### Scenario: Both selectors set is rejected
 
-- **WHEN** `ReleaseSelectorFlags.Validate()` is called with both `ReleaseName` and `ReleaseID` set to non-empty strings
-- **THEN** it SHALL return an error with message containing `"mutually exclusive"`
+- **WHEN** `InstanceSelectorFlags.Validate()` is called with both `InstanceName` and `InstanceID` set to non-empty strings
+- **THEN** it SHALL return an error with message containing `"--instance-name and --instance-id are mutually exclusive"`
 
-#### Scenario: Validate rejects neither release-name nor release-id
+#### Scenario: Neither selector set is rejected
 
-- **WHEN** `ReleaseSelectorFlags.Validate()` is called with both `ReleaseName` and `ReleaseID` set to empty strings
-- **THEN** it SHALL return an error with message containing `"either --release-name or --release-id is required"`
+- **WHEN** `InstanceSelectorFlags.Validate()` is called with both `InstanceName` and `InstanceID` set to empty strings
+- **THEN** it SHALL return an error with message containing `"either --instance-name or --instance-id is required"`
 
-#### Scenario: Validate accepts exactly one of release-name or release-id
+#### Scenario: Exactly one selector set is accepted
 
-- **WHEN** `ReleaseSelectorFlags.Validate()` is called with `ReleaseName` set to `"my-app"` and `ReleaseID` set to `""`
-- **THEN** it SHALL return `nil`
+- **WHEN** `InstanceSelectorFlags.Validate()` is called with `InstanceName` set to `"my-app"` and `InstanceID` set to `""`
+- **THEN** it SHALL return no error
 
-### Requirement: ReleaseSelectorFlags provides a LogName helper
+### Requirement: InstanceSelectorFlags provides a LogName helper
 
-The `ReleaseSelectorFlags` struct SHALL provide a `LogName()` method that returns the release name if set, or a truncated release ID prefix (first 8 characters) formatted as `"release:<prefix>"` otherwise. This is used for scoped logger creation.
+The `InstanceSelectorFlags` struct SHALL provide a `LogName()` method that returns the instance name if set, or a truncated instance ID prefix (first 8 characters) formatted as `"instance:<prefix>"` otherwise. This is used for scoped logger creation. <!-- Was: ReleaseSelectorFlags.LogName, "release:<prefix>" (0002 D10) -->
 
-#### Scenario: LogName returns release name when set
+#### Scenario: LogName prefers instance name
 
-- **WHEN** `LogName()` is called with `ReleaseName` set to `"my-app"`
+- **WHEN** `LogName()` is called with `InstanceName` set to `"my-app"`
 - **THEN** it SHALL return `"my-app"`
 
-#### Scenario: LogName returns truncated release ID when name is empty
+#### Scenario: LogName falls back to truncated instance ID
 
-- **WHEN** `LogName()` is called with `ReleaseName` set to `""` and `ReleaseID` set to `"a1b2c3d4-e5f6-7890-abcd"`
-- **THEN** it SHALL return `"release:a1b2c3d4"`
+- **WHEN** `LogName()` is called with `InstanceName` set to `""` and `InstanceID` set to `"a1b2c3d4-e5f6-7890-abcd"`
+- **THEN** it SHALL return `"instance:a1b2c3d4"`
 
 ### Requirement: RenderRelease orchestration
 
@@ -203,78 +203,33 @@ The `PrintRenderErrors` function SHALL accept a slice of errors and print each o
 
 ### Requirement: Refactored mod commands preserve exact behavioral equivalence
 
-After refactoring to use `cmdutil`, each mod command SHALL produce identical output, exit codes, error messages, and flag behavior compared to the pre-refactoring implementation. No user-observable change SHALL occur.
+The `mod` subcommands that consume `InstanceSelectorFlags` SHALL preserve the same observable behavior after the rename: identical resolution, output, and exit codes for equivalent inputs, with the flag names updated to `--instance-name`/`--instance-id`. <!-- Was: --release-name/--release-id (0002 D-X4.2) -->
 
-#### Scenario: mod vet validation output is identical after refactoring
+#### Scenario: mod delete behavior preserved under renamed flags
 
-- **WHEN** `opm mod vet` is run on a valid module before and after the refactoring
-- **THEN** the per-resource validation lines and summary SHALL be identical
-- **AND** the exit code SHALL be 0 in both cases
+- **WHEN** `opm mod delete --instance-name my-app -n production` is run
+- **THEN** it SHALL produce the same resolution and deletion behavior the pre-rename `--release-name` form produced
 
-#### Scenario: mod delete confirmation prompt is identical after refactoring
+#### Scenario: mod status behavior preserved under renamed flags
 
-- **WHEN** `opm mod delete --release-name my-app -n production` is run before and after the refactoring
-- **THEN** the confirmation prompt text SHALL be identical
-
-#### Scenario: mod status table output is identical after refactoring
-
-- **WHEN** `opm mod status --release-name my-app -n production` is run before and after the refactoring
-- **THEN** the table output format SHALL be identical
+- **WHEN** `opm mod status --instance-name my-app -n production` is run
+- **THEN** it SHALL produce the same status output the pre-rename `--release-name` form produced
 
 ### Requirement: Shared inventory resolution helper in cmdutil
 
-The `cmdutil` package SHALL provide a `ResolveInventory` function that encapsulates
-the full inventory lookup-and-discover flow used by `mod delete` and `mod status`.
+`cmdutil.ResolveInventory` SHALL resolve an inventory record from an `*InstanceSelectorFlags` (carrying instance name and/or instance ID). If `flags.InstanceID` is non-empty, it SHALL resolve via `inventory.GetInventory` using the instance ID; if `flags.InstanceName` is also set, that name SHALL be used as the display name. If only `flags.InstanceName` is non-empty, it SHALL resolve via `inventory.FindInventoryByInstanceName`. When no inventory Secret is found, it SHALL return an `InstanceNotFoundError`. <!-- Was: *ReleaseSelectorFlags, ReleaseID/ReleaseName, ReleaseNotFoundError (0002 D10) -->
 
-The function SHALL accept:
-- A context
-- A Kubernetes client
-- A `*ReleaseSelectorFlags` (carrying release name and/or release ID)
-- A namespace string
-- A structured logger scoped to the release
+#### Scenario: Resolve by instance name
 
-The function SHALL return the resolved `*inventory.InventorySecret`, the discovered
-live `[]*core.Resource`, and an error.
+- **WHEN** `InstanceSelectorFlags.InstanceName` is set and the inventory Secret exists
+- **THEN** `ResolveInventory` SHALL return the matching inventory record
 
-The function MUST implement the following resolution logic:
-- If `rsf.ReleaseID` is non-empty: resolve via `inventory.GetInventory` using the
-  release ID. If `rsf.ReleaseName` is also set, use it as the display name; otherwise
-  use the release ID as the display name.
-- If `rsf.ReleaseName` is non-empty (and no ReleaseID): resolve via
-  `inventory.FindInventoryByReleaseName`.
-- If inventory lookup fails: log the error and return an `*ExitError` with code
-  `ExitGeneralError`.
-- If the inventory Secret is not found: log the error and return an `*ExitError`
-  with code `ExitNotFound`.
-- After resolving the Secret: call `inventory.DiscoverResourcesFromInventory` to fetch
-  live resources. If this fails: log the error and return an `*ExitError` with code
-  `ExitGeneralError`.
+#### Scenario: Resolve by instance ID
 
-#### Scenario: Resolution by release name succeeds
+- **WHEN** `InstanceSelectorFlags.InstanceID` is set and the inventory Secret exists
+- **THEN** `ResolveInventory` SHALL return the matching inventory record
 
-- **WHEN** `ReleaseSelectorFlags.ReleaseName` is set and the inventory Secret exists
-- **THEN** `ResolveInventory` returns the Secret and its discovered live resources with no error
+#### Scenario: Instance not found
 
-#### Scenario: Resolution by release ID succeeds
-
-- **WHEN** `ReleaseSelectorFlags.ReleaseID` is set and the inventory Secret exists
-- **THEN** `ResolveInventory` returns the Secret and its discovered live resources with no error
-
-#### Scenario: Release not found
-
-- **WHEN** the inventory Secret does not exist
-- **THEN** `ResolveInventory` returns an `*ExitError` with code `ExitNotFound`
-
-#### Scenario: Kubernetes error during inventory lookup
-
-- **WHEN** `inventory.GetInventory` or `inventory.FindInventoryByReleaseName` returns
-  a non-nil error
-- **THEN** `ResolveInventory` logs the error and returns an `*ExitError` with code
-  `ExitGeneralError`
-
-#### Scenario: Resource discovery fails
-
-- **WHEN** the inventory Secret is found but `DiscoverResourcesFromInventory` returns
-  an error
-- **THEN** `ResolveInventory` logs the error and returns an `*ExitError` with code
-  `ExitGeneralError`
+- **WHEN** the underlying inventory lookup returns no Secret
+- **THEN** `ResolveInventory` SHALL return an `InstanceNotFoundError`

@@ -36,21 +36,6 @@ The `pkg/render` package SHALL export a `Module` struct that renders a `*module.
 - **WHEN** the provided `context.Context` is cancelled during transform execution
 - **THEN** the renderer stops executing remaining pairs and returns the context error alongside any resources produced so far
 
-### Requirement: Bundle renderer renders a BundleRelease into resources
-The `pkg/render` package SHALL export a `Bundle` struct that renders a `*bundle.Release` into `[]*core.Resource` by iterating child module releases and delegating to `Module.Execute`.
-
-#### Scenario: Successful bundle render
-- **WHEN** `render.Bundle.Execute(ctx, bundleRelease)` is called with a valid bundle
-- **THEN** it returns a `*render.BundleResult` containing aggregated `[]*core.Resource` from all child module renders
-
-#### Scenario: Bundle render collects all release errors (fail-slow)
-- **WHEN** one or more module releases in the bundle fail to render
-- **THEN** the Bundle continues rendering remaining releases, collects all errors, and returns them alongside any successfully rendered resources
-
-#### Scenario: Bundle releases are processed in deterministic order
-- **WHEN** a BundleRelease has multiple module releases
-- **THEN** the Bundle processes them in sorted key order (alphabetical by instance name) to ensure deterministic output
-
 ### Requirement: Transform execution injects context and component
 The engine SHALL execute each matched pair by: (1) looking up `#transform` from the provider, (2) filling `#component` with the finalized data component, (3) filling `#context` with release and component metadata, and (4) decoding the `output` field into resources.
 
@@ -74,14 +59,6 @@ The internal `executeTransforms`, `executePair`, and `injectContext` functions S
 - **WHEN** `injectContext` builds `#moduleReleaseMetadata` for the transformer context
 - **THEN** it SHALL read `rel.Metadata.Name`, `rel.Metadata.Namespace`, `rel.Metadata.UUID`, `rel.Metadata.Labels`, `rel.Metadata.Annotations`
 - **AND** it SHALL read `rel.Module.Metadata.FQN`, `rel.Module.Metadata.Version`
-
-### Requirement: Bundle renderer uses Release map
-The `Bundle.Execute` method SHALL iterate `bundle.Release.Releases` which contains `*module.Release` entries. It SHALL call `MatchComponents()` on each `Release` for matching.
-
-#### Scenario: Bundle renderer iterates releases
-- **WHEN** `render.Bundle.Execute(ctx, bundleRelease)` is called
-- **THEN** it SHALL iterate `bundleRelease.Releases` which are `*module.Release`
-- **AND** it SHALL call `modRel.MatchComponents()` on each entry
 
 ### Requirement: No CLI logging framework dependency
 The `pkg/render` package SHALL NOT import `charmbracelet/log` or any other CLI-specific logging framework. All diagnostic information SHALL be surfaced through return values (Warnings slices, error types).

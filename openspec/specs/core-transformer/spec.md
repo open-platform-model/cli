@@ -37,7 +37,7 @@ Defines transformer types, matching structures, context, execution logic, and wa
 `TransformerMatchPlan.Execute()` SHALL produce identical resources and errors for identical inputs after the move.
 
 #### Scenario: Matched transformers produce same resources
-- **WHEN** `Execute()` is called with a valid match plan and `ModuleRelease`
+- **WHEN** `Execute()` is called with a valid match plan and `ModuleInstance`
 - **THEN** the returned `[]*core.Resource` slice is identical to what the previous implementation produced
 
 #### Scenario: Context cancellation is respected
