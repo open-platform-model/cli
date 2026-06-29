@@ -65,15 +65,15 @@ func TestCollectResourceList(t *testing.T) {
 	v := ctx.CompileString(expr)
 	require.NoError(t, v.Err())
 
-	resources, err := collectResourceList(v, "my-release", "my-comp", "tf/kubernetes")
+	resources, err := collectResourceList(v, "my-instance", "my-comp", "tf/kubernetes")
 	require.NoError(t, err)
 	require.Len(t, resources, 2)
 
-	assert.Equal(t, "my-release", resources[0].Release)
+	assert.Equal(t, "my-instance", resources[0].Instance)
 	assert.Equal(t, "my-comp", resources[0].Component)
 	assert.Equal(t, "tf/kubernetes", resources[0].Transformer)
 
-	assert.Equal(t, "my-release", resources[1].Release)
+	assert.Equal(t, "my-instance", resources[1].Instance)
 	assert.Equal(t, "ConfigMap", resources[0].Kind())
 	assert.Equal(t, "Secret", resources[1].Kind())
 }
@@ -100,12 +100,12 @@ func TestCollectResourceMap(t *testing.T) {
 	v := ctx.CompileString(expr)
 	require.NoError(t, v.Err())
 
-	resources, err := collectResourceMap(v, "my-release", "my-comp", "tf/kubernetes")
+	resources, err := collectResourceMap(v, "my-instance", "my-comp", "tf/kubernetes")
 	require.NoError(t, err)
 	require.Len(t, resources, 2)
 
 	for _, r := range resources {
-		assert.Equal(t, "my-release", r.Release)
+		assert.Equal(t, "my-instance", r.Instance)
 		assert.Equal(t, "my-comp", r.Component)
 		assert.Equal(t, "tf/kubernetes", r.Transformer)
 	}

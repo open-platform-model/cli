@@ -3,14 +3,14 @@
 // Integration test for opm rel list — inventory listing and health evaluation.
 //
 // Tests covered:
-//   - Scenario 1: List in specific namespace returns correct releases
-//   - Scenario 2: List all namespaces returns releases from all test namespaces
+//   - Scenario 1: List in specific namespace returns correct instances
+//   - Scenario 2: List all namespaces returns instances from all test namespaces
 //   - Scenario 3: List in empty namespace returns zero results
 //   - Scenario 4: Health status accuracy — missing resource shows NotReady
-//   - Scenario 5: Metadata correctness — module name, version, release ID
+//   - Scenario 5: Metadata correctness — module name, version, instance ID
 //
 // Requires a running kind cluster at context "kind-opm-dev".
-// Run with: go run tests/integration/rel-list/main.go
+// Run with: go run tests/integration/inst-list/main.go
 package main
 
 import (
@@ -36,13 +36,13 @@ const (
 	nsB     = "opm-list-test-b"
 	nsEmpty = "opm-list-test-empty"
 
-	releaseOne   = "app-one"
-	releaseTwo   = "app-two"
-	releaseThree = "app-three"
+	instanceOne   = "app-one"
+	instanceTwo   = "app-two"
+	instanceThree = "app-three"
 
-	releaseIDOne   = "11111111-aaaa-bbbb-cccc-000000000001"
-	releaseIDTwo   = "22222222-aaaa-bbbb-cccc-000000000002"
-	releaseIDThree = "33333333-aaaa-bbbb-cccc-000000000003"
+	instanceIDOne   = "11111111-aaaa-bbbb-cccc-000000000001"
+	instanceIDTwo   = "22222222-aaaa-bbbb-cccc-000000000002"
+	instanceIDThree = "33333333-aaaa-bbbb-cccc-000000000003"
 
 	moduleName    = "test-module"
 	moduleVersion = "1.0.0"
@@ -54,7 +54,7 @@ var serviceGVR = schema.GroupVersionResource{Group: "", Version: "v1", Resource:
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== OPM Release List Integration Test ===")
+	fmt.Println("=== OPM Instance List Integration Test ===")
 	fmt.Println()
 
 	client, err := kubernetes.NewClient(kubernetes.ClientOptions{
@@ -68,85 +68,85 @@ func main() {
 	cleanup(ctx, client)
 	ensureNamespaces(ctx, client)
 
-	// Deploy test releases
-	deployRelease(ctx, client, releaseOne, nsA, releaseIDOne, []string{"cm-one-a", "cm-one-b"})
-	deployRelease(ctx, client, releaseTwo, nsA, releaseIDTwo, []string{"cm-two-a"})
-	deployRelease(ctx, client, releaseThree, nsB, releaseIDThree, []string{"cm-three-a", "cm-three-b"})
-	fmt.Println("OK: test releases deployed")
+	// Deploy test instances
+	deployInstance(ctx, client, instanceOne, nsA, instanceIDOne, []string{"cm-one-a", "cm-one-b"})
+	deployInstance(ctx, client, instanceTwo, nsA, instanceIDTwo, []string{"cm-two-a"})
+	deployInstance(ctx, client, instanceThree, nsB, instanceIDThree, []string{"cm-three-a", "cm-three-b"})
+	fmt.Println("OK: test instances deployed")
 	fmt.Println()
 
 	// ----------------------------------------------------------------
 	// Scenario 1: List in specific namespace
 	// ----------------------------------------------------------------
-	step(1, "List in specific namespace returns correct releases")
+	step(1, "List in specific namespace returns correct instances")
 
 	listA, err := inventory.ListInventories(ctx, client, nsA)
 	check("listing inventories in ns-a", err)
 	if len(listA) != 2 {
-		failf("expected 2 releases in %s, got %d", nsA, len(listA))
+		failf("expected 2 instances in %s, got %d", nsA, len(listA))
 	}
 	// Should be sorted: app-one, app-two
-	if listA[0].ReleaseMetadata.ReleaseName != releaseOne {
-		failf("expected first release to be %q, got %q", releaseOne, listA[0].ReleaseMetadata.ReleaseName)
+	if listA[0].InstanceMetadata.InstanceName != instanceOne {
+		failf("expected first instance to be %q, got %q", instanceOne, listA[0].InstanceMetadata.InstanceName)
 	}
-	if listA[1].ReleaseMetadata.ReleaseName != releaseTwo {
-		failf("expected second release to be %q, got %q", releaseTwo, listA[1].ReleaseMetadata.ReleaseName)
+	if listA[1].InstanceMetadata.InstanceName != instanceTwo {
+		failf("expected second instance to be %q, got %q", instanceTwo, listA[1].InstanceMetadata.InstanceName)
 	}
-	fmt.Printf("   OK: %d releases in %s, correctly sorted\n", len(listA), nsA)
+	fmt.Printf("   OK: %d instances in %s, correctly sorted\n", len(listA), nsA)
 
 	listB, err := inventory.ListInventories(ctx, client, nsB)
 	check("listing inventories in ns-b", err)
 	if len(listB) != 1 {
-		failf("expected 1 release in %s, got %d", nsB, len(listB))
+		failf("expected 1 instance in %s, got %d", nsB, len(listB))
 	}
-	if listB[0].ReleaseMetadata.ReleaseName != releaseThree {
-		failf("expected release %q in ns-b, got %q", releaseThree, listB[0].ReleaseMetadata.ReleaseName)
+	if listB[0].InstanceMetadata.InstanceName != instanceThree {
+		failf("expected instance %q in ns-b, got %q", instanceThree, listB[0].InstanceMetadata.InstanceName)
 	}
-	fmt.Printf("   OK: %d release in %s\n", len(listB), nsB)
+	fmt.Printf("   OK: %d instance in %s\n", len(listB), nsB)
 
 	// ----------------------------------------------------------------
 	// Scenario 2: List all namespaces
 	// ----------------------------------------------------------------
-	step(2, "List all namespaces returns releases from all test namespaces")
+	step(2, "List all namespaces returns instances from all test namespaces")
 
 	listAll, err := inventory.ListInventories(ctx, client, "")
 	check("listing inventories across all namespaces", err)
 
-	// Find our test releases in the full list (there may be others from other tests)
-	foundReleases := map[string]bool{}
+	// Find our test instances in the full list (there may be others from other tests)
+	foundInstances := map[string]bool{}
 	for _, inv := range listAll {
-		switch inv.ReleaseMetadata.ReleaseName {
-		case releaseOne, releaseTwo, releaseThree:
-			foundReleases[inv.ReleaseMetadata.ReleaseName] = true
+		switch inv.InstanceMetadata.InstanceName {
+		case instanceOne, instanceTwo, instanceThree:
+			foundInstances[inv.InstanceMetadata.InstanceName] = true
 		}
 	}
-	if len(foundReleases) != 3 {
-		failf("expected to find all 3 test releases across all namespaces, found %d: %v", len(foundReleases), foundReleases)
+	if len(foundInstances) != 3 {
+		failf("expected to find all 3 test instances across all namespaces, found %d: %v", len(foundInstances), foundInstances)
 	}
-	fmt.Printf("   OK: all 3 test releases found in all-namespaces list (%d total releases)\n", len(listAll))
+	fmt.Printf("   OK: all 3 test instances found in all-namespaces list (%d total instances)\n", len(listAll))
 
 	// Verify namespace is populated on each
 	for _, inv := range listAll {
-		if inv.ReleaseMetadata.ReleaseName == releaseOne {
-			if inv.ReleaseMetadata.ReleaseNamespace != nsA {
-				failf("expected namespace %q for %s, got %q", nsA, releaseOne, inv.ReleaseMetadata.ReleaseNamespace)
+		if inv.InstanceMetadata.InstanceName == instanceOne {
+			if inv.InstanceMetadata.InstanceNamespace != nsA {
+				failf("expected namespace %q for %s, got %q", nsA, instanceOne, inv.InstanceMetadata.InstanceNamespace)
 			}
 		}
 	}
-	fmt.Println("   OK: namespace correctly populated on each release")
+	fmt.Println("   OK: namespace correctly populated on each instance")
 
 	// ----------------------------------------------------------------
 	// Scenario 2b: Ownership visibility in summaries
 	// ----------------------------------------------------------------
 	step(3, "Ownership visibility - controller and legacy inventories resolve correctly")
 
-	controllerInv, err := inventory.GetInventory(ctx, client, releaseThree, nsB, releaseIDThree)
+	controllerInv, err := inventory.GetInventory(ctx, client, instanceThree, nsB, instanceIDThree)
 	check("reading inventory for controller scenario", err)
 	controllerInv.CreatedBy = inventory.CreatedByController
 	err = inventory.WriteInventory(ctx, client, controllerInv, moduleName, "", controllerInv.ModuleMetadata.Version, inventory.CreatedByCLI)
 	check("rewriting controller-owned inventory", err)
 
-	legacyInv, err := inventory.GetInventory(ctx, client, releaseTwo, nsA, releaseIDTwo)
+	legacyInv, err := inventory.GetInventory(ctx, client, instanceTwo, nsA, instanceIDTwo)
 	check("reading inventory for legacy scenario", err)
 	legacyInv.CreatedBy = ""
 	legacySecret, err := inventory.MarshalToSecret(legacyInv)
@@ -154,20 +154,20 @@ func main() {
 	_, err = client.Clientset.CoreV1().Secrets(nsA).Update(ctx, legacySecret, metav1.UpdateOptions{})
 	check("writing legacy inventory", err)
 
-	controllerRead, err := inventory.GetInventory(ctx, client, releaseThree, nsB, releaseIDThree)
+	controllerRead, err := inventory.GetInventory(ctx, client, instanceThree, nsB, instanceIDThree)
 	check("reading controller-owned inventory", err)
-	legacyRead, err := inventory.GetInventory(ctx, client, releaseTwo, nsA, releaseIDTwo)
+	legacyRead, err := inventory.GetInventory(ctx, client, instanceTwo, nsA, instanceIDTwo)
 	check("reading legacy inventory", err)
 
-	controllerSummary := query.BuildReleaseSummary(controllerRead)
-	legacySummary := query.BuildReleaseSummary(legacyRead)
+	controllerSummary := query.BuildInstanceSummary(controllerRead)
+	legacySummary := query.BuildInstanceSummary(legacyRead)
 	if controllerSummary.Owner != "controller" {
 		failf("expected controller-owned summary owner, got %q", controllerSummary.Owner)
 	}
 	if legacySummary.Owner != "cli" {
 		failf("expected legacy summary owner cli, got %q", legacySummary.Owner)
 	}
-	fmt.Println("   OK: controller-owned releases show owner=controller and legacy inventories resolve to owner=cli")
+	fmt.Println("   OK: controller-owned instances show owner=controller and legacy inventories resolve to owner=cli")
 
 	// ----------------------------------------------------------------
 	// Scenario 3: Empty namespace
@@ -177,9 +177,9 @@ func main() {
 	listEmpty, err := inventory.ListInventories(ctx, client, nsEmpty)
 	check("listing inventories in empty namespace", err)
 	if len(listEmpty) != 0 {
-		failf("expected 0 releases in %s, got %d", nsEmpty, len(listEmpty))
+		failf("expected 0 instances in %s, got %d", nsEmpty, len(listEmpty))
 	}
-	fmt.Printf("   OK: 0 releases in %s\n", nsEmpty)
+	fmt.Printf("   OK: 0 instances in %s\n", nsEmpty)
 
 	// ----------------------------------------------------------------
 	// Scenario 4: Health status accuracy
@@ -193,7 +193,7 @@ func main() {
 		failf("expected 0 missing resources initially, got %d", len(missing))
 	}
 
-	status, ready, total := kubernetes.QuickReleaseHealth(live, len(missing))
+	status, ready, total := kubernetes.QuickInstanceHealth(live, len(missing))
 	if status != kubernetes.HealthReady {
 		failf("expected HealthReady initially, got %s", status)
 	}
@@ -207,7 +207,7 @@ func main() {
 	check("deleting cm-one-b to simulate missing resource", err)
 
 	// Re-read inventory and check health
-	invOneRefresh, err := inventory.GetInventory(ctx, client, releaseOne, nsA, releaseIDOne)
+	invOneRefresh, err := inventory.GetInventory(ctx, client, instanceOne, nsA, instanceIDOne)
 	check("refreshing app-one inventory", err)
 	live2, missing2, err := inventory.DiscoverResourcesFromInventory(ctx, client, invOneRefresh)
 	check("re-discovering resources for app-one", err)
@@ -216,7 +216,7 @@ func main() {
 		failf("expected 1 missing resource after delete, got %d", len(missing2))
 	}
 
-	status2, ready2, total2 := kubernetes.QuickReleaseHealth(live2, len(missing2))
+	status2, ready2, total2 := kubernetes.QuickInstanceHealth(live2, len(missing2))
 	if status2 != kubernetes.HealthNotReady {
 		failf("expected HealthNotReady after delete, got %s", status2)
 	}
@@ -228,31 +228,31 @@ func main() {
 	// ----------------------------------------------------------------
 	// Scenario 5: Metadata correctness
 	// ----------------------------------------------------------------
-	step(6, "Metadata correctness — module name, version, release ID")
+	step(6, "Metadata correctness — module name, version, instance ID")
 
 	for _, inv := range listA {
 		// Module name
 		if inv.ModuleMetadata.Name != moduleName {
-			failf("expected module name %q for %s, got %q", moduleName, inv.ReleaseMetadata.ReleaseName, inv.ModuleMetadata.Name)
+			failf("expected module name %q for %s, got %q", moduleName, inv.InstanceMetadata.InstanceName, inv.ModuleMetadata.Name)
 		}
 
-		// Release ID
-		switch inv.ReleaseMetadata.ReleaseName {
-		case releaseOne:
-			if inv.ReleaseMetadata.ReleaseID != releaseIDOne {
-				failf("expected release ID %q, got %q", releaseIDOne, inv.ReleaseMetadata.ReleaseID)
+		// Instance ID
+		switch inv.InstanceMetadata.InstanceName {
+		case instanceOne:
+			if inv.InstanceMetadata.InstanceID != instanceIDOne {
+				failf("expected instance ID %q, got %q", instanceIDOne, inv.InstanceMetadata.InstanceID)
 			}
-		case releaseTwo:
-			if inv.ReleaseMetadata.ReleaseID != releaseIDTwo {
-				failf("expected release ID %q, got %q", releaseIDTwo, inv.ReleaseMetadata.ReleaseID)
+		case instanceTwo:
+			if inv.InstanceMetadata.InstanceID != instanceIDTwo {
+				failf("expected instance ID %q, got %q", instanceIDTwo, inv.InstanceMetadata.InstanceID)
 			}
 		}
 
 		if inv.ModuleMetadata.Version != moduleVersion {
-			failf("expected version %q for %s, got %q", moduleVersion, inv.ReleaseMetadata.ReleaseName, inv.ModuleMetadata.Version)
+			failf("expected version %q for %s, got %q", moduleVersion, inv.InstanceMetadata.InstanceName, inv.ModuleMetadata.Version)
 		}
 	}
-	fmt.Println("   OK: module name, release ID, and version all correct")
+	fmt.Println("   OK: module name, instance ID, and version all correct")
 
 	// ----------------------------------------------------------------
 	// Cleanup
@@ -277,14 +277,14 @@ func ensureNamespaces(ctx context.Context, client *kubernetes.Client) {
 	}
 }
 
-// deployRelease creates ConfigMap resources and an inventory Secret for a release.
-func deployRelease(ctx context.Context, client *kubernetes.Client, name, ns, releaseID string, cmNames []string) {
-	inv := buildInventory(name, ns, releaseID, cmNames, inventory.CreatedByCLI)
-	writeRelease(ctx, client, name, ns, inv, cmNames)
+// deployInstance creates ConfigMap resources and an inventory Secret for an instance.
+func deployInstance(ctx context.Context, client *kubernetes.Client, name, ns, instanceID string, cmNames []string) {
+	inv := buildInventory(name, ns, instanceID, cmNames, inventory.CreatedByCLI)
+	writeInstance(ctx, client, name, ns, inv, cmNames)
 }
 
-func writeRelease(ctx context.Context, client *kubernetes.Client, name, ns string, inv *inventory.ReleaseInventoryRecord, cmNames []string) {
-	resources := buildResources(name, ns, inv.ReleaseMetadata.ReleaseID, cmNames)
+func writeInstance(ctx context.Context, client *kubernetes.Client, name, ns string, inv *inventory.InstanceInventoryRecord, cmNames []string) {
+	resources := buildResources(name, ns, inv.InstanceMetadata.InstanceID, cmNames)
 
 	// Apply resources
 	result, err := kubernetes.Apply(ctx, client, resources, name, kubernetes.ApplyOptions{})
@@ -293,31 +293,31 @@ func writeRelease(ctx context.Context, client *kubernetes.Client, name, ns strin
 		failf("apply errors for %s: %v", name, result.Errors[0])
 	}
 
-	inv.ReleaseMetadata.LastTransitionTime = time.Now().UTC().Format(time.RFC3339)
+	inv.InstanceMetadata.LastTransitionTime = time.Now().UTC().Format(time.RFC3339)
 
 	err = inventory.WriteInventory(ctx, client, inv, moduleName, "", inv.ModuleMetadata.Version, inventory.CreatedByCLI)
 	check(fmt.Sprintf("writing inventory for %s", name), err)
 }
 
-func buildInventory(name, ns, releaseID string, cmNames []string, createdBy inventory.CreatedBy) *inventory.ReleaseInventoryRecord {
-	resources := buildResources(name, ns, releaseID, cmNames)
+func buildInventory(name, ns, instanceID string, cmNames []string, createdBy inventory.CreatedBy) *inventory.InstanceInventoryRecord {
+	resources := buildResources(name, ns, instanceID, cmNames)
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
 	}
 
-	inv := &inventory.ReleaseInventoryRecord{
+	inv := &inventory.InstanceInventoryRecord{
 		CreatedBy: createdBy,
-		ReleaseMetadata: inventory.ReleaseMetadata{
-			Kind:             "ModuleRelease",
-			APIVersion:       "core.opmodel.dev/v1alpha1",
-			ReleaseName:      name,
-			ReleaseNamespace: ns,
-			ReleaseID:        releaseID,
+		InstanceMetadata: inventory.InstanceMetadata{
+			Kind:              "ModuleInstance",
+			APIVersion:        inventory.APIVersionV1Alpha1,
+			InstanceName:      name,
+			InstanceNamespace: ns,
+			InstanceID:        instanceID,
 		},
 		ModuleMetadata: inventory.ModuleMetadata{
 			Kind:       "Module",
-			APIVersion: "core.opmodel.dev/v1alpha1",
+			APIVersion: inventory.APIVersionV1Alpha1,
 			Name:       moduleName,
 			Version:    moduleVersion,
 		},
@@ -331,13 +331,13 @@ func buildInventory(name, ns, releaseID string, cmNames []string, createdBy inve
 	return inv
 }
 
-func buildResources(relName, ns, releaseID string, cmNames []string) []*unstructured.Unstructured {
+func buildResources(relName, ns, instanceID string, cmNames []string) []*unstructured.Unstructured {
 	resources := make([]*unstructured.Unstructured, len(cmNames))
 	for i, cmName := range cmNames {
 		labels := map[string]interface{}{
-			pkgcore.LabelManagedBy:            pkgcore.LabelManagedByValue,
-			"module-release.opmodel.dev/name": relName,
-			"module-release.opmodel.dev/uuid": releaseID,
+			pkgcore.LabelManagedBy:             pkgcore.LabelManagedByValue,
+			"module-instance.opmodel.dev/name": relName,
+			"module-instance.opmodel.dev/uuid": instanceID,
 		}
 		resources[i] = &unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": "v1",
@@ -360,9 +360,9 @@ func cleanup(ctx context.Context, client *kubernetes.Client) {
 	for _, entry := range []struct {
 		name, ns, id string
 	}{
-		{releaseOne, nsA, releaseIDOne},
-		{releaseTwo, nsA, releaseIDTwo},
-		{releaseThree, nsB, releaseIDThree},
+		{instanceOne, nsA, instanceIDOne},
+		{instanceTwo, nsA, instanceIDTwo},
+		{instanceThree, nsB, instanceIDThree},
 	} {
 		secretName := inventory.SecretName(entry.name, entry.id)
 		_ = client.Clientset.CoreV1().Secrets(entry.ns).Delete(ctx, secretName, metav1.DeleteOptions{})

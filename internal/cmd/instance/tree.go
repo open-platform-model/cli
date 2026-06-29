@@ -85,15 +85,15 @@ func runInstanceTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8
 
 	namespace := target.Namespace
 	logName := target.LogName
-	releaseLog := output.ReleaseLogger(logName)
+	instanceLog := output.InstanceLogger(logName)
 
 	k8sClient, err := cmdutil.NewK8sClient(target.K8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
-		releaseLog.Error("connecting to cluster", "error", err)
+		instanceLog.Error("connecting to cluster", "error", err)
 		return err
 	}
 
-	inv, liveResources, _, err := query.ResolveInventory(ctx, k8sClient, target.Selector, namespace, releaseLog)
+	inv, liveResources, _, err := query.ResolveInventory(ctx, k8sClient, target.Selector, namespace, instanceLog)
 	if err != nil {
 		return err
 	}
@@ -104,15 +104,15 @@ func runInstanceTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8
 		componentMap[key] = entry.Component
 	}
 
-	releaseInfo := kubernetes.ReleaseInfo{
-		Name:      inv.ReleaseMetadata.ReleaseName,
-		Namespace: inv.ReleaseMetadata.ReleaseNamespace,
+	instanceInfo := kubernetes.InstanceInfo{
+		Name:      inv.InstanceMetadata.InstanceName,
+		Namespace: inv.InstanceMetadata.InstanceNamespace,
 		Module:    inv.ModuleMetadata.Name,
 		Version:   inv.ModuleMetadata.Version,
 	}
 
 	treeOpts := kubernetes.TreeOptions{
-		ReleaseInfo:   releaseInfo,
+		InstanceInfo:  instanceInfo,
 		InventoryLive: liveResources,
 		ComponentMap:  componentMap,
 		Depth:         depth,
@@ -122,16 +122,16 @@ func runInstanceTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8
 	result, err := kubernetes.GetModuleTree(ctx, k8sClient, treeOpts)
 	if err != nil {
 		if kubernetes.IsNoResourcesFound(err) {
-			releaseLog.Error("no resources found", "instance", logName, "namespace", namespace)
+			instanceLog.Error("no resources found", "instance", logName, "namespace", namespace)
 			return &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: err, Printed: true}
 		}
-		releaseLog.Error("getting tree", "error", err)
+		instanceLog.Error("getting tree", "error", err)
 		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
 	formatted, err := kubernetes.FormatTree(result, outputFormat)
 	if err != nil {
-		releaseLog.Error("formatting tree", "error", err)
+		instanceLog.Error("formatting tree", "error", err)
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
 	}
 

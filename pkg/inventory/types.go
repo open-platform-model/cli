@@ -14,7 +14,7 @@ type InventoryEntry struct {
 	Component string `json:"component,omitempty"` // source component name
 }
 
-// Inventory is the current set of resources owned by a release.
+// Inventory is the current set of resources owned by an instance.
 type Inventory struct {
 	Revision int              `json:"revision,omitempty"`
 	Digest   string           `json:"digest,omitempty"`

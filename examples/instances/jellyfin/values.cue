@@ -1,4 +1,4 @@
-// Concrete values for the Jellyfin release.
+// Concrete values for the Jellyfin instance.
 // See the public module schema at opmodel.dev/modules/jellyfin@v1
 // (or modules/jellyfin/module.cue) for the full #config surface.
 package jellyfin

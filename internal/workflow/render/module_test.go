@@ -37,9 +37,9 @@ func TestFromModule_NilK8sConfig(t *testing.T) {
 	assert.Contains(t, exitErr.Error(), "kubernetes config not resolved")
 }
 
-func TestFromModule_RejectsReleasePackage(t *testing.T) {
+func TestFromModule_RejectsInstancePackage(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "release.cue"), []byte("package test\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "instance.cue"), []byte("package test\n"), 0o644))
 
 	_, err := FromModule(context.Background(), ModuleOpts{
 		ModulePath: dir,
@@ -47,7 +47,7 @@ func TestFromModule_RejectsReleasePackage(t *testing.T) {
 		K8sConfig:  &config.ResolvedKubernetesConfig{},
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "release package")
+	assert.Contains(t, err.Error(), "instance package")
 }
 
 // TestResolveModuleValues_UsesValuesFile asserts that supplied -f files are
@@ -119,5 +119,5 @@ func TestFromModule_RegistryE2E(t *testing.T) {
 		t.Skipf("FromModule failed (likely registry/provider unavailable): %v", err)
 	}
 	require.NotNil(t, result)
-	assert.Equal(t, "mc-router-test", result.Release.Name)
+	assert.Equal(t, "mc-router-test", result.Instance.Name)
 }

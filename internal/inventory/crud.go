@@ -12,15 +12,15 @@ import (
 	pkgcore "github.com/opmodel/cli/pkg/core"
 )
 
-// GetInventory reads the inventory Secret for a release.
+// GetInventory reads the inventory Secret for an instance.
 //
 // Discovery strategy:
-//  1. Primary: direct GET by constructed name (opm.<releaseName>.<releaseID>)
-//  2. Fallback: list Secrets with label module-release.opmodel.dev/uuid=<releaseID>
+//  1. Primary: direct GET by constructed name (opm.<instanceName>.<instanceID>)
+//  2. Fallback: list Secrets with label module-instance.opmodel.dev/uuid=<instanceID>
 //
 // Returns (nil, nil) on first-time apply when no inventory exists.
-func GetInventory(ctx context.Context, client *kubernetes.Client, releaseName, namespace, releaseID string) (*ReleaseInventoryRecord, error) {
-	secretName := SecretName(releaseName, releaseID)
+func GetInventory(ctx context.Context, client *kubernetes.Client, instanceName, namespace, instanceID string) (*InstanceInventoryRecord, error) {
+	secretName := SecretName(instanceName, instanceID)
 
 	// Primary: direct GET by name
 	secret, err := client.Clientset.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
@@ -38,10 +38,10 @@ func GetInventory(ctx context.Context, client *kubernetes.Client, releaseName, n
 
 	// Fallback: label-based lookup (handles renamed Secrets or legacy inventory)
 	output.Debug("inventory Secret not found by name, falling back to label lookup",
-		"name", secretName, "releaseID", releaseID)
+		"name", secretName, "instanceID", instanceID)
 
 	labelSelector := fmt.Sprintf("%s=%s,%s=%s",
-		pkgcore.LabelModuleReleaseUUID, releaseID,
+		pkgcore.LabelModuleInstanceUUID, instanceID,
 		pkgcore.LabelComponent, "inventory",
 	)
 	list, err := client.Clientset.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{
@@ -52,7 +52,7 @@ func GetInventory(ctx context.Context, client *kubernetes.Client, releaseName, n
 	}
 
 	if len(list.Items) == 0 {
-		output.Debug("no inventory found, treating as first-time apply", "releaseID", releaseID)
+		output.Debug("no inventory found, treating as first-time apply", "instanceID", instanceID)
 		return nil, nil
 	}
 
@@ -73,15 +73,15 @@ func GetInventory(ctx context.Context, client *kubernetes.Client, releaseName, n
 // moduleName and moduleUUID are the canonical module name and identity UUID.
 // moduleVersion is the deployed module version for versioned modules.
 // createdBy records the original creator for newly created inventories.
-// These values are only used when constructing a new release inventory record and are
+// These values are only used when constructing a new instance inventory record and are
 // ignored on updates where metadata is preserved from the previous Secret.
-func WriteInventory(ctx context.Context, client *kubernetes.Client, inv *ReleaseInventoryRecord, moduleName, moduleUUID, moduleVersion string, createdBy CreatedBy) error {
+func WriteInventory(ctx context.Context, client *kubernetes.Client, inv *InstanceInventoryRecord, moduleName, moduleUUID, moduleVersion string, createdBy CreatedBy) error {
 	// On first write (no resourceVersion), populate ModuleMetadata from caller-supplied values.
 	// On updates, ModuleMetadata is already populated from UnmarshalFromSecret — preserve it.
 	if inv.ResourceVersion() == "" && inv.ModuleMetadata.Name == "" {
 		inv.ModuleMetadata = ModuleMetadata{
 			Kind:       "Module",
-			APIVersion: "core.opmodel.dev/v1alpha1",
+			APIVersion: APIVersionV1Alpha1,
 			Name:       moduleName,
 			UUID:       moduleUUID,
 			Version:    moduleVersion,
@@ -124,39 +124,39 @@ func WriteInventory(ctx context.Context, client *kubernetes.Client, inv *Release
 	return nil
 }
 
-// FindInventoryByReleaseName finds the inventory Secret for a release using only
-// the release name and namespace, without requiring a release ID.
+// FindInventoryByInstanceName finds the inventory Secret for an instance using only
+// the instance name and namespace, without requiring an instance ID.
 //
-// Uses label selector: module-release.opmodel.dev/name=<releaseName> + opmodel.dev/component=inventory
+// Uses label selector: module-instance.opmodel.dev/name=<instanceName> + opmodel.dev/component=inventory
 //
-// Returns (nil, nil) if no inventory Secret exists for the release.
+// Returns (nil, nil) if no inventory Secret exists for the instance.
 // Returns an error if multiple inventory Secrets are found (unexpected state).
-func FindInventoryByReleaseName(ctx context.Context, client *kubernetes.Client, releaseName, namespace string) (*ReleaseInventoryRecord, error) {
+func FindInventoryByInstanceName(ctx context.Context, client *kubernetes.Client, instanceName, namespace string) (*InstanceInventoryRecord, error) {
 	labelSelector := fmt.Sprintf("%s=%s,%s=%s",
-		pkgcore.LabelModuleReleaseName, releaseName,
+		pkgcore.LabelModuleInstanceName, instanceName,
 		pkgcore.LabelComponent, "inventory",
 	)
 	list, err := client.Clientset.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("listing inventory Secrets for release %q: %w", releaseName, err)
+		return nil, fmt.Errorf("listing inventory Secrets for instance %q: %w", instanceName, err)
 	}
 
 	if len(list.Items) == 0 {
-		output.Debug("no inventory Secret found for release", "releaseName", releaseName, "namespace", namespace)
+		output.Debug("no inventory Secret found for instance", "instanceName", instanceName, "namespace", namespace)
 		return nil, nil
 	}
 
 	// Use the first match; warn if multiple exist (shouldn't happen in practice)
 	if len(list.Items) > 1 {
-		output.Debug("multiple inventory Secrets found for release, using first",
-			"releaseName", releaseName, "namespace", namespace, "count", len(list.Items))
+		output.Debug("multiple inventory Secrets found for instance, using first",
+			"instanceName", instanceName, "namespace", namespace, "count", len(list.Items))
 	}
 
 	inv, err := UnmarshalFromSecret(&list.Items[0])
 	if err != nil {
-		return nil, fmt.Errorf("parsing inventory Secret for release %q: %w", releaseName, err)
+		return nil, fmt.Errorf("parsing inventory Secret for instance %q: %w", instanceName, err)
 	}
 	return inv, nil
 }

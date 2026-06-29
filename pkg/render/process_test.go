@@ -68,7 +68,7 @@ func TestProcessModuleInstance_Success(t *testing.T) {
 						kind: "Deployment"
 						metadata: {
 							name: #context.#componentMetadata.name
-							namespace: #context.#moduleReleaseMetadata.namespace
+							namespace: #context.#moduleInstanceMetadata.namespace
 							labels: "app.kubernetes.io/managed-by": #context.#runtimeName
 						}
 						spec: replicas: #component.spec.replicas
@@ -78,7 +78,7 @@ func TestProcessModuleInstance_Success(t *testing.T) {
 		}
 	}`)
 
-	// Construct a fully prepared release (as ParseModuleInstance would produce).
+	// Construct a fully prepared instance (as ParseModuleInstance would produce).
 	rel := &module.Instance{
 		Metadata: &module.InstanceMetadata{Name: "demo", Namespace: "apps"},
 		Module:   module.Module{Metadata: &module.ModuleMetadata{FQN: "example.com/modules/demo@v1", Version: "v1"}},

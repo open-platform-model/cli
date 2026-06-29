@@ -17,7 +17,7 @@ import (
 
 // NewInstanceApplyCmd creates the instance apply command.
 func NewInstanceApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
-	var rff cmdutil.ReleaseFileFlags
+	var rff cmdutil.InstanceFileFlags
 	var kf cmdutil.K8sFlags
 	var namespace string
 
@@ -60,7 +60,7 @@ Examples:
 }
 
 // runInstanceApply executes the instance apply command.
-func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, kf *cmdutil.K8sFlags, namespaceFlag string,
+func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.InstanceFileFlags, kf *cmdutil.K8sFlags, namespaceFlag string,
 	dryRun, createNS, noPrune, force bool) error {
 	ctx := context.Background()
 
@@ -75,11 +75,11 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
-	result, err := render.FromReleaseFile(ctx, render.ReleaseFileOpts{
-		ReleaseFilePath: instanceFile,
-		ValuesFiles:     rff.Values,
-		K8sConfig:       k8sConfig,
-		Config:          cfg,
+	result, err := render.FromInstanceFile(ctx, render.InstanceFileOpts{
+		InstanceFilePath: instanceFile,
+		ValuesFiles:      rff.Values,
+		K8sConfig:        k8sConfig,
+		Config:           cfg,
 	})
 	if err != nil {
 		return err
@@ -87,11 +87,11 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 
 	render.ShowOutput(result, render.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
 
-	releaseLog := output.ReleaseLogger(result.Release.Name)
+	instanceLog := output.InstanceLogger(result.Instance.Name)
 
 	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
-		releaseLog.Error("connecting to cluster", "error", err)
+		instanceLog.Error("connecting to cluster", "error", err)
 		return err
 	}
 
@@ -100,7 +100,7 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 	return workflowapply.Execute(ctx, workflowapply.Request{
 		Result:    result,
 		K8sClient: k8sClient,
-		Log:       releaseLog,
+		Log:       instanceLog,
 		Options: workflowapply.Options{
 			DryRun:                 dryRun,
 			CreateNS:               createNS,

@@ -16,16 +16,16 @@ import (
 
 // DeleteOptions configures a delete operation.
 type DeleteOptions struct {
-	// ReleaseName is the release name to delete.
-	// Mutually exclusive with ReleaseID.
-	ReleaseName string
+	// InstanceName is the instance name to delete.
+	// Mutually exclusive with InstanceID.
+	InstanceName string
 
 	// Namespace is the namespace to search for resources.
 	Namespace string
 
-	// ReleaseID is the release identity UUID for discovery.
-	// Mutually exclusive with ReleaseName.
-	ReleaseID string
+	// InstanceID is the instance identity UUID for discovery.
+	// Mutually exclusive with InstanceName.
+	InstanceID string
 
 	// DryRun previews resources to delete without removing them.
 	DryRun bool
@@ -55,24 +55,24 @@ type DeleteResult struct {
 	Errors []resourceError
 }
 
-// Delete removes all resources belonging to a release deployment.
+// Delete removes all resources belonging to an instance deployment.
 // opts.InventoryLive must be pre-fetched from the inventory Secret by the caller.
 // Resources are deleted in reverse weight order. After all workload resources are
 // deleted, the inventory Secret itself is deleted last.
 func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteResult, error) {
 	result := &DeleteResult{}
 
-	// Use release name for logging if available, otherwise use ReleaseID
-	logName := opts.ReleaseName
+	// Use instance name for logging if available, otherwise use InstanceID
+	logName := opts.InstanceName
 	if logName == "" {
-		logName = fmt.Sprintf("release-id:%s", opts.ReleaseID)
+		logName = fmt.Sprintf("instance-id:%s", opts.InstanceID)
 	}
-	releaseLog := output.ReleaseLogger(logName)
+	instanceLog := output.InstanceLogger(logName)
 
 	resources := opts.InventoryLive
 
-	releaseLog.Debug("deleting release resources from inventory",
-		"release", logName,
+	instanceLog.Debug("deleting instance resources from inventory",
+		"instance", logName,
 		"namespace", opts.Namespace,
 		"count", len(resources),
 	)
@@ -82,13 +82,13 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 	// Return error when no resources found (and no inventory Secret to delete)
 	if len(resources) == 0 && opts.InventorySecretName == "" {
 		return nil, &noResourcesFoundError{
-			ReleaseName: opts.ReleaseName,
-			ReleaseID:   opts.ReleaseID,
-			Namespace:   opts.Namespace,
+			InstanceName: opts.InstanceName,
+			InstanceID:   opts.InstanceID,
+			Namespace:    opts.Namespace,
 		}
 	}
 
-	releaseLog.Debug("resources to delete", "count", len(resources))
+	instanceLog.Debug("resources to delete", "count", len(resources))
 
 	// Sort in reverse weight order (highest weight first = delete webhooks before deployments)
 	sortByWeightDescending(resources)
@@ -100,13 +100,13 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 		ns := res.GetNamespace()
 
 		if opts.DryRun {
-			releaseLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
+			instanceLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
 			result.Deleted++
 			continue
 		}
 
 		if err := deleteResource(ctx, client, res); err != nil {
-			releaseLog.Warn(fmt.Sprintf("deleting %s/%s: %v", kind, name, err))
+			instanceLog.Warn(fmt.Sprintf("deleting %s/%s: %v", kind, name, err))
 			result.Errors = append(result.Errors, resourceError{
 				Kind:      kind,
 				Name:      name,
@@ -116,12 +116,12 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 			continue
 		}
 
-		releaseLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
+		instanceLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
 		result.Deleted++
 	}
 
 	// Delete the inventory Secret last (after all workload resources are gone).
-	// This ensures the inventory is only removed when the release is fully deleted.
+	// This ensures the inventory is only removed when the instance is fully deleted.
 	if opts.InventorySecretName != "" && !opts.DryRun {
 		invSecretNS := opts.InventorySecretNamespace
 		if invSecretNS == "" {
@@ -129,10 +129,10 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 		}
 		if err := client.Clientset.CoreV1().Secrets(invSecretNS).Delete(ctx, opts.InventorySecretName, metav1.DeleteOptions{}); err != nil {
 			if !apierrors.IsNotFound(err) {
-				releaseLog.Debug("could not delete inventory Secret", "name", opts.InventorySecretName, "err", err)
+				instanceLog.Debug("could not delete inventory Secret", "name", opts.InventorySecretName, "err", err)
 			}
 		} else {
-			releaseLog.Debug("deleted inventory Secret", "name", opts.InventorySecretName, "namespace", invSecretNS)
+			instanceLog.Debug("deleted inventory Secret", "name", opts.InventorySecretName, "namespace", invSecretNS)
 		}
 	}
 

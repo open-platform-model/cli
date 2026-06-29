@@ -11,23 +11,23 @@ import (
 	"github.com/opmodel/cli/internal/config"
 )
 
-func TestValidateModuleInputPath_RejectsReleasePackage(t *testing.T) {
+func TestValidateModuleInputPath_RejectsInstancePackage(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "release.cue"), []byte("package test\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "instance.cue"), []byte("package test\n"), 0o600))
 
 	err := ValidateModuleInputPath(dir)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "release package, not a module")
+	assert.Contains(t, err.Error(), "instance package, not a module")
 	assert.Contains(t, err.Error(), "opm instance")
 }
 
-func TestValidateReleaseInputPath_RejectsModulePackage(t *testing.T) {
+func TestValidateInstanceInputPath_RejectsModulePackage(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "module.cue"), []byte("package test\n"), 0o600))
 
-	err := ValidateReleaseInputPath(dir)
+	err := ValidateInstanceInputPath(dir)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "module package, not a release")
+	assert.Contains(t, err.Error(), "module package, not an instance")
 	assert.Contains(t, err.Error(), "opm module")
 }
 
@@ -37,5 +37,5 @@ func TestResolveInstanceArg_RejectsModulePackagePath(t *testing.T) {
 
 	_, err := ResolveInstanceArg(dir, &config.GlobalConfig{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "module package, not a release")
+	assert.Contains(t, err.Error(), "module package, not an instance")
 }

@@ -12,7 +12,7 @@ import (
 
 func TestFormatStatus_Table(t *testing.T) {
 	result := &StatusResult{
-		ReleaseName:     "my-app",
+		InstanceName:    "my-app",
 		Owner:           "cli",
 		Namespace:       "default",
 		AggregateStatus: HealthReady,
@@ -34,7 +34,7 @@ func TestFormatStatus_Table(t *testing.T) {
 
 func TestFormatStatus_JSON(t *testing.T) {
 	result := &StatusResult{
-		ReleaseName:     "my-app",
+		InstanceName:    "my-app",
 		Owner:           "cli",
 		Namespace:       "default",
 		AggregateStatus: HealthReady,
@@ -53,7 +53,7 @@ func TestFormatStatus_JSON(t *testing.T) {
 
 func TestFormatStatus_YAML(t *testing.T) {
 	result := &StatusResult{
-		ReleaseName:     "my-app",
+		InstanceName:    "my-app",
 		Owner:           "cli",
 		Namespace:       "default",
 		AggregateStatus: HealthReady,
@@ -72,7 +72,7 @@ func TestFormatStatus_YAML(t *testing.T) {
 
 func TestFormatStatusTable_DefaultColumns(t *testing.T) {
 	result := &StatusResult{
-		ReleaseName:     "my-app",
+		InstanceName:    "my-app",
 		Owner:           "cli",
 		Namespace:       "production",
 		AggregateStatus: HealthReady,
@@ -89,7 +89,7 @@ func TestFormatStatusTable_DefaultColumns(t *testing.T) {
 	assert.Contains(t, out, "STATUS")
 	assert.Contains(t, out, "Deployment")
 	assert.Contains(t, out, "server")
-	assert.Contains(t, out, "Release:")
+	assert.Contains(t, out, "Instance:")
 	assert.Contains(t, out, "Owner:")
 	assert.Contains(t, out, "my-app")
 	assert.Contains(t, out, "2 total")
@@ -97,7 +97,7 @@ func TestFormatStatusTable_DefaultColumns(t *testing.T) {
 
 func TestFormatStatusTable_WideColumns(t *testing.T) {
 	result := &StatusResult{
-		ReleaseName:     "my-app",
+		InstanceName:    "my-app",
 		Owner:           "cli",
 		Namespace:       "production",
 		AggregateStatus: HealthNotReady,
@@ -121,7 +121,7 @@ func TestFormatStatusTable_WideColumns(t *testing.T) {
 
 func TestFormatStatusTable_VerboseBlocks(t *testing.T) {
 	result := &StatusResult{
-		ReleaseName:     "my-app",
+		InstanceName:    "my-app",
 		Owner:           "cli",
 		Namespace:       "production",
 		AggregateStatus: HealthNotReady,
@@ -148,7 +148,7 @@ func TestFormatStatusTable_VerboseBlocks(t *testing.T) {
 
 func TestFormatStatusTable_NotReadySummary(t *testing.T) {
 	result := &StatusResult{
-		ReleaseName:     "my-app",
+		InstanceName:    "my-app",
 		Owner:           "cli",
 		Namespace:       "production",
 		AggregateStatus: HealthNotReady,
@@ -168,7 +168,7 @@ func TestFormatStatusTable_NotReadySummary(t *testing.T) {
 
 func TestFormatStatusHeader_ControllerWarning(t *testing.T) {
 	result := &StatusResult{
-		ReleaseName:     "my-app",
+		InstanceName:    "my-app",
 		Owner:           "controller",
 		Namespace:       "production",
 		AggregateStatus: HealthReady,
@@ -177,7 +177,7 @@ func TestFormatStatusHeader_ControllerWarning(t *testing.T) {
 
 	out := FormatStatusTable(result)
 	assert.Contains(t, out, "Owner:")
-	assert.Contains(t, out, "controller-managed release")
+	assert.Contains(t, out, "controller-managed instance")
 }
 
 func TestFormatDuration(t *testing.T) {

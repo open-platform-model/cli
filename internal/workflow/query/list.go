@@ -16,7 +16,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type ReleaseSummary struct {
+type InstanceSummary struct {
 	Name        string `json:"name" yaml:"name"`
 	Module      string `json:"module" yaml:"module"`
 	Namespace   string `json:"namespace" yaml:"namespace"`
@@ -24,32 +24,32 @@ type ReleaseSummary struct {
 	Status      string `json:"status" yaml:"status"`
 	ReadyCount  int    `json:"readyCount" yaml:"readyCount"`
 	TotalCount  int    `json:"totalCount" yaml:"totalCount"`
-	ReleaseID   string `json:"releaseId" yaml:"releaseId"`
+	InstanceID  string `json:"instanceID" yaml:"instanceID"`
 	LastApplied string `json:"lastApplied" yaml:"lastApplied"`
 	Age         string `json:"age" yaml:"age"`
 	Owner       string `json:"owner" yaml:"owner"`
 }
 
-type releaseHealthResult struct {
+type instanceHealthResult struct {
 	index  int
 	status kubernetes.HealthStatus
 	ready  int
 	total  int
 }
 
-func EvaluateReleaseHealth(ctx context.Context, client *kubernetes.Client, inventories []*inventory.ReleaseInventoryRecord, concurrency int, logDiscoveryFailures bool) []ReleaseSummary {
-	summaries := make([]ReleaseSummary, len(inventories))
+func EvaluateInstanceHealth(ctx context.Context, client *kubernetes.Client, inventories []*inventory.InstanceInventoryRecord, concurrency int, logDiscoveryFailures bool) []InstanceSummary {
+	summaries := make([]InstanceSummary, len(inventories))
 	for i, inv := range inventories {
-		summaries[i] = BuildReleaseSummary(inv)
+		summaries[i] = BuildInstanceSummary(inv)
 	}
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, concurrency)
-	results := make([]releaseHealthResult, len(inventories))
+	results := make([]instanceHealthResult, len(inventories))
 
 	for i, inv := range inventories {
 		wg.Add(1)
-		go func(idx int, inv *inventory.ReleaseInventoryRecord) {
+		go func(idx int, inv *inventory.InstanceInventoryRecord) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -57,14 +57,14 @@ func EvaluateReleaseHealth(ctx context.Context, client *kubernetes.Client, inven
 			live, missing, err := inventory.DiscoverResourcesFromInventory(ctx, client, inv)
 			if err != nil {
 				if logDiscoveryFailures {
-					output.Debug("failed to discover resources for release", "release", inv.ReleaseMetadata.ReleaseName, "error", err)
+					output.Debug("failed to discover resources for instance", "instance", inv.InstanceMetadata.InstanceName, "error", err)
 				}
-				results[idx] = releaseHealthResult{index: idx, status: kubernetes.HealthUnknown}
+				results[idx] = instanceHealthResult{index: idx, status: kubernetes.HealthUnknown}
 				return
 			}
 
-			status, ready, total := kubernetes.QuickReleaseHealth(live, len(missing))
-			results[idx] = releaseHealthResult{index: idx, status: status, ready: ready, total: total}
+			status, ready, total := kubernetes.QuickInstanceHealth(live, len(missing))
+			results[idx] = instanceHealthResult{index: idx, status: status, ready: ready, total: total}
 		}(i, inv)
 	}
 	wg.Wait()
@@ -78,20 +78,20 @@ func EvaluateReleaseHealth(ctx context.Context, client *kubernetes.Client, inven
 	return summaries
 }
 
-func BuildReleaseSummary(inv *inventory.ReleaseInventoryRecord) ReleaseSummary {
-	s := ReleaseSummary{
-		Name:      inv.ReleaseMetadata.ReleaseName,
-		Module:    inv.ModuleMetadata.Name,
-		Namespace: inv.ReleaseMetadata.ReleaseNamespace,
-		ReleaseID: inv.ReleaseMetadata.ReleaseID,
-		Owner:     string(inventory.NormalizeCreatedBy(inv.CreatedBy)),
+func BuildInstanceSummary(inv *inventory.InstanceInventoryRecord) InstanceSummary {
+	s := InstanceSummary{
+		Name:       inv.InstanceMetadata.InstanceName,
+		Module:     inv.ModuleMetadata.Name,
+		Namespace:  inv.InstanceMetadata.InstanceNamespace,
+		InstanceID: inv.InstanceMetadata.InstanceID,
+		Owner:      string(inventory.NormalizeCreatedBy(inv.CreatedBy)),
 	}
 	if inv.ModuleMetadata.Version != "" {
 		s.Version = inv.ModuleMetadata.Version
 	}
-	s.LastApplied = inv.ReleaseMetadata.LastTransitionTime
-	if inv.ReleaseMetadata.LastTransitionTime != "" {
-		if t, err := time.Parse(time.RFC3339, inv.ReleaseMetadata.LastTransitionTime); err == nil {
+	s.LastApplied = inv.InstanceMetadata.LastTransitionTime
+	if inv.InstanceMetadata.LastTransitionTime != "" {
+		if t, err := time.Parse(time.RFC3339, inv.InstanceMetadata.LastTransitionTime); err == nil {
 			s.Age = kubernetes.FormatDuration(time.Since(t))
 		}
 	}
@@ -107,7 +107,7 @@ func BuildReleaseSummary(inv *inventory.ReleaseInventoryRecord) ReleaseSummary {
 	return s
 }
 
-func RenderReleaseListOutput(summaries []ReleaseSummary, format output.Format, allNamespaces bool) error {
+func RenderInstanceListOutput(summaries []InstanceSummary, format output.Format, allNamespaces bool) error {
 	switch format { //nolint:exhaustive // output.ParseFormat constrains values before this switch
 	case output.FormatJSON:
 		data, err := json.MarshalIndent(summaries, "", "  ")
@@ -124,10 +124,10 @@ func RenderReleaseListOutput(summaries []ReleaseSummary, format output.Format, a
 		output.Println(strings.TrimSpace(string(data)))
 		return nil
 	case output.FormatWide:
-		renderReleaseListTable(summaries, allNamespaces, true)
+		renderInstanceListTable(summaries, allNamespaces, true)
 		return nil
 	default:
-		renderReleaseListTable(summaries, allNamespaces, false)
+		renderInstanceListTable(summaries, allNamespaces, false)
 		return nil
 	}
 }
@@ -144,17 +144,14 @@ func formatStatusColumn(status string, ready, total int) string {
 	return fmt.Sprintf("%s (%d/%d)", output.FormatHealthStatus(status), ready, total)
 }
 
-func renderReleaseListTable(summaries []ReleaseSummary, allNamespaces, wide bool) {
-	var headers []string
-	switch {
-	case allNamespaces && wide:
-		headers = []string{"NAMESPACE", "NAME", "MODULE", "OWNER", "VERSION", "STATUS", "AGE", "RELEASE-ID", "LAST-APPLIED"}
-	case allNamespaces:
-		headers = []string{"NAMESPACE", "NAME", "MODULE", "OWNER", "VERSION", "STATUS", "AGE"}
-	case wide:
-		headers = []string{"NAME", "MODULE", "OWNER", "VERSION", "STATUS", "AGE", "RELEASE-ID", "LAST-APPLIED"}
-	default:
-		headers = []string{"NAME", "MODULE", "OWNER", "VERSION", "STATUS", "AGE"}
+func renderInstanceListTable(summaries []InstanceSummary, allNamespaces, wide bool) {
+	// Compose headers from shared parts to avoid duplicated column literals.
+	headers := []string{"NAME", "MODULE", "OWNER", "VERSION", "STATUS", "AGE"}
+	if wide {
+		headers = append(headers, "INSTANCE-ID", "LAST-APPLIED")
+	}
+	if allNamespaces {
+		headers = append([]string{"NAMESPACE"}, headers...)
 	}
 
 	tbl := output.NewTable(headers...)
@@ -163,11 +160,11 @@ func renderReleaseListTable(summaries []ReleaseSummary, allNamespaces, wide bool
 		status := formatStatusColumn(s.Status, s.ReadyCount, s.TotalCount)
 		switch {
 		case allNamespaces && wide:
-			tbl.Row(s.Namespace, s.Name, s.Module, s.Owner, s.Version, status, s.Age, s.ReleaseID, s.LastApplied)
+			tbl.Row(s.Namespace, s.Name, s.Module, s.Owner, s.Version, status, s.Age, s.InstanceID, s.LastApplied)
 		case allNamespaces:
 			tbl.Row(s.Namespace, s.Name, s.Module, s.Owner, s.Version, status, s.Age)
 		case wide:
-			tbl.Row(s.Name, s.Module, s.Owner, s.Version, status, s.Age, s.ReleaseID, s.LastApplied)
+			tbl.Row(s.Name, s.Module, s.Owner, s.Version, status, s.Age, s.InstanceID, s.LastApplied)
 		default:
 			tbl.Row(s.Name, s.Module, s.Owner, s.Version, status, s.Age)
 		}

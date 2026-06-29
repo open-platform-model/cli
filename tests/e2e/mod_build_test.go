@@ -85,7 +85,7 @@ func copyDir(src, dst string) error {
 	})
 }
 
-// TestE2E_ModBuild_FromExampleModule renders a synthetic release for an
+// TestE2E_ModBuild_FromExampleModule renders a synthetic instance for an
 // example module using its debugValues. Skipped if the registry is unreachable
 // (CI runs with a pre-warmed registry per task 8.5).
 func TestE2E_ModBuild_FromExampleModule(t *testing.T) {
@@ -111,13 +111,13 @@ func TestE2E_ModBuild_FromExampleModule(t *testing.T) {
 	if err != nil {
 		t.Skipf("opm module build failed (likely registry/provider unavailable): err=%v stderr=%s", err, stderr)
 	}
-	assert.Contains(t, stderr, "synthetic release")
+	assert.Contains(t, stderr, "synthetic instance")
 	assert.Contains(t, stderr, "e2e-mc-router")
 	assert.NotEmpty(t, stdout, "expected manifest output on stdout")
 }
 
 // TestE2E_ModBuild_RejectsFileArgument confirms that a file path produces an
-// actionable error directing the user to `opm release build`.
+// actionable error directing the user to `opm instance build`.
 func TestE2E_ModBuild_RejectsFileArgument(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "e2e-mod-build-*")
 	require.NoError(t, err)
@@ -129,5 +129,5 @@ func TestE2E_ModBuild_RejectsFileArgument(t *testing.T) {
 	_, stderr, err := runOPM(t, tmpDir, "module", "build", filePath)
 	require.Error(t, err)
 	assert.Contains(t, stderr, "expects a directory")
-	assert.Contains(t, stderr, "opm release build")
+	assert.Contains(t, stderr, "opm instance build")
 }

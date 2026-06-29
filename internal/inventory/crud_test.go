@@ -19,20 +19,20 @@ func makeTestClient(objects ...runtime.Object) *kubernetes.Client {
 	return &kubernetes.Client{Clientset: fake.NewClientset(objects...)}
 }
 
-func makeTestRecord(moduleName, releaseName, namespace, releaseID string) *inventory.ReleaseInventoryRecord {
-	return &inventory.ReleaseInventoryRecord{
+func makeTestRecord(moduleName, instanceName, namespace, instanceID string) *inventory.InstanceInventoryRecord {
+	return &inventory.InstanceInventoryRecord{
 		CreatedBy: inventory.CreatedByCLI,
-		ReleaseMetadata: inventory.ReleaseMetadata{
-			Kind:               "ModuleRelease",
-			APIVersion:         "core.opmodel.dev/v1alpha1",
-			ReleaseName:        releaseName,
-			ReleaseNamespace:   namespace,
-			ReleaseID:          releaseID,
+		InstanceMetadata: inventory.InstanceMetadata{
+			Kind:               "ModuleInstance",
+			APIVersion:         inventory.APIVersionV1Alpha1,
+			InstanceName:       instanceName,
+			InstanceNamespace:  namespace,
+			InstanceID:         instanceID,
 			LastTransitionTime: "2026-01-01T00:00:00Z",
 		},
 		ModuleMetadata: inventory.ModuleMetadata{
 			Kind:       "Module",
-			APIVersion: "core.opmodel.dev/v1alpha1",
+			APIVersion: inventory.APIVersionV1Alpha1,
 			Name:       moduleName,
 			Version:    "1.2.3",
 		},
@@ -42,7 +42,7 @@ func makeTestRecord(moduleName, releaseName, namespace, releaseID string) *inven
 
 func TestGetInventory_FirstTimeApply_ReturnsNil(t *testing.T) {
 	client := makeTestClient()
-	inv, err := inventory.GetInventory(context.Background(), client, "jellyfin", "media", "release-uuid-123")
+	inv, err := inventory.GetInventory(context.Background(), client, "jellyfin", "media", "instance-uuid-123")
 	require.NoError(t, err)
 	assert.Nil(t, inv)
 }
@@ -55,7 +55,7 @@ func TestMarshalUnmarshalRoundTrip(t *testing.T) {
 	restored, err := inventory.UnmarshalFromSecret(secret)
 	require.NoError(t, err)
 	assert.Equal(t, original.CreatedBy, restored.CreatedBy)
-	assert.Equal(t, original.ReleaseMetadata, restored.ReleaseMetadata)
+	assert.Equal(t, original.InstanceMetadata, restored.InstanceMetadata)
 	assert.Equal(t, original.ModuleMetadata, restored.ModuleMetadata)
 	assert.Equal(t, original.Inventory, restored.Inventory)
 }
@@ -80,19 +80,19 @@ func TestGetInventory_FallbackToLabelLookup(t *testing.T) {
 	result, err := inventory.GetInventory(context.Background(), client, "jellyfin", "media", "uuid-xyz")
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Equal(t, "uuid-xyz", result.ReleaseMetadata.ReleaseID)
+	assert.Equal(t, "uuid-xyz", result.InstanceMetadata.InstanceID)
 }
 
 func TestWriteInventory_CreateAndUpdate(t *testing.T) {
 	ctx := context.Background()
 	client := makeTestClient()
-	record := &inventory.ReleaseInventoryRecord{
-		ReleaseMetadata: inventory.ReleaseMetadata{
-			Kind:             "ModuleRelease",
-			APIVersion:       "core.opmodel.dev/v1alpha1",
-			ReleaseName:      "mc",
-			ReleaseNamespace: "default",
-			ReleaseID:        "uuid-create-test",
+	record := &inventory.InstanceInventoryRecord{
+		InstanceMetadata: inventory.InstanceMetadata{
+			Kind:              "ModuleInstance",
+			APIVersion:        inventory.APIVersionV1Alpha1,
+			InstanceName:      "mc",
+			InstanceNamespace: "default",
+			InstanceID:        "uuid-create-test",
 		},
 		Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{{Kind: "ConfigMap", Namespace: "default", Name: "cfg"}}},
 	}
@@ -120,16 +120,16 @@ func TestWriteInventory_CreateAndUpdate(t *testing.T) {
 	assert.Equal(t, 2, updated.Inventory.Revision)
 }
 
-func TestFindInventoryByReleaseName_Found(t *testing.T) {
+func TestFindInventoryByInstanceName_Found(t *testing.T) {
 	secret, err := inventory.MarshalToSecret(makeTestRecord("minecraft", "mc", "default", "uuid-mc-001"))
 	require.NoError(t, err)
 	secret.ResourceVersion = "1"
 	client := makeTestClient(secret)
-	found, err := inventory.FindInventoryByReleaseName(context.Background(), client, "mc", "default")
+	found, err := inventory.FindInventoryByInstanceName(context.Background(), client, "mc", "default")
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.Equal(t, "minecraft", found.ModuleMetadata.Name)
-	assert.Equal(t, "mc", found.ReleaseMetadata.ReleaseName)
+	assert.Equal(t, "mc", found.InstanceMetadata.InstanceName)
 }
 
 func TestLegacyCreatedByDefaultsToCLI(t *testing.T) {

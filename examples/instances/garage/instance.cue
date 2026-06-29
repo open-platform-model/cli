@@ -1,9 +1,9 @@
-// Garage release example.
+// Garage instance example.
 // Imports the public garage module (opmodel.dev/modules/garage@v0)
-// and binds it to a ModuleRelease.
+// and binds it to a ModuleInstance.
 //
-// Build:   opm release build ./examples/releases/garage/release.cue
-// Apply:   opm release apply ./examples/releases/garage/release.cue --create-namespace
+// Build:   opm instance build ./examples/instances/garage/instance.cue
+// Apply:   opm instance apply ./examples/instances/garage/instance.cue --create-namespace
 package garage
 
 import (
@@ -11,7 +11,7 @@ import (
 	m "opmodel.dev/modules/garage@v0"
 )
 
-mr.#ModuleRelease
+mr.#ModuleInstance
 
 metadata: {
 	name:      "garage"

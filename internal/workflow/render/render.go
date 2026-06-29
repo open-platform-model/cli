@@ -20,51 +20,51 @@ import (
 	pkgrender "github.com/opmodel/cli/pkg/render"
 )
 
-// FromReleaseFile prepares and renders a release from a declarative #ModuleRelease CUE file.
-// It parses the release file, resolves values, and renders through the pipeline. The release
+// FromInstanceFile prepares and renders an instance from a declarative #ModuleInstance CUE file.
+// It parses the instance file, resolves values, and renders through the pipeline. The instance
 // file must import a module to fill #module. This is typically used by platform operators to
-// deploy configured instances of modules (e.g., via "opm instance apply my-app-release.cue").
-func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error) {
+// deploy configured instances of modules (e.g., via "opm instance apply my-app-instance.cue").
+func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, error) {
 	if opts.Config == nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
 	}
 	if opts.K8sConfig == nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("kubernetes config not resolved")}
 	}
-	if opts.ReleaseFilePath == "" {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("release file path is required")}
+	if opts.InstanceFilePath == "" {
+		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("instance file path is required")}
 	}
 
 	namespace := opts.K8sConfig.Namespace.Value
 	providerName := opts.K8sConfig.Provider.Value
 
-	output.Debug("rendering from release file", "file", opts.ReleaseFilePath, "namespace", namespace, "provider", providerName)
+	output.Debug("rendering from instance file", "file", opts.InstanceFilePath, "namespace", namespace, "provider", providerName)
 
 	cueCtx := opts.Config.CueContext
-	if pathErr := cmdutil.ValidateReleaseInputPath(opts.ReleaseFilePath); pathErr != nil {
+	if pathErr := cmdutil.ValidateInstanceInputPath(opts.InstanceFilePath); pathErr != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: pathErr}
 	}
-	fileRelease, err := internalinstancefile.GetInstanceFile(cueCtx, opts.ReleaseFilePath)
+	fileInstance, err := internalinstancefile.GetInstanceFile(cueCtx, opts.InstanceFilePath)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
-	parseData := fileRelease.Module
+	parseData := fileInstance.Module
 
-	// Verify #module is filled in the release file.
+	// Verify #module is filled in the instance file.
 	moduleVal := parseData.Spec.LookupPath(cue.MakePath(cue.Def("module")))
 	if !moduleVal.Exists() || moduleVal.Validate(cue.Concrete(true)) != nil {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("#module is not filled in the release file — import a module to fill it")}
+		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("#module is not filled in the instance file — import a module to fill it")}
 	}
 
 	// Resolve values from --values files, auto-discovered values.cue, or inline values.
-	valuesVals, err := resolveReleaseValues(cueCtx, parseData.Spec, opts.ReleaseFilePath, opts.ValuesFiles)
+	valuesVals, err := resolveInstanceValues(cueCtx, parseData.Spec, opts.InstanceFilePath, opts.ValuesFiles)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	// Prepare the release: validate values, fill, check concreteness, decode metadata.
+	// Prepare the instance: validate values, fill, check concreteness, decode metadata.
 	rel, err := pkgmodule.ParseModuleInstance(ctx, parseData.Spec, parseData.Module, valuesVals)
 	if err != nil {
 		printValidationError(err)
@@ -81,12 +81,12 @@ func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
 	}
 
-	return renderPreparedModuleRelease(ctx, rel, p)
+	return renderPreparedModuleInstance(ctx, rel, p)
 }
 
-// renderPreparedModuleRelease runs the render engine on a fully prepared release
+// renderPreparedModuleInstance runs the render engine on a fully prepared instance
 // and converts the result to unstructured resources.
-func renderPreparedModuleRelease(
+func renderPreparedModuleInstance(
 	ctx context.Context,
 	rel *pkgmodule.Instance,
 	p *provider.Provider,
@@ -108,7 +108,7 @@ func renderPreparedModuleRelease(
 
 	return &Result{
 		Resources:  resources,
-		Release:    *rel.Metadata,
+		Instance:   *rel.Metadata,
 		Module:     *rel.Module.Metadata,
 		Components: engineResult.Components,
 		MatchPlan:  engineResult.MatchPlan,

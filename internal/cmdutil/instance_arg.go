@@ -30,22 +30,18 @@ type InstanceArg struct {
 	Namespace string
 }
 
-// ToSelectorFlags builds a ReleaseSelectorFlags from the resolved arg.
+// ToSelectorFlags builds an InstanceSelectorFlags from the resolved arg.
 // namespaceFlag (the --namespace CLI flag) overrides the file-derived Namespace
 // when non-empty, matching the precedence: flag > file > config default.
-//
-// Note: the returned flag bundle is still named ReleaseSelectorFlags — that type
-// (and its --release-name/--release-id flags) is renamed in the X4 slice; this
-// cross-type reference compiles unchanged in the meantime.
-func (r InstanceArg) ToSelectorFlags(namespaceFlag string) *ReleaseSelectorFlags {
+func (r InstanceArg) ToSelectorFlags(namespaceFlag string) *InstanceSelectorFlags {
 	ns := namespaceFlag
 	if ns == "" {
 		ns = r.Namespace
 	}
-	return &ReleaseSelectorFlags{
-		ReleaseName: r.Name,
-		ReleaseID:   r.UUID,
-		Namespace:   ns,
+	return &InstanceSelectorFlags{
+		InstanceName: r.Name,
+		InstanceID:   r.UUID,
+		Namespace:    ns,
 	}
 }
 
@@ -74,7 +70,7 @@ func ResolveInstanceArg(arg string, cfg *config.GlobalConfig) (InstanceArg, erro
 	if isInstancePath(arg) {
 		return resolveInstanceArgFromFile(arg, cfg)
 	}
-	name, uuid := ResolveReleaseIdentifier(arg)
+	name, uuid := ResolveInstanceIdentifier(arg)
 	return InstanceArg{Name: name, UUID: uuid}, nil
 }
 
@@ -99,7 +95,7 @@ func isInstancePath(arg string) bool {
 // containing one) and extracts the instance name and namespace from its
 // metadata. Was: resolveReleaseArgFromFile.
 func resolveInstanceArgFromFile(arg string, cfg *config.GlobalConfig) (InstanceArg, error) {
-	if err := ValidateReleaseInputPath(arg); err != nil {
+	if err := ValidateInstanceInputPath(arg); err != nil {
 		return InstanceArg{}, err
 	}
 
@@ -123,7 +119,7 @@ func resolveInstanceArgFromFile(arg string, cfg *config.GlobalConfig) (InstanceA
 
 // extractInstanceFileIdentity reads the instance name and namespace from the
 // metadata struct of an already-loaded CUE instance value. Was:
-// extractReleaseFileIdentity.
+// extractInstanceFileIdentity.
 //
 // name must be a concrete string; namespace is extracted best-effort (an
 // incomplete or constrained namespace value is silently ignored so the caller

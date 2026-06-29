@@ -101,7 +101,7 @@ func TestConfig_Valid(t *testing.T) {
 	}`)
 	require.NoError(t, values.Err())
 
-	_, err := Config(schema, []cue.Value{values}, "module", "test-release")
+	_, err := Config(schema, []cue.Value{values}, "module", "test-instance")
 	assert.Nil(t, err, "valid values should produce no error")
 }
 
@@ -119,12 +119,12 @@ func TestConfig_TypeMismatch(t *testing.T) {
 	}`)
 	require.NoError(t, values.Err())
 
-	_, cfgErr := Config(schema, []cue.Value{values}, "module", "my-release")
+	_, cfgErr := Config(schema, []cue.Value{values}, "module", "my-instance")
 	require.NotNil(t, cfgErr, "type mismatch should produce ConfigError")
 	assert.IsType(t, &oerrors.ConfigError{}, cfgErr)
 	assert.Equal(t, "module", cfgErr.Context)
-	assert.Equal(t, "my-release", cfgErr.Name)
-	assert.Contains(t, cfgErr.Error(), "my-release")
+	assert.Equal(t, "my-instance", cfgErr.Name)
+	assert.Contains(t, cfgErr.Error(), "my-instance")
 }
 
 func TestConfig_MissingRequired(t *testing.T) {
@@ -143,9 +143,9 @@ func TestConfig_MissingRequired(t *testing.T) {
 	}`)
 	require.NoError(t, values.Err())
 
-	_, cfgErr := Config(schema, []cue.Value{values}, "module", "incomplete-release")
+	_, cfgErr := Config(schema, []cue.Value{values}, "module", "incomplete-instance")
 	require.NotNil(t, cfgErr, "missing required field should produce ConfigError")
-	assert.Equal(t, "incomplete-release", cfgErr.Name)
+	assert.Equal(t, "incomplete-instance", cfgErr.Name)
 }
 
 func TestConfig_MissingSchema(t *testing.T) {

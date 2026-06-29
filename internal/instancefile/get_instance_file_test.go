@@ -39,7 +39,7 @@ func TestGetInstanceFile_UnknownKind(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "instance.cue")
 	require.NoError(t, os.WriteFile(path, []byte(`package test
-kind: "MysteryRelease"
+kind: "MysteryKind"
 `), 0o644))
 
 	_, err := GetInstanceFile(cuecontext.New(), path)

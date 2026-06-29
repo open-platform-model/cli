@@ -16,7 +16,7 @@ import (
 
 // NewInstanceVetCmd creates the instance vet command.
 func NewInstanceVetCmd(cfg *config.GlobalConfig) *cobra.Command {
-	var rff cmdutil.ReleaseFileFlags
+	var rff cmdutil.InstanceFileFlags
 	var namespace string
 
 	c := &cobra.Command{
@@ -50,7 +50,7 @@ Examples:
 }
 
 // runInstanceVet executes the instance vet command.
-func runInstanceVet(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, namespaceFlag string) error {
+func runInstanceVet(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.InstanceFileFlags, namespaceFlag string) error {
 	ctx := context.Background()
 
 	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
@@ -62,11 +62,11 @@ func runInstanceVet(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
-	result, err := render.FromReleaseFile(ctx, render.ReleaseFileOpts{
-		ReleaseFilePath: instanceFile,
-		ValuesFiles:     rff.Values,
-		K8sConfig:       k8sConfig,
-		Config:          cfg,
+	result, err := render.FromInstanceFile(ctx, render.InstanceFileOpts{
+		InstanceFilePath: instanceFile,
+		ValuesFiles:      rff.Values,
+		K8sConfig:        k8sConfig,
+		Config:           cfg,
 	})
 	if err != nil {
 		return err
@@ -74,18 +74,18 @@ func runInstanceVet(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.
 
 	render.ShowOutput(result, render.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
 
-	releaseLog := output.ReleaseLogger(result.Release.Name)
+	instanceLog := output.InstanceLogger(result.Instance.Name)
 
 	// Print per-resource validation lines (skip when --verbose already showed them)
 	if !cfg.Flags.Verbose {
 		for _, res := range result.Resources {
 			line := output.FormatResourceLine(res.GetKind(), res.GetNamespace(), res.GetName(), output.StatusValid)
-			releaseLog.Info(line)
+			instanceLog.Info(line)
 		}
 	}
 
 	summary := fmt.Sprintf("Instance valid (%d resources)", result.ResourceCount())
-	releaseLog.Info(output.FormatCheckmark(summary))
+	instanceLog.Info(output.FormatCheckmark(summary))
 
 	return nil
 }

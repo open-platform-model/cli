@@ -58,7 +58,7 @@ func TestLoadInstanceFile(t *testing.T) {
 	ctx := cuecontext.New()
 
 	t.Run("valid ModuleInstance file", func(t *testing.T) {
-		filePath := makeInstanceFileFixture(t, "instance.cue", `package releases
+		filePath := makeInstanceFileFixture(t, "instance.cue", `package instances
 
 kind: "ModuleInstance"
 metadata: name: "my-instance"
@@ -74,7 +74,7 @@ metadata: name: "my-instance"
 	})
 
 	t.Run("invalid CUE syntax", func(t *testing.T) {
-		filePath := makeInstanceFileFixture(t, "bad.cue", `package releases
+		filePath := makeInstanceFileFixture(t, "bad.cue", `package instances
 
 this is not valid CUE !!!`)
 		_, _, err := LoadInstanceFile(ctx, filePath, LoadOptions{})
@@ -87,7 +87,7 @@ this is not valid CUE !!!`)
 	})
 
 	t.Run("returns parent directory", func(t *testing.T) {
-		filePath := makeInstanceFileFixture(t, "my_instance.cue", `package releases
+		filePath := makeInstanceFileFixture(t, "my_instance.cue", `package instances
 
 kind: "ModuleInstance"
 `)

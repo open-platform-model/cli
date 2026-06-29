@@ -22,11 +22,11 @@ import (
 // The test uses a minimal inline provider that reads #context.#runtimeName and
 // writes it to metadata.labels[app.kubernetes.io/managed-by] — the same wiring
 // the real catalog's #TransformerContext.controllerLabels performs. It also
-// confirms release-level labels (module-release.opmodel.dev/uuid) continue to
-// flow through #moduleReleaseMetadata.labels onto the output resource.
+// confirms instance-level labels (module-instance.opmodel.dev/uuid) continue to
+// flow through #moduleInstanceMetadata.labels onto the output resource.
 func TestRender_RuntimeName_StampsManagedByLabel(t *testing.T) {
 	cueCtx := cuecontext.New()
-	releaseUUID := "a3b8f2e1-7c4d-5a9e-b6f0-1234567890ab"
+	instanceUUID := "a3b8f2e1-7c4d-5a9e-b6f0-1234567890ab"
 
 	raw := cueCtx.CompileString(`{
 		metadata: {
@@ -66,11 +66,11 @@ func TestRender_RuntimeName_StampsManagedByLabel(t *testing.T) {
 						kind: "ConfigMap"
 						metadata: {
 							name: #context.#componentMetadata.name
-							namespace: #context.#moduleReleaseMetadata.namespace
+							namespace: #context.#moduleInstanceMetadata.namespace
 							labels: {
 								"app.kubernetes.io/managed-by": #context.#runtimeName
-								if #context.#moduleReleaseMetadata.labels != _|_ {
-									for k, v in #context.#moduleReleaseMetadata.labels {
+								if #context.#moduleInstanceMetadata.labels != _|_ {
+									for k, v in #context.#moduleInstanceMetadata.labels {
 										(k): "\(v)"
 									}
 								}
@@ -87,9 +87,9 @@ func TestRender_RuntimeName_StampsManagedByLabel(t *testing.T) {
 		Metadata: &module.InstanceMetadata{
 			Name:      "demo",
 			Namespace: "apps",
-			UUID:      releaseUUID,
+			UUID:      instanceUUID,
 			Labels: map[string]string{
-				core.LabelModuleReleaseUUID: releaseUUID,
+				core.LabelModuleInstanceUUID: instanceUUID,
 			},
 		},
 		Module: module.Module{Metadata: &module.ModuleMetadata{FQN: "example.com/modules/demo@v1", Version: "v1"}},
@@ -110,8 +110,8 @@ func TestRender_RuntimeName_StampsManagedByLabel(t *testing.T) {
 
 	assert.Equal(t, core.LabelManagedByValue, labels[core.LabelManagedBy],
 		"managed-by must equal the runtimeName the CLI supplies")
-	assert.NotEmpty(t, labels[core.LabelModuleReleaseUUID],
-		"module-release.opmodel.dev/uuid must flow through from release metadata labels")
+	assert.NotEmpty(t, labels[core.LabelModuleInstanceUUID],
+		"module-instance.opmodel.dev/uuid must flow through from instance metadata labels")
 }
 
 // TestRender_RuntimeName_EmptyFailsAtBoundary verifies that ProcessModuleInstance
@@ -149,7 +149,7 @@ func TestRender_RuntimeName_MissingFailsCUEEvaluation(t *testing.T) {
 
 	val := cueCtx.CompileString(`
 		#Ctx: {
-			#moduleReleaseMetadata: {
+			#moduleInstanceMetadata: {
 				name!:      string
 				namespace!: string
 				fqn:        string
@@ -163,7 +163,7 @@ func TestRender_RuntimeName_MissingFailsCUEEvaluation(t *testing.T) {
 		}
 
 		ctx: #Ctx & {
-			#moduleReleaseMetadata: {
+			#moduleInstanceMetadata: {
 				name:      "demo"
 				namespace: "apps"
 				fqn:       "example.com/modules/demo@v1"

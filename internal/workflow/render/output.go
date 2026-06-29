@@ -10,6 +10,6 @@ func ParseManifestOutputFormat(outputFmt string) (output.Format, error) {
 	return cmdutil.ParseManifestOutputFormat(outputFmt)
 }
 
-func WriteManifestOutput(resources []*unstructured.Unstructured, outputFormat output.Format, split bool, outDir, releaseName string) error {
-	return cmdutil.WriteManifestOutput(resources, outputFormat, split, outDir, releaseName)
+func WriteManifestOutput(resources []*unstructured.Unstructured, outputFormat output.Format, split bool, outDir, instanceName string) error {
+	return cmdutil.WriteManifestOutput(resources, outputFormat, split, outDir, instanceName)
 }

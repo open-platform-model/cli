@@ -33,7 +33,7 @@ func LoadInstanceFile(ctx *cue.Context, filePath string, opts LoadOptions) (cue.
 
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
-		return cue.Value{}, "", fmt.Errorf("resolving release file path: %w", err)
+		return cue.Value{}, "", fmt.Errorf("resolving instance file path: %w", err)
 	}
 
 	parentDir := filepath.Dir(absPath)
@@ -61,12 +61,12 @@ func LoadInstanceFile(ctx *cue.Context, filePath string, opts LoadOptions) (cue.
 		return cue.Value{}, "", fmt.Errorf("no CUE instances found for %s", absPath)
 	}
 	if instances[0].Err != nil {
-		return cue.Value{}, "", fmt.Errorf("loading release file: %w", instances[0].Err)
+		return cue.Value{}, "", fmt.Errorf("loading instance file: %w", instances[0].Err)
 	}
 
 	val := ctx.BuildInstance(instances[0])
 	if err := val.Err(); err != nil {
-		return cue.Value{}, "", fmt.Errorf("building release file: %w", err)
+		return cue.Value{}, "", fmt.Errorf("building instance file: %w", err)
 	}
 
 	return val, parentDir, nil

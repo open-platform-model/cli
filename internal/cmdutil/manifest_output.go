@@ -25,14 +25,14 @@ func ParseManifestOutputFormat(outputFmt string) (output.Format, error) {
 }
 
 // WriteManifestOutput writes manifests either to stdout or split files.
-func WriteManifestOutput(resources []*unstructured.Unstructured, outputFormat output.Format, split bool, outDir, releaseName string) error {
-	releaseLog := output.ReleaseLogger(releaseName)
+func WriteManifestOutput(resources []*unstructured.Unstructured, outputFormat output.Format, split bool, outDir, instanceName string) error {
+	instanceLog := output.InstanceLogger(instanceName)
 	if split {
 		splitOpts := output.SplitOptions{OutDir: outDir, Format: outputFormat}
 		if err := output.WriteSplitManifests(resources, splitOpts); err != nil {
 			return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("writing split manifests: %w", err)}
 		}
-		releaseLog.Info(fmt.Sprintf("wrote %d resources to %s", len(resources), outDir))
+		instanceLog.Info(fmt.Sprintf("wrote %d resources to %s", len(resources), outDir))
 		return nil
 	}
 

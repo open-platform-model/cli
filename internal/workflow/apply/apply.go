@@ -47,20 +47,20 @@ type Request struct {
 
 func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orchestration for apply flow spans validation, apply, prune, and inventory write
 	result := req.Result
-	releaseLog := req.Log
-	namespace := result.Release.Namespace
+	instanceLog := req.Log
+	namespace := result.Instance.Namespace
 
-	if err := EnsureNamespaceIfRequested(ctx, req.K8sClient, namespace, req.Options.CreateNS, req.Options.DryRun, releaseLog); err != nil {
+	if err := EnsureNamespaceIfRequested(ctx, req.K8sClient, namespace, req.Options.CreateNS, req.Options.DryRun, instanceLog); err != nil {
 		return err
 	}
 
 	manifestDigest := inventory.ComputeManifestDigest(result.Resources)
 	output.Debug("manifest digest computed", "digest", manifestDigest)
 
-	releaseID := result.Release.UUID
-	prevInventory := LoadPreviousInventory(ctx, req.K8sClient, result.Release.Name, namespace, releaseID, req.Options.DryRun, releaseLog)
+	instanceID := result.Instance.UUID
+	prevInventory := LoadPreviousInventory(ctx, req.K8sClient, result.Instance.Name, namespace, instanceID, req.Options.DryRun, instanceLog)
 	if prevInventory != nil {
-		if err := ownership.EnsureCLIMutable(string(prevInventory.NormalizedCreatedBy()), prevInventory.ReleaseMetadata.ReleaseName, prevInventory.ReleaseMetadata.ReleaseNamespace); err != nil {
+		if err := ownership.EnsureCLIMutable(string(prevInventory.NormalizedCreatedBy()), prevInventory.InstanceMetadata.InstanceName, prevInventory.InstanceMetadata.InstanceNamespace); err != nil {
 			return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 		}
 	}
@@ -68,7 +68,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	currentEntries := CurrentInventoryEntries(result.Resources)
 	staleSet := ComputeStaleInventorySet(prevEntries, currentEntries)
 
-	if err := GuardEmptyRender(len(result.Resources), prevEntries, req.Options.Force, releaseLog); err != nil {
+	if err := GuardEmptyRender(len(result.Resources), prevEntries, req.Options.Force, instanceLog); err != nil {
 		return err
 	}
 	if len(result.Resources) == 0 && len(prevEntries) == 0 {
@@ -80,58 +80,58 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	}
 
 	if req.Options.DryRun {
-		releaseLog.Info("dry run - no changes will be made")
+		instanceLog.Info("dry run - no changes will be made")
 	}
 	if len(result.Resources) > 0 {
-		releaseLog.Info(fmt.Sprintf("applying %d resources", len(result.Resources)))
+		instanceLog.Info(fmt.Sprintf("applying %d resources", len(result.Resources)))
 	}
 
 	var applyResult *kubernetes.ApplyResult
 	if len(result.Resources) > 0 {
 		var err error
-		applyResult, err = kubernetes.Apply(ctx, req.K8sClient, result.Resources, result.Release.Name, kubernetes.ApplyOptions{DryRun: req.Options.DryRun})
+		applyResult, err = kubernetes.Apply(ctx, req.K8sClient, result.Resources, result.Instance.Name, kubernetes.ApplyOptions{DryRun: req.Options.DryRun})
 		if err != nil {
-			releaseLog.Error("apply failed", "error", err)
+			instanceLog.Error("apply failed", "error", err)
 			return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 		}
 
 		if len(applyResult.Errors) > 0 {
-			releaseLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(applyResult.Errors)))
+			instanceLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(applyResult.Errors)))
 			for _, e := range applyResult.Errors {
-				releaseLog.Error(e.Error())
+				instanceLog.Error(e.Error())
 			}
 		}
 
 		if req.Options.DryRun {
-			releaseLog.Info(fmt.Sprintf("dry run complete: %d resources would be applied", applyResult.Applied))
+			instanceLog.Info(fmt.Sprintf("dry run complete: %d resources would be applied", applyResult.Applied))
 		} else {
-			releaseLog.Info(FormatApplySummary(applyResult))
+			instanceLog.Info(FormatApplySummary(applyResult))
 		}
 	}
 
-	if !req.Options.DryRun && releaseID != "" {
+	if !req.Options.DryRun && instanceID != "" {
 		applyHadErrors := applyResult != nil && len(applyResult.Errors) > 0
 		if applyHadErrors {
-			releaseLog.Warn("apply had errors — skipping pruning and inventory write")
+			instanceLog.Warn("apply had errors — skipping pruning and inventory write")
 			return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)), Printed: true}
 		}
 
 		if len(staleSet) > 0 && !req.Options.NoPrune {
-			releaseLog.Info(fmt.Sprintf("pruning %d stale resource(s)", len(staleSet)))
+			instanceLog.Info(fmt.Sprintf("pruning %d stale resource(s)", len(staleSet)))
 			if err := inventory.PruneStaleResources(ctx, req.K8sClient, staleSet); err != nil {
-				releaseLog.Warn("pruning stale resources failed", "error", err)
+				instanceLog.Warn("pruning stale resources failed", "error", err)
 			}
 		}
 
 		newOrUpdatedInventory := prevInventory
 		if newOrUpdatedInventory == nil {
-			newOrUpdatedInventory = &inventory.ReleaseInventoryRecord{
-				ReleaseMetadata: inventory.ReleaseMetadata{
-					Kind:             "ModuleRelease",
-					APIVersion:       "core.opmodel.dev/v1alpha1",
-					ReleaseName:      result.Release.Name,
-					ReleaseNamespace: namespace,
-					ReleaseID:        releaseID,
+			newOrUpdatedInventory = &inventory.InstanceInventoryRecord{
+				InstanceMetadata: inventory.InstanceMetadata{
+					Kind:              "ModuleInstance",
+					APIVersion:        inventory.APIVersionV1Alpha1,
+					InstanceName:      result.Instance.Name,
+					InstanceNamespace: namespace,
+					InstanceID:        instanceID,
 				},
 			}
 		}
@@ -140,7 +140,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		if prevInventory != nil && prevInventory.Inventory.Revision > 0 {
 			revision = prevInventory.Inventory.Revision + 1
 		}
-		newOrUpdatedInventory.ReleaseMetadata.LastTransitionTime = time.Now().UTC().Format(time.RFC3339)
+		newOrUpdatedInventory.InstanceMetadata.LastTransitionTime = time.Now().UTC().Format(time.RFC3339)
 		newOrUpdatedInventory.Inventory = pkginventory.Inventory{
 			Revision: revision,
 			Digest:   inventory.ComputeDigest(currentEntries),
@@ -149,7 +149,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		}
 
 		if err := inventory.WriteInventory(ctx, req.K8sClient, newOrUpdatedInventory, req.ModuleName, req.ModuleUUID, req.Change.Version, inventory.CreatedByCLI); err != nil {
-			releaseLog.Warn("failed to write inventory Secret", "error", err)
+			instanceLog.Warn("failed to write inventory Secret", "error", err)
 		} else {
 			output.Debug("inventory written", "revision", revision)
 		}
@@ -170,40 +170,40 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	return nil
 }
 
-func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Client, namespace string, createNS, dryRun bool, releaseLog *log.Logger) error {
+func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Client, namespace string, createNS, dryRun bool, instanceLog *log.Logger) error {
 	if !createNS || namespace == "" {
 		return nil
 	}
 
 	created, err := k8sClient.EnsureNamespace(ctx, namespace, dryRun)
 	if err != nil {
-		releaseLog.Error("ensuring namespace", "error", err)
+		instanceLog.Error("ensuring namespace", "error", err)
 		return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 	if created {
 		if dryRun {
-			releaseLog.Info(fmt.Sprintf("namespace %q would be created", namespace))
+			instanceLog.Info(fmt.Sprintf("namespace %q would be created", namespace))
 		} else {
-			releaseLog.Info(fmt.Sprintf("namespace %q created", namespace))
+			instanceLog.Info(fmt.Sprintf("namespace %q created", namespace))
 		}
 	}
 	return nil
 }
 
-func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, releaseName, namespace, releaseID string, dryRun bool, releaseLog *log.Logger) *inventory.ReleaseInventoryRecord {
-	if releaseID == "" || dryRun {
+func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, instanceName, namespace, instanceID string, dryRun bool, instanceLog *log.Logger) *inventory.InstanceInventoryRecord {
+	if instanceID == "" || dryRun {
 		return nil
 	}
 
-	prevInventory, err := inventory.GetInventory(ctx, k8sClient, releaseName, namespace, releaseID)
+	prevInventory, err := inventory.GetInventory(ctx, k8sClient, instanceName, namespace, instanceID)
 	if err != nil {
-		releaseLog.Warn("could not read inventory, proceeding without it", "error", err)
+		instanceLog.Warn("could not read inventory, proceeding without it", "error", err)
 		return nil
 	}
 	return prevInventory
 }
 
-func PreviousInventoryEntries(prevInventory *inventory.ReleaseInventoryRecord) []inventory.InventoryEntry {
+func PreviousInventoryEntries(prevInventory *inventory.InstanceInventoryRecord) []inventory.InventoryEntry {
 	if prevInventory == nil {
 		return nil
 	}
@@ -223,7 +223,7 @@ func ComputeStaleInventorySet(prevEntries, currentEntries []inventory.InventoryE
 	return inventory.ApplyComponentRenameSafetyCheck(staleSet, currentEntries)
 }
 
-func GuardEmptyRender(resourceCount int, prevEntries []inventory.InventoryEntry, force bool, releaseLog *log.Logger) error {
+func GuardEmptyRender(resourceCount int, prevEntries []inventory.InventoryEntry, force bool, instanceLog *log.Logger) error {
 	if resourceCount != 0 {
 		return nil
 	}
@@ -231,12 +231,12 @@ func GuardEmptyRender(resourceCount int, prevEntries []inventory.InventoryEntry,
 		return fmt.Errorf("render produced 0 resources but previous inventory has %d entries — this would prune all resources; use --force to proceed or --no-prune to skip pruning", len(prevEntries))
 	}
 	if len(prevEntries) == 0 {
-		releaseLog.Info("no resources to apply")
+		instanceLog.Info("no resources to apply")
 	}
 	return nil
 }
 
-func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, prevInventory *inventory.ReleaseInventoryRecord, dryRun bool, currentEntries []inventory.InventoryEntry) error {
+func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, prevInventory *inventory.InstanceInventoryRecord, dryRun bool, currentEntries []inventory.InventoryEntry) error {
 	if prevInventory != nil || dryRun {
 		return nil
 	}

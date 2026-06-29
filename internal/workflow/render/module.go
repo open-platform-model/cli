@@ -16,8 +16,8 @@ import (
 	pkgmodule "github.com/opmodel/cli/pkg/module"
 )
 
-// FromModule synthesizes a #ModuleRelease from a module-package directory and
-// renders it through the same pipeline as FromReleaseFile. Values come from
+// FromModule synthesizes a #ModuleInstance from a module-package directory and
+// renders it through the same pipeline as FromInstanceFile. Values come from
 // `-f` files when supplied, else from the module's `debugValues`.
 func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	if opts.Config == nil {
@@ -65,7 +65,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	if modName == "" {
 		modName = filepath.Base(opts.ModulePath)
 	}
-	output.Info(fmt.Sprintf("Building synthetic release %q for module %q", synthName, modName))
+	output.Info(fmt.Sprintf("Building synthetic instance %q for module %q", synthName, modName))
 
 	rel, err := pkgmodule.ParseModuleInstance(ctx, synth.Spec, mod, values)
 	if err != nil {
@@ -82,7 +82,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
 	}
 
-	return renderPreparedModuleRelease(ctx, rel, p)
+	return renderPreparedModuleInstance(ctx, rel, p)
 }
 
 // resolveModuleValues mirrors `opm module vet`: -f files override debugValues.

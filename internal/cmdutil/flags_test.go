@@ -24,7 +24,7 @@ func TestRenderFlags_AddTo(t *testing.T) {
 	assert.Equal(t, "n", nsFlag.Shorthand)
 	assert.Equal(t, "", nsFlag.DefValue)
 
-	rnFlag := cmd.Flags().Lookup("release-name")
+	rnFlag := cmd.Flags().Lookup("instance-name")
 	require.NotNil(t, rnFlag)
 	assert.Equal(t, "", rnFlag.DefValue)
 
@@ -47,8 +47,8 @@ func TestK8sFlags_AddTo(t *testing.T) {
 	assert.Equal(t, "", ctxFlag.DefValue)
 }
 
-func TestReleaseSelectorFlags_AddTo(t *testing.T) {
-	var rsf ReleaseSelectorFlags
+func TestInstanceSelectorFlags_AddTo(t *testing.T) {
+	var rsf InstanceSelectorFlags
 	cmd := &cobra.Command{Use: "test"}
 	rsf.AddTo(cmd)
 
@@ -56,45 +56,45 @@ func TestReleaseSelectorFlags_AddTo(t *testing.T) {
 	require.NotNil(t, nsFlag)
 	assert.Equal(t, "n", nsFlag.Shorthand)
 
-	rnFlag := cmd.Flags().Lookup("release-name")
+	rnFlag := cmd.Flags().Lookup("instance-name")
 	require.NotNil(t, rnFlag)
 
-	ridFlag := cmd.Flags().Lookup("release-id")
+	ridFlag := cmd.Flags().Lookup("instance-id")
 	require.NotNil(t, ridFlag)
 }
 
-func TestReleaseSelectorFlags_Validate(t *testing.T) {
+func TestInstanceSelectorFlags_Validate(t *testing.T) {
 	tests := []struct {
-		name        string
-		releaseName string
-		releaseID   string
-		wantErr     string
+		name         string
+		instanceName string
+		instanceID   string
+		wantErr      string
 	}{
 		{
-			name:        "both set",
-			releaseName: "my-app",
-			releaseID:   "abc-123",
-			wantErr:     "mutually exclusive",
+			name:         "both set",
+			instanceName: "my-app",
+			instanceID:   "abc-123",
+			wantErr:      "mutually exclusive",
 		},
 		{
 			name:    "neither set",
-			wantErr: "either --release-name or --release-id is required",
+			wantErr: "either --instance-name or --instance-id is required",
 		},
 		{
-			name:        "only release-name",
-			releaseName: "my-app",
+			name:         "only instance-name",
+			instanceName: "my-app",
 		},
 		{
-			name:      "only release-id",
-			releaseID: "abc-123",
+			name:       "only instance-id",
+			instanceID: "abc-123",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rsf := ReleaseSelectorFlags{
-				ReleaseName: tt.releaseName,
-				ReleaseID:   tt.releaseID,
+			rsf := InstanceSelectorFlags{
+				InstanceName: tt.instanceName,
+				InstanceID:   tt.instanceID,
 			}
 			err := rsf.Validate()
 			if tt.wantErr != "" {
@@ -107,44 +107,44 @@ func TestReleaseSelectorFlags_Validate(t *testing.T) {
 	}
 }
 
-func TestReleaseSelectorFlags_LogName(t *testing.T) {
+func TestInstanceSelectorFlags_LogName(t *testing.T) {
 	tests := []struct {
-		name        string
-		releaseName string
-		releaseID   string
-		want        string
+		name         string
+		instanceName string
+		instanceID   string
+		want         string
 	}{
 		{
-			name:        "release name set",
-			releaseName: "my-app",
-			releaseID:   "a1b2c3d4-e5f6-7890-abcd",
-			want:        "my-app",
+			name:         "instance name set",
+			instanceName: "my-app",
+			instanceID:   "a1b2c3d4-e5f6-7890-abcd",
+			want:         "my-app",
 		},
 		{
-			name:      "only release ID",
-			releaseID: "a1b2c3d4-e5f6-7890-abcd",
-			want:      "release:a1b2c3d4",
+			name:       "only instance ID",
+			instanceID: "a1b2c3d4-e5f6-7890-abcd",
+			want:       "instance:a1b2c3d4",
 		},
 		{
-			name:      "short release ID",
-			releaseID: "abc",
-			want:      "release:abc",
+			name:       "short instance ID",
+			instanceID: "abc",
+			want:       "instance:abc",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rsf := ReleaseSelectorFlags{
-				ReleaseName: tt.releaseName,
-				ReleaseID:   tt.releaseID,
+			rsf := InstanceSelectorFlags{
+				InstanceName: tt.instanceName,
+				InstanceID:   tt.instanceID,
 			}
 			assert.Equal(t, tt.want, rsf.LogName())
 		})
 	}
 }
 
-func TestReleaseFileFlags_AddTo(t *testing.T) {
-	var rff ReleaseFileFlags
+func TestInstanceFileFlags_AddTo(t *testing.T) {
+	var rff InstanceFileFlags
 	cmd := &cobra.Command{Use: "test"}
 	rff.AddTo(cmd)
 
@@ -157,7 +157,7 @@ func TestReleaseFileFlags_AddTo(t *testing.T) {
 	assert.Equal(t, "stringArray", valuesFlag.Value.Type())
 }
 
-func TestResolveReleaseIdentifier(t *testing.T) {
+func TestResolveInstanceIdentifier(t *testing.T) {
 	tests := []struct {
 		name     string
 		arg      string
@@ -165,13 +165,13 @@ func TestResolveReleaseIdentifier(t *testing.T) {
 		wantUUID string
 	}{
 		{
-			name:     "plain release name",
+			name:     "plain instance name",
 			arg:      "jellyfin",
 			wantName: "jellyfin",
 			wantUUID: "",
 		},
 		{
-			name:     "release name with hyphens",
+			name:     "instance name with hyphens",
 			arg:      "my-app-prod",
 			wantName: "my-app-prod",
 			wantUUID: "",
@@ -210,7 +210,7 @@ func TestResolveReleaseIdentifier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			name, uuid := ResolveReleaseIdentifier(tt.arg)
+			name, uuid := ResolveInstanceIdentifier(tt.arg)
 			assert.Equal(t, tt.wantName, name)
 			assert.Equal(t, tt.wantUUID, uuid)
 		})
@@ -226,7 +226,7 @@ func TestFlagGroupComposition(t *testing.T) {
 	kf.AddTo(cmd)
 
 	// All 6 flags should be registered
-	expectedFlags := []string{"values", "namespace", "release-name", "provider", "kubeconfig", "context"}
+	expectedFlags := []string{"values", "namespace", "instance-name", "provider", "kubeconfig", "context"}
 	for _, name := range expectedFlags {
 		flag := cmd.Flags().Lookup(name)
 		assert.NotNil(t, flag, "flag %q should be registered", name)

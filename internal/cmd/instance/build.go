@@ -17,7 +17,7 @@ import (
 
 // NewInstanceBuildCmd creates the instance build command.
 func NewInstanceBuildCmd(cfg *config.GlobalConfig) *cobra.Command {
-	var rff cmdutil.ReleaseFileFlags
+	var rff cmdutil.InstanceFileFlags
 	var namespace string
 	var nameFlag string
 
@@ -34,7 +34,7 @@ func NewInstanceBuildCmd(cfg *config.GlobalConfig) *cobra.Command {
 
 When the argument is an instance .cue file, it is loaded and rendered as-is.
 When the argument is a directory containing a module CUE package, the CLI
-synthesizes a #ModuleRelease around the module using the module's debugValues
+synthesizes a #ModuleInstance around the module using the module's debugValues
 (or values from -f) and renders it.
 
 Arguments:
@@ -70,7 +70,7 @@ Examples:
 }
 
 // runInstanceBuild executes the instance build command.
-func runInstanceBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, namespaceFlag, nameFlag, outputFmt string, split bool, outDir string) error {
+func runInstanceBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.InstanceFileFlags, namespaceFlag, nameFlag, outputFmt string, split bool, outDir string) error {
 	ctx := context.Background()
 
 	outputFormat, err := render.ParseManifestOutputFormat(outputFmt)
@@ -109,11 +109,11 @@ func runInstanceBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.Re
 		if nameFlag != "" {
 			output.Warn("--name is ignored for instance-file builds; it only applies to module-directory builds")
 		}
-		result, err = render.FromReleaseFile(ctx, render.ReleaseFileOpts{
-			ReleaseFilePath: buildArg,
-			ValuesFiles:     rff.Values,
-			K8sConfig:       k8sConfig,
-			Config:          cfg,
+		result, err = render.FromInstanceFile(ctx, render.InstanceFileOpts{
+			InstanceFilePath: buildArg,
+			ValuesFiles:      rff.Values,
+			K8sConfig:        k8sConfig,
+			Config:           cfg,
 		})
 	}
 	if err != nil {
@@ -122,5 +122,5 @@ func runInstanceBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.Re
 
 	render.ShowOutput(result, render.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
 
-	return render.WriteManifestOutput(result.Resources, outputFormat, split, outDir, result.Release.Name)
+	return render.WriteManifestOutput(result.Resources, outputFormat, split, outDir, result.Instance.Name)
 }

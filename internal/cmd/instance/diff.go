@@ -18,7 +18,7 @@ import (
 
 // NewInstanceDiffCmd creates the instance diff command.
 func NewInstanceDiffCmd(cfg *config.GlobalConfig) *cobra.Command {
-	var rff cmdutil.ReleaseFileFlags
+	var rff cmdutil.InstanceFileFlags
 	var kf cmdutil.K8sFlags
 	var namespace string
 
@@ -47,7 +47,7 @@ Examples:
 }
 
 // runInstanceDiff executes the instance diff command.
-func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, kf *cmdutil.K8sFlags, namespaceFlag string) error { //nolint:gocyclo // orchestration function; complexity is inherent
+func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.InstanceFileFlags, kf *cmdutil.K8sFlags, namespaceFlag string) error { //nolint:gocyclo // orchestration function; complexity is inherent
 	ctx := context.Background()
 
 	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
@@ -61,61 +61,61 @@ func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
-	result, err := render.FromReleaseFile(ctx, render.ReleaseFileOpts{
-		ReleaseFilePath: instanceFile,
-		ValuesFiles:     rff.Values,
-		K8sConfig:       k8sConfig,
-		Config:          cfg,
+	result, err := render.FromInstanceFile(ctx, render.InstanceFileOpts{
+		InstanceFilePath: instanceFile,
+		ValuesFiles:      rff.Values,
+		K8sConfig:        k8sConfig,
+		Config:           cfg,
 	})
 	if err != nil {
 		return err
 	}
 
-	releaseLog := output.ReleaseLogger(result.Release.Name)
+	instanceLog := output.InstanceLogger(result.Instance.Name)
 
 	if result.HasWarnings() {
 		for _, w := range result.Warnings {
-			releaseLog.Warn(w)
+			instanceLog.Warn(w)
 		}
 	}
 
 	if len(result.Resources) == 0 {
-		releaseLog.Info("no resources to diff")
+		instanceLog.Info("no resources to diff")
 		return nil
 	}
 
 	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
-		releaseLog.Error("connecting to cluster", "error", err)
+		instanceLog.Error("connecting to cluster", "error", err)
 		return err
 	}
 
 	comparer := kubernetes.NewComparer()
 
 	var diffOpts kubernetes.DiffOptions
-	releaseID := result.Release.UUID
-	if releaseID != "" {
-		inv, invErr := inventory.GetInventory(ctx, k8sClient, result.Release.Name, result.Release.Namespace, releaseID)
+	instanceID := result.Instance.UUID
+	if instanceID != "" {
+		inv, invErr := inventory.GetInventory(ctx, k8sClient, result.Instance.Name, result.Instance.Namespace, instanceID)
 		if invErr != nil {
-			releaseLog.Debug("could not read inventory for diff", "error", invErr)
+			instanceLog.Debug("could not read inventory for diff", "error", invErr)
 		} else if inv != nil {
 			liveResources, _, invDiscoverErr := inventory.DiscoverResourcesFromInventory(ctx, k8sClient, inv)
 			if invDiscoverErr != nil {
-				releaseLog.Debug("inventory discovery failed", "error", invDiscoverErr)
+				instanceLog.Debug("inventory discovery failed", "error", invDiscoverErr)
 			} else {
 				diffOpts.InventoryLive = liveResources
 			}
 		}
 	}
 
-	diffResult, err := kubernetes.Diff(ctx, k8sClient, result.Resources, result.Release.Name, comparer, diffOpts)
+	diffResult, err := kubernetes.Diff(ctx, k8sClient, result.Resources, result.Instance.Name, comparer, diffOpts)
 	if err != nil {
-		releaseLog.Error("diff failed", "error", err)
+		instanceLog.Error("diff failed", "error", err)
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
 	}
 
 	for _, w := range diffResult.Warnings {
-		releaseLog.Warn(w)
+		instanceLog.Warn(w)
 	}
 
 	if diffResult.IsEmpty() {

@@ -3,7 +3,7 @@
 package mc_java_fleet
 
 values: {
-	// releaseName must match the ModuleRelease metadata.name above.
+	// releaseName must match the ModuleInstance metadata.name above.
 	releaseName: "mc-java-fleet"
 	domain:      "mc.example.com"
 	namespace:   "default"

@@ -7,7 +7,7 @@
 //
 // Scenarios:
 //   - First apply: resources are created and an inventory Secret is written
-//     keyed on the synthetic release UUID.
+//     keyed on the synthetic instance UUID.
 //   - Idempotent re-apply: no new resources, inventory revision increments.
 //   - Dry-run: no inventory Secret, no resource creation.
 //   - Prune: re-applying with values_api_off.cue removes the api resources
@@ -43,9 +43,9 @@ const (
 	clusterContext = "kind-opm-dev"
 	testNamespace  = "opm-module-apply-itest"
 
-	// Synthetic release name: testdata module is "module-apply-itest" → "<module>-debug" by default.
+	// Synthetic instance name: testdata module is "module-apply-itest" → "<module>-debug" by default.
 	// We pass --name explicitly to keep the name deterministic in the assertions.
-	releaseName = "module-apply-itest"
+	instanceName = "module-apply-itest"
 
 	moduleFixture       = "tests/integration/module-apply/testdata"
 	valuesApiOffFixture = "tests/integration/module-apply/testdata/values_api_off.cue"
@@ -84,7 +84,7 @@ func main() {
 	stdout, stderr, exitCode := runModuleApply([]string{
 		moduleFixture,
 		"--context", clusterContext,
-		"--name", releaseName,
+		"--name", instanceName,
 		"-n", testNamespace,
 	})
 	if exitCode != 0 {
@@ -92,10 +92,10 @@ func main() {
 	}
 	fmt.Printf("   OK: apply succeeded (exit 0)\n")
 
-	releaseID := waitForReleaseUUID(ctx, client, releaseName, testNamespace)
-	fmt.Printf("   OK: release UUID resolved from inventory: %s\n", releaseID)
+	instanceID := waitForInstanceUUID(ctx, client, instanceName, testNamespace)
+	fmt.Printf("   OK: instance UUID resolved from inventory: %s\n", instanceID)
 
-	inv1, err := inventory.GetInventory(ctx, client, releaseName, testNamespace, releaseID)
+	inv1, err := inventory.GetInventory(ctx, client, instanceName, testNamespace, instanceID)
 	check("reading inventory after first apply", err)
 	if inv1 == nil {
 		failf("expected non-nil inventory after first apply")
@@ -127,7 +127,7 @@ func main() {
 	// top-level inventory record fields. The path round-trip is covered by
 	// the unit test for runModuleApply; here we just assert the inventory
 	// secret exists by name, which is a strong proxy.
-	secretName := inventory.SecretName(releaseName, releaseID)
+	secretName := inventory.SecretName(instanceName, instanceID)
 	if _, err := client.Clientset.CoreV1().Secrets(testNamespace).Get(ctx, secretName, metav1.GetOptions{}); err != nil {
 		failf("inventory Secret %q not found: %v", secretName, err)
 	}
@@ -141,14 +141,14 @@ func main() {
 	stdout, stderr, exitCode = runModuleApply([]string{
 		moduleFixture,
 		"--context", clusterContext,
-		"--name", releaseName,
+		"--name", instanceName,
 		"-n", testNamespace,
 	})
 	if exitCode != 0 {
 		failf("re-apply exited %d:\n%s\n%s", exitCode, stdout, stderr)
 	}
 
-	inv2, err := inventory.GetInventory(ctx, client, releaseName, testNamespace, releaseID)
+	inv2, err := inventory.GetInventory(ctx, client, instanceName, testNamespace, instanceID)
 	check("reading inventory after re-apply", err)
 	if inv2.Inventory.Revision <= inv1.Inventory.Revision {
 		failf("expected revision to increment after re-apply, got %d (was %d)", inv2.Inventory.Revision, inv1.Inventory.Revision)
@@ -167,7 +167,7 @@ func main() {
 	stdout, stderr, exitCode = runModuleApply([]string{
 		moduleFixture,
 		"--context", clusterContext,
-		"--name", releaseName,
+		"--name", instanceName,
 		"-n", testNamespace,
 		"--dry-run",
 	})
@@ -175,7 +175,7 @@ func main() {
 		failf("dry-run apply exited %d:\n%s\n%s", exitCode, stdout, stderr)
 	}
 
-	inv3, err := inventory.GetInventory(ctx, client, releaseName, testNamespace, releaseID)
+	inv3, err := inventory.GetInventory(ctx, client, instanceName, testNamespace, instanceID)
 	check("reading inventory after dry-run", err)
 	if inv3.Inventory.Revision != revBeforeDryRun {
 		failf("dry-run mutated inventory: revision %d → %d", revBeforeDryRun, inv3.Inventory.Revision)
@@ -190,7 +190,7 @@ func main() {
 	stdout, stderr, exitCode = runModuleApply([]string{
 		moduleFixture,
 		"--context", clusterContext,
-		"--name", releaseName,
+		"--name", instanceName,
 		"-n", testNamespace,
 		"-f", valuesApiOffFixture,
 	})
@@ -198,7 +198,7 @@ func main() {
 		failf("prune-mode apply exited %d:\n%s\n%s", exitCode, stdout, stderr)
 	}
 
-	inv4, err := inventory.GetInventory(ctx, client, releaseName, testNamespace, releaseID)
+	inv4, err := inventory.GetInventory(ctx, client, instanceName, testNamespace, instanceID)
 	check("reading inventory after prune-mode apply", err)
 	if inv4.Inventory.Revision <= inv3.Inventory.Revision {
 		failf("expected revision to increment after prune-mode re-apply, got %d (was %d)", inv4.Inventory.Revision, inv3.Inventory.Revision)
@@ -212,7 +212,7 @@ func main() {
 	fmt.Printf("   OK: inventory now tracks %d entries, api component pruned\n", len(inv4.Inventory.Entries))
 
 	// Verify the api Deployment is actually gone from the cluster.
-	apiDeploymentName := releaseName + "-api"
+	apiDeploymentName := instanceName + "-api"
 	waitForResourceAbsent(ctx, client, deploymentGVR, testNamespace, apiDeploymentName)
 	fmt.Printf("   OK: Deployment/%s is deleted (404)\n", apiDeploymentName)
 
@@ -263,18 +263,18 @@ func runModuleApply(args []string) (stdout, stderr string, exitCode int) {
 	return outBuf.String(), errBuf.String(), exitCode
 }
 
-// waitForReleaseUUID polls inventory.FindInventoryByReleaseName until the
-// inventory Secret exists, then returns the release UUID. The synthetic UUID
+// waitForInstanceUUID polls inventory.FindInventoryByInstanceName until the
+// inventory Secret exists, then returns the instance UUID. The synthetic UUID
 // is computed in CUE; we read it back from the cluster rather than predicting it.
-func waitForReleaseUUID(ctx context.Context, client *kubernetes.Client, name, ns string) string {
+func waitForInstanceUUID(ctx context.Context, client *kubernetes.Client, name, ns string) string {
 	deadline := time.Now().Add(15 * time.Second)
 	for {
-		inv, err := inventory.FindInventoryByReleaseName(ctx, client, name, ns)
+		inv, err := inventory.FindInventoryByInstanceName(ctx, client, name, ns)
 		if err == nil && inv != nil {
-			return inv.ReleaseMetadata.ReleaseID
+			return inv.InstanceMetadata.InstanceID
 		}
 		if time.Now().After(deadline) {
-			failf("timed out waiting for inventory Secret for release %q in %q", name, ns)
+			failf("timed out waiting for inventory Secret for instance %q in %q", name, ns)
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
@@ -282,7 +282,7 @@ func waitForReleaseUUID(ctx context.Context, client *kubernetes.Client, name, ns
 
 func containsComponent(entries []inventory.InventoryEntry, component string) bool {
 	for _, e := range entries {
-		// Inventory entry names are "<release>-<component>" by convention.
+		// Inventory entry names are "<instance>-<component>" by convention.
 		if strings.Contains(e.Name, "-"+component) {
 			return true
 		}

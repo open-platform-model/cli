@@ -107,7 +107,7 @@ func TestGetModuleEvents(t *testing.T) {
 	t.Run("UID filtering", func(t *testing.T) {
 		result, err := GetModuleEvents(context.Background(), client, EventsOptions{
 			Namespace:     "default",
-			ReleaseName:   "test",
+			InstanceName:  "test",
 			InventoryLive: []*unstructured.Unstructured{parentRes},
 		})
 		require.NoError(t, err)
@@ -122,7 +122,7 @@ func TestGetModuleEvents(t *testing.T) {
 		since := now.Add(-30 * time.Minute)
 		result, err := GetModuleEvents(context.Background(), client, EventsOptions{
 			Namespace:     "default",
-			ReleaseName:   "test",
+			InstanceName:  "test",
 			Since:         since,
 			InventoryLive: []*unstructured.Unstructured{parentRes},
 		})
@@ -134,7 +134,7 @@ func TestGetModuleEvents(t *testing.T) {
 	t.Run("type filtering", func(t *testing.T) {
 		result, err := GetModuleEvents(context.Background(), client, EventsOptions{
 			Namespace:     "default",
-			ReleaseName:   "test",
+			InstanceName:  "test",
 			EventType:     "Warning",
 			InventoryLive: []*unstructured.Unstructured{parentRes},
 		})
@@ -146,7 +146,7 @@ func TestGetModuleEvents(t *testing.T) {
 	t.Run("sort order ascending", func(t *testing.T) {
 		result, err := GetModuleEvents(context.Background(), client, EventsOptions{
 			Namespace:     "default",
-			ReleaseName:   "test",
+			InstanceName:  "test",
 			InventoryLive: []*unstructured.Unstructured{parentRes},
 		})
 		require.NoError(t, err)
@@ -161,7 +161,7 @@ func TestGetModuleEvents(t *testing.T) {
 		noMatchRes := makeParent("ConfigMap", "cfg", "default", "uid-no-match")
 		result, err := GetModuleEvents(context.Background(), client, EventsOptions{
 			Namespace:     "default",
-			ReleaseName:   "test",
+			InstanceName:  "test",
 			InventoryLive: []*unstructured.Unstructured{noMatchRes},
 		})
 		require.NoError(t, err)
@@ -171,7 +171,7 @@ func TestGetModuleEvents(t *testing.T) {
 	t.Run("no resources returns error", func(t *testing.T) {
 		_, err := GetModuleEvents(context.Background(), client, EventsOptions{
 			Namespace:     "default",
-			ReleaseName:   "test",
+			InstanceName:  "test",
 			InventoryLive: nil,
 		})
 		assert.Error(t, err)
@@ -206,8 +206,8 @@ func TestFormatEventsTable_Empty(t *testing.T) {
 
 func TestFormatEventsJSON(t *testing.T) {
 	result := &EventsResult{
-		ReleaseName: "test",
-		Namespace:   "default",
+		InstanceName: "test",
+		Namespace:    "default",
 		Events: []EventEntry{
 			{LastSeen: "2025-01-01T00:00:00Z", Type: "Normal", Kind: "Pod", Name: "web-x1", Reason: "Pulled", Message: "Image pulled", Count: 1},
 		},
@@ -219,14 +219,14 @@ func TestFormatEventsJSON(t *testing.T) {
 	var parsed EventsResult
 	err = json.Unmarshal([]byte(jsonStr), &parsed)
 	require.NoError(t, err)
-	assert.Equal(t, "test", parsed.ReleaseName)
+	assert.Equal(t, "test", parsed.InstanceName)
 	assert.Len(t, parsed.Events, 1)
 }
 
 func TestFormatEventsYAML(t *testing.T) {
 	result := &EventsResult{
-		ReleaseName: "test",
-		Namespace:   "default",
+		InstanceName: "test",
+		Namespace:    "default",
 		Events: []EventEntry{
 			{LastSeen: "2025-01-01T00:00:00Z", Type: "Warning", Kind: "Pod", Name: "web-x1", Reason: "BackOff", Message: "Back-off", Count: 5},
 		},
@@ -234,7 +234,7 @@ func TestFormatEventsYAML(t *testing.T) {
 
 	yamlStr, err := FormatEventsYAML(result)
 	require.NoError(t, err)
-	assert.Contains(t, yamlStr, "releaseName: test")
+	assert.Contains(t, yamlStr, "instanceName: test")
 	assert.Contains(t, yamlStr, "BackOff")
 }
 

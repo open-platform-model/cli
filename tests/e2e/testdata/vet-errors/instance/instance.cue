@@ -1,9 +1,9 @@
 package demo
 
-kind: "ModuleRelease"
+kind: "ModuleInstance"
 
 metadata: {
-	name:      "demo-release"
+	name:      "demo-instance"
 	namespace: "default"
 }
 

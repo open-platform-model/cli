@@ -56,10 +56,10 @@ func (e *resourceError) Error() string {
 
 // Apply performs server-side apply for a set of rendered resources.
 // Resources are assumed to be already ordered by weight (from RenderResult).
-// releaseName is used for logging only.
-func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstructured, releaseName string, opts ApplyOptions) (*ApplyResult, error) {
+// instanceName is used for logging only.
+func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstructured, instanceName string, opts ApplyOptions) (*ApplyResult, error) {
 	result := &ApplyResult{}
-	releaseLog := output.ReleaseLogger(releaseName)
+	instanceLog := output.InstanceLogger(instanceName)
 
 	for _, res := range resources {
 		kind := res.GetKind()
@@ -69,7 +69,7 @@ func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstru
 		// Apply the resource
 		status, err := applyResource(ctx, client, res, opts)
 		if err != nil {
-			releaseLog.Warn(fmt.Sprintf("applying %s/%s: %v", kind, name, err))
+			instanceLog.Warn(fmt.Sprintf("applying %s/%s: %v", kind, name, err))
 			result.Errors = append(result.Errors, resourceError{
 				Kind:      kind,
 				Name:      name,
@@ -88,7 +88,7 @@ func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstru
 		case output.StatusUnchanged:
 			result.Unchanged++
 		}
-		releaseLog.Info(output.FormatResourceLine(kind, ns, name, status))
+		instanceLog.Info(output.FormatResourceLine(kind, ns, name, status))
 	}
 
 	return result, nil

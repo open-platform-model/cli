@@ -8,11 +8,11 @@ import (
 )
 
 func TestEnsureCLIMutable_AllowsLegacyAndCLI(t *testing.T) {
-	assert.NoError(t, EnsureCLIMutable("", "my-release", "default"))
-	assert.NoError(t, EnsureCLIMutable(CreatedByCLI, "my-release", "default"))
+	assert.NoError(t, EnsureCLIMutable("", "my-instance", "default"))
+	assert.NoError(t, EnsureCLIMutable(CreatedByCLI, "my-instance", "default"))
 }
 
-func TestEnsureCLIMutable_BlocksControllerManagedRelease(t *testing.T) {
+func TestEnsureCLIMutable_BlocksControllerManagedInstance(t *testing.T) {
 	err := EnsureCLIMutable(CreatedByController, "demo", "apps")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "controller-managed")

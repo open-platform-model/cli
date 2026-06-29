@@ -28,42 +28,42 @@ func ParseStatusOutputFormat(outputFmt string) (output.Format, error) {
 func ResolveInventory(
 	ctx context.Context,
 	client *kubernetes.Client,
-	rsf *cmdutil.ReleaseSelectorFlags,
+	rsf *cmdutil.InstanceSelectorFlags,
 	namespace string,
-	releaseLog *log.Logger,
-) (inv *inventory.ReleaseInventoryRecord, live []*unstructured.Unstructured, missing []inventory.InventoryEntry, err error) {
+	instanceLog *log.Logger,
+) (inv *inventory.InstanceInventoryRecord, live []*unstructured.Unstructured, missing []inventory.InventoryEntry, err error) {
 	var invErr error
 	switch {
-	case rsf.ReleaseID != "":
-		relName := rsf.ReleaseName
+	case rsf.InstanceID != "":
+		relName := rsf.InstanceName
 		if relName == "" {
-			relName = rsf.ReleaseID
+			relName = rsf.InstanceID
 		}
-		inv, invErr = inventory.GetInventory(ctx, client, relName, namespace, rsf.ReleaseID)
-	case rsf.ReleaseName != "":
-		inv, invErr = inventory.FindInventoryByReleaseName(ctx, client, rsf.ReleaseName, namespace)
+		inv, invErr = inventory.GetInventory(ctx, client, relName, namespace, rsf.InstanceID)
+	case rsf.InstanceName != "":
+		inv, invErr = inventory.FindInventoryByInstanceName(ctx, client, rsf.InstanceName, namespace)
 	}
 
 	if invErr != nil {
-		releaseLog.Error("reading inventory", "error", invErr)
+		instanceLog.Error("reading inventory", "error", invErr)
 		err = &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("reading inventory: %w", invErr)}
 		return nil, nil, nil, err
 	}
 
 	if inv == nil {
-		name := rsf.ReleaseName
+		name := rsf.InstanceName
 		if name == "" {
-			name = rsf.ReleaseID
+			name = rsf.InstanceID
 		}
-		notFound := &kubernetes.ReleaseNotFoundError{Name: name, Namespace: namespace}
-		releaseLog.Error("release not found", "name", name, "namespace", namespace)
+		notFound := &kubernetes.InstanceNotFoundError{Name: name, Namespace: namespace}
+		instanceLog.Error("instance not found", "name", name, "namespace", namespace)
 		err = &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: notFound, Printed: true}
 		return nil, nil, nil, err
 	}
 
 	liveResources, missingEntries, discoverErr := inventory.DiscoverResourcesFromInventory(ctx, client, inv)
 	if discoverErr != nil {
-		releaseLog.Error("discovering resources from inventory", "error", discoverErr)
+		instanceLog.Error("discovering resources from inventory", "error", discoverErr)
 		err = &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("discovering resources: %w", discoverErr)}
 		return nil, nil, nil, err
 	}
@@ -73,7 +73,7 @@ func ResolveInventory(
 	return inv, live, missing, nil
 }
 
-func BuildStatusOptions(namespace string, rsf *cmdutil.ReleaseSelectorFlags, outputFormat output.Format, verbose bool, inv *inventory.ReleaseInventoryRecord, liveResources []*unstructured.Unstructured, missingEntries []inventory.InventoryEntry) kubernetes.StatusOptions {
+func BuildStatusOptions(namespace string, rsf *cmdutil.InstanceSelectorFlags, outputFormat output.Format, verbose bool, inv *inventory.InstanceInventoryRecord, liveResources []*unstructured.Unstructured, missingEntries []inventory.InventoryEntry) kubernetes.StatusOptions {
 	componentMap := make(map[string]string)
 	for _, entry := range inv.Inventory.Entries {
 		key := entry.Kind + "/" + entry.Namespace + "/" + entry.Name
@@ -82,8 +82,8 @@ func BuildStatusOptions(namespace string, rsf *cmdutil.ReleaseSelectorFlags, out
 
 	statusOpts := kubernetes.StatusOptions{
 		Namespace:     namespace,
-		ReleaseName:   rsf.ReleaseName,
-		ReleaseID:     rsf.ReleaseID,
+		InstanceName:  rsf.InstanceName,
+		InstanceID:    rsf.InstanceID,
 		Version:       inv.ModuleMetadata.Version,
 		Owner:         string(inventory.NormalizeCreatedBy(inv.CreatedBy)),
 		ComponentMap:  componentMap,
@@ -102,28 +102,28 @@ func BuildStatusOptions(namespace string, rsf *cmdutil.ReleaseSelectorFlags, out
 	return statusOpts
 }
 
-func PrintReleaseStatus(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string) error {
-	releaseLog := output.ReleaseLogger(logName)
+func PrintInstanceStatus(ctx context.Context, client *kubernetes.Client, opts kubernetes.StatusOptions, logName string) error {
+	instanceLog := output.InstanceLogger(logName)
 
-	result, err := kubernetes.GetReleaseStatus(ctx, client, opts)
+	result, err := kubernetes.GetInstanceStatus(ctx, client, opts)
 	if err != nil {
 		if kubernetes.IsNoResourcesFound(err) {
-			releaseLog.Error("getting status", "error", err)
+			instanceLog.Error("getting status", "error", err)
 			return &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: err, Printed: true}
 		}
-		releaseLog.Error("getting status", "error", err)
+		instanceLog.Error("getting status", "error", err)
 		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
 	formatted, err := kubernetes.FormatStatus(result, opts.OutputFormat)
 	if err != nil {
-		releaseLog.Error("formatting status", "error", err)
+		instanceLog.Error("formatting status", "error", err)
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
 	}
 	output.Println(formatted)
 
 	if result.AggregateStatus != "Ready" && result.AggregateStatus != "Complete" {
-		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: fmt.Errorf("release %q: %d resource(s) not ready", opts.ReleaseName, result.Summary.NotReady), Printed: true}
+		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: fmt.Errorf("instance %q: %d resource(s) not ready", opts.InstanceName, result.Summary.NotReady), Printed: true}
 	}
 	return nil
 }

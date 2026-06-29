@@ -2,5 +2,5 @@
 // the CLI and other OPM components.
 //
 // It contains only ownership-focused data types and pure helpers for reasoning
-// about the current set of Kubernetes resources owned by a release.
+// about the current set of Kubernetes resources owned by an instance.
 package inventory

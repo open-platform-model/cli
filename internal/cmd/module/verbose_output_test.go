@@ -17,8 +17,8 @@ import (
 // testing output formatting without requiring a registry or real module render.
 func buildTestResult() *render.Result {
 	return &render.Result{
-		Release: module.InstanceMetadata{
-			Name:      "test-release",
+		Instance: module.InstanceMetadata{
+			Name:      "test-instance",
 			Namespace: "default",
 		},
 		Module: module.ModuleMetadata{
@@ -45,12 +45,12 @@ func buildTestResult() *render.Result {
 			{Object: map[string]interface{}{
 				"apiVersion": "apps/v1",
 				"kind":       "Deployment",
-				"metadata":   map[string]interface{}{"name": "test-release", "namespace": "default"},
+				"metadata":   map[string]interface{}{"name": "test-instance", "namespace": "default"},
 			}},
 			{Object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Service",
-				"metadata":   map[string]interface{}{"name": "test-release", "namespace": "default"},
+				"metadata":   map[string]interface{}{"name": "test-instance", "namespace": "default"},
 			}},
 		},
 		Warnings: []string{},
@@ -97,7 +97,7 @@ func TestVerboseOutput_TransformerMatches(t *testing.T) {
 
 		outputStr := buf.String()
 
-		assert.Contains(t, outputStr, "release", "verbose should contain release metadata")
+		assert.Contains(t, outputStr, "instance", "verbose should contain instance metadata")
 		assert.Contains(t, outputStr, "namespace=default", "verbose should show namespace")
 		assert.Contains(t, outputStr, "version=1.0.0", "verbose should show version")
 		assert.Contains(t, outputStr, "component: web", "verbose should show component name")

@@ -24,11 +24,11 @@ type EventsOptions struct {
 	// Namespace is the target namespace for events.
 	Namespace string
 
-	// ReleaseName identifies the release (for structured output metadata).
-	ReleaseName string
+	// InstanceName identifies the instance (for structured output metadata).
+	InstanceName string
 
-	// ReleaseID identifies the release by ID (for structured output metadata).
-	ReleaseID string
+	// InstanceID identifies the instance by ID (for structured output metadata).
+	InstanceID string
 
 	// Since is the time window cutoff. Only events with lastTimestamp after this are returned.
 	Since time.Time
@@ -45,10 +45,10 @@ type EventsOptions struct {
 
 // EventsResult is the structured output for JSON/YAML serialization.
 type EventsResult struct {
-	ReleaseName string       `json:"releaseName,omitempty" yaml:"releaseName,omitempty"`
-	ReleaseID   string       `json:"releaseId,omitempty" yaml:"releaseId,omitempty"`
-	Namespace   string       `json:"namespace" yaml:"namespace"`
-	Events      []EventEntry `json:"events" yaml:"events"`
+	InstanceName string       `json:"instanceName,omitempty" yaml:"instanceName,omitempty"`
+	InstanceID   string       `json:"instanceID,omitempty" yaml:"instanceID,omitempty"`
+	Namespace    string       `json:"namespace" yaml:"namespace"`
+	Events       []EventEntry `json:"events" yaml:"events"`
 }
 
 // EventEntry represents a single Kubernetes event in structured output.
@@ -63,15 +63,15 @@ type EventEntry struct {
 	FirstSeen string `json:"firstSeen,omitempty" yaml:"firstSeen,omitempty"`
 }
 
-// GetModuleEvents collects Kubernetes events for all resources belonging to a release,
+// GetModuleEvents collects Kubernetes events for all resources belonging to an instance,
 // including events from Kubernetes-owned children (Pods, ReplicaSets).
 //
 // Flow: discover children → collect UIDs → bulk fetch events → filter → sort.
 func GetModuleEvents(ctx context.Context, client *Client, opts EventsOptions) (*EventsResult, error) {
 	if len(opts.InventoryLive) == 0 {
 		return nil, &noResourcesFoundError{
-			ReleaseName: opts.ReleaseName,
-			Namespace:   opts.Namespace,
+			InstanceName: opts.InstanceName,
+			Namespace:    opts.Namespace,
 		}
 	}
 
@@ -129,10 +129,10 @@ func GetModuleEvents(ctx context.Context, client *Client, opts EventsOptions) (*
 
 	// Build result.
 	result := &EventsResult{
-		ReleaseName: opts.ReleaseName,
-		ReleaseID:   opts.ReleaseID,
-		Namespace:   opts.Namespace,
-		Events:      make([]EventEntry, 0, len(filtered)),
+		InstanceName: opts.InstanceName,
+		InstanceID:   opts.InstanceID,
+		Namespace:    opts.Namespace,
+		Events:       make([]EventEntry, 0, len(filtered)),
 	}
 
 	for i := range filtered {

@@ -1,4 +1,4 @@
-// Package loader provides functions to load providers and module releases
+// Package loader provides functions to load providers and module instances
 // from CUE module directories. These are the entry points for embedding
 // the OPM engine in other tools.
 package loader

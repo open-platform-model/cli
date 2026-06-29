@@ -70,7 +70,7 @@ func runInstanceStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.
 	cmdutil.LogResolvedKubernetesConfig(target.Namespace, target.K8sConfig.Kubeconfig.Value, target.K8sConfig.Context.Value)
 
 	logName := target.LogName
-	releaseLog := output.ReleaseLogger(logName)
+	instanceLog := output.InstanceLogger(logName)
 
 	outputFormat, err := query.ParseStatusOutputFormat(outputFmt)
 	if err != nil {
@@ -79,15 +79,15 @@ func runInstanceStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.
 
 	k8sClient, err := cmdutil.NewK8sClient(target.K8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
-		releaseLog.Error("connecting to cluster", "error", err)
+		instanceLog.Error("connecting to cluster", "error", err)
 		return err
 	}
 
-	inv, liveResources, missingEntries, err := query.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, releaseLog)
+	inv, liveResources, missingEntries, err := query.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, instanceLog)
 	if err != nil {
 		return err
 	}
 
 	statusOpts := query.BuildStatusOptions(target.Namespace, target.Selector, outputFormat, verbose, inv, liveResources, missingEntries)
-	return query.PrintReleaseStatus(ctx, k8sClient, statusOpts, logName)
+	return query.PrintInstanceStatus(ctx, k8sClient, statusOpts, logName)
 }

@@ -28,7 +28,7 @@ func NewK8sClient(k8sConfig *config.ResolvedKubernetesConfig, apiWarnings string
 
 // RequireNamespace returns an error if the resolved namespace is empty (i.e.
 // no namespace was provided via flag, environment variable, or config file).
-// Call this in commands that cannot derive their namespace from a release
+// Call this in commands that cannot derive their namespace from an instance
 // definition (list, status, tree, events, delete).
 func RequireNamespace(k8sConfig *config.ResolvedKubernetesConfig) error {
 	if k8sConfig.Namespace.Value == "" {

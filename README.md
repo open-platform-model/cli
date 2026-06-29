@@ -78,16 +78,16 @@ Use `opm instance` when you are starting from an instance file or when you want 
 
 ```bash
 # Validate an instance file
-opm instance vet ./releases/jellyfin/release.cue
+opm instance vet ./instances/jellyfin/instance.cue
 
 # Render manifests from an instance file
-opm instance build ./releases/jellyfin/release.cue
+opm instance build ./instances/jellyfin/instance.cue
 
 # Apply an instance file to the cluster
-opm instance apply ./releases/jellyfin/release.cue
+opm instance apply ./instances/jellyfin/instance.cue
 
 # Inspect deployed state by file, name, or UUID
-opm instance status ./releases/jellyfin/release.cue
+opm instance status ./instances/jellyfin/instance.cue
 opm instance status jellyfin -n media
 ```
 

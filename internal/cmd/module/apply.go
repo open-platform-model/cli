@@ -19,10 +19,10 @@ import (
 // NewModuleApplyCmd creates the module apply command.
 //
 // `opm module apply` deploys a module package directly to a Kubernetes cluster
-// via the synthetic `#ModuleRelease` flow. It is the deploy counterpart to
+// via the synthetic `#ModuleInstance` flow. It is the deploy counterpart to
 // `opm module build`. After the render stage, behavior is identical to
 // `opm instance apply` — inventory, prune, dry-run, and ownership semantics
-// all apply to the synthesized release.
+// all apply to the synthesized instance.
 func NewModuleApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var rf cmdutil.RenderFlags
 	var kf cmdutil.K8sFlags
@@ -37,18 +37,18 @@ func NewModuleApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "apply [path]",
-		Short: "Deploy a module to a cluster via synthetic release",
+		Short: "Deploy a module to a cluster via synthetic instance",
 		Long: `Deploy an OPM module package to a Kubernetes cluster by synthesizing
-a #ModuleRelease around it and applying the result. Values come from the
+a #ModuleInstance around it and applying the result. Values come from the
 module's debugValues (default) or from -f/--values files.
 
-The synthetic release defaults to "<module>-debug". --name and --namespace
-participate in release identity (different values produce different releases,
+The synthetic instance defaults to "<module>-debug". --name and --namespace
+participate in instance identity (different values produce different instances,
 each with its own inventory Secret). For persistent deploys, author a
-release.cue file and use 'opm instance apply' instead.
+instance.cue file and use 'opm instance apply' instead.
 
 When switching from 'opm module apply' to 'opm instance apply' (or vice versa)
-with a different release name, delete the previous release first to avoid
+with a different instance name, delete the previous instance first to avoid
 orphan inventory:
 
   opm instance delete <module>-debug
@@ -60,7 +60,7 @@ Examples:
   # Apply the current module using debugValues
   opm module apply
 
-  # Apply with a custom synthetic release name
+  # Apply with a custom synthetic instance name
   opm module apply ./my-module --name my-debug
 
   # Dry run against a specific namespace
@@ -73,7 +73,7 @@ Examples:
 
 	rf.AddTo(c)
 	kf.AddTo(c)
-	c.Flags().StringVar(&nameFlag, "name", "", "Override synthetic release name")
+	c.Flags().StringVar(&nameFlag, "name", "", "Override synthetic instance name")
 	c.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Server-side dry run (no changes made)")
 	c.Flags().BoolVar(&createNSFlag, "create-namespace", false, "Create target namespace if it does not exist")
 	c.Flags().BoolVar(&noPruneFlag, "no-prune", false, "Skip stale resource pruning")
@@ -99,7 +99,7 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 	if !info.IsDir() {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitGeneralError,
-			Err:  fmt.Errorf("module apply expects a directory; CUE packages span all files in a dir. Use 'opm instance apply %s' for a release file", modulePath),
+			Err:  fmt.Errorf("module apply expects a directory; CUE packages span all files in a dir. Use 'opm instance apply %s' for a instance file", modulePath),
 		}
 	}
 
@@ -132,25 +132,25 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 
 	render.ShowOutput(result, render.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
 
-	releaseLog := output.ReleaseLogger(result.Release.Name)
+	instanceLog := output.InstanceLogger(result.Instance.Name)
 
 	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
-		releaseLog.Error("connecting to cluster", "error", err)
+		instanceLog.Error("connecting to cluster", "error", err)
 		return err
 	}
 
 	return workflowapply.Execute(ctx, workflowapply.Request{
 		Result:    result,
 		K8sClient: k8sClient,
-		Log:       releaseLog,
+		Log:       instanceLog,
 		Options: workflowapply.Options{
 			DryRun:                 dryRun,
 			CreateNS:               createNS,
 			NoPrune:                noPrune,
 			Force:                  force,
-			SuccessUpToDateMessage: "Release up to date",
-			SuccessAppliedMessage:  "Release applied",
+			SuccessUpToDateMessage: "Instance up to date",
+			SuccessAppliedMessage:  "Instance applied",
 		},
 		Change: workflowapply.ChangeDescriptor{
 			Path:      absModulePath,

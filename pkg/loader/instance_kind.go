@@ -9,7 +9,7 @@ import (
 )
 
 // kindModuleInstance is the core@v1 module-instance wire kind (was
-// "ModuleRelease", enhancement 0002 D-X1.1).
+// "ModuleInstance", enhancement 0002 D-X1.1).
 const kindModuleInstance = "ModuleInstance"
 
 // DetectInstanceKind returns the kind field from an evaluated instance value.
@@ -37,7 +37,7 @@ func DetectInstanceKind(v cue.Value) (string, error) {
 
 // resolveInstanceFile resolves either an instance directory or direct file path.
 // Inside a directory the loader requires instance.cue (was release.cue, 0002 D9);
-// release.cue is not accepted as a fallback (D8 hard-rename, no alias).
+// instance.cue is not accepted as a fallback (D8 hard-rename, no alias).
 //
 // Was: resolveReleaseFile (enhancement 0002 D8 hard-rename).
 func resolveInstanceFile(path string) (string, error) {

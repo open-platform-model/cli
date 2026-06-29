@@ -10,9 +10,9 @@ import (
 	"github.com/opmodel/cli/pkg/module"
 )
 
-// moduleReleaseContextData is the Go-side mirror of #TransformerContext.#moduleReleaseMetadata.
+// moduleInstanceContextData is the Go-side mirror of #TransformerContext.#moduleInstanceMetadata.
 // Field names use json tags that match the CUE definition fields.
-type moduleReleaseContextData struct {
+type moduleInstanceContextData struct {
 	Name        string            `json:"name"`
 	Namespace   string            `json:"namespace"`
 	FQN         string            `json:"fqn"`
@@ -79,7 +79,7 @@ func executeTransforms(
 //  1. Look up the transformer's #transform from the provider raw value.
 //  2. Look up the component from dataComponents (already finalized — no constraints).
 //  3. FillPath #component with the data component value directly (no materialize needed).
-//  4. FillPath #context.* fields (name, namespace, #moduleReleaseMetadata, #componentMetadata).
+//  4. FillPath #context.* fields (name, namespace, #moduleInstanceMetadata, #componentMetadata).
 //     Metadata is read from schemaComponents which preserves definition fields.
 //  5. Look up and decode the output field.
 func executePair(
@@ -141,7 +141,7 @@ func executePair(
 		return nil, nil, fmt.Errorf("component %q / transformer %q: evaluating output: %w", compName, tfFQN, err)
 	}
 
-	releaseName := rel.Metadata.Name
+	instanceName := rel.Metadata.Name
 
 	// Decode the output into resources. Three supported forms:
 	//   1. List of resources  — cue.ListKind
@@ -153,13 +153,13 @@ func executePair(
 	// Transformer authors MUST ensure output conforms to one of these three forms.
 	switch outputVal.Kind() {
 	case cue.ListKind:
-		res, err := collectResourceList(outputVal, releaseName, compName, tfFQN)
+		res, err := collectResourceList(outputVal, instanceName, compName, tfFQN)
 		return res, warnings, err
 	case cue.StructKind:
 		if isSingleResource(outputVal) {
-			return []*core.Resource{{Value: outputVal, Release: releaseName, Component: compName, Transformer: tfFQN}}, warnings, nil
+			return []*core.Resource{{Value: outputVal, Instance: instanceName, Component: compName, Transformer: tfFQN}}, warnings, nil
 		}
-		res, err := collectResourceMap(outputVal, releaseName, compName, tfFQN)
+		res, err := collectResourceMap(outputVal, instanceName, compName, tfFQN)
 		return res, warnings, err
 	default:
 		return nil, nil, fmt.Errorf("component %q / transformer %q: unexpected output kind %s", compName, tfFQN, outputVal.Kind())
@@ -168,7 +168,7 @@ func executePair(
 
 // injectContext fills all #context fields into the unified transformer value.
 //
-// Uses typed structs (moduleReleaseContextData, componentContextData) encoded via
+// Uses typed structs (moduleInstanceContextData, componentContextData) encoded via
 // cueCtx.Encode() rather than manually constructed map[string]any values. This
 // keeps the injection type-safe and ensures the Go struct mirrors the CUE schema.
 //
@@ -187,10 +187,10 @@ func injectContext(
 ) (cue.Value, []string, error) {
 	var warnings []string
 
-	// #moduleReleaseMetadata — encode the typed struct directly.
-	// Combines fields from both ReleaseMetadata and ModuleMetadata to mirror
-	// the #TransformerContext.#moduleReleaseMetadata CUE schema.
-	mrmData := moduleReleaseContextData{
+	// #moduleInstanceMetadata — encode the typed struct directly.
+	// Combines fields from both InstanceMetadata and ModuleMetadata to mirror
+	// the #TransformerContext.#moduleInstanceMetadata CUE schema.
+	mrmData := moduleInstanceContextData{
 		Name:        rel.Metadata.Name,
 		Namespace:   rel.Metadata.Namespace,
 		FQN:         rel.Module.Metadata.FQN,
@@ -200,7 +200,7 @@ func injectContext(
 		Annotations: rel.Metadata.Annotations,
 	}
 	unified = unified.FillPath(
-		cue.MakePath(cue.Def("context"), cue.Def("moduleReleaseMetadata")),
+		cue.MakePath(cue.Def("context"), cue.Def("moduleInstanceMetadata")),
 		cueCtx.Encode(mrmData),
 	)
 
@@ -263,28 +263,28 @@ func isSingleResource(v cue.Value) bool {
 
 // collectResourceList wraps each item in a CUE list as a Resource,
 // keeping the CUE value intact without any intermediate decoding.
-func collectResourceList(v cue.Value, releaseName, compName, tfFQN string) ([]*core.Resource, error) {
+func collectResourceList(v cue.Value, instanceName, compName, tfFQN string) ([]*core.Resource, error) {
 	var resources []*core.Resource
 	iter, err := v.List()
 	if err != nil {
 		return nil, fmt.Errorf("component %q / transformer %q: iterating output list: %w", compName, tfFQN, err)
 	}
 	for iter.Next() {
-		resources = append(resources, &core.Resource{Value: iter.Value(), Release: releaseName, Component: compName, Transformer: tfFQN})
+		resources = append(resources, &core.Resource{Value: iter.Value(), Instance: instanceName, Component: compName, Transformer: tfFQN})
 	}
 	return resources, nil
 }
 
 // collectResourceMap wraps each field value in a CUE struct as a Resource,
 // keeping the CUE value intact without any intermediate decoding.
-func collectResourceMap(v cue.Value, releaseName, compName, tfFQN string) ([]*core.Resource, error) {
+func collectResourceMap(v cue.Value, instanceName, compName, tfFQN string) ([]*core.Resource, error) {
 	var resources []*core.Resource
 	iter, err := v.Fields()
 	if err != nil {
 		return nil, fmt.Errorf("component %q / transformer %q: iterating output map: %w", compName, tfFQN, err)
 	}
 	for iter.Next() {
-		resources = append(resources, &core.Resource{Value: iter.Value(), Release: releaseName, Component: compName, Transformer: tfFQN})
+		resources = append(resources, &core.Resource{Value: iter.Value(), Instance: instanceName, Component: compName, Transformer: tfFQN})
 	}
 	return resources, nil
 }

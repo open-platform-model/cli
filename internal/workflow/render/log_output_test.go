@@ -8,12 +8,12 @@ import (
 )
 
 func TestWriteTransformerMatches_NilMatchPlan(t *testing.T) {
-	result := &Result{Release: module.InstanceMetadata{Name: "test", Namespace: "default"}}
+	result := &Result{Instance: module.InstanceMetadata{Name: "test", Namespace: "default"}}
 	writeTransformerMatches(result)
 }
 
 func TestWriteVerboseMatchLog_NilMatchPlan(t *testing.T) {
-	result := &Result{Release: module.InstanceMetadata{Name: "test", Namespace: "default"}}
+	result := &Result{Instance: module.InstanceMetadata{Name: "test", Namespace: "default"}}
 	writeVerboseMatchLog(result)
 }
 

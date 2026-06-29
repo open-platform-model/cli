@@ -30,10 +30,10 @@ import (
 
 const (
 	clusterContext = "kind-opm-dev"
-	releaseName    = "opm-inv-apply-test"
+	instanceName   = "opm-inv-apply-test"
 	namespace      = "default"
-	// Fixed release UUID for deterministic inventory Secret naming.
-	releaseID = "a1b2c3d4-1111-2222-3333-aabbccddeeff"
+	// Fixed instance UUID for deterministic inventory Secret naming.
+	instanceID = "a1b2c3d4-1111-2222-3333-aabbccddeeff"
 
 	modulePath    = "tests/integration/inventory-apply"
 	moduleVersion = "0.1.0"
@@ -65,7 +65,7 @@ func main() {
 
 	resources := buildResources([]string{"cm-a", "cm-b"})
 
-	applyResult, err := kubernetes.Apply(ctx, client, resources, releaseName, kubernetes.ApplyOptions{})
+	applyResult, err := kubernetes.Apply(ctx, client, resources, instanceName, kubernetes.ApplyOptions{})
 	check("applying resources", err)
 	if len(applyResult.Errors) > 0 {
 		failf("apply had errors: %v", applyResult.Errors[0])
@@ -75,19 +75,19 @@ func main() {
 	// Build and write inventory after apply.
 	currentEntries := entriesToWrite(resources)
 
-	inv := &inventory.ReleaseInventoryRecord{
+	inv := &inventory.InstanceInventoryRecord{
 		CreatedBy: inventory.CreatedByCLI,
-		ReleaseMetadata: inventory.ReleaseMetadata{
-			Kind:             "ModuleRelease",
-			APIVersion:       "core.opmodel.dev/v1alpha1",
-			ReleaseName:      releaseName,
-			ReleaseNamespace: namespace,
-			ReleaseID:        releaseID,
+		InstanceMetadata: inventory.InstanceMetadata{
+			Kind:              "ModuleInstance",
+			APIVersion:        inventory.APIVersionV1Alpha1,
+			InstanceName:      instanceName,
+			InstanceNamespace: namespace,
+			InstanceID:        instanceID,
 		},
 		ModuleMetadata: inventory.ModuleMetadata{
 			Kind:       "Module",
-			APIVersion: "core.opmodel.dev/v1alpha1",
-			Name:       releaseName, // module name (same as release name in this test)
+			APIVersion: inventory.APIVersionV1Alpha1,
+			Name:       instanceName, // module name (same as instance name in this test)
 			Version:    moduleVersion,
 		},
 		Inventory: inventory.Inventory{Revision: 1, Digest: inventory.ComputeDigest(currentEntries), Count: len(currentEntries), Entries: currentEntries},
@@ -98,7 +98,7 @@ func main() {
 	fmt.Println("   OK: inventory written")
 
 	// Verify inventory is readable and has 2 entries.
-	readInv, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
+	readInv, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
 	check("reading back inventory", err)
 	if readInv == nil {
 		failf("expected non-nil inventory after first-time apply")
@@ -108,8 +108,8 @@ func main() {
 	}
 	latestEntries := readInv.Inventory.Entries
 
-	// Verify inventory Secret labels — exactly 5, all release-scoped (no module.opmodel.dev/* labels).
-	secretName := inventory.SecretName(releaseName, releaseID)
+	// Verify inventory Secret labels — exactly 5, all instance-scoped (no module.opmodel.dev/* labels).
+	secretName := inventory.SecretName(instanceName, instanceID)
 	secret, err := client.Clientset.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
 	check("fetching inventory Secret", err)
 	labels := secret.GetLabels()
@@ -119,14 +119,14 @@ func main() {
 	if labels[pkgcore.LabelManagedBy] != pkgcore.LabelManagedByValue {
 		failf("inventory Secret missing %s label", pkgcore.LabelManagedBy)
 	}
-	if labels["module-release.opmodel.dev/name"] != releaseName {
-		failf("inventory Secret module-release.opmodel.dev/name: want %q, got %q", releaseName, labels["module-release.opmodel.dev/name"])
+	if labels["module-instance.opmodel.dev/name"] != instanceName {
+		failf("inventory Secret module-instance.opmodel.dev/name: want %q, got %q", instanceName, labels["module-instance.opmodel.dev/name"])
 	}
-	if labels["module-release.opmodel.dev/namespace"] != namespace {
-		failf("inventory Secret module-release.opmodel.dev/namespace: want %q, got %q", namespace, labels["module-release.opmodel.dev/namespace"])
+	if labels["module-instance.opmodel.dev/namespace"] != namespace {
+		failf("inventory Secret module-instance.opmodel.dev/namespace: want %q, got %q", namespace, labels["module-instance.opmodel.dev/namespace"])
 	}
-	if labels["module-release.opmodel.dev/uuid"] != releaseID {
-		failf("inventory Secret module-release.opmodel.dev/uuid: want %q, got %q", releaseID, labels["module-release.opmodel.dev/uuid"])
+	if labels["module-instance.opmodel.dev/uuid"] != instanceID {
+		failf("inventory Secret module-instance.opmodel.dev/uuid: want %q, got %q", instanceID, labels["module-instance.opmodel.dev/uuid"])
 	}
 	if labels["opmodel.dev/component"] != "inventory" {
 		failf("inventory Secret opmodel.dev/component: want \"inventory\", got %q", labels["opmodel.dev/component"])
@@ -142,7 +142,7 @@ func main() {
 	step(2, "5.11: Idempotent re-apply — same change ID, no stale")
 
 	// Re-apply the same resources.
-	applyResult2, err := kubernetes.Apply(ctx, client, resources, releaseName, kubernetes.ApplyOptions{})
+	applyResult2, err := kubernetes.Apply(ctx, client, resources, instanceName, kubernetes.ApplyOptions{})
 	check("re-applying resources", err)
 	if len(applyResult2.Errors) > 0 {
 		failf("re-apply had errors: %v", applyResult2.Errors[0])
@@ -157,13 +157,13 @@ func main() {
 	fmt.Println("   OK: stale set is empty")
 
 	// Update inventory — digest and tracked entries should remain stable on idempotent re-apply.
-	readInv2, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
+	readInv2, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
 	check("reading inventory before re-apply write", err)
 	readInv2.Inventory = inventory.Inventory{Revision: readInv2.Inventory.Revision + 1, Digest: inventory.ComputeDigest(currentEntries), Count: len(currentEntries), Entries: currentEntries}
 	err = inventory.WriteInventory(ctx, client, readInv2, "", "", readInv2.ModuleMetadata.Version, inventory.CreatedByCLI)
 	check("writing inventory on re-apply", err)
 
-	readInv3, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
+	readInv3, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
 	check("reading inventory after re-apply write", err)
 	if len(readInv3.Inventory.Entries) != 2 {
 		failf("expected 2 inventory entries after idempotent re-apply, got %d", len(readInv3.Inventory.Entries))
@@ -190,7 +190,7 @@ func main() {
 	fmt.Println("   OK: stale set = [cm-b]")
 
 	// Apply new resources.
-	applyResult3, err := kubernetes.Apply(ctx, client, newResources, releaseName, kubernetes.ApplyOptions{})
+	applyResult3, err := kubernetes.Apply(ctx, client, newResources, instanceName, kubernetes.ApplyOptions{})
 	check("applying renamed resources", err)
 	if len(applyResult3.Errors) > 0 {
 		failf("apply had errors: %v", applyResult3.Errors[0])
@@ -207,14 +207,14 @@ func main() {
 	fmt.Println("   OK: cm-b is deleted (404)")
 
 	// Write updated inventory.
-	readInv4, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
+	readInv4, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
 	check("reading inventory before rename write", err)
 	readInv4.Inventory = inventory.Inventory{Revision: readInv4.Inventory.Revision + 1, Digest: inventory.ComputeDigest(newEntries), Count: len(newEntries), Entries: newEntries}
 	err = inventory.WriteInventory(ctx, client, readInv4, "", "", readInv4.ModuleMetadata.Version, inventory.CreatedByCLI)
 	check("writing inventory after rename", err)
 
 	// Verify inventory now tracks [cm-a, cm-c].
-	readInv5, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
+	readInv5, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
 	check("reading inventory after rename", err)
 	if len(readInv5.Inventory.Entries) != 2 {
 		failf("expected 2 inventory entries after rename, got %d", len(readInv5.Inventory.Entries))
@@ -240,7 +240,7 @@ func main() {
 	badResource := buildCM("cm-bad", badNS)
 	mixedResources := []*unstructured.Unstructured{goodResource, badResource}
 
-	applyResult59, applyErr59 := kubernetes.Apply(ctx, client, mixedResources, releaseName, kubernetes.ApplyOptions{})
+	applyResult59, applyErr59 := kubernetes.Apply(ctx, client, mixedResources, instanceName, kubernetes.ApplyOptions{})
 	// Either the call itself errors or individual resources in Errors slice.
 	applyHadErrors := applyErr59 != nil || (applyResult59 != nil && len(applyResult59.Errors) > 0)
 	if !applyHadErrors {
@@ -251,13 +251,13 @@ func main() {
 
 		// Capture inventory state. Simulate write-nothing-on-failure by
 		// NOT calling WriteInventory, then verify the inventory is unchanged.
-		invBefore, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
+		invBefore, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
 		check("reading inventory to verify no write", err)
 		entriesBefore := make([]inventory.InventoryEntry, len(invBefore.Inventory.Entries))
 		copy(entriesBefore, invBefore.Inventory.Entries)
 
 		// (We deliberately do not call WriteInventory here — testing the invariant.)
-		invAfter, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
+		invAfter, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
 		check("reading inventory after failed apply", err)
 
 		if len(invAfter.Inventory.Entries) != len(entriesBefore) {
@@ -295,11 +295,11 @@ func main() {
 // opmLabels returns the standard OPM labels for test resources.
 func opmLabels() map[string]interface{} {
 	return map[string]interface{}{
-		pkgcore.LabelManagedBy:            pkgcore.LabelManagedByValue,
-		"module-release.opmodel.dev/name": releaseName,
-		"module-release.opmodel.dev/uuid": releaseID,
-		"module.opmodel.dev/name":         releaseName,
-		"module.opmodel.dev/version":      moduleVersion,
+		pkgcore.LabelManagedBy:             pkgcore.LabelManagedByValue,
+		"module-instance.opmodel.dev/name": instanceName,
+		"module-instance.opmodel.dev/uuid": instanceID,
+		"module.opmodel.dev/name":          instanceName,
+		"module.opmodel.dev/version":       moduleVersion,
 	}
 }
 
@@ -346,7 +346,7 @@ func cleanup(ctx context.Context, client *kubernetes.Client) {
 		_ = client.ResourceClient(configMapGVR, namespace).Delete(ctx, name, metav1.DeleteOptions{})
 		waitForConfigMapState(ctx, client, name, false)
 	}
-	secretName := inventory.SecretName(releaseName, releaseID)
+	secretName := inventory.SecretName(instanceName, instanceID)
 	_ = client.Clientset.CoreV1().Secrets(namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
 	waitForSecretDeleted(ctx, client, secretName)
 }

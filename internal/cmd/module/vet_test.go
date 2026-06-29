@@ -33,7 +33,7 @@ func TestNewModuleVetCmd_NoLocalVerboseFlag(t *testing.T) {
 }
 
 // TestModVet_ValidModule exercises the module vet path with the simple-module
-// fixture (no release.cue, no debugValues).
+// fixture (no instance.cue, no debugValues).
 func TestModVet_ValidModule(t *testing.T) {
 	fixtureDir := filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "simple-module")
 	if _, err := os.Stat(fixtureDir); os.IsNotExist(err) {
@@ -62,7 +62,7 @@ func TestModVet_ValidModule(t *testing.T) {
 	assert.Contains(t, err.Error(), "module does not define debugValues")
 }
 
-func TestModVet_RejectsReleasePackage(t *testing.T) {
+func TestModVet_RejectsInstancePackage(t *testing.T) {
 	tmpHome, cleanup := setupTestConfig(t)
 	defer cleanup()
 
@@ -72,10 +72,10 @@ func TestModVet_RejectsReleasePackage(t *testing.T) {
 
 	os.Unsetenv("OPM_REGISTRY")
 
-	releaseDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(releaseDir, "release.cue"), []byte(`package jellyfin
+	instanceDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(instanceDir, "instance.cue"), []byte(`package jellyfin
 
-kind: "ModuleRelease"
+kind: "ModuleInstance"
 metadata: name: "jf"
 `), 0o600))
 
@@ -85,11 +85,11 @@ metadata: name: "jf"
 	cmd := NewModuleVetCmd(cfg)
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{releaseDir})
+	cmd.SetArgs([]string{instanceDir})
 
 	err := cmd.Execute()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "is a release package, not a module")
+	assert.Contains(t, err.Error(), "is an instance package, not a module")
 	assert.Contains(t, err.Error(), "opm instance")
 }
 

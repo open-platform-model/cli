@@ -96,8 +96,8 @@ func TestNewInstanceDeleteCmd(t *testing.T) {
 }
 
 func TestEnsureDeleteAllowed_BlocksControllerManagedInstance(t *testing.T) {
-	// inventory.ReleaseInventoryRecord / ReleaseMetadata are renamed in the X4 slice.
-	err := ensureDeleteAllowed(&inventory.ReleaseInventoryRecord{CreatedBy: inventory.CreatedByController, ReleaseMetadata: inventory.ReleaseMetadata{ReleaseName: "demo", ReleaseNamespace: "apps"}})
+	// inventory.InstanceInventoryRecord / InstanceMetadata are renamed in the X4 slice.
+	err := ensureDeleteAllowed(&inventory.InstanceInventoryRecord{CreatedBy: inventory.CreatedByController, InstanceMetadata: inventory.InstanceMetadata{InstanceName: "demo", InstanceNamespace: "apps"}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "controller-managed")
 }
@@ -109,8 +109,8 @@ func TestNewInstanceListCmd(t *testing.T) {
 }
 
 // TestInstanceClusterQueryArgParsing tests that positional arg is correctly resolved
-// via ResolveReleaseIdentifier inside the command handlers.
-// (ResolveReleaseIdentifier lives in cmdutil/flags.go and is renamed in the X4 slice.)
+// via ResolveInstanceIdentifier inside the command handlers.
+// (ResolveInstanceIdentifier lives in cmdutil/flags.go and is renamed in the X4 slice.)
 func TestInstanceClusterQueryArgParsing(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -133,7 +133,7 @@ func TestInstanceClusterQueryArgParsing(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			name, uuid := cmdutil.ResolveReleaseIdentifier(tt.arg)
+			name, uuid := cmdutil.ResolveInstanceIdentifier(tt.arg)
 			assert.Equal(t, tt.wantName, name)
 			assert.Equal(t, tt.wantUUID, uuid)
 		})
@@ -154,14 +154,14 @@ func TestInstanceVetCmd_RejectsMissingArg(t *testing.T) {
 }
 
 func TestRunInstanceBuild_RejectsNonManifestOutput(t *testing.T) {
-	// cmdutil.ReleaseFileFlags is renamed in the X4 slice.
-	err := runInstanceBuild("instance.cue", &config.GlobalConfig{}, &cmdutil.ReleaseFileFlags{}, "", "", "wide", false, "")
+	// cmdutil.InstanceFileFlags is renamed in the X4 slice.
+	err := runInstanceBuild("instance.cue", &config.GlobalConfig{}, &cmdutil.InstanceFileFlags{}, "", "", "wide", false, "")
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "invalid output format"))
 }
 
 func TestRunInstanceBuild_MissingPath(t *testing.T) {
-	err := runInstanceBuild("/nonexistent/instance/path", &config.GlobalConfig{}, &cmdutil.ReleaseFileFlags{}, "", "", "yaml", false, "")
+	err := runInstanceBuild("/nonexistent/instance/path", &config.GlobalConfig{}, &cmdutil.InstanceFileFlags{}, "", "", "yaml", false, "")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }

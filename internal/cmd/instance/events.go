@@ -77,22 +77,22 @@ func runInstanceEvents(identifier string, cfg *config.GlobalConfig, kf *cmdutil.
 	}
 
 	logName := target.LogName
-	releaseLog := output.ReleaseLogger(logName)
+	instanceLog := output.InstanceLogger(logName)
 
 	k8sClient, err := cmdutil.NewK8sClient(target.K8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
-		releaseLog.Error("connecting to cluster", "error", err)
+		instanceLog.Error("connecting to cluster", "error", err)
 		return err
 	}
 
-	_, liveResources, _, err := query.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, releaseLog)
+	_, liveResources, _, err := query.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, instanceLog)
 	if err != nil {
 		return err
 	}
 
 	eventsOpts.Namespace = target.Namespace
-	eventsOpts.ReleaseName = target.Selector.ReleaseName
-	eventsOpts.ReleaseID = target.Selector.ReleaseID
+	eventsOpts.InstanceName = target.Selector.InstanceName
+	eventsOpts.InstanceID = target.Selector.InstanceID
 	eventsOpts.InventoryLive = liveResources
 
 	if watchMode {

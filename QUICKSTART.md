@@ -101,7 +101,7 @@ opm module build
 ```
 
 `opm module build` synthesizes a `#ModuleRelease` around the module so you
-do not need a `release.cue` while iterating. The rendered YAML is written
+do not need an `instance.cue` while iterating. The rendered YAML is written
 to stdout by default.
 
 Useful variants:
@@ -130,34 +130,34 @@ work as `opm mod init`, `opm mod build`, etc.
 ## Working from a Release File
 
 When you already have a release definition, `opm instance` is the canonical
-workflow. The example release files under `examples/releases/` are small
+workflow. The example instance files under `examples/instances/` are small
 release definitions that import published modules straight from the
 public catalog (`opmodel.dev/modules/<name>@v1`) — no local module sources
 required, no `task publish`.
 
 Available examples:
 
-- `examples/releases/jellyfin/` — single-container stateful app (storage,
+- `examples/instances/jellyfin/` — single-container stateful app (storage,
   optional gateway route, optional K8up backup). Used throughout this
   guide.
-- `examples/releases/garage/` — stateless S3-compatible object store;
+- `examples/instances/garage/` — stateless S3-compatible object store;
   showcases the "required secret" pattern (`adminToken`, `rpcSecret`).
-- `examples/releases/mc_java_fleet/` — multi-instance Minecraft fleet
+- `examples/instances/mc_java_fleet/` — multi-instance Minecraft fleet
   with a shared mc-router. Has a default single-server `values.cue` and
   a multi-server `values_multi.cue`.
 
 ### Build
 
 ```bash
-opm instance build ./examples/releases/jellyfin/release.cue
+opm instance build ./examples/instances/jellyfin/instance.cue
 ```
 
 The release directory contains a sibling `values.cue` which is loaded
 automatically. To use a different values file, pass it explicitly:
 
 ```bash
-opm instance build ./examples/releases/mc_java_fleet/release.cue \
-  -f ./examples/releases/mc_java_fleet/values_multi.cue
+opm instance build ./examples/instances/mc_java_fleet/instance.cue \
+  -f ./examples/instances/mc_java_fleet/values_multi.cue
 ```
 
 A release file pulling a public module looks like the `jellyfin` example:
@@ -198,11 +198,11 @@ This creates a local kind cluster named `opm-dev`.
 ### Apply
 
 ```bash
-opm instance apply ./examples/releases/jellyfin/release.cue --create-namespace
+opm instance apply ./examples/instances/jellyfin/instance.cue --create-namespace
 ```
 
 The `garage` and `mc_java_fleet` examples follow the same pattern — point
-`opm instance apply` at their `release.cue`. Note that `garage` requires
+`opm instance apply` at their `instance.cue`. Note that `garage` requires
 you to replace the `adminToken` and `rpcSecret` placeholders in
 `values.cue` before applying.
 

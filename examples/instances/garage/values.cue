@@ -1,4 +1,4 @@
-// Concrete values for the Garage release.
+// Concrete values for the Garage instance.
 // adminToken and rpcSecret are REQUIRED — replace the placeholders below
 // before applying to a real cluster.
 //

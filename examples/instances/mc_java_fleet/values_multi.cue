@@ -4,7 +4,7 @@
 //   survival.mc.example.com → survival server
 //   creative.mc.example.com → creative server
 //
-// Use with: opm release build .../release.cue -f .../values_multi.cue
+// Use with: opm instance build .../instance.cue -f .../values_multi.cue
 package mc_java_fleet
 
 values: {

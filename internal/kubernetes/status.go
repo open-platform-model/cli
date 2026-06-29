@@ -27,19 +27,19 @@ type StatusOptions struct {
 	// Namespace is the target namespace for resource lookup.
 	Namespace string
 
-	// ReleaseName is the release name.
-	// Mutually exclusive with ReleaseID.
-	ReleaseName string
+	// InstanceName is the instance name.
+	// Mutually exclusive with InstanceID.
+	InstanceName string
 
-	// ReleaseID is the release identity UUID for discovery.
-	// Mutually exclusive with ReleaseName.
-	ReleaseID string
+	// InstanceID is the instance identity UUID for discovery.
+	// Mutually exclusive with InstanceName.
+	InstanceID string
 
 	// Version is the module version, sourced from inv.Changes[latest].Source.Version.
 	// Empty for local modules.
 	Version string
 
-	// Owner is the effective owner of the release from inventory provenance.
+	// Owner is the effective owner of the instance from inventory provenance.
 	Owner string
 
 	// ComponentMap maps "Kind/Namespace/Name" to component name, built from inventory entries.
@@ -49,7 +49,7 @@ type StatusOptions struct {
 	OutputFormat output.Format
 
 	// InventoryLive is the list of live resources pre-fetched from the inventory
-	// Secret by the caller. When empty or nil, GetReleaseStatus returns
+	// Secret by the caller. When empty or nil, GetInstanceStatus returns
 	// noResourcesFoundError (unless MissingResources is also non-empty).
 	InventoryLive []*unstructured.Unstructured
 
@@ -113,11 +113,11 @@ type statusSummary struct {
 
 // StatusResult contains the full status output.
 type StatusResult struct {
-	// ReleaseName is the human-readable release name.
-	ReleaseName string `json:"releaseName" yaml:"releaseName"`
+	// InstanceName is the human-readable instance name.
+	InstanceName string `json:"instanceName" yaml:"instanceName"`
 	// Version is the module version (empty for local modules).
 	Version string `json:"version,omitempty" yaml:"version,omitempty"`
-	// Owner is the effective owner of the release.
+	// Owner is the effective owner of the instance.
 	Owner string `json:"owner" yaml:"owner"`
 	// Namespace is the Kubernetes namespace.
 	Namespace string `json:"namespace" yaml:"namespace"`
@@ -129,17 +129,17 @@ type StatusResult struct {
 	Summary statusSummary `json:"summary" yaml:"summary"`
 }
 
-// GetReleaseStatus evaluates health for all resources tracked in opts.InventoryLive.
+// GetInstanceStatus evaluates health for all resources tracked in opts.InventoryLive.
 // Returns noResourcesFoundError when no resources are present and no missing entries exist.
 //
 // opts.InventoryLive contains the live resources fetched from the inventory Secret by the
 // caller. opts.MissingResources contains entries tracked in inventory that no longer exist
 // on the cluster; these are appended with "Missing" status.
-func GetReleaseStatus(ctx context.Context, client *Client, opts StatusOptions) (*StatusResult, error) {
+func GetInstanceStatus(ctx context.Context, client *Client, opts StatusOptions) (*StatusResult, error) {
 	resources := opts.InventoryLive
 
-	output.Debug("evaluating release status from inventory",
-		"release", opts.ReleaseName,
+	output.Debug("evaluating instance status from inventory",
+		"instance", opts.InstanceName,
 		"liveCount", len(resources),
 		"missingCount", len(opts.MissingResources),
 	)
@@ -147,17 +147,17 @@ func GetReleaseStatus(ctx context.Context, client *Client, opts StatusOptions) (
 	// Return error when no resources found (and no missing resources to show)
 	if len(resources) == 0 && len(opts.MissingResources) == 0 {
 		return nil, &noResourcesFoundError{
-			ReleaseName: opts.ReleaseName,
-			ReleaseID:   opts.ReleaseID,
-			Namespace:   opts.Namespace,
+			InstanceName: opts.InstanceName,
+			InstanceID:   opts.InstanceID,
+			Namespace:    opts.Namespace,
 		}
 	}
 
 	result := &StatusResult{
-		ReleaseName: opts.ReleaseName,
-		Version:     opts.Version,
-		Owner:       opts.Owner,
-		Namespace:   opts.Namespace,
+		InstanceName: opts.InstanceName,
+		Version:      opts.Version,
+		Owner:        opts.Owner,
+		Namespace:    opts.Namespace,
 	}
 	allReady := true
 
@@ -227,7 +227,7 @@ func buildResourceHealth(ctx context.Context, client *Client, res *unstructured.
 
 	// listWorkloadPods is only called for live, unhealthy workloads.
 	// Missing resources are never passed through buildResourceHealth — they are
-	// appended directly in GetReleaseStatus, so health == HealthMissing cannot
+	// appended directly in GetInstanceStatus, so health == HealthMissing cannot
 	// occur here.
 	if opts.Verbose && health == HealthNotReady {
 		if pods, err := listWorkloadPods(ctx, client, res); err == nil && len(pods) > 0 {
@@ -295,10 +295,10 @@ func formatStatusWide(result *StatusResult) string {
 	return sb.String()
 }
 
-// formatStatusHeader renders the release metadata header block.
+// formatStatusHeader renders the instance metadata header block.
 func formatStatusHeader(result *StatusResult) string {
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "Release:    %s\n", output.StyleNoun(result.ReleaseName))
+	fmt.Fprintf(&sb, "Instance:    %s\n", output.StyleNoun(result.InstanceName))
 	if result.Version != "" {
 		fmt.Fprintf(&sb, "Version:    %s\n", result.Version)
 	}
@@ -313,7 +313,7 @@ func formatStatusHeader(result *StatusResult) string {
 	}
 	sb.WriteString(")\n")
 	if result.Owner == "controller" {
-		sb.WriteString("Warning:   controller-managed release; the CLI can inspect it but cannot mutate it\n")
+		sb.WriteString("Warning:   controller-managed instance; the CLI can inspect it but cannot mutate it\n")
 	}
 	return sb.String()
 }

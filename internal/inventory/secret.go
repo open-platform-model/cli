@@ -11,37 +11,37 @@ import (
 )
 
 const (
-	secretType      = "opmodel.dev/release" //nolint:gosec // not a credential
+	secretType      = "opmodel.dev/instance" //nolint:gosec // not a credential
 	secretKeyRecord = "inventory"
 )
 
-func SecretName(releaseName, releaseID string) string {
-	return fmt.Sprintf("opm.%s.%s", releaseName, releaseID)
+func SecretName(instanceName, instanceID string) string {
+	return fmt.Sprintf("opm.%s.%s", instanceName, instanceID)
 }
 
 //nolint:revive // Inventory prefix matches existing internal call sites.
-func InventoryLabels(releaseName, releaseNamespace, releaseID string) map[string]string {
+func InventoryLabels(instanceName, instanceNamespace, instanceID string) map[string]string {
 	return map[string]string{
-		pkgcore.LabelManagedBy:              pkgcore.LabelManagedByValue,
-		pkgcore.LabelModuleReleaseName:      releaseName,
-		pkgcore.LabelModuleReleaseNamespace: releaseNamespace,
-		pkgcore.LabelModuleReleaseUUID:      releaseID,
-		pkgcore.LabelComponent:              "inventory",
+		pkgcore.LabelManagedBy:               pkgcore.LabelManagedByValue,
+		pkgcore.LabelModuleInstanceName:      instanceName,
+		pkgcore.LabelModuleInstanceNamespace: instanceNamespace,
+		pkgcore.LabelModuleInstanceUUID:      instanceID,
+		pkgcore.LabelComponent:               "inventory",
 	}
 }
 
-func MarshalToSecret(record *ReleaseInventoryRecord) (*corev1.Secret, error) {
-	secretName := SecretName(record.ReleaseMetadata.ReleaseName, record.ReleaseMetadata.ReleaseID)
+func MarshalToSecret(record *InstanceInventoryRecord) (*corev1.Secret, error) {
+	secretName := SecretName(record.InstanceMetadata.InstanceName, record.InstanceMetadata.InstanceID)
 	payload, err := json.Marshal(record)
 	if err != nil {
-		return nil, fmt.Errorf("marshaling release inventory record: %w", err)
+		return nil, fmt.Errorf("marshaling instance inventory record: %w", err)
 	}
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: record.ReleaseMetadata.ReleaseNamespace,
-			Labels:    InventoryLabels(record.ReleaseMetadata.ReleaseName, record.ReleaseMetadata.ReleaseNamespace, record.ReleaseMetadata.ReleaseID),
+			Namespace: record.InstanceMetadata.InstanceNamespace,
+			Labels:    InventoryLabels(record.InstanceMetadata.InstanceName, record.InstanceMetadata.InstanceNamespace, record.InstanceMetadata.InstanceID),
 		},
 		Type: secretType,
 		Data: map[string][]byte{
@@ -56,7 +56,7 @@ func MarshalToSecret(record *ReleaseInventoryRecord) (*corev1.Secret, error) {
 	return secret, nil
 }
 
-func UnmarshalFromSecret(secret *corev1.Secret) (*ReleaseInventoryRecord, error) {
+func UnmarshalFromSecret(secret *corev1.Secret) (*InstanceInventoryRecord, error) {
 	payload, ok := secret.Data[secretKeyRecord]
 	if !ok {
 		if payloadStr, ok := secret.StringData[secretKeyRecord]; ok {
@@ -66,9 +66,16 @@ func UnmarshalFromSecret(secret *corev1.Secret) (*ReleaseInventoryRecord, error)
 		}
 	}
 
-	var record ReleaseInventoryRecord
+	var record InstanceInventoryRecord
 	if err := json.Unmarshal(payload, &record); err != nil {
-		return nil, fmt.Errorf("parsing release inventory record: %w", err)
+		return nil, fmt.Errorf("parsing instance inventory record: %w", err)
+	}
+	// Fail loud on a zero-value instance metadata: a pre-migration Secret carrying
+	// the old `releaseMetadata` JSON key (enhancement 0002 D8/D9) unmarshals cleanly
+	// into an empty InstanceMetadata, which would otherwise surface as a phantom
+	// blank-name record in `instance list` or poison a `GetInventory` read.
+	if record.InstanceMetadata.InstanceName == "" {
+		return nil, fmt.Errorf("inventory Secret %q has empty instance metadata (possibly a pre-migration record)", secret.Name)
 	}
 	if record.Inventory.Entries == nil {
 		record.Inventory.Entries = []InventoryEntry{}

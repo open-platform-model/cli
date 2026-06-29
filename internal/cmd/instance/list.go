@@ -100,6 +100,6 @@ func runInstanceList(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFl
 		return nil
 	}
 
-	summaries := query.EvaluateReleaseHealth(ctx, k8sClient, inventories, instanceListConcurrency, false)
-	return query.RenderReleaseListOutput(summaries, outputFormat, allNamespaces)
+	summaries := query.EvaluateInstanceHealth(ctx, k8sClient, inventories, instanceListConcurrency, false)
+	return query.RenderInstanceListOutput(summaries, outputFormat, allNamespaces)
 }

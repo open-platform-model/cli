@@ -82,24 +82,24 @@ func runInstanceDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.
 
 	rsf := target.Selector
 	namespace := target.Namespace
-	releaseLog := output.ReleaseLogger(target.LogName)
+	instanceLog := output.InstanceLogger(target.LogName)
 
 	k8sClient, err := cmdutil.NewK8sClient(target.K8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
-		releaseLog.Error("connecting to cluster", "error", err)
+		instanceLog.Error("connecting to cluster", "error", err)
 		return err
 	}
 
 	if dryRun {
-		releaseLog.Info("dry run - no changes will be made")
+		instanceLog.Info("dry run - no changes will be made")
 	} else if !force {
-		if !confirmInstanceDelete(rsf.ReleaseName, rsf.ReleaseID, namespace) {
-			releaseLog.Info("deletion canceled")
+		if !confirmInstanceDelete(rsf.InstanceName, rsf.InstanceID, namespace) {
+			instanceLog.Info("deletion canceled")
 			return nil
 		}
 	}
 
-	inv, liveResources, _, err := query.ResolveInventory(ctx, k8sClient, rsf, namespace, releaseLog)
+	inv, liveResources, _, err := query.ResolveInventory(ctx, k8sClient, rsf, namespace, instanceLog)
 	if err != nil {
 		return err
 	}
@@ -107,35 +107,35 @@ func runInstanceDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.
 		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	releaseLog.Info(fmt.Sprintf("deleting resources in namespace %q", namespace))
+	instanceLog.Info(fmt.Sprintf("deleting resources in namespace %q", namespace))
 
 	deleteOpts := kubernetes.DeleteOptions{
-		ReleaseName:              rsf.ReleaseName,
+		InstanceName:             rsf.InstanceName,
 		Namespace:                namespace,
-		ReleaseID:                rsf.ReleaseID,
+		InstanceID:               rsf.InstanceID,
 		DryRun:                   dryRun,
 		InventoryLive:            liveResources,
-		InventorySecretName:      inventory.SecretName(inv.ReleaseMetadata.ReleaseName, inv.ReleaseMetadata.ReleaseID),
+		InventorySecretName:      inventory.SecretName(inv.InstanceMetadata.InstanceName, inv.InstanceMetadata.InstanceID),
 		InventorySecretNamespace: namespace,
 	}
 
 	deleteResult, err := kubernetes.Delete(ctx, k8sClient, deleteOpts)
 	if err != nil {
-		releaseLog.Error("delete failed", "error", err)
+		instanceLog.Error("delete failed", "error", err)
 		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
 	if len(deleteResult.Errors) > 0 {
-		releaseLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(deleteResult.Errors)))
+		instanceLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(deleteResult.Errors)))
 		for _, e := range deleteResult.Errors {
-			releaseLog.Error(e.Error())
+			instanceLog.Error(e.Error())
 		}
 	}
 
 	if dryRun {
-		releaseLog.Info(fmt.Sprintf("dry run complete: %d resources would be deleted", deleteResult.Deleted))
+		instanceLog.Info(fmt.Sprintf("dry run complete: %d resources would be deleted", deleteResult.Deleted))
 	} else {
-		releaseLog.Info("all resources have been deleted")
+		instanceLog.Info("all resources have been deleted")
 		output.Println(output.FormatCheckmark("Instance deleted"))
 	}
 
@@ -149,19 +149,19 @@ func runInstanceDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.
 	return nil
 }
 
-func ensureDeleteAllowed(inv *inventory.ReleaseInventoryRecord) error {
+func ensureDeleteAllowed(inv *inventory.InstanceInventoryRecord) error {
 	if inv == nil {
 		return nil
 	}
-	return ownership.EnsureCLIMutable(string(inv.NormalizedCreatedBy()), inv.ReleaseMetadata.ReleaseName, inv.ReleaseMetadata.ReleaseNamespace)
+	return ownership.EnsureCLIMutable(string(inv.NormalizedCreatedBy()), inv.InstanceMetadata.InstanceName, inv.InstanceMetadata.InstanceNamespace)
 }
 
-func confirmInstanceDelete(releaseName, releaseID, namespace string) bool {
+func confirmInstanceDelete(instanceName, instanceID, namespace string) bool {
 	var prompt string
-	if releaseName != "" {
-		prompt = fmt.Sprintf("Delete all resources for instance %q in namespace %q? [y/N]: ", releaseName, namespace)
+	if instanceName != "" {
+		prompt = fmt.Sprintf("Delete all resources for instance %q in namespace %q? [y/N]: ", instanceName, namespace)
 	} else {
-		prompt = fmt.Sprintf("Delete all resources for instance-id %q in namespace %q? [y/N]: ", releaseID, namespace)
+		prompt = fmt.Sprintf("Delete all resources for instance-id %q in namespace %q? [y/N]: ", instanceID, namespace)
 	}
 	output.Prompt(prompt)
 	scanner := bufio.NewScanner(os.Stdin)

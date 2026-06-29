@@ -8,15 +8,15 @@
 //   - 14.3: Verify tree output at depth=1 (resources only, no children)
 //   - 14.4: Verify tree output at depth=2 (Deployment→RS→Pod visible)
 //   - 14.5: Verify JSON output structure matches schema
-//   - 14.6: Verify no-release-found error (empty InventoryLive)
+//   - 14.6: Verify no-instance-found error (empty InventoryLive)
 //   - 14.7: Verify component grouping with real resources
 //   - 14.8: Verify StatefulSet→Pod chain at depth=2
-//   - 15.1: Resolve release arg by name → inventory lookup via ResolveReleaseArg+ResolveInventory
-//   - 15.2: Resolve release arg by UUID → inventory lookup via ResolveReleaseArg+ResolveInventory
-//   - 15.3: Resolve release arg from file path → extract metadata, then inventory lookup
+//   - 15.1: Resolve instance arg by name → inventory lookup via ResolveInstanceArg+ResolveInventory
+//   - 15.2: Resolve instance arg by UUID → inventory lookup via ResolveInstanceArg+ResolveInventory
+//   - 15.3: Resolve instance arg from file path → extract metadata, then inventory lookup
 //
 // Requires a running kind cluster at context "kind-opm-dev".
-// Run with: go run tests/integration/rel-tree/main.go
+// Run with: go run tests/integration/inst-tree/main.go
 package main
 
 import (
@@ -44,12 +44,12 @@ const (
 	clusterContext = "kind-opm-dev"
 	namespace      = "opm-tree-test"
 
-	releaseName = "tree-test-rel"
-	releaseID   = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0001"
+	instanceName = "tree-test-rel"
+	instanceID   = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0001"
 
 	moduleName    = "tree-test-module"
 	moduleVersion = "1.0.0"
-	modulePath    = "tests/integration/rel-tree"
+	modulePath    = "tests/integration/inst-tree"
 )
 
 var (
@@ -62,7 +62,7 @@ var (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== OPM Release Tree Integration Test ===")
+	fmt.Println("=== OPM Instance Tree Integration Test ===")
 	fmt.Println()
 
 	// ── Create Kubernetes client ─────────────────────────────────────────────
@@ -85,7 +85,7 @@ func main() {
 
 	resources := buildAllResources()
 
-	result, err := kubernetes.Apply(ctx, client, resources, releaseName, kubernetes.ApplyOptions{})
+	result, err := kubernetes.Apply(ctx, client, resources, instanceName, kubernetes.ApplyOptions{})
 	check("applying resources", err)
 	if len(result.Errors) > 0 {
 		failf("apply errors: %v", result.Errors[0])
@@ -104,7 +104,7 @@ func main() {
 	fmt.Println("   OK: all workloads ready")
 
 	// Read back inventory and discover live resources.
-	readInv, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
+	readInv, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
 	check("reading back inventory", err)
 	liveResources, missingEntries, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv)
 	check("discovering resources from inventory", err)
@@ -124,18 +124,18 @@ func main() {
 		componentMap[key] = e.Component
 	}
 
-	releaseInfo := kubernetes.ReleaseInfo{
-		Name:      releaseName,
+	instanceInfo := kubernetes.InstanceInfo{
+		Name:      instanceName,
 		Namespace: namespace,
 		Module:    moduleName,
 		Version:   moduleVersion,
 	}
 
-	// ── Step 2: No-release-found error (14.6) ───────────────────────────────
-	step(2, "14.6: Verify no-release-found error with empty InventoryLive")
+	// ── Step 2: No-instance-found error (14.6) ───────────────────────────────
+	step(2, "14.6: Verify no-instance-found error with empty InventoryLive")
 
 	_, errEmpty := kubernetes.GetModuleTree(ctx, client, kubernetes.TreeOptions{
-		ReleaseInfo:   releaseInfo,
+		InstanceInfo:  instanceInfo,
 		InventoryLive: nil,
 		ComponentMap:  componentMap,
 		Depth:         2,
@@ -153,7 +153,7 @@ func main() {
 	step(3, "14.2: Verify tree output at depth=0 (component summary)")
 
 	tree0, err := kubernetes.GetModuleTree(ctx, client, kubernetes.TreeOptions{
-		ReleaseInfo:   releaseInfo,
+		InstanceInfo:  instanceInfo,
 		InventoryLive: liveResources,
 		ComponentMap:  componentMap,
 		Depth:         0,
@@ -209,7 +209,7 @@ func main() {
 	step(4, "14.3: Verify tree output at depth=1 (resources only, no children)")
 
 	tree1, err := kubernetes.GetModuleTree(ctx, client, kubernetes.TreeOptions{
-		ReleaseInfo:   releaseInfo,
+		InstanceInfo:  instanceInfo,
 		InventoryLive: liveResources,
 		ComponentMap:  componentMap,
 		Depth:         1,
@@ -273,7 +273,7 @@ func main() {
 	step(5, "14.4 + 14.7: Verify tree output at depth=2 (full tree) and component grouping")
 
 	tree2, err := kubernetes.GetModuleTree(ctx, client, kubernetes.TreeOptions{
-		ReleaseInfo:   releaseInfo,
+		InstanceInfo:  instanceInfo,
 		InventoryLive: liveResources,
 		ComponentMap:  componentMap,
 		Depth:         2,
@@ -369,26 +369,26 @@ func main() {
 	check("parsing JSON output", err)
 
 	// Verify top-level keys.
-	if _, ok := jsonData["release"]; !ok {
-		failf("JSON: missing 'release' key")
+	if _, ok := jsonData["instance"]; !ok {
+		failf("JSON: missing 'instance' key")
 	}
 	if _, ok := jsonData["components"]; !ok {
 		failf("JSON: missing 'components' key")
 	}
-	fmt.Println("   OK: JSON has 'release' and 'components' keys")
+	fmt.Println("   OK: JSON has 'instance' and 'components' keys")
 
-	// Verify release metadata.
-	release, ok := jsonData["release"].(map[string]interface{})
+	// Verify instance metadata.
+	instance, ok := jsonData["instance"].(map[string]interface{})
 	if !ok {
-		failf("JSON: 'release' is not an object")
+		failf("JSON: 'instance' is not an object")
 	}
-	if release["name"] != releaseName {
-		failf("JSON: expected release.name=%q, got %q", releaseName, release["name"])
+	if instance["name"] != instanceName {
+		failf("JSON: expected instance.name=%q, got %q", instanceName, instance["name"])
 	}
-	if release["namespace"] != namespace {
-		failf("JSON: expected release.namespace=%q, got %q", namespace, release["namespace"])
+	if instance["namespace"] != namespace {
+		failf("JSON: expected instance.namespace=%q, got %q", namespace, instance["namespace"])
 	}
-	fmt.Println("   OK: release metadata correct in JSON")
+	fmt.Println("   OK: instance metadata correct in JSON")
 
 	// Verify components array.
 	components, ok := jsonData["components"].([]interface{})
@@ -434,7 +434,7 @@ func main() {
 	fmt.Println("   OK: 14.5 — JSON structure validated with nested children")
 
 	// ── Steps 8–10: Argument resolution chain ────────────────────────────────
-	// These steps exercise ResolveReleaseArg + ResolveInventory using the
+	// These steps exercise ResolveInstanceArg + ResolveInventory using the
 	// inventory Secret written in Step 1. A minimal GlobalConfig suffices:
 	// Registry comes from OPM_REGISTRY (same as the Taskfile integration env).
 	cfg := &config.GlobalConfig{
@@ -444,14 +444,14 @@ func main() {
 	silentLog.SetLevel(log.FatalLevel)
 
 	// ── Step 8: Name-based resolution (15.1) ─────────────────────────────────
-	step(8, "15.1: Resolve release by name → inventory lookup")
+	step(8, "15.1: Resolve instance by name → inventory lookup")
 
-	nameArg, err := cmdutil.ResolveReleaseArg(releaseName, cfg)
-	check("ResolveReleaseArg(name)", err)
-	if nameArg.Name != releaseName || nameArg.UUID != "" {
-		failf("15.1: expected ReleaseArg{Name:%q}, got Name=%q UUID=%q", releaseName, nameArg.Name, nameArg.UUID)
+	nameArg, err := cmdutil.ResolveInstanceArg(instanceName, cfg)
+	check("ResolveInstanceArg(name)", err)
+	if nameArg.Name != instanceName || nameArg.UUID != "" {
+		failf("15.1: expected InstanceArg{Name:%q}, got Name=%q UUID=%q", instanceName, nameArg.Name, nameArg.UUID)
 	}
-	fmt.Printf("   OK: ResolveReleaseArg returned Name=%q\n", nameArg.Name)
+	fmt.Printf("   OK: ResolveInstanceArg returned Name=%q\n", nameArg.Name)
 
 	nameRSF := nameArg.ToSelectorFlags("")
 	nameRSF.Namespace = namespace
@@ -466,14 +466,14 @@ func main() {
 	fmt.Printf("   OK: inventory found, %d live resources discovered\n", len(nameLive))
 
 	// ── Step 9: UUID-based resolution (15.2) ─────────────────────────────────
-	step(9, "15.2: Resolve release by UUID → inventory lookup")
+	step(9, "15.2: Resolve instance by UUID → inventory lookup")
 
-	uuidArg, err := cmdutil.ResolveReleaseArg(releaseID, cfg)
-	check("ResolveReleaseArg(uuid)", err)
-	if uuidArg.UUID != releaseID || uuidArg.Name != "" {
-		failf("15.2: expected ReleaseArg{UUID:%q}, got Name=%q UUID=%q", releaseID, uuidArg.Name, uuidArg.UUID)
+	uuidArg, err := cmdutil.ResolveInstanceArg(instanceID, cfg)
+	check("ResolveInstanceArg(uuid)", err)
+	if uuidArg.UUID != instanceID || uuidArg.Name != "" {
+		failf("15.2: expected InstanceArg{UUID:%q}, got Name=%q UUID=%q", instanceID, uuidArg.Name, uuidArg.UUID)
 	}
-	fmt.Printf("   OK: ResolveReleaseArg returned UUID=%q\n", uuidArg.UUID)
+	fmt.Printf("   OK: ResolveInstanceArg returned UUID=%q\n", uuidArg.UUID)
 
 	uuidRSF := uuidArg.ToSelectorFlags("")
 	uuidRSF.Namespace = namespace
@@ -488,13 +488,13 @@ func main() {
 	fmt.Printf("   OK: inventory found, %d live resources discovered\n", len(uuidLive))
 
 	// ── Step 10: Path-based resolution (15.3) ────────────────────────────────
-	step(10, "15.3: Resolve release from file path → inventory lookup")
+	step(10, "15.3: Resolve instance from file path → inventory lookup")
 
-	fixturePath := "tests/integration/rel-tree/testdata/release.cue"
-	pathArg, err := cmdutil.ResolveReleaseArg(fixturePath, cfg)
-	check("ResolveReleaseArg(path)", err)
-	if pathArg.Name != releaseName {
-		failf("15.3: expected Name=%q from fixture, got %q", releaseName, pathArg.Name)
+	fixturePath := "tests/integration/inst-tree/testdata/instance.cue"
+	pathArg, err := cmdutil.ResolveInstanceArg(fixturePath, cfg)
+	check("ResolveInstanceArg(path)", err)
+	if pathArg.Name != instanceName {
+		failf("15.3: expected Name=%q from fixture, got %q", instanceName, pathArg.Name)
 	}
 	if pathArg.Namespace != namespace {
 		failf("15.3: expected Namespace=%q from fixture, got %q", namespace, pathArg.Namespace)
@@ -502,7 +502,7 @@ func main() {
 	if pathArg.UUID != "" {
 		failf("15.3: expected UUID to be empty for path arg, got %q", pathArg.UUID)
 	}
-	fmt.Printf("   OK: ResolveReleaseArg extracted Name=%q Namespace=%q from file\n", pathArg.Name, pathArg.Namespace)
+	fmt.Printf("   OK: ResolveInstanceArg extracted Name=%q Namespace=%q from file\n", pathArg.Name, pathArg.Namespace)
 
 	pathRSF := pathArg.ToSelectorFlags("")
 	pathInv, pathLive, _, err := query.ResolveInventory(ctx, client, pathRSF, namespace, silentLog)
@@ -532,11 +532,11 @@ func main() {
 // opmLabels returns the standard OPM labels for test resources.
 func opmLabels(component string) map[string]interface{} {
 	labels := map[string]interface{}{
-		pkgcore.LabelManagedBy:            pkgcore.LabelManagedByValue,
-		"module-release.opmodel.dev/name": releaseName,
-		"module-release.opmodel.dev/uuid": releaseID,
-		"module.opmodel.dev/name":         moduleName,
-		"module.opmodel.dev/version":      moduleVersion,
+		pkgcore.LabelManagedBy:             pkgcore.LabelManagedByValue,
+		"module-instance.opmodel.dev/name": instanceName,
+		"module-instance.opmodel.dev/uuid": instanceID,
+		"module.opmodel.dev/name":          moduleName,
+		"module.opmodel.dev/version":       moduleVersion,
 	}
 	if component != "" {
 		labels["component.opmodel.dev/name"] = component
@@ -699,25 +699,25 @@ func buildStatefulSet(name, component string) *unstructured.Unstructured {
 // Inventory
 // ─────────────────────────────────────────────────────────────────────────────
 
-func buildInventory(resources []*unstructured.Unstructured) *inventory.ReleaseInventoryRecord {
+func buildInventory(resources []*unstructured.Unstructured) *inventory.InstanceInventoryRecord {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
 	}
 
-	inv := &inventory.ReleaseInventoryRecord{
+	inv := &inventory.InstanceInventoryRecord{
 		CreatedBy: inventory.CreatedByCLI,
-		ReleaseMetadata: inventory.ReleaseMetadata{
-			Kind:               "ModuleRelease",
-			APIVersion:         "core.opmodel.dev/v1alpha1",
-			ReleaseName:        releaseName,
-			ReleaseNamespace:   namespace,
-			ReleaseID:          releaseID,
+		InstanceMetadata: inventory.InstanceMetadata{
+			Kind:               "ModuleInstance",
+			APIVersion:         inventory.APIVersionV1Alpha1,
+			InstanceName:       instanceName,
+			InstanceNamespace:  namespace,
+			InstanceID:         instanceID,
 			LastTransitionTime: time.Now().UTC().Format(time.RFC3339),
 		},
 		ModuleMetadata: inventory.ModuleMetadata{
 			Kind:       "Module",
-			APIVersion: "core.opmodel.dev/v1alpha1",
+			APIVersion: inventory.APIVersionV1Alpha1,
 			Name:       moduleName,
 			Version:    moduleVersion,
 		},
@@ -831,7 +831,7 @@ func cleanup(ctx context.Context, client *kubernetes.Client) {
 	}
 
 	// Delete inventory secret.
-	secretName := inventory.SecretName(releaseName, releaseID)
+	secretName := inventory.SecretName(instanceName, instanceID)
 	_ = client.Clientset.CoreV1().Secrets(namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
 
 	// Delete namespace.

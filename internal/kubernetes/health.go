@@ -109,11 +109,11 @@ func IsHealthy(status HealthStatus) bool {
 	return status == HealthReady || status == HealthComplete || status == HealthBound
 }
 
-// QuickReleaseHealth evaluates aggregate health from pre-fetched resources.
+// QuickInstanceHealth evaluates aggregate health from pre-fetched resources.
 // It calls EvaluateHealth on each live resource and counts healthy vs total.
 // missingCount is the number of inventory-tracked resources not found on the cluster.
 // Returns the aggregate status, ready count, and total count.
-func QuickReleaseHealth(resources []*unstructured.Unstructured, missingCount int) (status HealthStatus, readyCount, totalCount int) {
+func QuickInstanceHealth(resources []*unstructured.Unstructured, missingCount int) (status HealthStatus, readyCount, totalCount int) {
 	total := len(resources) + missingCount
 	if total == 0 {
 		return HealthUnknown, 0, 0

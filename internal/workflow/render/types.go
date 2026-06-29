@@ -11,7 +11,7 @@ import (
 // Result is the output of the shared render workflow.
 type Result struct {
 	Resources  []*unstructured.Unstructured
-	Release    pkgmodule.InstanceMetadata
+	Instance   pkgmodule.InstanceMetadata // Was: Release (enhancement 0002 D8/D9)
 	Module     pkgmodule.ModuleMetadata
 	Components []pkgrender.ComponentSummary
 	MatchPlan  *pkgrender.MatchPlan
@@ -26,15 +26,15 @@ func (r *Result) ResourceCount() int {
 	return len(r.Resources)
 }
 
-type ReleaseFileOpts struct {
-	ReleaseFilePath string
-	ValuesFiles     []string
-	K8sConfig       *config.ResolvedKubernetesConfig
-	Config          *config.GlobalConfig
+type InstanceFileOpts struct {
+	InstanceFilePath string
+	ValuesFiles      []string
+	K8sConfig        *config.ResolvedKubernetesConfig
+	Config           *config.GlobalConfig
 }
 
 // ModuleOpts configures rendering from a module-package directory through the
-// synthesis path (no release.cue on disk).
+// synthesis path (no instance.cue on disk).
 type ModuleOpts struct {
 	// ModulePath is the directory containing the user's module CUE package.
 	ModulePath string

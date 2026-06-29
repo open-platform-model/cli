@@ -104,7 +104,7 @@ func SynthesizeModuleInstanceFromPackage(ctx *cue.Context, modulePath string, op
 		FillPath(cue.ParsePath("metadata.name"), synthName).
 		FillPath(cue.ParsePath("metadata.namespace"), synthNamespace)
 	if err := spec.Err(); err != nil {
-		return nil, fmt.Errorf("composing synthetic release: %w", err)
+		return nil, fmt.Errorf("composing synthetic instance: %w", err)
 	}
 
 	return &SynthesisResult{

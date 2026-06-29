@@ -4,7 +4,7 @@
 // Was: package releasefile (enhancement 0002 D10 — package name carried the
 // `release` token). The bundle path was removed in 0002 X2 (D15, supersedes
 // D7): bundle support was unreachable dead code, so KindBundleRelease,
-// *bundle.Release, and the bare/must bundle helpers are gone.
+// *bundle.Instance, and the bare/must bundle helpers are gone.
 package instancefile
 
 import (
@@ -20,7 +20,7 @@ import (
 type Kind string
 
 const (
-	// KindModuleInstance was KindModuleRelease; value flips to the core@v1 wire
+	// KindModuleInstance was KindModuleInstance; value flips to the core@v1 wire
 	// string "ModuleInstance" (enhancement 0002 D-X1.1).
 	KindModuleInstance Kind = "ModuleInstance"
 )
@@ -40,16 +40,16 @@ type ModuleParseData struct {
 	Metadata *module.InstanceMetadata
 }
 
-// FileRelease is the container returned by GetInstanceFile: it holds a
+// FileInstance is the container returned by GetInstanceFile: it holds a
 // module-instance parse-data. The struct name is kept verbatim (it doubles as
 // an X3 workflow surface).
-type FileRelease struct {
+type FileInstance struct {
 	Path   string
 	Kind   Kind
 	Module *ModuleParseData
 }
 
-func GetInstanceFile(ctx *cue.Context, filePath string) (*FileRelease, error) {
+func GetInstanceFile(ctx *cue.Context, filePath string) (*FileInstance, error) {
 	val, _, err := loader.LoadInstanceFile(ctx, filePath, loader.LoadOptions{Registry: os.Getenv("CUE_REGISTRY")})
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func GetInstanceFile(ctx *cue.Context, filePath string) (*FileRelease, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &FileRelease{
+		return &FileInstance{
 			Path:   filePath,
 			Kind:   KindModuleInstance,
 			Module: parseData,

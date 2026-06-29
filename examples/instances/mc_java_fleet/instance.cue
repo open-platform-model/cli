@@ -1,6 +1,6 @@
-// Minecraft Java fleet release example.
+// Minecraft Java fleet instance example.
 // Imports the public mc_java_fleet module
-// (opmodel.dev/modules/mc_java_fleet@v0) and binds it to a ModuleRelease.
+// (opmodel.dev/modules/mc_java_fleet@v0) and binds it to a ModuleInstance.
 //
 // The fleet module wraps multiple Minecraft Java servers behind a shared
 // mc-router that does hostname-based routing. The default values.cue
@@ -8,10 +8,10 @@
 // two-server fleet with the router exposed as LoadBalancer.
 //
 // Build (single server):
-//   opm release build ./examples/releases/mc_java_fleet/release.cue
+//   opm instance build ./examples/instances/mc_java_fleet/instance.cue
 // Build (multi-server):
-//   opm release build ./examples/releases/mc_java_fleet/release.cue \
-//     -f ./examples/releases/mc_java_fleet/values_multi.cue
+//   opm instance build ./examples/instances/mc_java_fleet/instance.cue \
+//     -f ./examples/instances/mc_java_fleet/values_multi.cue
 package mc_java_fleet
 
 import (
@@ -19,7 +19,7 @@ import (
 	m "opmodel.dev/modules/mc_java_fleet@v0"
 )
 
-mr.#ModuleRelease
+mr.#ModuleInstance
 
 metadata: {
 	name:      "mc-java-fleet"
