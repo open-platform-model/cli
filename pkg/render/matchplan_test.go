@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/pkg/bundle"
 	"github.com/opmodel/cli/pkg/core"
 	"github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/provider"
@@ -36,19 +35,4 @@ func TestModuleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {
 	assert.Empty(t, result.Resources)
 	assert.Empty(t, result.Components)
 	assert.Empty(t, result.Warnings)
-}
-
-func TestBundleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {
-	ctx := cuecontext.New()
-	providerVal := ctx.CompileString(`{#transformers:{}}`)
-	renderer := render.NewBundle(&provider.Provider{Data: providerVal}, core.LabelManagedByValue)
-	result, err := renderer.Execute(context.Background(), &bundle.Release{Releases: map[string]*module.Instance{}})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	assert.NotNil(t, result.Resources)
-	assert.NotNil(t, result.Warnings)
-	assert.NotNil(t, result.ReleaseOrder)
-	assert.Empty(t, result.Resources)
-	assert.Empty(t, result.Warnings)
-	assert.Empty(t, result.ReleaseOrder)
 }

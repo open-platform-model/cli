@@ -239,28 +239,6 @@ func containsToken(data []byte, token string) bool {
 	return false
 }
 
-// TestSynthesizeModuleInstanceFromPackage_BundleRejected ensures a
-// #BundleRelease-shaped CUE package is rejected before synthesis attempts to
-// proceed.
-func TestSynthesizeModuleInstanceFromPackage_BundleRejected(t *testing.T) {
-	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
-		t.Skip("skipping registry-backed synth tests")
-	}
-	ctx := cuecontext.New()
-
-	dir := makeSynthFixture(t, synthFixtureOpts{
-		moduleSource: `package mymodule
-
-kind: "BundleRelease"
-metadata: name: "fake-bundle"
-`,
-	})
-
-	_, err := SynthesizeModuleInstanceFromPackage(ctx, dir, SynthesizeOptions{Name: "x"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "bundle")
-}
-
 // TestSynthesizeModuleInstanceFromPackage_NameNamespaceOverride asserts the
 // caller's --name and --namespace overrides land on the synthesized spec.
 func TestSynthesizeModuleInstanceFromPackage_NameNamespaceOverride(t *testing.T) {

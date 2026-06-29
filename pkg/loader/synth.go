@@ -13,14 +13,7 @@ import (
 	oerrors "github.com/opmodel/cli/pkg/errors"
 )
 
-const (
-	catalogModulePath = "opmodel.dev/core/v1alpha1@v1"
-	// kindModuleInstance is the core@v1 module-instance wire kind (was
-	// "ModuleRelease", enhancement 0002 D-X1.1).
-	kindModuleInstance = "ModuleInstance"
-	// kindBundleRelease is left as-is until X2 flips the bundle path.
-	kindBundleRelease = "BundleRelease"
-)
+const catalogModulePath = "opmodel.dev/core/v1alpha1@v1"
 
 // SynthesizeOptions configures synthesis of a #ModuleInstance wrapper from a
 // module-package directory.
@@ -84,10 +77,6 @@ func SynthesizeModuleInstanceFromPackage(ctx *cue.Context, modulePath string, op
 	// up the synth anchor.
 	modVal, err := loadUserModule(ctx, absModule)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := rejectBundleShape(modVal); err != nil {
 		return nil, err
 	}
 
@@ -260,33 +249,6 @@ mr.#ModuleRelease
 		return cue.Value{}, fmt.Errorf("resolving catalog dep for synth wrapper: %w", err)
 	}
 	return val, nil
-}
-
-// rejectBundleShape returns an error if the loaded module value resembles a
-// bundle (#Bundle / #BundleRelease shape) instead of a module.
-func rejectBundleShape(v cue.Value) error {
-	for _, sel := range []string{"#bundle", "kind"} {
-		field := v.LookupPath(cue.ParsePath(sel))
-		if !field.Exists() {
-			continue
-		}
-		if sel == "kind" {
-			s, err := field.String()
-			if err == nil && (s == kindBundleRelease || s == "Bundle") {
-				return bundleNotSupported()
-			}
-			continue
-		}
-		return bundleNotSupported()
-	}
-	if v.LookupPath(cue.MakePath(cue.Def("Bundle"))).Exists() {
-		return bundleNotSupported()
-	}
-	return nil
-}
-
-func bundleNotSupported() error {
-	return errors.New("bundle synthesis is not supported; pass a single-module directory or a release file")
 }
 
 func lookupString(v cue.Value, path string) (string, bool) {

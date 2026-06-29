@@ -35,32 +35,6 @@ values: {
 	assert.True(t, rel.Module.Spec.Exists())
 }
 
-// Bundle kind detection stays on "BundleRelease" until X2 flips the bundle path.
-func TestGetInstanceFile_BundleReleasePartial(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "instance.cue")
-	require.NoError(t, os.WriteFile(path, []byte(`package test
-
-apiVersion: "opmodel.dev/core/v1alpha1"
-kind: "BundleRelease"
-metadata: {
-	name: "stack"
-}
-values: {
-	replicas: 2
-}
-`), 0o644))
-
-	rel, err := GetInstanceFile(cuecontext.New(), path)
-	require.NoError(t, err)
-	require.NotNil(t, rel.Bundle)
-	assert.Equal(t, KindBundleRelease, rel.Kind)
-	assert.Equal(t, "stack", rel.Bundle.Metadata.Name)
-	assert.True(t, rel.Bundle.Spec.Exists())
-	assert.Empty(t, rel.Bundle.Releases)
-	assert.False(t, rel.Bundle.Values.Exists())
-}
-
 func TestGetInstanceFile_UnknownKind(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "instance.cue")
@@ -82,22 +56,6 @@ kind: "ModuleInstance"
 metadata: {
 	name: string
 	namespace: "apps"
-}
-`), 0o644))
-
-	_, err := GetInstanceFile(cuecontext.New(), path)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "metadata must be concrete")
-}
-
-func TestGetInstanceFile_FailsWhenBundleMetadataNotConcrete(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "instance.cue")
-	require.NoError(t, os.WriteFile(path, []byte(`package test
-
-kind: "BundleRelease"
-metadata: {
-	name: string
 }
 `), 0o644))
 

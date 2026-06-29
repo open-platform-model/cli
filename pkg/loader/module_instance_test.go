@@ -27,10 +27,12 @@ func TestDetectInstanceKind(t *testing.T) {
 			wantKind: "ModuleInstance",
 		},
 		{
-			// BundleRelease is still accepted (X2 flips it to BundleInstance).
-			name:     "BundleRelease",
-			cue:      `{ kind: "BundleRelease" }`,
-			wantKind: "BundleRelease",
+			// BundleRelease is no longer recognized — the bundle path was
+			// removed in 0002 X2 (D15, supersedes D7).
+			name:      "BundleRelease rejected",
+			cue:       `{ kind: "BundleRelease" }`,
+			wantErr:   true,
+			errSubstr: "unknown instance kind",
 		},
 		{
 			name:      "unknown kind",

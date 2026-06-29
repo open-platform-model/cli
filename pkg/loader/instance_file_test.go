@@ -73,22 +73,6 @@ metadata: name: "my-instance"
 		assert.Equal(t, "ModuleInstance", kind)
 	})
 
-	t.Run("valid BundleRelease file", func(t *testing.T) {
-		filePath := makeInstanceFileFixture(t, "bundle_release.cue", `package releases
-
-kind: "BundleRelease"
-metadata: name: "my-bundle"
-`)
-		val, dir, err := LoadInstanceFile(ctx, filePath, LoadOptions{})
-		require.NoError(t, err)
-		assert.NotEmpty(t, dir)
-		assert.NoError(t, val.Err())
-
-		kind, kindErr := val.LookupPath(cue.ParsePath("kind")).String()
-		require.NoError(t, kindErr)
-		assert.Equal(t, "BundleRelease", kind)
-	})
-
 	t.Run("invalid CUE syntax", func(t *testing.T) {
 		filePath := makeInstanceFileFixture(t, "bad.cue", `package releases
 

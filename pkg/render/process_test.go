@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/pkg/bundle"
 	"github.com/opmodel/cli/pkg/core"
 	"github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/provider"
@@ -97,27 +96,4 @@ func TestProcessModuleInstance_Success(t *testing.T) {
 	var labels map[string]string
 	require.NoError(t, labelsVal.Decode(&labels))
 	assert.Equal(t, core.LabelManagedByValue, labels[core.LabelManagedBy])
-}
-
-func TestProcessBundleRelease_StubAfterValidation(t *testing.T) {
-	ctx := cuecontext.New()
-	raw := ctx.CompileString(`{
-		metadata: name: "stack"
-		#bundle: {
-			#config: {
-				replicas: int
-			}
-		}
-	}`)
-	br := &bundle.Release{
-		Metadata: &bundle.ReleaseMetadata{Name: "stack"},
-		Spec:     raw,
-		Config:   raw.LookupPath(cue.ParsePath("#bundle.#config")),
-		Releases: map[string]*module.Instance{},
-	}
-
-	_, err := ProcessBundleRelease(context.Background(), br, []cue.Value{ctx.CompileString(`{replicas: 1}`)}, &provider.Provider{Data: ctx.CompileString(`{}`)})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not implemented")
-	assert.True(t, br.Values.Exists())
 }

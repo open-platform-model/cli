@@ -111,12 +111,14 @@ func TestResolveReleaseValues_UsesValuesFile(t *testing.T) {
 	assert.True(t, values[0].Exists())
 }
 
+// A bundle file is no longer specially handled — the bundle path was removed in
+// 0002 X2 (D15). It now fails upstream at kind detection as an unknown kind.
 func TestRenderFromReleaseFile_RejectsBundleRelease(t *testing.T) {
 	ctx := cuecontext.New()
 	filePath := makeReleaseFileFixture(t, "bundle_release.cue", "package releases\nkind: \"BundleRelease\"\nmetadata: name: \"my-bundle\"\n")
 	_, err := FromReleaseFile(context.Background(), ReleaseFileOpts{ReleaseFilePath: filePath, Config: &config.GlobalConfig{CueContext: ctx, Providers: map[string]cue.Value{}}, K8sConfig: &config.ResolvedKubernetesConfig{}})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "bundle releases are not yet supported")
+	assert.Contains(t, err.Error(), "unknown instance kind")
 }
 
 func TestRenderFromReleaseFile_ValidValuesDoNotPanicAcrossRuntimes(t *testing.T) {

@@ -16,10 +16,9 @@ type LoadOptions struct {
 	Registry string
 }
 
-// LoadInstanceFile loads a #ModuleInstance or #BundleRelease from a standalone
-// .cue file. CUE imports (including registry module references) are resolved
-// via load.Instances() using the file's parent directory for cue.mod resolution.
-// ("#BundleRelease" stays until X2 flips the bundle path, 0002.)
+// LoadInstanceFile loads a #ModuleInstance from a standalone .cue file. CUE
+// imports (including registry module references) are resolved via
+// load.Instances() using the file's parent directory for cue.mod resolution.
 //
 // The returned cue.Value may have #module unfilled if the instance file does not
 // import a module. The instance file must import a module to fill #module.

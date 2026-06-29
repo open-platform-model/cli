@@ -49,9 +49,6 @@ func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error)
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
-	if fileRelease.Kind == internalinstancefile.KindBundleRelease {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("bundle releases are not yet supported - use a #ModuleRelease file")}
-	}
 	parseData := fileRelease.Module
 
 	// Verify #module is filled in the release file.

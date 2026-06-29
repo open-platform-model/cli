@@ -8,6 +8,10 @@ import (
 	"cuelang.org/go/cue"
 )
 
+// kindModuleInstance is the core@v1 module-instance wire kind (was
+// "ModuleRelease", enhancement 0002 D-X1.1).
+const kindModuleInstance = "ModuleInstance"
+
 // DetectInstanceKind returns the kind field from an evaluated instance value.
 //
 // Was: DetectReleaseKind (enhancement 0002 D8 hard-rename).
@@ -22,9 +26,9 @@ func DetectInstanceKind(v cue.Value) (string, error) {
 	}
 	switch kind {
 	// "ModuleInstance" is the core@v1 wire kind (was "ModuleRelease", 0002 D-X1.1).
-	// kindBundleRelease ("BundleRelease") is left untouched here; X2 flips it to
-	// "BundleInstance" in the same atomic PR.
-	case kindModuleInstance, kindBundleRelease:
+	// The bundle path was removed in 0002 X2 (D15); "BundleRelease" is no longer
+	// recognized and falls through to the unknown-kind error.
+	case kindModuleInstance:
 		return kind, nil
 	default:
 		return "", fmt.Errorf("unknown instance kind: %q", kind)

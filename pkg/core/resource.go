@@ -22,8 +22,7 @@ import (
 // conversion methods below.
 //
 // Release, Component, and Transformer record provenance for inventory tracking
-// and display. Release is especially important when rendering a BundleRelease,
-// where resources from multiple ModuleReleases are collected together.
+// and display.
 type Resource struct {
 	// Value is the CUE value of the rendered resource (e.g. a Kubernetes manifest).
 	// Concrete and fully evaluated — safe to encode directly to YAML or JSON.
