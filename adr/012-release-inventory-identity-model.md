@@ -1,4 +1,4 @@
-# ADR-012: Release Inventory Identity Model
+# ADR-012: Instance Inventory Identity Model
 
 ## Status
 
@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The release inventory tracks which Kubernetes resources are owned by a release (see ADR-008) and must detect stale resources when the set changes between applies.
+The instance inventory tracks which Kubernetes resources are owned by an instance (see ADR-008) and must detect stale resources when the set changes between applies.
 
 Comparing inventory entries requires a definition of identity: when are two entries "the same resource"?
 
@@ -25,13 +25,13 @@ Exclude Version from both identity models. Including Version was rejected becaus
 
 Construct inventory entries from rendered resources by extracting Group/Kind from GVK, Namespace/Name from metadata, and Component from the OPM label.
 
-Store the inventory as a Kubernetes Secret named `opm.<release-name>.<release-id>` where release-id is a deterministic UUID v5.
+Store the inventory as a Kubernetes Secret named `opm.<instance-name>.<instance-id>` where instance-id is a deterministic UUID v5.
 
-Apply five labels to the inventory Secret: `app.kubernetes.io/managed-by: open-platform-model`, `module-release.opmodel.dev/name`, `module-release.opmodel.dev/namespace`, `module-release.opmodel.dev/uuid`, and `opmodel.dev/component: inventory`.
+Apply five labels to the inventory Secret: `app.kubernetes.io/managed-by: open-platform-model`, `module-instance.opmodel.dev/name`, `module-instance.opmodel.dev/namespace`, `module-instance.opmodel.dev/uuid`, and `opmodel.dev/component: inventory`.
 
 Model the inventory as current ownership only — no change history, timestamps, source paths, or remediation counters. The inventory represents what is owned now, not what happened before.
 
-Include `ReleaseMetadata` and `ModuleMetadata` in the persisted record to enable future migration from Secrets to CRDs without changing the storage shape.
+Include `InstanceMetadata` and `ModuleMetadata` in the persisted record to enable future migration from Secrets to CRDs without changing the storage shape.
 
 Compute inventory digest deterministically: same entries in different order produce the same digest, enabling reliable change detection.
 

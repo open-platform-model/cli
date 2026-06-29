@@ -1,6 +1,6 @@
 //go:build ignore
 
-// Integration test for opm rel list — inventory listing and health evaluation.
+// Integration test for opm instance list — inventory listing and health evaluation.
 //
 // Tests covered:
 //   - Scenario 1: List in specific namespace returns correct instances

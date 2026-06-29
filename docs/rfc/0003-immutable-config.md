@@ -5,11 +5,11 @@
 | **Status**   | Draft                                                                                    |
 | **Created**  | 2026-02-11                                                                               |
 | **Authors**  | OPM Contributors                                                                         |
-| **Related**  | RFC-0001 (Release Inventory), RFC-0002 (Sensitive Data Model), RFC-0005 (Env & Config Wiring), K8s Coverage Gap Analysis |
+| **Related**  | RFC-0001 (Instance Inventory), RFC-0002 (Sensitive Data Model), RFC-0005 (Env & Config Wiring), K8s Coverage Gap Analysis |
 
 ## Summary
 
-Add an `immutable` field to `#SecretSchema` and `#ConfigMapSchema`. When set to `true`, the transformer appends a content-hash suffix to the Kubernetes resource name and sets the native `spec.immutable: true` field on the emitted resource. Content changes produce a new name, which triggers workload rolling updates (once env wiring is implemented) and causes the old resource to be garbage collected via the Release Inventory (RFC-0001).
+Add an `immutable` field to `#SecretSchema` and `#ConfigMapSchema`. When set to `true`, the transformer appends a content-hash suffix to the Kubernetes resource name and sets the native `spec.immutable: true` field on the emitted resource. Content changes produce a new name, which triggers workload rolling updates (once env wiring is implemented) and causes the old resource to be garbage collected via the Instance Inventory (RFC-0001).
 
 This is the OPM equivalent of Kustomize's `configMapGenerator`/`secretGenerator` and Timoni's `#ImmutableConfig`.
 
@@ -63,7 +63,7 @@ The established solution across the Kubernetes ecosystem is to treat config reso
 
 Two concurrent developments make this the right time:
 
-1. **RFC-0001 (Release Inventory)** provides the garbage collection mechanism.
+1. **RFC-0001 (Instance Inventory)** provides the garbage collection mechanism.
    Without inventory-based pruning, old hash-suffixed resources would accumulate    indefinitely. With it, they are automatically cleaned up as stale resources.
 
 2. **The env valueFrom gap** (K8s Coverage Gap Analysis, item 1.1) is the next
@@ -431,7 +431,7 @@ valueFrom implementation (K8s Coverage Gap Analysis, item 1.1). This RFC only de
 
 ### Garbage Collection
 
-Immutable resources rely on the Release Inventory (RFC-0001) for lifecycle management. When data changes, the content hash changes, which changes the resource name. From the inventory's perspective, this is identical to a resource rename — the core scenario that motivated RFC-0001.
+Immutable resources rely on the Instance Inventory (RFC-0001) for lifecycle management. When data changes, the content hash changes, which changes the resource name. From the inventory's perspective, this is identical to a resource rename — the core scenario that motivated RFC-0001.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -487,7 +487,7 @@ They compose as follows:
 
 The hash input varies by variant because OPM's visibility into the data varies. For `#SecretLiteral`, OPM has the actual values. For `#SecretEsoRef`, OPM only has the reference metadata. For `#SecretK8sRef`, OPM doesn't own the resource at all. The hash captures what OPM knows — changes to the reference trigger recreation, while runtime rotation by the external store does not.
 
-### Release Inventory (RFC-0001)
+### Instance Inventory (RFC-0001)
 
 Required dependency. Immutable config is a special case of the rename problem that motivated RFC-0001. Both should ship together as a cohesive feature:
 
@@ -768,6 +768,6 @@ For `#SecretEsoRef` sources that produce ExternalSecret CRs, the `immutable` fie
 - [Kustomize configMapGenerator](https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/configmapgenerator/) — Kustomize's hash-suffixed config generation
 - [KEP-1412: Immutable Secrets and ConfigMaps](https://github.com/kubernetes/enhancements/tree/master/keps/sig-storage/1412-immutable-secrets-and-configmaps) — Kubernetes native immutability
 - [Helm: Automatically Roll Deployments](https://helm.sh/docs/howto/charts_tips_and_tricks/#automatically-roll-deployments) — Helm's checksum annotation pattern
-- [RFC-0001: Release Inventory](0001-release-inventory.md) — OPM's inventory-based pruning system
+- [RFC-0001: Instance Inventory](0001-release-inventory.md) — OPM's inventory-based pruning system
 - [RFC-0002: Sensitive Data Model](0002-sensitive-data-model.md) — First-class #Secret type for OPM
 - [RFC-0005: Environment & Config Wiring](0005-env-config-wiring.md) — Env var wiring, envFrom, volume mounts

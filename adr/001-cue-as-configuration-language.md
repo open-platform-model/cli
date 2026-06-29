@@ -14,7 +14,7 @@ Config files may contain sensitive provider settings, making file permissions a 
 
 ## Decision
 
-Use CUE as the single configuration language for modules, providers, releases, and CLI configuration. YAML was considered but rejected because it cannot express provider module references via imports and would require separate schema validation tooling.
+Use CUE as the single configuration language for modules, providers, instances, and CLI configuration. YAML was considered but rejected because it cannot express provider module references via imports and would require separate schema validation tooling.
 
 To resolve the registry bootstrap problem, config loading uses two phases: the first phase extracts the registry URL with simple parsing before any CUE evaluation, and the second phase loads the full config with the registry available for CUE module imports.
 
@@ -24,6 +24,6 @@ See also ADR-011 for how CUE evaluation is used for metadata extraction.
 
 ## Consequences
 
-Using CUE as the single configuration language provides type-safe configuration with built-in validation, allows provider references to be expressed as native CUE imports, and enforces schema constraints at the language level without external tooling. A single language across the entire stack — modules, providers, releases, and config — reduces cognitive overhead.
+Using CUE as the single configuration language provides type-safe configuration with built-in validation, allows provider references to be expressed as native CUE imports, and enforces schema constraints at the language level without external tooling. A single language across the entire stack — modules, providers, instances, and config — reduces cognitive overhead.
 
 The two-phase config loading adds complexity to the initialization path. CUE has a steeper learning curve than YAML for new users. Secure default permissions prevent accidental credential exposure but may surprise users expecting standard file permissions.

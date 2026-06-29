@@ -1048,7 +1048,7 @@ Result: Module author wrote no infrastructure code. Platform provided concrete b
 
 **Options**:
 
-- A. Platform injects values into `requires` during ModuleRelease rendering
+- A. Platform injects values into `requires` during ModuleInstance rendering
   (CUE unification)
 - B. `requires` fields generate a parallel config structure that gets merged
 - C. A pre-processing step rewrites `requires.X.field` references to concrete

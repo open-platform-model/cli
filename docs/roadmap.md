@@ -21,7 +21,7 @@ OPM's CLI foundation has been built over the first iteration of development. The
 
 **Core definitions and rendering:**
 
-- CUE-native definitions: Module, ModuleRelease, Component, Resource, Trait, Policy
+- CUE-native definitions: Module, ModuleInstance, Component, Resource, Trait, Policy
 - Catalog of definitions: 5 resources, 20+ traits, 5 blueprints
 - 6-phase render pipeline with AST-based overlay generation
 - Kubernetes Provider with 12 transformers (Deployment, StatefulSet, DaemonSet, Job, CronJob, Service, PVC, ConfigMap, Secret, ServiceAccount, HPA, Ingress)
@@ -30,21 +30,21 @@ OPM's CLI foundation has been built over the first iteration of development. The
 
 - `opm module init` — scaffold a new module (simple, standard, advanced templates)
 - `opm module vet` — native CUE SDK validation with custom error formatting
-- `opm release build` — render a release file to manifests
-- `opm release apply` — server-side apply with inventory tracking and stale resource pruning
-- `opm release delete` — inventory-based or label-based discovery with release name or UUID
-- `opm release diff` — compare a release file against live cluster state
-- `opm release status` — health and readiness status (table/yaml/json, watch mode)
-- `opm release tree` — tree view of release resources and hierarchy
-- `opm release events` — Kubernetes events for release resources
-- `opm release list` — list deployed releases in a namespace (`-A` for all namespaces)
+- `opm instance build` — render an instance file to manifests
+- `opm instance apply` — server-side apply with inventory tracking and stale resource pruning
+- `opm instance delete` — inventory-based or label-based discovery with instance name or UUID
+- `opm instance diff` — compare an instance file against live cluster state
+- `opm instance status` — health and readiness status (table/yaml/json, watch mode)
+- `opm instance tree` — tree view of instance resources and hierarchy
+- `opm instance events` — Kubernetes events for instance resources
+- `opm instance list` — list deployed instances in a namespace (`-A` for all namespaces)
 - `opm config init` — initialize `~/.opm/config.cue`
 - `opm config vet` — native CUE SDK config validation
 
 **Infrastructure:**
 
-- Release Inventory — Secret-based resource tracking with change history and stale resource pruning
-- Deterministic release identity via UUID v5 labels
+- Instance Inventory — Secret-based resource tracking with change history and stale resource pruning
+- Deterministic instance identity via UUID v5 labels
 - CUE-native configuration with full precedence chain (Flag > Env > Config > Default)
 - Values validation against module `#config` schema during build
 - Unchanged apply detection — skips inventory write when nothing changed
@@ -71,11 +71,11 @@ M1: CLI Stability & Validation
  │
  ├──► M2: Secrets & Config Lifecycle
  │     │
- │     ├── Release Inventory ······ (done)
+ │     ├── Instance Inventory ······ (done)
  │     ├── Sensitive Data Model
  │     │     └──► Env & Config Wiring
  │     └── Immutable Config
- │           └──► Release Inventory (for GC of old immutables)
+ │           └──► Instance Inventory (for GC of old immutables)
  │
  ├──► M3: Distribution
  │     │
@@ -99,21 +99,21 @@ The foundation must be solid before adding new capabilities. This milestone focu
 
 - ~~**Native validation** — Replace the stub `opm module vet` and `opm config vet` commands with native Go CUE SDK implementations. 4-phase validation pipeline with custom error formatting, entity summaries, `--debug`/`--values`/`--package`/`--concrete` flags.~~ (done)
 
-- ~~**`#ModuleRelease.values` validation against `#Module.#config`** — During processing, validate that the values provided in a ModuleRelease satisfy the schema defined by the Module's `#config`. Leverages CUE's evaluator to support mandatory (`!`), optional (`?`), and default (`*`) fields.~~ (done)
+- ~~**`#ModuleInstance.values` validation against `#Module.#config`** — During processing, validate that the values provided in a ModuleInstance satisfy the schema defined by the Module's `#config`. Leverages CUE's evaluator to support mandatory (`!`), optional (`?`), and default (`*`) fields.~~ (done)
 
-- **Atomic apply** — An incorrectly configured release must not partially apply. Today, `opm release apply` renders all resources and validates before applying, but a failure mid-apply does not roll back previously-applied resources. Investigate dry-run validation or rollback strategies.
+- **Atomic apply** — An incorrectly configured instance must not partially apply. Today, `opm instance apply` renders all resources and validates before applying, but a failure mid-apply does not roll back previously-applied resources. Investigate dry-run validation or rollback strategies.
 
-- ~~**Unchanged apply detection** — When `opm release apply` is run against an already-applied release with no changes, the output indicates that no changes were made instead of displaying "Release applied."~~ (done)
+- ~~**Unchanged apply detection** — When `opm instance apply` is run against an already-applied instance with no changes, the output indicates that no changes were made instead of displaying "Instance applied."~~ (done)
 
 **Additional deliverables:**
 
 - `opm module eval` — print the raw CUE evaluation of a module
-- ~~`opm release list` — list deployed releases in a namespace (`-A` for all namespaces), leveraging inventory for discovery~~ (done)
-- ~~`opm release tree` — tree view of release resources and resource hierarchy~~ (done)
-- ~~`opm release events` — Kubernetes events for release resources~~ (done)
-- ~~`opm release status` v2 — improved health reporting, inventory-aware~~ (done)
-- ~~`--ignore-not-found` flag for `opm release delete` and `opm release status` for idempotent operations (exit 0 when no resources match)~~ (done)
-- ~~`--create-namespace` flag for `opm release apply`~~ (done)
+- ~~`opm instance list` — list deployed instances in a namespace (`-A` for all namespaces), leveraging inventory for discovery~~ (done)
+- ~~`opm instance tree` — tree view of instance resources and resource hierarchy~~ (done)
+- ~~`opm instance events` — Kubernetes events for instance resources~~ (done)
+- ~~`opm instance status` v2 — improved health reporting, inventory-aware~~ (done)
+- ~~`--ignore-not-found` flag for `opm instance delete` and `opm instance status` for idempotent operations (exit 0 when no resources match)~~ (done)
+- ~~`--create-namespace` flag for `opm instance apply`~~ (done)
 - ~~Remove `injectLabels()` — redundant with transformer-based label injection~~ (done)
 
 ### M2: Secrets and Config Lifecycle
@@ -122,13 +122,13 @@ Full lifecycle management of configuration and sensitive data. This is the criti
 
 **Major deliverables:**
 
-- ~~**Release Inventory** — A lightweight Kubernetes Secret that tracks which resources belong to a ModuleRelease. Enables automatic pruning of stale resources during `opm release apply` and provides a precise source of truth for `diff`, `delete`, and `status`. Maintains change history for future rollback.~~ (done)
+- ~~**Instance Inventory** — A lightweight Kubernetes Secret that tracks which resources belong to a ModuleInstance. Enables automatic pruning of stale resources during `opm instance apply` and provides a precise source of truth for `diff`, `delete`, and `status`. Maintains change history for future rollback.~~ (done)
 
-- **Sensitive Data Model** — Introduce `#Secret` as a first-class type that tags fields as sensitive at the schema level. This single annotation propagates through every layer — module definition, release fulfillment, transformer output — enabling the toolchain to redact, encrypt, and dispatch secrets to platform-appropriate resources (K8s Secrets, ExternalSecrets, CSI volumes). Supports literal values, external references, and CLI `@` tag injection.
+- **Sensitive Data Model** — Introduce `#Secret` as a first-class type that tags fields as sensitive at the schema level. This single annotation propagates through every layer — module definition, instance fulfillment, transformer output — enabling the toolchain to redact, encrypt, and dispatch secrets to platform-appropriate resources (K8s Secrets, ExternalSecrets, CSI volumes). Supports literal values, external references, and CLI `@` tag injection.
 
 - **Environment and Config Wiring** — Full `#EnvVarSchema` with four source types (literal, configMapKeyRef, secretKeyRef, fieldRef), bulk injection via `envFrom`, volume-mounted secrets, and auto-discovery of secrets from `#config`. This is the output side of the Sensitive Data Model's data flow.
 
-- **Immutable ConfigMaps and Secrets** — When `immutable: true` is set, the transformer appends a content-hash suffix to the resource name and sets `spec.immutable: true`. Content changes produce a new name, triggering workload rolling updates. Old resources are garbage collected via the Release Inventory. The OPM equivalent of Kustomize's `configMapGenerator`.
+- **Immutable ConfigMaps and Secrets** — When `immutable: true` is set, the transformer appends a content-hash suffix to the resource name and sets `spec.immutable: true`. Content changes produce a new name, triggering workload rolling updates. Old resources are garbage collected via the Instance Inventory. The OPM equivalent of Kustomize's `configMapGenerator`.
 
 ### M3: Distribution
 
@@ -168,15 +168,15 @@ The same Module lifecycle as the CLI, delivered through an in-cluster controller
 
 ### M5: In-Cluster Controller
 
-The core controller that watches ModuleRelease custom resources and reconciles them.
+The core controller that watches ModuleInstance custom resources and reconciles them.
 
 **Preliminary deliverables:**
 
-- ModuleRelease CRD definition and controller scaffolding
+- ModuleInstance CRD definition and controller scaffolding
 - Embed the Phase 1 rendering pipeline — same CUE evaluation, same transformer matching, same output
 - Continuous reconciliation — drift detection and re-apply to maintain desired state
 - Controller-based status reporting via CRD status subresource and Kubernetes events
-- Multi-cluster topology — target multiple clusters and namespaces from a single ModuleRelease definition, with override policies for per-cluster customisation
+- Multi-cluster topology — target multiple clusters and namespaces from a single ModuleInstance definition, with override policies for per-cluster customisation
 
 ### M6: Platform Registry
 
@@ -205,7 +205,7 @@ Standard service interfaces that any conforming provider can implement, creating
 - Commodity service interface definitions — CUE schemas for StatelessWorkload, StatefulWorkload, VirtualMachine, DatabaseAsAService, ObjectStorage, DNS, LoadBalancer, MessageQueue, KeyValueStore, CertificateAuthority
 - Provider certification model — machine-verifiable proof that a provider's implementation satisfies a commodity interface
 - Cross-provider contracts for networking, identity and access control, and observability
-- Multi-provider rendering pipeline — a single ModuleRelease producing resources across multiple providers, each handling the capabilities it's registered for
+- Multi-provider rendering pipeline — a single ModuleInstance producing resources across multiple providers, each handling the capabilities it's registered for
 
 ### M8: Multi-Provider Ecosystem
 

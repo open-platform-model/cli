@@ -123,12 +123,12 @@ Everything lives in one artifact: components, traits, multi-cluster topology, ov
 and a multi-step workflow with manual approval. The controller parses this, evaluates CUE
 templates internally, and renders Kubernetes resources.
 
-### OPM: Module + ModuleRelease
+### OPM: Module + ModuleInstance
 
 In OPM, the application definition is split into two artifacts:
 
 1. **Module** — the portable blueprint (written by a Module Author)
-2. **ModuleRelease** — the concrete deployment instance (written by an End User)
+2. **ModuleInstance** — the concrete deployment instance (written by an End User)
 
 Here's the equivalent from `catalog/v0/examples/modules/basic_module.cue`:
 
@@ -200,12 +200,12 @@ basicModule: core.#Module & {
 ```
 
 ```cue
-// ModuleRelease (End User writes this)
+// ModuleInstance (End User writes this)
 // Source: catalog/v0/examples/modules/basic_module.cue
 
-basicModuleRelease: core.#ModuleRelease & {
+basicModuleInstance: core.#ModuleInstance & {
     metadata: {
-        name:      "basic-module-release"
+        name:      "basic-module-instance"
         namespace: "production"
 
         labels: {
@@ -227,7 +227,7 @@ basicModuleRelease: core.#ModuleRelease & {
 ```
 
 The Module defines *what's configurable* (`#config`) and *what the sane defaults are*
-(`values`). The ModuleRelease provides *concrete overrides* for a specific environment.
+(`values`). The ModuleInstance provides *concrete overrides* for a specific environment.
 The CLI evaluates the CUE, unifies config + values, runs transformer matching, and
 produces Kubernetes manifests.
 
@@ -235,17 +235,17 @@ produces Kubernetes manifests.
 
 | Aspect | KubeVela | OPM |
 |--------|----------|-----|
-| Artifact count | 1 (Application YAML) | 2 (Module + ModuleRelease in CUE) |
+| Artifact count | 1 (Application YAML) | 2 (Module + ModuleInstance in CUE) |
 | Language | YAML (with CUE evaluated internally) | Pure CUE throughout |
 | Validation | Runtime (controller rejects invalid apps) | Build-time (CUE catches errors before apply) |
-| Value system | 2-tier: Definition defaults → Application properties | 3-tier: `#config` schema → Author `values` → Release `values` |
+| Value system | 2-tier: Definition defaults → Application properties | 3-tier: `#config` schema → Author `values` → Instance `values` |
 | Controller required | Yes | No |
 
 KubeVela is simpler to get started with — one YAML file, `kubectl apply`, done. The
 controller handles everything. The trade-off is that validation happens at runtime. If
 you typo a property name, you find out when the controller tries to reconcile.
 
-OPM requires more upfront structure (separate Module and ModuleRelease, CUE imports,
+OPM requires more upfront structure (separate Module and ModuleInstance, CUE imports,
 typed schemas) but catches errors earlier. If you provide `scaling: "three"` where an
 `int` is expected, CUE rejects it before anything touches the cluster. The three-tier
 value system also creates a clearer handoff: the Module Author defines the schema and
@@ -1067,14 +1067,14 @@ spec:
     ref: make-release-in-hangzhou
 ```
 
-### OPM: ModuleRelease per Target
+### OPM: ModuleInstance per Target
 
-OPM currently handles multi-environment deployment by creating separate ModuleReleases
+OPM currently handles multi-environment deployment by creating separate ModuleInstances
 that target different namespaces:
 
 ```cue
 // Deploy to staging
-stagingRelease: core.#ModuleRelease & {
+stagingInstance: core.#ModuleInstance & {
     metadata: {
         name:      "my-app-staging"
         namespace: "staging"
@@ -1087,7 +1087,7 @@ stagingRelease: core.#ModuleRelease & {
 }
 
 // Deploy to production
-productionRelease: core.#ModuleRelease & {
+productionInstance: core.#ModuleInstance & {
     metadata: {
         name:      "my-app-production"
         namespace: "production"
@@ -1101,8 +1101,8 @@ productionRelease: core.#ModuleRelease & {
 ```
 
 There's no built-in concept of cluster topology, override policies, or orchestrated
-multi-cluster rollouts. Each release is independent, applied separately. Orchestration
-across releases is delegated to external CI/CD pipelines.
+multi-cluster rollouts. Each instance is independent, applied separately. Orchestration
+across instances is delegated to external CI/CD pipelines.
 
 ### Analysis
 
@@ -1114,7 +1114,7 @@ deeply integrated:
 - **Override policies** customise per-cluster (image, replicas, traits)
 - **Workflow steps** orchestrate the rollout order with approval gates
 
-OPM's approach is simpler but less capable. A ModuleRelease targets a single namespace,
+OPM's approach is simpler but less capable. A ModuleInstance targets a single namespace,
 and orchestrating across environments requires external tooling. This is a deliberate
 trade-off — OPM avoids runtime complexity — but it means multi-cluster is currently a
 manual exercise.
@@ -1302,7 +1302,7 @@ applies them via server-side apply. That's it.
 ```text
 opm mod apply ./my-module
     │
-    ├── Evaluate CUE (Module + ModuleRelease + Provider)
+    ├── Evaluate CUE (Module + ModuleInstance + Provider)
     ├── Match transformers to components
     ├── Run #transform for each match
     ├── Output Kubernetes manifests
@@ -1376,11 +1376,11 @@ opm mod apply ./my-module
 ┌──────────────────────────────────────┐
 │   CLI (local machine)                │
 │                                      │
-│  1. Load Module + ModuleRelease      │
+│  1. Load Module + ModuleInstance     │
 │  2. Evaluate CUE (full unification)  │
 │  3. #MatchTransformers:              │
 │     For each Transformer in Provider │
-│       For each Component in Release  │
+│       For each Component in Instance │
 │         Check requiredLabels         │
 │         Check requiredResources      │
 │         Check requiredTraits         │
@@ -1445,7 +1445,7 @@ it has Container + `workload-type: stateless` label) and the `ServiceTransformer
 
 The `#TransformerContext` carries labels and annotations down to the output:
 
-- Module-level labels (from ModuleRelease metadata)
+- Module-level labels (from ModuleInstance metadata)
 - Component-level labels (from Component metadata, inherited from Resources/Traits)
 - Controller labels (`app.kubernetes.io/managed-by`, `app.kubernetes.io/name`, etc.)
 
@@ -1480,12 +1480,12 @@ ComponentDefinition renders what you expect.
 | **Runtime** | In-cluster controller (required) | CLI only (no controller) |
 | **Language** | YAML + CUE templates | Pure CUE throughout |
 | **Validation timing** | Runtime (controller rejects invalid apps) | Build-time (CUE catches errors before apply) |
-| **Application artifact** | `Application` CR (single YAML) | `#Module` + `#ModuleRelease` (split CUE) |
-| **Value system** | 2-tier (definition defaults → app properties) | 3-tier (schema → author defaults → release values) |
+| **Application artifact** | `Application` CR (single YAML) | `#Module` + `#ModuleInstance` (split CUE) |
+| **Value system** | 2-tier (definition defaults → app properties) | 3-tier (schema → author defaults → instance values) |
 | **Component model** | `type:` name + `properties:` + `traits:` | Embed Resources + Traits + Blueprints into `#Component` |
 | **Extending platform** | ComponentDefinition + TraitDefinition (CUE in YAML CRDs) | Resource + Trait + Transformer (pure CUE modules) |
 | **Rendering ownership** | Definition owns rendering (`output:`/`outputs:`) | Transformer owns rendering (separate from definitions) |
-| **Multi-cluster** | Topology + Override policies, Cluster Gateway | ModuleRelease per target (no orchestration) |
+| **Multi-cluster** | Topology + Override policies, Cluster Gateway | ModuleInstance per target (no orchestration) |
 | **Workflow engine** | Built-in (deploy, suspend, notify, step-group, conditional) | None (delegates to CI/CD) |
 | **Drift correction** | Automatic (controller reconciles) | Manual (re-run apply) |
 | **Web UI** | VelaUX | None |
@@ -1545,11 +1545,11 @@ adopting these capabilities, adapted to its build-time-first architecture:
   the CLI or a lightweight controller, preserving the "render, then apply" philosophy.
 - **Multi-cluster topology** (planned): First-class topology and override policies so
   that a single Module or Bundle can target multiple clusters and namespaces without
-  duplicating ModuleReleases.
+  duplicating ModuleInstances.
 - **Continuous reconciliation** (planned): An optional in-cluster controller that watches
   for drift and re-applies desired state using the same CUE evaluation pipeline as the
   CLI — ensuring identical behaviour locally and in-cluster.
-- **Quick-start experience**: the Module + ModuleRelease split is more work than a single
+- **Quick-start experience**: the Module + ModuleInstance split is more work than a single
   Application YAML. The `opm mod init` templates help, but there's room to simplify the
   happy path further.
 

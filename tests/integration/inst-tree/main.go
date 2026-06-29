@@ -1,6 +1,6 @@
 //go:build ignore
 
-// Integration test for opm rel tree — tree building with real cluster resources.
+// Integration test for opm instance tree — tree building with real cluster resources.
 //
 // Tests covered:
 //   - 14.1: Deploy test module with multiple components (Deployment, StatefulSet, Services, ConfigMaps)

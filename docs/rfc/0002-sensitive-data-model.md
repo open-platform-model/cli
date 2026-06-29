@@ -10,7 +10,7 @@
 
 Introduce a `#Secret` type that makes sensitive data a first-class concept in OPM. Today, all values flow through `#config` → `values` → transformer identically — `db.host` and `db.password` are both plain strings. Passwords end up as plaintext in CUE files, git repositories, and rendered manifests.
 
-`#Secret` tags a field as sensitive at the schema level. This single annotation propagates through every layer — module definition, release fulfillment, transformer output — enabling the toolchain to redact, encrypt, and dispatch secrets to platform-appropriate resources (K8s Secrets, ExternalSecrets, CSI volumes) without the module author managing any of that machinery.
+`#Secret` tags a field as sensitive at the schema level. This single annotation propagates through every layer — module definition, instance fulfillment, transformer output — enabling the toolchain to redact, encrypt, and dispatch secrets to platform-appropriate resources (K8s Secrets, ExternalSecrets, CSI volumes) without the module author managing any of that machinery.
 
 `#Secret` is a three-variant disjunction (`#SecretLiteral | #SecretK8sRef | #SecretEsoRef`). Each variant carries a `$opm: "secret"` discriminator that enables **auto-discovery** — CUE comprehensions walk resolved `#config` values, detect `#Secret` fields via a negation test, and group them by `$secretName` to generate the K8s Secret resource layout automatically. Module authors declare secrets once in `#config` and wire them in env vars — no manual bridging layer required.
 
@@ -335,7 +335,7 @@ For `#SecretK8sRef` and `#SecretEsoRef`, constraints remain in the schema as mac
 
 ### Input Paths
 
-Three input paths for providing secret values, plus CLI `@` tag injection. All can coexist within a single module release.
+Three input paths for providing secret values, plus CLI `@` tag injection. All can coexist within a single module instance.
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
@@ -365,7 +365,7 @@ Three input paths for providing secret values, plus CLI `@` tag injection. All c
 // Module definition
 #config: db: password: #Secret & { $secretName: "db-creds", $dataKey: "password" }
 
-// Module release — resolves to #SecretLiteral
+// Module instance — resolves to #SecretLiteral
 values: db: password: { value: "my-secret-password" }
 ```
 
@@ -926,7 +926,7 @@ Organizations can enable strict mode via platform policy:
 
 ```cue
 #NoLiteralSecrets: #PolicyRule & {
-    // Validates that no #Secret field in the release is a #SecretLiteral
+    // Validates that no #Secret field in the instance is a #SecretLiteral
 }
 ```
 
@@ -1126,7 +1126,7 @@ extensible.
 
 ### Q4: SecretStore Configuration
 
-Where does the user specify which `ClusterSecretStore` to use for a given `#SecretEsoRef`? Options: (A) Provider-level. (B) Release-level. (C) Policy-level.
+Where does the user specify which `ClusterSecretStore` to use for a given `#SecretEsoRef`? Options: (A) Provider-level. (B) Instance-level. (C) Policy-level.
 
 **Recommendation:** Option C. Secret store config is an environment concern. Aligns with the Interface RFC's platform fulfillment model. ESO simplifies this further — the platform operator configures `ClusterSecretStore` resources once and all `#SecretEsoRef` variants resolve through them.
 
@@ -1204,7 +1204,7 @@ Enforcement rules like `#NoLiteralSecrets` require a policy evaluation pass. Des
 
 ### Controller-Time Secret Constraint Validation
 
-When OPM implements a controller, `#SecretK8sRef` and `#SecretEsoRef` values can be validated against schema constraints after the controller fetches the actual secret from the external store. An externally-sourced password that fails a `MinRunes(12)` constraint would surface as a status condition on the ModuleRelease resource, rather than silently deploying a non-conforming value. This closes the validation gap for externally-resolved secrets that the CLI cannot check at eval time.
+When OPM implements a controller, `#SecretK8sRef` and `#SecretEsoRef` values can be validated against schema constraints after the controller fetches the actual secret from the external store. An externally-sourced password that fails a `MinRunes(12)` constraint would surface as a status condition on the ModuleInstance resource, rather than silently deploying a non-conforming value. This closes the validation gap for externally-resolved secrets that the CLI cannot check at eval time.
 
 ### CSI Volume Driver Support
 

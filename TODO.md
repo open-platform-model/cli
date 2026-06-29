@@ -16,7 +16,7 @@
 - [x] ~~Add `--ignore-not-found` flag to `opm mod delete` and `opm mod status` for idempotent operations. Currently these commands fail with an error when no resources match the selector. The flag would suppress this error and exit 0 instead.~~
 - [ ] Find a way top create something similar like "timoni vendor crd" but fully in CUE. I MUST utilize "cue import openapi".
   - Example found here: <https://github.com/cue-lang/cue/issues/2691>
-- [ ] Add #ModuleRelease.values to #Module.#config validation during processing. Meaning it should take the schema (#Module.#config) and validate it against the values (unified #ModuleRelease.values).
+- [ ] Add #ModuleInstance.values to #Module.#config validation during processing. Meaning it should take the schema (#Module.#config) and validate it against the values (unified #ModuleInstance.values).
   - By leaning on the CUE evaluator we can allow developers to include mandatory fields (!) and optional fields (?) in #Module.#config. This was not possible before.
   - NOTE: Investigate wheter we should also allow for using default (*) in values.
   - Extract the schema and unified values separately and evaluate.
@@ -25,7 +25,7 @@
   - This is a helper command so that users can "upgrade" their configuration more easily.
 - [ ] During "opm mod init" the module.cue in cue.mod should initialize as a blank slate, allowing opm to grab the latest versions of all OPM modules. Either by running "opm mod tidy" (internally) or by running something similar to "cue mod get" on each dependency.
 - [ ] Add "opm mod list". It should list all modules in the defined namespace (default ns is, default). "-A" should list in all namespaces.
-  - Note: Can now leverage `release-id` labels for discovery (see deterministic-release-identity).
+  - Note: Can now leverage `instance-id` labels for discovery (see deterministic-release-identity).
 - [ ] Add check during processing: Check if a module author has referenced "values" and not "#config" in a component. This will not work and should warn the user.
   - This can be utilized with the future "opm mod publish" command, so that an author cannot publish a module that is not valid.
 - [x] ~~"opm mod delete --name blog --namespace default --verbose" proceeds but with no change, 0 resources deleted. We should add validation to first look for the module and inform the caller if not found.~~
@@ -48,7 +48,7 @@
 
 - [ ] "opm mod delete" should only delete the resources owned by OPM. Now it deletes related resources like Endpoints.
   - **Root cause**: The `ExcludeOwned` filter (`discovery.go:170-173`) checks `ownerReferences` to skip auto-managed resources. This works for EndpointSlice, ReplicaSet, Pods, etc. — but `v1/Endpoints` does NOT have `ownerReferences`. The legacy Endpoints controller manages them by name-matching convention (same name as Service), not ownership. Since Endpoints inherit labels from the parent Service, they match OPM's label selector and pass the ownerReferences filter.
-  - **Resolution**: Will be fixed by the inventory-based delete implementation — only resources tracked in the release inventory (i.e., resources OPM actually rendered) will be deleted. Endpoints won't be in the inventory.
+  - **Resolution**: Will be fixed by the inventory-based delete implementation — only resources tracked in the instance inventory (i.e., resources OPM actually rendered) will be deleted. Endpoints won't be in the inventory.
 
   ```bash
   ❯ opm mod delete --name jellyfin --namespace default
@@ -96,13 +96,13 @@
 
 ## Investigation
 
-- [ ] Investigate how to build a competent and reusable module validation pipeline. Something that can be used to validate the ModuleRelease in the finishing steps of the build pipeline but also can be used for "opm mod vet".
+- [ ] Investigate how to build a competent and reusable module validation pipeline. Something that can be used to validate the ModuleInstance in the finishing steps of the build pipeline but also can be used for "opm mod vet".
   - It should output the errors similar to how CUE does. Pointing to which file, line and row the error occured.
 - [x] ~~Investigate how to redesign the "opm mod delete" workflow to be smarter. It should find ALL resources, even if the user has changed the module (and didn't apply the changes) before running "delete".~~
-  - **Resolved:** Implemented across `deterministic-release-identity` and `refine-resource-discovery` changes. Each release now gets a deterministic UUID v5 identity (`module-release.opmodel.dev/uuid` label) computed by the CUE catalog schemas. The `opm mod delete` command now supports:
-    - `--release-id <uuid>` flag for direct UUID-based deletion (mutually exclusive with `--name`)
+  - **Resolved:** Implemented across `deterministic-release-identity` and `refine-resource-discovery` changes. Each instance now gets a deterministic UUID v5 identity (`module-instance.opmodel.dev/uuid` label) computed by the CUE catalog schemas. The `opm mod delete` command now supports:
+    - `--instance-id <uuid>` flag for direct UUID-based deletion (mutually exclusive with `--name`)
     - Fails with an error when no resources match the selector (catches typos and misconfigurations)
-    - Resources can be found even if module name changed, as long as release-id is known
+    - Resources can be found even if module name changed, as long as instance-id is known
 - [ ] Test if the CLI has staged apply and delete. If not we must design a staged apply and delete system.
   - For resources that we MUST wait for status we need the CLI to wait for that resource to be reporting ok before moving on to the next.
   - Investigate if this should be configurable in the model. Either in the module as a Policy or in each component.
@@ -110,7 +110,7 @@
 ### Possible in controller?
 
 - [ ] Add a smart delete workflow to "opm mod delete". **This is and advanced feature so will will pin it for now**
-  - Should look for a Custom Resource called ModuleRelease in the namespace (or all namespaces), this CR contains all the information required and owns all the child resources.
+  - Should look for a Custom Resource called ModuleInstance in the namespace (or all namespaces), this CR contains all the information required and owns all the child resources.
 
 env: {
  PUID: {

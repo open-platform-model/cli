@@ -6,17 +6,17 @@ Accepted
 
 ## Context
 
-The CLI needs to apply rendered Kubernetes resources to a cluster and later delete or inspect them. Discovering which resources belong to a release can be done two ways: re-rendering the module from source and comparing, or reading a persisted inventory of previously applied resources.
+The CLI needs to apply rendered Kubernetes resources to a cluster and later delete or inspect them. Discovering which resources belong to an instance can be done two ways: re-rendering the module from source and comparing, or reading a persisted inventory of previously applied resources.
 
 Re-rendering requires source files to be available at delete/inspect time, which is not always the case — users may delete a module's source after deploying it.
 
-Label-based cluster scanning (listing all resources with a given label) is imprecise: it cannot distinguish resources created by the release from resources created by controllers or operators that inherited the labels.
+Label-based cluster scanning (listing all resources with a given label) is imprecise: it cannot distinguish resources created by the instance from resources created by controllers or operators that inherited the labels.
 
 Apply operations need conflict handling and idempotency guarantees.
 
 ## Decision
 
-Use inventory-first resource discovery: `mod delete`, `mod status`, `mod tree`, and `mod list` read the persisted release inventory to enumerate owned resources. Label-based scanning is a fallback only when no inventory exists.
+Use inventory-first resource discovery: `mod delete`, `mod status`, `mod tree`, and `mod list` read the persisted instance inventory to enumerate owned resources. Label-based scanning is a fallback only when no inventory exists.
 
 Re-rendering for resource discovery was rejected because it requires source files at delete/inspect time and is slower than reading a stored inventory.
 
@@ -24,9 +24,9 @@ Use Kubernetes server-side apply (SSA) with force conflicts for all apply operat
 
 Apply resources in ascending weight order (CRDs before CRs, ConfigMaps before Deployments); delete in descending weight order.
 
-Write a persisted release inventory record (as a Kubernetes Secret) after each successful apply, containing the current owned resource set and deployed module version. Failed applies skip the inventory write to allow convergence on retry.
+Write a persisted instance inventory record (as a Kubernetes Secret) after each successful apply, containing the current owned resource set and deployed module version. Failed applies skip the inventory write to allow convergence on retry.
 
-Refuse deletion of controller-managed releases (`createdBy: "controller"`) to prevent CLI/operator conflicts.
+Refuse deletion of controller-managed instances (`createdBy: "controller"`) to prevent CLI/operator conflicts.
 
 Refuse applying an empty render result when a previous inventory exists (safety gate against accidental mass deletion), unless `--force` is provided.
 
@@ -48,4 +48,4 @@ See also ADR-009 for the pruning safety checks and ADR-012 for the inventory ide
 
 **Negative:** Two discovery paths (inventory-first, label-fallback) create more code paths to maintain.
 
-**Trade-off:** Refusing controller-managed release deletion protects against CLI/operator conflicts but means users must use the controller to manage those releases.
+**Trade-off:** Refusing controller-managed instance deletion protects against CLI/operator conflicts but means users must use the controller to manage those instances.

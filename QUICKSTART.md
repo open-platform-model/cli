@@ -100,7 +100,7 @@ cd my-app
 opm module build
 ```
 
-`opm module build` synthesizes a `#ModuleRelease` around the module so you
+`opm module build` synthesizes a `#ModuleInstance` around the module so you
 do not need an `instance.cue` while iterating. The rendered YAML is written
 to stdout by default.
 
@@ -110,7 +110,7 @@ Useful variants:
 # Run from anywhere by passing a module directory
 opm module build ./my-app
 
-# Override the synthetic release name
+# Override the synthetic instance name
 opm module build ./my-app --name my-app-debug
 
 # Provide explicit values instead of debugValues
@@ -121,17 +121,17 @@ opm module build ./my-app --split --out-dir ./manifests
 ```
 
 `opm instance build` accepts the same module-directory form, so
-`opm instance build ./my-app` is equivalent for symmetry with the release
+`opm instance build ./my-app` is equivalent for symmetry with the instance
 workflow.
 
 `opm mod` is an alias for `opm module`, so all of the commands above also
 work as `opm mod init`, `opm mod build`, etc.
 
-## Working from a Release File
+## Working from an Instance File
 
-When you already have a release definition, `opm instance` is the canonical
+When you already have an instance definition, `opm instance` is the canonical
 workflow. The example instance files under `examples/instances/` are small
-release definitions that import published modules straight from the
+instance definitions that import published modules straight from the
 public catalog (`opmodel.dev/modules/<name>@v1`) — no local module sources
 required, no `task publish`.
 
@@ -152,7 +152,7 @@ Available examples:
 opm instance build ./examples/instances/jellyfin/instance.cue
 ```
 
-The release directory contains a sibling `values.cue` which is loaded
+The instance directory contains a sibling `values.cue` which is loaded
 automatically. To use a different values file, pass it explicitly:
 
 ```bash
@@ -160,7 +160,7 @@ opm instance build ./examples/instances/mc_java_fleet/instance.cue \
   -f ./examples/instances/mc_java_fleet/values_multi.cue
 ```
 
-A release file pulling a public module looks like the `jellyfin` example:
+An instance file pulling a public module looks like the `jellyfin` example:
 
 ```cue
 package jellyfin
@@ -170,7 +170,7 @@ import (
     m  "opmodel.dev/modules/jellyfin@v1"
 )
 
-mr.#ModuleRelease
+mr.#ModuleInstance
 
 metadata: {
     name:      "jellyfin"
@@ -208,7 +208,7 @@ you to replace the `adminToken` and `rpcSecret` placeholders in
 
 ### Inspect
 
-The `jellyfin` example release uses release name `jellyfin` in namespace
+The `jellyfin` example instance uses instance name `jellyfin` in namespace
 `default`.
 
 ```bash

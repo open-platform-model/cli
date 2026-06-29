@@ -1,4 +1,4 @@
-# RFC-0001: Release Inventory
+# RFC-0001: Instance Inventory
 
 | Field       | Value                              |
 |-------------|------------------------------------|
@@ -8,7 +8,7 @@
 
 ## Summary
 
-Introduce a lightweight release inventory stored as a Kubernetes Secret that tracks which resources belong to a ModuleRelease. This enables automatic pruning of stale resources during `opm mod apply` and provides a precise source of truth for `diff`, `delete`, and `status` commands. The Secret also maintains a history of changes, enabling future rollback capabilities.
+Introduce a lightweight instance inventory stored as a Kubernetes Secret that tracks which resources belong to a ModuleInstance. This enables automatic pruning of stale resources during `opm mod apply` and provides a precise source of truth for `diff`, `delete`, and `status` commands. The Secret also maintains a history of changes, enabling future rollback capabilities.
 
 ## Motivation
 
@@ -84,7 +84,7 @@ The core motivating scenario. Consider an application "Jellyfin":
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-Tools like bare `kubectl apply` and `kustomize` cannot handle this. The resource is lost and will not be removed or recreated. A release inventory solves this by tracking the previous set and computing the diff.
+Tools like bare `kubectl apply` and `kustomize` cannot handle this. The resource is lost and will not be removed or recreated. An instance inventory solves this by tracking the previous set and computing the diff.
 
 ## Prior Art
 
@@ -203,7 +203,7 @@ Crossplane uses Composite resources with `ownerReferences` on all composed resou
 #### Server-Side Apply managedFields (Kubernetes native)
 
 SSA with a named field manager tracks which **fields** are owned, but not which
-**resources** belong to a release. Solves field ownership, not inventory.
+**resources** belong to an instance. Solves field ownership, not inventory.
 
 #### External Storage (Helm SQL driver, Pulumi)
 
@@ -289,15 +289,15 @@ OPM adopts these patterns, adapted to its own domain model and naming convention
 
 ### Secret Structure Overview
 
-A single Kubernetes Secret per release contains all state: release metadata, a change history index, and individual change entries. This keeps all release state co-located and atomically updatable.
+A single Kubernetes Secret per instance contains all state: instance metadata, a change history index, and individual change entries. This keeps all instance state co-located and atomically updatable.
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│  Secret: opm.<release-name>.<release-id-uuid>                   │
-│  type: opmodel.dev/release                                      │
+│  Secret: opm.<instance-name>.<instance-id-uuid>                 │
+│  type: opmodel.dev/instance                                     │
 │                                                                 │
 │  data:                                                          │
-│    metadata:          Release-level metadata (typed JSON blob)  │
+│    metadata:          Instance-level metadata (typed JSON blob) │
 │    index:             Ordered list of change IDs (newest first) │
 │    change-sha1-<id>:  Per-change state (inventory, values, etc) │
 │    change-sha1-<id>:  ...                                       │
@@ -307,26 +307,26 @@ A single Kubernetes Secret per release contains all state: release metadata, a c
 
 ### Metadata Field
 
-The `data.metadata` field contains release-level information as a typed JSON object with `kind`/`apiVersion`, following Timoni's pattern. This enables schema versioning and maps directly to a future CRD.
+The `data.metadata` field contains instance-level information as a typed JSON object with `kind`/`apiVersion`, following Timoni's pattern. This enables schema versioning and maps directly to a future CRD.
 
 ```json
 {
-  "kind": "ModuleRelease",
+  "kind": "ModuleInstance",
   "apiVersion": "core.opmodel.dev/v1alpha1",
   "name": "minecraft",
   "namespace": "default",
-  "releaseId": "a3b8f2e1-7c4d-5a9e-b6f0-1234567890ab",
+  "instanceId": "a3b8f2e1-7c4d-5a9e-b6f0-1234567890ab",
   "lastTransitionTime": "2026-02-11T14:30:00Z"
 }
 ```
 
 | Field                 | Content                                         | Purpose                            |
 |-----------------------|-------------------------------------------------|------------------------------------|
-| `kind`                | `"ModuleRelease"`                                     | Schema identification              |
+| `kind`                | `"ModuleInstance"`                                     | Schema identification              |
 | `apiVersion`          | `"core.opmodel.dev/v1alpha1"`                        | Schema versioning, CRD migration   |
-| `name`                | Release name                                    | Human identification               |
-| `namespace`           | Release namespace                               | Scoping                            |
-| `releaseId`           | Deterministic UUIDv5                            | Unique release identity            |
+| `name`                | Instance name                                    | Human identification               |
+| `namespace`           | Instance namespace                               | Scoping                            |
+| `instanceId`           | Deterministic UUIDv5                            | Unique instance identity            |
 | `lastTransitionTime`  | RFC 3339 timestamp of last apply                | Debugging, status reporting        |
 
 ### Index Field
@@ -388,10 +388,10 @@ manifests. This captures any change to the module output — including template 
 **Inventory entry identity**: Each entry has fields `group`, `kind`,
 `namespace`, `name`, `component` (the identity) and `v` (the API version, stored separately). Set operations for pruning use the identity fields. The `v` field is used when fetching or deleting the resource from the cluster. Separating version from identity prevents false orphans when Kubernetes API versions change (e.g., Ingress migrating from `networking.k8s.io/v1beta1` to `networking.k8s.io/v1`).
 
-The `component` field records which module component produced the resource (e.g., `"app"`, `"cache"`, `"worker"`). This enables `opm mod status` to group resources by component when displaying release health, using only the inventory — no need to read labels back from the cluster. Including component in identity means the inventory can precisely track which component owns which resource. However, because Kubernetes itself identifies resources by GVK + namespace + name (without component), a **component rename safety check** is required during pruning to prevent a component rename from triggering a spurious delete (see Apply Flow, Step 5b).
+The `component` field records which module component produced the resource (e.g., `"app"`, `"cache"`, `"worker"`). This enables `opm mod status` to group resources by component when displaying instance health, using only the inventory — no need to read labels back from the cluster. Including component in identity means the inventory can precisely track which component owns which resource. However, because Kubernetes itself identifies resources by GVK + namespace + name (without component), a **component rename safety check** is required during pruning to prevent a component rename from triggering a spurious delete (see Apply Flow, Step 5b).
 
 **What gets tracked**: The inventory contains **only resources that OPM directly
-renders** — the output of the build pipeline. Derived resources that Kubernetes automatically creates (Endpoints for Services, ReplicaSets for Deployments, Pods for StatefulSets/Deployments, etc.) are NOT tracked. When OPM deletes a release, it deletes only the parent resources in the inventory. Kubernetes garbage collection handles cleanup of derived child resources automatically. This keeps the inventory precise, avoids unnecessary API calls, and respects Kubernetes ownership semantics — OPM owns what it renders, not what controllers create in response.
+renders** — the output of the build pipeline. Derived resources that Kubernetes automatically creates (Endpoints for Services, ReplicaSets for Deployments, Pods for StatefulSets/Deployments, etc.) are NOT tracked. When OPM deletes an instance, it deletes only the parent resources in the inventory. Kubernetes garbage collection handles cleanup of derived child resources automatically. This keeps the inventory precise, avoids unnecessary API calls, and respects Kubernetes ownership semantics — OPM owns what it renders, not what controllers create in response.
 
 ### Change ID
 
@@ -574,14 +574,14 @@ On each successful apply:
 
 The inventory Secret is always updated with a **full PUT** (replace the entire Secret). Read the Secret, modify the in-memory representation (add/update change entry, update index, update metadata, prune old changes), then write the whole thing back.
 
-This is atomic, simple, and safe. Since OPM is a CLI tool (not a controller), concurrent writers to the same release are not a realistic concern. If two humans run `opm mod apply` against the same release simultaneously, they already have bigger problems than Secret contention.
+This is atomic, simple, and safe. Since OPM is a CLI tool (not a controller), concurrent writers to the same instance are not a realistic concern. If two humans run `opm mod apply` against the same instance simultaneously, they already have bigger problems than Secret contention.
 
 ### Naming Convention
 
 The inventory Secret name follows the pattern:
 
 ```text
-opm.<release-name>.<release-id-uuid>
+opm.<instance-name>.<instance-id-uuid>
 ```
 
 Example:
@@ -592,8 +592,8 @@ opm.minecraft.a3b8f2e1-7c4d-5a9e-b6f0-1234567890ab
 
 **Rationale:**
 
-- The release name is there for humans (`kubectl get secrets` is scannable).
-- The release-id UUID ensures uniqueness (no collisions if two modules share a
+- The instance name is there for humans (`kubectl get secrets` is scannable).
+- The instance-id UUID ensures uniqueness (no collisions if two modules share a
   name in the same namespace).
 - The `opm.` prefix identifies it as an OPM-managed resource.
 
@@ -606,11 +606,11 @@ Allowed chars:  lowercase alphanumeric, '-', '.'
 Must start/end: alphanumeric
 
 Fixed overhead:  "opm." (4) + "." (1) + UUID (36) = 41 chars
-Remaining:       253 - 41 = 212 chars for release name
-Label check:     "opm" (3 ok), release-name (≤63 ok), UUID (36 ok)
+Remaining:       253 - 41 = 212 chars for instance name
+Label check:     "opm" (3 ok), instance-name (≤63 ok), UUID (36 ok)
 ```
 
-Release names are already constrained to ≤63 characters (they are used as Kubernetes label values), so this fits cleanly.
+Instance names are already constrained to ≤63 characters (they are used as Kubernetes label values), so this fits cleanly.
 
 ### Inventory Lookup
 
@@ -618,10 +618,10 @@ The inventory Secret is found by **name convention** (direct GET) with a
 **label-based fallback**:
 
 1. **Primary**: Construct the Secret name from render metadata
-   (`opm.<name>.<release-id>`) and perform a direct `GET`. This is fast (single    API call). The release-id is deterministic (UUIDv5 computed from module name +    namespace), so it can always be reconstructed from the render output.
+   (`opm.<name>.<instance-id>`) and perform a direct `GET`. This is fast (single    API call). The instance-id is deterministic (UUIDv5 computed from module name +    namespace), so it can always be reconstructed from the render output.
 
 2. **Fallback**: If the direct GET fails (e.g., naming convention changed), list
-   Secrets with label `module-release.opmodel.dev/uuid=<release-id>`.
+   Secrets with label `module-instance.opmodel.dev/uuid=<instance-id>`.
 
 ### Labels on the Inventory Secret
 
@@ -632,7 +632,7 @@ labels:
   app.kubernetes.io/managed-by: open-platform-model
   module.opmodel.dev/name: <name>
   module.opmodel.dev/namespace: <namespace>
-  module-release.opmodel.dev/uuid: <release-id>
+  module-instance.opmodel.dev/uuid: <instance-id>
   opmodel.dev/component: inventory
 ```
 
@@ -659,17 +659,17 @@ metadata:
     app.kubernetes.io/managed-by: open-platform-model
     module.opmodel.dev/name: minecraft
     module.opmodel.dev/namespace: default
-    module-release.opmodel.dev/uuid: a3b8f2e1-7c4d-5a9e-b6f0-1234567890ab
+    module-instance.opmodel.dev/uuid: a3b8f2e1-7c4d-5a9e-b6f0-1234567890ab
     opmodel.dev/component: inventory
-type: opmodel.dev/release
+type: opmodel.dev/instance
 stringData:
   metadata: |
     {
-      "kind": "ModuleRelease",
+      "kind": "ModuleInstance",
       "apiVersion": "core.opmodel.dev/v1alpha1",
       "name": "minecraft",
       "namespace": "default",
-      "releaseId": "a3b8f2e1-7c4d-5a9e-b6f0-1234567890ab",
+      "instanceId": "a3b8f2e1-7c4d-5a9e-b6f0-1234567890ab",
       "lastTransitionTime": "2026-02-11T16:45:00Z"
     }
   index: |
@@ -764,7 +764,7 @@ In this example:
 │                 ▼                                                   │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │ 4. READ PREVIOUS INVENTORY                                   │   │
-│  │    GET Secret/opm.<name>.<release-id> in <namespace>         │   │
+│  │    GET Secret/opm.<name>.<instance-id> in <namespace>        │   │
 │  │    → Read index → latest change = index[0]                   │   │
 │  │    → previous_inventory = latest change's inventory entries  │   │
 │  │    → if not found: previous_inventory = ∅ (first install)   │   │
@@ -1091,13 +1091,13 @@ Pre-apply existence check (step 5c) queries cluster:
 
 Apply FAILS before any resource is touched:
   "Resource PersistentVolumeClaim/config in namespace default already exists
-   but is not tracked by this release. Delete it manually or use --adopt
+   but is not tracked by this instance. Delete it manually or use --adopt
    to take ownership."
 
 Result: Fail-safe. No silent adoption of untracked resources. [ ]
 ```
 
-This prevents OPM from accidentally patching resources created by `kubectl`, Helm, or another OPM release. Without this check, SSA apply would merge into the existing resource and add it to the inventory — potentially corrupting configuration managed by another tool.
+This prevents OPM from accidentally patching resources created by `kubectl`, Helm, or another OPM instance. Without this check, SSA apply would merge into the existing resource and add it to the inventory — potentially corrupting configuration managed by another tool.
 
 The `--adopt` flag is a future escape hatch for intentional adoption (see Open Questions).
 
@@ -1195,7 +1195,7 @@ v2: Module removes the Namespace component (or module is deleted)
 Result: Namespace pruning is destructive beyond OPM's scope. [ ]
 ```
 
-Recommendation: Exclude `kind: Namespace` from inventory-based pruning by default. Require an explicit `--prune-namespaces` flag to override. This mirrors Helm's approach of protecting namespaces from release-scoped deletion. Alternative: warn during prune if the stale set contains a Namespace and require interactive confirmation.
+Recommendation: Exclude `kind: Namespace` from inventory-based pruning by default. Require an explicit `--prune-namespaces` flag to override. This mirrors Helm's approach of protecting namespaces from instance-scoped deletion. Alternative: warn during prune if the stale set contains a Namespace and require interactive confirmation.
 
 ### Scenario P: Empty Render Wipes All Resources
 
@@ -1255,19 +1255,19 @@ The following edge cases are acknowledged but do not require dedicated scenarios
 
 ## Architectural Limitations
 
-The following scenarios represent fundamental limitations of the per-release, Secret-based inventory design. Some may be addressable within the current architecture; others may require controller-based coordination or be declared out of scope. These are documented for transparency — decisions on which to address will be made during implementation.
+The following scenarios represent fundamental limitations of the per-instance, Secret-based inventory design. Some may be addressable within the current architecture; others may require controller-based coordination or be declared out of scope. These are documented for transparency — decisions on which to address will be made during implementation.
 
-### Cross-Release Resource Conflicts
+### Cross-Instance Resource Conflicts
 
-The inventory is per-release with no awareness of other releases in the same namespace.
+The inventory is per-instance with no awareness of other instances in the same namespace.
 
-**Shared resource collision.** If Release A and Release B both produce
-`ConfigMap/shared-config`, each tracks it independently. When Release A removes it and prunes, Release B's resource is destroyed. Release B's inventory still references it. Next `status` sees a missing resource with no explanation.
+**Shared resource collision.** If Instance A and Instance B both produce
+`ConfigMap/shared-config`, each tracks it independently. When Instance A removes it and prunes, Instance B's resource is destroyed. Instance B's inventory still references it. Next `status` sees a missing resource with no explanation.
 
-The pre-apply existence check (Step 5c) catches this on **first apply only**. On subsequent applies where both inventories exist, there is no cross-release coordination.
+The pre-apply existence check (Step 5c) catches this on **first apply only**. On subsequent applies where both inventories exist, there is no cross-instance coordination.
 
-**Resource transfer between releases.** Moving a resource from Release A to
-Release B requires A to prune (removed from template) and B to create (added to template). Delete-then-create causes downtime. No "transfer ownership" mechanism exists.
+**Resource transfer between instances.** Moving a resource from Instance A to
+Instance B requires A to prune (removed from template) and B to create (added to template). Delete-then-create causes downtime. No "transfer ownership" mechanism exists.
 
 **Scope:** May be out of scope. Requires cluster-wide coordination (controller
 or CRD). Similar to Helm releases sharing resources — undefined behavior.
@@ -1276,11 +1276,11 @@ or CRD). Similar to Helm releases sharing resources — undefined behavior.
 
 The inventory Secret is namespace-scoped. Modules can produce cluster-scoped resources (CRDs, ClusterRoles, ClusterRoleBindings, Namespaces).
 
-**Conflict across namespaces.** Release A in `team-a` namespace and Release B
-in `team-b` namespace both produce `ClusterRole/app-reader`. Each inventory considers it "theirs." If Release A is deleted, the ClusterRole is pruned, breaking Release B silently.
+**Conflict across namespaces.** Instance A in `team-a` namespace and Instance B
+in `team-b` namespace both produce `ClusterRole/app-reader`. Each inventory considers it "theirs." If Instance A is deleted, the ClusterRole is pruned, breaking Instance B silently.
 
 **Scope:** Likely out of scope for Secret-based inventory. Full solution
-requires cluster-wide registry or ModuleRelease CRD (see Deferred Work). Mitigation: lint rule warning when modules produce cluster-scoped resources.
+requires cluster-wide registry or ModuleInstance CRD (see Deferred Work). Mitigation: lint rule warning when modules produce cluster-scoped resources.
 
 ### Controller-Created Side-Effect Resources
 
@@ -1295,7 +1295,7 @@ The inventory tracks only resources OPM directly renders. Resources created as s
   no visibility.
 
 **Scope:** By design. OPM respects Kubernetes ownership semantics. Cleanup
-responsibility falls on operators' ownerReference behavior. Not solvable without wrapping all resources in a ModuleRelease CRD parent.
+responsibility falls on operators' ownerReference behavior. Not solvable without wrapping all resources in a ModuleInstance CRD parent.
 
 ### State Reconstruction After Inventory Loss
 
@@ -1453,15 +1453,15 @@ The change history model in this RFC provides the foundation for rollback. A fut
 
 This is deferred because it requires the module OCI reference to be resolvable at rollback time, and the interaction with local modules needs further design.
 
-### ModuleRelease CRD with ownerReferences
+### ModuleInstance CRD with ownerReferences
 
-The long-term vision: a `ModuleRelease` Custom Resource Definition with `ownerReferences` on all child resources. This enables:
+The long-term vision: a `ModuleInstance` Custom Resource Definition with `ownerReferences` on all child resources. This enables:
 
 - Native Kubernetes garbage collection (delete parent → children auto-delete).
 - Controller-based reconciliation.
-- First-class `kubectl get modulereleases` experience.
+- First-class `kubectl get moduleinstances` experience.
 
-The `data.metadata` blob uses `kind: Release` and `apiVersion: core.opmodel.dev/v1alpha1` specifically so that the schema can migrate to a CRD with minimal changes. The inventory Secret is a stepping stone that may become permanent for CLI-only users while the CRD serves the controller path.
+The `data.metadata` blob uses `kind: ModuleInstance` and `apiVersion: core.opmodel.dev/v1alpha1` specifically so that the schema can migrate to a CRD with minimal changes. The inventory Secret is a stepping stone that may become permanent for CLI-only users while the CRD serves the controller path.
 
 ## Open Questions
 
@@ -1552,7 +1552,7 @@ This question is deferred to implementation. The inventory format does not need 
 When no inventory Secret exists (first-time apply), OPM must verify that the resources it intends to create do not already exist on the cluster. This prevents two failure modes:
 
 1. **Untracked resource adoption**: A resource with the same GVK + namespace +
-   name exists but was created by another tool (kubectl, Helm, another OPM    release). Applying over it would silently adopt it into this release's    inventory.
+   name exists but was created by another tool (kubectl, Helm, another OPM    instance). Applying over it would silently adopt it into this instance's    inventory.
 
 2. **Terminating resource race**: A resource is being deleted (has
    `deletionTimestamp` set). SSA apply "succeeds" on terminating resources, but    the resource will be garbage-collected when finalizers complete.

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Reduce orchestration complexity around `release build` and `release apply` without changing user-visible behavior, render semantics, or Kubernetes functionality.
+Reduce orchestration complexity around `instance build` and `instance apply` without changing user-visible behavior, render semantics, or Kubernetes functionality.
 
 This plan focuses on making the current pipeline smaller, easier to read, and easier to extend by removing duplicate orchestration, tightening package ownership, and clarifying phase boundaries.
 
@@ -12,13 +12,13 @@ This plan focuses on making the current pipeline smaller, easier to read, and ea
 - Do not change the transformer execution model.
 - Do not change value precedence rules.
 - Do not change inventory, pruning, or apply behavior.
-- Do not finish bundle-release support as part of this simplification work.
+- Do not add bundle support as part of this simplification work — the bundle path is not supported.
 
 ## Current pain points
 
 - The render workflow has two large entrypoints that converge late and duplicate the same tail logic.
-- `ModuleRelease` currently acts as both parsed input and mutable phase state, which makes invariants harder to track.
-- Release-file parsing constructs partially initialized render-layer types, which blurs package boundaries.
+- `ModuleInstance` currently acts as both parsed input and mutable phase state, which makes invariants harder to track.
+- Instance-file parsing constructs partially initialized render-layer types, which blurs package boundaries.
 - Values resolution is spread across multiple branches.
 - Several small helper layers only forward calls and add navigation overhead without adding policy.
 - A few pure duplicates exist, such as apply summary formatting and resource conversion loops.
@@ -31,7 +31,7 @@ The code should read as three clear stages:
 2. Process/render
 3. Emit/apply
 
-The preparation stage should be mode-specific (`module` source vs `release.cue` source), while processing and emission should be shared.
+The preparation stage should be mode-specific (`module` source vs `instance.cue` source), while processing and emission should be shared.
 
 ---
 
@@ -41,14 +41,14 @@ The preparation stage should be mode-specific (`module` source vs `release.cue` 
 
 `internal/workflow/render/render.go` currently has two main flows:
 
-- `Release(...)` for module-source rendering
-- `ReleaseFile(...)` for release-file rendering
+- `Instance(...)` for module-source rendering
+- `InstanceFile(...)` for instance-file rendering
 
-They prepare inputs differently, but once they have a `*pkgrender.ModuleRelease` and values, they do the same work:
+They prepare inputs differently, but once they have a `*pkgrender.ModuleInstance` and values, they do the same work:
 
 - apply namespace override
 - load the provider
-- call `pkg/render.ProcessModuleRelease(...)`
+- call `pkg/render.ProcessModuleInstance(...)`
 - convert resources to `*unstructured.Unstructured`
 - assemble the workflow `Result`
 
@@ -57,9 +57,9 @@ They prepare inputs differently, but once they have a `*pkgrender.ModuleRelease`
 Extract one shared helper for the common tail, conceptually:
 
 ```go
-renderPreparedModuleRelease(
+renderPreparedModuleInstance(
     ctx context.Context,
-    rel *pkgrender.ModuleRelease,
+    rel *pkgrender.ModuleInstance,
     values []cue.Value,
     provider *provider.Provider,
     namespaceOverride string,
@@ -68,8 +68,8 @@ renderPreparedModuleRelease(
 
 The two public entrypoints remain, but they become thin preparation adapters:
 
-- `Release(...)` prepares from module source, then calls the common helper
-- `ReleaseFile(...)` prepares from a release file, then calls the common helper
+- `Instance(...)` prepares from module source, then calls the common helper
+- `InstanceFile(...)` prepares from an instance file, then calls the common helper
 
 ### Why
 
@@ -86,36 +86,36 @@ The two public entrypoints remain, but they become thin preparation adapters:
 
 ---
 
-## Improvement 2: Introduce a single preparation phase for `ModuleRelease`
+## Improvement 2: Introduce a single preparation phase for `ModuleInstance`
 
 ### What it is
 
-Today the logic that answers “how do I get a renderable `ModuleRelease`?” is split across:
+Today the logic that answers “how do I get a renderable `ModuleInstance`?” is split across:
 
 - `internal/workflow/render/render.go`
 - `internal/workflow/render/values.go`
-- `internal/releasefile/get_release_file.go`
+- `internal/instancefile/get_instance_file.go`
 
 ### What would change
 
 Create explicit preparation helpers with a common output shape:
 
 ```go
-type PreparedModuleRelease struct {
-    Release *pkgrender.ModuleRelease
-    Values  []cue.Value
+type PreparedModuleInstance struct {
+    Instance *pkgrender.ModuleInstance
+    Values   []cue.Value
 }
 ```
 
 Then use two preparation functions:
 
 - `PrepareFromModulePath(...)`
-- `PrepareFromReleaseFile(...)`
+- `PrepareFromInstanceFile(...)`
 
 Each helper owns all mode-specific setup:
 
 - loading source CUE
-- release-name override
+- instance-name override
 - `debugValues` behavior
 - values-file loading
 - local `--module` injection when applicable
@@ -131,21 +131,21 @@ Each helper owns all mode-specific setup:
 ### Expected code impact
 
 - Fewer branches in the main render functions.
-- More focused tests around module preparation vs release-file preparation.
+- More focused tests around module preparation vs instance-file preparation.
 - Easier reuse for `vet`, `build`, `diff`, and `apply`.
 
 ---
 
-## Improvement 3: Reduce mutation and phase ambiguity in `ModuleRelease`
+## Improvement 3: Reduce mutation and phase ambiguity in `ModuleInstance`
 
 ### What it is
 
-`pkg/render/modulerelease.go` currently stores both:
+`pkg/render/moduleinstance.go` currently stores both:
 
 - parsed input state
 - processing state created later in the pipeline
 
-The most confusing field is `RawCUE`, because it starts as parse-time release CUE and later becomes a values-filled concrete release value.
+The most confusing field is `RawCUE`, because it starts as parse-time instance CUE and later becomes a values-filled concrete instance value.
 
 ### What would change
 
@@ -164,8 +164,8 @@ Keep `DataComponents` and `Values`, but make the phase transitions explicit.
 
 Split runtime state into stage-specific types, for example:
 
-- `ParsedModuleRelease`
-- `ProcessedModuleRelease`
+- `ParsedModuleInstance`
+- `ProcessedModuleInstance`
 
 The processing function would accept the parsed type and return the processed type or final render result.
 
@@ -180,7 +180,7 @@ The processing function would accept the parsed type and return the processed ty
 
 - Better naming in the render engine.
 - Fewer comments needed to explain lifecycle semantics.
-- Easier debugging of release preparation vs release processing.
+- Easier debugging of instance preparation vs instance processing.
 
 ### Recommendation
 
@@ -188,14 +188,14 @@ Start with Option A first. It gives most of the readability gain at lower risk.
 
 ---
 
-## Improvement 4: Simplify the release-file layer
+## Improvement 4: Simplify the instance-file layer
 
 I want to discuss improvement nr 4.
-Based on the change for improvement nr 3 (release-phase-split) we have to adapt this change.
+Based on the change for improvement nr 3 (instance-phase-split) we have to adapt this change.
 
 ### What it is
 
-`internal/releasefile/get_release_file.go` currently parses a release file and directly constructs a partially initialized `render.ModuleRelease` or `render.BundleRelease`.
+`internal/instancefile/get_instance_file.go` currently parses an instance file and directly constructs a partially initialized `render.ModuleInstance`.
 
 That means a parsing package is already constructing runtime render-state objects.
 
@@ -204,29 +204,28 @@ That means a parsing package is already constructing runtime render-state object
 Replace the current “bare render object” output with a smaller parsed DTO, such as:
 
 ```go
-type ParsedReleaseFile struct {
+type ParsedInstanceFile struct {
     Path        string
     Kind        Kind
     RawCUE      cue.Value
     Metadata    cue.Value
     ModuleCUE   cue.Value
-    BundleCUE   cue.Value
     Config      cue.Value
 }
 ```
 
-The render preparation phase then translates that DTO into a proper `ModuleRelease` or `BundleRelease`.
+The render preparation phase then translates that DTO into a proper `ModuleInstance`.
 
 ### Why
 
 - Keeps parsing responsibilities separate from runtime orchestration.
 - Avoids passing partially initialized render objects across package boundaries.
-- Makes release-file loading easier to test in isolation.
-- Improves long-term flexibility if release-file semantics change.
+- Makes instance-file loading easier to test in isolation.
+- Improves long-term flexibility if instance-file semantics change.
 
 ### Expected code impact
 
-- Cleaner separation between `internal/releasefile` and `pkg/render`.
+- Cleaner separation between `internal/instancefile` and `pkg/render`.
 - Fewer “best effort” init patterns in the parse layer.
 - More explicit assembly of render state in one place.
 
@@ -250,7 +249,7 @@ The rules are spread across several functions.
 Move each mode's values logic behind one explicit helper and make precedence obvious in code. For example:
 
 - `resolveModuleValues(...)`
-- `resolveReleaseFileValues(...)`
+- `resolveInstanceFileValues(...)`
 
 Each helper should:
 
@@ -331,7 +330,7 @@ The current extra forwarding layer should be removed if it adds no policy.
 
 ### What it is
 
-`internal/cmd/module/build.go` and `internal/cmd/release/build.go` follow the same pattern:
+`internal/cmd/module/build.go` and `internal/cmd/instance/build.go` follow the same pattern:
 
 - parse output format
 - resolve Kubernetes config
@@ -357,7 +356,7 @@ For example, the helper could accept:
 ### Expected code impact
 
 - Smaller command implementations.
-- Better consistency between `module build` and `release build`.
+- Better consistency between `module build` and `instance build`.
 
 ---
 
@@ -437,13 +436,13 @@ Resolve and load the provider once during preparation/orchestration, then pass a
 
 This changes the shape from:
 
-- prepare release
+- prepare instance
 - load provider later
-- process release
+- process instance
 
 to:
 
-- prepare release
+- prepare instance
 - prepare provider
 - execute render with ready inputs
 
@@ -498,7 +497,7 @@ Treat this as a follow-up simplification after the render/orchestration cleanup.
 
 ### What it is
 
-Bundle render types exist, but the main CLI path does not support bundle release rendering yet.
+Bundle render types exist, but the main CLI path does not support bundle rendering (the bundle path is not supported).
 
 ### What would change
 
@@ -523,7 +522,7 @@ Choose one of these approaches:
 ### Expected code impact
 
 - Better signal about currently supported behavior.
-- Less confusion while refactoring the active `ModuleRelease` path.
+- Less confusion while refactoring the active `ModuleInstance` path.
 
 ### Recommendation
 
@@ -577,8 +576,8 @@ To keep the work low-risk and incremental, apply the changes in this order:
 4. Remove wrapper-only output forwarding layers
 5. Unify build-command execution logic
 6. Consolidate values resolution into explicit preparation helpers
-7. Refactor the release-file layer to return parsed DTOs instead of partial render objects
-8. Reduce `ModuleRelease` phase ambiguity
+7. Refactor the instance-file layer to return parsed DTOs instead of partial render objects
+8. Reduce `ModuleInstance` phase ambiguity
 9. Encapsulate config-loader registry side effects
 10. Reassess bundle scaffolding boundaries
 
@@ -587,11 +586,11 @@ This order starts with the highest-value, lowest-risk changes and defers structu
 ## Success criteria
 
 - The render workflow reads as prepare -> process -> emit/apply.
-- Module-source and release-file rendering share one common execution tail.
+- Module-source and instance-file rendering share one common execution tail.
 - Value precedence rules remain unchanged but live in fewer places.
 - No package returns partially initialized render-state objects unless that is its explicit responsibility.
 - Duplicate helpers and forwarding-only layers are removed.
-- Reading the `release apply` flow requires fewer file jumps.
+- Reading the `instance apply` flow requires fewer file jumps.
 
 ## Summary
 
@@ -600,7 +599,7 @@ The main simplification opportunity is not in the CUE execution engine itself. T
 The code already has a good conceptual foundation:
 
 - modules define intent
-- releases define concrete deployment instances
+- instances define concrete deployments
 - providers define transformer behavior
 - the engine turns those into concrete resources
 
