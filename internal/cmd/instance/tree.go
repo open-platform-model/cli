@@ -1,4 +1,4 @@
-package release
+package instance
 
 import (
 	"context"
@@ -15,8 +15,8 @@ import (
 	"github.com/opmodel/cli/internal/workflow/query"
 )
 
-// NewReleaseTreeCmd creates the release tree command.
-func NewReleaseTreeCmd(cfg *config.GlobalConfig) *cobra.Command {
+// NewInstanceTreeCmd creates the instance tree command.
+func NewInstanceTreeCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var kf cmdutil.K8sFlags
 	var namespace string
 	var depthFlag int
@@ -24,31 +24,31 @@ func NewReleaseTreeCmd(cfg *config.GlobalConfig) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "tree <file|name|uuid>",
-		Short: "Show resource hierarchy for a release",
-		Long: `Show the component and resource hierarchy of a deployed OPM release.
+		Short: "Show resource hierarchy for an instance",
+		Long: `Show the component and resource hierarchy of a deployed OPM instance.
 
 Arguments:
-  file         Path to a release.cue file or directory containing one.
-               The release name and namespace are read from the file's metadata.
+  file         Path to an instance.cue file or directory containing one.
+               The instance name and namespace are read from the file's metadata.
                --namespace overrides the namespace found in the file.
-  name         Release name (use -n / --namespace to scope by namespace).
-  uuid         Release UUID.
+  name         Instance name (use -n / --namespace to scope by namespace).
+  uuid         Instance UUID.
 
 Examples:
-  # Identify by release.cue file in the current directory
-  opm release tree .
+  # Identify by instance.cue file in the current directory
+  opm instance tree .
 
-  # Identify by release.cue file path
-  opm release tree ./releases/jellyfin/release.cue
+  # Identify by instance.cue file path
+  opm instance tree ./instances/jellyfin/instance.cue
 
   # Identify by name, full tree (default depth=2)
-  opm release tree jellyfin -n media
+  opm instance tree jellyfin -n media
 
   # Component summary only
-  opm release tree jellyfin -n media --depth 0`,
+  opm instance tree jellyfin -n media --depth 0`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runReleaseTree(args[0], cfg, &kf, namespace, depthFlag, outputFlag)
+			return runInstanceTree(args[0], cfg, &kf, namespace, depthFlag, outputFlag)
 		},
 	}
 
@@ -60,7 +60,7 @@ Examples:
 	return c
 }
 
-func runReleaseTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, depth int, outputFmt string) error {
+func runInstanceTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, depth int, outputFmt string) error {
 	ctx := context.Background()
 
 	if depth < 0 || depth > 2 {
@@ -78,7 +78,7 @@ func runReleaseTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8s
 		}
 	}
 
-	target, err := cmdutil.ResolveReleaseTarget(identifier, cfg, kf, namespaceFlag)
+	target, err := cmdutil.ResolveInstanceTarget(identifier, cfg, kf, namespaceFlag)
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func runReleaseTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8s
 	result, err := kubernetes.GetModuleTree(ctx, k8sClient, treeOpts)
 	if err != nil {
 		if kubernetes.IsNoResourcesFound(err) {
-			releaseLog.Error("no resources found", "release", logName, "namespace", namespace)
+			releaseLog.Error("no resources found", "instance", logName, "namespace", namespace)
 			return &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: err, Printed: true}
 		}
 		releaseLog.Error("getting tree", "error", err)

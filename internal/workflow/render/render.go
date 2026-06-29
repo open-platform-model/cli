@@ -23,7 +23,7 @@ import (
 // FromReleaseFile prepares and renders a release from a declarative #ModuleRelease CUE file.
 // It parses the release file, resolves values, and renders through the pipeline. The release
 // file must import a module to fill #module. This is typically used by platform operators to
-// deploy configured instances of modules (e.g., via "opm release apply my-app-release.cue").
+// deploy configured instances of modules (e.g., via "opm instance apply my-app-release.cue").
 func FromReleaseFile(ctx context.Context, opts ReleaseFileOpts) (*Result, error) {
 	if opts.Config == nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}

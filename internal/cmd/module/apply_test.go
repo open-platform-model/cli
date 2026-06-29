@@ -28,8 +28,8 @@ func TestNewModuleApplyCmd_Long_DocumentsSyntheticIdentity(t *testing.T) {
 	assert.Contains(t, long, "-debug", "Long must mention the synthetic <module>-debug naming convention")
 	assert.Contains(t, long, "release identity", "Long must explain that --name/--namespace participate in release identity")
 	assert.Contains(t, long, "release.cue", "Long must point users at release.cue for persistent deploys")
-	assert.Contains(t, long, "opm release apply", "Long must mention the graduation path")
-	assert.Contains(t, long, "opm release delete", "Long must call out the orphan-inventory mitigation")
+	assert.Contains(t, long, "opm instance apply", "Long must mention the graduation path")
+	assert.Contains(t, long, "opm instance delete", "Long must call out the orphan-inventory mitigation")
 }
 
 func TestNewModuleApplyCmd_Long_HasUsageExamples(t *testing.T) {
@@ -93,7 +93,7 @@ func TestRunModuleApply_RejectsFileArgument(t *testing.T) {
 	err := runModuleApply([]string{filePath}, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, &cmdutil.K8sFlags{}, "", false, false, false, false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "expects a directory")
-	assert.Contains(t, err.Error(), "opm release apply", "error must point users at release apply for files")
+	assert.Contains(t, err.Error(), "opm instance apply", "error must point users at release apply for files")
 
 	var exitErr *opmexit.ExitError
 	require.True(t, errors.As(err, &exitErr), "error must be an *opmexit.ExitError")

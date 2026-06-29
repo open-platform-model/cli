@@ -90,7 +90,7 @@ metadata: name: "jf"
 	err := cmd.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "is a release package, not a module")
-	assert.Contains(t, err.Error(), "opm release")
+	assert.Contains(t, err.Error(), "opm instance")
 }
 
 func TestModVet_CUEValidationError(t *testing.T) {

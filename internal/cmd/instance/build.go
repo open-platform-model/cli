@@ -1,4 +1,4 @@
-package release
+package instance
 
 import (
 	"context"
@@ -15,8 +15,8 @@ import (
 	"github.com/opmodel/cli/internal/workflow/render"
 )
 
-// NewReleaseBuildCmd creates the release build command.
-func NewReleaseBuildCmd(cfg *config.GlobalConfig) *cobra.Command {
+// NewInstanceBuildCmd creates the instance build command.
+func NewInstanceBuildCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var rff cmdutil.ReleaseFileFlags
 	var namespace string
 	var nameFlag string
@@ -28,40 +28,40 @@ func NewReleaseBuildCmd(cfg *config.GlobalConfig) *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use:   "build <release.cue|module-dir>",
-		Short: "Render a release file or module directory to manifests",
-		Long: `Render an OPM release file or a module package directory to Kubernetes manifests.
+		Use:   "build <instance.cue|module-dir>",
+		Short: "Render an instance file or module directory to manifests",
+		Long: `Render an OPM instance file or a module package directory to Kubernetes manifests.
 
-When the argument is a release .cue file, it is loaded and rendered as-is.
+When the argument is an instance .cue file, it is loaded and rendered as-is.
 When the argument is a directory containing a module CUE package, the CLI
 synthesizes a #ModuleRelease around the module using the module's debugValues
 (or values from -f) and renders it.
 
 Arguments:
-  release.cue     Path to a release .cue file
-  module-dir      Path to a module package directory (synthesizes a release)
+  instance.cue     Path to an instance .cue file
+  module-dir      Path to a module package directory (synthesizes an instance)
 
 Examples:
-  # Build a release file
-  opm release build ./jellyfin_release.cue
+  # Build an instance file
+  opm instance build ./jellyfin_instance.cue
 
   # Build with split output
-  opm release build ./jellyfin_release.cue --split --out-dir ./manifests
+  opm instance build ./jellyfin_instance.cue --split --out-dir ./manifests
 
   # Build as JSON
-  opm release build ./jellyfin_release.cue -o json
+  opm instance build ./jellyfin_instance.cue -o json
 
-  # Synthesize and build a module without writing a release.cue
-  opm release build ./my-module --name my-debug`,
+  # Synthesize and build a module without writing an instance.cue
+  opm instance build ./my-module --name my-debug`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runReleaseBuild(args[0], cfg, &rff, namespace, nameFlag, outputFlag, splitFlag, outDirFlag)
+			return runInstanceBuild(args[0], cfg, &rff, namespace, nameFlag, outputFlag, splitFlag, outDirFlag)
 		},
 	}
 
 	rff.AddTo(c)
 	c.Flags().StringVarP(&namespace, "namespace", "n", "", "Target namespace")
-	c.Flags().StringVar(&nameFlag, "name", "", "Override synthetic release name (module-directory mode only)")
+	c.Flags().StringVar(&nameFlag, "name", "", "Override synthetic instance name (module-directory mode only)")
 	c.Flags().StringVarP(&outputFlag, "output", "o", "yaml", "Output format: yaml, json")
 	c.Flags().BoolVar(&splitFlag, "split", false, "Write separate files per resource")
 	c.Flags().StringVar(&outDirFlag, "out-dir", "./manifests", "Directory for split output")
@@ -69,8 +69,8 @@ Examples:
 	return c
 }
 
-// runReleaseBuild executes the release build command.
-func runReleaseBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, namespaceFlag, nameFlag, outputFmt string, split bool, outDir string) error {
+// runInstanceBuild executes the instance build command.
+func runInstanceBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, namespaceFlag, nameFlag, outputFmt string, split bool, outDir string) error {
 	ctx := context.Background()
 
 	outputFormat, err := render.ParseManifestOutputFormat(outputFmt)
@@ -107,7 +107,7 @@ func runReleaseBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.Rel
 		})
 	default:
 		if nameFlag != "" {
-			output.Warn("--name is ignored for release-file builds; it only applies to module-directory builds")
+			output.Warn("--name is ignored for instance-file builds; it only applies to module-directory builds")
 		}
 		result, err = render.FromReleaseFile(ctx, render.ReleaseFileOpts{
 			ReleaseFilePath: buildArg,

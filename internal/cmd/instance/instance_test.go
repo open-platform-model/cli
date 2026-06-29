@@ -1,4 +1,4 @@
-package release
+package instance
 
 import (
 	"strings"
@@ -12,104 +12,106 @@ import (
 	"github.com/opmodel/cli/internal/config"
 )
 
-// --- 8.1 Unit tests for release render commands ---
+// --- 8.1 Unit tests for instance render commands ---
 
-func TestNewReleaseVetCmd(t *testing.T) {
-	cmd := NewReleaseVetCmd(&config.GlobalConfig{})
-	assert.Equal(t, "vet <release.cue>", cmd.Use)
+func TestNewInstanceVetCmd(t *testing.T) {
+	cmd := NewInstanceVetCmd(&config.GlobalConfig{})
+	assert.Equal(t, "vet <instance.cue>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotEmpty(t, cmd.Long)
 	assert.NotNil(t, cmd.Args, "should require exactly 1 positional arg")
 }
 
-func TestNewReleaseVetCmd_Flags(t *testing.T) {
-	cmd := NewReleaseVetCmd(&config.GlobalConfig{})
+func TestNewInstanceVetCmd_Flags(t *testing.T) {
+	cmd := NewInstanceVetCmd(&config.GlobalConfig{})
 	assert.NotNil(t, cmd.Flags().Lookup("provider"), "--provider flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("namespace"), "--namespace/-n flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("values"), "--values/-f flag should be registered")
 }
 
-func TestNewReleaseBuildCmd(t *testing.T) {
-	cmd := NewReleaseBuildCmd(&config.GlobalConfig{})
-	assert.Equal(t, "build <release.cue|module-dir>", cmd.Use)
+func TestNewInstanceBuildCmd(t *testing.T) {
+	cmd := NewInstanceBuildCmd(&config.GlobalConfig{})
+	assert.Equal(t, "build <instance.cue|module-dir>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 }
 
-func TestNewReleaseBuildCmd_Flags(t *testing.T) {
-	cmd := NewReleaseBuildCmd(&config.GlobalConfig{})
+func TestNewInstanceBuildCmd_Flags(t *testing.T) {
+	cmd := NewInstanceBuildCmd(&config.GlobalConfig{})
 	assert.NotNil(t, cmd.Flags().Lookup("output"), "--output/-o flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("values"), "--values/-f flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("name"), "--name flag should be registered")
 }
 
-func TestNewReleaseApplyCmd(t *testing.T) {
-	cmd := NewReleaseApplyCmd(&config.GlobalConfig{})
-	assert.Equal(t, "apply <release.cue>", cmd.Use)
+func TestNewInstanceApplyCmd(t *testing.T) {
+	cmd := NewInstanceApplyCmd(&config.GlobalConfig{})
+	assert.Equal(t, "apply <instance.cue>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 }
 
-func TestNewReleaseApplyCmd_Flags(t *testing.T) {
-	cmd := NewReleaseApplyCmd(&config.GlobalConfig{})
+func TestNewInstanceApplyCmd_Flags(t *testing.T) {
+	cmd := NewInstanceApplyCmd(&config.GlobalConfig{})
 	assert.NotNil(t, cmd.Flags().Lookup("dry-run"), "--dry-run flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("values"), "--values/-f flag should be registered")
 }
 
-func TestNewReleaseDiffCmd(t *testing.T) {
-	cmd := NewReleaseDiffCmd(&config.GlobalConfig{})
-	assert.Equal(t, "diff <release.cue>", cmd.Use)
+func TestNewInstanceDiffCmd(t *testing.T) {
+	cmd := NewInstanceDiffCmd(&config.GlobalConfig{})
+	assert.Equal(t, "diff <instance.cue>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 }
 
-// --- 8.2 Unit tests for release cluster-query commands ---
+// --- 8.2 Unit tests for instance cluster-query commands ---
 
-func TestNewReleaseStatusCmd(t *testing.T) {
-	cmd := NewReleaseStatusCmd(&config.GlobalConfig{})
+func TestNewInstanceStatusCmd(t *testing.T) {
+	cmd := NewInstanceStatusCmd(&config.GlobalConfig{})
 	assert.Equal(t, "status <file|name|uuid>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotNil(t, cmd.Args, "should require exactly 1 positional arg")
 }
 
-func TestNewReleaseTreeCmd(t *testing.T) {
-	cmd := NewReleaseTreeCmd(&config.GlobalConfig{})
+func TestNewInstanceTreeCmd(t *testing.T) {
+	cmd := NewInstanceTreeCmd(&config.GlobalConfig{})
 	assert.Equal(t, "tree <file|name|uuid>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 }
 
-func TestNewReleaseEventsCmd(t *testing.T) {
-	cmd := NewReleaseEventsCmd(&config.GlobalConfig{})
+func TestNewInstanceEventsCmd(t *testing.T) {
+	cmd := NewInstanceEventsCmd(&config.GlobalConfig{})
 	assert.Equal(t, "events <file|name|uuid>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 }
 
-func TestNewReleaseStatusCmd_Flags(t *testing.T) {
-	cmd := NewReleaseStatusCmd(&config.GlobalConfig{})
+func TestNewInstanceStatusCmd_Flags(t *testing.T) {
+	cmd := NewInstanceStatusCmd(&config.GlobalConfig{})
 	assert.NotNil(t, cmd.Flags().Lookup("namespace"), "--namespace/-n flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("output"), "--output/-o flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("details"), "--details flag should be registered")
 }
 
-func TestNewReleaseDeleteCmd(t *testing.T) {
-	cmd := NewReleaseDeleteCmd(&config.GlobalConfig{})
+func TestNewInstanceDeleteCmd(t *testing.T) {
+	cmd := NewInstanceDeleteCmd(&config.GlobalConfig{})
 	assert.Equal(t, "delete <file|name|uuid>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotNil(t, cmd.Flags().Lookup("dry-run"), "--dry-run flag should be registered")
 }
 
-func TestEnsureDeleteAllowed_BlocksControllerManagedRelease(t *testing.T) {
+func TestEnsureDeleteAllowed_BlocksControllerManagedInstance(t *testing.T) {
+	// inventory.ReleaseInventoryRecord / ReleaseMetadata are renamed in the X4 slice.
 	err := ensureDeleteAllowed(&inventory.ReleaseInventoryRecord{CreatedBy: inventory.CreatedByController, ReleaseMetadata: inventory.ReleaseMetadata{ReleaseName: "demo", ReleaseNamespace: "apps"}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "controller-managed")
 }
 
-func TestNewReleaseListCmd(t *testing.T) {
-	cmd := NewReleaseListCmd(&config.GlobalConfig{})
+func TestNewInstanceListCmd(t *testing.T) {
+	cmd := NewInstanceListCmd(&config.GlobalConfig{})
 	assert.Equal(t, "list", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 }
 
-// TestReleaseClusterQueryArgParsing tests that positional arg is correctly resolved
+// TestInstanceClusterQueryArgParsing tests that positional arg is correctly resolved
 // via ResolveReleaseIdentifier inside the command handlers.
-func TestReleaseClusterQueryArgParsing(t *testing.T) {
+// (ResolveReleaseIdentifier lives in cmdutil/flags.go and is renamed in the X4 slice.)
+func TestInstanceClusterQueryArgParsing(t *testing.T) {
 	tests := []struct {
 		name     string
 		arg      string
@@ -138,41 +140,43 @@ func TestReleaseClusterQueryArgParsing(t *testing.T) {
 	}
 }
 
-// --- 8.6 BundleRelease rejection ---
+// --- 8.6 Unknown-kind rejection ---
+// Was: TestReleaseVetCmd_RejectsBundleRelease (enhancement 0002 D-X3.2). X2 removed
+// bundle support; a stray kind: "BundleRelease" file now errors via DetectInstanceKind's
+// default ("unknown instance kind"). This test only verifies arg-count enforcement.
 
-func TestReleaseVetCmd_RejectsBundleRelease(t *testing.T) {
-	// This test verifies the command structure enforces exactly 1 arg.
-	// BundleRelease rejection is exercised at the RenderFromReleaseFile level.
-	cmd := NewReleaseVetCmd(&config.GlobalConfig{})
+func TestInstanceVetCmd_RejectsMissingArg(t *testing.T) {
+	cmd := NewInstanceVetCmd(&config.GlobalConfig{})
 	cmd.SetArgs([]string{}) // no args
 
 	err := cmd.Execute()
-	require.Error(t, err, "vet command should fail without a release file arg")
+	require.Error(t, err, "vet command should fail without an instance file arg")
 }
 
-func TestRunReleaseBuild_RejectsNonManifestOutput(t *testing.T) {
-	err := runReleaseBuild("release.cue", &config.GlobalConfig{}, &cmdutil.ReleaseFileFlags{}, "", "", "wide", false, "")
+func TestRunInstanceBuild_RejectsNonManifestOutput(t *testing.T) {
+	// cmdutil.ReleaseFileFlags is renamed in the X4 slice.
+	err := runInstanceBuild("instance.cue", &config.GlobalConfig{}, &cmdutil.ReleaseFileFlags{}, "", "", "wide", false, "")
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "invalid output format"))
 }
 
-func TestRunReleaseBuild_MissingPath(t *testing.T) {
-	err := runReleaseBuild("/nonexistent/release/path", &config.GlobalConfig{}, &cmdutil.ReleaseFileFlags{}, "", "", "yaml", false, "")
+func TestRunInstanceBuild_MissingPath(t *testing.T) {
+	err := runInstanceBuild("/nonexistent/instance/path", &config.GlobalConfig{}, &cmdutil.ReleaseFileFlags{}, "", "", "yaml", false, "")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }
 
-// TestReleaseGroup verifies the release command group is correctly configured.
-func TestNewReleaseCmd(t *testing.T) {
-	cmd := NewReleaseCmd(&config.GlobalConfig{})
-	assert.Equal(t, "release", cmd.Use)
-	assert.Contains(t, cmd.Aliases, "rel")
+// TestNewInstanceCmd verifies the instance command group is correctly configured.
+func TestNewInstanceCmd(t *testing.T) {
+	cmd := NewInstanceCmd(&config.GlobalConfig{})
+	assert.Equal(t, "instance", cmd.Use)
+	assert.Contains(t, cmd.Aliases, "inst")
 
 	subcommands := make(map[string]bool)
 	for _, sub := range cmd.Commands() {
 		subcommands[sub.Name()] = true
 	}
 	for _, expected := range []string{"vet", "build", "apply", "diff", "status", "tree", "events", "delete", "list"} {
-		assert.True(t, subcommands[expected], "release group should have %q subcommand", expected)
+		assert.True(t, subcommands[expected], "instance group should have %q subcommand", expected)
 	}
 }

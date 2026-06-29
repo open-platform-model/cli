@@ -74,7 +74,7 @@ func runModuleBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 	if !info.IsDir() {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitGeneralError,
-			Err:  fmt.Errorf("module build expects a directory; CUE packages span all files in a dir. Use 'opm release build %s' for a release file", modulePath),
+			Err:  fmt.Errorf("module build expects a directory; CUE packages span all files in a dir. Use 'opm instance build %s' for a release file", modulePath),
 		}
 	}
 

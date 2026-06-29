@@ -1,4 +1,4 @@
-package release
+package instance
 
 import (
 	"context"
@@ -15,8 +15,8 @@ import (
 	"github.com/opmodel/cli/internal/workflow/render"
 )
 
-// NewReleaseApplyCmd creates the release apply command.
-func NewReleaseApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
+// NewInstanceApplyCmd creates the instance apply command.
+func NewInstanceApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var rff cmdutil.ReleaseFileFlags
 	var kf cmdutil.K8sFlags
 	var namespace string
@@ -29,22 +29,22 @@ func NewReleaseApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use:   "apply <release.cue>",
-		Short: "Deploy release to cluster",
-		Long: `Deploy an OPM release file to a Kubernetes cluster using server-side apply.
+		Use:   "apply <instance.cue>",
+		Short: "Deploy instance to cluster",
+		Long: `Deploy an OPM instance file to a Kubernetes cluster using server-side apply.
 
 Arguments:
-  release.cue    Path to the release .cue file (required)
+  instance.cue    Path to the instance .cue file (required)
 
 Examples:
-  # Apply a release file
-  opm release apply ./jellyfin_release.cue
+  # Apply an instance file
+  opm instance apply ./jellyfin_instance.cue
 
   # Dry run
-  opm release apply ./jellyfin_release.cue --dry-run`,
+  opm instance apply ./jellyfin_instance.cue --dry-run`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runReleaseApply(args[0], cfg, &rff, &kf, namespace, dryRunFlag, createNSFlag, noPruneFlag, forceFlag)
+			return runInstanceApply(args[0], cfg, &rff, &kf, namespace, dryRunFlag, createNSFlag, noPruneFlag, forceFlag)
 		},
 	}
 
@@ -59,8 +59,8 @@ Examples:
 	return c
 }
 
-// runReleaseApply executes the release apply command.
-func runReleaseApply(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, kf *cmdutil.K8sFlags, namespaceFlag string,
+// runInstanceApply executes the instance apply command.
+func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, kf *cmdutil.K8sFlags, namespaceFlag string,
 	dryRun, createNS, noPrune, force bool) error {
 	ctx := context.Background()
 
@@ -76,7 +76,7 @@ func runReleaseApply(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 	}
 
 	result, err := render.FromReleaseFile(ctx, render.ReleaseFileOpts{
-		ReleaseFilePath: releaseFile,
+		ReleaseFilePath: instanceFile,
 		ValuesFiles:     rff.Values,
 		K8sConfig:       k8sConfig,
 		Config:          cfg,
@@ -106,11 +106,11 @@ func runReleaseApply(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.
 			CreateNS:               createNS,
 			NoPrune:                noPrune,
 			Force:                  force,
-			SuccessUpToDateMessage: "Release up to date",
-			SuccessAppliedMessage:  "Release applied",
+			SuccessUpToDateMessage: "Instance up to date",
+			SuccessAppliedMessage:  "Instance applied",
 		},
 		Change: workflowapply.ChangeDescriptor{
-			Path:      releaseFile,
+			Path:      instanceFile,
 			ValuesStr: valuesStr,
 			Version:   result.Module.Version,
 			Local:     result.Module.Version == "",

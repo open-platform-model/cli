@@ -21,7 +21,7 @@ import (
 // `opm module apply` deploys a module package directly to a Kubernetes cluster
 // via the synthetic `#ModuleRelease` flow. It is the deploy counterpart to
 // `opm module build`. After the render stage, behavior is identical to
-// `opm release apply` — inventory, prune, dry-run, and ownership semantics
+// `opm instance apply` — inventory, prune, dry-run, and ownership semantics
 // all apply to the synthesized release.
 func NewModuleApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var rf cmdutil.RenderFlags
@@ -45,13 +45,13 @@ module's debugValues (default) or from -f/--values files.
 The synthetic release defaults to "<module>-debug". --name and --namespace
 participate in release identity (different values produce different releases,
 each with its own inventory Secret). For persistent deploys, author a
-release.cue file and use 'opm release apply' instead.
+release.cue file and use 'opm instance apply' instead.
 
-When switching from 'opm module apply' to 'opm release apply' (or vice versa)
+When switching from 'opm module apply' to 'opm instance apply' (or vice versa)
 with a different release name, delete the previous release first to avoid
 orphan inventory:
 
-  opm release delete <module>-debug
+  opm instance delete <module>-debug
 
 Arguments:
   path    Path to a module package directory (default: current directory)
@@ -99,7 +99,7 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 	if !info.IsDir() {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitGeneralError,
-			Err:  fmt.Errorf("module apply expects a directory; CUE packages span all files in a dir. Use 'opm release apply %s' for a release file", modulePath),
+			Err:  fmt.Errorf("module apply expects a directory; CUE packages span all files in a dir. Use 'opm instance apply %s' for a release file", modulePath),
 		}
 	}
 

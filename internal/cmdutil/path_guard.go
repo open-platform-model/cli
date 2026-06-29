@@ -22,13 +22,13 @@ func ValidateModuleInputPath(path string) error {
 
 	if info.IsDir() {
 		if hasFile(absPath, "release.cue") {
-			return fmt.Errorf("path %q is a release package, not a module - use 'opm release'", absPath)
+			return fmt.Errorf("path %q is a release package, not a module - use 'opm instance'", absPath)
 		}
 		return nil
 	}
 
 	if filepath.Base(absPath) == "release.cue" {
-		return fmt.Errorf("path %q is a release file, not a module - use 'opm release'", absPath)
+		return fmt.Errorf("path %q is a release file, not a module - use 'opm instance'", absPath)
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-package release
+package instance
 
 import (
 	"bufio"
@@ -20,8 +20,8 @@ import (
 	"github.com/opmodel/cli/pkg/ownership"
 )
 
-// NewReleaseDeleteCmd creates the release delete command.
-func NewReleaseDeleteCmd(cfg *config.GlobalConfig) *cobra.Command {
+// NewInstanceDeleteCmd creates the instance delete command.
+func NewInstanceDeleteCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var kf cmdutil.K8sFlags
 	var namespace string
 
@@ -32,34 +32,34 @@ func NewReleaseDeleteCmd(cfg *config.GlobalConfig) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "delete <file|name|uuid>",
-		Short: "Delete release resources from cluster",
-		Long: `Delete all resources belonging to an OPM release from a Kubernetes cluster.
+		Short: "Delete instance resources from cluster",
+		Long: `Delete all resources belonging to an OPM instance from a Kubernetes cluster.
 
 Arguments:
-  file         Path to a release.cue file or directory containing one.
-               The release name and namespace are read from the file's metadata.
+  file         Path to an instance.cue file or directory containing one.
+               The instance name and namespace are read from the file's metadata.
                --namespace overrides the namespace found in the file.
-  name         Release name (use -n / --namespace to scope by namespace).
-  uuid         Release UUID.
+  name         Instance name (use -n / --namespace to scope by namespace).
+  uuid         Instance UUID.
 
 Examples:
-  # Delete by release.cue file in the current directory
-  opm release delete .
+  # Delete by instance.cue file in the current directory
+  opm instance delete .
 
-  # Delete by release.cue file path
-  opm release delete ./releases/jellyfin/release.cue -n media
+  # Delete by instance.cue file path
+  opm instance delete ./instances/jellyfin/instance.cue -n media
 
   # Delete by name
-  opm release delete jellyfin -n media
+  opm instance delete jellyfin -n media
 
   # Preview what would be deleted
-  opm release delete jellyfin -n media --dry-run
+  opm instance delete jellyfin -n media --dry-run
 
   # Skip confirmation prompt
-  opm release delete jellyfin -n media --force`,
+  opm instance delete jellyfin -n media --force`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runReleaseDelete(args[0], cfg, &kf, namespace, forceFlag, dryRunFlag)
+			return runInstanceDelete(args[0], cfg, &kf, namespace, forceFlag, dryRunFlag)
 		},
 	}
 
@@ -71,10 +71,10 @@ Examples:
 	return c
 }
 
-func runReleaseDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, force, dryRun bool) error {
+func runInstanceDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, force, dryRun bool) error {
 	ctx := context.Background()
 
-	target, err := cmdutil.ResolveReleaseTarget(identifier, cfg, kf, namespaceFlag)
+	target, err := cmdutil.ResolveInstanceTarget(identifier, cfg, kf, namespaceFlag)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func runReleaseDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 	if dryRun {
 		releaseLog.Info("dry run - no changes will be made")
 	} else if !force {
-		if !confirmReleaseDelete(rsf.ReleaseName, rsf.ReleaseID, namespace) {
+		if !confirmInstanceDelete(rsf.ReleaseName, rsf.ReleaseID, namespace) {
 			releaseLog.Info("deletion canceled")
 			return nil
 		}
@@ -136,7 +136,7 @@ func runReleaseDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K
 		releaseLog.Info(fmt.Sprintf("dry run complete: %d resources would be deleted", deleteResult.Deleted))
 	} else {
 		releaseLog.Info("all resources have been deleted")
-		output.Println(output.FormatCheckmark("Release deleted"))
+		output.Println(output.FormatCheckmark("Instance deleted"))
 	}
 
 	if len(deleteResult.Errors) > 0 {
@@ -156,12 +156,12 @@ func ensureDeleteAllowed(inv *inventory.ReleaseInventoryRecord) error {
 	return ownership.EnsureCLIMutable(string(inv.NormalizedCreatedBy()), inv.ReleaseMetadata.ReleaseName, inv.ReleaseMetadata.ReleaseNamespace)
 }
 
-func confirmReleaseDelete(releaseName, releaseID, namespace string) bool {
+func confirmInstanceDelete(releaseName, releaseID, namespace string) bool {
 	var prompt string
 	if releaseName != "" {
-		prompt = fmt.Sprintf("Delete all resources for release %q in namespace %q? [y/N]: ", releaseName, namespace)
+		prompt = fmt.Sprintf("Delete all resources for instance %q in namespace %q? [y/N]: ", releaseName, namespace)
 	} else {
-		prompt = fmt.Sprintf("Delete all resources for release-id %q in namespace %q? [y/N]: ", releaseID, namespace)
+		prompt = fmt.Sprintf("Delete all resources for instance-id %q in namespace %q? [y/N]: ", releaseID, namespace)
 	}
 	output.Prompt(prompt)
 	scanner := bufio.NewScanner(os.Stdin)

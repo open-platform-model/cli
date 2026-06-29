@@ -1,4 +1,4 @@
-package release
+package instance
 
 import (
 	"context"
@@ -16,26 +16,26 @@ import (
 	"github.com/opmodel/cli/internal/workflow/render"
 )
 
-// NewReleaseDiffCmd creates the release diff command.
-func NewReleaseDiffCmd(cfg *config.GlobalConfig) *cobra.Command {
+// NewInstanceDiffCmd creates the instance diff command.
+func NewInstanceDiffCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var rff cmdutil.ReleaseFileFlags
 	var kf cmdutil.K8sFlags
 	var namespace string
 
 	c := &cobra.Command{
-		Use:   "diff <release.cue>",
-		Short: "Show differences between release file and cluster",
-		Long: `Show differences between a release file and live cluster state.
+		Use:   "diff <instance.cue>",
+		Short: "Show differences between instance file and cluster",
+		Long: `Show differences between an instance file and live cluster state.
 
 Arguments:
-  release.cue    Path to the release .cue file (required)
+  instance.cue    Path to the instance .cue file (required)
 
 Examples:
-  # Diff a release file against the cluster
-  opm release diff ./jellyfin_release.cue`,
+  # Diff an instance file against the cluster
+  opm instance diff ./jellyfin_instance.cue`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runReleaseDiff(args[0], cfg, &rff, &kf, namespace)
+			return runInstanceDiff(args[0], cfg, &rff, &kf, namespace)
 		},
 	}
 
@@ -46,8 +46,8 @@ Examples:
 	return c
 }
 
-// runReleaseDiff executes the release diff command.
-func runReleaseDiff(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, kf *cmdutil.K8sFlags, namespaceFlag string) error { //nolint:gocyclo // orchestration function; complexity is inherent
+// runInstanceDiff executes the instance diff command.
+func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, kf *cmdutil.K8sFlags, namespaceFlag string) error { //nolint:gocyclo // orchestration function; complexity is inherent
 	ctx := context.Background()
 
 	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
@@ -62,7 +62,7 @@ func runReleaseDiff(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.R
 	}
 
 	result, err := render.FromReleaseFile(ctx, render.ReleaseFileOpts{
-		ReleaseFilePath: releaseFile,
+		ReleaseFilePath: instanceFile,
 		ValuesFiles:     rff.Values,
 		K8sConfig:       k8sConfig,
 		Config:          cfg,

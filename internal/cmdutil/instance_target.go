@@ -8,17 +8,20 @@ import (
 	"github.com/opmodel/cli/internal/config"
 )
 
-// ResolvedReleaseTarget bundles selector and Kubernetes config for release commands.
-type ResolvedReleaseTarget struct {
+// ResolvedInstanceTarget bundles selector and Kubernetes config for instance commands.
+// Was: ResolvedReleaseTarget (enhancement 0002 D10). The Selector type
+// (ReleaseSelectorFlags) is renamed in the X4 slice.
+type ResolvedInstanceTarget struct {
 	Selector  *ReleaseSelectorFlags
 	K8sConfig *config.ResolvedKubernetesConfig
 	Namespace string
 	LogName   string
 }
 
-// ResolveReleaseTarget resolves a release identifier into selector flags and Kubernetes config.
-func ResolveReleaseTarget(identifier string, cfg *config.GlobalConfig, kf *K8sFlags, namespaceFlag string) (*ResolvedReleaseTarget, error) {
-	ra, err := ResolveReleaseArg(identifier, cfg)
+// ResolveInstanceTarget resolves an instance identifier into selector flags and
+// Kubernetes config. Was: ResolveReleaseTarget.
+func ResolveInstanceTarget(identifier string, cfg *config.GlobalConfig, kf *K8sFlags, namespaceFlag string) (*ResolvedInstanceTarget, error) {
+	ra, err := ResolveInstanceArg(identifier, cfg)
 	if err != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}
@@ -40,7 +43,7 @@ func ResolveReleaseTarget(identifier string, cfg *config.GlobalConfig, kf *K8sFl
 		return nil, err
 	}
 
-	return &ResolvedReleaseTarget{
+	return &ResolvedInstanceTarget{
 		Selector:  rsf,
 		K8sConfig: k8sConfig,
 		Namespace: k8sConfig.Namespace.Value,

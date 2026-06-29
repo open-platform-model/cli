@@ -7,8 +7,8 @@ import (
 	"github.com/spf13/cobra"
 
 	cmdconfig "github.com/opmodel/cli/internal/cmd/config"
+	cmdinstance "github.com/opmodel/cli/internal/cmd/instance" // Was: cmdrelease "…/internal/cmd/release" (enhancement 0002 D6)
 	cmdmodule "github.com/opmodel/cli/internal/cmd/module"
-	cmdrelease "github.com/opmodel/cli/internal/cmd/release"
 	"github.com/opmodel/cli/internal/cmdutil"
 	"github.com/opmodel/cli/internal/config"
 	"github.com/opmodel/cli/internal/output"
@@ -51,7 +51,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(NewVersionCmd(&cfg))
 	rootCmd.AddCommand(cmdmodule.NewModuleCmd(&cfg))
 	rootCmd.AddCommand(cmdconfig.NewConfigCmd(&cfg))
-	rootCmd.AddCommand(cmdrelease.NewReleaseCmd(&cfg))
+	rootCmd.AddCommand(cmdinstance.NewInstanceCmd(&cfg))
 
 	return rootCmd
 }

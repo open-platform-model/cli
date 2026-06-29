@@ -1,4 +1,4 @@
-package release
+package instance
 
 import (
 	"context"
@@ -14,32 +14,32 @@ import (
 	"github.com/opmodel/cli/internal/workflow/render"
 )
 
-// NewReleaseVetCmd creates the release vet command.
-func NewReleaseVetCmd(cfg *config.GlobalConfig) *cobra.Command {
+// NewInstanceVetCmd creates the instance vet command.
+func NewInstanceVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var rff cmdutil.ReleaseFileFlags
 	var namespace string
 
 	c := &cobra.Command{
-		Use:   "vet <release.cue>",
-		Short: "Validate release file without generating manifests",
-		Long: `Validate an OPM release file via the render pipeline.
+		Use:   "vet <instance.cue>",
+		Short: "Validate instance file without generating manifests",
+		Long: `Validate an OPM instance file via the render pipeline.
 
-This command loads a release file, matches components to transformers, and
-validates the release can be rendered successfully.
+This command loads an instance file, matches components to transformers, and
+validates the instance can be rendered successfully.
 No manifests are output — purely a pass/fail validation tool.
 
 Arguments:
-  release.cue    Path to the release .cue file (required)
+  instance.cue    Path to the instance .cue file (required)
 
 Examples:
-  # Validate a release file
-  opm release vet ./jellyfin_release.cue
+  # Validate an instance file
+  opm instance vet ./jellyfin_instance.cue
 
   # Validate with a specific namespace
-  opm release vet ./jellyfin_release.cue -n production`,
+  opm instance vet ./jellyfin_instance.cue -n production`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runReleaseVet(args[0], cfg, &rff, namespace)
+			return runInstanceVet(args[0], cfg, &rff, namespace)
 		},
 	}
 
@@ -49,8 +49,8 @@ Examples:
 	return c
 }
 
-// runReleaseVet executes the release vet command.
-func runReleaseVet(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, namespaceFlag string) error {
+// runInstanceVet executes the instance vet command.
+func runInstanceVet(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.ReleaseFileFlags, namespaceFlag string) error {
 	ctx := context.Background()
 
 	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
@@ -63,7 +63,7 @@ func runReleaseVet(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.Re
 	}
 
 	result, err := render.FromReleaseFile(ctx, render.ReleaseFileOpts{
-		ReleaseFilePath: releaseFile,
+		ReleaseFilePath: instanceFile,
 		ValuesFiles:     rff.Values,
 		K8sConfig:       k8sConfig,
 		Config:          cfg,
@@ -84,7 +84,7 @@ func runReleaseVet(releaseFile string, cfg *config.GlobalConfig, rff *cmdutil.Re
 		}
 	}
 
-	summary := fmt.Sprintf("Release valid (%d resources)", result.ResourceCount())
+	summary := fmt.Sprintf("Instance valid (%d resources)", result.ResourceCount())
 	releaseLog.Info(output.FormatCheckmark(summary))
 
 	return nil

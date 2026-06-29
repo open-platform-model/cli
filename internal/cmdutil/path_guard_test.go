@@ -18,7 +18,7 @@ func TestValidateModuleInputPath_RejectsReleasePackage(t *testing.T) {
 	err := ValidateModuleInputPath(dir)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "release package, not a module")
-	assert.Contains(t, err.Error(), "opm release")
+	assert.Contains(t, err.Error(), "opm instance")
 }
 
 func TestValidateReleaseInputPath_RejectsModulePackage(t *testing.T) {
@@ -31,11 +31,11 @@ func TestValidateReleaseInputPath_RejectsModulePackage(t *testing.T) {
 	assert.Contains(t, err.Error(), "opm module")
 }
 
-func TestResolveReleaseArg_RejectsModulePackagePath(t *testing.T) {
+func TestResolveInstanceArg_RejectsModulePackagePath(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "module.cue"), []byte("package test\n"), 0o600))
 
-	_, err := ResolveReleaseArg(dir, &config.GlobalConfig{})
+	_, err := ResolveInstanceArg(dir, &config.GlobalConfig{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "module package, not a release")
 }

@@ -1,4 +1,4 @@
-package release
+package instance
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 	"github.com/opmodel/cli/internal/workflow/query"
 )
 
-// NewReleaseStatusCmd creates the release status command.
-func NewReleaseStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
+// NewInstanceStatusCmd creates the instance status command.
+func NewInstanceStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var kf cmdutil.K8sFlags
 	var namespace string
 
@@ -23,31 +23,31 @@ func NewReleaseStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "status <file|name|uuid>",
-		Short: "Show resource status for a release",
-		Long: `Show status of resources deployed by an OPM release.
+		Short: "Show resource status for an instance",
+		Long: `Show status of resources deployed by an OPM instance.
 
 Arguments:
-  file         Path to a release.cue file or directory containing one.
-               The release name and namespace are read from the file's metadata.
+  file         Path to an instance.cue file or directory containing one.
+               The instance name and namespace are read from the file's metadata.
                --namespace overrides the namespace found in the file.
-  name         Release name (use -n / --namespace to scope by namespace).
-  uuid         Release UUID.
+  name         Instance name (use -n / --namespace to scope by namespace).
+  uuid         Instance UUID.
 
 Examples:
-  # Identify by release.cue file in the current directory
-  opm release status .
+  # Identify by instance.cue file in the current directory
+  opm instance status .
 
-  # Identify by release.cue file path
-  opm release status ./releases/jellyfin/release.cue
+  # Identify by instance.cue file path
+  opm instance status ./instances/jellyfin/instance.cue
 
   # Identify by name
-  opm release status jellyfin -n media
+  opm instance status jellyfin -n media
 
   # Wide output
-  opm release status jellyfin -n media -o wide`,
+  opm instance status jellyfin -n media -o wide`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runReleaseStatus(args[0], cfg, &kf, namespace, outputFlag, detailsFlag)
+			return runInstanceStatus(args[0], cfg, &kf, namespace, outputFlag, detailsFlag)
 		},
 	}
 
@@ -59,10 +59,10 @@ Examples:
 	return c
 }
 
-func runReleaseStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag, outputFmt string, verbose bool) error {
+func runInstanceStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag, outputFmt string, verbose bool) error {
 	ctx := context.Background()
 
-	target, err := cmdutil.ResolveReleaseTarget(identifier, cfg, kf, namespaceFlag)
+	target, err := cmdutil.ResolveInstanceTarget(identifier, cfg, kf, namespaceFlag)
 	if err != nil {
 		return err
 	}
