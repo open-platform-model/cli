@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.0.0-alpha](https://github.com/open-platform-model/cli/compare/v0.6.0...v1.0.0-alpha) (2026-06-30)
+
+
+### Features
+
+* **module:** add `opm module apply` subcommand ([04d93aa](https://github.com/open-platform-model/cli/commit/04d93aaa931a42f054a4d6290826caa98f97bd5a))
+* **security-audit:** add registry/k8s cli security audit skill ([20d010c](https://github.com/open-platform-model/cli/commit/20d010c19b573db779b1731c37c196caf178d4a3))
+
+
+### Documentation
+
+* **commit:** allow co-authored-by attribution trailer ([e187fd7](https://github.com/open-platform-model/cli/commit/e187fd70be54bca03023cfe5d2c80f2dd8865163))
+* drop ADR workflow section from CLAUDE.md ([a22554e](https://github.com/open-platform-model/cli/commit/a22554e3dce7b52063f2519ae7158e6966597eda))
+* require claude co-authorship trailer in commits ([#89](https://github.com/open-platform-model/cli/issues/89)) ([232aa06](https://github.com/open-platform-model/cli/commit/232aa062349f18bf87c6aa5bebb4d099a34f57c8))
+
+
+### Miscellaneous Chores
+
+* configure release-please for the v1 alpha prerelease line ([#96](https://github.com/open-platform-model/cli/issues/96)) ([cc9efe8](https://github.com/open-platform-model/cli/commit/cc9efe871bba5dd0e4ab48626026e811378960e2))
+* **deps:** bump module deps in examples and fixtures ([010aa1e](https://github.com/open-platform-model/cli/commit/010aa1e46d44b1584bb4abc1e7f7f0f5a7749015))
+* **rfc:** Add handoff rfc ([061544b](https://github.com/open-platform-model/cli/commit/061544bff98b786c050ebca298b1ebd3fc89a2c3))
+* **skill:** Add instructions on how to write commit messages ([7d17bb6](https://github.com/open-platform-model/cli/commit/7d17bb60a4dfee7832f69d384414a3f0667de04b))
+
 ## [0.6.0](https://github.com/open-platform-model/cli/compare/v0.5.1...v0.6.0) (2026-05-07)
 
 
