@@ -32,10 +32,10 @@ import (
 
 const (
 	clusterContext = "kind-opm-dev"
-	releaseName    = "opm-inv-ops-test"
+	instanceName   = "opm-inv-ops-test"
 	namespace      = "default"
-	// Fixed release UUID for deterministic inventory Secret naming.
-	releaseID = "b2c3d4e5-2222-3333-4444-bbccddeeff00"
+	// Fixed instance UUID for deterministic inventory Secret naming.
+	instanceID = "b2c3d4e5-2222-3333-4444-bbccddeeff00"
 
 	modulePath    = "tests/integration/inventory-ops"
 	moduleVersion = "0.1.0"
@@ -73,7 +73,7 @@ func main() {
 	res65svc := buildServiceResources([]string{"svc-a"})
 	res65all := append(res65cm, res65svc...)
 
-	_, err = kubernetes.Apply(ctx, client, res65all, releaseName, kubernetes.ApplyOptions{})
+	_, err = kubernetes.Apply(ctx, client, res65all, instanceName, kubernetes.ApplyOptions{})
 	check("applying resources for 6.5", err)
 	fmt.Println("   OK: cm-a and svc-a applied")
 
@@ -83,7 +83,7 @@ func main() {
 	fmt.Println("   OK: inventory written tracking [cm-a, svc-a]")
 
 	// Read back and discover live resources from inventory.
-	readInv65, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
+	readInv65, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
 	check("reading inventory for 6.5", err)
 	liveResources65, missing65, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv65)
 	check("discovering resources from inventory for 6.5", err)
@@ -96,7 +96,7 @@ func main() {
 	fmt.Println("   OK: discovered 2 live resources from inventory")
 
 	// Diff: local render has only cm-a; svc-a is an orphan.
-	diffResult65, err := kubernetes.Diff(ctx, client, res65cm, releaseName, comparer,
+	diffResult65, err := kubernetes.Diff(ctx, client, res65cm, instanceName, comparer,
 		kubernetes.DiffOptions{InventoryLive: liveResources65})
 	check("diffing with inventory for 6.5", err)
 	if diffResult65.Orphaned != 1 {
@@ -120,7 +120,7 @@ func main() {
 	res67svc := buildServiceResources([]string{"svc-a"})
 	res67all := append(res67cm, res67svc...)
 
-	_, err = kubernetes.Apply(ctx, client, res67all, releaseName, kubernetes.ApplyOptions{})
+	_, err = kubernetes.Apply(ctx, client, res67all, instanceName, kubernetes.ApplyOptions{})
 	check("applying resources for 6.7", err)
 	fmt.Println("   OK: cm-a and svc-a applied")
 
@@ -130,16 +130,16 @@ func main() {
 	fmt.Println("   OK: inventory written")
 
 	// Discover live resources.
-	readInv67, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
+	readInv67, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
 	check("reading inventory for 6.7", err)
 	liveResources67, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv67)
 	check("discovering resources from inventory for 6.7", err)
 
-	invSecretName67 := inventory.SecretName(releaseName, releaseID)
+	invSecretName67 := inventory.SecretName(instanceName, instanceID)
 
 	// Delete with inventory-first path.
 	deleteResult67, err := kubernetes.Delete(ctx, client, kubernetes.DeleteOptions{
-		ReleaseName:              releaseName,
+		InstanceName:             instanceName,
 		Namespace:                namespace,
 		InventoryLive:            liveResources67,
 		InventorySecretName:      invSecretName67,
@@ -172,7 +172,7 @@ func main() {
 	res68svc := buildServiceResources([]string{"svc-a"})
 	res68all := append(res68cm, res68svc...)
 
-	_, err = kubernetes.Apply(ctx, client, res68all, releaseName, kubernetes.ApplyOptions{})
+	_, err = kubernetes.Apply(ctx, client, res68all, instanceName, kubernetes.ApplyOptions{})
 	check("applying resources for 6.8", err)
 	fmt.Println("   OK: cm-a and svc-a applied")
 
@@ -188,7 +188,7 @@ func main() {
 	fmt.Println("   OK: svc-a manually deleted (simulating missing resource)")
 
 	// Discover resources from inventory — svc-a should be in missing list.
-	readInv68, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
+	readInv68, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
 	check("reading inventory for 6.8", err)
 	liveResources68, missingResources68, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv68)
 	check("discovering resources from inventory for 6.8", err)
@@ -214,9 +214,9 @@ func main() {
 		}
 	}
 
-	// Call GetReleaseStatus with inventory-first path.
-	statusResult, err := kubernetes.GetReleaseStatus(ctx, client, kubernetes.StatusOptions{
-		ReleaseName:      releaseName,
+	// Call GetInstanceStatus with inventory-first path.
+	statusResult, err := kubernetes.GetInstanceStatus(ctx, client, kubernetes.StatusOptions{
+		InstanceName:     instanceName,
 		Namespace:        namespace,
 		InventoryLive:    liveResources68,
 		MissingResources: missing68,
@@ -250,15 +250,15 @@ func main() {
 	fmt.Printf("   OK: AggregateStatus = %q (not Ready)\n", statusResult.AggregateStatus)
 
 	readInv68.CreatedBy = inventory.CreatedByController
-	statusOpts := workflowquery.BuildStatusOptions(namespace, &cmdutil.ReleaseSelectorFlags{ReleaseName: releaseName, ReleaseID: releaseID}, "table", false, readInv68, liveResources68, missingResources68)
+	statusOpts := workflowquery.BuildStatusOptions(namespace, &cmdutil.InstanceSelectorFlags{InstanceName: instanceName, InstanceID: instanceID}, "table", false, readInv68, liveResources68, missingResources68)
 	statusResult.Owner = statusOpts.Owner
 	formatted, err := kubernetes.FormatStatus(statusResult, "table")
 	check("formatting controller-managed status", err)
 	if !contains(formatted, "Owner:      controller") {
 		failf("6.8: expected formatted status to show controller owner, got: %s", formatted)
 	}
-	if !contains(formatted, "controller-managed release") {
-		failf("6.8: expected formatted status warning for controller-managed release")
+	if !contains(formatted, "controller-managed instance") {
+		failf("6.8: expected formatted status warning for controller-managed instance")
 	}
 	fmt.Println("   OK: status formatting shows owner and controller-managed warning")
 
@@ -279,11 +279,11 @@ func main() {
 // opmLabels returns the standard OPM labels for test resources.
 func opmLabels() map[string]interface{} {
 	return map[string]interface{}{
-		pkgcore.LabelManagedBy:            pkgcore.LabelManagedByValue,
-		"module-release.opmodel.dev/name": releaseName,
-		"module-release.opmodel.dev/uuid": releaseID,
-		"module.opmodel.dev/name":         releaseName,
-		"module.opmodel.dev/version":      moduleVersion,
+		pkgcore.LabelManagedBy:             pkgcore.LabelManagedByValue,
+		"module-instance.opmodel.dev/name": instanceName,
+		"module-instance.opmodel.dev/uuid": instanceID,
+		"module.opmodel.dev/name":          instanceName,
+		"module.opmodel.dev/version":       moduleVersion,
 	}
 }
 
@@ -321,7 +321,7 @@ func buildSvc(name string) *unstructured.Unstructured {
 		},
 		"spec": map[string]interface{}{
 			"selector": map[string]interface{}{
-				"app": releaseName,
+				"app": instanceName,
 			},
 			"ports": []interface{}{
 				map[string]interface{}{
@@ -352,26 +352,26 @@ func buildServiceResources(names []string) []*unstructured.Unstructured {
 	return res
 }
 
-// buildInventory creates a new release inventory record from the given resources.
-func buildInventory(resources []*unstructured.Unstructured) *inventory.ReleaseInventoryRecord {
+// buildInventory creates a new instance inventory record from the given resources.
+func buildInventory(resources []*unstructured.Unstructured) *inventory.InstanceInventoryRecord {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
 	}
 
-	inv := &inventory.ReleaseInventoryRecord{
+	inv := &inventory.InstanceInventoryRecord{
 		CreatedBy: inventory.CreatedByCLI,
-		ReleaseMetadata: inventory.ReleaseMetadata{
-			Kind:             "ModuleRelease",
-			APIVersion:       "core.opmodel.dev/v1alpha1",
-			ReleaseName:      releaseName,
-			ReleaseNamespace: namespace,
-			ReleaseID:        releaseID,
+		InstanceMetadata: inventory.InstanceMetadata{
+			Kind:              "ModuleInstance",
+			APIVersion:        inventory.APIVersionV1Alpha1,
+			InstanceName:      instanceName,
+			InstanceNamespace: namespace,
+			InstanceID:        instanceID,
 		},
 		ModuleMetadata: inventory.ModuleMetadata{
 			Kind:       "Module",
-			APIVersion: "core.opmodel.dev/v1alpha1",
-			Name:       releaseName, // module name (same as release name in this test)
+			APIVersion: inventory.APIVersionV1Alpha1,
+			Name:       instanceName, // module name (same as instance name in this test)
 			Version:    moduleVersion,
 		},
 		Inventory: inventory.Inventory{Revision: 1, Digest: inventory.ComputeDigest(entries), Count: len(entries), Entries: entries},
@@ -389,7 +389,7 @@ func cleanup(ctx context.Context, client *kubernetes.Client) {
 		_ = client.ResourceClient(serviceGVR, namespace).Delete(ctx, name, metav1.DeleteOptions{})
 		waitForServiceDeleted(ctx, client, name)
 	}
-	secretName := inventory.SecretName(releaseName, releaseID)
+	secretName := inventory.SecretName(instanceName, instanceID)
 	_ = client.Clientset.CoreV1().Secrets(namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
 	waitForSecretDeleted(ctx, client, secretName)
 }

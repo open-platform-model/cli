@@ -24,7 +24,7 @@ The public inventory package SHALL expose ownership inventory types, identity he
 
 ### Requirement: Persisted release record may keep metadata outside the public ownership contract
 
-The CLI MAY persist a release inventory record that includes top-level `createdBy`, `releaseMetadata`, and `moduleMetadata` around the ownership-only inventory payload. Those persisted metadata fields SHALL NOT expand the public ownership contract exposed by `pkg/inventory`.
+The CLI MAY persist a instance inventory record that includes top-level `createdBy`, `instanceMetadata`, and `moduleMetadata` around the ownership-only inventory payload. Those persisted metadata fields SHALL NOT expand the public ownership contract exposed by `pkg/inventory`.
 
 #### Scenario: Persisted record keeps CLI metadata while public inventory stays small
 

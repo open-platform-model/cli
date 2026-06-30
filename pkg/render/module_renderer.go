@@ -36,7 +36,7 @@ type ComponentSummary struct {
 	TraitFQNs []string
 }
 
-// Module drives the OPM render pipeline for a single ModuleRelease.
+// Module drives the OPM render pipeline for a single ModuleInstance.
 //
 // A Module is constructed once per provider and reused across multiple
 // Execute calls. It is not safe for concurrent use (CUE context is single-threaded).
@@ -66,7 +66,7 @@ type ModuleResult struct {
 // NewModule creates a Module renderer for the given provider and runtime identity.
 // runtimeName is stamped onto every rendered resource as app.kubernetes.io/managed-by
 // via the catalog's controllerLabels block. Callers MUST pass a non-empty value;
-// ProcessModuleRelease validates this at the public boundary.
+// ProcessModuleInstance validates this at the public boundary.
 func NewModule(p *provider.Provider, runtimeName string) *Module {
 	return &Module{provider: p, runtimeName: runtimeName}
 }
@@ -79,7 +79,7 @@ func NewModule(p *provider.Provider, runtimeName string) *Module {
 // dataComponents is the finalized, constraint-free components value for FillPath injection.
 func (r *Module) Execute(
 	ctx context.Context,
-	rel *module.Release,
+	rel *module.Instance,
 	schemaComponents cue.Value,
 	dataComponents cue.Value,
 	plan *MatchPlan,

@@ -145,7 +145,7 @@ application packaging. The core improvements:
 | Go templates over YAML — no type safety         | CUE-native definitions with compile-time validation                                                       |
 | Monolithic chart structure — all concerns mixed | Resource + Trait + Policy composition with clear ownership                                                |
 | `values.yaml` is untyped — any key accepted     | `#config` schema constrains what's configurable; CUE rejects invalid values                               |
-| No separation between author and consumer       | Module Author writes `#Module` with `#config` + `values`; End User writes `#ModuleRelease` with overrides |
+| No separation between author and consumer       | Module Author writes `#Module` with `#config` + `values`; End User writes `#ModuleInstance` with overrides |
 | Subcharts are fragile and poorly composable     | Modules compose via CUE unification; Bundles group modules                                                |
 | No built-in policy enforcement                  | `#Policy` / `#PolicyRule` with block/warn/audit semantics                                                 |
 | OCI distribution bolted on after the fact       | OCI-native distribution from day one (CUE registry + ORAS)                                                |
@@ -162,7 +162,7 @@ CLI or a lightweight controller, keeping the "render, then apply" philosophy int
 
 **Multi-cluster topology** — First-class support for targeting multiple clusters and
 namespaces from a single Module or Bundle definition. Topology and override policies
-will allow per-cluster customisation without duplicating ModuleReleases.
+will allow per-cluster customisation without duplicating ModuleInstances.
 
 **Continuous reconciliation** — An optional in-cluster controller that watches for
 drift and re-applies the desired state. This complements the CLI's one-shot apply model
@@ -445,7 +445,7 @@ in the same environment:
   providers for different services
 - **Transformers** are provider-specific, but the components they consume are
   provider-agnostic
-- **A single ModuleRelease** can result in resources being created across multiple
+- **A single ModuleInstance** can result in resources being created across multiple
   providers, each handling the capabilities it's registered for
 
 The hard work — networking, storage, identity — is not in the application definition.
@@ -467,7 +467,7 @@ bottom-up: Layer 1 first, Layer 2 next, Layer 3 when the foundations are solid.
 
 **What's built:**
 
-- Core CUE definitions: Module, ModuleRelease, Component, Resource, Trait, Policy
+- Core CUE definitions: Module, ModuleInstance, Component, Resource, Trait, Policy
 - Catalog of definitions: 5 resources, 20+ traits, 5 blueprints
 - Kubernetes Provider with 12 transformers (Deployment, StatefulSet, DaemonSet, Job,
   CronJob, Service, PVC, ConfigMap, Secret, ServiceAccount, HPA, Ingress)
@@ -486,8 +486,8 @@ Full lifecycle management of applications using the CLI. The priority items are:
 - Immutable config — [RFC-0003](../rfc/0003-immutable-config.md): content-hash suffixed
   ConfigMaps and Secrets with `spec.immutable: true`, automatic rolling updates on
   config change, garbage collection of old resources
-- Garbage collection — [RFC-0001](../rfc/0001-release-inventory.md): release inventory
-  Secret that tracks which resources belong to a ModuleRelease, enabling automatic
+- Garbage collection — [RFC-0001](../rfc/0001-release-inventory.md): instance inventory
+  Secret that tracks which resources belong to a ModuleInstance, enabling automatic
   pruning of stale resources during `opm mod apply`
 - Policy definitions — first-class `#Policy` / `#PolicyRule` enforcement with
   block/warn/audit semantics across the rendering pipeline
@@ -502,7 +502,7 @@ The same Module lifecycle as the CLI, but delivered through an in-cluster contro
 and a custom resource. This phase marks the transition from developer tooling to
 platform infrastructure.
 
-- In-cluster controller that watches ModuleRelease custom resources and reconciles
+- In-cluster controller that watches ModuleInstance custom resources and reconciles
   them using the same CUE rendering pipeline as the CLI
 - Continuous reconciliation — drift detection and re-apply to maintain desired state
 - Platform registry of providers and modules — a curated catalog, ready for
@@ -527,7 +527,7 @@ each capability.
   commodity interface
 - Cross-provider contracts for networking, identity and access control, and
   observability
-- Multi-provider rendering pipeline — a single ModuleRelease producing resources
+- Multi-provider rendering pipeline — a single ModuleInstance producing resources
   across multiple providers, each handling the capabilities it's registered for
 - Multi-provider marketplace with discovery and selection
 - Provider onboarding and certification pipeline

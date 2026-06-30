@@ -16,8 +16,8 @@ import (
 	pkgmodule "github.com/opmodel/cli/pkg/module"
 )
 
-// FromModule synthesizes a #ModuleRelease from a module-package directory and
-// renders it through the same pipeline as FromReleaseFile. Values come from
+// FromModule synthesizes a #ModuleInstance from a module-package directory and
+// renders it through the same pipeline as FromInstanceFile. Values come from
 // `-f` files when supplied, else from the module's `debugValues`.
 func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	if opts.Config == nil {
@@ -45,7 +45,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 		synthOpts.Namespace = namespace
 	}
 
-	synth, err := loader.SynthesizeModuleReleaseFromPackage(cueCtx, opts.ModulePath, synthOpts)
+	synth, err := loader.SynthesizeModuleInstanceFromPackage(cueCtx, opts.ModulePath, synthOpts)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
@@ -65,9 +65,9 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	if modName == "" {
 		modName = filepath.Base(opts.ModulePath)
 	}
-	output.Info(fmt.Sprintf("Building synthetic release %q for module %q", synthName, modName))
+	output.Info(fmt.Sprintf("Building synthetic instance %q for module %q", synthName, modName))
 
-	rel, err := pkgmodule.ParseModuleRelease(ctx, synth.Spec, mod, values)
+	rel, err := pkgmodule.ParseModuleInstance(ctx, synth.Spec, mod, values)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
@@ -82,7 +82,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
 	}
 
-	return renderPreparedModuleRelease(ctx, rel, p)
+	return renderPreparedModuleInstance(ctx, rel, p)
 }
 
 // resolveModuleValues mirrors `opm module vet`: -f files override debugValues.
@@ -98,7 +98,7 @@ func resolveModuleValues(cueCtx *cue.Context, modVal cue.Value, valuesFiles []st
 }
 
 // buildModuleFromValue constructs a pkgmodule.Module from a loaded module
-// CUE value. Mirrors the bare-module side of internal/releasefile.bareModuleRelease
+// CUE value. Mirrors the bare-module side of internal/instancefile.bareModuleInstance
 // but for a directly-loaded module value (no #module wrapper yet).
 func buildModuleFromValue(modVal cue.Value, modulePath string) pkgmodule.Module {
 	meta := &pkgmodule.ModuleMetadata{}

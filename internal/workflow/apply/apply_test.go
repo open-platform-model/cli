@@ -26,7 +26,7 @@ func TestCurrentInventoryEntries(t *testing.T) {
 }
 
 func TestPreviousInventoryEntries(t *testing.T) {
-	prevInventory := &inventory.ReleaseInventoryRecord{Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{{Kind: "Service", Name: "web"}}}}
+	prevInventory := &inventory.InstanceInventoryRecord{Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{{Kind: "Service", Name: "web"}}}}
 	entries := PreviousInventoryEntries(prevInventory)
 	require.Len(t, entries, 1)
 	assert.Equal(t, "Service", entries[0].Kind)
@@ -34,8 +34,8 @@ func TestPreviousInventoryEntries(t *testing.T) {
 }
 
 func TestGuardEmptyRender(t *testing.T) {
-	releaseLog := output.ReleaseLogger("test")
-	err := GuardEmptyRender(0, []inventory.InventoryEntry{{Kind: "ConfigMap"}}, false, releaseLog)
+	instanceLog := output.InstanceLogger("test")
+	err := GuardEmptyRender(0, []inventory.InventoryEntry{{Kind: "ConfigMap"}}, false, instanceLog)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "render produced 0 resources")
 }
@@ -45,18 +45,18 @@ func TestFormatApplySummary(t *testing.T) {
 	assert.Equal(t, "applied 5 resources successfully (2 created, 1 configured, 2 unchanged)", summary)
 }
 
-func TestExecute_BlocksControllerManagedRelease(t *testing.T) {
+func TestExecute_BlocksControllerManagedInstance(t *testing.T) {
 	ctx := context.Background()
-	inv := &inventory.ReleaseInventoryRecord{
+	inv := &inventory.InstanceInventoryRecord{
 		CreatedBy: inventory.CreatedByController,
-		ReleaseMetadata: inventory.ReleaseMetadata{
-			Kind:             "ModuleRelease",
-			APIVersion:       "core.opmodel.dev/v1alpha1",
-			ReleaseName:      "demo",
-			ReleaseNamespace: "apps",
-			ReleaseID:        "uuid-1",
+		InstanceMetadata: inventory.InstanceMetadata{
+			Kind:              "ModuleInstance",
+			APIVersion:        inventory.APIVersionV1Alpha1,
+			InstanceName:      "demo",
+			InstanceNamespace: "apps",
+			InstanceID:        "uuid-1",
 		},
-		ModuleMetadata: inventory.ModuleMetadata{Kind: "Module", APIVersion: "core.opmodel.dev/v1alpha1", Name: "demo-module"},
+		ModuleMetadata: inventory.ModuleMetadata{Kind: "Module", APIVersion: inventory.APIVersionV1Alpha1, Name: "demo-module"},
 		Inventory:      inventory.Inventory{},
 	}
 	secret, err := inventory.MarshalToSecret(inv)
@@ -66,7 +66,7 @@ func TestExecute_BlocksControllerManagedRelease(t *testing.T) {
 	client := &kubernetes.Client{Clientset: fake.NewClientset(secret)}
 	req := Request{
 		Result: &workflowrender.Result{
-			Release: module.ReleaseMetadata{Name: "demo", Namespace: "apps", UUID: "uuid-1"},
+			Instance: module.InstanceMetadata{Name: "demo", Namespace: "apps", UUID: "uuid-1"},
 		},
 		K8sClient: client,
 		Log:       log.New(nil),

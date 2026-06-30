@@ -23,12 +23,12 @@ func writeTransformerMatches(result *Result) {
 	if result.MatchPlan == nil {
 		return
 	}
-	releaseLog := output.ReleaseLogger(result.Release.Name)
+	instanceLog := output.InstanceLogger(result.Instance.Name)
 	for _, pair := range result.MatchPlan.MatchedPairs() {
-		releaseLog.Info(output.FormatTransformerMatch(pair.ComponentName, pair.TransformerFQN))
+		instanceLog.Info(output.FormatTransformerMatch(pair.ComponentName, pair.TransformerFQN))
 	}
 	for _, comp := range result.MatchPlan.Unmatched {
-		releaseLog.Warn(output.FormatTransformerUnmatched(comp))
+		instanceLog.Warn(output.FormatTransformerUnmatched(comp))
 	}
 }
 
@@ -36,8 +36,8 @@ func writeVerboseMatchLog(result *Result) {
 	if result.MatchPlan == nil {
 		return
 	}
-	releaseLog := output.ReleaseLogger(result.Release.Name)
-	releaseLog.Info("release", "namespace", result.Release.Namespace, "version", result.Module.Version)
+	instanceLog := output.InstanceLogger(result.Instance.Name)
+	instanceLog.Info("instance", "namespace", result.Instance.Namespace, "version", result.Module.Version)
 
 	for _, comp := range result.Components {
 		attrs := []any{}
@@ -50,7 +50,7 @@ func writeVerboseMatchLog(result *Result) {
 		for k, v := range comp.Labels {
 			attrs = append(attrs, k, v)
 		}
-		releaseLog.Info(fmt.Sprintf("component: %s", comp.Name), attrs...)
+		instanceLog.Info(fmt.Sprintf("component: %s", comp.Name), attrs...)
 	}
 
 	type matchLine struct {
@@ -78,7 +78,7 @@ func writeVerboseMatchLog(result *Result) {
 	})
 	for _, l := range lines {
 		if l.matched {
-			releaseLog.Info(output.FormatTransformerMatch(l.compName, l.tfFQN))
+			instanceLog.Info(output.FormatTransformerMatch(l.compName, l.tfFQN))
 		} else {
 			attrs := []any{}
 			if len(l.missing.labels) > 0 {
@@ -90,11 +90,11 @@ func writeVerboseMatchLog(result *Result) {
 			if len(l.missing.traits) > 0 {
 				attrs = append(attrs, "missing-traits", strings.Join(l.missing.traits, ", "))
 			}
-			releaseLog.Debug(output.FormatTransformerSkipped(l.compName, l.tfFQN), attrs...)
+			instanceLog.Debug(output.FormatTransformerSkipped(l.compName, l.tfFQN), attrs...)
 		}
 	}
 
 	for _, res := range result.Resources {
-		releaseLog.Info(output.FormatResourceLine(res.GetKind(), res.GetNamespace(), res.GetName(), output.StatusValid))
+		instanceLog.Info(output.FormatResourceLine(res.GetKind(), res.GetNamespace(), res.GetName(), output.StatusValid))
 	}
 }

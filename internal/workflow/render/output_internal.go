@@ -12,8 +12,8 @@ func showOutput(result *Result, opts ShowOutputOpts) {
 		writeTransformerMatches(result)
 	}
 
-	releaseLog := output.ReleaseLogger(result.Release.Name)
+	instanceLog := output.InstanceLogger(result.Instance.Name)
 	for _, w := range result.Warnings {
-		releaseLog.Warn(w)
+		instanceLog.Warn(w)
 	}
 }

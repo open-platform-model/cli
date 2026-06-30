@@ -6,49 +6,38 @@ Defines the public API of `pkg/loader` — the release-centric loading functions
 
 ## Requirements
 
-### Requirement: LoadReleasePackage loads release CUE files
-The `pkg/loader` package SHALL export a `LoadReleasePackage` function that loads a release CUE package (release.cue + values.cue) and returns the raw evaluated `cue.Value` and the release directory path.
+### Requirement: LoadInstancePackage loads instance CUE files
+The `pkg/loader` package SHALL export a `LoadInstancePackage` function that loads an instance CUE package (instance.cue + values.cue) and returns the raw evaluated `cue.Value` and the instance directory path.
 
 #### Scenario: Load with explicit values file
-- **WHEN** `LoadReleasePackage(cueCtx, releaseFile, valuesFile)` is called with a non-empty valuesFile
+- **WHEN** `LoadInstancePackage(cueCtx, instanceFile, valuesFile)` is called with a non-empty valuesFile
 - **THEN** it loads exactly the two specified files as one CUE instance
 
 #### Scenario: Load with default values file
-- **WHEN** `LoadReleasePackage(cueCtx, releaseFile, "")` is called with empty valuesFile
-- **THEN** it loads `release.cue` and `values.cue` from the release directory
+- **WHEN** `LoadInstancePackage(cueCtx, instanceFile, "")` is called with empty valuesFile
+- **THEN** it loads `instance.cue` and `values.cue` from the instance directory
 
-#### Scenario: Directory path resolves to release.cue
-- **WHEN** releaseFile is a directory path (not ending in .cue)
-- **THEN** the loader resolves it to `<directory>/release.cue` using `os.Stat()` and `IsDir()`
+#### Scenario: Directory path resolves to instance.cue
+- **WHEN** instanceFile is a directory path (not ending in .cue)
+- **THEN** the loader resolves it to `<directory>/instance.cue` using `os.Stat()` and `IsDir()`
 
-### Requirement: DetectReleaseKind identifies release type
-The `pkg/loader` package SHALL export a `DetectReleaseKind` function that reads the `kind` field from a loaded release package.
+### Requirement: DetectInstanceKind identifies instance type
+The `pkg/loader` package SHALL export a `DetectInstanceKind` function that reads the `kind` field from a loaded instance package. It SHALL recognize `"ModuleInstance"` and reject every other kind with an error; bundle kinds are no longer recognized (enhancement 0002 D15 — the bundle path is removed).
 
-#### Scenario: ModuleRelease kind detection
-- **WHEN** `DetectReleaseKind(pkg)` is called and the `kind` field is "ModuleRelease"
-- **THEN** it returns "ModuleRelease"
-
-#### Scenario: BundleRelease kind detection
-- **WHEN** `DetectReleaseKind(pkg)` is called and the `kind` field is "BundleRelease"
-- **THEN** it returns "BundleRelease"
+#### Scenario: ModuleInstance kind detection
+- **WHEN** `DetectInstanceKind(pkg)` is called and the `kind` field is "ModuleInstance"
+- **THEN** it returns "ModuleInstance"
 
 #### Scenario: Unknown kind
-- **WHEN** `DetectReleaseKind(pkg)` is called with an unrecognized kind
-- **THEN** it returns an error
+- **WHEN** `DetectInstanceKind(pkg)` is called with an unrecognized kind (including the former `"BundleRelease"`)
+- **THEN** it returns an `unknown instance kind` error
 
-### Requirement: LoadModuleReleaseFromValue builds a ModuleRelease
-The `pkg/loader` package SHALL export a `LoadModuleReleaseFromValue` function that validates, finalizes, and extracts a `*ModuleRelease` from an already-loaded CUE package value.
+### Requirement: LoadModuleInstanceFromValue builds a ModuleInstance
+The `pkg/loader` package SHALL export a `LoadModuleInstanceFromValue` function that validates, finalizes, and extracts a `*ModuleInstance` from an already-loaded CUE package value.
 
 #### Scenario: Full loading pipeline
-- **WHEN** `LoadModuleReleaseFromValue(cueCtx, pkg, fallbackName)` is called with a valid package
-- **THEN** it runs Module Gate → concreteness check → metadata extraction → finalization → DataComponents extraction, returning a fully populated `*ModuleRelease`
-
-### Requirement: LoadBundleReleaseFromValue builds a BundleRelease
-The `pkg/loader` package SHALL export a `LoadBundleReleaseFromValue` function that validates and extracts a `*BundleRelease` with its contained module releases.
-
-#### Scenario: Full bundle loading pipeline
-- **WHEN** `LoadBundleReleaseFromValue(cueCtx, pkg, fallbackName)` is called with a valid bundle package
-- **THEN** it runs Bundle Gate → per-release Module Gate + finalization, returning a `*BundleRelease` with populated `Releases` map
+- **WHEN** `LoadModuleInstanceFromValue(cueCtx, pkg, fallbackName)` is called with a valid package
+- **THEN** it runs Module Gate → concreteness check → metadata extraction → finalization → DataComponents extraction, returning a fully populated `*ModuleInstance`
 
 ### Requirement: LoadProvider loads a provider from CUE
 The `pkg/loader` package SHALL export a `LoadProvider` function that loads a named provider from the CUE `#Registry`.
@@ -72,21 +61,21 @@ The loader SHALL provide a `finalizeValue` function (internal or exported) that 
 - **WHEN** `finalizeValue()` produces `*ast.File` instead of `ast.Expr`
 - **THEN** it returns an error indicating unresolved imports or definition fields that should have been resolved upstream
 
-### Requirement: `SynthesizeModuleReleaseFromPackage` builds a release `cue.Value` from a module directory
+### Requirement: `SynthesizeModuleInstanceFromPackage` builds an instance `cue.Value` from a module directory
 
-The `pkg/loader` package SHALL export a function (working name: `SynthesizeModuleReleaseFromPackage`) that loads a module CUE package from a directory, composes a `#ModuleRelease` wrapper around it using a small synthetic CUE module pinned at the same catalog version the user's module already uses, fills synthetic metadata, and returns a `cue.Value` ready to feed into `LoadModuleReleaseFromValue`.
+The `pkg/loader` package SHALL export a function (working name: `SynthesizeModuleInstanceFromPackage`) that loads a module CUE package from a directory, composes a `#ModuleInstance` wrapper around it using a small synthetic CUE module pinned at the same catalog version the user's module already uses, fills synthetic metadata, and returns a `cue.Value` ready to feed into `LoadModuleInstanceFromValue`.
 
 #### Scenario: Whole-package load of the user's module
 
-- **WHEN** `SynthesizeModuleReleaseFromPackage(ctx, modulePath, opts)` is called with a directory containing a CUE module package
+- **WHEN** `SynthesizeModuleInstanceFromPackage(ctx, modulePath, opts)` is called with a directory containing a CUE module package
 - **THEN** the loader SHALL evaluate every `.cue` file in that directory belonging to the same package via `load.Instances(["."], &load.Config{Dir: modulePath})`
 - **AND** the loader SHALL return an error if the directory does not contain a single resolvable CUE package
 
 #### Scenario: Synthetic wrapper resolves the catalog via the registry
 
-- **WHEN** the synthesis composes the `#ModuleRelease` wrapper
+- **WHEN** the synthesis composes the `#ModuleInstance` wrapper
 - **THEN** the wrapper SHALL be a small CUE module declaring one dep on `opmodel.dev/core/v1alpha1@v1`
-- **AND** the wrapper file SHALL import `mr "opmodel.dev/core/v1alpha1/modulerelease@v1"` and apply `mr.#ModuleRelease` at the top level (matching the shape of real release files in `releases/<env>/<module>/release.cue`)
+- **AND** the wrapper file SHALL import `mr "opmodel.dev/core/v1alpha1/modulerelease@v1"` and apply `mr.#ModuleInstance` at the top level (matching the shape of real instance files in `releases/<env>/<module>/instance.cue`)
 - **AND** the wrapper's `cue.mod/module.cue` and `wrapper.cue` SHALL be served via `load.Config.Overlay` against a temp anchor created with `os.MkdirTemp` and removed before the function returns
 - **AND** the catalog dep SHALL be resolved via the loader's default registry (`CUE_REGISTRY` env), reusing the local cache
 
@@ -104,8 +93,8 @@ The `pkg/loader` package SHALL export a function (working name: `SynthesizeModul
 #### Scenario: Caller-supplied values are preserved for downstream filling
 
 - **WHEN** the function is called with values to use (either pre-loaded `-f` files or the module's `debugValues`)
-- **THEN** the returned `cue.Value` SHALL have `#module` filled with the loaded module value but SHALL leave `values` to be filled by `LoadModuleReleaseFromValue`
-- **AND** `LoadModuleReleaseFromValue` SHALL run the Module Gate (validate values vs `#config`), concreteness check, metadata extraction, and finalisation exactly as it does for release-file inputs
+- **THEN** the returned `cue.Value` SHALL have `#module` filled with the loaded module value but SHALL leave `values` to be filled by `LoadModuleInstanceFromValue`
+- **AND** `LoadModuleInstanceFromValue` SHALL run the Module Gate (validate values vs `#config`), concreteness check, metadata extraction, and finalisation exactly as it does for instance-file inputs
 
 ### Requirement: Synth wrapper pins the catalog at the user module's pinned version
 
@@ -139,17 +128,3 @@ The synthesis path SHALL NOT create, modify, or remove any files inside the user
 
 - **WHEN** synthesis returns (whether successful or with an error)
 - **THEN** the temp anchor directory SHALL have been removed via `os.RemoveAll`
-
----
-
-## Removed Requirements
-
-### Requirement: Module loader function name
-**Reason**: `LoadModule()` is replaced by a release-centric loading approach. The new loader operates on release packages (`release.cue + values.cue`) instead of module directories.
-
-**Migration**: Replace `loader.LoadModule(cueCtx, modulePath, registry)` with `loader.LoadReleasePackage(cueCtx, releaseFile, valuesFile)` followed by `loader.LoadModuleReleaseFromValue()`.
-
-### Requirement: Shared CUE string-map extraction helper
-**Reason**: `extractCUEStringMap` is no longer needed — the new loader uses `cue.Value.Decode()` into typed structs instead of manual field-by-field extraction.
-
-**Migration**: No migration needed — internal helper eliminated.

@@ -49,20 +49,20 @@ func ParseEventsOptions(since, eventType, outputFmt string, watchMode bool) (kub
 }
 
 func PrintEvents(ctx context.Context, client *kubernetes.Client, opts kubernetes.EventsOptions, logName string) error {
-	releaseLog := output.ReleaseLogger(logName)
+	instanceLog := output.InstanceLogger(logName)
 	result, err := kubernetes.GetModuleEvents(ctx, client, opts)
 	if err != nil {
 		if kubernetes.IsNoResourcesFound(err) {
-			releaseLog.Error("getting events", "error", err)
+			instanceLog.Error("getting events", "error", err)
 			return &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: err, Printed: true}
 		}
-		releaseLog.Error("getting events", "error", err)
+		instanceLog.Error("getting events", "error", err)
 		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
 	formatted, err := kubernetes.FormatEvents(result, opts.OutputFormat)
 	if err != nil {
-		releaseLog.Error("formatting events", "error", err)
+		instanceLog.Error("formatting events", "error", err)
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
 	}
 
@@ -71,7 +71,7 @@ func PrintEvents(ctx context.Context, client *kubernetes.Client, opts kubernetes
 }
 
 func WatchEvents(ctx context.Context, client *kubernetes.Client, opts kubernetes.EventsOptions, logName string) error { //nolint:gocyclo // watch setup, child discovery, and event streaming are coordinated here
-	releaseLog := output.ReleaseLogger(logName)
+	instanceLog := output.InstanceLogger(logName)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -82,7 +82,7 @@ func WatchEvents(ctx context.Context, client *kubernetes.Client, opts kubernetes
 
 	children, err := kubernetes.DiscoverChildren(ctx, client, opts.InventoryLive, opts.Namespace)
 	if err != nil {
-		releaseLog.Error("discovering children", "error", err)
+		instanceLog.Error("discovering children", "error", err)
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("discovering children: %w", err)}
 	}
 
@@ -96,7 +96,7 @@ func WatchEvents(ctx context.Context, client *kubernetes.Client, opts kubernetes
 
 	watcher, err := client.Clientset.CoreV1().Events(opts.Namespace).Watch(ctx, metav1.ListOptions{})
 	if err != nil {
-		releaseLog.Error("starting event watch", "error", err)
+		instanceLog.Error("starting event watch", "error", err)
 		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: fmt.Errorf("starting event watch: %w", err)}
 	}
 	defer watcher.Stop()

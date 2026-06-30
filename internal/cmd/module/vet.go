@@ -28,7 +28,7 @@ func NewModuleVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 
 	This command validates the module's #config contract using either the module's
 	debugValues (default) or explicit values files passed with -f/--values.
-	It does not render resources, resolve providers, or validate release files.
+	It does not render resources, resolve providers, or validate instance files.
 
 	Arguments:
 	  path    Path to module directory (default: current directory)
@@ -58,10 +58,10 @@ func runVet(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags) er
 	return runVetModuleOnly(modulePath, cfg, rf)
 }
 
-// runVetModuleOnly validates a module directory without a release.cue.
+// runVetModuleOnly validates a module directory without an instance.cue.
 // It loads the module CUE package, validates the schema, and checks that the
 // values (from -f flag or debugValues field) satisfy #config.
-// No release wrapper, engine render, or cluster connection is required.
+// No instance wrapper, engine render, or cluster connection is required.
 func runVetModuleOnly(modulePath string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags) error {
 	cueCtx := cfg.CueContext
 
@@ -88,7 +88,7 @@ func runVetModuleOnly(modulePath string, cfg *config.GlobalConfig, rf *cmdutil.R
 			modName = name
 		}
 	}
-	moduleLog := output.ReleaseLogger(modName)
+	moduleLog := output.InstanceLogger(modName)
 
 	// Resolve the values to validate against #config.
 	valuesVals := make([]cue.Value, 0, len(rf.Values))

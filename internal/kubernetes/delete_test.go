@@ -49,7 +49,7 @@ func TestDelete_DeletesOnlyTrackedInventoryResources(t *testing.T) {
 	}
 
 	result, err := Delete(ctx, client, DeleteOptions{
-		ReleaseName:              "demo",
+		InstanceName:             "demo",
 		Namespace:                namespace,
 		InventoryLive:            []*unstructured.Unstructured{tracked.DeepCopy()},
 		InventorySecretName:      secret.Name,

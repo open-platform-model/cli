@@ -25,7 +25,7 @@ If an inventory Secret does not contain `createdBy`, the system SHALL treat it a
 #### Scenario: Missing provenance on existing inventory
 
 - **WHEN** an inventory Secret created before provenance support is read
-- **AND** its `releaseMetadata` has no `createdBy` field
+- **AND** its `instanceMetadata` has no `createdBy` field
 - **THEN** the release SHALL be treated as CLI-managed
 
 ### Requirement: Ownership is exclusive across tools

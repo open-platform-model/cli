@@ -31,7 +31,7 @@ Read when entering `cli/`:
 - `internal/config/` - config resolution, schema validation, defaults.
 - `internal/kubernetes/` - cluster ops, status, apply, delete, events.
 - `internal/output/` - terminal formatting, log output, tables, manifests.
-- `internal/releasefile/` - release file detection + loading.
+- `internal/instancefile/` - instance file detection + loading.
 - `internal/workflow/` - shared render/apply/query orchestration.
 - `pkg/loader/` - CUE loading for modules, providers, releases.
 - `pkg/render/` - render pipeline logic.

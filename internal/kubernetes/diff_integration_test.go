@@ -19,7 +19,7 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 	client, err := NewClient(ClientOptions{})
 	require.NoError(t, err, "need a valid kubeconfig for integration tests")
 
-	releaseName := "diff-integration-test"
+	instanceName := "diff-integration-test"
 	namespace := "default"
 	comparer := NewComparer()
 
@@ -36,7 +36,7 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 	resources := []*unstructured.Unstructured{cm}
 
 	// Apply the original resource
-	applyResult, err := Apply(ctx, client, resources, releaseName, ApplyOptions{})
+	applyResult, err := Apply(ctx, client, resources, instanceName, ApplyOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, 1, applyResult.Applied)
 
@@ -48,7 +48,7 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 	modifiedResources := []*unstructured.Unstructured{modifiedCM}
 
 	// Diff should show modifications
-	diffResult, err := Diff(ctx, client, modifiedResources, releaseName, comparer)
+	diffResult, err := Diff(ctx, client, modifiedResources, instanceName, comparer)
 	require.NoError(t, err)
 	assert.Equal(t, 1, diffResult.Modified, "should detect 1 modified resource")
 	assert.Equal(t, 0, diffResult.Added)
@@ -56,8 +56,8 @@ func TestDiffIntegration_ShowsModifications(t *testing.T) {
 
 	// Cleanup
 	_, err = Delete(ctx, client, DeleteOptions{
-		ReleaseName: releaseName,
-		Namespace:   namespace,
+		InstanceName: instanceName,
+		Namespace:    namespace,
 	})
 	require.NoError(t, err)
 }
@@ -70,7 +70,7 @@ func TestDiffIntegration_ApplyThenDiffShowsNoDifferences(t *testing.T) {
 	client, err := NewClient(ClientOptions{})
 	require.NoError(t, err, "need a valid kubeconfig for integration tests")
 
-	releaseName := "diff-no-change-test"
+	instanceName := "diff-no-change-test"
 	namespace := "default"
 	comparer := NewComparer()
 
@@ -87,12 +87,12 @@ func TestDiffIntegration_ApplyThenDiffShowsNoDifferences(t *testing.T) {
 	resources := []*unstructured.Unstructured{cm}
 
 	// Apply
-	applyResult, err := Apply(ctx, client, resources, releaseName, ApplyOptions{})
+	applyResult, err := Apply(ctx, client, resources, instanceName, ApplyOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, 1, applyResult.Applied)
 
 	// Diff immediately — with field projection, should show "No differences found"
-	diffResult, err := Diff(ctx, client, resources, releaseName, comparer)
+	diffResult, err := Diff(ctx, client, resources, instanceName, comparer)
 	require.NoError(t, err)
 	assert.Equal(t, 0, diffResult.Modified, "apply-then-diff with no changes should report 0 modified")
 	assert.Equal(t, 0, diffResult.Added, "apply-then-diff with no changes should report 0 added")
@@ -101,8 +101,8 @@ func TestDiffIntegration_ApplyThenDiffShowsNoDifferences(t *testing.T) {
 
 	// Cleanup
 	_, err = Delete(ctx, client, DeleteOptions{
-		ReleaseName: releaseName,
-		Namespace:   namespace,
+		InstanceName: instanceName,
+		Namespace:    namespace,
 	})
 	require.NoError(t, err)
 }
@@ -115,7 +115,7 @@ func TestStatusIntegration_ReportsHealth(t *testing.T) {
 	client, err := NewClient(ClientOptions{})
 	require.NoError(t, err, "need a valid kubeconfig for integration tests")
 
-	releaseName := "status-integration-test"
+	instanceName := "status-integration-test"
 	namespace := "default"
 
 	// Create and apply a ConfigMap (passive resource = always healthy)
@@ -131,14 +131,14 @@ func TestStatusIntegration_ReportsHealth(t *testing.T) {
 	resources := []*unstructured.Unstructured{cm}
 
 	// Apply
-	applyResult, err := Apply(ctx, client, resources, releaseName, ApplyOptions{})
+	applyResult, err := Apply(ctx, client, resources, instanceName, ApplyOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, 1, applyResult.Applied)
 
 	// Check status
-	statusResult, err := GetReleaseStatus(ctx, client, StatusOptions{
-		ReleaseName: releaseName,
-		Namespace:   namespace,
+	statusResult, err := GetInstanceStatus(ctx, client, StatusOptions{
+		InstanceName: instanceName,
+		Namespace:    namespace,
 	})
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(statusResult.Resources), 1)
@@ -146,8 +146,8 @@ func TestStatusIntegration_ReportsHealth(t *testing.T) {
 
 	// Cleanup
 	_, err = Delete(ctx, client, DeleteOptions{
-		ReleaseName: releaseName,
-		Namespace:   namespace,
+		InstanceName: instanceName,
+		Namespace:    namespace,
 	})
 	require.NoError(t, err)
 }
@@ -160,7 +160,7 @@ func TestDiffIntegration_AllAdditions(t *testing.T) {
 	client, err := NewClient(ClientOptions{})
 	require.NoError(t, err, "need a valid kubeconfig for integration tests")
 
-	releaseName := "diff-additions-test"
+	instanceName := "diff-additions-test"
 	namespace := "default"
 	comparer := NewComparer()
 
@@ -177,7 +177,7 @@ func TestDiffIntegration_AllAdditions(t *testing.T) {
 	resources := []*unstructured.Unstructured{cm}
 
 	// Diff without prior deployment — all should be additions
-	diffResult, err := Diff(ctx, client, resources, releaseName, comparer)
+	diffResult, err := Diff(ctx, client, resources, instanceName, comparer)
 	require.NoError(t, err)
 	assert.Equal(t, 0, diffResult.Modified)
 	assert.Equal(t, 1, diffResult.Added, "resource should show as added")
@@ -192,12 +192,12 @@ func TestStatusIntegration_NoResources(t *testing.T) {
 	client, err := NewClient(ClientOptions{})
 	require.NoError(t, err, "need a valid kubeconfig for integration tests")
 
-	// Query for a release that doesn't exist
-	_, err = GetReleaseStatus(ctx, client, StatusOptions{
-		ReleaseName: "nonexistent-module",
-		Namespace:   "default",
+	// Query for an instance that doesn't exist
+	_, err = GetInstanceStatus(ctx, client, StatusOptions{
+		InstanceName: "nonexistent-module",
+		Namespace:    "default",
 	})
-	// After YAGNI removal, GetReleaseStatus returns noResourcesFoundError
+	// After YAGNI removal, GetInstanceStatus returns noResourcesFoundError
 	// when no resources match the selector.
 	require.Error(t, err)
 	assert.True(t, IsNoResourcesFound(err))

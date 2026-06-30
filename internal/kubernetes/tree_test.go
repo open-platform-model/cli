@@ -344,7 +344,7 @@ func TestBuildTree_Depth0_ComponentSummaryOnly(t *testing.T) {
 	_ = unstructured.SetNestedField(r2.Object, nil, "status") // passive
 
 	opts := TreeOptions{
-		ReleaseInfo:   ReleaseInfo{Name: "my-app", Namespace: "ns"},
+		InstanceInfo:  InstanceInfo{Name: "my-app", Namespace: "ns"},
 		InventoryLive: []*unstructured.Unstructured{r1, r2},
 		ComponentMap: map[string]string{
 			"Deployment/ns/web": "server",
@@ -367,7 +367,7 @@ func TestBuildTree_Depth1_ResourcesNoChildren(t *testing.T) {
 
 	res := makeReadyDeployment("ns", "web")
 	opts := TreeOptions{
-		ReleaseInfo:   ReleaseInfo{Name: "my-app", Namespace: "ns"},
+		InstanceInfo:  InstanceInfo{Name: "my-app", Namespace: "ns"},
 		InventoryLive: []*unstructured.Unstructured{res},
 		ComponentMap:  map[string]string{"Deployment/ns/web": "server"},
 		Depth:         1,
@@ -417,7 +417,7 @@ func TestBuildTree_Depth2_FullTree(t *testing.T) {
 	deploy.SetUID(deployUID)
 
 	opts := TreeOptions{
-		ReleaseInfo:   ReleaseInfo{Name: "my-app", Namespace: "ns"},
+		InstanceInfo:  InstanceInfo{Name: "my-app", Namespace: "ns"},
 		InventoryLive: []*unstructured.Unstructured{deploy},
 		ComponentMap:  map[string]string{"Deployment/ns/web": "server"},
 		Depth:         2,
@@ -443,7 +443,7 @@ func TestBuildTree_ComponentSorting(t *testing.T) {
 	r3 := makeRes("ConfigMap", "ns", "c3")
 
 	opts := TreeOptions{
-		ReleaseInfo:   ReleaseInfo{Name: "app", Namespace: "ns"},
+		InstanceInfo:  InstanceInfo{Name: "app", Namespace: "ns"},
 		InventoryLive: []*unstructured.Unstructured{r1, r2, r3},
 		ComponentMap: map[string]string{
 			"ConfigMap/ns/c1": "zebra",
@@ -469,7 +469,7 @@ func TestGetModuleTree_EmptyInventory_ReturnsError(t *testing.T) {
 	client := makeTreeClient()
 
 	opts := TreeOptions{
-		ReleaseInfo:   ReleaseInfo{Name: "my-app", Namespace: "default"},
+		InstanceInfo:  InstanceInfo{Name: "my-app", Namespace: "default"},
 		InventoryLive: nil,
 	}
 
@@ -485,7 +485,7 @@ func TestGetModuleTree_WithResources_ReturnsTree(t *testing.T) {
 
 	res := makeRes("ConfigMap", "ns", "cfg")
 	opts := TreeOptions{
-		ReleaseInfo:   ReleaseInfo{Name: "my-app", Namespace: "ns", Module: "example.com/app", Version: "1.0.0"},
+		InstanceInfo:  InstanceInfo{Name: "my-app", Namespace: "ns", Module: "example.com/app", Version: "1.0.0"},
 		InventoryLive: []*unstructured.Unstructured{res},
 		ComponentMap:  map[string]string{"ConfigMap/ns/cfg": "core"},
 		Depth:         1,
@@ -493,9 +493,9 @@ func TestGetModuleTree_WithResources_ReturnsTree(t *testing.T) {
 
 	result, err := GetModuleTree(ctx, client, opts)
 	require.NoError(t, err)
-	assert.Equal(t, "my-app", result.Release.Name)
-	assert.Equal(t, "example.com/app", result.Release.Module)
-	assert.Equal(t, "1.0.0", result.Release.Version)
+	assert.Equal(t, "my-app", result.Instance.Name)
+	assert.Equal(t, "example.com/app", result.Instance.Module)
+	assert.Equal(t, "1.0.0", result.Instance.Version)
 	assert.Len(t, result.Components, 1)
 }
 
@@ -505,7 +505,7 @@ func TestGetModuleTree_WithResources_ReturnsTree(t *testing.T) {
 
 func makeSimpleResult() *TreeResult {
 	return &TreeResult{
-		Release: ReleaseInfo{Name: "my-app", Namespace: "ns", Module: "example.com/app", Version: "1.0.0"},
+		Instance: InstanceInfo{Name: "my-app", Namespace: "ns", Module: "example.com/app", Version: "1.0.0"},
 		Components: []Component{
 			{
 				Name:          "server",
@@ -563,7 +563,7 @@ func TestFormatPlainTree_NoANSICodes(t *testing.T) {
 
 func TestFormatTreeTable_Depth0_SummaryLines(t *testing.T) {
 	result := &TreeResult{
-		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
+		Instance: InstanceInfo{Name: "app", Namespace: "ns"},
 		Components: []Component{
 			{Name: "server", ResourceCount: 3, Status: HealthReady},
 			{Name: "database", ResourceCount: 1, Status: HealthNotReady},
@@ -581,17 +581,17 @@ func TestFormatTreeTable_Depth0_SummaryLines(t *testing.T) {
 
 func TestFormatTreeTable_NoModule_HeaderSimple(t *testing.T) {
 	result := &TreeResult{
-		Release:    ReleaseInfo{Name: "local-app", Namespace: "ns"},
+		Instance:   InstanceInfo{Name: "local-app", Namespace: "ns"},
 		Components: []Component{{Name: "core", ResourceCount: 1, Status: HealthReady}},
 	}
 	out := formatPlainTree(result)
-	// Header should just be the release name, no parenthesised module
+	// Header should just be the instance name, no parenthesised module
 	assert.True(t, strings.HasPrefix(out, "local-app\n"))
 }
 
 func TestFormatTreeTable_Children_Rendered(t *testing.T) {
 	result := &TreeResult{
-		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
+		Instance: InstanceInfo{Name: "app", Namespace: "ns"},
 		Components: []Component{
 			{
 				Name:          "server",
@@ -652,7 +652,7 @@ func TestFormatTreeYAML_Schema(t *testing.T) {
 
 func TestFormatTreeJSON_NestedChildren(t *testing.T) {
 	result := &TreeResult{
-		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
+		Instance: InstanceInfo{Name: "app", Namespace: "ns"},
 		Components: []Component{
 			{
 				Name:          "server",
@@ -799,7 +799,7 @@ func TestFormatPlainTree_AlignedColumns(t *testing.T) {
 	// "ContainerCreating" (17 chars) is the longest status; all col2 values must
 	// start at the same column regardless of depth.
 	result := &TreeResult{
-		Release: ReleaseInfo{Name: "jf", Namespace: "ns", Module: "jellyfin", Version: "0.1.0"},
+		Instance: InstanceInfo{Name: "jf", Namespace: "ns", Module: "jellyfin", Version: "0.1.0"},
 		Components: []Component{
 			{
 				Name:          "jellyfin",
@@ -855,7 +855,7 @@ func TestFormatPlainTree_AlignedColumns(t *testing.T) {
 // start at the same column on every row that carries them, regardless of status width.
 func TestFormatPlainTree_Col3Aligned(t *testing.T) {
 	result := &TreeResult{
-		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
+		Instance: InstanceInfo{Name: "app", Namespace: "ns"},
 		Components: []Component{
 			{
 				Name:          "store",
@@ -895,7 +895,7 @@ func TestFormatPlainTree_Col3Aligned(t *testing.T) {
 // TestFormatPlainTree_CrossDepthAlignment verifies col2 aligns across depth-0 and depth-1 nodes.
 func TestFormatPlainTree_CrossDepthAlignment(t *testing.T) {
 	result := &TreeResult{
-		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
+		Instance: InstanceInfo{Name: "app", Namespace: "ns"},
 		Components: []Component{
 			{
 				Name:          "server",
@@ -943,7 +943,7 @@ func TestFormatPlainTree_CrossDepthAlignment(t *testing.T) {
 // TestFormatPlainTree_RSStatusSuppressed verifies ReplicaSet nodes omit the status column.
 func TestFormatPlainTree_RSStatusSuppressed(t *testing.T) {
 	result := &TreeResult{
-		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
+		Instance: InstanceInfo{Name: "app", Namespace: "ns"},
 		Components: []Component{
 			{
 				Name:          "server",
@@ -977,7 +977,7 @@ func TestFormatPlainTree_RSStatusSuppressed(t *testing.T) {
 // TestFormatPlainTree_PVCAbbreviated verifies PersistentVolumeClaim is displayed as PVC.
 func TestFormatPlainTree_PVCAbbreviated(t *testing.T) {
 	result := &TreeResult{
-		Release: ReleaseInfo{Name: "app", Namespace: "ns"},
+		Instance: InstanceInfo{Name: "app", Namespace: "ns"},
 		Components: []Component{
 			{
 				Name:          "storage",

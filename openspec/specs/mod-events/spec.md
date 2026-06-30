@@ -4,45 +4,20 @@ Defines the `opm mod events` command that aggregates Kubernetes events from all 
 
 ## Requirements
 
-### Requirement: Events command discovers release resources and their children
+### Requirement: Events command discovers instance resources and their children
 
-The `opm mod events` command SHALL discover OPM-managed resources via `cmdutil.ResolveInventory` (inventory-based discovery), then walk ownerReferences downward to find Kubernetes-owned children (ReplicaSets, Pods) of workload resources. The combined set of resource UIDs SHALL be used to filter events.
-
-The ownerReference traversal SHALL cover these workload hierarchies:
-
-| Parent Kind | Children | Grandchildren |
-|-------------|----------|---------------|
-| Deployment | ReplicaSets | Pods |
-| StatefulSet | Pods | - |
-| DaemonSet | Pods | - |
-| Job | Pods | - |
-| CronJob | Jobs | Pods |
-
-Non-workload resources (ConfigMap, Secret, Service, PVC, Ingress, etc.) SHALL NOT be traversed for children — only their own events are included.
+The `opm mod events` command SHALL discover OPM-managed resources via `cmdutil.ResolveInventory` (inventory-based discovery), then walk ownerReferences downward to find Kubernetes-owned children (ReplicaSets, Pods) of workload resources. The combined set of resource UIDs SHALL be used to filter events. <!-- Was: "discovers release resources" (0002 D9) -->
 
 #### Scenario: Events include Pod-level events from Deployment children
 
-- **WHEN** the user runs `opm mod events --release-name my-app -n production`
-- **AND** the release contains a Deployment `my-app-web` which owns ReplicaSet `my-app-web-abc12` which owns Pod `my-app-web-abc12-x1`
+- **WHEN** the user runs `opm mod events --instance-name my-app -n production`
+- **AND** the instance contains a Deployment `my-app-web` which owns ReplicaSet `my-app-web-abc12` which owns Pod `my-app-web-abc12-x1`
 - **THEN** the output SHALL include events for the Deployment, the ReplicaSet, and the Pod
-
-#### Scenario: Events include Pod-level events from StatefulSet children
-
-- **WHEN** the release contains a StatefulSet `my-app-db` which owns Pod `my-app-db-0`
-- **THEN** the output SHALL include events for both the StatefulSet and the Pod
-
-#### Scenario: Non-workload resources have no child traversal
-
-- **WHEN** the release contains a ConfigMap `my-app-config`
-- **THEN** the output SHALL include events for the ConfigMap itself
-- **AND** no ownerReference traversal SHALL be performed for the ConfigMap
 
 #### Scenario: No OPM resources found
 
-- **WHEN** no resources match the release selector
+- **WHEN** no resources match the instance selector
 - **THEN** the command SHALL exit with a non-zero exit code and display an error message
-
----
 
 ### Requirement: Events are fetched in bulk and filtered client-side
 
@@ -69,17 +44,17 @@ The flag SHALL accept Go-style duration strings (`30m`, `1h`, `2h30m`) plus a `d
 
 #### Scenario: Default time window
 
-- **WHEN** the user runs `opm mod events --release-name my-app -n prod` without `--since`
+- **WHEN** the user runs `opm mod events --instance-name my-app -n prod` without `--since`
 - **THEN** only events with `lastTimestamp` within the last 1 hour SHALL be displayed
 
 #### Scenario: Custom time window
 
-- **WHEN** the user runs `opm mod events --release-name my-app -n prod --since 30m`
+- **WHEN** the user runs `opm mod events --instance-name my-app -n prod --since 30m`
 - **THEN** only events with `lastTimestamp` within the last 30 minutes SHALL be displayed
 
 #### Scenario: Day-based time window
 
-- **WHEN** the user runs `opm mod events --release-name my-app -n prod --since 7d`
+- **WHEN** the user runs `opm mod events --instance-name my-app -n prod --since 7d`
 - **THEN** only events with `lastTimestamp` within the last 7 days SHALL be displayed
 
 #### Scenario: Invalid since value
@@ -95,12 +70,12 @@ The command SHALL accept a `--type` flag that filters events by their Kubernetes
 
 #### Scenario: Filter to warnings only
 
-- **WHEN** the user runs `opm mod events --release-name my-app -n prod --type Warning`
+- **WHEN** the user runs `opm mod events --instance-name my-app -n prod --type Warning`
 - **THEN** only events with `type == "Warning"` SHALL be displayed
 
 #### Scenario: Filter to normal events only
 
-- **WHEN** the user runs `opm mod events --release-name my-app -n prod --type Normal`
+- **WHEN** the user runs `opm mod events --instance-name my-app -n prod --type Normal`
 - **THEN** only events with `type == "Normal"` SHALL be displayed
 
 #### Scenario: Invalid type value
@@ -116,7 +91,7 @@ The default output format SHALL be a table with columns: LAST SEEN, TYPE, RESOUR
 
 #### Scenario: Default table output
 
-- **WHEN** the user runs `opm mod events --release-name my-app -n prod` without `-o`
+- **WHEN** the user runs `opm mod events --instance-name my-app -n prod` without `-o`
 - **THEN** the output SHALL be a formatted table with LAST SEEN, TYPE, RESOURCE, REASON, and MESSAGE columns
 - **AND** events SHALL be sorted oldest-first (ascending by lastTimestamp)
 
@@ -165,12 +140,12 @@ JSON and YAML output SHALL emit a structured object containing release metadata 
 
 #### Scenario: JSON output
 
-- **WHEN** the user runs `opm mod events --release-name my-app -n prod -o json`
+- **WHEN** the user runs `opm mod events --instance-name my-app -n prod -o json`
 - **THEN** the output SHALL be valid JSON with `releaseName`, `namespace`, and `events` array fields
 
 #### Scenario: YAML output
 
-- **WHEN** the user runs `opm mod events --release-name my-app -n prod -o yaml`
+- **WHEN** the user runs `opm mod events --instance-name my-app -n prod -o yaml`
 - **THEN** the output SHALL be valid YAML with the same structure as JSON output
 
 #### Scenario: Invalid output format
@@ -188,7 +163,7 @@ The UID set for filtering SHALL be computed once at startup. Watch mode SHALL ex
 
 #### Scenario: Watch mode streams new events
 
-- **WHEN** the user runs `opm mod events --release-name my-app -n prod --watch`
+- **WHEN** the user runs `opm mod events --instance-name my-app -n prod --watch`
 - **AND** a new event occurs for a resource in the release
 - **THEN** the event SHALL be appended to the terminal output
 
@@ -200,7 +175,7 @@ The UID set for filtering SHALL be computed once at startup. Watch mode SHALL ex
 
 #### Scenario: Watch mode respects --type filter
 
-- **WHEN** the user runs `opm mod events --release-name my-app -n prod --watch --type Warning`
+- **WHEN** the user runs `opm mod events --instance-name my-app -n prod --watch --type Warning`
 - **AND** a `Normal` event occurs
 - **THEN** the event SHALL NOT be displayed
 
@@ -211,21 +186,19 @@ The UID set for filtering SHALL be computed once at startup. Watch mode SHALL ex
 
 ---
 
-### Requirement: Events command uses shared release selector flags
+### Requirement: Events command uses shared instance selector flags
 
-The command SHALL use `ReleaseSelectorFlags` for `--release-name`/`--release-id`/`-n` with the same mutual exclusivity validation as `mod status` and `mod delete`. Exactly one of `--release-name` or `--release-id` MUST be provided.
+The command SHALL use `InstanceSelectorFlags` for `--instance-name`/`--instance-id`/`-n` with the same mutual exclusivity validation as `mod status` and `mod delete`. Exactly one of `--instance-name` or `--instance-id` MUST be provided. <!-- Was: ReleaseSelectorFlags, --instance-name/--release-id (0002 D10/D-X4.2) -->
 
 #### Scenario: Both selectors provided
 
-- **WHEN** the user provides both `--release-name` and `--release-id`
-- **THEN** the command SHALL exit with error: `"--release-name and --release-id are mutually exclusive"`
+- **WHEN** the user provides both `--instance-name` and `--instance-id`
+- **THEN** the command SHALL exit with error: `"--instance-name and --instance-id are mutually exclusive"`
 
 #### Scenario: Neither selector provided
 
-- **WHEN** the user provides neither `--release-name` nor `--release-id`
-- **THEN** the command SHALL exit with error: `"either --release-name or --release-id is required"`
-
----
+- **WHEN** the user provides neither `--instance-name` nor `--instance-id`
+- **THEN** the command SHALL exit with error: `"either --instance-name or --instance-id is required"`
 
 ### Requirement: Events command uses shared Kubernetes connection flags
 
@@ -233,7 +206,7 @@ The command SHALL use `K8sFlags` for `--kubeconfig`/`--context` with the same re
 
 #### Scenario: Custom kubeconfig
 
-- **WHEN** the user runs `opm mod events --kubeconfig /path/to/config --release-name my-app -n prod`
+- **WHEN** the user runs `opm mod events --kubeconfig /path/to/config --instance-name my-app -n prod`
 - **THEN** the command SHALL use the specified kubeconfig file
 
 #### Scenario: Cluster unreachable

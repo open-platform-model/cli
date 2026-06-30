@@ -17,7 +17,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	fmt.Println("=== OPM Release Deploy Integration Test ===")
+	fmt.Println("=== OPM Instance Deploy Integration Test ===")
 	fmt.Println()
 
 	// 1. Create client targeting kind-opm-dev
@@ -31,10 +31,10 @@ func main() {
 	}
 	fmt.Println("   OK: client created")
 
-	releaseName := "opm-deploy-test"
+	instanceName := "opm-deploy-test"
 	namespace := "default"
-	// Fixed release UUID for deterministic inventory Secret naming.
-	releaseID := "a1b2c3d4-1111-2222-3333-aabbccdd0011"
+	// Fixed instance UUID for deterministic inventory Secret naming.
+	instanceID := "a1b2c3d4-1111-2222-3333-aabbccdd0011"
 
 	// 2. Build test resources (a ConfigMap and a Service)
 	fmt.Println()
@@ -43,11 +43,11 @@ func main() {
 	// OPM labels that the CUE transformers normally inject via #context.labels.
 	// Since this integration test bypasses the render pipeline, we add them manually.
 	opmLabels := map[string]interface{}{
-		pkgcore.LabelManagedBy:            pkgcore.LabelManagedByValue,
-		"module-release.opmodel.dev/name": releaseName,
-		"module-release.opmodel.dev/uuid": releaseID,
-		"module.opmodel.dev/name":         releaseName,
-		"module.opmodel.dev/version":      "0.1.0",
+		pkgcore.LabelManagedBy:             pkgcore.LabelManagedByValue,
+		"module-instance.opmodel.dev/name": instanceName,
+		"module-instance.opmodel.dev/uuid": instanceID,
+		"module.opmodel.dev/name":          instanceName,
+		"module.opmodel.dev/version":       "0.1.0",
 	}
 
 	cm := &unstructured.Unstructured{Object: map[string]interface{}{
@@ -91,7 +91,7 @@ func main() {
 	// 3. Dry-run apply
 	fmt.Println()
 	fmt.Println("3. Testing dry-run apply...")
-	dryResult, err := kubernetes.Apply(ctx, client, resources, releaseName, kubernetes.ApplyOptions{
+	dryResult, err := kubernetes.Apply(ctx, client, resources, instanceName, kubernetes.ApplyOptions{
 		DryRun: true,
 	})
 	if err != nil {
@@ -109,7 +109,7 @@ func main() {
 	// 4. Real apply
 	fmt.Println()
 	fmt.Println("4. Applying resources to cluster...")
-	applyResult, err := kubernetes.Apply(ctx, client, resources, releaseName, kubernetes.ApplyOptions{})
+	applyResult, err := kubernetes.Apply(ctx, client, resources, instanceName, kubernetes.ApplyOptions{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: apply: %v\n", err)
 		os.Exit(1)
@@ -123,7 +123,7 @@ func main() {
 	fmt.Printf("   OK: %d resources applied\n", applyResult.Applied)
 
 	// Write inventory after apply so subsequent operations use inventory-first path.
-	inv := buildInventory(resources, releaseName, namespace, releaseID)
+	inv := buildInventory(resources, instanceName, namespace, instanceID)
 	if err := inventory.WriteInventory(ctx, client, inv, "", "", inv.ModuleMetadata.Version, inventory.CreatedByCLI); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: writing inventory: %v\n", err)
 		os.Exit(1)
@@ -133,7 +133,7 @@ func main() {
 	// 5. Verify resources via inventory-first discovery
 	fmt.Println()
 	fmt.Println("5. Discovering resources via inventory...")
-	readInv, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
+	readInv, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: reading inventory: %v\n", err)
 		os.Exit(1)
@@ -150,10 +150,10 @@ func main() {
 	fmt.Printf("   OK: found %d resources\n", len(discovered))
 	for _, r := range discovered {
 		labels := r.GetLabels()
-		fmt.Printf("   - %s/%s (managed-by=%s, release=%s)\n",
+		fmt.Printf("   - %s/%s (managed-by=%s, instance=%s)\n",
 			r.GetKind(), r.GetName(),
 			labels["app.kubernetes.io/managed-by"],
-			labels["module-release.opmodel.dev/name"],
+			labels["module-instance.opmodel.dev/name"],
 		)
 	}
 	if len(discovered) < 2 {
@@ -164,7 +164,7 @@ func main() {
 	// 6. Idempotency test - apply again
 	fmt.Println()
 	fmt.Println("6. Testing idempotency (second apply)...")
-	applyResult2, err := kubernetes.Apply(ctx, client, resources, releaseName, kubernetes.ApplyOptions{})
+	applyResult2, err := kubernetes.Apply(ctx, client, resources, instanceName, kubernetes.ApplyOptions{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: second apply: %v\n", err)
 		os.Exit(1)
@@ -180,7 +180,7 @@ func main() {
 	// 7. Dry-run delete — discover from inventory for InventoryLive
 	fmt.Println()
 	fmt.Println("7. Testing dry-run delete...")
-	dryInv, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
+	dryInv, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: reading inventory for dry-run delete: %v\n", err)
 		os.Exit(1)
@@ -194,7 +194,7 @@ func main() {
 		}
 	}
 	dryDeleteResult, err := kubernetes.Delete(ctx, client, kubernetes.DeleteOptions{
-		ReleaseName:   releaseName,
+		InstanceName:  instanceName,
 		Namespace:     namespace,
 		DryRun:        true,
 		InventoryLive: dryLive,
@@ -210,13 +210,13 @@ func main() {
 	fmt.Println("8. Deleting resources from cluster...")
 	kubernetes.ResetClient()
 	client, _ = kubernetes.NewClient(kubernetes.ClientOptions{Context: "kind-opm-dev"})
-	delInv, err := inventory.GetInventory(ctx, client, releaseName, namespace, releaseID)
+	delInv, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: reading inventory for delete: %v\n", err)
 		os.Exit(1)
 	}
 	var delLive []*unstructured.Unstructured
-	invSecretName := inventory.SecretName(releaseName, releaseID)
+	invSecretName := inventory.SecretName(instanceName, instanceID)
 	if delInv != nil {
 		delLive, _, err = inventory.DiscoverResourcesFromInventory(ctx, client, delInv)
 		if err != nil {
@@ -225,7 +225,7 @@ func main() {
 		}
 	}
 	deleteResult, err := kubernetes.Delete(ctx, client, kubernetes.DeleteOptions{
-		ReleaseName:              releaseName,
+		InstanceName:             instanceName,
 		Namespace:                namespace,
 		InventoryLive:            delLive,
 		InventorySecretName:      invSecretName,
@@ -251,7 +251,7 @@ func main() {
 	fmt.Println("9. Verifying cleanup (inventory after delete)...")
 	kubernetes.ResetClient()
 	client, _ = kubernetes.NewClient(kubernetes.ClientOptions{Context: "kind-opm-dev"})
-	remainingInv, err := inventory.FindInventoryByReleaseName(ctx, client, releaseName, namespace)
+	remainingInv, err := inventory.FindInventoryByInstanceName(ctx, client, instanceName, namespace)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: post-delete inventory check: %v\n", err)
 		os.Exit(1)
@@ -266,26 +266,26 @@ func main() {
 	fmt.Println("=== ALL TESTS PASSED ===")
 }
 
-// buildInventory creates a release inventory record from the given resources.
-func buildInventory(resources []*unstructured.Unstructured, releaseName, namespace, releaseID string) *inventory.ReleaseInventoryRecord {
+// buildInventory creates a instance inventory record from the given resources.
+func buildInventory(resources []*unstructured.Unstructured, instanceName, namespace, instanceID string) *inventory.InstanceInventoryRecord {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
 	}
 
-	inv := &inventory.ReleaseInventoryRecord{
+	inv := &inventory.InstanceInventoryRecord{
 		CreatedBy: inventory.CreatedByCLI,
-		ReleaseMetadata: inventory.ReleaseMetadata{
-			Kind:             "ModuleRelease",
-			APIVersion:       "core.opmodel.dev/v1alpha1",
-			ReleaseName:      releaseName,
-			ReleaseNamespace: namespace,
-			ReleaseID:        releaseID,
+		InstanceMetadata: inventory.InstanceMetadata{
+			Kind:              "ModuleInstance",
+			APIVersion:        inventory.APIVersionV1Alpha1,
+			InstanceName:      instanceName,
+			InstanceNamespace: namespace,
+			InstanceID:        instanceID,
 		},
 		ModuleMetadata: inventory.ModuleMetadata{
 			Kind:       "Module",
-			APIVersion: "core.opmodel.dev/v1alpha1",
-			Name:       releaseName,
+			APIVersion: inventory.APIVersionV1Alpha1,
+			Name:       instanceName,
 			Version:    "0.1.0",
 		},
 		Inventory: inventory.Inventory{Revision: 1, Digest: inventory.ComputeDigest(entries), Count: len(entries), Entries: entries},

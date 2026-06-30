@@ -18,7 +18,7 @@ func NewModuleCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Use this command group when you are starting from module source: initialize a
 		module or validate it.
 
-		For rendering and deploying, use 'opm release build' or 'opm release apply'.`,
+		For rendering and deploying, use 'opm instance build' or 'opm instance apply'.`,
 	}
 
 	c.AddCommand(NewModuleInitCmd(cfg))

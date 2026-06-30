@@ -46,9 +46,9 @@ const (
 	kindPersistentVolumeClaim = "PersistentVolumeClaim"
 )
 
-// ReleaseInfo holds release metadata for tree display.
+// InstanceInfo holds instance metadata for tree display.
 // Populated by the command layer from the inventory Secret.
-type ReleaseInfo struct {
+type InstanceInfo struct {
 	Name      string `json:"name" yaml:"name"`
 	Namespace string `json:"namespace" yaml:"namespace"`
 	Module    string `json:"module,omitempty" yaml:"module,omitempty"`
@@ -84,16 +84,16 @@ type ResourceNode struct {
 // TreeResult is the intermediate data structure produced by BuildTree.
 // It can be rendered as a terminal tree or serialized to JSON/YAML.
 type TreeResult struct {
-	Release    ReleaseInfo `json:"release" yaml:"release"`
-	Components []Component `json:"components" yaml:"components"`
+	Instance   InstanceInfo `json:"instance" yaml:"instance"` // Was: Release (enhancement 0002 D8/D9)
+	Components []Component  `json:"components" yaml:"components"`
 }
 
 // TreeOptions configures a tree operation.
 // Resource discovery and component mapping are resolved by the command layer,
 // mirroring the StatusOptions pattern.
 type TreeOptions struct {
-	// ReleaseInfo is populated from the inventory Secret by the command layer.
-	ReleaseInfo ReleaseInfo
+	// InstanceInfo is populated from the inventory Secret by the command layer.
+	InstanceInfo InstanceInfo
 
 	// InventoryLive is the list of live resources fetched from the inventory Secret.
 	InventoryLive []*unstructured.Unstructured
@@ -117,12 +117,12 @@ type TreeOptions struct {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // GetModuleTree is the main entry point for the tree command.
-// It returns noResourcesFoundError when InventoryLive is empty (mirrors GetReleaseStatus).
+// It returns noResourcesFoundError when InventoryLive is empty (mirrors GetInstanceStatus).
 func GetModuleTree(ctx context.Context, client *Client, opts TreeOptions) (*TreeResult, error) {
 	if len(opts.InventoryLive) == 0 {
 		return nil, &noResourcesFoundError{
-			ReleaseName: opts.ReleaseInfo.Name,
-			Namespace:   opts.ReleaseInfo.Namespace,
+			InstanceName: opts.InstanceInfo.Name,
+			Namespace:    opts.InstanceInfo.Namespace,
 		}
 	}
 	return BuildTree(ctx, client, opts), nil
@@ -136,7 +136,7 @@ func GetModuleTree(ctx context.Context, client *Client, opts TreeOptions) (*Tree
 // At depth=0 resources are counted but not included. At depth>=2 K8s ownership
 // is walked to produce child nodes (ReplicaSets, Pods, etc.).
 func BuildTree(ctx context.Context, client *Client, opts TreeOptions) *TreeResult {
-	result := &TreeResult{Release: opts.ReleaseInfo}
+	result := &TreeResult{Instance: opts.InstanceInfo}
 
 	groups := groupByComponent(opts.InventoryLive, opts.ComponentMap)
 	for _, compName := range sortedComponentNames(groups) {
@@ -490,12 +490,12 @@ func FormatTree(result *TreeResult, format output.Format) (string, error) {
 func formatTreeTable(result *TreeResult, colored bool) string {
 	var sb strings.Builder
 
-	// ── Release header ────────────────────────────────────────────────────────
-	header := result.Release.Name
-	if result.Release.Module != "" {
-		mod := result.Release.Module
-		if result.Release.Version != "" {
-			mod += "@" + result.Release.Version
+	// ── Instance header ────────────────────────────────────────────────────────
+	header := result.Instance.Name
+	if result.Instance.Module != "" {
+		mod := result.Instance.Module
+		if result.Instance.Version != "" {
+			mod += "@" + result.Instance.Version
 		}
 		header += " (" + mod + ")"
 	}

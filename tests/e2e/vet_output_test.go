@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestE2E_ReleaseVet_Output(t *testing.T) {
+func TestE2E_InstanceVet_Output(t *testing.T) {
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 	testdataDir := filepath.Join(cwd, "testdata", "vet-errors")
@@ -20,9 +20,9 @@ func TestE2E_ReleaseVet_Output(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	_, stderr, err := runOPM(t, tmpDir, "rel", "vet",
-		filepath.Join(testdataDir, "release", "release.cue"),
-		"-f", filepath.Join(testdataDir, "release", "values.cue"))
+	_, stderr, err := runOPM(t, tmpDir, "instance", "vet",
+		filepath.Join(testdataDir, "instance", "instance.cue"),
+		"-f", filepath.Join(testdataDir, "instance", "values.cue"))
 
 	// Assert exit code 2
 	require.Error(t, err)
@@ -53,7 +53,7 @@ func TestE2E_ModuleVet_Output(t *testing.T) {
 
 	_, stderr, err := runOPM(t, tmpDir, "mod", "vet",
 		filepath.Join(testdataDir, "module"),
-		"-f", filepath.Join(testdataDir, "release", "values.cue"))
+		"-f", filepath.Join(testdataDir, "instance", "values.cue"))
 
 	// Assert exit code 2
 	require.Error(t, err)

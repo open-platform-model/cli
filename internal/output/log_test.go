@@ -67,19 +67,19 @@ func TestSetupLogging_DefaultInfoLevel(t *testing.T) {
 	assert.Equal(t, log.InfoLevel, logger.GetLevel(), "default should be info level")
 }
 
-func TestReleaseLogger_HasPrefix(t *testing.T) {
+func TestInstanceLogger_HasPrefix(t *testing.T) {
 	SetupLogging(LogConfig{})
-	releaseLog := ReleaseLogger("my-app")
-	assert.NotNil(t, releaseLog, "release logger should not be nil")
+	instanceLog := InstanceLogger("my-app")
+	assert.NotNil(t, instanceLog, "instance logger should not be nil")
 
-	prefix := releaseLog.GetPrefix()
-	assert.Contains(t, prefix, "my-app", "prefix should contain release name")
+	prefix := instanceLog.GetPrefix()
+	assert.Contains(t, prefix, "my-app", "prefix should contain instance name")
 }
 
-func TestReleaseLogger_InheritsLevel(t *testing.T) {
+func TestInstanceLogger_InheritsLevel(t *testing.T) {
 	SetupLogging(LogConfig{Verbose: true})
-	releaseLog := ReleaseLogger("my-app")
-	assert.Equal(t, log.DebugLevel, releaseLog.GetLevel(), "release logger should inherit debug level")
+	instanceLog := InstanceLogger("my-app")
+	assert.Equal(t, log.DebugLevel, instanceLog.GetLevel(), "instance logger should inherit debug level")
 }
 
 func TestBoolPtr(t *testing.T) {

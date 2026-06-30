@@ -27,9 +27,9 @@ func NewModuleBuildCmd(cfg *config.GlobalConfig) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "build [path]",
-		Short: "Render a module to manifests via synthetic release",
+		Short: "Render a module to manifests via synthetic instance",
 		Long: `Render an OPM module package to Kubernetes manifests by synthesizing
-a #ModuleRelease around it. Values come from the module's debugValues (default)
+a #ModuleInstance around it. Values come from the module's debugValues (default)
 or from -f/--values files.
 
 Arguments:
@@ -42,7 +42,7 @@ Examples:
   # Build a specific module with custom values
   opm module build ./my-module -f overrides.cue
 
-  # Build with a custom synthetic release name
+  # Build with a custom synthetic instance name
   opm module build ./my-module --name my-debug`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
@@ -51,7 +51,7 @@ Examples:
 	}
 
 	rf.AddTo(c)
-	c.Flags().StringVar(&nameFlag, "name", "", "Override synthetic release name")
+	c.Flags().StringVar(&nameFlag, "name", "", "Override synthetic instance name")
 	c.Flags().StringVarP(&outputFlag, "output", "o", "yaml", "Output format: yaml, json")
 	c.Flags().BoolVar(&splitFlag, "split", false, "Write separate files per resource")
 	c.Flags().StringVar(&outDirFlag, "out-dir", "./manifests", "Directory for split output")
@@ -74,7 +74,7 @@ func runModuleBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 	if !info.IsDir() {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitGeneralError,
-			Err:  fmt.Errorf("module build expects a directory; CUE packages span all files in a dir. Use 'opm release build %s' for a release file", modulePath),
+			Err:  fmt.Errorf("module build expects a directory; CUE packages span all files in a dir. Use 'opm instance build %s' for a instance file", modulePath),
 		}
 	}
 
@@ -105,5 +105,5 @@ func runModuleBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 
 	render.ShowOutput(result, render.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
 
-	return render.WriteManifestOutput(result.Resources, outputFormat, split, outDir, result.Release.Name)
+	return render.WriteManifestOutput(result.Resources, outputFormat, split, outDir, result.Instance.Name)
 }

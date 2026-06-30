@@ -1,6 +1,6 @@
 // Package module defines the Module and ModuleMetadata types, mirroring the
 // #Module definition in the CUE catalog (v1alpha1). A Module represents the
-// parsed module definition before it is built into a release.
+// parsed module definition before it is built into an instance.
 package module
 
 import (
@@ -24,7 +24,7 @@ type Module struct {
 }
 
 // ModuleMetadata contains module-level identity and version information.
-// This is the module's canonical metadata, distinct from the release it is deployed as.
+// This is the module's canonical metadata, distinct from the instance it is deployed as.
 //
 //nolint:revive // stutter intentional: module.ModuleMetadata reads clearly at call sites
 type ModuleMetadata struct {

@@ -12,6 +12,10 @@ const (
 	CreatedByController CreatedBy = CreatedBy(ownership.CreatedByController)
 )
 
+// APIVersionV1Alpha1 is the apiVersion stamped on persisted instance/module
+// metadata, enabling future migration from Secrets to CRDs.
+const APIVersionV1Alpha1 = "core.opmodel.dev/v1alpha1"
+
 func NormalizeCreatedBy(createdBy CreatedBy) CreatedBy {
 	if createdBy == CreatedByController {
 		return CreatedByController
@@ -19,12 +23,12 @@ func NormalizeCreatedBy(createdBy CreatedBy) CreatedBy {
 	return CreatedByCLI
 }
 
-type ReleaseMetadata struct {
+type InstanceMetadata struct {
 	Kind               string `json:"kind"`
 	APIVersion         string `json:"apiVersion"`
-	ReleaseName        string `json:"name"`
-	ReleaseNamespace   string `json:"namespace"`
-	ReleaseID          string `json:"uuid"`
+	InstanceName       string `json:"name"`
+	InstanceNamespace  string `json:"namespace"`
+	InstanceID         string `json:"uuid"`
 	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
 }
 
@@ -36,23 +40,23 @@ type ModuleMetadata struct {
 	Version    string `json:"version,omitempty"`
 }
 
-type ReleaseInventoryRecord struct {
-	CreatedBy       CreatedBy              `json:"createdBy,omitempty"`
-	ReleaseMetadata ReleaseMetadata        `json:"releaseMetadata"`
-	ModuleMetadata  ModuleMetadata         `json:"moduleMetadata"`
-	Inventory       pkginventory.Inventory `json:"inventory"`
+type InstanceInventoryRecord struct {
+	CreatedBy        CreatedBy              `json:"createdBy,omitempty"`
+	InstanceMetadata InstanceMetadata       `json:"instanceMetadata"`
+	ModuleMetadata   ModuleMetadata         `json:"moduleMetadata"`
+	Inventory        pkginventory.Inventory `json:"inventory"`
 
 	resourceVersion string
 }
 
-func (r *ReleaseInventoryRecord) ResourceVersion() string {
+func (r *InstanceInventoryRecord) ResourceVersion() string {
 	return r.resourceVersion
 }
 
-func (r *ReleaseInventoryRecord) SetResourceVersion(resourceVersion string) {
+func (r *InstanceInventoryRecord) SetResourceVersion(resourceVersion string) {
 	r.resourceVersion = resourceVersion
 }
 
-func (r *ReleaseInventoryRecord) NormalizedCreatedBy() CreatedBy {
+func (r *InstanceInventoryRecord) NormalizedCreatedBy() CreatedBy {
 	return NormalizeCreatedBy(r.CreatedBy)
 }

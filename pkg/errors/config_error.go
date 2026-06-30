@@ -17,7 +17,7 @@ type ConfigError struct {
 	// Context is "bundle" or "module" — identifies which gate produced the error.
 	Context string
 
-	// Name is the release/bundle name for display (e.g. "my-game-stack", "server").
+	// Name is the instance/bundle name for display (e.g. "my-game-stack", "server").
 	Name string
 
 	// RawError is the original CUE unification or concreteness error.

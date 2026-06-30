@@ -100,8 +100,8 @@ cd my-app
 opm module build
 ```
 
-`opm module build` synthesizes a `#ModuleRelease` around the module so you
-do not need a `release.cue` while iterating. The rendered YAML is written
+`opm module build` synthesizes a `#ModuleInstance` around the module so you
+do not need an `instance.cue` while iterating. The rendered YAML is written
 to stdout by default.
 
 Useful variants:
@@ -110,7 +110,7 @@ Useful variants:
 # Run from anywhere by passing a module directory
 opm module build ./my-app
 
-# Override the synthetic release name
+# Override the synthetic instance name
 opm module build ./my-app --name my-app-debug
 
 # Provide explicit values instead of debugValues
@@ -120,47 +120,47 @@ opm module build ./my-app -f ./my-overrides.cue
 opm module build ./my-app --split --out-dir ./manifests
 ```
 
-`opm release build` accepts the same module-directory form, so
-`opm release build ./my-app` is equivalent for symmetry with the release
+`opm instance build` accepts the same module-directory form, so
+`opm instance build ./my-app` is equivalent for symmetry with the instance
 workflow.
 
 `opm mod` is an alias for `opm module`, so all of the commands above also
 work as `opm mod init`, `opm mod build`, etc.
 
-## Working from a Release File
+## Working from an Instance File
 
-When you already have a release definition, `opm release` is the canonical
-workflow. The example release files under `examples/releases/` are small
-release definitions that import published modules straight from the
+When you already have an instance definition, `opm instance` is the canonical
+workflow. The example instance files under `examples/instances/` are small
+instance definitions that import published modules straight from the
 public catalog (`opmodel.dev/modules/<name>@v1`) — no local module sources
 required, no `task publish`.
 
 Available examples:
 
-- `examples/releases/jellyfin/` — single-container stateful app (storage,
+- `examples/instances/jellyfin/` — single-container stateful app (storage,
   optional gateway route, optional K8up backup). Used throughout this
   guide.
-- `examples/releases/garage/` — stateless S3-compatible object store;
+- `examples/instances/garage/` — stateless S3-compatible object store;
   showcases the "required secret" pattern (`adminToken`, `rpcSecret`).
-- `examples/releases/mc_java_fleet/` — multi-instance Minecraft fleet
+- `examples/instances/mc_java_fleet/` — multi-instance Minecraft fleet
   with a shared mc-router. Has a default single-server `values.cue` and
   a multi-server `values_multi.cue`.
 
 ### Build
 
 ```bash
-opm release build ./examples/releases/jellyfin/release.cue
+opm instance build ./examples/instances/jellyfin/instance.cue
 ```
 
-The release directory contains a sibling `values.cue` which is loaded
+The instance directory contains a sibling `values.cue` which is loaded
 automatically. To use a different values file, pass it explicitly:
 
 ```bash
-opm release build ./examples/releases/mc_java_fleet/release.cue \
-  -f ./examples/releases/mc_java_fleet/values_multi.cue
+opm instance build ./examples/instances/mc_java_fleet/instance.cue \
+  -f ./examples/instances/mc_java_fleet/values_multi.cue
 ```
 
-A release file pulling a public module looks like the `jellyfin` example:
+An instance file pulling a public module looks like the `jellyfin` example:
 
 ```cue
 package jellyfin
@@ -170,7 +170,7 @@ import (
     m  "opmodel.dev/modules/jellyfin@v1"
 )
 
-mr.#ModuleRelease
+mr.#ModuleInstance
 
 metadata: {
     name:      "jellyfin"
@@ -180,8 +180,8 @@ metadata: {
 #module: m
 ```
 
-With the public registry configured, `opm release build` and
-`opm release apply` resolve `opmodel.dev/modules/jellyfin@v1` from
+With the public registry configured, `opm instance build` and
+`opm instance apply` resolve `opmodel.dev/modules/jellyfin@v1` from
 `ghcr.io/open-platform-model` automatically.
 
 ## Deploy to a Cluster
@@ -198,29 +198,29 @@ This creates a local kind cluster named `opm-dev`.
 ### Apply
 
 ```bash
-opm release apply ./examples/releases/jellyfin/release.cue --create-namespace
+opm instance apply ./examples/instances/jellyfin/instance.cue --create-namespace
 ```
 
 The `garage` and `mc_java_fleet` examples follow the same pattern — point
-`opm release apply` at their `release.cue`. Note that `garage` requires
+`opm instance apply` at their `instance.cue`. Note that `garage` requires
 you to replace the `adminToken` and `rpcSecret` placeholders in
 `values.cue` before applying.
 
 ### Inspect
 
-The `jellyfin` example release uses release name `jellyfin` in namespace
+The `jellyfin` example instance uses instance name `jellyfin` in namespace
 `default`.
 
 ```bash
-opm release status jellyfin -n default
-opm release tree   jellyfin -n default
-opm release events jellyfin -n default
+opm instance status jellyfin -n default
+opm instance tree   jellyfin -n default
+opm instance events jellyfin -n default
 ```
 
 ### Delete
 
 ```bash
-opm release delete jellyfin -n default --force
+opm instance delete jellyfin -n default --force
 ```
 
 ## Cleanup
@@ -233,7 +233,7 @@ task cluster:delete
 
 ## Next Steps
 
-- Run `opm release --help` and `opm module --help`
+- Run `opm instance --help` and `opm module --help`
 - See `README.md` for command overview
 - See `AGENTS.md` for architecture and development guidance
 - Browse the public module catalog at

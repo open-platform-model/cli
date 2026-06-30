@@ -25,7 +25,7 @@ func (e *TransformError) Component() string {
 	return e.ComponentName
 }
 
-// ValidationError indicates the release failed validation.
+// ValidationError indicates the instance failed validation.
 type ValidationError struct {
 	// Message describes what validation failed.
 	Message string
@@ -39,9 +39,9 @@ type ValidationError struct {
 
 func (e *ValidationError) Error() string {
 	if e.Cause != nil {
-		return "release validation failed: " + e.Message + ": " + e.Cause.Error()
+		return "instance validation failed: " + e.Message + ": " + e.Cause.Error()
 	}
-	return "release validation failed: " + e.Message
+	return "instance validation failed: " + e.Message
 }
 
 func (e *ValidationError) Unwrap() error {

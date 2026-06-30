@@ -37,7 +37,7 @@ func TestRunModuleBuild_RejectsFileArgument(t *testing.T) {
 	err := runModuleBuild([]string{filePath}, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, "", "yaml", false, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "expects a directory")
-	assert.Contains(t, err.Error(), "opm release build")
+	assert.Contains(t, err.Error(), "opm instance build")
 }
 
 func TestRunModuleBuild_MissingPath(t *testing.T) {

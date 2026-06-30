@@ -5,7 +5,7 @@
 | **Status**   | Draft                                                                                                                                              |
 | **Created**  | 2026-02-12                                                                                                                                         |
 | **Authors**  | OPM Contributors                                                                                                                                   |
-| **Related**  | RFC-0001 (Release Inventory), RFC-0002 (Sensitive Data), RFC-0003 (Immutable Config), RFC-0004 (Interface Architecture), K8s Coverage Gap Analysis |
+| **Related**  | RFC-0001 (Instance Inventory), RFC-0002 (Sensitive Data), RFC-0003 (Immutable Config), RFC-0004 (Interface Architecture), K8s Coverage Gap Analysis |
 
 ## Summary
 
@@ -634,7 +634,7 @@ The ConfigMapTransformer reads `spec.configMaps` and emits K8s ConfigMap resourc
 
 ## Interaction with Other RFCs
 
-### RFC-0001: Release Inventory
+### RFC-0001: Instance Inventory
 
 The inventory tracks all resources emitted by transformers, including Secrets generated from `spec.secrets` entries. When a secret value changes (and the secret is immutable per RFC-0003), the old hash-suffixed resource appears in the stale set and is pruned automatically.
 
@@ -1106,7 +1106,7 @@ If the 3-level nesting limit in CUE comprehensions proves insufficient, the Go S
 
 ## References
 
-- [RFC-0001: Release Inventory](0001-release-inventory.md) — Inventory-based pruning for stale resources
+- [RFC-0001: Instance Inventory](0001-release-inventory.md) — Inventory-based pruning for stale resources
 - [RFC-0002: Sensitive Data Model](0002-sensitive-data-model.md) — `#Secret` type, input paths, provider handlers
 - [RFC-0003: Immutable ConfigMaps and Secrets](0003-immutable-config.md) — Content-hash naming and K8s `immutable` flag
 - [RFC-0004: Interface Architecture](0004-interface-architecture.md) — `provides`/`requires` with typed shapes

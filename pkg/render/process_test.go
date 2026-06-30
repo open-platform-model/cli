@@ -9,13 +9,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/pkg/bundle"
 	"github.com/opmodel/cli/pkg/core"
 	"github.com/opmodel/cli/pkg/module"
 	"github.com/opmodel/cli/pkg/provider"
 )
 
-func TestProcessModuleRelease_Success(t *testing.T) {
+func TestProcessModuleInstance_Success(t *testing.T) {
 	ctx := cuecontext.New()
 	raw := ctx.CompileString(`{
 		metadata: {
@@ -69,7 +68,7 @@ func TestProcessModuleRelease_Success(t *testing.T) {
 						kind: "Deployment"
 						metadata: {
 							name: #context.#componentMetadata.name
-							namespace: #context.#moduleReleaseMetadata.namespace
+							namespace: #context.#moduleInstanceMetadata.namespace
 							labels: "app.kubernetes.io/managed-by": #context.#runtimeName
 						}
 						spec: replicas: #component.spec.replicas
@@ -79,15 +78,15 @@ func TestProcessModuleRelease_Success(t *testing.T) {
 		}
 	}`)
 
-	// Construct a fully prepared release (as ParseModuleRelease would produce).
-	rel := &module.Release{
-		Metadata: &module.ReleaseMetadata{Name: "demo", Namespace: "apps"},
+	// Construct a fully prepared instance (as ParseModuleInstance would produce).
+	rel := &module.Instance{
+		Metadata: &module.InstanceMetadata{Name: "demo", Namespace: "apps"},
 		Module:   module.Module{Metadata: &module.ModuleMetadata{FQN: "example.com/modules/demo@v1", Version: "v1"}},
 		Spec:     raw,
 		Values:   ctx.CompileString(`{replicas: 2}`),
 	}
 
-	result, err := ProcessModuleRelease(context.Background(), rel, &provider.Provider{Data: pv}, core.LabelManagedByValue)
+	result, err := ProcessModuleInstance(context.Background(), rel, &provider.Provider{Data: pv}, core.LabelManagedByValue)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Len(t, result.Resources, 1)
@@ -97,27 +96,4 @@ func TestProcessModuleRelease_Success(t *testing.T) {
 	var labels map[string]string
 	require.NoError(t, labelsVal.Decode(&labels))
 	assert.Equal(t, core.LabelManagedByValue, labels[core.LabelManagedBy])
-}
-
-func TestProcessBundleRelease_StubAfterValidation(t *testing.T) {
-	ctx := cuecontext.New()
-	raw := ctx.CompileString(`{
-		metadata: name: "stack"
-		#bundle: {
-			#config: {
-				replicas: int
-			}
-		}
-	}`)
-	br := &bundle.Release{
-		Metadata: &bundle.ReleaseMetadata{Name: "stack"},
-		Spec:     raw,
-		Config:   raw.LookupPath(cue.ParsePath("#bundle.#config")),
-		Releases: map[string]*module.Release{},
-	}
-
-	_, err := ProcessBundleRelease(context.Background(), br, []cue.Value{ctx.CompileString(`{replicas: 1}`)}, &provider.Provider{Data: ctx.CompileString(`{}`)})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not implemented")
-	assert.True(t, br.Values.Exists())
 }

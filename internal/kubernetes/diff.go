@@ -325,8 +325,8 @@ type DiffOptions struct {
 }
 
 // Diff compares rendered resources against the live cluster state and returns categorized results.
-// releaseName is unused but kept for caller context (logging reserved for future use).
-func Diff(ctx context.Context, client *Client, resources []*unstructured.Unstructured, releaseName string, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
+// instanceName is unused but kept for caller context (logging reserved for future use).
+func Diff(ctx context.Context, client *Client, resources []*unstructured.Unstructured, instanceName string, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
 	var diffOpts DiffOptions
 	if len(opts) > 0 {
 		diffOpts = opts[0]
@@ -415,7 +415,7 @@ func Diff(ctx context.Context, client *Client, resources []*unstructured.Unstruc
 
 // findOrphans returns resources that exist in inventoryLive but are not present
 // in the rendered resource set. When inventoryLive is nil the set is empty and
-// no orphans are reported (first-time diff where no release has been deployed yet).
+// no orphans are reported (first-time diff where no instance has been deployed yet).
 func findOrphans(renderedKeys map[string]bool, inventoryLive []*unstructured.Unstructured) []*unstructured.Unstructured {
 	output.Debug("orphan detection from inventory", "liveCount", len(inventoryLive))
 

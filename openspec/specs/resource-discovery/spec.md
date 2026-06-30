@@ -8,25 +8,25 @@ Defines how OPM CLI commands discover and select resources in a Kubernetes clust
 
 Commands that discover resources (`delete`, `status`) MUST accept exactly one selector type per invocation.
 
-#### Scenario: Both --name and --release-id provided
+#### Scenario: Both --name and --instance-id provided
 
-- **WHEN** user provides both `--name` and `--release-id` flags
-- **THEN** command exits with error: `"--name and --release-id are mutually exclusive"`
+- **WHEN** user provides both `--name` and `--instance-id` flags
+- **THEN** command exits with error: `"--name and --instance-id are mutually exclusive"`
 
-#### Scenario: Neither --name nor --release-id provided
+#### Scenario: Neither --name nor --instance-id provided
 
-- **WHEN** user provides neither `--name` nor `--release-id` flag
-- **THEN** command exits with error: `"either --name or --release-id is required"`
+- **WHEN** user provides neither `--name` nor `--instance-id` flag
+- **THEN** command exits with error: `"either --name or --instance-id is required"`
 
 #### Scenario: Only --name provided
 
 - **WHEN** user provides `--name` flag (and `--namespace`)
 - **THEN** command uses name+namespace label selector
 
-#### Scenario: Only --release-id provided
+#### Scenario: Only --instance-id provided
 
-- **WHEN** user provides `--release-id` flag (and `--namespace`)
-- **THEN** command uses release-id label selector
+- **WHEN** user provides `--instance-id` flag (and `--namespace`)
+- **THEN** command uses instance-id label selector
 
 ---
 
@@ -36,26 +36,26 @@ The `--namespace`/`-n` flag SHALL be optional for commands that discover resourc
 
 #### Scenario: Namespace omitted uses config default
 
-- **WHEN** the user runs `opm mod delete --release-name my-app` without `-n`
+- **WHEN** the user runs `opm mod delete --instance-name my-app` without `-n`
 - **AND** the config file sets `kubernetes: namespace: "staging"`
 - **THEN** the command SHALL operate in the `staging` namespace
 
 #### Scenario: Namespace omitted falls back to default
 
-- **WHEN** the user runs `opm mod status --release-name my-app` without `-n`
+- **WHEN** the user runs `opm mod status --instance-name my-app` without `-n`
 - **AND** no config or env sets a namespace
 - **THEN** the command SHALL operate in the `default` namespace
 
 ---
 
-### Requirement: Status command supports --release-id
+### Requirement: Status command supports --instance-id
 
-The `status` command MUST support `--release-id` flag with same semantics as `delete`.
+The `status` command MUST support `--instance-id` flag with same semantics as `delete`.
 
-#### Scenario: Status with --release-id
+#### Scenario: Status with --instance-id
 
-- **WHEN** user runs `opm mod status --release-id <uuid> --namespace bar`
-- **THEN** status displays resources matching the release-id label selector
+- **WHEN** user runs `opm mod status --instance-id <uuid> --namespace bar`
+- **THEN** status displays resources matching the instance-id label selector
 
 ---
 

@@ -16,14 +16,14 @@ task build
 # Validate a module
 ./bin/opm module vet ./my-module
 
-# Validate a release file
-./bin/opm release vet ./release.cue
+# Validate an instance file
+./bin/opm instance vet ./instance.cue
 
-# Render a release file
-./bin/opm release build ./release.cue
+# Render an instance file
+./bin/opm instance build ./instance.cue
 
-# Apply a release file
-./bin/opm release apply ./release.cue
+# Apply an instance file
+./bin/opm instance apply ./instance.cue
 ```
 
 ## Features
@@ -40,30 +40,32 @@ task build
 
 `opm mod` remains available as a compatibility alias.
 
-Use `opm module` when you are starting from module source. For rendering, deploying, or inspecting releases, use `opm release`.
+Use `opm module` when you are starting from module source. For rendering, deploying, or inspecting instances, use `opm instance`.
 
 | Command | Description |
 |---------|-------------|
 | `module init` | Create a new module from a template |
 | `module vet` | Validate a module without rendering manifests |
 
-### Release Operations (`opm release`)
+### Instance Operations (`opm instance`)
 
-`opm rel` remains available as a compatibility alias.
+<!-- Renamed from `opm release` / `opm rel` (enhancement 0002 D6). The old `release`/`rel` verb is removed — no back-compat alias (D8). -->
 
-Use `opm release` when you are starting from a release file or when you want to inspect, list, or delete deployed releases.
+`opm inst` is the short alias.
+
+Use `opm instance` when you are starting from an instance file or when you want to inspect, list, or delete deployed instances.
 
 | Command | Description |
 |---------|-------------|
-| `release vet` | Validate a release file without generating manifests |
-| `release build` | Render a release file to manifests |
-| `release apply` | Deploy a release file to a cluster |
-| `release diff` | Compare a release file with live cluster state |
-| `release status` | Show resource status for a deployed release |
-| `release tree` | Show release resource hierarchy |
-| `release delete` | Delete release resources from a cluster |
-| `release list` | List deployed releases |
-| `release events` | Show events for a release |
+| `instance vet` | Validate an instance file without generating manifests |
+| `instance build` | Render an instance file to manifests |
+| `instance apply` | Deploy an instance file to a cluster |
+| `instance diff` | Compare an instance file with live cluster state |
+| `instance status` | Show resource status for a deployed instance |
+| `instance tree` | Show instance resource hierarchy |
+| `instance delete` | Delete instance resources from a cluster |
+| `instance list` | List deployed instances |
+| `instance events` | Show events for an instance |
 
 ### Configuration (`opm config`)
 
@@ -72,21 +74,21 @@ Use `opm release` when you are starting from a release file or when you want to 
 | `config init` | Initialize OPM configuration |
 | `config vet` | Validate configuration |
 
-## Example Release Workflow
+## Example Instance Workflow
 
 ```bash
-# Validate a release file
-opm release vet ./releases/jellyfin/release.cue
+# Validate an instance file
+opm instance vet ./instances/jellyfin/instance.cue
 
-# Render manifests from a release file
-opm release build ./releases/jellyfin/release.cue
+# Render manifests from an instance file
+opm instance build ./instances/jellyfin/instance.cue
 
-# Apply a release file to the cluster
-opm release apply ./releases/jellyfin/release.cue
+# Apply an instance file to the cluster
+opm instance apply ./instances/jellyfin/instance.cue
 
 # Inspect deployed state by file, name, or UUID
-opm release status ./releases/jellyfin/release.cue
-opm release status jellyfin -n media
+opm instance status ./instances/jellyfin/instance.cue
+opm instance status jellyfin -n media
 ```
 
 ## Documentation

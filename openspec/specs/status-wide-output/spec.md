@@ -14,7 +14,7 @@ If a status field is missing or zero, it SHALL be displayed as `0`.
 
 #### Scenario: Deployment replicas in wide format
 
-- **WHEN** the user runs `opm mod status --release-name my-app -n prod -o wide`
+- **WHEN** the user runs `opm mod status --instance-name my-app -n prod -o wide`
 - **AND** a Deployment has `spec.replicas: 3` and `status.readyReplicas: 3`
 - **THEN** the REPLICAS column for that Deployment SHALL display `3/3`
 
@@ -92,5 +92,5 @@ When `-o wide` is specified, the table SHALL display the following columns in or
 
 #### Scenario: Wide table column order
 
-- **WHEN** the user runs `opm mod status --release-name my-app -n prod -o wide`
+- **WHEN** the user runs `opm mod status --instance-name my-app -n prod -o wide`
 - **THEN** the table headers SHALL be KIND, NAME, COMPONENT, STATUS, REPLICAS, IMAGE, AGE in that order

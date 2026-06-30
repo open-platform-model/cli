@@ -24,9 +24,9 @@ import (
 // or legacy open-platform-model) are discovered during the transition to
 // runtime-owned labels.
 //
-// Results are sorted alphabetically by ReleaseMetadata.ReleaseName.
+// Results are sorted alphabetically by InstanceMetadata.InstanceName.
 // Corrupt Secrets that fail to unmarshal are logged and skipped.
-func ListInventories(ctx context.Context, client *kubernetes.Client, namespace string) ([]*ReleaseInventoryRecord, error) {
+func ListInventories(ctx context.Context, client *kubernetes.Client, namespace string) ([]*InstanceInventoryRecord, error) {
 	labelSelector := fmt.Sprintf("%s=%s",
 		pkgcore.LabelComponent, "inventory",
 	)
@@ -38,7 +38,7 @@ func ListInventories(ctx context.Context, client *kubernetes.Client, namespace s
 		return nil, fmt.Errorf("listing inventory Secrets: %w", err)
 	}
 
-	var inventories []*ReleaseInventoryRecord
+	var inventories []*InstanceInventoryRecord
 	for i := range list.Items {
 		inv, unmarshalErr := UnmarshalFromSecret(&list.Items[i])
 		if unmarshalErr != nil {
@@ -53,7 +53,7 @@ func ListInventories(ctx context.Context, client *kubernetes.Client, namespace s
 	}
 
 	sort.Slice(inventories, func(i, j int) bool {
-		return inventories[i].ReleaseMetadata.ReleaseName < inventories[j].ReleaseMetadata.ReleaseName
+		return inventories[i].InstanceMetadata.InstanceName < inventories[j].InstanceMetadata.InstanceName
 	})
 
 	return inventories, nil

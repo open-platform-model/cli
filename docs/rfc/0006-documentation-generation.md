@@ -381,7 +381,7 @@ opmodel.dev/docs/
 │   ├── Definitions/              [x] Generated from CUE
 │   │   ├── Core/
 │   │   │   ├── Module
-│   │   │   ├── ModuleRelease
+│   │   │   ├── ModuleInstance
 │   │   │   ├── Component
 │   │   │   ├── Resource
 │   │   │   ├── Trait

@@ -2,22 +2,22 @@
 
 ### Requirement: Tree discovers resources via inventory
 
-The `opm mod tree` command SHALL discover deployed resources by looking up the OPM inventory Secret for the release (via `cmdutil.ResolveInventory` / `inventory.DiscoverResourcesFromInventory`), then fetching each tracked resource by GVK + name. It MUST NOT require module source or re-rendering.
+The `opm mod tree` command SHALL discover deployed resources by looking up the OPM inventory Secret for the instance (via `cmdutil.ResolveInventory` / `inventory.DiscoverResourcesFromInventory`), then fetching each tracked resource by GVK + name. It MUST NOT require module source or re-rendering.
 
-#### Scenario: Tree shows deployed resources by release name
+#### Scenario: Tree shows deployed resources by instance name
 
-- **WHEN** the user runs `opm mod tree --release-name jellyfin -n media`
-- **THEN** the command SHALL look up the inventory Secret for release name `jellyfin` in namespace `media` and display all tracked resources
+- **WHEN** the user runs `opm mod tree --instance-name jellyfin -n media`
+- **THEN** the command SHALL look up the inventory Secret for instance name `jellyfin` in namespace `media` and display all tracked resources
 
-#### Scenario: Tree shows deployed resources by release ID
+#### Scenario: Tree shows deployed resources by instance ID
 
-- **WHEN** the user runs `opm mod tree --release-id abc123-def456 -n media`
-- **THEN** the command SHALL look up the inventory Secret for release ID `abc123-def456` in namespace `media` and display all tracked resources
+- **WHEN** the user runs `opm mod tree --instance-id abc123-def456 -n media`
+- **THEN** the command SHALL look up the inventory Secret for instance ID `abc123-def456` in namespace `media` and display all tracked resources
 
 #### Scenario: No resources found
 
-- **WHEN** no inventory Secret (or no tracked resources) is found for the given release selector and namespace
-- **THEN** the command SHALL exit with code 5 and display error "no resources found for release <name|id> in namespace <namespace>"
+- **WHEN** no inventory Secret (or no tracked resources) is found for the given instance selector and namespace
+- **THEN** the command SHALL exit with code 5 and display error "no resources found for instance <name|id> in namespace <namespace>"
 
 ---
 
@@ -148,27 +148,27 @@ The command SHALL support a `--depth` flag with values 0, 1, or 2 to control tre
 
 #### Scenario: Depth 0 shows component summary
 
-- **WHEN** the user runs `opm mod tree --release-name app -n ns --depth 0`
+- **WHEN** the user runs `opm mod tree --instance-name app -n ns --depth 0`
 - **THEN** the output SHALL display component names with resource counts and aggregate status
 - **AND** SHALL NOT display individual resources or Kubernetes-owned children
 - **AND** SHALL NOT query the cluster for child resources
 
 #### Scenario: Depth 1 shows components and OPM resources
 
-- **WHEN** the user runs `opm mod tree --release-name app -n ns --depth 1`
+- **WHEN** the user runs `opm mod tree --instance-name app -n ns --depth 1`
 - **THEN** the output SHALL display component groups and OPM-managed resources
 - **AND** SHALL NOT display Kubernetes-owned children (Pods, ReplicaSets)
 - **AND** SHALL NOT query the cluster for child resources
 
 #### Scenario: Depth 2 shows full hierarchy
 
-- **WHEN** the user runs `opm mod tree --release-name app -n ns --depth 2` OR omits `--depth`
+- **WHEN** the user runs `opm mod tree --instance-name app -n ns --depth 2` OR omits `--depth`
 - **THEN** the output SHALL display components, OPM-managed resources, and Kubernetes-owned children
 - **AND** SHALL query the cluster for ReplicaSets and Pods as needed
 
 #### Scenario: Invalid depth rejected
 
-- **WHEN** the user runs `opm mod tree --release-name app -n ns --depth 5`
+- **WHEN** the user runs `opm mod tree --instance-name app -n ns --depth 5`
 - **THEN** the command SHALL exit with code 1 and display error "invalid depth: must be 0, 1, or 2"
 
 ---
@@ -213,18 +213,18 @@ The command SHALL support `--output`/`-o` with values `table` (default), `json`,
 
 #### Scenario: Default table output
 
-- **WHEN** the user runs `opm mod tree --release-name app -n ns` without `--output`
+- **WHEN** the user runs `opm mod tree --instance-name app -n ns` without `--output`
 - **THEN** the output SHALL be a colored tree with box-drawing characters
 
 #### Scenario: JSON output
 
-- **WHEN** the user runs `opm mod tree --release-name app -n ns -o json`
-- **THEN** the output SHALL be valid JSON with structure: `{"release": {...}, "components": [...]}`
+- **WHEN** the user runs `opm mod tree --instance-name app -n ns -o json`
+- **THEN** the output SHALL be valid JSON with structure: `{"instance": {...}, "components": [...]}`
 - **AND** SHALL contain no ANSI color codes
 
 #### Scenario: YAML output
 
-- **WHEN** the user runs `opm mod tree --release-name app -n ns -o yaml`
+- **WHEN** the user runs `opm mod tree --instance-name app -n ns -o yaml`
 - **THEN** the output SHALL be valid YAML with the same structure as JSON
 - **AND** SHALL contain no ANSI color codes
 
@@ -236,33 +236,33 @@ The command SHALL support `--output`/`-o` with values `table` (default), `json`,
 
 ---
 
-### Requirement: Tree accepts release selector flags
+### Requirement: Tree accepts instance selector flags
 
-The command SHALL accept release selector flags following the same pattern as `mod status` and `mod delete`: exactly one of `--release-name` or `--release-id` MUST be provided, and `--namespace` is required.
+The command SHALL accept instance selector flags following the same pattern as `mod status` and `mod delete`: exactly one of `--instance-name` or `--instance-id` MUST be provided, and `--namespace` is required.
 
-#### Scenario: Release name and namespace required
+#### Scenario: Instance name and namespace required
 
-- **WHEN** the user runs `opm mod tree --release-name app -n production`
-- **THEN** the command SHALL discover resources using the release name selector
+- **WHEN** the user runs `opm mod tree --instance-name app -n production`
+- **THEN** the command SHALL discover resources using the instance name selector
 
-#### Scenario: Release ID selector
+#### Scenario: Instance ID selector
 
-- **WHEN** the user runs `opm mod tree --release-id abc123 -n production`
-- **THEN** the command SHALL discover resources using the release ID selector
+- **WHEN** the user runs `opm mod tree --instance-id abc123 -n production`
+- **THEN** the command SHALL discover resources using the instance ID selector
 
-#### Scenario: Both release-name and release-id rejected
+#### Scenario: Both instance-name and instance-id rejected
 
-- **WHEN** the user provides both `--release-name app` and `--release-id abc123`
-- **THEN** the command SHALL exit with code 1 and error "--release-name and --release-id are mutually exclusive"
+- **WHEN** the user provides both `--instance-name app` and `--instance-id abc123`
+- **THEN** the command SHALL exit with code 1 and error "--instance-name and --instance-id are mutually exclusive"
 
-#### Scenario: Neither release-name nor release-id provided
+#### Scenario: Neither instance-name nor instance-id provided
 
-- **WHEN** the user omits both `--release-name` and `--release-id`
-- **THEN** the command SHALL exit with code 1 and error "either --release-name or --release-id is required"
+- **WHEN** the user omits both `--instance-name` and `--instance-id`
+- **THEN** the command SHALL exit with code 1 and error "either --instance-name or --instance-id is required"
 
 #### Scenario: Missing namespace flag
 
-- **WHEN** the user runs `opm mod tree --release-name app` without `-n`
+- **WHEN** the user runs `opm mod tree --instance-name app` without `-n`
 - **THEN** the command SHALL exit with code 1 and display a usage error indicating `-n` is required
 
 ---
@@ -273,17 +273,17 @@ The command SHALL accept `--kubeconfig` and `--context` flags for cluster connec
 
 #### Scenario: Custom kubeconfig
 
-- **WHEN** the user runs `opm mod tree --kubeconfig /custom/config --release-name app -n ns`
+- **WHEN** the user runs `opm mod tree --kubeconfig /custom/config --instance-name app -n ns`
 - **THEN** the command SHALL use the specified kubeconfig file
 
 #### Scenario: Custom context
 
-- **WHEN** the user runs `opm mod tree --context prod-cluster --release-name app -n ns`
+- **WHEN** the user runs `opm mod tree --context prod-cluster --instance-name app -n ns`
 - **THEN** the command SHALL use the specified Kubernetes context
 
 #### Scenario: Default kubeconfig resolution
 
-- **WHEN** the user runs `opm mod tree --release-name app -n ns` without `--kubeconfig`
+- **WHEN** the user runs `opm mod tree --instance-name app -n ns` without `--kubeconfig`
 - **THEN** the command SHALL resolve kubeconfig from `KUBECONFIG` env var if set, otherwise `~/.kube/config`
 
 ---
@@ -304,19 +304,19 @@ The command SHALL fail immediately with a clear error message if the Kubernetes 
 
 ---
 
-### Requirement: Tree displays release metadata header
+### Requirement: Tree displays instance metadata header
 
-The command SHALL display release metadata in the header: release name, module FQN (if available from labels), version, and namespace.
+The command SHALL display instance metadata in the header: instance name, module FQN (if available from labels), version, and namespace.
 
 #### Scenario: Header with module FQN and version
 
-- **WHEN** resources have labels `module-release.opmodel.dev/name=jellyfin-media` and `module-release.opmodel.dev/version=1.2.0`
+- **WHEN** resources have labels `module-instance.opmodel.dev/name=jellyfin-media` and `module-instance.opmodel.dev/version=1.2.0`
 - **THEN** the tree header SHALL display `jellyfin-media (opmodel.dev/community/jellyfin@1.2.0)` or equivalent metadata
 
 #### Scenario: Header without module FQN
 
 - **WHEN** resources lack module FQN metadata
-- **THEN** the tree header SHALL display release name and version only
+- **THEN** the tree header SHALL display instance name and version only
 
 ---
 

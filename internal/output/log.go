@@ -51,11 +51,11 @@ func SetupLogging(cfg LogConfig) {
 	})
 }
 
-// ReleaseLogger returns a child logger scoped to a release name.
+// InstanceLogger returns a child logger scoped to a instance name.
 // The prefix renders as: m:<name>:
-// with dim "m:" and cyan release name. The trailing ":" is appended
+// with dim "m:" and cyan instance name. The trailing ":" is appended
 // automatically by charmbracelet/log's prefix renderer.
-func ReleaseLogger(name string) *log.Logger {
+func InstanceLogger(name string) *log.Logger {
 	prefix := fmt.Sprintf("%s%s",
 		styleDim.Render("m:"),
 		StyleNoun(name),
