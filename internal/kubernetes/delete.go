@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/opmodel/cli/pkg/resourceorder"
+	"github.com/open-platform-model/cli/pkg/resourceorder"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/opmodel/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/output"
 )
 
 // DeleteOptions configures a delete operation.

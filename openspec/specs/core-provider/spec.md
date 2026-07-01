@@ -12,7 +12,7 @@ Defines provider types in `pkg/provider/`. `Provider` is a thin CUE value wrappe
 The `Provider` and `ProviderMetadata` types SHALL be defined in `pkg/provider/` (moved from `internal/core/provider/`). `Provider` SHALL be a thin CUE value wrapper with NO Go-side `Match()` method.
 
 #### Scenario: Provider is importable from pkg/provider
-- **WHEN** code imports `github.com/opmodel/cli/pkg/provider`
+- **WHEN** code imports `github.com/open-platform-model/cli/pkg/provider`
 - **THEN** `provider.Provider` and `provider.ProviderMetadata` are accessible
 
 #### Scenario: No Match method on Provider

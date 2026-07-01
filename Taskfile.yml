@@ -17,9 +17,9 @@ vars:
   BUILD_DATE:
     sh: date -u +"%Y-%m-%dT%H:%M:%SZ"
   LDFLAGS: >-
-    -X github.com/opmodel/cli/internal/version.Version={{.VERSION}}
-    -X github.com/opmodel/cli/internal/version.GitCommit={{.COMMIT}}
-    -X github.com/opmodel/cli/internal/version.BuildDate={{.BUILD_DATE}}
+    -X github.com/open-platform-model/cli/internal/version.Version={{.VERSION}}
+    -X github.com/open-platform-model/cli/internal/version.GitCommit={{.COMMIT}}
+    -X github.com/open-platform-model/cli/internal/version.BuildDate={{.BUILD_DATE}}
 
 tasks:
   default:

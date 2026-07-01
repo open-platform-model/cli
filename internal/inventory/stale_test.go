@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/opmodel/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/kubernetes"
 )
 
 // helper to build an InventoryEntry quickly

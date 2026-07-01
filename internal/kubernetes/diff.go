@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/output"
 )
 
 // ResourceState represents the state of a resource in a diff comparison.

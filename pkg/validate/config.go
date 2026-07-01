@@ -7,7 +7,7 @@ import (
 	cueerrors "cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/token"
 
-	oerrors "github.com/opmodel/cli/pkg/errors"
+	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
 const fieldNotAllowed = "field not allowed"

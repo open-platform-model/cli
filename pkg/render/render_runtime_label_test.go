@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/pkg/core"
-	"github.com/opmodel/cli/pkg/module"
-	"github.com/opmodel/cli/pkg/provider"
+	"github.com/open-platform-model/cli/pkg/core"
+	"github.com/open-platform-model/cli/pkg/module"
+	"github.com/open-platform-model/cli/pkg/provider"
 )
 
 // TestRender_RuntimeName_StampsManagedByLabel verifies that the CLI render

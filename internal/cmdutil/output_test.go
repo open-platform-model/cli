@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/opmodel/cli/internal/output"
-	pkgerrors "github.com/opmodel/cli/pkg/errors"
+	"github.com/open-platform-model/cli/internal/output"
+	pkgerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
 func TestPrintValidationError_ConfigError(t *testing.T) {

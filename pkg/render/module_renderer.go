@@ -9,9 +9,9 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/pkg/core"
-	"github.com/opmodel/cli/pkg/module"
-	"github.com/opmodel/cli/pkg/provider"
+	"github.com/open-platform-model/cli/pkg/core"
+	"github.com/open-platform-model/cli/pkg/module"
+	"github.com/open-platform-model/cli/pkg/provider"
 )
 
 // ComponentSummary contains display-oriented summary data extracted from a component

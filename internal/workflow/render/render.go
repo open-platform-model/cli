@@ -4,20 +4,20 @@ import (
 	"context"
 	"fmt"
 
-	opmexit "github.com/opmodel/cli/internal/exit"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"cuelang.org/go/cue"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/opmodel/cli/internal/cmdutil"
-	"github.com/opmodel/cli/internal/config"
-	internalinstancefile "github.com/opmodel/cli/internal/instancefile"
-	"github.com/opmodel/cli/internal/output"
-	pkgcore "github.com/opmodel/cli/pkg/core"
-	"github.com/opmodel/cli/pkg/loader"
-	pkgmodule "github.com/opmodel/cli/pkg/module"
-	"github.com/opmodel/cli/pkg/provider"
-	pkgrender "github.com/opmodel/cli/pkg/render"
+	"github.com/open-platform-model/cli/internal/cmdutil"
+	"github.com/open-platform-model/cli/internal/config"
+	internalinstancefile "github.com/open-platform-model/cli/internal/instancefile"
+	"github.com/open-platform-model/cli/internal/output"
+	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	"github.com/open-platform-model/cli/pkg/loader"
+	pkgmodule "github.com/open-platform-model/cli/pkg/module"
+	"github.com/open-platform-model/cli/pkg/provider"
+	pkgrender "github.com/open-platform-model/cli/pkg/render"
 )
 
 // FromInstanceFile prepares and renders an instance from a declarative #ModuleInstance CUE file.

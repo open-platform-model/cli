@@ -1,8 +1,8 @@
 package render
 
 import (
-	"github.com/opmodel/cli/internal/cmdutil"
-	"github.com/opmodel/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/cmdutil"
+	"github.com/open-platform-model/cli/internal/output"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 

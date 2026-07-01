@@ -3,9 +3,9 @@ package cmdutil_test
 import (
 	"testing"
 
-	opmexit "github.com/opmodel/cli/internal/exit"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 
-	"github.com/opmodel/cli/internal/cmdutil"
+	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/stretchr/testify/assert"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"

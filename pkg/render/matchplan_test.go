@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/pkg/core"
-	"github.com/opmodel/cli/pkg/module"
-	"github.com/opmodel/cli/pkg/provider"
-	"github.com/opmodel/cli/pkg/render"
+	"github.com/open-platform-model/cli/pkg/core"
+	"github.com/open-platform-model/cli/pkg/module"
+	"github.com/open-platform-model/cli/pkg/provider"
+	"github.com/open-platform-model/cli/pkg/render"
 )
 
 func TestModuleRenderer_RenderReturnsNonNilEmptySlices(t *testing.T) {

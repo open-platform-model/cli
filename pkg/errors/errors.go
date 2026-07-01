@@ -1,5 +1,5 @@
 // Package errors provides sentinel errors and structured error types for the OPM CLI.
-// Import alias convention: import oerrors "github.com/opmodel/cli/pkg/errors"
+// Import alias convention: import oerrors "github.com/open-platform-model/cli/pkg/errors"
 package errors
 
 import (

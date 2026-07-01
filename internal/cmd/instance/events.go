@@ -5,10 +5,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/cmdutil"
-	"github.com/opmodel/cli/internal/config"
-	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/internal/workflow/query"
+	"github.com/open-platform-model/cli/internal/cmdutil"
+	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/workflow/query"
 )
 
 // NewInstanceEventsCmd creates the instance events command.

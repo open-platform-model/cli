@@ -3,9 +3,9 @@ package query
 import (
 	"testing"
 
-	"github.com/opmodel/cli/internal/cmdutil"
-	"github.com/opmodel/cli/internal/inventory"
-	"github.com/opmodel/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/cmdutil"
+	"github.com/open-platform-model/cli/internal/inventory"
+	"github.com/open-platform-model/cli/internal/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/opmodel/cli/internal/inventory"
+	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -8,8 +8,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/kubernetes"
-	"github.com/opmodel/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/output"
 )
 
 // DiscoverResourcesFromInventory fetches the live state of each resource

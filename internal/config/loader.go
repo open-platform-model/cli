@@ -11,8 +11,8 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/load"
 
-	"github.com/opmodel/cli/internal/output"
-	oerrors "github.com/opmodel/cli/pkg/errors"
+	"github.com/open-platform-model/cli/internal/output"
+	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
 // LoaderOptions contains options for loading configuration.

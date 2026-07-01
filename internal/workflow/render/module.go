@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"path/filepath"
 
-	opmexit "github.com/opmodel/cli/internal/exit"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/internal/cmdutil"
-	"github.com/opmodel/cli/internal/config"
-	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/pkg/loader"
-	pkgmodule "github.com/opmodel/cli/pkg/module"
+	"github.com/open-platform-model/cli/internal/cmdutil"
+	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/pkg/loader"
+	pkgmodule "github.com/open-platform-model/cli/pkg/module"
 )
 
 // FromModule synthesizes a #ModuleInstance from a module-package directory and

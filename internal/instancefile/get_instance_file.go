@@ -13,8 +13,8 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/pkg/loader"
-	"github.com/opmodel/cli/pkg/module"
+	"github.com/open-platform-model/cli/pkg/loader"
+	"github.com/open-platform-model/cli/pkg/module"
 )
 
 type Kind string

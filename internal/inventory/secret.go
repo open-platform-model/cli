@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	pkgcore "github.com/opmodel/cli/pkg/core"
+	pkgcore "github.com/open-platform-model/cli/pkg/core"
 )
 
 const (

@@ -8,12 +8,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/cmdutil"
-	"github.com/opmodel/cli/internal/config"
-	opmexit "github.com/opmodel/cli/internal/exit"
-	"github.com/opmodel/cli/internal/output"
-	workflowapply "github.com/opmodel/cli/internal/workflow/apply"
-	"github.com/opmodel/cli/internal/workflow/render"
+	"github.com/open-platform-model/cli/internal/cmdutil"
+	"github.com/open-platform-model/cli/internal/config"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/output"
+	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
+	"github.com/open-platform-model/cli/internal/workflow/render"
 )
 
 // NewModuleApplyCmd creates the module apply command.

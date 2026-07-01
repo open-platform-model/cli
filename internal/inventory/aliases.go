@@ -1,6 +1,6 @@
 package inventory
 
-import pkginventory "github.com/opmodel/cli/pkg/inventory"
+import pkginventory "github.com/open-platform-model/cli/pkg/inventory"
 
 type (
 	InventoryEntry = pkginventory.InventoryEntry //nolint:revive // compatibility alias while contract moves to pkg/inventory

@@ -8,8 +8,8 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
-	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/pkg/validate"
+	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/pkg/validate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	oerrors "github.com/opmodel/cli/pkg/errors"
+	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
 // UnmatchedComponentsError is returned when one or more components have no

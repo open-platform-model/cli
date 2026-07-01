@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	opmexit "github.com/opmodel/cli/internal/exit"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 
-	"github.com/opmodel/cli/internal/inventory"
-	"github.com/opmodel/cli/internal/kubernetes"
-	"github.com/opmodel/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/inventory"
+	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/output"
 	"gopkg.in/yaml.v3"
 )
 

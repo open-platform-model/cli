@@ -4,7 +4,7 @@ package modulecmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/config"
 )
 
 // NewModuleCmd creates the module command group.

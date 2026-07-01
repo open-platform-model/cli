@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/opmodel/cli/pkg/module"
-	"github.com/opmodel/cli/pkg/provider"
+	"github.com/open-platform-model/cli/pkg/module"
+	"github.com/open-platform-model/cli/pkg/provider"
 )
 
 // ProcessModuleInstance renders a prepared instance with the given provider.

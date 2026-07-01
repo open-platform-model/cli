@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/pkg/core"
+	"github.com/open-platform-model/cli/pkg/core"
 )
 
 // deploymentCUE is a minimal concrete Kubernetes Deployment manifest in CUE.

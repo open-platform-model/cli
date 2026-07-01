@@ -5,9 +5,9 @@ builds:
   - main: ./cmd/opm
     binary: opm
     ldflags:
-      - -X github.com/opmodel/cli/internal/version.Version={{ .Version }}
-      - -X github.com/opmodel/cli/internal/version.GitCommit={{ .Commit }}
-      - -X github.com/opmodel/cli/internal/version.BuildDate={{ .Date }}
+      - -X github.com/open-platform-model/cli/internal/version.Version={{ .Version }}
+      - -X github.com/open-platform-model/cli/internal/version.GitCommit={{ .Commit }}
+      - -X github.com/open-platform-model/cli/internal/version.BuildDate={{ .Date }}
     goos:
       - linux
       - darwin

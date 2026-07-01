@@ -11,8 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/opmodel/cli/internal/inventory"
-	"github.com/opmodel/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/inventory"
+	"github.com/open-platform-model/cli/internal/kubernetes"
 )
 
 func makeTestClient(objects ...runtime.Object) *kubernetes.Client {

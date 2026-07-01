@@ -6,15 +6,15 @@ import (
 	"strings"
 	"time"
 
-	opmexit "github.com/opmodel/cli/internal/exit"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"github.com/charmbracelet/log"
-	"github.com/opmodel/cli/internal/inventory"
-	"github.com/opmodel/cli/internal/kubernetes"
-	"github.com/opmodel/cli/internal/output"
-	workflowrender "github.com/opmodel/cli/internal/workflow/render"
-	pkginventory "github.com/opmodel/cli/pkg/inventory"
-	"github.com/opmodel/cli/pkg/ownership"
+	"github.com/open-platform-model/cli/internal/inventory"
+	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/output"
+	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
+	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
+	"github.com/open-platform-model/cli/pkg/ownership"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )

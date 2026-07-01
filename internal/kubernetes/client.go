@@ -15,7 +15,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	oerrors "github.com/opmodel/cli/pkg/errors"
+	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
 // ClientOptions configures Kubernetes client creation.

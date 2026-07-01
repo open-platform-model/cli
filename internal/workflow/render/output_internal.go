@@ -1,7 +1,7 @@
 package render
 
 import (
-	"github.com/opmodel/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/output"
 )
 
 func showOutput(result *Result, opts ShowOutputOpts) {

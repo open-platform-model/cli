@@ -6,8 +6,8 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/pkg/core"
-	"github.com/opmodel/cli/pkg/module"
+	"github.com/open-platform-model/cli/pkg/core"
+	"github.com/open-platform-model/cli/pkg/module"
 )
 
 // moduleInstanceContextData is the Go-side mirror of #TransformerContext.#moduleInstanceMetadata.

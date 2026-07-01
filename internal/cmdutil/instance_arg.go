@@ -8,8 +8,8 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 
-	"github.com/opmodel/cli/internal/config"
-	"github.com/opmodel/cli/pkg/loader"
+	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/pkg/loader"
 )
 
 // InstanceArg holds the resolved instance identifier from a positional CLI arg.

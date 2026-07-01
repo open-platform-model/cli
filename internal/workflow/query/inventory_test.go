@@ -5,12 +5,12 @@ import (
 	"errors"
 	"testing"
 
-	opmexit "github.com/opmodel/cli/internal/exit"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"github.com/charmbracelet/log"
-	"github.com/opmodel/cli/internal/cmdutil"
-	"github.com/opmodel/cli/internal/inventory"
-	"github.com/opmodel/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/cmdutil"
+	"github.com/open-platform-model/cli/internal/inventory"
+	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"

@@ -8,14 +8,14 @@ import (
 	"strings"
 	"unicode"
 
-	opmexit "github.com/opmodel/cli/internal/exit"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/config"
-	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/internal/templates"
-	oerrors "github.com/opmodel/cli/pkg/errors"
+	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/templates"
+	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
 // moduleNameRegex enforces a strict subset of the module-path segment grammar:

@@ -23,9 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/inventory"
-	"github.com/opmodel/cli/internal/kubernetes"
-	pkgcore "github.com/opmodel/cli/pkg/core"
+	"github.com/open-platform-model/cli/internal/inventory"
+	"github.com/open-platform-model/cli/internal/kubernetes"
+	pkgcore "github.com/open-platform-model/cli/pkg/core"
 )
 
 const (

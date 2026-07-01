@@ -1,8 +1,8 @@
 package inventory
 
 import (
-	pkginventory "github.com/opmodel/cli/pkg/inventory"
-	"github.com/opmodel/cli/pkg/ownership"
+	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
+	"github.com/open-platform-model/cli/pkg/ownership"
 )
 
 type CreatedBy string

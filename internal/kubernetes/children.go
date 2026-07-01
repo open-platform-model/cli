@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/opmodel/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/output"
 )
 
 // DiscoverChildren finds Kubernetes-owned child resources of the given parents.
