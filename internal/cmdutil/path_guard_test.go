@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/config"
 )
 
 func TestValidateModuleInputPath_RejectsInstancePackage(t *testing.T) {

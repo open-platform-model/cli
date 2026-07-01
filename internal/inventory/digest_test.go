@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	pkgcore "github.com/opmodel/cli/pkg/core"
+	pkgcore "github.com/open-platform-model/cli/pkg/core"
 )
 
 // makeResourceWithContent builds a *unstructured.Unstructured with the given object fields.

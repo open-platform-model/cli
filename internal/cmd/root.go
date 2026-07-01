@@ -6,12 +6,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	cmdconfig "github.com/opmodel/cli/internal/cmd/config"
-	cmdinstance "github.com/opmodel/cli/internal/cmd/instance" // Was: cmdrelease "…/internal/cmd/release" (enhancement 0002 D6)
-	cmdmodule "github.com/opmodel/cli/internal/cmd/module"
-	"github.com/opmodel/cli/internal/cmdutil"
-	"github.com/opmodel/cli/internal/config"
-	"github.com/opmodel/cli/internal/output"
+	cmdconfig "github.com/open-platform-model/cli/internal/cmd/config"
+	cmdinstance "github.com/open-platform-model/cli/internal/cmd/instance" // Was: cmdrelease "…/internal/cmd/release" (enhancement 0002 D6)
+	cmdmodule "github.com/open-platform-model/cli/internal/cmd/module"
+	"github.com/open-platform-model/cli/internal/cmdutil"
+	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/output"
 )
 
 // NewRootCmd creates the root command for the OPM CLI.

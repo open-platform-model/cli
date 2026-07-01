@@ -7,7 +7,7 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/pkg/loader"
+	"github.com/open-platform-model/cli/pkg/loader"
 )
 
 func resolveInstanceValues(cueCtx *cue.Context, rawInstance cue.Value, instanceFilePath string, valuesFiles []string) ([]cue.Value, error) {

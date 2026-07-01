@@ -7,9 +7,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/opmodel/cli/internal/kubernetes"
-	"github.com/opmodel/cli/internal/output"
-	pkgcore "github.com/opmodel/cli/pkg/core"
+	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/output"
+	pkgcore "github.com/open-platform-model/cli/pkg/core"
 )
 
 // ListInventories discovers all inventory Secrets in the given namespace.

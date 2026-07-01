@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/opmodel/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/output"
 )
 
 // MissingResource identifies a resource that is tracked in the inventory but

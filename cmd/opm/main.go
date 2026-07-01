@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	opmexit "github.com/opmodel/cli/internal/exit"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 
-	"github.com/opmodel/cli/internal/cmd"
+	"github.com/open-platform-model/cli/internal/cmd"
 )
 
 func main() {

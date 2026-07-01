@@ -4,12 +4,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/opmodel/cli/internal/inventory"
+	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/cmdutil"
-	"github.com/opmodel/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/cmdutil"
+	"github.com/open-platform-model/cli/internal/config"
 )
 
 // --- 8.1 Unit tests for instance render commands ---

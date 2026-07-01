@@ -5,15 +5,15 @@ import (
 	"os"
 	"path/filepath"
 
-	opmexit "github.com/opmodel/cli/internal/exit"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/cmdutil"
-	"github.com/opmodel/cli/internal/config"
-	"github.com/opmodel/cli/internal/cuetidy"
-	"github.com/opmodel/cli/internal/output"
-	oerrors "github.com/opmodel/cli/pkg/errors"
+	"github.com/open-platform-model/cli/internal/cmdutil"
+	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/cuetidy"
+	"github.com/open-platform-model/cli/internal/output"
+	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
 // NewConfigInitCmd creates the config init command.

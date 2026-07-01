@@ -1,6 +1,6 @@
 package cmdutil
 
-import "github.com/opmodel/cli/internal/output"
+import "github.com/open-platform-model/cli/internal/output"
 
 // LogResolvedKubernetesConfig emits the resolved Kubernetes config at debug level.
 func LogResolvedKubernetesConfig(k8sConfigNamespace, kubeconfig, contextName string) {

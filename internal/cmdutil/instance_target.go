@@ -3,9 +3,9 @@ package cmdutil
 import (
 	"fmt"
 
-	opmexit "github.com/opmodel/cli/internal/exit"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 
-	"github.com/opmodel/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/config"
 )
 
 // ResolvedInstanceTarget bundles selector and Kubernetes config for instance commands.

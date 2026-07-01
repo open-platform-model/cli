@@ -9,10 +9,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/opmodel/cli/internal/kubernetes"
-	"github.com/opmodel/cli/internal/output"
-	pkgcore "github.com/opmodel/cli/pkg/core"
-	"github.com/opmodel/cli/pkg/resourceorder"
+	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/output"
+	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	"github.com/open-platform-model/cli/pkg/resourceorder"
 )
 
 // ApplyComponentRenameSafetyCheck filters the stale set to remove entries

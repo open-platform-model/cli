@@ -8,7 +8,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	pkgcore "github.com/opmodel/cli/pkg/core"
+	pkgcore "github.com/open-platform-model/cli/pkg/core"
 )
 
 func NewEntryFromResource(r *unstructured.Unstructured) InventoryEntry {

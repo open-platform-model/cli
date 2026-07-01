@@ -4,7 +4,7 @@ package config
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/config"
 )
 
 // NewConfigCmd creates the config command group.

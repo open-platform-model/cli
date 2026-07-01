@@ -7,14 +7,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	opmexit "github.com/opmodel/cli/internal/exit"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
-	"github.com/opmodel/cli/internal/config"
-	internalinstancefile "github.com/opmodel/cli/internal/instancefile"
-	"github.com/opmodel/cli/pkg/module"
-	"github.com/opmodel/cli/pkg/validate"
+	"github.com/open-platform-model/cli/internal/config"
+	internalinstancefile "github.com/open-platform-model/cli/internal/instancefile"
+	"github.com/open-platform-model/cli/pkg/module"
+	"github.com/open-platform-model/cli/pkg/validate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

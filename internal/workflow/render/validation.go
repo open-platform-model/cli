@@ -1,7 +1,7 @@
 package render
 
 import (
-	"github.com/opmodel/cli/internal/cmdutil"
+	"github.com/open-platform-model/cli/internal/cmdutil"
 )
 
 func printValidationError(err error) {

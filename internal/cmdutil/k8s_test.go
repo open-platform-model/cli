@@ -4,9 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	opmexit "github.com/opmodel/cli/internal/exit"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 
-	"github.com/opmodel/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

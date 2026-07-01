@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	opmconfig "github.com/opmodel/cli/internal/config"
+	opmconfig "github.com/open-platform-model/cli/internal/config"
 )
 
 func TestNewConfigInitCmd(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/opmodel/cli/pkg/validate"
+	"github.com/open-platform-model/cli/pkg/validate"
 )
 
 // ParseModuleInstance validates values, fills them into the instance spec,

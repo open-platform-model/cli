@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/opmodel/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/output"
 )
 
 func formatFQNList(fqns []string) string {

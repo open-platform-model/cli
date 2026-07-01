@@ -12,12 +12,12 @@ Defines the error types domain for OPM. All error types are exported from `pkg/e
 All error types SHALL be defined in `pkg/errors/` (moved from `internal/errors/`). All existing types MUST be preserved: `DetailError`, `ExitError`, `TransformError`, `ValidationError`, `ValuesValidationError`, `FieldError`, `ConflictError`, sentinel errors (`ErrValidation`, `ErrConnectivity`, `ErrPermission`, `ErrNotFound`), and exit code constants.
 
 #### Scenario: Error types importable from pkg/errors
-- **WHEN** code imports `github.com/opmodel/cli/pkg/errors`
+- **WHEN** code imports `github.com/open-platform-model/cli/pkg/errors`
 - **THEN** all error types, sentinels, and exit code constants are accessible
 
 #### Scenario: Import alias convention
 - **WHEN** code imports `pkg/errors` alongside stdlib `errors`
-- **THEN** the convention `import oerrors "github.com/opmodel/cli/pkg/errors"` SHALL be used
+- **THEN** the convention `import oerrors "github.com/open-platform-model/cli/pkg/errors"` SHALL be used
 
 ### Requirement: ConfigError type for gate validation
 The `pkg/errors` package (or `pkg/loader`) SHALL export a `ConfigError` type that carries the gate context ("module" or "bundle"), the release name, and the raw CUE error. It SHALL provide `FieldErrors() []FieldError` for structured parsing and `Unwrap() error` for error chain compatibility.

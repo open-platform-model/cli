@@ -168,7 +168,7 @@ Subpackages SHALL use correct import paths for internal and external dependencie
 #### Scenario: Subpackage imports shared types
 
 - **WHEN** a subpackage needs LoadedComponent
-- **THEN** it SHALL import `"github.com/opmodel/cli/internal/build"`
+- **THEN** it SHALL import `"github.com/open-platform-model/cli/internal/build"`
 
 #### Scenario: Import order maintained
 

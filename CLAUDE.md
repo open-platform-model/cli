@@ -41,7 +41,7 @@ Read when entering `cli/`:
 
 ## Environment Notes
 
-- Go version in `go.mod`: `1.25.0`.
+- Go version in `go.mod`: `1.26.0`.
 - Integration + CUE workflows need registry config.
 - Local dev defaults:
 
@@ -108,7 +108,7 @@ export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
 
 - Standard Go order: stdlib, third-party, internal project imports.
 - Blank lines between groups as `goimports` produces.
-- Alias `github.com/opmodel/cli/pkg/errors` as `oerrors`.
+- Alias `github.com/open-platform-model/cli/pkg/errors` as `oerrors`.
 - No unnecessary aliases unless collision or strong clarity reason.
 
 ### Types and APIs

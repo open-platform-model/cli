@@ -3,9 +3,9 @@ package render
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/opmodel/cli/internal/config"
-	pkgmodule "github.com/opmodel/cli/pkg/module"
-	pkgrender "github.com/opmodel/cli/pkg/render"
+	"github.com/open-platform-model/cli/internal/config"
+	pkgmodule "github.com/open-platform-model/cli/pkg/module"
+	pkgrender "github.com/open-platform-model/cli/pkg/render"
 )
 
 // Result is the output of the shared render workflow.

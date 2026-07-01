@@ -5,16 +5,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	opmexit "github.com/opmodel/cli/internal/exit"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"cuelang.org/go/cue"
 	"github.com/spf13/cobra"
 
-	"github.com/opmodel/cli/internal/cmdutil"
-	"github.com/opmodel/cli/internal/config"
-	"github.com/opmodel/cli/internal/output"
-	"github.com/opmodel/cli/pkg/loader"
-	"github.com/opmodel/cli/pkg/validate"
+	"github.com/open-platform-model/cli/internal/cmdutil"
+	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/pkg/loader"
+	"github.com/open-platform-model/cli/pkg/validate"
 )
 
 // NewModuleVetCmd creates the module vet command.

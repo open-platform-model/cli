@@ -3,7 +3,7 @@ package output
 import (
 	"testing"
 
-	pkgerrors "github.com/opmodel/cli/pkg/errors"
+	pkgerrors "github.com/open-platform-model/cli/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 

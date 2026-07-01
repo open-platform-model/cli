@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/cmdutil"
-	"github.com/opmodel/cli/internal/config"
-	opmexit "github.com/opmodel/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/cmdutil"
+	"github.com/open-platform-model/cli/internal/config"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 )
 
 func TestNewModuleApplyCmd(t *testing.T) {

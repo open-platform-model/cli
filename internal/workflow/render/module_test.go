@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/opmodel/cli/internal/config"
-	opmexit "github.com/opmodel/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/config"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 )
 
 func TestFromModule_NilConfig(t *testing.T) {

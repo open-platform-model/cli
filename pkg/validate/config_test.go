@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	oerrors "github.com/opmodel/cli/pkg/errors"
+	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
 func TestConfig_MergesValues(t *testing.T) {

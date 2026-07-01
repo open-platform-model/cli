@@ -1,4 +1,4 @@
-module github.com/opmodel/cli
+module github.com/open-platform-model/cli
 
 go 1.26.0
 

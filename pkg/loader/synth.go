@@ -10,7 +10,7 @@ import (
 	"cuelang.org/go/cue/load"
 	"cuelang.org/go/mod/modfile"
 
-	oerrors "github.com/opmodel/cli/pkg/errors"
+	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
 const catalogModulePath = "opmodel.dev/core/v1alpha1@v1"
