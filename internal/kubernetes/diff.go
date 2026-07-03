@@ -304,7 +304,7 @@ func buildNameIndex(live []interface{}) map[string]map[string]interface{} {
 
 // FetchLiveState fetches a single resource from the cluster.
 func fetchLiveState(ctx context.Context, client *Client, resource *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	gvr := gvrFromUnstructured(resource)
+	gvr := GVRFromUnstructured(resource)
 	ns := resource.GetNamespace()
 	name := resource.GetName()
 

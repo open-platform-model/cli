@@ -1,6 +1,8 @@
 # Build artifacts
 bin/
 dist/
+!internal/operator/dist/
+!internal/operator/dist/install.yaml
 *.exe
 *.test
 *.out

@@ -213,3 +213,26 @@ tasks:
     desc: Run go generate
     cmds:
       - go generate ./...
+
+  #########################
+  ## Operator lifecycle tasks
+  #########################
+  operator:sync:
+    desc: Refresh the embedded opm-operator manifest and version pin
+    summary: |
+      Downloads dist/install.yaml from the given opm-operator GitHub release tag,
+      replaces the embedded copy, and rewrites PinnedOperatorVersion to match.
+      The whole upgrade is one reviewable diff.
+
+      Usage:
+        task operator:sync VERSION=v1.0.0-alpha.3
+    vars:
+      VERSION: '{{.VERSION | default ""}}'
+    preconditions:
+      - sh: '[ -n "{{.VERSION}}" ]'
+        msg: "VERSION variable is required. Usage: task operator:sync VERSION=<tag>"
+    cmds:
+      - curl -sfL "https://github.com/open-platform-model/opm-operator/releases/download/{{.VERSION}}/install.yaml" -o internal/operator/dist/install.yaml
+      - perl -pi -e 's/^const PinnedOperatorVersion = ".*"/const PinnedOperatorVersion = "{{.VERSION}}"/' internal/operator/manifest.go
+      - gofmt -w internal/operator/manifest.go
+      - echo "Synced embedded operator manifest to {{.VERSION}}"

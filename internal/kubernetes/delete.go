@@ -141,7 +141,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 
 // deleteResource deletes a single resource with foreground propagation.
 func deleteResource(ctx context.Context, client *Client, obj *unstructured.Unstructured) error {
-	gvr := gvrFromUnstructured(obj)
+	gvr := GVRFromUnstructured(obj)
 	ns := obj.GetNamespace()
 	propagation := metav1.DeletePropagationForeground
 

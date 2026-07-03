@@ -8,8 +8,8 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-// gvrFromUnstructured derives GroupVersionResource from an unstructured object.
-func gvrFromUnstructured(obj *unstructured.Unstructured) schema.GroupVersionResource {
+// GVRFromUnstructured derives GroupVersionResource from an unstructured object.
+func GVRFromUnstructured(obj *unstructured.Unstructured) schema.GroupVersionResource {
 	gvk := obj.GroupVersionKind()
 	return schema.GroupVersionResource{
 		Group:    gvk.Group,
