@@ -67,7 +67,7 @@ func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstru
 		ns := res.GetNamespace()
 
 		// Apply the resource
-		status, err := applyResource(ctx, client, res, opts)
+		status, err := ApplyOne(ctx, client, res, opts)
 		if err != nil {
 			instanceLog.Warn(fmt.Sprintf("applying %s/%s: %v", kind, name, err))
 			result.Errors = append(result.Errors, resourceError{
@@ -94,10 +94,10 @@ func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstru
 	return result, nil
 }
 
-// applyResource performs server-side apply for a single resource.
+// ApplyOne performs server-side apply for a single resource.
 // Returns the status of the operation (created, configured, or unchanged).
-func applyResource(ctx context.Context, client *Client, obj *unstructured.Unstructured, opts ApplyOptions) (string, error) {
-	gvr := gvrFromUnstructured(obj)
+func ApplyOne(ctx context.Context, client *Client, obj *unstructured.Unstructured, opts ApplyOptions) (string, error) {
+	gvr := GVRFromUnstructured(obj)
 	ns := obj.GetNamespace()
 
 	// Check if resource already exists to determine status after apply.

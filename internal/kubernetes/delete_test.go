@@ -59,10 +59,10 @@ func TestDelete_DeletesOnlyTrackedInventoryResources(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Equal(t, 1, result.Deleted)
 
-	_, err = client.ResourceClient(gvrFromUnstructured(tracked), namespace).Get(ctx, tracked.GetName(), metav1.GetOptions{})
+	_, err = client.ResourceClient(GVRFromUnstructured(tracked), namespace).Get(ctx, tracked.GetName(), metav1.GetOptions{})
 	assert.Error(t, err)
 
-	remaining, err := client.ResourceClient(gvrFromUnstructured(untracked), namespace).Get(ctx, untracked.GetName(), metav1.GetOptions{})
+	remaining, err := client.ResourceClient(GVRFromUnstructured(untracked), namespace).Get(ctx, untracked.GetName(), metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, untracked.GetName(), remaining.GetName())
 

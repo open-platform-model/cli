@@ -74,6 +74,29 @@ Use `opm instance` when you are starting from an instance file or when you want 
 | `config init` | Initialize OPM configuration |
 | `config vet` | Validate configuration |
 
+### Operator Lifecycle (`opm operator`)
+
+Use `opm operator` to put the opm-operator (and its CRDs) onto a cluster — a prerequisite for any `opm instance apply`.
+
+| Command | Description |
+|---------|-------------|
+| `operator install` | Install the opm-operator (`--crds-only`, `--rbac [--user\|--group]`, `--version`, `--timeout`) |
+| `operator uninstall` | Remove the opm-operator, preserving CRDs and its Namespace (`--remove-finalizers`) |
+
+```bash
+# Install the full operator and wait for it to become ready
+opm operator install
+
+# CLI-solo path: install just the CRDs, no running operator
+opm operator install --crds-only
+
+# Grant a non-admin user access to ModuleInstances
+opm operator install --crds-only --rbac --user alice
+
+# Remove the operator (refuses while any ModuleInstance is still active)
+opm operator uninstall
+```
+
 ## Example Instance Workflow
 
 ```bash

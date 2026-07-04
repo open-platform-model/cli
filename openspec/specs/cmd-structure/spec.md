@@ -43,6 +43,12 @@ The `internal/cmd/` package SHALL be split into sub-packages that mirror the cob
 - **AND** the `instance build` subcommand SHALL accept either an instance `.cue` file or a module-package directory as its positional argument
 - **AND** when the argument is a directory the subcommand SHALL delegate to the same module-synthesis path used by `opm module build`
 
+#### Scenario: operator commands are in their own package
+
+- **WHEN** the `internal/cmd/operator/` directory is inspected
+- **THEN** it SHALL contain the `operator` sub-command implementations: `install`, `uninstall`
+- **AND** the commands SHALL be thin cobra wiring that delegates all behavior to `internal/operator/`
+
 ### Requirement: Instance command group registered at root level
 
 The root command SHALL register `opm instance` (alias: `inst`) as a top-level command group via `cmdinstance.NewInstanceCmd(&cfg)`. This SHALL follow the same dependency injection pattern as `mod` and `config` groups. The former `cmdrelease.NewReleaseCmd` registration is removed (no back-compat alias — enhancement 0002 D8).
@@ -52,6 +58,16 @@ The root command SHALL register `opm instance` (alias: `inst`) as a top-level co
 - **WHEN** `internal/cmd/root.go` is inspected
 - **THEN** it SHALL contain `rootCmd.AddCommand(cmdinstance.NewInstanceCmd(&cfg))`
 - **AND** it SHALL NOT contain `cmdrelease.NewReleaseCmd`
+
+### Requirement: Operator command group registered at root level
+
+The root command SHALL register `opm operator` as a top-level command group via `cmdoperator.NewOperatorCmd(&cfg)`, following the same `GlobalConfig` dependency-injection pattern as the `module`, `instance`, and `config` groups. The group is noun-first (enhancement 0006 D32): there are no `opm install` or `opm uninstall` verb groups at root level.
+
+#### Scenario: Root command registers operator group
+
+- **WHEN** `internal/cmd/root.go` is inspected
+- **THEN** it SHALL contain `rootCmd.AddCommand(cmdoperator.NewOperatorCmd(&cfg))`
+- **AND** the root command SHALL NOT register `install` or `uninstall` as top-level commands
 
 ### Requirement: Cluster-query commands migrate from mod to instance
 

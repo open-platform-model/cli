@@ -43,7 +43,7 @@ The `*Client` type SHALL provide a `ResourceClient` method that accepts a `schem
 
 #### Scenario: Apply uses ResourceClient for GET and PATCH
 
-- **WHEN** `applyResource` performs a GET to check existing state and a PATCH to apply
+- **WHEN** `ApplyOne` performs a GET to check existing state and a PATCH to apply
 - **THEN** both operations SHALL use `client.ResourceClient(gvr, ns)` instead of inline `if ns != ""` branching
 
 #### Scenario: Delete uses ResourceClient

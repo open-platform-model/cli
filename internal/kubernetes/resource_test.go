@@ -59,23 +59,23 @@ func TestHeuristicPluralize(t *testing.T) {
 	}
 }
 
-func TestGvrFromUnstructured(t *testing.T) {
+func TestGVRFromUnstructured(t *testing.T) {
 	obj := &unstructured.Unstructured{}
 	obj.SetAPIVersion("apps/v1")
 	obj.SetKind("Deployment")
 
-	gvr := gvrFromUnstructured(obj)
+	gvr := GVRFromUnstructured(obj)
 	assert.Equal(t, "apps", gvr.Group)
 	assert.Equal(t, "v1", gvr.Version)
 	assert.Equal(t, "deployments", gvr.Resource)
 }
 
-func TestGvrFromUnstructured_CoreGroup(t *testing.T) {
+func TestGVRFromUnstructured_CoreGroup(t *testing.T) {
 	obj := &unstructured.Unstructured{}
 	obj.SetAPIVersion("v1")
 	obj.SetKind("Service")
 
-	gvr := gvrFromUnstructured(obj)
+	gvr := GVRFromUnstructured(obj)
 	assert.Equal(t, "", gvr.Group)
 	assert.Equal(t, "v1", gvr.Version)
 	assert.Equal(t, "services", gvr.Resource)
