@@ -16,12 +16,12 @@ deps: {
 		v: "v0.0.4"
 	}
 	"opmodel.dev/modules/jellyfin@v1": {
-		v: "v1.0.31"
+		v: "v1.0.32"
 	}
 	"opmodel.dev/modules/mc_java_fleet@v0": {
-		v: "v0.1.3"
+		v: "v0.2.0"
 	}
 	"opmodel.dev/opm/v1alpha1@v1": {
-		v: "v1.5.9"
+		v: "v1.6.0"
 	}
 }
