@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 
 	"github.com/open-platform-model/cli/pkg/core"
 	"github.com/open-platform-model/cli/pkg/module"
@@ -84,8 +85,11 @@ func (r *Module) Execute(
 	dataComponents cue.Value,
 	plan *MatchPlan,
 ) (*ModuleResult, error) {
-	// The CUE context lives on each cue.Value — extract it from the provider.
-	cueCtx := r.provider.Data.Context()
+	// A one-off context for values built during execution (encoded metadata,
+	// filled transforms). v0.17 permits combining values across contexts, so it
+	// need not match the provider's or instance's context; minting a fresh one
+	// avoids the deprecated cue.Value.Context accessor.
+	cueCtx := cuecontext.New()
 
 	if plan == nil {
 		return nil, fmt.Errorf("match plan is required")

@@ -20,9 +20,9 @@ import (
 // previous directory on return. Callers must not invoke Run concurrently from
 // multiple goroutines for the same process.
 //
-// out receives the underlying command's output (cuelang's `Command.SetOutput`
-// drives a single writer for both stdout-style messages and the error printer).
-// Pass io.Discard to silence it.
+// out receives the underlying command's output: it is set as both the stdout
+// writer (SetOut) and the stderr/error-printer writer (SetErr), so a single
+// writer captures everything. Pass io.Discard to silence it.
 func Run(ctx context.Context, dir string, out io.Writer) error {
 	if out == nil {
 		out = io.Discard
@@ -45,7 +45,12 @@ func Run(ctx context.Context, dir string, out io.Writer) error {
 	if newErr != nil {
 		return fmt.Errorf("constructing cue command: %w", newErr)
 	}
-	cmd.SetOutput(out)
+	// SetOutput is deprecated; SetOut + SetErr to the same writer reproduces it
+	// (both go to `out`, inherited by the `mod tidy` subcommand). cuelang's
+	// SetOut routes to the root command and SetErr to the active one, which are
+	// the same command at this point (before Run reassigns to the subcommand).
+	cmd.SetOut(out)
+	cmd.SetErr(out)
 
 	return cmd.Run(ctx)
 }
