@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"cuelang.org/go/cue/cuecontext"
+
 	"github.com/open-platform-model/cli/pkg/module"
 	"github.com/open-platform-model/cli/pkg/provider"
 )
@@ -24,7 +26,7 @@ func ProcessModuleInstance(ctx context.Context, rel *module.Instance, p *provide
 		return nil, fmt.Errorf("instance %q: no components field in instance spec", rel.Metadata.Name)
 	}
 
-	dataComponents, err := finalizeValue(p.Data.Context(), schemaComponents)
+	dataComponents, err := finalizeValue(cuecontext.New(), schemaComponents)
 	if err != nil {
 		return nil, fmt.Errorf("finalizing components: %w", err)
 	}
