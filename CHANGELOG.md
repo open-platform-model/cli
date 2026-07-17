@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.0.0-alpha.1](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha...v1.0.0-alpha.1) (2026-07-17)
+
+
+### Features
+
+* **cli:** operator install command ([#105](https://github.com/open-platform-model/cli/issues/105)) ([5ab639b](https://github.com/open-platform-model/cli/commit/5ab639bcd88f54489722a01f436d217a2870c9e6))
+
+
+### Documentation
+
+* **openspec:** draft cli-cr-inventory-backend change (0006 C1) ([4cc446b](https://github.com/open-platform-model/cli/commit/4cc446baaaa628d8033be68dc79d9daa850a42f7))
+
+
+### Code Refactoring
+
+* **cli:** rename go module to github.com/open-platform-model/cli ([#101](https://github.com/open-platform-model/cli/issues/101)) ([35fe6e3](https://github.com/open-platform-model/cli/commit/35fe6e3db51febaccae274dfa477588985c1a1f8))
+
+
+### Miscellaneous Chores
+
+* drop the sticky release-as override from release-please ([#110](https://github.com/open-platform-model/cli/issues/110)) ([b312be3](https://github.com/open-platform-model/cli/commit/b312be32a8743b2a9b42f627f7f352caab262d9f))
+* **main:** release 1.0.0-alpha ([#102](https://github.com/open-platform-model/cli/issues/102)) ([26cfcf5](https://github.com/open-platform-model/cli/commit/26cfcf5aac7bd25626356341b7a796ac08d45266))
+* **main:** release 1.0.0-alpha ([#104](https://github.com/open-platform-model/cli/issues/104)) ([39ab8c2](https://github.com/open-platform-model/cli/commit/39ab8c22c12e4beb5b7f9e959248f1fa53b40ae9))
+* **main:** release 1.0.0-alpha ([#107](https://github.com/open-platform-model/cli/issues/107)) ([2dd0f69](https://github.com/open-platform-model/cli/commit/2dd0f69496420d1caa84784eff6f4d8f8b081a3f))
+
 ## [1.0.0-alpha](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha...v1.0.0-alpha) (2026-07-16)
 
 
