@@ -46,7 +46,7 @@ import (
 const (
 	moduleDir     = "../opm-operator/test/fixtures/modules/podinfo"
 	modulePath    = "opmodel.dev/modules/test/podinfo@v0"
-	moduleVersion = "v0.1.2"
+	moduleVersion = "v0.1.3"
 	instName      = "podinfo-parity"
 	instNamespace = "default"
 )

@@ -1,12 +1,7 @@
 module: "opmodel.dev/tests/rel-tree@v1"
 language: {
-	version: "v0.15.0"
+	version: "v0.17.0"
 }
 source: {
 	kind: "self"
-}
-deps: {
-	"opmodel.dev/core/v1alpha1@v1": {
-		v: "v1.3.10"
-	}
 }

@@ -1,8 +1,9 @@
+// Identity-only fixture: `opm instance tree <file>` resolves the instance
+// name/namespace from this file (cmdutil.ResolveInstanceArg). Data-only —
+// no schema import needed for identity extraction (core@v1 line).
 package insttreetest
 
-import mr "opmodel.dev/core/v1alpha1/modulerelease@v1"
-
-mr.#ModuleInstance
+kind: "ModuleInstance"
 
 metadata: {
 	name:      "tree-test-rel"
