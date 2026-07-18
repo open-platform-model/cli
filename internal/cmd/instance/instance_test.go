@@ -95,11 +95,16 @@ func TestNewInstanceDeleteCmd(t *testing.T) {
 	assert.NotNil(t, cmd.Flags().Lookup("dry-run"), "--dry-run flag should be registered")
 }
 
-func TestEnsureDeleteAllowed_BlocksControllerManagedInstance(t *testing.T) {
-	// inventory.InstanceInventoryRecord / InstanceMetadata are renamed in the X4 slice.
-	err := ensureDeleteAllowed(&inventory.InstanceInventoryRecord{CreatedBy: inventory.CreatedByController, InstanceMetadata: inventory.InstanceMetadata{InstanceName: "demo", InstanceNamespace: "apps"}})
+func TestEnsureDeleteAllowed_RefusesOperatorOwnedInstance(t *testing.T) {
+	err := ensureDeleteAllowed(&inventory.Record{Owner: inventory.OwnerOperator, Name: "demo", Namespace: "apps"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "controller-managed")
+	assert.Contains(t, err.Error(), "operator-managed")
+	assert.Contains(t, err.Error(), "kubectl delete moduleinstance")
+}
+
+func TestEnsureDeleteAllowed_AllowsCLIOwnedInstance(t *testing.T) {
+	err := ensureDeleteAllowed(&inventory.Record{Owner: inventory.OwnerCLI, Name: "demo", Namespace: "apps"})
+	require.NoError(t, err)
 }
 
 func TestNewInstanceListCmd(t *testing.T) {

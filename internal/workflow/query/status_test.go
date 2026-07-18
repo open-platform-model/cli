@@ -22,13 +22,17 @@ func TestParseStatusOutputFormat(t *testing.T) {
 
 func TestBuildStatusOptions(t *testing.T) {
 	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "demo", InstanceID: "uuid-1"}
-	inv := &inventory.InstanceInventoryRecord{CreatedBy: inventory.CreatedByController, ModuleMetadata: inventory.ModuleMetadata{Version: "1.2.3"}, Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{{Kind: "Service", Namespace: "apps", Name: "web", Component: "frontend"}}}}
+	inv := &inventory.Record{
+		Owner:         inventory.OwnerOperator,
+		ModuleVersion: "1.2.3",
+		Inventory:     inventory.Inventory{Entries: []inventory.InventoryEntry{{Kind: "Service", Namespace: "apps", Name: "web", Component: "frontend"}}},
+	}
 	live := []*unstructured.Unstructured{{}}
 	missing := []inventory.InventoryEntry{{Kind: "ConfigMap", Namespace: "apps", Name: "cfg"}}
 	opts := BuildStatusOptions("apps", rsf, output.FormatWide, true, inv, live, missing)
 	assert.Equal(t, "apps", opts.Namespace)
 	assert.Equal(t, "1.2.3", opts.Version)
-	assert.Equal(t, "controller", opts.Owner)
+	assert.Equal(t, "operator", opts.Owner)
 	assert.True(t, opts.Wide)
 	assert.True(t, opts.Verbose)
 	assert.Equal(t, "frontend", opts.ComponentMap["Service/apps/web"])

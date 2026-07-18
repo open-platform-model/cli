@@ -11,7 +11,15 @@ import (
 
 func TestBuildInstanceSummary(t *testing.T) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	inv := &inventory.InstanceInventoryRecord{InstanceMetadata: inventory.InstanceMetadata{InstanceName: "demo", InstanceNamespace: "apps", InstanceID: "uuid-1", LastTransitionTime: now}, ModuleMetadata: inventory.ModuleMetadata{Name: "module-a", Version: "0.1.0"}}
+	inv := &inventory.Record{
+		Name:          "demo",
+		Namespace:     "apps",
+		InstanceUUID:  "uuid-1",
+		Owner:         inventory.OwnerCLI,
+		ModulePath:    "module-a",
+		ModuleVersion: "0.1.0",
+		LastAppliedAt: now,
+	}
 	summary := BuildInstanceSummary(inv)
 	assert.Equal(t, "demo", summary.Name)
 	assert.Equal(t, "module-a", summary.Module)

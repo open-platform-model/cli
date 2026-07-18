@@ -10,27 +10,23 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 )
 
-// opmodelAPIGroup and moduleInstancesResource identify the ModuleInstance CRD,
-// hardcoded rather than imported from opm-operator's types package — the CLI
-// has no Go module dependency on opm-operator (0006/D13).
+// The ModuleInstance CRD coordinates are defined once in internal/inventory
+// (enhancement 0006 D1/D13); these package-local aliases keep the existing
+// call sites (RBAC rule construction, finalizer name) readable.
 const (
-	opmodelAPIGroup         = "opmodel.dev"
-	moduleInstancesResource = "moduleinstances"
+	opmodelAPIGroup         = inventory.GroupOpmodel
+	moduleInstancesResource = inventory.ResourceModuleInstances
 )
 
 // moduleInstanceGVR is the ModuleInstance CRD's GroupVersionResource.
-var moduleInstanceGVR = schema.GroupVersionResource{
-	Group:    opmodelAPIGroup,
-	Version:  "v1alpha1",
-	Resource: moduleInstancesResource,
-}
+var moduleInstanceGVR = inventory.ModuleInstanceGVR
 
 // cleanupFinalizer is the operator's finalizer that blocks uninstall until
 // removed or the ModuleInstance is otherwise cleaned up.

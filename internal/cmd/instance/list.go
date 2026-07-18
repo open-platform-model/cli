@@ -13,6 +13,7 @@ import (
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/workflow/query"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 const instanceListConcurrency = 5
@@ -86,8 +87,15 @@ func runInstanceList(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFl
 		return err
 	}
 
-	inventories, err := inventory.ListInventories(ctx, k8sClient, targetNamespace)
+	inventories, err := inventory.ListRecords(ctx, k8sClient, targetNamespace)
 	if err != nil {
+		if allNamespaces && apierrors.IsForbidden(err) {
+			return &opmexit.ExitError{
+				Code:    opmexit.ExitPermissionDenied,
+				Err:     fmt.Errorf("listing instances across all namespaces requires cluster-wide 'list' permission on moduleinstances.opmodel.dev: %w", err),
+				Printed: true,
+			}
+		}
 		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: fmt.Errorf("listing instances: %w", err)}
 	}
 

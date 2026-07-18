@@ -33,8 +33,10 @@ func main() {
 
 	instanceName := "opm-deploy-test"
 	namespace := "default"
-	// Fixed instance UUID for deterministic inventory Secret naming.
+	// Fixed instance UUID for the ModuleInstance CR's status.instanceUUID.
 	instanceID := "a1b2c3d4-1111-2222-3333-aabbccdd0011"
+	const modulePath = "opmodel.dev/modules/opm_deploy_test@v0"
+	const moduleVersion = "0.1.0"
 
 	// 2. Build test resources (a ConfigMap and a Service)
 	fmt.Println()
@@ -122,9 +124,9 @@ func main() {
 	}
 	fmt.Printf("   OK: %d resources applied\n", applyResult.Applied)
 
-	// Write inventory after apply so subsequent operations use inventory-first path.
-	inv := buildInventory(resources, instanceName, namespace, instanceID)
-	if err := inventory.WriteInventory(ctx, client, inv, "", "", inv.ModuleMetadata.Version, inventory.CreatedByCLI); err != nil {
+	// Write inventory to the ModuleInstance CR so subsequent operations use the
+	// inventory-first path.
+	if err := writeInventoryCR(ctx, client, instanceName, namespace, instanceID, modulePath, moduleVersion, 1, entriesFromResources(resources)); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: writing inventory: %v\n", err)
 		os.Exit(1)
 	}
@@ -133,7 +135,7 @@ func main() {
 	// 5. Verify resources via inventory-first discovery
 	fmt.Println()
 	fmt.Println("5. Discovering resources via inventory...")
-	readInv, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
+	readInv, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: reading inventory: %v\n", err)
 		os.Exit(1)
@@ -180,7 +182,7 @@ func main() {
 	// 7. Dry-run delete — discover from inventory for InventoryLive
 	fmt.Println()
 	fmt.Println("7. Testing dry-run delete...")
-	dryInv, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
+	dryInv, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: reading inventory for dry-run delete: %v\n", err)
 		os.Exit(1)
@@ -210,13 +212,12 @@ func main() {
 	fmt.Println("8. Deleting resources from cluster...")
 	kubernetes.ResetClient()
 	client, _ = kubernetes.NewClient(kubernetes.ClientOptions{Context: "kind-opm-dev"})
-	delInv, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
+	delInv, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: reading inventory for delete: %v\n", err)
 		os.Exit(1)
 	}
 	var delLive []*unstructured.Unstructured
-	invSecretName := inventory.SecretName(instanceName, instanceID)
 	if delInv != nil {
 		delLive, _, err = inventory.DiscoverResourcesFromInventory(ctx, client, delInv)
 		if err != nil {
@@ -225,15 +226,21 @@ func main() {
 		}
 	}
 	deleteResult, err := kubernetes.Delete(ctx, client, kubernetes.DeleteOptions{
-		InstanceName:             instanceName,
-		Namespace:                namespace,
-		InventoryLive:            delLive,
-		InventorySecretName:      invSecretName,
-		InventorySecretNamespace: namespace,
+		InstanceName:          instanceName,
+		Namespace:             namespace,
+		InventoryLive:         delLive,
+		InventoryRecordExists: delInv != nil,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: delete: %v\n", err)
 		os.Exit(1)
+	}
+	// Delete the ModuleInstance CR last, after all workload resources are gone.
+	if delInv != nil {
+		if err := inventory.DeleteCR(ctx, client, instanceName, namespace); err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: deleting ModuleInstance CR: %v\n", err)
+			os.Exit(1)
+		}
 	}
 	// Note: Kubernetes auto-generates derivative resources (Endpoints, EndpointSlice)
 	// for Services. When the Service is deleted, these may disappear before we try
@@ -246,49 +253,56 @@ func main() {
 	}
 	fmt.Printf("   OK: %d resources deleted\n", deleteResult.Deleted)
 
-	// 9. Verify cleanup — inventory should be gone after delete
+	// 9. Verify cleanup — inventory CR should be gone after delete
 	fmt.Println()
 	fmt.Println("9. Verifying cleanup (inventory after delete)...")
 	kubernetes.ResetClient()
 	client, _ = kubernetes.NewClient(kubernetes.ClientOptions{Context: "kind-opm-dev"})
-	remainingInv, err := inventory.FindInventoryByInstanceName(ctx, client, instanceName, namespace)
+	remainingInv, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: post-delete inventory check: %v\n", err)
 		os.Exit(1)
 	}
 	if remainingInv != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: inventory Secret still exists after delete\n")
+		fmt.Fprintf(os.Stderr, "FAIL: ModuleInstance CR still exists after delete\n")
 		os.Exit(1)
 	}
-	fmt.Println("   OK: inventory Secret deleted (nil confirmed)")
+	fmt.Println("   OK: ModuleInstance CR deleted (nil confirmed)")
 
 	fmt.Println()
 	fmt.Println("=== ALL TESTS PASSED ===")
 }
 
-// buildInventory creates a instance inventory record from the given resources.
-func buildInventory(resources []*unstructured.Unstructured, instanceName, namespace, instanceID string) *inventory.InstanceInventoryRecord {
+// entriesFromResources builds inventory entries from rendered resources.
+func entriesFromResources(resources []*unstructured.Unstructured) []inventory.InventoryEntry {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
 	}
+	return entries
+}
 
-	inv := &inventory.InstanceInventoryRecord{
-		CreatedBy: inventory.CreatedByCLI,
-		InstanceMetadata: inventory.InstanceMetadata{
-			Kind:              "ModuleInstance",
-			APIVersion:        inventory.APIVersionV1Alpha1,
-			InstanceName:      instanceName,
-			InstanceNamespace: namespace,
-			InstanceID:        instanceID,
-		},
-		ModuleMetadata: inventory.ModuleMetadata{
-			Kind:       "Module",
-			APIVersion: inventory.APIVersionV1Alpha1,
-			Name:       instanceName,
-			Version:    "0.1.0",
-		},
-		Inventory: inventory.Inventory{Revision: 1, Digest: inventory.ComputeDigest(entries), Count: len(entries), Entries: entries},
+// writeInventoryCR writes the ModuleInstance CR spec and its CLI-owned status
+// subset (the integration-test analog of the apply workflow's record write).
+func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, namespace, instanceID, modulePath, moduleVersion string, revision int, entries []inventory.InventoryEntry) error {
+	if err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
+		Name:          name,
+		Namespace:     namespace,
+		Owner:         inventory.OwnerCLI,
+		ModulePath:    modulePath,
+		ModuleVersion: moduleVersion,
+	}); err != nil {
+		return err
 	}
-	return inv
+	return inventory.ApplyStatus(ctx, client, inventory.StatusInput{
+		Name:         name,
+		Namespace:    namespace,
+		InstanceUUID: instanceID,
+		Inventory: inventory.Inventory{
+			Revision: revision,
+			Digest:   inventory.ComputeDigest(entries),
+			Count:    len(entries),
+			Entries:  entries,
+		},
+	})
 }

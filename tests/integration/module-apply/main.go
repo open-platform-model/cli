@@ -6,10 +6,10 @@
 // kind-opm-dev cluster using the testdata module fixture.
 //
 // Scenarios:
-//   - First apply: resources are created and an inventory Secret is written
-//     keyed on the synthetic instance UUID.
+//   - First apply: resources are created and a ModuleInstance CR (inventory
+//     record) is written carrying the synthetic instance UUID.
 //   - Idempotent re-apply: no new resources, inventory revision increments.
-//   - Dry-run: no inventory Secret, no resource creation.
+//   - Dry-run: no inventory mutation, no resource creation.
 //   - Prune: re-applying with values_api_off.cue removes the api resources
 //     and bumps the inventory revision.
 //
@@ -95,7 +95,7 @@ func main() {
 	instanceID := waitForInstanceUUID(ctx, client, instanceName, testNamespace)
 	fmt.Printf("   OK: instance UUID resolved from inventory: %s\n", instanceID)
 
-	inv1, err := inventory.GetInventory(ctx, client, instanceName, testNamespace, instanceID)
+	inv1, err := inventory.GetRecord(ctx, client, instanceName, testNamespace)
 	check("reading inventory after first apply", err)
 	if inv1 == nil {
 		failf("expected non-nil inventory after first apply")
@@ -123,15 +123,22 @@ func main() {
 	if !filepath.IsAbs(wantPath) {
 		failf("test bug: could not compute absolute fixture path")
 	}
-	// Inventory Secret stores ChangeDescriptor; not directly exposed via the
-	// top-level inventory record fields. The path round-trip is covered by
-	// the unit test for runModuleApply; here we just assert the inventory
-	// secret exists by name, which is a strong proxy.
-	secretName := inventory.SecretName(instanceName, instanceID)
-	if _, err := client.Clientset.CoreV1().Secrets(testNamespace).Get(ctx, secretName, metav1.GetOptions{}); err != nil {
-		failf("inventory Secret %q not found: %v", secretName, err)
+	// The inventory now lives in the ModuleInstance CR (the Secret backend is
+	// gone). The ChangeDescriptor round-trip is covered by the unit test for
+	// runModuleApply; here we assert the CR exists, is CLI-owned, and its
+	// inventory count matches the tracked entries — a strong proxy.
+	crRec, err := inventory.GetRecord(ctx, client, instanceName, testNamespace)
+	check("reading ModuleInstance CR after first apply", err)
+	if crRec == nil {
+		failf("expected ModuleInstance CR for instance %q to exist after first apply", instanceName)
 	}
-	fmt.Printf("   OK: inventory Secret %q exists\n", secretName)
+	if crRec.Owner != inventory.OwnerCLI {
+		failf("expected ModuleInstance CR owner %q, got %q", inventory.OwnerCLI, crRec.Owner)
+	}
+	if crRec.Inventory.Count != len(firstEntries) {
+		failf("expected ModuleInstance CR inventory count %d, got %d", len(firstEntries), crRec.Inventory.Count)
+	}
+	fmt.Printf("   OK: ModuleInstance CR exists (owner=%s, count=%d)\n", crRec.Owner, crRec.Inventory.Count)
 
 	// ----------------------------------------------------------------
 	// Scenario 2: Idempotent re-apply
@@ -148,7 +155,7 @@ func main() {
 		failf("re-apply exited %d:\n%s\n%s", exitCode, stdout, stderr)
 	}
 
-	inv2, err := inventory.GetInventory(ctx, client, instanceName, testNamespace, instanceID)
+	inv2, err := inventory.GetRecord(ctx, client, instanceName, testNamespace)
 	check("reading inventory after re-apply", err)
 	if inv2.Inventory.Revision <= inv1.Inventory.Revision {
 		failf("expected revision to increment after re-apply, got %d (was %d)", inv2.Inventory.Revision, inv1.Inventory.Revision)
@@ -175,7 +182,7 @@ func main() {
 		failf("dry-run apply exited %d:\n%s\n%s", exitCode, stdout, stderr)
 	}
 
-	inv3, err := inventory.GetInventory(ctx, client, instanceName, testNamespace, instanceID)
+	inv3, err := inventory.GetRecord(ctx, client, instanceName, testNamespace)
 	check("reading inventory after dry-run", err)
 	if inv3.Inventory.Revision != revBeforeDryRun {
 		failf("dry-run mutated inventory: revision %d → %d", revBeforeDryRun, inv3.Inventory.Revision)
@@ -198,7 +205,7 @@ func main() {
 		failf("prune-mode apply exited %d:\n%s\n%s", exitCode, stdout, stderr)
 	}
 
-	inv4, err := inventory.GetInventory(ctx, client, instanceName, testNamespace, instanceID)
+	inv4, err := inventory.GetRecord(ctx, client, instanceName, testNamespace)
 	check("reading inventory after prune-mode apply", err)
 	if inv4.Inventory.Revision <= inv3.Inventory.Revision {
 		failf("expected revision to increment after prune-mode re-apply, got %d (was %d)", inv4.Inventory.Revision, inv3.Inventory.Revision)
@@ -263,18 +270,19 @@ func runModuleApply(args []string) (stdout, stderr string, exitCode int) {
 	return outBuf.String(), errBuf.String(), exitCode
 }
 
-// waitForInstanceUUID polls inventory.FindInventoryByInstanceName until the
-// inventory Secret exists, then returns the instance UUID. The synthetic UUID
-// is computed in CUE; we read it back from the cluster rather than predicting it.
+// waitForInstanceUUID polls inventory.GetRecord until the ModuleInstance CR
+// exists with a populated status.instanceUUID, then returns the instance UUID.
+// The synthetic UUID is computed in CUE; we read it back from the cluster
+// rather than predicting it.
 func waitForInstanceUUID(ctx context.Context, client *kubernetes.Client, name, ns string) string {
 	deadline := time.Now().Add(15 * time.Second)
 	for {
-		inv, err := inventory.FindInventoryByInstanceName(ctx, client, name, ns)
-		if err == nil && inv != nil {
-			return inv.InstanceMetadata.InstanceID
+		inv, err := inventory.GetRecord(ctx, client, name, ns)
+		if err == nil && inv != nil && inv.InstanceUUID != "" {
+			return inv.InstanceUUID
 		}
 		if time.Now().After(deadline) {
-			failf("timed out waiting for inventory Secret for instance %q in %q", name, ns)
+			failf("timed out waiting for ModuleInstance CR for instance %q in %q", name, ns)
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
@@ -308,13 +316,11 @@ func waitForResourceAbsent(ctx context.Context, client *kubernetes.Client, gvr s
 }
 
 func cleanup(ctx context.Context, client *kubernetes.Client) {
-	// Delete inventory Secrets in the test namespace.
-	secrets, err := client.Clientset.CoreV1().Secrets(testNamespace).List(ctx, metav1.ListOptions{
-		LabelSelector: "opmodel.dev/component=inventory",
-	})
+	// Delete any ModuleInstance CRs (inventory records) in the test namespace.
+	records, err := inventory.ListRecords(ctx, client, testNamespace)
 	if err == nil {
-		for _, s := range secrets.Items {
-			_ = client.Clientset.CoreV1().Secrets(testNamespace).Delete(ctx, s.Name, metav1.DeleteOptions{})
+		for _, r := range records {
+			_ = inventory.DeleteCR(ctx, client, r.Name, r.Namespace)
 		}
 	}
 	// Delete the test namespace; this cascades to all owned resources.

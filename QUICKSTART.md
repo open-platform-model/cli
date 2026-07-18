@@ -195,6 +195,22 @@ task cluster:create
 
 This creates a local kind cluster named `opm-dev`.
 
+### Install the ModuleInstance CRD (required)
+
+`opm instance apply` records what it deployed in a `ModuleInstance` custom
+resource, so the `ModuleInstance` CRD must exist on the cluster before you
+apply. Install just the CRDs (no operator) with:
+
+```bash
+opm operator install --crds-only
+```
+
+Apply fails fast with a hint if the CRD is missing or out of date. If your
+user is namespace-scoped, also grant write access to the
+`moduleinstances/status` subresource (or run `opm operator install
+--crds-only --rbac`) — apply aborts before touching any resource when it
+cannot record inventory.
+
 ### Apply
 
 ```bash
@@ -216,6 +232,21 @@ opm instance status jellyfin -n default
 opm instance tree   jellyfin -n default
 opm instance events jellyfin -n default
 ```
+
+List deployed instances — scoped to a namespace, or cluster-wide with
+`-A` / `--all-namespaces` (which needs cluster-wide list permission on
+`moduleinstances.opmodel.dev` and fails with a clear error otherwise):
+
+```bash
+opm instance list -n default
+opm instance list --all-namespaces
+```
+
+> **Upgrading from an older CLI?** Inventory moved from a per-instance
+> Secret to the `ModuleInstance` CR (a breaking change with no deprecation
+> window). Re-apply each live instance once — the first apply migrates its
+> Secret to a CR and deletes the Secret. Until an instance is re-applied,
+> `status`/`list`/`delete` will not see it.
 
 ### Delete
 

@@ -9,7 +9,9 @@ import (
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
+	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
@@ -17,7 +19,6 @@ import (
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/workflow/query"
-	"github.com/open-platform-model/cli/pkg/ownership"
 )
 
 // NewInstanceDeleteCmd creates the instance delete command.
@@ -107,19 +108,22 @@ func runInstanceDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.
 		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
+	return executeInstanceDelete(ctx, k8sClient, rsf, namespace, inv, liveResources, dryRun, instanceLog)
+}
+
+// executeInstanceDelete deletes the instance's tracked workloads, then the
+// ModuleInstance CR last (after all workloads are gone; skipped on dry-run).
+func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, inv *inventory.Record, liveResources []*unstructured.Unstructured, dryRun bool, instanceLog *log.Logger) error {
 	instanceLog.Info(fmt.Sprintf("deleting resources in namespace %q", namespace))
 
-	deleteOpts := kubernetes.DeleteOptions{
-		InstanceName:             rsf.InstanceName,
-		Namespace:                namespace,
-		InstanceID:               rsf.InstanceID,
-		DryRun:                   dryRun,
-		InventoryLive:            liveResources,
-		InventorySecretName:      inventory.SecretName(inv.InstanceMetadata.InstanceName, inv.InstanceMetadata.InstanceID),
-		InventorySecretNamespace: namespace,
-	}
-
-	deleteResult, err := kubernetes.Delete(ctx, k8sClient, deleteOpts)
+	deleteResult, err := kubernetes.Delete(ctx, k8sClient, kubernetes.DeleteOptions{
+		InstanceName:          rsf.InstanceName,
+		Namespace:             namespace,
+		InstanceID:            rsf.InstanceID,
+		DryRun:                dryRun,
+		InventoryLive:         liveResources,
+		InventoryRecordExists: inv != nil,
+	})
 	if err != nil {
 		instanceLog.Error("delete failed", "error", err)
 		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
@@ -129,6 +133,15 @@ func runInstanceDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.
 		instanceLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(deleteResult.Errors)))
 		for _, e := range deleteResult.Errors {
 			instanceLog.Error(e.Error())
+		}
+	}
+
+	// Delete the ModuleInstance CR last — only after every tracked workload
+	// resource is gone (enhancement 0006 D1). Skipped on dry-run and on partial
+	// failure (so a re-run can retry the remaining workloads).
+	if !dryRun && inv != nil && len(deleteResult.Errors) == 0 {
+		if err := inventory.DeleteCR(ctx, k8sClient, inv.Name, inv.Namespace); err != nil {
+			instanceLog.Warn("could not delete ModuleInstance CR", "error", err)
 		}
 	}
 
@@ -149,11 +162,11 @@ func runInstanceDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.
 	return nil
 }
 
-func ensureDeleteAllowed(inv *inventory.InstanceInventoryRecord) error {
-	if inv == nil {
-		return nil
+func ensureDeleteAllowed(inv *inventory.Record) error {
+	if inventory.ResolveOwnership(inv) == inventory.ModeOperatorOwned {
+		return inventory.OperatorOwnedDeleteError(inv.Name, inv.Namespace)
 	}
-	return ownership.EnsureCLIMutable(string(inv.NormalizedCreatedBy()), inv.InstanceMetadata.InstanceName, inv.InstanceMetadata.InstanceNamespace)
+	return nil
 }
 
 func confirmInstanceDelete(instanceName, instanceID, namespace string) bool {

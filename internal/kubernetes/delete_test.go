@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,20 +39,21 @@ func TestDelete_DeletesOnlyTrackedInventoryResources(t *testing.T) {
 
 	tracked := makeUnstructured("v1", "ConfigMap", "tracked", namespace)
 	untracked := makeUnstructured("v1", "ConfigMap", "untracked", namespace)
-	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "opm.demo.uuid-1", Namespace: namespace}}
 
 	scheme := runtime.NewScheme()
 	client := &Client{
-		Clientset: fake.NewClientset(tracked.DeepCopy(), untracked.DeepCopy(), secret),
+		Clientset: fake.NewClientset(tracked.DeepCopy(), untracked.DeepCopy()),
 		Dynamic:   dynamicfake.NewSimpleDynamicClient(scheme, tracked.DeepCopy(), untracked.DeepCopy()),
 	}
 
+	// The ModuleInstance CR is deleted last by the caller, not by Delete; here
+	// we only assert Delete removes the tracked workload and leaves untracked
+	// resources alone.
 	result, err := Delete(ctx, client, DeleteOptions{
-		InstanceName:             "demo",
-		Namespace:                namespace,
-		InventoryLive:            []*unstructured.Unstructured{tracked.DeepCopy()},
-		InventorySecretName:      secret.Name,
-		InventorySecretNamespace: namespace,
+		InstanceName:          "demo",
+		Namespace:             namespace,
+		InventoryLive:         []*unstructured.Unstructured{tracked.DeepCopy()},
+		InventoryRecordExists: true,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -65,9 +65,6 @@ func TestDelete_DeletesOnlyTrackedInventoryResources(t *testing.T) {
 	remaining, err := client.ResourceClient(GVRFromUnstructured(untracked), namespace).Get(ctx, untracked.GetName(), metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, untracked.GetName(), remaining.GetName())
-
-	_, err = client.Clientset.CoreV1().Secrets(namespace).Get(ctx, secret.Name, metav1.GetOptions{})
-	assert.Error(t, err)
 }
 
 func makeUnstructured(apiVersion, kind, name, namespace string) *unstructured.Unstructured {

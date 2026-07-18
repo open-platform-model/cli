@@ -1,6 +1,6 @@
 ## Purpose
 
-Defines the ownership-focused instance inventory data model, persisted instance record envelope, serialization format, and CRUD semantics used by the CLI for pruning, discovery, and instance metadata.
+Defines the ownership-focused instance inventory data model and the `ModuleInstance` custom resource that persists it, including entry identity, the CR spec/status write contract, entry wire mapping, CR CRUD semantics, and deterministic digest requirements used by the CLI for pruning, discovery, and instance metadata.
 
 ## Requirements
 
@@ -46,31 +46,104 @@ The system SHALL construct an `InventoryEntry` from a rendered Kubernetes resour
 - **WHEN** constructing an entry from a resource with GVK `rbac.authorization.k8s.io/v1/ClusterRole`, name `my-role`, empty namespace, component `rbac`
 - **THEN** the entry SHALL have Group=`rbac.authorization.k8s.io`, Kind=`ClusterRole`, Namespace=`""`, Name=`my-role`, Version=`v1`, Component=`rbac`
 
-### Requirement: Inventory Secret name convention
+### Requirement: ModuleInstance CR is the inventory store
 
-The inventory Secret name SHALL follow the pattern `opm.<instance-name>.<instance-id>` where instance-name is the module instance name and instance-id is the deterministic UUID v5 instance identity.
+The CLI SHALL persist instance inventory in a `ModuleInstance` custom resource (`opmodel.dev/v1alpha1`, resource `moduleinstances`) named after the instance, in the instance's namespace, handled as `unstructured` via the dynamic client. The CLI MUST NOT import `opm-operator` Go packages. The `ModuleInstance` GVR and related constants SHALL be defined once in `internal/inventory` and consumed by all CLI packages that reference the CR (including `internal/operator`).
 
-#### Scenario: Secret name for a module instance
+#### Scenario: Apply creates the CR
 
-- **WHEN** computing the Secret name for instance name `jellyfin` with instance ID `a3b8f2e1-1234-5678-9abc-def012345678`
-- **THEN** the Secret name SHALL be `opm.jellyfin.a3b8f2e1-1234-5678-9abc-def012345678`
+- **WHEN** `opm instance apply` succeeds for instance `podinfo` in namespace `demo` and no `ModuleInstance` exists
+- **THEN** a `ModuleInstance` named `podinfo` SHALL exist in `demo` with the CLI's spec and status subset
 
-### Requirement: Inventory Secret labels
+#### Scenario: No inventory Secret is written
 
-The inventory Secret SHALL carry these OPM identity labels, derived from the instance metadata: <!-- Was: module-release.opmodel.dev/* (0002 D4) -->
+- **WHEN** any apply completes
+- **THEN** no `opm.<name>.<id>` inventory Secret SHALL be created or updated
 
-| Label | Value | Source |
-| --- | --- | --- |
-| `module-instance.opmodel.dev/name` | instance name (e.g. `mc`) | The user-supplied instance name (`--instance-name`) |
-| `module-instance.opmodel.dev/namespace` | instance namespace | Namespace the instance is deployed into |
-| `module-instance.opmodel.dev/uuid` | instance UUID | Deterministic UUID v5 instance identity |
+### Requirement: CLI writes a strict status subset via the status subresource
 
-#### Scenario: Inventory Secret label values
+After resources are applied and pruned, the CLI SHALL write, via the status subresource with field manager `opm-cli`: `status.inventory` (revision, digest, count, entries), `status.instanceUUID`, `status.lastAppliedRenderDigest`, `status.lastAppliedSourceDigest`, `status.lastAppliedConfigDigest`, and `status.lastAppliedAt`. The CLI MUST NOT write `status.conditions`, `status.observedGeneration`, `status.lastAttempted*`, `status.failureCounters`, `status.history`, or `status.nextRetryAt`.
 
-- **WHEN** an inventory Secret is written for instance name `mc` in namespace `games`
-- **THEN** the Secret SHALL carry `module-instance.opmodel.dev/name: mc`
-- **AND** SHALL carry `module-instance.opmodel.dev/namespace: games`
-- **AND** SHALL carry `module-instance.opmodel.dev/uuid` set to the deterministic instance UUID
+#### Scenario: Status subset after successful apply
+
+- **WHEN** an apply deploys 3 resources successfully
+- **THEN** `status.inventory.count` SHALL be 3 and `status.lastAppliedAt` SHALL be set
+- **AND** `status.conditions` SHALL NOT be present in the CLI's applied status document
+
+#### Scenario: Revision increments across applies
+
+- **WHEN** a second apply succeeds for an instance whose `status.inventory.revision` was 1
+- **THEN** the written `status.inventory.revision` SHALL be 2
+
+### Requirement: Spec write contents
+
+On apply in CLI-executor mode, the CLI SHALL server-side-apply the CR spec with field manager `opm-cli`, containing: `spec.owner: cli`, `spec.module.path` and `spec.module.version` set to the module's canonical declared path and version (for local-directory and locally-replaced module resolution as well — the CR MUST NOT contain a filesystem path), and `spec.values` set to the single unified values blob that the render consumed.
+
+#### Scenario: Local-path apply writes the declared reference
+
+- **WHEN** applying from a local module directory whose `module.cue` declares path `opmodel.dev/modules/podinfo@v0` and version `v0.1.0`
+- **THEN** `spec.module.path` SHALL be `opmodel.dev/modules/podinfo@v0` and `spec.module.version` SHALL be `v0.1.0`
+
+#### Scenario: Values are the unified blob
+
+- **WHEN** applying with multiple `--values` files
+- **THEN** `spec.values` SHALL contain the single unified result the render consumed, not the individual layers
+
+### Requirement: Entry wire shape targets the CRD schema
+
+Conversion between the CLI's `InventoryEntry` type and the CR's `status.inventory.entries[]` SHALL be performed by explicit mapping functions that produce/consume the CRD's field names (`group`, `kind`, `namespace`, `name`, `v`, `component`), independent of the Go struct's own JSON tags. The mapping SHALL round-trip losslessly.
+
+#### Scenario: Version serializes as `v`
+
+- **WHEN** an entry with Version `v1` is written to the CR
+- **THEN** the entry object in `status.inventory.entries[]` SHALL carry the key `v` with value `v1`
+
+#### Scenario: Round-trip preserves the entry set
+
+- **WHEN** an entry list is written to a CR and read back
+- **THEN** the resulting entries SHALL equal the originals
+
+### Requirement: instanceUUID is extracted from the render
+
+The CLI SHALL populate `status.instanceUUID` from the rendered resources' `module-instance.opmodel.dev/uuid` label (first non-empty value). If no rendered resource carries the label, the field SHALL be omitted. The CLI MUST NOT generate the UUID itself.
+
+#### Scenario: UUID extracted from rendered labels
+
+- **WHEN** rendered resources carry `module-instance.opmodel.dev/uuid: 7c9e6679-7425-40de-944b-e07fc1f90ae7`
+- **THEN** `status.instanceUUID` SHALL be `7c9e6679-7425-40de-944b-e07fc1f90ae7`
+
+### Requirement: Render provenance annotation
+
+When the applied render's module bytes did not come from pure registry resolution — the main module is a local directory, or the main module's `cue.mod/local-module.cue` contains any local-path `replaceWith` — the CLI SHALL include the annotation `module-instance.opmodel.dev/source: local` in its spec apply. When a later apply resolves fully from registries, the CLI SHALL omit the annotation so server-side apply removes it. The annotation is a fail-closed signal for the handoff pre-gate (slice C3); no CLI gate in this slice SHALL read it as an authority.
+
+#### Scenario: Local render stamps the annotation
+
+- **WHEN** an apply renders from a local module directory
+- **THEN** the CR SHALL carry `module-instance.opmodel.dev/source: local`
+
+#### Scenario: Replacement in effect stamps the annotation
+
+- **WHEN** an apply's main module has a `cue.mod/local-module.cue` with a local-path `replaceWith`
+- **THEN** the CR SHALL carry `module-instance.opmodel.dev/source: local`
+
+#### Scenario: Registry apply clears the annotation
+
+- **WHEN** an instance carrying the annotation is re-applied with fully registry-resolved modules
+- **THEN** the annotation SHALL no longer be present on the CR
+
+### Requirement: CR CRUD semantics
+
+Reading inventory SHALL be a direct GET of the `ModuleInstance` by name and namespace, with NotFound returned as "no inventory" (first-apply). `--instance-id` selectors SHALL resolve by listing `ModuleInstance` CRs and matching `status.instanceUUID`. On `instance delete`, the CLI SHALL delete owned resources first (existing reverse-weight prune semantics) and delete the CR last; CR deletion SHALL treat NotFound as success.
+
+#### Scenario: First apply finds no inventory
+
+- **WHEN** `opm instance apply` runs and no `ModuleInstance` exists for the name
+- **THEN** the apply SHALL proceed as a first-time apply with an empty previous inventory
+
+#### Scenario: Delete removes the CR last
+
+- **WHEN** `opm instance delete` succeeds
+- **THEN** every tracked resource SHALL be deleted before the `ModuleInstance` CR itself
 
 ### Requirement: Inventory represents current ownership only
 
@@ -96,109 +169,6 @@ The public inventory contract MUST NOT require or embed:
 - **WHEN** an inventory includes `revision`, `digest`, and `count`
 - **THEN** those fields SHALL describe the current inventory set only
 - **AND** they SHALL NOT imply a retained change history
-
-### Requirement: Persisted instance inventory record preserves instance and module metadata
-
-The CLI persisted instance inventory record SHALL preserve `instanceMetadata` and `moduleMetadata` alongside the ownership-only inventory so the CLI can identify the instance, identify the module, and report deployed module version without retaining inventory change history.
-
-#### Scenario: Persisted record includes module version without change history
-
-- **WHEN** a instance is persisted using the v2 record shape
-- **THEN** the record SHALL contain `moduleMetadata.version` for the deployed module version
-- **AND** that version SHALL NOT require a latest history entry to be read
-
-### Requirement: Persisted instance inventory record stores creator provenance at the top level
-
-The CLI persisted instance inventory record SHALL store `createdBy` as a top-level field rather than nesting it inside `instanceMetadata`.
-
-#### Scenario: Top-level creator provenance
-
-- **WHEN** a persisted instance inventory record is read
-- **THEN** the CLI SHALL be able to determine whether it is CLI-managed or controller-managed from the top-level `createdBy` field
-- **AND** that determination SHALL NOT depend on inventory history
-
-### Requirement: Inventory Secret serialization roundtrip
-
-`MarshalToSecret` SHALL serialize an `InstanceInventoryRecord` to a typed `corev1.Secret` using a single JSON-encoded document stored under `data.inventory`. `UnmarshalFromSecret` SHALL deserialize a `corev1.Secret` back into an `InstanceInventoryRecord`, handling both `stringData` and `data` (base64-encoded) forms. If the decoded record omits `inventory.entries`, deserialization SHALL normalize that field to an empty list. The `resourceVersion` from the Secret SHALL be preserved as an unexported field for optimistic concurrency. <!-- Was: ReleaseInventoryRecord (0002 D8) -->
-
-#### Scenario: Roundtrip preserves record
-
-- **WHEN** marshaling an `InstanceInventoryRecord` with top-level `createdBy`, instance metadata, module metadata, and an ownership inventory
-- **AND** then unmarshaling the resulting Secret
-- **THEN** the resulting `InstanceInventoryRecord` SHALL be identical to the original
-
-### Requirement: Inventory metadata enables future CRD migration
-
-The `InstanceMetadata` SHALL include `kind: "ModuleInstance"` and `apiVersion: "core.opmodel.dev/v1alpha1"` fields. The `ModuleMetadata` SHALL include `kind: "Module"` and `apiVersion: "core.opmodel.dev/v1alpha1"` fields. Both enable future migration from Secrets to CRDs without changing the persisted instance inventory record shape. <!-- Was: ReleaseMetadata, kind: "ModuleRelease" (0002 D8) -->
-
-#### Scenario: InstanceMetadata kind and apiVersion
-
-- **WHEN** an `InstanceMetadata` is serialized
-- **THEN** the `kind` field SHALL be `"ModuleInstance"`
-- **AND** the `apiVersion` field SHALL be `"core.opmodel.dev/v1alpha1"`
-
-### Requirement: Instance metadata data key structure
-
-The persisted instance metadata SHALL use these data keys, mapped from the `InstanceMetadata` Go struct: <!-- Was: Release metadata / ReleaseMetadata (0002 D8) -->
-
-| Data key | Go field | Value |
-| --- | --- | --- |
-| `kind` | `Kind` | Always `"ModuleInstance"` |
-| `name` | `InstanceName` | The instance name (user-supplied `--instance-name`, e.g. `"mc"`) |
-| `namespace` | `InstanceNamespace` | The Kubernetes namespace of the instance |
-| `uuid` | `InstanceID` | Deterministic UUID v5 instance identity |
-
-#### Scenario: InstanceMetadata name field holds instance name
-
-- **WHEN** serializing an `InstanceMetadata` for instance name `mc` and module `minecraft`
-- **THEN** the `name` data key SHALL hold `"mc"`
-
-### Requirement: Module metadata data key structure
-
-The `moduleMetadata` object inside the persisted instance inventory record SHALL use the following JSON field names:
-
-| JSON key | Go field | Description |
-|---|---|---|
-| `kind` | `Kind` | Always `"Module"` |
-| `apiVersion` | `APIVersion` | Always `"core.opmodel.dev/v1alpha1"` |
-| `name` | `Name` | The canonical module name (e.g. `"minecraft"`) |
-| `uuid` | `UUID` | Module identity UUID (omitted if empty) |
-| `version` | `Version` | Deployed module version (omitted if empty) |
-
-#### Scenario: ModuleMetadata name field holds module name
-
-- **WHEN** serializing a `ModuleMetadata` for module `minecraft` with UUID `a1b2c3d4-...`
-- **THEN** the JSON `"name"` field SHALL be `"minecraft"`
-- **AND** the JSON `"uuid"` field SHALL be `"a1b2c3d4-..."`
-
-#### Scenario: ModuleMetadata uuid omitted when empty
-
-- **WHEN** serializing a `ModuleMetadata` with an empty UUID
-- **THEN** the JSON SHALL NOT contain a `"uuid"` field
-
-#### Scenario: ModuleMetadata version recorded when present
-
-- **WHEN** serializing a `ModuleMetadata` with version `1.2.3`
-- **THEN** the JSON SHALL contain `"version": "1.2.3"`
-
-### Requirement: Inventory Secret CRUD operations
-
-`GetInventory` SHALL first attempt a direct GET by constructed Secret name (`opm.<instanceName>.<instanceID>`). If the Secret is not found, it SHALL fall back to listing Secrets with label `module-instance.opmodel.dev/uuid=<instanceID>`. If no inventory is found (first-time apply), it SHALL return `nil, nil`. `WriteInventory` SHALL use full PUT semantics (create or replace) with optimistic concurrency via `resourceVersion`, preserving instance identity metadata and creator provenance from previously read records while updating the ownership inventory and deployed module version. `DeleteInventory` SHALL delete the inventory Secret and treat 404 as success (idempotent). <!-- Was: releaseName/releaseID, module-release.opmodel.dev/uuid (0002 D4/D8) -->
-
-#### Scenario: GetInventory falls back to UUID label
-
-- **WHEN** `GetInventory` cannot find the Secret by constructed name
-- **AND** a Secret with label `module-instance.opmodel.dev/uuid=<instanceID>` exists
-- **THEN** `GetInventory` SHALL return the record from that Secret
-
-### Requirement: Inventory labels remain unchanged when provenance is added
-
-Adding provenance support SHALL NOT change the inventory Secret label set. Inventory Secrets SHALL continue to use the existing five-label selector contract.
-
-#### Scenario: Provenance does not add new label
-
-- **WHEN** an inventory Secret includes top-level `createdBy`
-- **THEN** the Secret SHALL still have exactly the existing five labels used for inventory discovery
 
 ### Requirement: Deterministic inventory digest
 

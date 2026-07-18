@@ -16,6 +16,19 @@ type Result struct {
 	Components []pkgrender.ComponentSummary
 	MatchPlan  *pkgrender.MatchPlan
 	Warnings   []string
+
+	// Values is the single unified values blob the render consumed, decoded to
+	// a JSON-shaped map. The apply workflow writes it verbatim to the
+	// ModuleInstance CR's spec.values (enhancement 0006 D19). Nil when the
+	// instance carries no values or they could not be decoded.
+	Values map[string]any
+
+	// SourceLocal is the render-provenance signal (enhancement 0006 D7): true
+	// when the module bytes did not come from pure registry resolution — the
+	// main module is a local directory, or its cue.mod/local-module.cue carries
+	// a replaceWith. The apply workflow stamps
+	// module-instance.opmodel.dev/source: local on the CR accordingly.
+	SourceLocal bool
 }
 
 func (r *Result) HasWarnings() bool {

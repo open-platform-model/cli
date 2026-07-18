@@ -16,7 +16,7 @@ import (
 
 // PinnedOperatorVersion is the opm-operator release tag whose dist/install.yaml
 // is embedded below. Refresh both together with `task operator:sync VERSION=<tag>`.
-const PinnedOperatorVersion = "v1.0.0-alpha.2"
+const PinnedOperatorVersion = "v1.0.0-alpha.4"
 
 //go:embed dist/install.yaml
 var embeddedManifest []byte

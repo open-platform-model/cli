@@ -31,17 +31,16 @@ func ResolveInventory(
 	rsf *cmdutil.InstanceSelectorFlags,
 	namespace string,
 	instanceLog *log.Logger,
-) (inv *inventory.InstanceInventoryRecord, live []*unstructured.Unstructured, missing []inventory.InventoryEntry, err error) {
+) (inv *inventory.Record, live []*unstructured.Unstructured, missing []inventory.InventoryEntry, err error) {
 	var invErr error
 	switch {
 	case rsf.InstanceID != "":
-		relName := rsf.InstanceName
-		if relName == "" {
-			relName = rsf.InstanceID
-		}
-		inv, invErr = inventory.GetInventory(ctx, client, relName, namespace, rsf.InstanceID)
+		// Instance-id selectors resolve by listing ModuleInstance CRs and
+		// matching status.instanceUUID.
+		inv, invErr = inventory.FindRecordByInstanceUUID(ctx, client, namespace, rsf.InstanceID)
 	case rsf.InstanceName != "":
-		inv, invErr = inventory.FindInventoryByInstanceName(ctx, client, rsf.InstanceName, namespace)
+		// Name selectors resolve by a direct ModuleInstance GET.
+		inv, invErr = inventory.GetRecord(ctx, client, rsf.InstanceName, namespace)
 	}
 
 	if invErr != nil {
@@ -73,7 +72,7 @@ func ResolveInventory(
 	return inv, live, missing, nil
 }
 
-func BuildStatusOptions(namespace string, rsf *cmdutil.InstanceSelectorFlags, outputFormat output.Format, verbose bool, inv *inventory.InstanceInventoryRecord, liveResources []*unstructured.Unstructured, missingEntries []inventory.InventoryEntry) kubernetes.StatusOptions {
+func BuildStatusOptions(namespace string, rsf *cmdutil.InstanceSelectorFlags, outputFormat output.Format, verbose bool, inv *inventory.Record, liveResources []*unstructured.Unstructured, missingEntries []inventory.InventoryEntry) kubernetes.StatusOptions {
 	componentMap := make(map[string]string)
 	for _, entry := range inv.Inventory.Entries {
 		key := entry.Kind + "/" + entry.Namespace + "/" + entry.Name
@@ -84,8 +83,8 @@ func BuildStatusOptions(namespace string, rsf *cmdutil.InstanceSelectorFlags, ou
 		Namespace:     namespace,
 		InstanceName:  rsf.InstanceName,
 		InstanceID:    rsf.InstanceID,
-		Version:       inv.ModuleMetadata.Version,
-		Owner:         string(inventory.NormalizeCreatedBy(inv.CreatedBy)),
+		Version:       inv.ModuleVersion,
+		Owner:         inventory.DisplayOwner(inv.Owner),
 		ComponentMap:  componentMap,
 		OutputFormat:  outputFormat,
 		InventoryLive: liveResources,

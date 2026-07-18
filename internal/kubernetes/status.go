@@ -312,8 +312,8 @@ func formatStatusHeader(result *StatusResult) string {
 		fmt.Fprintf(&sb, ", %d not ready", result.Summary.NotReady)
 	}
 	sb.WriteString(")\n")
-	if result.Owner == "controller" {
-		sb.WriteString("Warning:   controller-managed instance; the CLI can inspect it but cannot mutate it\n")
+	if result.Owner != "" && result.Owner != "cli" {
+		sb.WriteString("Warning:   operator-managed instance; the CLI can inspect it but cannot mutate it\n")
 	}
 	return sb.String()
 }

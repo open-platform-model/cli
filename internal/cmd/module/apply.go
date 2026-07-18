@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -44,8 +43,9 @@ module's debugValues (default) or from -f/--values files.
 
 The synthetic instance defaults to "<module>-debug". --name and --namespace
 participate in instance identity (different values produce different instances,
-each with its own inventory Secret). For persistent deploys, author a
-instance.cue file and use 'opm instance apply' instead.
+each with its own ModuleInstance CR). The ModuleInstance CRD must be installed
+first (run 'opm operator install --crds-only'). For persistent deploys, author
+a instance.cue file and use 'opm instance apply' instead.
 
 When switching from 'opm module apply' to 'opm instance apply' (or vice versa)
 with a different instance name, delete the previous instance first to avoid
@@ -103,11 +103,6 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 		}
 	}
 
-	absModulePath, err := filepath.Abs(modulePath)
-	if err != nil {
-		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving absolute module path: %w", err)}
-	}
-
 	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
 		Config:         cfg,
 		KubeconfigFlag: kf.Kubeconfig,
@@ -152,13 +147,5 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 			SuccessUpToDateMessage: "Instance up to date",
 			SuccessAppliedMessage:  "Instance applied",
 		},
-		Change: workflowapply.ChangeDescriptor{
-			Path:      absModulePath,
-			ValuesStr: "",
-			Version:   result.Module.Version,
-			Local:     true,
-		},
-		ModuleName: result.Module.Name,
-		ModuleUUID: result.Module.UUID,
 	})
 }

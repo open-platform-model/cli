@@ -7,7 +7,6 @@ import (
 
 	"github.com/open-platform-model/cli/pkg/resourceorder"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -30,17 +29,17 @@ type DeleteOptions struct {
 	// DryRun previews resources to delete without removing them.
 	DryRun bool
 
-	// InventoryLive is the list of live resources pre-fetched from the inventory
-	// Secret by the caller. Resources are deleted from this list. When nil or
-	// empty (and InventorySecretName is also empty), Delete returns noResourcesFoundError.
+	// InventoryLive is the list of live resources pre-fetched from the
+	// ModuleInstance CR inventory by the caller. Resources are deleted from this
+	// list. When nil or empty (and InventoryRecordExists is false), Delete
+	// returns noResourcesFoundError.
 	InventoryLive []*unstructured.Unstructured
 
-	// InventorySecretName is the name of the inventory Secret to delete last.
-	// Empty means no inventory Secret to delete.
-	InventorySecretName string
-
-	// InventorySecretNamespace is the namespace of the inventory Secret.
-	InventorySecretNamespace string
+	// InventoryRecordExists indicates a ModuleInstance CR is present for the
+	// instance. When true, an empty InventoryLive is not treated as
+	// "not found" — the caller deletes the CR itself (last) after Delete
+	// returns.
+	InventoryRecordExists bool
 }
 
 // DeleteResult contains the outcome of a delete operation.
@@ -56,9 +55,9 @@ type DeleteResult struct {
 }
 
 // Delete removes all resources belonging to an instance deployment.
-// opts.InventoryLive must be pre-fetched from the inventory Secret by the caller.
-// Resources are deleted in reverse weight order. After all workload resources are
-// deleted, the inventory Secret itself is deleted last.
+// opts.InventoryLive must be pre-fetched from the ModuleInstance CR inventory by
+// the caller. Resources are deleted in reverse weight order. The ModuleInstance
+// CR itself is deleted last by the caller, after Delete returns.
 func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteResult, error) {
 	result := &DeleteResult{}
 
@@ -79,8 +78,8 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 
 	result.Resources = resources
 
-	// Return error when no resources found (and no inventory Secret to delete)
-	if len(resources) == 0 && opts.InventorySecretName == "" {
+	// Return error when no resources found and no ModuleInstance CR to delete.
+	if len(resources) == 0 && !opts.InventoryRecordExists {
 		return nil, &noResourcesFoundError{
 			InstanceName: opts.InstanceName,
 			InstanceID:   opts.InstanceID,
@@ -120,22 +119,8 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 		result.Deleted++
 	}
 
-	// Delete the inventory Secret last (after all workload resources are gone).
-	// This ensures the inventory is only removed when the instance is fully deleted.
-	if opts.InventorySecretName != "" && !opts.DryRun {
-		invSecretNS := opts.InventorySecretNamespace
-		if invSecretNS == "" {
-			invSecretNS = opts.Namespace
-		}
-		if err := client.Clientset.CoreV1().Secrets(invSecretNS).Delete(ctx, opts.InventorySecretName, metav1.DeleteOptions{}); err != nil {
-			if !apierrors.IsNotFound(err) {
-				instanceLog.Debug("could not delete inventory Secret", "name", opts.InventorySecretName, "err", err)
-			}
-		} else {
-			instanceLog.Debug("deleted inventory Secret", "name", opts.InventorySecretName, "namespace", invSecretNS)
-		}
-	}
-
+	// The ModuleInstance CR is deleted last by the caller (after this returns),
+	// so the inventory record is only removed once the instance is fully torn down.
 	return result, nil
 }
 

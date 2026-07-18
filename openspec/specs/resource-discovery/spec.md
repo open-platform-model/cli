@@ -1,12 +1,12 @@
 ## Purpose
 
-Defines how OPM CLI commands discover and select resources in a Kubernetes cluster. Primary discovery uses the inventory Secret (targeted GET calls per tracked resource). Label-based discovery via `DiscoverResources()` is retained for commands that still require it (e.g., delete fallback). This covers the `delete` and `status` commands that operate on existing deployed resources.
+Defines how OPM CLI commands discover and select resources in a Kubernetes cluster. Primary discovery reads the `ModuleInstance` CR (direct GET by name, or CR list matched on `status.instanceUUID`). Label-based discovery via `DiscoverResources()` is retained for commands that still require it (e.g., delete fallback). This covers the `delete` and `status` commands that operate on existing deployed resources.
 
 ## Requirements
 
 ### Requirement: Selector mutual exclusivity
 
-Commands that discover resources (`delete`, `status`) MUST accept exactly one selector type per invocation.
+Commands that discover resources (`delete`, `status`) MUST accept exactly one selector type per invocation. Name selectors resolve by a direct `ModuleInstance` GET; instance-id selectors resolve by listing `ModuleInstance` CRs in the namespace and matching `status.instanceUUID`.
 
 #### Scenario: Both --name and --instance-id provided
 
@@ -21,12 +21,12 @@ Commands that discover resources (`delete`, `status`) MUST accept exactly one se
 #### Scenario: Only --name provided
 
 - **WHEN** user provides `--name` flag (and `--namespace`)
-- **THEN** command uses name+namespace label selector
+- **THEN** command resolves the instance by a direct `ModuleInstance` GET by name in the namespace
 
 #### Scenario: Only --instance-id provided
 
 - **WHEN** user provides `--instance-id` flag (and `--namespace`)
-- **THEN** command uses instance-id label selector
+- **THEN** command resolves the instance by listing `ModuleInstance` CRs in the namespace and matching `status.instanceUUID`
 
 ---
 

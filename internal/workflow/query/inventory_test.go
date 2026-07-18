@@ -13,67 +13,96 @@ import (
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 )
 
-func makeTestK8sClient(objects ...runtime.Object) *kubernetes.Client {
-	return &kubernetes.Client{Clientset: fake.NewClientset(objects...)}
+func makeCRClient(objs ...*unstructured.Unstructured) *kubernetes.Client {
+	scheme := runtime.NewScheme()
+	runtimeObjs := make([]runtime.Object, len(objs))
+	for i, o := range objs {
+		runtimeObjs[i] = o
+	}
+	listKinds := map[schema.GroupVersionResource]string{
+		inventory.ModuleInstanceGVR: "ModuleInstanceList",
+	}
+	return &kubernetes.Client{
+		Dynamic: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, listKinds, runtimeObjs...),
+	}
 }
 
-func makeTestInventorySecret(t *testing.T, instanceName, namespace, instanceID string) *corev1.Secret {
-	t.Helper()
-	inv := &inventory.InstanceInventoryRecord{InstanceMetadata: inventory.InstanceMetadata{Kind: "ModuleInstance", APIVersion: inventory.APIVersionV1Alpha1, InstanceName: instanceName, InstanceNamespace: namespace, InstanceID: instanceID, LastTransitionTime: "2026-01-01T00:00:00Z"}, ModuleMetadata: inventory.ModuleMetadata{Kind: "Module", APIVersion: inventory.APIVersionV1Alpha1, Name: instanceName}, Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{}}}
-	secret, err := inventory.MarshalToSecret(inv)
-	require.NoError(t, err)
-	secret.Namespace = namespace
-	return secret
+// makeModuleInstanceCR builds a ModuleInstance CR with the CLI's spec/status
+// subset for tests.
+func makeModuleInstanceCR(name, namespace, instanceID string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": inventory.APIVersionModuleInstance,
+		"kind":       inventory.KindModuleInstance,
+		"metadata": map[string]any{
+			"name":      name,
+			"namespace": namespace,
+		},
+		"spec": map[string]any{
+			"owner": inventory.OwnerCLI,
+			"module": map[string]any{
+				"path":    "opmodel.dev/modules/myapp@v0",
+				"version": "0.1.0",
+			},
+		},
+		"status": map[string]any{
+			"instanceUUID": instanceID,
+			"inventory": map[string]any{
+				"revision": int64(1),
+				"count":    int64(0),
+				"entries":  []any{},
+			},
+		},
+	}}
 }
 
 func silentLogger() *log.Logger { return log.New(nil) }
 
 func TestResolveInventory_ByInstanceName_Success(t *testing.T) {
-	secret := makeTestInventorySecret(t, "myapp", "default", "uuid-abc-123")
-	client := makeTestK8sClient(secret)
+	cr := makeModuleInstanceCR("myapp", "default", "uuid-abc-123")
+	client := makeCRClient(cr)
 	ctx := context.Background()
 	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "myapp", Namespace: "default"}
 	inv, live, missing, err := ResolveInventory(ctx, client, rsf, "default", silentLogger())
 	require.NoError(t, err)
 	require.NotNil(t, inv)
-	assert.Equal(t, "myapp", inv.InstanceMetadata.InstanceName)
-	assert.Equal(t, "uuid-abc-123", inv.InstanceMetadata.InstanceID)
+	assert.Equal(t, "myapp", inv.Name)
+	assert.Equal(t, "uuid-abc-123", inv.InstanceUUID)
 	assert.Empty(t, live)
 	assert.Empty(t, missing)
 }
 
 func TestResolveInventory_ByInstanceID_Success(t *testing.T) {
-	secret := makeTestInventorySecret(t, "myapp", "production", "uuid-xyz-789")
-	client := makeTestK8sClient(secret)
+	cr := makeModuleInstanceCR("myapp", "production", "uuid-xyz-789")
+	client := makeCRClient(cr)
 	ctx := context.Background()
 	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "myapp", InstanceID: "uuid-xyz-789", Namespace: "production"}
 	inv, live, missing, err := ResolveInventory(ctx, client, rsf, "production", silentLogger())
 	require.NoError(t, err)
 	require.NotNil(t, inv)
-	assert.Equal(t, "uuid-xyz-789", inv.InstanceMetadata.InstanceID)
+	assert.Equal(t, "uuid-xyz-789", inv.InstanceUUID)
 	assert.Empty(t, live)
 	assert.Empty(t, missing)
 }
 
 func TestResolveInventory_ByInstanceID_NoInstanceName(t *testing.T) {
-	secret := makeTestInventorySecret(t, "myapp", "default", "uuid-nnn-000")
-	client := makeTestK8sClient(secret)
+	cr := makeModuleInstanceCR("myapp", "default", "uuid-nnn-000")
+	client := makeCRClient(cr)
 	ctx := context.Background()
 	rsf := &cmdutil.InstanceSelectorFlags{InstanceID: "uuid-nnn-000", Namespace: "default"}
 	inv, _, _, err := ResolveInventory(ctx, client, rsf, "default", silentLogger())
 	require.NoError(t, err)
 	require.NotNil(t, inv)
-	assert.Equal(t, "uuid-nnn-000", inv.InstanceMetadata.InstanceID)
+	assert.Equal(t, "uuid-nnn-000", inv.InstanceUUID)
 }
 
 func TestResolveInventory_NotFound(t *testing.T) {
-	client := makeTestK8sClient()
+	client := makeCRClient()
 	ctx := context.Background()
 	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "nonexistent", Namespace: "default"}
 	inv, live, missing, err := ResolveInventory(ctx, client, rsf, "default", silentLogger())
@@ -84,19 +113,4 @@ func TestResolveInventory_NotFound(t *testing.T) {
 	var exitErr *opmexit.ExitError
 	require.True(t, errors.As(err, &exitErr))
 	assert.Equal(t, opmexit.ExitNotFound, exitErr.Code)
-}
-
-func TestResolveInventory_K8sError_LookupFails(t *testing.T) {
-	brokenSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: inventory.SecretName("brokenapp", "uuid-broken"), Namespace: "default", Labels: map[string]string{"opmodel.dev/component": "inventory", "module-instance.opmodel.dev/name": "brokenapp"}}, Data: map[string][]byte{"inventory": []byte("not-valid-json")}}
-	client := makeTestK8sClient(brokenSecret)
-	ctx := context.Background()
-	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "brokenapp", Namespace: "default"}
-	inv, live, missing, err := ResolveInventory(ctx, client, rsf, "default", silentLogger())
-	require.Error(t, err)
-	assert.Nil(t, inv)
-	assert.Nil(t, live)
-	assert.Nil(t, missing)
-	var exitErr *opmexit.ExitError
-	require.True(t, errors.As(err, &exitErr))
-	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
 }
