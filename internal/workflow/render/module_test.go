@@ -43,7 +43,7 @@ func TestFromModule_RejectsInstancePackage(t *testing.T) {
 
 	_, err := FromModule(context.Background(), ModuleOpts{
 		ModulePath: dir,
-		Config:     &config.GlobalConfig{CueContext: cuecontext.New()},
+		Config:     &config.GlobalConfig{},
 		K8sConfig:  &config.ResolvedKubernetesConfig{},
 	})
 	require.Error(t, err)
@@ -63,8 +63,7 @@ func TestResolveModuleValues_UsesValuesFile(t *testing.T) {
 
 	values, err := resolveModuleValues(ctx, modVal, []string{valuesFile})
 	require.NoError(t, err)
-	require.Len(t, values, 1)
-	assert.True(t, values[0].Exists())
+	assert.True(t, values.Exists())
 }
 
 // TestResolveModuleValues_FallbackDebugValues exercises the debugValues path.
@@ -75,8 +74,7 @@ func TestResolveModuleValues_FallbackDebugValues(t *testing.T) {
 
 	values, err := resolveModuleValues(ctx, modVal, nil)
 	require.NoError(t, err)
-	require.Len(t, values, 1)
-	assert.True(t, values[0].Exists())
+	assert.True(t, values.Exists())
 }
 
 // TestResolveModuleValues_NoDebugValues asserts the actionable error when
@@ -89,35 +87,4 @@ func TestResolveModuleValues_NoDebugValues(t *testing.T) {
 	_, err := resolveModuleValues(ctx, modVal, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "debugValues")
-}
-
-// TestFromModule_RegistryE2E exercises the full FromModule pipeline against
-// an example module with debugValues. Skipped if the registry is unreachable.
-func TestFromModule_RegistryE2E(t *testing.T) {
-	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
-		t.Skip("skipping registry-backed render tests")
-	}
-
-	modPath, err := filepath.Abs("../../../examples/modules/mc_router")
-	require.NoError(t, err)
-	if _, statErr := os.Stat(modPath); statErr != nil {
-		t.Skip("examples/modules/mc_router not available")
-	}
-
-	cfg := &config.GlobalConfig{
-		CueContext: cuecontext.New(),
-	}
-	k8sCfg := &config.ResolvedKubernetesConfig{}
-
-	result, err := FromModule(context.Background(), ModuleOpts{
-		ModulePath: modPath,
-		Name:       "mc-router-test",
-		Config:     cfg,
-		K8sConfig:  k8sCfg,
-	})
-	if err != nil {
-		t.Skipf("FromModule failed (likely registry/provider unavailable): %v", err)
-	}
-	require.NotNil(t, result)
-	assert.Equal(t, "mc-router-test", result.Instance.Name)
 }

@@ -100,6 +100,11 @@ Config loading SHALL be single-pass: because `~/.opm/config.cue` contains no CUE
 - **THEN** schema validation SHALL fail naming the removed field
 - **AND** the error SHALL point at `opm config init` for regeneration
 
+#### Scenario: Imports rejected
+
+- **WHEN** config.cue contains any CUE `import` declaration (including stdlib)
+- **THEN** loading SHALL fail stating the config file must be data-only
+
 ### Requirement: Resolution tracking for debugging
 
 The CLI SHALL track the source of each resolved configuration value for verbose logging.
@@ -110,17 +115,17 @@ Each resolved value records:
 - The source (flag, env, config, or default)
 - Any shadowed values from lower-precedence sources
 
-The CLI SHALL emit a single "initializing CLI" debug log line showing all resolved values when `--verbose` is specified: kubeconfig, context, namespace, config path, registry, and platform source. Provider does not exist as a resolved value.
+The CLI SHALL emit a single "initializing CLI" debug log line when `--verbose` is specified, showing the values resolved at initialization time: config path and registry. Kubernetes values resolve at point of use per command; the platform source is a per-command concern reported by every render-bearing command (see `platform-resolution`), not an initialization-time value. Provider does not exist as a resolved value.
 
 The following debug log lines SHALL be retained:
 
 - `"resolved config path"` — shows config file location and source
 - `"resolved registry"` — shows registry URL and source
 
-#### Scenario: Verbose mode shows all resolved values
+#### Scenario: Verbose mode shows initialization-time values
 
 - **WHEN** `--verbose` flag is specified
-- **THEN** the "initializing CLI" debug log SHALL include all resolved values: kubeconfig, context, namespace, config path, and registry
+- **THEN** the "initializing CLI" debug log SHALL include the resolved config path and registry
 - **THEN** each value SHALL show the final resolved value (not raw flag defaults)
 
 #### Scenario: Verbose mode shows resolution source

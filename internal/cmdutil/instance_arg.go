@@ -99,10 +99,7 @@ func resolveInstanceArgFromFile(arg string, cfg *config.GlobalConfig) (InstanceA
 		return InstanceArg{}, err
 	}
 
-	cueCtx := cfg.CueContext
-	if cueCtx == nil {
-		cueCtx = cuecontext.New()
-	}
+	cueCtx := cuecontext.New()
 
 	pkg, _, err := loader.LoadInstanceFile(cueCtx, arg, loader.LoadOptions{Registry: cfg.Registry})
 	if err != nil {

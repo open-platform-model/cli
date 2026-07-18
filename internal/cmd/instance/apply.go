@@ -11,6 +11,7 @@ import (
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/platform"
 	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
 	"github.com/open-platform-model/cli/internal/workflow/render"
 )
@@ -73,15 +74,24 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 		KubeconfigFlag: kf.Kubeconfig,
 		ContextFlag:    kf.Context,
 		NamespaceFlag:  namespaceFlag,
-		ProviderFlag:   rff.Provider,
 	})
 	if err != nil {
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
+	// Cluster client before render: apply resolves its platform from the
+	// cluster Platform CR by default (0006 D21).
+	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
+	if err != nil {
+		output.Error("connecting to cluster", "error", err)
+		return err
+	}
+
 	result, err := render.FromInstanceFile(ctx, render.InstanceFileOpts{
 		InstanceFilePath: instanceFile,
 		ValuesFiles:      rff.Values,
+		PlatformFlag:     rff.Platform,
+		ClusterPlatform:  platform.ClusterSpecGetterFor(k8sClient.Dynamic),
 		K8sConfig:        k8sConfig,
 		Config:           cfg,
 	})
@@ -92,12 +102,6 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 	render.ShowOutput(result, render.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
 
 	instanceLog := output.InstanceLogger(result.Instance.Name)
-
-	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
-	if err != nil {
-		instanceLog.Error("connecting to cluster", "error", err)
-		return err
-	}
 
 	return workflowapply.Execute(ctx, workflowapply.Request{
 		Result:    result,

@@ -1,10 +1,6 @@
 // Package config provides configuration loading and management.
 package config
 
-import (
-	"cuelang.org/go/cue"
-)
-
 // APIWarningsWarn is the default value for LogKubernetesConfig.APIWarnings.
 // It causes Kubernetes API deprecation warnings to be logged at WARN level.
 const APIWarningsWarn = "warn"
@@ -74,15 +70,6 @@ type GlobalConfig struct {
 	// ConfigPath is the resolved config file path.
 	// Set by config.Load.
 	ConfigPath string
-
-	// Providers maps provider names to their loaded CUE definitions.
-	// Key: provider alias (e.g., "kubernetes")
-	// Value: loaded CUE value referencing the provider's #Provider definition
-	Providers map[string]cue.Value
-
-	// CueContext is the CUE context used to load providers and other CUE-backed inputs.
-	// Shared with module loader to ensure all values are from the same runtime.
-	CueContext *cue.Context
 
 	// Flags holds the raw CLI flag values as set by the user.
 	Flags GlobalFlags

@@ -8,6 +8,7 @@ metadata: {
 }
 
 #module: {
+	kind: "Module"
 	metadata: {
 		name:       "demo"
 		modulePath: "test.example.com/demo"

@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 )
@@ -48,7 +49,7 @@ const (
 	instanceName = "module-apply-itest"
 
 	moduleFixture       = "tests/integration/module-apply/testdata"
-	valuesApiOffFixture = "tests/integration/module-apply/testdata/values_api_off.cue"
+	valuesApiOffFixture = "tests/integration/module-apply/values_api_off.cue"
 
 	binaryPath = "bin/opm-module-apply-itest"
 )
@@ -65,6 +66,7 @@ func main() {
 	fmt.Println()
 
 	buildBinary()
+	seedHome()
 
 	client, err := kubernetes.NewClient(kubernetes.ClientOptions{Context: clusterContext})
 	check("creating Kubernetes client", err)
@@ -250,6 +252,39 @@ func buildBinary() {
 	fmt.Println()
 }
 
+// itestHome is the temp HOME seeded with the post-D39 two-file ~/.opm
+// (config.cue + platform.cue) the binary renders against. Populated once by
+// seedHome.
+var itestHome string
+
+// realKubeconfig is the invoking user's kubeconfig path, resolved before the
+// binary's HOME is redirected to the temp dir.
+var realKubeconfig string
+
+// seedHome creates a temp HOME with the default config + platform templates
+// (the same files `opm config init` writes), so the binary resolves the local
+// default platform and never trips over the invoking user's real ~/.opm.
+func seedHome() {
+	if home, err := os.UserHomeDir(); err == nil {
+		realKubeconfig = filepath.Join(home, ".kube", "config")
+	}
+	dir, err := os.MkdirTemp("", "opm-module-apply-itest-home-*")
+	if err != nil {
+		failf("creating temp HOME: %v", err)
+	}
+	opmDir := filepath.Join(dir, ".opm")
+	if err := os.MkdirAll(opmDir, 0o700); err != nil {
+		failf("creating temp ~/.opm: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(opmDir, "config.cue"), []byte(config.DefaultConfigTemplate), 0o600); err != nil {
+		failf("writing temp config.cue: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(opmDir, "platform.cue"), []byte(config.DefaultPlatformTemplate), 0o600); err != nil {
+		failf("writing temp platform.cue: %v", err)
+	}
+	itestHome = dir
+}
+
 // runModuleApply invokes `./bin/<binary> module apply <args...>` and returns stdout,
 // stderr, and the exit code.
 func runModuleApply(args []string) (stdout, stderr string, exitCode int) {
@@ -257,6 +292,10 @@ func runModuleApply(args []string) (stdout, stderr string, exitCode int) {
 	cmd := exec.Command("./"+binaryPath, full...)
 	cmd.Env = append(os.Environ(),
 		"OPM_REGISTRY="+os.Getenv("OPM_REGISTRY"),
+		"HOME="+itestHome,
+		// The temp HOME has no ~/.kube; point the binary at the invoking
+		// user's kubeconfig explicitly.
+		"OPM_KUBECONFIG="+realKubeconfig,
 	)
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf

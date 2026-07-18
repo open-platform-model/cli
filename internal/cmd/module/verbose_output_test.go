@@ -10,7 +10,8 @@ import (
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/workflow/render"
 	"github.com/open-platform-model/cli/pkg/module"
-	pkgrender "github.com/open-platform-model/cli/pkg/render"
+	"github.com/open-platform-model/library/opm/compile"
+	"github.com/open-platform-model/library/opm/kernel"
 )
 
 // buildTestResult constructs a minimal *render.Result suitable for
@@ -24,7 +25,7 @@ func buildTestResult() *render.Result {
 		Module: module.ModuleMetadata{
 			Version: "1.0.0",
 		},
-		Components: []pkgrender.ComponentSummary{
+		Components: []compile.ComponentSummary{
 			{
 				Name:         "web",
 				Labels:       map[string]string{"core.opmodel.dev/workload-type": "stateless"},
@@ -32,8 +33,8 @@ func buildTestResult() *render.Result {
 				TraitFQNs:    []string{"opmodel.dev/opm/v1alpha1/traits/network/expose@v1"},
 			},
 		},
-		MatchPlan: &pkgrender.MatchPlan{
-			Matches: map[string]map[string]pkgrender.MatchResult{
+		MatchPlan: &kernel.MatchPlan{
+			Matches: map[string]map[string]compile.MatchResult{
 				"web": {
 					"test#DeploymentTransformer": {Matched: true},
 					"test#ServiceTransformer":    {Matched: true},

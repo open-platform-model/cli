@@ -8,6 +8,7 @@ import (
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/spf13/cobra"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
@@ -44,7 +45,7 @@ func NewModuleVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 	  opm module vet ./my-module -f base.cue -f prod.cue`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runVet(args, cfg, &rf)
+			return runVet(args, &rf)
 		},
 	}
 
@@ -53,17 +54,17 @@ func NewModuleVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 	return c
 }
 
-func runVet(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags) error {
+func runVet(args []string, rf *cmdutil.RenderFlags) error {
 	modulePath := cmdutil.ResolveModulePath(args)
-	return runVetModuleOnly(modulePath, cfg, rf)
+	return runVetModuleOnly(modulePath, rf)
 }
 
 // runVetModuleOnly validates a module directory without an instance.cue.
 // It loads the module CUE package, validates the schema, and checks that the
 // values (from -f flag or debugValues field) satisfy #config.
 // No instance wrapper, engine render, or cluster connection is required.
-func runVetModuleOnly(modulePath string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags) error {
-	cueCtx := cfg.CueContext
+func runVetModuleOnly(modulePath string, rf *cmdutil.RenderFlags) error {
+	cueCtx := cuecontext.New()
 
 	if err := cmdutil.ValidateModuleInputPath(modulePath); err != nil {
 		return &opmexit.ExitError{

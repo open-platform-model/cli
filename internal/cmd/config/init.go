@@ -1,9 +1,7 @@
 package config
 
 import (
-	"context"
 	"os"
-	"path/filepath"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
@@ -11,7 +9,6 @@ import (
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
-	"github.com/open-platform-model/cli/internal/cuetidy"
 	"github.com/open-platform-model/cli/internal/output"
 	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
@@ -19,10 +16,7 @@ import (
 // NewConfigInitCmd creates the config init command.
 func NewConfigInitCmd(_ *config.GlobalConfig) *cobra.Command {
 	// Init-specific flags (local to this command)
-	var (
-		forceFlag  bool
-		noTidyFlag bool
-	)
+	var forceFlag bool
 
 	c := &cobra.Command{
 		Use:   "init",
@@ -30,31 +24,21 @@ func NewConfigInitCmd(_ *config.GlobalConfig) *cobra.Command {
 		Long: `Initialize the OPM CLI configuration.
 
 Creates the following files in ~/.opm/:
-  config.cue           Main configuration file
-  cue.mod/module.cue   CUE module metadata
+  config.cue     CLI configuration (registry, kubernetes, log)
+  platform.cue   Local default platform (catalog subscriptions)
 
-The configuration includes:
-  - Default registry for CUE module resolution
-  - Kubernetes provider configuration
-  - Cache directory settings
-
-After writing the files, opm runs the equivalent of 'cue mod tidy' in
-~/.opm to fetch the providers referenced by the default config so that
-'opm config vet' works without further setup. Disable with --no-tidy
-when working offline or against a registry that does not yet have the
-providers available.
+Both files are plain data — no CUE module, no imports, nothing to fetch.
+The platform file subscribes to the official OPM catalogs and is used
+whenever no --platform flag is given and no cluster Platform is readable.
 
 Examples:
-  # Initialize configuration (resolves dependencies automatically)
+  # Initialize configuration
   opm config init
 
   # Overwrite existing configuration
-  opm config init --force
-
-  # Skip dependency resolution (offline / air-gapped use)
-  opm config init --no-tidy`,
+  opm config init --force`,
 		RunE: func(c *cobra.Command, args []string) error {
-			return runConfigInit(c.Context(), args, forceFlag, noTidyFlag)
+			return runConfigInit(args, forceFlag)
 		},
 		Annotations: map[string]string{
 			cmdutil.SkipConfigLoadAnnotation: "true",
@@ -63,13 +47,11 @@ Examples:
 
 	c.Flags().BoolVarP(&forceFlag, "force", "f", false,
 		"Overwrite existing configuration")
-	c.Flags().BoolVar(&noTidyFlag, "no-tidy", false,
-		"Skip running 'cue mod tidy' after writing the config")
 
 	return c
 }
 
-func runConfigInit(ctx context.Context, _ []string, force, noTidy bool) error {
+func runConfigInit(_ []string, force bool) error {
 	// Get paths
 	paths, err := config.DefaultPaths()
 	if err != nil {
@@ -93,19 +75,11 @@ func runConfigInit(ctx context.Context, _ []string, force, noTidy bool) error {
 		}
 	}
 
-	// Create directories with secure permissions (0700)
+	// Create directory with secure permissions (0700)
 	if err := os.MkdirAll(paths.HomeDir, 0o700); err != nil {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitPermissionDenied,
 			Err:  oerrors.Wrap(oerrors.ErrPermission, "could not create ~/.opm directory"),
-		}
-	}
-
-	cueModDir := filepath.Join(paths.HomeDir, "cue.mod")
-	if err := os.MkdirAll(cueModDir, 0o700); err != nil {
-		return &opmexit.ExitError{
-			Code: opmexit.ExitPermissionDenied,
-			Err:  oerrors.Wrap(oerrors.ErrPermission, "could not create ~/.opm/cue.mod directory"),
 		}
 	}
 
@@ -117,12 +91,11 @@ func runConfigInit(ctx context.Context, _ []string, force, noTidy bool) error {
 		}
 	}
 
-	// Write cue.mod/module.cue with secure permissions (0600)
-	moduleFile := filepath.Join(cueModDir, "module.cue")
-	if err := os.WriteFile(moduleFile, []byte(config.DefaultModuleTemplate), 0o600); err != nil {
+	// Write platform.cue with secure permissions (0600)
+	if err := os.WriteFile(paths.PlatformFile, []byte(config.DefaultPlatformTemplate), 0o600); err != nil {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitPermissionDenied,
-			Err:  oerrors.Wrap(oerrors.ErrPermission, "could not write cue.mod/module.cue"),
+			Err:  oerrors.Wrap(oerrors.ErrPermission, "could not write platform.cue"),
 		}
 	}
 
@@ -130,50 +103,9 @@ func runConfigInit(ctx context.Context, _ []string, force, noTidy bool) error {
 	output.Println("")
 	output.Println("Created files:")
 	output.Println("  " + paths.ConfigFile)
-	output.Println("  " + moduleFile)
+	output.Println("  " + paths.PlatformFile)
 	output.Println("")
-
-	if noTidy {
-		output.Println(output.FormatNotice("Run 'cue mod tidy' in " + paths.HomeDir + " to resolve dependencies (skipped: --no-tidy)"))
-		output.Println("Validate with: opm config vet")
-		return nil
-	}
-
-	if err := tidyConfigDir(ctx, paths.HomeDir); err != nil {
-		// Tidy failure is not fatal: the files are written. Surface the cause
-		// and fall back to the manual instructions so the user can recover.
-		output.Println(output.FormatNotice("Could not resolve dependencies automatically: " + err.Error()))
-		output.Println(output.FormatNotice("Run 'cue mod tidy' in " + paths.HomeDir + " once the issue is resolved"))
-		output.Println("Validate with: opm config vet")
-		return nil //nolint:nilerr // best-effort: files exist; tidy failure should not fail init
-	}
-
-	output.Println(output.FormatCheckmark("Dependencies resolved (cue.mod/module.cue updated)"))
 	output.Println("Validate with: opm config vet")
 
 	return nil
-}
-
-// tidyConfigDir runs the equivalent of `cue mod tidy` against dir. If the user
-// has not set CUE_REGISTRY, we provide the same default registry baked into the
-// config template so the providers referenced there can be resolved on a fresh
-// machine. The original env value is restored on return.
-func tidyConfigDir(ctx context.Context, dir string) error {
-	const cueRegistryEnv = "CUE_REGISTRY"
-
-	prev, hadPrev := os.LookupEnv(cueRegistryEnv)
-	if !hadPrev || prev == "" {
-		if err := os.Setenv(cueRegistryEnv, config.DefaultRegistry); err != nil {
-			return err
-		}
-		defer func() {
-			if hadPrev {
-				_ = os.Setenv(cueRegistryEnv, prev)
-			} else {
-				_ = os.Unsetenv(cueRegistryEnv)
-			}
-		}()
-	}
-
-	return cuetidy.Run(ctx, dir, os.Stderr)
 }

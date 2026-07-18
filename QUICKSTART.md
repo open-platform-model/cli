@@ -50,14 +50,13 @@ Add these exports to your shell profile if you plan to use OPM regularly.
 opm config init
 ```
 
-This creates `~/.opm/config.cue` with default settings.
+This creates two plain data files — nothing to fetch, no CUE module:
 
-Next you need to tidy to pull all dependencies down.
-
-```bash
-cd ~/.opm/
-cue mod tidy
-```
+- `~/.opm/config.cue` — CLI settings (registry, kubernetes, log)
+- `~/.opm/platform.cue` — the local default platform, subscribed to the
+  official OPM catalogs. Renders use it whenever no `--platform` flag is
+  given and no cluster `Platform` is readable. Rendering resolves the
+  subscribed catalogs from the registry, so `build` needs registry access.
 
 ## Create Your First Module
 

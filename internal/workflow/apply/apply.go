@@ -14,6 +14,7 @@ import (
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/platform"
 	"github.com/open-platform-model/cli/internal/version"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
 	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
@@ -49,8 +50,10 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		return err
 	}
 
-	manifestDigest := inventory.ComputeManifestDigest(result.Resources)
-	output.Debug("manifest digest computed", "digest", manifestDigest)
+	// Operator-parity render digest, computed by the render workflow over the
+	// kernel-compiled resources (0006 D9/D30 — see inventory.ComputeRenderDigest).
+	manifestDigest := result.RenderDigest
+	output.Debug("render digest computed", "digest", manifestDigest)
 
 	// Pre-apply gates 1-3 (cluster probes). Skipped entirely on dry-run — they
 	// exist to protect writes, and a dry-run writes nothing (enhancement 0006 D5).
@@ -148,6 +151,19 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			output.Println(output.FormatCheckmark(req.Options.SuccessUpToDateMessage))
 		} else {
 			output.Println(output.FormatCheckmark(req.Options.SuccessAppliedMessage))
+		}
+
+		// Solo-cluster Platform seeding (0006 D12/D22): when the render fell
+		// back from the cluster to the local default platform, seed the
+		// singleton cluster Platform write-if-absent so the operator adopts
+		// it on install. The seeded document is the exact resolved spec the
+		// render consumed (Result.PlatformSpec — no file re-read, no TOCTOU).
+		// Best-effort — Ensure degrades on RBAC and no-ops on AlreadyExists;
+		// only unexpected errors surface as warnings.
+		if result.Platform.Source == platform.SourceLocalDefault && result.Platform.Warning != "" {
+			if seedErr := platform.EnsureClusterPlatform(ctx, req.K8sClient.Dynamic, result.PlatformSpec); seedErr != nil {
+				instanceLog.Warn("could not seed cluster Platform", "error", seedErr)
+			}
 		}
 	}
 
@@ -368,10 +384,14 @@ func FormatApplySummary(r *kubernetes.ApplyResult) string {
 }
 
 // sourceDigest returns a deterministic digest identifying the module source of
-// this apply, derived from the canonical module reference (path@version). The
-// CLI's current render pipeline has no module OCI source bytes to hash, so this
-// is a stable source-identity digest rather than a content digest; kernel
-// adoption (slice C2) replaces it with the operator's source-bytes digest.
+// this apply, derived from the canonical module reference (path@version). For
+// any non-empty reference this is byte-identical to the operator's
+// ModuleSourceDigest (opm-operator internal/status): on the CUE-native
+// resolution path BOTH actors use the reference-identity digest — there is no
+// Flux artifact content digest here. Do not change one side without the
+// other. The empty-reference guard below is CLI-only (omits the status field
+// instead of hashing "@"); D6 guarantees a non-empty canonical reference on
+// every real apply, so the divergence is unreachable in practice.
 func sourceDigest(modulePath, moduleVersion string) string {
 	if modulePath == "" && moduleVersion == "" {
 		return ""
@@ -380,11 +400,13 @@ func sourceDigest(modulePath, moduleVersion string) string {
 	return fmt.Sprintf("sha256:%x", sum)
 }
 
-// valuesDigest returns a deterministic digest of the unified values blob, or ""
-// when there are no values.
+// valuesDigest returns a deterministic digest of the unified values blob.
+// Canonical-JSON semantics match the operator's ConfigDigest, including the
+// empty case (SHA-256 of no bytes), so the field is cross-actor comparable.
 func valuesDigest(values map[string]any) string {
 	if len(values) == 0 {
-		return ""
+		sum := sha256.Sum256(nil)
+		return fmt.Sprintf("sha256:%x", sum)
 	}
 	b, err := json.Marshal(values)
 	if err != nil {

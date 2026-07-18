@@ -57,7 +57,7 @@ func writeVerboseMatchLog(result *Result) {
 		compName string
 		tfFQN    string
 		matched  bool
-		missing  struct{ labels, resources, traits []string }
+		missing  struct{ labels []string }
 	}
 	var lines []matchLine
 	for _, p := range result.MatchPlan.MatchedPairs() {
@@ -65,9 +65,9 @@ func writeVerboseMatchLog(result *Result) {
 	}
 	for _, p := range result.MatchPlan.NonMatchedPairs() {
 		l := matchLine{compName: p.ComponentName, tfFQN: p.TransformerFQN, matched: false}
+		// The kernel's match model matches on labels; per-FQN missing
+		// resource/trait diagnostics live in MatchPlan.Missing.
 		l.missing.labels = p.MissingLabels
-		l.missing.resources = p.MissingResources
-		l.missing.traits = p.MissingTraits
 		lines = append(lines, l)
 	}
 	sort.Slice(lines, func(i, j int) bool {
@@ -83,12 +83,6 @@ func writeVerboseMatchLog(result *Result) {
 			attrs := []any{}
 			if len(l.missing.labels) > 0 {
 				attrs = append(attrs, "missing-labels", strings.Join(l.missing.labels, ", "))
-			}
-			if len(l.missing.resources) > 0 {
-				attrs = append(attrs, "missing-resources", strings.Join(l.missing.resources, ", "))
-			}
-			if len(l.missing.traits) > 0 {
-				attrs = append(attrs, "missing-traits", strings.Join(l.missing.traits, ", "))
 			}
 			instanceLog.Debug(output.FormatTransformerSkipped(l.compName, l.tfFQN), attrs...)
 		}

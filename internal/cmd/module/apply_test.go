@@ -51,7 +51,7 @@ func TestNewModuleApplyCmd_Flags(t *testing.T) {
 	}
 	cases := []flagExpect{
 		{"values", "f", "stringArray", "[]"},
-		{"provider", "", "string", ""},
+		{"platform", "", "string", ""},
 		{"name", "", "string", ""},
 		{"namespace", "n", "string", ""},
 		{"kubeconfig", "", "string", ""},

@@ -1,58 +1,62 @@
 // Components for the integration-test module. The api component is gated on
 // #config.api.enabled so the test can verify the prune path by re-applying
-// with `enabled: false`.
-package itest
+// with values_api_off.cue (web: Deployment + Service; api: Deployment only).
+package module_apply_itest
 
 import (
-	resources_workload "opmodel.dev/opm/v1alpha1/resources/workload@v1"
-	traits_workload "opmodel.dev/opm/v1alpha1/traits/workload@v1"
-	traits_network "opmodel.dev/opm/v1alpha1/traits/network@v1"
+	bp "opmodel.dev/catalogs/opm/blueprints/workload"
+	tr "opmodel.dev/catalogs/opm/traits"
 )
 
 #components: {
 	web: {
-		metadata: labels: "core.opmodel.dev/workload-type": "stateless"
+		bp.#StatelessWorkload
+		tr.#Expose
 
-		resources_workload.#Container
-		traits_workload.#Scaling
-		traits_workload.#RestartPolicy
-		traits_workload.#UpdateStrategy
-		traits_network.#Expose
+		metadata: {
+			name: "web"
+			labels: "core.opmodel.dev/workload-type": "stateless"
+		}
 
 		spec: {
-			restartPolicy: "Always"
-			updateStrategy: type: "RollingUpdate"
-			container: {
-				name:  "web"
-				image: #config.web.image
-				ports: http: targetPort: 80
+			statelessWorkload: {
+				container: {
+					name:  "web"
+					image: #config.web.image
+					ports: http: {name: "http", targetPort: 80}
+				}
+				scaling: count: #config.web.scaling
+				restartPolicy: "Always"
+				updateStrategy: type: "RollingUpdate"
 			}
-			scaling: count: #config.web.scaling
+
 			expose: {
-				ports: http: container.ports.http & {exposedPort: #config.web.port}
 				type: "ClusterIP"
+				ports: http: {name: "http", targetPort: 80}
 			}
 		}
 	}
 
 	if #config.api.enabled {
 		api: {
-			metadata: labels: "core.opmodel.dev/workload-type": "stateless"
+			bp.#StatelessWorkload
 
-			resources_workload.#Container
-			traits_workload.#Scaling
-			traits_workload.#RestartPolicy
-			traits_workload.#UpdateStrategy
+			metadata: {
+				name: "api"
+				labels: "core.opmodel.dev/workload-type": "stateless"
+			}
 
 			spec: {
-				restartPolicy: "Always"
-				updateStrategy: type: "RollingUpdate"
-				container: {
-					name:  "api"
-					image: #config.api.image
-					ports: http: targetPort: #config.api.port
+				statelessWorkload: {
+					container: {
+						name:  "api"
+						image: #config.api.image
+						ports: http: {name: "http", targetPort: 3000}
+					}
+					scaling: count: #config.api.scaling
+					restartPolicy: "Always"
+					updateStrategy: type: "RollingUpdate"
 				}
-				scaling: count: #config.api.scaling
 			}
 		}
 	}

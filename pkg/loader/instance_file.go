@@ -151,3 +151,32 @@ func LoadValuesFile(ctx *cue.Context, path string) (cue.Value, error) {
 
 	return val, nil
 }
+
+// resolveInstanceFile resolves either an instance directory or direct file path.
+// Inside a directory the loader requires instance.cue (was release.cue, 0002 D9);
+// instance.cue is not accepted as a fallback (D8 hard-rename, no alias).
+//
+// Was: resolveReleaseFile (enhancement 0002 D8 hard-rename).
+func resolveInstanceFile(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("instance path must not be empty")
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("instance path %q not found", path)
+		}
+		return "", fmt.Errorf("stat instance path: %w", err)
+	}
+	if info.IsDir() {
+		instancePath := filepath.Join(path, "instance.cue")
+		if _, err := os.Stat(instancePath); err != nil {
+			if os.IsNotExist(err) {
+				return "", fmt.Errorf("instance path %q does not contain instance.cue", path)
+			}
+			return "", fmt.Errorf("stat instance file: %w", err)
+		}
+		return instancePath, nil
+	}
+	return path, nil
+}

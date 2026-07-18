@@ -11,6 +11,10 @@ type Paths struct {
 	// ConfigFile is the path to the config file (~/.opm/config.cue).
 	ConfigFile string
 
+	// PlatformFile is the path to the local default platform file
+	// (~/.opm/platform.cue).
+	PlatformFile string
+
 	// HomeDir is the path to the OPM home directory (~/.opm).
 	HomeDir string
 }
@@ -24,8 +28,9 @@ func DefaultPaths() (*Paths, error) {
 
 	opmHome := filepath.Join(homeDir, ".opm")
 	return &Paths{
-		ConfigFile: filepath.Join(opmHome, "config.cue"),
-		HomeDir:    opmHome,
+		ConfigFile:   filepath.Join(opmHome, "config.cue"),
+		PlatformFile: filepath.Join(opmHome, "platform.cue"),
+		HomeDir:      opmHome,
 	}, nil
 }
 

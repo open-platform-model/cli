@@ -1,30 +1,14 @@
-// Package module defines the Module and ModuleMetadata types, mirroring the
-// #Module definition in the CUE catalog (v1alpha1). A Module represents the
-// parsed module definition before it is built into an instance.
+// Package module defines the decoded metadata types for modules and module
+// instances (ModuleMetadata, InstanceMetadata) plus the canonical module
+// reference derivation. Loading, validation, and rendering live in the
+// library kernel (enhancement 0006 C2); this package carries only the
+// CLI-side identity shapes.
 package module
 
 import (
 	"fmt"
 	"strings"
-
-	"cuelang.org/go/cue"
 )
-
-// Module represents the #Module type before it is built.
-type Module struct {
-	// Metadata is the module metadata extracted from the module definition.
-	Metadata *ModuleMetadata `json:"metadata"`
-
-	// Config is the #config schema from the module definition (#Module.#config).
-	// It defines the constraints and defaults for module values.
-	Config cue.Value `json:"#config,omitempty"`
-
-	// Raw is the fully evaluated CUE value for the module.
-	Raw cue.Value
-
-	// ModulePath is the local filesystem directory path to the module.
-	ModulePath string
-}
 
 // ModuleMetadata contains module-level identity and version information.
 // This is the module's canonical metadata, distinct from the instance it is deployed as.

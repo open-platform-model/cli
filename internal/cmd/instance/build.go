@@ -81,7 +81,6 @@ func runInstanceBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.In
 	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
 		Config:        cfg,
 		NamespaceFlag: namespaceFlag,
-		ProviderFlag:  rff.Provider,
 	})
 	if err != nil {
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
@@ -99,17 +98,19 @@ func runInstanceBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.In
 	switch {
 	case info.IsDir():
 		result, err = render.FromModule(ctx, render.ModuleOpts{
-			ModulePath:  buildArg,
-			ValuesFiles: rff.Values,
-			Name:        nameFlag,
-			K8sConfig:   k8sConfig,
-			Config:      cfg,
+			ModulePath:   buildArg,
+			ValuesFiles:  rff.Values,
+			Name:         nameFlag,
+			PlatformFlag: rff.Platform, // offline: no cluster read (0006 D21)
+			K8sConfig:    k8sConfig,
+			Config:       cfg,
 		})
 	default:
 		if nameFlag != "" {
 			output.Warn("--name is ignored for instance-file builds; it only applies to module-directory builds")
 		}
 		result, err = render.FromInstanceFile(ctx, render.InstanceFileOpts{
+			PlatformFlag:     rff.Platform, // offline: no cluster read (0006 D21)
 			InstanceFilePath: buildArg,
 			ValuesFiles:      rff.Values,
 			K8sConfig:        k8sConfig,

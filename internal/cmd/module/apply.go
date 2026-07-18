@@ -11,6 +11,7 @@ import (
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/platform"
 	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
 	"github.com/open-platform-model/cli/internal/workflow/render"
 )
@@ -108,18 +109,27 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 		KubeconfigFlag: kf.Kubeconfig,
 		ContextFlag:    kf.Context,
 		NamespaceFlag:  rf.Namespace,
-		ProviderFlag:   rf.Provider,
 	})
 	if err != nil {
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
+	// Cluster client before render: apply resolves its platform from the
+	// cluster Platform CR by default (0006 D21).
+	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
+	if err != nil {
+		output.Error("connecting to cluster", "error", err)
+		return err
+	}
+
 	result, err := render.FromModule(ctx, render.ModuleOpts{
-		ModulePath:  modulePath,
-		ValuesFiles: rf.Values,
-		Name:        nameFlag,
-		K8sConfig:   k8sConfig,
-		Config:      cfg,
+		ModulePath:      modulePath,
+		ValuesFiles:     rf.Values,
+		Name:            nameFlag,
+		PlatformFlag:    rf.Platform,
+		ClusterPlatform: platform.ClusterSpecGetterFor(k8sClient.Dynamic),
+		K8sConfig:       k8sConfig,
+		Config:          cfg,
 	})
 	if err != nil {
 		return err
@@ -128,12 +138,6 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 	render.ShowOutput(result, render.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
 
 	instanceLog := output.InstanceLogger(result.Instance.Name)
-
-	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
-	if err != nil {
-		instanceLog.Error("connecting to cluster", "error", err)
-		return err
-	}
 
 	return workflowapply.Execute(ctx, workflowapply.Request{
 		Result:    result,

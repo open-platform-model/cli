@@ -45,14 +45,14 @@ The CLI SHALL inject its runtime identity (`opm-cli`) into the kernel render con
 
 ### Requirement: Render digests are kernel-derived and operator-parity
 
-`status.lastAppliedRenderDigest` SHALL be computed over the kernel-finalized manifests using the same canonical serialization the operator uses. A kind- and registry-gated integration check SHALL verify that a CLI render and an operator render of the same instance against the same Platform spec produce identical render digests (0006 D30 gate). The check SHALL report CUE evaluator-version skew between `cli`, `library`, and `opm-operator` explicitly rather than failing obscurely (0006 D36 precondition).
+`status.lastAppliedRenderDigest` SHALL be computed over the kernel-finalized manifests using the same canonical serialization the operator uses. A registry-gated integration check SHALL verify that the CLI's local-dir staging path and the operator's registry-acquisition call sequence produce identical render digests for the same instance against the same Platform spec, with the runtime name held constant (0006 D30 gate; the runtime identity is stamped into rendered labels, so cross-actor digests differ by that label by construction). Evaluator-version skew reporting applies to the future cross-binary comparison (slice C3, where CLI and operator binaries embed separate CUE evaluators); the in-binary check compiles both paths with one evaluator and cannot exhibit skew.
 
 #### Scenario: Parity for the same inputs
 
 - **WHEN** the parity check renders a fixture instance via the CLI kernel path and via the operator's renderer against the same Platform spec
 - **THEN** the two render digests SHALL be identical
 
-#### Scenario: Skew reported explicitly
+#### Scenario: Skew reported explicitly (cross-binary check, slice C3)
 
-- **WHEN** the parity check runs while `library` and `opm-operator` resolve different `cuelang.org/go` minor versions
+- **WHEN** the future cross-binary parity comparison runs while the `cli` and `opm-operator` binaries embed different `cuelang.org/go` minor versions
 - **THEN** the check SHALL fail with a message naming the evaluator-version skew as the suspected cause

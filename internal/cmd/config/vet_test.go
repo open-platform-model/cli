@@ -13,6 +13,26 @@ import (
 	opmconfig "github.com/open-platform-model/cli/internal/config"
 )
 
+// writeOpmFile writes content into ~/.opm/<name> under tmpHome, creating the
+// directory as needed, and returns the file path.
+func writeOpmFile(t *testing.T, tmpHome, name, content string) {
+	t.Helper()
+	opmDir := filepath.Join(tmpHome, ".opm")
+	require.NoError(t, os.MkdirAll(opmDir, 0o700))
+	path := filepath.Join(opmDir, name)
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+}
+
+const validVetConfig = `package config
+
+config: {
+	kubernetes: {
+		kubeconfig: "~/.kube/config"
+		namespace: "default"
+	}
+}
+`
+
 func TestNewConfigVetCmd(t *testing.T) {
 	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 
@@ -22,170 +42,143 @@ func TestNewConfigVetCmd(t *testing.T) {
 }
 
 func TestConfigVet_MissingConfigFile(t *testing.T) {
-	// Use temp home directory without config
-	tmpHome, err := os.MkdirTemp("", "config-vet-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpHome)
-
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpHome)
-	defer os.Setenv("HOME", origHome)
-
-	// Clear any config override
+	setTempHome(t)
 	os.Unsetenv("OPM_CONFIG")
 
 	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }
 
-func TestConfigVet_MissingModuleFile(t *testing.T) {
-	tmpHome, err := os.MkdirTemp("", "config-vet-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpHome)
-
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpHome)
-	defer os.Setenv("HOME", origHome)
-
+func TestConfigVet_ValidConfig_NoPlatformFile(t *testing.T) {
+	// A missing platform.cue is a note, not a failure (0006 D39).
+	tmpHome := setTempHome(t)
 	os.Unsetenv("OPM_CONFIG")
+	os.Unsetenv("OPM_REGISTRY")
 
-	// Create config file but not cue.mod/module.cue
-	opmDir := filepath.Join(tmpHome, ".opm")
-	require.NoError(t, os.MkdirAll(opmDir, 0o700))
-	configFile := filepath.Join(opmDir, "config.cue")
-	require.NoError(t, os.WriteFile(configFile, []byte("package config\n"), 0o600))
+	writeOpmFile(t, tmpHome, "config.cue", validVetConfig)
 
 	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	err = cmd.Execute()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "module.cue")
+	require.NoError(t, cmd.Execute())
 }
 
-func TestConfigVet_ValidConfig(t *testing.T) {
-	tmpHome, err := os.MkdirTemp("", "config-vet-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpHome)
-
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpHome)
-	defer os.Setenv("HOME", origHome)
-
+func TestConfigVet_ValidConfigAndPlatform(t *testing.T) {
+	tmpHome := setTempHome(t)
 	os.Unsetenv("OPM_CONFIG")
 	os.Unsetenv("OPM_REGISTRY")
 
-	// Create full config structure using templates
-	opmDir := filepath.Join(tmpHome, ".opm")
-	require.NoError(t, os.MkdirAll(opmDir, 0o700))
+	writeOpmFile(t, tmpHome, "config.cue", validVetConfig)
+	writeOpmFile(t, tmpHome, "platform.cue", opmconfig.DefaultPlatformTemplate)
 
-	cueModDir := filepath.Join(opmDir, "cue.mod")
-	require.NoError(t, os.MkdirAll(cueModDir, 0o700))
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
 
-	// Write a simple config that doesn't require imports
-	simpleConfig := `package config
+	require.NoError(t, cmd.Execute())
+}
+
+func TestConfigVet_InvalidPlatformFile(t *testing.T) {
+	tmpHome := setTempHome(t)
+	os.Unsetenv("OPM_CONFIG")
+	os.Unsetenv("OPM_REGISTRY")
+
+	writeOpmFile(t, tmpHome, "config.cue", validVetConfig)
+	// Missing required name/type
+	writeOpmFile(t, tmpHome, "platform.cue", `registry: {}
+`)
+
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "platform")
+}
+
+func TestConfigVet_ImportBearingPlatformFile(t *testing.T) {
+	tmpHome := setTempHome(t)
+	os.Unsetenv("OPM_CONFIG")
+	os.Unsetenv("OPM_REGISTRY")
+
+	writeOpmFile(t, tmpHome, "config.cue", validVetConfig)
+	writeOpmFile(t, tmpHome, "platform.cue", `import "strings"
+
+name: strings.ToLower("Cluster")
+type: "kubernetes"
+`)
+
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "data-only")
+}
+
+func TestConfigVet_StaleProvidersBlock(t *testing.T) {
+	// A pre-D39 config with a providers block fails with the migration hint.
+	tmpHome := setTempHome(t)
+	os.Unsetenv("OPM_CONFIG")
+	os.Unsetenv("OPM_REGISTRY")
+
+	writeOpmFile(t, tmpHome, "config.cue", `package config
 
 config: {
+	registry: "localhost:5000"
+	providers: {
+		kubernetes: {}
+	}
 	kubernetes: {
-		kubeconfig: "~/.kube/config"
 		namespace: "default"
 	}
 }
-`
-	configFile := filepath.Join(opmDir, "config.cue")
-	require.NoError(t, os.WriteFile(configFile, []byte(simpleConfig), 0o600))
-
-	// Write module file
-	moduleContent := `module: "test.local/config@v0"
-
-language: {
-	version: "v0.15.0"
-}
-`
-	moduleFile := filepath.Join(cueModDir, "module.cue")
-	require.NoError(t, os.WriteFile(moduleFile, []byte(moduleContent), 0o600))
+`)
 
 	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	err = cmd.Execute()
-	require.NoError(t, err)
+	err := cmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "providers")
+	assert.Contains(t, err.Error(), "opm config init")
 }
 
 func TestConfigVet_InvalidCUESyntax(t *testing.T) {
-	tmpHome, err := os.MkdirTemp("", "config-vet-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpHome)
-
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpHome)
-	defer os.Setenv("HOME", origHome)
-
+	tmpHome := setTempHome(t)
 	os.Unsetenv("OPM_CONFIG")
 	os.Unsetenv("OPM_REGISTRY")
 
-	// Create config structure with invalid CUE
-	opmDir := filepath.Join(tmpHome, ".opm")
-	require.NoError(t, os.MkdirAll(opmDir, 0o700))
-
-	cueModDir := filepath.Join(opmDir, "cue.mod")
-	require.NoError(t, os.MkdirAll(cueModDir, 0o700))
-
-	// Invalid CUE syntax
-	invalidConfig := `package config
+	writeOpmFile(t, tmpHome, "config.cue", `package config
 
 config: {
 	this is not valid CUE syntax!!!
 }
-`
-	configFile := filepath.Join(opmDir, "config.cue")
-	require.NoError(t, os.WriteFile(configFile, []byte(invalidConfig), 0o600))
-
-	moduleContent := `module: "test.local/config@v0"
-
-language: {
-	version: "v0.15.0"
-}
-`
-	moduleFile := filepath.Join(cueModDir, "module.cue")
-	require.NoError(t, os.WriteFile(moduleFile, []byte(moduleContent), 0o600))
+`)
 
 	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	assert.Error(t, err)
 }
 
 func TestConfigVet_SchemaViolation_UnknownField(t *testing.T) {
-	tmpHome, err := os.MkdirTemp("", "config-vet-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpHome)
-
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpHome)
-	defer os.Setenv("HOME", origHome)
-
+	tmpHome := setTempHome(t)
 	os.Unsetenv("OPM_CONFIG")
 	os.Unsetenv("OPM_REGISTRY")
 
-	// Create config structure with schema violation
-	opmDir := filepath.Join(tmpHome, ".opm")
-	require.NoError(t, os.MkdirAll(opmDir, 0o700))
-
-	cueModDir := filepath.Join(opmDir, "cue.mod")
-	require.NoError(t, os.MkdirAll(cueModDir, 0o700))
-
-	// Config with unknown field
-	invalidConfig := `package config
+	writeOpmFile(t, tmpHome, "config.cue", `package config
 
 config: {
 	registry: "localhost:5000"
@@ -194,98 +187,46 @@ config: {
 		namespace: "default"
 	}
 }
-`
-	configFile := filepath.Join(opmDir, "config.cue")
-	require.NoError(t, os.WriteFile(configFile, []byte(invalidConfig), 0o600))
-
-	moduleContent := `module: "test.local/config@v0"
-
-language: {
-	version: "v0.15.0"
-}
-`
-	moduleFile := filepath.Join(cueModDir, "module.cue")
-	require.NoError(t, os.WriteFile(moduleFile, []byte(moduleContent), 0o600))
+`)
 
 	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "schema validation")
 }
 
 func TestConfigVet_SchemaViolation_InvalidNamespace(t *testing.T) {
-	tmpHome, err := os.MkdirTemp("", "config-vet-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpHome)
-
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpHome)
-	defer os.Setenv("HOME", origHome)
-
+	tmpHome := setTempHome(t)
 	os.Unsetenv("OPM_CONFIG")
 	os.Unsetenv("OPM_REGISTRY")
 
-	// Create config structure with invalid namespace
-	opmDir := filepath.Join(tmpHome, ".opm")
-	require.NoError(t, os.MkdirAll(opmDir, 0o700))
-
-	cueModDir := filepath.Join(opmDir, "cue.mod")
-	require.NoError(t, os.MkdirAll(cueModDir, 0o700))
-
-	// Namespace with uppercase (violates RFC-1123)
-	invalidConfig := `package config
+	writeOpmFile(t, tmpHome, "config.cue", `package config
 
 config: {
 	kubernetes: {
 		namespace: "UPPERCASE-Not-Allowed"
 	}
 }
-`
-	configFile := filepath.Join(opmDir, "config.cue")
-	require.NoError(t, os.WriteFile(configFile, []byte(invalidConfig), 0o600))
-
-	moduleContent := `module: "test.local/config@v0"
-
-language: {
-	version: "v0.15.0"
-}
-`
-	moduleFile := filepath.Join(cueModDir, "module.cue")
-	require.NoError(t, os.WriteFile(moduleFile, []byte(moduleContent), 0o600))
+`)
 
 	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "schema validation")
 }
 
 func TestConfigVet_SchemaViolation_InvalidAPIWarnings(t *testing.T) {
-	tmpHome, err := os.MkdirTemp("", "config-vet-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpHome)
-
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpHome)
-	defer os.Setenv("HOME", origHome)
-
+	tmpHome := setTempHome(t)
 	os.Unsetenv("OPM_CONFIG")
 	os.Unsetenv("OPM_REGISTRY")
 
-	// Create config structure with invalid apiWarnings value
-	opmDir := filepath.Join(tmpHome, ".opm")
-	require.NoError(t, os.MkdirAll(opmDir, 0o700))
-
-	cueModDir := filepath.Join(opmDir, "cue.mod")
-	require.NoError(t, os.MkdirAll(cueModDir, 0o700))
-
-	// Invalid enum value for apiWarnings
-	invalidConfig := `package config
+	writeOpmFile(t, tmpHome, "config.cue", `package config
 
 config: {
 	log: {
@@ -294,63 +235,33 @@ config: {
 		}
 	}
 }
-`
-	configFile := filepath.Join(opmDir, "config.cue")
-	require.NoError(t, os.WriteFile(configFile, []byte(invalidConfig), 0o600))
-
-	moduleContent := `module: "test.local/config@v0"
-
-language: {
-	version: "v0.15.0"
-}
-`
-	moduleFile := filepath.Join(cueModDir, "module.cue")
-	require.NoError(t, os.WriteFile(moduleFile, []byte(moduleContent), 0o600))
+`)
 
 	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "schema validation")
 }
 
 func TestConfigVet_CustomConfigPath(t *testing.T) {
-	tmpHome, err := os.MkdirTemp("", "config-vet-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpHome)
+	tmpHome := setTempHome(t)
 
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpHome)
-	defer os.Setenv("HOME", origHome)
-
-	// Create custom config location
+	// Create custom config location (no ~/.opm involvement)
 	customDir := filepath.Join(tmpHome, "custom")
 	require.NoError(t, os.MkdirAll(customDir, 0o700))
 
-	cueModDir := filepath.Join(customDir, "cue.mod")
-	require.NoError(t, os.MkdirAll(cueModDir, 0o700))
-
-	simpleConfig := `package config
+	customConfig := filepath.Join(customDir, "config.cue")
+	require.NoError(t, os.WriteFile(customConfig, []byte(`package config
 
 config: {
 	kubernetes: {
 		namespace: "test"
 	}
 }
-`
-	customConfig := filepath.Join(customDir, "config.cue")
-	require.NoError(t, os.WriteFile(customConfig, []byte(simpleConfig), 0o600))
-
-	moduleContent := `module: "test.local/config@v0"
-
-language: {
-	version: "v0.15.0"
-}
-`
-	moduleFile := filepath.Join(cueModDir, "module.cue")
-	require.NoError(t, os.WriteFile(moduleFile, []byte(moduleContent), 0o600))
+`), 0o600))
 
 	// Use OPM_CONFIG env var to point to custom config
 	os.Setenv("OPM_CONFIG", customConfig)
@@ -361,6 +272,39 @@ language: {
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	err = cmd.Execute()
-	require.NoError(t, err)
+	require.NoError(t, cmd.Execute())
+}
+
+func TestConfigVet_CustomPathPlatformSibling(t *testing.T) {
+	// The platform file resolves as a sibling of the resolved config path,
+	// so --config/OPM_CONFIG overrides move both files together.
+	tmpHome := setTempHome(t)
+
+	customDir := filepath.Join(tmpHome, "custom")
+	require.NoError(t, os.MkdirAll(customDir, 0o700))
+
+	customConfig := filepath.Join(customDir, "config.cue")
+	require.NoError(t, os.WriteFile(customConfig, []byte(`package config
+
+config: {
+	kubernetes: {
+		namespace: "test"
+	}
+}
+`), 0o600))
+	// Invalid platform sibling must fail vet even at a custom path
+	require.NoError(t, os.WriteFile(filepath.Join(customDir, "platform.cue"), []byte(`bogus: true
+`), 0o600))
+
+	os.Setenv("OPM_CONFIG", customConfig)
+	defer os.Unsetenv("OPM_CONFIG")
+	os.Unsetenv("OPM_REGISTRY")
+
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "platform")
 }

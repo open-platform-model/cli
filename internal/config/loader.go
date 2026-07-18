@@ -4,16 +4,22 @@ package config
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"regexp"
+	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
-	"cuelang.org/go/cue/load"
+	"cuelang.org/go/cue/parser"
 
 	"github.com/open-platform-model/cli/internal/output"
 	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
+
+// defaultKubeconfig is the built-in kubeconfig path default.
+const defaultKubeconfig = "~/.kube/config"
+
+// configErrType is the DetailError type used for config file parse/load
+// failures.
+const configErrType = "configuration error"
 
 // LoaderOptions contains options for loading configuration.
 type LoaderOptions struct {
@@ -23,52 +29,15 @@ type LoaderOptions struct {
 	ConfigFlag string
 }
 
-// registryRegex matches registry field in CUE config.
-// Matches patterns like: registry: "localhost:5001" or registry: "registry.example.com"
-var registryRegex = regexp.MustCompile(`(?m)^\s*registry:\s*"([^"]*)"`)
-
-// BootstrapRegistry extracts the registry value from config.cue using simple parsing.
-// This is Phase 1 of the two-phase loading process (FR-013).
+// Load loads the OPM configuration into cfg, applying precedence rules.
 //
-// Phase 1 (Bootstrap): Extract config.registry via simple CUE parsing without import resolution.
-// This allows us to resolve the registry before loading config with provider imports.
-func BootstrapRegistry(configPath string) (string, error) {
-	// Check if config file exists
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		output.Debug("config file not found, skipping bootstrap",
-			"path", configPath,
-		)
-		return "", nil // No config file, no registry
-	}
-
-	// Read config file
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		return "", fmt.Errorf("reading config file: %w", err)
-	}
-
-	// Simple regex extraction of registry value
-	// This avoids CUE parsing which would require resolving imports
-	matches := registryRegex.FindSubmatch(content)
-	if len(matches) < 2 {
-		output.Debug("no registry found in config",
-			"path", configPath,
-		)
-		return "", nil // No registry in config
-	}
-
-	registry := string(matches[1])
-	return registry, nil
-}
-
-// Load loads the full OPM configuration into cfg, applying precedence rules.
-// This implements the two-phase loading process per FR-013.
+// Loading is single-pass: ~/.opm/config.cue is import-free scalar data
+// (enhancement 0006 D39), so the file is parsed and validated exactly once
+// and the registry resolves by ordinary flag > env > config precedence
+// afterwards. There is no registry-bootstrap pre-pass.
 //
-// Phase 1: Extract config.registry via simple parsing (BootstrapRegistry)
-// Phase 2: Load config.cue with CUE_REGISTRY set to resolved registry
-//
-// Load sets: cfg.ConfigPath, cfg.Registry, cfg.Kubernetes, cfg.Log, cfg.Providers, cfg.CueContext.
-// The caller sets cfg.Flags before or after calling Load.
+// Load sets: cfg.ConfigPath, cfg.Registry, cfg.Kubernetes, cfg.Log,
+// cfg.CueContext. The caller sets cfg.Flags before or after calling Load.
 func Load(cfg *GlobalConfig, opts LoaderOptions) error {
 	// Step 1: Resolve config path
 	configPathResult, err := ResolveConfigPath(ResolveConfigPathOptions{
@@ -85,13 +54,13 @@ func Load(cfg *GlobalConfig, opts LoaderOptions) error {
 		"source", configPathResult.Source,
 	)
 
-	// Step 2: Bootstrap - extract registry from config without full parsing
-	configRegistry, err := BootstrapRegistry(configPathResult.ConfigPath)
+	// Step 2: Parse and validate the config file (single pass).
+	configRegistry, err := loadConfigFile(cfg, configPathResult.ConfigPath)
 	if err != nil {
-		return fmt.Errorf("bootstrap registry extraction: %w", err)
+		return err
 	}
 
-	// Step 3: Resolve registry using precedence
+	// Step 3: Resolve registry using precedence flag > env > config.
 	registryResult := ResolveRegistry(ResolveRegistryOptions{
 		FlagValue:   opts.RegistryFlag,
 		ConfigValue: configRegistry,
@@ -104,110 +73,57 @@ func Load(cfg *GlobalConfig, opts LoaderOptions) error {
 		"source", registryResult.Source,
 	)
 
-	// Step 4: Check if providers are configured but no registry
-	// Per FR-014: Fail fast if providers configured but no registry resolvable
-	if registryResult.Registry == "" {
-		// Check if config exists and has providers
-		hasProviders, err := configHasProviders(configPathResult.ConfigPath)
-		if err != nil {
-			output.Debug("could not check for providers", "error", err)
-		}
-		if hasProviders {
-			return oerrors.NewValidationError(
-				"providers configured but no registry resolvable",
-				configPathResult.ConfigPath,
-				"providers", // field
-				"Set OPM_REGISTRY environment variable, use --registry flag, or add registry field to config.cue",
-			)
-		}
-	}
-
-	// Step 5: Phase 2 - Load full config with registry set
-	err = loadFullConfig(cfg, configPathResult.ConfigPath, registryResult.Registry)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
-// configHasProviders checks if the config file references providers.
-func configHasProviders(configPath string) (bool, error) {
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return false, nil
-	}
+// loadConfigFile parses configPath, validates it against the embedded schema,
+// and populates cfg's config-file fields. It returns the registry value
+// declared in the file (empty when absent) for precedence resolution by the
+// caller.
+//
+// A missing config file is not an error: defaults apply.
+func loadConfigFile(cfg *GlobalConfig, configPath string) (string, error) {
+	ctx := cuecontext.New()
 
 	content, err := os.ReadFile(configPath)
 	if err != nil {
-		return false, err
-	}
-
-	// Simple check: look for "providers" in config
-	providerRegex := regexp.MustCompile(`(?m)^\s*providers:\s*{`)
-	return providerRegex.Match(content), nil
-}
-
-// loadFullConfig loads the config.cue file with full CUE evaluation,
-// populating cfg fields directly.
-// This is Phase 2 of the two-phase loading process.
-func loadFullConfig(cfg *GlobalConfig, configPath, registry string) error {
-	// Check if config exists
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		output.Debug("config file not found, using defaults",
-			"path", configPath,
-		)
-		// Apply defaults inline
-		cfg.Kubernetes = KubernetesConfig{
-			Kubeconfig: "~/.kube/config",
-			Namespace:  "default",
+		if os.IsNotExist(err) {
+			output.Debug("config file not found, using defaults",
+				"path", configPath,
+			)
+			applyDefaults(cfg)
+			return "", nil
 		}
-		cfg.Log.Kubernetes.APIWarnings = APIWarningsWarn
-		cfg.CueContext = cuecontext.New()
-		return nil
+		return "", fmt.Errorf("reading config file: %w", err)
 	}
 
-	// Use the directory containing the config file for CUE loading.
-	// This ensures custom config paths work correctly.
-	configDir := filepath.Dir(configPath)
-
-	// Set CUE_REGISTRY if registry is provided
-	if registry != "" {
-		os.Setenv("CUE_REGISTRY", registry)
-		defer os.Unsetenv("CUE_REGISTRY") // Clean up after loading
-	}
-
-	// Load CUE configuration
-	ctx := cuecontext.New()
-
-	cueLoadCfg := &load.Config{
-		Dir: configDir,
-	}
-
-	instances := load.Instances([]string{"."}, cueLoadCfg)
-	if len(instances) == 0 {
-		return oerrors.NewValidationError(
-			"no CUE instances found",
-			configDir,
-			"", // no specific field
-			"Ensure config.cue exists in the configuration directory",
-		)
-	}
-
-	inst := instances[0]
-	if inst.Err != nil {
-		return &oerrors.DetailError{
-			Type:     "configuration error",
-			Message:  inst.Err.Error(),
+	// Data-only contract (D39): reject CUE imports before evaluation, the
+	// same guard ValidatePlatformFile applies to platform.cue. CompileBytes
+	// would happily resolve stdlib imports otherwise.
+	astFile, err := parser.ParseFile(configPath, content)
+	if err != nil {
+		return "", &oerrors.DetailError{
+			Type:     configErrType,
+			Message:  err.Error(),
 			Location: configPath,
 			Hint:     "Run 'opm config vet' to check for configuration errors",
 			Cause:    oerrors.ErrValidation,
 		}
 	}
+	if fileHasImports(astFile) {
+		return "", &oerrors.DetailError{
+			Type:     configErrType,
+			Message:  "the config file must be data-only — CUE imports are not allowed",
+			Location: configPath,
+			Hint:     "Remove the import declarations (config.cue is scalar data since 0006 D39); re-run 'opm config init' for a fresh template",
+			Cause:    oerrors.ErrValidation,
+		}
+	}
 
-	value := ctx.BuildInstance(inst)
+	value := ctx.CompileBytes(content, cue.Filename(configPath))
 	if value.Err() != nil {
-		return &oerrors.DetailError{
-			Type:     "configuration error",
+		return "", &oerrors.DetailError{
+			Type:     configErrType,
 			Message:  value.Err().Error(),
 			Location: configPath,
 			Hint:     "Run 'opm config vet' to check for configuration errors",
@@ -217,7 +133,7 @@ func loadFullConfig(cfg *GlobalConfig, configPath, registry string) error {
 
 	// Validate against embedded schema
 	if err := validateConfigSchema(ctx, value, configPath); err != nil {
-		return err
+		return "", err
 	}
 
 	// Extract config values into cfg
@@ -228,82 +144,26 @@ func loadFullConfig(cfg *GlobalConfig, configPath, registry string) error {
 		cfg.Log.Kubernetes.APIWarnings = APIWarningsWarn
 	}
 
-	// Extract providers
-	cfg.Providers = extractProviders(value)
-	cfg.CueContext = ctx
-
-	return nil
-}
-
-// validateConfigSchema validates the loaded CUE value against the embedded schema.
-func validateConfigSchema(ctx *cue.Context, value cue.Value, configPath string) error {
-	// Compile the embedded schema
-	schema := ctx.CompileBytes(configSchemaCUE, cue.Filename("schema/config.cue"))
-	if schema.Err() != nil {
-		return fmt.Errorf("compiling embedded config schema: %w", schema.Err())
-	}
-
-	// Look up #CLIConfig definition
-	def := schema.LookupPath(cue.ParsePath("#CLIConfig"))
-	if !def.Exists() {
-		return fmt.Errorf("embedded schema missing #CLIConfig definition")
-	}
-
-	// Unify user config with schema
-	unified := def.Unify(value)
-	if err := unified.Validate(cue.Concrete(true)); err != nil {
-		// CUE validation error - extract meaningful parts
-		return &oerrors.DetailError{
-			Type:     "schema validation failed",
-			Message:  err.Error(),
-			Location: configPath,
-			Hint:     "Check your config.cue against the expected schema. Run 'opm config vet' for validation.",
-			Cause:    oerrors.ErrValidation,
-		}
-	}
-
-	return nil
-}
-
-// extractProviders extracts provider definitions from the CUE config value.
-// Returns a map of provider alias to CUE value.
-func extractProviders(value cue.Value) map[string]cue.Value {
-	// Look for providers in config struct first
+	// Extract the file's registry value for precedence resolution.
 	configValue := value.LookupPath(cue.ParsePath("config"))
 	if !configValue.Exists() {
 		configValue = value
 	}
-
-	providersValue := configValue.LookupPath(cue.ParsePath("providers"))
-	if !providersValue.Exists() {
-		output.Debug("no providers found in config")
-		return nil
+	registry := ""
+	if regVal := configValue.LookupPath(cue.ParsePath("registry")); regVal.Exists() {
+		if str, err := regVal.String(); err == nil {
+			registry = str
+		}
 	}
 
-	providers := make(map[string]cue.Value)
-	iter, err := providersValue.Fields()
-	if err != nil {
-		output.Debug("failed to iterate providers", "error", err)
-		return nil
-	}
-
-	for iter.Next() {
-		name := iter.Selector().Unquoted()
-		providers[name] = iter.Value()
-	}
-
-	if len(providers) == 0 {
-		return nil
-	}
-
-	return providers
+	return registry, nil
 }
 
 // extractConfigInto populates cfg fields from the CUE value.
 func extractConfigInto(cfg *GlobalConfig, value cue.Value) {
 	// Apply defaults first
 	cfg.Kubernetes = KubernetesConfig{
-		Kubeconfig: "~/.kube/config",
+		Kubeconfig: defaultKubeconfig,
 		Namespace:  "default",
 	}
 
@@ -313,9 +173,6 @@ func extractConfigInto(cfg *GlobalConfig, value cue.Value) {
 		// Try top-level fields directly
 		configValue = value
 	}
-
-	// Extract registry (already resolved separately, but keep for completeness)
-	// Note: cfg.Registry is already set by the caller via ResolveRegistry
 
 	// Extract kubernetes config
 	k8sValue := configValue.LookupPath(cue.ParsePath("kubernetes"))
@@ -355,5 +212,57 @@ func extractConfigInto(cfg *GlobalConfig, value cue.Value) {
 				}
 			}
 		}
+	}
+}
+
+// applyDefaults fills cfg with built-in defaults for the no-config-file case.
+func applyDefaults(cfg *GlobalConfig) {
+	cfg.Kubernetes = KubernetesConfig{
+		Kubeconfig: defaultKubeconfig,
+		Namespace:  "default",
+	}
+	cfg.Log.Kubernetes.APIWarnings = APIWarningsWarn
+}
+
+// validateConfigSchema validates the loaded CUE value against the embedded schema.
+func validateConfigSchema(ctx *cue.Context, value cue.Value, configPath string) error {
+	// Compile the embedded schema
+	schema := ctx.CompileBytes(configSchemaCUE, cue.Filename("schema/config.cue"))
+	if schema.Err() != nil {
+		return fmt.Errorf("compiling embedded config schema: %w", schema.Err())
+	}
+
+	// Look up #CLIConfig definition
+	def := schema.LookupPath(cue.ParsePath("#CLIConfig"))
+	if !def.Exists() {
+		return fmt.Errorf("embedded schema missing #CLIConfig definition")
+	}
+
+	// Unify user config with schema
+	unified := def.Unify(value)
+	if err := unified.Validate(cue.Concrete(true)); err != nil {
+		return &oerrors.DetailError{
+			Type:     "schema validation failed",
+			Message:  err.Error(),
+			Location: configPath,
+			Hint:     removedFieldHint(err.Error()),
+			Cause:    oerrors.ErrValidation,
+		}
+	}
+
+	return nil
+}
+
+// removedFieldHint returns a migration hint when the validation error points
+// at a field removed by enhancement 0006 D39 (providers, cacheDir), and the
+// generic vet hint otherwise.
+func removedFieldHint(errMsg string) string {
+	switch {
+	case strings.Contains(errMsg, "providers"):
+		return "The 'providers' field was removed — catalog selection now lives in ~/.opm/platform.cue. Re-run 'opm config init' (or delete the providers block and any ~/.opm/cue.mod/)"
+	case strings.Contains(errMsg, "cacheDir"):
+		return "The 'cacheDir' field was removed. Re-run 'opm config init' (or delete the field)"
+	default:
+		return "Check your config.cue against the expected schema. Run 'opm config vet' for validation."
 	}
 }

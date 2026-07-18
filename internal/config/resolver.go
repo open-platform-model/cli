@@ -134,9 +134,6 @@ func ResolveConfigPath(opts ResolveConfigPathOptions) (ResolveConfigPathResult, 
 	return result, nil
 }
 
-// SourceConfigAuto indicates provider was auto-resolved from single configured provider.
-const SourceConfigAuto Source = "config-auto"
-
 // ResolvedField contains a resolved configuration value with source tracking.
 type ResolvedField struct {
 	// Value is the resolved value.
@@ -152,7 +149,6 @@ type ResolvedKubernetesConfig struct {
 	Kubeconfig ResolvedField
 	Context    ResolvedField
 	Namespace  ResolvedField
-	Provider   ResolvedField
 }
 
 // ResolveKubernetesOptions contains options for resolving Kubernetes configuration values.
@@ -161,10 +157,8 @@ type ResolveKubernetesOptions struct {
 	KubeconfigFlag string
 	ContextFlag    string
 	NamespaceFlag  string
-	ProviderFlag   string
 
-	// Config is the loaded global configuration. Provides kubernetes config values
-	// and provider names for auto-resolution.
+	// Config is the loaded global configuration. Provides kubernetes config values.
 	Config *GlobalConfig
 }
 
@@ -212,17 +206,6 @@ func ResolveKubernetes(opts ResolveKubernetesOptions) (*ResolvedKubernetesConfig
 		},
 		"", // no built-in default: namespace must be explicit or come from the instance definition
 	)
-
-	// Extract provider names from config
-	var providerNames []string
-	if opts.Config != nil {
-		for name := range opts.Config.Providers {
-			providerNames = append(providerNames, name)
-		}
-	}
-
-	// Resolve provider with auto-resolution
-	result.Provider = resolveProvider(opts.ProviderFlag, providerNames)
 
 	return result, nil
 }
@@ -273,31 +256,5 @@ func resolveStringField(flagValue, envVar string, configGetter func() string, de
 		result.Source = SourceDefault
 	}
 
-	return result
-}
-
-// resolveProvider resolves the provider field with auto-resolution logic.
-func resolveProvider(flagValue string, providerNames []string) ResolvedField {
-	result := ResolvedField{
-		Shadowed: make(map[Source]string),
-	}
-
-	// If flag is set, use it
-	if flagValue != "" {
-		result.Value = flagValue
-		result.Source = SourceFlag
-		return result
-	}
-
-	// Auto-resolve if exactly one provider configured
-	if len(providerNames) == 1 {
-		result.Value = providerNames[0]
-		result.Source = SourceConfigAuto
-		return result
-	}
-
-	// Otherwise, provider remains empty
-	result.Value = ""
-	result.Source = "" // no source when empty
 	return result
 }

@@ -10,20 +10,16 @@ package schema
 }
 
 // #Config defines the structure of the config struct.
+//
+// The config file is scalar data only — no CUE imports, no providers
+// (retired by enhancement 0006 D39; catalog selection lives in the
+// sibling ~/.opm/platform.cue, see schema/platform.cue).
 #Config: {
 	// registry is the default registry for CUE module resolution.
 	// Can be overridden by --registry flag or OPM_REGISTRY env var.
 	// Format supports multiple registries separated by commas, with options like +insecure.
 	// Example: "opmodel.dev=localhost:5000+insecure,registry.cue.works"
 	registry?: string
-
-	// cacheDir is the local cache directory path.
-	// Can be overridden by OPM_CACHE_DIR env var.
-	cacheDir?: string
-
-	// providers maps provider aliases to their definitions.
-	// Loaded from registry via CUE imports.
-	providers?: [string]: _
 
 	// kubernetes contains Kubernetes-specific settings.
 	kubernetes?: #KubernetesConfig

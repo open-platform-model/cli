@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -49,9 +48,7 @@ func TestModVet_ValidModule(t *testing.T) {
 
 	os.Unsetenv("OPM_REGISTRY")
 
-	cfg := &config.GlobalConfig{
-		CueContext: cuecontext.New(),
-	}
+	cfg := &config.GlobalConfig{}
 	cmd := NewModuleVetCmd(cfg)
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -79,9 +76,7 @@ kind: "ModuleInstance"
 metadata: name: "jf"
 `), 0o600))
 
-	cfg := &config.GlobalConfig{
-		CueContext: cuecontext.New(),
-	}
+	cfg := &config.GlobalConfig{}
 	cmd := NewModuleVetCmd(cfg)
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})

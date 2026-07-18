@@ -24,7 +24,8 @@ func TestNewInstanceVetCmd(t *testing.T) {
 
 func TestNewInstanceVetCmd_Flags(t *testing.T) {
 	cmd := NewInstanceVetCmd(&config.GlobalConfig{})
-	assert.NotNil(t, cmd.Flags().Lookup("provider"), "--provider flag should be registered")
+	assert.Nil(t, cmd.Flags().Lookup("provider"), "--provider is retired (0006 D21)")
+	assert.NotNil(t, cmd.Flags().Lookup("platform"))
 	assert.NotNil(t, cmd.Flags().Lookup("namespace"), "--namespace/-n flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("values"), "--values/-f flag should be registered")
 }
