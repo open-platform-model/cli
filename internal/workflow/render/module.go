@@ -82,7 +82,9 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
 	}
 
-	return renderPreparedModuleInstance(ctx, rel, p)
+	// A module apply always renders a local module directory (the main module is
+	// local), so render provenance is local (enhancement 0006 D7).
+	return renderPreparedModuleInstance(ctx, rel, p, true)
 }
 
 // resolveModuleValues mirrors `opm module vet`: -f files override debugValues.

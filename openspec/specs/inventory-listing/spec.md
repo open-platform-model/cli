@@ -1,38 +1,34 @@
-## ADDED Requirements
+## Purpose
 
-### Requirement: ListInventories discovers all inventory Secrets in a namespace
+Defines how `opm instance list` discovers deployed instances by listing `ModuleInstance` custom resources, including namespace scoping and cluster-wide listing.
 
-The inventory package SHALL provide a `ListInventories` function that discovers all inventory Secrets in a given namespace by listing Secrets matching the label selector `app.kubernetes.io/managed-by=open-platform-model` AND `opmodel.dev/component=inventory`. Each matching Secret SHALL be deserialized via `UnmarshalFromSecret`. The results SHALL be sorted alphabetically by `InstanceMetadata.InstanceName`.
+## Requirements
+
+### Requirement: Instance listing is a native ModuleInstance CR list
+
+`opm instance list` SHALL list `ModuleInstance` custom resources in the target namespace (resolved by the standard namespace precedence). Results SHALL be sorted alphabetically by instance name. A CR that cannot be interpreted (e.g. malformed status) SHALL be reported with a warning and skipped, without failing the listing.
 
 #### Scenario: List in a specific namespace
 
-- **WHEN** `ListInventories` is called with namespace `"production"`
-- **AND** 3 inventory Secrets exist in `production`
-- **THEN** it SHALL return 3 `*InventorySecret` values sorted by instance name
+- **WHEN** `opm instance list -n production` runs and 3 `ModuleInstance` CRs exist in `production`
+- **THEN** the command SHALL display those 3 instances sorted by name
 
-#### Scenario: List across all namespaces
+#### Scenario: Empty namespace lists nothing
 
-- **WHEN** `ListInventories` is called with namespace `""` (empty string)
-- **THEN** it SHALL list inventory Secrets across all namespaces
-- **AND** the results SHALL be sorted alphabetically by instance name
+- **WHEN** `opm instance list` runs against a namespace with no `ModuleInstance` CRs
+- **THEN** the command SHALL succeed with an empty result
 
-#### Scenario: Empty namespace returns empty slice
+### Requirement: Cluster-wide listing via --all-namespaces
 
-- **WHEN** `ListInventories` is called with a namespace containing no inventory Secrets
-- **THEN** it SHALL return an empty slice and nil error
+`opm instance list --all-namespaces` (shorthand `-A`) SHALL perform a cluster-wide `ModuleInstance` list. On insufficient RBAC (cross-namespace list denied), the command SHALL fail with a clear, actionable error naming the missing permission. It MUST NOT degrade to a partial or label-based listing.
 
-#### Scenario: Unmarshal failure skips corrupt Secret
+#### Scenario: Cluster-wide list
 
-- **WHEN** one inventory Secret in the namespace has corrupt data
-- **THEN** `ListInventories` SHALL log a warning for the corrupt Secret
-- **AND** SHALL continue processing remaining Secrets
-- **AND** SHALL return the successfully deserialized results
+- **WHEN** `opm instance list -A` runs with cluster-wide list permission
+- **THEN** instances from all namespaces SHALL be displayed with their namespaces
 
-### Requirement: ListInventories uses existing label constants
+#### Scenario: Insufficient RBAC fails clearly
 
-The function SHALL use the label constants already defined in `internal/core/` (`LabelManagedBy`, `LabelManagedByValue`, `LabelComponent`) to build the selector. It MUST NOT hardcode label strings.
-
-#### Scenario: Label selector matches inventory convention
-
-- **WHEN** `ListInventories` constructs its label selector
-- **THEN** it SHALL use `core.LabelManagedBy=core.LabelManagedByValue` and `core.LabelComponent=inventory`
+- **WHEN** `opm instance list -A` runs without cluster-wide `list` permission on `moduleinstances`
+- **THEN** the command SHALL exit non-zero with an error naming the required permission
+- **AND** SHALL NOT display a partial result

@@ -2,6 +2,8 @@ package apply
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -12,9 +14,9 @@ import (
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/version"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
 	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
-	"github.com/open-platform-model/cli/pkg/ownership"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -28,43 +30,54 @@ type Options struct {
 	SuccessAppliedMessage  string
 }
 
-type ChangeDescriptor struct {
-	Path      string
-	ValuesStr string
-	Version   string
-	Local     bool
-}
-
 type Request struct {
-	Result     *workflowrender.Result
-	K8sClient  *kubernetes.Client
-	Log        *log.Logger
-	Options    Options
-	Change     ChangeDescriptor
-	ModuleName string
-	ModuleUUID string
+	Result    *workflowrender.Result
+	K8sClient *kubernetes.Client
+	Log       *log.Logger
+	Options   Options
 }
 
-func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orchestration for apply flow spans validation, apply, prune, and inventory write
+func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orchestration for apply flow spans gates, apply, prune, and CR spec+status writes
 	result := req.Result
 	instanceLog := req.Log
 	namespace := result.Instance.Namespace
+	name := result.Instance.Name
+	instanceID := result.Instance.UUID
+	dryRun := req.Options.DryRun
 
-	if err := EnsureNamespaceIfRequested(ctx, req.K8sClient, namespace, req.Options.CreateNS, req.Options.DryRun, instanceLog); err != nil {
+	if err := EnsureNamespaceIfRequested(ctx, req.K8sClient, namespace, req.Options.CreateNS, dryRun, instanceLog); err != nil {
 		return err
 	}
 
 	manifestDigest := inventory.ComputeManifestDigest(result.Resources)
 	output.Debug("manifest digest computed", "digest", manifestDigest)
 
-	instanceID := result.Instance.UUID
-	prevInventory := LoadPreviousInventory(ctx, req.K8sClient, result.Instance.Name, namespace, instanceID, req.Options.DryRun, instanceLog)
-	if prevInventory != nil {
-		if err := ownership.EnsureCLIMutable(string(prevInventory.NormalizedCreatedBy()), prevInventory.InstanceMetadata.InstanceName, prevInventory.InstanceMetadata.InstanceNamespace); err != nil {
+	// Pre-apply gates 1-3 (cluster probes). Skipped entirely on dry-run — they
+	// exist to protect writes, and a dry-run writes nothing (enhancement 0006 D5).
+	if !dryRun {
+		if err := RunClusterGates(ctx, req.K8sClient); err != nil {
 			return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 		}
 	}
-	prevEntries := PreviousInventoryEntries(prevInventory)
+
+	// Load the previous inventory from the CR; when absent, look for a legacy
+	// Secret to migrate. Both are read-only.
+	prevRecord, legacy := LoadPreviousInventory(ctx, req.K8sClient, name, namespace, instanceID, dryRun, instanceLog)
+
+	// Gate 4: ownership. Operator-owned instances are refused before any write.
+	if inventory.ResolveOwnership(prevRecord) == inventory.ModeOperatorOwned {
+		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: inventory.OperatorOwnedApplyError(name, namespace), Printed: true}
+	}
+
+	// Gate 5: status-RBAC pre-flight (CLI-executor mode, non-dry-run). Ensures
+	// resources are never deployed without a recordable inventory.
+	if !dryRun && instanceID != "" {
+		if err := inventory.GateStatusRBAC(ctx, req.K8sClient, namespace); err != nil {
+			return &opmexit.ExitError{Code: opmexit.ExitPermissionDenied, Err: err, Printed: true}
+		}
+	}
+
+	prevEntries := previousEntries(prevRecord, legacy)
 	currentEntries := CurrentInventoryEntries(result.Resources)
 	staleSet := ComputeStaleInventorySet(prevEntries, currentEntries)
 
@@ -75,11 +88,13 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		return nil
 	}
 
-	if err := RunPreApplyExistenceCheck(ctx, req.K8sClient, prevInventory, req.Options.DryRun, currentEntries); err != nil {
+	// Gate 6: existence check, first-ever apply only (no previous inventory).
+	hasPrevInventory := prevRecord != nil || legacy != nil
+	if err := RunPreApplyExistenceCheck(ctx, req.K8sClient, hasPrevInventory, dryRun, currentEntries); err != nil {
 		return err
 	}
 
-	if req.Options.DryRun {
+	if dryRun {
 		instanceLog.Info("dry run - no changes will be made")
 	}
 	if len(result.Resources) > 0 {
@@ -89,7 +104,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	var applyResult *kubernetes.ApplyResult
 	if len(result.Resources) > 0 {
 		var err error
-		applyResult, err = kubernetes.Apply(ctx, req.K8sClient, result.Resources, result.Instance.Name, kubernetes.ApplyOptions{DryRun: req.Options.DryRun})
+		applyResult, err = kubernetes.Apply(ctx, req.K8sClient, result.Resources, name, kubernetes.ApplyOptions{DryRun: dryRun})
 		if err != nil {
 			instanceLog.Error("apply failed", "error", err)
 			return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
@@ -102,14 +117,14 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			}
 		}
 
-		if req.Options.DryRun {
+		if dryRun {
 			instanceLog.Info(fmt.Sprintf("dry run complete: %d resources would be applied", applyResult.Applied))
 		} else {
 			instanceLog.Info(FormatApplySummary(applyResult))
 		}
 	}
 
-	if !req.Options.DryRun && instanceID != "" {
+	if !dryRun && instanceID != "" {
 		applyHadErrors := applyResult != nil && len(applyResult.Errors) > 0
 		if applyHadErrors {
 			instanceLog.Warn("apply had errors — skipping pruning and inventory write")
@@ -123,39 +138,12 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			}
 		}
 
-		newOrUpdatedInventory := prevInventory
-		if newOrUpdatedInventory == nil {
-			newOrUpdatedInventory = &inventory.InstanceInventoryRecord{
-				InstanceMetadata: inventory.InstanceMetadata{
-					Kind:              "ModuleInstance",
-					APIVersion:        inventory.APIVersionV1Alpha1,
-					InstanceName:      result.Instance.Name,
-					InstanceNamespace: namespace,
-					InstanceID:        instanceID,
-				},
-			}
-		}
-
-		revision := 1
-		if prevInventory != nil && prevInventory.Inventory.Revision > 0 {
-			revision = prevInventory.Inventory.Revision + 1
-		}
-		newOrUpdatedInventory.InstanceMetadata.LastTransitionTime = time.Now().UTC().Format(time.RFC3339)
-		newOrUpdatedInventory.Inventory = pkginventory.Inventory{
-			Revision: revision,
-			Digest:   inventory.ComputeDigest(currentEntries),
-			Count:    len(currentEntries),
-			Entries:  currentEntries,
-		}
-
-		if err := inventory.WriteInventory(ctx, req.K8sClient, newOrUpdatedInventory, req.ModuleName, req.ModuleUUID, req.Change.Version, inventory.CreatedByCLI); err != nil {
-			instanceLog.Warn("failed to write inventory Secret", "error", err)
-		} else {
-			output.Debug("inventory written", "revision", revision)
+		if err := WriteInstanceRecord(ctx, req, prevRecord, legacy, currentEntries, manifestDigest, instanceLog); err != nil {
+			return err
 		}
 	}
 
-	if applyResult != nil && len(applyResult.Errors) == 0 && !req.Options.DryRun {
+	if applyResult != nil && len(applyResult.Errors) == 0 && !dryRun {
 		if applyResult.Unchanged == applyResult.Applied {
 			output.Println(output.FormatCheckmark(req.Options.SuccessUpToDateMessage))
 		} else {
@@ -168,6 +156,18 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	}
 
 	return nil
+}
+
+// RunClusterGates runs the read-only pre-apply cluster gates in order: CRD
+// presence, CRD field floor, operator-version ceiling.
+func RunClusterGates(ctx context.Context, client *kubernetes.Client) error {
+	if err := inventory.GateCRDPresent(ctx, client); err != nil {
+		return err
+	}
+	if err := inventory.GateCRDFieldFloor(ctx, client); err != nil {
+		return err
+	}
+	return inventory.GateOperatorVersionCeiling(ctx, client, version.Version)
 }
 
 func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Client, namespace string, createNS, dryRun bool, instanceLog *log.Logger) error {
@@ -190,24 +190,127 @@ func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Clien
 	return nil
 }
 
-func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, instanceName, namespace, instanceID string, dryRun bool, instanceLog *log.Logger) *inventory.InstanceInventoryRecord {
+// LoadPreviousInventory reads the ModuleInstance CR for an instance. When no CR
+// exists, it looks for a legacy inventory Secret to migrate (enhancement 0006
+// D6). Returns (nil, nil) on dry-run, missing instance ID, or a first apply
+// with no legacy Secret.
+func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, name, namespace, instanceID string, dryRun bool, instanceLog *log.Logger) (*inventory.Record, *inventory.LegacyInventory) {
 	if instanceID == "" || dryRun {
-		return nil
+		return nil, nil
 	}
 
-	prevInventory, err := inventory.GetInventory(ctx, k8sClient, instanceName, namespace, instanceID)
+	prevRecord, err := inventory.GetRecord(ctx, k8sClient, name, namespace)
 	if err != nil {
-		instanceLog.Warn("could not read inventory, proceeding without it", "error", err)
-		return nil
+		instanceLog.Warn("could not read inventory CR, proceeding without it", "error", err)
+		return nil, nil
 	}
-	return prevInventory
+	if prevRecord != nil {
+		return prevRecord, nil
+	}
+
+	legacy, err := inventory.FindLegacySecretInventory(ctx, k8sClient, name, namespace, instanceID)
+	if err != nil {
+		instanceLog.Warn("could not read legacy inventory Secret, proceeding as first apply", "error", err)
+		return nil, nil
+	}
+	if legacy == nil {
+		return nil, nil
+	}
+	instanceLog.Info("migrating legacy inventory Secret to ModuleInstance CR")
+	return nil, legacy
 }
 
-func PreviousInventoryEntries(prevInventory *inventory.InstanceInventoryRecord) []inventory.InventoryEntry {
-	if prevInventory == nil {
+// WriteInstanceRecord writes the ModuleInstance CR spec, then its status subset
+// on the status subresource, then (for a migration) deletes the ported legacy
+// Secret only after the status write succeeds.
+func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory.Record, legacy *inventory.LegacyInventory, currentEntries []inventory.InventoryEntry, manifestDigest string, instanceLog *log.Logger) error {
+	result := req.Result
+	name := result.Instance.Name
+	namespace := result.Instance.Namespace
+	instanceID := result.Instance.UUID
+
+	modulePath, moduleVersion := result.Module.CanonicalModuleRef()
+
+	if err := inventory.ApplySpec(ctx, req.K8sClient, inventory.SpecInput{
+		Name:          name,
+		Namespace:     namespace,
+		Owner:         inventory.OwnerCLI,
+		ModulePath:    modulePath,
+		ModuleVersion: moduleVersion,
+		Values:        result.Values,
+		SourceLocal:   result.SourceLocal,
+	}); err != nil {
+		instanceLog.Warn("failed to write ModuleInstance spec", "error", err)
+		return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
+	}
+
+	revision := nextRevision(prevRecord, legacy)
+	statusInput := inventory.StatusInput{
+		Name:      name,
+		Namespace: namespace,
+		Inventory: pkginventory.Inventory{
+			Revision: revision,
+			Digest:   inventory.ComputeDigest(currentEntries),
+			Count:    len(currentEntries),
+			Entries:  currentEntries,
+		},
+		InstanceUUID:            inventory.ExtractInstanceUUID(result.Resources),
+		LastAppliedRenderDigest: manifestDigest,
+		LastAppliedSourceDigest: sourceDigest(modulePath, moduleVersion),
+		LastAppliedConfigDigest: valuesDigest(result.Values),
+		LastAppliedAt:           time.Now().UTC().Format(time.RFC3339),
+	}
+	if statusInput.InstanceUUID == "" {
+		statusInput.InstanceUUID = instanceID
+	}
+
+	if err := inventory.ApplyStatus(ctx, req.K8sClient, statusInput); err != nil {
+		instanceLog.Warn("failed to write ModuleInstance status", "error", err)
+		return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
+	}
+	output.Debug("inventory written to ModuleInstance CR", "revision", revision)
+
+	// Delete the migrated (or leftover) legacy Secret only after the status
+	// write succeeds, so a failure leaves the Secret authoritative for a re-run.
+	cleanupLegacySecret(ctx, req.K8sClient, name, namespace, instanceID, legacy, instanceLog)
+	return nil
+}
+
+func cleanupLegacySecret(ctx context.Context, client *kubernetes.Client, name, namespace, instanceID string, legacy *inventory.LegacyInventory, instanceLog *log.Logger) {
+	secretName := inventory.LegacySecretName(name, instanceID)
+	secretNS := namespace
+	if legacy != nil {
+		secretName = legacy.SecretName
+		secretNS = legacy.SecretNamespace
+	}
+	if err := inventory.DeleteLegacySecret(ctx, client, secretName, secretNS); err != nil {
+		instanceLog.Warn("could not delete legacy inventory Secret", "error", err)
+	}
+}
+
+func nextRevision(prevRecord *inventory.Record, legacy *inventory.LegacyInventory) int {
+	prev := 0
+	switch {
+	case prevRecord != nil:
+		prev = prevRecord.Inventory.Revision
+	case legacy != nil:
+		prev = legacy.Inventory.Revision
+	}
+	if prev < 0 {
+		prev = 0
+	}
+	return prev + 1
+}
+
+func previousEntries(prevRecord *inventory.Record, legacy *inventory.LegacyInventory) []inventory.InventoryEntry {
+	switch {
+	case prevRecord != nil:
+		return prevRecord.Inventory.Entries
+	case legacy != nil:
+		return legacy.Inventory.Entries
+	default:
 		return nil
 	}
-	return prevInventory.Inventory.Entries
 }
 
 func CurrentInventoryEntries(resources []*unstructured.Unstructured) []inventory.InventoryEntry {
@@ -236,8 +339,8 @@ func GuardEmptyRender(resourceCount int, prevEntries []inventory.InventoryEntry,
 	return nil
 }
 
-func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, prevInventory *inventory.InstanceInventoryRecord, dryRun bool, currentEntries []inventory.InventoryEntry) error {
-	if prevInventory != nil || dryRun {
+func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, hasPrevInventory, dryRun bool, currentEntries []inventory.InventoryEntry) error {
+	if hasPrevInventory || dryRun {
 		return nil
 	}
 	if err := inventory.PreApplyExistenceCheck(ctx, k8sClient, currentEntries); err != nil {
@@ -262,6 +365,33 @@ func FormatApplySummary(r *kubernetes.ApplyResult) string {
 		summary += fmt.Sprintf(" (%s)", strings.Join(parts, ", "))
 	}
 	return summary
+}
+
+// sourceDigest returns a deterministic digest identifying the module source of
+// this apply, derived from the canonical module reference (path@version). The
+// CLI's current render pipeline has no module OCI source bytes to hash, so this
+// is a stable source-identity digest rather than a content digest; kernel
+// adoption (slice C2) replaces it with the operator's source-bytes digest.
+func sourceDigest(modulePath, moduleVersion string) string {
+	if modulePath == "" && moduleVersion == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(modulePath + "@" + moduleVersion))
+	return fmt.Sprintf("sha256:%x", sum)
+}
+
+// valuesDigest returns a deterministic digest of the unified values blob, or ""
+// when there are no values.
+func valuesDigest(values map[string]any) string {
+	if len(values) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(values)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(b)
+	return fmt.Sprintf("sha256:%x", sum)
 }
 
 func exitCodeFromK8sError(err error) int {

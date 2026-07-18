@@ -49,7 +49,7 @@ const (
 
 	moduleName    = "tree-test-module"
 	moduleVersion = "1.0.0"
-	modulePath    = "tests/integration/inst-tree"
+	modulePath    = "opmodel.dev/modules/opm_tree_test@v0"
 )
 
 var (
@@ -92,8 +92,7 @@ func main() {
 	}
 	fmt.Printf("   OK: %d resources applied\n", len(resources))
 
-	inv := buildInventory(resources)
-	err = inventory.WriteInventory(ctx, client, inv, moduleName, "", inv.ModuleMetadata.Version, inventory.CreatedByCLI)
+	err = writeInventoryCR(ctx, client, instanceName, namespace, instanceID, modulePath, moduleVersion, 1, entriesFromResources(resources))
 	check("writing inventory", err)
 	fmt.Println("   OK: inventory written")
 
@@ -104,7 +103,7 @@ func main() {
 	fmt.Println("   OK: all workloads ready")
 
 	// Read back inventory and discover live resources.
-	readInv, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
+	readInv, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	check("reading back inventory", err)
 	liveResources, missingEntries, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv)
 	check("discovering resources from inventory", err)
@@ -699,31 +698,38 @@ func buildStatefulSet(name, component string) *unstructured.Unstructured {
 // Inventory
 // ─────────────────────────────────────────────────────────────────────────────
 
-func buildInventory(resources []*unstructured.Unstructured) *inventory.InstanceInventoryRecord {
+// entriesFromResources builds inventory entries from rendered resources.
+func entriesFromResources(resources []*unstructured.Unstructured) []inventory.InventoryEntry {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
 	}
+	return entries
+}
 
-	inv := &inventory.InstanceInventoryRecord{
-		CreatedBy: inventory.CreatedByCLI,
-		InstanceMetadata: inventory.InstanceMetadata{
-			Kind:               "ModuleInstance",
-			APIVersion:         inventory.APIVersionV1Alpha1,
-			InstanceName:       instanceName,
-			InstanceNamespace:  namespace,
-			InstanceID:         instanceID,
-			LastTransitionTime: time.Now().UTC().Format(time.RFC3339),
-		},
-		ModuleMetadata: inventory.ModuleMetadata{
-			Kind:       "Module",
-			APIVersion: inventory.APIVersionV1Alpha1,
-			Name:       moduleName,
-			Version:    moduleVersion,
-		},
-		Inventory: inventory.Inventory{Revision: 1, Digest: inventory.ComputeDigest(entries), Count: len(entries), Entries: entries},
+// writeInventoryCR writes the ModuleInstance CR spec and its CLI-owned status
+// subset (the integration-test analog of the apply workflow's record write).
+func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, namespace, instanceID, modulePath, moduleVersion string, revision int, entries []inventory.InventoryEntry) error {
+	if err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
+		Name:          name,
+		Namespace:     namespace,
+		Owner:         inventory.OwnerCLI,
+		ModulePath:    modulePath,
+		ModuleVersion: moduleVersion,
+	}); err != nil {
+		return err
 	}
-	return inv
+	return inventory.ApplyStatus(ctx, client, inventory.StatusInput{
+		Name:         name,
+		Namespace:    namespace,
+		InstanceUUID: instanceID,
+		Inventory: inventory.Inventory{
+			Revision: revision,
+			Digest:   inventory.ComputeDigest(entries),
+			Count:    len(entries),
+			Entries:  entries,
+		},
+	})
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -830,9 +836,8 @@ func cleanup(ctx context.Context, client *kubernetes.Client) {
 		_ = client.ResourceClient(configMapGVR, namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	}
 
-	// Delete inventory secret.
-	secretName := inventory.SecretName(instanceName, instanceID)
-	_ = client.Clientset.CoreV1().Secrets(namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
+	// Delete inventory ModuleInstance CR.
+	_ = inventory.DeleteCR(ctx, client, instanceName, namespace)
 
 	// Delete namespace.
 	_ = client.Clientset.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})

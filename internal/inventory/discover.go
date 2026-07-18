@@ -19,7 +19,7 @@ import (
 // Returns:
 //   - live: resources that currently exist on the cluster
 //   - missing: inventory entries whose resources no longer exist on the cluster
-func DiscoverResourcesFromInventory(ctx context.Context, client *kubernetes.Client, inv *InstanceInventoryRecord) (live []*unstructured.Unstructured, missing []InventoryEntry, err error) {
+func DiscoverResourcesFromInventory(ctx context.Context, client *kubernetes.Client, inv *Record) (live []*unstructured.Unstructured, missing []InventoryEntry, err error) {
 	if inv == nil || len(inv.Inventory.Entries) == 0 {
 		return nil, nil, nil
 	}

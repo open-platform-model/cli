@@ -34,10 +34,10 @@ const (
 	clusterContext = "kind-opm-dev"
 	instanceName   = "opm-inv-ops-test"
 	namespace      = "default"
-	// Fixed instance UUID for deterministic inventory Secret naming.
+	// Fixed instance UUID for the ModuleInstance CR's status.instanceUUID.
 	instanceID = "b2c3d4e5-2222-3333-4444-bbccddeeff00"
 
-	modulePath    = "tests/integration/inventory-ops"
+	modulePath    = "opmodel.dev/modules/opm_inv_ops_test@v0"
 	moduleVersion = "0.1.0"
 )
 
@@ -77,13 +77,12 @@ func main() {
 	check("applying resources for 6.5", err)
 	fmt.Println("   OK: cm-a and svc-a applied")
 
-	inv65 := buildInventory(res65all)
-	err = inventory.WriteInventory(ctx, client, inv65, "", "", inv65.ModuleMetadata.Version, inventory.CreatedByCLI)
+	err = writeInventoryCR(ctx, client, res65all)
 	check("writing inventory for 6.5", err)
 	fmt.Println("   OK: inventory written tracking [cm-a, svc-a]")
 
 	// Read back and discover live resources from inventory.
-	readInv65, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
+	readInv65, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	check("reading inventory for 6.5", err)
 	liveResources65, missing65, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv65)
 	check("discovering resources from inventory for 6.5", err)
@@ -124,28 +123,26 @@ func main() {
 	check("applying resources for 6.7", err)
 	fmt.Println("   OK: cm-a and svc-a applied")
 
-	inv67 := buildInventory(res67all)
-	err = inventory.WriteInventory(ctx, client, inv67, "", "", inv67.ModuleMetadata.Version, inventory.CreatedByCLI)
+	err = writeInventoryCR(ctx, client, res67all)
 	check("writing inventory for 6.7", err)
 	fmt.Println("   OK: inventory written")
 
 	// Discover live resources.
-	readInv67, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
+	readInv67, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	check("reading inventory for 6.7", err)
 	liveResources67, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv67)
 	check("discovering resources from inventory for 6.7", err)
 
-	invSecretName67 := inventory.SecretName(instanceName, instanceID)
-
-	// Delete with inventory-first path.
+	// Delete with inventory-first path. The ModuleInstance CR is deleted last
+	// by the caller, after the workload resources.
 	deleteResult67, err := kubernetes.Delete(ctx, client, kubernetes.DeleteOptions{
-		InstanceName:             instanceName,
-		Namespace:                namespace,
-		InventoryLive:            liveResources67,
-		InventorySecretName:      invSecretName67,
-		InventorySecretNamespace: namespace,
+		InstanceName:          instanceName,
+		Namespace:             namespace,
+		InventoryLive:         liveResources67,
+		InventoryRecordExists: readInv67 != nil,
 	})
 	check("deleting with inventory for 6.7", err)
+	check("deleting ModuleInstance CR for 6.7", inventory.DeleteCR(ctx, client, instanceName, namespace))
 
 	// Only cm-a and svc-a should be deleted (not auto-generated Endpoints).
 	if deleteResult67.Deleted != 2 {
@@ -155,9 +152,9 @@ func main() {
 	waitForServiceDeleted(ctx, client, "svc-a")
 	fmt.Printf("   OK: %d resources deleted (no Endpoints)\n", deleteResult67.Deleted)
 
-	// Verify the inventory Secret is gone (deleted last).
-	waitForSecretDeleted(ctx, client, invSecretName67)
-	fmt.Println("   OK: inventory Secret deleted last (404 confirmed)")
+	// Verify the ModuleInstance CR is gone (deleted last).
+	waitForCRDeleted(ctx, client, instanceName, namespace)
+	fmt.Println("   OK: ModuleInstance CR deleted last (404 confirmed)")
 
 	// cleanup is no-op here since delete already removed everything
 	cleanup(ctx, client)
@@ -176,8 +173,7 @@ func main() {
 	check("applying resources for 6.8", err)
 	fmt.Println("   OK: cm-a and svc-a applied")
 
-	inv68 := buildInventory(res68all)
-	err = inventory.WriteInventory(ctx, client, inv68, "", "", inv68.ModuleMetadata.Version, inventory.CreatedByCLI)
+	err = writeInventoryCR(ctx, client, res68all)
 	check("writing inventory for 6.8", err)
 	fmt.Println("   OK: inventory written")
 
@@ -188,7 +184,7 @@ func main() {
 	fmt.Println("   OK: svc-a manually deleted (simulating missing resource)")
 
 	// Discover resources from inventory — svc-a should be in missing list.
-	readInv68, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
+	readInv68, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	check("reading inventory for 6.8", err)
 	liveResources68, missingResources68, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv68)
 	check("discovering resources from inventory for 6.8", err)
@@ -249,18 +245,18 @@ func main() {
 	}
 	fmt.Printf("   OK: AggregateStatus = %q (not Ready)\n", statusResult.AggregateStatus)
 
-	readInv68.CreatedBy = inventory.CreatedByController
+	readInv68.Owner = inventory.OwnerOperator
 	statusOpts := workflowquery.BuildStatusOptions(namespace, &cmdutil.InstanceSelectorFlags{InstanceName: instanceName, InstanceID: instanceID}, "table", false, readInv68, liveResources68, missingResources68)
 	statusResult.Owner = statusOpts.Owner
 	formatted, err := kubernetes.FormatStatus(statusResult, "table")
-	check("formatting controller-managed status", err)
-	if !contains(formatted, "Owner:      controller") {
-		failf("6.8: expected formatted status to show controller owner, got: %s", formatted)
+	check("formatting operator-managed status", err)
+	if !contains(formatted, "Owner:      operator") {
+		failf("6.8: expected formatted status to show operator owner, got: %s", formatted)
 	}
-	if !contains(formatted, "controller-managed instance") {
-		failf("6.8: expected formatted status warning for controller-managed instance")
+	if !contains(formatted, "operator-managed instance") {
+		failf("6.8: expected formatted status warning for operator-managed instance")
 	}
-	fmt.Println("   OK: status formatting shows owner and controller-managed warning")
+	fmt.Println("   OK: status formatting shows owner and operator-managed warning")
 
 	// Cleanup.
 	fmt.Println()
@@ -352,31 +348,39 @@ func buildServiceResources(names []string) []*unstructured.Unstructured {
 	return res
 }
 
-// buildInventory creates a new instance inventory record from the given resources.
-func buildInventory(resources []*unstructured.Unstructured) *inventory.InstanceInventoryRecord {
+// entriesFromResources builds inventory entries from rendered resources.
+func entriesFromResources(resources []*unstructured.Unstructured) []inventory.InventoryEntry {
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
 	}
+	return entries
+}
 
-	inv := &inventory.InstanceInventoryRecord{
-		CreatedBy: inventory.CreatedByCLI,
-		InstanceMetadata: inventory.InstanceMetadata{
-			Kind:              "ModuleInstance",
-			APIVersion:        inventory.APIVersionV1Alpha1,
-			InstanceName:      instanceName,
-			InstanceNamespace: namespace,
-			InstanceID:        instanceID,
-		},
-		ModuleMetadata: inventory.ModuleMetadata{
-			Kind:       "Module",
-			APIVersion: inventory.APIVersionV1Alpha1,
-			Name:       instanceName, // module name (same as instance name in this test)
-			Version:    moduleVersion,
-		},
-		Inventory: inventory.Inventory{Revision: 1, Digest: inventory.ComputeDigest(entries), Count: len(entries), Entries: entries},
+// writeInventoryCR writes the ModuleInstance CR spec and its CLI-owned status
+// subset for the given resources.
+func writeInventoryCR(ctx context.Context, client *kubernetes.Client, resources []*unstructured.Unstructured) error {
+	entries := entriesFromResources(resources)
+	if err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
+		Name:          instanceName,
+		Namespace:     namespace,
+		Owner:         inventory.OwnerCLI,
+		ModulePath:    modulePath,
+		ModuleVersion: moduleVersion,
+	}); err != nil {
+		return err
 	}
-	return inv
+	return inventory.ApplyStatus(ctx, client, inventory.StatusInput{
+		Name:         instanceName,
+		Namespace:    namespace,
+		InstanceUUID: instanceID,
+		Inventory: inventory.Inventory{
+			Revision: 1,
+			Digest:   inventory.ComputeDigest(entries),
+			Count:    len(entries),
+			Entries:  entries,
+		},
+	})
 }
 
 // cleanup deletes all test resources and the inventory Secret.
@@ -389,9 +393,8 @@ func cleanup(ctx context.Context, client *kubernetes.Client) {
 		_ = client.ResourceClient(serviceGVR, namespace).Delete(ctx, name, metav1.DeleteOptions{})
 		waitForServiceDeleted(ctx, client, name)
 	}
-	secretName := inventory.SecretName(instanceName, instanceID)
-	_ = client.Clientset.CoreV1().Secrets(namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
-	waitForSecretDeleted(ctx, client, secretName)
+	_ = inventory.DeleteCR(ctx, client, instanceName, namespace)
+	waitForCRDeleted(ctx, client, instanceName, namespace)
 }
 
 func waitForConfigMapDeleted(ctx context.Context, client *kubernetes.Client, name string) {
@@ -428,18 +431,18 @@ func waitForServiceDeleted(ctx context.Context, client *kubernetes.Client, name 
 	}
 }
 
-func waitForSecretDeleted(ctx context.Context, client *kubernetes.Client, name string) {
+func waitForCRDeleted(ctx context.Context, client *kubernetes.Client, name, ns string) {
 	deadline := time.Now().Add(15 * time.Second)
 	for {
-		_, err := client.Clientset.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
+		rec, err := inventory.GetRecord(ctx, client, name, ns)
+		if err == nil && rec == nil {
 			return
 		}
 		if err != nil {
-			failf("waiting for Secret/%s deletion: %v", name, err)
+			failf("waiting for ModuleInstance/%s deletion: %v", name, err)
 		}
 		if time.Now().After(deadline) {
-			failf("timed out waiting for Secret/%s deletion", name)
+			failf("timed out waiting for ModuleInstance/%s deletion", name)
 		}
 		time.Sleep(250 * time.Millisecond)
 	}

@@ -2,7 +2,9 @@ package render
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"path/filepath"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
@@ -81,7 +83,15 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
 	}
 
-	return renderPreparedModuleInstance(ctx, rel, p)
+	// Render provenance (enhancement 0006 D7): an instance apply is local when
+	// its module's cue.mod/local-module.cue replaces a dependency; otherwise it
+	// resolves from registries.
+	sourceLocal := false
+	if abs, absErr := filepath.Abs(opts.InstanceFilePath); absErr == nil {
+		sourceLocal = loader.HasLocalModuleReplacement(loader.ModuleRootFrom(filepath.Dir(abs)))
+	}
+
+	return renderPreparedModuleInstance(ctx, rel, p, sourceLocal)
 }
 
 // renderPreparedModuleInstance runs the render engine on a fully prepared instance
@@ -90,6 +100,7 @@ func renderPreparedModuleInstance(
 	ctx context.Context,
 	rel *pkgmodule.Instance,
 	p *provider.Provider,
+	sourceLocal bool,
 ) (*Result, error) {
 	engineResult, err := pkgrender.ProcessModuleInstance(ctx, rel, p, pkgcore.LabelManagedByValue)
 	if err != nil {
@@ -107,13 +118,35 @@ func renderPreparedModuleInstance(
 	}
 
 	return &Result{
-		Resources:  resources,
-		Instance:   *rel.Metadata,
-		Module:     *rel.Module.Metadata,
-		Components: engineResult.Components,
-		MatchPlan:  engineResult.MatchPlan,
-		Warnings:   engineResult.Warnings,
+		Resources:   resources,
+		Instance:    *rel.Metadata,
+		Module:      *rel.Module.Metadata,
+		Components:  engineResult.Components,
+		MatchPlan:   engineResult.MatchPlan,
+		Warnings:    engineResult.Warnings,
+		Values:      decodeUnifiedValues(rel.Values),
+		SourceLocal: sourceLocal,
 	}, nil
+}
+
+// decodeUnifiedValues converts the instance's concrete, merged values into a
+// JSON-shaped map for the ModuleInstance CR's spec.values. A non-existent or
+// undecodable value yields nil (spec.values omitted).
+func decodeUnifiedValues(v cue.Value) map[string]any {
+	if !v.Exists() {
+		return nil
+	}
+	data, err := v.MarshalJSON()
+	if err != nil {
+		output.Debug("could not encode instance values for spec.values", "err", err)
+		return nil
+	}
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		output.Debug("could not decode instance values for spec.values", "err", err)
+		return nil
+	}
+	return m
 }
 
 func ShowOutput(result *Result, opts ShowOutputOpts) {

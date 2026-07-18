@@ -37,7 +37,7 @@ type instanceHealthResult struct {
 	total  int
 }
 
-func EvaluateInstanceHealth(ctx context.Context, client *kubernetes.Client, inventories []*inventory.InstanceInventoryRecord, concurrency int, logDiscoveryFailures bool) []InstanceSummary {
+func EvaluateInstanceHealth(ctx context.Context, client *kubernetes.Client, inventories []*inventory.Record, concurrency int, logDiscoveryFailures bool) []InstanceSummary {
 	summaries := make([]InstanceSummary, len(inventories))
 	for i, inv := range inventories {
 		summaries[i] = BuildInstanceSummary(inv)
@@ -49,7 +49,7 @@ func EvaluateInstanceHealth(ctx context.Context, client *kubernetes.Client, inve
 
 	for i, inv := range inventories {
 		wg.Add(1)
-		go func(idx int, inv *inventory.InstanceInventoryRecord) {
+		go func(idx int, inv *inventory.Record) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -57,7 +57,7 @@ func EvaluateInstanceHealth(ctx context.Context, client *kubernetes.Client, inve
 			live, missing, err := inventory.DiscoverResourcesFromInventory(ctx, client, inv)
 			if err != nil {
 				if logDiscoveryFailures {
-					output.Debug("failed to discover resources for instance", "instance", inv.InstanceMetadata.InstanceName, "error", err)
+					output.Debug("failed to discover resources for instance", "instance", inv.Name, "error", err)
 				}
 				results[idx] = instanceHealthResult{index: idx, status: kubernetes.HealthUnknown}
 				return
@@ -78,20 +78,20 @@ func EvaluateInstanceHealth(ctx context.Context, client *kubernetes.Client, inve
 	return summaries
 }
 
-func BuildInstanceSummary(inv *inventory.InstanceInventoryRecord) InstanceSummary {
+func BuildInstanceSummary(inv *inventory.Record) InstanceSummary {
 	s := InstanceSummary{
-		Name:       inv.InstanceMetadata.InstanceName,
-		Module:     inv.ModuleMetadata.Name,
-		Namespace:  inv.InstanceMetadata.InstanceNamespace,
-		InstanceID: inv.InstanceMetadata.InstanceID,
-		Owner:      string(inventory.NormalizeCreatedBy(inv.CreatedBy)),
+		Name:       inv.Name,
+		Module:     inv.ModulePath,
+		Namespace:  inv.Namespace,
+		InstanceID: inv.InstanceUUID,
+		Owner:      inventory.DisplayOwner(inv.Owner),
 	}
-	if inv.ModuleMetadata.Version != "" {
-		s.Version = inv.ModuleMetadata.Version
+	if inv.ModuleVersion != "" {
+		s.Version = inv.ModuleVersion
 	}
-	s.LastApplied = inv.InstanceMetadata.LastTransitionTime
-	if inv.InstanceMetadata.LastTransitionTime != "" {
-		if t, err := time.Parse(time.RFC3339, inv.InstanceMetadata.LastTransitionTime); err == nil {
+	s.LastApplied = inv.LastAppliedAt
+	if inv.LastAppliedAt != "" {
+		if t, err := time.Parse(time.RFC3339, inv.LastAppliedAt); err == nil {
 			s.Age = kubernetes.FormatDuration(time.Since(t))
 		}
 	}

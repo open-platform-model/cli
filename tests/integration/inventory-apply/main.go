@@ -35,7 +35,7 @@ const (
 	// Fixed instance UUID for deterministic inventory Secret naming.
 	instanceID = "a1b2c3d4-1111-2222-3333-aabbccddeeff"
 
-	modulePath    = "tests/integration/inventory-apply"
+	modulePath    = "opmodel.dev/modules/opm_inv_apply_test@v0"
 	moduleVersion = "0.1.0"
 )
 
@@ -73,32 +73,14 @@ func main() {
 	fmt.Printf("   OK: %d resources applied\n", applyResult.Applied)
 
 	// Build and write inventory after apply.
-	currentEntries := entriesToWrite(resources)
+	currentEntries := entriesFromResources(resources)
 
-	inv := &inventory.InstanceInventoryRecord{
-		CreatedBy: inventory.CreatedByCLI,
-		InstanceMetadata: inventory.InstanceMetadata{
-			Kind:              "ModuleInstance",
-			APIVersion:        inventory.APIVersionV1Alpha1,
-			InstanceName:      instanceName,
-			InstanceNamespace: namespace,
-			InstanceID:        instanceID,
-		},
-		ModuleMetadata: inventory.ModuleMetadata{
-			Kind:       "Module",
-			APIVersion: inventory.APIVersionV1Alpha1,
-			Name:       instanceName, // module name (same as instance name in this test)
-			Version:    moduleVersion,
-		},
-		Inventory: inventory.Inventory{Revision: 1, Digest: inventory.ComputeDigest(currentEntries), Count: len(currentEntries), Entries: currentEntries},
-	}
-
-	err = inventory.WriteInventory(ctx, client, inv, "", "", inv.ModuleMetadata.Version, inventory.CreatedByCLI)
+	err = writeInventoryCR(ctx, client, instanceName, namespace, instanceID, modulePath, moduleVersion, 1, currentEntries)
 	check("writing inventory", err)
 	fmt.Println("   OK: inventory written")
 
 	// Verify inventory is readable and has 2 entries.
-	readInv, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
+	readInv, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	check("reading back inventory", err)
 	if readInv == nil {
 		failf("expected non-nil inventory after first-time apply")
@@ -108,33 +90,19 @@ func main() {
 	}
 	latestEntries := readInv.Inventory.Entries
 
-	// Verify inventory Secret labels — exactly 5, all instance-scoped (no module.opmodel.dev/* labels).
-	secretName := inventory.SecretName(instanceName, instanceID)
-	secret, err := client.Clientset.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
-	check("fetching inventory Secret", err)
-	labels := secret.GetLabels()
-	if len(labels) != 5 {
-		failf("inventory Secret must have exactly 5 labels, got %d: %v", len(labels), labels)
+	// Verify the ModuleInstance CR (not a Secret) is present and CLI-owned.
+	crCheck, err := inventory.GetRecord(ctx, client, instanceName, namespace)
+	check("re-reading inventory CR", err)
+	if crCheck == nil {
+		failf("expected non-nil inventory CR after first-time apply")
 	}
-	if labels[pkgcore.LabelManagedBy] != pkgcore.LabelManagedByValue {
-		failf("inventory Secret missing %s label", pkgcore.LabelManagedBy)
+	if crCheck.Owner != inventory.OwnerCLI {
+		failf("inventory CR owner: want %q, got %q", inventory.OwnerCLI, crCheck.Owner)
 	}
-	if labels["module-instance.opmodel.dev/name"] != instanceName {
-		failf("inventory Secret module-instance.opmodel.dev/name: want %q, got %q", instanceName, labels["module-instance.opmodel.dev/name"])
+	if crCheck.Inventory.Count != 2 {
+		failf("inventory CR count: want 2, got %d", crCheck.Inventory.Count)
 	}
-	if labels["module-instance.opmodel.dev/namespace"] != namespace {
-		failf("inventory Secret module-instance.opmodel.dev/namespace: want %q, got %q", namespace, labels["module-instance.opmodel.dev/namespace"])
-	}
-	if labels["module-instance.opmodel.dev/uuid"] != instanceID {
-		failf("inventory Secret module-instance.opmodel.dev/uuid: want %q, got %q", instanceID, labels["module-instance.opmodel.dev/uuid"])
-	}
-	if labels["opmodel.dev/component"] != "inventory" {
-		failf("inventory Secret opmodel.dev/component: want \"inventory\", got %q", labels["opmodel.dev/component"])
-	}
-	if _, hasModuleName := labels["module.opmodel.dev/name"]; hasModuleName {
-		failf("inventory Secret must not have module.opmodel.dev/name label")
-	}
-	fmt.Println("   OK: inventory has 2 entries, correct labels (exactly 5, no module.opmodel.dev/name)")
+	fmt.Println("   OK: inventory CR present, CLI-owned, count=2")
 
 	// ----------------------------------------------------------------
 	// Scenario 5.11: Idempotent re-apply — same change ID, empty stale set
@@ -157,13 +125,12 @@ func main() {
 	fmt.Println("   OK: stale set is empty")
 
 	// Update inventory — digest and tracked entries should remain stable on idempotent re-apply.
-	readInv2, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
+	readInv2, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	check("reading inventory before re-apply write", err)
-	readInv2.Inventory = inventory.Inventory{Revision: readInv2.Inventory.Revision + 1, Digest: inventory.ComputeDigest(currentEntries), Count: len(currentEntries), Entries: currentEntries}
-	err = inventory.WriteInventory(ctx, client, readInv2, "", "", readInv2.ModuleMetadata.Version, inventory.CreatedByCLI)
+	err = writeInventoryCR(ctx, client, instanceName, namespace, instanceID, modulePath, moduleVersion, readInv2.Inventory.Revision+1, currentEntries)
 	check("writing inventory on re-apply", err)
 
-	readInv3, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
+	readInv3, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	check("reading inventory after re-apply write", err)
 	if len(readInv3.Inventory.Entries) != 2 {
 		failf("expected 2 inventory entries after idempotent re-apply, got %d", len(readInv3.Inventory.Entries))
@@ -176,7 +143,7 @@ func main() {
 	step(3, "5.8: Rename scenario — cm-b pruned, cm-c applied")
 
 	newResources := buildResources([]string{"cm-a", "cm-c"})
-	newEntries := entriesToWrite(newResources)
+	newEntries := entriesFromResources(newResources)
 
 	// Compute stale set from previous [cm-a, cm-b] → current [cm-a, cm-c].
 	stale58 := inventory.ComputeStaleSet(latestEntries, newEntries)
@@ -207,14 +174,13 @@ func main() {
 	fmt.Println("   OK: cm-b is deleted (404)")
 
 	// Write updated inventory.
-	readInv4, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
+	readInv4, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	check("reading inventory before rename write", err)
-	readInv4.Inventory = inventory.Inventory{Revision: readInv4.Inventory.Revision + 1, Digest: inventory.ComputeDigest(newEntries), Count: len(newEntries), Entries: newEntries}
-	err = inventory.WriteInventory(ctx, client, readInv4, "", "", readInv4.ModuleMetadata.Version, inventory.CreatedByCLI)
+	err = writeInventoryCR(ctx, client, instanceName, namespace, instanceID, modulePath, moduleVersion, readInv4.Inventory.Revision+1, newEntries)
 	check("writing inventory after rename", err)
 
 	// Verify inventory now tracks [cm-a, cm-c].
-	readInv5, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
+	readInv5, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	check("reading inventory after rename", err)
 	if len(readInv5.Inventory.Entries) != 2 {
 		failf("expected 2 inventory entries after rename, got %d", len(readInv5.Inventory.Entries))
@@ -251,13 +217,13 @@ func main() {
 
 		// Capture inventory state. Simulate write-nothing-on-failure by
 		// NOT calling WriteInventory, then verify the inventory is unchanged.
-		invBefore, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
+		invBefore, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 		check("reading inventory to verify no write", err)
 		entriesBefore := make([]inventory.InventoryEntry, len(invBefore.Inventory.Entries))
 		copy(entriesBefore, invBefore.Inventory.Entries)
 
 		// (We deliberately do not call WriteInventory here — testing the invariant.)
-		invAfter, err := inventory.GetInventory(ctx, client, instanceName, namespace, instanceID)
+		invAfter, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 		check("reading inventory after failed apply", err)
 
 		if len(invAfter.Inventory.Entries) != len(entriesBefore) {
@@ -331,24 +297,13 @@ func buildResources(names []string) []*unstructured.Unstructured {
 	return res
 }
 
-// entriesToWrite converts *unstructured.Unstructured resources to InventoryEntry slice.
-func entriesToWrite(resources []*unstructured.Unstructured) []inventory.InventoryEntry {
-	entries := make([]inventory.InventoryEntry, len(resources))
-	for i, r := range resources {
-		entries[i] = inventory.NewEntryFromResource(r)
-	}
-	return entries
-}
-
-// cleanup deletes all test ConfigMaps and the inventory Secret.
+// cleanup deletes all test ConfigMaps and the inventory ModuleInstance CR.
 func cleanup(ctx context.Context, client *kubernetes.Client) {
 	for _, name := range []string{"cm-a", "cm-b", "cm-c"} {
 		_ = client.ResourceClient(configMapGVR, namespace).Delete(ctx, name, metav1.DeleteOptions{})
 		waitForConfigMapState(ctx, client, name, false)
 	}
-	secretName := inventory.SecretName(instanceName, instanceID)
-	_ = client.Clientset.CoreV1().Secrets(namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
-	waitForSecretDeleted(ctx, client, secretName)
+	_ = inventory.DeleteCR(ctx, client, instanceName, namespace)
 }
 
 func waitForConfigMapState(ctx context.Context, client *kubernetes.Client, name string, wantPresent bool) {
@@ -375,23 +330,6 @@ func waitForConfigMapState(ctx context.Context, client *kubernetes.Client, name 
 	}
 }
 
-func waitForSecretDeleted(ctx context.Context, client *kubernetes.Client, name string) {
-	deadline := time.Now().Add(15 * time.Second)
-	for {
-		_, err := client.Clientset.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return
-		}
-		if err != nil {
-			failf("waiting for Secret/%s deletion: %v", name, err)
-		}
-		if time.Now().After(deadline) {
-			failf("timed out waiting for Secret/%s deletion", name)
-		}
-		time.Sleep(250 * time.Millisecond)
-	}
-}
-
 // step prints a numbered step header.
 func step(n int, desc string) {
 	fmt.Printf("\n--- Step %d: %s\n", n, desc)
@@ -409,4 +347,38 @@ func check(label string, err error) {
 func failf(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, "FAIL: "+format+"\n", args...)
 	os.Exit(1)
+}
+
+// entriesFromResources builds inventory entries from rendered resources.
+func entriesFromResources(resources []*unstructured.Unstructured) []inventory.InventoryEntry {
+	entries := make([]inventory.InventoryEntry, len(resources))
+	for i, r := range resources {
+		entries[i] = inventory.NewEntryFromResource(r)
+	}
+	return entries
+}
+
+// writeInventoryCR writes the ModuleInstance CR spec and its CLI-owned status
+// subset (the integration-test analog of the apply workflow's record write).
+func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, namespace, instanceID, modulePath, moduleVersion string, revision int, entries []inventory.InventoryEntry) error {
+	if err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
+		Name:          name,
+		Namespace:     namespace,
+		Owner:         inventory.OwnerCLI,
+		ModulePath:    modulePath,
+		ModuleVersion: moduleVersion,
+	}); err != nil {
+		return err
+	}
+	return inventory.ApplyStatus(ctx, client, inventory.StatusInput{
+		Name:         name,
+		Namespace:    namespace,
+		InstanceUUID: instanceID,
+		Inventory: inventory.Inventory{
+			Revision: revision,
+			Digest:   inventory.ComputeDigest(entries),
+			Count:    len(entries),
+			Entries:  entries,
+		},
+	})
 }

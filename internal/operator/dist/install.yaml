@@ -721,6 +721,9 @@ spec:
     - jsonPath: .status.conditions[?(@.type=='Ready')].reason
       name: Reason
       type: string
+    - jsonPath: .status.operatorVersion
+      name: Operator
+      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -866,6 +869,13 @@ spec:
               observedGeneration:
                 format: int64
                 type: integer
+              operatorVersion:
+                description: |-
+                  operatorVersion is the version of the operator that last patched this
+                  Platform's status, stamped on every reconcile regardless of outcome
+                  (enhancement 0006 D24). The CLI reads it as the version-skew ceiling;
+                  absence means no operator has reconciled the Platform (solo cluster).
+                type: string
             type: object
         required:
         - spec
@@ -1205,7 +1215,7 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: ghcr.io/open-platform-model/opm-operator:v1.0.0-alpha.2@sha256:9ee84e3ec4ef160a90bd1c89a32b765d4e89d7aa846763faee243092dbc9c2d8
+        image: ghcr.io/open-platform-model/opm-operator:v1.0.0-alpha.4@sha256:7935b01d51dd5b9b993f940c52637a5d831c22214bcc99ab5926091e8fc77589
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:

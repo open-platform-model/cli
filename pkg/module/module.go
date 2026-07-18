@@ -4,6 +4,9 @@
 package module
 
 import (
+	"fmt"
+	"strings"
+
 	"cuelang.org/go/cue"
 )
 
@@ -48,6 +51,12 @@ type ModuleMetadata struct {
 	// Version is the module version (semver).
 	Version string `json:"version"`
 
+	// NameSnakeCase is the snake_case projection of Name (core
+	// #Module.metadata.nameSnakeCase), used as the module's registry-path leaf.
+	// Absent on modules built against a pre-nameSnakeCase core; derived from
+	// Name as a fallback (see CanonicalModuleRef).
+	NameSnakeCase string `json:"nameSnakeCase,omitempty"`
+
 	// UUID is the module identity UUID (from #Module.metadata.identity).
 	UUID string `json:"uuid"`
 
@@ -56,4 +65,30 @@ type ModuleMetadata struct {
 
 	// Annotations from the module definition.
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// CanonicalModuleRef returns the module's canonical registry import path and
+// declared version — the reference a consumer would import or a
+// ModuleInstance.spec.module would pin. The path follows the convention
+// `modulePath + "/" + nameSnakeCase + "@v" + MAJOR(version)` (e.g.
+// "opmodel.dev/modules/cert_manager@v0"); the version is the declared semver
+// verbatim (e.g. "0.1.0"). It is never a filesystem path, so it is correct for
+// local-directory and locally-replaced module resolution as well.
+func (m ModuleMetadata) CanonicalModuleRef() (path, version string) {
+	leaf := m.NameSnakeCase
+	if leaf == "" {
+		leaf = strings.ReplaceAll(m.Name, "-", "_")
+	}
+	path = fmt.Sprintf("%s/%s@%s", m.ModulePath, leaf, majorVersionTag(m.Version))
+	return path, m.Version
+}
+
+// majorVersionTag returns the "vN" major-version tag for a semver string
+// ("0.1.0" -> "v0"). An unparseable version yields "v0".
+func majorVersionTag(version string) string {
+	major := "0"
+	if idx := strings.IndexByte(version, '.'); idx > 0 {
+		major = version[:idx]
+	}
+	return "v" + major
 }

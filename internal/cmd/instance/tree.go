@@ -105,10 +105,10 @@ func runInstanceTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8
 	}
 
 	instanceInfo := kubernetes.InstanceInfo{
-		Name:      inv.InstanceMetadata.InstanceName,
-		Namespace: inv.InstanceMetadata.InstanceNamespace,
-		Module:    inv.ModuleMetadata.Name,
-		Version:   inv.ModuleMetadata.Version,
+		Name:      inv.Name,
+		Namespace: inv.Namespace,
+		Module:    inv.ModulePath,
+		Version:   inv.ModuleVersion,
 	}
 
 	treeOpts := kubernetes.TreeOptions{

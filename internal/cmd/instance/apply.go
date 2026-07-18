@@ -33,6 +33,10 @@ func NewInstanceApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Short: "Deploy instance to cluster",
 		Long: `Deploy an OPM instance file to a Kubernetes cluster using server-side apply.
 
+Apply records what it deployed in a ModuleInstance custom resource, so the
+ModuleInstance CRD must be installed first (run 'opm operator install
+--crds-only'). Apply fails fast with a hint if it is missing or out of date.
+
 Arguments:
   instance.cue    Path to the instance .cue file (required)
 
@@ -40,7 +44,7 @@ Examples:
   # Apply an instance file
   opm instance apply ./jellyfin_instance.cue
 
-  # Dry run
+  # Dry run (skips the cluster gates; no CRD required)
   opm instance apply ./jellyfin_instance.cue --dry-run`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
@@ -95,8 +99,6 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 		return err
 	}
 
-	valuesStr := ""
-
 	return workflowapply.Execute(ctx, workflowapply.Request{
 		Result:    result,
 		K8sClient: k8sClient,
@@ -109,13 +111,5 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 			SuccessUpToDateMessage: "Instance up to date",
 			SuccessAppliedMessage:  "Instance applied",
 		},
-		Change: workflowapply.ChangeDescriptor{
-			Path:      instanceFile,
-			ValuesStr: valuesStr,
-			Version:   result.Module.Version,
-			Local:     result.Module.Version == "",
-		},
-		ModuleName: result.Module.Name,
-		ModuleUUID: result.Module.UUID,
 	})
 }

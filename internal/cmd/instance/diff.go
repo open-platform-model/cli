@@ -95,7 +95,8 @@ func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil
 	var diffOpts kubernetes.DiffOptions
 	instanceID := result.Instance.UUID
 	if instanceID != "" {
-		inv, invErr := inventory.GetInventory(ctx, k8sClient, result.Instance.Name, result.Instance.Namespace, instanceID)
+		// Orphan detection reads status.inventory from the ModuleInstance CR.
+		inv, invErr := inventory.GetRecord(ctx, k8sClient, result.Instance.Name, result.Instance.Namespace)
 		if invErr != nil {
 			instanceLog.Debug("could not read inventory for diff", "error", invErr)
 		} else if inv != nil {

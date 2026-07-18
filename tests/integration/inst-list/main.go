@@ -44,7 +44,7 @@ const (
 	instanceIDTwo   = "22222222-aaaa-bbbb-cccc-000000000002"
 	instanceIDThree = "33333333-aaaa-bbbb-cccc-000000000003"
 
-	moduleName    = "test-module"
+	modulePath    = "opmodel.dev/modules/test_module@v0"
 	moduleVersion = "1.0.0"
 )
 
@@ -80,27 +80,27 @@ func main() {
 	// ----------------------------------------------------------------
 	step(1, "List in specific namespace returns correct instances")
 
-	listA, err := inventory.ListInventories(ctx, client, nsA)
+	listA, err := inventory.ListRecords(ctx, client, nsA)
 	check("listing inventories in ns-a", err)
 	if len(listA) != 2 {
 		failf("expected 2 instances in %s, got %d", nsA, len(listA))
 	}
 	// Should be sorted: app-one, app-two
-	if listA[0].InstanceMetadata.InstanceName != instanceOne {
-		failf("expected first instance to be %q, got %q", instanceOne, listA[0].InstanceMetadata.InstanceName)
+	if listA[0].Name != instanceOne {
+		failf("expected first instance to be %q, got %q", instanceOne, listA[0].Name)
 	}
-	if listA[1].InstanceMetadata.InstanceName != instanceTwo {
-		failf("expected second instance to be %q, got %q", instanceTwo, listA[1].InstanceMetadata.InstanceName)
+	if listA[1].Name != instanceTwo {
+		failf("expected second instance to be %q, got %q", instanceTwo, listA[1].Name)
 	}
 	fmt.Printf("   OK: %d instances in %s, correctly sorted\n", len(listA), nsA)
 
-	listB, err := inventory.ListInventories(ctx, client, nsB)
+	listB, err := inventory.ListRecords(ctx, client, nsB)
 	check("listing inventories in ns-b", err)
 	if len(listB) != 1 {
 		failf("expected 1 instance in %s, got %d", nsB, len(listB))
 	}
-	if listB[0].InstanceMetadata.InstanceName != instanceThree {
-		failf("expected instance %q in ns-b, got %q", instanceThree, listB[0].InstanceMetadata.InstanceName)
+	if listB[0].Name != instanceThree {
+		failf("expected instance %q in ns-b, got %q", instanceThree, listB[0].Name)
 	}
 	fmt.Printf("   OK: %d instance in %s\n", len(listB), nsB)
 
@@ -109,15 +109,15 @@ func main() {
 	// ----------------------------------------------------------------
 	step(2, "List all namespaces returns instances from all test namespaces")
 
-	listAll, err := inventory.ListInventories(ctx, client, "")
+	listAll, err := inventory.ListRecords(ctx, client, "")
 	check("listing inventories across all namespaces", err)
 
 	// Find our test instances in the full list (there may be others from other tests)
 	foundInstances := map[string]bool{}
 	for _, inv := range listAll {
-		switch inv.InstanceMetadata.InstanceName {
+		switch inv.Name {
 		case instanceOne, instanceTwo, instanceThree:
-			foundInstances[inv.InstanceMetadata.InstanceName] = true
+			foundInstances[inv.Name] = true
 		}
 	}
 	if len(foundInstances) != 3 {
@@ -127,9 +127,9 @@ func main() {
 
 	// Verify namespace is populated on each
 	for _, inv := range listAll {
-		if inv.InstanceMetadata.InstanceName == instanceOne {
-			if inv.InstanceMetadata.InstanceNamespace != nsA {
-				failf("expected namespace %q for %s, got %q", nsA, instanceOne, inv.InstanceMetadata.InstanceNamespace)
+		if inv.Name == instanceOne {
+			if inv.Namespace != nsA {
+				failf("expected namespace %q for %s, got %q", nsA, instanceOne, inv.Namespace)
 			}
 		}
 	}
@@ -138,43 +138,40 @@ func main() {
 	// ----------------------------------------------------------------
 	// Scenario 2b: Ownership visibility in summaries
 	// ----------------------------------------------------------------
-	step(3, "Ownership visibility - controller and legacy inventories resolve correctly")
+	step(3, "Ownership visibility - operator-owned and cli-owned instances resolve correctly")
 
-	controllerInv, err := inventory.GetInventory(ctx, client, instanceThree, nsB, instanceIDThree)
-	check("reading inventory for controller scenario", err)
-	controllerInv.CreatedBy = inventory.CreatedByController
-	err = inventory.WriteInventory(ctx, client, controllerInv, moduleName, "", controllerInv.ModuleMetadata.Version, inventory.CreatedByCLI)
-	check("rewriting controller-owned inventory", err)
+	// Re-mark app-three as operator-owned by rewriting its spec.owner. Ownership
+	// now derives from the CR's spec.owner, not a record's createdBy.
+	err = inventory.ApplySpec(ctx, client, inventory.SpecInput{
+		Name:          instanceThree,
+		Namespace:     nsB,
+		Owner:         inventory.OwnerOperator,
+		ModulePath:    modulePath,
+		ModuleVersion: moduleVersion,
+	})
+	check("marking app-three operator-owned", err)
 
-	legacyInv, err := inventory.GetInventory(ctx, client, instanceTwo, nsA, instanceIDTwo)
-	check("reading inventory for legacy scenario", err)
-	legacyInv.CreatedBy = ""
-	legacySecret, err := inventory.MarshalToSecret(legacyInv)
-	check("marshaling legacy inventory", err)
-	_, err = client.Clientset.CoreV1().Secrets(nsA).Update(ctx, legacySecret, metav1.UpdateOptions{})
-	check("writing legacy inventory", err)
+	operatorRead, err := inventory.GetRecord(ctx, client, instanceThree, nsB)
+	check("reading operator-owned inventory", err)
+	cliRead, err := inventory.GetRecord(ctx, client, instanceTwo, nsA)
+	check("reading cli-owned inventory", err)
 
-	controllerRead, err := inventory.GetInventory(ctx, client, instanceThree, nsB, instanceIDThree)
-	check("reading controller-owned inventory", err)
-	legacyRead, err := inventory.GetInventory(ctx, client, instanceTwo, nsA, instanceIDTwo)
-	check("reading legacy inventory", err)
-
-	controllerSummary := query.BuildInstanceSummary(controllerRead)
-	legacySummary := query.BuildInstanceSummary(legacyRead)
-	if controllerSummary.Owner != "controller" {
-		failf("expected controller-owned summary owner, got %q", controllerSummary.Owner)
+	operatorSummary := query.BuildInstanceSummary(operatorRead)
+	cliSummary := query.BuildInstanceSummary(cliRead)
+	if operatorSummary.Owner != "operator" {
+		failf("expected operator-owned summary owner, got %q", operatorSummary.Owner)
 	}
-	if legacySummary.Owner != "cli" {
-		failf("expected legacy summary owner cli, got %q", legacySummary.Owner)
+	if cliSummary.Owner != "cli" {
+		failf("expected cli summary owner, got %q", cliSummary.Owner)
 	}
-	fmt.Println("   OK: controller-owned instances show owner=controller and legacy inventories resolve to owner=cli")
+	fmt.Println("   OK: operator-owned instances show owner=operator and cli-owned show owner=cli")
 
 	// ----------------------------------------------------------------
 	// Scenario 3: Empty namespace
 	// ----------------------------------------------------------------
 	step(4, "List in empty namespace returns zero results")
 
-	listEmpty, err := inventory.ListInventories(ctx, client, nsEmpty)
+	listEmpty, err := inventory.ListRecords(ctx, client, nsEmpty)
 	check("listing inventories in empty namespace", err)
 	if len(listEmpty) != 0 {
 		failf("expected 0 instances in %s, got %d", nsEmpty, len(listEmpty))
@@ -207,7 +204,7 @@ func main() {
 	check("deleting cm-one-b to simulate missing resource", err)
 
 	// Re-read inventory and check health
-	invOneRefresh, err := inventory.GetInventory(ctx, client, instanceOne, nsA, instanceIDOne)
+	invOneRefresh, err := inventory.GetRecord(ctx, client, instanceOne, nsA)
 	check("refreshing app-one inventory", err)
 	live2, missing2, err := inventory.DiscoverResourcesFromInventory(ctx, client, invOneRefresh)
 	check("re-discovering resources for app-one", err)
@@ -231,25 +228,25 @@ func main() {
 	step(6, "Metadata correctness — module name, version, instance ID")
 
 	for _, inv := range listA {
-		// Module name
-		if inv.ModuleMetadata.Name != moduleName {
-			failf("expected module name %q for %s, got %q", moduleName, inv.InstanceMetadata.InstanceName, inv.ModuleMetadata.Name)
+		// Module path
+		if inv.ModulePath != modulePath {
+			failf("expected module path %q for %s, got %q", modulePath, inv.Name, inv.ModulePath)
 		}
 
 		// Instance ID
-		switch inv.InstanceMetadata.InstanceName {
+		switch inv.Name {
 		case instanceOne:
-			if inv.InstanceMetadata.InstanceID != instanceIDOne {
-				failf("expected instance ID %q, got %q", instanceIDOne, inv.InstanceMetadata.InstanceID)
+			if inv.InstanceUUID != instanceIDOne {
+				failf("expected instance ID %q, got %q", instanceIDOne, inv.InstanceUUID)
 			}
 		case instanceTwo:
-			if inv.InstanceMetadata.InstanceID != instanceIDTwo {
-				failf("expected instance ID %q, got %q", instanceIDTwo, inv.InstanceMetadata.InstanceID)
+			if inv.InstanceUUID != instanceIDTwo {
+				failf("expected instance ID %q, got %q", instanceIDTwo, inv.InstanceUUID)
 			}
 		}
 
-		if inv.ModuleMetadata.Version != moduleVersion {
-			failf("expected version %q for %s, got %q", moduleVersion, inv.InstanceMetadata.InstanceName, inv.ModuleMetadata.Version)
+		if inv.ModuleVersion != moduleVersion {
+			failf("expected version %q for %s, got %q", moduleVersion, inv.Name, inv.ModuleVersion)
 		}
 	}
 	fmt.Println("   OK: module name, instance ID, and version all correct")
@@ -277,58 +274,49 @@ func ensureNamespaces(ctx context.Context, client *kubernetes.Client) {
 	}
 }
 
-// deployInstance creates ConfigMap resources and an inventory Secret for an instance.
+// deployInstance applies ConfigMap resources and writes the ModuleInstance CR
+// (spec + CLI-owned status) for an instance.
 func deployInstance(ctx context.Context, client *kubernetes.Client, name, ns, instanceID string, cmNames []string) {
-	inv := buildInventory(name, ns, instanceID, cmNames, inventory.CreatedByCLI)
-	writeInstance(ctx, client, name, ns, inv, cmNames)
-}
+	resources := buildResources(name, ns, instanceID, cmNames)
 
-func writeInstance(ctx context.Context, client *kubernetes.Client, name, ns string, inv *inventory.InstanceInventoryRecord, cmNames []string) {
-	resources := buildResources(name, ns, inv.InstanceMetadata.InstanceID, cmNames)
-
-	// Apply resources
 	result, err := kubernetes.Apply(ctx, client, resources, name, kubernetes.ApplyOptions{})
 	check(fmt.Sprintf("applying resources for %s", name), err)
 	if len(result.Errors) > 0 {
 		failf("apply errors for %s: %v", name, result.Errors[0])
 	}
 
-	inv.InstanceMetadata.LastTransitionTime = time.Now().UTC().Format(time.RFC3339)
-
-	err = inventory.WriteInventory(ctx, client, inv, moduleName, "", inv.ModuleMetadata.Version, inventory.CreatedByCLI)
-	check(fmt.Sprintf("writing inventory for %s", name), err)
-}
-
-func buildInventory(name, ns, instanceID string, cmNames []string, createdBy inventory.CreatedBy) *inventory.InstanceInventoryRecord {
-	resources := buildResources(name, ns, instanceID, cmNames)
 	entries := make([]inventory.InventoryEntry, len(resources))
 	for i, r := range resources {
 		entries[i] = inventory.NewEntryFromResource(r)
 	}
+	err = writeInventoryCR(ctx, client, name, ns, instanceID, inventory.OwnerCLI, 1, entries)
+	check(fmt.Sprintf("writing inventory for %s", name), err)
+}
 
-	inv := &inventory.InstanceInventoryRecord{
-		CreatedBy: createdBy,
-		InstanceMetadata: inventory.InstanceMetadata{
-			Kind:              "ModuleInstance",
-			APIVersion:        inventory.APIVersionV1Alpha1,
-			InstanceName:      name,
-			InstanceNamespace: ns,
-			InstanceID:        instanceID,
-		},
-		ModuleMetadata: inventory.ModuleMetadata{
-			Kind:       "Module",
-			APIVersion: inventory.APIVersionV1Alpha1,
-			Name:       moduleName,
-			Version:    moduleVersion,
-		},
+// writeInventoryCR writes the ModuleInstance CR spec (with the given owner) and
+// its CLI-owned status subset.
+func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, ns, instanceID, owner string, revision int, entries []inventory.InventoryEntry) error {
+	if err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
+		Name:          name,
+		Namespace:     ns,
+		Owner:         owner,
+		ModulePath:    modulePath,
+		ModuleVersion: moduleVersion,
+	}); err != nil {
+		return err
+	}
+	return inventory.ApplyStatus(ctx, client, inventory.StatusInput{
+		Name:         name,
+		Namespace:    ns,
+		InstanceUUID: instanceID,
 		Inventory: inventory.Inventory{
-			Revision: 1,
+			Revision: revision,
 			Digest:   inventory.ComputeDigest(entries),
 			Count:    len(entries),
 			Entries:  entries,
 		},
-	}
-	return inv
+		LastAppliedAt: time.Now().UTC().Format(time.RFC3339),
+	})
 }
 
 func buildResources(relName, ns, instanceID string, cmNames []string) []*unstructured.Unstructured {
@@ -356,7 +344,7 @@ func buildResources(relName, ns, instanceID string, cmNames []string) []*unstruc
 }
 
 func cleanup(ctx context.Context, client *kubernetes.Client) {
-	// Delete inventory Secrets
+	// Delete ModuleInstance CRs
 	for _, entry := range []struct {
 		name, ns, id string
 	}{
@@ -364,8 +352,7 @@ func cleanup(ctx context.Context, client *kubernetes.Client) {
 		{instanceTwo, nsA, instanceIDTwo},
 		{instanceThree, nsB, instanceIDThree},
 	} {
-		secretName := inventory.SecretName(entry.name, entry.id)
-		_ = client.Clientset.CoreV1().Secrets(entry.ns).Delete(ctx, secretName, metav1.DeleteOptions{})
+		_ = inventory.DeleteCR(ctx, client, entry.name, entry.ns)
 	}
 
 	// Delete ConfigMaps
