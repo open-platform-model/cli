@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0-alpha.2](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.1...v1.0.0-alpha.2) (2026-07-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* ~/.opm/config.cue no longer accepts providers or cacheDir and ~/.opm is no longer a CUE module; re-run opm config init. The render path errors on providers until kernel adoption (Phase C of the same change) lands; the phases ship as one PR.
+
+### Features
+
+* render through the library kernel and simplify ~/.opm to two data files (0006 C2) ([#112](https://github.com/open-platform-model/cli/issues/112)) ([2ba7c40](https://github.com/open-platform-model/cli/commit/2ba7c4084d7c3ee57bfdfa8d3a5ab4a35e504aa0))
+
 ## [1.0.0-alpha.1](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha...v1.0.0-alpha.1) (2026-07-17)
 
 
