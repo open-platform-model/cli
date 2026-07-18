@@ -50,8 +50,10 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		return err
 	}
 
-	manifestDigest := inventory.ComputeManifestDigest(result.Resources)
-	output.Debug("manifest digest computed", "digest", manifestDigest)
+	// Operator-parity render digest, computed by the render workflow over the
+	// kernel-compiled resources (0006 D9/D30 — see inventory.ComputeRenderDigest).
+	manifestDigest := result.RenderDigest
+	output.Debug("render digest computed", "digest", manifestDigest)
 
 	// Pre-apply gates 1-3 (cluster probes). Skipped entirely on dry-run — they
 	// exist to protect writes, and a dry-run writes nothing (enhancement 0006 D5).
@@ -383,10 +385,11 @@ func FormatApplySummary(r *kubernetes.ApplyResult) string {
 }
 
 // sourceDigest returns a deterministic digest identifying the module source of
-// this apply, derived from the canonical module reference (path@version). The
-// CLI's current render pipeline has no module OCI source bytes to hash, so this
-// is a stable source-identity digest rather than a content digest; kernel
-// adoption (slice C2) replaces it with the operator's source-bytes digest.
+// this apply, derived from the canonical module reference (path@version). This
+// is byte-identical to the operator's ModuleSourceDigest (opm-operator
+// internal/status): on the CUE-native resolution path BOTH actors use the
+// reference-identity digest — there is no Flux artifact content digest here.
+// Do not change one side without the other.
 func sourceDigest(modulePath, moduleVersion string) string {
 	if modulePath == "" && moduleVersion == "" {
 		return ""
@@ -395,11 +398,13 @@ func sourceDigest(modulePath, moduleVersion string) string {
 	return fmt.Sprintf("sha256:%x", sum)
 }
 
-// valuesDigest returns a deterministic digest of the unified values blob, or ""
-// when there are no values.
+// valuesDigest returns a deterministic digest of the unified values blob.
+// Canonical-JSON semantics match the operator's ConfigDigest, including the
+// empty case (SHA-256 of no bytes), so the field is cross-actor comparable.
 func valuesDigest(values map[string]any) string {
 	if len(values) == 0 {
-		return ""
+		sum := sha256.Sum256(nil)
+		return fmt.Sprintf("sha256:%x", sum)
 	}
 	b, err := json.Marshal(values)
 	if err != nil {

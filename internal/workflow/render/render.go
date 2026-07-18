@@ -17,6 +17,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
 	pkgcore "github.com/open-platform-model/cli/pkg/core"
 	"github.com/open-platform-model/cli/pkg/loader"
@@ -131,13 +132,19 @@ func compileInstance(
 		})
 	}
 
+	renderDigest, err := inventory.ComputeRenderDigest(converted)
+	if err != nil {
+		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
+	}
+
 	result := &Result{
-		Components:  out.Components,
-		MatchPlan:   out.MatchPlan,
-		Warnings:    out.Warnings,
-		Platform:    env.resolution,
-		Values:      decodeUnifiedValues(inst.Package.LookupPath(schema.Values)),
-		SourceLocal: sourceLocal,
+		Components:   out.Components,
+		MatchPlan:    out.MatchPlan,
+		Warnings:     out.Warnings,
+		Platform:     env.resolution,
+		RenderDigest: renderDigest,
+		Values:       decodeUnifiedValues(inst.Package.LookupPath(schema.Values)),
+		SourceLocal:  sourceLocal,
 	}
 
 	for _, r := range converted {

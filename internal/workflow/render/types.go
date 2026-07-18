@@ -24,6 +24,13 @@ type Result struct {
 	// apply workflow uses it for the D12 write-if-absent decision.
 	Platform platform.Resolution
 
+	// RenderDigest is the operator-parity render digest computed over the
+	// kernel-compiled resources (CUE-value serialization, operator sort
+	// order — see inventory.ComputeRenderDigest). Written verbatim to
+	// status.lastAppliedRenderDigest; the D7.4 handoff verification
+	// compares against it (0006 D9/D30).
+	RenderDigest string
+
 	// Values is the single unified values blob the render consumed, decoded to
 	// a JSON-shaped map. The apply workflow writes it verbatim to the
 	// ModuleInstance CR's spec.values (enhancement 0006 D19). Nil when the
