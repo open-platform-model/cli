@@ -59,12 +59,18 @@ jobs:
           sudo mv ./kind /usr/local/bin/kind
       - name: Create kind cluster
         run: kind create cluster --name opm-dev --config hack/kind-config.yaml --image kindest/node:v1.34.3@sha256:08497ee19eace7b4b5348db5c6a1591d7752b164530a36f855cb0f2bdcbadd48
+      - name: Install ModuleInstance CRDs
+        # The CLI records inventory in the ModuleInstance CR, so the CRD is a
+        # hard prerequisite for every apply-path integration program.
+        run: go run ./cmd/opm operator install --crds-only --context kind-opm-dev
       - name: Run integration scripts
         run: |
           go run tests/integration/deploy/main.go
           go run tests/integration/inventory-apply/main.go
           go run tests/integration/inventory-ops/main.go
           go run tests/integration/inst-list/main.go
+          go run tests/integration/migration/main.go
+          go run tests/integration/gates/main.go
       - name: Delete kind cluster
         if: always()
         run: kind delete cluster --name opm-dev || true
