@@ -26,7 +26,6 @@ require (
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/cockroachdb/apd/v3 v3.2.3 // indirect
-	github.com/coder/websocket v1.8.14 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/emicklei/proto v1.14.3 // indirect
@@ -67,7 +66,6 @@ require (
 	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
-	github.com/tetratelabs/wazero v1.12.0 // indirect
 	github.com/texttheater/golang-levenshtein v1.0.1 // indirect
 	github.com/virtuald/go-ordered-json v0.0.0-20170621173500-b18e6e673d74 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
@@ -82,7 +80,6 @@ require (
 	golang.org/x/term v0.44.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
-	golang.org/x/tools v0.45.0 // indirect
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect

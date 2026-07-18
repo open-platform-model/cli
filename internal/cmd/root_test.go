@@ -54,10 +54,7 @@ func TestRootCmd_ConfigInitSkipsConfigLoad(t *testing.T) {
 	}()
 
 	cmd := NewRootCmd()
-	// Skip auto-tidy: this unit test only verifies the config-load short-circuit;
-	// running cue mod tidy here would hit the network and leave read-only files
-	// in t.TempDir that defeat its cleanup.
-	cmd.SetArgs([]string{"config", "init", "--no-tidy"})
+	cmd.SetArgs([]string{"config", "init"})
 
 	err := cmd.Execute()
 	assert.NoError(t, err)

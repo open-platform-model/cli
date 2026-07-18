@@ -4,14 +4,14 @@ Phases mirror design.md's migration plan: A (config, D39) → B (platform) → C
 
 ## 1. Phase A — `~/.opm` simplification (D39)
 
-- [ ] 1.1 Shrink the embedded config schema (`internal/config/schema/config.cue`): remove `providers` and `cacheDir`; validation error for a present `providers:` field names the removed field and hints `opm config init`
-- [ ] 1.2 Collapse `config.Load` to single-pass: delete `BootstrapRegistry`, `configHasProviders`, `extractProviders`, and the `CUE_REGISTRY` staging; registry resolves by ordinary flag > env > config precedence after parse
-- [ ] 1.3 Drop `Providers` and `CueContext` from `GlobalConfig`; introduce a temporary shim feeding the (still-alive) render path until Phase C deletes its consumers; update `resolver.go` to drop `resolveProvider` and the resolved `Provider` field
-- [ ] 1.4 Rewrite `templates.go`: scalar-only `DefaultConfigTemplate`; new `DefaultPlatformTemplate` seeding `opmodel.dev/catalogs/opm` (`>=1.0.0-0 <2.0.0-0`) and `opmodel.dev/catalogs/kubernetes` (`>=1.1.0-0 <2.0.0-0`); delete `DefaultModuleTemplate`
-- [ ] 1.5 Rework `opm config init`: write `config.cue` + `platform.cue`, no `cue.mod/`, no tidy; update init tests
-- [ ] 1.6 Add the embedded platform projection schema (name, type, registry map with enable/filter.range/allow/deny; no imports allowed) in `internal/config/schema/`
-- [ ] 1.7 Rework `opm config vet`: validate both files; missing `platform.cue` is a note, not a failure; stale `providers`/`cue.mod` produces the migration hint; update vet tests
-- [ ] 1.8 Update `config` unit tests for single-pass load and removed fields; `task check` green
+- [x] 1.1 Shrink the embedded config schema (`internal/config/schema/config.cue`): remove `providers` and `cacheDir`; validation error for a present `providers:` field names the removed field and hints `opm config init`
+- [x] 1.2 Collapse `config.Load` to single-pass: delete `BootstrapRegistry`, `configHasProviders`, `extractProviders`, and the `CUE_REGISTRY` staging; registry resolves by ordinary flag > env > config precedence after parse
+- [x] 1.3 (amended during implementation) Keep `Providers`/`CueContext` on `GlobalConfig` as documented legacy-shim fields — `config.Load` never populates `Providers` — instead of dropping them now: dropping in Phase A would force rewiring every render-path consumer twice. The fields, `resolveProvider`, and the resolved `Provider` field are deleted in Phase C (task 3.6) together with their consumers
+- [x] 1.4 Rewrite `templates.go`: scalar-only `DefaultConfigTemplate`; new `DefaultPlatformTemplate` seeding `opmodel.dev/catalogs/opm` (`>=1.0.0-0 <2.0.0-0`) and `opmodel.dev/catalogs/kubernetes` (`>=1.1.0-0 <2.0.0-0`); delete `DefaultModuleTemplate`
+- [x] 1.5 Rework `opm config init`: write `config.cue` + `platform.cue`, no `cue.mod/`, no tidy; update init tests
+- [x] 1.6 Add the embedded platform projection schema (name, type, registry map with enable/filter.range/allow/deny; no imports allowed) in `internal/config/schema/`
+- [x] 1.7 Rework `opm config vet`: validate both files; missing `platform.cue` is a note, not a failure; stale `providers`/`cue.mod` produces the migration hint; update vet tests
+- [x] 1.8 Update `config` unit tests for single-pass load and removed fields; `task check` green
 
 ## 2. Phase B — platform resolution (D11/D12/D17/D21/D22)
 
@@ -28,7 +28,7 @@ Phases mirror design.md's migration plan: A (config, D39) → B (platform) → C
 - [ ] 3.3 Rewire `internal/workflow/render`: instance-file path via kernel instance loading + `ProcessModuleInstance`; module-dir path via `LoadModulePackage` + `SynthesizeInstance`; registry refs via `AcquireModuleFromRegistry`; values resolution feeds a `cue.Value` (adapter or kernel `Source`s per design LD2); runtime identity `opm-cli`
 - [ ] 3.4 Rewire synthesis (`opm module build` / `opm instance build <dir>`): kernel `SynthesizeInstance`, emitted kind `ModuleInstance`, no synthetic wrapper module, no `#ModuleRelease`/`modulerelease@v1` references anywhere in production code
 - [ ] 3.5 Rewire `internal/workflow/apply` to consume kernel results (resources + digests) with the existing SSA apply/prune/CR-status flow untouched
-- [ ] 3.6 Delete `pkg/render`, `pkg/provider`, `pkg/loader`'s provider/synth/match code, and the Phase A shim; remove the `--provider` flag; fix all compile errors by rewiring callers to kernel/workflow seams
+- [ ] 3.6 Delete `pkg/render`, `pkg/provider`, `pkg/loader`'s provider/synth/match code, and the Phase A shim fields (`GlobalConfig.Providers`/`CueContext`, `resolveProvider`, resolved `Provider`); remove the `--provider` flag; fix all compile errors by rewiring callers to kernel/workflow seams
 - [ ] 3.7 Update/retire tests of deleted packages; adapt `internal/workflow` tests to kernel fixtures; `task check` green
 - [ ] 3.8 Update `mod vet` / `instance vet` paths to kernel validation (`ValidateModuleValues*` / `ProcessModuleInstance` concreteness), preserving debugValues selection behavior
 

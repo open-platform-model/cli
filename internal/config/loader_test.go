@@ -11,123 +11,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBootstrapRegistry_NoFile(t *testing.T) {
-	registry, err := BootstrapRegistry("/nonexistent/path/config.cue")
-	require.NoError(t, err)
-	assert.Empty(t, registry)
-}
-
-func TestBootstrapRegistry_NoRegistryInFile(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "bootstrap-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	configPath := filepath.Join(tmpDir, "config.cue")
-	content := `package config
-
-kubernetes: {
-    namespace: "default"
-}
-`
-	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
-
-	registry, err := BootstrapRegistry(configPath)
-	require.NoError(t, err)
-	assert.Empty(t, registry)
-}
-
-func TestBootstrapRegistry_WithRegistry(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "bootstrap-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	configPath := filepath.Join(tmpDir, "config.cue")
-	content := `package config
-
-registry: "localhost:5001"
-
-kubernetes: {
-    namespace: "default"
-}
-`
-	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
-
-	registry, err := BootstrapRegistry(configPath)
-	require.NoError(t, err)
-	assert.Equal(t, "localhost:5001", registry)
-}
-
-func TestBootstrapRegistry_RegistryInConfigStruct(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "bootstrap-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	configPath := filepath.Join(tmpDir, "config.cue")
-	content := `package config
-
-config: {
-    registry: "registry.example.com"
-    kubernetes: {
-        namespace: "default"
-    }
-}
-`
-	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
-
-	registry, err := BootstrapRegistry(configPath)
-	require.NoError(t, err)
-	assert.Equal(t, "registry.example.com", registry)
-}
-
-func TestConfigHasProviders_NoFile(t *testing.T) {
-	has, err := configHasProviders("/nonexistent/path/config.cue")
-	require.NoError(t, err)
-	assert.False(t, has)
-}
-
-func TestConfigHasProviders_NoProviders(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "provider-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	configPath := filepath.Join(tmpDir, "config.cue")
-	content := `package config
-
-registry: "localhost:5001"
-`
-	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
-
-	has, err := configHasProviders(configPath)
-	require.NoError(t, err)
-	assert.False(t, has)
-}
-
-func TestConfigHasProviders_WithProviders(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "provider-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	configPath := filepath.Join(tmpDir, "config.cue")
-	content := `package config
-
-registry: "localhost:5001"
-
-providers: {
-    kubernetes: something
-}
-`
-	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
-
-	has, err := configHasProviders(configPath)
-	require.NoError(t, err)
-	assert.True(t, has)
+// writeConfig writes content as config.cue in a fresh temp dir and returns
+// its path.
+func writeConfig(t *testing.T, content string) string {
+	t.Helper()
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.cue")
+	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o600))
+	return configPath
 }
 
 func TestLoad_NoConfigFile(t *testing.T) {
 	// Use a temp home dir that doesn't have .opm
-	tmpHome, err := os.MkdirTemp("", "opm-load-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpHome)
+	tmpHome := t.TempDir()
 
 	origHome := os.Getenv("HOME")
 	os.Setenv("HOME", tmpHome)
@@ -138,17 +34,18 @@ func TestLoad_NoConfigFile(t *testing.T) {
 	os.Unsetenv("OPM_CONFIG")
 
 	var cfg GlobalConfig
-	err = Load(&cfg, LoaderOptions{})
+	err := Load(&cfg, LoaderOptions{})
 	require.NoError(t, err)
 
 	// Should populate with defaults (empty registry when no config or env)
 	assert.Empty(t, cfg.Registry)
+	assert.Equal(t, "~/.kube/config", cfg.Kubernetes.Kubeconfig)
+	assert.Equal(t, "default", cfg.Kubernetes.Namespace)
+	assert.Equal(t, APIWarningsWarn, cfg.Log.Kubernetes.APIWarnings)
 }
 
 func TestLoad_WithRegistryEnv(t *testing.T) {
-	tmpHome, err := os.MkdirTemp("", "opm-load-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpHome)
+	tmpHome := t.TempDir()
 
 	origHome := os.Getenv("HOME")
 	os.Setenv("HOME", tmpHome)
@@ -159,16 +56,14 @@ func TestLoad_WithRegistryEnv(t *testing.T) {
 	os.Unsetenv("OPM_CONFIG")
 
 	var cfg GlobalConfig
-	err = Load(&cfg, LoaderOptions{})
+	err := Load(&cfg, LoaderOptions{})
 	require.NoError(t, err)
 
 	assert.Equal(t, "env-registry.example.com", cfg.Registry)
 }
 
 func TestLoad_RegistryFlagPrecedence(t *testing.T) {
-	tmpHome, err := os.MkdirTemp("", "opm-load-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpHome)
+	tmpHome := t.TempDir()
 
 	origHome := os.Getenv("HOME")
 	os.Setenv("HOME", tmpHome)
@@ -179,7 +74,7 @@ func TestLoad_RegistryFlagPrecedence(t *testing.T) {
 	os.Unsetenv("OPM_CONFIG")
 
 	var cfg GlobalConfig
-	err = Load(&cfg, LoaderOptions{
+	err := Load(&cfg, LoaderOptions{
 		RegistryFlag: "flag-registry.example.com",
 	})
 	require.NoError(t, err)
@@ -188,29 +83,33 @@ func TestLoad_RegistryFlagPrecedence(t *testing.T) {
 	assert.Equal(t, "flag-registry.example.com", cfg.Registry)
 }
 
-func TestExtractConfig_Empty(t *testing.T) {
-	// This test verifies default values are returned for empty CUE value
-	// In practice, extractConfig is called with loaded CUE values
-}
+func TestLoad_RegistryFromConfigFile(t *testing.T) {
+	// Single-pass: the registry comes out of the parsed file, no bootstrap
+	// pre-pass. The package clause must be accepted (existing user files
+	// carry one).
+	configPath := writeConfig(t, `package config
 
-func TestExtractConfig_LogTimestampsFalse(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "log-config-test-*")
+config: {
+	registry: "registry.example.com"
+	kubernetes: {
+		namespace: "default"
+	}
+}
+`)
+
+	os.Unsetenv("OPM_REGISTRY")
+
+	var cfg GlobalConfig
+	err := Load(&cfg, LoaderOptions{ConfigFlag: configPath})
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
 
-	// Create a minimal CUE module
-	modDir := filepath.Join(tmpDir, "cue.mod")
-	require.NoError(t, os.MkdirAll(modDir, 0o755))
-	modCue := `module: "test.local/config@v0"
-
-language: {
-	version: "v0.15.0"
+	assert.Equal(t, "registry.example.com", cfg.Registry)
 }
-`
-	require.NoError(t, os.WriteFile(filepath.Join(modDir, "module.cue"), []byte(modCue), 0o644))
 
-	configPath := filepath.Join(tmpDir, "config.cue")
-	content := `package config
+func TestLoadConfigFile_LogTimestampsFalse(t *testing.T) {
+	// No cue.mod needed: the config file is import-free data parsed in a
+	// single pass.
+	configPath := writeConfig(t, `package config
 
 config: {
 	log: {
@@ -221,34 +120,17 @@ config: {
 		namespace: "default"
 	}
 }
-`
-	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
+`)
 
 	var cfg GlobalConfig
-	err = loadFullConfig(&cfg, configPath, "")
+	_, err := loadConfigFile(&cfg, configPath)
 	require.NoError(t, err)
 	require.NotNil(t, cfg.Log.Timestamps, "Log.Timestamps should not be nil")
 	assert.False(t, *cfg.Log.Timestamps, "Log.Timestamps should be false")
 }
 
-func TestExtractConfig_NoLogSection(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "log-config-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// Create a minimal CUE module
-	modDir := filepath.Join(tmpDir, "cue.mod")
-	require.NoError(t, os.MkdirAll(modDir, 0o755))
-	modCue := `module: "test.local/config@v0"
-
-language: {
-	version: "v0.15.0"
-}
-`
-	require.NoError(t, os.WriteFile(filepath.Join(modDir, "module.cue"), []byte(modCue), 0o644))
-
-	configPath := filepath.Join(tmpDir, "config.cue")
-	content := `package config
+func TestLoadConfigFile_NoLogSection(t *testing.T) {
+	configPath := writeConfig(t, `package config
 
 config: {
 	kubernetes: {
@@ -256,33 +138,16 @@ config: {
 		namespace: "default"
 	}
 }
-`
-	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
+`)
 
 	var cfg GlobalConfig
-	err = loadFullConfig(&cfg, configPath, "")
+	_, err := loadConfigFile(&cfg, configPath)
 	require.NoError(t, err)
-	assert.Nil(t, cfg.Log.Timestamps, "Log.Timestamps should be nil when not configured (defaults handled by caller)")
+	assert.Nil(t, cfg.Log.Timestamps, "Log.Timestamps should be nil when not configured")
 }
 
-func TestExtractConfig_LogTimestampsInvalidType(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "log-config-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// Create a minimal CUE module
-	modDir := filepath.Join(tmpDir, "cue.mod")
-	require.NoError(t, os.MkdirAll(modDir, 0o755))
-	modCue := `module: "test.local/config@v0"
-
-language: {
-	version: "v0.15.0"
-}
-`
-	require.NoError(t, os.WriteFile(filepath.Join(modDir, "module.cue"), []byte(modCue), 0o644))
-
-	configPath := filepath.Join(tmpDir, "config.cue")
-	content := `package config
+func TestLoadConfigFile_LogTimestampsInvalidType(t *testing.T) {
+	configPath := writeConfig(t, `package config
 
 config: {
 	log: {
@@ -293,14 +158,38 @@ config: {
 		namespace: "default"
 	}
 }
-`
-	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
+`)
 
-	var cfg2 GlobalConfig
-	err = loadFullConfig(&cfg2, configPath, "")
+	var cfg GlobalConfig
+	_, err := loadConfigFile(&cfg, configPath)
 	// Schema validation should catch the type error (string instead of bool)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "schema validation")
+}
+
+func TestLoadConfigFile_ReturnsRegistry(t *testing.T) {
+	configPath := writeConfig(t, `package config
+
+config: {
+	registry: "localhost:5001"
+}
+`)
+
+	var cfg GlobalConfig
+	registry, err := loadConfigFile(&cfg, configPath)
+	require.NoError(t, err)
+	assert.Equal(t, "localhost:5001", registry)
+}
+
+func TestLoadConfigFile_DefaultTemplateIsValid(t *testing.T) {
+	// The template written by `opm config init` must load cleanly.
+	configPath := writeConfig(t, DefaultConfigTemplate)
+
+	var cfg GlobalConfig
+	registry, err := loadConfigFile(&cfg, configPath)
+	require.NoError(t, err)
+	assert.Equal(t, DefaultRegistry, registry)
+	assert.Equal(t, "default", cfg.Kubernetes.Namespace)
 }
 
 func TestExtractConfig_LogKubernetesAPIWarnings(t *testing.T) {
@@ -374,7 +263,7 @@ config: {
 
 			var cfg GlobalConfig
 			extractConfigInto(&cfg, value)
-			// Apply the same default as loadFullConfig does
+			// Apply the same default as loadConfigFile does
 			if cfg.Log.Kubernetes.APIWarnings == "" {
 				cfg.Log.Kubernetes.APIWarnings = "warn"
 			}
@@ -406,18 +295,13 @@ func TestValidateConfigSchema_ValidFull(t *testing.T) {
 
 config: {
 	registry: "opmodel.dev=localhost:5000+insecure,registry.cue.works"
-	cacheDir: "/tmp/cache"
-	
-	providers: {
-		kubernetes: {}
-	}
-	
+
 	kubernetes: {
 		kubeconfig: "~/.kube/config"
 		context: "prod"
 		namespace: "my-app"
 	}
-	
+
 	log: {
 		timestamps: true
 		kubernetes: {
@@ -431,6 +315,50 @@ config: {
 
 	err := validateConfigSchema(ctx, value, "test-config.cue")
 	assert.NoError(t, err)
+}
+
+func TestValidateConfigSchema_ProvidersRejected(t *testing.T) {
+	// The providers field was removed by enhancement 0006 D39. A pre-D39
+	// config must fail with a migration hint naming the removed field.
+	ctx := cuecontext.New()
+	configCUE := `package config
+
+config: {
+	registry: "localhost:5000"
+	providers: {
+		kubernetes: {}
+	}
+	kubernetes: {
+		namespace: "default"
+	}
+}
+`
+	value := ctx.CompileString(configCUE)
+	require.NoError(t, value.Err())
+
+	err := validateConfigSchema(ctx, value, "test-config.cue")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "providers")
+	assert.Contains(t, err.Error(), "opm config init")
+}
+
+func TestValidateConfigSchema_CacheDirRejected(t *testing.T) {
+	ctx := cuecontext.New()
+	configCUE := `package config
+
+config: {
+	cacheDir: "/tmp/cache"
+	kubernetes: {
+		namespace: "default"
+	}
+}
+`
+	value := ctx.CompileString(configCUE)
+	require.NoError(t, value.Err())
+
+	err := validateConfigSchema(ctx, value, "test-config.cue")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cacheDir")
 }
 
 func TestValidateConfigSchema_UnknownField(t *testing.T) {

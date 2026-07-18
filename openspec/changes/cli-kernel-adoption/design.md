@@ -89,7 +89,7 @@ Its motivation (running `cue mod tidy` for `~/.opm`) is deleted by D39. This cha
 
 ## Migration Plan
 
-1. Phase A (config, D39): shrink schema + loader, delete provider machinery **except** the render path's consumption (temporarily feed render from a shim), retire templates/cue.mod. — *Note: `providers` consumption by render means Phase A and Phase C cannot be fully independent; Phase A removes init/vet/schema surface, Phase C deletes the last consumers.*
+1. Phase A (config, D39): shrink schema + loader, retire templates/cue.mod/tidy (and the now-dead `internal/cuetidy`). *Implemented deviation:* `GlobalConfig.Providers`/`CueContext` stay as documented legacy-shim fields (never populated) rather than being dropped — dropping them in A would force rewiring every render-path consumer twice; Phase C deletes fields + consumers together.
 2. Phase B (platform): `internal/platform` + `platform.cue` schema + `--platform` flag + provenance reporting + write-if-absent.
 3. Phase C (kernel): add `library` dep, rewire render/build/diff/apply through the kernel, delete `pkg/render`/`pkg/provider`/loader match+synth, retire `--provider`.
 4. Phase D (parity + cleanup): source-digest upgrade, D30 parity integration test, docs, 0006 history event.

@@ -76,12 +76,18 @@ type GlobalConfig struct {
 	ConfigPath string
 
 	// Providers maps provider names to their loaded CUE definitions.
-	// Key: provider alias (e.g., "kubernetes")
-	// Value: loaded CUE value referencing the provider's #Provider definition
+	//
+	// Legacy shim: the providers concept is retired (enhancement 0006 D39);
+	// config.Load never populates this. The field survives only for the
+	// legacy render path and is deleted with kernel adoption (0006 C2
+	// Phase C), together with its consumers.
 	Providers map[string]cue.Value
 
-	// CueContext is the CUE context used to load providers and other CUE-backed inputs.
-	// Shared with module loader to ensure all values are from the same runtime.
+	// CueContext is the CUE context used for CUE-backed inputs.
+	//
+	// Legacy shim: the per-invocation library kernel owns the CUE context
+	// after kernel adoption (0006 C2 Phase C); this field is deleted with
+	// it.
 	CueContext *cue.Context
 
 	// Flags holds the raw CLI flag values as set by the user.
