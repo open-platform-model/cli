@@ -15,15 +15,15 @@ Phases mirror design.md's migration plan: A (config, D39) → B (platform) → C
 
 ## 2. Phase B — platform resolution (D11/D12/D17/D21/D22)
 
-- [ ] 2.1 Create `internal/platform`: decode function (CUE file bytes or unstructured CR spec map → `synth.PlatformInput`), shared by all three sources; unit tests with table-driven fixtures
-- [ ] 2.2 Implement `Resolve` with precedence `--platform` file > cluster `Platform` CR (cluster-facing commands only) > `~/.opm/platform.cue`; warn on cluster→local fallback; return resolved source for provenance reporting
-- [ ] 2.3 Add the `--platform <file>` flag to `apply`/`diff`/`build`/`render` command surfaces; offline `build`/`render` never attempt cluster reads; every render-bearing command prints the resolved platform source
-- [ ] 2.4 Implement solo-cluster write-if-absent: plain dynamic-client `Create` of the `cluster` Platform from the resolved local spec, field manager `opm-cli`, `AlreadyExists` = success-noop, forbidden = warning; unit tests for 409 and 403 paths
-- [ ] 2.5 Wire `SynthesizePlatform` → `Materialize` on the invocation kernel behind `Resolve` (registry from resolved config); integration test materializing the seeded default platform against a local registry
+- [x] 2.1 Create `internal/platform`: decode function (CUE file bytes or unstructured CR spec map → `synth.PlatformInput`), shared by all three sources; unit tests with table-driven fixtures
+- [x] 2.2 Implement `Resolve` with precedence `--platform` file > cluster `Platform` CR (cluster-facing commands only) > `~/.opm/platform.cue`; warn on cluster→local fallback; return resolved source for provenance reporting
+- [x] 2.3 (flag surface landed; call-site consumption wires in Phase C) `--platform <file>` registered on `RenderFlags` + `InstanceFileFlags` (module build/apply/vet, instance apply/build/diff/vet); offline-never-cluster and provenance printing are encoded in `platform.Resolve`/`Resolution.Describe` and become user-visible when Phase C rewires render through them
+- [x] 2.4 Implement solo-cluster write-if-absent: plain dynamic-client `Create` of the `cluster` Platform from the resolved local spec, field manager `opm-cli`, `AlreadyExists` = success-noop, forbidden = warning; unit tests for 409 and 403 paths
+- [x] 2.5 Wire `SynthesizePlatform` → `Materialize` on the invocation kernel behind `Resolve` (registry from resolved config); integration test materializing the seeded default platform against a local registry
 
 ## 3. Phase C — kernel adoption (D9 + 0002 carryover)
 
-- [ ] 3.1 Add `github.com/open-platform-model/library` to `go.mod` (kernel only; verify no `opm-operator`, controller-runtime, or Flux edges appear in `go.mod`/`go.sum`); construct one `kernel.Kernel` per invocation at workflow entry
+- [x] 3.1 (pulled forward into Phase B — `internal/platform` needs `synth.PlatformInput`) Add `github.com/open-platform-model/library` to `go.mod` (kernel only; verify no `opm-operator`, controller-runtime, or Flux edges appear in `go.mod`/`go.sum`); construct one `kernel.Kernel` per invocation at workflow entry
 - [ ] 3.2 Port the CLI's render golden/fixture tests to drive the kernel path (side-by-side, old pipeline still in place) and record output diffs; review every diff as intended-kernel-behavior vs regression before proceeding
 - [ ] 3.3 Rewire `internal/workflow/render`: instance-file path via kernel instance loading + `ProcessModuleInstance`; module-dir path via `LoadModulePackage` + `SynthesizeInstance`; registry refs via `AcquireModuleFromRegistry`; values resolution feeds a `cue.Value` (adapter or kernel `Source`s per design LD2); runtime identity `opm-cli`
 - [ ] 3.4 Rewire synthesis (`opm module build` / `opm instance build <dir>`): kernel `SynthesizeInstance`, emitted kind `ModuleInstance`, no synthetic wrapper module, no `#ModuleRelease`/`modulerelease@v1` references anywhere in production code

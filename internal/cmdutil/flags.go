@@ -17,6 +17,10 @@ type RenderFlags struct {
 	Namespace    string
 	InstanceName string
 	Provider     string
+	// Platform is the --platform local override file (0006 D21; highest
+	// platform-source precedence). Supersedes --provider, which is retired
+	// with kernel adoption (0006 C2 Phase C).
+	Platform string
 }
 
 // AddTo registers the render flags on the given cobra command.
@@ -29,6 +33,8 @@ func (f *RenderFlags) AddTo(cmd *cobra.Command) {
 		"Instance name (default: module name)") // Was: --release-name (enhancement 0002 D-X4.2)
 	cmd.Flags().StringVar(&f.Provider, "provider", "",
 		"Provider to use (default: from config)")
+	cmd.Flags().StringVar(&f.Platform, "platform", "",
+		"Path to a local platform file (overrides the cluster Platform and ~/.opm/platform.cue)")
 }
 
 // K8sFlags holds flags for Kubernetes cluster connection
@@ -104,6 +110,10 @@ type InstanceFileFlags struct {
 	// Values are additional values CUE files (-f/--values flag).
 	// When empty, values.cue next to the instance file is used if it exists.
 	Values []string
+	// Platform is the --platform local override file (0006 D21; highest
+	// platform-source precedence). Supersedes --provider, which is retired
+	// with kernel adoption (0006 C2 Phase C).
+	Platform string
 }
 
 // AddTo registers the instance file flags on the given cobra command.
@@ -112,6 +122,8 @@ func (f *InstanceFileFlags) AddTo(cmd *cobra.Command) {
 		"Provider to use (default: from config)")
 	cmd.Flags().StringArrayVarP(&f.Values, "values", "f", nil,
 		"Additional values files (can be repeated; default: values.cue next to the instance file)")
+	cmd.Flags().StringVar(&f.Platform, "platform", "",
+		"Path to a local platform file (overrides the cluster Platform and ~/.opm/platform.cue)")
 }
 
 // uuidPattern matches a UUID v4/v5: 8-4-4-4-12 lowercase hex digits.
