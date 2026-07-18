@@ -4,6 +4,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/library/opm/compile"
+	"github.com/open-platform-model/library/opm/helper/synth"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/config"
@@ -23,6 +24,11 @@ type Result struct {
 	// Platform is the resolved platform-source provenance (0006 D21). The
 	// apply workflow uses it for the D12 write-if-absent decision.
 	Platform platform.Resolution
+
+	// PlatformSpec is the resolved (pre-materialize) platform input the
+	// render consumed — the exact document the D12 write-if-absent seeds,
+	// with no re-read of the platform file at apply time.
+	PlatformSpec synth.PlatformInput
 
 	// RenderDigest is the operator-parity render digest computed over the
 	// kernel-compiled resources (CUE-value serialization, operator sort

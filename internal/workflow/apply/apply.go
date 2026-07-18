@@ -156,13 +156,12 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		// Solo-cluster Platform seeding (0006 D12/D22): when the render fell
 		// back from the cluster to the local default platform, seed the
 		// singleton cluster Platform write-if-absent so the operator adopts
-		// it on install. Best-effort — Ensure degrades on RBAC and no-ops on
-		// AlreadyExists; only unexpected errors surface as warnings.
+		// it on install. The seeded document is the exact resolved spec the
+		// render consumed (Result.PlatformSpec — no file re-read, no TOCTOU).
+		// Best-effort — Ensure degrades on RBAC and no-ops on AlreadyExists;
+		// only unexpected errors surface as warnings.
 		if result.Platform.Source == platform.SourceLocalDefault && result.Platform.Warning != "" {
-			in, decodeErr := platform.DecodeFile(result.Platform.Location)
-			if decodeErr != nil {
-				instanceLog.Warn("could not seed cluster Platform: re-reading local platform file", "error", decodeErr)
-			} else if seedErr := platform.EnsureClusterPlatform(ctx, req.K8sClient.Dynamic, in); seedErr != nil {
+			if seedErr := platform.EnsureClusterPlatform(ctx, req.K8sClient.Dynamic, result.PlatformSpec); seedErr != nil {
 				instanceLog.Warn("could not seed cluster Platform", "error", seedErr)
 			}
 		}

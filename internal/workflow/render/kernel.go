@@ -6,6 +6,7 @@ import (
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
+	"github.com/open-platform-model/library/opm/helper/synth"
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/materialize"
 	"github.com/open-platform-model/library/opm/schema"
@@ -36,6 +37,10 @@ type renderEnv struct {
 	kernel     *kernel.Kernel
 	platform   *materialize.MaterializedPlatform
 	resolution platform.Resolution
+	// input is the resolved (pre-materialize) platform spec — carried onto
+	// Result so the apply workflow can seed the cluster Platform without
+	// re-reading the file (no second I/O, no TOCTOU).
+	input synth.PlatformInput
 }
 
 // resolvePlatformEnv resolves the platform by precedence (D11/D21), reports
@@ -59,5 +64,5 @@ func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.Globa
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("materializing platform (source %s): %w", res.Source, err)}
 	}
 
-	return &renderEnv{kernel: k, platform: mp, resolution: res}, nil
+	return &renderEnv{kernel: k, platform: mp, resolution: res, input: in}, nil
 }

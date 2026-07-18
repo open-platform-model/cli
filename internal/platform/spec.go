@@ -10,10 +10,6 @@ package platform
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-
-	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/cuecontext"
 
 	"github.com/open-platform-model/library/opm/helper/synth"
 
@@ -69,21 +65,12 @@ func (w wireSpec) toInput() synth.PlatformInput {
 }
 
 // DecodeFile validates the platform file at path (data-only, embedded
-// projection schema — config.ValidatePlatformFile) and decodes it into a
-// synth.PlatformInput.
+// projection schema — config.LoadPlatformFile, one read/compile) and
+// decodes it into a synth.PlatformInput.
 func DecodeFile(path string) (synth.PlatformInput, error) {
-	if err := config.ValidatePlatformFile(path); err != nil {
-		return synth.PlatformInput{}, err
-	}
-
-	content, err := os.ReadFile(path)
+	value, err := config.LoadPlatformFile(path)
 	if err != nil {
-		return synth.PlatformInput{}, fmt.Errorf("reading platform file: %w", err)
-	}
-
-	value := cuecontext.New().CompileBytes(content, cue.Filename(path))
-	if value.Err() != nil {
-		return synth.PlatformInput{}, fmt.Errorf("compiling platform file %s: %w", path, value.Err())
+		return synth.PlatformInput{}, err
 	}
 
 	var w wireSpec

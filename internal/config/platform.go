@@ -26,22 +26,30 @@ func PlatformFilePath(configPath string) string {
 }
 
 // ValidatePlatformFile parses and validates the platform file at path
-// against the embedded #PlatformFile projection schema. The file MUST be
+// against the embedded #PlatformFile projection schema. See LoadPlatformFile.
+func ValidatePlatformFile(path string) error {
+	_, err := LoadPlatformFile(path)
+	return err
+}
+
+// LoadPlatformFile parses and validates the platform file at path against
+// the embedded #PlatformFile projection schema and returns the compiled
+// value, so callers decode without a second read/compile. The file MUST be
 // data-only: any CUE import declaration is rejected (enhancement 0006 D39).
 //
-// The caller decides how a missing file is handled; ValidatePlatformFile
+// The caller decides how a missing file is handled; LoadPlatformFile
 // returns the os.Stat error untouched when the file does not exist.
-func ValidatePlatformFile(path string) error {
+func LoadPlatformFile(path string) (cue.Value, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return cue.Value{}, err
 	}
 
 	// Reject imports before evaluation: the local platform file is data
 	// only. Parsing is cheap and gives a precise, early error.
 	astFile, err := parser.ParseFile(path, content)
 	if err != nil {
-		return &oerrors.DetailError{
+		return cue.Value{}, &oerrors.DetailError{
 			Type:     platformFileErrType,
 			Message:  err.Error(),
 			Location: path,
@@ -50,7 +58,7 @@ func ValidatePlatformFile(path string) error {
 		}
 	}
 	if fileHasImports(astFile) {
-		return &oerrors.DetailError{
+		return cue.Value{}, &oerrors.DetailError{
 			Type:     platformFileErrType,
 			Message:  "the local platform file must be data-only — CUE imports are not allowed",
 			Location: path,
@@ -62,7 +70,7 @@ func ValidatePlatformFile(path string) error {
 	ctx := cuecontext.New()
 	value := ctx.CompileBytes(content, cue.Filename(path))
 	if value.Err() != nil {
-		return &oerrors.DetailError{
+		return cue.Value{}, &oerrors.DetailError{
 			Type:     platformFileErrType,
 			Message:  value.Err().Error(),
 			Location: path,
@@ -73,16 +81,16 @@ func ValidatePlatformFile(path string) error {
 
 	schema := ctx.CompileBytes(platformSchemaCUE, cue.Filename("schema/platform.cue"))
 	if schema.Err() != nil {
-		return fmt.Errorf("compiling embedded platform schema: %w", schema.Err())
+		return cue.Value{}, fmt.Errorf("compiling embedded platform schema: %w", schema.Err())
 	}
 	def := schema.LookupPath(cue.ParsePath("#PlatformFile"))
 	if !def.Exists() {
-		return fmt.Errorf("embedded schema missing #PlatformFile definition")
+		return cue.Value{}, fmt.Errorf("embedded schema missing #PlatformFile definition")
 	}
 
 	unified := def.Unify(value)
 	if err := unified.Validate(cue.Concrete(true)); err != nil {
-		return &oerrors.DetailError{
+		return cue.Value{}, &oerrors.DetailError{
 			Type:     "platform schema validation failed",
 			Message:  err.Error(),
 			Location: path,
@@ -91,7 +99,7 @@ func ValidatePlatformFile(path string) error {
 		}
 	}
 
-	return nil
+	return value, nil
 }
 
 // fileHasImports reports whether the parsed CUE file contains any import
