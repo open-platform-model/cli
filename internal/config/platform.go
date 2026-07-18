@@ -95,7 +95,8 @@ func ValidatePlatformFile(path string) error {
 }
 
 // fileHasImports reports whether the parsed CUE file contains any import
-// declaration.
+// declaration. Shared by the config and platform file loaders: both ~/.opm
+// files are data-only by contract (enhancement 0006 D39).
 func fileHasImports(f *ast.File) bool {
 	for _, decl := range f.Decls {
 		if _, ok := decl.(*ast.ImportDecl); ok {

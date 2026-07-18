@@ -95,6 +95,11 @@ func DecodeFile(path string) (synth.PlatformInput, error) {
 
 // DecodeCRSpec decodes a cluster Platform CR's spec (as an unstructured map)
 // into a synth.PlatformInput. name is the CR's metadata.name.
+//
+// Deliberately lighter validation than DecodeFile: the CR spec was already
+// admitted by the CRD's OpenAPI schema server-side, so only the one field the
+// CRD cannot default (spec.type) is re-checked here. Shape errors that slip
+// through surface from Materialize.
 func DecodeCRSpec(spec map[string]any, name string) (synth.PlatformInput, error) {
 	// JSON round-trip: the CR spec is the same wire shape, produced by the
 	// CRD's serialization, so this is an explicit, lossless mapping.

@@ -8,6 +8,7 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/cue/parser"
 
 	"github.com/open-platform-model/cli/internal/output"
 	oerrors "github.com/open-platform-model/cli/pkg/errors"
@@ -15,6 +16,10 @@ import (
 
 // defaultKubeconfig is the built-in kubeconfig path default.
 const defaultKubeconfig = "~/.kube/config"
+
+// configErrType is the DetailError type used for config file parse/load
+// failures.
+const configErrType = "configuration error"
 
 // LoaderOptions contains options for loading configuration.
 type LoaderOptions struct {
@@ -92,10 +97,33 @@ func loadConfigFile(cfg *GlobalConfig, configPath string) (string, error) {
 		return "", fmt.Errorf("reading config file: %w", err)
 	}
 
+	// Data-only contract (D39): reject CUE imports before evaluation, the
+	// same guard ValidatePlatformFile applies to platform.cue. CompileBytes
+	// would happily resolve stdlib imports otherwise.
+	astFile, err := parser.ParseFile(configPath, content)
+	if err != nil {
+		return "", &oerrors.DetailError{
+			Type:     configErrType,
+			Message:  err.Error(),
+			Location: configPath,
+			Hint:     "Run 'opm config vet' to check for configuration errors",
+			Cause:    oerrors.ErrValidation,
+		}
+	}
+	if fileHasImports(astFile) {
+		return "", &oerrors.DetailError{
+			Type:     configErrType,
+			Message:  "the config file must be data-only — CUE imports are not allowed",
+			Location: configPath,
+			Hint:     "Remove the import declarations (config.cue is scalar data since 0006 D39); re-run 'opm config init' for a fresh template",
+			Cause:    oerrors.ErrValidation,
+		}
+	}
+
 	value := ctx.CompileBytes(content, cue.Filename(configPath))
 	if value.Err() != nil {
 		return "", &oerrors.DetailError{
-			Type:     "configuration error",
+			Type:     configErrType,
 			Message:  value.Err().Error(),
 			Location: configPath,
 			Hint:     "Run 'opm config vet' to check for configuration errors",

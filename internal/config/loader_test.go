@@ -436,3 +436,21 @@ config: {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "schema validation failed")
 }
+
+func TestLoadConfigFile_ImportsRejected(t *testing.T) {
+	// Data-only contract (0006 D39): even CUE stdlib imports are rejected,
+	// mirroring the platform-file guard.
+	configPath := writeConfig(t, `package config
+
+import "strings"
+
+config: {
+	registry: strings.ToLower("LOCALHOST:5000")
+}
+`)
+
+	var cfg GlobalConfig
+	_, err := loadConfigFile(&cfg, configPath)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "data-only")
+}

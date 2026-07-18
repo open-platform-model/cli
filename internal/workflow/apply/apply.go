@@ -160,10 +160,10 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		// AlreadyExists; only unexpected errors surface as warnings.
 		if result.Platform.Source == platform.SourceLocalDefault && result.Platform.Warning != "" {
 			in, decodeErr := platform.DecodeFile(result.Platform.Location)
-			if decodeErr == nil {
-				if seedErr := platform.EnsureClusterPlatform(ctx, req.K8sClient.Dynamic, in); seedErr != nil {
-					instanceLog.Warn("could not seed cluster Platform", "error", seedErr)
-				}
+			if decodeErr != nil {
+				instanceLog.Warn("could not seed cluster Platform: re-reading local platform file", "error", decodeErr)
+			} else if seedErr := platform.EnsureClusterPlatform(ctx, req.K8sClient.Dynamic, in); seedErr != nil {
+				instanceLog.Warn("could not seed cluster Platform", "error", seedErr)
 			}
 		}
 	}
@@ -385,11 +385,14 @@ func FormatApplySummary(r *kubernetes.ApplyResult) string {
 }
 
 // sourceDigest returns a deterministic digest identifying the module source of
-// this apply, derived from the canonical module reference (path@version). This
-// is byte-identical to the operator's ModuleSourceDigest (opm-operator
-// internal/status): on the CUE-native resolution path BOTH actors use the
-// reference-identity digest — there is no Flux artifact content digest here.
-// Do not change one side without the other.
+// this apply, derived from the canonical module reference (path@version). For
+// any non-empty reference this is byte-identical to the operator's
+// ModuleSourceDigest (opm-operator internal/status): on the CUE-native
+// resolution path BOTH actors use the reference-identity digest — there is no
+// Flux artifact content digest here. Do not change one side without the
+// other. The empty-reference guard below is CLI-only (omits the status field
+// instead of hashing "@"); D6 guarantees a non-empty canonical reference on
+// every real apply, so the divergence is unreachable in practice.
 func sourceDigest(modulePath, moduleVersion string) string {
 	if modulePath == "" && moduleVersion == "" {
 		return ""

@@ -74,23 +74,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	// Synthetic identity: caller-supplied name or "<module.metadata.name>-debug";
-	// namespace from --namespace/env override, else "default".
-	modName := ""
-	if mod.Metadata != nil {
-		modName = mod.Metadata.Name
-	}
-	if modName == "" {
-		modName = filepath.Base(opts.ModulePath)
-	}
-	synthName := opts.Name
-	if synthName == "" {
-		synthName = modName + "-debug"
-	}
-	synthNamespace := "default"
-	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
-		synthNamespace = namespace
-	}
+	modName, synthName, synthNamespace := syntheticIdentity(mod, opts, namespace)
 
 	output.Info(fmt.Sprintf("Building synthetic instance %q for module %q", synthName, modName))
 
@@ -117,6 +101,31 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	return compileInstance(ctx, env, inst, opts.K8sConfig, true)
 }
 
+// defaultNamespace is the synthetic-instance namespace when no
+// --namespace/env override is given.
+const defaultNamespace = "default"
+
+// syntheticIdentity derives the synthetic instance identity: caller-supplied
+// name or "<module.metadata.name>-debug"; namespace from --namespace/env
+// override, else "default".
+func syntheticIdentity(mod *module.Module, opts ModuleOpts, namespace string) (modName, synthName, synthNamespace string) {
+	if mod.Metadata != nil {
+		modName = mod.Metadata.Name
+	}
+	if modName == "" {
+		modName = filepath.Base(opts.ModulePath)
+	}
+	synthName = opts.Name
+	if synthName == "" {
+		synthName = modName + "-debug"
+	}
+	synthNamespace = defaultNamespace
+	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
+		synthNamespace = namespace
+	}
+	return modName, synthName, synthNamespace
+}
+
 // stageLocalModuleSource builds a module.Source overlay from a local module
 // directory so kernel synthesis can use it as the build's main module. Every
 // regular file under the directory is staged (VCS and build-artifact
@@ -126,26 +135,34 @@ func stageLocalModuleSource(dir string) (*module.Source, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Root-scoped filesystem: every read stays inside the module directory
+	// even under concurrent symlink swaps (gosec G122).
+	root, err := os.OpenRoot(absDir)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+
 	overlay := make(map[string]load.Source)
-	err = filepath.WalkDir(absDir, func(path string, d fs.DirEntry, walkErr error) error {
+	err = fs.WalkDir(root.FS(), ".", func(rel string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 		if d.IsDir() {
 			switch d.Name() {
 			case ".git", ".build", "node_modules":
-				return filepath.SkipDir
+				return fs.SkipDir
 			}
 			return nil
 		}
 		if !d.Type().IsRegular() {
 			return nil
 		}
-		content, readErr := os.ReadFile(path)
+		content, readErr := fs.ReadFile(root.FS(), rel)
 		if readErr != nil {
 			return readErr
 		}
-		overlay[path] = load.FromBytes(content)
+		overlay[filepath.Join(absDir, filepath.FromSlash(rel))] = load.FromBytes(content)
 		return nil
 	})
 	if err != nil {
