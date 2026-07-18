@@ -79,9 +79,6 @@ func Load(cfg *GlobalConfig, opts LoaderOptions) error {
 // A missing config file is not an error: defaults apply.
 func loadConfigFile(cfg *GlobalConfig, configPath string) (string, error) {
 	ctx := cuecontext.New()
-	// Shim until kernel adoption (0006 C2 Phase C): downstream render code
-	// still expects a shared CUE context on GlobalConfig.
-	cfg.CueContext = ctx
 
 	content, err := os.ReadFile(configPath)
 	if err != nil {

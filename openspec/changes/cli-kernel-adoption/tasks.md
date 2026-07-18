@@ -24,13 +24,13 @@ Phases mirror design.md's migration plan: A (config, D39) → B (platform) → C
 ## 3. Phase C — kernel adoption (D9 + 0002 carryover)
 
 - [x] 3.1 (pulled forward into Phase B — `internal/platform` needs `synth.PlatformInput`) Add `github.com/open-platform-model/library` to `go.mod` (kernel only; verify no `opm-operator`, controller-runtime, or Flux edges appear in `go.mod`/`go.sum`); construct one `kernel.Kernel` per invocation at workflow entry
-- [ ] 3.2 Port the CLI's render golden/fixture tests to drive the kernel path (side-by-side, old pipeline still in place) and record output diffs; review every diff as intended-kernel-behavior vs regression before proceeding
-- [ ] 3.3 Rewire `internal/workflow/render`: instance-file path via kernel instance loading + `ProcessModuleInstance`; module-dir path via `LoadModulePackage` + `SynthesizeInstance`; registry refs via `AcquireModuleFromRegistry`; values resolution feeds a `cue.Value` (adapter or kernel `Source`s per design LD2); runtime identity `opm-cli`
-- [ ] 3.4 Rewire synthesis (`opm module build` / `opm instance build <dir>`): kernel `SynthesizeInstance`, emitted kind `ModuleInstance`, no synthetic wrapper module, no `#ModuleRelease`/`modulerelease@v1` references anywhere in production code
-- [ ] 3.5 Rewire `internal/workflow/apply` to consume kernel results (resources + digests) with the existing SSA apply/prune/CR-status flow untouched
-- [ ] 3.6 Delete `pkg/render`, `pkg/provider`, `pkg/loader`'s provider/synth/match code, and the Phase A shim fields (`GlobalConfig.Providers`/`CueContext`, `resolveProvider`, resolved `Provider`); remove the `--provider` flag; fix all compile errors by rewiring callers to kernel/workflow seams
-- [ ] 3.7 Update/retire tests of deleted packages; adapt `internal/workflow` tests to kernel fixtures; `task check` green
-- [ ] 3.8 Update `mod vet` / `instance vet` paths to kernel validation (`ValidateModuleValues*` / `ProcessModuleInstance` concreteness), preserving debugValues selection behavior
+- [x] 3.2 (amended during implementation) Old-pipeline-vs-kernel golden diffing is not meaningful: the old pipeline renders only old-model (core/v1alpha1) modules and the kernel only new-model (core@v1) ones — there is no shared input to diff. Replaced by empirical fixture verification: podinfo (new-model operator fixture) renders end-to-end through the kernel with correct manifests/labels/runtime identity, and the vet error-format e2e asserts byte-identical grouped diagnostics. CLI≡operator correctness is the D30 parity gate (task 4.2)
+- [x] 3.3 Rewire `internal/workflow/render`: instance-file path via kernel instance loading + `ProcessModuleInstance`; module-dir path via `LoadModulePackage` + `SynthesizeInstance`; registry refs via `AcquireModuleFromRegistry`; values resolution feeds a `cue.Value` (adapter or kernel `Source`s per design LD2); runtime identity `opm-cli`
+- [x] 3.4 Rewire synthesis (`opm module build` / `opm instance build <dir>`): kernel `SynthesizeInstance`, emitted kind `ModuleInstance`, no synthetic wrapper module, no `#ModuleRelease`/`modulerelease@v1` references anywhere in production code
+- [x] 3.5 Rewire `internal/workflow/apply` to consume kernel results (resources + digests) with the existing SSA apply/prune/CR-status flow untouched
+- [x] 3.6 Delete `pkg/render`, `pkg/provider`, `pkg/loader`'s provider/synth/match code, and the Phase A shim fields (`GlobalConfig.Providers`/`CueContext`, `resolveProvider`, resolved `Provider`); remove the `--provider` flag; fix all compile errors by rewiring callers to kernel/workflow seams
+- [x] 3.7 Update/retire tests of deleted packages; adapt `internal/workflow` tests to kernel fixtures; `task check` green
+- [x] 3.8 Update `mod vet` / `instance vet` paths to kernel validation (`ValidateModuleValues*` / `ProcessModuleInstance` concreteness), preserving debugValues selection behavior
 
 ## 4. Phase D — parity, digests, cleanup
 

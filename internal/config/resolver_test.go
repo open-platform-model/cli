@@ -131,7 +131,6 @@ func TestResolveKubernetes_FlagOverridesAll(t *testing.T) {
 		KubeconfigFlag: "/flag/kubeconfig",
 		ContextFlag:    "flag-context",
 		NamespaceFlag:  "flag-namespace",
-		ProviderFlag:   "flag-provider",
 		Config: &GlobalConfig{
 			Kubernetes: KubernetesConfig{
 				Kubeconfig: "/config/kubeconfig",
@@ -148,8 +147,6 @@ func TestResolveKubernetes_FlagOverridesAll(t *testing.T) {
 	assert.Equal(t, SourceFlag, result.Context.Source)
 	assert.Equal(t, "flag-namespace", result.Namespace.Value)
 	assert.Equal(t, SourceFlag, result.Namespace.Source)
-	assert.Equal(t, "flag-provider", result.Provider.Value)
-	assert.Equal(t, SourceFlag, result.Provider.Source)
 }
 
 func TestResolveKubernetes_EnvOverridesConfig(t *testing.T) {
@@ -206,27 +203,6 @@ func TestResolveKubernetes_DefaultsUsedWhenNothingSet(t *testing.T) {
 	assert.Equal(t, SourceDefault, result.Namespace.Source)
 }
 
-func TestResolveKubernetes_ProviderAutoResolve_NoProviders(t *testing.T) {
-	result, err := ResolveKubernetes(ResolveKubernetesOptions{
-		Config: &GlobalConfig{},
-	})
-	require.NoError(t, err)
-
-	assert.Equal(t, "", result.Provider.Value)
-	assert.Equal(t, Source(""), result.Provider.Source)
-}
-
-func TestResolveKubernetes_ProviderFlagOverridesAutoResolve(t *testing.T) {
-	result, err := ResolveKubernetes(ResolveKubernetesOptions{
-		ProviderFlag: "nomad",
-		Config:       &GlobalConfig{},
-	})
-	require.NoError(t, err)
-
-	assert.Equal(t, "nomad", result.Provider.Value)
-	assert.Equal(t, SourceFlag, result.Provider.Source)
-}
-
 func TestResolveKubernetes_AllFlags(t *testing.T) {
 	os.Setenv("OPM_KUBECONFIG", "/env/kubeconfig")
 	os.Setenv("OPM_CONTEXT", "env-context")
@@ -241,7 +217,6 @@ func TestResolveKubernetes_AllFlags(t *testing.T) {
 		KubeconfigFlag: "/flag/kubeconfig",
 		ContextFlag:    "flag-context",
 		NamespaceFlag:  "flag-namespace",
-		ProviderFlag:   "flag-provider",
 		Config: &GlobalConfig{
 			Kubernetes: KubernetesConfig{
 				Kubeconfig: "/config/kubeconfig",
@@ -258,8 +233,6 @@ func TestResolveKubernetes_AllFlags(t *testing.T) {
 	assert.Equal(t, SourceFlag, result.Context.Source)
 	assert.Equal(t, "flag-namespace", result.Namespace.Value)
 	assert.Equal(t, SourceFlag, result.Namespace.Source)
-	assert.Equal(t, "flag-provider", result.Provider.Value)
-	assert.Equal(t, SourceFlag, result.Provider.Source)
 }
 
 func TestResolveKubernetes_Defaults(t *testing.T) {
@@ -279,16 +252,4 @@ func TestResolveKubernetes_Defaults(t *testing.T) {
 	assert.Equal(t, "", result.Context.Value)
 	assert.Equal(t, "", result.Namespace.Value) // no built-in default; must be explicit
 	assert.Equal(t, SourceDefault, result.Namespace.Source)
-}
-
-func TestResolveKubernetes_ProviderAutoResolve(t *testing.T) {
-	// Provider auto-resolve requires exactly one provider in config.Providers.
-	// We can't easily add a cue.Value in a unit test, so we verify
-	// the nil/empty case: no providers = no auto-resolve.
-	result, err := ResolveKubernetes(ResolveKubernetesOptions{
-		Config: &GlobalConfig{Providers: nil},
-	})
-	require.NoError(t, err)
-
-	assert.Equal(t, "", result.Provider.Value)
 }

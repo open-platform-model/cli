@@ -28,9 +28,10 @@ func TestRenderFlags_AddTo(t *testing.T) {
 	require.NotNil(t, rnFlag)
 	assert.Equal(t, "", rnFlag.DefValue)
 
-	provFlag := cmd.Flags().Lookup("provider")
-	require.NotNil(t, provFlag)
-	assert.Equal(t, "", provFlag.DefValue)
+	require.Nil(t, cmd.Flags().Lookup("provider"), "--provider is retired (0006 D21)")
+	platformFlag := cmd.Flags().Lookup("platform")
+	require.NotNil(t, platformFlag)
+	assert.Equal(t, "", platformFlag.DefValue)
 }
 
 func TestK8sFlags_AddTo(t *testing.T) {
@@ -148,9 +149,10 @@ func TestInstanceFileFlags_AddTo(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
 	rff.AddTo(cmd)
 
-	provFlag := cmd.Flags().Lookup("provider")
-	require.NotNil(t, provFlag)
-	assert.Equal(t, "", provFlag.DefValue)
+	require.Nil(t, cmd.Flags().Lookup("provider"), "--provider is retired (0006 D21)")
+	platformFlag := cmd.Flags().Lookup("platform")
+	require.NotNil(t, platformFlag)
+	assert.Equal(t, "", platformFlag.DefValue)
 
 	valuesFlag := cmd.Flags().Lookup("values")
 	require.NotNil(t, valuesFlag)
@@ -226,7 +228,7 @@ func TestFlagGroupComposition(t *testing.T) {
 	kf.AddTo(cmd)
 
 	// All 6 flags should be registered
-	expectedFlags := []string{"values", "namespace", "instance-name", "provider", "kubeconfig", "context"}
+	expectedFlags := []string{"values", "namespace", "instance-name", "platform", "kubeconfig", "context"}
 	for _, name := range expectedFlags {
 		flag := cmd.Flags().Lookup(name)
 		assert.NotNil(t, flag, "flag %q should be registered", name)

@@ -86,18 +86,18 @@ func runModuleBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
 		Config:        cfg,
 		NamespaceFlag: rf.Namespace,
-		ProviderFlag:  rf.Provider,
 	})
 	if err != nil {
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
 	result, err := render.FromModule(ctx, render.ModuleOpts{
-		ModulePath:  modulePath,
-		ValuesFiles: rf.Values,
-		Name:        nameFlag,
-		K8sConfig:   k8sConfig,
-		Config:      cfg,
+		ModulePath:   modulePath,
+		ValuesFiles:  rf.Values,
+		Name:         nameFlag,
+		PlatformFlag: rf.Platform, // offline: no cluster read (0006 D21)
+		K8sConfig:    k8sConfig,
+		Config:       cfg,
 	})
 	if err != nil {
 		return err

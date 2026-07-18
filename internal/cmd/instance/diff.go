@@ -13,6 +13,7 @@ import (
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/platform"
 	"github.com/open-platform-model/cli/internal/workflow/render"
 )
 
@@ -55,15 +56,24 @@ func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil
 		KubeconfigFlag: kf.Kubeconfig,
 		ContextFlag:    kf.Context,
 		NamespaceFlag:  namespaceFlag,
-		ProviderFlag:   rff.Provider,
 	})
 	if err != nil {
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
 	}
 
+	// Cluster client before render: diff follows apply's platform-source
+	// precedence so the diff reflects what apply would do (0006 D21/OQ12).
+	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
+	if err != nil {
+		output.Error("connecting to cluster", "error", err)
+		return err
+	}
+
 	result, err := render.FromInstanceFile(ctx, render.InstanceFileOpts{
 		InstanceFilePath: instanceFile,
 		ValuesFiles:      rff.Values,
+		PlatformFlag:     rff.Platform,
+		ClusterPlatform:  platform.ClusterSpecGetterFor(k8sClient.Dynamic),
 		K8sConfig:        k8sConfig,
 		Config:           cfg,
 	})
@@ -82,12 +92,6 @@ func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil
 	if len(result.Resources) == 0 {
 		instanceLog.Info("no resources to diff")
 		return nil
-	}
-
-	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
-	if err != nil {
-		instanceLog.Error("connecting to cluster", "error", err)
-		return err
 	}
 
 	comparer := kubernetes.NewComparer()

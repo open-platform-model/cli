@@ -38,8 +38,8 @@ func TestMain(m *testing.M) {
 	}
 	cancel() // Call cancel explicitly before os.Exit
 
-	// Write a dummy config.cue directly to avoid external CUE resolution issues
-	// We only want a stub provider definition for vet tests, without importing anything from registry
+	// Write a stub config.cue directly — scalar data only, matching the
+	// post-D39 schema (no providers, no imports, no cue.mod).
 	opmDir := filepath.Join(homeDir, ".opm")
 	if err := os.MkdirAll(opmDir, 0o755); err != nil {
 		os.RemoveAll(tmpDir)
@@ -49,10 +49,10 @@ func TestMain(m *testing.M) {
 	dummyConfig := `package config
 config: {
 	registry: "localhost:5000"
-	providers: kubernetes: {
-		context: "kind-opm-dev"
+	kubernetes: {
+		context:    "kind-opm-dev"
 		kubeconfig: "~/.kube/config"
-		namespace: "default"
+		namespace:  "default"
 	}
 }`
 	if err := os.WriteFile(filepath.Join(opmDir, "config.cue"), []byte(dummyConfig), 0o644); err != nil {

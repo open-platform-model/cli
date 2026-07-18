@@ -9,23 +9,26 @@ import (
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"cuelang.org/go/cue"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
+	"github.com/open-platform-model/library/opm/kernel"
+	"github.com/open-platform-model/library/opm/module"
+	"github.com/open-platform-model/library/opm/schema"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
-	internalinstancefile "github.com/open-platform-model/cli/internal/instancefile"
 	"github.com/open-platform-model/cli/internal/output"
 	pkgcore "github.com/open-platform-model/cli/pkg/core"
 	"github.com/open-platform-model/cli/pkg/loader"
 	pkgmodule "github.com/open-platform-model/cli/pkg/module"
-	"github.com/open-platform-model/cli/pkg/provider"
-	pkgrender "github.com/open-platform-model/cli/pkg/render"
 )
 
-// FromInstanceFile prepares and renders an instance from a declarative #ModuleInstance CUE file.
-// It parses the instance file, resolves values, and renders through the pipeline. The instance
-// file must import a module to fill #module. This is typically used by platform operators to
-// deploy configured instances of modules (e.g., via "opm instance apply my-app-instance.cue").
+// FromInstanceFile prepares and renders an instance from a declarative
+// #ModuleInstance CUE package through the library kernel (0006 D9). The
+// package directory containing the instance file is loaded as one CUE
+// package (instance.cue + values.cue + overlays), the embedded #module is
+// decoded, and the kernel validates, matches, and compiles against the
+// resolved platform.
 func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, error) {
 	if opts.Config == nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
@@ -36,51 +39,49 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	if opts.InstanceFilePath == "" {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("instance file path is required")}
 	}
-
-	namespace := opts.K8sConfig.Namespace.Value
-	providerName := opts.K8sConfig.Provider.Value
-
-	output.Debug("rendering from instance file", "file", opts.InstanceFilePath, "namespace", namespace, "provider", providerName)
-
-	cueCtx := opts.Config.CueContext
 	if pathErr := cmdutil.ValidateInstanceInputPath(opts.InstanceFilePath); pathErr != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: pathErr}
 	}
-	fileInstance, err := internalinstancefile.GetInstanceFile(cueCtx, opts.InstanceFilePath)
+
+	output.Debug("rendering from instance file", "file", opts.InstanceFilePath, "namespace", opts.K8sConfig.Namespace.Value)
+
+	k := NewKernel(opts.Config)
+
+	// Load the instance package (the directory containing the instance file).
+	instanceDir, err := resolveInstanceDir(opts.InstanceFilePath)
 	if err != nil {
-		printValidationError(err)
-		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}
-	parseData := fileInstance.Module
-
-	// Verify #module is filled in the instance file.
-	moduleVal := parseData.Spec.LookupPath(cue.MakePath(cue.Def("module")))
-	if !moduleVal.Exists() || moduleVal.Validate(cue.Concrete(true)) != nil {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("#module is not filled in the instance file — import a module to fill it")}
-	}
-
-	// Resolve values from --values files, auto-discovered values.cue, or inline values.
-	valuesVals, err := resolveInstanceValues(cueCtx, parseData.Spec, opts.InstanceFilePath, opts.ValuesFiles)
-	if err != nil {
-		printValidationError(err)
-		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
-	}
-
-	// Prepare the instance: validate values, fill, check concreteness, decode metadata.
-	rel, err := pkgmodule.ParseModuleInstance(ctx, parseData.Spec, parseData.Module, valuesVals)
+	instVal, err := k.LoadInstancePackage(ctx, instanceDir, loaderfile.LoadOptions{Registry: opts.Config.Registry})
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	// Apply namespace override from --namespace flag or env.
-	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
-		rel.Metadata.Namespace = namespace
+	// The embedded #module must be filled by the package's own import.
+	moduleVal := instVal.LookupPath(schema.Module)
+	if !moduleVal.Exists() {
+		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("#module is not filled in the instance package — import a module to fill it")}
+	}
+	mod, err := k.NewModuleFromValue(moduleVal)
+	if err != nil {
+		printValidationError(err)
+		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	p, err := loader.LoadProvider(providerName, opts.Config.Providers)
+	// Values: -f files (unified) win; otherwise the package's own values
+	// (values.cue / inline) already live in the loaded package and
+	// ProcessModuleInstance enforces concreteness.
+	values, err := unifyValuesFiles(k.CueContext(), opts.ValuesFiles)
 	if err != nil {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
+		printValidationError(err)
+		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+	}
+
+	inst, err := k.ProcessModuleInstance(ctx, instVal, *mod, values)
+	if err != nil {
+		printValidationError(err)
+		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
 	// Render provenance (enhancement 0006 D7): an instance apply is local when
@@ -91,42 +92,99 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 		sourceLocal = loader.HasLocalModuleReplacement(loader.ModuleRootFrom(filepath.Dir(abs)))
 	}
 
-	return renderPreparedModuleInstance(ctx, rel, p, sourceLocal)
+	// Platform resolution + materialization only after the instance itself
+	// validated: cheap failures never hit the cluster or registry.
+	env, err := resolvePlatformEnv(ctx, k, opts.Config, opts.PlatformFlag, opts.ClusterPlatform)
+	if err != nil {
+		return nil, err
+	}
+
+	return compileInstance(ctx, env, inst, opts.K8sConfig, sourceLocal)
 }
 
-// renderPreparedModuleInstance runs the render engine on a fully prepared instance
-// and converts the result to unstructured resources.
-func renderPreparedModuleInstance(
+// compileInstance runs the kernel compile on a processed instance and adapts
+// the result to the workflow Result.
+func compileInstance(
 	ctx context.Context,
-	rel *pkgmodule.Instance,
-	p *provider.Provider,
+	env *renderEnv,
+	inst *module.Instance,
+	k8sCfg *config.ResolvedKubernetesConfig,
 	sourceLocal bool,
 ) (*Result, error) {
-	engineResult, err := pkgrender.ProcessModuleInstance(ctx, rel, p, pkgcore.LabelManagedByValue)
+	out, err := env.kernel.Compile(ctx, kernel.CompileInput{
+		ModuleInstance: inst,
+		Platform:       env.platform,
+		RuntimeName:    RuntimeName,
+	})
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	resources := make([]*unstructured.Unstructured, 0, len(engineResult.Resources))
-	for _, r := range engineResult.Resources {
+	converted := make([]*pkgcore.Resource, 0, len(out.Compiled))
+	for _, c := range out.Compiled {
+		converted = append(converted, &pkgcore.Resource{
+			Value:       c.Value,
+			Instance:    c.Instance,
+			Component:   c.Component,
+			Transformer: c.Transformer,
+		})
+	}
+
+	result := &Result{
+		Components:  out.Components,
+		MatchPlan:   out.MatchPlan,
+		Warnings:    out.Warnings,
+		Platform:    env.resolution,
+		Values:      decodeUnifiedValues(inst.Package.LookupPath(schema.Values)),
+		SourceLocal: sourceLocal,
+	}
+
+	for _, r := range converted {
 		u, convErr := r.ToUnstructured()
 		if convErr != nil {
 			return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("converting resource %s/%s to unstructured: %w", r.Kind(), r.Name(), convErr)}
 		}
-		resources = append(resources, u)
+		result.Resources = append(result.Resources, u)
 	}
 
-	return &Result{
-		Resources:   resources,
-		Instance:    *rel.Metadata,
-		Module:      *rel.Module.Metadata,
-		Components:  engineResult.Components,
-		MatchPlan:   engineResult.MatchPlan,
-		Warnings:    engineResult.Warnings,
-		Values:      decodeUnifiedValues(rel.Values),
-		SourceLocal: sourceLocal,
-	}, nil
+	// Instance metadata from the kernel's decode; namespace flag/env override
+	// applies to the apply target, mirroring the legacy pipeline.
+	if inst.Metadata != nil {
+		result.Instance = pkgmodule.InstanceMetadata{
+			Name:      inst.Metadata.Name,
+			Namespace: inst.Metadata.Namespace,
+			UUID:      inst.Metadata.UUID,
+			Labels:    inst.Metadata.Labels,
+		}
+	}
+	if k8sCfg != nil {
+		if s := k8sCfg.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
+			result.Instance.Namespace = k8sCfg.Namespace.Value
+		}
+	}
+
+	// Module metadata decoded from the embedded #module value (carries
+	// nameSnakeCase for the canonical spec.module reference — D6/D37).
+	result.Module = decodeModuleMetadata(inst.Package.LookupPath(schema.Module))
+
+	return result, nil
+}
+
+// decodeModuleMetadata decodes the CLI's module metadata (including
+// nameSnakeCase) from a module CUE value.
+func decodeModuleMetadata(moduleVal cue.Value) pkgmodule.ModuleMetadata {
+	meta := pkgmodule.ModuleMetadata{}
+	if !moduleVal.Exists() {
+		return meta
+	}
+	if mv := moduleVal.LookupPath(cue.ParsePath("metadata")); mv.Exists() {
+		// Best-effort decode: leaves zero-value fields if metadata is partial.
+		if err := mv.Decode(&meta); err != nil {
+			output.Debug("could not decode module metadata", "err", err)
+		}
+	}
+	return meta
 }
 
 // decodeUnifiedValues converts the instance's concrete, merged values into a

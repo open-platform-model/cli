@@ -3,21 +3,29 @@ package render
 import (
 	"context"
 	"fmt"
+	"io/fs"
+	"os"
 	"path/filepath"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/load"
+
+	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
+	"github.com/open-platform-model/library/opm/helper/synth"
+	"github.com/open-platform-model/library/opm/module"
+	"github.com/open-platform-model/library/opm/schema"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/output"
-	"github.com/open-platform-model/cli/pkg/loader"
-	pkgmodule "github.com/open-platform-model/cli/pkg/module"
 )
 
-// FromModule synthesizes a #ModuleInstance from a module-package directory and
-// renders it through the same pipeline as FromInstanceFile. Values come from
+// FromModule synthesizes an instance from a module-package directory through
+// kernel SynthesizeInstance and renders it through the same compile path as
+// FromInstanceFile (0006 D9; retires the CLI's synthetic-wrapper module and
+// the last #ModuleRelease application — 0002 carryover). Values come from
 // `-f` files when supplied, else from the module's `debugValues`.
 func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	if opts.Config == nil {
@@ -29,103 +37,136 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	if opts.ModulePath == "" {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("module path is required")}
 	}
-
 	if pathErr := cmdutil.ValidateModuleInputPath(opts.ModulePath); pathErr != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: pathErr}
 	}
 
-	cueCtx := opts.Config.CueContext
 	namespace := opts.K8sConfig.Namespace.Value
-	providerName := opts.K8sConfig.Provider.Value
+	output.Debug("rendering from module", "path", opts.ModulePath, "namespace", namespace)
 
-	output.Debug("rendering from module", "path", opts.ModulePath, "namespace", namespace, "provider", providerName)
+	k := NewKernel(opts.Config)
 
-	synthOpts := loader.SynthesizeOptions{Name: opts.Name}
-	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
-		synthOpts.Namespace = namespace
+	modVal, err := k.LoadModulePackage(ctx, opts.ModulePath, loaderfile.LoadOptions{Registry: opts.Config.Registry})
+	if err != nil {
+		printValidationError(err)
+		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
-
-	synth, err := loader.SynthesizeModuleInstanceFromPackage(cueCtx, opts.ModulePath, synthOpts)
+	mod, err := k.NewModuleFromValue(modVal)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	values, err := resolveModuleValues(cueCtx, synth.ModuleValue, opts.ValuesFiles)
+	// Stage the local directory as the module's source tree: synthesis
+	// builds the instance package inside the module's own root, so the
+	// module import resolves locally (no registry round-trip for the module
+	// itself) and its cue.mod — including any local-module.cue replaceWith
+	// (D37) — drives transitive resolution.
+	src, err := stageLocalModuleSource(opts.ModulePath)
+	if err != nil {
+		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("staging module source: %w", err)}
+	}
+	mod.Source = src
+
+	values, err := resolveModuleValues(k.CueContext(), modVal, opts.ValuesFiles)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	mod := buildModuleFromValue(synth.ModuleValue, opts.ModulePath)
-
-	// Read back the synthesized metadata.name for the banner.
-	synthName := lookupStringOrDefault(synth.Spec, "metadata.name", "<unnamed>")
-	modName := synth.ModuleName
+	// Synthetic identity: caller-supplied name or "<module.metadata.name>-debug";
+	// namespace from --namespace/env override, else "default".
+	modName := ""
+	if mod.Metadata != nil {
+		modName = mod.Metadata.Name
+	}
 	if modName == "" {
 		modName = filepath.Base(opts.ModulePath)
 	}
+	synthName := opts.Name
+	if synthName == "" {
+		synthName = modName + "-debug"
+	}
+	synthNamespace := "default"
+	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
+		synthNamespace = namespace
+	}
+
 	output.Info(fmt.Sprintf("Building synthetic instance %q for module %q", synthName, modName))
 
-	rel, err := pkgmodule.ParseModuleInstance(ctx, synth.Spec, mod, values)
+	inst, err := k.SynthesizeInstance(ctx, synth.InstanceInput{
+		Module:    mod,
+		Name:      synthName,
+		Namespace: synthNamespace,
+		Values:    values,
+	})
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
-		rel.Metadata.Namespace = namespace
-	}
-
-	p, err := loader.LoadProvider(providerName, opts.Config.Providers)
+	// Platform resolution + materialization only after synthesis validated
+	// the values: cheap failures never hit the cluster or registry.
+	env, err := resolvePlatformEnv(ctx, k, opts.Config, opts.PlatformFlag, opts.ClusterPlatform)
 	if err != nil {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("loading provider: %w", err)}
+		return nil, err
 	}
 
 	// A module apply always renders a local module directory (the main module is
 	// local), so render provenance is local (enhancement 0006 D7).
-	return renderPreparedModuleInstance(ctx, rel, p, true)
+	return compileInstance(ctx, env, inst, opts.K8sConfig, true)
+}
+
+// stageLocalModuleSource builds a module.Source overlay from a local module
+// directory so kernel synthesis can use it as the build's main module. Every
+// regular file under the directory is staged (VCS and build-artifact
+// directories skipped).
+func stageLocalModuleSource(dir string) (*module.Source, error) {
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
+	overlay := make(map[string]load.Source)
+	err = filepath.WalkDir(absDir, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", ".build", "node_modules":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		content, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		overlay[path] = load.FromBytes(content)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(overlay) == 0 {
+		return nil, fmt.Errorf("module directory %s contains no files", dir)
+	}
+	return &module.Source{Root: absDir, Overlay: overlay}, nil
 }
 
 // resolveModuleValues mirrors `opm module vet`: -f files override debugValues.
-func resolveModuleValues(cueCtx *cue.Context, modVal cue.Value, valuesFiles []string) ([]cue.Value, error) {
+// The returned value is a single unified cue.Value (the kernel's synthesis
+// takes one values input).
+func resolveModuleValues(cueCtx *cue.Context, modVal cue.Value, valuesFiles []string) (cue.Value, error) {
 	if len(valuesFiles) > 0 {
-		return loadValuesFiles(cueCtx, valuesFiles)
+		return unifyValuesFiles(cueCtx, valuesFiles)
 	}
-	debugVal := modVal.LookupPath(cue.ParsePath("debugValues"))
+	debugVal := modVal.LookupPath(schema.DebugValues)
 	if !debugVal.Exists() {
-		return nil, fmt.Errorf("module does not define debugValues - add debugValues or provide values with -f")
+		return cue.Value{}, fmt.Errorf("module does not define debugValues - add debugValues or provide values with -f")
 	}
-	return []cue.Value{debugVal}, nil
-}
-
-// buildModuleFromValue constructs a pkgmodule.Module from a loaded module
-// CUE value. Mirrors the bare-module side of internal/instancefile.bareModuleInstance
-// but for a directly-loaded module value (no #module wrapper yet).
-func buildModuleFromValue(modVal cue.Value, modulePath string) pkgmodule.Module {
-	meta := &pkgmodule.ModuleMetadata{}
-	if mv := modVal.LookupPath(cue.ParsePath("metadata")); mv.Exists() {
-		// Best-effort decode: leaves zero-value fields if metadata is partial.
-		if err := mv.Decode(meta); err != nil {
-			_ = err
-		}
-	}
-	return pkgmodule.Module{
-		Metadata:   meta,
-		Config:     modVal.LookupPath(cue.ParsePath("#config")),
-		Raw:        modVal,
-		ModulePath: modulePath,
-	}
-}
-
-func lookupStringOrDefault(v cue.Value, path, fallback string) string {
-	field := v.LookupPath(cue.ParsePath(path))
-	if !field.Exists() {
-		return fallback
-	}
-	s, err := field.String()
-	if err != nil || s == "" {
-		return fallback
-	}
-	return s
+	return debugVal, nil
 }
