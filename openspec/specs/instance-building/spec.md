@@ -6,74 +6,33 @@ Defines the contract for loading and building a concrete `*moduleinstance.Module
 
 ### Requirement: Loader validates consumer values and produces a concrete ModuleInstance
 
-The `pkg/loader` package SHALL provide the full pipeline from CUE file loading through to a validated, concrete `*moduleinstance.ModuleInstance`. There is no separate builder phase — loading IS building, consistent with the `promote-factory-engine` architecture.
+The CLI SHALL produce validated, concrete instances exclusively through the `library` kernel. The three loading entry points map onto kernel calls:
 
-The loader SHALL support three loading entry points:
+1. **Module-directory path**: kernel `LoadModulePackage` + `SynthesizeInstance` — used by `opm mod`/`opm module` commands. Accepts a directory containing a module CUE package.
+2. **Standalone instance file**: kernel instance-package loading (`LoadInstancePackage`/`LoadSourceFromFile`) + `ProcessModuleInstance` — used by `opm instance` commands. Accepts a `.cue` file with CUE import resolution.
+3. **Module-package synthesis**: kernel `SynthesizeInstance` — used by `opm instance build <dir>` and `opm module build`. Accepts a module package directory (no `instance.cue`); the kernel unifies inputs against the resolved `#ModuleInstance` schema and lets CUE derive uuid, components, auto-secrets, and standard labels.
 
-1. **Module-directory path** (`LoadInstancePackage` + `LoadModuleInstanceFromValue`): used by `opm mod` commands. Accepts a directory containing `instance.cue` + `values.cue`.
-2. **Standalone instance file** (`LoadInstanceFile` + `LoadModuleInstanceFromValue`): used by `opm release` commands. Accepts a single `.cue` file with CUE import resolution.
-3. **Module-package synthesis** (`SynthesizeModuleInstanceFromPackage` + `LoadModuleInstanceFromValue`): used by `opm release build <dir>` and `opm module build`. Accepts a directory containing a module CUE package (no `instance.cue`), composes a `#ModuleInstance` wrapper from a synthetic CUE module pinned at the user-module's catalog version, and feeds the result into the same downstream pipeline.
+All paths run the kernel's Module Gate equivalent (`ValidateModuleValues*` / `ProcessModuleInstance` concreteness enforcement), producing a `*module.Instance`. The CLI SHALL NOT carry its own `LoadModuleInstanceFromValue` pipeline.
 
-All three paths feed into the same `LoadModuleInstanceFromValue()` function which runs the Module Gate (validate values against `#module.#config`), concreteness check, metadata extraction, and value finalization.
+#### Scenario: Successful load from module directory
 
-#### Scenario: Successful load from module directory (existing behavior)
-
-- **WHEN** `LoadInstancePackage()` is called with a module directory containing `instance.cue` and `values.cue`
-- **THEN** it returns a concrete `cue.Value` ready for `LoadModuleInstanceFromValue()`
-- **AND** `LoadModuleInstanceFromValue()` returns a `*ModuleInstance` with all fields populated
+- **WHEN** the module-directory path loads a directory containing a module package and values
+- **THEN** kernel synthesis returns a `*module.Instance` with all fields populated
 
 #### Scenario: Successful load from instance file
 
-- **WHEN** `LoadInstanceFile()` is called with a `.cue` file where `#module` is already filled via CUE import
-- **THEN** it returns a concrete `cue.Value`
-- **AND** `LoadModuleInstanceFromValue()` returns a `*ModuleInstance` with all fields populated (including auto-secrets handled by CUE `#AutoSecrets`)
+- **WHEN** the instance-file path loads a `.cue` file where the module reference resolves via CUE import
+- **THEN** kernel processing returns a `*module.Instance` with all fields populated (including auto-secrets derived by CUE)
 
 #### Scenario: Successful synthesis from a module-package directory
 
-- **WHEN** `SynthesizeModuleInstanceFromPackage()` is called with a module-package directory and either `-f` values or the module's `debugValues`
-- **THEN** it returns a `cue.Value` shaped as a `#ModuleInstance` with `#module` filled by the loaded module value and `metadata.name`/`metadata.namespace` filled with caller-supplied or default synthetic values
-- **AND** `LoadModuleInstanceFromValue()` returns a `*ModuleInstance` with all fields populated (including auto-secrets handled by CUE `#AutoSecrets`)
+- **WHEN** synthesis runs against a module-package directory with `-f` values or the module's `debugValues`
+- **THEN** kernel `SynthesizeInstance` returns a `*module.Instance` whose kind is `ModuleInstance`
 
 #### Scenario: Module Gate catches type mismatch
 
 - **WHEN** consumer values contain a field with the wrong type
-- **THEN** `LoadModuleInstanceFromValue()` returns a `*ConfigError` with structured `FieldError` details
-
-#### Scenario: Auto-secrets are handled by CUE (no Go injection)
-
-- **WHEN** a module's `#config` contains `#Secret` fields and concrete secret values are provided
-- **THEN** the CUE `#AutoSecrets` mechanism in the loader automatically discovers and groups secrets
-- **AND** the resulting `*ModuleInstance` contains the `opm-secrets` component
-- **AND** no Go-side auto-secrets injection code is required
-
-### Requirement: Synthesis path resolves the catalog dep through the registry
-
-The synthesis entry point SHALL declare `opmodel.dev/core/v1alpha1@v1` as a dependency in the synthetic wrapper's `cue.mod/module.cue` and SHALL let CUE's loader resolve it via the standard registry/cache path (`CUE_REGISTRY` + `~/.cache/cuelang/mod`). The user's module SHALL NOT be required to add `opmodel.dev/core/v1alpha1/modulerelease@v1` as its own dependency.
-
-#### Scenario: Synthesis works for an unpublished local module
-
-- **WHEN** the user invokes `SynthesizeModuleInstanceFromPackage()` with a module that has never been published to a registry but does declare `opmodel.dev/core/v1alpha1@v1` in its own `cue.mod/module.cue`
-- **THEN** synthesis SHALL succeed
-- **AND** the user's module package SHALL be loaded directly from disk (not via the registry)
-
-#### Scenario: Synthesis reuses the local CUE module cache
-
-- **WHEN** synthesis runs a second time for the same catalog version
-- **THEN** the catalog dep SHALL be served from `~/.cache/cuelang/mod` without a network fetch
-
-### Requirement: Synth wrapper and user module load the same catalog version
-
-The synthesis SHALL guarantee that the synthetic wrapper and the user's module resolve `opmodel.dev/core/v1alpha1@v1` to the same registry artifact, so that the `#Module` definition the user satisfies is the same `#Module` definition the wrapper's `#ModuleInstance.#module!: module.#Module` constraint expects.
-
-#### Scenario: Catalog version copied from user modfile
-
-- **WHEN** the user's `cue.mod/module.cue` pins `opmodel.dev/core/v1alpha1@v1` at version `vX.Y.Z`
-- **THEN** the synthetic wrapper's `cue.mod/module.cue` SHALL pin the same dep at the same `vX.Y.Z`
-
-#### Scenario: User module declares no catalog dep
-
-- **WHEN** the user's `cue.mod/module.cue` declares no `opmodel.dev/core/v1alpha1@v1` dep
-- **THEN** synthesis SHALL return a `DetailError` instructing the user to add the dep
+- **THEN** the kernel validation SHALL surface a structured config error identifying the offending field
 
 ### Requirement: Values are validated against the module config schema before injection
 The builder SHALL validate the selected values against the module's `#config` schema and return a descriptive error if they do not conform.
@@ -155,39 +114,6 @@ When using `LoadInstanceFile()` (instance-file path), the `values` field is inli
 
 - **WHEN** more than one values file is provided via `--values`
 - **THEN** the builder SHALL unify all files together before injection
-
-### Requirement: `LoadInstanceFile()` loads a standalone `.cue` file with import resolution
-
-The `pkg/loader` package SHALL export `LoadInstanceFile()` in `pkg/loader/instance_file.go`. This function loads a standalone `.cue` instance file using `load.Instances()` with the file's parent directory for `cue.mod` resolution, enabling CUE registry module imports.
-
-```go
-func LoadInstanceFile(ctx *cue.Context, filePath string, registry string) (cue.Value, string, error)
-```
-
-#### Scenario: Instance file with registry import resolves successfully
-
-- **WHEN** `LoadInstanceFile()` is called with a `.cue` file that imports a module from `opmodel.dev/modules/jellyfin@v1`
-- **AND** the file's parent directory contains a `cue.mod/module.cue` declaring the dependency
-- **THEN** the import is resolved, the module is unified into `#module`, and the evaluated value is returned
-
-#### Scenario: Instance file without `cue.mod/` fails with clear error
-
-- **WHEN** `LoadInstanceFile()` is called with a `.cue` file in a directory with no `cue.mod/` ancestor
-- **THEN** the loader returns an error describing the missing module configuration
-
-### Requirement: `LoadModulePackage()` loads a local module CUE package
-
-The `pkg/loader` package SHALL export `LoadModulePackage()` in `pkg/loader/instance_file.go`. This function loads a module CUE package from a local directory and returns the raw `cue.Value`. It is used by `opm module vet` to load a module from a directory path.
-
-```go
-func LoadModulePackage(ctx *cue.Context, dirPath string) (cue.Value, error)
-```
-
-#### Scenario: Local module loaded for module vet
-
-- **WHEN** `LoadModulePackage()` is called with a valid module directory
-- **THEN** it returns the evaluated `cue.Value` of the module package
-- **AND** the caller can use it for module-level validation
 
 ### Requirement: `opm mod vet` uses `debugValues` by default
 
