@@ -6,40 +6,30 @@ Defines how the CLI synthesizes a concrete `#ModuleInstance` directly from a mod
 
 ### Requirement: Synthesize a `#ModuleInstance` from a module-package directory
 
-The CLI SHALL synthesize a concrete `*ModuleInstance` from a module CUE package directory without requiring an `instance.cue` file. The synthesis SHALL load the module as a whole CUE package (matching `cue eval`/`cue vet` semantics) and SHALL feed the produced `cue.Value` into the same downstream pipeline (`pkg/loader.LoadModuleInstanceFromValue`) used for instance files and instance packages.
+The CLI SHALL synthesize a concrete instance from a module CUE package directory without requiring an `instance.cue` file, via kernel `SynthesizeInstance`. The synthesis SHALL load the module as a whole CUE package (matching `cue eval`/`cue vet` semantics) and pass it, with resolved values and synthetic metadata, to the kernel; the kernel unifies against the resolved `#ModuleInstance` schema so uuid, components, auto-secrets, and standard labels derive in CUE. The produced instance SHALL have `kind: "ModuleInstance"` — the synthesis SHALL NOT apply `#ModuleRelease` and SHALL NOT import `opmodel.dev/core/v1alpha1/modulerelease@v1`.
 
 #### Scenario: Module directory loads as a whole CUE package
 
-- **WHEN** the synthesis function is called with a module-package directory containing multiple `.cue` files in the same package (e.g., `module.cue`, `components.cue`)
-- **THEN** all files in the package SHALL be unified into a single CUE instance via `load.Instances(["."], &load.Config{Dir: modulePath})`
+- **WHEN** synthesis is called with a module-package directory containing multiple `.cue` files in the same package
+- **THEN** all files in the package SHALL be loaded as a single CUE instance via the kernel's module-package loading
 - **AND** no individual file path SHALL be accepted as the synthesis input
 
-#### Scenario: `#ModuleInstance` schema is sourced via the registry
+#### Scenario: Emitted kind is ModuleInstance
 
-- **WHEN** the synthesis builds the wrapper
-- **THEN** `#ModuleInstance` (and its transitive `core/v1alpha1` packages) SHALL be obtained from the OPM catalog by importing `mr "opmodel.dev/core/v1alpha1/modulerelease@v1"` in a small synthetic CUE module
-- **AND** the wrapper SHALL apply `mr.#ModuleInstance` at the top level (the same shape used by real `releases/<env>/<module>/instance.cue` files)
-- **AND** the catalog dep in the synthetic `cue.mod/module.cue` SHALL be `opmodel.dev/core/v1alpha1@v1` (whole module, matching the pin shape used by real instance modfiles)
-- **AND** the catalog dep SHALL be resolved through CUE's standard registry/cache machinery (`CUE_REGISTRY` env + `~/.cache/cuelang/mod`)
-- **AND** the synthesis SHALL NOT require the user's module to declare `opmodel.dev/core/v1alpha1/modulerelease@v1` as a dependency
-- **AND** the synthesis SHALL NOT carry an embedded copy of the catalog schemas in the CLI binary
+- **WHEN** `opm module build` or `opm instance build <dir>` synthesizes and renders
+- **THEN** the built instance SHALL carry `kind: "ModuleInstance"`
+- **AND** no production code path SHALL reference `#ModuleRelease`
 
-#### Scenario: Synth wrapper pins catalog at the user module's version
+#### Scenario: No synthetic wrapper module
 
-- **WHEN** the user's module's `cue.mod/module.cue` pins `opmodel.dev/core/v1alpha1@v1` at `vX.Y.Z`
-- **THEN** the synthesis SHALL parse the user modfile via `mod/modfile.Parse` and reuse `vX.Y.Z` as the synth wrapper's pin for the same dep
+- **WHEN** synthesis runs
+- **THEN** no temporary CUE module (synthetic `cue.mod/module.cue`) SHALL be created
+- **AND** no files SHALL be created, modified, or left behind inside the module directory
 
-#### Scenario: User module and synthetic wrapper share one CUE context
+#### Scenario: One CUE context
 
-- **WHEN** the user's module value and the synthetic wrapper value are composed
-- **THEN** both values SHALL be produced from the same `*cue.Context`
-- **AND** composition SHALL use `Value.Unify` and `Value.FillPath`, not string-based CUE source generation
-
-#### Scenario: No filesystem writes inside the user's module directory
-
-- **WHEN** the synthesis runs
-- **THEN** no files SHALL be created, modified, or left behind inside the module directory or its `cue.mod/`
-- **AND** any temporary anchor directory used by the loader SHALL be removed before the command returns
+- **WHEN** the module value and synthesized instance are composed
+- **THEN** both SHALL be produced from the kernel's single `*cue.Context`
 
 ### Requirement: Values selection mirrors `opm module vet`
 
@@ -79,20 +69,6 @@ The synthesis SHALL produce a `metadata.name` and `metadata.namespace` for the s
 
 - **WHEN** the user passes `--name <n>` or `--namespace <ns>` (or both)
 - **THEN** the synthetic `metadata.name` and/or `metadata.namespace` SHALL take the flag values
-
-### Requirement: User module must declare a catalog dep
-
-The synthesis SHALL require the user's module to declare `opmodel.dev/core/v1alpha1@v1` in its `cue.mod/module.cue` so that the synth wrapper can pin the same catalog version.
-
-#### Scenario: Catalog dep present
-
-- **WHEN** the user's module pins `opmodel.dev/core/v1alpha1@v1`
-- **THEN** synthesis SHALL proceed using the same version pin
-
-#### Scenario: Catalog dep missing
-
-- **WHEN** the user's module declares no `opmodel.dev/core/v1alpha1@v1` dep
-- **THEN** the CLI SHALL return an actionable error instructing the user to add the dep before building
 
 ### Requirement: Output banner distinguishes synthetic builds
 

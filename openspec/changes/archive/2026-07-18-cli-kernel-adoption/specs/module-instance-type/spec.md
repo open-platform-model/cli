@@ -23,3 +23,8 @@ The CLI-side prepared-instance type is retired; the library kernel's `module.Ins
 
 **Reason**: Moot — the type it constrains is deleted.
 **Migration**: None needed.
+
+### Requirement: Old constructor removed
+
+**Reason**: Moot — the Instance type itself is deleted; there is no constructor surface to constrain (caught during archive sync).
+**Migration**: None needed.
