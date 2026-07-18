@@ -7,59 +7,9 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	pkgcore "github.com/open-platform-model/cli/pkg/core"
 )
-
-// makeResourceWithContent builds a *unstructured.Unstructured with the given object fields.
-// The component label (component.opmodel.dev/name) is set to the component parameter.
-func makeResourceWithContent(group, version, kind, namespace, name, component string, extra map[string]interface{}) *unstructured.Unstructured { //nolint:unparam // version param kept for test flexibility
-	obj := &unstructured.Unstructured{Object: map[string]interface{}{
-		"apiVersion": group + "/" + version,
-		"kind":       kind,
-		"metadata": map[string]interface{}{
-			"name":      name,
-			"namespace": namespace,
-			"labels": map[string]interface{}{
-				pkgcore.LabelComponentName: component,
-			},
-		},
-	}}
-	if group == "" {
-		obj.Object["apiVersion"] = version
-	}
-	for k, v := range extra {
-		obj.Object[k] = v
-	}
-	obj.SetGroupVersionKind(schema.GroupVersionKind{Group: group, Version: version, Kind: kind})
-	obj.SetNamespace(namespace)
-	obj.SetName(name)
-	// Preserve component label after SetName/SetNamespace (they don't touch labels)
-	labels := obj.GetLabels()
-	if labels == nil {
-		labels = map[string]string{}
-	}
-	labels[pkgcore.LabelComponentName] = component
-	obj.SetLabels(labels)
-	return obj
-}
-
-// standardResources returns a typical 3-resource set.
-func standardResources() []*unstructured.Unstructured {
-	return []*unstructured.Unstructured{
-		makeResourceWithContent("apps", "v1", "Deployment", "ns", "app", "web", map[string]interface{}{
-			"spec": map[string]interface{}{"replicas": int64(2)},
-		}),
-		makeResourceWithContent("", "v1", "Service", "ns", "app", "web", map[string]interface{}{
-			"spec": map[string]interface{}{"port": int64(8080)},
-		}),
-		makeResourceWithContent("", "v1", "ConfigMap", "ns", "config", "web", map[string]interface{}{
-			"data": map[string]interface{}{"key": "value"},
-		}),
-	}
-}
 
 // cueResource compiles a CUE manifest source into a *pkgcore.Resource.
 func cueResource(t *testing.T, src string) *pkgcore.Resource {
