@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-alpha.3](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.2...v1.0.0-alpha.3) (2026-07-18)
+
+
+### Miscellaneous Chores
+
+* **openspec:** archive cli-kernel-adoption and sync 25 delta specs ([#114](https://github.com/open-platform-model/cli/issues/114)) ([cb70108](https://github.com/open-platform-model/cli/commit/cb70108a6a0b38c87ec6fa22216cc055f67d6b26))
+
 ## [1.0.0-alpha.2](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.1...v1.0.0-alpha.2) (2026-07-18)
 
 
