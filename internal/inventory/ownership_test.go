@@ -30,13 +30,3 @@ func TestDisplayOwner(t *testing.T) {
 	assert.Equal(t, "operator", DisplayOwner("operator"))
 	assert.Equal(t, "operator", DisplayOwner(""))
 }
-
-func TestOperatorOwnedErrors(t *testing.T) {
-	applyErr := OperatorOwnedApplyError("demo", "apps")
-	assert.Contains(t, applyErr.Error(), "operator-managed")
-	assert.Contains(t, applyErr.Error(), "demo")
-
-	deleteErr := OperatorOwnedDeleteError("demo", "apps")
-	assert.Contains(t, deleteErr.Error(), "operator-managed")
-	assert.Contains(t, deleteErr.Error(), "kubectl delete moduleinstance demo")
-}

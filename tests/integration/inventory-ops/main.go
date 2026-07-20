@@ -361,7 +361,7 @@ func entriesFromResources(resources []*unstructured.Unstructured) []inventory.In
 // subset for the given resources.
 func writeInventoryCR(ctx context.Context, client *kubernetes.Client, resources []*unstructured.Unstructured) error {
 	entries := entriesFromResources(resources)
-	if err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
+	if _, err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
 		Name:          instanceName,
 		Namespace:     namespace,
 		Owner:         inventory.OwnerCLI,

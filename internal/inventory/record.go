@@ -22,6 +22,19 @@ type Record struct {
 	ModulePath    string
 	ModuleVersion string
 
+	// SpecValues is the CR's spec.values block — the unified values the last
+	// apply consumed. The handoff verification render replays them against the
+	// registry-resolved module (enhancement 0006 D7.4/D38).
+	SpecValues map[string]any
+
+	// Prune is the CR's spec.prune marker, which governs whether the operator
+	// deletes an instance's workloads when the CR is removed. It has no CRD
+	// default, so it is false unless someone set it — and the operator then
+	// deliberately orphans the workloads ("Prune disabled, orphaning managed
+	// resources on deletion"). The CLI does not write this field; it reads it
+	// so an operator-owned delete can report what will actually happen.
+	Prune bool
+
 	// InstanceUUID is the CR's status.instanceUUID.
 	InstanceUUID string
 
@@ -37,4 +50,17 @@ type Record struct {
 	// SourceLocal reflects the render-provenance annotation
 	// (module-instance.opmodel.dev/source: local) on the CR.
 	SourceLocal bool
+
+	// Generation is the CR's metadata.generation — the spec revision the API
+	// server assigned. Compared against ObservedGeneration to tell whether the
+	// operator has caught up with the latest write.
+	Generation int64
+
+	// ObservedGeneration is the CR's status.observedGeneration: the generation
+	// the operator last reconciled. Operator-written; the CLI only reads it.
+	ObservedGeneration int64
+
+	// Conditions is the CR's status.conditions block, operator-written. The
+	// CLI reads it to report reconcile outcomes (see ReadyFor).
+	Conditions []Condition
 }

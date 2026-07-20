@@ -3,6 +3,7 @@ package instance
 import (
 	"context"
 	"fmt"
+	"time"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
@@ -10,6 +11,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/platform"
 	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
@@ -27,6 +29,7 @@ func NewInstanceApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 		createNSFlag bool
 		noPruneFlag  bool
 		forceFlag    bool
+		timeoutFlag  time.Duration
 	)
 
 	c := &cobra.Command{
@@ -49,7 +52,13 @@ Examples:
   opm instance apply ./jellyfin_instance.cue --dry-run`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runInstanceApply(args[0], cfg, &rff, &kf, namespace, dryRunFlag, createNSFlag, noPruneFlag, forceFlag)
+			return runInstanceApply(args[0], cfg, &rff, &kf, namespace, applyFlags{
+				DryRun:   dryRunFlag,
+				CreateNS: createNSFlag,
+				NoPrune:  noPruneFlag,
+				Force:    forceFlag,
+				Timeout:  timeoutFlag,
+			})
 		},
 	}
 
@@ -60,13 +69,24 @@ Examples:
 	c.Flags().BoolVar(&createNSFlag, "create-namespace", false, "Create target namespace if it does not exist")
 	c.Flags().BoolVar(&noPruneFlag, "no-prune", false, "Skip stale resource pruning")
 	c.Flags().BoolVar(&forceFlag, "force", false, "Allow empty render to prune all previously tracked resources")
+	c.Flags().DurationVar(&timeoutFlag, "timeout", inventory.DefaultReconcileTimeout,
+		"Bound on the operator-reconcile wait (operator-managed instances only)")
 
 	return c
 }
 
+// applyFlags carries the apply command's behavior flags.
+type applyFlags struct {
+	DryRun   bool
+	CreateNS bool
+	NoPrune  bool
+	Force    bool
+	Timeout  time.Duration
+}
+
 // runInstanceApply executes the instance apply command.
 func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.InstanceFileFlags, kf *cmdutil.K8sFlags, namespaceFlag string,
-	dryRun, createNS, noPrune, force bool) error {
+	flags applyFlags) error {
 	ctx := context.Background()
 
 	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
@@ -108,10 +128,11 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 		K8sClient: k8sClient,
 		Log:       instanceLog,
 		Options: workflowapply.Options{
-			DryRun:                 dryRun,
-			CreateNS:               createNS,
-			NoPrune:                noPrune,
-			Force:                  force,
+			DryRun:                 flags.DryRun,
+			CreateNS:               flags.CreateNS,
+			NoPrune:                flags.NoPrune,
+			Force:                  flags.Force,
+			Timeout:                flags.Timeout,
 			SuccessUpToDateMessage: "Instance up to date",
 			SuccessAppliedMessage:  "Instance applied",
 		},

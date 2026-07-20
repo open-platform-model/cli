@@ -313,7 +313,8 @@ func formatStatusHeader(result *StatusResult) string {
 	}
 	sb.WriteString(")\n")
 	if result.Owner != "" && result.Owner != "cli" {
-		sb.WriteString("Warning:   operator-managed instance; the CLI can inspect it but cannot mutate it\n")
+		sb.WriteString("Note:      operator-managed instance; the operator reconciles it. " +
+			"'opm instance apply' edits its spec and 'opm instance delete' removes it, both via the operator\n")
 	}
 	return sb.String()
 }

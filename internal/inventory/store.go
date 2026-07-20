@@ -82,24 +82,48 @@ func FindRecordByInstanceUUID(ctx context.Context, client *kubernetes.Client, na
 }
 
 // SpecInput is the desired ModuleInstance spec the CLI server-side-applies.
+//
+// Every field the opm-cli manager owns must be present on every apply. Under
+// server-side apply a manager's document is its COMPLETE declared intent: a
+// field this manager previously owned but now omits is released, and — since
+// no other manager claims these fields — pruned from the live object. So an
+// apply that means to change one field still carries the others at their
+// current values. Restating an unchanged value is a no-op; omitting it is a
+// deletion. (Verified against a live API server; see TestSSA_* in
+// tests/integration/ssa-ownership.)
 type SpecInput struct {
-	Name          string
-	Namespace     string
+	Name      string
+	Namespace string
+	// Owner is the spec.owner marker. Empty omits the field entirely, which
+	// the CRD reads as operator-managed — use it only to leave an already
+	// absent owner absent, never to "not change" a set one (that prunes it).
 	Owner         string
 	ModulePath    string
 	ModuleVersion string
-	// Values is the single unified values blob the render consumed. Nil omits
-	// spec.values entirely.
+	// Values is the single unified values blob. Nil omits spec.values — which
+	// DELETES any existing values on an update. Pass the current values to
+	// leave them unchanged.
 	Values map[string]any
 	// SourceLocal stamps the render-provenance annotation when true; when false
 	// the annotation is omitted so SSA field ownership removes any prior value.
 	SourceLocal bool
 }
 
-// ApplySpec server-side-applies the CLI-owned ModuleInstance spec document
-// (owner, module reference, values, managed labels, and the provenance
-// annotation). Create-or-update is handled by the apply semantics.
-func ApplySpec(ctx context.Context, client *kubernetes.Client, in SpecInput) error {
+// ApplySpec server-side-applies the complete CLI-owned ModuleInstance spec
+// document (owner, module reference, values, managed labels, and the
+// provenance annotation) and returns the resulting metadata.generation.
+// Create-or-update is handled by the apply semantics.
+//
+// This is the single writer for the CLI-owned spec. Targeted single-field
+// variants are not possible with this field manager — see SpecInput.
+func ApplySpec(ctx context.Context, client *kubernetes.Client, in SpecInput) (int64, error) {
+	spec := map[string]any{
+		"module": moduleRef(in.ModulePath, in.ModuleVersion),
+	}
+	if in.Owner != "" {
+		spec["owner"] = in.Owner
+	}
+
 	obj := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": APIVersionModuleInstance,
 		"kind":       KindModuleInstance,
@@ -108,22 +132,16 @@ func ApplySpec(ctx context.Context, client *kubernetes.Client, in SpecInput) err
 			"namespace": in.Namespace,
 			"labels":    crLabels(in.Name, in.Namespace),
 		},
-		"spec": map[string]any{
-			"owner": in.Owner,
-			"module": map[string]any{
-				"path":    in.ModulePath,
-				"version": in.ModuleVersion,
-			},
-		},
+		"spec": spec,
 	}}
 
 	if in.Values != nil {
 		values, err := jsonNormalizeMap(in.Values)
 		if err != nil {
-			return fmt.Errorf("normalizing spec.values for ModuleInstance %q: %w", in.Name, err)
+			return 0, fmt.Errorf("normalizing spec.values for ModuleInstance %q: %w", in.Name, err)
 		}
 		if err := unstructured.SetNestedMap(obj.Object, values, "spec", "values"); err != nil {
-			return fmt.Errorf("setting spec.values for ModuleInstance %q: %w", in.Name, err)
+			return 0, fmt.Errorf("setting spec.values for ModuleInstance %q: %w", in.Name, err)
 		}
 	}
 
@@ -131,11 +149,12 @@ func ApplySpec(ctx context.Context, client *kubernetes.Client, in SpecInput) err
 		obj.SetAnnotations(map[string]string{AnnotationSource: SourceLocal})
 	}
 
-	if err := ssaApply(ctx, client, obj, in.Name, in.Namespace); err != nil {
-		return err
+	applied, err := ssaApplyReturning(ctx, client, obj, in.Name, in.Namespace)
+	if err != nil {
+		return 0, err
 	}
 	output.Debug("applied ModuleInstance spec", "name", in.Name, "namespace", in.Namespace, "owner", in.Owner)
-	return nil
+	return applied.GetGeneration(), nil
 }
 
 // StatusInput is the CLI-owned status subset written on the status subresource.
@@ -193,19 +212,28 @@ func DeleteCR(ctx context.Context, client *kubernetes.Client, name, namespace st
 }
 
 func ssaApply(ctx context.Context, client *kubernetes.Client, obj *unstructured.Unstructured, name, namespace string, subresources ...string) error {
+	_, err := ssaApplyReturning(ctx, client, obj, name, namespace, subresources...)
+	return err
+}
+
+// ssaApplyReturning is ssaApply that hands back the server's view of the
+// applied object — callers that must observe the resulting metadata.generation
+// (the ownership flip, the thin-editor spec edit) need it to know which
+// generation a follow-on reconcile wait is waiting for.
+func ssaApplyReturning(ctx context.Context, client *kubernetes.Client, obj *unstructured.Unstructured, name, namespace string, subresources ...string) (*unstructured.Unstructured, error) {
 	data, err := json.Marshal(obj.Object)
 	if err != nil {
-		return fmt.Errorf("marshaling ModuleInstance %q: %w", name, err)
+		return nil, fmt.Errorf("marshaling ModuleInstance %q: %w", name, err)
 	}
-	_, err = client.ResourceClient(ModuleInstanceGVR, namespace).Patch(
+	applied, err := client.ResourceClient(ModuleInstanceGVR, namespace).Patch(
 		ctx, name, types.ApplyPatchType, data,
 		metav1.PatchOptions{FieldManager: fieldManager, Force: output.BoolPtr(true)},
 		subresources...,
 	)
 	if err != nil {
-		return fmt.Errorf("applying ModuleInstance %q: %w", name, err)
+		return nil, fmt.Errorf("applying ModuleInstance %q: %w", name, err)
 	}
-	return nil
+	return applied, nil
 }
 
 func recordFromUnstructured(obj *unstructured.Unstructured) *Record {
@@ -220,6 +248,23 @@ func recordFromUnstructured(obj *unstructured.Unstructured) *Record {
 		LastAppliedSourceDigest: nestedString(obj.Object, "status", "lastAppliedSourceDigest"),
 		LastAppliedConfigDigest: nestedString(obj.Object, "status", "lastAppliedConfigDigest"),
 		LastAppliedAt:           nestedString(obj.Object, "status", "lastAppliedAt"),
+		Generation:              obj.GetGeneration(),
+		Conditions:              conditionsFromUnstructured(obj),
+	}
+
+	//nolint:errcheck // best-effort read; a wrong-typed status.observedGeneration reads as 0 (not yet reconciled)
+	if observed, ok, _ := unstructured.NestedInt64(obj.Object, "status", "observedGeneration"); ok {
+		rec.ObservedGeneration = observed
+	}
+
+	//nolint:errcheck // best-effort read; a wrong-typed spec.values reads as absent
+	if values, ok, _ := unstructured.NestedMap(obj.Object, "spec", "values"); ok {
+		rec.SpecValues = values
+	}
+
+	//nolint:errcheck // best-effort read; absent or wrong-typed spec.prune reads as false, matching the operator's own default
+	if prune, ok, _ := unstructured.NestedBool(obj.Object, "spec", "prune"); ok {
+		rec.Prune = prune
 	}
 
 	//nolint:errcheck // best-effort read; a wrong-typed status.inventory yields empty inventory
@@ -252,6 +297,15 @@ func interpretableInventory(obj *unstructured.Unstructured) bool {
 	}
 	_, ok := raw.(map[string]any)
 	return ok
+}
+
+// moduleRef builds the spec.module reference document. Shared by the full spec
+// apply and the thin-editor spec edit so the two writers cannot drift.
+func moduleRef(path, version string) map[string]any {
+	return map[string]any{
+		"path":    path,
+		"version": version,
+	}
 }
 
 func crLabels(name, namespace string) map[string]any {

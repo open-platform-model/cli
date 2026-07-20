@@ -81,10 +81,11 @@ func main() {
 
 	// Write the CR (spec + status) continuing the legacy revision, then delete
 	// the Secret only after the status write succeeds.
-	check("writing CR spec", inventory.ApplySpec(ctx, client, inventory.SpecInput{
+	_, specErr := inventory.ApplySpec(ctx, client, inventory.SpecInput{
 		Name: instanceName, Namespace: namespace, Owner: inventory.OwnerCLI,
 		ModulePath: modulePath, ModuleVersion: "0.1.0",
-	}))
+	})
+	check("writing CR spec", specErr)
 	check("writing CR status", inventory.ApplyStatus(ctx, client, inventory.StatusInput{
 		Name: instanceName, Namespace: namespace, InstanceUUID: instanceID,
 		Inventory: inventory.Inventory{

@@ -29,6 +29,11 @@ type Options struct {
 	Force                  bool
 	SuccessUpToDateMessage string
 	SuccessAppliedMessage  string
+
+	// Timeout bounds the operator-reconcile wait in thin-editor mode. Unused
+	// in CLI-executor mode, which does its own applying. Zero uses
+	// inventory.DefaultReconcileTimeout.
+	Timeout time.Duration
 }
 
 type Request struct {
@@ -59,7 +64,24 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	// exist to protect writes, and a dry-run writes nothing (enhancement 0006 D5).
 	if !dryRun {
 		if err := RunClusterGates(ctx, req.K8sClient); err != nil {
-			return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+			// Not Printed: the gates return bare errors without logging, so
+			// claiming otherwise makes a missing CRD exit silently.
+			return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err}
+		}
+	}
+
+	// Ownership has to be resolved on dry-run too. LoadPreviousInventory
+	// deliberately reads nothing here — its record feeds the prune and migration
+	// paths, which a dry-run never exercises — but with no record the resolver
+	// below would see an absent CR and preview the CLI-executor path, promising
+	// resource applies that an operator-owned instance would never receive.
+	// --dry-run is server-side, so the client is connected and this read is safe.
+	if dryRun && instanceID != "" {
+		rec, err := inventory.GetRecord(ctx, req.K8sClient, name, namespace)
+		if err != nil {
+			instanceLog.Warn("could not read inventory CR, previewing as CLI-managed", "error", err)
+		} else if inventory.ResolveOwnership(rec) == inventory.ModeOperatorOwned {
+			return previewThinEditor(req, rec)
 		}
 	}
 
@@ -67,16 +89,19 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	// Secret to migrate. Both are read-only.
 	prevRecord, legacy := LoadPreviousInventory(ctx, req.K8sClient, name, namespace, instanceID, dryRun, instanceLog)
 
-	// Gate 4: ownership. Operator-owned instances are refused before any write.
+	// Gate 4: ownership — the single branch point (0006 D18). An operator-owned
+	// instance takes the thin-editor path and returns; everything below this
+	// point is CLI-executor mode.
 	if inventory.ResolveOwnership(prevRecord) == inventory.ModeOperatorOwned {
-		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: inventory.OperatorOwnedApplyError(name, namespace), Printed: true}
+		return executeThinEditor(ctx, req, prevRecord)
 	}
 
 	// Gate 5: status-RBAC pre-flight (CLI-executor mode, non-dry-run). Ensures
 	// resources are never deployed without a recordable inventory.
 	if !dryRun && instanceID != "" {
 		if err := inventory.GateStatusRBAC(ctx, req.K8sClient, namespace); err != nil {
-			return &opmexit.ExitError{Code: opmexit.ExitPermissionDenied, Err: err, Printed: true}
+			// Not Printed — see RunClusterGates above.
+			return &opmexit.ExitError{Code: opmexit.ExitPermissionDenied, Err: err}
 		}
 	}
 
@@ -247,7 +272,7 @@ func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory
 
 	modulePath, moduleVersion := result.Module.CanonicalModuleRef()
 
-	if err := inventory.ApplySpec(ctx, req.K8sClient, inventory.SpecInput{
+	if _, err := inventory.ApplySpec(ctx, req.K8sClient, inventory.SpecInput{
 		Name:          name,
 		Namespace:     namespace,
 		Owner:         inventory.OwnerCLI,
