@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-alpha.4](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.3...v1.0.0-alpha.4) (2026-07-20)
+
+
+### Features
+
+* **instance:** add handoff and operator-owned apply/delete (0006 C3) ([#116](https://github.com/open-platform-model/cli/issues/116)) ([093b976](https://github.com/open-platform-model/cli/commit/093b9761453437e7ceb8c15c75c156ebbd971d94))
+
 ## [1.0.0-alpha.3](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.2...v1.0.0-alpha.3) (2026-07-18)
 
 
