@@ -320,7 +320,7 @@ tasks:
       The whole upgrade is one reviewable diff.
 
       Usage:
-        task operator:sync VERSION=v1.0.0-alpha.3
+        task operator:sync VERSION=v1.0.0-alpha.4
     vars:
       VERSION: '{{.VERSION | default ""}}'
     preconditions:

@@ -51,7 +51,7 @@ Examples:
   opm operator install --crds-only --rbac --user alice
 
   # Install a specific opm-operator release instead of the embedded pin
-  opm operator install --version v1.0.0-alpha.3`,
+  opm operator install --version v1.0.0-alpha.4`,
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return runOperatorInstall(cfg, &kf, installFlags{
