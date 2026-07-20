@@ -66,6 +66,83 @@ Use `opm instance` when you are starting from an instance file or when you want 
 | `instance delete` | Delete instance resources from a cluster |
 | `instance list` | List deployed instances |
 | `instance events` | Show events for an instance |
+| `instance handoff` | Transfer a CLI-managed instance to the operator |
+
+#### CLI-managed vs operator-managed instances
+
+Every deployed instance is managed by exactly one of two actors, recorded as
+`spec.owner` on its `ModuleInstance`. The CLI behaves differently against each,
+and resolves which one it is before doing anything.
+
+**CLI-managed** (`spec.owner: cli`, the default for `opm instance apply`): the
+CLI renders, applies, prunes, and records the inventory itself.
+
+**Operator-managed** (`spec.owner: operator`): the operator reconciles the
+instance, and the CLI edits its spec rather than the cluster.
+
+| Command | Against an operator-managed instance |
+|---------|--------------------------------------|
+| `instance apply` | Acts as a spec editor: writes `spec.module` and `spec.values`, waits for the operator's reconcile, reports the result. Applies and prunes nothing itself. Refuses a module that resolves from local bytes — the operator can only fetch published modules. |
+| `instance delete` | Deletes the `ModuleInstance` and lets the operator's cleanup finalizer act. Refuses when the operator is not running, because deleting a finalizer-armed resource with no controller wedges it in `Terminating` with its workloads orphaned. Whether the workloads are actually removed depends on `spec.prune` — see below. |
+
+> **`spec.prune` decides whether an operator-owned delete removes anything.**
+> The field has no default and the CLI does not write it, so for a
+> CLI-created instance the operator removes the `ModuleInstance` and
+> deliberately **leaves the workloads running**. `opm instance delete` reports
+> which of the two happened rather than assuming. To have the operator remove
+> workloads on delete, set it first:
+>
+> ```bash
+> kubectl patch moduleinstance <name> -n <ns> --type=merge -p '{"spec":{"prune":true}}'
+> ```
+
+Both wait for the operator, bounded by `--timeout` (default 5m).
+
+#### Graduating an instance to the operator (`instance handoff`)
+
+`opm instance handoff <name>` moves a CLI-managed instance to operator
+management. It verifies the operator can take over safely *before* changing
+anything, checking in order:
+
+1. the operator is installed and ready
+2. the `ModuleInstance` exists and the CLI owns it
+3. the instance was not last applied from local module bytes
+4. `spec.module` resolves from the registry — ignoring any local replacement
+   and any cached copy, since the operator gets neither
+5. re-rendering the published module against the cluster `Platform` reproduces
+   what is currently deployed
+
+Only then does it set `spec.owner: operator` and wait for the operator's first
+reconcile, which must leave the instance's resource set unchanged.
+
+```bash
+# Install the operator, then graduate an existing CLI-managed instance
+opm operator install
+opm instance handoff jellyfin -n media
+
+# Afterwards, update values through the operator
+opm instance apply ./instances/jellyfin/instance.cue -n media
+```
+
+Adoption relabels the instance's resources to the operator's `managed-by`
+identity. Nothing is restarted, created, or removed — the command reports the
+relabel as information, not as a change.
+
+Two things to know before running it:
+
+- **Handoff is forward-only.** There is no reverse mode and no flag for one. If
+  the operator's first reconcile fails, ownership stays with the operator and
+  the CLI tells you so rather than silently undoing the transfer.
+- **`--platform` is rejected.** Verification renders against the cluster
+  `Platform`, because that is what the operator will use; verifying against
+  anything else would prove nothing.
+
+If step 5 reports a digest mismatch, the cluster is running something the
+registry no longer describes. Re-apply with the CLI to reconcile them, or pass
+`--force` to hand off anyway with the mismatch displayed. `--force` bypasses
+only that check — the ownership, provenance, and resolvability gates have no
+override, since failing them makes the transfer unsafe rather than merely
+unverified.
 
 ### Configuration (`opm config`)
 
@@ -112,6 +189,9 @@ opm instance apply ./instances/jellyfin/instance.cue
 # Inspect deployed state by file, name, or UUID
 opm instance status ./instances/jellyfin/instance.cue
 opm instance status jellyfin -n media
+
+# Hand the instance over to the operator once you want it reconciled
+opm instance handoff jellyfin -n media
 ```
 
 ## Documentation

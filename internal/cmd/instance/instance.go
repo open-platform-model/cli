@@ -35,6 +35,7 @@ For operations that start from module source, use 'opm module'.`,
 	c.AddCommand(NewInstanceEventsCmd(cfg))
 	c.AddCommand(NewInstanceDeleteCmd(cfg))
 	c.AddCommand(NewInstanceListCmd(cfg))
+	c.AddCommand(NewInstanceHandoffCmd(cfg))
 
 	return c
 }

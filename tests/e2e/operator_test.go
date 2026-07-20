@@ -156,6 +156,26 @@ func stripAllModuleInstanceFinalizers(t *testing.T, kubeconfig string) {
 	}
 }
 
+// restoreDevOperator rebuilds the reconciling dev operator this suite's
+// destructive tests tear down, by re-running the one target that owns that
+// setup rather than duplicating its steps here. Best-effort: a failure is
+// reported as a test log, not a failure, since the lifecycle test itself has
+// already passed by this point — but it is logged loudly, because a silent
+// failure here shows up as an unrelated hard-fail in the next run.
+func restoreDevOperator(t *testing.T) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "task", "cluster:operator")
+	cmd.Dir = repoPath(t, ".")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Logf("WARNING: could not restore the dev operator via `task cluster:operator`: %v\n%s\n"+
+			"Run it by hand before the next e2e run, or the adoption tests will fail.", err, out)
+	}
+}
+
 // resetOperatorCluster removes everything the operator manifest can create,
 // including CRDs and the Namespace (which `opm operator uninstall` itself
 // deliberately never touches), so each e2e run starts from a clean slate.
@@ -179,10 +199,19 @@ func resetOperatorCluster(t *testing.T, kubeconfig string) {
 // re-install, uninstall's finalizer guard and its --remove-finalizers
 // override (CRDs/Namespace surviving throughout), and a solo --crds-only
 // install onto a freshly reset cluster.
+// This test is DESTRUCTIVE: resetOperatorCluster deletes the CRDs, the
+// opm-operator-system Namespace, and every ModuleInstance, which tears down the
+// reconciling operator that the handoff/adoption tests require. Those tests
+// hard-fail without one, so the teardown is followed by a rebuild via
+// `task cluster:operator` — otherwise a full suite run would poison the next
+// one, and the failure would surface far from its cause.
 func TestE2E_Operator_InstallUninstallLifecycle(t *testing.T) {
 	kubeconfig := requireKindCluster(t)
 	image := pinnedOperatorImage(t)
 
+	// Registered before the reset cleanup so it runs after it (t.Cleanup is
+	// LIFO): tear the cluster down, then put the dev operator back.
+	t.Cleanup(func() { restoreDevOperator(t) })
 	t.Cleanup(func() { resetOperatorCluster(t, kubeconfig) })
 	resetOperatorCluster(t, kubeconfig)
 

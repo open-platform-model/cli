@@ -52,24 +52,53 @@ type ModuleMetadata struct {
 }
 
 // CanonicalModuleRef returns the module's canonical registry import path and
-// declared version — the reference a consumer would import or a
+// pinned version — the reference a consumer would import or a
 // ModuleInstance.spec.module would pin. The path follows the convention
 // `modulePath + "/" + nameSnakeCase + "@v" + MAJOR(version)` (e.g.
 // "opmodel.dev/modules/cert_manager@v0"); the version is the declared semver
-// verbatim (e.g. "0.1.0"). It is never a filesystem path, so it is correct for
-// local-directory and locally-replaced module resolution as well.
+// with a "v" prefix (e.g. "v0.1.0"). It is never a filesystem path, so it is
+// correct for local-directory and locally-replaced module resolution as well.
+//
+// The "v" prefix is load-bearing, not cosmetic. This pair is written verbatim
+// to ModuleInstance.spec.module, which the operator reads and passes straight
+// to the registry loader with no normalization of its own — and CUE rejects a
+// bare "0.1.0" as a malformed module version. A bare version therefore produces
+// a CR that the operator cannot resolve, and that `opm instance handoff` cannot
+// verify, which defeats the point of both actors sharing one record. The
+// operator's own CRD documents the v-prefixed form (`Example: "v0.2.1"`).
 func (m ModuleMetadata) CanonicalModuleRef() (path, version string) {
 	leaf := m.NameSnakeCase
 	if leaf == "" {
 		leaf = strings.ReplaceAll(m.Name, "-", "_")
 	}
 	path = fmt.Sprintf("%s/%s@%s", m.ModulePath, leaf, majorVersionTag(m.Version))
-	return path, m.Version
+	return path, ensureVPrefix(m.Version)
+}
+
+// ensureVPrefix normalizes a declared semver to the "v"-prefixed form the
+// registry expects. Idempotent, and leaves an empty version empty so callers
+// can still detect "no version declared".
+func ensureVPrefix(version string) string {
+	if version == "" || hasVPrefix(version) {
+		return version
+	}
+	return "v" + version
+}
+
+// hasVPrefix reports a leading "v" in either case. Both helpers here treat the
+// prefix case-insensitively so a "V0.1.0" cannot slip through one and be
+// stripped by the other, which would produce "vV0" as a major tag.
+func hasVPrefix(version string) bool {
+	return version != "" && (version[0] == 'v' || version[0] == 'V')
 }
 
 // majorVersionTag returns the "vN" major-version tag for a semver string
-// ("0.1.0" -> "v0"). An unparseable version yields "v0".
+// ("0.1.0" -> "v0"). An already-prefixed input ("v0.1.0") yields the same tag
+// rather than "vv0". An unparseable version yields "v0".
 func majorVersionTag(version string) string {
+	if hasVPrefix(version) {
+		version = version[1:]
+	}
 	major := "0"
 	if idx := strings.IndexByte(version, '.'); idx > 0 {
 		major = version[:idx]

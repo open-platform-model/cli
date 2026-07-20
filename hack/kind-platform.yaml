@@ -1,0 +1,29 @@
+# Cluster Platform singleton for the local kind dev cluster.
+# Applied by: task cluster:operator
+#
+# The subscription ranges here MIRROR internal/config/templates.go's
+# DefaultPlatformTemplate on purpose. Handoff renders against the cluster
+# Platform (0006 D11) and so does apply (D21), while the operator materializes
+# this same document — if the ranges drifted from the CLI's local default, the
+# two actors could resolve different catalog versions and the D7.4 digest gate
+# would compare renders that were never meant to match.
+apiVersion: opmodel.dev/v1alpha1
+kind: Platform
+metadata:
+  # Platform is a cluster singleton; the operator ignores any other name
+  # (platform_controller.go: platformSingletonName = "cluster").
+  name: cluster
+spec:
+  type: kubernetes
+  registry:
+    # Prerelease-inclusive lower bounds: plain ">=1.0.0" excludes -alpha tags,
+    # and every catalog on the core@v1 line is still a prerelease. Resource and
+    # transformer FQNs embed the catalog version, so a range that resolves to a
+    # v0 catalog surfaces as "no matching transformer" rather than as a version
+    # error — a symptom that looks nothing like its cause.
+    opmodel.dev/catalogs/opm:
+      filter:
+        range: ">=1.0.0-0 <2.0.0-0"
+    opmodel.dev/catalogs/kubernetes:
+      filter:
+        range: ">=1.1.0-0 <2.0.0-0"

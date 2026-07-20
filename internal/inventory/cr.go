@@ -34,6 +34,12 @@ const (
 
 	// APIVersionModuleInstance is the apiVersion string written on the CR document.
 	APIVersionModuleInstance = GroupOpmodel + "/" + VersionV1Alpha1
+
+	// CleanupFinalizer is the operator's finalizer on the ModuleInstance CR. It
+	// blocks the CR's removal until the operator has pruned the instance's
+	// workloads — which is what makes an operator-owned delete a CR delete
+	// (enhancement 0006 D18), and what wedges the CR if no operator is running.
+	CleanupFinalizer = GroupOpmodel + "/cleanup"
 )
 
 // Ownership marker values (spec.owner), matching the CRD's enum.

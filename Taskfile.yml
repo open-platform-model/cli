@@ -8,8 +8,16 @@ vars:
   BUILD_DIR: bin
   CLUSTER_NAME: opm-dev
   K8S_NODE_IMAGE: "kindest/node:v1.34.3@sha256:08497ee19eace7b4b5348db5c6a1591d7752b164530a36f855cb0f2bdcbadd48"
+  REGISTRY_CONTAINER: '{{.REGISTRY_CONTAINER | default "opm-registry"}}'
   OPM_REGISTRY:
     sh: echo "${OPM_REGISTRY:-opmodel.dev=localhost:5000+insecure,registry.cue.works}"
+  # The in-cluster spelling of OPM_REGISTRY. The host reaches the registry on
+  # localhost:5000 (published port); a pod reaches the same container by its
+  # name on kind's docker network. Same blobs, two addresses — module identity
+  # (opmodel.dev/...) is stable across both, only the host part differs.
+  # Both opmodel.dev AND testing.opmodel.dev must map, or publishes/pulls fall
+  # through to a remote host and 401.
+  KIND_CUE_REGISTRY: '{{.KIND_CUE_REGISTRY | default "opmodel.dev=opm-registry:5000+insecure,testing.opmodel.dev=opm-registry:5000+insecure,registry.cue.works"}}'
   VERSION:
     sh: git describe --tags --always --dirty 2>/dev/null || echo "v0.0.0-dev"
   COMMIT:
@@ -88,6 +96,7 @@ tasks:
       - go run tests/integration/module-apply/main.go
       - go run tests/integration/migration/main.go
       - go run tests/integration/gates/main.go
+      - go run tests/integration/ssa-ownership/main.go
       - go run tests/integration/platform-materialize/main.go
       - go run tests/integration/render-parity/main.go
 
@@ -164,6 +173,88 @@ tasks:
     cmds:
       - task: cluster:delete
       - task: cluster:create
+
+  cluster:operator:
+    desc: Install a reconciling operator into the kind cluster, wired to the local registry
+    summary: |
+      Brings up an opm-operator that can actually reconcile ModuleInstances
+      against the local OCI registry, which the handoff/adoption e2e tests
+      require.
+
+      Three things have to be true and none of them are the default:
+
+        1. The registry container must be on kind's docker network, so the
+           operator pod can reach it by name.
+        2. The operator must be told to use it. Its registry is a COMMAND-LINE
+           FLAG, not an env var: --registry wins over OPM_REGISTRY (which is
+           only read when the flag is empty, and the flag defaults to GHCR),
+           and the operator overwrites CUE_REGISTRY in its own process env.
+           Setting either as a pod env var does nothing.
+        3. A cluster Platform singleton named "cluster" must exist, or every
+           ModuleInstance parks at Ready=False/PlatformNotReady.
+
+      Idempotent: safe to re-run. Requires the registry container from
+      `task registry:start` in the opm/ repo (or any registry named
+      {{.REGISTRY_CONTAINER}} publishing :5000).
+    preconditions:
+      - sh: kubectl cluster-info --context kind-{{.CLUSTER_NAME}} &>/dev/null
+        msg: "Cluster 'kind-{{.CLUSTER_NAME}}' is not running. Run: task cluster:create"
+      - sh: docker ps -f name={{.REGISTRY_CONTAINER}} --format '{{`{{.Names}}`}}' | grep -qx {{.REGISTRY_CONTAINER}}
+        msg: "Registry container '{{.REGISTRY_CONTAINER}}' is not running — the operator has nowhere to resolve modules from."
+    cmds:
+      # The kind network only exists once a cluster has been created, so this
+      # cannot move into cluster:create. Errors when already connected.
+      - docker network connect kind {{.REGISTRY_CONTAINER}} 2>/dev/null || true
+      # --config keeps this hermetic: the dev-cluster tooling must not depend on
+      # a developer's personal ~/.opm being present or in the post-D39 format.
+      - ./{{.BUILD_DIR}}/{{.BINARY_NAME}} operator install --config hack/opm-config.cue --context kind-{{.CLUSTER_NAME}} --timeout 180s
+      # Append --registry only if it is not already there, so re-runs do not
+      # stack duplicate flags on the container args.
+      - |
+        current=$(kubectl --context kind-{{.CLUSTER_NAME}} -n opm-operator-system get deployment opm-operator-controller-manager \
+          -o jsonpath='{.spec.template.spec.containers[0].args}')
+        if echo "$current" | grep -q -- "--registry="; then
+          echo "operator already carries a --registry flag; leaving it alone"
+        else
+          kubectl --context kind-{{.CLUSTER_NAME}} -n opm-operator-system patch deployment opm-operator-controller-manager \
+            --type=json \
+            -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--registry={{.KIND_CUE_REGISTRY}}"}]'
+        fi
+      - kubectl --context kind-{{.CLUSTER_NAME}} -n opm-operator-system rollout status deployment/opm-operator-controller-manager --timeout=180s
+      - kubectl --context kind-{{.CLUSTER_NAME}} apply -f hack/kind-platform.yaml
+      # The operator ships with no workload permissions — it expects to
+      # impersonate a per-instance ServiceAccount the CLI cannot write. Dev-only
+      # grant; see the file header.
+      - kubectl --context kind-{{.CLUSTER_NAME}} apply -f hack/kind-operator-rbac.yaml
+      # status.operatorVersion is stamped by the PlatformReconciler, so it is
+      # proof the operator is genuinely reconciling and not merely Running.
+      - |
+        echo "waiting for the operator to reconcile the Platform..."
+        for i in $(seq 1 60); do
+          v=$(kubectl --context kind-{{.CLUSTER_NAME}} get platform cluster -o jsonpath='{.status.operatorVersion}' 2>/dev/null || true)
+          if [ -n "$v" ]; then echo "operator $v is reconciling"; exit 0; fi
+          sleep 2
+        done
+        echo "Platform/cluster has no status.operatorVersion after 120s." >&2
+        echo "Check: kubectl -n opm-operator-system logs deploy/opm-operator-controller-manager" >&2
+        echo "A 'Failed to resolve OPM core schema' line means the --registry patch did not take" >&2
+        echo "or the registry is unreachable from inside the pod." >&2
+        exit 1
+
+  cluster:operator:status:
+    desc: Report whether a reconciling operator is present in the kind cluster
+    cmds:
+      - |
+        replicas=$(kubectl --context kind-{{.CLUSTER_NAME}} -n opm-operator-system get deployment opm-operator-controller-manager \
+          -o jsonpath='{.status.availableReplicas}' 2>/dev/null || true)
+        if [ -z "$replicas" ] || [ "$replicas" = "0" ]; then
+          echo "No reconciling operator. Run: task cluster:operator"
+          exit 1
+        fi
+        echo "operator available replicas: $replicas"
+        kubectl --context kind-{{.CLUSTER_NAME}} -n opm-operator-system get deployment opm-operator-controller-manager \
+          -o jsonpath='{.spec.template.spec.containers[0].args}'; echo
+        echo "Platform/cluster operatorVersion: $(kubectl --context kind-{{.CLUSTER_NAME}} get platform cluster -o jsonpath='{.status.operatorVersion}' 2>/dev/null)"
 
   #########################
   ## Code quality tasks

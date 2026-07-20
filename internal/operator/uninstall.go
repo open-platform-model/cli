@@ -29,8 +29,9 @@ const (
 var moduleInstanceGVR = inventory.ModuleInstanceGVR
 
 // cleanupFinalizer is the operator's finalizer that blocks uninstall until
-// removed or the ModuleInstance is otherwise cleaned up.
-const cleanupFinalizer = opmodelAPIGroup + "/cleanup"
+// removed or the ModuleInstance is otherwise cleaned up. Defined once in
+// internal/inventory alongside the rest of the CR coordinates.
+const cleanupFinalizer = inventory.CleanupFinalizer
 
 // ArmedInstance identifies a ModuleInstance still carrying the operator's
 // cleanup finalizer.

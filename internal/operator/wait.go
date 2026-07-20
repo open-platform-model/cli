@@ -115,13 +115,5 @@ func pendingObjects(ctx context.Context, client *kubernetes.Client, objs []*unst
 }
 
 func describeObjects(objs []*unstructured.Unstructured) string {
-	names := make([]string, len(objs))
-	for i, obj := range objs {
-		if ns := obj.GetNamespace(); ns != "" {
-			names[i] = fmt.Sprintf("%s/%s in %s", obj.GetKind(), obj.GetName(), ns)
-		} else {
-			names[i] = fmt.Sprintf("%s/%s", obj.GetKind(), obj.GetName())
-		}
-	}
-	return strings.Join(names, ", ")
+	return strings.Join(describeObjectList(objs), ", ")
 }

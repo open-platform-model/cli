@@ -142,7 +142,7 @@ func main() {
 
 	// Re-mark app-three as operator-owned by rewriting its spec.owner. Ownership
 	// now derives from the CR's spec.owner, not a record's createdBy.
-	err = inventory.ApplySpec(ctx, client, inventory.SpecInput{
+	_, err = inventory.ApplySpec(ctx, client, inventory.SpecInput{
 		Name:          instanceThree,
 		Namespace:     nsB,
 		Owner:         inventory.OwnerOperator,
@@ -296,7 +296,7 @@ func deployInstance(ctx context.Context, client *kubernetes.Client, name, ns, in
 // writeInventoryCR writes the ModuleInstance CR spec (with the given owner) and
 // its CLI-owned status subset.
 func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, ns, instanceID, owner string, revision int, entries []inventory.InventoryEntry) error {
-	if err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
+	if _, err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
 		Name:          name,
 		Namespace:     ns,
 		Owner:         owner,

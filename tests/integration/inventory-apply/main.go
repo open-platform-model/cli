@@ -361,7 +361,7 @@ func entriesFromResources(resources []*unstructured.Unstructured) []inventory.In
 // writeInventoryCR writes the ModuleInstance CR spec and its CLI-owned status
 // subset (the integration-test analog of the apply workflow's record write).
 func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, namespace, instanceID, modulePath, moduleVersion string, revision int, entries []inventory.InventoryEntry) error {
-	if err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
+	if _, err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
 		Name:          name,
 		Namespace:     namespace,
 		Owner:         inventory.OwnerCLI,

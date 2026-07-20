@@ -94,18 +94,40 @@ func TestNewInstanceDeleteCmd(t *testing.T) {
 	assert.Equal(t, "delete <file|name|uuid>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotNil(t, cmd.Flags().Lookup("dry-run"), "--dry-run flag should be registered")
+	assert.NotNil(t, cmd.Flags().Lookup("timeout"), "--timeout flag should be registered")
 }
 
-func TestEnsureDeleteAllowed_RefusesOperatorOwnedInstance(t *testing.T) {
-	err := ensureDeleteAllowed(&inventory.Record{Owner: inventory.OwnerOperator, Name: "demo", Namespace: "apps"})
+// Operator-owned instances are no longer refused by delete — they route to the
+// finalizer-delegating path (enhancement 0006 D18). Ownership routing itself is
+// covered by inventory.ResolveOwnership's tests; here we only assert that
+// delete consumes that resolver rather than a private rule of its own.
+func TestInstanceDelete_OperatorOwnedRoutesToDelegation(t *testing.T) {
+	assert.Equal(t, inventory.ModeOperatorOwned,
+		inventory.ResolveOwnership(&inventory.Record{Owner: inventory.OwnerOperator, Name: "demo", Namespace: "apps"}))
+	assert.Equal(t, inventory.ModeCLIExecutor,
+		inventory.ResolveOwnership(&inventory.Record{Owner: inventory.OwnerCLI, Name: "demo", Namespace: "apps"}))
+}
+
+func TestNewInstanceHandoffCmd(t *testing.T) {
+	cmd := NewInstanceHandoffCmd(&config.GlobalConfig{})
+	assert.Equal(t, "handoff <name>", cmd.Use)
+	assert.NotEmpty(t, cmd.Short)
+	assert.NotNil(t, cmd.Flags().Lookup("namespace"), "--namespace/-n flag should be registered")
+	assert.NotNil(t, cmd.Flags().Lookup("timeout"), "--timeout flag should be registered")
+	assert.NotNil(t, cmd.Flags().Lookup("force"), "--force flag should be registered")
+
+	// Forward-only: no reverse mode exists on the command surface (0006 D16).
+	assert.Nil(t, cmd.Flags().Lookup("to"), "handoff must expose no reverse-direction flag")
+}
+
+func TestNewInstanceHandoffCmd_RejectsPlatformFlag(t *testing.T) {
+	cmd := NewInstanceHandoffCmd(&config.GlobalConfig{})
+	require.NoError(t, cmd.Flags().Set("platform", "./platform.cue"))
+
+	err := cmd.RunE(cmd, []string{"demo"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "operator-managed")
-	assert.Contains(t, err.Error(), "kubectl delete moduleinstance")
-}
-
-func TestEnsureDeleteAllowed_AllowsCLIOwnedInstance(t *testing.T) {
-	err := ensureDeleteAllowed(&inventory.Record{Owner: inventory.OwnerCLI, Name: "demo", Namespace: "apps"})
-	require.NoError(t, err)
+	assert.Contains(t, err.Error(), "--platform")
+	assert.Contains(t, err.Error(), "cluster Platform")
 }
 
 func TestNewInstanceListCmd(t *testing.T) {
