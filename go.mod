@@ -11,7 +11,7 @@ require (
 	github.com/open-platform-model/library v1.0.0-alpha.8
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/mod v0.37.0
+	golang.org/x/mod v0.38.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.36.0
 	k8s.io/apimachinery v0.36.0
