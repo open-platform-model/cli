@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0-alpha.5](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.4...v1.0.0-alpha.5) (2026-07-21)
+
+
+### Documentation
+
+* **openspec:** draft test-coverage-and-fixture-hygiene change ([#120](https://github.com/open-platform-model/cli/issues/120)) ([37001cc](https://github.com/open-platform-model/cli/commit/37001cc459a579a0bf2991cd77a3795a810f91d7))
+* **operator:** refresh stale version examples to v1.0.0-alpha.4 ([13022e8](https://github.com/open-platform-model/cli/commit/13022e82479baf89bdb946dae93c2b4d8c530261))
+
 ## [1.0.0-alpha.4](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.3...v1.0.0-alpha.4) (2026-07-20)
 
 
