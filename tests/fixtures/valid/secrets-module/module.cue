@@ -1,35 +1,39 @@
-package main
+// Vet fixture on the current schema line (opmodel.dev/core@v1) exercising secret
+// discovery: #config carries res.#Secret contract fields (the $opm-tagged
+// contract the secret transformer discovers) plus a container component wired to
+// the image. Ported from the retired v1alpha1 catalog line; the old standalone
+// values.cue is folded into debugValues (a stray top-level `values:` field would
+// break the closed #Module).
+package secretsmodule
 
 import (
-	core "opmodel.dev/core/v1alpha1@v1"
-	schemas "opmodel.dev/opm/v1alpha1/schemas@v1"
-	resources_workload "opmodel.dev/opm/v1alpha1/resources/workload@v1"
+	m "opmodel.dev/core@v1"
+	res "opmodel.dev/catalogs/opm/resources"
 )
 
-core.#Module
+m.#Module
 
 metadata: {
-	modulePath:       "example.com/modules"
-	name:             "secrets-module"
-	version:          "0.1.0"
-	defaultNamespace: "default"
+	modulePath: "example.com/modules"
+	name:       "secrets-module"
+	version:    "0.1.0"
 }
 
 #config: {
-	image: schemas.#Image
+	image: res.#Image
 
 	db: {
-		password: schemas.#Secret & {
+		password: res.#Secret & {
 			$secretName: "db-creds"
 			$dataKey:    "password"
 		}
-		host: schemas.#Secret & {
+		host: res.#Secret & {
 			$secretName: "db-creds"
 			$dataKey:    "host"
 		}
 	}
 
-	apiKey: schemas.#Secret & {
+	apiKey: res.#Secret & {
 		$secretName: "api-keys"
 		$dataKey:    "api-key"
 	}
@@ -37,7 +41,7 @@ metadata: {
 
 #components: {
 	web: {
-		resources_workload.#Container
+		res.#Container
 
 		metadata: {
 			name: "web"
@@ -49,4 +53,17 @@ metadata: {
 			image: #config.image
 		}
 	}
+}
+
+debugValues: {
+	image: {
+		repository: "nginx"
+		tag:        "1.28"
+		digest:     ""
+	}
+	db: {
+		password: value: "super-secret"
+		host: value:     "db.example.com"
+	}
+	apiKey: value: "my-api-key-123"
 }

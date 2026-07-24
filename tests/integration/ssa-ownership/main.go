@@ -21,6 +21,10 @@
 //  2. Restating unchanged fields does not bump metadata.generation, so the
 //     post-flip reconcile wait cannot be fooled by a no-op re-apply.
 //  3. A thin-editor apply that restates the operator's owner preserves it.
+//  4. A local render stamps the source-provenance annotation and a following
+//     registry render (which omits it) has it pruned by SSA — the fail-closed
+//     handoff gate input (0006 D38) that patch_test.go's fake client cannot
+//     model.
 //
 // Requires a running kind cluster at context "kind-opm-dev" with the
 // ModuleInstance CRD installed (opm operator install --crds-only).
@@ -123,6 +127,40 @@ func main() {
 	requireEqual("spec.module.path survived the edit", modulePath, rec.ModulePath)
 	requireTrue("spec.values was updated", fmt.Sprint(rec.SpecValues["replicas"]) == "5")
 	fmt.Println("   OK: owner preserved, module intact, values updated")
+
+	step(5, "a local render stamps the provenance annotation on the live object")
+	_, err = inventory.ApplySpec(ctx, client, inventory.SpecInput{
+		Name:          instanceName,
+		Namespace:     namespace,
+		Owner:         rec.Owner,
+		ModulePath:    rec.ModulePath,
+		ModuleVersion: rec.ModuleVersion,
+		Values:        rec.SpecValues,
+		SourceLocal:   true,
+	})
+	check("applying with SourceLocal=true", err)
+	rec = mustGet(ctx, client)
+	requireTrue("provenance annotation present after a local render", rec.SourceLocal)
+	fmt.Printf("   OK: %s stamped on the live object\n", inventory.AnnotationSource)
+
+	step(6, "a registry render omits the annotation and SSA prunes the stale value")
+	// The fake dynamic client cannot model this — omission-on-reapply is
+	// server-side-apply removal-on-omit, the same pruning the field-ownership
+	// steps above exercise. Only a real API server clears the annotation, which
+	// is why this assertion lives here rather than in patch_test.go.
+	_, err = inventory.ApplySpec(ctx, client, inventory.SpecInput{
+		Name:          instanceName,
+		Namespace:     namespace,
+		Owner:         rec.Owner,
+		ModulePath:    rec.ModulePath,
+		ModuleVersion: rec.ModuleVersion,
+		Values:        rec.SpecValues,
+		SourceLocal:   false,
+	})
+	check("re-applying with SourceLocal=false", err)
+	rec = mustGet(ctx, client)
+	requireTrue("provenance annotation removed by SSA after a registry render", !rec.SourceLocal)
+	fmt.Println("   OK: annotation cleared on omit — the fail-closed handoff gate reads a truthful provenance")
 
 	fmt.Println("\nPASS: server-side-apply field ownership behaves as the handoff and thin-editor paths require")
 }

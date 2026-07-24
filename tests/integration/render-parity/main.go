@@ -44,7 +44,10 @@ import (
 )
 
 const (
-	moduleDir     = "../opm-operator/test/fixtures/modules/podinfo"
+	// moduleDir is repo-local (vendored from opm-operator — see the fixture's
+	// module.cue header) so render-parity runs in a standalone clone with no
+	// sibling checkout. Resolved relative to the repo root, the program's cwd.
+	moduleDir     = "tests/fixtures/modules/podinfo"
 	modulePath    = "opmodel.dev/modules/test/podinfo@v0"
 	moduleVersion = "v0.1.3"
 	instName      = "podinfo-parity"
@@ -76,16 +79,12 @@ func run() error {
 		return nil
 	}
 
-	absModuleDir, err := filepath.Abs(filepath.Join("..", "..", "..", "..", "opm-operator", "test", "fixtures", "modules", "podinfo"))
+	absModuleDir, err := filepath.Abs(moduleDir)
 	if err != nil {
 		return err
 	}
 	if _, statErr := os.Stat(absModuleDir); statErr != nil {
-		// Fall back to a workspace-root-relative guess when run from repo root.
-		absModuleDir, _ = filepath.Abs(moduleDir)
-		if _, statErr := os.Stat(absModuleDir); statErr != nil {
-			return skipOrFail("podinfo fixture not found near %s", moduleDir)
-		}
+		return skipOrFail("podinfo fixture not found at %s", absModuleDir)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
