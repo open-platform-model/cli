@@ -8,7 +8,7 @@ require (
 	github.com/charmbracelet/log v1.0.0
 	github.com/gonvenience/ytbx v1.5.0
 	github.com/homeport/dyff v1.12.0
-	github.com/open-platform-model/library v1.0.0-alpha.7
+	github.com/open-platform-model/library v1.0.0-alpha.8
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/mod v0.37.0
