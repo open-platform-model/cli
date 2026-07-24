@@ -23,6 +23,26 @@ The audit's cli findings split into "spec'd but untested" (annotation SSA-clear,
 
 `tests/fixtures/valid/*` port to `core@v1` data-file form (the shape the handoff/inst-tree fixtures established); their vet tests keep asserting the same behaviors (valid module, secrets discovery, debug values). `examples/instances/jellyfin` ports (jellyfin@v2 is published on the v1 line); examples whose modules never moved lines (verify garage, mc_java_fleet against the registry) move to `examples/legacy/` with a README stating they document the retired v0 line — visible retirement, not deletion, since they remain the only worked examples of those modules. `examples/cue.mod` follows the port. `mc_router` (mod_build_test's registry-backed module) is verified against the current line and ported or the test's fixture swapped to a v1-line module.
 
+> **Correction applied during implementation (LD2).** Registry verification
+> contradicted two premises above:
+> - No jellyfin version is on `core@v1`: `jellyfin@v1.x` is `core/v1alpha1`,
+>   and `jellyfin@v2.x` depends on `core@v0` + `catalogs/opm@v0.5.2`
+>   (unresolvable in the standard v1 registry) — not the `core@v1` line.
+>   `garage` and `mc_java_fleet` are `core/v1alpha1`; `examples/modules/mc_router`
+>   did not exist and `mc_router` is `core/v1alpha1`-only.
+> - The example modules (jellyfin, garage, mc_java_fleet) are the maintainer's
+>   real homelab services; per maintainer direction they must not appear as
+>   examples/fixtures at all.
+>
+> Resolution: the branded examples were **deleted** (not moved to
+> `examples/legacy/`) and replaced with neutral `core@v1` `#ModuleInstance`
+> examples importing the published test modules
+> `opmodel.dev/modules/test/{hello-web,podinfo}@v0` — the same neutral fixtures
+> opm-operator uses (`test/fixtures/modules`). No `examples/legacy/` dir is
+> created: nothing retired is worth keeping, so the lineage grep passes with
+> zero retired-line references anywhere. `mod_build_test` was repointed at the
+> vendored `core@v1` `tests/fixtures/modules/podinfo`.
+
 ### LD3: Vendor the podinfo fixture, note provenance
 
 Copy `test/fixtures/modules/podinfo` from opm-operator into `cli/tests/fixtures/modules/podinfo` with a header comment naming the origin and that drift is acceptable — render-parity's correctness comes from comparing the CLI and kernel paths over the *same* fixture, not from matching the operator's copy byte-for-byte. `render-parity/main.go` drops the `../opm-operator` path.

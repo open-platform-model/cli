@@ -25,6 +25,8 @@ import (
 
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/output"
+	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
 	pkgcore "github.com/open-platform-model/cli/pkg/core"
 )
 
@@ -134,6 +136,41 @@ func main() {
 		}
 	}
 	fmt.Println("   OK: Secret-only instance is not found by GetRecord/ListRecords")
+
+	// 5. Idempotent re-run: a leftover legacy Secret alongside an already-migrated
+	//    CR is swept on the next apply without being read as inventory, and the
+	//    migration does not run a second time.
+	step(5, "Idempotent re-apply — leftover Secret swept, CR inventory continues unbroken")
+	// The primary instance CR is present (revision 5) and its Secret was deleted
+	// in step 2. Recreate a leftover Secret as if a prior apply's post-status
+	// delete had failed, leaving the Secret behind.
+	createLegacySecret(ctx, client, entriesOf(current), 4)
+
+	// The apply's inventory load must read the CR, not the Secret: with a CR
+	// present, LoadPreviousInventory never consults the legacy Secret, so the
+	// migration path is not re-entered.
+	prevRecord, legacy := workflowapply.LoadPreviousInventory(ctx, client, instanceName, namespace, instanceID, false, output.InstanceLogger("migrate-idempotence"))
+	if legacy != nil {
+		failf("a present CR must make the leftover Secret invisible as inventory, but it was read for migration")
+	}
+	if prevRecord == nil || prevRecord.Inventory.Revision != 5 {
+		failf("expected the CR at revision 5 to be the inventory source, got %+v", prevRecord)
+	}
+
+	// Mirror the apply's post-status cleanup (cleanupLegacySecret, legacy==nil
+	// branch): the deterministic-named leftover Secret is deleted.
+	check("sweeping the leftover Secret", inventory.DeleteLegacySecret(ctx, client, inventory.LegacySecretName(instanceName, instanceID), namespace))
+
+	// End state: a single CR still at its continued revision, no Secret, no dup.
+	rec, err = inventory.GetRecord(ctx, client, instanceName, namespace)
+	check("reading the CR after the idempotent apply", err)
+	if rec == nil || rec.Inventory.Revision != 5 {
+		failf("expected a single CR still at revision 5 (no duplicate migration), got %+v", rec)
+	}
+	if _, getErr := client.Clientset.CoreV1().Secrets(namespace).Get(ctx, inventory.LegacySecretName(instanceName, instanceID), metav1.GetOptions{}); !apierrors.IsNotFound(getErr) {
+		failf("expected the leftover Secret to be swept, got err=%v", getErr)
+	}
+	fmt.Println("   OK: leftover Secret swept, CR still at revision 5 — no duplicate migration")
 
 	cleanup(ctx, client)
 	fmt.Println("\n=== ALL SCENARIOS PASSED ===")

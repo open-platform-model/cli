@@ -85,9 +85,11 @@ func copyDir(src, dst string) error {
 	})
 }
 
-// TestE2E_ModBuild_FromExampleModule renders a synthetic instance for an
-// example module using its debugValues. Skipped if the registry is unreachable
-// (CI runs with a pre-warmed registry per task 8.5).
+// TestE2E_ModBuild_FromExampleModule renders a synthetic instance for a module
+// using its debugValues. It builds the repo-local podinfo fixture — a current
+// core@v1-line module (tests/fixtures/modules/podinfo) — so the test carries no
+// dependency on a retired-line example or a sibling checkout. Skipped if the
+// registry is unreachable (CI runs with a pre-warmed registry per task 8.5).
 func TestE2E_ModBuild_FromExampleModule(t *testing.T) {
 	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
 		t.Skip("skipping registry-backed e2e tests")
@@ -95,9 +97,9 @@ func TestE2E_ModBuild_FromExampleModule(t *testing.T) {
 
 	repoRoot, err := filepath.Abs("../..")
 	require.NoError(t, err)
-	modPath := filepath.Join(repoRoot, "examples", "modules", "mc_router")
+	modPath := filepath.Join(repoRoot, "tests", "fixtures", "modules", "podinfo")
 	if _, statErr := os.Stat(modPath); statErr != nil {
-		t.Skipf("examples/modules/mc_router not available: %v", statErr)
+		t.Skipf("tests/fixtures/modules/podinfo not available: %v", statErr)
 	}
 
 	tmpDir, err := os.MkdirTemp("", "e2e-mod-build-*")
@@ -107,12 +109,12 @@ func TestE2E_ModBuild_FromExampleModule(t *testing.T) {
 	customHome := makeBuildHome(t)
 	defer os.RemoveAll(customHome)
 
-	stdout, stderr, err := runOPMWithEnv(t, tmpDir, customHome, 120*time.Second, "module", "build", modPath, "--name", "e2e-mc-router")
+	stdout, stderr, err := runOPMWithEnv(t, tmpDir, customHome, 120*time.Second, "module", "build", modPath, "--name", "e2e-podinfo")
 	if err != nil {
 		t.Skipf("opm module build failed (likely registry/provider unavailable): err=%v stderr=%s", err, stderr)
 	}
 	assert.Contains(t, stderr, "synthetic instance")
-	assert.Contains(t, stderr, "e2e-mc-router")
+	assert.Contains(t, stderr, "e2e-podinfo")
 	assert.NotEmpty(t, stdout, "expected manifest output on stdout")
 }
 

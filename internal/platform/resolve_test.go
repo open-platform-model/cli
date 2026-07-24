@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/output"
 )
 
 // tempOpmDir writes a config.cue path (the file itself need not exist) and
@@ -83,6 +85,30 @@ func TestResolve_FallbackToLocalWarns(t *testing.T) {
 	assert.Equal(t, SourceLocalDefault, res.Source)
 	assert.NotEmpty(t, res.Warning, "cluster→local fallback must carry a warning")
 	assert.Contains(t, res.Warning, "no Platform CR in the cluster")
+}
+
+// The D21 fallback is never silent: when the cluster Platform is unavailable
+// and resolution drops to the local default, the provenance warning banner must
+// actually reach the CLI's output sink — not merely land in Resolution.Warning.
+func TestResolve_FallbackEmitsProvenanceBanner(t *testing.T) {
+	configPath := tempOpmDir(t, true)
+
+	var buf bytes.Buffer
+	output.SetLogWriter(&buf)
+	t.Cleanup(func() { output.SetLogWriter(os.Stderr) })
+
+	_, res, err := Resolve(context.Background(), ResolveOptions{
+		ConfigPath: configPath,
+		Cluster:    clusterGetterReturning(nil, "", "no Platform CR in the cluster", nil),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, SourceLocalDefault, res.Source)
+
+	emitted := buf.String()
+	assert.Contains(t, emitted, "falling back to the local default platform",
+		"the fallback must emit the D21 provenance warning, not just record it")
+	assert.Contains(t, emitted, "no Platform CR in the cluster",
+		"the emitted banner must name why the cluster Platform was unavailable")
 }
 
 func TestResolve_ClusterHardErrorIsFatal(t *testing.T) {

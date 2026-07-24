@@ -1,36 +1,22 @@
+// Vet fixture on the current schema line (opmodel.dev/core@v1). A structurally
+// valid #Module that defines #config but deliberately no debugValues, so
+// `opm module vet` reaches and fails the debugValues check — the same behavior
+// this fixture had on the retired v1alpha1 line.
 package simplemodule
 
-// Module metadata (v1alpha1 format)
+import m "opmodel.dev/core@v1"
+
+m.#Module
+
 metadata: {
 	modulePath: "example.com/modules"
 	name:       "simple-module"
 	version:    "0.1.0"
-	fqn:        "example.com/modules/simple-module:0.1.0"
 }
 
-// Configuration schema with defaults.
-// In v1alpha1, defaults live in #config — no separate values.cue is needed.
+// Configuration schema with defaults. No debugValues field: the vet test
+// asserts the module is rejected for not defining one.
 #config: {
 	replicas: *1 | int
 	image:    *"nginx:latest" | string
 }
-
-// Output manifests
-manifests: [
-	{
-		apiVersion: "apps/v1"
-		kind:       "Deployment"
-		metadata: name: metadata.name
-		spec: {
-			replicas: #config.replicas
-			selector: matchLabels: app: metadata.name
-			template: {
-				metadata: labels: app: metadata.name
-				spec: containers: [{
-					name:  metadata.name
-					image: #config.image
-				}]
-			}
-		}
-	},
-]

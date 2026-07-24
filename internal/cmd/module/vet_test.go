@@ -55,8 +55,13 @@ func TestModVet_ValidModule(t *testing.T) {
 	cmd.SetArgs([]string{fixtureDir})
 
 	err := cmd.Execute()
-	require.Error(t, err, "module without debugValues should fail")
-	assert.Contains(t, err.Error(), "module does not define debugValues")
+	require.Error(t, err, "module without concrete debugValues should fail vet")
+	// On the core@v1 line #Module declares `debugValues: _`, so a module that
+	// leaves it unset is rejected for non-concrete debugValues rather than for a
+	// missing field — the same behavior (vet refuses a module without usable
+	// debugValues) surfacing through the concreteness gate.
+	assert.Contains(t, err.Error(), "debugValues")
+	assert.Contains(t, err.Error(), "not fully concrete")
 }
 
 func TestModVet_RejectsInstancePackage(t *testing.T) {
