@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-alpha.6](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.5...v1.0.0-alpha.6) (2026-07-28)
+
+
+### Documentation
+
+* forbid AI attribution and session links in commits and PRs ([#128](https://github.com/open-platform-model/cli/issues/128)) ([ccfde69](https://github.com/open-platform-model/cli/commit/ccfde6966bd494bb5abdf2bfe1f3f49645890bf4))
+
 ## [1.0.0-alpha.5](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.4...v1.0.0-alpha.5) (2026-07-21)
 
 
