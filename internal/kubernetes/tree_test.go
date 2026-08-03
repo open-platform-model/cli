@@ -1023,12 +1023,15 @@ func countListActions(t *testing.T, client *Client, resource string) int {
 func TestBuildTree_ReusesNamespaceListingsAcrossWorkloads(t *testing.T) {
 	ctx := context.Background()
 
-	var objects []runtime.Object
-	var live []*unstructured.Unstructured
+	// Four DaemonSets in one namespace: without reuse this is four pod LISTs.
+	daemonSets := []string{"agent-a", "agent-b", "agent-c", "agent-d"}
+
+	// +1 for the Deployment below and the ReplicaSet backing it.
+	objects := make([]runtime.Object, 0, len(daemonSets)+1)
+	live := make([]*unstructured.Unstructured, 0, len(daemonSets)+1)
 	componentMap := map[string]string{}
 
-	// Four DaemonSets in one namespace: without reuse this is four pod LISTs.
-	for _, name := range []string{"agent-a", "agent-b", "agent-c", "agent-d"} {
+	for _, name := range daemonSets {
 		ds := makeRes("DaemonSet", "default", name)
 		live = append(live, ds)
 		componentMap["DaemonSet/default/"+name] = "agents"
