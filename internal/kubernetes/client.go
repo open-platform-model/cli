@@ -162,5 +162,29 @@ func buildRestConfig(opts ClientOptions) (*rest.Config, error) {
 		overrides,
 	)
 
-	return clientConfig.ClientConfig()
+	restConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// client-go defaults to QPS=5/Burst=10. Read-heavy commands issue one GET
+	// per inventory entry, so that token bucket — not the API server — sets the
+	// command's latency: `instance list -A` over 176 entries took 33s, almost
+	// exactly the (176-10)/5 the limiter permits. A negative QPS disables the
+	// client-side limiter (see rest.RESTClientForConfigAndClient, which only
+	// installs one when qps > 0), which is what kubectl does: servers have
+	// enforced API Priority and Fairness since 1.29, so client-side throttling
+	// is redundant back pressure. Real back pressure comes from the bounded
+	// worker pools at the call sites, which cap concurrent in-flight requests.
+	//
+	// Only defaults are overridden — an explicit QPS/Burst from the kubeconfig
+	// or a caller-supplied rest.Config still wins.
+	if restConfig.QPS == 0 {
+		restConfig.QPS = -1
+	}
+	if restConfig.Burst == 0 {
+		restConfig.Burst = -1
+	}
+
+	return restConfig, nil
 }

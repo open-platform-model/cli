@@ -207,7 +207,7 @@ func TestWalkDeployment_ReturnsRSAndPods(t *testing.T) {
 	deploy := makeRes("Deployment", "default", "web")
 	deploy.SetUID(deployUID)
 
-	children := walkDeployment(ctx, client, deploy)
+	children := walkDeployment(ctx, client, deploy, newListCache())
 	require.Len(t, children, 1)
 	assert.Equal(t, "ReplicaSet", children[0].Kind)
 	assert.Equal(t, "web-rs-abc", children[0].Name)
@@ -242,7 +242,7 @@ func TestWalkDeployment_OldRSWithZeroPods(t *testing.T) {
 	deploy := makeRes("Deployment", "default", "web")
 	deploy.SetUID(deployUID)
 
-	children := walkDeployment(ctx, client, deploy)
+	children := walkDeployment(ctx, client, deploy, newListCache())
 	require.Len(t, children, 1)
 	assert.Equal(t, HealthReady, children[0].Status, "RS with 0 replicas should be Ready")
 	assert.Equal(t, "0 pods", children[0].Replicas)
@@ -272,7 +272,7 @@ func TestWalkStatefulSet_ReturnsPods(t *testing.T) {
 	ss := makeRes("StatefulSet", "default", "db")
 	ss.SetUID(ssUID)
 
-	children := walkStatefulSet(ctx, client, ss)
+	children := walkStatefulSet(ctx, client, ss, newListCache())
 	require.Len(t, children, 1)
 	assert.Equal(t, "Pod", children[0].Kind)
 	assert.Equal(t, "db-0", children[0].Name)
@@ -305,7 +305,7 @@ func TestWalkOwnership_IgnoresUnownedPods(t *testing.T) {
 	deploy := makeRes("Deployment", "default", "web")
 	deploy.SetUID(deployUID)
 
-	children := walkDeployment(ctx, client, deploy)
+	children := walkDeployment(ctx, client, deploy, newListCache())
 	assert.Empty(t, children)
 }
 
@@ -315,7 +315,7 @@ func TestWalkOwnership_PassiveResourceReturnsNil(t *testing.T) {
 
 	for _, kind := range []string{"Service", "ConfigMap", "Ingress", "PersistentVolumeClaim"} {
 		res := makeRes(kind, "ns", "r")
-		children := walkOwnership(ctx, client, res)
+		children := walkOwnership(ctx, client, res, newListCache())
 		assert.Nil(t, children, "passive resource %s should have no children", kind)
 	}
 }
@@ -995,4 +995,93 @@ func TestFormatPlainTree_PVCAbbreviated(t *testing.T) {
 	assert.NotContains(t, out, "PersistentVolumeClaim/data", "full kind should not appear in terminal output")
 	assert.Contains(t, out, "Bound")
 	assert.Contains(t, out, "10Gi")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section 6: Namespace listing reuse
+// ─────────────────────────────────────────────────────────────────────────────
+
+// countListActions returns how many LIST calls the fake clientset recorded for
+// the given resource.
+func countListActions(t *testing.T, client *Client, resource string) int {
+	t.Helper()
+	fakeClient, ok := client.Clientset.(*fake.Clientset)
+	require.True(t, ok, "expected a fake clientset")
+
+	n := 0
+	for _, a := range fakeClient.Actions() {
+		if a.GetVerb() == "list" && a.GetResource().Resource == resource {
+			n++
+		}
+	}
+	return n
+}
+
+// Ownership walking filters a full namespace listing by owner UID, so every
+// workload used to trigger its own identical LIST. One build must reuse a single
+// listing per namespace no matter how many workloads it contains.
+func TestBuildTree_ReusesNamespaceListingsAcrossWorkloads(t *testing.T) {
+	ctx := context.Background()
+
+	// Four DaemonSets in one namespace: without reuse this is four pod LISTs.
+	daemonSets := []string{"agent-a", "agent-b", "agent-c", "agent-d"}
+
+	// +1 for the Deployment below and the ReplicaSet backing it.
+	objects := make([]runtime.Object, 0, len(daemonSets)+1)
+	live := make([]*unstructured.Unstructured, 0, len(daemonSets)+1)
+	componentMap := map[string]string{}
+
+	for _, name := range daemonSets {
+		ds := makeRes("DaemonSet", "default", name)
+		live = append(live, ds)
+		componentMap["DaemonSet/default/"+name] = "agents"
+		objects = append(objects, &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            name + "-pod",
+				Namespace:       "default",
+				OwnerReferences: []metav1.OwnerReference{{UID: ds.GetUID()}},
+			},
+			Status: corev1.PodStatus{Phase: corev1.PodRunning},
+		})
+	}
+
+	// A Deployment adds a ReplicaSet layer, which lists pods again.
+	deploy := makeRes("Deployment", "default", "web")
+	live = append(live, deploy)
+	componentMap["Deployment/default/web"] = "web"
+	objects = append(objects, &appsv1.ReplicaSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "web-rs",
+			Namespace:       "default",
+			UID:             types.UID("web-rs-uid"),
+			OwnerReferences: []metav1.OwnerReference{{UID: deploy.GetUID()}},
+		},
+		Status: appsv1.ReplicaSetStatus{Replicas: 1, ReadyReplicas: 1},
+	})
+
+	client := makeTreeClient(objects...)
+	result := BuildTree(ctx, client, TreeOptions{
+		InventoryLive: live,
+		ComponentMap:  componentMap,
+		Depth:         2,
+	})
+
+	// The tree itself must still be complete.
+	require.Len(t, result.Components, 2)
+	var daemonSetsWithPods int
+	for _, comp := range result.Components {
+		for _, res := range comp.Resources {
+			if res.Kind == "DaemonSet" {
+				assert.Len(t, res.Children, 1, "daemonset %s lost its pod", res.Name)
+				daemonSetsWithPods++
+			}
+		}
+	}
+	assert.Equal(t, 4, daemonSetsWithPods)
+
+	// Five workloads, but each namespace is listed exactly once.
+	assert.Equal(t, 1, countListActions(t, client, "pods"),
+		"pods should be listed once per namespace, not once per workload")
+	assert.Equal(t, 1, countListActions(t, client, "replicasets"),
+		"replicasets should be listed once per namespace")
 }
