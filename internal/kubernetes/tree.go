@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
@@ -19,6 +20,74 @@ import (
 
 // noComponentLabel is the placeholder used for resources missing a component mapping.
 const noComponentLabel = "(no component)"
+
+// listCache memoizes the namespace-scoped Pod and ReplicaSet listings that
+// ownership walking depends on. Every walk asks for the same unfiltered listing
+// of a namespace and filters by owner UID client-side, so without memoization a
+// component with N workloads issues N identical full-namespace LISTs — each one
+// transferring every Pod in the namespace. One build reuses a single listing per
+// (kind, namespace).
+//
+// A nil *listCache is valid and simply performs uncached listings, which keeps
+// the walk functions usable on their own.
+type listCache struct {
+	mu          sync.Mutex
+	pods        map[string][]corev1.Pod
+	replicaSets map[string][]appsv1.ReplicaSet
+}
+
+func newListCache() *listCache {
+	return &listCache{
+		pods:        make(map[string][]corev1.Pod),
+		replicaSets: make(map[string][]appsv1.ReplicaSet),
+	}
+}
+
+// podsIn returns every Pod in ns, listing it at most once per cache.
+func (c *listCache) podsIn(ctx context.Context, client *Client, ns string) ([]corev1.Pod, error) {
+	if c == nil {
+		list, err := client.Clientset.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return nil, err
+		}
+		return list.Items, nil
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if cached, ok := c.pods[ns]; ok {
+		return cached, nil
+	}
+	list, err := client.Clientset.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	c.pods[ns] = list.Items
+	return list.Items, nil
+}
+
+// replicaSetsIn returns every ReplicaSet in ns, listing it at most once per cache.
+func (c *listCache) replicaSetsIn(ctx context.Context, client *Client, ns string) ([]appsv1.ReplicaSet, error) {
+	if c == nil {
+		list, err := client.Clientset.AppsV1().ReplicaSets(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return nil, err
+		}
+		return list.Items, nil
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if cached, ok := c.replicaSets[ns]; ok {
+		return cached, nil
+	}
+	list, err := client.Clientset.AppsV1().ReplicaSets(ns).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	c.replicaSets[ns] = list.Items
+	return list.Items, nil
+}
 
 // displayKind returns an abbreviated kind name for terminal display.
 // PersistentVolumeClaim is shortened to PVC to keep tree lines compact.
@@ -138,6 +207,11 @@ func GetModuleTree(ctx context.Context, client *Client, opts TreeOptions) (*Tree
 func BuildTree(ctx context.Context, client *Client, opts TreeOptions) *TreeResult {
 	result := &TreeResult{Instance: opts.InstanceInfo}
 
+	// One cache per build: ownership walking re-lists the same namespaces once
+	// per workload, and a tree is a point-in-time view, so a single listing per
+	// namespace is both cheaper and more internally consistent.
+	cache := newListCache()
+
 	groups := groupByComponent(opts.InventoryLive, opts.ComponentMap)
 	for _, compName := range sortedComponentNames(groups) {
 		resources := groups[compName]
@@ -148,7 +222,7 @@ func BuildTree(ctx context.Context, client *Client, opts TreeOptions) *TreeResul
 
 		if opts.Depth >= 1 {
 			for _, res := range resources {
-				comp.Resources = append(comp.Resources, buildResourceNode(ctx, client, res, opts.Depth))
+				comp.Resources = append(comp.Resources, buildResourceNode(ctx, client, res, opts.Depth, cache))
 			}
 		}
 
@@ -160,7 +234,7 @@ func BuildTree(ctx context.Context, client *Client, opts TreeOptions) *TreeResul
 }
 
 // buildResourceNode constructs a ResourceNode for a single live unstructured resource.
-func buildResourceNode(ctx context.Context, client *Client, res *unstructured.Unstructured, depth int) ResourceNode {
+func buildResourceNode(ctx context.Context, client *Client, res *unstructured.Unstructured, depth int, cache *listCache) ResourceNode {
 	node := ResourceNode{
 		Kind:      res.GetKind(),
 		Name:      res.GetName(),
@@ -169,7 +243,7 @@ func buildResourceNode(ctx context.Context, client *Client, res *unstructured.Un
 		Replicas:  getReplicaCount(res),
 	}
 	if depth >= 2 {
-		node.Children = walkOwnership(ctx, client, res)
+		node.Children = walkOwnership(ctx, client, res, cache)
 	}
 	return node
 }
@@ -284,26 +358,26 @@ func getReplicaCount(res *unstructured.Unstructured) string {
 // Only Deployment, StatefulSet, DaemonSet, and Job produce children.
 // On any API error the resource is returned without children and the error is
 // logged at DEBUG level (graceful degradation).
-func walkOwnership(ctx context.Context, client *Client, res *unstructured.Unstructured) []ResourceNode {
+func walkOwnership(ctx context.Context, client *Client, res *unstructured.Unstructured, cache *listCache) []ResourceNode {
 	switch res.GetKind() {
 	case kindDeployment:
-		return walkDeployment(ctx, client, res)
+		return walkDeployment(ctx, client, res, cache)
 	case kindStatefulSet:
-		return walkStatefulSet(ctx, client, res)
+		return walkStatefulSet(ctx, client, res, cache)
 	case kindDaemonSet:
-		return walkDaemonSet(ctx, client, res)
+		return walkDaemonSet(ctx, client, res, cache)
 	case kindJob:
-		return walkJob(ctx, client, res)
+		return walkJob(ctx, client, res, cache)
 	}
 	return nil
 }
 
 // walkDeployment returns ReplicaSet nodes, each with their Pod children.
-func walkDeployment(ctx context.Context, client *Client, res *unstructured.Unstructured) []ResourceNode {
+func walkDeployment(ctx context.Context, client *Client, res *unstructured.Unstructured, cache *listCache) []ResourceNode {
 	ns := res.GetNamespace()
 	uid := res.GetUID()
 
-	rsList, err := client.Clientset.AppsV1().ReplicaSets(ns).List(ctx, metav1.ListOptions{})
+	replicaSets, err := cache.replicaSetsIn(ctx, client, ns)
 	if err != nil {
 		output.Debug("failed to list replicasets",
 			"deployment", res.GetName(), "namespace", ns, "error", err)
@@ -311,8 +385,8 @@ func walkDeployment(ctx context.Context, client *Client, res *unstructured.Unstr
 	}
 
 	var nodes []ResourceNode
-	for i := range rsList.Items {
-		rs := &rsList.Items[i]
+	for i := range replicaSets {
+		rs := &replicaSets[i]
 		if !hasOwnerWithUID(rs.OwnerReferences, uid) {
 			continue
 		}
@@ -322,7 +396,7 @@ func walkDeployment(ctx context.Context, client *Client, res *unstructured.Unstr
 			Namespace: rs.Namespace,
 			Status:    replicaSetHealth(rs),
 			Replicas:  pluralPods(int64(rs.Status.Replicas)),
-			Children:  walkReplicaSet(ctx, client, rs),
+			Children:  walkReplicaSet(ctx, client, rs, cache),
 		}
 		nodes = append(nodes, node)
 	}
@@ -332,8 +406,8 @@ func walkDeployment(ctx context.Context, client *Client, res *unstructured.Unstr
 }
 
 // walkReplicaSet returns Pod nodes owned by a ReplicaSet.
-func walkReplicaSet(ctx context.Context, client *Client, rs *appsv1.ReplicaSet) []ResourceNode {
-	podList, err := client.Clientset.CoreV1().Pods(rs.Namespace).List(ctx, metav1.ListOptions{})
+func walkReplicaSet(ctx context.Context, client *Client, rs *appsv1.ReplicaSet, cache *listCache) []ResourceNode {
+	pods, err := cache.podsIn(ctx, client, rs.Namespace)
 	if err != nil {
 		output.Debug("failed to list pods",
 			"replicaset", rs.Name, "namespace", rs.Namespace, "error", err)
@@ -342,8 +416,8 @@ func walkReplicaSet(ctx context.Context, client *Client, rs *appsv1.ReplicaSet) 
 
 	uid := rs.UID
 	var nodes []ResourceNode
-	for i := range podList.Items {
-		pod := &podList.Items[i]
+	for i := range pods {
+		pod := &pods[i]
 		if !hasOwnerWithUID(pod.OwnerReferences, uid) {
 			continue
 		}
@@ -355,34 +429,34 @@ func walkReplicaSet(ctx context.Context, client *Client, rs *appsv1.ReplicaSet) 
 }
 
 // walkStatefulSet returns Pod nodes directly owned by a StatefulSet (no RS layer).
-func walkStatefulSet(ctx context.Context, client *Client, res *unstructured.Unstructured) []ResourceNode {
+func walkStatefulSet(ctx context.Context, client *Client, res *unstructured.Unstructured, cache *listCache) []ResourceNode {
 	return walkPodsOwnedBy(ctx, client, res.GetNamespace(), res.GetUID(),
-		"statefulset", res.GetName())
+		"statefulset", res.GetName(), cache)
 }
 
 // walkDaemonSet returns Pod nodes owned by a DaemonSet.
-func walkDaemonSet(ctx context.Context, client *Client, res *unstructured.Unstructured) []ResourceNode {
+func walkDaemonSet(ctx context.Context, client *Client, res *unstructured.Unstructured, cache *listCache) []ResourceNode {
 	return walkPodsOwnedBy(ctx, client, res.GetNamespace(), res.GetUID(),
-		"daemonset", res.GetName())
+		"daemonset", res.GetName(), cache)
 }
 
 // walkJob returns Pod nodes owned by a Job.
-func walkJob(ctx context.Context, client *Client, res *unstructured.Unstructured) []ResourceNode {
+func walkJob(ctx context.Context, client *Client, res *unstructured.Unstructured, cache *listCache) []ResourceNode {
 	return walkPodsOwnedBy(ctx, client, res.GetNamespace(), res.GetUID(),
-		"job", res.GetName())
+		"job", res.GetName(), cache)
 }
 
 // walkPodsOwnedBy lists all Pods in ns and returns those owned by the given uid.
-func walkPodsOwnedBy(ctx context.Context, client *Client, ns string, uid types.UID, kind, name string) []ResourceNode {
-	podList, err := client.Clientset.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
+func walkPodsOwnedBy(ctx context.Context, client *Client, ns string, uid types.UID, kind, name string, cache *listCache) []ResourceNode {
+	pods, err := cache.podsIn(ctx, client, ns)
 	if err != nil {
 		output.Debug("failed to list pods", kind, name, "namespace", ns, "error", err)
 		return nil
 	}
 
 	var nodes []ResourceNode
-	for i := range podList.Items {
-		pod := &podList.Items[i]
+	for i := range pods {
+		pod := &pods[i]
 		if !hasOwnerWithUID(pod.OwnerReferences, uid) {
 			continue
 		}
