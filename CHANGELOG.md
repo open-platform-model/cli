@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-alpha.7](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.6...v1.0.0-alpha.7) (2026-08-03)
+
+
+### Performance Improvements
+
+* **cli:** remove client-side api throttling and redundant listings ([#135](https://github.com/open-platform-model/cli/issues/135)) ([eaab04e](https://github.com/open-platform-model/cli/commit/eaab04ef835e409ba808fd70ec972be6d2d1759d))
+
 ## [1.0.0-alpha.6](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.5...v1.0.0-alpha.6) (2026-07-28)
 
 
