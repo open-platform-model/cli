@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-alpha.8](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.7...v1.0.0-alpha.8) (2026-08-07)
+
+
+### Documentation
+
+* forbid bare at-sign mentions in GitHub-destined text ([2d51cfb](https://github.com/open-platform-model/cli/commit/2d51cfbb177c65acb46063988d1b7f5415a5e581))
+
 ## [1.0.0-alpha.7](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.6...v1.0.0-alpha.7) (2026-08-03)
 
 
