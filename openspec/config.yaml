@@ -95,7 +95,7 @@ context: |
   - Types: feat, fix, refactor, docs, test, chore
   - Scope: cmd, cue, kubernetes, output, config, etc.
   - Keep descriptions concise
-  - End commits with the `Co-Authored-By: Claude <noreply@anthropic.com>` trailer
+  - Commits may end with the plain `Co-Authored-By: Claude <noreply@anthropic.com>` trailer (optional); never a session ID/URL or generated-with footer
 
 rules:
   proposal:
