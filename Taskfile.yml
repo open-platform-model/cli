@@ -9,8 +9,12 @@ vars:
   CLUSTER_NAME: opm-dev
   K8S_NODE_IMAGE: "kindest/node:v1.34.3@sha256:08497ee19eace7b4b5348db5c6a1591d7752b164530a36f855cb0f2bdcbadd48"
   REGISTRY_CONTAINER: '{{.REGISTRY_CONTAINER | default "opm-registry"}}'
+  # Canonical mapping (Registry Policy, root CLAUDE.md): opmodel.dev/* reads
+  # resolve from GHCR; testing.opmodel.dev/* from the local registry. An
+  # exported OPM_REGISTRY wins. The kind dev-cluster flow (cluster:operator)
+  # uses its own local mappings — see KIND_CUE_REGISTRY and hack/opm-config.cue.
   OPM_REGISTRY:
-    sh: echo "${OPM_REGISTRY:-opmodel.dev=localhost:5000+insecure,registry.cue.works}"
+    sh: echo "${OPM_REGISTRY:-opmodel.dev=ghcr.io/open-platform-model,testing.opmodel.dev=localhost:5000+insecure,registry.cue.works}"
   # The in-cluster spelling of OPM_REGISTRY. The host reaches the registry on
   # localhost:5000 (published port); a pod reaches the same container by its
   # name on kind's docker network. Same blobs, two addresses — module identity
@@ -194,8 +198,10 @@ tasks:
            ModuleInstance parks at Ready=False/PlatformNotReady.
 
       Idempotent: safe to re-run. Requires the registry container from
-      `task registry:start` in the opm/ repo (or any registry named
-      {{.REGISTRY_CONTAINER}} publishing :5000).
+      `task registry:start` at the workspace root (.tasks/registry/docker.yml),
+      or any registry named {{.REGISTRY_CONTAINER}} publishing :5000. This is a
+      local-registry-gated dev flow (Registry Policy, root CLAUDE.md): the
+      whole kind loop runs against the local registry by design.
     preconditions:
       - sh: kubectl cluster-info --context kind-{{.CLUSTER_NAME}} &>/dev/null
         msg: "Cluster 'kind-{{.CLUSTER_NAME}}' is not running. Run: task cluster:create"

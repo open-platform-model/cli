@@ -95,13 +95,14 @@ Read when entering `cli/`:
 ## Environment Notes
 
 - Go version in `go.mod`: `1.26.0`.
-- Integration + CUE workflows need registry config.
-- Local dev defaults:
+- Integration + CUE workflows need registry config. Follow the Registry Policy in the root `CLAUDE.md` — reads resolve `opmodel.dev/*` from GHCR:
 
 ```bash
-export OPM_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
-export CUE_REGISTRY='opmodel.dev=localhost:5000+insecure,registry.cue.works'
+export CUE_REGISTRY='opmodel.dev=ghcr.io/open-platform-model,testing.opmodel.dev=localhost:5000+insecure,registry.cue.works'
+export OPM_REGISTRY="$CUE_REGISTRY"
 ```
+
+- **Known deviation — kind dev-cluster flow:** `task cluster:operator` (and `hack/opm-config.cue`, `KIND_CUE_REGISTRY`) runs entirely against the local registry: it hard-requires the `opm-registry` container and routes `opmodel.dev/*` to it, because the loop iterates on locally published workspace modules and `opmodel.dev/modules/test/*` fixtures that are not on GHCR. Local-registry-gated — only run when the user asks for the kind dev flow. The shipped CLI default (`internal/config/templates.go`) is GHCR.
 
 ## Build And Dev Commands
 

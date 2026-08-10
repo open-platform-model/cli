@@ -13,8 +13,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  OPM_REGISTRY: 'opmodel.dev=localhost:5000+insecure,registry.cue.works'
-  CUE_REGISTRY: 'opmodel.dev=localhost:5000+insecure,registry.cue.works'
+  # GHCR mapping: no registry service runs in CI, so anything the tests
+  # genuinely resolve must be published (public) on GHCR — same arrangement as
+  # the library repo's CI.
+  OPM_REGISTRY: 'opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+  CUE_REGISTRY: 'opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
 
 jobs:
   lint:
