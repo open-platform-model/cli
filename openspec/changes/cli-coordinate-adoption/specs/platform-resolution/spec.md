@@ -2,7 +2,7 @@
 
 ## MODIFIED Requirements
 
-### Requirement: Platform File Shape
+### Requirement: Local platform file is a data-only CR-spec projection
 
 `~/.opm/platform.cue` (and any `--platform <file>`) SHALL be a data-only CUE file with no imports, shaped as the Platform CR spec projection: `name`, `type`, and `registry` — a map from a **major-suffixed** catalog module path (`…@vN`) to a subscription with optional `enable` and required scalar `version` (bare SemVer naming exactly one catalog build). The filter vocabulary (`filter.range`/`allow`/`deny`) SHALL NOT be accepted. The CLI SHALL validate against the embedded projection schema and decode into `synth.PlatformInput`. One decode function SHALL serve all three sources (flag file, cluster CR spec, local default).
 
@@ -21,6 +21,11 @@
 - **WHEN** a platform file's registry key carries no `@vN` suffix
 - **THEN** validation fails before any synthesis
 
+#### Scenario: Import-bearing platform file rejected
+
+- **WHEN** the platform file contains a CUE `import` declaration
+- **THEN** validation SHALL fail with an error stating the local platform file must be data-only
+
 ## ADDED Requirements
 
 ### Requirement: Legacy Cluster CR Tolerance
@@ -31,12 +36,3 @@ Decoding a **cluster CR spec** SHALL tolerate legacy stored shapes permanently: 
 
 - **WHEN** the cluster Platform CR carries a legacy `filter` block and no `version`
 - **THEN** decode succeeds, and materialization fails with the missing-version error plus the legacy-CR hint
-
-### Requirement: Cluster Platform Write Guard
-
-While the CLI's vendored operator manifest declares a Platform CRD without a `version` property on subscriptions, the CLI SHALL refuse to create the cluster Platform CR, with an error naming the operator retarget as the dependency — a structural CRD would silently prune the field, producing a platform that materializes nothing. The guard SHALL be removed when the vendored manifest carries the v2 CRD.
-
-#### Scenario: Write refused against pre-v2 CRD
-
-- **WHEN** `EnsureClusterPlatform` would write a subscription with `version` and the vendored CRD has no such property
-- **THEN** the write is refused with an actionable error and nothing is created

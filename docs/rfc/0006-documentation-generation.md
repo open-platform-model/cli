@@ -181,8 +181,8 @@ The tool produces one JSON file per CUE module containing all definitions:
 
 ```json
 {
-  "module": "opmodel.dev/core@v0",
-  "version": "v0.1.21",
+  "module": "opmodel.dev/core@v2",
+  "version": "v2.0.0-alpha.4",
   "definitions": [
     {
       "name": "Resource",

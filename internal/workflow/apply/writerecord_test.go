@@ -78,7 +78,7 @@ func TestWriteInstanceRecord_StatusFailureRetainsLegacySecret(t *testing.T) {
 	req := Request{
 		Result: &workflowrender.Result{
 			Instance: pkgmodule.InstanceMetadata{Name: name, Namespace: namespace, UUID: instID},
-			Module:   pkgmodule.ModuleMetadata{ModulePath: "opmodel.dev/modules", Name: name, Version: "0.1.0"},
+			Module:   pkgmodule.ModuleMetadata{ModulePath: "opmodel.dev/modules/" + name + "@v0", Name: name, Version: "0.1.0"},
 		},
 		K8sClient: client,
 		Log:       output.InstanceLogger("migrate-fail-test"),

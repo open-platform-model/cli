@@ -2,7 +2,7 @@
 
 ## MODIFIED Requirements
 
-### Requirement: Spec Writing (CLI-executor mode)
+### Requirement: Spec write contents
 
 On apply in CLI-executor mode, the CLI SHALL server-side-apply the CR spec with field manager `opm-cli`, containing: `spec.owner: cli`, `spec.module.path` and `spec.module.version` set to the module's declared identity **read verbatim from core-v2 metadata** — `spec.module.path` is `metadata.modulePath` as-is (the complete major-suffixed registry address; no composition from a parent prefix and a name), and `spec.module.version` is `metadata.version` normalized to the `v`-prefixed registry-tag form — and `spec.values` set to the single unified values blob that the render consumed. The pair applies for local-directory and locally-replaced module resolution as well; the CR MUST NOT contain a filesystem path. The declared pair is verified against fetched coordinates wherever it later meets a registry (handoff verification, operator acquire), not at write time.
 
@@ -15,3 +15,8 @@ On apply in CLI-executor mode, the CLI SHALL server-side-apply the CR spec with 
 
 - **WHEN** the written path is compared to the module's declared `metadata.modulePath`
 - **THEN** they SHALL be byte-identical — no major tag, leaf, or prefix is computed by the CLI
+
+#### Scenario: Values are the unified blob
+
+- **WHEN** applying with multiple `--values` files
+- **THEN** `spec.values` SHALL contain the single unified result the render consumed, not the individual layers

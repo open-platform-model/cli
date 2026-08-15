@@ -87,7 +87,7 @@ func copyDir(src, dst string) error {
 
 // TestE2E_ModBuild_FromExampleModule renders a synthetic instance for a module
 // using its debugValues. It builds the repo-local podinfo fixture — a current
-// core@v1-line module (tests/fixtures/modules/podinfo) — so the test carries no
+// core@v2-line module (tests/fixtures/modules/podinfo) — so the test carries no
 // dependency on a retired-line example or a sibling checkout. Skipped if the
 // registry is unreachable (CI runs with a pre-warmed registry per task 8.5).
 func TestE2E_ModBuild_FromExampleModule(t *testing.T) {
