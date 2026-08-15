@@ -1,4 +1,4 @@
-module: "example.com/module-with-debug-values@v0"
+module: "example.com/modules/module_with_debug_values@v0"
 language: {
 	version: "v0.17.0"
 }

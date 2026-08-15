@@ -2,7 +2,7 @@
 // valid #Module that defines #config but deliberately no debugValues, so
 // `opm module vet` reaches and fails the debugValues check — the same behavior
 // this fixture had on the retired v1alpha1 line.
-package simplemodule
+package simple_module
 
 import m "opmodel.dev/core@v1"
 

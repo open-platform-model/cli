@@ -2,7 +2,7 @@
 // debugValues path: a valid #Module whose debugValues make #config concrete, so
 // module vet passes. Ported from the retired v1alpha1 line (which carried only a
 // cue.mod — this restores the module body its name promises).
-package modulewithdebugvalues
+package module_with_debug_values
 
 import m "opmodel.dev/core@v1"
 

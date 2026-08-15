@@ -4,7 +4,7 @@
 // the image. Ported from the retired v1alpha1 catalog line; the old standalone
 // values.cue is folded into debugValues (a stray top-level `values:` field would
 // break the closed #Module).
-package secretsmodule
+package secrets_module
 
 import (
 	m "opmodel.dev/core@v1"

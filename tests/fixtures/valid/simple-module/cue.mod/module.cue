@@ -1,4 +1,4 @@
-module: "example.com/simple-module@v0"
+module: "example.com/modules/simple_module@v0"
 language: {
 	version: "v0.17.0"
 }
