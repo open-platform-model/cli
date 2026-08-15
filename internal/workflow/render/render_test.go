@@ -116,3 +116,33 @@ func TestUnifyValuesFiles_ConflictFails(t *testing.T) {
 	_, err := unifyValuesFiles(ctx, []string{f1, f2})
 	require.Error(t, err)
 }
+
+func writeD19File(t *testing.T, path, content string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+}
+
+// The D19 warning fires exactly when the effective module context carries a
+// local replacement; both render entries share warnLocalReplacement, so the
+// warning string cannot diverge between them.
+func TestWarnLocalReplacement(t *testing.T) {
+	assert.True(t, warnLocalReplacement(true))
+	assert.False(t, warnLocalReplacement(false))
+}
+
+func TestModuleContextHasLocalReplacement_PresentWithReplaceWith(t *testing.T) {
+	root := t.TempDir()
+	writeD19File(t, filepath.Join(root, "cue.mod", "module.cue"), `module: "example.com/main@v0"`)
+	writeD19File(t, filepath.Join(root, "cue.mod", "local-module.cue"),
+		`deps: "opmodel.dev/modules/podinfo@v0": replaceWith: "../podinfo"`)
+
+	assert.True(t, moduleContextHasLocalReplacement(root))
+}
+
+func TestModuleContextHasLocalReplacement_AbsentStaysSilent(t *testing.T) {
+	root := t.TempDir()
+	writeD19File(t, filepath.Join(root, "cue.mod", "module.cue"), `module: "example.com/main@v0"`)
+
+	assert.False(t, moduleContextHasLocalReplacement(root))
+}

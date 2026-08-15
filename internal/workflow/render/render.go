@@ -92,6 +92,7 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	if abs, absErr := filepath.Abs(opts.InstanceFilePath); absErr == nil {
 		sourceLocal = loader.HasLocalModuleReplacement(loader.ModuleRootFrom(filepath.Dir(abs)))
 	}
+	warnLocalReplacement(sourceLocal)
 
 	// Platform resolution + materialization only after the instance itself
 	// validated: cheap failures never hit the cluster or registry.
@@ -101,6 +102,35 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	}
 
 	return compileInstance(ctx, env, inst, opts.K8sConfig, sourceLocal)
+}
+
+// localReplacementWarning is the D19 (enhancement 0010) render warning: a
+// local-path replacement in cue.mod/local-module.cue means demanded keys were
+// resolved against local bytes, which may not correspond to any published
+// build of the replaced module. One string, shared by both render entries.
+const localReplacementWarning = "module context carries cue.mod/local-module.cue replacements: demanded keys may not correspond to published bytes"
+
+// warnLocalReplacement emits the D19 warning when the effective module context
+// carries a local replacement. Reports whether it warned (for tests); it never
+// blocks or alters the render.
+func warnLocalReplacement(replaced bool) bool {
+	if replaced {
+		output.Warn(localReplacementWarning)
+	}
+	return replaced
+}
+
+// moduleContextHasLocalReplacement is the module-entry D19 predicate: whether
+// the module directory's own module root carries a local-module.cue
+// replacement. Distinct from the module path's render provenance (always
+// local — the main module is the local directory); this detects replaced
+// *dependencies*.
+func moduleContextHasLocalReplacement(moduleDir string) bool {
+	abs, err := filepath.Abs(moduleDir)
+	if err != nil {
+		return false
+	}
+	return loader.HasLocalModuleReplacement(loader.ModuleRootFrom(abs))
 }
 
 // compileInstance runs the kernel compile on a processed instance and adapts
@@ -171,15 +201,15 @@ func compileInstance(
 		}
 	}
 
-	// Module metadata decoded from the embedded #module value (carries
-	// nameSnakeCase for the canonical spec.module reference — D6/D37).
+	// Module metadata decoded from the embedded #module value (carries the
+	// full registry modulePath for the canonical spec.module reference).
 	result.Module = decodeModuleMetadata(inst.Package.LookupPath(schema.Module))
 
 	return result, nil
 }
 
-// decodeModuleMetadata decodes the CLI's module metadata (including
-// nameSnakeCase) from a module CUE value.
+// decodeModuleMetadata decodes the CLI's module metadata from a module CUE
+// value.
 func decodeModuleMetadata(moduleVal cue.Value) pkgmodule.ModuleMetadata {
 	meta := pkgmodule.ModuleMetadata{}
 	if !moduleVal.Exists() {
