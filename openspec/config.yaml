@@ -150,3 +150,9 @@ rules:
     - Group implementation tasks by package
     - Include validation gates as final tasks (task lint, task test)
     - Include integration test tasks where K8s interaction is involved
+    - "NEVER include delivery operations as tasks: no committing, pushing, branching,
+      opening or merging PRs, tagging, cutting releases, and no commit-message or PR-body
+      hygiene checks. tasks.md covers implementation and verification only — delivery
+      happens afterwards under the repo's normal git workflow and needs no spelling out.
+      Sole exception: a change whose stated deliverable is itself a release or publishing
+      operation; there those steps ARE the implementation."
