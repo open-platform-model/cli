@@ -3,6 +3,9 @@ package cmdutil
 import (
 	"errors"
 	"fmt"
+	"strings"
+
+	liberrors "github.com/open-platform-model/library/opm/errors"
 
 	"github.com/open-platform-model/cli/internal/output"
 	pkgerrors "github.com/open-platform-model/cli/pkg/errors"
@@ -33,6 +36,21 @@ func PrintValidationError(msg string, err error) {
 		return
 	}
 
+	// Unresolved demands (kernel matcher, 0010 D28): render one line per
+	// demand with its contract key and same-base alternatives instead of the
+	// flat error blob the CUE-position heuristic would produce.
+	var demandsErr *liberrors.UnresolvedDemandsError
+	if errors.As(err, &demandsErr) {
+		n := len(demandsErr.Demands)
+		noun := "demand"
+		if n != 1 {
+			noun = "demands"
+		}
+		output.Error(fmt.Sprintf("%s: %d unresolved %s", msg, n, noun))
+		output.Details(FormatUnresolvedDemands(demandsErr))
+		return
+	}
+
 	// Try to extract CUE errors from any wrapped error chain before falling back
 	// to the raw key-value format. Only use grouped display when at least one
 	// location has a valid source position — plain errors promoted by CUE have
@@ -43,6 +61,23 @@ func PrintValidationError(msg string, err error) {
 	}
 
 	output.Error(msg, "error", err)
+}
+
+// FormatUnresolvedDemands renders an unresolved-demands aggregate as one
+// block: per demand the component, kind, and contract key, followed by the
+// same-base alternatives the platform does implement (the actionable half of
+// the diagnostic) or an explicit nothing-implements line.
+func FormatUnresolvedDemands(demandsErr *liberrors.UnresolvedDemandsError) string {
+	var b strings.Builder
+	for _, d := range demandsErr.Demands {
+		fmt.Fprintf(&b, "component %q: unresolved %s demand %q\n", d.Component, d.Kind, d.FQN)
+		if len(d.Alternatives) > 0 {
+			fmt.Fprintf(&b, "  implemented at: %s\n", strings.Join(d.Alternatives, ", "))
+		} else {
+			b.WriteString("  nothing on this platform implements this contract\n")
+		}
+	}
+	return strings.TrimRight(b.String(), "\n")
 }
 
 // hasPositions reports whether any location in any group has a valid source

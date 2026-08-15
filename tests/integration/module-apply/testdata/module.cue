@@ -1,18 +1,18 @@
-// Integration-test fixture for `opm module apply` (core@v1 line). The api
+// Integration-test fixture for `opm module apply` (core@v2 line). The api
 // component is gated on #config.api.enabled so the test can verify the prune
 // path by re-applying with values_api_off.cue.
 package module_apply_itest
 
 import (
-	m "opmodel.dev/core@v1"
-	res "opmodel.dev/catalogs/opm/resources"
+	m "opmodel.dev/core@v2"
+	res "opmodel.dev/catalogs/opm/resources/v1beta1"
 )
 
 m.#Module
 
 metadata: {
-	modulePath:       "example.com/modules"
-	name:             "module-apply-itest"
+	name:             "module_apply_itest"
+	modulePath:       "example.com/modules/module_apply_itest@v0"
 	version:          "0.1.0"
 	description: "Integration-test fixture for opm module apply"
 }

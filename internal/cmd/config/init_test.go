@@ -135,16 +135,18 @@ func TestConfigInit_ConfigContent(t *testing.T) {
 	assert.NotContains(t, configStr, "providers")
 	assert.NotContains(t, configStr, "import")
 
-	// Check platform.cue content: seeded official catalog subscriptions
-	// with explicit ranges (enhancement 0006 D39)
+	// Check platform.cue content: the single seeded catalog subscription
+	// with an explicit pinned version (enhancement 0006 D39; 0010 scalar
+	// subscriptions). No filter vocabulary, no retired kubernetes catalog.
 	platformFile := filepath.Join(tmpHome, ".opm", "platform.cue")
 	platformContent, err := os.ReadFile(platformFile)
 	require.NoError(t, err)
 
 	platformStr := string(platformContent)
-	assert.Contains(t, platformStr, "opmodel.dev/catalogs/opm")
-	assert.Contains(t, platformStr, "opmodel.dev/catalogs/kubernetes")
-	assert.Contains(t, platformStr, "range:")
+	assert.Contains(t, platformStr, "opmodel.dev/catalogs/opm@v2")
+	assert.Contains(t, platformStr, "version:")
+	assert.NotContains(t, platformStr, "opmodel.dev/catalogs/kubernetes")
+	assert.NotContains(t, platformStr, "filter")
 }
 
 func TestConfigInit_OutputMessage(t *testing.T) {

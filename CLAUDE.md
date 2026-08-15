@@ -99,6 +99,13 @@ Read when entering `cli/`:
 ## Environment Notes
 
 - Go version in `go.mod`: `1.26.0`.
+- **Schema line: OPM v2.** The CLI embeds the library on the core v2 line; the
+  platform surface is scalar subscriptions (`{enable?, version!}`, registry keys
+  carry the catalog's major suffix), and module identity is read verbatim from
+  core-v2 metadata (`metadata.modulePath` is the complete registry address). CUE
+  fixtures pin `opmodel.dev/core` `v2.0.0-alpha.4` and `opmodel.dev/catalogs/opm`
+  `v2.0.0-alpha.3`; the seeded platform template pins the same catalog build
+  (mirror peers: `hack/platform.cue`, the operator's sample Platform).
 - Integration + CUE workflows need registry config. Follow the Registry Policy in the root `CLAUDE.md` — reads resolve `opmodel.dev/*` from GHCR:
 
 ```bash

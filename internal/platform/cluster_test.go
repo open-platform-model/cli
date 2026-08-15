@@ -43,8 +43,8 @@ func testInput() synth.PlatformInput {
 		Name: "cluster",
 		Type: "kubernetes",
 		Subscriptions: map[string]synth.SubscriptionSpec{
-			"opmodel.dev/catalogs/opm": {
-				Filter: &synth.FilterSpec{Range: ">=1.0.0-0 <2.0.0-0"},
+			"opmodel.dev/catalogs/opm@v2": {
+				Version: "2.0.0-alpha.3",
 			},
 		},
 	}
@@ -98,10 +98,10 @@ func TestEnsureClusterPlatform_CreatesWhenAbsent(t *testing.T) {
 	_, hasName := spec["name"]
 	assert.False(t, hasName, "spec must not carry a name field")
 
-	rng, _, err := unstructured.NestedString(created.Object,
-		"spec", "registry", "opmodel.dev/catalogs/opm", "filter", "range")
+	version, _, err := unstructured.NestedString(created.Object,
+		"spec", "registry", "opmodel.dev/catalogs/opm@v2", "version")
 	require.NoError(t, err)
-	assert.Equal(t, ">=1.0.0-0 <2.0.0-0", rng)
+	assert.Equal(t, "2.0.0-alpha.3", version)
 }
 
 func TestEnsureClusterPlatform_AlreadyExistsIsNoop(t *testing.T) {

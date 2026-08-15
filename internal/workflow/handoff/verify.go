@@ -2,9 +2,11 @@ package handoff
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
+	liberrors "github.com/open-platform-model/library/opm/errors"
 	"github.com/open-platform-model/library/opm/helper/synth"
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/materialize"
@@ -69,9 +71,7 @@ func VerificationDigest(ctx context.Context, in VerificationInput) (string, erro
 
 	mod, err := k.AcquireModuleFromRegistry(ctx, in.ModulePath, in.ModuleVersion)
 	if err != nil {
-		return "", fmt.Errorf(
-			"cannot resolve module %s@%s from the registry — the operator would fail the same way; publish the module (or correct spec.module) before handing off: %w",
-			in.ModulePath, in.ModuleVersion, err)
+		return "", acquireFailureError(in.ModulePath, in.ModuleVersion, err)
 	}
 
 	// The CR's spec.values replayed as the synthesis input. An instance with no
@@ -126,6 +126,24 @@ func VerificationDigest(ctx context.Context, in VerificationInput) (string, erro
 	return digest, nil
 }
 
+// acquireFailureError shapes a registry-acquire failure for handoff
+// verification. An identity mismatch is not a missing artifact: the fetch
+// succeeded but the artifact's declared metadata disagrees with the
+// coordinate it was fetched by (library acquire-time verification), so
+// attributing it to "not published" would send the user to the wrong fix.
+// Every other failure keeps the publish hint.
+func acquireFailureError(modulePath, moduleVersion string, err error) error {
+	var idErr *liberrors.IdentityError
+	if errors.As(err, &idErr) {
+		return fmt.Errorf(
+			"module artifact identity mismatch at %s@%s: the artifact declares %s %q but was fetched by %q — republish the module with truthful metadata (or correct spec.module) before handing off: %w",
+			modulePath, moduleVersion, idErr.Field, idErr.Declared, idErr.Fetched, err)
+	}
+	return fmt.Errorf(
+		"cannot resolve module %s@%s from the registry — the operator would fail the same way; publish the module (or correct spec.module) before handing off: %w",
+		modulePath, moduleVersion, err)
+}
+
 // materializeClusterPlatform resolves the platform for a verification render.
 // The cluster Platform is the only permitted source (0006 D11): there is no
 // --platform flag on handoff, and unlike every other render path a failure to
@@ -151,7 +169,7 @@ func materializeClusterPlatform(ctx context.Context, k *kernel.Kernel, in Verifi
 
 	mp, err := platform.Materialize(ctx, k, input)
 	if err != nil {
-		return nil, fmt.Errorf("materializing the cluster Platform %q for verification: %w", name, err)
+		return nil, fmt.Errorf("materializing the cluster Platform %q for verification: %w", name, platform.WrapClusterMaterializeError(err))
 	}
 	return mp, nil
 }

@@ -69,7 +69,7 @@ if value.Err() != nil {
 ```
 
 This is the heaviest path. Use it when you need full import resolution (e.g., modules
-that import `opmodel.dev/core@v0`).
+that import `opmodel.dev/core@v2`).
 
 **Overlay injection** — inject generated CUE files without writing to disk:
 
@@ -251,7 +251,7 @@ go func() {
 }()
 ```
 
-For modules with external imports (e.g., `opmodel.dev/core@v0`), `ctx.BuildFile` cannot
+For modules with external imports (e.g., `opmodel.dev/core@v2`), `ctx.BuildFile` cannot
 resolve those imports. Use the reload-per-goroutine strategy instead:
 
 ```go
@@ -426,7 +426,7 @@ val := ctx.BuildFile(fresh)
 ```
 
 **Limitation:** `ctx.BuildFile` does not resolve external imports. If the CUE source
-contains `import "opmodel.dev/core@v0"`, BuildFile will fail. For those cases, format
+contains `import "opmodel.dev/core@v2"`, BuildFile will fail. For those cases, format
 the modified AST to bytes, write it as an overlay, and use `load.Instances`:
 
 ```go

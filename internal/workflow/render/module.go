@@ -68,6 +68,11 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	}
 	mod.Source = src
 
+	// D19: a replaced dependency in the module's own cue.mod means demanded
+	// keys may not correspond to published bytes (distinct from this path's
+	// always-local render provenance below).
+	warnLocalReplacement(moduleContextHasLocalReplacement(opts.ModulePath))
+
 	values, err := resolveModuleValues(k.CueContext(), modVal, opts.ValuesFiles)
 	if err != nil {
 		printValidationError(err)

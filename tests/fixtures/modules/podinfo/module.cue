@@ -5,23 +5,24 @@
 // CLI and kernel render paths over the SAME fixture, not from matching the
 // operator's copy (enhancement 0006 slice C2, design LD3).
 //
-// podinfo — stateless web example module (opmodel.dev/core@v1). Renders a
+// podinfo — stateless web example module (opmodel.dev/core@v2). Renders a
 // Deployment + Service via the catalog's deployment- and service-transformers,
 // with an HTTP livenessProbe (/healthz) and readinessProbe (/readyz) on the
-// podinfo HTTP port (9898).
+// podinfo HTTP port (9898). Serves as a real-world "getting started" example a
+// newcomer can apply against a running operator to see OPM work end-to-end.
 package podinfo
 
 import (
-	m "opmodel.dev/core@v1"
-	res "opmodel.dev/catalogs/opm/resources"
+	m "opmodel.dev/core@v2"
+	res "opmodel.dev/catalogs/opm/resources/v1beta1"
 )
 
 m.#Module
 
 metadata: {
-	modulePath:  "opmodel.dev/modules/test"
 	name:        "podinfo"
-	version:     "0.1.3"
+	modulePath:  "opmodel.dev/modules/test/podinfo@v0"
+	version:     "0.1.4"
 	description: "Stateless web example — Deployment + Service with HTTP liveness/readiness probes"
 }
 

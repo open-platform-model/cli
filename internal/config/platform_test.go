@@ -59,7 +59,7 @@ type: "kubernetes"
 
 func TestValidatePlatformFile_MissingRequiredFields(t *testing.T) {
 	path := writePlatform(t, `registry: {
-	"opmodel.dev/catalogs/opm": {}
+	"opmodel.dev/catalogs/opm@v2": {version: "2.0.0-alpha.3"}
 }
 `)
 	err := ValidatePlatformFile(path)
@@ -68,12 +68,15 @@ func TestValidatePlatformFile_MissingRequiredFields(t *testing.T) {
 }
 
 func TestValidatePlatformFile_InvalidSubscriptionShape(t *testing.T) {
+	// The retired filter vocabulary is an unknown field under the scalar
+	// subscription shape.
 	path := writePlatform(t, `name: "cluster"
 type: "kubernetes"
 registry: {
-	"opmodel.dev/catalogs/opm": {
+	"opmodel.dev/catalogs/opm@v2": {
+		version: "2.0.0-alpha.3"
 		filter: {
-			range: 42
+			range: ">=1.0.0-0 <2.0.0-0"
 		}
 	}
 }

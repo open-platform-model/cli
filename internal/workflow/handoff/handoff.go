@@ -212,7 +212,7 @@ func verify(ctx context.Context, req Request, rec *inventory.Record) error {
 
 	// The path already carries its major-version tag (…/podinfo@v0), so the
 	// pinned version is reported as its own field rather than concatenated —
-	// "…podinfo@v0@v0.1.3" reads like a malformed reference.
+	// "…podinfo@v0@v0.1.4" reads like a malformed reference.
 	req.Log.Info("verifying the published module reproduces the deployed state",
 		"module", rec.ModulePath, "version", rec.ModuleVersion)
 

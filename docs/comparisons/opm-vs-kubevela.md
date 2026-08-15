@@ -139,7 +139,7 @@ Here's the equivalent from `catalog/v0/examples/modules/basic_module.cue`:
 package modules
 
 import (
-    core "opmodel.dev/core@v0"
+    core "opmodel.dev/core@v2"
     components "opmodel.dev/examples/components@v0"
 )
 
@@ -318,7 +318,7 @@ Resources (the nouns) and Traits (the adjectives), then embed them into a Compon
 package components
 
 import (
-    core "opmodel.dev/core@v0"
+    core "opmodel.dev/core@v2"
     workload_resources "opmodel.dev/resources/workload@v0"
     storage_resources "opmodel.dev/resources/storage@v0"
     workload_traits "opmodel.dev/traits/workload@v0"

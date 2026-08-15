@@ -18,7 +18,7 @@ var (
 	BuildDate = "unknown"
 
 	// CUESDKVersion is the CUE SDK version embedded at build time.
-	CUESDKVersion = "v0.15.0"
+	CUESDKVersion = "v0.17.1"
 )
 
 // Info contains version information.

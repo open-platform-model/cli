@@ -8,9 +8,9 @@
 // SynthesizePlatform → Materialize chain (the operator's own ingestion
 // path) against the registry in OPM_REGISTRY.
 //
-// The default platform subscribes to the official catalogs
-// (opmodel.dev/catalogs/opm, opmodel.dev/catalogs/kubernetes). When the
-// registry does not serve them, the test SKIPS unless
+// The default platform subscribes to the single first-party catalog
+// (opmodel.dev/catalogs/opm@v2) at a pinned version. When the
+// registry does not serve it, the test SKIPS unless
 // OPM_ITEST_PLATFORM_MATERIALIZE=1 forces a hard failure — CI registries
 // that only publish example modules stay green while a fully-populated
 // local registry exercises the real path.
@@ -47,7 +47,7 @@ func run() error {
 		fmt.Println("SKIP: neither OPM_REGISTRY nor CUE_REGISTRY is set")
 		return nil
 	}
-	// The kernel's schema OCILoader resolves opmodel.dev/core@v1 against the
+	// The kernel's schema OCILoader resolves opmodel.dev/core@v2 against the
 	// process environment, not the kernel registry option — mirror the
 	// resolved registry into CUE_REGISTRY for the schema fetch.
 	if os.Getenv("CUE_REGISTRY") == "" {
