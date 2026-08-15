@@ -13,7 +13,6 @@ import (
 	"github.com/open-platform-model/library/opm/helper/synth"
 
 	"github.com/open-platform-model/cli/internal/inventory"
-	"github.com/open-platform-model/cli/internal/operator"
 	"github.com/open-platform-model/cli/internal/output"
 	pkgcore "github.com/open-platform-model/cli/pkg/core"
 )
@@ -42,11 +41,6 @@ func ClusterSpecGetterFor(dyn dynamic.Interface) ClusterSpecGetter {
 	}
 }
 
-// platformCRDHasSubscriptionVersion is the write guard's probe, a variable
-// only as a test seam (the seed-behavior tests exercise the post-guard
-// paths). Deleted together with the guard at the operator re-vendor.
-var platformCRDHasSubscriptionVersion = operator.PlatformCRDHasSubscriptionVersion
-
 // EnsureClusterPlatform seeds the singleton cluster Platform from the
 // resolved local platform spec, write-if-absent (D12/D22): a plain create
 // with field manager opm-cli, treating AlreadyExists as success-noop.
@@ -54,18 +48,6 @@ var platformCRDHasSubscriptionVersion = operator.PlatformCRDHasSubscriptionVersi
 // A Forbidden create degrades to a warning (D17: the render already
 // succeeded against the local platform).
 func EnsureClusterPlatform(ctx context.Context, dyn dynamic.Interface, in synth.PlatformInput) error {
-	// Transitional write guard: while the vendored operator CRD predates the
-	// scalar subscription `version` field, the API server's structural schema
-	// would silently prune it — seeding would create a platform that
-	// materializes nothing, with no error anywhere. Refuse instead. The guard
-	// (and operator.PlatformCRDHasSubscriptionVersion) is deleted when the
-	// embedded manifest carries the v2 CRD.
-	if !platformCRDHasSubscriptionVersion() {
-		return fmt.Errorf(
-			"refusing to seed the cluster Platform: the embedded operator manifest (%s) has no subscription `version` property, so the API server would silently prune it — a platform that materializes nothing; this lifts when the CLI vendors the operator-library-retarget release",
-			operator.PinnedOperatorVersion)
-	}
-
 	w := wireFromInput(in)
 
 	// The CR keeps the name in metadata; the singleton's name is fixed.

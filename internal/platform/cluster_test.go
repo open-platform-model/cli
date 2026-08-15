@@ -17,7 +17,6 @@ import (
 	"github.com/open-platform-model/library/opm/helper/synth"
 
 	"github.com/open-platform-model/cli/internal/inventory"
-	"github.com/open-platform-model/cli/internal/operator"
 )
 
 // newFakeDynamic builds a fake dynamic client that knows the Platform GVR,
@@ -84,40 +83,7 @@ func TestClusterSpecGetterFor_ForbiddenIsFallback(t *testing.T) {
 	assert.Contains(t, unavailable, "RBAC")
 }
 
-// stubCRDSupportsVersion stubs the transitional write guard's probe so the
-// seed-behavior tests exercise the post-guard paths. The stub and the guard
-// tests below are deleted together with the guard at the operator re-vendor.
-func stubCRDSupportsVersion(t *testing.T, supported bool) {
-	t.Helper()
-	prev := platformCRDHasSubscriptionVersion
-	platformCRDHasSubscriptionVersion = func() bool { return supported }
-	t.Cleanup(func() { platformCRDHasSubscriptionVersion = prev })
-}
-
-func TestEnsureClusterPlatform_RefusedWhileCRDLacksVersion(t *testing.T) {
-	stubCRDSupportsVersion(t, false)
-	dyn := newFakeDynamic()
-
-	err := EnsureClusterPlatform(context.Background(), dyn, testInput())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "operator-library-retarget")
-
-	// Nothing was created.
-	_, getErr := dyn.Resource(inventory.PlatformGVR).Get(context.Background(),
-		inventory.PlatformSingletonName, metav1.GetOptions{})
-	assert.True(t, apierrors.IsNotFound(getErr))
-}
-
-func TestEnsureClusterPlatform_EmbeddedManifestGuardState(t *testing.T) {
-	// Pins the real probe to the vendored manifest's actual capability: while
-	// the embedded CRD lacks the subscription version property the guard must
-	// hold. Flip this assertion when `task operator:sync` vendors the v2 CRD
-	// (the guard is deleted then).
-	assert.False(t, operator.PlatformCRDHasSubscriptionVersion())
-}
-
 func TestEnsureClusterPlatform_CreatesWhenAbsent(t *testing.T) {
-	stubCRDSupportsVersion(t, true)
 	dyn := newFakeDynamic()
 
 	require.NoError(t, EnsureClusterPlatform(context.Background(), dyn, testInput()))
@@ -139,7 +105,6 @@ func TestEnsureClusterPlatform_CreatesWhenAbsent(t *testing.T) {
 }
 
 func TestEnsureClusterPlatform_AlreadyExistsIsNoop(t *testing.T) {
-	stubCRDSupportsVersion(t, true)
 	existing := clusterPlatformObj(map[string]any{
 		"type": "pre-existing",
 	})
@@ -157,7 +122,6 @@ func TestEnsureClusterPlatform_AlreadyExistsIsNoop(t *testing.T) {
 }
 
 func TestEnsureClusterPlatform_ForbiddenDegradesToWarning(t *testing.T) {
-	stubCRDSupportsVersion(t, true)
 	dyn := newFakeDynamic()
 	dyn.PrependReactor("create", "platforms", func(k8stesting.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewForbidden(
@@ -170,7 +134,6 @@ func TestEnsureClusterPlatform_ForbiddenDegradesToWarning(t *testing.T) {
 }
 
 func TestEnsureClusterPlatform_OtherErrorIsFatal(t *testing.T) {
-	stubCRDSupportsVersion(t, true)
 	dyn := newFakeDynamic()
 	dyn.PrependReactor("create", "platforms", func(k8stesting.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(assert.AnError)
