@@ -18,9 +18,9 @@ package schema
 	// It does not affect matching.
 	type!: string & !=""
 
-	// registry is the set of catalog subscriptions keyed by catalog CUE
-	// module path (e.g. "opmodel.dev/catalogs/opm").
-	registry?: [string]: #Subscription
+	// registry is the set of catalog subscriptions keyed by the catalog's
+	// major-suffixed CUE module path (e.g. "opmodel.dev/catalogs/opm@v2").
+	registry?: [=~"@v[0-9]+$"]: #Subscription
 }
 
 // #Subscription is a single catalog subscription, projecting core
@@ -30,18 +30,8 @@ package schema
 	// default (true).
 	enable?: bool
 
-	// filter optionally constrains the subscribed versions.
-	filter?: #SubscriptionFilter
-}
-
-// #SubscriptionFilter mirrors core #SubscriptionFilter.
-#SubscriptionFilter: {
-	// range is a SemVer constraint expression (e.g. ">=1.0.0-0 <2.0.0-0").
-	range?: string
-
-	// allow force-includes specific versions regardless of range.
-	allow?: [...string]
-
-	// deny force-excludes specific versions from the survivor set.
-	deny?: [...string]
+	// version pins the subscription to exactly one published catalog build
+	// (bare SemVer, e.g. "2.0.0-alpha.3"). Required: the platform names the
+	// builds it materializes; there is no range selection.
+	version!: string & !=""
 }

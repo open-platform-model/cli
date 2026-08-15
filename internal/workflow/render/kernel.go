@@ -61,6 +61,9 @@ func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.Globa
 
 	mp, err := platform.Materialize(ctx, k, in)
 	if err != nil {
+		if res.Source == platform.SourceClusterCR {
+			err = platform.WrapClusterMaterializeError(err)
+		}
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("materializing platform (source %s): %w", res.Source, err)}
 	}
 

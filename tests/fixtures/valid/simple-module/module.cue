@@ -1,16 +1,16 @@
-// Vet fixture on the current schema line (opmodel.dev/core@v1). A structurally
+// Vet fixture on the current schema line (opmodel.dev/core@v2). A structurally
 // valid #Module that defines #config but deliberately no debugValues, so
 // `opm module vet` reaches and fails the debugValues check — the same behavior
 // this fixture had on the retired v1alpha1 line.
 package simple_module
 
-import m "opmodel.dev/core@v1"
+import m "opmodel.dev/core@v2"
 
 m.#Module
 
 metadata: {
-	modulePath: "example.com/modules"
-	name:       "simple-module"
+	name:       "simple_module"
+	modulePath: "example.com/modules/simple_module@v0"
 	version:    "0.1.0"
 }
 

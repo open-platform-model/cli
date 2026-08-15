@@ -47,7 +47,7 @@ const (
 	instanceName   = "ssa-ownership-itest"
 	namespace      = "default"
 	modulePath     = "opmodel.dev/modules/test/podinfo@v0"
-	moduleVersion  = "v0.1.3"
+	moduleVersion  = "v0.1.4"
 )
 
 func main() {

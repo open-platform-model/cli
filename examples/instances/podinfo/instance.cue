@@ -1,4 +1,4 @@
-// podinfo instance example (opmodel.dev/core@v1).
+// podinfo instance example (opmodel.dev/core@v2).
 // Imports the neutral podinfo test module
 // (opmodel.dev/modules/test/podinfo@v0) and binds it to a #ModuleInstance.
 // Renders a Deployment + Service with HTTP liveness/readiness probes.
@@ -8,7 +8,7 @@
 package podinfo
 
 import (
-	core "opmodel.dev/core@v1"
+	core "opmodel.dev/core@v2"
 	podinfo "opmodel.dev/modules/test/podinfo@v0"
 )
 

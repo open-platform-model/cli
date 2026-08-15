@@ -6,16 +6,13 @@ source: {
 	kind: "self"
 }
 deps: {
-	"opmodel.dev/catalogs/opm@v1": {
-		v: "v1.0.0-alpha.1"
+	"opmodel.dev/catalogs/opm@v2": {
+		v: "v2.0.0-alpha.3"
 	}
-	"opmodel.dev/core@v1": {
-		v: "v1.0.0-alpha.1"
-	}
-	"opmodel.dev/modules/test/hello-web@v0": {
-		v: "v0.1.2"
+	"opmodel.dev/core@v2": {
+		v: "v2.0.0-alpha.4"
 	}
 	"opmodel.dev/modules/test/podinfo@v0": {
-		v: "v0.1.3"
+		v: "v0.1.4"
 	}
 }

@@ -1,12 +1,16 @@
 package platform
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/open-platform-model/library/opm/helper/synth"
 
 	"github.com/open-platform-model/cli/internal/config"
 )
@@ -29,30 +33,21 @@ func TestDecodeFile_DefaultTemplate(t *testing.T) {
 
 	assert.Equal(t, "cluster", in.Name)
 	assert.Equal(t, "kubernetes", in.Type)
-	require.Len(t, in.Subscriptions, 2)
+	require.Len(t, in.Subscriptions, 1)
 
-	opm, ok := in.Subscriptions["opmodel.dev/catalogs/opm"]
+	opm, ok := in.Subscriptions["opmodel.dev/catalogs/opm@v2"]
 	require.True(t, ok)
 	assert.Nil(t, opm.Enable, "omitted enable defers to the schema default")
-	require.NotNil(t, opm.Filter)
-	assert.Equal(t, ">=1.0.0-0 <2.0.0-0", opm.Filter.Range)
-
-	k8s, ok := in.Subscriptions["opmodel.dev/catalogs/kubernetes"]
-	require.True(t, ok)
-	require.NotNil(t, k8s.Filter)
-	assert.Equal(t, ">=1.1.0-0 <2.0.0-0", k8s.Filter.Range)
+	assert.Equal(t, "2.0.0-alpha.3", opm.Version)
 }
 
-func TestDecodeFile_ExplicitEnableAndLists(t *testing.T) {
+func TestDecodeFile_ExplicitEnableAndVersion(t *testing.T) {
 	path := writePlatformFile(t, `name: "cluster"
 type: "kubernetes"
 registry: {
-	"opmodel.dev/catalogs/opm": {
-		enable: false
-		filter: {
-			allow: ["1.2.3"]
-			deny: ["1.2.4"]
-		}
+	"opmodel.dev/catalogs/opm@v2": {
+		enable:  false
+		version: "2.0.0-alpha.3"
 	}
 }
 `)
@@ -60,13 +55,10 @@ registry: {
 	in, err := DecodeFile(path)
 	require.NoError(t, err)
 
-	sub := in.Subscriptions["opmodel.dev/catalogs/opm"]
+	sub := in.Subscriptions["opmodel.dev/catalogs/opm@v2"]
 	require.NotNil(t, sub.Enable)
 	assert.False(t, *sub.Enable)
-	require.NotNil(t, sub.Filter)
-	assert.Equal(t, []string{"1.2.3"}, sub.Filter.Allow)
-	assert.Equal(t, []string{"1.2.4"}, sub.Filter.Deny)
-	assert.Empty(t, sub.Filter.Range)
+	assert.Equal(t, "2.0.0-alpha.3", sub.Version)
 }
 
 func TestDecodeFile_InvalidFileRejected(t *testing.T) {
@@ -76,16 +68,55 @@ func TestDecodeFile_InvalidFileRejected(t *testing.T) {
 	require.Error(t, err, "missing required name must fail schema validation")
 }
 
+func TestDecodeFile_FilterShapeRejected(t *testing.T) {
+	// The retired filter vocabulary is not accepted in files.
+	path := writePlatformFile(t, `name: "cluster"
+type: "kubernetes"
+registry: {
+	"opmodel.dev/catalogs/opm@v2": {
+		version: "2.0.0-alpha.3"
+		filter: range: ">=1.0.0-0 <2.0.0-0"
+	}
+}
+`)
+	_, err := DecodeFile(path)
+	require.Error(t, err, "a filter block must fail schema validation")
+}
+
+func TestDecodeFile_MissingVersionRejected(t *testing.T) {
+	path := writePlatformFile(t, `name: "cluster"
+type: "kubernetes"
+registry: {
+	"opmodel.dev/catalogs/opm@v2": {
+		enable: true
+	}
+}
+`)
+	_, err := DecodeFile(path)
+	require.Error(t, err, "a subscription without version must fail schema validation")
+}
+
+func TestDecodeFile_MajorFreeKeyRejected(t *testing.T) {
+	path := writePlatformFile(t, `name: "cluster"
+type: "kubernetes"
+registry: {
+	"opmodel.dev/catalogs/opm": {
+		version: "2.0.0-alpha.3"
+	}
+}
+`)
+	_, err := DecodeFile(path)
+	require.Error(t, err, "a registry key without the @vN suffix must fail schema validation")
+}
+
 func TestDecodeCRSpec_RoundTripsWireShape(t *testing.T) {
 	// The CR spec is the same wire shape the file uses.
 	spec := map[string]any{
 		"type": "kubernetes",
 		"registry": map[string]any{
-			"opmodel.dev/catalogs/opm": map[string]any{
-				"enable": true,
-				"filter": map[string]any{
-					"range": ">=1.0.0-0 <2.0.0-0",
-				},
+			"opmodel.dev/catalogs/opm@v2": map[string]any{
+				"enable":  true,
+				"version": "2.0.0-alpha.3",
 			},
 		},
 	}
@@ -95,17 +126,54 @@ func TestDecodeCRSpec_RoundTripsWireShape(t *testing.T) {
 
 	assert.Equal(t, "cluster", in.Name)
 	assert.Equal(t, "kubernetes", in.Type)
-	sub := in.Subscriptions["opmodel.dev/catalogs/opm"]
+	sub := in.Subscriptions["opmodel.dev/catalogs/opm@v2"]
 	require.NotNil(t, sub.Enable)
 	assert.True(t, *sub.Enable)
-	require.NotNil(t, sub.Filter)
-	assert.Equal(t, ">=1.0.0-0 <2.0.0-0", sub.Filter.Range)
+	assert.Equal(t, "2.0.0-alpha.3", sub.Version)
+}
+
+func TestDecodeCRSpec_LegacyFilterCRTolerated(t *testing.T) {
+	// A stored CR from before the scalar-version shape carries filter and no
+	// version. Decode must succeed (read tolerance is permanent); the empty
+	// version passes through to fail only at synthesis.
+	spec := map[string]any{
+		"type": "kubernetes",
+		"registry": map[string]any{
+			"opmodel.dev/catalogs/opm": map[string]any{
+				"filter": map[string]any{"range": ">=1.0.0-0 <2.0.0-0"},
+			},
+		},
+	}
+
+	in, err := DecodeCRSpec(spec, "cluster")
+	require.NoError(t, err, "legacy filter-shaped CRs must decode")
+
+	sub, ok := in.Subscriptions["opmodel.dev/catalogs/opm"]
+	require.True(t, ok)
+	assert.Empty(t, sub.Version, "missing version decodes empty and fails at synthesis")
 }
 
 func TestDecodeCRSpec_MissingType(t *testing.T) {
 	_, err := DecodeCRSpec(map[string]any{}, "cluster")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec.type")
+}
+
+func TestWrapClusterMaterializeError_LegacyCRHint(t *testing.T) {
+	// The kernel's missing-version refusal (what an empty Version from a
+	// legacy CR fails with at synthesis) gains the legacy-CR hint; the
+	// sentinel stays reachable for errors.Is.
+	synthErr := fmt.Errorf("synthesizing platform %q: %w", "cluster", synth.ErrSubscriptionMissingVersion)
+
+	wrapped := WrapClusterMaterializeError(synthErr)
+	require.Error(t, wrapped)
+	assert.ErrorIs(t, wrapped, synth.ErrSubscriptionMissingVersion)
+	assert.Contains(t, wrapped.Error(), "predate the scalar-version subscription shape")
+
+	// Any other error passes through unchanged.
+	other := errors.New("boom")
+	assert.Same(t, other, WrapClusterMaterializeError(other))
+	assert.NoError(t, WrapClusterMaterializeError(nil))
 }
 
 func TestWireRoundTrip_FileToInputToCRSpec(t *testing.T) {
@@ -117,5 +185,5 @@ func TestWireRoundTrip_FileToInputToCRSpec(t *testing.T) {
 	w := wireFromInput(in)
 	assert.Equal(t, in.Type, w.Type)
 	assert.Len(t, w.Registry, len(in.Subscriptions))
-	assert.Equal(t, ">=1.0.0-0 <2.0.0-0", w.Registry["opmodel.dev/catalogs/opm"].Filter.Range)
+	assert.Equal(t, "2.0.0-alpha.3", w.Registry["opmodel.dev/catalogs/opm@v2"].Version)
 }

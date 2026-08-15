@@ -53,7 +53,7 @@ func TestPreviewThinEditor_DescribesTheSpecEditOnly(t *testing.T) {
 	result := &workflowrender.Result{
 		Instance: pkgmodule.InstanceMetadata{Name: "podinfo", Namespace: "demo"},
 		Module: pkgmodule.ModuleMetadata{
-			ModulePath: "opmodel.dev/modules", Name: "podinfo", Version: "0.1.3",
+			ModulePath: "opmodel.dev/modules/test/podinfo@v0", Name: "podinfo", Version: "0.1.4",
 		},
 	}
 

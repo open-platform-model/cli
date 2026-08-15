@@ -151,7 +151,7 @@ func materializeClusterPlatform(ctx context.Context, k *kernel.Kernel, in Verifi
 
 	mp, err := platform.Materialize(ctx, k, input)
 	if err != nil {
-		return nil, fmt.Errorf("materializing the cluster Platform %q for verification: %w", name, err)
+		return nil, fmt.Errorf("materializing the cluster Platform %q for verification: %w", name, platform.WrapClusterMaterializeError(err))
 	}
 	return mp, nil
 }

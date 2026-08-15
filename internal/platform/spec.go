@@ -26,17 +26,13 @@ type wireSpec struct {
 	Registry map[string]wireSubscription `json:"registry,omitempty"`
 }
 
-// wireSubscription mirrors core #Subscription / the CR Subscription shape.
+// wireSubscription mirrors core #Subscription / the CR Subscription shape:
+// optional enable plus the required scalar version naming exactly one
+// catalog build. Version is empty only on legacy stored CRs (see
+// DecodeCRSpec); synthesis enforces it via ErrSubscriptionMissingVersion.
 type wireSubscription struct {
-	Enable *bool       `json:"enable,omitempty"`
-	Filter *wireFilter `json:"filter,omitempty"`
-}
-
-// wireFilter mirrors core #SubscriptionFilter.
-type wireFilter struct {
-	Range string   `json:"range,omitempty"`
-	Allow []string `json:"allow,omitempty"`
-	Deny  []string `json:"deny,omitempty"`
+	Enable  *bool  `json:"enable,omitempty"`
+	Version string `json:"version,omitempty"`
 }
 
 // toInput converts the wire shape into the kernel's typed platform input.
@@ -50,15 +46,10 @@ func (w wireSpec) toInput() synth.PlatformInput {
 	if len(w.Registry) > 0 {
 		in.Subscriptions = make(map[string]synth.SubscriptionSpec, len(w.Registry))
 		for path, sub := range w.Registry {
-			spec := synth.SubscriptionSpec{Enable: sub.Enable}
-			if sub.Filter != nil {
-				spec.Filter = &synth.FilterSpec{
-					Range: sub.Filter.Range,
-					Allow: sub.Filter.Allow,
-					Deny:  sub.Filter.Deny,
-				}
+			in.Subscriptions[path] = synth.SubscriptionSpec{
+				Enable:  sub.Enable,
+				Version: sub.Version,
 			}
-			in.Subscriptions[path] = spec
 		}
 	}
 	return in
@@ -87,6 +78,13 @@ func DecodeFile(path string) (synth.PlatformInput, error) {
 // admitted by the CRD's OpenAPI schema server-side, so only the one field the
 // CRD cannot default (spec.type) is re-checked here. Shape errors that slip
 // through surface from Materialize.
+//
+// Legacy stored shapes are tolerated permanently (never for files): a `filter`
+// key is ignored (json.Unmarshal drops unknown fields), and a subscription
+// with no `version` decodes with Version "" and fails only at synthesis via
+// the kernel's ErrSubscriptionMissingVersion — wrapped with the legacy-CR hint
+// by WrapClusterMaterializeError. Stored CRs keep their pre-v2 shape in etcd
+// until their next spec write, so this tolerance is not transitional.
 func DecodeCRSpec(spec map[string]any, name string) (synth.PlatformInput, error) {
 	// JSON round-trip: the CR spec is the same wire shape, produced by the
 	// CRD's serialization, so this is an explicit, lossless mapping.
@@ -116,15 +114,10 @@ func wireFromInput(in synth.PlatformInput) wireSpec {
 	if len(in.Subscriptions) > 0 {
 		w.Registry = make(map[string]wireSubscription, len(in.Subscriptions))
 		for path, sub := range in.Subscriptions {
-			ws := wireSubscription{Enable: sub.Enable}
-			if sub.Filter != nil {
-				ws.Filter = &wireFilter{
-					Range: sub.Filter.Range,
-					Allow: sub.Filter.Allow,
-					Deny:  sub.Filter.Deny,
-				}
+			w.Registry[path] = wireSubscription{
+				Enable:  sub.Enable,
+				Version: sub.Version,
 			}
-			w.Registry[path] = ws
 		}
 	}
 	return w

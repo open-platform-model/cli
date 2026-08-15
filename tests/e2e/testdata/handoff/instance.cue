@@ -7,12 +7,12 @@
 // module is refused outright (0006 D38), and the digest gate needs something to
 // compare against.
 //
-// Requires opmodel.dev/modules/test/podinfo@v0 v0.1.3 in the configured
+// Requires opmodel.dev/modules/test/podinfo@v0 v0.1.4 in the configured
 // registry (the local kind registry publishes it).
 package handoff_instance
 
 import (
-	core "opmodel.dev/core@v1"
+	core "opmodel.dev/core@v2"
 	podinfo "opmodel.dev/modules/test/podinfo@v0"
 )
 

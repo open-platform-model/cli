@@ -2,6 +2,7 @@ package platform
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/open-platform-model/library/opm/helper/synth"
@@ -23,4 +24,17 @@ func Materialize(ctx context.Context, k *kernel.Kernel, in synth.PlatformInput) 
 		return nil, fmt.Errorf("materializing platform %q: %w", in.Name, err)
 	}
 	return mp, nil
+}
+
+// WrapClusterMaterializeError adds the legacy-CR hint to a synthesis or
+// materialize failure of a cluster-CR-sourced platform: a missing
+// subscription version usually means a legacy filter-shaped CR stored before
+// the scalar-version shape. Permanent behavior, not transitional — stored CRs
+// keep their old shape in etcd until their next spec write. Any other error
+// (and a nil error) passes through unchanged.
+func WrapClusterMaterializeError(err error) error {
+	if err != nil && errors.Is(err, synth.ErrSubscriptionMissingVersion) {
+		return fmt.Errorf("%w — the cluster Platform may predate the scalar-version subscription shape (legacy filter-shaped CR); re-apply its spec with version set on every subscription", err)
+	}
+	return err
 }
