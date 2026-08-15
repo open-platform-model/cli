@@ -46,20 +46,24 @@ The builder SHALL validate the selected values against the module's `#config` sc
 - **THEN** the builder SHALL return an error identifying the offending field and the constraint that was violated
 
 ### Requirement: Instance metadata and labels are derived by CUE evaluation
-The builder SHALL load `#ModuleInstance` from `opmodel.dev/core@v1` (resolved from the module's own dependency cache) and inject the module, instance name, namespace, and values via `FillPath`. UUID, labels, and derived metadata fields SHALL be computed by CUE evaluation, not by Go code.
+
+The builder SHALL load `#ModuleInstance` from `opmodel.dev/core@v2` (resolved from the module's own dependency cache) and inject the module, instance name, namespace, and values via `FillPath`. UUID, labels, and derived metadata fields SHALL be computed by CUE evaluation, not by Go code.
 
 #### Scenario: UUID is deterministic
+
 - **WHEN** the same module, instance name, and namespace are provided
 - **THEN** the resulting `ModuleInstance.Metadata.UUID` SHALL be identical across builds
 
 #### Scenario: Labels are populated from CUE evaluation
+
 - **WHEN** the instance is built successfully
 - **THEN** `ModuleInstance.Metadata.Labels` SHALL contain all expected OPM labels as evaluated by `#ModuleInstance`
 
-#### Scenario: Core v1 schema loaded
+#### Scenario: Core v2 schema loaded
+
 - **WHEN** the builder loads the core schema
-- **THEN** it SHALL load `opmodel.dev/core@v1` (not `opmodel.dev/core@v0`)
-- **THEN** error messages SHALL reference `opmodel.dev/core@v1`
+- **THEN** it SHALL load `opmodel.dev/core@v2` (not `opmodel.dev/core@v1`)
+- **THEN** error messages SHALL reference `opmodel.dev/core@v2`
 
 ### Requirement: The resulting instance must be fully concrete
 The builder SHALL validate that the `#ModuleInstance` value is fully concrete after injection, and return an error if any field remains abstract or unresolved.
