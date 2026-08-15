@@ -65,6 +65,18 @@ func TestSourceDigest(t *testing.T) {
 	assert.Equal(t, "", sourceDigest("", ""))
 }
 
+// TestSourceDigestGoldenPeer pins the exact bytes of the digest for a fixed
+// canonical reference. The operator's ModuleSourceDigest
+// (opm-operator/internal/status) is the byte-identical peer computing
+// sha256(path + "@" + version) over the same pair read from the same CR; the
+// operator carries the mirror of this golden. A change that moves this value
+// breaks cross-actor digest comparability — fix the code, not the golden,
+// unless both sides move together.
+func TestSourceDigestGoldenPeer(t *testing.T) {
+	got := sourceDigest("opmodel.dev/modules/podinfo@v0", "v0.1.4")
+	assert.Equal(t, "sha256:abb734bab3f4ff7665b0f5da96352c68f0b539905501916df3b1a1c6a87e910d", got)
+}
+
 func TestFormatApplySummary(t *testing.T) {
 	summary := FormatApplySummary(&kubernetes.ApplyResult{Applied: 5, Created: 2, Configured: 1, Unchanged: 2})
 	assert.Equal(t, "applied 5 resources successfully (2 created, 1 configured, 2 unchanged)", summary)
