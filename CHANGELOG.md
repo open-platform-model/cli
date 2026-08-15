@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.0.0-alpha.9](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.8...v1.0.0-alpha.9) (2026-08-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* cross the CLI to core v2 and scalar platform subscriptions ([#141](https://github.com/open-platform-model/cli/issues/141))
+
+### Features
+
+* cross the CLI to core v2 and scalar platform subscriptions ([#141](https://github.com/open-platform-model/cli/issues/141)) ([691d794](https://github.com/open-platform-model/cli/commit/691d794be25396e756e34f6741c1e3a5a6ec5d4d))
+
+
+### Documentation
+
+* allow plain Claude co-author trailer; keep session-ID ban ([778fee4](https://github.com/open-platform-model/cli/commit/778fee41fbb37efb9f499b5517fb3355fc4585d3))
+
+
+### Miscellaneous Chores
+
+* **registry:** ghcr-first defaults, fix stale ci localhost mapping ([386a796](https://github.com/open-platform-model/cli/commit/386a796017ee9c40dd2288bba5df5a30a0ef22d7))
+
 ## [1.0.0-alpha.8](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.7...v1.0.0-alpha.8) (2026-08-07)
 
 
