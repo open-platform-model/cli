@@ -21,7 +21,7 @@ func TestInfoString(t *testing.T) {
 		GitCommit:     "abc123",
 		BuildDate:     "2026-01-29",
 		GoVersion:     "go1.25",
-		CUESDKVersion: "v0.15.0",
+		CUESDKVersion: "v0.17.1",
 	}
 
 	str := info.String()
@@ -30,5 +30,5 @@ func TestInfoString(t *testing.T) {
 	assert.Contains(t, str, "abc123")
 	assert.Contains(t, str, "2026-01-29")
 	assert.Contains(t, str, "go1.25")
-	assert.Contains(t, str, "v0.15.0")
+	assert.Contains(t, str, "v0.17.1")
 }
