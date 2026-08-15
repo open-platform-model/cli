@@ -47,7 +47,7 @@ func run() error {
 		fmt.Println("SKIP: neither OPM_REGISTRY nor CUE_REGISTRY is set")
 		return nil
 	}
-	// The kernel's schema OCILoader resolves opmodel.dev/core@v1 against the
+	// The kernel's schema OCILoader resolves opmodel.dev/core@v2 against the
 	// process environment, not the kernel registry option — mirror the
 	// resolved registry into CUE_REGISTRY for the schema fetch.
 	if os.Getenv("CUE_REGISTRY") == "" {
