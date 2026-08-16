@@ -235,6 +235,15 @@ Version: #VersionType | *"2.0.0-alpha.3" // x-release-please-version
 			wantDefaulted: true,
 		},
 		{
+			name: "hash-quoted literal reads through CUE unquoting",
+			in: `package identity
+
+Version: #"1.2.0"#
+`,
+			wantValue:     "1.2.0",
+			wantDefaulted: false,
+		},
+		{
 			name: "open field reads as empty",
 			in: `package identity
 

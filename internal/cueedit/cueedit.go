@@ -17,6 +17,7 @@ import (
 	"strconv"
 
 	"cuelang.org/go/cue/ast"
+	"cuelang.org/go/cue/literal"
 	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
 )
@@ -82,18 +83,7 @@ func SetIdentityVersion(dir, version string) (changed bool, err error) {
 	if bytes.Equal(edited, data) {
 		return false, nil
 	}
-
-	// The splice is byte surgery; prove the result still parses before it
-	// replaces the committed file.
-	if _, err := parser.ParseFile(path, edited); err != nil {
-		return false, fmt.Errorf("internal error: rewritten %s does not parse: %w", path, err)
-	}
-
-	info, err := os.Stat(path)
-	if err != nil {
-		return false, fmt.Errorf("stat %s: %w", path, err)
-	}
-	if err := writeFileAtomic(path, edited, info.Mode().Perm()); err != nil {
+	if err := verifyAndWrite(path, edited); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -114,9 +104,9 @@ func ReadIdentityVersion(dir string) (value string, defaulted bool, err error) {
 	if lit == nil {
 		return "", false, nil
 	}
-	value, err = strconv.Unquote(lit.Value)
+	value, err = literal.Unquote(lit.Value)
 	if err != nil {
-		return "", false, fmt.Errorf("%w: %s: Version literal %s is not a plain string: %w", ErrIdentityShape, path, lit.Value, err)
+		return "", false, fmt.Errorf("%w: %s: Version literal %s is not a string: %w", ErrIdentityShape, path, lit.Value, err)
 	}
 	return value, defaulted, nil
 }
@@ -163,19 +153,25 @@ func SetCueModModule(dir, modulePath string) (changed bool, err error) {
 	if bytes.Equal(edited, data) {
 		return false, nil
 	}
-
-	if _, err := parser.ParseFile(path, edited); err != nil {
-		return false, fmt.Errorf("internal error: rewritten %s does not parse: %w", path, err)
-	}
-
-	info, err := os.Stat(path)
-	if err != nil {
-		return false, fmt.Errorf("stat %s: %w", path, err)
-	}
-	if err := writeFileAtomic(path, edited, info.Mode().Perm()); err != nil {
+	if err := verifyAndWrite(path, edited); err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+// verifyAndWrite is the shared tail of every writer: the splice is byte
+// surgery, so prove the result still parses before it atomically replaces
+// the committed file. Callers have already established the edit is a real
+// change.
+func verifyAndWrite(path string, edited []byte) error {
+	if _, err := parser.ParseFile(path, edited); err != nil {
+		return fmt.Errorf("internal error: rewritten %s does not parse: %w", path, err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("stat %s: %w", path, err)
+	}
+	return writeFileAtomic(path, edited, info.Mode().Perm())
 }
 
 // loadIdentity reads and parses dir/identity/identity.cue and locates its

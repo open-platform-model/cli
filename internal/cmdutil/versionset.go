@@ -25,21 +25,24 @@ func RunVersionSet(kind publish.Kind, version string, pathArgs []string) error {
 		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err}
 	}
 
+	// The pre-read only supplies the message's old value; whether anything
+	// was written is the writer's own verdict, so the no-op decision has one
+	// home (cueedit's byte comparison) instead of a second copy here.
 	current, _, err := cueedit.ReadIdentityVersion(dir)
 	if err != nil {
 		return versionSetError(err)
 	}
-	if current == version {
-		output.Info(fmt.Sprintf("Version already %s; identity/identity.cue untouched", version))
-		return nil
-	}
 
-	if _, err := cueedit.SetIdentityVersion(dir, version); err != nil {
+	changed, err := cueedit.SetIdentityVersion(dir, version)
+	if err != nil {
 		return versionSetError(err)
 	}
-	if current == "" {
+	switch {
+	case !changed:
+		output.Info(fmt.Sprintf("Version already %s; identity/identity.cue untouched", version))
+	case current == "":
 		output.Info(output.FormatCheckmark(fmt.Sprintf("Set %s version %s (identity/identity.cue)", kind, version)))
-	} else {
+	default:
 		output.Info(output.FormatCheckmark(fmt.Sprintf("Set %s version %s -> %s (identity/identity.cue)", kind, current, version)))
 	}
 	return nil
