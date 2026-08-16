@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	cmdcatalog "github.com/open-platform-model/cli/internal/cmd/catalog"
 	cmdconfig "github.com/open-platform-model/cli/internal/cmd/config"
 	cmdinstance "github.com/open-platform-model/cli/internal/cmd/instance" // Was: cmdrelease "…/internal/cmd/release" (enhancement 0002 D6)
 	cmdmodule "github.com/open-platform-model/cli/internal/cmd/module"
@@ -51,6 +52,7 @@ func NewRootCmd() *cobra.Command {
 	// Add subcommands — sub-packages receive *config.GlobalConfig for dependency injection.
 	rootCmd.AddCommand(NewVersionCmd(&cfg))
 	rootCmd.AddCommand(cmdmodule.NewModuleCmd(&cfg))
+	rootCmd.AddCommand(cmdcatalog.NewCatalogCmd(&cfg))
 	rootCmd.AddCommand(cmdconfig.NewConfigCmd(&cfg))
 	rootCmd.AddCommand(cmdinstance.NewInstanceCmd(&cfg))
 	rootCmd.AddCommand(cmdoperator.NewOperatorCmd(&cfg))
