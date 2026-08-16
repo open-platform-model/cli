@@ -16,6 +16,6 @@
 
 ## 3. Specs, gates, record
 
-- [ ] 3.1 New spec `authoring-commands` (version-set contract).
-- [ ] 3.2 `CLAUDE.md` command map; `task fmt vet lint test` green.
+- [x] 3.1 New spec `authoring-commands` (version-set contract).
+- [x] 3.2 `CLAUDE.md` command map; `task fmt vet lint test` green.
 - [ ] 3.3 Record in `enhancements/0011/`: slice `cli-authoring-commands` → `in-progress` note that it lands as two changes (this + `cli-template-modules`); flip to `done` with both `openspec_ref`s when the second lands.

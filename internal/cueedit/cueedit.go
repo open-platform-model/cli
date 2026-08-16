@@ -290,27 +290,33 @@ func versionLiteral(expr ast.Expr) (lit *ast.BasicLit, defaulted bool) {
 			}
 		}
 	case *ast.BinaryExpr:
-		// Only "|" and "&" chains can hold the version literal; any other
-		// operator (comparison, arithmetic, pattern match) does not.
-		if e.Op == token.OR {
-			// Prefer the defaulted arm — that is the committed, release-owned
-			// declaration.
-			for _, side := range []ast.Expr{e.X, e.Y} {
-				if u, ok := side.(*ast.UnaryExpr); ok && u.Op == token.MUL {
-					if lit, _ := versionLiteral(u.X); lit != nil {
-						return lit, true
-					}
+		return binaryVersionLiteral(e)
+	}
+	return nil, false
+}
+
+// binaryVersionLiteral resolves versionLiteral over a binary expression: only
+// "|" and "&" chains can hold the version literal — any other operator
+// (comparison, arithmetic, pattern match) does not.
+func binaryVersionLiteral(e *ast.BinaryExpr) (lit *ast.BasicLit, defaulted bool) {
+	if e.Op != token.OR && e.Op != token.AND {
+		return nil, false
+	}
+	if e.Op == token.OR {
+		// Prefer the defaulted arm — that is the committed, release-owned
+		// declaration.
+		for _, side := range []ast.Expr{e.X, e.Y} {
+			if u, ok := side.(*ast.UnaryExpr); ok && u.Op == token.MUL {
+				if lit, _ := versionLiteral(u.X); lit != nil {
+					return lit, true
 				}
 			}
 		}
-		if e.Op == token.OR || e.Op == token.AND {
-			if lit, defaulted := versionLiteral(e.X); lit != nil {
-				return lit, defaulted
-			}
-			return versionLiteral(e.Y)
-		}
 	}
-	return nil, false
+	if lit, defaulted := versionLiteral(e.X); lit != nil {
+		return lit, defaulted
+	}
+	return versionLiteral(e.Y)
 }
 
 // span returns the byte offsets [start, end) of an expression in its file.
