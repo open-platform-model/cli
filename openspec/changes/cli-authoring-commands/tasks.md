@@ -10,9 +10,9 @@
 
 ## 2. version set
 
-- [ ] 2.1 Shared `runVersionSet` in `cmdutil`: read → no-op fast path ("already X") → set → report old → new; structural refusal via `ErrIdentityShape` pointing at `opm module vet`; exit 0/0/2.
-- [ ] 2.2 `opm module version set` + `opm catalog version set` cobra wiring (`version` subgroups); constructor tests.
-- [ ] 2.3 Real-repo fixtures per the graduation gate: copies of the shipped catalog and module identity files; idempotency, assertion preservation, and release-please-marker preservation asserted on both.
+- [x] 2.1 Shared `runVersionSet` in `cmdutil`: read → no-op fast path ("already X") → set → report old → new; structural refusal via `ErrIdentityShape` pointing at `opm module vet`; exit 0/0/2.
+- [x] 2.2 `opm module version set` + `opm catalog version set` cobra wiring (`version` subgroups); constructor tests.
+- [x] 2.3 Real-repo fixtures per the graduation gate: copies of the shipped catalog and module identity files; idempotency, assertion preservation, and release-please-marker preservation asserted on both.
 
 ## 3. Specs, gates, record
 
