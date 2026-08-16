@@ -79,9 +79,9 @@ M1: CLI Stability & Validation
  │
  ├──► M3: Distribution
  │     │
- │     ├── distribution-v1
+ │     ├── cli-publish-pipeline ··· (done)
  │     └── templates-v2
- │           └──► distribution-v1
+ │           └──► cli-publish-pipeline
  │
  └──► M4: Rendering Pipeline Maturity
        │
@@ -136,7 +136,7 @@ OCI-native module distribution — the ability to publish, discover, and consume
 
 **Major deliverables:**
 
-- **Module distribution** — `opm module publish` (push module to OCI registry), `opm module get` (pull module), `opm module update` (update dependencies), `opm module tidy` (tidy CUE module dependencies without the external `cue` binary). Uses oras-go for OCI, Docker `config.json` for auth. Strict SemVer only — no `@latest`. *(openspec change: distribution-v1)*
+- **Module distribution** — `opm module publish` and `opm catalog publish` landed as the identity-driven pipeline of enhancement 0011 (`internal/publish`): coordinates derive from the artifact's own `identity/identity.cue`, gates refuse in the fixed condition → evidence → consequence → action shape, the plan doubles as the dry run, and the push goes through CUE's own module machinery (`modzip` + `modregistry` via `modconfig`'s resolver — Docker `config.json` auth arrives through the same chain reads use; no oras-go). Strict SemVer only — no `@latest`. *(openspec change: cli-publish-pipeline; still open here: `opm module get` / `update` / `tidy`)*
 
 - **Template distribution** — `opm template list`, `get`, `show`, `validate`, `publish`. Replaces the V1 embedded templates with registry-distributed templates. V1 templates remain during transition. *(openspec change: templates-v2)*
 

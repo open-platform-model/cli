@@ -27,7 +27,7 @@
 - [ ] Add "opm mod list". It should list all modules in the defined namespace (default ns is, default). "-A" should list in all namespaces.
   - Note: Can now leverage `instance-id` labels for discovery (see deterministic-release-identity).
 - [ ] Add check during processing: Check if a module author has referenced "values" and not "#config" in a component. This will not work and should warn the user.
-  - This can be utilized with the future "opm mod publish" command, so that an author cannot publish a module that is not valid.
+  - `opm module publish` exists now (cli-publish-pipeline); this warning could land as a publish gate in `internal/publish/gates.go`, so an author cannot publish a module that is not valid.
 - [x] ~~"opm mod delete --name blog --namespace default --verbose" proceeds but with no change, 0 resources deleted. We should add validation to first look for the module and inform the caller if not found.~~
   - **Resolved:** Implemented in `refine-resource-discovery` change. Commands now return `NoResourcesFoundError` when no resources match the selector.
 - [x] ~~Add a flag to "opm mod apply" that will create the namespace if missing.~~
