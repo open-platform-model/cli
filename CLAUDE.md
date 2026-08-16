@@ -83,11 +83,11 @@ Read when entering `cli/`:
 
 - `adr/` - Architecture Decision Records
 - `cmd/opm/` - CLI entrypoint + root command wiring.
-- `internal/cmd/` - Cobra command implementations (command groups: `module`, `catalog`, `instance`, `config`, `operator`).
+- `internal/cmd/` - Cobra command implementations (command groups: `module`, `catalog`, `instance`, `config`, `operator`; `module`/`catalog` each carry a `version set` subgroup — offline, idempotent identity Version writes).
 - `internal/cmdutil/` - shared flags, annotations, command-facing helpers.
 - `internal/config/` - config resolution, schema validation, defaults.
 - `internal/publish/` - identity-driven publish pipeline (enhancement 0011): gates, refusal catalog, plan/dry-run, registry lookup + push; also the vet-shared identity/coordinate checks.
-- `internal/cueedit/` - surgical identity-file rewrites (D8's schema-fixed-path `Version` write; used by `publish --version`, reused by `version set`).
+- `internal/cueedit/` - surgical authoring-file rewrites (D8's schema-fixed-path identity `Version` write — idempotent, with a read — plus the cue.mod `module:` writer; used by `publish --version` and `version set`, the cue.mod writer's consumers land with `cli-template-modules`).
 - `internal/kubernetes/` - cluster ops, status, apply, delete, events.
 - `internal/output/` - terminal formatting, log output, tables, manifests.
 - `internal/instancefile/` - instance file detection + loading.

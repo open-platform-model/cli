@@ -70,7 +70,7 @@ func Push(ctx context.Context, opts Options, p *Plan) error {
 		return fmt.Errorf("internal error: push invoked on a refused plan")
 	}
 	if p.FillVersion != "" {
-		if err := cueedit.SetIdentityVersion(p.Dir, p.FillVersion); err != nil {
+		if _, err := cueedit.SetIdentityVersion(p.Dir, p.FillVersion); err != nil {
 			return fmt.Errorf("filling identity Version: %w", err)
 		}
 	}
