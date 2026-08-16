@@ -25,6 +25,7 @@ func NewModuleCmd(cfg *config.GlobalConfig) *cobra.Command {
 	c.AddCommand(NewModuleVetCmd(cfg))
 	c.AddCommand(NewModuleBuildCmd(cfg))
 	c.AddCommand(NewModuleApplyCmd(cfg))
+	c.AddCommand(NewModulePublishCmd(cfg))
 
 	return c
 }
