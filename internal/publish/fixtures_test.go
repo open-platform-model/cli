@@ -121,6 +121,20 @@ func emptyTestRegistry(t *testing.T) string {
 	return reg.Host() + "+insecure"
 }
 
+// baseOptions builds the Options runDir would run with, for tests that call
+// pipeline internals directly rather than through Run.
+func baseOptions(t *testing.T, dir string) Options {
+	t.Helper()
+	ctx := cuecontext.New()
+	return Options{
+		Dir:            dir,
+		Kind:           KindCatalog,
+		Context:        ctx,
+		IdentitySchema: stubSchema(t, ctx),
+		Registry:       emptyTestRegistry(t),
+	}
+}
+
 // runFixture runs the pipeline on files with the stub schema and an empty
 // in-process registry; tests that exercise the registry gates configure
 // their own.
