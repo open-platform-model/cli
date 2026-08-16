@@ -65,8 +65,13 @@ func (p *Plan) Render() string {
 		row("compat gate", compat)
 	}
 
+	// A catalog's registry work is done only when the compatibility walk
+	// finished too — a walk aborted mid-flight must not render the GO the
+	// gates never finished earning.
+	registryDone := p.RegistryChecked && (p.Kind != KindCatalog || p.CompatChecked)
+
 	switch {
-	case p.Go() && p.RegistryChecked:
+	case p.Go() && registryDone:
 		fmt.Fprintf(&b, "\n  GO — pushing %s:%s\n", p.RegistryRepo, p.Tag)
 	case p.Go():
 		// Every local gate passed but the already-published lookup never
