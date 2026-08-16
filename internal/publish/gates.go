@@ -94,6 +94,22 @@ func Run(ctx context.Context, opts Options) (*Plan, error) {
 	gatePackageName(p, a)
 	gateOverride(p, opts)
 
+	// The catalog-only local gates (D22): enumerate the member tree once,
+	// unify every member against the FQN gate and every trait's posture
+	// against the optional gate. Both are local — no registry is touched.
+	if p.Kind == KindCatalog {
+		if !opts.MemberFQNGateSchema.Exists() || !opts.TraitOptionalGateSchema.Exists() {
+			return nil, fmt.Errorf("publish: Options.MemberFQNGateSchema and Options.TraitOptionalGateSchema are required for catalog publish")
+		}
+		var refusals []Refusal
+		p.members, refusals = enumerateMembers(opts, absDir)
+		for _, r := range refusals {
+			p.refuse(r)
+		}
+		gateMemberFQN(p, opts, a, p.members)
+		gateTraitOptional(p, opts, p.members)
+	}
+
 	// Gate: the tag must not already be published (D15) — the one registry
 	// round-trip before the push. The dry run runs it too: a dry run
 	// surfaces rejections, never defers them.

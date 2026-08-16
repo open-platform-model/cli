@@ -47,6 +47,7 @@ func gateAlreadyPublished(ctx context.Context, p *Plan, opts Options) error {
 	}
 	p.RegistryChecked = true
 	p.registryClient = client
+	p.publishedVersions = versions
 	for _, v := range versions {
 		if v != p.Tag {
 			continue

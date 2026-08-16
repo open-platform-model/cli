@@ -51,6 +51,20 @@ func (p *Plan) Render() string {
 	}
 	row("local override", override)
 
+	// The catalog gates' per-gate outcomes (D22, D9). Text-only — plan --json
+	// remains deferred.
+	if p.Kind == KindCatalog {
+		g := p.CatalogGates
+		row("member gate", fmt.Sprintf("%d members checked, %d refused", g.MembersChecked, g.MembersRefused))
+		row("posture gate", fmt.Sprintf("%d traits checked, %d refused", g.TraitsChecked, g.TraitsRefused))
+		compat := fmt.Sprintf("%d compared, %d refused, %d alpha-exempt, %d new",
+			g.CompatCompared, g.CompatRefused, g.CompatAlpha, g.CompatNew)
+		if !p.CompatChecked {
+			compat = "not completed"
+		}
+		row("compat gate", compat)
+	}
+
 	switch {
 	case p.Go() && p.RegistryChecked:
 		fmt.Fprintf(&b, "\n  GO — pushing %s:%s\n", p.RegistryRepo, p.Tag)
