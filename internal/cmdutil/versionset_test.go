@@ -94,6 +94,25 @@ ModulePath: "opmodel.dev/modules/web_app@v1"
 	assert.True(t, errors.Is(err, cueedit.ErrIdentityShape))
 }
 
+// TestVersionSetRefusal_PointsAtKindConformanceCheck pins the refusal action
+// to a command that exists for the kind: a catalog has no vet
+// (cli-catalog-gates' recorded scope call), so it must never be sent there.
+func TestVersionSetRefusal_PointsAtKindConformanceCheck(t *testing.T) {
+	err := errors.New("shape mismatch")
+
+	module := versionSetRefusal(publish.KindModule, err)
+	assert.Contains(t, module.Action, "opm module vet")
+
+	catalog := versionSetRefusal(publish.KindCatalog, err)
+	assert.Contains(t, catalog.Action, "opm catalog publish --dry-run")
+	assert.NotContains(t, catalog.Action, "module vet")
+
+	for _, r := range []publish.Refusal{module, catalog} {
+		assert.Equal(t, err.Error(), r.Headline)
+		assert.Equal(t, "Nothing was written.", r.Consequence)
+	}
+}
+
 func TestRunVersionSet_InvalidSemverExitsValidation(t *testing.T) {
 	dir := writeVersionSetIdentity(t, `package identity
 

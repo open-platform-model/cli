@@ -15,7 +15,7 @@ A thin change by construction: the writer mechanism already shipped with the pip
 ### `version set` is offline; conformance stays with vet/publish
 
 **Context**: D8 refuses a non-conformant identity file "as a schema failure"; full `#IdentityPackage` unification needs core's schema from the registry; the command's habitat is a laptop pre-commit.
-**Decision**: refuse on `cueedit`'s structural contract only (present, parseable, `Version` at the schema-fixed path — the same `ErrIdentityShape` the pipeline uses), no registry I/O, refusal points at `opm module vet`.
+**Decision**: refuse on `cueedit`'s structural contract only (present, parseable, `Version` at the schema-fixed path — the same `ErrIdentityShape` the pipeline uses), no registry I/O, refusal points at the kind's own full-conformance check: `opm module vet` for modules, `opm catalog publish --dry-run` for catalogs — no catalog vet exists, and `cli-catalog-gates` records that one is deliberately not built (`publish --dry-run` and `registry check` cover both directions).
 **Rationale**: D8's measured refusal cases are structural — the schema-fixed *path* is the locator, and the locator failing is the refusal. Type-level defects are caught one command later by vet/publish, which run the real unification. An offline writer that sometimes dials the registry is the worse surprise.
 
 ### `SetCueModModule` lands here, used later

@@ -41,7 +41,8 @@ func newCatalogVersionSetCmd() *cobra.Command {
 
 	The command is offline: no registry access, no schema fetch. It refuses an
 	identity file that does not structurally carry a Version field; run
-	'opm module vet' for full conformance checking.
+	'opm catalog publish --dry-run' for full conformance checking — every
+	publish gate runs, nothing is pushed.
 
 	Exit codes: 0 set (or already set), 2 refused.
 

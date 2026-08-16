@@ -15,9 +15,11 @@ import (
 // place, idempotently and offline (0011 D3, D8). Setting the already-declared
 // version touches nothing — no write, no mtime change — and reports the no-op
 // as success; both outcomes exit 0. A structurally non-conformant identity
-// file is refused (exit 2) through the standard funnel, pointing at
-// `opm module vet` for full conformance. No registry I/O ever happens here —
-// type-level defects are vet's and publish's to catch.
+// file is refused (exit 2) through the standard funnel, pointing at the
+// kind's own full-conformance check — `opm module vet` for modules,
+// `opm catalog publish --dry-run` for catalogs (no catalog vet exists, by
+// cli-catalog-gates' recorded scope call). No registry I/O ever happens here
+// — type-level defects are that next command's to catch.
 func RunVersionSet(kind publish.Kind, version string, pathArgs []string) error {
 	dir := ResolveModulePath(pathArgs)
 
@@ -30,12 +32,12 @@ func RunVersionSet(kind publish.Kind, version string, pathArgs []string) error {
 	// home (cueedit's byte comparison) instead of a second copy here.
 	current, _, err := cueedit.ReadIdentityVersion(dir)
 	if err != nil {
-		return versionSetError(err)
+		return versionSetError(kind, err)
 	}
 
 	changed, err := cueedit.SetIdentityVersion(dir, version)
 	if err != nil {
-		return versionSetError(err)
+		return versionSetError(kind, err)
 	}
 	switch {
 	case !changed:
@@ -52,13 +54,9 @@ func RunVersionSet(kind publish.Kind, version string, pathArgs []string) error {
 // mismatch is a refusal (2) printed through the refusal funnel — the message
 // already names the file and the path element it failed to find — and
 // anything else is unexpected (1).
-func versionSetError(err error) error {
+func versionSetError(kind publish.Kind, err error) error {
 	if errors.Is(err, cueedit.ErrIdentityShape) {
-		PrintRefusals([]publish.Refusal{{
-			Headline:    err.Error(),
-			Consequence: "Nothing was written.",
-			Action:      "Fix the identity package, then check full conformance:  opm module vet",
-		}})
+		PrintRefusals([]publish.Refusal{versionSetRefusal(kind, err)})
 		return &opmexit.ExitError{
 			Code:    opmexit.ExitValidationError,
 			Err:     err,
@@ -66,4 +64,20 @@ func versionSetError(err error) error {
 		}
 	}
 	return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
+}
+
+// versionSetRefusal frames a shape mismatch as a refusal whose action names
+// the kind's own full-conformance check — a module has `opm module vet`; a
+// catalog has no vet (cli-catalog-gates' recorded scope call), so the check
+// that runs its full identity conformance is the publish dry run.
+func versionSetRefusal(kind publish.Kind, err error) publish.Refusal {
+	action := "Fix the identity package, then check full conformance:  opm module vet"
+	if kind == publish.KindCatalog {
+		action = "Fix the identity package, then check full conformance:  opm catalog publish --dry-run"
+	}
+	return publish.Refusal{
+		Headline:    err.Error(),
+		Consequence: "Nothing was written.",
+		Action:      action,
+	}
 }
