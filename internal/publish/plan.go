@@ -54,15 +54,7 @@ func (p *Plan) Render() string {
 	// The catalog gates' per-gate outcomes (D22, D9). Text-only — plan --json
 	// remains deferred.
 	if p.Kind == KindCatalog {
-		g := p.CatalogGates
-		row("member gate", fmt.Sprintf("%d members checked, %d refused", g.MembersChecked, g.MembersRefused))
-		row("posture gate", fmt.Sprintf("%d traits checked, %d refused", g.TraitsChecked, g.TraitsRefused))
-		compat := fmt.Sprintf("%d compared, %d refused, %d alpha-exempt, %d new",
-			g.CompatCompared, g.CompatRefused, g.CompatAlpha, g.CompatNew)
-		if !p.CompatChecked {
-			compat = "not completed"
-		}
-		row("compat gate", compat)
+		p.renderCatalogGates(row)
 	}
 
 	// A catalog's registry work is done only when the compatibility walk
@@ -86,4 +78,17 @@ func (p *Plan) Render() string {
 		fmt.Fprintf(&b, "\n  REFUSED — %d %s\n", len(p.Refusals), noun)
 	}
 	return b.String()
+}
+
+// renderCatalogGates prints the catalog-only per-gate outcome rows.
+func (p *Plan) renderCatalogGates(row func(label, value string)) {
+	g := p.CatalogGates
+	row("member gate", fmt.Sprintf("%d members checked, %d refused", g.MembersChecked, g.MembersRefused))
+	row("posture gate", fmt.Sprintf("%d traits checked, %d refused", g.TraitsChecked, g.TraitsRefused))
+	compat := fmt.Sprintf("%d compared, %d refused, %d alpha-exempt, %d new",
+		g.CompatCompared, g.CompatRefused, g.CompatAlpha, g.CompatNew)
+	if !p.CompatChecked {
+		compat = "not completed"
+	}
+	row("compat gate", compat)
 }

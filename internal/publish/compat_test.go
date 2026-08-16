@@ -99,6 +99,22 @@ func TestGateCompat_CleanHistoryPasses(t *testing.T) {
 	assert.Contains(t, p.Render(), "GO —")
 }
 
+func TestGateCompat_AdditiveChangeComparesClean(t *testing.T) {
+	// A genuinely changed member (so the identical-modulo-provenance fast
+	// path cannot fire) whose change is additive: the walk itself must pass
+	// it.
+	coldCUECache(t)
+	registry := emptyTestRegistry(t)
+	pushCatalog(t, registry, memberCatalogFilesAt("1.0.0"))
+
+	next := memberCatalogFilesAt("1.2.0")
+	next["resources/v1beta1/thing.cue"] = strings.Replace(
+		next["resources/v1beta1/thing.cue"], "note?: string", "note?: string\n\t\tadded?: int", 1)
+	p := runCatalog(t, registry, next)
+	require.True(t, p.Go(), refusalHeadlines(p)+refusalDetails(p))
+	assert.Equal(t, 4, p.CatalogGates.CompatCompared)
+}
+
 func TestGateCompat_FieldRemovedRefused(t *testing.T) {
 	coldCUECache(t)
 	registry := emptyTestRegistry(t)
