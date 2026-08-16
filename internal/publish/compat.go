@@ -37,10 +37,24 @@ func gateCompat(p *Plan, opts Options) error {
 	if p.Kind != KindCatalog || !p.RegistryChecked {
 		return nil // never judged: the lookup's ConnectivityError already reported it
 	}
+	versions := predecessorVersions(p.publishedVersions, p.Tag, p.Major)
+	if err := compatScan(opts, p.RegistryRepo, versions, p.members, &p.CatalogGates, p.refuse); err != nil {
+		return err
+	}
+	p.CompatChecked = true
+	return nil
+}
 
+// compatScan is the walk itself, shared by the publish gate and
+// `opm catalog registry check --compat` (D7): partition the members
+// (transformers structurally, alpha by policy — both before any registry
+// work), group by package, and probe the given versions newest-first until
+// every member found its predecessor or history is exhausted. Counts land in
+// g; violations go through refuse.
+func compatScan(opts Options, repo string, versions []string, members []Member, g *CatalogGateOutcomes, refuse func(Refusal)) error {
 	byPkg := map[string][]Member{}
 	var pkgs []string
-	for _, m := range p.members {
+	for _, m := range members {
 		if m.Kind == "transformers" {
 			continue
 		}
@@ -49,7 +63,7 @@ func gateCompat(p *Plan, opts Options) error {
 			continue // no classifiable apiVersion — the FQN gate's finding, not this one's
 		}
 		if !lvl.Enforced() {
-			p.CatalogGates.CompatAlpha++
+			g.CompatAlpha++
 			continue
 		}
 		if _, seen := byPkg[m.PkgPath]; !seen {
@@ -58,8 +72,6 @@ func gateCompat(p *Plan, opts Options) error {
 		byPkg[m.PkgPath] = append(byPkg[m.PkgPath], m)
 	}
 	sort.Strings(pkgs)
-
-	versions := predecessorVersions(p.publishedVersions, p.Tag, p.Major)
 
 	// The loads run from a neutral directory: a versioned package pattern
 	// resolves against the registry, and running it inside the artifact's own
@@ -76,7 +88,7 @@ func gateCompat(p *Plan, opts Options) error {
 			if len(unresolved) == 0 {
 				break
 			}
-			pkgVal, found, err := loadPublishedPackage(opts, loadDir, p.RegistryRepo+"/"+pkgPath, v)
+			pkgVal, found, err := loadPublishedPackage(opts, loadDir, repo+"/"+pkgPath, v)
 			if err != nil {
 				return err
 			}
@@ -91,24 +103,22 @@ func gateCompat(p *Plan, opts Options) error {
 					still = append(still, m)
 					continue
 				}
-				refusal, err := compareMember(m, prev, p.RegistryRepo, v)
+				refusal, err := compareMember(m, prev, repo, v)
 				if err != nil {
 					return err
 				}
-				p.CatalogGates.CompatCompared++
+				g.CompatCompared++
 				if refusal != nil {
-					p.CatalogGates.CompatRefused++
-					p.refuse(*refusal)
+					g.CompatRefused++
+					refuse(*refusal)
 				}
 			}
 			unresolved = still
 		}
 		// History exhausted: whatever remains is new at its key — the
 		// apiVersion-bump escape.
-		p.CatalogGates.CompatNew += len(unresolved)
+		g.CompatNew += len(unresolved)
 	}
-
-	p.CompatChecked = true
 	return nil
 }
 

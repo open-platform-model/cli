@@ -2,9 +2,9 @@ package publish
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -72,41 +72,45 @@ func enumerateMembers(opts Options, dir string) ([]Member, []Refusal) {
 	var members []Member
 	var refusals []Refusal
 
-	walkPkg := func(pkgPath string) {
+	for _, pkgPath := range memberPackagePaths(os.DirFS(dir), ".") {
 		val, _, _, refusal := loadPackage(opts, dir, "./"+pkgPath)
 		if refusal != nil {
 			refusal.Headline = fmt.Sprintf("the %s package does not load, so its members cannot be gated", pkgPath)
 			refusals = append(refusals, *refusal)
-			return
+			continue
 		}
 		members = append(members, membersOfPackage(val, pkgPath)...)
 	}
 
+	return members, refusals
+}
+
+// memberPackagePaths lists the member package directories under a catalog
+// root, by the D49 filing convention: every `<kind>/<apiVersion>` directory
+// holding .cue files, a kind directory's own flat package when it holds files
+// directly, and the flat `transformers/` package. Takes an fs.FS so the same
+// convention reads a working tree and a fetched published build alike.
+func memberPackagePaths(fsys fs.FS, root string) []string {
+	var pkgs []string
 	for _, kind := range memberKindDirs {
-		kindDir := filepath.Join(dir, kind)
-		if hasCueFiles(kindDir) {
-			walkPkg(kind)
+		kindDir := path.Join(root, kind)
+		if hasCueFiles(fsys, kindDir) {
+			pkgs = append(pkgs, kind)
 		}
-		entries, err := os.ReadDir(kindDir)
+		entries, err := fs.ReadDir(fsys, kindDir)
 		if err != nil {
 			continue // no such kind directory — nothing of that kind to gate
 		}
 		for _, e := range entries {
-			if !e.IsDir() {
-				continue
-			}
-			sub := filepath.Join(kindDir, e.Name())
-			if hasCueFiles(sub) {
-				walkPkg(path.Join(kind, e.Name()))
+			if e.IsDir() && hasCueFiles(fsys, path.Join(kindDir, e.Name())) {
+				pkgs = append(pkgs, path.Join(kind, e.Name()))
 			}
 		}
 	}
-
-	if hasCueFiles(filepath.Join(dir, "transformers")) {
-		walkPkg("transformers")
+	if hasCueFiles(fsys, path.Join(root, "transformers")) {
+		pkgs = append(pkgs, "transformers")
 	}
-
-	return members, refusals
+	return pkgs
 }
 
 // membersOfPackage iterates a loaded package's top-level definitions and
@@ -154,8 +158,8 @@ func membersOfPackage(val cue.Value, pkgPath string) []Member {
 }
 
 // hasCueFiles reports whether dir directly contains at least one .cue file.
-func hasCueFiles(dir string) bool {
-	entries, err := os.ReadDir(dir)
+func hasCueFiles(fsys fs.FS, dir string) bool {
+	entries, err := fs.ReadDir(fsys, dir)
 	if err != nil {
 		return false
 	}
