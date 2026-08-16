@@ -46,6 +46,17 @@ Use `opm module` when you are starting from module source. For rendering, deploy
 |---------|-------------|
 | `module init` | Create a new module from a template |
 | `module vet` | Validate a module without rendering manifests |
+| `module version set` | Set the version the module declares in `identity/identity.cue` — surgical, idempotent, offline |
+| `module publish` | Publish the module from its committed source, at the coordinates it declares |
+
+### Catalog Operations (`opm catalog`)
+
+Use `opm catalog` when you are starting from catalog source: declare a version or publish a release from the committed tree.
+
+| Command | Description |
+|---------|-------------|
+| `catalog version set` | Set the version the catalog declares in `identity/identity.cue` — surgical, idempotent, offline |
+| `catalog publish` | Publish the catalog from its committed source, at the coordinates it declares |
 
 ### Instance Operations (`opm instance`)
 
