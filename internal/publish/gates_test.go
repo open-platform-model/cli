@@ -187,6 +187,7 @@ func TestGate_Namespace(t *testing.T) {
 		{"testing domain is a separate domain, not policed", KindModule, "testing.opmodel.dev/modules/web_app@v1"},
 		{"community module with owner segment", KindModule, "community.opmodel.dev/m/acme/media_server@v2"},
 		{"opmodel.dev/core is the fixed path outside the kind pattern", KindCatalog, "opmodel.dev/core@v1"},
+		{"reserved templates segment is module-kind (D25)", KindModule, "opmodel.dev/templates/standard@v1"},
 	}
 	for _, tt := range passing {
 		t.Run(tt.name, func(t *testing.T) {
@@ -207,6 +208,8 @@ func TestGate_Namespace(t *testing.T) {
 		{"nested path under a valid kind segment", KindModule, "opmodel.dev/modules/test/hello_web@v1", "does not fit the namespace"},
 		{"module published to a catalogs path", KindModule, "opmodel.dev/catalogs/opm@v1", "cannot publish under the catalogs/ segment"},
 		{"catalog published to a modules path", KindCatalog, "opmodel.dev/modules/demo@v1", "cannot publish under the modules/ segment"},
+		{"nested path under the templates segment (D25)", KindModule, "opmodel.dev/templates/x/y@v1", "does not fit the namespace"},
+		{"catalog published to a templates path (D25)", KindCatalog, "opmodel.dev/templates/opm@v1", "cannot publish under the templates/ segment"},
 	}
 	for _, tt := range refused {
 		t.Run(tt.name, func(t *testing.T) {
