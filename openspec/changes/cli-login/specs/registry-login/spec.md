@@ -4,7 +4,7 @@
 
 ### Requirement: Login writes where the push reads
 
-`opm login [host]` SHALL store a credential in the standard OCI/docker credential file — the store CUE's resolver reads for both push and pull. With a host argument, that host is targeted literally. Without one, the command SHALL resolve the configured registry mapping (flag > environment > config, reporting the winning source and any shadowed values) to its host set: exactly one host proceeds; several refuse with each host listed as a runnable `opm login <host>` action; none refuses pointing at configuration. The credential SHALL be verified against the registry before writing; a failed verification leaves the file untouched. The write SHALL modify only the targeted host's entry, preserving every other key in the file byte-for-byte, creating the file with owner-only permissions when absent.
+`opm registry login [host]` SHALL store a credential in the standard OCI/docker credential file — the store CUE's resolver reads for both push and pull. With a host argument, that host is targeted literally. Without one, the command SHALL resolve the configured registry mapping (flag > environment > config, reporting the winning source and any shadowed values) to its host set: exactly one host proceeds; several refuse with each host listed as a runnable `opm registry login <host>` action; none refuses pointing at configuration. The credential SHALL be verified against the registry before writing; a failed verification leaves the file untouched. The write SHALL modify only the targeted host's entry, preserving every other key in the file byte-for-byte, creating the file with owner-only permissions when absent.
 
 #### Scenario: Single-host mapping logs in
 

@@ -2,9 +2,15 @@
 
 ## Overview
 
-One small command over one careful file writer. The design's center of gravity is *not writing more than it must*: the docker config file is shared property (docker, podman, other tools, `credsStore`/`credHelpers` indirections), and `opm login` edits exactly one `auths` entry.
+One small command over one careful file writer. The design's center of gravity is *not writing more than it must*: the docker config file is shared property (docker, podman, other tools, `credsStore`/`credHelpers` indirections), and `opm registry login` edits exactly one `auths` entry.
 
 ## Research & Decisions
+
+### Name: `opm registry login`, not top-level `opm login`
+
+**Context**: D11 drafted the command as top-level `opm login`. On review of this slice's artifacts the name read as ambiguous — "do I log in to OPM or to something else?" — because `opm` is a platform tool with no hosted OPM service behind it, unlike docker/podman/oras/cue where the registry is the only possible referent of "login".
+**Decision**: `opm registry login [host]` — a new `registry` root command group, `login` its first subcommand. Recorded as 0011 D24 (amends D11); flags, defaults, and the whole contract are unchanged. Helm is the precedent: a package tool pushing to OCI registries it does not operate, answering the same ambiguity with `helm registry login`. The capability name (`registry-login`) and the existing `opm catalog registry check` subgroup already use the noun.
+**Rationale**: the command names what you authenticate to, and the group gives logout and the `docker-credential-opm` helper flow a home when they arrive.
 
 ### Store: docker config, not `logins.json`, not device flow
 
@@ -16,7 +22,7 @@ One small command over one careful file writer. The design's center of gravity i
 ### Host resolution: bare host argument; mapping resolved only for the no-arg case
 
 **Context**: D11 fixes the no-arg target as "the registry `ResolveRegistry` produces" — a CUE_REGISTRY *mapping*, not a host; nothing in 0011 bridges that gap. `cue login`'s answer to multi-host is refusal.
-**Decision**: `opm login ghcr.io` takes the host literally (docker-login semantics — no mapping parse). `opm login` with no argument builds the public resolver over the resolved mapping and takes `AllHosts()`: one host → proceed; several → refuse, listing each host with `opm login <host>` as the action (the house refusal shape); zero (no registry configured) → refuse pointing at `opm config init`. The resolution report names the source and any shadowed values — `ResolveRegistry.Shadowed`'s first consumer, closing D11's "an override is reportable rather than silent" claim.
+**Decision**: `opm registry login ghcr.io` takes the host literally (docker-login semantics — no mapping parse). `opm registry login` with no argument builds the public resolver over the resolved mapping and takes `AllHosts()`: one host → proceed; several → refuse, listing each host with `opm registry login <host>` as the action (the house refusal shape); zero (no registry configured) → refuse pointing at `opm config init`. The resolution report names the source and any shadowed values — `ResolveRegistry.Shadowed`'s first consumer, closing D11's "an override is reportable rather than silent" claim.
 **Rationale**: no magic: picking the first-party prefix's host silently would authenticate users against a host they didn't name. The refusal is one copy-paste away from correct, which is the same standard the publish refusals hold.
 
 ### Verify-then-write
@@ -36,7 +42,7 @@ One small command over one careful file writer. The design's center of gravity i
 
 ## Technical Notes
 
-- Command: `internal/cmd/login.go`, registered in `root.go`; no `SkipConfigLoadAnnotation` (registry resolution requires config load; config load performs no Kubernetes I/O).
+- Command: new `internal/cmd/registry` package — `registry.go` (the group) plus `login.go` — with the group registered in `root.go`; no `SkipConfigLoadAnnotation` (registry resolution requires config load; config load performs no Kubernetes I/O).
 - Path resolution: `$DOCKER_CONFIG/config.json` else `~/.docker/config.json` — mirroring the read side's order so the write lands where the push will look. (`$DOCKER_AUTH_CONFIG` inline JSON and the podman path are read-side extras; login does not write them and says so if `$DOCKER_AUTH_CONFIG` is set, since it would shadow the written entry.)
 - Exit codes: 0 written; 2 refusal (multi-host, no registry, bad credential, non-TTY); 3 connectivity.
 - Tests: `dockercfg` table tests (fresh file 0600; existing file with `credsStore`+foreign hosts preserved byte-for-byte outside the edited entry; invalid JSON refused); command tests with `t.Setenv(DOCKER_CONFIG)`; the end-to-end inversion — login against `modregistrytest.NewServer` basic auth, then the pipeline's push succeeds using only the written file; multi-host refusal against the shipped default mapping.

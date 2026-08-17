@@ -15,7 +15,7 @@
 
 ## 3. Command
 
-- [ ] 3.1 `internal/cmd/login.go`: prompts (stderr username, no-echo secret via `x/term` — dependency becomes direct), non-TTY refusal pointing at `docker login`; `$DOCKER_AUTH_CONFIG`-set notice; success message naming file + host. Root registration.
+- [ ] 3.1 New `internal/cmd/registry` package (`registry.go` group + `login.go`): prompts (stderr username, no-echo secret via `x/term` — dependency becomes direct), non-TTY refusal pointing at `docker login`; `$DOCKER_AUTH_CONFIG`-set notice; success message naming file + host. Root registration of the `registry` group.
 - [ ] 3.2 Constructor + refusal-shape tests; multi-host refusal asserted against the shipped `DefaultRegistry` value.
 
 ## 4. End-to-end, specs, record
