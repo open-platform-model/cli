@@ -11,9 +11,9 @@
 
 ## 2. Writers (cueedit additions)
 
-- [ ] 2.1 Self-import rewriter: every import of path P → path Q across the tree; splice-style; tests incl. the `import id` line and a multi-file case.
-- [ ] 2.2 Package-clause renamer: old leaf → new leaf, all `.cue` files; tests preserve following comments/whitespace.
-- [ ] 2.3 Identity `ModulePath` rewrite + `Version` reset to the defaulted `*"0.1.0"` form (extends the existing writer set); tests.
+- [x] 2.1 Self-import rewriter: every import of path P → path Q across the tree; splice-style; tests incl. the `import id` line and a multi-file case.
+- [x] 2.2 Package-clause renamer: old leaf → new leaf, all `.cue` files; tests preserve following comments/whitespace.
+- [x] 2.3 Identity `ModulePath` rewrite + `Version` reset to the defaulted `*"0.1.0"` form (extends the existing writer set); tests.
 
 ## 3. Publish gates learn the segment
 
