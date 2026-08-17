@@ -33,7 +33,7 @@
 
 ## 6. CI publish job
 
-- [ ] 6.1 Release workflow: build `opm`, per template resolve declared version, caller-side tag-existence filter, publish unpublished ones; a gate refusal fails the release. Dry-run path exercised in PR CI (no push).
+- [x] 6.1 Release workflow: build `opm`, per template resolve declared version, caller-side tag-existence filter, publish unpublished ones; a gate refusal fails the release. Dry-run path exercised in PR CI (no push).
 
 ## 7. E2E, specs, gates
 
