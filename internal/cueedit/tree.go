@@ -155,6 +155,66 @@ func rewriteTree(dir string, rewrite func(path string, data []byte, f *ast.File)
 	return changed, nil
 }
 
+// ListSelfImports reports which .cue files under dir (cue.mod excluded)
+// import the module at modulePath or any subpackage beneath it, without
+// writing anything. Repair mode uses it to refuse a cue.mod rewrite that
+// would strand imports of the old path — the wholesale rewrite belongs to
+// init-from-template alone.
+func ListSelfImports(dir, modulePath string) (files []string, err error) {
+	base, major := splitMajor(modulePath)
+	if base == "" {
+		return nil, errors.New("module path must not be empty")
+	}
+
+	err = filepath.WalkDir(dir, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			if d.Name() == "cue.mod" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(d.Name(), ".cue") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", path, err)
+		}
+		f, err := parser.ParseFile(path, data, parser.ParseComments)
+		if err != nil {
+			return fmt.Errorf("%s does not parse: %w", path, err)
+		}
+		for _, decl := range f.Decls {
+			imp, ok := decl.(*ast.ImportDecl)
+			if !ok {
+				continue
+			}
+			for _, spec := range imp.Specs {
+				ipath, err := literal.Unquote(spec.Path.Value)
+				if err != nil {
+					continue
+				}
+				if _, ok := rewriteImportPath(ipath, base, major, base, major); ok {
+					rel, err := filepath.Rel(dir, path)
+					if err != nil {
+						rel = path
+					}
+					files = append(files, rel)
+					return nil
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
+}
+
 // rewriteImportPath maps one import path from the old module to the new. An
 // import path is `<path>[@major][:pkg]`; the qualifier survives verbatim, a
 // major equal to the old module's follows the new module's, and any other

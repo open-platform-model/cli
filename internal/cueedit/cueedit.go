@@ -111,6 +111,57 @@ func ReadIdentityVersion(dir string) (value string, defaulted bool, err error) {
 	return value, defaulted, nil
 }
 
+// ReadIdentityModulePath reports the ModulePath dir/identity/identity.cue
+// declares — the same string literal SetIdentityModulePath would rewrite. A
+// field carrying anything but a string literal reads as "" with no error
+// (nothing writable to report); shape failures are ErrIdentityShape.
+func ReadIdentityModulePath(dir string) (string, error) {
+	path, _, _, field, err := loadIdentityField(dir, "ModulePath")
+	if err != nil {
+		return "", err
+	}
+	lit, ok := field.Value.(*ast.BasicLit)
+	if !ok || lit.Kind != token.STRING {
+		return "", nil
+	}
+	value, err := literal.Unquote(lit.Value)
+	if err != nil {
+		return "", fmt.Errorf("%w: %s: ModulePath literal %s is not a string: %w", ErrIdentityShape, path, lit.Value, err)
+	}
+	return value, nil
+}
+
+// ReadCueModModule reports the module path dir/cue.mod/module.cue declares —
+// the same string literal SetCueModModule would rewrite. Shape failures are
+// ErrCueModShape, exactly as the writer refuses them.
+func ReadCueModModule(dir string) (string, error) {
+	path := filepath.Join(dir, "cue.mod", "module.cue")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("%w: %s does not exist", ErrCueModShape, path)
+		}
+		return "", fmt.Errorf("reading %s: %w", path, err)
+	}
+	f, err := parser.ParseFile(path, data, parser.ParseComments)
+	if err != nil {
+		return "", fmt.Errorf("%w: %s does not parse: %w", ErrCueModShape, path, err)
+	}
+	field := topLevelField(f, "module")
+	if field == nil {
+		return "", fmt.Errorf("%w: %s declares no top-level module field", ErrCueModShape, path)
+	}
+	lit, ok := field.Value.(*ast.BasicLit)
+	if !ok || lit.Kind != token.STRING {
+		return "", fmt.Errorf("%w: %s module field does not carry a string literal", ErrCueModShape, path)
+	}
+	value, err := literal.Unquote(lit.Value)
+	if err != nil {
+		return "", fmt.Errorf("%w: %s module literal %s is not a string: %w", ErrCueModShape, path, lit.Value, err)
+	}
+	return value, nil
+}
+
 // SetCueModModule rewrites the module field of dir/cue.mod/module.cue to the
 // given module path (major suffix included), preserving all surrounding bytes
 // — comments, field order, the language stanza. Declaring the path the file

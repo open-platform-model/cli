@@ -85,7 +85,7 @@ func TestRealTree_CatalogOpm(t *testing.T) {
 	repo, major, ok := strings.Cut(modPath, "@")
 	require.True(t, ok)
 
-	client, err := newRegistryClient(realTreeRegistry)
+	client, err := NewRegistryClient(realTreeRegistry)
 	require.NoError(t, err)
 	versions, err := client.ModuleVersions(context.Background(), modPath)
 	if err != nil {

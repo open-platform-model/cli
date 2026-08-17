@@ -145,7 +145,7 @@ deps: "example.com/dep@v1": v: "v1.4.0"
 	require.True(t, p.OverrideWaived)
 	require.NoError(t, Push(context.Background(), opts, p))
 
-	client, err := newRegistryClient(opts.Registry)
+	client, err := NewRegistryClient(opts.Registry)
 	require.NoError(t, err)
 	mv, err := module.NewVersion(p.DeclaredPath, p.Tag)
 	require.NoError(t, err)
@@ -168,7 +168,7 @@ func TestPush_RoundTrip(t *testing.T) {
 	files := moduleFiles()
 	p, opts := pushFixture(t, registry, files)
 
-	client, err := newRegistryClient(opts.Registry)
+	client, err := NewRegistryClient(opts.Registry)
 	require.NoError(t, err)
 	mv, err := module.NewVersion(p.DeclaredPath, p.Tag)
 	require.NoError(t, err)
@@ -220,7 +220,7 @@ metadata: {
 	assert.Contains(t, string(onDisk), `#VersionType & "1.3.0"`)
 
 	// …and the published bytes are that written tree.
-	client, err := newRegistryClient(opts.Registry)
+	client, err := NewRegistryClient(opts.Registry)
 	require.NoError(t, err)
 	mv, err := module.NewVersion("example.com/modules/demo@v1", "v1.3.0")
 	require.NoError(t, err)

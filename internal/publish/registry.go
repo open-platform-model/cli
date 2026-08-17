@@ -14,11 +14,11 @@ import (
 	"github.com/open-platform-model/cli/internal/cueedit"
 )
 
-// newRegistryClient builds a module-registry client through the same resolver
+// NewRegistryClient builds a module-registry client through the same resolver
 // chain reads use: modconfig routes by CUE registry syntax and layers Docker
 // and Podman credentials under CUE's logins.json, so push and pull share one
 // path (D11). No os.Setenv — the resolved registry rides the config struct.
-func newRegistryClient(registry string) (*modregistry.Client, error) {
+func NewRegistryClient(registry string) (*modregistry.Client, error) {
 	resolver, err := modconfig.NewResolver(&modconfig.Config{CUERegistry: registry})
 	if err != nil {
 		return nil, fmt.Errorf("resolving registry configuration: %w", err)
@@ -34,7 +34,7 @@ func gateAlreadyPublished(ctx context.Context, p *Plan, opts Options) error {
 	if p.DeclaredPath == "" || p.Tag == "" {
 		return nil
 	}
-	client, err := newRegistryClient(opts.Registry)
+	client, err := NewRegistryClient(opts.Registry)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func Push(ctx context.Context, opts Options, p *Plan) error {
 
 	client := p.registryClient
 	if client == nil {
-		if client, err = newRegistryClient(opts.Registry); err != nil {
+		if client, err = NewRegistryClient(opts.Registry); err != nil {
 			return err
 		}
 	}
