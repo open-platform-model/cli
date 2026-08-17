@@ -51,8 +51,19 @@ func (p *Plan) Render() string {
 	}
 	row("local override", override)
 
+	// The catalog gates' per-gate outcomes (D22, D9). Text-only — plan --json
+	// remains deferred.
+	if p.Kind == KindCatalog {
+		p.renderCatalogGates(row)
+	}
+
+	// A catalog's registry work is done only when the compatibility walk
+	// finished too — a walk aborted mid-flight must not render the GO the
+	// gates never finished earning.
+	registryDone := p.RegistryChecked && (p.Kind != KindCatalog || p.CompatChecked)
+
 	switch {
-	case p.Go() && p.RegistryChecked:
+	case p.Go() && registryDone:
 		fmt.Fprintf(&b, "\n  GO — pushing %s:%s\n", p.RegistryRepo, p.Tag)
 	case p.Go():
 		// Every local gate passed but the already-published lookup never
@@ -67,4 +78,17 @@ func (p *Plan) Render() string {
 		fmt.Fprintf(&b, "\n  REFUSED — %d %s\n", len(p.Refusals), noun)
 	}
 	return b.String()
+}
+
+// renderCatalogGates prints the catalog-only per-gate outcome rows.
+func (p *Plan) renderCatalogGates(row func(label, value string)) {
+	g := p.CatalogGates
+	row("member gate", fmt.Sprintf("%d members checked, %d refused", g.MembersChecked, g.MembersRefused))
+	row("posture gate", fmt.Sprintf("%d traits checked, %d refused", g.TraitsChecked, g.TraitsRefused))
+	compat := fmt.Sprintf("%d compared, %d refused, %d alpha-exempt, %d new",
+		g.CompatCompared, g.CompatRefused, g.CompatAlpha, g.CompatNew)
+	if !p.CompatChecked {
+		compat = "not completed"
+	}
+	row("compat gate", compat)
 }

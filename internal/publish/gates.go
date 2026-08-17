@@ -28,9 +28,13 @@ var (
 //
 // A tree that does not load short-circuits with the load error — nothing
 // downstream is evaluable. Everything else accumulates, so one pass fixes
-// everything. The only registry round-trip is the already-published lookup;
-// an unreachable registry there returns a *ConnectivityError rather than a
-// refusal.
+// everything. A module's only registry round-trip is the already-published
+// lookup; a catalog additionally walks its published history — the
+// compatibility gate's predecessor scan loads one build per enumerated
+// version per gated package (CUE-cached, so each build is fetched once). A
+// transport failure anywhere in that walk returns a *ConnectivityError
+// rather than a refusal: the artifact was never judged, and no partial
+// verdict is rendered.
 func Run(ctx context.Context, opts Options) (*Plan, error) {
 	if opts.Context == nil {
 		return nil, fmt.Errorf("publish: Options.Context is required")
@@ -94,10 +98,32 @@ func Run(ctx context.Context, opts Options) (*Plan, error) {
 	gatePackageName(p, a)
 	gateOverride(p, opts)
 
-	// Gate: the tag must not already be published (D15) — the one registry
-	// round-trip before the push. The dry run runs it too: a dry run
-	// surfaces rejections, never defers them.
+	// The catalog-only local gates (D22): enumerate the member tree once,
+	// unify every member against the FQN gate and every trait's posture
+	// against the optional gate. Both are local — no registry is touched.
+	if p.Kind == KindCatalog {
+		if !opts.MemberFQNGateSchema.Exists() || !opts.TraitOptionalGateSchema.Exists() {
+			return nil, fmt.Errorf("publish: Options.MemberFQNGateSchema and Options.TraitOptionalGateSchema are required for catalog publish")
+		}
+		var refusals []Refusal
+		p.members, refusals = enumerateMembers(opts, absDir)
+		for _, r := range refusals {
+			p.refuse(r)
+		}
+		gateMemberFQN(p, opts, a, p.members)
+		gateTraitOptional(p, opts, p.members)
+	}
+
+	// Gate: the tag must not already be published (D15) — the first registry
+	// round-trip, and the enumeration the predecessor scan reuses. The dry
+	// run runs it too: a dry run surfaces rejections, never defers them.
 	if err := gateAlreadyPublished(ctx, p, opts); err != nil {
+		return p, err
+	}
+
+	// Gate: the compatibility walk (D9) — catalogs only, and the reason the
+	// enumeration above is kept on the plan.
+	if err := gateCompat(p, opts); err != nil {
 		return p, err
 	}
 

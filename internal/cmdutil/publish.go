@@ -75,6 +75,27 @@ func RunPublish(cmd *cobra.Command, cfg *config.GlobalConfig, kind publish.Kind,
 		SkipOverrideCheck: flags.SkipOverrideCheck,
 	}
 
+	// The catalog gates' schemas (D22), resolved beside #IdentityPackage from
+	// the same schema build. Catalog-only: module publish never reads them.
+	if kind == publish.KindCatalog {
+		for _, s := range []struct {
+			name string
+			dst  *cue.Value
+		}{
+			{"CatalogMemberFQNGate", &opts.MemberFQNGateSchema},
+			{"TraitOptionalGate", &opts.TraitOptionalGateSchema},
+		} {
+			def := schemaVal.LookupPath(cue.MakePath(cue.Def(s.name)))
+			if !def.Exists() {
+				return &opmexit.ExitError{
+					Code: opmexit.ExitGeneralError,
+					Err:  fmt.Errorf("resolved core schema (%s) does not define #%s; catalog publish requires a core v2 schema", k.SchemaCache().ResolvedVersion(), s.name),
+				}
+			}
+			*s.dst = def
+		}
+	}
+
 	plan, runErr := publish.Run(cmd.Context(), opts)
 
 	// The plan prints on every invocation before any push — it is the dry

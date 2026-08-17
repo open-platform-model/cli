@@ -31,6 +31,13 @@ func TestPublishError_ExitCodes(t *testing.T) {
 			want: opmexit.ExitConnectivityError,
 		},
 		{
+			// The compatibility walk's mid-flight abort is the same error
+			// class as the lookup's: the artifact was never judged, exit 3.
+			name: "compat-walk abort maps to ExitConnectivityError",
+			err:  &publish.ConnectivityError{Op: "loading example.com/catalogs/demo/resources/v1beta1@v1.0.0", Err: errors.New("dial tcp: refused")},
+			want: opmexit.ExitConnectivityError,
+		},
+		{
 			name: "anything else maps to ExitGeneralError",
 			err:  errors.New("zipping failed"),
 			want: opmexit.ExitGeneralError,

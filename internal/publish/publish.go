@@ -48,6 +48,15 @@ type Options struct {
 	// against it, so CUE produces the diagnostic (refusal 10).
 	IdentitySchema cue.Value
 
+	// MemberFQNGateSchema is core's #CatalogMemberFQNGate definition, resolved
+	// beside IdentitySchema. Required for catalog publish; module publish
+	// never reads it.
+	MemberFQNGateSchema cue.Value
+
+	// TraitOptionalGateSchema is core's #TraitOptionalGate definition,
+	// resolved beside IdentitySchema. Required for catalog publish.
+	TraitOptionalGateSchema cue.Value
+
 	// Registry is the resolved CUE registry (flag > env > config). Empty
 	// inherits the process environment.
 	Registry string
@@ -147,6 +156,16 @@ type Plan struct {
 	// renders INCOMPLETE rather than a GO the gates never finished earning.
 	RegistryChecked bool
 
+	// CatalogGates carries the catalog-only gates' per-gate outcome counts
+	// (member/posture/compat). Zero-valued for modules.
+	CatalogGates CatalogGateOutcomes
+
+	// CompatChecked reports the compatibility walk completed (catalogs only).
+	// A walk aborted mid-flight by a transport failure leaves it false, and a
+	// refusal-free plan renders INCOMPLETE — no partial verdict (D35's
+	// connectivity contract extends to the member walk).
+	CompatChecked bool
+
 	// Refusals is the accumulated refusal list. Empty means GO.
 	Refusals []Refusal
 
@@ -154,6 +173,14 @@ type Plan struct {
 	// carried so Push does not resolve registry configuration and
 	// credentials a second time.
 	registryClient *modregistry.Client
+
+	// members is the enumerated member list (catalogs only), carried from the
+	// local gates to the compatibility gate so the tree is walked once.
+	members []Member
+
+	// publishedVersions is what the already-published lookup enumerated,
+	// carried so the predecessor scan does not repeat the round-trip.
+	publishedVersions []string
 }
 
 // Go reports whether every gate passed.
