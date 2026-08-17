@@ -96,3 +96,19 @@ language: version: "v0.15.0"
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "configuration error:")
 }
+
+// TestRootCmdCarriesRegistryGroup: the registry group (0011 D24) is a root
+// command — `opm registry login` is reachable.
+func TestRootCmdCarriesRegistryGroup(t *testing.T) {
+	cmd := NewRootCmd()
+
+	names := make([]string, 0, len(cmd.Commands()))
+	for _, c := range cmd.Commands() {
+		names = append(names, c.Name())
+	}
+	assert.Contains(t, names, "registry")
+
+	registry, _, err := cmd.Find([]string{"registry", "login"})
+	require.NoError(t, err)
+	assert.Equal(t, "login", registry.Name())
+}

@@ -162,6 +162,16 @@ unverified.
 | `config init` | Initialize OPM configuration |
 | `config vet` | Validate configuration |
 
+### Registry Operations (`opm registry`)
+
+Use `opm registry` to manage credentials for the OCI registries OPM publishes to and pulls from.
+
+| Command | Description |
+|---------|-------------|
+| `registry login [host]` | Verify a credential against the registry, then store it in the standard docker credential file — the store push and pull both read. Interactive by design; in CI use `docker login`, which writes the same file |
+
+Without a host argument, the configured registry mapping is resolved to its host set: one host proceeds, several refuse with each listed as a runnable command. Append `+insecure` for a registry served over plain HTTP.
+
 ### Operator Lifecycle (`opm operator`)
 
 Use `opm operator` to put the opm-operator (and its CRDs) onto a cluster — a prerequisite for any `opm instance apply`.

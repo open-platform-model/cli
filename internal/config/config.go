@@ -67,6 +67,11 @@ type GlobalConfig struct {
 	// Set by config.Load using flag > env > config precedence.
 	Registry string
 
+	// RegistryResolution records how Registry was resolved — the winning
+	// source and any shadowed values. Set by config.Load beside Registry;
+	// first consumer is `opm registry login`'s resolution report.
+	RegistryResolution ResolveRegistryResult
+
 	// ConfigPath is the resolved config file path.
 	// Set by config.Load.
 	ConfigPath string
