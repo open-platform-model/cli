@@ -43,4 +43,4 @@
 
 ## 8. Record
 
-- [ ] 8.1 `enhancements/0011/`: history event — the `cli-authoring-commands` slice lands as two changes (`openspec_ref` cites both); `HighestStable` disposition resolved (float selector; first caller is template resolution — update the cli-catalog-gates task note); templates DN implemented by tasks 1/3/6.
+- [x] 8.1 `enhancements/0011/`: history event — the `cli-authoring-commands` slice lands as two changes (`openspec_ref` cites both); `HighestStable` disposition resolved (float selector; first caller is template resolution — update the cli-catalog-gates task note); templates DN implemented by tasks 1/3/6.
