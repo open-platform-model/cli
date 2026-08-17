@@ -21,15 +21,15 @@
 
 ## 4. init rewrite
 
-- [ ] 4.1 Shortcut expansion + `--from` + `-t` alias: the grammar table as a pure function with exhaustive tests (bare word, majors, exact semver, literal paths never expanded).
-- [ ] 4.2 Scaffold path: resolve (stable-float via `compat.HighestStable`), acquire, copy staged tree, re-identify via the writer set, post-rewrite parse+derivation assertion, file-tree output + vet pointer.
-- [ ] 4.3 Interactive form: template-only argument prompts for the module path; non-TTY without a path refuses; offline refusal names the expansion and registry.
-- [ ] 4.4 Repair mode relocated from the authoring draft: detector, second confirmation (file tree + aligned pairs), `--yes`, never-invent, stranding refusal; stdin-driven tests.
-- [ ] 4.5 Delete `internal/templates/` + embed machinery + old init rendering/tests.
+- [x] 4.1 Shortcut expansion + `--from` + `-t` alias: the grammar table as a pure function with exhaustive tests (bare word, majors, exact semver, literal paths never expanded).
+- [x] 4.2 Scaffold path: resolve (stable-float via `compat.HighestStable`), acquire, copy staged tree, re-identify via the writer set, post-rewrite parse+derivation assertion, file-tree output + vet pointer.
+- [x] 4.3 Interactive form: template-only argument prompts for the module path; non-TTY without a path refuses; offline refusal names the expansion and registry.
+- [x] 4.4 Repair mode relocated from the authoring draft: detector, second confirmation (file tree + aligned pairs), `--yes`, never-invent, stranding refusal; stdin-driven tests.
+- [x] 4.5 Delete `internal/templates/` + embed machinery + old init rendering/tests.
 
 ## 5. template list
 
-- [ ] 5.1 Baked table (drives expansion + listing); `opm module template list` under a new `template` subgroup; tests assert table and expansion share one source.
+- [x] 5.1 Baked table (drives expansion + listing); `opm module template list` under a new `template` subgroup; tests assert table and expansion share one source.
 
 ## 6. CI publish job
 
