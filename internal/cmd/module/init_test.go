@@ -17,7 +17,7 @@ import (
 
 // runInit executes the init command with args and optional injected stdin,
 // inside dir, returning the error.
-func runInit(t *testing.T, dir string, stdin string, args ...string) error {
+func runInit(t *testing.T, dir, stdin string, args ...string) error {
 	t.Helper()
 	wd, err := os.Getwd()
 	require.NoError(t, err)

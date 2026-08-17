@@ -37,9 +37,9 @@
 
 ## 7. E2E, specs, gates
 
-- [ ] 7.1 Hermetic e2e: publish `standard` into the in-process registry, init from it via shortcut, scaffold passes vet + dry-run GO; template identity never leaks into the scaffold. Revive `TestE2E_ModInit_ThenVet` in this form.
-- [ ] 7.2 Spec deltas: new `template-modules`; `core`/`core/project-structure` variant-enumeration removal.
-- [ ] 7.3 `CLAUDE.md` command map + layout; `task fmt vet lint test` green.
+- [x] 7.1 Hermetic e2e: publish `standard` into the in-process registry, init from it via shortcut, scaffold passes vet + dry-run GO; template identity never leaks into the scaffold. Revive `TestE2E_ModInit_ThenVet` in this form.
+- [x] 7.2 Spec deltas: new `template-modules`; `core`/`core/project-structure` variant-enumeration removal.
+- [x] 7.3 `CLAUDE.md` command map + layout; `task fmt vet lint test` green.
 
 ## 8. Record
 

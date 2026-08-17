@@ -83,11 +83,13 @@ Read when entering `cli/`:
 
 - `adr/` - Architecture Decision Records
 - `cmd/opm/` - CLI entrypoint + root command wiring.
-- `internal/cmd/` - Cobra command implementations (command groups: `module`, `catalog`, `instance`, `config`, `operator`, `registry`; `module`/`catalog` each carry a `version set` subgroup — offline, idempotent identity Version writes; `registry` carries `login` — interactive credential entry into the docker config file, 0011 D11/D24).
+- `internal/cmd/` - Cobra command implementations (command groups: `module`, `catalog`, `instance`, `config`, `operator`, `registry`; `module`/`catalog` each carry a `version set` subgroup — offline, idempotent identity Version writes; `module` also carries `template list` — the baked official-template table — and an `init` that scaffolds by fetch-and-re-identify or repairs an existing tree behind a second confirmation (0011 D20/D25); `registry` carries `login` — interactive credential entry into the docker config file, 0011 D11/D24).
 - `internal/cmdutil/` - shared flags, annotations, command-facing helpers.
 - `internal/config/` - config resolution, schema validation, defaults.
 - `internal/publish/` - identity-driven publish pipeline (enhancement 0011): gates, refusal catalog, plan/dry-run, registry lookup + push; also the vet-shared identity/coordinate checks.
-- `internal/cueedit/` - surgical authoring-file rewrites (D8's schema-fixed-path identity `Version` write — idempotent, with a read — plus the cue.mod `module:` writer; used by `publish --version` and `version set`, the cue.mod writer's consumers land with `cli-template-modules`).
+- `internal/cueedit/` - surgical authoring-file rewrites (D8's schema-fixed-path identity `Version` write — idempotent, with a read — the identity `ModulePath` writer, the cue.mod `module:` writer/reader, and the tree-wide re-identification set: self-import rewriter, package-clause renamer, self-import scanner; used by `publish --version`, `version set`, and `mod init`).
+- `internal/scaffold/` - fetch-based init engine (0011 D20/D25): template-ref grammar + shortcut expansion, the baked official-template table, stable-float version resolution (`compat.HighestStable`), staged-tree copy, wholesale re-identification, and repair-plan detection.
+- `templates/` - the official template module trees (`minimal`, `standard`, `advanced`) — real CUE modules at `opmodel.dev/templates/<name>` published by release CI through `opm module publish`; deps maintained by the workspace `deps:update:templates` task.
 - `internal/dockercfg/` - single-entry read-modify-write of the standard OCI/docker credential file (`auths[host]` upsert; everything else passes through untouched; used by `registry login`).
 - `internal/kubernetes/` - cluster ops, status, apply, delete, events.
 - `internal/output/` - terminal formatting, log output, tables, manifests.

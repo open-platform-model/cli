@@ -20,7 +20,7 @@ import (
 )
 
 // _versionLabels is shared by every component's PodMetadata attachment.
-_versionLabels: "app.kubernetes.io/version": id.Version
+_versionLabels: "app.kubernetes.io/version": "\(id.Version)"
 
 #components: {
 	// Web frontend — stateless, exposed, optionally routed.
@@ -135,8 +135,8 @@ _versionLabels: "app.kubernetes.io/version": id.Version
 		spec: {
 			statelessWorkload: {
 				container: {
-					name:    "worker"
-					image:   #config.worker.image
+					name:  "worker"
+					image: #config.worker.image
 					command: ["/bin/sh", "-c"]
 					args: ["while true; do echo working; sleep \(#config.worker.interval); done"]
 				}

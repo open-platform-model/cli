@@ -160,12 +160,15 @@ func classifyArgs(args []string) (pathArg, templateArg string, err error) {
 			return args[0], "", nil
 		}
 		return "", args[0], nil
-	default:
+	case 2:
 		if !pathShaped(args[0]) {
 			return "", "", validationError(fmt.Sprintf("the first argument must be the new module path; %q is not one", args[0]),
 				"With two arguments the order is:  opm mod init <new-module-path> <template>")
 		}
-		return args[0], args[1], nil
+		return args[0], args[1], nil //nolint:gosec // G602: the enclosing case is len(args) == 2
+	default:
+		// Unreachable behind cobra.MaximumNArgs(2).
+		return "", "", validationError("too many arguments", "Usage:  opm mod init [new-module-path] [template]")
 	}
 }
 

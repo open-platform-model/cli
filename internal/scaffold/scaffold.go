@@ -15,8 +15,8 @@ import (
 	"cuelang.org/go/mod/module"
 
 	"github.com/open-platform-model/library/opm/compat"
-	"github.com/open-platform-model/library/opm/kernel"
 	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
+	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/cueedit"
 	"github.com/open-platform-model/cli/internal/publish"
@@ -257,6 +257,7 @@ func copyFetched(ctx context.Context, registry, modulePath, version, dest string
 		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 			return err
 		}
+		//nolint:gosec // G306: scaffolded source files are project files, not secrets
 		if err := os.WriteFile(target, data, 0o644); err != nil {
 			return err
 		}

@@ -124,7 +124,7 @@ func rewriteTree(dir string, rewrite func(path string, data []byte, f *ast.File)
 			return nil
 		}
 
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // G122: the walk stays inside the module tree the caller named; paths come from WalkDir itself
 		if err != nil {
 			return fmt.Errorf("reading %s: %w", path, err)
 		}
@@ -179,7 +179,7 @@ func ListSelfImports(dir, modulePath string) (files []string, err error) {
 		if !strings.HasSuffix(d.Name(), ".cue") {
 			return nil
 		}
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // G122: the walk stays inside the module tree the caller named; paths come from WalkDir itself
 		if err != nil {
 			return fmt.Errorf("reading %s: %w", path, err)
 		}

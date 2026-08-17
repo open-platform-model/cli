@@ -11,8 +11,8 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/open-platform-model/library/opm/kernel"
 	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
+	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/cueedit"
 	"github.com/open-platform-model/cli/internal/publish"
@@ -152,7 +152,7 @@ func planCueMod(p *RepairPlan, cueModPath string, cueModErr error, target string
 				if err := os.MkdirAll(filepath.Join(dir, "cue.mod"), 0o755); err != nil {
 					return err
 				}
-				return os.WriteFile(filepath.Join(dir, file), []byte(content), 0o644)
+				return os.WriteFile(filepath.Join(dir, file), []byte(content), 0o644) //nolint:gosec // G306: repaired source files are project files, not secrets
 			},
 		})
 		return nil
@@ -227,7 +227,7 @@ func planIdentity(ctx context.Context, k *kernel.Kernel, registry string, p *Rep
 			if err := os.MkdirAll(filepath.Join(dir, "identity"), 0o755); err != nil {
 				return err
 			}
-			return os.WriteFile(filepath.Join(dir, file), []byte(content), 0o644)
+			return os.WriteFile(filepath.Join(dir, file), []byte(content), 0o644) //nolint:gosec // G306: repaired source files are project files, not secrets
 		},
 	})
 	return nil
