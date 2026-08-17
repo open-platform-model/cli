@@ -67,6 +67,7 @@ func Load(cfg *GlobalConfig, opts LoaderOptions) error {
 	})
 
 	cfg.Registry = registryResult.Registry
+	cfg.RegistryResolution = registryResult
 
 	output.Debug("resolved registry",
 		"registry", registryResult.Registry,

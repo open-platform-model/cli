@@ -27,7 +27,7 @@ One small command over one careful file writer. The design's center of gravity i
 
 ### Verify-then-write
 
-**Decision**: before writing, probe `GET /v2/` with the entered basic credential — `https://` normally, `http://` when the resolved mapping marks the host `+insecure` (or the bare-host form is given the literal `+insecure` suffix). 401/403 → refusal, file untouched; other transport failure → connectivity error (exit 3); 200/404-with-auth-accepted → write. Success message names the file written and the host.
+**Decision**: before writing, probe `GET /v2/` with the entered basic credential — `https://` normally, `http://` when the resolved mapping marks the host `+insecure` (or the bare-host form is given the literal `+insecure` suffix). 401/403 → refusal, file untouched; other transport failure → connectivity error (exit 3); 200/404-with-auth-accepted → write. Success message names the file written and the host. Implemented through CUE's own `ociauth` transport rather than a raw basic GET — GHCR answers `/v2/` with a bearer challenge regardless of credential validity, so only the challenge-following transport verifies for real; basic-auth registries behave identically either way.
 **Rationale**: a login that stores a bad credential moves the failure to the next publish, blamed on the wrong command. The probe is one request and mirrors what the transport will do anyway.
 
 ### The writer (`internal/dockercfg`)
