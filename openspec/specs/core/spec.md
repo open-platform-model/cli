@@ -55,7 +55,7 @@ The `GetWeight(gvk schema.GroupVersionKind) int` function SHALL be defined in `p
 
 ### Module Commands
 
-- **FR-001**: The CLI MUST provide `mod init` to create a new module from a template. Support `--template` flag accepting `simple`, `standard` (default), or `advanced`.
+- **FR-001**: The CLI MUST provide `mod init` to create a new module from a published template module. The template set and template-reference grammar are defined by the `template-modules` capability; the default template is `standard`.
 - **FR-002**: The CLI MUST provide `mod vet` for module validation and `mod tidy` for dependency management.
 
 ### Configuration

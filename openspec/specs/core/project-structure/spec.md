@@ -32,9 +32,7 @@ As the OPM CLI, I need to enforce consistent project structure so that modules a
 
 ### Template Layouts
 
-- **FR-PS-005**: `mod init --template simple` MUST create minimal single-file structure.
-- **FR-PS-006**: `mod init --template standard` (default) MUST create separated concerns structure.
-- **FR-PS-007**: `mod init --template advanced` MUST create multi-package architecture with subpackages.
+- **FR-PS-005**: The official template set MUST be `minimal`, `standard`, and `advanced` (renaming `simple` to `minimal`), sourced as real published modules under `cli/templates/` rather than embedded text templates. `internal/templates/` and the embed machinery MUST NOT exist — the cli binary embeds no template file trees; templates reach users only as published modules, resolvable in the reserved segment at their declared versions once a cli release completes. The variants' authoritative definition is the `template-modules` capability; this requirement retains only the set's names and their cli-repo home. (Former FR-PS-006 and FR-PS-007 are folded into this requirement.)
 
 ### Validation
 
@@ -52,11 +50,11 @@ Strict conventions enable tooling to locate definitions without configuration. `
 
 Different use cases need different complexity levels:
 
-- `simple`: Learning, prototypes (single file)
+- `minimal`: Learning, prototypes (single file)
 - `standard`: Team projects (separated concerns)
-- `advanced`: Enterprise (multi-package with subpackages)
+- `advanced`: Showcase (multiple components, trait attachments, values plumbing)
 
 ## Related
 
 - **CLI Core**: `cli/openspec/specs/core/spec.md`
-- **Templates Implementation**: `cli/internal/templates/`
+- **Template Modules**: `cli/openspec/specs/template-modules/spec.md` (source trees: `cli/templates/`)
