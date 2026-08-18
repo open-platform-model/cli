@@ -15,9 +15,11 @@ concurrency:
 env:
   # GHCR mapping: no registry service runs in CI, so anything the tests
   # genuinely resolve must be published (public) on GHCR — same arrangement as
-  # the library repo's CI.
-  OPM_REGISTRY: 'opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
-  CUE_REGISTRY: 'opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+  # the library repo's CI. testing.opmodel.dev carries this repo's fixture
+  # modules, published by publish-fixtures.yml; it is a GHCR-backed domain like
+  # any other, not a local-registry alias.
+  OPM_REGISTRY: 'testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+  CUE_REGISTRY: 'testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
 
 jobs:
   lint:
@@ -62,6 +64,24 @@ jobs:
         run: go install cuelang.org/go/cmd/cue@v0.17.1
       - name: Dry-run the template publish gates
         run: .github/scripts/publish-templates.sh --dry-run
+
+  fixture-gates:
+    # The same gates over the fixture trees, dry-run. A fixture that would fail
+    # publish-fixtures.yml fails the PR first, rather than after merge when the
+    # publish workflow is the only thing that would have caught it.
+    name: Fixture Publish Gates (dry-run)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.0'
+      - name: Build opm
+        run: go build -o bin/opm ./cmd/opm
+      - name: Install cue
+        run: go install cuelang.org/go/cmd/cue@v0.17.1
+      - name: Dry-run the fixture publish gates
+        run: .github/scripts/publish-fixtures.sh --dry-run
 
   integration:
     name: Integration Tests

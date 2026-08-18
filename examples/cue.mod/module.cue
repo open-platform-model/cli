@@ -12,7 +12,7 @@ deps: {
 	"opmodel.dev/core@v2": {
 		v: "v2.0.0-alpha.4"
 	}
-	"opmodel.dev/modules/test/podinfo@v0": {
+	"testing.opmodel.dev/modules/cli/podinfo@v0": {
 		v: "v0.1.4"
 	}
 }

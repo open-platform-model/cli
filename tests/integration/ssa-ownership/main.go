@@ -46,7 +46,7 @@ const (
 	clusterContext = "kind-opm-dev"
 	instanceName   = "ssa-ownership-itest"
 	namespace      = "default"
-	modulePath     = "opmodel.dev/modules/test/podinfo@v0"
+	modulePath     = "testing.opmodel.dev/modules/cli/podinfo@v0"
 	moduleVersion  = "v0.1.4"
 )
 

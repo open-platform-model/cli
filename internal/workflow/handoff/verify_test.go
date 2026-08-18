@@ -22,7 +22,7 @@ func TestAcquireFailureError_IdentityMismatch(t *testing.T) {
 	}
 	wrapped := fmt.Errorf("acquiring module: %w", idErr)
 
-	err := acquireFailureError("opmodel.dev/modules/test/podinfo@v0", "v0.1.4", wrapped)
+	err := acquireFailureError("testing.opmodel.dev/modules/cli/podinfo@v0", "v0.1.4", wrapped)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "identity mismatch")
 	assert.Contains(t, err.Error(), `declares version "v0.1.2"`)
@@ -32,7 +32,7 @@ func TestAcquireFailureError_IdentityMismatch(t *testing.T) {
 }
 
 func TestAcquireFailureError_NotFoundKeepsPublishHint(t *testing.T) {
-	err := acquireFailureError("opmodel.dev/modules/test/podinfo@v0", "v0.9.9",
+	err := acquireFailureError("testing.opmodel.dev/modules/cli/podinfo@v0", "v0.9.9",
 		fmt.Errorf("module not found"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "publish the module")

@@ -1,5 +1,5 @@
-// Vendored from opm-operator/test/fixtures/modules/podinfo (components.cue) —
-// see module.cue for provenance and the drift-is-acceptable rationale.
+// Forked from opm-operator/test/fixtures/modules/podinfo (components.cue) —
+// see module.cue for provenance and the drift-is-intended rationale.
 package podinfo
 
 import (

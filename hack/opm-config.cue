@@ -8,10 +8,12 @@
 package config
 
 config: {
-	// Host-side spelling of the local registry. The operator running inside the
-	// cluster uses a different address for the same registry — see
-	// KIND_CUE_REGISTRY in Taskfile.yml.
-	registry: "testing.opmodel.dev=localhost:5000+insecure,opmodel.dev=localhost:5000+insecure,registry.cue.works"
+	// Both domains resolve from GHCR: opmodel.dev carries core and the catalogs,
+	// testing.opmodel.dev this repo's own fixture modules (published by
+	// .github/workflows/publish-fixtures.yml). Matches the shipped default in
+	// internal/config/templates.go. To point the kind flow at a local registry
+	// instead, set KIND_CUE_REGISTRY — see Taskfile.yml.
+	registry: "testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"
 
 	kubernetes: {
 		kubeconfig: "~/.kube/config"

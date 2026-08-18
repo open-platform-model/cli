@@ -7,13 +7,14 @@
 // module is refused outright (0006 D38), and the digest gate needs something to
 // compare against.
 //
-// Requires opmodel.dev/modules/test/podinfo@v0 v0.1.4 in the configured
-// registry (the local kind registry publishes it).
+// Requires testing.opmodel.dev/modules/cli/podinfo@v0 v0.1.4 in the configured
+// registry. It is published to GHCR by .github/workflows/publish-fixtures.yml,
+// so the default registry mapping resolves it.
 package handoff_instance
 
 import (
 	core "opmodel.dev/core@v2"
-	podinfo "opmodel.dev/modules/test/podinfo@v0"
+	podinfo "testing.opmodel.dev/modules/cli/podinfo@v0"
 )
 
 core.#ModuleInstance

@@ -3,11 +3,10 @@ version: "3"
 silent: true
 
 env:
-  # Known deviation (Registry Policy, root CLAUDE.md): the example modules pin
-  # opmodel.dev/modules/test/* fixtures that exist only in the local registry,
-  # so that prefix routes to localhost until the fixtures move under
-  # testing.opmodel.dev/*. Everything else (core, catalogs) resolves from GHCR.
-  CUE_REGISTRY: "opmodel.dev/modules/test=localhost:5000+insecure,testing.opmodel.dev=localhost:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"
+  # Everything these examples resolve is on GHCR: core and the catalogs under
+  # opmodel.dev, this repo's fixture modules under testing.opmodel.dev
+  # (published by .github/workflows/publish-fixtures.yml). No local registry.
+  CUE_REGISTRY: "testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"
 
 tasks:
   deps:update:

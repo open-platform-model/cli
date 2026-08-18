@@ -1,28 +1,43 @@
-// Vendored from opm-operator/test/fixtures/modules/podinfo (module.cue) for the
-// render-parity integration program, so this repo's tests carry no sibling
-// checkout dependency. Byte-for-byte drift from the operator's copy is
-// acceptable by design: render-parity's correctness comes from comparing the
-// CLI and kernel render paths over the SAME fixture, not from matching the
-// operator's copy (enhancement 0006 slice C2, design LD3).
+// podinfo — the CLI's own publishable test fixture, living on the testing
+// domain (testing.opmodel.dev/modules/cli/podinfo) and published to GHCR by
+// .github/workflows/publish-fixtures.yml. Consumers resolve it from GHCR like
+// any other module: nothing here requires a local registry.
 //
-// podinfo — stateless web example module (opmodel.dev/core@v2). Renders a
-// Deployment + Service via the catalog's deployment- and service-transformers,
-// with an HTTP livenessProbe (/healthz) and readinessProbe (/readyz) on the
-// podinfo HTTP port (9898). Serves as a real-world "getting started" example a
-// newcomer can apply against a running operator to see OPM work end-to-end.
+// Forked from opm-operator/test/fixtures/modules/podinfo, which keeps its own
+// copy on its own coordinate. The two are independent artifacts and are meant
+// to drift: render-parity's correctness comes from comparing the CLI and
+// kernel render paths over the SAME fixture, not from matching the operator's
+// copy (enhancement 0006 slice C2, design LD3).
+//
+// Stateless web example module (opmodel.dev/core@v2). Renders a Deployment +
+// Service via the catalog's deployment- and service-transformers, with an HTTP
+// livenessProbe (/healthz) and readinessProbe (/readyz) on the podinfo HTTP
+// port (9898). Serves as a real-world "getting started" example a newcomer can
+// apply against a running operator to see OPM work end-to-end.
 package podinfo
 
 import (
+	"strings"
+
 	m "opmodel.dev/core@v2"
 	res "opmodel.dev/catalogs/opm/resources/v1beta1"
+
+	id "testing.opmodel.dev/modules/cli/podinfo/identity"
 )
 
 m.#Module
 
+// Module metadata — modulePath and version are the identity package's values,
+// and name is the path's leaf (enhancements 0010 D8, 0011 D12). Edit
+// identity/identity.cue, not this block.
 metadata: {
-	name:        "podinfo"
-	modulePath:  "opmodel.dev/modules/test/podinfo@v0"
-	version:     "0.1.4"
+	_segments:  strings.Split(strings.SplitN(id.ModulePath, "@", 2)[0], "/")
+	name:       _segments[len(_segments)-1]
+	modulePath: id.ModulePath
+	// Interpolated rather than referenced so the value is concrete before
+	// defaults are finalized — the registry loader's shape gate requires a
+	// concrete metadata.version, and id.Version is a defaulted disjunction.
+	version:     "\(id.Version)"
 	description: "Stateless web example — Deployment + Service with HTTP liveness/readiness probes"
 }
 

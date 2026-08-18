@@ -18,7 +18,7 @@ package schema
 	// registry is the default registry for CUE module resolution.
 	// Can be overridden by --registry flag or OPM_REGISTRY env var.
 	// Format supports multiple registries separated by commas, with options like +insecure.
-	// Example: "opmodel.dev=localhost:5000+insecure,registry.cue.works"
+	// Example: "opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"
 	registry?: string
 
 	// kubernetes contains Kubernetes-specific settings.
