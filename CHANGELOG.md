@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-alpha.11](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.10...v1.0.0-alpha.11) (2026-08-18)
+
+
+### Features
+
+* **cmd:** template modules - fetch-based mod init from published templates ([#149](https://github.com/open-platform-model/cli/issues/149)) ([6410e02](https://github.com/open-platform-model/cli/commit/6410e02d5b8ab1d861b8ec67bf6568e24d9d6485))
+
 ## [1.0.0-alpha.10](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.9...v1.0.0-alpha.10) (2026-08-17)
 
 
