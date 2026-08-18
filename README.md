@@ -62,7 +62,7 @@ Use `opm catalog` when you are starting from catalog source: declare a version o
 
 <!-- Renamed from `opm release` / `opm rel` (enhancement 0002 D6). The old `release`/`rel` verb is removed — no back-compat alias (D8). -->
 
-`opm inst` is the short alias.
+`opm i`, `opm ins`, and `opm inst` are the short aliases.
 
 Use `opm instance` when you are starting from an instance file or when you want to inspect, list, or delete deployed instances.
 

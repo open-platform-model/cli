@@ -13,7 +13,7 @@ import (
 func NewInstanceCmd(cfg *config.GlobalConfig) *cobra.Command {
 	c := &cobra.Command{
 		Use:     "instance",
-		Aliases: []string{"inst"},
+		Aliases: []string{"i", "ins", "inst"},
 		Short:   "Work with instance files and deployed instances",
 		Long: `Work with OPM instance files.
 
