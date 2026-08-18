@@ -170,6 +170,44 @@ Version:    #VersionType | *"1.0.0"
 	})
 }
 
+// TestInit_TemplateOnlyPromptsForThePath pins the interactive form: the
+// template-only invocation reads the new module path from stdin before
+// writing anything (D20's "asks for one"). The injected paths steer the run
+// into deterministic offline refusals, proving the prompt was consumed and
+// nothing was scaffolded.
+func TestInit_TemplateOnlyPromptsForThePath(t *testing.T) {
+	t.Run("prompted path is used before any write", func(t *testing.T) {
+		// The prompted path's leaf directory already holds a module, so the
+		// run refuses (template against an existing tree) without touching
+		// the registry — reachable only by reading the path from stdin.
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "my_app", "cue.mod"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "my_app", "cue.mod", "module.cue"),
+			[]byte("module: \"example.com/modules/my_app@v0\"\n"), 0o644))
+
+		err := runInit(t, dir, "example.com/modules/my_app@v0\n", "standard")
+		assert.Equal(t, 2, exitCode(t, err))
+		assert.Contains(t, err.Error(), "already holds a module")
+	})
+
+	t.Run("empty answer refuses", func(t *testing.T) {
+		dir := t.TempDir()
+		err := runInit(t, dir, "\n", "standard")
+		assert.Equal(t, 2, exitCode(t, err))
+		assert.Contains(t, err.Error(), "must not be empty")
+		assert.NoDirExists(t, filepath.Join(dir, "standard"))
+	})
+
+	t.Run("invalid answer refuses before any write", func(t *testing.T) {
+		dir := t.TempDir()
+		err := runInit(t, dir, "not a path\n", "standard")
+		assert.Equal(t, 2, exitCode(t, err))
+		entries, readErr := os.ReadDir(dir)
+		require.NoError(t, readErr)
+		assert.Empty(t, entries, "nothing may be written on a refused prompt")
+	})
+}
+
 func TestInit_NothingToRepairIsSuccess(t *testing.T) {
 	dir := t.TempDir()
 	mod := filepath.Join(dir, "app")

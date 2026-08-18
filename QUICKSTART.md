@@ -66,29 +66,43 @@ the generated manifests.
 ### Scaffold
 
 ```bash
-opm module init my-app
+opm mod init example.com/modules/my_app@v0
 ```
 
-This creates `./my-app/` from the `standard` template:
+This fetches the `standard` template — a real published module in the
+reserved `opmodel.dev/templates` segment — and re-identifies it to your
+module path, creating `./my_app/`:
 
 ```text
-my-app/
+my_app/
   cue.mod/module.cue        CUE module metadata
+  identity/identity.cue     Single source of the module's path and version
   module.cue                Module definition (metadata + #config + debugValues)
   components.cue            Component definitions
 ```
 
-Other templates are available via `--template`:
+Name another template as the second argument
+(`opm mod init example.com/modules/my_app@v0 minimal`), or list the set:
 
-- `simple` - single-file module, good for learning
+```bash
+opm module template list
+```
+
+- `minimal` - smallest useful module, single file, good for learning
 - `standard` - separated concerns (default)
-- `advanced` - multi-package architecture for complex platforms
+- `advanced` - showcase: multiple components, trait attachments, values plumbing
+
+Fetching a template needs registry access once; after that, CUE's module
+cache serves repeats offline. Any published module can also seed a scaffold
+via `--from <module-path>`.
 
 ### Inspect
 
-Open `my-app/module.cue` and `my-app/components.cue`. The scaffold defines
+Open `my_app/module.cue` and `my_app/components.cue`. The scaffold defines
 a minimal workload, a default `#config` schema, and `debugValues` that
-populate that schema with placeholder values.
+populate that schema with placeholder values. `identity/identity.cue` is
+the single source of the module's path and version — `metadata` derives
+from it.
 
 ### Build
 

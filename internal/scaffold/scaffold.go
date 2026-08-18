@@ -272,8 +272,14 @@ func copyFetched(ctx context.Context, registry, modulePath, version, dest string
 
 // assertDerives is the post-rewrite assertion: the scaffolded tree loads and
 // its metadata derives the new identity — modulePath the new path, version
-// the initial default. A failure here is an internal error (the writers left
-// an inconsistent tree), not a user refusal.
+// the initial default. A load failure is an internal error (the writers left
+// an inconsistent tree). A value MISMATCH is a property of the clone source:
+// re-identification rewrote the identity package, so metadata still stating
+// the old values means the source carries literals instead of the D12
+// derivation — official templates cannot hit this (their derivation is
+// gate-enforced at publish), an arbitrary `--from` donor can, and it earns a
+// refusal naming the donor's defect rather than a blamed-wrong internal
+// error.
 func assertDerives(ctx context.Context, k *kernel.Kernel, registry, dir, newPath string) error {
 	val, err := k.LoadModulePackage(ctx, dir, loaderfile.LoadOptions{Registry: registry})
 	if err != nil {
@@ -288,10 +294,26 @@ func assertDerives(ctx context.Context, k *kernel.Kernel, registry, dir, newPath
 			return fmt.Errorf("internal error: scaffolded metadata.%s does not evaluate: %w", field, err)
 		}
 		if got != want {
-			return fmt.Errorf("internal error: scaffolded metadata.%s is %q, want %q", field, got, want)
+			return &RefusalError{publish.Refusal{
+				Headline: fmt.Sprintf("the clone source does not derive metadata.%s from its identity package", field),
+				Evidence: [][]string{
+					{"metadata." + field, got},
+					{"expected", want, "derived from identity/identity.cue after re-identification"},
+				},
+				Consequence: "Re-identification rewrites the identity package and everything that\nderives from it; metadata carrying literals stays stamped with the\nsource's old identity (D12).",
+				Action:      fmt.Sprintf("Clone a module whose metadata derives (%s: id.%s), or start\nfrom an official template:  opm module template list", field, deriveField(field)),
+			}}
 		}
 	}
 	return nil
+}
+
+// deriveField maps a metadata field to the identity export it derives from.
+func deriveField(metaField string) string {
+	if metaField == "version" {
+		return "Version"
+	}
+	return "ModulePath"
 }
 
 // majorOf returns the major a v-prefixed tag names ("v1.2.3" → "v1").

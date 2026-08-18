@@ -54,12 +54,13 @@ The supply-chain front door.
 - Pulled artifact content is validated (kind/schema via the library) before being applied to a cluster
 - Key files: `internal/config/loader.go`, `pkg/loader/`
 
-### Dimension 4: Template Injection (Scaffolding)
+### Dimension 4: Scaffolding & Re-identification (mod init)
 
-- Go `text/template` renders module scaffolding from user-controlled `TemplateData` (`ModuleName`, `PackageName`, etc.) — assess injection into generated file **contents** and, more importantly, into generated **file paths / names** (path traversal via a crafted module name)
-- User-controlled names that become filesystem paths during scaffolding are sanitized (no `../`, no absolute paths, allowlisted charset)
-- If any rendered output is HTML or shell, the correct safe package/escaping is used (`html/template`, no shell interpolation)
-- Key files: `internal/templates/embed.go`
+- `opm mod init` fetches a template module from a registry and copies its staged tree to disk (`internal/scaffold/`) — assess the copy for path traversal: fetched **file names become filesystem paths** under the destination (`copyFetched`), and the destination itself derives from user input (`Leaf`, `--dir`)
+- Shortcut expansion must only ever target the reserved `opmodel.dev/templates` segment — verify a crafted reference cannot expand into an unreserved namespace (typosquat surface); literal paths must never be expanded
+- The re-identification writers (`internal/cueedit`) splice user-supplied module paths and package names into CUE files — assess injection into generated file **contents** via a crafted module path (quoting via `strconv.Quote`; package names via the validated snake charset)
+- The fetch trusts the kernel acquire's identity verification — assess what a tampered or squatted artifact could reach before that gate fires
+- Key files: `internal/scaffold/scaffold.go`, `internal/scaffold/repair.go`, `internal/cueedit/tree.go`, `internal/cmd/module/init.go`
 
 ### Dimension 5: Kubernetes Privilege & Manifest Safety
 
@@ -273,7 +274,7 @@ Apply the relevant subset based on in-scope code.
 
 - **Only `internal/kubernetes/` in scope** → focus D5/D6/D9; skip registry/template dimensions
 - **Only `internal/config/` in scope** → focus D2/D3/D7; skip K8s/template
-- **Only `internal/templates/` in scope** → focus D4 (and D1 path handling); skip registry/K8s
+- **Only `internal/scaffold/` or `templates/` in scope** → focus D4 (and D1 path handling); skip K8s
 - **No cluster/K8s code in scope** → skip D5; note in Skipped
 - **Only dependency/build files in scope** → focus D8; skip runtime dimensions
 - **Single small file** → skip D9 (Architecture); note in Skipped

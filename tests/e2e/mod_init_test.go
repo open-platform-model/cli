@@ -189,6 +189,134 @@ func TestE2E_ModInit_TypoFailsInsideTheSegment(t *testing.T) {
 	assert.NoDirExists(t, filepath.Join(tmpDir, "my_app"))
 }
 
+// TestE2E_ModInit_OfflineRefusesHonestly pins the offline scenario: with the
+// reserved segment routed at an unreachable registry and nothing cached, init
+// refuses naming the expanded template path and the registry it tried —
+// exit 3, no directory created, no embedded fallback.
+func TestE2E_ModInit_OfflineRefusesHonestly(t *testing.T) {
+	// 127.0.0.1:1 answers nothing; the mapping makes the failure hermetic.
+	env := []string{"OPM_REGISTRY=opmodel.dev/templates=127.0.0.1:1+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"}
+	tmpDir := t.TempDir()
+
+	stdout, stderr, err := runOPMPublish(t, tmpDir, env, "mod", "init", "example.com/modules/my_app@v0", "standard")
+	require.Error(t, err)
+	var exitErr *exec.ExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, 3, exitErr.ExitCode(), "stdout: %s\nstderr: %s", stdout, stderr)
+	assert.Contains(t, stderr, "opmodel.dev/templates/standard", "the refusal names the expansion")
+	assert.Contains(t, stderr, "127.0.0.1:1", "the refusal names the registry tried")
+	assert.NoDirExists(t, filepath.Join(tmpDir, "my_app"))
+}
+
+// TestE2E_ModInit_FromClonesAnyPublishedModule pins --from as a first-class
+// clone source: publish a derivation-complete donor into the in-process
+// registry, clone it to a new identity, and require the donor's identity to
+// appear nowhere in the result.
+func TestE2E_ModInit_FromClonesAnyPublishedModule(t *testing.T) {
+	env := []string{templatesRegistryEnv(t)}
+	tmpDir := t.TempDir()
+
+	donor := publishModuleFixture(t, func(files map[string]string) {
+		// The donor derives its metadata from its identity package (D12) —
+		// what makes a clone follow the rewritten identity. kind is required
+		// by the registry loader's shape gate.
+		files["module.cue"] = `package demo
+
+import (
+	"strings"
+
+	id "example.com/modules/demo/identity"
+)
+
+kind: "Module"
+
+metadata: {
+	_segments: strings.Split(strings.SplitN(id.ModulePath, "@", 2)[0], "/")
+	name:       _segments[len(_segments)-1]
+	modulePath: id.ModulePath
+	version:    "\(id.Version)"
+}
+`
+	})
+
+	stdout, stderr, err := runOPMPublish(t, donor, env, "module", "publish")
+	skipWithoutCoreSchema(t, stderr)
+	require.NoError(t, err, "publishing the donor failed\nstdout: %s\nstderr: %s", stdout, stderr)
+
+	stdout, stderr, err = runOPMPublish(t, tmpDir, env, "mod", "init",
+		"example.com/modules/clone@v0", "--from", "example.com/modules/demo@v1")
+	require.NoError(t, err, "clone failed\nstdout: %s\nstderr: %s", stdout, stderr)
+
+	cloneDir := filepath.Join(tmpDir, "clone")
+	require.DirExists(t, cloneDir)
+
+	require.NoError(t, filepath.Walk(cloneDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.NotContains(t, string(data), "modules/demo", "donor identity leaked into %s", path)
+		return nil
+	}))
+
+	moduleCue, err := os.ReadFile(filepath.Join(cloneDir, "module.cue"))
+	require.NoError(t, err)
+	assert.Contains(t, string(moduleCue), "package clone")
+	idCue, err := os.ReadFile(filepath.Join(cloneDir, "identity", "identity.cue"))
+	require.NoError(t, err)
+	assert.Contains(t, string(idCue), `ModulePath: "example.com/modules/clone@v0"`)
+	assert.Contains(t, string(idCue), `"0.1.0"`)
+}
+
+// TestE2E_ModInit_NonDerivingDonorRefuses pins the mismatch half: a donor
+// whose metadata carries literals instead of the D12 derivation cannot be
+// re-identified — init refuses naming the defect and leaves nothing behind.
+func TestE2E_ModInit_NonDerivingDonorRefuses(t *testing.T) {
+	env := []string{templatesRegistryEnv(t)}
+	tmpDir := t.TempDir()
+
+	// Distinct coordinates from the deriving donor above: CUE's module cache
+	// is shared across the suite's single temp HOME and keyed by
+	// path@version, so republishing different bytes under the same
+	// coordinates would serve the sibling test's cached module (the warm-
+	// cache trap). kind is still needed for the acquire's shape gate.
+	donor := publishModuleFixture(t, func(files map[string]string) {
+		files["cue.mod/module.cue"] = `module: "example.com/modules/litdonor@v1"
+language: version: "v0.17.0"
+source: kind: "self"
+`
+		files["identity/identity.cue"] = `package identity
+
+ModulePath: "example.com/modules/litdonor@v1"
+Version:    "1.2.0"
+`
+		files["module.cue"] = `package litdonor
+
+kind: "Module"
+
+metadata: {
+	name:       "litdonor"
+	modulePath: "example.com/modules/litdonor@v1"
+	version:    "1.2.0"
+}
+`
+	})
+
+	stdout, stderr, err := runOPMPublish(t, donor, env, "module", "publish")
+	skipWithoutCoreSchema(t, stderr)
+	require.NoError(t, err, "publishing the donor failed\nstdout: %s\nstderr: %s", stdout, stderr)
+
+	stdout, stderr, err = runOPMPublish(t, tmpDir, env, "mod", "init",
+		"example.com/modules/clone@v0", "--from", "example.com/modules/litdonor@v1")
+	require.Error(t, err)
+	var exitErr *exec.ExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, 2, exitErr.ExitCode(), "stdout: %s\nstderr: %s", stdout, stderr)
+	assert.Contains(t, stderr, "does not derive metadata", "stdout: %s\nstderr: %s", stdout, stderr)
+	assert.NoDirExists(t, filepath.Join(tmpDir, "clone"), "a refused clone leaves nothing behind")
+}
+
 func TestE2E_ModInit_ExistingNonModuleDirRefuses(t *testing.T) {
 	tmpDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "my_app"), 0o755))
