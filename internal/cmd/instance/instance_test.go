@@ -198,7 +198,7 @@ func TestRunInstanceBuild_MissingPath(t *testing.T) {
 func TestNewInstanceCmd(t *testing.T) {
 	cmd := NewInstanceCmd(&config.GlobalConfig{})
 	assert.Equal(t, "instance", cmd.Use)
-	assert.Contains(t, cmd.Aliases, "inst")
+	assert.Equal(t, []string{"i", "ins", "inst"}, cmd.Aliases)
 
 	subcommands := make(map[string]bool)
 	for _, sub := range cmd.Commands() {
