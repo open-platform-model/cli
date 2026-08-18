@@ -48,3 +48,40 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-templates:
+    # The official template modules ship through the cli's own publish
+    # pipeline (enhancement 0011 D25): the freshly built opm runs every gate,
+    # so a rotten template fails the release. The script filters to
+    # unpublished versions caller-side (D15) — a release with no template
+    # version bumped publishes nothing and succeeds.
+    name: Publish template modules
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.0'
+
+      - name: Build opm
+        run: go build -o bin/opm ./cmd/opm
+
+      - name: Install cue
+        run: go install cuelang.org/go/cmd/cue@v0.17.1
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Publish unpublished templates
+        run: .github/scripts/publish-templates.sh
+        env:
+          GHCR_AUTH: ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}

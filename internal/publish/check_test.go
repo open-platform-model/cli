@@ -20,7 +20,7 @@ import (
 func rawPush(t *testing.T, registry string, files map[string]string, path, tag string) {
 	t.Helper()
 	dir := writeTree(t, files)
-	client, err := newRegistryClient(registry)
+	client, err := NewRegistryClient(registry)
 	require.NoError(t, err)
 	mv, err := module.NewVersion(path, tag)
 	require.NoError(t, err)

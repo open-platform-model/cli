@@ -28,7 +28,7 @@ OPM's CLI foundation has been built over the first iteration of development. The
 
 **CLI commands:**
 
-- `opm module init` — scaffold a new module (simple, standard, advanced templates)
+- `opm module init` — scaffold a new module from a published template (minimal, standard, advanced — see `opm module template list`)
 - `opm module vet` — native CUE SDK validation with custom error formatting
 - `opm instance build` — render an instance file to manifests
 - `opm instance apply` — server-side apply with inventory tracking and stale resource pruning

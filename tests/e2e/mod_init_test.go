@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"cuelabs.dev/go/oci/ociregistry/ocimem"
+	"cuelang.org/go/mod/modregistrytest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -86,105 +88,253 @@ func runOPM(t *testing.T, workDir string, args ...string) (stdout, stderr string
 	return string(stdoutBytes), string(stderrBytes), err
 }
 
-func TestE2E_ModInit_SimpleTemplate(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "e2e-mod-init-*")
+// templatesRegistryEnv starts an in-process registry and returns the
+// OPM_REGISTRY value routing the reserved templates segment and the
+// scaffold's own example.com domain at it, while the core schema and the
+// templates' catalog/core deps still resolve from GHCR — the hermetic
+// inversion: the shortcut's expansion resolves against a registry this test
+// owns.
+func templatesRegistryEnv(t *testing.T) string {
+	t.Helper()
+	reg, err := modregistrytest.NewServer(ocimem.NewWithConfig(&ocimem.Config{ImmutableTags: true}), nil)
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	_, stderr, err := runOPM(t, tmpDir, "mod", "init", "my-app", "--template", "simple")
-	require.NoError(t, err, "stderr: %s", stderr)
-
-	// Verify files were created
-	assert.FileExists(t, filepath.Join(tmpDir, "my-app", "module.cue"))
-	assert.FileExists(t, filepath.Join(tmpDir, "my-app", "cue.mod", "module.cue"))
-	assert.NoFileExists(t, filepath.Join(tmpDir, "my-app", "values.cue"), "values.cue must not be generated")
+	t.Cleanup(reg.Close)
+	return "OPM_REGISTRY=opmodel.dev/templates=" + reg.Host() + "+insecure" +
+		",example.com=" + reg.Host() + "+insecure" +
+		",opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"
 }
 
-func TestE2E_ModInit_StandardTemplate(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "e2e-mod-init-*")
+// repoTemplateDir resolves a template tree in this repository.
+func repoTemplateDir(t *testing.T, name string) string {
+	t.Helper()
+	abs, err := filepath.Abs(filepath.Join("..", "..", "templates", name))
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	_, stderr, err := runOPM(t, tmpDir, "mod", "init", "my-app", "--template", "standard")
-	require.NoError(t, err, "stderr: %s", stderr)
-
-	// Verify files were created
-	assert.FileExists(t, filepath.Join(tmpDir, "my-app", "module.cue"))
-	assert.FileExists(t, filepath.Join(tmpDir, "my-app", "components.cue"))
-	assert.FileExists(t, filepath.Join(tmpDir, "my-app", "cue.mod", "module.cue"))
-	assert.NoFileExists(t, filepath.Join(tmpDir, "my-app", "values.cue"), "values.cue must not be generated")
+	return abs
 }
 
-func TestE2E_ModInit_InvalidTemplate(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "e2e-mod-init-*")
+// TestE2E_ModInit_ThenVet is the hermetic scaffold round-trip: publish the
+// repo's real standard template into an in-process registry, init from it
+// via the bare-word shortcut, and require the scaffold to pass vet and a
+// publish dry-run (GO) with the template's identity appearing nowhere in it.
+func TestE2E_ModInit_ThenVet(t *testing.T) {
+	env := []string{templatesRegistryEnv(t)}
+	tmpDir := t.TempDir()
+
+	// Publish the template through the real pipeline — the same act the
+	// release CI performs.
+	stdout, stderr, err := runOPMPublish(t, tmpDir, env, "module", "publish", repoTemplateDir(t, "standard"))
+	skipWithoutCoreSchema(t, stderr)
+	require.NoError(t, err, "publishing the template failed\nstdout: %s\nstderr: %s", stdout, stderr)
+
+	// Scaffold from it by shortcut. The bare word expands into the reserved
+	// segment, which the env routes at the in-process registry.
+	stdout, stderr, err = runOPMPublish(t, tmpDir, env, "mod", "init", "example.com/modules/my_app@v0", "standard")
+	require.NoError(t, err, "init failed\nstdout: %s\nstderr: %s", stdout, stderr)
+	assert.Contains(t, stdout, "opm module vet", "init points at vet")
+
+	moduleDir := filepath.Join(tmpDir, "my_app")
+	require.DirExists(t, moduleDir)
+
+	// The template's identity never leaks into the scaffold: no file carries
+	// its path, and the package clauses bind the new leaf.
+	var files []string
+	require.NoError(t, filepath.Walk(moduleDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+		files = append(files, path)
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.NotContains(t, string(data), "opmodel.dev/templates",
+			"template identity leaked into %s", path)
+		return nil
+	}))
+	require.NotEmpty(t, files)
+
+	moduleCue, err := os.ReadFile(filepath.Join(moduleDir, "module.cue"))
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	assert.Contains(t, string(moduleCue), "package my_app")
+	componentsCue, err := os.ReadFile(filepath.Join(moduleDir, "components.cue"))
+	require.NoError(t, err)
+	assert.Contains(t, string(componentsCue), "package my_app")
 
-	_, _, err = runOPM(t, tmpDir, "mod", "init", "my-app", "--template", "invalid")
-	assert.Error(t, err)
+	idCue, err := os.ReadFile(filepath.Join(moduleDir, "identity", "identity.cue"))
+	require.NoError(t, err)
+	assert.Contains(t, string(idCue), `ModulePath: "example.com/modules/my_app@v0"`)
+	assert.Contains(t, string(idCue), `*"0.1.0"`, "version resets to the defaulted initial form")
 
-	// Check exit code is 2 (validation error)
+	// The scaffold passes vet unmodified…
+	stdout, stderr, err = runOPMPublish(t, moduleDir, env, "module", "vet")
+	require.NoError(t, err, "vet failed\nstdout: %s\nstderr: %s", stdout, stderr)
+
+	// …and every publish gate short of the push: dry-run reports GO.
+	stdout, stderr, err = runOPMPublish(t, moduleDir, env, "module", "publish", "--dry-run")
+	require.NoError(t, err, "dry-run failed\nstdout: %s\nstderr: %s", stdout, stderr)
+	assert.Contains(t, stdout, "GO — pushing example.com/modules/my_app:v0.1.0")
+}
+
+// TestE2E_ModInit_TypoFailsInsideTheSegment pins the no-fallback contract: a
+// bare word that names no published template refuses naming the expanded
+// path — inside the reserved segment, never elsewhere.
+func TestE2E_ModInit_TypoFailsInsideTheSegment(t *testing.T) {
+	env := []string{templatesRegistryEnv(t)}
+	tmpDir := t.TempDir()
+
+	stdout, stderr, err := runOPMPublish(t, tmpDir, env, "mod", "init", "example.com/modules/my_app@v0", "standrad")
+	require.Error(t, err)
+	var exitErr *exec.ExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, 2, exitErr.ExitCode(), "stdout: %s\nstderr: %s", stdout, stderr)
+	assert.Contains(t, stderr, "opmodel.dev/templates/standrad", "the refusal names the expansion")
+	assert.NoDirExists(t, filepath.Join(tmpDir, "my_app"))
+}
+
+// TestE2E_ModInit_OfflineRefusesHonestly pins the offline scenario: with the
+// reserved segment routed at an unreachable registry and nothing cached, init
+// refuses naming the expanded template path and the registry it tried —
+// exit 3, no directory created, no embedded fallback.
+func TestE2E_ModInit_OfflineRefusesHonestly(t *testing.T) {
+	// 127.0.0.1:1 answers nothing; the mapping makes the failure hermetic.
+	env := []string{"OPM_REGISTRY=opmodel.dev/templates=127.0.0.1:1+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"}
+	tmpDir := t.TempDir()
+
+	stdout, stderr, err := runOPMPublish(t, tmpDir, env, "mod", "init", "example.com/modules/my_app@v0", "standard")
+	require.Error(t, err)
+	var exitErr *exec.ExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, 3, exitErr.ExitCode(), "stdout: %s\nstderr: %s", stdout, stderr)
+	assert.Contains(t, stderr, "opmodel.dev/templates/standard", "the refusal names the expansion")
+	assert.Contains(t, stderr, "127.0.0.1:1", "the refusal names the registry tried")
+	assert.NoDirExists(t, filepath.Join(tmpDir, "my_app"))
+}
+
+// TestE2E_ModInit_FromClonesAnyPublishedModule pins --from as a first-class
+// clone source: publish a derivation-complete donor into the in-process
+// registry, clone it to a new identity, and require the donor's identity to
+// appear nowhere in the result.
+func TestE2E_ModInit_FromClonesAnyPublishedModule(t *testing.T) {
+	env := []string{templatesRegistryEnv(t)}
+	tmpDir := t.TempDir()
+
+	donor := publishModuleFixture(t, func(files map[string]string) {
+		// The donor derives its metadata from its identity package (D12) —
+		// what makes a clone follow the rewritten identity. kind is required
+		// by the registry loader's shape gate.
+		files["module.cue"] = `package demo
+
+import (
+	"strings"
+
+	id "example.com/modules/demo/identity"
+)
+
+kind: "Module"
+
+metadata: {
+	_segments: strings.Split(strings.SplitN(id.ModulePath, "@", 2)[0], "/")
+	name:       _segments[len(_segments)-1]
+	modulePath: id.ModulePath
+	version:    "\(id.Version)"
+}
+`
+	})
+
+	stdout, stderr, err := runOPMPublish(t, donor, env, "module", "publish")
+	skipWithoutCoreSchema(t, stderr)
+	require.NoError(t, err, "publishing the donor failed\nstdout: %s\nstderr: %s", stdout, stderr)
+
+	stdout, stderr, err = runOPMPublish(t, tmpDir, env, "mod", "init",
+		"example.com/modules/clone@v0", "--from", "example.com/modules/demo@v1")
+	require.NoError(t, err, "clone failed\nstdout: %s\nstderr: %s", stdout, stderr)
+
+	cloneDir := filepath.Join(tmpDir, "clone")
+	require.DirExists(t, cloneDir)
+
+	require.NoError(t, filepath.Walk(cloneDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.NotContains(t, string(data), "modules/demo", "donor identity leaked into %s", path)
+		return nil
+	}))
+
+	moduleCue, err := os.ReadFile(filepath.Join(cloneDir, "module.cue"))
+	require.NoError(t, err)
+	assert.Contains(t, string(moduleCue), "package clone")
+	idCue, err := os.ReadFile(filepath.Join(cloneDir, "identity", "identity.cue"))
+	require.NoError(t, err)
+	assert.Contains(t, string(idCue), `ModulePath: "example.com/modules/clone@v0"`)
+	assert.Contains(t, string(idCue), `"0.1.0"`)
+}
+
+// TestE2E_ModInit_NonDerivingDonorRefuses pins the mismatch half: a donor
+// whose metadata carries literals instead of the D12 derivation cannot be
+// re-identified — init refuses naming the defect and leaves nothing behind.
+func TestE2E_ModInit_NonDerivingDonorRefuses(t *testing.T) {
+	env := []string{templatesRegistryEnv(t)}
+	tmpDir := t.TempDir()
+
+	// Distinct coordinates from the deriving donor above: CUE's module cache
+	// is shared across the suite's single temp HOME and keyed by
+	// path@version, so republishing different bytes under the same
+	// coordinates would serve the sibling test's cached module (the warm-
+	// cache trap). kind is still needed for the acquire's shape gate.
+	donor := publishModuleFixture(t, func(files map[string]string) {
+		files["cue.mod/module.cue"] = `module: "example.com/modules/litdonor@v1"
+language: version: "v0.17.0"
+source: kind: "self"
+`
+		files["identity/identity.cue"] = `package identity
+
+ModulePath: "example.com/modules/litdonor@v1"
+Version:    "1.2.0"
+`
+		files["module.cue"] = `package litdonor
+
+kind: "Module"
+
+metadata: {
+	name:       "litdonor"
+	modulePath: "example.com/modules/litdonor@v1"
+	version:    "1.2.0"
+}
+`
+	})
+
+	stdout, stderr, err := runOPMPublish(t, donor, env, "module", "publish")
+	skipWithoutCoreSchema(t, stderr)
+	require.NoError(t, err, "publishing the donor failed\nstdout: %s\nstderr: %s", stdout, stderr)
+
+	stdout, stderr, err = runOPMPublish(t, tmpDir, env, "mod", "init",
+		"example.com/modules/clone@v0", "--from", "example.com/modules/litdonor@v1")
+	require.Error(t, err)
+	var exitErr *exec.ExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, 2, exitErr.ExitCode(), "stdout: %s\nstderr: %s", stdout, stderr)
+	assert.Contains(t, stderr, "does not derive metadata", "stdout: %s\nstderr: %s", stdout, stderr)
+	assert.NoDirExists(t, filepath.Join(tmpDir, "clone"), "a refused clone leaves nothing behind")
+}
+
+func TestE2E_ModInit_ExistingNonModuleDirRefuses(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "my_app"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "my_app", "notes.txt"), []byte("hi"), 0o644))
+
+	_, _, err := runOPM(t, tmpDir, "mod", "init", "example.com/modules/my_app@v0")
+	require.Error(t, err)
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		assert.Equal(t, 2, exitErr.ExitCode(), "expected exit code 2 for validation error")
 	}
 }
 
-func TestE2E_ModInit_ThenVet(t *testing.T) {
-	// TODO: re-enable once builder/values.go is updated to resolve defaults from
-	// #config when no values.cue is present and no --values flag is passed.
-	// Until then, `opm mod vet` fails because selectValues() still requires values.cue.
-	t.Skip("requires builder update: selectValues() must resolve defaults from #config")
-
-	if _, err := exec.LookPath("cue"); err != nil {
-		t.Skip("cue binary not available")
-	}
-
-	tmpDir, err := os.MkdirTemp("", "e2e-mod-init-vet-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// Initialize module
-	_, stderr, err := runOPM(t, tmpDir, "mod", "init", "my-app", "--template", "simple")
-	require.NoError(t, err, "mod init failed: %s", stderr)
-
-	// Validate module
-	moduleDir := filepath.Join(tmpDir, "my-app")
-	_, stderr, err = runOPM(t, moduleDir, "mod", "vet")
-	require.NoError(t, err, "mod vet failed: %s", stderr)
-}
-
-func TestE2E_ModInit_CustomDir(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "e2e-mod-init-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	customDir := filepath.Join(tmpDir, "custom", "path", "my-module")
-
-	_, stderr, err := runOPM(t, tmpDir, "mod", "init", "my-app", "--dir", customDir)
+func TestE2E_TemplateList(t *testing.T) {
+	stdout, stderr, err := runOPM(t, t.TempDir(), "module", "template", "list")
 	require.NoError(t, err, "stderr: %s", stderr)
-
-	// Verify files were created in custom directory
-	assert.FileExists(t, filepath.Join(customDir, "module.cue"))
-	assert.FileExists(t, filepath.Join(customDir, "cue.mod", "module.cue"))
-}
-
-func TestE2E_ModInit_DirectoryExists(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "e2e-mod-init-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// Create the directory first
-	existingDir := filepath.Join(tmpDir, "existing")
-	require.NoError(t, os.MkdirAll(existingDir, 0o755))
-
-	_, _, err = runOPM(t, tmpDir, "mod", "init", "my-app", "--dir", existingDir)
-	assert.Error(t, err)
-
-	// Check exit code is 2 (validation error)
-	var exitErr2 *exec.ExitError
-	if errors.As(err, &exitErr2) {
-		assert.Equal(t, 2, exitErr2.ExitCode(), "expected exit code 2 for validation error")
+	for _, name := range []string{"minimal", "standard", "advanced"} {
+		assert.Contains(t, stdout, name)
 	}
 }
 

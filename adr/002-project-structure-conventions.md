@@ -4,6 +4,8 @@
 
 Accepted
 
+> **Partially superseded (2026-08-18)** by the `cli-template-modules` change (enhancement 0011 D25): the `simple` tier is renamed `minimal`, and templates are no longer embedded in the binary — they are real CUE modules published to the reserved `opmodel.dev/templates` segment, fetched and re-identified by `opm mod init`. The layout conventions below otherwise stand.
+
 ## Context
 
 OPM modules need a predictable file layout so that tooling (CLI, linters, editors, CI) can locate definitions without per-project configuration. Module authors range from beginners prototyping a single service to enterprise teams managing multi-package deployments. A single rigid structure would either overwhelm beginners or constrain advanced users. The CLI needs to reliably find the module root directory, the module definition, and consumer-facing values.

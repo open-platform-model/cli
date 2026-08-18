@@ -10,11 +10,11 @@ Command-line interface for the Open Platform Model (OPM). Build, validate, deplo
 # Build the CLI
 task build
 
-# Initialize a new module
-./bin/opm module init ./my-module
+# Initialize a new module (fetches the standard template and re-identifies it)
+./bin/opm mod init example.com/modules/my_module@v0
 
 # Validate a module
-./bin/opm module vet ./my-module
+./bin/opm module vet ./my_module
 
 # Validate an instance file
 ./bin/opm instance vet ./instance.cue

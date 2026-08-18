@@ -123,7 +123,7 @@ func RegistryCheck(ctx context.Context, opts CheckOptions) (*CheckReport, error)
 	}
 
 	if opts.Compat {
-		client, err := newRegistryClient(opts.Registry)
+		client, err := NewRegistryClient(opts.Registry)
 		if err != nil {
 			return nil, err
 		}

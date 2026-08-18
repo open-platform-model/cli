@@ -13,11 +13,14 @@ import (
 	"github.com/open-platform-model/cli/pkg/loader"
 )
 
-// Owned-domain shapes (D13/D14): the namespace rules bind only where OPM owns
-// the domain. Outside opmodel.dev and community.opmodel.dev publish asserts
-// nothing about the path — path ownership is domain ownership.
+// Owned-domain shapes (D13/D14/D25): the namespace rules bind only where OPM
+// owns the domain. Outside opmodel.dev and community.opmodel.dev publish
+// asserts nothing about the path — path ownership is domain ownership.
+// templates/ is D25's reserved segment: official scaffold templates as
+// module-kind artifacts, exactly one name deep (no nesting — that is part of
+// what keeps shortcut expansion unambiguous), with no community mirror.
 var (
-	firstPartyShape = regexp.MustCompile(`^opmodel\.dev/(modules|catalogs|platforms)/[a-z0-9._-]+$`)
+	firstPartyShape = regexp.MustCompile(`^opmodel\.dev/(modules|catalogs|platforms|templates)/[a-z0-9._-]+$`)
 	communityShape  = regexp.MustCompile(`^community\.opmodel\.dev/(m|catalogs|p)/[a-z0-9._-]+/[a-z0-9._-]+$`)
 )
 
@@ -262,7 +265,7 @@ func gateNamespace(p *Plan) {
 	if repo == "" || !ownedDomain(repo) || repo == "opmodel.dev/core" {
 		return
 	}
-	shape, allowed := firstPartyShape, "opmodel.dev/(modules|catalogs|platforms)/<name>"
+	shape, allowed := firstPartyShape, "opmodel.dev/(modules|catalogs|platforms|templates)/<name>"
 	if strings.HasPrefix(repo, "community.opmodel.dev/") {
 		shape, allowed = communityShape, "community.opmodel.dev/(m|catalogs|p)/<owner>/<name>"
 	}
@@ -285,6 +288,8 @@ func gateNamespace(p *Plan) {
 // what is being published — one implementation with two entry points means
 // nothing else stops `opm module publish` landing where consumers look for
 // catalogs. No platforms arm: nothing publishes a platform today (D14).
+// templates/ sits in the module arm: D25 makes the segment module-kind, so a
+// template publishes as an ordinary module and a catalog can never land there.
 func gateKindSegment(p *Plan) {
 	repo := p.RegistryRepo
 	if repo == "" || !ownedDomain(repo) || repo == "opmodel.dev/core" {
@@ -298,7 +303,7 @@ func gateKindSegment(p *Plan) {
 	agrees := false
 	switch p.Kind {
 	case KindModule:
-		agrees = seg == "modules" || seg == "m"
+		agrees = seg == "modules" || seg == "m" || seg == "templates"
 	case KindCatalog:
 		agrees = seg == "catalogs"
 	}

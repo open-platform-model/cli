@@ -1,309 +1,242 @@
-// Package mod provides CLI command implementations for module operations.
 package modulecmd
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/open-platform-model/cli/internal/config"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/scaffold"
 )
 
-func TestNewModuleInitCmd(t *testing.T) {
-	cmd := NewModuleInitCmd(&config.GlobalConfig{})
-
-	assert.Equal(t, "init <module-name>", cmd.Use)
-	assert.NotEmpty(t, cmd.Short)
-	assert.NotEmpty(t, cmd.Long)
-
-	// Check flags exist
-	assert.NotNil(t, cmd.Flags().Lookup("template"))
-	assert.NotNil(t, cmd.Flags().Lookup("dir"))
-}
-
-func TestModInit_RequiresArgs(t *testing.T) {
-	cmd := NewModuleInitCmd(&config.GlobalConfig{})
-	cmd.SetArgs([]string{})
-
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	err := cmd.Execute()
-	assert.Error(t, err)
-	// Cobra's ExactArgs(1) returns "accepts 1 arg(s), received 0"
-	assert.Contains(t, err.Error(), "accepts 1 arg")
-}
-
-func TestModInit_InvalidTemplate(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "mod-init-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	cmd := NewModuleInitCmd(&config.GlobalConfig{})
-	cmd.SetArgs([]string{"test-app", "--template", "invalid", "--dir", filepath.Join(tmpDir, "out")})
-
-	// Capture output
-	var outBuf, errBuf bytes.Buffer
-	cmd.SetOut(&outBuf)
-	cmd.SetErr(&errBuf)
-
-	err = cmd.Execute()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "unknown template")
-}
-
-func TestModInit_DirectoryExists(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "mod-init-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// Create the target directory
-	targetDir := filepath.Join(tmpDir, "existing-dir")
-	require.NoError(t, os.MkdirAll(targetDir, 0o755))
-
-	cmd := NewModuleInitCmd(&config.GlobalConfig{})
-	cmd.SetArgs([]string{"test-app", "--dir", targetDir})
-
-	err = cmd.Execute()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "already exists")
-}
-
-func TestModInit_Simple(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "mod-init-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	targetDir := filepath.Join(tmpDir, "my-app")
-
-	cmd := NewModuleInitCmd(&config.GlobalConfig{})
-	cmd.SetArgs([]string{"my-app", "--template", "simple", "--dir", targetDir})
-
-	// Silence output
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	err = cmd.Execute()
-	require.NoError(t, err)
-
-	// Check files were created
-	assert.FileExists(t, filepath.Join(targetDir, "module.cue"))
-	assert.FileExists(t, filepath.Join(targetDir, "cue.mod", "module.cue"))
-	assert.NoFileExists(t, filepath.Join(targetDir, "values.cue"), "values.cue must not be generated — defaults live in #config")
-
-	assertScaffoldPaths(t, targetDir, "my-app")
-}
-
-func TestModInit_Standard(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "mod-init-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	targetDir := filepath.Join(tmpDir, "my-app")
-
-	cmd := NewModuleInitCmd(&config.GlobalConfig{})
-	cmd.SetArgs([]string{"my-app", "--template", "standard", "--dir", targetDir})
-
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	err = cmd.Execute()
-	require.NoError(t, err)
-
-	// Check files were created
-	assert.FileExists(t, filepath.Join(targetDir, "module.cue"))
-	assert.FileExists(t, filepath.Join(targetDir, "components.cue"))
-	assert.FileExists(t, filepath.Join(targetDir, "cue.mod", "module.cue"))
-	assert.NoFileExists(t, filepath.Join(targetDir, "values.cue"), "values.cue must not be generated — defaults live in #config")
-
-	assertScaffoldPaths(t, targetDir, "my-app")
-}
-
-func TestModInit_Advanced(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "mod-init-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	targetDir := filepath.Join(tmpDir, "my-app")
-
-	cmd := NewModuleInitCmd(&config.GlobalConfig{})
-	cmd.SetArgs([]string{"my-app", "--template", "advanced", "--dir", targetDir})
-
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	err = cmd.Execute()
-	require.NoError(t, err)
-
-	// Check files and directories were created
-	assert.FileExists(t, filepath.Join(targetDir, "module.cue"))
-	assert.FileExists(t, filepath.Join(targetDir, "components.cue"))
-	assert.DirExists(t, filepath.Join(targetDir, "components"))
-	assert.NoFileExists(t, filepath.Join(targetDir, "values.cue"), "values.cue must not be generated — defaults live in #config")
-
-	assertScaffoldPaths(t, targetDir, "my-app")
-
-	// Advanced subpackage import must reference the module's full registry path.
-	componentsContent, err := os.ReadFile(filepath.Join(targetDir, "components.cue"))
-	require.NoError(t, err)
-	assert.Contains(t, string(componentsContent), `comps "example.com/modules/my-app/components@v0"`,
-		"advanced subpackage import must include module name segment")
-}
-
-func TestModInit_DefaultDir(t *testing.T) {
-	// Save and change working directory
-	origWd, err := os.Getwd()
-	require.NoError(t, err)
-
-	tmpDir, err := os.MkdirTemp("", "mod-init-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	require.NoError(t, os.Chdir(tmpDir))
-	defer os.Chdir(origWd)
-
-	cmd := NewModuleInitCmd(&config.GlobalConfig{})
-	cmd.SetArgs([]string{"test-module", "--template", "simple"})
-
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	err = cmd.Execute()
-	require.NoError(t, err)
-
-	// Should create directory with module name
-	assert.DirExists(t, filepath.Join(tmpDir, "test-module"))
-	assert.FileExists(t, filepath.Join(tmpDir, "test-module", "module.cue"))
-}
-
-func TestModInit_ContentSubstitution(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "mod-init-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	targetDir := filepath.Join(tmpDir, "my-special-app")
-
-	cmd := NewModuleInitCmd(&config.GlobalConfig{})
-	cmd.SetArgs([]string{"my-special-app", "--template", "simple", "--dir", targetDir})
-
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	err = cmd.Execute()
-	require.NoError(t, err)
-
-	assertScaffoldPaths(t, targetDir, "my-special-app")
-}
-
-func TestModInit_InvalidName(t *testing.T) {
-	tests := []struct {
-		name       string
-		moduleName string
-	}{
-		{"spaces", "Bad Name"},
-		{"uppercase", "UPPER"},
-		{"mixed-case", "MixedCase"},
-		{"underscore", "under_score"},
-		{"leading-hyphen", "-leading"},
-		{"trailing-hyphen", "trailing-"},
-		{"numeric-start", "1numeric"},
-		{"dot", "with.dot"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			targetDir := filepath.Join(tmpDir, "out")
-
-			cmd := NewModuleInitCmd(&config.GlobalConfig{})
-			// "--" forces cobra to treat the next token as a positional, so
-			// names beginning with "-" reach our validation rather than being
-			// parsed as flags.
-			cmd.SetArgs([]string{"--template", "simple", "--dir", targetDir, "--", tt.moduleName})
-			cmd.SetOut(&bytes.Buffer{})
-			cmd.SetErr(&bytes.Buffer{})
-
-			err := cmd.Execute()
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "invalid module name")
-			assert.NoDirExists(t, targetDir, "scaffold must not be created when name is invalid")
-		})
-	}
-}
-
-// assertScaffoldPaths verifies the rendered module has the correct registry-path
-// shape: cue.mod uses the full <parent>/<name>@v0 path, while metadata.modulePath
-// holds only the parent. The schema computes fqn = "<modulePath>/<name>:<version>",
-// so any duplication of the name segment would produce a malformed fqn.
-func assertScaffoldPaths(t *testing.T, targetDir, moduleName string) {
+// runInit executes the init command with args and optional injected stdin,
+// inside dir, returning the error.
+func runInit(t *testing.T, dir, stdin string, args ...string) error {
 	t.Helper()
-
-	cueModContent, err := os.ReadFile(filepath.Join(targetDir, "cue.mod", "module.cue"))
+	wd, err := os.Getwd()
 	require.NoError(t, err)
-	assert.Contains(t, string(cueModContent),
-		fmt.Sprintf(`module: "example.com/modules/%s@v0"`, moduleName),
-		"cue.mod must use full <parent>/<name>@v0 path")
+	require.NoError(t, os.Chdir(dir))
+	t.Cleanup(func() { _ = os.Chdir(wd) })
 
-	moduleContent, err := os.ReadFile(filepath.Join(targetDir, "module.cue"))
-	require.NoError(t, err)
-	moduleStr := string(moduleContent)
-	assert.Contains(t, moduleStr, `modulePath:`, "module.cue must declare modulePath")
-	assert.Contains(t, moduleStr, `"example.com/modules"`,
-		"metadata.modulePath must be the parent only (no module name)")
-	assert.Contains(t, moduleStr, fmt.Sprintf(`name:        %q`, moduleName),
-		"metadata.name must be the module name")
-	assert.NotContains(t, moduleStr,
-		fmt.Sprintf(`"example.com/modules/%s"`, moduleName),
-		"metadata.modulePath must not include the module name segment (would double in fqn)")
+	c := NewModuleInitCmd(&config.GlobalConfig{})
+	c.SetArgs(args)
+	c.SetOut(new(bytes.Buffer))
+	c.SetErr(new(bytes.Buffer))
+	if stdin != "" {
+		c.SetIn(strings.NewReader(stdin))
+	}
+	return c.Execute()
 }
 
-func TestGetFileDescription(t *testing.T) {
-	tests := []struct {
-		filename string
-		want     string
-	}{
-		{"module.cue", "Module definition"},
-		{"components.cue", "Component definitions"},
-		{"cue.mod/module.cue", "CUE module metadata"},
-		{"scopes.cue", "Scope definitions"},
-		{"policies.cue", "Policy definitions"},
-		{"debug_values.cue", "Debug-specific values"},
-		{"components/api.cue", "Component template"},
-		{"scopes/backend.cue", "Scope template"},
-		{"unknown.cue", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.filename, func(t *testing.T) {
-			got := getFileDescription(tt.filename)
-			assert.Equal(t, tt.want, got)
-		})
-	}
+func exitCode(t *testing.T, err error) int {
+	t.Helper()
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	return exitErr.Code
 }
 
-func TestToPackageName(t *testing.T) {
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"my-app", "my_app"},
-		{"my_app", "my_app"},
-		{"MY-APP", "my_app"},
-		{"api.server", "api_server"},
-		{"123-app", "module_123_app"},
-		{"---", "module"},
-		{"hello world", "hello_world"},
+func TestClassifyArgs(t *testing.T) {
+	p, tpl, err := classifyArgs(nil)
+	require.NoError(t, err)
+	assert.Empty(t, p)
+	assert.Empty(t, tpl)
+
+	p, tpl, err = classifyArgs([]string{"example.com/modules/app@v0"})
+	require.NoError(t, err)
+	assert.Equal(t, "example.com/modules/app@v0", p)
+	assert.Empty(t, tpl)
+
+	p, tpl, err = classifyArgs([]string{"standard@v1"})
+	require.NoError(t, err)
+	assert.Empty(t, p)
+	assert.Equal(t, "standard@v1", tpl)
+
+	p, tpl, err = classifyArgs([]string{"example.com/modules/app@v0", "standard@v1"})
+	require.NoError(t, err)
+	assert.Equal(t, "example.com/modules/app@v0", p)
+	assert.Equal(t, "standard@v1", tpl)
+
+	// Two positionals with a bare word first is a grammar error, not a guess.
+	_, _, err = classifyArgs([]string{"standard", "example.com/modules/app@v0"})
+	assert.Error(t, err)
+}
+
+func TestPickTemplateRef(t *testing.T) {
+	ref, err := pickTemplateRef("", initFlags{})
+	require.NoError(t, err)
+	assert.Empty(t, ref)
+
+	ref, err = pickTemplateRef("standard", initFlags{})
+	require.NoError(t, err)
+	assert.Equal(t, "standard", ref)
+
+	// -t is an alias for --from; either spelling alone works.
+	ref, err = pickTemplateRef("", initFlags{template: "minimal"})
+	require.NoError(t, err)
+	assert.Equal(t, "minimal", ref)
+
+	ref, err = pickTemplateRef("", initFlags{from: "example.com/modules/donor@v2"})
+	require.NoError(t, err)
+	assert.Equal(t, "example.com/modules/donor@v2", ref)
+
+	// Naming it twice is refused rather than ranked.
+	_, err = pickTemplateRef("standard", initFlags{from: "minimal"})
+	assert.Error(t, err)
+}
+
+func TestInit_TemplateOnlyNonTTYRefuses(t *testing.T) {
+	// No injected stdin: the command sees the process stdin, which is not a
+	// terminal under go test — the template-only form must refuse rather
+	// than hang or invent a path.
+	err := runInit(t, t.TempDir(), "", "standard")
+	assert.Equal(t, 2, exitCode(t, err))
+	assert.Contains(t, err.Error(), "not a terminal")
+}
+
+func TestInit_InvalidNewPathRefusesBeforeAnyIO(t *testing.T) {
+	err := runInit(t, t.TempDir(), "", "example.com/modules/My-App@v0")
+	assert.Equal(t, 2, exitCode(t, err))
+}
+
+func TestInit_TemplateAgainstExistingModuleRefuses(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "app", "cue.mod"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app", "cue.mod", "module.cue"),
+		[]byte("module: \"example.com/modules/app@v0\"\n"), 0o644))
+
+	err := runInit(t, dir, "", "example.com/modules/app@v0", "standard")
+	assert.Equal(t, 2, exitCode(t, err))
+	assert.Contains(t, err.Error(), "already holds a module")
+}
+
+func TestInit_RepairConfirmationIsStdinDriven(t *testing.T) {
+	// A tree whose identity states the path but whose cue.mod is missing:
+	// repair plans one create. "n" declines it; the file must not appear.
+	files := map[string]string{
+		"identity/identity.cue": `package identity
+
+#VersionType: string & =~"^\\d+"
+
+ModulePath: "example.com/modules/app@v1"
+Version:    #VersionType | *"1.0.0"
+`,
+	}
+	writeRepairTree := func(t *testing.T) string {
+		t.Helper()
+		dir := t.TempDir()
+		mod := filepath.Join(dir, "app")
+		for rel, content := range files {
+			path := filepath.Join(mod, rel)
+			require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+			require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+		}
+		return dir
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := toPackageName(tt.input)
-			assert.Equal(t, tt.want, got)
-		})
+	t.Run("declined leaves the tree untouched", func(t *testing.T) {
+		dir := writeRepairTree(t)
+		err := runInit(t, dir, "n\n", "--dir", "app")
+		assert.Equal(t, 2, exitCode(t, err))
+		assert.NoFileExists(t, filepath.Join(dir, "app", "cue.mod", "module.cue"))
+	})
+
+	t.Run("accepted applies the plan", func(t *testing.T) {
+		dir := writeRepairTree(t)
+		err := runInit(t, dir, "y\n", "--dir", "app")
+		require.NoError(t, err)
+		data, err := os.ReadFile(filepath.Join(dir, "app", "cue.mod", "module.cue"))
+		require.NoError(t, err)
+		assert.Contains(t, string(data), `module: "example.com/modules/app@v1"`)
+	})
+
+	t.Run("--yes bypasses the confirmation", func(t *testing.T) {
+		dir := writeRepairTree(t)
+		err := runInit(t, dir, "", "--dir", "app", "--yes")
+		require.NoError(t, err)
+		assert.FileExists(t, filepath.Join(dir, "app", "cue.mod", "module.cue"))
+	})
+
+	t.Run("non-TTY without --yes refuses", func(t *testing.T) {
+		dir := writeRepairTree(t)
+		err := runInit(t, dir, "", "--dir", "app")
+		assert.Equal(t, 2, exitCode(t, err))
+		assert.NoFileExists(t, filepath.Join(dir, "app", "cue.mod", "module.cue"))
+	})
+}
+
+// TestInit_TemplateOnlyPromptsForThePath pins the interactive form: the
+// template-only invocation reads the new module path from stdin before
+// writing anything (D20's "asks for one"). The injected paths steer the run
+// into deterministic offline refusals, proving the prompt was consumed and
+// nothing was scaffolded.
+func TestInit_TemplateOnlyPromptsForThePath(t *testing.T) {
+	t.Run("prompted path is used before any write", func(t *testing.T) {
+		// The prompted path's leaf directory already holds a module, so the
+		// run refuses (template against an existing tree) without touching
+		// the registry — reachable only by reading the path from stdin.
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "my_app", "cue.mod"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "my_app", "cue.mod", "module.cue"),
+			[]byte("module: \"example.com/modules/my_app@v0\"\n"), 0o644))
+
+		err := runInit(t, dir, "example.com/modules/my_app@v0\n", "standard")
+		assert.Equal(t, 2, exitCode(t, err))
+		assert.Contains(t, err.Error(), "already holds a module")
+	})
+
+	t.Run("empty answer refuses", func(t *testing.T) {
+		dir := t.TempDir()
+		err := runInit(t, dir, "\n", "standard")
+		assert.Equal(t, 2, exitCode(t, err))
+		assert.Contains(t, err.Error(), "must not be empty")
+		assert.NoDirExists(t, filepath.Join(dir, "standard"))
+	})
+
+	t.Run("invalid answer refuses before any write", func(t *testing.T) {
+		dir := t.TempDir()
+		err := runInit(t, dir, "not a path\n", "standard")
+		assert.Equal(t, 2, exitCode(t, err))
+		entries, readErr := os.ReadDir(dir)
+		require.NoError(t, readErr)
+		assert.Empty(t, entries, "nothing may be written on a refused prompt")
+	})
+}
+
+func TestInit_NothingToRepairIsSuccess(t *testing.T) {
+	dir := t.TempDir()
+	mod := filepath.Join(dir, "app")
+	require.NoError(t, os.MkdirAll(filepath.Join(mod, "identity"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(mod, "cue.mod"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(mod, "cue.mod", "module.cue"),
+		[]byte("module: \"example.com/modules/app@v1\"\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(mod, "identity", "identity.cue"),
+		[]byte("package identity\n\nModulePath: \"example.com/modules/app@v1\"\nVersion: \"1.0.0\"\n"), 0o644))
+
+	err := runInit(t, dir, "", "--dir", "app")
+	assert.NoError(t, err)
+}
+
+// TestTemplateList_SharesTheExpansionTable asserts `template list` prints
+// exactly the baked table shortcut expansion reads — one source, no drift.
+func TestTemplateList_SharesTheExpansionTable(t *testing.T) {
+	c := NewModuleTemplateCmd()
+	out := new(bytes.Buffer)
+	c.SetArgs([]string{"list"})
+	c.SetOut(out)
+	require.NoError(t, c.Execute())
+
+	for _, tpl := range scaffold.Official {
+		assert.Contains(t, out.String(), tpl.Name)
+		assert.Contains(t, out.String(), tpl.DefaultMajor)
+
+		ref, err := scaffold.ParseTemplateRef(tpl.Name)
+		require.NoError(t, err)
+		assert.Equal(t, scaffold.Segment+"/"+tpl.Name, ref.Base)
 	}
 }
