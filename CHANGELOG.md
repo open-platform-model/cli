@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-alpha.13](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.12...v1.0.0-alpha.13) (2026-08-18)
+
+
+### Miscellaneous Chores
+
+* **openspec:** withdraw the cue-binary-integration change ([#154](https://github.com/open-platform-model/cli/issues/154)) ([01ba23f](https://github.com/open-platform-model/cli/commit/01ba23f3d57b32e00d42fc5690cf3281d00a30ea))
+
 ## [1.0.0-alpha.12](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.11...v1.0.0-alpha.12) (2026-08-18)
 
 
