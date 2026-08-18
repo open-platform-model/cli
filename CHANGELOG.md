@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0-alpha.12](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.11...v1.0.0-alpha.12) (2026-08-18)
+
+
+### Features
+
+* **cmd:** add i and ins aliases to the instance command group ([#151](https://github.com/open-platform-model/cli/issues/151)) ([96ea63c](https://github.com/open-platform-model/cli/commit/96ea63c71c97b364642ed052f32a6b1ef9337b73))
+* **fixtures:** move podinfo to testing.opmodel.dev and publish it to GHCR ([#153](https://github.com/open-platform-model/cli/issues/153)) ([33abb0e](https://github.com/open-platform-model/cli/commit/33abb0e2d3912fd5cb3c0d6aed25d1a77628b386))
+
 ## [1.0.0-alpha.11](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.10...v1.0.0-alpha.11) (2026-08-18)
 
 
