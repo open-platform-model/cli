@@ -111,14 +111,15 @@ Read when entering `cli/`:
   fixtures pin `opmodel.dev/core` `v2.0.0-alpha.4` and `opmodel.dev/catalogs/opm`
   `v2.0.0-alpha.3`; the seeded platform template pins the same catalog build
   (mirror peers: `hack/platform.cue`, the operator's sample Platform).
-- Integration + CUE workflows need registry config. Follow the Registry Policy in the root `CLAUDE.md` — reads resolve `opmodel.dev/*` from GHCR:
+- Integration + CUE workflows need registry config. Follow the Registry Policy in the root `CLAUDE.md` — both `opmodel.dev/*` and `testing.opmodel.dev/*` resolve from GHCR:
 
 ```bash
-export CUE_REGISTRY='opmodel.dev=ghcr.io/open-platform-model,testing.opmodel.dev=localhost:5000+insecure,registry.cue.works'
+export CUE_REGISTRY='opmodel.dev=ghcr.io/open-platform-model,testing.opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
 export OPM_REGISTRY="$CUE_REGISTRY"
 ```
 
-- **Known deviation — kind dev-cluster flow:** `task cluster:operator` (and `hack/opm-config.cue`, `KIND_CUE_REGISTRY`) runs entirely against the local registry: it hard-requires the `opm-registry` container and routes `opmodel.dev/*` to it, because the loop iterates on locally published workspace modules and `opmodel.dev/modules/test/*` fixtures that are not on GHCR. Local-registry-gated — only run when the user asks for the kind dev flow. The shipped CLI default (`internal/config/templates.go`) is GHCR.
+- **No local registry is required anywhere in this repo** — unit tests, e2e, integration, the examples, and the kind dev-cluster flow all resolve from GHCR. `task cluster:operator` installs the pinned operator and relies on its built-in `--registry` default (which routes both domains to GHCR); it patches `--registry` onto the Deployment and requires the `opm-registry` container **only** when `KIND_CUE_REGISTRY` is explicitly set, which is the opt-in path for iterating against a locally published module. The shipped CLI default (`internal/config/templates.go`) matches.
+- **Test fixtures live on the testing domain.** `tests/fixtures/modules/*` declare `testing.opmodel.dev/modules/cli/<name>@v0`, carry an `identity/` package, and are published to GHCR by `.github/workflows/publish-fixtures.yml` through `opm module publish` — the same pipeline and gates the official templates go through. Never give a fixture an `opmodel.dev/*` path: CUE routes by longest prefix, so a fixture there drags core and the catalogs onto whatever registry serves the fixture. A fixture version bump is an edit to `identity/identity.cue` plus a re-pin in every consumer; publish it (dispatch the workflow) before the consumers that pin it merge.
 
 ## Build And Dev Commands
 

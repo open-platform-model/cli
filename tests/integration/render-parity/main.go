@@ -16,7 +16,7 @@
 // per-actor label is the KNOWN delta, load-path equivalence is what this
 // check proves (local staging ≡ registry acquisition; D37/D6).
 //
-// Requires: registry serving opmodel.dev/modules/test/podinfo@v0 at the
+// Requires: registry serving testing.opmodel.dev/modules/cli/podinfo@v0 at the
 // fixture's version, the catalogs, and core — SKIPs otherwise unless
 // OPM_ITEST_RENDER_PARITY=1 forces a hard failure.
 //
@@ -44,11 +44,12 @@ import (
 )
 
 const (
-	// moduleDir is repo-local (vendored from opm-operator — see the fixture's
-	// module.cue header) so render-parity runs in a standalone clone with no
-	// sibling checkout. Resolved relative to the repo root, the program's cwd.
+	// moduleDir is repo-local (forked from opm-operator's copy — see the
+	// fixture's module.cue header) so render-parity runs in a standalone clone
+	// with no sibling checkout. Resolved relative to the repo root, the
+	// program's cwd.
 	moduleDir     = "tests/fixtures/modules/podinfo"
-	modulePath    = "opmodel.dev/modules/test/podinfo@v0"
+	modulePath    = "testing.opmodel.dev/modules/cli/podinfo@v0"
 	moduleVersion = "v0.1.4"
 	instName      = "podinfo-parity"
 	instNamespace = "default"

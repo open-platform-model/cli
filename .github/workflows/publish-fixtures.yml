@@ -1,0 +1,56 @@
+name: Publish Fixtures
+
+# The repo's own test-fixture modules live on the testing domain
+# (testing.opmodel.dev/modules/cli/*) and are published to GHCR, so consumers —
+# examples, e2e testdata, the kind dev cluster, a fresh clone — resolve them
+# from a public registry with no local registry involved.
+#
+# Independent of the cli's release train: a fixture is not release-please
+# managed, and a fixture bump should reach the registry without waiting for a
+# release. The script's caller-side GHCR probe makes re-runs no-ops, so pushing
+# an unrelated change under tests/fixtures/modules/ publishes nothing.
+#
+# workflow_dispatch is the bootstrap and repair path: dispatch against a branch
+# to publish a new coordinate BEFORE the consumers that pin it merge.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'tests/fixtures/modules/**'
+      - '.github/scripts/publish-fixtures.sh'
+      - '.github/workflows/publish-fixtures.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish fixture modules
+    # Forks have no access to GITHUB_TOKEN with packages:write — skip cleanly.
+    if: github.event.repository.fork == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.0'
+
+      - name: Build opm
+        run: go build -o bin/opm ./cmd/opm
+
+      - name: Install cue
+        run: go install cuelang.org/go/cmd/cue@v0.17.1
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Publish unpublished fixtures
+        run: .github/scripts/publish-fixtures.sh
+        env:
+          GHCR_AUTH: ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}
