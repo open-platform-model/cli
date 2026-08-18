@@ -20,7 +20,12 @@ if [ "${1:-}" = "--dry-run" ]; then
 fi
 
 opm=${OPM_BIN:-./bin/opm}
+# BOTH are required: `cue eval` reads CUE_REGISTRY, `opm` reads OPM_REGISTRY
+# (--registry > OPM_REGISTRY > ~/.opm/config.cue — never CUE_REGISTRY). With only
+# CUE_REGISTRY set, opm silently falls through to the caller's personal config;
+# it happens to work on a CI runner that has none, and misleads everywhere else.
 export CUE_REGISTRY=${CUE_REGISTRY:-opmodel.dev=ghcr.io/open-platform-model}
+export OPM_REGISTRY=${OPM_REGISTRY:-$CUE_REGISTRY}
 
 # published <repo> <tag> — 0 when the manifest exists. GHCR_AUTH
 # ("user:token") authenticates the token exchange; without it the anonymous
