@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.0.0-alpha.10](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.9...v1.0.0-alpha.10) (2026-08-17)
+
+
+### Features
+
+* **cmd:** module and catalog version set over an idempotent writer toolkit ([#145](https://github.com/open-platform-model/cli/issues/145)) ([4de3b0b](https://github.com/open-platform-model/cli/commit/4de3b0be508d09cf38e8adcdba9ddf81775f4eee))
+* **publish:** catalog member, posture and compat gates plus registry check ([#147](https://github.com/open-platform-model/cli/issues/147)) ([ad8f2e9](https://github.com/open-platform-model/cli/commit/ad8f2e9e2f794b069d0c5c628300c9445dbd378e))
+* **publish:** identity-driven publish pipeline for modules and catalogs ([#144](https://github.com/open-platform-model/cli/issues/144)) ([938055e](https://github.com/open-platform-model/cli/commit/938055e5f2caacbf6487ba4ce2b4f16139c93160))
+* **registry:** add opm registry login over a docker config writer ([#148](https://github.com/open-platform-model/cli/issues/148)) ([8374728](https://github.com/open-platform-model/cli/commit/8374728cbf6ebafa7cce7147946f4b17c4f515f6))
+
+
+### Documentation
+
+* **openspec:** rename login command to opm registry login (0011 D24) ([54eff29](https://github.com/open-platform-model/cli/commit/54eff2902f3e62d281fe825fe76c6c2f24b7c859))
+
+
+### Miscellaneous Chores
+
+* **openspec:** deny delivery-operation tasks in tasks.md ([#142](https://github.com/open-platform-model/cli/issues/142)) ([62007e4](https://github.com/open-platform-model/cli/commit/62007e4f7f252dba79c17c7f860ed0383e3598e9))
+
 ## [1.0.0-alpha.9](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.8...v1.0.0-alpha.9) (2026-08-15)
 
 
