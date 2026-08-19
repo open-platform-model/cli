@@ -141,3 +141,79 @@ func TestEnsureClusterPlatform_OtherErrorIsFatal(t *testing.T) {
 
 	require.Error(t, EnsureClusterPlatform(context.Background(), dyn, testInput()))
 }
+
+func TestEnsureClusterPlatformForCatalog_CreatesWhenAbsent(t *testing.T) {
+	dyn := newFakeDynamic()
+
+	require.NoError(t, EnsureClusterPlatformForCatalog(context.Background(), dyn,
+		DefaultCatalogPath, "2.0.0-alpha.3"))
+
+	created, err := dyn.Resource(inventory.PlatformGVR).Get(context.Background(),
+		inventory.PlatformSingletonName, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	assert.Equal(t, inventory.PlatformSingletonName, created.GetName())
+	assert.Equal(t, inventory.KindPlatform, created.GetKind())
+
+	typ, _, err := unstructured.NestedString(created.Object, "spec", "type")
+	require.NoError(t, err)
+	assert.Equal(t, "kubernetes", typ)
+
+	version, _, err := unstructured.NestedString(created.Object,
+		"spec", "registry", DefaultCatalogPath, "version")
+	require.NoError(t, err)
+	assert.Equal(t, "2.0.0-alpha.3", version, "the resolved version is what gets pinned")
+
+	// The wire spec keeps the name in metadata only.
+	spec, _, err := unstructured.NestedMap(created.Object, "spec")
+	require.NoError(t, err)
+	_, hasName := spec["name"]
+	assert.False(t, hasName, "spec must not carry a name field")
+}
+
+func TestEnsureClusterPlatformForCatalog_ExistingPlatformIsUntouched(t *testing.T) {
+	existing := clusterPlatformObj(map[string]any{
+		"type": "kubernetes",
+		"registry": map[string]any{
+			DefaultCatalogPath: map[string]any{"version": "2.0.0-alpha.1"},
+		},
+	})
+	dyn := newFakeDynamic(existing)
+
+	require.NoError(t, EnsureClusterPlatformForCatalog(context.Background(), dyn,
+		DefaultCatalogPath, "2.0.0-alpha.3"))
+
+	after, err := dyn.Resource(inventory.PlatformGVR).Get(context.Background(),
+		inventory.PlatformSingletonName, metav1.GetOptions{})
+	require.NoError(t, err)
+	version, _, err := unstructured.NestedString(after.Object,
+		"spec", "registry", DefaultCatalogPath, "version")
+	require.NoError(t, err)
+	assert.Equal(t, "2.0.0-alpha.1", version,
+		"install must never rewrite the catalog pin of an existing Platform")
+}
+
+func TestEnsureClusterPlatformForCatalog_ForbiddenDegradesToWarning(t *testing.T) {
+	dyn := newFakeDynamic()
+	dyn.PrependReactor("create", "platforms", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(
+			k8sschema.GroupResource{Group: inventory.GroupOpmodel, Resource: inventory.ResourcePlatforms},
+			inventory.PlatformSingletonName, nil)
+	})
+
+	assert.NoError(t, EnsureClusterPlatformForCatalog(context.Background(), dyn,
+		DefaultCatalogPath, "2.0.0-alpha.3"),
+		"an RBAC-denied create must not fail an otherwise successful install")
+}
+
+func TestEnsureClusterPlatformForCatalog_UnexpectedErrorPropagates(t *testing.T) {
+	dyn := newFakeDynamic()
+	dyn.PrependReactor("create", "platforms", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewInternalError(assert.AnError)
+	})
+
+	err := EnsureClusterPlatformForCatalog(context.Background(), dyn,
+		DefaultCatalogPath, "2.0.0-alpha.3")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "creating cluster Platform")
+}
