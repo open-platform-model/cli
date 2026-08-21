@@ -167,15 +167,7 @@ func compileInstance(
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}
 
-	result := &Result{
-		Components:   out.Components,
-		MatchPlan:    out.MatchPlan,
-		Warnings:     out.Warnings,
-		Platform:     env.resolution,
-		RenderDigest: renderDigest,
-		Values:       decodeUnifiedValues(inst.Package.LookupPath(schema.Values)),
-		SourceLocal:  sourceLocal,
-	}
+	result := newResult(env, out, renderDigest, decodeUnifiedValues(inst.Package.LookupPath(schema.Values)), sourceLocal)
 
 	for _, r := range converted {
 		u, convErr := r.ToUnstructured()
@@ -206,6 +198,23 @@ func compileInstance(
 	result.Module = decodeModuleMetadata(inst.Package.LookupPath(schema.Module))
 
 	return result, nil
+}
+
+// newResult assembles the workflow Result from the compile output and the
+// render environment. PlatformSpec must carry the exact resolved platform
+// input the render consumed — the D12 write-if-absent seeding writes it
+// verbatim, with no re-read of the platform file at apply time.
+func newResult(env *renderEnv, out *kernel.CompileResult, renderDigest string, values map[string]any, sourceLocal bool) *Result {
+	return &Result{
+		Components:   out.Components,
+		MatchPlan:    out.MatchPlan,
+		Warnings:     out.Warnings,
+		Platform:     env.resolution,
+		PlatformSpec: env.input,
+		RenderDigest: renderDigest,
+		Values:       values,
+		SourceLocal:  sourceLocal,
+	}
 }
 
 // decodeModuleMetadata decodes the CLI's module metadata from a module CUE

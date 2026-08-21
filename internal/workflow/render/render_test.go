@@ -13,7 +13,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/open-platform-model/library/opm/helper/synth"
+	"github.com/open-platform-model/library/opm/kernel"
+
 	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/platform"
 	"github.com/open-platform-model/cli/pkg/module"
 )
 
@@ -71,6 +75,34 @@ func TestRenderFromInstanceFile_RejectsModulePackagePath(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "module package, not an instance")
+}
+
+func TestNewResult_CarriesResolvedPlatform(t *testing.T) {
+	// The apply workflow seeds the cluster Platform from Result.PlatformSpec
+	// (0006 D12): the assembly must carry the resolved input verbatim, or
+	// the seeded document degrades to the zero value.
+	enable := true
+	input := synth.PlatformInput{
+		Name: "local-default",
+		Type: "kubernetes",
+		Subscriptions: map[string]synth.SubscriptionSpec{
+			"opmodel.dev/catalogs/opm@v2": {Enable: &enable, Version: "2.0.0-alpha.3"},
+		},
+	}
+	env := &renderEnv{
+		resolution: platform.Resolution{Source: platform.SourceLocalDefault, Location: "~/.opm/platform.cue", Warning: "cluster Platform not found"},
+		input:      input,
+	}
+
+	result := newResult(env, &kernel.CompileResult{Warnings: []string{"w1"}}, "digest", map[string]any{"k": "v"}, true)
+
+	assert.Equal(t, env.resolution, result.Platform)
+	assert.Equal(t, input, result.PlatformSpec)
+	assert.NotEmpty(t, result.PlatformSpec.Type, "seeded spec must never carry an empty type")
+	assert.Equal(t, []string{"w1"}, result.Warnings)
+	assert.Equal(t, "digest", result.RenderDigest)
+	assert.Equal(t, map[string]any{"k": "v"}, result.Values)
+	assert.True(t, result.SourceLocal)
 }
 
 func TestUnifyValuesFiles_Empty(t *testing.T) {
