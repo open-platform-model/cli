@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0-alpha.14](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.13...v1.0.0-alpha.14) (2026-08-22)
+
+
+### Features
+
+* **operator:** seed the cluster Platform from the resolved catalog ([#156](https://github.com/open-platform-model/cli/issues/156)) ([331c696](https://github.com/open-platform-model/cli/commit/331c696918da91848facae70d1abe394db92f9ac))
+
+
+### Bug Fixes
+
+* **render:** carry resolved platform spec for cluster seeding ([ca82241](https://github.com/open-platform-model/cli/commit/ca82241a35ef6f448847b9fe1ae92d9408afb4a7))
+
+
+### Documentation
+
+* **config:** propose seeding both catalogs in the default platform ([#161](https://github.com/open-platform-model/cli/issues/161)) ([78b9110](https://github.com/open-platform-model/cli/commit/78b911059bcf364198b7d590a9ae8993b912c50b))
+
 ## [1.0.0-alpha.13](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.12...v1.0.0-alpha.13) (2026-08-18)
 
 
