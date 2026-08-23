@@ -11,7 +11,7 @@ The command creates:
 - `~/.opm/config.cue` — scalar-only configuration file (registry, kubernetes, log) with no CUE imports
 - `~/.opm/platform.cue` — data-only default platform file (name, type, registry subscriptions) with no CUE imports
 
-The command SHALL NOT create `~/.opm/cue.mod/` and SHALL NOT run `cue mod tidy` or any CUE module operation. The seeded `platform.cue` SHALL subscribe to `opmodel.dev/catalogs/opm@v2` only — the sole first-party catalog since the consolidation — with an explicit pinned scalar `version` naming one published catalog build. The pin is load-bearing: it is bumped by hand as catalog releases ship, kept aligned with `hack/platform.cue` and the operator's sample Platform.
+The command SHALL NOT create `~/.opm/cue.mod/` and SHALL NOT run `cue mod tidy` or any CUE module operation. The seeded `platform.cue` SHALL subscribe to **both** first-party catalogs — `opmodel.dev/catalogs/opm@v2`, the abstraction catalog, and `opmodel.dev/catalogs/k8s@v1`, the raw Kubernetes passthrough catalog — each with an explicit pinned scalar `version` naming one published build of that catalog. Each pin is load-bearing: pins are bumped by hand as catalog releases ship, kept aligned with `hack/platform.cue` and the operator's sample Platform. A pin SHALL name a version that is actually published, because `opm config init` is normatively offline and cannot resolve one.
 
 #### Scenario: Initialize configuration for first time
 
@@ -27,9 +27,15 @@ The command SHALL NOT create `~/.opm/cue.mod/` and SHALL NOT run `cue mod tidy` 
 #### Scenario: Seeded platform subscriptions
 
 - **WHEN** `opm config init` writes `platform.cue`
-- **THEN** the file SHALL contain exactly one `registry` entry, keyed `opmodel.dev/catalogs/opm@v2`
-- **AND** that entry SHALL carry an explicit concrete `version`
-- **AND** the file SHALL contain no `filter` vocabulary and no `opmodel.dev/catalogs/kubernetes` entry
+- **THEN** the file SHALL contain exactly two `registry` entries, keyed `opmodel.dev/catalogs/opm@v2` and `opmodel.dev/catalogs/k8s@v1`
+- **AND** each entry SHALL carry an explicit concrete `version`
+- **AND** the file SHALL contain no `filter` vocabulary
+- **AND** the file SHALL contain no `opmodel.dev/catalogs/kubernetes` entry, which names a retired module path rather than the extracted catalog
+
+#### Scenario: Seeded platform offers the raw escape hatch
+
+- **WHEN** a module demands a contract from `opmodel.dev/catalogs/k8s@v1` and the platform is the seeded default
+- **THEN** the subscription needed to match that contract SHALL already be present, without the user editing `platform.cue`
 
 #### Scenario: Refuse to overwrite existing configuration
 
