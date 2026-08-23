@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"cuelang.org/go/cue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -135,18 +137,44 @@ func TestConfigInit_ConfigContent(t *testing.T) {
 	assert.NotContains(t, configStr, "providers")
 	assert.NotContains(t, configStr, "import")
 
-	// Check platform.cue content: the single seeded catalog subscription
+	// Check platform.cue content: both seeded catalog subscriptions, each
 	// with an explicit pinned version (enhancement 0006 D39; 0010 scalar
-	// subscriptions). No filter vocabulary, no retired kubernetes catalog.
+	// subscriptions; seed-both-catalogs). No filter vocabulary, no retired
+	// kubernetes catalog.
 	platformFile := filepath.Join(tmpHome, ".opm", "platform.cue")
 	platformContent, err := os.ReadFile(platformFile)
 	require.NoError(t, err)
 
 	platformStr := string(platformContent)
 	assert.Contains(t, platformStr, "opmodel.dev/catalogs/opm@v2")
-	assert.Contains(t, platformStr, "version:")
+	assert.Contains(t, platformStr, "opmodel.dev/catalogs/k8s@v1")
+	assert.Equal(t, 2, strings.Count(platformStr, "version:"), "exactly two registry entries, each with a concrete version")
 	assert.NotContains(t, platformStr, "opmodel.dev/catalogs/kubernetes")
 	assert.NotContains(t, platformStr, "filter")
+}
+
+func TestConfigInit_SeededPlatformOffersRawEscapeHatch(t *testing.T) {
+	tmpHome := setTempHome(t)
+
+	cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	require.NoError(t, cmd.Execute())
+
+	// A module demanding a contract from the raw passthrough catalog must
+	// already have a matching subscription in the seeded default, with no
+	// user edit to platform.cue.
+	platformFile := filepath.Join(tmpHome, ".opm", "platform.cue")
+	value, err := opmconfig.LoadPlatformFile(platformFile)
+	require.NoError(t, err)
+
+	sub := value.LookupPath(cue.ParsePath(`registry."opmodel.dev/catalogs/k8s@v1"`))
+	require.True(t, sub.Exists(), "seeded platform must already subscribe to the raw escape-hatch catalog")
+
+	version, err := sub.LookupPath(cue.ParsePath("version")).String()
+	require.NoError(t, err)
+	assert.NotEmpty(t, version)
 }
 
 func TestConfigInit_OutputMessage(t *testing.T) {
