@@ -18,11 +18,14 @@ D47 merged the catalogs into one.
 - **The seeded `~/.opm/platform.cue` names both catalogs**, each with its own explicit pinned
   scalar `version`. **BREAKING** for the seeded artifact's shape: the file now carries two
   `registry` entries where the spec previously required exactly one.
-- **`config.DefaultCatalogPath` becomes plural.** The single constant that spells the catalog path
-  once becomes a pair, so the template and any future caller stay spelled in one place.
-- The mirror contract recorded in `CLAUDE.md` grows a fourth pin: `internal/config/templates.go`,
-  `hack/platform.cue`, and the operator's sample Platform each gain the second subscription and
-  stay aligned in the same commit.
+- **`config.DefaultCatalogPath` becomes plural.** `DefaultCatalogPaths` becomes the source of truth
+  naming both catalogs; `DefaultCatalogPath` survives as a derived alias to the OPM entry so the
+  install-side single-catalog callers (explicitly out of scope, below) need no changes. See
+  design.md.
+- The mirror contract recorded in `CLAUDE.md` grows a fourth *file*: `internal/config/templates.go`,
+  `hack/platform.cue`, `hack/kind-platform.yaml` (previously mirroring the pin without being named in
+  the contract), and the operator's sample Platform each gain the second subscription and stay
+  aligned in the same commit.
 
 Explicitly **not** in this change:
 
@@ -46,16 +49,21 @@ Explicitly **not** in this change:
 
 ## Impact
 
-- `internal/config/templates.go` — `DefaultCatalogPath` and `DefaultPlatformTemplate`.
-- `internal/platform/catalog.go` — the re-export of the catalog path constant.
+- `internal/config/templates.go` — `DefaultCatalogPath`/`DefaultCatalogPaths` and
+  `DefaultPlatformTemplate`.
+- `internal/platform/catalog.go` — the re-export of the catalog path constants.
 - `internal/cmd/config/init_test.go` — currently asserts the seeded file contains exactly one
   registry entry and no second catalog path.
-- `hack/platform.cue` and the operator's sample Platform — mirror peers of the seeded template.
+- `hack/platform.cue`, `hack/kind-platform.yaml`, and the operator's sample Platform — mirror peers
+  of the seeded template.
 - `CLAUDE.md` — the mirror-contract note.
 
-**Sequencing constraint.** The seeded pin is a hand-bumped literal and `opm config init` is
-normatively offline, so it cannot resolve "latest". The template's stated invariant is that an
+Not touched: `internal/cmd/operator/install.go` and its tests keep resolving `DefaultCatalogPath`
+unchanged (design.md).
+
+**Sequencing constraint — satisfied.** The seeded pin is a hand-bumped literal and `opm config init`
+is normatively offline, so it cannot resolve "latest". The template's stated invariant is that an
 immutable published tag never dangles, which holds only for a version that exists. This change
-therefore MUST NOT merge before the first release of `opmodel.dev/catalogs/k8s@v1` is published to
-GHCR; until then there is no version to pin, and seeding one would break the invariant the existing
-comment relies on.
+required the first release of `opmodel.dev/catalogs/k8s@v1` to be published to GHCR before merging;
+that release (`1.0.0-alpha.1`) and a compatible `opmodel.dev/catalogs/opm@v2` build (`2.0.0-alpha.5`)
+are now published and verified (2026-08-22).

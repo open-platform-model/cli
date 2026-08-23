@@ -109,8 +109,11 @@ Read when entering `cli/`:
   carry the catalog's major suffix), and module identity is read verbatim from
   core-v2 metadata (`metadata.modulePath` is the complete registry address). CUE
   fixtures pin `opmodel.dev/core` `v2.0.0-alpha.4` and `opmodel.dev/catalogs/opm`
-  `v2.0.0-alpha.3`; the seeded platform template pins the same catalog build
-  (mirror peers: `hack/platform.cue`, the operator's sample Platform).
+  `v2.0.0-alpha.3`; the seeded platform template pins both first-party catalogs
+  (`opmodel.dev/catalogs/opm@v2`, `opmodel.dev/catalogs/k8s@v1`), each mirrored
+  in the same commit across four files: `internal/config/templates.go`
+  (source), `hack/platform.cue`, `hack/kind-platform.yaml`, and the operator's
+  sample Platform.
 - Integration + CUE workflows need registry config. Follow the Registry Policy in the root `CLAUDE.md` — both `opmodel.dev/*` and `testing.opmodel.dev/*` resolve from GHCR:
 
 ```bash
