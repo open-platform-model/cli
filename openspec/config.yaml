@@ -113,22 +113,23 @@ rules:
     - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY) to indicate requirement strength
     - MUST include "Research & Decisions" section when exploration was done
     - Document what was explored, alternatives considered, and rationale
-    - Format: |
-        ## Research & Decisions
-        
-        ### [Topic]
-        **Context**: [Why this decision was needed]
-        **Explored**: [What was investigated - link to exploration notes]
-        **Options considered**:
-        1. [Option A] - [pros/cons]
-        2. [Option B] - [pros/cons]
-        **Decision**: [Chosen option]
-        **Rationale**: [Why this option was selected]
+    - |
+      Format:
+      ## Research & Decisions
+
+      ### [Topic]
+      **Context**: [Why this decision was needed]
+      **Explored**: [What was investigated - link to exploration notes]
+      **Options considered**:
+      1. [Option A] - [pros/cons]
+      2. [Option B] - [pros/cons]
+      **Decision**: [Chosen option]
+      **Rationale**: [Why this option was selected]
     - Include Go pseudo-code or function signatures
     - Reference upstream patterns (Timoni, kubectl) when applicable
     - Data flow diagrams for pipeline commands (build, apply, etc.)
-    - Error handling: what errors can occur and how they're surfaced
-    - Define command syntax: "opm <group> <command> [args] [flags]"
+    - "Error handling: what errors can occur and how they're surfaced"
+    - 'Define command syntax: "opm <group> <command> [args] [flags]"' 
     - Document all flags with types, defaults, and descriptions
     - Specify exit codes (0=success, 1=usage error, 2=execution error)
     - Specify error messages and suggested fixes
