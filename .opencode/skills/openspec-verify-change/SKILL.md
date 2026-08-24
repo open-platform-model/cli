@@ -1,29 +1,35 @@
 ---
 name: openspec-verify-change
 description: Verify implementation matches change artifacts. Use when the user wants to validate that implementation is complete, correct, and coherent before archiving.
+allowed-tools: Bash(openspec:*)
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:
   author: openspec
   version: "1.0"
-  generatedBy: "1.0.2"
+  generatedBy: "1.9.0"
 ---
 
 Verify that an implementation matches the change artifacts (specs, tasks, design).
+
+**Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`, `schemas`, `view`). Once selected, treat `--store <id>` as sticky for the rest of the workflow. Every unscoped example of those commands below is shorthand: before running it, append the flag. For example, run `openspec status --change "<name>" --json --store "<id>"`, not the unscoped form shown below. Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
 **Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
 
-1. **If no change name provided, prompt for selection**
+1. **Select the change**
 
-   Run `openspec list --json` to get available changes. Use the **AskUserQuestion tool** to let the user select.
+   If a name is provided, use it. Otherwise:
+   - Infer from conversation context if the user mentioned a change
+   - Auto-select if only one active change exists
+   - If ambiguous, run `openspec list --json` to get available changes and ask the user to select one
 
-   Show changes that have implementation tasks (tasks artifact exists).
+   When prompting, show changes that have implementation tasks (tasks artifact exists).
    Include the schema used for each change if available.
    Mark changes with incomplete tasks as "(In Progress)".
 
-   **IMPORTANT**: Do NOT guess or auto-select a change. Always let the user choose.
+   Always announce: "Using change: <name>" and how to override (e.g., `/openspec-verify-change <other>`).
 
 2. **Check status to understand the schema**
    ```bash
@@ -31,29 +37,31 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
    ```
    Parse the JSON to understand:
    - `schemaName`: The workflow being used (e.g., "spec-driven")
+   - `planningHome`, `changeRoot`, `artifactPaths`, and `actionContext`: path and scope context
    - Which artifacts exist for this change
 
-3. **Get the change directory and load artifacts**
+3. **Get planning context and load artifacts**
 
    ```bash
    openspec instructions apply --change "<name>" --json
    ```
 
-   This returns the change directory and context files. Read all available artifacts from `contextFiles`.
+   This returns the change directory and `contextFiles` (artifact ID -> array of concrete file paths). Read all available artifacts from `contextFiles`.
 
 4. **Initialize verification report structure**
 
-   Create a report structure with three dimensions:
-   - **Completeness**: Track tasks and spec coverage
-   - **Correctness**: Track requirement implementation and scenario coverage
-   - **Coherence**: Track design adherence and pattern consistency
+   Create a report structure with four dimensions:
+   1. **Completeness** — tasks and spec coverage
+   2. **Correctness** — requirement implementation and scenario coverage
+   3. **Coherence** — design adherence and pattern consistency
+   4. **Cleanliness** — dead code left behind by the change
 
    Each dimension can have CRITICAL, WARNING, or SUGGESTION issues.
 
 5. **Verify Completeness**
 
    **Task Completion**:
-   - If tasks.md exists in contextFiles, read it
+   - If `contextFiles.tasks` exists, read every file path in it
    - Parse checkboxes: `- [ ]` (incomplete) vs `- [x]` (complete)
    - Count complete vs total tasks
    - If incomplete tasks exist:
@@ -66,7 +74,7 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
    - Exception: skip this check when the change's stated deliverable is itself a release or publishing operation — there those steps are the implementation
 
    **Spec Coverage**:
-   - If delta specs exist in `openspec/changes/<name>/specs/`:
+   - If delta specs exist in `contextFiles.specs`:
      - Extract all requirements (marked with "### Requirement:")
      - For each requirement:
        - Search codebase for keywords related to the requirement
@@ -97,7 +105,7 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
 7. **Verify Coherence**
 
    **Design Adherence**:
-   - If design.md exists in contextFiles:
+   - If `contextFiles.design` exists:
      - Extract key decisions (look for sections like "Decision:", "Approach:", "Architecture:")
      - Verify implementation follows those decisions
      - If contradiction detected:
@@ -112,10 +120,22 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
      - Add SUGGESTION: "Code pattern deviation: <details>"
      - Recommendation: "Consider following project pattern: <example>"
 
-8. **Generate Verification Report**
+8. **Verify Cleanliness**
+
+   Load the **openspec-cleanup-change** skill in change-aware mode (pass the change name) and incorporate its report as the Cleanliness dimension.
+
+   Map cleanup findings to verification issues:
+   - High-confidence candidates → WARNING: "Dead code candidate: `<symbol>` in `<file>:<line>` — <reason>"
+   - Medium/low-confidence candidates → SUGGESTION with the same format
+
+   If cleanup reports no candidates: note "No dead code detected" in Summary.
+
+   **Skip condition**: If no code changes have been implemented yet (all tasks incomplete), skip this check and note in Summary: "Cleanliness check skipped — no implementation to analyze."
+
+9. **Generate Verification Report**
 
    **Summary Scorecard**:
-   ```
+   ```markdown
    ## Verification Report: <change-name>
 
    ### Summary
@@ -132,16 +152,19 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
       - Incomplete tasks
       - Missing requirement implementations
       - Each with specific, actionable recommendation
+      - Namingscheme C<number> (e.g. C1, C2)
 
    2. **WARNING** (Should fix):
       - Spec/design divergences
       - Missing scenario coverage
       - Each with specific recommendation
+      - Namingscheme W<number> (e.g. W1, W2)
 
    3. **SUGGESTION** (Nice to fix):
       - Pattern inconsistencies
       - Minor improvements
       - Each with specific recommendation
+      - Namingscheme S<number> (e.g. S1, S2)
 
    **Final Assessment**:
    - If CRITICAL issues: "X critical issue(s) found. Fix before archiving."
