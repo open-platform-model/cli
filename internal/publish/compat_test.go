@@ -274,3 +274,85 @@ func TestNextAPIVersion(t *testing.T) {
 	assert.Equal(t, "v2", nextAPIVersion("v1"))
 	assert.Equal(t, "<next-apiVersion>", nextAPIVersion("weird"))
 }
+
+func TestIsDevTag(t *testing.T) {
+	cases := map[string]bool{
+		"v2.0.0-0.dev.1787747172.gcf5f131": true,
+		"v1.1.0-dev.1":                     true,
+		"v1.0.0-alpha.1.dev.3":             true,
+		"v2.0.0-alpha.5":                   false,
+		"v2.0.0-beta.2":                    false,
+		"v2.0.0-rc.1":                      false,
+		"v2.0.0":                           false,
+		"v2.0.0-devel.1":                   false,
+		"":                                 false,
+	}
+	for tag, want := range cases {
+		assert.Equal(t, want, isDevTag(tag), tag)
+	}
+}
+
+func TestPredecessorVersions_DevTagsExcluded(t *testing.T) {
+	// The measured ordering: -0.dev.* sorts below -alpha.N, so before D26 a
+	// dev tag's window held only older dev tags and a release tag's window
+	// reached dev tags only behind every release. Now dev tags are out of
+	// every window; alpha/beta/rc release prereleases stay, newest first.
+	published := []string{
+		"v2.0.0-alpha.4", "v2.0.0-0.dev.1787747172.gcf5f131",
+		"v2.0.0-0.dev.1787800000.gabc1234", "v2.0.0-alpha.3", "v2.0.0-beta.1",
+	}
+	assert.Equal(t, []string{"v2.0.0-beta.1", "v2.0.0-alpha.4", "v2.0.0-alpha.3"},
+		predecessorVersions(published, "v2.0.0", "v2"))
+	assert.Equal(t, []string{"v2.0.0-alpha.4", "v2.0.0-alpha.3"},
+		predecessorVersions(published, "v2.0.0-alpha.5", "v2"))
+	// A dev tag's own window: only the release tags below it, no dev tags.
+	assert.Equal(t, []string{"v2.0.0-alpha.4", "v2.0.0-alpha.3"},
+		predecessorVersions(published, "v2.0.0-alpha.5-0.dev.1787900000.gdead000", "v2"))
+	assert.Empty(t, predecessorVersions(published, "v2.0.0-0.dev.1787900000.gdead000", "v2"))
+}
+
+func TestGateCompat_DevBuildNotJudged(t *testing.T) {
+	// D26 clause 1: a dev-tagged tree that breaks a beta contract is not
+	// refused on compatibility, and the plan says so rather than reading as
+	// a clean compare.
+	coldCUECache(t)
+	registry := emptyTestRegistry(t)
+	pushCatalog(t, registry, memberCatalogFilesAt("1.0.0"))
+
+	dev := memberCatalogFilesAt("1.1.0-0.dev.7.gabc1234")
+	dev["resources/v1beta1/thing.cue"] = strings.Replace(
+		dev["resources/v1beta1/thing.cue"], "size: int\n", "", 1)
+	p := runCatalog(t, registry, dev)
+	require.True(t, p.Go(), refusalHeadlines(p))
+	require.True(t, p.CompatChecked)
+	assert.True(t, p.CatalogGates.CompatDevExempt)
+	assert.Equal(t, 0, p.CatalogGates.CompatCompared)
+	assert.Contains(t, p.Render(), "compat gate     dev-exempt")
+}
+
+func TestGateCompat_DevBuildNeverBaseline(t *testing.T) {
+	// A dev tag newer than the latest release carries an extra field and a
+	// member no release has; the next release drops the field and ships the
+	// member — clean against 1.0.0, and the dev build is never consulted.
+	coldCUECache(t)
+	registry := emptyTestRegistry(t)
+	pushCatalog(t, registry, memberCatalogFilesAt("1.0.0"))
+
+	dev := memberCatalogFilesAt("1.1.0-0.dev.7.gabc1234")
+	dev["resources/v1beta1/thing.cue"] = strings.Replace(
+		dev["resources/v1beta1/thing.cue"], "note?: string", "note?: string\n\t\textra?: string", 1)
+	dev["resources/v1beta1/other.cue"] = strings.NewReplacer("Thing", "Other", "thing", "other").Replace(dev["resources/v1beta1/thing.cue"])
+	pushCatalog(t, registry, dev)
+
+	next := memberCatalogFilesAt("1.1.0")
+	next["resources/v1beta1/other.cue"] = strings.NewReplacer("Thing", "Other", "thing", "other").Replace(next["resources/v1beta1/thing.cue"])
+	p := runCatalog(t, registry, next)
+	require.True(t, p.Go(), refusalHeadlines(p))
+	require.True(t, p.CompatChecked)
+	assert.False(t, p.CatalogGates.CompatDevExempt)
+	assert.NotContains(t, refusalDetails(p), "0.dev")
+	// thing (and the other beta/GA members) compared against 1.0.0; other is
+	// new at its key because only the dev build carried it.
+	assert.Equal(t, 4, p.CatalogGates.CompatCompared)
+	assert.Equal(t, 1, p.CatalogGates.CompatNew)
+}

@@ -36,9 +36,19 @@ import (
 // failure during the walk aborts as a *ConnectivityError with no partial
 // verdict — the artifact was never judged; a package absent at a given
 // version is the scan's negative signal, never an error.
+//
+// A dev build (D26 clause 1) is outside the gate in both directions: it is
+// not judged here, and predecessorVersions never offers it as a baseline. The
+// gate still counts as run — CompatChecked is set — so the plan reports the
+// exemption rather than "not completed".
 func gateCompat(p *Plan, opts Options) error {
 	if p.Kind != KindCatalog || !p.RegistryChecked {
 		return nil // never judged: the lookup's ConnectivityError already reported it
+	}
+	if isDevTag(p.Tag) {
+		p.CatalogGates.CompatDevExempt = true
+		p.CompatChecked = true
+		return nil
 	}
 	versions := predecessorVersions(p.publishedVersions, p.Tag, p.Major)
 	if err := compatScan(opts, p.RegistryRepo, versions, p.members, &p.CatalogGates, p.refuse); err != nil {
@@ -134,13 +144,20 @@ func eligibleByPackage(members []Member, g *CatalogGateOutcomes) (byPkg map[stri
 }
 
 // predecessorVersions filters the published tags to the scan's window —
-// strictly below the effective tag, within the declared major, prereleases
-// included — ordered newest first, so each member resolves against the newest
-// build carrying it.
+// strictly below the effective tag, within the declared major, release
+// prereleases (alpha/beta/rc) included and dev builds excluded (D26) —
+// ordered newest first, so each member resolves against the newest build
+// carrying it.
+//
+// Measured ordering (golang.org/x/mod/semver): "-0.dev.N" sorts BELOW
+// "-alpha.N" (numeric identifier 0 precedes alpha), so a release tag's window
+// was never headed by a dev tag; a dev tag's window held only older dev tags.
+// The filter makes the baseline rule explicit for both, and closes the
+// absent-member fallthrough that could otherwise reach a dev build.
 func predecessorVersions(published []string, tag, major string) []string {
 	var out []string
 	for _, v := range published {
-		if !semver.IsValid(v) || semver.Major(v) != major {
+		if !semver.IsValid(v) || semver.Major(v) != major || isDevTag(v) {
 			continue
 		}
 		if tag != "" && semver.Compare(v, tag) >= 0 {
@@ -153,6 +170,25 @@ func predecessorVersions(published []string, tag, major string) []string {
 		out[i], out[j] = out[j], out[i]
 	}
 	return out
+}
+
+// isDevTag reports whether a tag is a dev build: any dot-separated identifier
+// of its prerelease segment is "dev". This recognizes catalog_opm's
+// branch-tag.sh shape v<M>.<m>.<p>-0.dev.<count>.g<sha> and the plain
+// -dev.N form without pinning either; release prereleases use alpha, beta and
+// rc counters and never carry the identifier. D26 clause 1: a dev build is
+// neither judged by the compat gate nor used as a baseline.
+func isDevTag(tag string) bool {
+	pre := strings.TrimPrefix(semver.Prerelease(tag), "-")
+	if pre == "" {
+		return false
+	}
+	for _, id := range strings.Split(pre, ".") {
+		if id == "dev" {
+			return true
+		}
+	}
+	return false
 }
 
 // loadPublishedPackage loads one published subpackage by

@@ -25,6 +25,9 @@ type CatalogGateOutcomes struct {
 	CompatRefused  int
 	CompatAlpha    int
 	CompatNew      int
+	// CompatDevExempt reports the build is a dev tag (D26): the gate ran and
+	// decided not to judge it, and the counts above are all zero.
+	CompatDevExempt bool
 }
 
 // gateMemberFQN is D22's structural gate (refusal 11): every member of the

@@ -123,23 +123,38 @@ func RegistryCheck(ctx context.Context, opts CheckOptions) (*CheckReport, error)
 	}
 
 	if opts.Compat {
-		client, err := NewRegistryClient(opts.Registry)
-		if err != nil {
+		if err := checkCompat(ctx, opts, lopts, repo, version, report); err != nil {
 			return nil, err
 		}
-		modPath := repo + "@" + semver.Major(version)
-		versions, err := client.ModuleVersions(ctx, modPath)
-		if err != nil {
-			return nil, &ConnectivityError{Op: fmt.Sprintf("listing published versions of %s", modPath), Err: err}
-		}
-		preds := predecessorVersions(versions, version, semver.Major(version))
-		if err := compatScan(lopts, repo, preds, report.Members, &report.Gates, report.finding); err != nil {
-			return nil, err
-		}
-		report.CompatRan = true
 	}
 
 	return report, nil
+}
+
+// checkCompat runs the --compat walk over the fetched build exactly as
+// publish would have: a dev build is exempt (D26) and does no history work;
+// any other build is compared against its dev-free predecessor window.
+func checkCompat(ctx context.Context, opts CheckOptions, lopts Options, repo, version string, report *CheckReport) error {
+	if isDevTag(version) {
+		report.Gates.CompatDevExempt = true
+		report.CompatRan = true
+		return nil
+	}
+	client, err := NewRegistryClient(opts.Registry)
+	if err != nil {
+		return err
+	}
+	modPath := repo + "@" + semver.Major(version)
+	versions, err := client.ModuleVersions(ctx, modPath)
+	if err != nil {
+		return &ConnectivityError{Op: fmt.Sprintf("listing published versions of %s", modPath), Err: err}
+	}
+	preds := predecessorVersions(versions, version, semver.Major(version))
+	if err := compatScan(lopts, repo, preds, report.Members, &report.Gates, report.finding); err != nil {
+		return err
+	}
+	report.CompatRan = true
+	return nil
 }
 
 // checkDeclaredIdentity is the consumer twin's assertion: the pulled
@@ -251,8 +266,12 @@ func (r *CheckReport) Render() string {
 	}
 	if r.CompatRan {
 		g := r.Gates
-		row("compat", fmt.Sprintf("%d compared, %d violating, %d alpha-exempt, %d new",
-			g.CompatCompared, g.CompatRefused, g.CompatAlpha, g.CompatNew))
+		compat := fmt.Sprintf("%d compared, %d violating, %d alpha-exempt, %d new",
+			g.CompatCompared, g.CompatRefused, g.CompatAlpha, g.CompatNew)
+		if g.CompatDevExempt {
+			compat = compatDevExemptRow
+		}
+		row("compat", compat)
 	}
 
 	if r.Clean() {
