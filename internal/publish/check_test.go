@@ -141,3 +141,45 @@ func TestRegistryCheck_BadCoordinate(t *testing.T) {
 		require.Error(t, err, coord)
 	}
 }
+
+func TestRegistryCheck_DevBuildIsExempt(t *testing.T) {
+	// D26: --compat on a published dev build reports the exemption, does no
+	// history work, and agrees with publish.
+	coldCUECache(t)
+	registry := emptyTestRegistry(t)
+	pushCatalog(t, registry, memberCatalogFilesAt("1.0.0"))
+
+	dev := memberCatalogFilesAt("1.1.0-0.dev.7.gabc1234")
+	dev["resources/v1beta1/thing.cue"] = strings.Replace(
+		dev["resources/v1beta1/thing.cue"], "size: int\n", "", 1)
+	rawPush(t, registry, dev, "example.com/catalogs/demo@v1", "v1.1.0-0.dev.7.gabc1234")
+
+	report, err := checkFixture(t, registry, "example.com/catalogs/demo@v1.1.0-0.dev.7.gabc1234", true)
+	require.NoError(t, err)
+	require.True(t, report.CompatRan)
+	assert.True(t, report.Gates.CompatDevExempt)
+	assert.True(t, report.Clean())
+	assert.Contains(t, report.Render(), "compat          dev-exempt")
+}
+
+func TestRegistryCheck_ReleaseIgnoresDevHistory(t *testing.T) {
+	// A dev tag newer than the last release carries a field the next release
+	// drops; the check compares the release against 1.0.0 and never names
+	// the dev coordinate.
+	coldCUECache(t)
+	registry := emptyTestRegistry(t)
+	pushCatalog(t, registry, memberCatalogFilesAt("1.0.0"))
+
+	dev := memberCatalogFilesAt("1.1.0-0.dev.7.gabc1234")
+	dev["resources/v1beta1/thing.cue"] = strings.Replace(
+		dev["resources/v1beta1/thing.cue"], "note?: string", "note?: string\n\t\textra?: string", 1)
+	rawPush(t, registry, dev, "example.com/catalogs/demo@v1", "v1.1.0-0.dev.7.gabc1234")
+	rawPush(t, registry, memberCatalogFilesAt("1.1.0"), "example.com/catalogs/demo@v1", "v1.1.0")
+
+	report, err := checkFixture(t, registry, "example.com/catalogs/demo@v1.1.0", true)
+	require.NoError(t, err)
+	require.True(t, report.CompatRan)
+	assert.True(t, report.Clean())
+	assert.Equal(t, 4, report.Gates.CompatCompared)
+	assert.NotContains(t, report.Render(), "0.dev")
+}

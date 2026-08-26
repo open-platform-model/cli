@@ -80,6 +80,10 @@ func (p *Plan) Render() string {
 	return b.String()
 }
 
+// compatDevExemptRow is the compat row for a dev build (D26): the gate ran,
+// and the exemption is stated rather than left to look like a clean compare.
+const compatDevExemptRow = "dev-exempt (dev builds are neither judged nor a baseline)"
+
 // renderCatalogGates prints the catalog-only per-gate outcome rows.
 func (p *Plan) renderCatalogGates(row func(label, value string)) {
 	g := p.CatalogGates
@@ -89,6 +93,9 @@ func (p *Plan) renderCatalogGates(row func(label, value string)) {
 		g.CompatCompared, g.CompatRefused, g.CompatAlpha, g.CompatNew)
 	if !p.CompatChecked {
 		compat = "not completed"
+	}
+	if g.CompatDevExempt {
+		compat = compatDevExemptRow
 	}
 	row("compat gate", compat)
 }
