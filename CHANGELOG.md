@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.0.0-alpha.14](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.13...v1.0.0-alpha.14) (2026-08-27)
+
+
+### Features
+
+* **config:** seed the default platform with both first-party catalogs ([#163](https://github.com/open-platform-model/cli/issues/163)) ([4af7cc9](https://github.com/open-platform-model/cli/commit/4af7cc95658a21092a74c389555a1370af4cb4e7))
+* **openspec:** wire enhancement delivery-log declarations into the workflow ([53a7d15](https://github.com/open-platform-model/cli/commit/53a7d15c061b193866b0b3528186259bac2e0c6b))
+* **operator:** seed the cluster Platform from the resolved catalog ([#156](https://github.com/open-platform-model/cli/issues/156)) ([331c696](https://github.com/open-platform-model/cli/commit/331c696918da91848facae70d1abe394db92f9ac))
+* **publish:** exempt beta/GA members on a prerelease module line ([#172](https://github.com/open-platform-model/cli/issues/172)) ([b9b42ae](https://github.com/open-platform-model/cli/commit/b9b42ae561d9011f49a1c2a62fc6dc791dbd279e))
+* **publish:** exempt dev builds from the compat gate ([#166](https://github.com/open-platform-model/cli/issues/166)) ([0df6014](https://github.com/open-platform-model/cli/commit/0df601459da2dc12e930d1e2a1b4f729e3e7af9d))
+
+
+### Bug Fixes
+
+* **openspec:** quote design rules so they parse as strings ([2370bd6](https://github.com/open-platform-model/cli/commit/2370bd6b967f9d59caa18e9e1652c033f85b9125))
+* **render:** carry resolved platform spec for cluster seeding ([ca82241](https://github.com/open-platform-model/cli/commit/ca82241a35ef6f448847b9fe1ae92d9408afb4a7))
+
+
+### Documentation
+
+* **config:** propose seeding both catalogs in the default platform ([#161](https://github.com/open-platform-model/cli/issues/161)) ([78b9110](https://github.com/open-platform-model/cli/commit/78b911059bcf364198b7d590a9ae8993b912c50b))
+* **openspec:** archive seed-both-catalogs and sync delta specs ([e5e4b53](https://github.com/open-platform-model/cli/commit/e5e4b53708555f91691b3d87bb52776601a613a5))
+
+
+### Miscellaneous Chores
+
+* **deps:** bump core, catalogs/opm and k8s.io pins in examples and templates ([#164](https://github.com/open-platform-model/cli/issues/164)) ([e441dc6](https://github.com/open-platform-model/cli/commit/e441dc6317636ca20a4e297d80eb8c9f0bd64c4e))
+* **openspec:** archive operator-install-platform and sync delta specs ([#162](https://github.com/open-platform-model/cli/issues/162)) ([6ffca34](https://github.com/open-platform-model/cli/commit/6ffca34c5a8ee9eb7af38f7e5135c8c790ed0715))
+* **openspec:** regenerate skills to 1.9.0, preserving local additions ([10b41b9](https://github.com/open-platform-model/cli/commit/10b41b90fa1aa4aeafeccef5500ff74b251e67c6))
+
 ## [1.0.0-alpha.13](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.12...v1.0.0-alpha.13) (2026-08-18)
 
 
