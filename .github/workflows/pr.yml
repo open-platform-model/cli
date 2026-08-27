@@ -65,14 +65,35 @@ jobs:
       - name: Dry-run the template publish gates
         run: .github/scripts/publish-templates.sh --dry-run
 
-  fixture-gates:
-    # The same gates over the fixture trees, dry-run. A fixture that would fail
-    # publish-fixtures.yml fails the PR first, rather than after merge when the
-    # publish workflow is the only thing that would have caught it.
-    name: Fixture Publish Gates (dry-run)
+  fixtures:
+    # The repo's published test fixtures (tests/fixtures/modules/*), the same
+    # flow opm-operator runs (hack/fixtures.sh is an identical copy in both):
+    #   check  every publish gate, dry-run against GHCR, plus changed-implies-
+    #          bumped: a fixture edited in this PR must carry a version GHCR
+    #          does not hold yet, because published versions are immutable.
+    #   seed   publish the tree's fixtures into a job-local registry.
+    # Then the registry-backed render-parity program runs against that seed
+    # (tree load == registry acquisition at the fixture's declared version),
+    # with core and the catalogs still from GHCR. publish-fixtures.yml
+    # publishes the same coordinate to GHCR on merge.
+    name: Fixtures (gates, seed, render parity)
     runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    env:
+      MIXED_CUE_REGISTRY: 'testing.opmodel.dev=localhost:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+      # A fresh module cache: a warm one would serve the fixture without
+      # touching the seeded registry and hide a bad mapping.
+      CUE_CACHE_DIR: ${{ github.workspace }}/.cue-cache
+      OPM_BIN: ./bin/opm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # `hack/fixtures.sh check` diffs each fixture against the base branch.
+          fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.0'
@@ -80,8 +101,21 @@ jobs:
         run: go build -o bin/opm ./cmd/opm
       - name: Install cue
         run: go install cuelang.org/go/cmd/cue@v0.17.1
-      - name: Dry-run the fixture publish gates
-        run: .github/scripts/publish-fixtures.sh --dry-run
+      - name: Fixture publish gates (changed implies bumped)
+        env:
+          BASE_REF: origin/${{ github.base_ref || 'main' }}
+        run: hack/fixtures.sh check
+      - name: Seed the job-local registry from the tree
+        env:
+          CUE_REGISTRY: ${{ env.MIXED_CUE_REGISTRY }}
+          OPM_REGISTRY: ${{ env.MIXED_CUE_REGISTRY }}
+        run: hack/fixtures.sh seed
+      - name: Render parity (tree vs seeded registry)
+        env:
+          CUE_REGISTRY: ${{ env.MIXED_CUE_REGISTRY }}
+          OPM_REGISTRY: ${{ env.MIXED_CUE_REGISTRY }}
+          OPM_ITEST_RENDER_PARITY: '1'
+        run: go run tests/integration/render-parity/main.go
 
   integration:
     name: Integration Tests

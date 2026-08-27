@@ -3,22 +3,24 @@ name: Publish Fixtures
 # The repo's own test-fixture modules live on the testing domain
 # (testing.opmodel.dev/modules/cli/*) and are published to GHCR, so consumers —
 # examples, e2e testdata, the kind dev cluster, a fresh clone — resolve them
-# from a public registry with no local registry involved.
+# from a public registry with no local registry involved. PR CI is the one
+# exception: pr.yml seeds a job-local registry from the tree (hack/fixtures.sh
+# seed) so a fixture bump and its consumers land in one PR; this workflow then
+# publishes the same coordinate to GHCR on merge.
 #
 # Independent of the cli's release train: a fixture is not release-please
 # managed, and a fixture bump should reach the registry without waiting for a
-# release. The script's caller-side GHCR probe makes re-runs no-ops, so pushing
-# an unrelated change under tests/fixtures/modules/ publishes nothing.
+# release. An already-published version is treated as success, so pushing an
+# unrelated change under tests/fixtures/modules/ publishes nothing.
 #
-# workflow_dispatch is the bootstrap and repair path: dispatch against a branch
-# to publish a new coordinate BEFORE the consumers that pin it merge.
+# workflow_dispatch is the repair path: re-publish without waiting for a merge.
 on:
   push:
     branches:
       - main
     paths:
       - 'tests/fixtures/modules/**'
-      - '.github/scripts/publish-fixtures.sh'
+      - 'hack/fixtures.sh'
       - '.github/workflows/publish-fixtures.yml'
   workflow_dispatch:
 
@@ -51,6 +53,6 @@ jobs:
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Publish unpublished fixtures
-        run: .github/scripts/publish-fixtures.sh
         env:
-          GHCR_AUTH: ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}
+          OPM_BIN: ./bin/opm
+        run: hack/fixtures.sh publish

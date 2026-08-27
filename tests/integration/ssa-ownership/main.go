@@ -40,15 +40,22 @@ import (
 
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/tests/fixtures"
 )
 
 const (
 	clusterContext = "kind-opm-dev"
 	instanceName   = "ssa-ownership-itest"
 	namespace      = "default"
-	modulePath     = "testing.opmodel.dev/modules/cli/podinfo@v0"
-	moduleVersion  = "v0.1.4"
 )
+
+// The fixture's declared coordinate (tests/fixtures/modules/podinfo/identity);
+// only written into the ModuleInstance, never resolved here.
+var modulePath, moduleVersion = func() (string, string) {
+	c, err := fixtures.Load("podinfo")
+	check("reading the podinfo fixture coordinate", err)
+	return c.ModulePath, c.Tag()
+}()
 
 func main() {
 	ctx := context.Background()
