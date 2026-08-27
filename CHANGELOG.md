@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.0-alpha.15](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.14...v1.0.0-alpha.15) (2026-08-27)
+
+
+### Miscellaneous Chores
+
+* **deps:** bump catalogs/opm to v2.0.0-alpha.6 in examples and templates ([#174](https://github.com/open-platform-model/cli/issues/174)) ([8926091](https://github.com/open-platform-model/cli/commit/89260912191ae303a4e4a7d15a9525d0d7bd4a1d))
+* **fixtures:** seed platform on catalogs/opm alpha.6 and republish podinfo at 0.1.5 ([77d9fc0](https://github.com/open-platform-model/cli/commit/77d9fc0d7892db020832433b62fd22c06ff3c09c))
+* **fixtures:** seed platform on catalogs/opm alpha.6 and republish podinfo at 0.1.5 ([#177](https://github.com/open-platform-model/cli/issues/177)) ([a6870b8](https://github.com/open-platform-model/cli/commit/a6870b848a555f3a59ae63887096b2842c01434a))
+
 ## [1.0.0-alpha.14](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.13...v1.0.0-alpha.14) (2026-08-27)
 
 
