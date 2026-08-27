@@ -133,8 +133,7 @@ func RegistryCheck(ctx context.Context, opts CheckOptions) (*CheckReport, error)
 
 // checkCompat runs the --compat walk over the fetched build exactly as
 // publish would have: a dev build is exempt (D26) and does no history work;
-// a release-prerelease build counts its beta/GA members prerelease-exempt;
-// a stable build is compared against its dev-free predecessor window.
+// any other build is compared against its dev-free predecessor window.
 func checkCompat(ctx context.Context, opts CheckOptions, lopts Options, repo, version string, report *CheckReport) error {
 	if isDevTag(version) {
 		report.Gates.CompatDevExempt = true
@@ -151,7 +150,7 @@ func checkCompat(ctx context.Context, opts CheckOptions, lopts Options, repo, ve
 		return &ConnectivityError{Op: fmt.Sprintf("listing published versions of %s", modPath), Err: err}
 	}
 	preds := predecessorVersions(versions, version, semver.Major(version))
-	if err := compatScan(lopts, repo, preds, isReleasePrerelease(version), report.Members, &report.Gates, report.finding); err != nil {
+	if err := compatScan(lopts, repo, preds, report.Members, &report.Gates, report.finding); err != nil {
 		return err
 	}
 	report.CompatRan = true
@@ -267,8 +266,8 @@ func (r *CheckReport) Render() string {
 	}
 	if r.CompatRan {
 		g := r.Gates
-		compat := fmt.Sprintf("%d compared, %d violating, %d alpha-exempt, %d prerelease-exempt, %d new",
-			g.CompatCompared, g.CompatRefused, g.CompatAlpha, g.CompatPrerelease, g.CompatNew)
+		compat := fmt.Sprintf("%d compared, %d violating, %d alpha-exempt, %d new",
+			g.CompatCompared, g.CompatRefused, g.CompatAlpha, g.CompatNew)
 		if g.CompatDevExempt {
 			compat = compatDevExemptRow
 		}

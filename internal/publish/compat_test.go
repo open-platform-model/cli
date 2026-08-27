@@ -95,7 +95,7 @@ func TestGateCompat_CleanHistoryPasses(t *testing.T) {
 	assert.Equal(t, 1, p.CatalogGates.CompatAlpha)
 	assert.Equal(t, 0, p.CatalogGates.CompatNew)
 	assert.Equal(t, 0, p.CatalogGates.CompatRefused)
-	assert.Contains(t, p.Render(), "4 compared, 0 refused, 1 alpha-exempt, 0 prerelease-exempt, 0 new")
+	assert.Contains(t, p.Render(), "4 compared, 0 refused, 1 alpha-exempt, 0 new")
 	assert.Contains(t, p.Render(), "GO —")
 }
 
@@ -355,59 +355,4 @@ func TestGateCompat_DevBuildNeverBaseline(t *testing.T) {
 	// new at its key because only the dev build carried it.
 	assert.Equal(t, 4, p.CatalogGates.CompatCompared)
 	assert.Equal(t, 1, p.CatalogGates.CompatNew)
-}
-
-func TestIsReleasePrerelease(t *testing.T) {
-	cases := map[string]bool{
-		"v1.0.0-alpha.1":                   true,
-		"v1.0.0-beta.2":                    true,
-		"v1.0.0-rc.1":                      true,
-		"v2.0.0-0.dev.1787747172.gcf5f131": false,
-		"v1.0.0-dev.3":                     false,
-		"v1.0.0":                           false,
-		"":                                 false,
-	}
-	for tag, want := range cases {
-		assert.Equal(t, want, isReleasePrerelease(tag), tag)
-	}
-}
-
-func TestGateCompat_PrereleaseLineExempt(t *testing.T) {
-	// D26 clause 2: on a release-prerelease module line a narrowed beta field
-	// is not compared; the exemption is counted and printed, and no registry
-	// history is loaded.
-	coldCUECache(t)
-	registry := emptyTestRegistry(t)
-	pushCatalog(t, registry, memberCatalogFilesAt("1.0.0-alpha.1"))
-
-	next := memberCatalogFilesAt("1.0.0-alpha.2")
-	next["resources/v1beta1/thing.cue"] = strings.Replace(
-		next["resources/v1beta1/thing.cue"], "size: int\n", "", 1)
-	p := runCatalog(t, registry, next)
-	require.True(t, p.Go(), refusalHeadlines(p))
-	require.True(t, p.CompatChecked)
-	assert.Equal(t, 0, p.CatalogGates.CompatCompared)
-	assert.Equal(t, 4, p.CatalogGates.CompatPrerelease)
-	assert.Equal(t, 1, p.CatalogGates.CompatAlpha)
-	assert.Contains(t, p.Render(), "0 compared, 0 refused, 1 alpha-exempt, 4 prerelease-exempt, 0 new")
-}
-
-func TestGateCompat_FirstStableArmsGate(t *testing.T) {
-	// The same break at the first stable tag is refused against the newest
-	// prerelease that carried the member.
-	coldCUECache(t)
-	registry := emptyTestRegistry(t)
-	pushCatalog(t, registry, memberCatalogFilesAt("1.0.0-alpha.1"))
-	pushCatalog(t, registry, memberCatalogFilesAt("1.0.0-alpha.2"))
-
-	stable := memberCatalogFilesAt("1.0.0")
-	stable["resources/v1beta1/thing.cue"] = strings.Replace(
-		stable["resources/v1beta1/thing.cue"], "size: int\n", "", 1)
-	p := runCatalog(t, registry, stable)
-	require.False(t, p.Go(), "the first stable tag arms the gate")
-	assert.Equal(t, 0, p.CatalogGates.CompatPrerelease)
-	assert.Equal(t, 1, p.CatalogGates.CompatRefused)
-	details := refusalDetails(p)
-	assert.Contains(t, details, "compared against example.com/catalogs/demo@1.0.0-alpha.2")
-	assert.Contains(t, details, "spec.size")
 }

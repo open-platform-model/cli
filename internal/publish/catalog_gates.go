@@ -25,9 +25,6 @@ type CatalogGateOutcomes struct {
 	CompatRefused  int
 	CompatAlpha    int
 	CompatNew      int
-	// CompatPrerelease: beta/GA members exempt because the module line is a
-	// release prerelease (D26 clause 2); always rendered, 0 on a stable line.
-	CompatPrerelease int
 	// CompatDevExempt reports the build is a dev tag (D26): the gate ran and
 	// decided not to judge it, and the counts above are all zero.
 	CompatDevExempt bool
