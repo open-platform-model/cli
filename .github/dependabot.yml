@@ -11,4 +11,7 @@ updates:
     schedule:
       interval: "weekly"
     commit-message:
-      prefix: "deps"
+      # "deps" is not a Conventional Commit type: pr-title.yml rejects it and
+      # release-please drops it from the changelog. Use "build(deps)".
+      prefix: "build"
+      include: "scope"
