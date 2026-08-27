@@ -98,6 +98,8 @@ Publish SHALL exit 0 on success, 2 on any refusal, 3 when a registry cannot be r
 
 A dev build, an effective tag whose prerelease segment carries a `dev` identifier (`v2.0.0-0.dev.1787747172.gcf5f131`), SHALL NOT be judged by the gate and SHALL NOT serve as any build's predecessor. The plan SHALL report the skip visibly on the `compat gate` row as `dev-exempt`; the row SHALL never read as a completed comparison for a dev build.
 
+While the effective tag is a release prerelease (`-alpha.N`, `-beta.N`, `-rc.N`), beta and GA members SHALL NOT be compared; they SHALL be counted into a `prerelease-exempt` bucket rendered on the `compat gate` row next to `alpha-exempt`. The exemption SHALL end at the first stable tag of the major: a stable effective tag SHALL compare every beta and GA member against the newest published build carrying it, release prereleases included.
+
 #### Scenario: Field removal refused against the true predecessor
 
 - **WHEN** a beta member removes a field relative to the newest published build that carried it
@@ -134,6 +136,17 @@ A dev build, an effective tag whose prerelease segment carries a `dev` identifie
 
 - **WHEN** the published history holds alpha, beta and dev tags below the effective tag
 - **THEN** the predecessor window is the alpha and beta tags newest first, with no dev tag
+
+#### Scenario: Prerelease module line is exempt, visibly
+
+- **WHEN** the effective tag is `v2.0.0-alpha.5` and a `v1beta1` member narrows a field relative to `v2.0.0-alpha.4`
+- **THEN** publish does not refuse on compatibility
+- **AND** the `compat gate` row counts that member under `prerelease-exempt` and reports `0 compared`
+
+#### Scenario: First stable tag arms the gate
+
+- **WHEN** the effective tag is `v2.0.0` and a `v1beta1` member narrows a field relative to `v2.0.0-alpha.5`
+- **THEN** publish refuses with the violation path and `compared against ...@2.0.0-alpha.5`
 
 ### Requirement: Member and posture gates
 
