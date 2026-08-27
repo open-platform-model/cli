@@ -118,6 +118,18 @@ tasks:
     cmds:
       - go test ./tests/e2e/... -v
 
+  test:fixtures:
+    desc: 'What PR CI runs over tests/fixtures/modules: publish gates + changed-implies-bumped (hack/fixtures.sh check), seed the local registry from the tree (task registry:start at the workspace root), then render parity against it. Fixtures from localhost:5000, core and catalogs from GHCR.'
+    vars:
+      MIXED_CUE_REGISTRY: '{{.MIXED_CUE_REGISTRY | default "testing.opmodel.dev=localhost:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"}}'
+    env:
+      OPM_BIN: ./bin/opm
+    cmds:
+      - go build -o bin/opm ./cmd/opm
+      - hack/fixtures.sh check
+      - CUE_REGISTRY='{{.MIXED_CUE_REGISTRY}}' hack/fixtures.sh seed
+      - CUE_REGISTRY='{{.MIXED_CUE_REGISTRY}}' OPM_REGISTRY='{{.MIXED_CUE_REGISTRY}}' OPM_ITEST_RENDER_PARITY=1 go run tests/integration/render-parity/main.go
+
   test:verbose:
     desc: Run all tests with verbose output
     cmds:

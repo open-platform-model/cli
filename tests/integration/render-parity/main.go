@@ -41,6 +41,7 @@ import (
 	"github.com/open-platform-model/cli/internal/platform"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
 	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	"github.com/open-platform-model/cli/tests/fixtures"
 )
 
 const (
@@ -49,8 +50,6 @@ const (
 	// with no sibling checkout. Resolved relative to the repo root, the
 	// program's cwd.
 	moduleDir     = "tests/fixtures/modules/podinfo"
-	modulePath    = "testing.opmodel.dev/modules/cli/podinfo@v0"
-	moduleVersion = "v0.1.4"
 	instName      = "podinfo-parity"
 	instNamespace = "default"
 )
@@ -87,6 +86,13 @@ func run() error {
 	if _, statErr := os.Stat(absModuleDir); statErr != nil {
 		return skipOrFail("podinfo fixture not found at %s", absModuleDir)
 	}
+	// The registry coordinate is the fixture's own declared one, so the two
+	// load paths compare the same version by construction.
+	podinfo, err := fixtures.Load("podinfo")
+	if err != nil {
+		return err
+	}
+	modulePath, moduleVersion := podinfo.ModulePath, podinfo.Tag()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
