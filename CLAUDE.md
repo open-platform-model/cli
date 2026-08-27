@@ -239,7 +239,7 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 - ASCII-safe output in docs, examples, terminal text.
 - Box-drawing: `[x]` / `[ ]` not Unicode checkmarks.
 - CLI docs: emphasize what happened + how to fix failures.
-- Follow SemVer + Conventional Commits for user-visible changes.
+- Follow SemVer + Conventional Commits for user-visible changes. The type decides the release: release-please hides `chore`, `test`, `ci` and `build`; `feat`, `fix`, `deps`, `perf`, `docs` and `refactor` release. Pins in `templates/*` and the `DefaultPlatformTemplate` seed in `internal/config/templates.go` are shipped, so bumping them is `fix(deps)`; `examples/*` and `tests/fixtures/*` bumps are `test(fixtures)` (no release). See the workspace commit skill.
 
 ## Agent Checklist
 
