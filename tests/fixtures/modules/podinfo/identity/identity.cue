@@ -17,4 +17,4 @@ ModulePath: "testing.opmodel.dev/modules/cli/podinfo@v0"
 // Hand-managed: this fixture is not on release-please's version train, so a
 // bump is an explicit edit here (or `opm module version set`) followed by a
 // re-pin in every consumer that names the version.
-Version: #VersionType | *"0.1.4"
+Version: #VersionType | *"0.1.5"

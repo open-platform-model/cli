@@ -101,7 +101,7 @@ type: "kubernetes"
 // bump the versions by hand as catalog releases ship.
 registry: {
 	%q: {
-		version: "2.0.0-alpha.5"
+		version: "2.0.0-alpha.6"
 	}
 	%q: {
 		version: "1.0.0-alpha.1"
