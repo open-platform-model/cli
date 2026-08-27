@@ -51,7 +51,7 @@ func gateCompat(p *Plan, opts Options) error {
 		return nil
 	}
 	versions := predecessorVersions(p.publishedVersions, p.Tag, p.Major)
-	if err := compatScan(opts, p.RegistryRepo, versions, p.members, &p.CatalogGates, p.refuse); err != nil {
+	if err := compatScan(opts, p.RegistryRepo, versions, isReleasePrerelease(p.Tag), p.members, &p.CatalogGates, p.refuse); err != nil {
 		return err
 	}
 	p.CompatChecked = true
@@ -60,12 +60,14 @@ func gateCompat(p *Plan, opts Options) error {
 
 // compatScan is the walk itself, shared by the publish gate and
 // `opm catalog registry check --compat` (D7): partition the members
-// (transformers structurally, alpha by policy — both before any registry
-// work), group by package, and probe the given versions newest-first until
-// every member found its predecessor or history is exhausted. Counts land in
-// g; violations go through refuse.
-func compatScan(opts Options, repo string, versions []string, members []Member, g *CatalogGateOutcomes, refuse func(Refusal)) error {
-	byPkg, pkgs := eligibleByPackage(members, g)
+// (transformers structurally, alpha by policy, beta/GA by policy while the
+// module line is a release prerelease — all before any registry work), group
+// by package, and probe the given versions newest-first until every member
+// found its predecessor or history is exhausted. Counts land in g;
+// violations go through refuse. On a prerelease line the walk set is empty
+// and no registry load happens.
+func compatScan(opts Options, repo string, versions []string, lineIsPrerelease bool, members []Member, g *CatalogGateOutcomes, refuse func(Refusal)) error {
+	byPkg, pkgs := eligibleByPackage(members, lineIsPrerelease, g)
 
 	// The loads run from a neutral directory: a versioned package pattern
 	// resolves against the registry, and running it inside the artifact's own
@@ -118,9 +120,11 @@ func compatScan(opts Options, repo string, versions []string, members []Member, 
 
 // eligibleByPackage partitions the members the compat gate binds to
 // (transformers excluded structurally, alpha members by policy, unclassifiable
-// apiVersions left to the FQN gate) and groups them by package, keys sorted
-// for deterministic walk order.
-func eligibleByPackage(members []Member, g *CatalogGateOutcomes) (byPkg map[string][]Member, pkgs []string) {
+// apiVersions left to the FQN gate, and every beta/GA member counted as
+// prerelease-exempt while the module line is a release prerelease — 0011 D26
+// clause 2, the gate arms at the first stable tag) and groups them by
+// package, keys sorted for deterministic walk order.
+func eligibleByPackage(members []Member, lineIsPrerelease bool, g *CatalogGateOutcomes) (byPkg map[string][]Member, pkgs []string) {
 	byPkg = map[string][]Member{}
 	for _, m := range members {
 		if m.Kind == "transformers" {
@@ -132,6 +136,10 @@ func eligibleByPackage(members []Member, g *CatalogGateOutcomes) (byPkg map[stri
 		}
 		if !lvl.Enforced() {
 			g.CompatAlpha++
+			continue
+		}
+		if lineIsPrerelease {
+			g.CompatPrerelease++
 			continue
 		}
 		if _, seen := byPkg[m.PkgPath]; !seen {
@@ -189,6 +197,14 @@ func isDevTag(tag string) bool {
 		}
 	}
 	return false
+}
+
+// isReleasePrerelease reports whether a tag is a release prerelease
+// (-alpha.N, -beta.N, -rc.N): any prerelease that is not a dev build. D26
+// clause 2 suspends the beta/GA compare while the module line is one; the
+// member-level model (0010 D34) is unchanged, only when publish enforces it.
+func isReleasePrerelease(tag string) bool {
+	return semver.Prerelease(tag) != "" && !isDevTag(tag)
 }
 
 // loadPublishedPackage loads one published subpackage by

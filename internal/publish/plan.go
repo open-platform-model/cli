@@ -89,8 +89,8 @@ func (p *Plan) renderCatalogGates(row func(label, value string)) {
 	g := p.CatalogGates
 	row("member gate", fmt.Sprintf("%d members checked, %d refused", g.MembersChecked, g.MembersRefused))
 	row("posture gate", fmt.Sprintf("%d traits checked, %d refused", g.TraitsChecked, g.TraitsRefused))
-	compat := fmt.Sprintf("%d compared, %d refused, %d alpha-exempt, %d new",
-		g.CompatCompared, g.CompatRefused, g.CompatAlpha, g.CompatNew)
+	compat := fmt.Sprintf("%d compared, %d refused, %d alpha-exempt, %d prerelease-exempt, %d new",
+		g.CompatCompared, g.CompatRefused, g.CompatAlpha, g.CompatPrerelease, g.CompatNew)
 	if !p.CompatChecked {
 		compat = "not completed"
 	}
