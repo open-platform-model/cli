@@ -94,7 +94,10 @@ func TestRealTree_CatalogOpm(t *testing.T) {
 	preds := predecessorVersions(versions, "v"+version, major)
 	require.NotEmpty(t, preds, "the live history should hold at least one predecessor build")
 
-	if err := compatScan(opts, repo, preds, members, &p.CatalogGates, p.refuse); err != nil {
+	// lineIsPrerelease=false on purpose: the tree's own version is a
+	// release prerelease, which D26 clause 2 would exempt; forcing the stable
+	// line proves the walk itself is clean over the real members.
+	if err := compatScan(opts, repo, preds, false, members, &p.CatalogGates, p.refuse); err != nil {
 		var connErr *ConnectivityError
 		if errors.As(err, &connErr) {
 			t.Skipf("GHCR unreachable mid-walk: %v", err)
