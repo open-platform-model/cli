@@ -1,10 +1,4 @@
-# test-fixture-lineage
-
-## Purpose
-
-Keeps the repo's fixtures and examples on the current published schema line and its tests free of sibling-checkout dependencies. (Test-infrastructure capability; precedent: `validation-gates`, `kind-cluster-tasks`, `ci-workflow`.)
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Maintained fixtures track the current schema line
 
@@ -28,12 +22,3 @@ A maintained module fixture's identity package SHALL declare `Version` as a plai
 - **THEN** each declares `Version: "<semver>"` with no `|`, no `*` and no `#VersionType`
 - **AND** the matching `module.cue` declares `version: id.Version`
 - **AND** `opm module build` on the fixture passes the loader shape gate
-
-### Requirement: Tests depend only on repo-local fixtures
-
-No test or integration program SHALL read fixtures from a sibling repository checkout. Vendored copies SHALL carry a provenance header naming their origin.
-
-#### Scenario: render-parity is self-contained
-
-- **WHEN** the render-parity program runs in a standalone clone of this repo (no sibling checkouts)
-- **THEN** it SHALL locate its module fixture under this repo's `tests/fixtures/` and proceed to the registry-gated comparison
