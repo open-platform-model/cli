@@ -1,10 +1,4 @@
-# Capability: authoring-commands
-
-## Purpose
-
-The commands that write artifact source deliberately and never invent identity (enhancement 0011, slice cli-authoring-commands, first of two changes): `opm module version set` and `opm catalog version set` put a commit between deciding a version and pushing an artifact. Writes go through `internal/cueedit`'s surgical byte-splice — idempotent, offline, preserving every byte the author committed except the version value itself. The `mod init` scaffold-and-repair rewrite composes the same writers in the sibling change `cli-template-modules`.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: version set writes in place, idempotently, offline
 
@@ -41,4 +35,3 @@ The writer SHALL tolerate every authored form (plain literal, `#VersionType & "x
 
 - **WHEN** `opm catalog version set` refuses a structurally non-conformant identity file
 - **THEN** the pointer names `opm catalog publish --dry-run`, never `opm module vet`
-
