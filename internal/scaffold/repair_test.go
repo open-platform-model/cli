@@ -24,10 +24,8 @@ func repairTree(t *testing.T, files map[string]string) string {
 
 const repairIdentity = `package identity
 
-#VersionType: string & =~"^\\d+"
-
 ModulePath: "example.com/modules/app@v1"
-Version:    #VersionType | *"1.2.0"
+Version:    "1.2.0"
 `
 
 const repairCueMod = `module: "example.com/modules/app@v1"

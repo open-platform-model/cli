@@ -121,10 +121,8 @@ func TestInit_RepairConfirmationIsStdinDriven(t *testing.T) {
 	files := map[string]string{
 		"identity/identity.cue": `package identity
 
-#VersionType: string & =~"^\\d+"
-
 ModulePath: "example.com/modules/app@v1"
-Version:    #VersionType | *"1.0.0"
+Version:    "1.0.0"
 `,
 	}
 	writeRepairTree := func(t *testing.T) string {

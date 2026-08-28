@@ -272,16 +272,14 @@ func identityFileContent(modulePath, version string) string {
 // against core's #IdentityPackage).
 package identity
 
-// #VersionType mirrors core.#VersionType (SemVer 2.0), duplicated so this
-// package stays import-free.
-#VersionType: string & =~"^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
-
 // ModulePath is the module's complete CUE module path, major suffix included
 // — byte-identical to the module field in cue.mod/module.cue.
 ModulePath: %q
 
 // Version is the module's bare SemVer; its major must agree with ModulePath's.
-Version: #VersionType | *%q
+// A plain literal: the kernel's loader gate requires a concrete value, and a
+// defaulted disjunction is not one. Written by opm module version set.
+Version: %q
 `, modulePath, version)
 }
 

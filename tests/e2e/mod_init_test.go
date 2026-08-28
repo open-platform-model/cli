@@ -161,7 +161,9 @@ func TestE2E_ModInit_ThenVet(t *testing.T) {
 	idCue, err := os.ReadFile(filepath.Join(moduleDir, "identity", "identity.cue"))
 	require.NoError(t, err)
 	assert.Contains(t, string(idCue), `ModulePath: "example.com/modules/my_app@v0"`)
-	assert.Contains(t, string(idCue), `*"0.1.0"`, "version resets to the defaulted initial form")
+	assert.Contains(t, string(idCue), `Version: "0.1.0"`, "version is set to the initial version as a plain literal")
+	assert.NotContains(t, string(idCue), `*"`, "no default arm: the kernel's loader gate needs a concrete literal")
+	assert.NotContains(t, string(idCue), "#VersionType", "no local #VersionType: core's #IdentityPackage constrains Version")
 
 	// The scaffold passes vet unmodified…
 	stdout, stderr, err = runOPMPublish(t, moduleDir, env, "module", "vet")
@@ -171,6 +173,19 @@ func TestE2E_ModInit_ThenVet(t *testing.T) {
 	stdout, stderr, err = runOPMPublish(t, moduleDir, env, "module", "publish", "--dry-run")
 	require.NoError(t, err, "dry-run failed\nstdout: %s\nstderr: %s", stdout, stderr)
 	assert.Contains(t, stdout, "GO — pushing example.com/modules/my_app:v0.1.0")
+
+	// …and the kernel's loader accepts it: the scaffold's identity is a plain
+	// literal, so metadata.version is concrete at the shape gate. A build that
+	// fails for any reason other than the gate (registry, platform) is skipped,
+	// but a gate refusal naming metadata.version is a hard failure.
+	buildHome := makeBuildHome(t)
+	defer os.RemoveAll(buildHome)
+	stdout, stderr, err = runOPMWithEnv(t, moduleDir, buildHome, 120*time.Second, "module", "build", moduleDir, "--name", "my-app")
+	assert.NotContains(t, stderr, `"metadata.version"`, "scaffold refused at the loader shape gate")
+	if err != nil {
+		t.Skipf("opm module build failed past the shape gate (likely registry/platform unavailable): err=%v stderr=%s", err, stderr)
+	}
+	assert.NotEmpty(t, stdout, "expected manifest output on stdout")
 }
 
 // TestE2E_ModInit_TypoFailsInsideTheSegment pins the no-fallback contract: a

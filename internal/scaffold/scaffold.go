@@ -188,7 +188,7 @@ func Run(ctx context.Context, k *kernel.Kernel, registry, newPath string, ref Te
 
 // Reidentify rewrites a freshly cloned tree from oldPath's identity to
 // newPath's: the cue.mod `module:` line, the identity package's ModulePath
-// and Version (reset to the defaulted initial form), every literal
+// and Version (set to the initial version as a plain literal), every literal
 // self-import, and every root-package clause (old leaf → new leaf). This is
 // D16's statement set plus the package clause, applied wholesale — correct
 // exactly because the user owns nothing in the tree yet; repair mode refuses
@@ -201,7 +201,7 @@ func Reidentify(dir, oldPath, newPath string) error {
 	if _, err := cueedit.SetIdentityModulePath(dir, newPath); err != nil {
 		return fmt.Errorf("re-identifying identity ModulePath: %w", err)
 	}
-	if _, err := cueedit.ResetIdentityVersion(dir, InitialVersion); err != nil {
+	if _, err := cueedit.SetIdentityVersion(dir, InitialVersion); err != nil {
 		return fmt.Errorf("resetting identity Version: %w", err)
 	}
 	if _, err := cueedit.RewriteSelfImports(dir, oldPath, newPath); err != nil {
