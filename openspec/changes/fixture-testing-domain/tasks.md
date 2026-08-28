@@ -61,9 +61,21 @@
 ## 6. Verification
 
 - [x] 6.1 `task fmt`, `go build ./...`, `go test ./internal/... ./pkg/...`.
-- [ ] 6.2 Bootstrap publish: dispatch `publish-fixtures.yml` against the branch, confirm the GHCR
+- [x] 6.2 Bootstrap publish: dispatch `publish-fixtures.yml` against the branch, confirm the GHCR
       manifest for `testing.opmodel.dev/modules/cli/podinfo:v0.1.4` returns 200.
-- [ ] 6.3 With the local registry stopped: `cd examples && task deps:update` and
+- [x] 6.3 With the local registry stopped: `cd examples && task deps:update` and
       `opm instance build ./examples/instances/podinfo/instance.cue`.
 - [ ] 6.4 With the local registry stopped: `task cluster:create && task cluster:operator`,
       then `task test:integration` and `task test:e2e`.
+      Run 2026-08-28 on a recreated `opm-dev` (main at f3d722f, registry stopped): 6.2 and 6.3 pass
+      (podinfo v0.1.4 and v0.1.5 manifests 200; `examples` deps:update moved catalogs/opm to alpha.7,
+      instance build renders). 6.4 blocked by three defects outside this change:
+      (a) `task cluster:operator` refuses to seed a Platform because catalogs/opm@v2 has no stable
+      release; installed with `--catalog-prerelease` instead. (b) integration `module-apply` and the
+      five handoff/thin-editor/delete e2e tests fail inside
+      `catalogs/opm/transformers/service-transformer@2.0.0-alpha.6|7` (`output.metadata.name:
+      cannot reference optional field: name`), a catalog_opm defect. (c) the e2e harness writes
+      `registry: "localhost:5000"` into its test config, so `TestE2E_ModuleVet_Output` and the
+      operator-lifecycle install step need the local registry; the lifecycle test then uninstalls the
+      operator and CRDs and cannot restore them via (a), leaving the cluster empty for later tests.
+      18 e2e tests pass; 5 of 6 integration programs pass.
