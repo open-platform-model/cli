@@ -5,15 +5,11 @@
 // against core's #IdentityPackage).
 package identity
 
-// #VersionType mirrors core.#VersionType (SemVer 2.0), duplicated so this
-// package stays import-free.
-#VersionType: string & =~"^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
-
 // ModulePath is the module's complete CUE module path, major suffix included
 // — byte-identical to cue.mod's `module:` field.
 ModulePath: "opmodel.dev/templates/standard@v1"
 
 // Version is the module's bare SemVer; its major must agree with ModulePath's.
-// The default is what the cli release publishes; release automation owns the
-// committed value via the marker below.
-Version: #VersionType | *"1.0.0" // x-release-please-version
+// A plain literal: the kernel's loader gate requires a concrete value, and a
+// defaulted disjunction is not one. Written by opm module version set.
+Version: "1.0.1"

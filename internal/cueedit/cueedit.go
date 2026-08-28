@@ -116,7 +116,7 @@ func ReadIdentityVersion(dir string) (value string, defaulted bool, err error) {
 // field carrying anything but a string literal reads as "" with no error
 // (nothing writable to report); shape failures are ErrIdentityShape.
 func ReadIdentityModulePath(dir string) (string, error) {
-	path, _, _, field, err := loadIdentityField(dir, "ModulePath")
+	path, _, field, err := loadIdentityField(dir, "ModulePath")
 	if err != nil {
 		return "", err
 	}
@@ -221,7 +221,7 @@ func SetIdentityModulePath(dir, modulePath string) (changed bool, err error) {
 		return false, errors.New("module path must not be empty")
 	}
 
-	path, data, _, field, err := loadIdentityField(dir, "ModulePath")
+	path, data, field, err := loadIdentityField(dir, "ModulePath")
 	if err != nil {
 		return false, err
 	}
@@ -244,92 +244,29 @@ func SetIdentityModulePath(dir, modulePath string) (changed bool, err error) {
 	return true, nil
 }
 
-// ResetIdentityVersion resets the Version field of dir/identity/identity.cue
-// to the defaulted form carrying version — `#VersionType | *"0.1.0"` for a
-// scaffold — so release automation owns the committed value from the first
-// commit (D12), while `--version` can still assert or fill it.
-//
-//   - a defaulted disjunction has its default literal replaced — the shape,
-//     including a release-automation marker comment on the line, survives
-//     byte-for-byte;
-//   - any other value in a file that declares a top-level #VersionType is
-//     replaced whole with `#VersionType | *"<version>"`;
-//   - without a #VersionType to reference, a concrete literal is replaced in
-//     place and an open field gains `| *"<version>"` — best effort that never
-//     splices an unresolvable reference into the file.
-func ResetIdentityVersion(dir, version string) (changed bool, err error) {
-	if err := CheckVersion(version); err != nil {
-		return false, err
-	}
-
-	path, data, f, field, err := loadIdentityField(dir, "Version")
-	if err != nil {
-		return false, err
-	}
-
-	edited, err := spliceVersionReset(data, field.Value, version, topLevelField(f, "#VersionType") != nil)
-	if err != nil {
-		return false, fmt.Errorf("%w: %s: %w", ErrIdentityShape, path, err)
-	}
-	if bytes.Equal(edited, data) {
-		return false, nil
-	}
-	if err := verifyAndWrite(path, edited); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-// spliceVersionReset implements ResetIdentityVersion's contract over the
-// Version field's value expression.
-func spliceVersionReset(data []byte, value ast.Expr, version string, hasVersionType bool) ([]byte, error) {
-	quoted := strconv.Quote(version)
-
-	if lit, defaulted := versionLiteral(value); lit != nil && defaulted {
-		start, end, err := span(lit)
-		if err != nil {
-			return nil, err
-		}
-		return splice(data, start, end, quoted), nil
-	}
-
-	if hasVersionType {
-		start, end, err := span(value)
-		if err != nil {
-			return nil, err
-		}
-		return splice(data, start, end, "#VersionType | *"+quoted), nil
-	}
-
-	// No #VersionType to reference: fall back to the plain Version writer's
-	// splice, which replaces a concrete literal in place and unifies an open
-	// field — then add the default marker only where a disjunction exists.
-	return spliceVersion(data, value, version)
-}
-
 // loadIdentityField reads and parses dir/identity/identity.cue and locates
 // the named top-level field, mapping each failure to the shared shape
 // refusal.
-func loadIdentityField(dir, name string) (path string, data []byte, f *ast.File, field *ast.Field, err error) {
+func loadIdentityField(dir, name string) (path string, data []byte, field *ast.Field, err error) {
 	path = filepath.Join(dir, "identity", "identity.cue")
 	data, err = os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", nil, nil, nil, fmt.Errorf("%w: %s does not exist", ErrIdentityShape, path)
+			return "", nil, nil, fmt.Errorf("%w: %s does not exist", ErrIdentityShape, path)
 		}
-		return "", nil, nil, nil, fmt.Errorf("reading %s: %w", path, err)
+		return "", nil, nil, fmt.Errorf("reading %s: %w", path, err)
 	}
 
-	f, err = parser.ParseFile(path, data, parser.ParseComments)
+	f, err := parser.ParseFile(path, data, parser.ParseComments)
 	if err != nil {
-		return "", nil, nil, nil, fmt.Errorf("%w: %s does not parse: %w", ErrIdentityShape, path, err)
+		return "", nil, nil, fmt.Errorf("%w: %s does not parse: %w", ErrIdentityShape, path, err)
 	}
 
 	field = topLevelField(f, name)
 	if field == nil {
-		return "", nil, nil, nil, fmt.Errorf("%w: %s declares no top-level %s field", ErrIdentityShape, path, name)
+		return "", nil, nil, fmt.Errorf("%w: %s declares no top-level %s field", ErrIdentityShape, path, name)
 	}
-	return path, data, f, field, nil
+	return path, data, field, nil
 }
 
 // verifyAndWrite is the shared tail of every writer: the splice is byte
@@ -351,7 +288,7 @@ func verifyAndWrite(path string, edited []byte) error {
 // top-level Version field, mapping each failure to the shape refusal shared
 // by the read and write paths.
 func loadIdentity(dir string) (path string, data []byte, field *ast.Field, err error) {
-	path, data, _, field, err = loadIdentityField(dir, "Version")
+	path, data, field, err = loadIdentityField(dir, "Version")
 	return path, data, field, err
 }
 
