@@ -5,6 +5,25 @@ import (
 	"strings"
 )
 
+// renderIdentity writes one row per identity field: state, its qualifiers
+// (default, filled by --version) and the value when concrete.
+func (p *Plan) renderIdentity(b *strings.Builder) {
+	for _, f := range p.Identity {
+		state := string(f.State)
+		if f.Defaulted {
+			state += " (default)"
+		}
+		if f.Filled {
+			state += " (filled by --version)"
+		}
+		v := ""
+		if f.Value != "" {
+			v = " = " + f.Value
+		}
+		fmt.Fprintf(b, "  %-15s %-11s %s%s\n", "identity", f.Name, state, v)
+	}
+}
+
 // Render prints the resolved plan in experiment 02's measured format: kind,
 // declared path, cue.mod path, repository, major, tag and its source, one
 // line per identity field, the override gate, then the verdict. The plan
@@ -31,25 +50,19 @@ func (p *Plan) Render() string {
 	if p.TagSource != "" {
 		row("tag from", p.TagSource)
 	}
-	for _, f := range p.Identity {
-		state := string(f.State)
-		if f.Defaulted {
-			state += " (default)"
-		}
-		if f.Filled {
-			state += " (filled by --version)"
-		}
-		v := ""
-		if f.Value != "" {
-			v = " = " + f.Value
-		}
-		fmt.Fprintf(&b, "  %-15s %-11s %s%s\n", "identity", f.Name, state, v)
-	}
+	p.renderIdentity(&b)
 	override := fmt.Sprintf("%v", p.OverridePresent)
 	if p.OverrideWaived {
 		override += " (gate waived by --skip-override-check; replacements are ignored either way)"
 	}
 	row("local override", override)
+	if p.KernelChecked {
+		kernel := "refused"
+		if p.KernelAccepted {
+			kernel = "accepted"
+		}
+		row("kernel loader", kernel)
+	}
 
 	// The catalog gates' per-gate outcomes (D22, D9). Text-only — plan --json
 	// remains deferred.

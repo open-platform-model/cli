@@ -48,6 +48,7 @@ source: kind: "self"
 func TestVetChecks_DerivationDrift(t *testing.T) {
 	files := edit(moduleFiles(), "module.cue", `package demo
 
+kind: "Module"
 metadata: {
 	name:       "demo"
 	modulePath: "example.com/modules/demo@v1"
@@ -86,6 +87,7 @@ Version:    #VersionType
 `)
 	files = edit(files, "module.cue", `package demo
 
+kind: "Module"
 metadata: {
 	name:       "demo"
 	modulePath: "example.com/modules/demo@v1"
@@ -105,6 +107,7 @@ Version:    "2.0.0"
 `)
 	files = edit(files, "module.cue", `package demo
 
+kind: "Module"
 metadata: {
 	name:       "demo"
 	modulePath: "example.com/modules/demo@v1"
@@ -113,4 +116,10 @@ metadata: {
 `)
 	p := runVetChecks(t, files)
 	assert.Contains(t, refusalHeadlines(p), "within the major")
+}
+
+func TestVetChecks_KernelLoad(t *testing.T) {
+	p := runVetChecks(t, defaultedIdentityFiles())
+	require.Len(t, p.Refusals, 1, refusalHeadlines(p))
+	assert.Contains(t, p.Refusals[0].Headline, "the kernel would refuse to load this module")
 }

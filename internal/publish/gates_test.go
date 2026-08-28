@@ -25,6 +25,7 @@ Version:    %q
 `, path, version))
 	out = edit(out, "module.cue", fmt.Sprintf(`package demo
 
+kind: "Module"
 metadata: {
 	name:       "demo"
 	modulePath: %q
@@ -92,6 +93,7 @@ func TestGate_Derivation(t *testing.T) {
 	t.Run("metadata.version literal drift is msg 7", func(t *testing.T) {
 		files := edit(moduleFiles(), "module.cue", `package demo
 
+kind: "Module"
 metadata: {
 	name:       "demo"
 	modulePath: "example.com/modules/demo@v1"
@@ -113,6 +115,7 @@ metadata: {
 	t.Run("metadata.modulePath drift caught too", func(t *testing.T) {
 		files := edit(moduleFiles(), "module.cue", `package demo
 
+kind: "Module"
 metadata: {
 	name:       "demo"
 	modulePath: "example.com/modules/demo-x@v1"
@@ -153,6 +156,7 @@ source: kind: "self"
 `)
 	files = edit(files, "module.cue", `package demo
 
+kind: "Module"
 metadata: {
 	name:       "demo"
 	modulePath: "example.com/modules/demo@v2"
@@ -232,6 +236,7 @@ func versionForPath(path string) string {
 func TestGate_PackageName(t *testing.T) {
 	misnamed := edit(moduleFiles(), "module.cue", `package demo_db
 
+kind: "Module"
 metadata: {
 	name:       "demo"
 	modulePath: "example.com/modules/demo@v1"
@@ -363,5 +368,73 @@ source: kind: "self"
 		out := p.Render()
 		assert.Contains(t, out, "REFUSED — 1 refusal")
 		assert.NotContains(t, out, "GO")
+	})
+}
+
+// defaultedIdentityFiles is the shape the modules fleet carried until
+// 2026-08-28: identity.Version a defaulted disjunction, metadata.version a
+// plain reference to it. Publish's own identity gates accept it (a defaulted
+// field is concrete at its default); the kernel's shape gate does not.
+func defaultedIdentityFiles() map[string]string {
+	files := edit(moduleFiles(), "identity/identity.cue", `package identity
+
+#T: string
+ModulePath: "example.com/modules/demo@v1"
+Version:    #T | *"1.2.0"
+`)
+	return edit(files, "module.cue", `package demo
+
+import id "example.com/modules/demo/identity"
+
+kind: "Module"
+metadata: {
+	name:       "demo"
+	modulePath: id.ModulePath
+	version:    id.Version
+}
+`)
+}
+
+func TestGate_KernelLoad(t *testing.T) {
+	t.Run("defaulted identity is one refusal, the kernel's", func(t *testing.T) {
+		p := runFixture(t, KindModule, defaultedIdentityFiles())
+		require.Len(t, p.Refusals, 1, refusalHeadlines(p))
+		r := p.Refusals[0]
+		assert.Contains(t, r.Headline, "the kernel would refuse to load this module")
+		assert.Contains(t, r.Details(), `"metadata.version"`)
+		assert.Contains(t, r.Action, "identity/identity.cue")
+		// The identity gates still derived the tag from the default.
+		assert.Equal(t, "v1.2.0", p.Tag)
+		assert.True(t, p.KernelChecked)
+		assert.False(t, p.KernelAccepted)
+		assert.Contains(t, p.Render(), "kernel loader   refused")
+	})
+
+	t.Run("literal identity passes", func(t *testing.T) {
+		p := runFixture(t, KindModule, moduleFiles())
+		assert.Empty(t, p.Refusals, refusalHeadlines(p))
+		assert.True(t, p.KernelAccepted)
+		assert.Contains(t, p.Render(), "kernel loader   accepted")
+	})
+
+	t.Run("wrong kind names the catalog command", func(t *testing.T) {
+		files := edit(moduleFiles(), "module.cue", `package demo
+
+kind: "Catalog"
+metadata: {
+	name:       "demo"
+	modulePath: "example.com/modules/demo@v1"
+	version:    "1.2.0"
+}
+`)
+		p := runFixture(t, KindModule, files)
+		require.Len(t, p.Refusals, 1, refusalHeadlines(p))
+		assert.Contains(t, p.Refusals[0].Details(), "wrong OPM artifact kind")
+		assert.Contains(t, p.Refusals[0].Action, "opm catalog publish")
+	})
+
+	t.Run("catalogs are not loaded as modules", func(t *testing.T) {
+		p := runFixture(t, KindCatalog, catalogFiles())
+		assert.False(t, p.KernelChecked)
 	})
 }

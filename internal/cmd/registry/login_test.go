@@ -291,7 +291,7 @@ func TestLogin_InversionAgainstRegistry(t *testing.T) {
 	files := map[string]string{
 		"cue.mod/module.cue":    "module: \"example.com/modules/demo@v1\"\nlanguage: version: \"v0.17.0\"\nsource: kind: \"self\"\n",
 		"identity/identity.cue": "package identity\n\nModulePath: \"example.com/modules/demo@v1\"\nVersion:    \"1.2.0\"\n",
-		"module.cue":            "package demo\n\nmetadata: {\n\tname:       \"demo\"\n\tmodulePath: \"example.com/modules/demo@v1\"\n\tversion:    \"1.2.0\"\n}\n",
+		"module.cue":            "package demo\n\nkind: \"Module\"\nmetadata: {\n\tname:       \"demo\"\n\tmodulePath: \"example.com/modules/demo@v1\"\n\tversion:    \"1.2.0\"\n}\n",
 	}
 	for name, content := range files {
 		p := filepath.Join(dir, filepath.FromSlash(name))

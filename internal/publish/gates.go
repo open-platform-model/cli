@@ -91,6 +91,11 @@ func Run(ctx context.Context, opts Options) (*Plan, error) {
 	}
 	resolveVersion(p, opts)
 
+	// Gate: the kernel's module loader accepts the tree (msg 12). Runs
+	// before the derivation gates so the plan reads top-down from "does it
+	// load" to "does it agree with itself"; accumulates like the rest.
+	gateKernelLoad(p, opts)
+
 	// The remaining gates, in dependency order; all evaluable ones run.
 	gateSourceSelf(p, a)
 	gateCueModAgreement(p, a)
