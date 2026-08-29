@@ -6,13 +6,18 @@ The cluster-backed e2e suite runs against a developer's `kind-opm-dev` cluster w
 
 ### Requirement: Operator applier grant is verified before handoff tests
 
-Every e2e test that hands a `ModuleInstance` to the operator, or otherwise relies on the operator applying workload resources, SHALL first verify that the operator's ServiceAccount is permitted to `patch` `services` (core API group) and `deployments` (`apps`) in the test namespace, using the cluster's own authorization check. If the check reports denial, the test SHALL fail before performing any cluster mutation, with a message that names the ServiceAccount, the denied verb and resource, and the remedy `task cluster:operator` (which applies `hack/kind-operator-rbac.yaml`). If the check itself cannot be performed (no cluster, kubectl failure), the existing cluster-reachability precondition applies and the test skips as it does today.
+Every e2e test that hands a `ModuleInstance` to the operator, or otherwise relies on the operator applying workload resources, SHALL first verify that the operator's effective applier identity is permitted to `patch` `services` (core API group) and `deployments` (`apps`) in the test namespace, using the cluster's own authorization check. The effective applier identity is the ServiceAccount named by the controller Deployment's `--default-service-account` argument, resolved in the test namespace, when that argument is present; otherwise the controller's own ServiceAccount. If the check reports denial, the test SHALL fail before performing any cluster mutation, with a message that names the identity probed, the denied verb and resource, and the remedy `task cluster:operator` (which applies `hack/kind-operator-rbac.yaml`). A denial SHALL be distinguished from a check that could not be performed: only an explicit `no` answer is a denial. If the check itself cannot be performed (no cluster, kubectl failure, no `impersonate` permission for the test user), the existing cluster-reachability precondition applies and the test skips as it does today, with the check's error in the skip message.
 
 #### Scenario: Operator installed without the dev grant
 
 - **WHEN** the operator was installed with `opm operator install` alone and a handoff e2e test starts
 - **THEN** the test fails immediately, its message names `system:serviceaccount:opm-operator-system:opm-operator-controller-manager`, the denied `patch services`, and `task cluster:operator` as the remedy
 - **AND** no `ModuleInstance` or workload has been created by the test
+
+#### Scenario: Check cannot be performed
+
+- **WHEN** the test user may not impersonate ServiceAccounts, so `kubectl auth can-i --as=...` errors instead of answering
+- **THEN** the test skips, naming the kubectl error, rather than reporting a denial
 
 #### Scenario: Cluster prepared by task cluster:operator
 
