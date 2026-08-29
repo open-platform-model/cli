@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,6 +56,13 @@ func runHandoffOPM(t *testing.T, timeout time.Duration, args ...string) (stdout,
 	return runOPMWithEnv(t, t.TempDir(), homeDir, timeout, full...)
 }
 
+const (
+	operatorNamespace    = "opm-operator-system"
+	operatorDeployment   = "opm-operator-controller-manager"
+	operatorControllerSA = "system:serviceaccount:" + operatorNamespace + ":" + operatorDeployment
+	defaultSAFlag        = "--default-service-account="
+)
+
 // operatorRunning reports whether the controller Deployment has an available
 // replica — the difference between "the manifest was applied" and "something is
 // reconciling".
@@ -64,7 +72,7 @@ func operatorRunning(t *testing.T, kubeconfig string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "kubectl", "--kubeconfig", kubeconfig, "--context", kindContext,
-		"get", "deployment", "opm-operator-controller-manager", "-n", "opm-operator-system",
+		"get", "deployment", operatorDeployment, "-n", operatorNamespace,
 		"-o", "jsonpath={.status.availableReplicas}").Output()
 	if err != nil {
 		return false
@@ -73,12 +81,74 @@ func operatorRunning(t *testing.T, kubeconfig string) bool {
 	return replicas != "" && replicas != "0"
 }
 
-// requireReconcilingOperator fails (does not skip) when no operator is running.
+// requireReconcilingOperator fails (does not skip) when no operator is running,
+// or when the operator's effective applier identity may not patch the workload
+// kinds the fixtures render in the test namespace. The second check is the
+// suite's own precondition for the dev grant in hack/kind-operator-rbac.yaml,
+// which only `task cluster:operator` applies: without it a handoff test would
+// otherwise fail 90 seconds later with the operator's own
+// `cannot patch resource "services"` error, pointing away from the remedy.
 func requireReconcilingOperator(t *testing.T, kubeconfig string) {
 	t.Helper()
 	if !operatorRunning(t, kubeconfig) {
 		t.Fatal("no reconciling opm-operator in the cluster — run `task cluster:operator` " +
 			"(installs the operator, wires its --registry to the local registry, seeds the cluster Platform)")
+	}
+	requireOperatorApplierGrant(t, kubeconfig)
+}
+
+// operatorApplierIdentity returns the identity the operator applies workloads
+// as, read from the controller Deployment's container args. With
+// --default-service-account=<sa> the operator impersonates <sa> in the
+// instance's namespace (the fixtures live in handoffNamespace); without it,
+// applies run as the controller's own ServiceAccount. Probing a constant would
+// report a false denial the day the dev operator runs with the flag.
+func operatorApplierIdentity(t *testing.T, kubeconfig string) string {
+	t.Helper()
+
+	out := kubectlOut(t, kubeconfig, "get", "deployment", operatorDeployment, "-n", operatorNamespace,
+		"-o", `jsonpath={range .spec.template.spec.containers[*].args[*]}{@}{"\n"}{end}`)
+	for arg := range strings.SplitSeq(out, "\n") {
+		arg = strings.TrimSpace(arg)
+		if sa, ok := strings.CutPrefix(arg, defaultSAFlag); ok && sa != "" {
+			return "system:serviceaccount:" + handoffNamespace + ":" + sa
+		}
+	}
+	return operatorControllerSA
+}
+
+// requireOperatorApplierGrant asks the cluster (SubjectAccessReview via
+// `kubectl auth can-i --as=<identity>`) whether the operator's applier may
+// patch the two representative kinds every fixture renders. An explicit "no"
+// is a preparation mistake on a reachable cluster and FAILS; anything other
+// than "yes"/"no" (kubectl error, test user lacking `impersonate`) means the
+// check could not be performed and follows the reachability rule: skip.
+func requireOperatorApplierGrant(t *testing.T, kubeconfig string) {
+	t.Helper()
+
+	identity := operatorApplierIdentity(t, kubeconfig)
+	for _, resource := range []string{"services", "deployments.apps"} {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		// kubectl exits 1 for a denial AND for a failed check; stdout tells them apart.
+		out, err := exec.CommandContext(ctx, "kubectl", "--kubeconfig", kubeconfig, "--context", kindContext,
+			"auth", "can-i", "patch", resource, "-n", handoffNamespace, "--as="+identity).Output()
+		cancel()
+		answer := strings.TrimSpace(string(out))
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
+			answer = strings.TrimSpace(answer + " " + string(exitErr.Stderr))
+		}
+		switch strings.TrimSpace(string(out)) {
+		case "yes":
+			continue
+		case "no":
+			t.Fatalf("operator applier %s may not patch %s in namespace %q: the dev grant "+
+				"(hack/kind-operator-rbac.yaml) is missing; `opm operator install` does not apply it. "+
+				"Run `task cluster:operator`.", identity, resource, handoffNamespace)
+		default:
+			t.Skipf("could not check whether %s may patch %s in namespace %q (kubectl auth can-i: %v: %s); "+
+				"skipping operator e2e", identity, resource, handoffNamespace, err, answer)
+		}
 	}
 }
 
