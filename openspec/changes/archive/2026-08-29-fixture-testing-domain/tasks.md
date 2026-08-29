@@ -65,7 +65,7 @@
       manifest for `testing.opmodel.dev/modules/cli/podinfo:v0.1.4` returns 200.
 - [x] 6.3 With the local registry stopped: `cd examples && task deps:update` and
       `opm instance build ./examples/instances/podinfo/instance.cue`.
-- [ ] 6.4 With the local registry stopped: `task cluster:create && task cluster:operator`,
+- [x] 6.4 With the local registry stopped: `task cluster:create && task cluster:operator`,
       then `task test:integration` and `task test:e2e`.
       Run 2026-08-28 on a recreated `opm-dev` (main at f3d722f, registry stopped): 6.2 and 6.3 pass
       (podinfo v0.1.4 and v0.1.5 manifests 200; `examples` deps:update moved catalogs/opm to alpha.7,
