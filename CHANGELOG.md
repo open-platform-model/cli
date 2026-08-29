@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0-alpha.16](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.15...v1.0.0-alpha.16) (2026-08-29)
+
+
+### Features
+
+* **publish:** run the kernel module loader as a publish and vet gate ([#186](https://github.com/open-platform-model/cli/issues/186)) ([80aa234](https://github.com/open-platform-model/cli/commit/80aa2347b871924ba6c93ab785ef7c4c2c29618e))
+
+
+### Bug Fixes
+
+* **scaffold:** write identity Version as a plain literal ([#183](https://github.com/open-platform-model/cli/issues/183)) ([f3d722f](https://github.com/open-platform-model/cli/commit/f3d722f78886b8436e37c66262c5208098823f92))
+
 ## [1.0.0-alpha.15](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.14...v1.0.0-alpha.15) (2026-08-27)
 
 
