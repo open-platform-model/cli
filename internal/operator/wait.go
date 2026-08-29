@@ -2,18 +2,21 @@ package operator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 )
 
-// waitPollInterval is how often Wait re-checks target readiness.
-const waitPollInterval = 2 * time.Second
+// waitPollInterval is how often the wait loops re-check the cluster. A
+// variable so tests can poll faster.
+var waitPollInterval = 2 * time.Second
 
 const (
 	kindDeployment       = "Deployment"
@@ -68,41 +71,107 @@ func WorkloadReadyPredicate(obj *unstructured.Unstructured) bool {
 	return kubernetes.IsHealthy(kubernetes.EvaluateHealth(obj))
 }
 
+// AbsentPredicate is the readiness predicate of absence mode: no live object
+// ever satisfies it, so the wait ends only when every object reads NotFound.
+func AbsentPredicate(*unstructured.Unstructured) bool { return false }
+
+// waitMode selects how the poll loop treats a NotFound read.
+type waitMode int
+
+const (
+	// modeReady waits for live objects to satisfy the predicate. A NotFound
+	// read is a definitive failure: the caller applied the object and it has
+	// since disappeared, so polling until the deadline would only hide it.
+	modeReady waitMode = iota
+
+	// modeAbsent waits for objects to disappear. A NotFound read satisfies
+	// the predicate; a live object is checked against it (AbsentPredicate
+	// keeps it pending).
+	modeAbsent
+)
+
 // Wait polls the live state of each object on the cluster until predicate
-// reports every one ready, or timeout elapses. Bounded and context-cancellable.
-// Objects that no longer exist (e.g. a Get error) count as not yet ready.
-func Wait(ctx context.Context, client *kubernetes.Client, objs []*unstructured.Unstructured, predicate ReadyPredicate, timeout time.Duration) error {
-	return wait(ctx, client, objs, predicate, timeout, waitPollInterval)
+// reports every one ready, or ctx is done. It carries no timeout of its own:
+// the caller's ctx deadline is the budget, and since marks when that budget
+// started so the timeout error reports the time actually consumed. An object
+// that reads NotFound fails the wait at once, naming it: the caller applied it
+// and it has since disappeared. Any other Get error counts as not yet ready.
+func Wait(ctx context.Context, client *kubernetes.Client, objs []*unstructured.Unstructured, predicate ReadyPredicate, since time.Time) error {
+	return waitUntil(ctx, client, objs, predicate, modeReady, since, waitPollInterval)
 }
 
-func wait(ctx context.Context, client *kubernetes.Client, objs []*unstructured.Unstructured, predicate ReadyPredicate, timeout, pollInterval time.Duration) error {
+// WaitAbsent polls each object until every one reads NotFound, or ctx is
+// done. It carries no timeout of its own: the caller's ctx deadline is the
+// budget, and since marks when that budget started so the timeout error
+// reports the time actually consumed. Any Get error other than NotFound
+// counts as still present.
+func WaitAbsent(ctx context.Context, client *kubernetes.Client, objs []*unstructured.Unstructured, since time.Time) error {
+	return waitUntil(ctx, client, objs, AbsentPredicate, modeAbsent, since, waitPollInterval)
+}
+
+// waitUntil is the shared poll loop behind Wait and WaitAbsent. since is when
+// the budget in force (ctx's deadline) started; the timeout error reports the
+// elapsed time from it rather than any nominal --timeout value, so a deadline
+// shared across several waits is reported honestly.
+func waitUntil(ctx context.Context, client *kubernetes.Client, objs []*unstructured.Unstructured, predicate ReadyPredicate, mode waitMode, since time.Time, pollInterval time.Duration) error {
 	if len(objs) == 0 {
 		return nil
 	}
-
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
 
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
 	remaining := objs
 	for {
-		remaining = pendingObjects(ctx, client, remaining, predicate)
+		var err error
+		remaining, err = pollObjects(ctx, client, remaining, predicate, mode)
+		if err != nil {
+			return err
+		}
 		if len(remaining) == 0 {
 			return nil
 		}
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timed out after %s waiting for %s to become ready", timeout, describeObjects(remaining))
+			if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				// Canceled by the caller (e.g. Ctrl-C), not by the budget.
+				return ctx.Err()
+			}
+			elapsed := time.Since(since).Round(time.Second)
+			if mode == modeAbsent {
+				return fmt.Errorf("timed out after %s waiting for %s to finish terminating", elapsed, describeObjects(remaining))
+			}
+			return fmt.Errorf("timed out after %s waiting for %s to become ready", elapsed, describeObjects(remaining))
 		case <-ticker.C:
 		}
 	}
 }
 
+// pollObjects fetches the live state of each object and returns those that
+// don't yet satisfy predicate. A NotFound read satisfies absence mode and
+// fails readiness mode with an error naming the object; any other Get error
+// leaves the object pending in both modes.
+func pollObjects(ctx context.Context, client *kubernetes.Client, objs []*unstructured.Unstructured, predicate ReadyPredicate, mode waitMode) ([]*unstructured.Unstructured, error) {
+	var pending []*unstructured.Unstructured
+	for _, obj := range objs {
+		live, err := client.ResourceClient(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace()).Get(ctx, obj.GetName(), metav1.GetOptions{})
+		switch {
+		case apierrors.IsNotFound(err):
+			if mode == modeReady {
+				return nil, fmt.Errorf("%s was applied and has since disappeared", describeObjects([]*unstructured.Unstructured{obj}))
+			}
+		case err != nil || !predicate(live):
+			pending = append(pending, obj)
+		}
+	}
+	return pending, nil
+}
+
 // pendingObjects fetches the live state of each object and returns those
-// that don't yet satisfy predicate.
+// that don't yet satisfy predicate. Single-shot semantics: an object that
+// reads NotFound (or any other Get error) is simply pending. CheckReady
+// relies on this; the post-apply wait uses pollObjects instead.
 func pendingObjects(ctx context.Context, client *kubernetes.Client, objs []*unstructured.Unstructured, predicate ReadyPredicate) []*unstructured.Unstructured {
 	var pending []*unstructured.Unstructured
 	for _, obj := range objs {
