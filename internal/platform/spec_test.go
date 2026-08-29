@@ -38,12 +38,12 @@ func TestDecodeFile_DefaultTemplate(t *testing.T) {
 	opm, ok := in.Subscriptions["opmodel.dev/catalogs/opm@v2"]
 	require.True(t, ok)
 	assert.Nil(t, opm.Enable, "omitted enable defers to the schema default")
-	assert.Equal(t, "2.0.0-alpha.6", opm.Version)
+	assert.Equal(t, "2.0.0", opm.Version)
 
 	k8s, ok := in.Subscriptions["opmodel.dev/catalogs/k8s@v1"]
 	require.True(t, ok)
 	assert.Nil(t, k8s.Enable, "omitted enable defers to the schema default")
-	assert.Equal(t, "1.0.0-alpha.1", k8s.Version)
+	assert.Equal(t, "1.0.0-alpha.2", k8s.Version)
 }
 
 func TestDecodeFile_ExplicitEnableAndVersion(t *testing.T) {
@@ -190,6 +190,6 @@ func TestWireRoundTrip_FileToInputToCRSpec(t *testing.T) {
 	w := wireFromInput(in)
 	assert.Equal(t, in.Type, w.Type)
 	assert.Len(t, w.Registry, len(in.Subscriptions))
-	assert.Equal(t, "2.0.0-alpha.6", w.Registry["opmodel.dev/catalogs/opm@v2"].Version)
-	assert.Equal(t, "1.0.0-alpha.1", w.Registry["opmodel.dev/catalogs/k8s@v1"].Version)
+	assert.Equal(t, "2.0.0", w.Registry["opmodel.dev/catalogs/opm@v2"].Version)
+	assert.Equal(t, "1.0.0-alpha.2", w.Registry["opmodel.dev/catalogs/k8s@v1"].Version)
 }

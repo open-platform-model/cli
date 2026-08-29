@@ -16,9 +16,9 @@ type: "kubernetes"
 
 registry: {
 	"opmodel.dev/catalogs/opm@v2": {
-		version: "2.0.0-alpha.5"
+		version: "2.0.0"
 	}
 	"opmodel.dev/catalogs/k8s@v1": {
-		version: "1.0.0-alpha.1"
+		version: "1.0.0-alpha.2"
 	}
 }
