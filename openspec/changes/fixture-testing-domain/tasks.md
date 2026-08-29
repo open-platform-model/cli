@@ -79,3 +79,14 @@
       operator-lifecycle install step need the local registry; the lifecycle test then uninstalls the
       operator and CRDs and cannot restore them via (a), leaving the cluster empty for later tests.
       18 e2e tests pass; 5 of 6 integration programs pass.
+      Re-run 2026-08-29 on main at 80aa234 with catalogs/opm alpha.8 (service-transformer fallback
+      landed) and the handoff / module-apply testdata re-pinned to alpha.8 (core alpha.6 by MVS):
+      `task test:integration` exit 0 (every program passes); e2e 20 pass, `TestE2E_ModuleVet_Output`
+      fixed. Still open: (a) `task cluster:operator` refuses (no stable catalog release; installed
+      with `--catalog-prerelease` by hand); (b) the six operator-reconciled e2e tests fail inside the
+      operator: `deployment-transformer@2.0.0-alpha.8 ... undefined field: #names`. The pinned
+      operator v1.0.0-alpha.11 embeds library alpha.13; filling #component from the evaluated value
+      (library alpha.15, 0019 D1) is what exposes #names to transformers, and no operator release
+      embeds it yet (alpha.13 -> library alpha.14; opm-operator#106 bumps main to alpha.20). 6.4
+      completes once an operator release carries library >= alpha.15 and the cli pin follows.
+
