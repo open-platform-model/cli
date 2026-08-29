@@ -7,6 +7,7 @@
 - `opm operator install` gains a pre-apply terminating guard: before applying, every object in the plan that exists on the cluster with `metadata.deletionTimestamp` set is waited on until it is gone (bounded by `--timeout`, sharing the budget with the readiness wait), and only then applied. The wait is reported per resource. If the object is still terminating when the budget runs out, the command exits non-zero naming it, and applies nothing.
 - The guard covers `--crds-only` and `--rbac` plans alike (it runs on the resolved plan).
 - No new flag: waiting is the sensible default; there is no case where applying onto a terminating object is what the user wants.
+- The readiness wait fails fast when an object it just applied reads NotFound, naming it, instead of polling until `--timeout`. The guard removes the known trigger; this removes the silent timeout for any trigger.
 
 Not in scope: making `uninstall` wait for deletion (its fire-and-report contract stays; the guard makes install robust to any prior delete, not only uninstall), and the e2e precondition probe (sibling change `e2e-dev-operator-applier-precondition`).
 
