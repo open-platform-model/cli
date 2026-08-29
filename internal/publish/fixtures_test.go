@@ -113,6 +113,7 @@ Version:    "1.2.0"
 `,
 		"module.cue": `package demo
 
+kind: "Module"
 metadata: {
 	name:       "demo"
 	modulePath: "example.com/modules/demo@v1"

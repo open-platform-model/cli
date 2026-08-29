@@ -33,6 +33,7 @@ Version:    "1.2.0"
 `,
 		"module.cue": `package demo
 
+kind: "Module"
 metadata: {
 	name:       "demo"
 	modulePath: "example.com/modules/demo@v1"
@@ -141,6 +142,49 @@ deps: "example.com/dep@v1": v: "v1.4.0"
 	assert.Contains(t, stderr, "local-module.cue is present")
 	assert.Contains(t, stderr, "--skip-override-check")
 	assert.Contains(t, stderr, "would resolve to v1.4.0 when published")
+}
+
+func TestE2E_ModulePublish_DryRunKernelRefused(t *testing.T) {
+	// The shape the modules fleet carried until 2026-08-28: identity.Version a
+	// defaulted disjunction, metadata.version a reference to it. Publish's own
+	// identity gates accept it; the kernel's loader does not (msg 12).
+	dir := publishModuleFixture(t, func(files map[string]string) {
+		files["identity/identity.cue"] = `package identity
+
+#T: string
+ModulePath: "example.com/modules/demo@v1"
+Version:    #T | *"1.2.0"
+`
+		files["module.cue"] = `package demo
+
+import id "example.com/modules/demo/identity"
+
+kind: "Module"
+metadata: {
+	name:       "demo"
+	modulePath: id.ModulePath
+	version:    id.Version
+}
+`
+	})
+	env := []string{publishRegistryEnv(t)}
+
+	stdout, stderr, err := runOPMPublish(t, dir, env, "module", "publish", "--dry-run")
+	skipWithoutCoreSchema(t, stderr)
+
+	require.Error(t, err)
+	var exitErr *exec.ExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, 2, exitErr.ExitCode(), "stdout: %s\nstderr: %s", stdout, stderr)
+
+	// One cause, one refusal: the identity gates still derive the tag from
+	// the default; only the kernel gate refuses, quoting the loader.
+	assert.Contains(t, stdout, "tag             v1.2.0")
+	assert.Contains(t, stdout, "kernel loader   refused")
+	assert.Contains(t, stdout, "REFUSED — 1 refusal")
+	assert.Contains(t, stderr, "the kernel would refuse to load this module")
+	assert.Contains(t, stderr, `"metadata.version"`)
+	assert.Contains(t, stderr, "identity/identity.cue")
 }
 
 func TestE2E_ModulePublish_PushAndAlreadyPublished(t *testing.T) {

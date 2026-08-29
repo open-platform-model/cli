@@ -79,6 +79,7 @@ func VetChecks(opts Options) (*Plan, cue.Value, error) {
 
 	gateCueModAgreement(p, a)
 	gateDerivation(p, a)
+	gateKernelLoad(p, opts)
 
 	return p, root, nil
 }

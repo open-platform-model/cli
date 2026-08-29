@@ -198,6 +198,7 @@ Version:    #VersionType
 `)
 	files = edit(files, "module.cue", `package demo
 
+kind: "Module"
 metadata: {
 	name:       "demo"
 	modulePath: "example.com/modules/demo@v1"

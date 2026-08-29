@@ -143,7 +143,13 @@ type Plan struct {
 	// (modules only). Replacements lists the entries either way.
 	OverridePresent bool
 	OverrideWaived  bool
-	Replacements    []Replacement
+
+	// KernelChecked reports that the kernel loader gate ran (msg 12); a
+	// module whose identity is open or absent skips it, so the row is
+	// omitted rather than misread as a pass. KernelAccepted is its verdict.
+	KernelChecked  bool
+	KernelAccepted bool
+	Replacements   []Replacement
 
 	// FillVersion, when non-empty, is the version Push writes into
 	// identity/identity.cue (through internal/cueedit) before zipping — D12:
