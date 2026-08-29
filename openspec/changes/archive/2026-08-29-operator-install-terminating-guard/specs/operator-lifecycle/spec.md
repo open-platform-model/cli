@@ -6,6 +6,8 @@
 
 Before applying, the command SHALL inspect every object in its plan on the cluster. An object that exists with `metadata.deletionTimestamp` set is terminating; the command SHALL wait for each such object to disappear before applying anything, report the wait per resource, and charge the wait against the same `--timeout` budget as the readiness wait. If a terminating object has not disappeared when the budget runs out, the command SHALL exit non-zero naming that resource and the elapsed timeout, and SHALL NOT have applied any document. An object that does not exist, or exists without a deletion timestamp, SHALL NOT delay the apply. The guard applies to every plan shape (`--crds-only`, `--rbac`).
 
+During the readiness wait, an applied object that the cluster reports as NotFound SHALL fail the command at once, naming the object as applied and since disappeared, rather than counting as not yet ready until the timeout. The reported timeout duration SHALL reflect the shared budget actually consumed, not the nominal `--timeout` value.
+
 After the readiness wait completes, and unless `--skip-platform` is given, the command SHALL create the singleton `cluster` Platform subscribing to the catalog build it resolved before contacting the cluster, under the write-if-absent contract of the `platform-resolution` capability: a plain create with field manager `opm-cli`, never server-side apply and never update. The seeding step SHALL run only after readiness, so the Platform CRD is `Established` before the write is attempted. The command SHALL report the Platform outcome (created with its pinned catalog coordinate, already present and left untouched, or skipped) beside the operator install summary.
 
 Seeding SHALL NOT be able to fail an otherwise successful install: an `AlreadyExists` response is a success-noop, and a create denied by RBAC SHALL degrade to a warning while the command still exits zero.
@@ -33,6 +35,12 @@ Seeding SHALL NOT be able to fail an otherwise successful install: an `AlreadyEx
 - **WHEN** an object in the plan stays terminating (for example, a finalizer nobody removes) for longer than `--timeout`
 - **THEN** the command exits non-zero naming that resource and the elapsed timeout
 - **AND** no manifest document has been applied
+
+#### Scenario: Applied object disappears during the readiness wait
+
+- **WHEN** an object the command has applied is deleted by another actor before it becomes ready
+- **THEN** the command exits non-zero as soon as the object reads NotFound, naming it as applied and since disappeared
+- **AND** it does not wait out the remaining `--timeout`
 
 #### Scenario: Readiness timeout
 

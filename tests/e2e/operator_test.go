@@ -290,6 +290,33 @@ func TestE2E_Operator_InstallUninstallLifecycle(t *testing.T) {
 		assertResourceExists(t, kubeconfig, "namespace", "", "opm-operator-system")
 	})
 
+	t.Run("install immediately after uninstall waits out the terminating Deployment", func(t *testing.T) {
+		// Uninstall is fire-and-report: its foreground deletes have been
+		// accepted but the Deployment is still terminating. Without the
+		// guard, install applied onto it, the garbage collector then removed
+		// it, and the readiness wait burned the whole timeout. No pause here
+		// is the point of the test.
+		waitTimeout := 15 * time.Second
+		if pullable {
+			waitTimeout = 150 * time.Second
+		}
+
+		stdout, stderr, err := runOPMWithEnv(t, tmpDir, homeDir, waitTimeout+30*time.Second,
+			"operator", "install", "--skip-platform",
+			"--kubeconfig", kubeconfig, "--context", kindContext,
+			"--timeout", waitTimeout.String())
+
+		if pullable {
+			require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
+			assertResourceHealthy(t, kubeconfig, "deployment", "opm-operator-system", "opm-operator-controller-manager")
+		} else {
+			// Only the rollout wait may fail; the Deployment existing
+			// post-apply (asserted below) shows the guard let apply run.
+			require.Error(t, err, "stdout=%s stderr=%s", stdout, stderr)
+		}
+		assertResourceExists(t, kubeconfig, "deployment", "opm-operator-system", "opm-operator-controller-manager")
+	})
+
 	t.Run("crds-only on a fresh cluster installs only the CRDs", func(t *testing.T) {
 		resetOperatorCluster(t, kubeconfig)
 

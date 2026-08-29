@@ -45,6 +45,10 @@ Service) and waits for the CRDs to reach Established and the operator
 Deployment to complete its rollout. --crds-only applies just the CRDs, for
 clusters where the CLI drives module lifecycle without a running operator.
 
+Objects left terminating by a previous uninstall (or any other delete) are
+waited out before anything is applied, so install can follow uninstall at
+once. The wait and the readiness wait share the single --timeout budget.
+
 A full install then creates the singleton cluster Platform, subscribed to the
 newest published release of the first-party catalog. The version is resolved
 from the registry before anything is applied, so a registry problem never
@@ -91,7 +95,7 @@ Examples:
 	c.Flags().StringVar(&userFlag, "user", "", "Bind the opm-cli-user ClusterRole to this user (requires --rbac)")
 	c.Flags().StringVar(&groupFlag, "group", "", "Bind the opm-cli-user ClusterRole to this group (requires --rbac)")
 	c.Flags().StringVar(&versionFlag, "version", "", "Fetch this opm-operator release tag instead of the embedded pin")
-	c.Flags().DurationVar(&timeoutFlag, "timeout", defaultOperatorInstallTimeout, "How long to wait for the install to become ready")
+	c.Flags().DurationVar(&timeoutFlag, "timeout", defaultOperatorInstallTimeout, "How long to wait, in total, for terminating objects to clear and the install to become ready")
 	c.Flags().BoolVar(&catalogPrereleaseFlag, "catalog-prerelease", false, "Subscribe the cluster Platform to the newest catalog prerelease instead of the newest release")
 	c.Flags().BoolVar(&skipPlatformFlag, "skip-platform", false, "Do not create the cluster Platform")
 

@@ -168,6 +168,7 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 - `task cluster:delete` - remove local cluster.
 - `task cluster:recreate` - recreate cluster from scratch.
 - `task test:integration` checks for context `kind-opm-dev` before running.
+- `task cluster:operator` is the complete path to a reconciling operator on `kind-opm-dev`: it installs the pinned operator, seeds the cluster Platform, and applies the dev-only applier grant `hack/kind-operator-rbac.yaml`. `opm operator install` alone does none of the last two; the handoff e2e tests then fail at their applier precondition (`operator applier ... may not patch services`) and name `task cluster:operator` as the remedy.
 
 ## Coding Standards
 
