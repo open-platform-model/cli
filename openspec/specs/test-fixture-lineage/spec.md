@@ -12,6 +12,8 @@ Fixtures and examples consumed by tests or presented as current documentation SH
 
 A maintained module fixture's identity package SHALL declare `Version` as a plain string literal with no default arm and no local `#VersionType`, and its `metadata.version` SHALL reference that literal directly. A fixture SHALL load through the kernel's module loader with no interpolation or other workaround in `metadata`.
 
+A fixture SHALL NOT depend on a catalog mechanism the catalog has withdrawn. When a catalog member or contract type a fixture exercises is removed from the published catalog, the fixture is removed with it rather than kept unvetted; a replacement fixture is added when the replacement mechanism exists.
+
 #### Scenario: No retired-schema imports outside legacy
 
 - **WHEN** the repo is grepped for retired-line imports (`opmodel.dev/core@v1`, `core/v1alpha1`, `modulerelease@v1`, `opm/v1alpha1`) outside the marked legacy location
@@ -20,7 +22,12 @@ A maintained module fixture's identity package SHALL declare `Version` as a plai
 #### Scenario: Vet fixtures exercise current schema
 
 - **WHEN** the module vet tests run
-- **THEN** their fixtures SHALL be `core@v2`-line modules exercising the same behaviors (valid module, secrets discovery, debug values) as before the port
+- **THEN** their fixtures SHALL be `core@v2`-line modules exercising the same behaviors (valid module, debug values) as before the port
+
+#### Scenario: No fixture exercises a withdrawn catalog mechanism
+
+- **WHEN** `tests/fixtures/` is grepped for the legacy secret vocabulary (`res.#Secret`, `$secretName`, `$dataKey`, `#AutoSecrets`, `opm-secrets`)
+- **THEN** there SHALL be no matches
 
 #### Scenario: Fixture identity is a literal
 
