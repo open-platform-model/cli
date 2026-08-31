@@ -19,7 +19,7 @@ import (
 // CLI (inventory-ownership spec).
 func TestNewInstanceCmd_Subcommands(t *testing.T) {
 	cmd := NewInstanceCmd(&config.GlobalConfig{})
-	var got []string
+	got := make([]string, 0, len(cmd.Commands()))
 	for _, c := range cmd.Commands() {
 		got = append(got, c.Name())
 	}
