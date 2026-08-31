@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-alpha.18](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.17...v1.0.0-alpha.18) (2026-08-31)
+
+
+### Bug Fixes
+
+* **deps:** bump library to v1.0.0-alpha.22, catalog_opm to the v4 line (4.0.1) ([#197](https://github.com/open-platform-model/cli/issues/197)) ([656b835](https://github.com/open-platform-model/cli/commit/656b835d853afc6f1c8f613ef0556111055ba09d))
+
 ## [1.0.0-alpha.17](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.16...v1.0.0-alpha.17) (2026-08-31)
 
 
