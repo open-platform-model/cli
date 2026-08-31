@@ -39,7 +39,7 @@ Today the CLI has exactly one arrow from CLI ownership to operator ownership, th
 **Options considered**:
 1. Keep names, remove code: cheapest, leaves a misleading trail.
 2. Rename to the surviving concept, operator-owned instances: one extra line in the root fixtures script.
-**Decision**: option 2. File `instance_operator_owned_test.go`, fixture `testdata/operator-owned/`, identifiers `operatorOwnedInstance`, `runOperatorOwnedOPM`, `resetOperatorOwnedInstance` (final spelling is the implementer's). The root script pin moves in the same PR set.
+**Decision**: option 2. File `instance_operator_owned_test.go`, fixture `testdata/operator-owned/`, identifiers `operatorOwnedInstance`, `runOperatorOwnedOPM`, `resetOperatorOwnedInstance` (final spelling is the implementer's). The workspace-root references move in the same PR set: the `.tasks/deps/fixtures.sh` pin and path comment, the `deps:pins:fixtures` description in `.tasks/deps.yml`, and the root `CLAUDE.md` mention.
 **Rationale**: a reader landing on "handoff" a year from now would look for a command that does not exist.
 
 ### Fields that stay written with no CLI reader
@@ -57,7 +57,7 @@ Today the CLI has exactly one arrow from CLI ownership to operator ownership, th
 
 - [The kubectl-patched owner leaves `spec.owner` field-managed by `kubectl-patch`, not `opm-cli`] → the thin-editor apply force-applies the same value; the SSA integration proof (`tests/integration/ssa-ownership`) covers the co-owner case and stays.
 - [Removing a command on the alpha line surprises a user with a script] → `BREAKING CHANGE` footer in the commit, changelog entry, README no longer lists it.
-- [A comment mentioning handoff survives] → `grep -ri handoff` over non-history files as a final task; the allowed survivors are `CHANGELOG.md`, `docs/rfc/0007*`, `openspec/changes/archive/**`.
+- [A comment mentioning handoff survives] → `grep -ri handoff` over non-history files as a final task; the allowed survivors are `CHANGELOG.md`, `docs/rfc/0007*`, `openspec/changes/archive/**`, and `docs/comparisons/**` (uses the word in its generic English sense, not the command).
 
 ## Migration Plan
 

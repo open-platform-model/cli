@@ -52,9 +52,9 @@ type ModuleMetadata struct {
 // to ModuleInstance.spec.module, which the operator reads and passes straight
 // to the registry loader with no normalization of its own — and CUE rejects a
 // bare "0.1.0" as a malformed module version. A bare version therefore produces
-// a CR that the operator cannot resolve, and that `opm instance handoff` cannot
-// verify, which defeats the point of both actors sharing one record. The
-// operator's own CRD documents the v-prefixed form (`Example: "v0.2.1"`).
+// a CR that the operator cannot resolve, which defeats the point of both actors
+// sharing one record. The operator's own CRD documents the v-prefixed form
+// (`Example: "v0.2.1"`).
 func (m ModuleMetadata) CanonicalModuleRef() (path, version string) {
 	return m.ModulePath, ensureVPrefix(m.Version)
 }

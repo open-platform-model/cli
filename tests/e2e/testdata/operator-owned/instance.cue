@@ -1,16 +1,16 @@
-// Renderable instance fixture for the handoff/adoption e2e tests.
+// Renderable instance fixture for the operator-owned e2e tests.
 //
 // Unlike the identity-only fixtures elsewhere in the suite, this one actually
 // renders: it imports the podinfo module from the registry, so the resulting
 // ModuleInstance carries a registry-resolvable spec.module and a real render
-// digest. Both are preconditions for `opm instance handoff` — a locally-sourced
-// module is refused outright (0006 D38), and the digest gate needs something to
-// compare against.
+// digest — what the operator needs to reconcile it once the tests patch
+// spec.owner to "operator" (the thin-editor path refuses a locally-sourced
+// module, 0006 D38).
 //
 // Requires testing.opmodel.dev/modules/cli/podinfo@v0 v0.1.4 in the configured
 // registry. It is published to GHCR by .github/workflows/publish-fixtures.yml,
 // so the default registry mapping resolves it.
-package handoff_instance
+package operator_owned_instance
 
 import (
 	core "opmodel.dev/core@v2"
@@ -20,7 +20,7 @@ import (
 core.#ModuleInstance
 
 metadata: {
-	name:      "e2e-handoff"
+	name:      "e2e-operator-owned"
 	namespace: "default"
 }
 

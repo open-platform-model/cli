@@ -23,8 +23,8 @@ type Record struct {
 	ModuleVersion string
 
 	// SpecValues is the CR's spec.values block — the unified values the last
-	// apply consumed. The handoff verification render replays them against the
-	// registry-resolved module (enhancement 0006 D7.4/D38).
+	// apply consumed, recorded so a future ownership transfer can replay them
+	// against the registry-resolved module (enhancement 0006 D7.4/D38).
 	SpecValues map[string]any
 
 	// Prune is the CR's spec.prune marker, which governs whether the operator

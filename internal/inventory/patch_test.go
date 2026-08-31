@@ -71,10 +71,10 @@ func (r *applyPatchRecorder) specOf(t *testing.T) map[string]any {
 	return spec
 }
 
-// The ownership flip must carry the module reference and values alongside the
-// new owner. A document with only spec.owner releases opm-cli's claim on
-// spec.module — a required CRD field — and the API server rejects the whole
-// apply, so handoff would fail on every real cluster.
+// A spec write must carry the module reference and values alongside the owner.
+// A document with only spec.owner releases opm-cli's claim on spec.module — a
+// required CRD field — and the API server rejects the whole apply, so the write
+// would fail on every real cluster.
 func TestApplySpec_OwnershipFlipCarriesTheWholeOwnedSpec(t *testing.T) {
 	client, rec := newApplyPatchClient(t, 9)
 

@@ -89,7 +89,7 @@ The digest fields SHALL be operator-parity: `lastAppliedRenderDigest` computed o
 
 ### Requirement: Spec write contents
 
-On apply in CLI-executor mode, the CLI SHALL server-side-apply the CR spec with field manager `opm-cli`, containing: `spec.owner: cli`, `spec.module.path` and `spec.module.version` set to the module's declared identity **read verbatim from core-v2 metadata** — `spec.module.path` is `metadata.modulePath` as-is (the complete major-suffixed registry address; no composition from a parent prefix and a name), and `spec.module.version` is `metadata.version` normalized to the `v`-prefixed registry-tag form — and `spec.values` set to the single unified values blob that the render consumed. The pair applies for local-directory and locally-replaced module resolution as well; the CR MUST NOT contain a filesystem path. The declared pair is verified against fetched coordinates wherever it later meets a registry (handoff verification, operator acquire), not at write time.
+On apply in CLI-executor mode, the CLI SHALL server-side-apply the CR spec with field manager `opm-cli`, containing: `spec.owner: cli`, `spec.module.path` and `spec.module.version` set to the module's declared identity **read verbatim from core-v2 metadata** — `spec.module.path` is `metadata.modulePath` as-is (the complete major-suffixed registry address; no composition from a parent prefix and a name), and `spec.module.version` is `metadata.version` normalized to the `v`-prefixed registry-tag form — and `spec.values` set to the single unified values blob that the render consumed. The pair applies for local-directory and locally-replaced module resolution as well; the CR MUST NOT contain a filesystem path. The declared pair is verified against fetched coordinates wherever it later meets a registry (operator acquire; any future ownership transfer), not at write time.
 
 #### Scenario: Local-path apply writes the declared reference
 
@@ -131,7 +131,7 @@ The CLI SHALL populate `status.instanceUUID` from the rendered resources' `modul
 
 ### Requirement: Render provenance annotation
 
-When the applied render's module bytes did not come from pure registry resolution — the main module is a local directory, or the main module's `cue.mod/local-module.cue` contains any local-path `replaceWith` — the CLI SHALL include the annotation `module-instance.opmodel.dev/source: local` in its spec apply. When a later apply resolves fully from registries, the CLI SHALL omit the annotation so server-side apply removes it. The annotation is a fail-closed signal for the handoff pre-gate (slice C3); no CLI gate in this slice SHALL read it as an authority.
+When the applied render's module bytes did not come from pure registry resolution — the main module is a local directory, or the main module's `cue.mod/local-module.cue` contains any local-path `replaceWith` — the CLI SHALL include the annotation `module-instance.opmodel.dev/source: local` in its spec apply. When a later apply resolves fully from registries, the CLI SHALL omit the annotation so server-side apply removes it. The annotation is a fail-closed provenance signal: the thin-editor apply path refuses a module that resolves from local bytes, and any future transfer of an instance to operator ownership reads it as a refusal; no CLI-executor-mode gate SHALL read it as an authority.
 
 #### Scenario: Local render stamps the annotation
 

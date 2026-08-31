@@ -1,9 +1,9 @@
 # DEV-CLUSTER ONLY — extra RBAC for the opm-operator in kind-opm-dev.
 # Applied by: task cluster:operator
 # NOT applied by: opm operator install. An operator installed with the CLI
-# command alone is complete for every purpose except the handoff e2e tests,
-# whose applies fail with `cannot patch resource "services"` until this file is
-# applied; the tests probe for the grant up front and name this remedy.
+# command alone is complete for every purpose except the operator-owned e2e
+# tests, whose applies fail with `cannot patch resource "services"` until this
+# file is applied; the tests probe for the grant up front and name this remedy.
 #
 # Why this is needed: the shipped opm-operator-manager-role grants the operator
 # NO permissions on workload resources. By design it applies an instance's

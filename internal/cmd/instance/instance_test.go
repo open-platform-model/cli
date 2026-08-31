@@ -12,6 +12,23 @@ import (
 	"github.com/open-platform-model/cli/internal/config"
 )
 
+// The instance command surface is a published contract (README command table,
+// SemVer major on removal), so the set is asserted exhaustively: an added or
+// dropped subcommand must show up here deliberately. No ownership-transfer
+// command exists — spec.owner is set at creation and changed only outside the
+// CLI (inventory-ownership spec).
+func TestNewInstanceCmd_Subcommands(t *testing.T) {
+	cmd := NewInstanceCmd(&config.GlobalConfig{})
+	got := make([]string, 0, len(cmd.Commands()))
+	for _, c := range cmd.Commands() {
+		got = append(got, c.Name())
+	}
+	assert.ElementsMatch(t, []string{
+		"vet", "build", "apply", "diff",
+		"status", "tree", "events", "delete", "list",
+	}, got)
+}
+
 // --- 8.1 Unit tests for instance render commands ---
 
 func TestNewInstanceVetCmd(t *testing.T) {
@@ -106,28 +123,6 @@ func TestInstanceDelete_OperatorOwnedRoutesToDelegation(t *testing.T) {
 		inventory.ResolveOwnership(&inventory.Record{Owner: inventory.OwnerOperator, Name: "demo", Namespace: "apps"}))
 	assert.Equal(t, inventory.ModeCLIExecutor,
 		inventory.ResolveOwnership(&inventory.Record{Owner: inventory.OwnerCLI, Name: "demo", Namespace: "apps"}))
-}
-
-func TestNewInstanceHandoffCmd(t *testing.T) {
-	cmd := NewInstanceHandoffCmd(&config.GlobalConfig{})
-	assert.Equal(t, "handoff <name>", cmd.Use)
-	assert.NotEmpty(t, cmd.Short)
-	assert.NotNil(t, cmd.Flags().Lookup("namespace"), "--namespace/-n flag should be registered")
-	assert.NotNil(t, cmd.Flags().Lookup("timeout"), "--timeout flag should be registered")
-	assert.NotNil(t, cmd.Flags().Lookup("force"), "--force flag should be registered")
-
-	// Forward-only: no reverse mode exists on the command surface (0006 D16).
-	assert.Nil(t, cmd.Flags().Lookup("to"), "handoff must expose no reverse-direction flag")
-}
-
-func TestNewInstanceHandoffCmd_RejectsPlatformFlag(t *testing.T) {
-	cmd := NewInstanceHandoffCmd(&config.GlobalConfig{})
-	require.NoError(t, cmd.Flags().Set("platform", "./platform.cue"))
-
-	err := cmd.RunE(cmd, []string{"demo"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--platform")
-	assert.Contains(t, err.Error(), "cluster Platform")
 }
 
 func TestNewInstanceListCmd(t *testing.T) {

@@ -201,7 +201,7 @@ func resetOperatorCluster(t *testing.T, kubeconfig string) {
 // install onto a freshly reset cluster.
 // This test is DESTRUCTIVE: resetOperatorCluster deletes the CRDs, the
 // opm-operator-system Namespace, and every ModuleInstance, which tears down the
-// reconciling operator that the handoff/adoption tests require. Those tests
+// reconciling operator that the operator-owned tests require. Those tests
 // hard-fail without one, so the teardown is followed by a rebuild via
 // `task cluster:operator` — otherwise a full suite run would poison the next
 // one, and the failure would surface far from its cause.

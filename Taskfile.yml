@@ -203,7 +203,7 @@ tasks:
     desc: Install a reconciling operator into the kind cluster
     summary: |
       Brings up an opm-operator that can actually reconcile ModuleInstances,
-      which the handoff/adoption e2e tests require.
+      which the operator-owned e2e tests require.
 
       By default this needs no local registry. Everything the kind flow
       resolves — core, the catalogs, and this repo's own
