@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0-alpha.17](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.16...v1.0.0-alpha.17) (2026-08-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* **instance:** opm instance handoff is removed with no replacement; the CLI offers no path from CLI to operator ownership. Operator-owned instances are created outside the CLI (kubectl, GitOps) and edited through the thin-editor apply path. The ownership model, render digest, and provenance annotation are unchanged.
+
+### Features
+
+* **instance:** remove the handoff command ([#196](https://github.com/open-platform-model/cli/issues/196)) ([7ae153f](https://github.com/open-platform-model/cli/commit/7ae153f7bd169e6e41dae0ed3e467c0c5fc74195))
+
+
+### Bug Fixes
+
+* **deps:** operator v1.0.0-alpha.14 and platform seed on catalog 2.0.0 ([#191](https://github.com/open-platform-model/cli/issues/191)) ([ff3dd0c](https://github.com/open-platform-model/cli/commit/ff3dd0c91e1a99ecd9dba9a8ad3628bfaf119003))
+* **operator:** terminating guard on install and e2e applier precondition ([#193](https://github.com/open-platform-model/cli/issues/193)) ([ef714c7](https://github.com/open-platform-model/cli/commit/ef714c73ef99833020fa0ce52fb6fa181566817b))
+
 ## [1.0.0-alpha.16](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.15...v1.0.0-alpha.16) (2026-08-29)
 
 
