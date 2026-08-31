@@ -267,24 +267,6 @@ opm instance list --all-namespaces
 opm instance delete jellyfin -n default --force
 ```
 
-## Graduating to the Operator
-
-Everything above manages the instance directly from the CLI. To hand it to the
-operator so it is reconciled continuously instead:
-
-```bash
-opm operator install
-opm instance handoff jellyfin -n default
-```
-
-Handoff verifies the operator can take over safely before changing anything,
-and is forward-only — there is no reverse mode. Afterwards the CLI still edits
-the instance (`opm instance apply`), but the operator does the applying.
-
-See the "CLI-managed vs operator-managed instances" section of `README.md` for
-the full contract, the precondition chain, and how `spec.prune` governs what a
-delete actually removes.
-
 ## Cleanup
 
 Delete the kind cluster:

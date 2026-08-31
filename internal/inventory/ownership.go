@@ -2,7 +2,7 @@ package inventory
 
 // OwnershipMode is the CLI's execution mode for an instance, derived from the
 // ModuleInstance CR's spec.owner marker. It is the single branch point every
-// mutating command (apply, delete, handoff) consumes.
+// mutating command (apply, delete) consumes.
 type OwnershipMode int
 
 const (

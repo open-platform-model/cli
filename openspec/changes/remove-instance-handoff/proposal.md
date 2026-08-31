@@ -24,14 +24,14 @@ None.
 
 - `instance-handoff`: all five requirements removed (the capability is retired).
 - `inventory-ownership`: the single-branch-point requirement no longer lists `handoff` among the consumers of the ownership resolver.
-- `instance-inventory`: the render provenance annotation requirement names its consumer as the thin-editor path rather than the handoff pre-gate.
-- `e2e-cluster-preconditions`: the applier-grant requirement is scoped to tests that rely on the operator applying workloads; the "hands off" wording is removed.
+- `instance-inventory`: the render provenance annotation requirement names its consumer as the thin-editor path rather than the handoff pre-gate; the spec-write-contents requirement names later coordinate verification as operator acquire and any future ownership transfer rather than handoff verification.
+- `e2e-cluster-preconditions`: the applier-grant requirement is renamed ("before operator-owned tests") and scoped to tests that rely on the operator applying workloads; the "hands off" wording is removed.
 
 ## Impact
 
 - Commands: `instance handoff` removed. `instance apply`, `instance delete` unchanged in behavior.
 - Packages removed: `internal/workflow/handoff`, `internal/cmd/instance/handoff.go`, `internal/inventory/drift.go`.
 - Packages touched for comments only: `internal/inventory` (`cr.go`, `digest.go`, `record.go`, `ownership.go`), `internal/workflow/render/types.go`, `pkg/module/module.go`, `tests/integration/ssa-ownership`.
-- Tests: `internal/cmd/instance` (two command tests), `internal/inventory` (`drift_test.go`), `tests/e2e` (three tests removed, two re-based, file and fixture renamed). The fixture path is pinned by the workspace root `.tasks/deps/fixtures.sh`; that one line moves with the rename.
+- Tests: `internal/cmd/instance` (two command tests), `internal/inventory` (`drift_test.go`), `tests/e2e` (three tests removed, two re-based, file and fixture renamed). The fixture path is named in three workspace-root files that move with the rename: the `.tasks/deps/fixtures.sh` pin and path comment, the `deps:pins:fixtures` description in `.tasks/deps.yml`, and the root `CLAUDE.md`.
 - SemVer: MAJOR (a command is removed, constitution VI). The repo is on the `1.0.0-alpha` prerelease line (`versioning: prerelease`, `prerelease-type: alpha`), so the release stays inside that line; the commit carries a `BREAKING CHANGE` footer so the changelog says so.
 - No enhancement is implemented by this change; enhancement 0006 remains the record of what was built.

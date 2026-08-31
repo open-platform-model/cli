@@ -33,8 +33,8 @@ type Result struct {
 	// RenderDigest is the operator-parity render digest computed over the
 	// kernel-compiled resources (CUE-value serialization, operator sort
 	// order — see inventory.ComputeRenderDigest). Written verbatim to
-	// status.lastAppliedRenderDigest; the D7.4 handoff verification
-	// compares against it (0006 D9/D30).
+	// status.lastAppliedRenderDigest so a future ownership transfer has a
+	// recorded value to verify against (0006 D9/D30).
 	RenderDigest string
 
 	// Values is the single unified values blob the render consumed, decoded to

@@ -1,4 +1,4 @@
-module: "opmodel.dev/tests/handoff_instance@v0"
+module: "opmodel.dev/tests/operator_owned_instance@v0"
 language: {
 	version: "v0.17.0"
 }

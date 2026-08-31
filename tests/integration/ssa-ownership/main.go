@@ -16,14 +16,14 @@
 // shows the pruning. Hence this program.
 //
 // What it proves:
-//  1. A full-spec apply that changes only spec.owner preserves module + values
-//     (the handoff flip).
-//  2. Restating unchanged fields does not bump metadata.generation, so the
-//     post-flip reconcile wait cannot be fooled by a no-op re-apply.
+//  1. A full-spec apply that changes only spec.owner preserves module + values.
+//  2. Restating unchanged fields does not bump metadata.generation, so a
+//     reconcile wait keyed on the generation cannot be fooled by a no-op
+//     re-apply.
 //  3. A thin-editor apply that restates the operator's owner preserves it.
 //  4. A local render stamps the source-provenance annotation and a following
 //     registry render (which omits it) has it pruned by SSA — the fail-closed
-//     handoff gate input (0006 D38) that patch_test.go's fake client cannot
+//     provenance signal (0006 D38) that patch_test.go's fake client cannot
 //     model.
 //
 // Requires a running kind cluster at context "kind-opm-dev" with the
@@ -167,9 +167,9 @@ func main() {
 	check("re-applying with SourceLocal=false", err)
 	rec = mustGet(ctx, client)
 	requireTrue("provenance annotation removed by SSA after a registry render", !rec.SourceLocal)
-	fmt.Println("   OK: annotation cleared on omit — the fail-closed handoff gate reads a truthful provenance")
+	fmt.Println("   OK: annotation cleared on omit — the fail-closed provenance signal stays truthful")
 
-	fmt.Println("\nPASS: server-side-apply field ownership behaves as the handoff and thin-editor paths require")
+	fmt.Println("\nPASS: server-side-apply field ownership behaves as the ownership model requires")
 }
 
 func mustGet(ctx context.Context, client *kubernetes.Client) *inventory.Record {

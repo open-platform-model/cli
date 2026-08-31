@@ -53,8 +53,9 @@ const (
 const (
 	// AnnotationSource is the render-provenance annotation. Value SourceLocal
 	// signals the last apply's module bytes did not come from pure registry
-	// resolution. It is a fail-closed signal consumed by the handoff pre-gate
-	// (slice C3); no gate in this slice reads it as an authority.
+	// resolution. It is a fail-closed signal consumed by the thin-editor apply
+	// path, which refuses a module that resolves from local bytes; any future
+	// ownership transfer reads it as a refusal, never as an authority.
 	AnnotationSource = "module-instance.opmodel.dev/source"
 	// SourceLocal is the AnnotationSource value stamped for local renders.
 	SourceLocal = "local"

@@ -2,11 +2,11 @@
 # Applied by: task cluster:operator
 #
 # The subscription pin here MIRRORS internal/config/templates.go's
-# DefaultPlatformTemplate (and hack/platform.cue) on purpose. Handoff renders
-# against the cluster Platform (0006 D11) and so does apply (D21), while the
-# operator materializes this same document — if the pin drifted from the CLI's
-# local default, the two actors could resolve different catalog builds and the
-# D7.4 digest gate would compare renders that were never meant to match.
+# DefaultPlatformTemplate (and hack/platform.cue) on purpose. Apply renders
+# against the cluster Platform (0006 D11/D21), while the operator materializes
+# this same document — if the pin drifted from the CLI's local default, the two
+# actors could resolve different catalog builds and produce renders that were
+# never meant to match.
 apiVersion: opmodel.dev/v1alpha1
 kind: Platform
 metadata:
