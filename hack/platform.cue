@@ -15,8 +15,8 @@ name: "cluster"
 type: "kubernetes"
 
 registry: {
-	"opmodel.dev/catalogs/opm@v2": {
-		version: "2.0.0"
+	"opmodel.dev/catalogs/opm@v4": {
+		version: "4.0.1"
 	}
 	"opmodel.dev/catalogs/k8s@v1": {
 		version: "1.0.0-alpha.2"

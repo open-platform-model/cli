@@ -59,7 +59,7 @@ config: {
 // k8s@v1 split). The generated default platform subscribes to both, so each
 // path is spelled exactly once here.
 var DefaultCatalogPaths = []string{
-	"opmodel.dev/catalogs/opm@v2",
+	"opmodel.dev/catalogs/opm@v4",
 	"opmodel.dev/catalogs/k8s@v1",
 }
 
@@ -105,7 +105,7 @@ type: "kubernetes"
 // bump the versions by hand as catalog releases ship.
 registry: {
 	%q: {
-		version: "2.0.0"
+		version: "4.0.1"
 	}
 	%q: {
 		version: "1.0.0-alpha.2"

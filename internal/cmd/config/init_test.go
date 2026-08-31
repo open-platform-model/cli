@@ -146,7 +146,7 @@ func TestConfigInit_ConfigContent(t *testing.T) {
 	require.NoError(t, err)
 
 	platformStr := string(platformContent)
-	assert.Contains(t, platformStr, "opmodel.dev/catalogs/opm@v2")
+	assert.Contains(t, platformStr, "opmodel.dev/catalogs/opm@v4")
 	assert.Contains(t, platformStr, "opmodel.dev/catalogs/k8s@v1")
 	assert.Equal(t, 2, strings.Count(platformStr, "version:"), "exactly two registry entries, each with a concrete version")
 	assert.NotContains(t, platformStr, "opmodel.dev/catalogs/kubernetes")
