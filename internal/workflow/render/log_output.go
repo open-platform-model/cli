@@ -66,7 +66,7 @@ func writeVerboseMatchLog(result *Result) {
 	for _, p := range result.MatchPlan.NonMatchedPairs() {
 		l := matchLine{compName: p.ComponentName, tfFQN: p.TransformerFQN, matched: false}
 		// The kernel's match model matches on labels; per-FQN missing
-		// resource/trait diagnostics live in MatchPlan.Missing.
+		// resource/trait diagnostics live in MatchPlan.Unresolved.
 		l.missing.labels = p.MissingLabels
 		lines = append(lines, l)
 	}
