@@ -90,20 +90,52 @@ formats it. It also pins the current test inventory, so a test deleted alongside
 
 ## 4. Implementation
 
-- [ ] 4.1 Deferred to design. Do not start before sections 1 and 2 are committed:
-      without both baselines there is nothing to compare the new output against.
+Governed by the design's **full library reliance** constraint: no values
+loading, merging or validation logic remains on the CLI side. One commit per
+task.
+
+- [ ] 4.1 (D6) Replace `pkg/loader.LoadValuesFile` with `Kernel.LoadSourceFromFile`
+      at all four `-f` call sites; `unifyValuesFiles` becomes a `[]kernel.Source`
+      builder with no CUE operation in it. Delete `LoadValuesFile`, its tests, and the
+      four `unifyValuesFiles` tests in `render_test.go`.
+- [ ] 4.2 (D1, D2, D7) `internal/cmd/module/vet.go` calls
+      `k.ValidateConfigDetailed(mod.ConfigSchema(), sources)` directly and wraps the
+      returned tree in `&oerrors.ConfigError{...}` for display only. Delete the
+      `pkg/validate` package in full and the per-file `cue.Concrete(true)` loop at
+      `vet.go:127`.
+- [ ] 4.3 (D5) The render path calls `ValidateConfigDetailed` before
+      `ProcessModuleInstance` / `SynthesizeInstance`, passing the returned merged
+      value on unchanged.
+- [ ] 4.4 (D3) Correct the `proposal.md` sentence claiming `-f` files are
+      later-wins: declaration order is preserved, and conflicting concrete values
+      across files remain an error under unification.
+- [ ] 4.5 Constraint gate: `grep -rn "walkDisallowed\|appendSchemaErrors\|\.Unify(" internal/ pkg/`
+      returns no hit on the values path, and `grep -rn "cue/load" internal/ pkg/` shows
+      no values-file loader. Any hit means CLI-side logic survived and MUST be moved
+      into the kernel instead (see 5.5).
 
 ## 5. Verify the diff is the intended one
 
 - [ ] 5.1 `OUT_DIR=after ./capture.sh && diff -ru baseline after`. Every
       `components-*` case MUST be byte-identical. Every values case MUST differ only by
-      added file/line attribution: same exit code, same grouped shape, same message text.
+      added file/line attribution and the D7 acceptance change: same exit code, same
+      grouped shape, same message text.
 - [ ] 5.2 `OUT_DIR=after ./gotest.sh && diff -ru baseline/gotest after/gotest`.
-      Expected diffs, and nothing else: the four `unifyValuesFiles` tests gone from the
-      inventory, the 2.3 position column naming the contributing file per case, and any
-      new test added by section 4. An unexplained diff in `pkg/validate` or
-      `internal/cmdutil` means the change reached further than intended.
+      Expected diffs, and nothing else: the four `unifyValuesFiles` tests and the whole
+      `pkg/validate` package gone from the inventory, the 2.3 position column naming the
+      contributing file per case, and any new test added by section 4. An unexplained
+      diff in `internal/cmdutil` means the change reached further than intended.
 - [ ] 5.3 Extend `tests/e2e/vet_output_test.go` with the two-file conflict and two-file
       disallowed cases, asserting each contributing file's basename appears in the grouped
       output. Keep the existing flattened-shape anti-regression assertions.
 - [ ] 5.4 `task lint` and `task test` pass.
+- [ ] 5.5 **Escalation gate.** If 5.1 or 5.2 shows any case losing a diagnostic,
+      losing a position, or gaining a message a user cannot act on, that is a
+      **library defect, not a CLI one**. STOP. Do not reintroduce staging,
+      merging, or a second validation pass in the CLI to paper over it. Open or
+      extend a change in `library/openspec/changes/` for the missing kernel
+      behavior (a `Staged()` `ValidateOption`, or per-source attribution inside
+      the existing pass), land it, re-pin `github.com/open-platform-model/library`
+      in `go.mod`, and re-run sections 5.1 and 5.2 from the same baselines.
+      Record in `baseline/NOTES.md` which case forced the escalation and what
+      kernel change resolved it.
