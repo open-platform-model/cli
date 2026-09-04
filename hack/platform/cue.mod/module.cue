@@ -1,0 +1,18 @@
+module: "opmodel.dev/platforms/local@v0"
+language: {
+	version: "v0.17.0"
+}
+deps: {
+	"cue.dev/x/k8s.io@v0": {
+		v: "v0.10.0"
+	}
+	"opmodel.dev/catalogs/k8s@v1": {
+		v: "v1.0.0-alpha.2"
+	}
+	"opmodel.dev/catalogs/opm@v4": {
+		v: "v4.0.1"
+	}
+	"opmodel.dev/core@v2": {
+		v: "v2.0.0-alpha.7"
+	}
+}

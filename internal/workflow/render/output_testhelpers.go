@@ -7,7 +7,3 @@ func WriteTransformerMatchesForTest(result *Result) {
 func WriteVerboseMatchLogForTest(result *Result) {
 	writeVerboseMatchLog(result)
 }
-
-func FormatFQNListForTest(fqns []string) string {
-	return formatFQNList(fqns)
-}

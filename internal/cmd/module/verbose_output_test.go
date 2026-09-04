@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/open-platform-model/library/opm/kernel"
+
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/workflow/render"
 	"github.com/open-platform-model/cli/pkg/module"
-	"github.com/open-platform-model/library/opm/compile"
-	"github.com/open-platform-model/library/opm/kernel"
 )
 
 // buildTestResult constructs a minimal *render.Result suitable for
@@ -25,22 +25,9 @@ func buildTestResult() *render.Result {
 		Module: module.ModuleMetadata{
 			Version: "1.0.0",
 		},
-		Components: []compile.ComponentSummary{
-			{
-				Name:         "web",
-				Labels:       map[string]string{"core.opmodel.dev/workload-type": "stateless"},
-				ResourceFQNs: []string{"opmodel.dev/opm/v1alpha1/resources/workload/container@v1"},
-				TraitFQNs:    []string{"opmodel.dev/opm/v1alpha1/traits/network/expose@v1"},
-			},
-		},
-		MatchPlan: &kernel.MatchPlan{
-			Matches: map[string]map[string]compile.MatchResult{
-				"web": {
-					"test#DeploymentTransformer": {Matched: true},
-					"test#ServiceTransformer":    {Matched: true},
-				},
-			},
-			Unmatched: nil,
+		Pairs: []kernel.RenderPair{
+			{Component: "web", Transformer: "test#DeploymentTransformer"},
+			{Component: "web", Transformer: "test#ServiceTransformer"},
 		},
 		Resources: []*unstructured.Unstructured{
 			{Object: map[string]interface{}{
@@ -61,15 +48,11 @@ func buildTestResult() *render.Result {
 func TestVerboseOutput_TransformerMatches(t *testing.T) {
 	result := buildTestResult()
 
-	// Verify the MatchPlan has the expected structure.
-	assert.NotEmpty(t, result.MatchPlan.Matches, "should have at least one match")
-
-	// Verify matched pairs are correctly reported.
-	pairs := result.MatchPlan.MatchedPairs()
-	assert.Len(t, pairs, 2, "should have 2 matched pairs")
-	for _, p := range pairs {
-		assert.Equal(t, "web", p.ComponentName, "each pair should have component name")
-		assert.NotEmpty(t, p.TransformerFQN, "each pair should have transformer FQN")
+	// Verify the pair set has the expected structure.
+	assert.Len(t, result.Pairs, 2, "should have 2 matched pairs")
+	for _, p := range result.Pairs {
+		assert.Equal(t, "web", p.Component, "each pair should have component name")
+		assert.NotEmpty(t, p.Transformer, "each pair should have transformer FQN")
 	}
 
 	t.Run("default output shows compact matches", func(t *testing.T) {
@@ -89,7 +72,7 @@ func TestVerboseOutput_TransformerMatches(t *testing.T) {
 		assert.NotContains(t, got, "module", "default output should not contain module metadata header")
 	})
 
-	t.Run("verbose output shows component details and metadata", func(t *testing.T) {
+	t.Run("verbose output shows pairs, metadata and resources", func(t *testing.T) {
 		var buf bytes.Buffer
 		output.SetupLogging(output.LogConfig{Verbose: true})
 		output.SetLogWriter(&buf)
@@ -101,13 +84,12 @@ func TestVerboseOutput_TransformerMatches(t *testing.T) {
 		assert.Contains(t, outputStr, "instance", "verbose should contain instance metadata")
 		assert.Contains(t, outputStr, "namespace=default", "verbose should show namespace")
 		assert.Contains(t, outputStr, "version=1.0.0", "verbose should show version")
-		assert.Contains(t, outputStr, "component: web", "verbose should show component name")
-		assert.Contains(t, outputStr, "container", "verbose should show component resources")
-		assert.Contains(t, outputStr, "expose", "verbose should show component traits")
 
 		assert.Contains(t, outputStr, "▸", "should contain bullet")
 		assert.Contains(t, outputStr, "web", "should contain component")
 		assert.Contains(t, outputStr, "←", "should contain arrow")
+		assert.Contains(t, outputStr, "DeploymentTransformer")
+		assert.Contains(t, outputStr, "ServiceTransformer")
 
 		assert.Contains(t, outputStr, "r:", "verbose should contain resource lines")
 		assert.Contains(t, outputStr, "valid", "verbose should show resource status")

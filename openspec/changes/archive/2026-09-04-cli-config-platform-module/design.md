@@ -44,6 +44,7 @@ Command syntax is unchanged: `opm config init [--force]`, `opm config vet`. No n
 **Context**: D5 derives an entry's `version` from the imported catalog; two answers to one question is the shape D5 removed.
 **Decision**: the template's `cue.mod/module.cue` pins core + both catalogs; `platform.cue` entries are `{#catalog: <import>}` only. Template comments document the bump loop (edit pin, `opm config vet`).
 **Rationale**: byte-for-byte the D5 contract; the derived readout plus the key binding turn a wrong pin or wrong import into a build conflict vet surfaces.
+**As implemented**: the pins are Go literals (`DefaultCorePin`, `DefaultCatalogPins`, index-aligned with `DefaultCatalogPaths`) rendered into the embedded `cue.mod`, not a CUE string block; the root `platform-pins.sh` bumps each by its key comment, and the legacy data literal plus `spec_test.go` derive from the same values, so no second literal tracks them. Core is a hand-pinned literal because the library at this pin cannot supply its verified release; `cli-render-switch` may switch it to `schema.DefaultSchemaVersion()`.
 
 Template sketch (final import spellings verified against the published catalogs at implementation time — the catalog root package name is confirmed from the artifact, not assumed):
 

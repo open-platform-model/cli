@@ -15,17 +15,24 @@ import (
 	"github.com/open-platform-model/cli/internal/output"
 )
 
-// tempOpmDir writes a config.cue path (the file itself need not exist) and
-// optionally a sibling platform.cue, returning the config path.
+// tempOpmDir returns a config.cue path in a fresh OPM home (the file itself
+// need not exist) and optionally seeds the sibling platform/ module.
 func tempOpmDir(t *testing.T, withLocalPlatform bool) string {
 	t.Helper()
-	dir := t.TempDir()
-	configPath := filepath.Join(dir, "config.cue")
+	configPath := filepath.Join(t.TempDir(), "config.cue")
 	if withLocalPlatform {
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "platform.cue"),
-			[]byte(config.DefaultPlatformTemplate), 0o600))
+		require.NoError(t, config.WritePlatformModule(config.PlatformDir(configPath)))
 	}
 	return configPath
+}
+
+// platformModuleDir writes a minimal platform module (cue.mod/module.cue and
+// platform.cue) into a fresh directory and returns it.
+func platformModuleDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	require.NoError(t, config.WritePlatformModule(dir))
+	return dir
 }
 
 func clusterGetterReturning(spec map[string]any, name, unavailable string, err error) ClusterSpecGetter {
@@ -36,9 +43,7 @@ func clusterGetterReturning(spec map[string]any, name, unavailable string, err e
 
 func TestResolve_FlagWinsOverEverything(t *testing.T) {
 	configPath := tempOpmDir(t, true)
-	flagFile := writePlatformFile(t, `name: "override"
-type: "kubernetes"
-`)
+	flagDir := platformModuleDir(t)
 
 	clusterCalled := false
 	getter := func(context.Context) (map[string]any, string, string, error) {
@@ -46,43 +51,108 @@ type: "kubernetes"
 		return map[string]any{"type": "kubernetes"}, "cluster", "", nil
 	}
 
-	in, res, err := Resolve(context.Background(), ResolveOptions{
-		PlatformFlag: flagFile,
+	dir, res, err := Resolve(context.Background(), ResolveOptions{
+		PlatformFlag: flagDir,
 		ConfigPath:   configPath,
 		Cluster:      getter,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "override", in.Name)
-	assert.Equal(t, SourceFlagFile, res.Source)
-	assert.Equal(t, flagFile, res.Location)
+	assert.Equal(t, flagDir, dir)
+	assert.Equal(t, SourceFlagDir, res.Source)
+	assert.Equal(t, flagDir, res.Location)
+	assert.Equal(t, flagDir, res.Dir)
 	assert.False(t, clusterCalled, "flag override must not read the cluster")
 }
 
-func TestResolve_ClusterUsedWhenNoFlag(t *testing.T) {
+func TestResolve_FlagFileRefused(t *testing.T) {
+	configPath := tempOpmDir(t, true)
+	file := filepath.Join(t.TempDir(), "platform.cue")
+	require.NoError(t, os.WriteFile(file, []byte(`name: "x"`), 0o600))
+
+	_, _, err := Resolve(context.Background(), ResolveOptions{PlatformFlag: file, ConfigPath: configPath})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "is a file")
+	assert.Contains(t, err.Error(), "cue.mod/module.cue")
+	assert.Contains(t, err.Error(), "opm config init")
+}
+
+func TestResolve_FlagDirWithoutModuleRefused(t *testing.T) {
+	configPath := tempOpmDir(t, true)
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "platform.cue"), []byte("package platform\n"), 0o600))
+
+	_, _, err := Resolve(context.Background(), ResolveOptions{PlatformFlag: dir, ConfigPath: configPath})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not a platform module")
+	assert.Contains(t, err.Error(), "opm config init")
+}
+
+func TestResolve_FlagMissingRefused(t *testing.T) {
 	configPath := tempOpmDir(t, true)
 
-	in, res, err := Resolve(context.Background(), ResolveOptions{
+	_, _, err := Resolve(context.Background(), ResolveOptions{PlatformFlag: filepath.Join(t.TempDir(), "nope"), ConfigPath: configPath})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+}
+
+func TestResolve_ClusterGeneratesModuleUnderCache(t *testing.T) {
+	configPath := tempOpmDir(t, true)
+	src := fixtureGraph()
+
+	dir, res, err := Resolve(context.Background(), ResolveOptions{
 		ConfigPath: configPath,
 		Cluster: clusterGetterReturning(map[string]any{
 			"type": "kubernetes",
+			"registry": map[string]any{
+				"opmodel.dev/catalogs/opm@v4": map[string]any{"version": "4.0.1"},
+			},
+			"skewPolicy": "Refuse",
 		}, "cluster", "", nil),
+		ModFiles: src,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "cluster", in.Name)
 	assert.Equal(t, SourceClusterCR, res.Source)
+	assert.Equal(t, "cluster", res.Location)
+	assert.Equal(t, dir, res.Dir)
+	assert.Equal(t, "Refuse", res.SkewPolicy)
 	assert.Empty(t, res.Warning)
+	assert.Equal(t, config.PlatformCacheDir(configPath), filepath.Dir(dir), "the generated module lives in the OPM home cache")
+	_, err = os.Stat(filepath.Join(dir, "cue.mod", "module.cue"))
+	assert.NoError(t, err)
+	assert.Contains(t, res.Describe(), dir)
+}
+
+func TestResolve_LegacyClusterCRFailsAtGeneration(t *testing.T) {
+	configPath := tempOpmDir(t, true)
+	src := fixtureGraph()
+
+	_, _, err := Resolve(context.Background(), ResolveOptions{
+		ConfigPath: configPath,
+		Cluster: clusterGetterReturning(map[string]any{
+			"type": "kubernetes",
+			"registry": map[string]any{
+				"opmodel.dev/catalogs/opm": map[string]any{"filter": map[string]any{"range": ">=1.0.0-0"}},
+			},
+		}, "cluster", "", nil),
+		ModFiles: src,
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrEntryMissingVersion)
+	assert.Contains(t, err.Error(), "predate the scalar-version subscription shape")
+	assert.Empty(t, src.calls, "no registry access before the legacy-CR refusal")
 }
 
 func TestResolve_FallbackToLocalWarns(t *testing.T) {
 	configPath := tempOpmDir(t, true)
 
-	in, res, err := Resolve(context.Background(), ResolveOptions{
+	dir, res, err := Resolve(context.Background(), ResolveOptions{
 		ConfigPath: configPath,
 		Cluster:    clusterGetterReturning(nil, "", "no Platform CR in the cluster", nil),
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "cluster", in.Name) // template's seeded name
+	assert.Equal(t, config.PlatformDir(configPath), dir)
 	assert.Equal(t, SourceLocalDefault, res.Source)
+	assert.Equal(t, dir, res.Dir)
 	assert.NotEmpty(t, res.Warning, "cluster→local fallback must carry a warning")
 	assert.Contains(t, res.Warning, "no Platform CR in the cluster")
 }
@@ -127,27 +197,39 @@ func TestResolve_OfflineNeverReadsCluster(t *testing.T) {
 	// nil Cluster getter = offline command (build/render): local default only.
 	configPath := tempOpmDir(t, true)
 
-	in, res, err := Resolve(context.Background(), ResolveOptions{
+	dir, res, err := Resolve(context.Background(), ResolveOptions{
 		ConfigPath: configPath,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, SourceLocalDefault, res.Source)
-	assert.Equal(t, "cluster", in.Name)
+	assert.Equal(t, config.PlatformDir(configPath), dir)
 	assert.Empty(t, res.Warning, "offline local default is not a fallback")
 }
 
 func TestResolve_NoSourceAvailable(t *testing.T) {
-	configPath := tempOpmDir(t, false) // no local platform.cue
+	configPath := tempOpmDir(t, false) // no local platform/ module
 
 	_, _, err := Resolve(context.Background(), ResolveOptions{
 		ConfigPath: configPath,
 	})
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), config.PlatformDir(configPath))
 	assert.Contains(t, err.Error(), "opm config init")
 }
 
+func TestResolve_LocalDefaultMalformedRefused(t *testing.T) {
+	configPath := tempOpmDir(t, false)
+	dir := config.PlatformDir(configPath)
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "platform.cue"), []byte("package platform\n"), 0o600))
+
+	_, _, err := Resolve(context.Background(), ResolveOptions{ConfigPath: configPath})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not a platform module")
+}
+
 func TestResolution_Describe(t *testing.T) {
-	assert.Contains(t, Resolution{Source: SourceFlagFile, Location: "p.cue"}.Describe(), "--platform")
-	assert.Contains(t, Resolution{Source: SourceClusterCR, Location: "cluster"}.Describe(), "cluster Platform CR")
-	assert.Contains(t, Resolution{Source: SourceLocalDefault, Location: "x"}.Describe(), "local default")
+	assert.Equal(t, "platform: /p (--platform)", Resolution{Source: SourceFlagDir, Location: "/p", Dir: "/p"}.Describe())
+	assert.Equal(t, "platform: cluster Platform CR cluster (generated module /c/abc)", Resolution{Source: SourceClusterCR, Location: "cluster", Dir: "/c/abc"}.Describe())
+	assert.Equal(t, "platform: /home/x/.opm/platform (local default)", Resolution{Source: SourceLocalDefault, Location: "/home/x/.opm/platform", Dir: "/home/x/.opm/platform"}.Describe())
 }

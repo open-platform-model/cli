@@ -1,29 +1,42 @@
 package render
 
 import (
+	"bytes"
 	"testing"
 
-	"github.com/open-platform-model/cli/pkg/module"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/open-platform-model/library/opm/kernel"
+
+	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/pkg/module"
 )
 
-func TestWriteTransformerMatches_NilMatchPlan(t *testing.T) {
+func TestWriteTransformerMatches_NoPairs(t *testing.T) {
 	result := &Result{Instance: module.InstanceMetadata{Name: "test", Namespace: "default"}}
-	writeTransformerMatches(result)
+	assert.NotPanics(t, func() { writeTransformerMatches(result) })
 }
 
-func TestWriteVerboseMatchLog_NilMatchPlan(t *testing.T) {
+func TestWriteVerboseMatchLog_NoPairs(t *testing.T) {
 	result := &Result{Instance: module.InstanceMetadata{Name: "test", Namespace: "default"}}
-	writeVerboseMatchLog(result)
+	assert.NotPanics(t, func() { writeVerboseMatchLog(result) })
 }
 
-func TestFormatFQNList_Empty(t *testing.T) {
-	assert.Equal(t, "", formatFQNList(nil))
-	assert.Equal(t, "", formatFQNList([]string{}))
-}
+func TestWriteTransformerMatches_PrintsEachPair(t *testing.T) {
+	var buf bytes.Buffer
+	output.SetupLogging(output.LogConfig{})
+	output.SetLogWriter(&buf)
 
-func TestFormatFQNList_Single(t *testing.T) {
-	result := formatFQNList([]string{"example.com/resources/workload/container@v1"})
-	assert.NotEmpty(t, result)
-	assert.Contains(t, result, "container")
+	writeTransformerMatches(&Result{
+		Instance: module.InstanceMetadata{Name: "test", Namespace: "default"},
+		Pairs: []kernel.RenderPair{
+			{Component: "web", Transformer: "opmodel.dev/catalogs/opm@v4#DeploymentTransformer"},
+			{Component: "web", Transformer: "opmodel.dev/catalogs/opm@v4#ServiceTransformer"},
+		},
+	})
+
+	got := buf.String()
+	assert.Contains(t, got, "DeploymentTransformer")
+	assert.Contains(t, got, "ServiceTransformer")
+	assert.Contains(t, got, "web")
 }

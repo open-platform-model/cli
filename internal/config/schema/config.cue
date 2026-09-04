@@ -13,7 +13,7 @@ package schema
 //
 // The config file is scalar data only — no CUE imports, no providers
 // (retired by enhancement 0006 D39; catalog selection lives in the
-// sibling ~/.opm/platform.cue, see schema/platform.cue).
+// sibling platform module ~/.opm/platform/, 0019 D5).
 #Config: {
 	// registry is the default registry for CUE module resolution.
 	// Can be overridden by --registry flag or OPM_REGISTRY env var.
@@ -26,6 +26,15 @@ package schema
 
 	// log contains logging configuration.
 	log?: #LogConfig
+
+	// skewPolicy governs how a render responds when a module's cue.mod
+	// requires a newer build of an OPM-namespace path (core or a catalog)
+	// than the platform pins (enhancement 0019 D18).
+	// - "warn" (default): render against the platform's build and report the skew
+	// - "refuse": fail the render before evaluation
+	// Applies to the local default platform and --platform directories; when
+	// the cluster Platform CR is the source its spec.skewPolicy wins. No flag.
+	skewPolicy?: "warn" | "refuse"
 }
 
 // #KubernetesConfig contains Kubernetes-specific settings.

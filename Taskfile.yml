@@ -110,7 +110,7 @@ tasks:
       - go run tests/integration/migration/main.go
       - go run tests/integration/gates/main.go
       - go run tests/integration/ssa-ownership/main.go
-      - go run tests/integration/platform-materialize/main.go
+      - go run tests/integration/platform-build/main.go
       - go run tests/integration/render-parity/main.go
 
   test:e2e:

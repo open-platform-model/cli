@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -23,15 +24,20 @@ func NewConfigVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 Checks performed:
   1. Config file exists at resolved path
   2. Config file is valid CUE and matches the embedded schema
-  3. Platform file (when present) is valid, data-only, and matches
-     the platform schema
+  3. Platform module (when present) builds: its imports resolve, it is a
+     well-formed #Platform, and every #registry entry's key matches the
+     catalog it imports
 
-A missing platform.cue is noted but does not fail validation — it is
-only required when a render needs the local default platform.
+The platform check builds a real CUE module: on a cold module cache it
+fetches the pinned core and catalogs from the registry; on a warm cache
+it is offline. A missing platform/ directory is noted but does not fail
+validation — it is only required when a render needs the local default
+platform. A legacy data-only platform.cue fails validation: re-run
+'opm config init --force' to migrate.
 
 The config path is resolved using precedence:
   --config flag > OPM_CONFIG env > ~/.opm/config.cue
-The platform file is resolved as platform.cue next to the config file.
+The platform module is resolved as platform/ next to the config file.
 
 Examples:
   # Validate default configuration
@@ -40,7 +46,7 @@ Examples:
   # Validate custom config path
   opm config vet --config /path/to/config.cue`,
 		RunE: func(c *cobra.Command, args []string) error {
-			return runConfigVet(args, cfg)
+			return runConfigVet(c, args, cfg)
 		},
 		Annotations: map[string]string{
 			cmdutil.SkipConfigLoadAnnotation: "true",
@@ -50,7 +56,7 @@ Examples:
 	return c
 }
 
-func runConfigVet(_ []string, cfg *config.GlobalConfig) error {
+func runConfigVet(c *cobra.Command, _ []string, cfg *config.GlobalConfig) error {
 	// Resolve config path using precedence: cfg.Flags.Config > env > default
 	pathResult, err := config.ResolveConfigPath(config.ResolveConfigPathOptions{
 		FlagValue: cfg.Flags.Config,
@@ -100,20 +106,42 @@ func runConfigVet(_ []string, cfg *config.GlobalConfig) error {
 	}
 	output.Println(output.FormatVetCheck("Config schema validation passed", ""))
 
-	// Check 3: Platform file (sibling of the config file). Missing is a
-	// note, not a failure.
-	platformPath := config.PlatformFilePath(configPath)
-	if _, err := os.Stat(platformPath); os.IsNotExist(err) {
-		output.Println(output.FormatNotice("No local default platform configured (" + platformPath + " not found) — run 'opm config init' to seed one"))
+	// Check 3: Platform module (sibling platform/ of the config file). A
+	// leftover pre-0019 data file fails loudly; a missing module is a note,
+	// not a failure.
+	legacy := config.LegacyPlatformFilePath(configPath)
+	switch _, err := os.Stat(legacy); {
+	case err == nil:
+		return &opmexit.ExitError{
+			Code: opmexit.ExitValidationError,
+			Err: &oerrors.DetailError{
+				Type:     "validation failed",
+				Message:  "legacy data-only platform file found; the local default platform is a CUE module since 0019",
+				Location: legacy,
+				Hint:     "Run 'opm config init --force' to migrate to the platform module at " + config.PlatformDir(configPath),
+				Cause:    oerrors.ErrValidation,
+			},
+		}
+	case !os.IsNotExist(err):
+		// Anything but "absent" is reported as what it is, never mistaken
+		// for the legacy file being present.
+		return &opmexit.ExitError{
+			Code: opmexit.ExitGeneralError,
+			Err:  fmt.Errorf("checking for a legacy platform file at %s: %w", legacy, err),
+		}
+	}
+	platformDir := config.PlatformDir(configPath)
+	if _, err := os.Stat(platformDir); os.IsNotExist(err) {
+		output.Println(output.FormatNotice("No local default platform configured (" + platformDir + " not found) — run 'opm config init' to seed one"))
 		return nil
 	}
-	if err := config.ValidatePlatformFile(platformPath); err != nil {
+	if _, err := config.BuildPlatformModule(c.Context(), platformDir, temp.Registry); err != nil {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitValidationError,
 			Err:  err,
 		}
 	}
-	output.Println(output.FormatVetCheck("Platform file validation passed", platformPath))
+	output.Println(output.FormatVetCheck("Platform module builds", platformDir))
 
 	return nil
 }

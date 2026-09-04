@@ -34,29 +34,24 @@ The CLI SHALL resolve the platform for every render by precedence: `--platform <
 - **THEN** the CLI SHALL NOT attempt any cluster read for platform resolution
 - **AND** the platform SHALL come from `--platform` or the local default only
 
-### Requirement: Local platform file is a data-only CR-spec projection
+### Requirement: Local default platform is a CUE module
 
-`~/.opm/platform.cue` (and any `--platform <file>`) SHALL be a data-only CUE file with no imports, shaped as the Platform CR spec projection: `name`, `type`, and `registry` — a map from a **major-suffixed** catalog module path (`…@vN`) to a subscription with optional `enable` and required scalar `version` (bare SemVer naming exactly one catalog build). The filter vocabulary (`filter.range`/`allow`/`deny`) SHALL NOT be accepted. The CLI SHALL validate against the embedded projection schema and decode into `synth.PlatformInput`. One decode function SHALL serve all three sources (flag file, cluster CR spec, local default).
+The local default platform SHALL be a CUE module directory (`~/.opm/platform/`, sibling of the resolved config file so `--config`/`OPM_CONFIG` overrides move both together): a `cue.mod/module.cue` under the reserved-unpublished module path `opmodel.dev/platforms/local@v0` pinning core and every subscribed catalog, and a `platform.cue` embedding `core.#Platform` with one `#registry` entry per catalog carrying the catalog by import (0019 D5). The build a catalog entry materializes SHALL be named exactly once, as the module's `cue.mod` dependency; `platform.cue` SHALL carry no version scalars. Maintenance is editing `cue.mod` (by hand or `cue mod get`) and verifying with `opm config vet`; the CLI SHALL NOT require any other tool to keep the platform current.
 
-#### Scenario: Valid platform file decodes
+#### Scenario: The module is the resolution
 
-- **WHEN** `~/.opm/platform.cue` declares `name`, `type`, and a `registry` entry for `opmodel.dev/catalogs/opm@v2` with `version: "2.0.0-alpha.3"`
-- **THEN** decoding yields a `synth.PlatformInput` with that subscription's `Version` set
+- **WHEN** the platform module's `cue.mod` pins `opmodel.dev/catalogs/opm@v4` at `4.0.1` and a newer catalog is published
+- **THEN** the platform still evaluates catalog `4.0.1` bytes until the pin is edited, with no lockfile and no re-resolution
 
-#### Scenario: Filter shape rejected in files
+#### Scenario: Pin bump loop
 
-- **WHEN** a platform file carries a `filter:` block under a subscription
-- **THEN** validation fails naming the unknown field
+- **WHEN** a user edits the platform module's `cue.mod` to a newer published catalog build and runs `opm config vet`
+- **THEN** vet builds the module against the new pin and reports success, or fails naming the dependency when the pinned build does not exist
 
-#### Scenario: Major-free key rejected
+#### Scenario: Key-to-import drift refuses
 
-- **WHEN** a platform file's registry key carries no `@vN` suffix
-- **THEN** validation fails before any synthesis
-
-#### Scenario: Import-bearing platform file rejected
-
-- **WHEN** the platform file contains a CUE `import` declaration
-- **THEN** validation SHALL fail with an error stating the local platform file must be data-only
+- **WHEN** a `#registry` entry is keyed at one catalog path but embeds an import of a different catalog
+- **THEN** building the platform module fails with a conflict at a path naming that entry (the D5 binding), and vet surfaces it
 
 ### Requirement: Materialization mirrors the operator
 

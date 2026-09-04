@@ -14,6 +14,7 @@ import (
 
 	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
 	"github.com/open-platform-model/library/opm/helper/synth"
+	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
 	"github.com/open-platform-model/library/opm/schema"
 
@@ -23,7 +24,7 @@ import (
 )
 
 // FromModule synthesizes an instance from a module-package directory through
-// kernel SynthesizeInstance and renders it through the same compile path as
+// kernel SynthesizeInstance and renders it through the same render path as
 // FromInstanceFile (0006 D9; retires the CLI's synthetic-wrapper module and
 // the last #ModuleRelease application — 0002 carryover). Values come from
 // `-f` files when supplied, else from the module's `debugValues`.
@@ -73,7 +74,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	// always-local render provenance below).
 	warnLocalReplacement(moduleContextHasLocalReplacement(opts.ModulePath))
 
-	values, err := resolveModuleValues(k.CueContext(), modVal, opts.ValuesFiles)
+	values, err := resolveModuleValues(k, mod, opts.ValuesFiles)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
@@ -94,8 +95,8 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	// Platform resolution + materialization only after synthesis validated
-	// the values: cheap failures never hit the cluster or registry.
+	// Platform resolution + acquisition only after synthesis validated the
+	// values: cheap failures never hit the cluster or registry.
 	env, err := resolvePlatformEnv(ctx, k, opts.Config, opts.PlatformFlag, opts.ClusterPlatform)
 	if err != nil {
 		return nil, err
@@ -103,7 +104,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 
 	// A module apply always renders a local module directory (the main module is
 	// local), so render provenance is local (enhancement 0006 D7).
-	return compileInstance(ctx, env, inst, opts.K8sConfig, true)
+	return renderInstance(ctx, env, inst, opts.K8sConfig, true)
 }
 
 // defaultNamespace is the synthetic-instance namespace when no
@@ -180,13 +181,23 @@ func stageLocalModuleSource(dir string) (*module.Source, error) {
 }
 
 // resolveModuleValues mirrors `opm module vet`: -f files override debugValues.
-// The returned value is a single unified cue.Value (the kernel's synthesis
-// takes one values input).
-func resolveModuleValues(cueCtx *cue.Context, modVal cue.Value, valuesFiles []string) (cue.Value, error) {
+// The files are layered as kernel values sources through the kernel's
+// layered validation against the module's #config, so a conflict or a
+// violation is attributed to the file it came from; the returned value is
+// the single merged cue.Value the kernel's synthesis takes.
+func resolveModuleValues(k *kernel.Kernel, mod *module.Module, valuesFiles []string) (cue.Value, error) {
 	if len(valuesFiles) > 0 {
-		return unifyValuesFiles(cueCtx, valuesFiles)
+		sources, err := loadValuesSources(k, valuesFiles)
+		if err != nil {
+			return cue.Value{}, err
+		}
+		schemaVal := mod.ConfigSchema()
+		if !schemaVal.Exists() {
+			return cue.Value{}, fmt.Errorf("module does not define #config; values files cannot be validated")
+		}
+		return k.ValidateConfigDetailed(schemaVal, sources)
 	}
-	debugVal := modVal.LookupPath(schema.DebugValues)
+	debugVal := mod.Package.LookupPath(schema.DebugValues)
 	if !debugVal.Exists() {
 		return cue.Value{}, fmt.Errorf("module does not define debugValues - add debugValues or provide values with -f")
 	}

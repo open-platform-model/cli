@@ -39,3 +39,6 @@ Thumbs.db
 
 # Claude Code local-only settings
 .claude/settings.local.json
+
+# Generated cluster platform modules (opm home cache beside hack/opm-config.cue)
+hack/cache/

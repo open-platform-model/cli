@@ -454,3 +454,100 @@ config: {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "data-only")
 }
+
+func TestLoad_NoConfigFile_SkewPolicyDefaultsToWarn(t *testing.T) {
+	tmpHome := t.TempDir()
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", origHome)
+
+	os.Unsetenv("OPM_REGISTRY")
+	os.Unsetenv("OPM_CONFIG")
+
+	var cfg GlobalConfig
+	require.NoError(t, Load(&cfg, LoaderOptions{}))
+	assert.Equal(t, SkewPolicyWarn, cfg.SkewPolicy)
+}
+
+func TestLoadConfigFile_SkewPolicy(t *testing.T) {
+	// 0019 D18: absent means warn; the two allowed values are read verbatim.
+	tests := []struct {
+		name    string
+		content string
+		want    string
+	}{
+		{
+			name: "absent defaults to warn",
+			content: `package config
+
+config: {
+	registry: "localhost:5000"
+}
+`,
+			want: SkewPolicyWarn,
+		},
+		{
+			name: "explicit warn",
+			content: `package config
+
+config: {
+	skewPolicy: "warn"
+}
+`,
+			want: SkewPolicyWarn,
+		},
+		{
+			name: "explicit refuse",
+			content: `package config
+
+config: {
+	skewPolicy: "refuse"
+}
+`,
+			want: SkewPolicyRefuse,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			configPath := writeConfig(t, tt.content)
+
+			var cfg GlobalConfig
+			_, err := loadConfigFile(&cfg, configPath)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, cfg.SkewPolicy)
+		})
+	}
+}
+
+func TestLoadConfigFile_SkewPolicyInvalidValue(t *testing.T) {
+	// Any value outside the disjunction fails schema validation naming both
+	// allowed values, so the user sees the fix without opening the schema.
+	configPath := writeConfig(t, `package config
+
+config: {
+	skewPolicy: "strict"
+}
+`)
+
+	var cfg GlobalConfig
+	_, err := loadConfigFile(&cfg, configPath)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "schema validation failed")
+	assert.Contains(t, err.Error(), "skewPolicy")
+	assert.Contains(t, err.Error(), `"warn"`)
+	assert.Contains(t, err.Error(), `"refuse"`)
+	assert.Empty(t, cfg.SkewPolicy, "a rejected file must not populate the policy")
+}
+
+func TestLoadConfigFile_DefaultTemplateSkewPolicy(t *testing.T) {
+	// The generated template documents the key with its default, so a fresh
+	// config loads with the warn policy.
+	configPath := writeConfig(t, DefaultConfigTemplate)
+
+	var cfg GlobalConfig
+	_, err := loadConfigFile(&cfg, configPath)
+	require.NoError(t, err)
+	assert.Equal(t, SkewPolicyWarn, cfg.SkewPolicy)
+}

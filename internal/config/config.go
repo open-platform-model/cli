@@ -5,6 +5,17 @@ package config
 // It causes Kubernetes API deprecation warnings to be logged at WARN level.
 const APIWarningsWarn = "warn"
 
+// Skew policy values for GlobalConfig.SkewPolicy (enhancement 0019 D18):
+// the render's response when a module requires a newer build of an
+// OPM-namespace path than the platform pins.
+const (
+	// SkewPolicyWarn renders against the platform's build and reports the
+	// skew as a warning. The default when config.cue carries no skewPolicy.
+	SkewPolicyWarn = "warn"
+	// SkewPolicyRefuse fails the render before evaluation.
+	SkewPolicyRefuse = "refuse"
+)
+
 // KubernetesConfig contains Kubernetes-specific settings.
 type KubernetesConfig struct {
 	// Kubeconfig is the path to the kubeconfig file.
@@ -62,6 +73,12 @@ type GlobalConfig struct {
 
 	// Log contains logging-related settings from config file.
 	Log LogConfig
+
+	// SkewPolicy is the config file's skewPolicy (SkewPolicyWarn when
+	// absent). It governs renders against the local default platform and
+	// --platform directories; when the cluster Platform CR is the source,
+	// the CR's spec.skewPolicy takes precedence. There is no flag.
+	SkewPolicy string
 
 	// Registry is the resolved registry URL after applying precedence.
 	// Set by config.Load using flag > env > config precedence.
