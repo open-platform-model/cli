@@ -43,8 +43,9 @@ func NewCatalogRegistryCheckCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Use:   "check <path@version>",
 		Short: "Verify a published catalog out of band",
 		Long: `Pull a published catalog by path@version and run the same verification a
-consumer performs at materialize: the declared identity is concrete, and its
-modulePath and version agree with the coordinate the build was fetched by.
+consumer performs when a platform acquires it: the declared identity is
+concrete, and its modulePath and version agree with the coordinate the build
+was fetched by.
 The report lists the catalog's members per kind and apiVersion.
 
 	With --compat, additionally compare every beta/GA member against the last

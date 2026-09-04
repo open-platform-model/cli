@@ -71,11 +71,11 @@ func (r *CheckReport) Clean() bool { return len(r.Findings) == 0 }
 func (r *CheckReport) finding(f Refusal) { r.Findings = append(r.Findings, f) }
 
 // RegistryCheck pulls a published catalog by path@version and verifies, out
-// of band, what a consumer verifies at materialize (D7): the declared
-// identity is concrete and its modulePath/version agree with the coordinate
-// the build was fetched by — read from the pulled catalog's metadata, like
-// the library's materialize-time twin; a published catalog's identity package
-// is never evaluated as a package by any consumer. It reports the member
+// of band, what a consumer verifies when a platform acquires it (D7): the
+// declared identity is concrete and its modulePath/version agree with the
+// coordinate the build was fetched by — read from the pulled catalog's
+// metadata, like the platform build's key-to-import binding; a published
+// catalog's identity package is never evaluated as a package by any consumer. It reports the member
 // inventory per kind and apiVersion, and with Compat set it runs the
 // predecessor comparison for the fetched build.
 //

@@ -75,4 +75,4 @@ Lands after `cli-config-platform-module` on one branch train; released together 
 
 ## Open Questions
 
-- Whether verbose output keeps a pair listing (task 3.4 reads the printer and decides; either answer changes one struct field, no spec).
+None. Resolved at task 3.4: verbose output keeps the pair listing, so `Result.Pairs` (from `RenderDiagnostics.Pairs`) replaces `MatchPlan`; the component summaries (resource/trait FQNs, labels) and the skipped-pair debug lines are dropped, since the kernel's diagnostics carry neither and deriving them would mean navigating the instance value from Go.

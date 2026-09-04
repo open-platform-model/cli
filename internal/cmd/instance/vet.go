@@ -24,8 +24,9 @@ func NewInstanceVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Short: "Validate instance file without generating manifests",
 		Long: `Validate an OPM instance file via the render pipeline.
 
-This command loads an instance file, matches components to transformers, and
-validates the instance can be rendered successfully.
+This command loads an instance file and renders it through the library kernel
+(component matching and transformer execution happen inside that one build),
+so it validates the instance can be rendered successfully.
 No manifests are output — purely a pass/fail validation tool.
 
 Arguments:

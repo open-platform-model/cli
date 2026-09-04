@@ -11,8 +11,8 @@ import (
 // turns a loader refusal into a publish refusal carrying the loader's own
 // error. Publish must not judge a module loadable by any test the kernel
 // does not apply (enhancement 0011: publish never judges an artifact
-// differently from a consumer). Modules only: a catalog is materialized,
-// not loaded as a module.
+// differently from a consumer). Modules only: a catalog is acquired by a
+// platform's import, not loaded as a module.
 //
 // Skipped when an identity field is open or absent: those trees are already
 // refused (or filled by --version) by the identity gates, and the loader
