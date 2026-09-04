@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.0.0-alpha.19](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.18...v1.0.0-alpha.19) (2026-09-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **config:** opm config init writes ~/.opm/platform/ (cue.mod pinning core and both first-party catalogs, platform.cue importing them) instead of the data-only ~/.opm/platform.cue, and opm config vet builds that module through the kernel loader. A leftover platform.cue fails vet until 'opm config init --force' migrates it. The render path still reads the legacy file until cli-render-switch lands; both ship in one release train.
+
+### Features
+
+* **config:** seed the local default platform as a CUE module (0019 D5) ([#203](https://github.com/open-platform-model/cli/issues/203)) ([0263b4e](https://github.com/open-platform-model/cli/commit/0263b4e98254c141c63be09e04911cbdac87943c))
+
+
+### Bug Fixes
+
+* **deps:** bump library to v1.0.0-alpha.23 ([#199](https://github.com/open-platform-model/cli/issues/199)) ([e5deff7](https://github.com/open-platform-model/cli/commit/e5deff7561f4c05d6179623445a64e0a413bbbda))
+
 ## [1.0.0-alpha.18](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.17...v1.0.0-alpha.18) (2026-08-31)
 
 
