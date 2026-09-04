@@ -5,16 +5,18 @@
 // Renders the SAME module two ways and requires byte-identical render digests:
 //
 //	Path A — the CLI workflow (FromModule): local module directory, staged as
-//	         the build's main module, synthesized and compiled by the kernel.
+//	         the build's main module, synthesized and rendered by the kernel.
 //	Path B — the operator's call sequence: AcquireModuleFromRegistry +
-//	         SynthesizeInstance + Compile (mirroring KernelModuleRenderer),
+//	         SynthesizeInstance + Render (mirroring KernelModuleRenderer),
 //	         digested with the same inventory.ComputeRenderDigest.
 //
-// Both paths run with RuntimeName "opm-cli": the runtime identity is stamped
-// into rendered labels (app.kubernetes.io/managed-by), so a cross-actor
-// comparison with different runtime names differs by construction — the
-// per-actor label is the KNOWN delta, load-path equivalence is what this
-// check proves (local staging ≡ registry acquisition; D37/D6).
+// Both paths render through Kernel.Render against the same platform module
+// directory (the seeded local default) with RuntimeName "opm-cli": the
+// runtime identity is stamped into rendered labels
+// (app.kubernetes.io/managed-by), so a cross-actor comparison with different
+// runtime names differs by construction — the per-actor label is the KNOWN
+// delta, load-path equivalence is what this check proves (local staging ≡
+// registry acquisition; D37/D6).
 //
 // Requires: registry serving testing.opmodel.dev/modules/cli/podinfo@v0 at the
 // fixture's version, the catalogs, and core — SKIPs otherwise unless
@@ -32,13 +34,13 @@ import (
 
 	"cuelang.org/go/cue"
 
+	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
 	"github.com/open-platform-model/library/opm/helper/synth"
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/schema"
 
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/inventory"
-	"github.com/open-platform-model/cli/internal/platform"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
 	pkgcore "github.com/open-platform-model/cli/pkg/core"
 	"github.com/open-platform-model/cli/tests/fixtures"
@@ -97,7 +99,8 @@ func run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
-	// Seed a temp ~/.opm (config + default platform) for the CLI path.
+	// Seed a temp ~/.opm (config + default platform module) for the CLI path;
+	// path B acquires the same directory.
 	dir, err := os.MkdirTemp("", "opm-render-parity-*")
 	if err != nil {
 		return err
@@ -107,7 +110,8 @@ func run() error {
 	if err := os.WriteFile(configPath, []byte(config.DefaultConfigTemplate), 0o600); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "platform.cue"), []byte(platform.LegacyDefaultPlatformFile), 0o600); err != nil {
+	platformDir := config.PlatformDir(configPath)
+	if err := config.WritePlatformModule(platformDir); err != nil {
 		return err
 	}
 
@@ -132,14 +136,10 @@ func run() error {
 		kernel.WithSchemaLoader(schema.OCILoader{Registry: registry}),
 	)
 
-	// Resolve + materialize the same default platform through the shared path.
-	in, _, err := platform.Resolve(ctx, platform.ResolveOptions{ConfigPath: configPath})
+	// Acquire the same platform module directory the CLI path resolved.
+	plat, err := k.AcquirePlatformFromDir(ctx, platformDir, loaderfile.LoadOptions{Registry: registry})
 	if err != nil {
-		return err
-	}
-	mp, err := platform.Materialize(ctx, k, in)
-	if err != nil {
-		return skipOrFail("platform materialize failed: %v", err)
+		return skipOrFail("platform module build failed: %v", err)
 	}
 
 	mod, err := k.AcquireModuleFromRegistry(ctx, modulePath, moduleVersion)
@@ -163,13 +163,13 @@ func run() error {
 		return fmt.Errorf("operator-path synthesis: %w", err)
 	}
 
-	out, err := k.Compile(ctx, kernel.CompileInput{
-		ModuleInstance: inst,
-		Platform:       mp,
-		RuntimeName:    workflowrender.RuntimeName, // held constant — see file comment
+	out, err := k.Render(ctx, kernel.RenderInput{
+		Instance:    inst,
+		Platform:    plat,
+		RuntimeName: workflowrender.RuntimeName, // held constant — see file comment
 	})
 	if err != nil {
-		return fmt.Errorf("operator-path compile: %w", err)
+		return fmt.Errorf("operator-path render: %w", err)
 	}
 
 	resources := make([]*pkgcore.Resource, 0, len(out.Compiled))

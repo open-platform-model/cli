@@ -1,21 +1,21 @@
 //go:build ignore
 
-// Integration test for platform resolution + kernel materialization
-// (enhancement 0006 C2 Phase B, tasks 2.1/2.5).
+// Integration test for platform resolution + kernel acquisition
+// (enhancement 0006 C2 Phase B; 0019 D5 platform modules).
 //
-// Verifies the legacy data-only ~/.opm/platform.cue resolves (offline
-// precedence, D21) and materializes through the kernel's
-// SynthesizePlatform → Materialize chain (the operator's own ingestion
-// path) against the registry in OPM_REGISTRY.
+// Verifies the seeded local default platform module (~/.opm/platform/, what
+// `opm config init` writes) resolves offline (precedence source 3, D21),
+// builds through the kernel's shape-gated directory acquisition
+// (AcquirePlatformFromDir — the operator's own ingestion path) against the
+// registry in OPM_REGISTRY, and that every #registry entry's derived version
+// is the build the module's cue.mod pins.
 //
-// The default platform subscribes to the single first-party catalog
-// (opmodel.dev/catalogs/opm@v2) at a pinned version. When the
-// registry does not serve it, the test SKIPS unless
-// OPM_ITEST_PLATFORM_MATERIALIZE=1 forces a hard failure — CI registries
-// that only publish example modules stay green while a fully-populated
-// local registry exercises the real path.
+// The default platform subscribes to the first-party catalogs at pinned
+// versions. When the registry does not serve them, the test SKIPS unless
+// OPM_ITEST_PLATFORM_BUILD=1 forces a hard failure — CI registries that only
+// publish example modules stay green while GHCR exercises the real path.
 //
-// Run with: go run tests/integration/platform-materialize/main.go
+// Run with: go run tests/integration/platform-build/main.go
 package main
 
 import (
@@ -23,8 +23,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/config"
@@ -47,15 +49,9 @@ func run() error {
 		fmt.Println("SKIP: neither OPM_REGISTRY nor CUE_REGISTRY is set")
 		return nil
 	}
-	// The kernel's schema OCILoader resolves opmodel.dev/core@v2 against the
-	// process environment, not the kernel registry option — mirror the
-	// resolved registry into CUE_REGISTRY for the schema fetch.
-	if os.Getenv("CUE_REGISTRY") == "" {
-		os.Setenv("CUE_REGISTRY", registry)
-	}
 
 	// Seed a temp ~/.opm with the default templates (what config init writes).
-	dir, err := os.MkdirTemp("", "opm-platform-materialize-*")
+	dir, err := os.MkdirTemp("", "opm-platform-build-*")
 	if err != nil {
 		return err
 	}
@@ -65,7 +61,7 @@ func run() error {
 	if err := os.WriteFile(configPath, []byte(config.DefaultConfigTemplate), 0o600); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "platform.cue"), []byte(platform.LegacyDefaultPlatformFile), 0o600); err != nil {
+	if err := config.WritePlatformModule(config.PlatformDir(configPath)); err != nil {
 		return err
 	}
 
@@ -73,31 +69,58 @@ func run() error {
 	defer cancel()
 
 	// Offline resolution (nil Cluster getter): must land on the local default.
-	in, res, err := platform.Resolve(ctx, platform.ResolveOptions{ConfigPath: configPath})
+	platformDir, res, err := platform.Resolve(ctx, platform.ResolveOptions{ConfigPath: configPath, Registry: registry})
 	if err != nil {
 		return fmt.Errorf("resolving platform: %w", err)
 	}
 	if res.Source != platform.SourceLocalDefault {
 		return fmt.Errorf("expected local-default source, got %q", res.Source)
 	}
+	if platformDir != config.PlatformDir(configPath) {
+		return fmt.Errorf("expected the local default module directory, got %q", platformDir)
+	}
 	fmt.Println("resolved:", res.Describe())
 
 	k := kernel.New(kernel.WithRegistry(registry))
-	mp, err := platform.Materialize(ctx, k, in)
+	p, err := k.AcquirePlatformFromDir(ctx, platformDir, loaderfile.LoadOptions{Registry: registry})
 	if err != nil {
-		if os.Getenv("OPM_ITEST_PLATFORM_MATERIALIZE") == "1" {
-			return fmt.Errorf("materializing default platform: %w", err)
+		if os.Getenv("OPM_ITEST_PLATFORM_BUILD") == "1" {
+			return fmt.Errorf("building default platform: %w", err)
 		}
-		fmt.Printf("SKIP: default platform did not materialize against %s (catalogs not served?): %v\n", registry, err)
+		fmt.Printf("SKIP: default platform did not build against %s (catalogs not served?): %v\n", registry, err)
 		return nil
 	}
+	if p.Source == nil {
+		return fmt.Errorf("acquired platform carries no source")
+	}
 
-	if len(mp.Resolved) == 0 {
-		return fmt.Errorf("materialized platform resolved no subscriptions")
+	spec, err := platform.SpecFromPlatform(p)
+	if err != nil {
+		return fmt.Errorf("decoding seed spec from the built platform: %w", err)
 	}
-	for path, version := range mp.Resolved {
-		fmt.Printf("materialized subscription %s -> %s\n", path, version)
+	if len(spec.Entries) != len(config.DefaultCatalogPaths) {
+		return fmt.Errorf("expected %d registry entries, got %d", len(config.DefaultCatalogPaths), len(spec.Entries))
 	}
-	fmt.Println("PASS: platform-materialize")
+	for i, path := range config.DefaultCatalogPaths {
+		want := strings.TrimPrefix(config.DefaultCatalogPins[i], "v")
+		found := false
+		for _, e := range spec.Entries {
+			if e.Path != path {
+				continue
+			}
+			found = true
+			if e.Version != want {
+				return fmt.Errorf("entry %s: derived version %q, want the pinned %q", path, e.Version, want)
+			}
+			if !e.Enable {
+				return fmt.Errorf("entry %s: expected enabled", path)
+			}
+			fmt.Printf("built entry %s -> %s (enable=%t)\n", e.Path, e.Version, e.Enable)
+		}
+		if !found {
+			return fmt.Errorf("entry %s missing from the built platform", path)
+		}
+	}
+	fmt.Println("PASS: platform-build")
 	return nil
 }
