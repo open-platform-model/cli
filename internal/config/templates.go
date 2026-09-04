@@ -53,6 +53,14 @@ config: {
 			apiWarnings: "debug"
 		}
 	}
+
+	// skewPolicy decides what a render does when a module requires a newer
+	// build of core or a catalog than the platform pins.
+	// "warn"   - render against the platform's build and report the skew (default)
+	// "refuse" - fail the render before evaluation
+	// Applies to the local default platform and --platform directories; the
+	// cluster Platform's spec.skewPolicy wins when the cluster is the source.
+	skewPolicy: "warn"
 }
 `, DefaultRegistry)
 

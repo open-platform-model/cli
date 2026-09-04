@@ -26,6 +26,15 @@ package schema
 
 	// log contains logging configuration.
 	log?: #LogConfig
+
+	// skewPolicy governs how a render responds when a module's cue.mod
+	// requires a newer build of an OPM-namespace path (core or a catalog)
+	// than the platform pins (enhancement 0019 D18).
+	// - "warn" (default): render against the platform's build and report the skew
+	// - "refuse": fail the render before evaluation
+	// Applies to the local default platform and --platform directories; when
+	// the cluster Platform CR is the source its spec.skewPolicy wins. No flag.
+	skewPolicy?: "warn" | "refuse"
 }
 
 // #KubernetesConfig contains Kubernetes-specific settings.

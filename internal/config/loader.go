@@ -146,6 +146,11 @@ func loadConfigFile(cfg *GlobalConfig, configPath string) (string, error) {
 		cfg.Log.Kubernetes.APIWarnings = APIWarningsWarn
 	}
 
+	// Absent skewPolicy means warn (0019 D18).
+	if cfg.SkewPolicy == "" {
+		cfg.SkewPolicy = SkewPolicyWarn
+	}
+
 	// Extract the file's registry value for precedence resolution.
 	configValue := value.LookupPath(cue.ParsePath("config"))
 	if !configValue.Exists() {
@@ -177,43 +182,35 @@ func extractConfigInto(cfg *GlobalConfig, value cue.Value) {
 	}
 
 	// Extract kubernetes config
-	k8sValue := configValue.LookupPath(cue.ParsePath("kubernetes"))
-	if k8sValue.Exists() {
-		if kubeconfigVal := k8sValue.LookupPath(cue.ParsePath("kubeconfig")); kubeconfigVal.Exists() {
-			if str, err := kubeconfigVal.String(); err == nil {
-				cfg.Kubernetes.Kubeconfig = str
-			}
-		}
-		if contextVal := k8sValue.LookupPath(cue.ParsePath("context")); contextVal.Exists() {
-			if str, err := contextVal.String(); err == nil {
-				cfg.Kubernetes.Context = str
-			}
-		}
-		if namespaceVal := k8sValue.LookupPath(cue.ParsePath("namespace")); namespaceVal.Exists() {
-			if str, err := namespaceVal.String(); err == nil {
-				cfg.Kubernetes.Namespace = str
-			}
-		}
+	if k8sValue := configValue.LookupPath(cue.ParsePath("kubernetes")); k8sValue.Exists() {
+		setString(&cfg.Kubernetes.Kubeconfig, k8sValue, "kubeconfig")
+		setString(&cfg.Kubernetes.Context, k8sValue, "context")
+		setString(&cfg.Kubernetes.Namespace, k8sValue, "namespace")
 	}
 
+	// Extract skewPolicy (validated against the schema's disjunction already).
+	setString(&cfg.SkewPolicy, configValue, "skewPolicy")
+
 	// Extract log config
-	logValue := configValue.LookupPath(cue.ParsePath("log"))
-	if logValue.Exists() {
+	if logValue := configValue.LookupPath(cue.ParsePath("log")); logValue.Exists() {
 		if tsVal := logValue.LookupPath(cue.ParsePath("timestamps")); tsVal.Exists() {
 			if b, err := tsVal.Bool(); err == nil {
 				cfg.Log.Timestamps = &b
 			}
 		}
+		setString(&cfg.Log.Kubernetes.APIWarnings, logValue, "kubernetes.apiWarnings")
+	}
+}
 
-		// Extract log.kubernetes.apiWarnings
-		logK8sValue := logValue.LookupPath(cue.ParsePath("kubernetes"))
-		if logK8sValue.Exists() {
-			if apiWarningsVal := logK8sValue.LookupPath(cue.ParsePath("apiWarnings")); apiWarningsVal.Exists() {
-				if str, err := apiWarningsVal.String(); err == nil {
-					cfg.Log.Kubernetes.APIWarnings = str
-				}
-			}
-		}
+// setString stores the string at path under parent into dst when the field
+// exists and is a string; otherwise dst keeps its current (default) value.
+func setString(dst *string, parent cue.Value, path string) {
+	v := parent.LookupPath(cue.ParsePath(path))
+	if !v.Exists() {
+		return
+	}
+	if str, err := v.String(); err == nil {
+		*dst = str
 	}
 }
 
@@ -224,6 +221,7 @@ func applyDefaults(cfg *GlobalConfig) {
 		Namespace:  "default",
 	}
 	cfg.Log.Kubernetes.APIWarnings = APIWarningsWarn
+	cfg.SkewPolicy = SkewPolicyWarn
 }
 
 // validateConfigSchema validates the loaded CUE value against the embedded schema.
@@ -255,15 +253,18 @@ func validateConfigSchema(ctx *cue.Context, value cue.Value, configPath string) 
 	return nil
 }
 
-// removedFieldHint returns a migration hint when the validation error points
-// at a field removed by enhancement 0006 D39 (providers, cacheDir), and the
-// generic vet hint otherwise.
+// removedFieldHint returns a targeted hint when the validation error points
+// at a field removed by enhancement 0006 D39 (providers, cacheDir) or at a
+// closed-enum key whose CUE error elides the allowed values (skewPolicy),
+// and the generic vet hint otherwise.
 func removedFieldHint(errMsg string) string {
 	switch {
 	case strings.Contains(errMsg, "providers"):
 		return "The 'providers' field was removed — catalog selection now lives in the platform module ~/.opm/platform/. Re-run 'opm config init' (or delete the providers block and any ~/.opm/cue.mod/)"
 	case strings.Contains(errMsg, "cacheDir"):
 		return "The 'cacheDir' field was removed. Re-run 'opm config init' (or delete the field)"
+	case strings.Contains(errMsg, "skewPolicy"):
+		return fmt.Sprintf("skewPolicy must be %q or %q (default %q when omitted)", SkewPolicyWarn, SkewPolicyRefuse, SkewPolicyWarn)
 	default:
 		return "Check your config.cue against the expected schema. Run 'opm config vet' for validation."
 	}
