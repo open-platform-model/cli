@@ -142,7 +142,11 @@ func TestResolve_NoSourceAvailable(t *testing.T) {
 		ConfigPath: configPath,
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "opm config init")
+	// The remedy must be one that works on this release: `opm config init`
+	// writes the module form, which resolution does not read until
+	// cli-render-switch, so the hint names --platform instead.
+	assert.Contains(t, err.Error(), "--platform <file>")
+	assert.NotContains(t, err.Error(), "run 'opm config init'")
 }
 
 func TestResolution_Describe(t *testing.T) {

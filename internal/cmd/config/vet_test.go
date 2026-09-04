@@ -346,8 +346,8 @@ config: {
 }
 
 func TestConfigVet_CustomPathPlatformSibling(t *testing.T) {
-	// The platform file resolves as a sibling of the resolved config path,
-	// so --config/OPM_CONFIG overrides move both files together.
+	// The platform module resolves as the sibling platform/ of the resolved
+	// config path, so --config/OPM_CONFIG overrides move both together.
 	tmpHome := setTempHome(t)
 
 	customDir := filepath.Join(tmpHome, "custom")

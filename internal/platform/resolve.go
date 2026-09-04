@@ -107,7 +107,7 @@ func Resolve(ctx context.Context, opts ResolveOptions) (synth.PlatformInput, Res
 	localPath := config.LegacyPlatformFilePath(opts.ConfigPath)
 	if _, err := os.Stat(localPath); os.IsNotExist(err) {
 		return synth.PlatformInput{}, Resolution{}, fmt.Errorf(
-			"no platform source available: no --platform flag%s and %s does not exist — run 'opm config init' to seed a local default platform",
+			"no platform source available: no --platform flag%s and no local platform file at %s — pass --platform <file> (this release renders from a data-only platform file; the platform module 'opm config init' writes is consumed from the next release)",
 			clusterCloseParen(opts.Cluster != nil), localPath)
 	}
 	in, err := DecodeFile(localPath)

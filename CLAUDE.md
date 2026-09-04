@@ -105,11 +105,12 @@ Read when entering `cli/`:
 
 - Go version in `go.mod`: `1.26.0`.
 - **Schema line: OPM v2.** The CLI embeds the library on the core v2 line; the
-  platform surface is scalar subscriptions (`{enable?, version!}`, registry keys
-  carry the catalog's major suffix), and module identity is read verbatim from
-  core-v2 metadata (`metadata.modulePath` is the complete registry address). CUE
-  fixtures pin `opmodel.dev/core` `v2.0.0-alpha.6` and `opmodel.dev/catalogs/opm`
-  `v2.0.0`. The local default platform is a CUE module (0019 D5): `opm config
+  cluster Platform CR surface is scalar subscriptions (`{enable?, version!}`,
+  registry keys carry the catalog's major suffix; the render path still reads
+  that shape until `cli-render-switch`), and module identity is read verbatim
+  from core-v2 metadata (`metadata.modulePath` is the complete registry
+  address). CUE fixtures pin `opmodel.dev/core` `v2.0.0-alpha.6` and
+  `opmodel.dev/catalogs/opm` `v4.0.1`. The local default platform is a CUE module (0019 D5): `opm config
   init` writes `~/.opm/platform/` (`cue.mod/module.cue` pinning core and both
   first-party catalogs, `platform.cue` with one `#registry` entry per catalog
   carrying it by import; module path `opmodel.dev/platforms/local@v0`). The

@@ -115,7 +115,7 @@ type InstanceFileFlags struct {
 func (f *InstanceFileFlags) AddTo(cmd *cobra.Command) {
 	cmd.Flags().StringArrayVarP(&f.Values, "values", "f", nil,
 		"Additional values files (can be repeated; default: values.cue next to the instance file)")
-	// See ModuleFlags.AddTo: the directory form lands with cli-render-switch.
+	// See RenderFlags.AddTo: the directory form lands with cli-render-switch.
 	cmd.Flags().StringVar(&f.Platform, "platform", "",
 		"Path to a local platform file (overrides the cluster Platform and ~/.opm/platform.cue)")
 }

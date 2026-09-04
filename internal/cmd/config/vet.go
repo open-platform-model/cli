@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -108,7 +109,9 @@ func runConfigVet(c *cobra.Command, _ []string, cfg *config.GlobalConfig) error 
 	// Check 3: Platform module (sibling platform/ of the config file). A
 	// leftover pre-0019 data file fails loudly; a missing module is a note,
 	// not a failure.
-	if legacy := config.LegacyPlatformFilePath(configPath); fileExists(legacy) {
+	legacy := config.LegacyPlatformFilePath(configPath)
+	switch _, err := os.Stat(legacy); {
+	case err == nil:
 		return &opmexit.ExitError{
 			Code: opmexit.ExitValidationError,
 			Err: &oerrors.DetailError{
@@ -118,6 +121,13 @@ func runConfigVet(c *cobra.Command, _ []string, cfg *config.GlobalConfig) error 
 				Hint:     "Run 'opm config init --force' to migrate to the platform module at " + config.PlatformDir(configPath),
 				Cause:    oerrors.ErrValidation,
 			},
+		}
+	case !os.IsNotExist(err):
+		// Anything but "absent" is reported as what it is, never mistaken
+		// for the legacy file being present.
+		return &opmexit.ExitError{
+			Code: opmexit.ExitGeneralError,
+			Err:  fmt.Errorf("checking for a legacy platform file at %s: %w", legacy, err),
 		}
 	}
 	platformDir := config.PlatformDir(configPath)
@@ -134,11 +144,4 @@ func runConfigVet(c *cobra.Command, _ []string, cfg *config.GlobalConfig) error 
 	output.Println(output.FormatVetCheck("Platform module builds", platformDir))
 
 	return nil
-}
-
-// fileExists reports whether path exists (any kind); errors other than
-// not-exist count as present so a later read surfaces them.
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
 }

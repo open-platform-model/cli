@@ -22,10 +22,9 @@ import (
 	"github.com/open-platform-model/cli/internal/config"
 )
 
-// wireSpec is the shared wire shape of a platform spec: the data-only
-// ~/.opm/platform.cue projection and the Platform CR's spec are the same
-// document (the file additionally carries name, which the CR keeps in
-// metadata.name).
+// wireSpec is the shared wire shape of a platform spec: the legacy data-only
+// platform.cue projection and the Platform CR's spec are the same document
+// (the file additionally carries name, which the CR keeps in metadata.name).
 type wireSpec struct {
 	Name     string                      `json:"name,omitempty"`
 	Type     string                      `json:"type"`
