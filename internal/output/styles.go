@@ -166,15 +166,6 @@ func FormatEventResource(kind, name string) string {
 	return StyleNoun(kind + "/" + name)
 }
 
-// FormatFQN formats a fully qualified name for display by replacing the
-// first "#" (provider#path separator) with " - " for readability.
-// Any "#" inside the path is preserved.
-//
-// Example: "kubernetes#deployment-transformer" → "kubernetes - deployment-transformer"
-func FormatFQN(fqn string) string {
-	return strings.Replace(fqn, "#", " - ", 1)
-}
-
 // styledFQN renders a fully-qualified transformer path with the transformer
 // name highlighted in the noun style (cyan) and the surrounding path dim.
 //
@@ -221,30 +212,6 @@ func FormatTransformerMatch(component, fqn string) string {
 	comp := styleNoun.Render(component)
 	arrow := styleDim.Render("←")
 	return bullet + " " + comp + " " + arrow + " " + styledFQN(fqn)
-}
-
-// FormatTransformerSkipped renders a non-matching transformer line for debug output.
-//
-// Format: ✗ <component> ↛ <provider> - <fqn>
-//
-// The cross and component name are dim. The arrow and FQN are dim.
-// Use with Debug-level logging and structured key-value pairs for the reasons.
-func FormatTransformerSkipped(component, fqn string) string {
-	cross := styleDim.Render("✗")
-	comp := styleDim.Render(component)
-	arrow := styleDim.Render("↛")
-	return cross + " " + comp + " " + arrow + " " + styledFQN(fqn)
-}
-
-// FormatTransformerUnmatched renders an unmatched component line.
-//
-// Format: ▸ <component> (no matching transformer)
-//
-// The bullet is yellow. The component name is unstyled. The parenthetical is dim.
-func FormatTransformerUnmatched(component string) string {
-	bullet := lipgloss.NewStyle().Foreground(ColorYellow).Render("▸")
-	detail := styleDim.Render("(no matching transformer)")
-	return bullet + " " + component + " " + detail
 }
 
 // vetCheckColumnWidth is the alignment column for detail text in FormatVetCheck.
