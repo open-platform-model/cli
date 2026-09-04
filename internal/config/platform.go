@@ -9,10 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
-	"cuelang.org/go/cue/cuecontext"
-	"cuelang.org/go/cue/parser"
 
 	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
 	"github.com/open-platform-model/library/opm/kernel"
@@ -25,10 +22,6 @@ import (
 // build failures.
 const platformModuleErrType = "platform module error"
 
-// platformFileErrType is the DetailError type used for legacy platform file
-// parse/validation failures.
-const platformFileErrType = "platform file error"
-
 // PlatformDir returns the platform module directory that is sibling to the
 // given (resolved) config file path, so --config/OPM_CONFIG overrides move
 // both together (enhancement 0019 D5: the local default platform is a CUE
@@ -37,11 +30,19 @@ func PlatformDir(configPath string) string {
 	return filepath.Join(filepath.Dir(configPath), PlatformDirName)
 }
 
+// PlatformCacheDir returns the directory generated platform modules are
+// cached under: cache/platforms beside the config file, so --config/OPM_CONFIG
+// overrides move it together with the platform module. A cluster Platform CR
+// is generated into <PlatformCacheDir>/<content-hash>/ before a render
+// acquires it. Derived state: safe to delete at any time.
+func PlatformCacheDir(configPath string) string {
+	return filepath.Join(filepath.Dir(configPath), "cache", "platforms")
+}
+
 // LegacyPlatformFilePath returns the path the pre-0019 data-only platform
 // file lived at: platform.cue beside the config file. It exists for
-// migration checks (`opm config vet` fails on it, `opm config init` removes
-// it) and for the render path until cli-render-switch moves resolution onto
-// the module directory.
+// migration checks only (`opm config vet` fails on it, `opm config init`
+// removes it); nothing reads the file.
 func LegacyPlatformFilePath(configPath string) string {
 	return filepath.Join(filepath.Dir(configPath), "platform.cue")
 }
@@ -131,85 +132,9 @@ func platformBuildHint(dir string, err error) string {
 	}
 }
 
-// LoadLegacyPlatformFile parses and validates a pre-0019 data-only platform
-// file at path against the embedded #PlatformFile projection schema and
-// returns the compiled value. The file MUST be data-only: any CUE import
-// declaration is rejected (enhancement 0006 D39).
-//
-// Retained only for the render path's --platform <file> and local-default
-// sources until cli-render-switch moves resolution onto platform module
-// directories; that change deletes it together with schema/platform.cue.
-// `opm config init` no longer writes this shape and `opm config vet`
-// refuses it.
-//
-// The caller decides how a missing file is handled; the os.Stat error is
-// returned untouched when the file does not exist.
-func LoadLegacyPlatformFile(path string) (cue.Value, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return cue.Value{}, err
-	}
-
-	// Reject imports before evaluation: the legacy platform file is data
-	// only. Parsing is cheap and gives a precise, early error.
-	astFile, err := parser.ParseFile(path, content)
-	if err != nil {
-		return cue.Value{}, &oerrors.DetailError{
-			Type:     platformFileErrType,
-			Message:  err.Error(),
-			Location: path,
-			Hint:     "Fix the CUE syntax, or migrate to the platform module with 'opm config init --force'",
-			Cause:    oerrors.ErrValidation,
-		}
-	}
-	if fileHasImports(astFile) {
-		return cue.Value{}, &oerrors.DetailError{
-			Type:     platformFileErrType,
-			Message:  "the legacy platform file must be data-only — CUE imports are not allowed",
-			Location: path,
-			Hint:     "A platform with imports is a module: point --platform at a platform module directory, or migrate with 'opm config init --force'",
-			Cause:    oerrors.ErrValidation,
-		}
-	}
-
-	ctx := cuecontext.New()
-	value := ctx.CompileBytes(content, cue.Filename(path))
-	if value.Err() != nil {
-		return cue.Value{}, &oerrors.DetailError{
-			Type:     platformFileErrType,
-			Message:  value.Err().Error(),
-			Location: path,
-			Hint:     "Fix the CUE errors, or migrate to the platform module with 'opm config init --force'",
-			Cause:    oerrors.ErrValidation,
-		}
-	}
-
-	schema := ctx.CompileBytes(platformSchemaCUE, cue.Filename("schema/platform.cue"))
-	if schema.Err() != nil {
-		return cue.Value{}, fmt.Errorf("compiling embedded platform schema: %w", schema.Err())
-	}
-	def := schema.LookupPath(cue.ParsePath("#PlatformFile"))
-	if !def.Exists() {
-		return cue.Value{}, fmt.Errorf("embedded schema missing #PlatformFile definition")
-	}
-
-	unified := def.Unify(value)
-	if err := unified.Validate(cue.Concrete(true)); err != nil {
-		return cue.Value{}, &oerrors.DetailError{
-			Type:     "platform schema validation failed",
-			Message:  err.Error(),
-			Location: path,
-			Hint:     "Check the platform file against the expected shape (name, type, registry subscriptions)",
-			Cause:    oerrors.ErrValidation,
-		}
-	}
-
-	return value, nil
-}
-
 // fileHasImports reports whether the parsed CUE file contains any import
-// declaration. Shared by the config loader and the legacy platform file
-// loader: both are data-only by contract (enhancement 0006 D39).
+// declaration. The config file is data-only by contract (enhancement 0006
+// D39).
 func fileHasImports(f *ast.File) bool {
 	for _, decl := range f.Decls {
 		if _, ok := decl.(*ast.ImportDecl); ok {

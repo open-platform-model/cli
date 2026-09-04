@@ -1,148 +1,57 @@
 package platform
 
 import (
-	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/open-platform-model/library/opm/helper/synth"
-
-	"github.com/open-platform-model/cli/internal/config"
 )
 
-// writePlatformFile writes content as platform.cue in a fresh temp dir and
-// returns its path.
-func writePlatformFile(t *testing.T, content string) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "platform.cue")
-	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
-	return path
-}
-
-func TestDecodeFile_LegacyDefault(t *testing.T) {
-	// The legacy data file must decode into a full PlatformInput pinning
-	// the same builds the seeded platform module pins.
-	path := writePlatformFile(t, LegacyDefaultPlatformFile)
-
-	in, err := DecodeFile(path)
-	require.NoError(t, err)
-
-	assert.Equal(t, "cluster", in.Name)
-	assert.Equal(t, "kubernetes", in.Type)
-	require.Len(t, in.Subscriptions, 2)
-
-	opm, ok := in.Subscriptions["opmodel.dev/catalogs/opm@v4"]
-	require.True(t, ok)
-	assert.Nil(t, opm.Enable, "omitted enable defers to the schema default")
-	assert.Equal(t, strings.TrimPrefix(config.DefaultCatalogPins[0], "v"), opm.Version)
-
-	k8s, ok := in.Subscriptions["opmodel.dev/catalogs/k8s@v1"]
-	require.True(t, ok)
-	assert.Nil(t, k8s.Enable, "omitted enable defers to the schema default")
-	assert.Equal(t, strings.TrimPrefix(config.DefaultCatalogPins[1], "v"), k8s.Version)
-}
-
-func TestDecodeFile_ExplicitEnableAndVersion(t *testing.T) {
-	path := writePlatformFile(t, `name: "cluster"
-type: "kubernetes"
-registry: {
-	"opmodel.dev/catalogs/opm@v2": {
-		enable:  false
-		version: "2.0.0-alpha.3"
-	}
-}
-`)
-
-	in, err := DecodeFile(path)
-	require.NoError(t, err)
-
-	sub := in.Subscriptions["opmodel.dev/catalogs/opm@v2"]
-	require.NotNil(t, sub.Enable)
-	assert.False(t, *sub.Enable)
-	assert.Equal(t, "2.0.0-alpha.3", sub.Version)
-}
-
-func TestDecodeFile_InvalidFileRejected(t *testing.T) {
-	path := writePlatformFile(t, `type: "kubernetes"
-`)
-	_, err := DecodeFile(path)
-	require.Error(t, err, "missing required name must fail schema validation")
-}
-
-func TestDecodeFile_FilterShapeRejected(t *testing.T) {
-	// The retired filter vocabulary is not accepted in files.
-	path := writePlatformFile(t, `name: "cluster"
-type: "kubernetes"
-registry: {
-	"opmodel.dev/catalogs/opm@v2": {
-		version: "2.0.0-alpha.3"
-		filter: range: ">=1.0.0-0 <2.0.0-0"
-	}
-}
-`)
-	_, err := DecodeFile(path)
-	require.Error(t, err, "a filter block must fail schema validation")
-}
-
-func TestDecodeFile_MissingVersionRejected(t *testing.T) {
-	path := writePlatformFile(t, `name: "cluster"
-type: "kubernetes"
-registry: {
-	"opmodel.dev/catalogs/opm@v2": {
-		enable: true
-	}
-}
-`)
-	_, err := DecodeFile(path)
-	require.Error(t, err, "a subscription without version must fail schema validation")
-}
-
-func TestDecodeFile_MajorFreeKeyRejected(t *testing.T) {
-	path := writePlatformFile(t, `name: "cluster"
-type: "kubernetes"
-registry: {
-	"opmodel.dev/catalogs/opm": {
-		version: "2.0.0-alpha.3"
-	}
-}
-`)
-	_, err := DecodeFile(path)
-	require.Error(t, err, "a registry key without the @vN suffix must fail schema validation")
-}
-
-func TestDecodeCRSpec_RoundTripsWireShape(t *testing.T) {
-	// The CR spec is the same wire shape the file uses.
+func TestDecodeCRSpec_DecodesWireShape(t *testing.T) {
 	spec := map[string]any{
 		"type": "kubernetes",
 		"registry": map[string]any{
-			"opmodel.dev/catalogs/opm@v2": map[string]any{
+			"opmodel.dev/catalogs/opm@v4": map[string]any{
 				"enable":  true,
-				"version": "2.0.0-alpha.3",
+				"version": "4.0.1",
+			},
+			"opmodel.dev/catalogs/k8s@v1": map[string]any{
+				"enable":  false,
+				"version": "1.0.0-alpha.2",
 			},
 		},
+		"skewPolicy": "Refuse",
 	}
 
-	in, err := DecodeCRSpec(spec, "cluster")
+	s, err := DecodeCRSpec(spec, "cluster")
 	require.NoError(t, err)
 
-	assert.Equal(t, "cluster", in.Name)
-	assert.Equal(t, "kubernetes", in.Type)
-	sub := in.Subscriptions["opmodel.dev/catalogs/opm@v2"]
-	require.NotNil(t, sub.Enable)
-	assert.True(t, *sub.Enable)
-	assert.Equal(t, "2.0.0-alpha.3", sub.Version)
+	assert.Equal(t, "cluster", s.Name)
+	assert.Equal(t, "kubernetes", s.Type)
+	assert.Equal(t, "Refuse", s.SkewPolicy)
+	require.Equal(t, []Entry{
+		{Path: "opmodel.dev/catalogs/k8s@v1", Version: "1.0.0-alpha.2", Enable: false},
+		{Path: "opmodel.dev/catalogs/opm@v4", Version: "4.0.1", Enable: true},
+	}, s.Entries, "entries are sorted by path")
+}
+
+func TestDecodeCRSpec_OmittedEnableIsTrue(t *testing.T) {
+	s, err := DecodeCRSpec(map[string]any{
+		"type": "kubernetes",
+		"registry": map[string]any{
+			"opmodel.dev/catalogs/opm@v4": map[string]any{"version": "4.0.1"},
+		},
+	}, "cluster")
+	require.NoError(t, err)
+	require.Len(t, s.Entries, 1)
+	assert.True(t, s.Entries[0].Enable, "a nil enable resolves to the schema default")
+	assert.Empty(t, s.SkewPolicy)
 }
 
 func TestDecodeCRSpec_LegacyFilterCRTolerated(t *testing.T) {
 	// A stored CR from before the scalar-version shape carries filter and no
 	// version. Decode must succeed (read tolerance is permanent); the empty
-	// version passes through to fail only at synthesis.
+	// version passes through to fail only at generation.
 	spec := map[string]any{
 		"type": "kubernetes",
 		"registry": map[string]any{
@@ -152,12 +61,11 @@ func TestDecodeCRSpec_LegacyFilterCRTolerated(t *testing.T) {
 		},
 	}
 
-	in, err := DecodeCRSpec(spec, "cluster")
+	s, err := DecodeCRSpec(spec, "cluster")
 	require.NoError(t, err, "legacy filter-shaped CRs must decode")
-
-	sub, ok := in.Subscriptions["opmodel.dev/catalogs/opm"]
-	require.True(t, ok)
-	assert.Empty(t, sub.Version, "missing version decodes empty and fails at synthesis")
+	require.Len(t, s.Entries, 1)
+	assert.Equal(t, "opmodel.dev/catalogs/opm", s.Entries[0].Path)
+	assert.Empty(t, s.Entries[0].Version, "missing version decodes empty and fails at generation")
 }
 
 func TestDecodeCRSpec_MissingType(t *testing.T) {
@@ -166,32 +74,25 @@ func TestDecodeCRSpec_MissingType(t *testing.T) {
 	assert.Contains(t, err.Error(), "spec.type")
 }
 
-func TestWrapClusterMaterializeError_LegacyCRHint(t *testing.T) {
-	// The kernel's missing-version refusal (what an empty Version from a
-	// legacy CR fails with at synthesis) gains the legacy-CR hint; the
-	// sentinel stays reachable for errors.Is.
-	synthErr := fmt.Errorf("synthesizing platform %q: %w", "cluster", synth.ErrSubscriptionMissingVersion)
+func TestWireRoundTrip_SpecToWireToSpec(t *testing.T) {
+	// spec → wire (write-if-absent doc) → spec must preserve the document,
+	// with every entry's enable stated explicitly on the wire.
+	in := Spec{
+		Name: "cluster",
+		Type: "kubernetes",
+		Entries: []Entry{
+			{Path: "opmodel.dev/catalogs/k8s@v1", Version: "1.0.0-alpha.2", Enable: false},
+			{Path: "opmodel.dev/catalogs/opm@v4", Version: "4.0.1", Enable: true},
+		},
+	}
 
-	wrapped := WrapClusterMaterializeError(synthErr)
-	require.Error(t, wrapped)
-	assert.ErrorIs(t, wrapped, synth.ErrSubscriptionMissingVersion)
-	assert.Contains(t, wrapped.Error(), "predate the scalar-version subscription shape")
-
-	// Any other error passes through unchanged.
-	other := errors.New("boom")
-	assert.Same(t, other, WrapClusterMaterializeError(other))
-	assert.NoError(t, WrapClusterMaterializeError(nil))
-}
-
-func TestWireRoundTrip_FileToInputToCRSpec(t *testing.T) {
-	// file → input → wire (write-if-absent doc) must preserve the document.
-	path := writePlatformFile(t, LegacyDefaultPlatformFile)
-	in, err := DecodeFile(path)
-	require.NoError(t, err)
-
-	w := wireFromInput(in)
+	w := wireFromSpec(in)
 	assert.Equal(t, in.Type, w.Type)
-	assert.Len(t, w.Registry, len(in.Subscriptions))
-	assert.Equal(t, strings.TrimPrefix(config.DefaultCatalogPins[0], "v"), w.Registry["opmodel.dev/catalogs/opm@v4"].Version)
-	assert.Equal(t, strings.TrimPrefix(config.DefaultCatalogPins[1], "v"), w.Registry["opmodel.dev/catalogs/k8s@v1"].Version)
+	require.Len(t, w.Registry, 2)
+	require.NotNil(t, w.Registry["opmodel.dev/catalogs/k8s@v1"].Enable)
+	assert.False(t, *w.Registry["opmodel.dev/catalogs/k8s@v1"].Enable)
+	assert.Equal(t, "4.0.1", w.Registry["opmodel.dev/catalogs/opm@v4"].Version)
+	assert.Empty(t, w.SkewPolicy, "a seed never writes a skew policy")
+
+	assert.Equal(t, in, w.toSpec("cluster"))
 }

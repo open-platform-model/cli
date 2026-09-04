@@ -3,8 +3,6 @@ package render
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/open-platform-model/library/opm/compile"
-	"github.com/open-platform-model/library/opm/helper/synth"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/config"
@@ -14,24 +12,32 @@ import (
 
 // Result is the output of the shared render workflow.
 type Result struct {
-	Resources  []*unstructured.Unstructured
-	Instance   pkgmodule.InstanceMetadata // Was: Release (enhancement 0002 D8/D9)
-	Module     pkgmodule.ModuleMetadata
-	Components []compile.ComponentSummary
-	MatchPlan  *kernel.MatchPlan
-	Warnings   []string
+	Resources []*unstructured.Unstructured
+	Instance  pkgmodule.InstanceMetadata // Was: Release (enhancement 0002 D8/D9)
+	Module    pkgmodule.ModuleMetadata
+
+	// Pairs are the matched (component, transformer) pairs the render
+	// evaluated, in build order — the kernel's diagnostics, shown by the
+	// transformer-match output.
+	Pairs []kernel.RenderPair
+
+	// Warnings are the kernel's render warnings: unhandled optional traits
+	// and, under the warn skew policy, catalog version skew. Non-empty is
+	// not failure; every entry is shown to the user.
+	Warnings []string
 
 	// Platform is the resolved platform-source provenance (0006 D21). The
 	// apply workflow uses it for the D12 write-if-absent decision.
 	Platform platform.Resolution
 
-	// PlatformSpec is the resolved (pre-materialize) platform input the
-	// render consumed — the exact document the D12 write-if-absent seeds,
-	// with no re-read of the platform file at apply time.
-	PlatformSpec synth.PlatformInput
+	// PlatformSpec is the seed document decoded from the built platform the
+	// render consumed (type, and per #registry entry its key, enable and the
+	// derived version) — the exact document the D12 write-if-absent seeds,
+	// with no re-read of the platform module at apply time.
+	PlatformSpec platform.Spec
 
 	// RenderDigest is the operator-parity render digest computed over the
-	// kernel-compiled resources (CUE-value serialization, operator sort
+	// kernel-rendered resources (CUE-value serialization, operator sort
 	// order — see inventory.ComputeRenderDigest). Written verbatim to
 	// status.lastAppliedRenderDigest so a future ownership transfer has a
 	// recorded value to verify against (0006 D9/D30).
@@ -61,9 +67,12 @@ func (r *Result) ResourceCount() int {
 
 type InstanceFileOpts struct {
 	InstanceFilePath string
-	ValuesFiles      []string
+	// ValuesFiles are -f files layered onto the instance package as kernel
+	// values sources, in order.
+	ValuesFiles []string
 
-	// PlatformFlag is the --platform local override file (0006 D21).
+	// PlatformFlag is the --platform platform module directory (0006 D21;
+	// highest platform-source precedence).
 	PlatformFlag string
 	// ClusterPlatform reads the cluster Platform CR spec. nil marks the
 	// command offline: the cluster is never consulted (D17/D21).
@@ -86,7 +95,8 @@ type ModuleOpts struct {
 	// "<module.metadata.name>-debug".
 	Name string
 
-	// PlatformFlag is the --platform local override file (0006 D21).
+	// PlatformFlag is the --platform platform module directory (0006 D21;
+	// highest platform-source precedence).
 	PlatformFlag string
 	// ClusterPlatform reads the cluster Platform CR spec. nil marks the
 	// command offline: the cluster is never consulted (D17/D21).

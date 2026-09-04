@@ -9,11 +9,10 @@ import (
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
-	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/cue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/open-platform-model/library/opm/helper/synth"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/config"
@@ -64,7 +63,7 @@ func TestRenderFromInstanceFile_NilK8sConfig(t *testing.T) {
 
 func TestRenderFromInstanceFile_RejectsModulePackagePath(t *testing.T) {
 	// The path guard fires before platform resolution, so no registry or
-	// platform file is needed.
+	// platform module is needed.
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "module.cue"), []byte("package test\n"), 0o644))
 
@@ -79,74 +78,110 @@ func TestRenderFromInstanceFile_RejectsModulePackagePath(t *testing.T) {
 
 func TestNewResult_CarriesResolvedPlatform(t *testing.T) {
 	// The apply workflow seeds the cluster Platform from Result.PlatformSpec
-	// (0006 D12): the assembly must carry the resolved input verbatim, or
-	// the seeded document degrades to the zero value.
-	enable := true
-	input := synth.PlatformInput{
-		Name: "local-default",
+	// (0006 D12): the assembly must carry the spec decoded from the built
+	// platform verbatim — every entry with its derived version — or the
+	// seeded document degrades to the zero value.
+	spec := platform.Spec{
+		Name: "cluster",
 		Type: "kubernetes",
-		Subscriptions: map[string]synth.SubscriptionSpec{
-			"opmodel.dev/catalogs/opm@v2": {Enable: &enable, Version: "2.0.0-alpha.3"},
+		Entries: []platform.Entry{
+			{Path: "opmodel.dev/catalogs/k8s@v1", Version: "1.0.0-alpha.2", Enable: true},
+			{Path: "opmodel.dev/catalogs/opm@v4", Version: "4.0.1", Enable: true},
 		},
 	}
 	env := &renderEnv{
-		resolution: platform.Resolution{Source: platform.SourceLocalDefault, Location: "~/.opm/platform.cue", Warning: "cluster Platform not found"},
-		input:      input,
+		resolution: platform.Resolution{Source: platform.SourceLocalDefault, Location: "/home/x/.opm/platform", Dir: "/home/x/.opm/platform", Warning: "cluster Platform not found"},
+		spec:       spec,
+	}
+	out := &kernel.RenderResult{
+		Warnings:    []string{"w1"},
+		Diagnostics: kernel.RenderDiagnostics{Pairs: []kernel.RenderPair{{Component: "web", Transformer: "x#Deployment"}}},
 	}
 
-	result := newResult(env, &kernel.CompileResult{Warnings: []string{"w1"}}, "digest", map[string]any{"k": "v"}, true)
+	result := newResult(env, out, "digest", map[string]any{"k": "v"}, true)
 
 	assert.Equal(t, env.resolution, result.Platform)
-	assert.Equal(t, input, result.PlatformSpec)
+	assert.Equal(t, spec, result.PlatformSpec)
 	assert.NotEmpty(t, result.PlatformSpec.Type, "seeded spec must never carry an empty type")
+	for _, e := range result.PlatformSpec.Entries {
+		assert.NotEmpty(t, e.Version, "seed carries the derived version of %s", e.Path)
+	}
 	assert.Equal(t, []string{"w1"}, result.Warnings)
+	assert.Equal(t, out.Diagnostics.Pairs, result.Pairs)
 	assert.Equal(t, "digest", result.RenderDigest)
 	assert.Equal(t, map[string]any{"k": "v"}, result.Values)
 	assert.True(t, result.SourceLocal)
 }
 
-func TestUnifyValuesFiles_Empty(t *testing.T) {
-	v, err := unifyValuesFiles(cuecontext.New(), nil)
-	require.NoError(t, err)
-	assert.False(t, v.Exists(), "zero value signals no files given")
+func TestSkewPolicyFor(t *testing.T) {
+	cr := func(policy string) platform.Resolution {
+		return platform.Resolution{Source: platform.SourceClusterCR, SkewPolicy: policy}
+	}
+	local := platform.Resolution{Source: platform.SourceLocalDefault}
+	flag := platform.Resolution{Source: platform.SourceFlagDir}
+	warnCfg := &config.GlobalConfig{SkewPolicy: config.SkewPolicyWarn}
+	refuseCfg := &config.GlobalConfig{SkewPolicy: config.SkewPolicyRefuse}
+	absentCfg := &config.GlobalConfig{}
+
+	tests := []struct {
+		name     string
+		res      platform.Resolution
+		cfg      *config.GlobalConfig
+		want     kernel.SkewPolicy
+		wantNote string
+	}{
+		{"local default is warn", local, absentCfg, kernel.SkewWarn, ""},
+		{"local with warn key", local, warnCfg, kernel.SkewWarn, ""},
+		{"local with refuse key", local, refuseCfg, kernel.SkewRefuse, "refuse (config)"},
+		{"flag with refuse key", flag, refuseCfg, kernel.SkewRefuse, "refuse (config)"},
+		{"cluster unset is warn", cr(""), absentCfg, kernel.SkewWarn, ""},
+		{"cluster Warn", cr("Warn"), absentCfg, kernel.SkewWarn, ""},
+		{"cluster Refuse", cr("Refuse"), warnCfg, kernel.SkewRefuse, "refuse (cluster Platform)"},
+		{"cluster Warn overrides refuse key", cr("Warn"), refuseCfg, kernel.SkewWarn, "cluster Platform overrides config skewPolicy"},
+		{"cluster unset overrides refuse key", cr(""), refuseCfg, kernel.SkewWarn, "cluster Platform overrides config skewPolicy"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, note := skewPolicyFor(tt.res, tt.cfg)
+			assert.Equal(t, tt.want, got)
+			if tt.wantNote == "" {
+				assert.Empty(t, note)
+			} else {
+				assert.Contains(t, note, tt.wantNote)
+			}
+		})
+	}
 }
 
-func TestUnifyValuesFiles_SingleFile(t *testing.T) {
-	ctx := cuecontext.New()
-	dir := t.TempDir()
-	valuesFile := filepath.Join(dir, "values.cue")
-	require.NoError(t, os.WriteFile(valuesFile, []byte("package test\nvalues: {replicas: 3}\n"), 0o644))
-
-	v, err := unifyValuesFiles(ctx, []string{valuesFile})
+func TestLoadValuesSources_Empty(t *testing.T) {
+	sources, err := loadValuesSources(kernel.New(), nil)
 	require.NoError(t, err)
-	require.True(t, v.Exists())
-	assert.NoError(t, v.Validate())
+	assert.Nil(t, sources, "no files means no sources: the package's own values apply")
 }
 
-func TestUnifyValuesFiles_MultipleFilesUnify(t *testing.T) {
-	ctx := cuecontext.New()
+func TestLoadValuesSources_InOrderWithFileOrigin(t *testing.T) {
+	k := kernel.New()
 	dir := t.TempDir()
 	f1 := filepath.Join(dir, "a.cue")
 	f2 := filepath.Join(dir, "b.cue")
 	require.NoError(t, os.WriteFile(f1, []byte("package test\nvalues: {replicas: 3}\n"), 0o644))
 	require.NoError(t, os.WriteFile(f2, []byte("package test\nvalues: {image: \"nginx\"}\n"), 0o644))
 
-	v, err := unifyValuesFiles(ctx, []string{f1, f2})
+	sources, err := loadValuesSources(k, []string{f1, f2})
 	require.NoError(t, err)
-	require.True(t, v.Exists())
-	assert.NoError(t, v.Validate())
+	require.Len(t, sources, 2)
+	assert.Equal(t, f1, sources[0].Origin, "each source is attributed to its file")
+	assert.Equal(t, f2, sources[1].Origin)
+	replicas, err := sources[0].Value.LookupPath(cue.ParsePath("replicas")).Int64()
+	require.NoError(t, err, "the top-level values field is unwrapped")
+	assert.Equal(t, int64(3), replicas)
 }
 
-func TestUnifyValuesFiles_ConflictFails(t *testing.T) {
-	ctx := cuecontext.New()
-	dir := t.TempDir()
-	f1 := filepath.Join(dir, "a.cue")
-	f2 := filepath.Join(dir, "b.cue")
-	require.NoError(t, os.WriteFile(f1, []byte("package test\nvalues: {replicas: 3}\n"), 0o644))
-	require.NoError(t, os.WriteFile(f2, []byte("package test\nvalues: {replicas: 4}\n"), 0o644))
-
-	_, err := unifyValuesFiles(ctx, []string{f1, f2})
+func TestLoadValuesSources_MissingFileNamesIt(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "nope.cue")
+	_, err := loadValuesSources(kernel.New(), []string{missing})
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), "nope.cue")
 }
 
 func writeD19File(t *testing.T, path, content string) {

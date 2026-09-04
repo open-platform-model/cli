@@ -14,20 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/open-platform-model/library/opm/schema"
-
 	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
-
-// writePlatform writes content as platform.cue in a fresh temp dir and
-// returns its path (legacy data-file shape).
-func writePlatform(t *testing.T, content string) string {
-	t.Helper()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "platform.cue")
-	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
-	return path
-}
 
 // seedPlatformModule writes the default platform module into a fresh temp
 // dir and returns the directory.
@@ -195,7 +183,7 @@ func TestBuildPlatformModule_DefaultTemplateBuilds(t *testing.T) {
 	assert.Equal(t, "cluster", p.Metadata.Name)
 	assert.Equal(t, "kubernetes", p.Metadata.Type)
 
-	registry := p.Package.LookupPath(schema.Registry)
+	registry := p.Package.LookupPath(cue.MakePath(cue.Def("registry")))
 	require.True(t, registry.Exists())
 	for i, path := range DefaultCatalogPaths {
 		entry := registry.LookupPath(cue.MakePath(cue.Str(path)))
@@ -255,77 +243,4 @@ func TestBuildPlatformModule_KeyImportDriftNamesTheEntry(t *testing.T) {
 	assert.True(t, named, "conflict must be reported at a #registry entry path: %s", msg)
 	assert.Contains(t, msg, "conflicting values")
 	assert.Contains(t, msg, "must equal the module path")
-}
-
-// Legacy data-only platform file loader (deleted by cli-render-switch).
-
-func TestLoadLegacyPlatformFile_MinimalValid(t *testing.T) {
-	path := writePlatform(t, `name: "cluster"
-type: "kubernetes"
-`)
-	_, err := LoadLegacyPlatformFile(path)
-	require.NoError(t, err)
-}
-
-func TestLoadLegacyPlatformFile_MissingFile(t *testing.T) {
-	_, err := LoadLegacyPlatformFile("/nonexistent/platform.cue")
-	require.Error(t, err)
-	assert.True(t, os.IsNotExist(err), "missing file should surface as os.IsNotExist")
-}
-
-func TestLoadLegacyPlatformFile_ImportsRejected(t *testing.T) {
-	path := writePlatform(t, `import "strings"
-
-name: strings.ToLower("Cluster")
-type: "kubernetes"
-`)
-	_, err := LoadLegacyPlatformFile(path)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "data-only")
-	assert.Contains(t, err.Error(), "opm config init --force")
-}
-
-func TestLoadLegacyPlatformFile_SchemaAndSyntaxErrors(t *testing.T) {
-	tests := []struct {
-		name    string
-		content string
-		want    string
-	}{
-		{"missing required fields", "registry: {\n\t\"opmodel.dev/catalogs/opm@v2\": {version: \"2.0.0-alpha.3\"}\n}\n", "platform schema validation failed"},
-		{"filter vocabulary rejected", "name: \"cluster\"\ntype: \"kubernetes\"\nregistry: {\n\t\"opmodel.dev/catalogs/opm@v2\": {\n\t\tversion: \"2.0.0-alpha.3\"\n\t\tfilter: range: \">=1.0.0-0 <2.0.0-0\"\n\t}\n}\n", "platform schema validation failed"},
-		{"unknown field rejected", "name: \"cluster\"\ntype: \"kubernetes\"\nbogus: true\n", "platform schema validation failed"},
-		{"syntax error", "name: \"cluster\n", "platform file error"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			path := writePlatform(t, tt.content)
-			_, err := LoadLegacyPlatformFile(path)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.want)
-		})
-	}
-}
-
-func TestHackPlatformMirror_PinsMatchSeed(t *testing.T) {
-	// hack/platform/cue.mod/module.cue is the kind dev-cluster mirror of the
-	// seeded module; its pins must equal the seed's so an offline build and
-	// an in-cluster render evaluate the same catalog builds.
-	mirrorPath := filepath.Join("..", "..", "hack", "platform", "cue.mod", "module.cue")
-	content, err := os.ReadFile(mirrorPath)
-	if err != nil {
-		t.Skipf("hack mirror not present: %v", err)
-	}
-	mirror, err := modfile.Parse(content, mirrorPath)
-	require.NoError(t, err)
-	seed, err := modfile.Parse([]byte(DefaultPlatformModuleFile), PlatformModuleFileName)
-	require.NoError(t, err)
-
-	// The mirror is kept in `cue mod tidy`'s canonical form, so it may carry
-	// transitive pins the offline seed does not; every root the seed pins
-	// must be pinned identically.
-	assert.Equal(t, seed.Module, mirror.Module)
-	for path, dep := range seed.Deps {
-		require.Contains(t, mirror.Deps, path)
-		assert.Equal(t, dep.Version, mirror.Deps[path].Version, "%s pin drifted between the seed and hack/platform", path)
-	}
 }

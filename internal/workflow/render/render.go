@@ -26,10 +26,11 @@ import (
 
 // FromInstanceFile prepares and renders an instance from a declarative
 // #ModuleInstance CUE package through the library kernel (0006 D9). The
-// package directory containing the instance file is loaded as one CUE
-// package (instance.cue + values.cue + overlays), the embedded #module is
-// decoded, and the kernel validates, matches, and compiles against the
-// resolved platform.
+// package directory containing the instance file is acquired as one CUE
+// package (instance.cue + values.cue + overlays) with any -f values files
+// layered through the kernel's values option, so the instance the render
+// imports already carries them; the kernel then renders it against the
+// resolved platform in one build.
 func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, error) {
 	if opts.Config == nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("configuration not loaded")}
@@ -48,38 +49,20 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 
 	k := NewKernel(opts.Config)
 
-	// Load the instance package (the directory containing the instance file).
+	// Acquire the instance package (the directory containing the instance
+	// file) with the -f files layered as values sources: the schema's own
+	// values unification performs the merge inside the build, nothing is
+	// filled from Go, and a conflict names the file it came from.
 	instanceDir, err := resolveInstanceDir(opts.InstanceFilePath)
 	if err != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}
-	instVal, err := k.LoadInstancePackage(ctx, instanceDir, loaderfile.LoadOptions{Registry: opts.Config.Registry})
+	sources, err := loadValuesSources(k, opts.ValuesFiles)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
-
-	// The embedded #module must be filled by the package's own import.
-	moduleVal := instVal.LookupPath(schema.Module)
-	if !moduleVal.Exists() {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("#module is not filled in the instance package — import a module to fill it")}
-	}
-	mod, err := k.NewModuleFromValue(moduleVal)
-	if err != nil {
-		printValidationError(err)
-		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
-	}
-
-	// Values: -f files (unified) win; otherwise the package's own values
-	// (values.cue / inline) already live in the loaded package and
-	// ProcessModuleInstance enforces concreteness.
-	values, err := unifyValuesFiles(k.CueContext(), opts.ValuesFiles)
-	if err != nil {
-		printValidationError(err)
-		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
-	}
-
-	inst, err := k.ProcessModuleInstance(ctx, instVal, *mod, values)
+	inst, err := k.AcquireInstanceFromDir(ctx, instanceDir, loaderfile.LoadOptions{Registry: opts.Config.Registry}, kernel.WithValues(sources...))
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
@@ -94,14 +77,14 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	}
 	warnLocalReplacement(sourceLocal)
 
-	// Platform resolution + materialization only after the instance itself
+	// Platform resolution + acquisition only after the instance itself
 	// validated: cheap failures never hit the cluster or registry.
 	env, err := resolvePlatformEnv(ctx, k, opts.Config, opts.PlatformFlag, opts.ClusterPlatform)
 	if err != nil {
 		return nil, err
 	}
 
-	return compileInstance(ctx, env, inst, opts.K8sConfig, sourceLocal)
+	return renderInstance(ctx, env, inst, opts.K8sConfig, sourceLocal)
 }
 
 // localReplacementWarning is the D19 (enhancement 0010) render warning: a
@@ -133,19 +116,24 @@ func moduleContextHasLocalReplacement(moduleDir string) bool {
 	return loader.HasLocalModuleReplacement(loader.ModuleRootFrom(abs))
 }
 
-// compileInstance runs the kernel compile on a processed instance and adapts
-// the result to the workflow Result.
-func compileInstance(
+// renderInstance runs the kernel's single render verb on a source-carrying
+// instance and adapts the result to the workflow Result. Every failure the
+// kernel reports — a skew refusal before evaluation, or the fail-closed gate
+// after it (unresolved demands, unmatched components, an over-subscribed
+// provider contract, a failed pair) — exits as a validation failure with the
+// kernel's message and the diagnostics printed beside it.
+func renderInstance(
 	ctx context.Context,
 	env *renderEnv,
 	inst *module.Instance,
 	k8sCfg *config.ResolvedKubernetesConfig,
 	sourceLocal bool,
 ) (*Result, error) {
-	out, err := env.kernel.Compile(ctx, kernel.CompileInput{
-		ModuleInstance: inst,
-		Platform:       env.platform,
-		RuntimeName:    RuntimeName,
+	out, err := env.kernel.Render(ctx, kernel.RenderInput{
+		Instance:    inst,
+		Platform:    env.platform,
+		RuntimeName: RuntimeName,
+		Skew:        env.skew,
 	})
 	if err != nil {
 		printValidationError(err)
@@ -200,17 +188,19 @@ func compileInstance(
 	return result, nil
 }
 
-// newResult assembles the workflow Result from the compile output and the
-// render environment. PlatformSpec must carry the exact resolved platform
-// input the render consumed — the D12 write-if-absent seeding writes it
-// verbatim, with no re-read of the platform file at apply time.
-func newResult(env *renderEnv, out *kernel.CompileResult, renderDigest string, values map[string]any, sourceLocal bool) *Result {
+// newResult assembles the workflow Result from the render output and the
+// render environment. PlatformSpec is the seed document decoded from the
+// exact built platform the render consumed — the D12 write-if-absent seeding
+// writes it verbatim, with no re-read of the platform module at apply time.
+// Warnings are the kernel's render warnings (unhandled optional traits, skew
+// under the warn policy); the D19 local-replacement warning is emitted
+// directly by the entry points, before the render.
+func newResult(env *renderEnv, out *kernel.RenderResult, renderDigest string, values map[string]any, sourceLocal bool) *Result {
 	return &Result{
-		Components:   out.Components,
-		MatchPlan:    out.MatchPlan,
+		Pairs:        out.Diagnostics.Pairs,
 		Warnings:     out.Warnings,
 		Platform:     env.resolution,
-		PlatformSpec: env.input,
+		PlatformSpec: env.spec,
 		RenderDigest: renderDigest,
 		Values:       values,
 		SourceLocal:  sourceLocal,

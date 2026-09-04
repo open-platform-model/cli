@@ -16,8 +16,9 @@ type RenderFlags struct {
 	Values       []string
 	Namespace    string
 	InstanceName string
-	// Platform is the --platform local override file (0006 D21; highest
-	// platform-source precedence). Supersedes the retired --provider flag.
+	// Platform is the --platform platform module directory (0006 D21;
+	// highest platform-source precedence). Supersedes the retired --provider
+	// flag.
 	Platform string
 }
 
@@ -29,11 +30,14 @@ func (f *RenderFlags) AddTo(cmd *cobra.Command) {
 		"Target namespace")
 	cmd.Flags().StringVar(&f.InstanceName, "instance-name", "",
 		"Instance name (default: module name)") // Was: --release-name (enhancement 0002 D-X4.2)
-	// --platform still names the legacy data-only file; cli-render-switch
-	// makes it a platform module directory and rewrites this help text.
 	cmd.Flags().StringVar(&f.Platform, "platform", "",
-		"Path to a local platform file (overrides the cluster Platform and ~/.opm/platform.cue)")
+		platformFlagHelp)
 }
+
+// platformFlagHelp is the --platform help text shared by every render-bearing
+// command: the flag names a platform module directory (0019 D5), never a
+// data file.
+const platformFlagHelp = "Path to a platform module directory (overrides the cluster Platform and ~/.opm/platform/)"
 
 // K8sFlags holds flags for Kubernetes cluster connection
 // (apply, delete, status).
@@ -106,8 +110,9 @@ type InstanceFileFlags struct {
 	// Values are additional values CUE files (-f/--values flag).
 	// When empty, values.cue next to the instance file is used if it exists.
 	Values []string
-	// Platform is the --platform local override file (0006 D21; highest
-	// platform-source precedence). Supersedes the retired --provider flag.
+	// Platform is the --platform platform module directory (0006 D21;
+	// highest platform-source precedence). Supersedes the retired --provider
+	// flag.
 	Platform string
 }
 
@@ -115,9 +120,8 @@ type InstanceFileFlags struct {
 func (f *InstanceFileFlags) AddTo(cmd *cobra.Command) {
 	cmd.Flags().StringArrayVarP(&f.Values, "values", "f", nil,
 		"Additional values files (can be repeated; default: values.cue next to the instance file)")
-	// See RenderFlags.AddTo: the directory form lands with cli-render-switch.
 	cmd.Flags().StringVar(&f.Platform, "platform", "",
-		"Path to a local platform file (overrides the cluster Platform and ~/.opm/platform.cue)")
+		platformFlagHelp)
 }
 
 // uuidPattern matches a UUID v4/v5: 8-4-4-4-12 lowercase hex digits.

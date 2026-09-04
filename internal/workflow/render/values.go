@@ -5,35 +5,27 @@ import (
 	"os"
 	"path/filepath"
 
-	"cuelang.org/go/cue"
-
-	"github.com/open-platform-model/cli/pkg/loader"
+	"github.com/open-platform-model/library/opm/kernel"
 )
 
-// unifyValuesFiles loads every -f/--values file and unifies them in
-// declaration order into a single cue.Value — the kernel's synthesis and
-// processing take one values input. The zero cue.Value means "no files
-// given" (the caller's fallback applies).
-func unifyValuesFiles(cueCtx *cue.Context, valuesFiles []string) (cue.Value, error) {
+// loadValuesSources loads every -f/--values file as a kernel values source,
+// in declaration order (stack order for layering): each source's Origin is
+// the file's absolute path, so a conflict or a schema violation is attributed
+// to the file the user wrote. An empty list yields nil (no sources: the
+// package's own values apply).
+func loadValuesSources(k *kernel.Kernel, valuesFiles []string) ([]kernel.Source, error) {
 	if len(valuesFiles) == 0 {
-		return cue.Value{}, nil
+		return nil, nil
 	}
-	var unified cue.Value
-	for i, valuesFile := range valuesFiles {
-		valuesVal, err := loader.LoadValuesFile(cueCtx, valuesFile)
+	sources := make([]kernel.Source, 0, len(valuesFiles))
+	for _, valuesFile := range valuesFiles {
+		src, err := k.LoadSourceFromFile(valuesFile)
 		if err != nil {
-			return cue.Value{}, fmt.Errorf("loading values file %q: %w", valuesFile, err)
+			return nil, fmt.Errorf("loading values file %q: %w", valuesFile, err)
 		}
-		if i == 0 {
-			unified = valuesVal
-			continue
-		}
-		unified = unified.Unify(valuesVal)
+		sources = append(sources, src)
 	}
-	if err := unified.Err(); err != nil {
-		return cue.Value{}, fmt.Errorf("unifying values files: %w", err)
-	}
-	return unified, nil
+	return sources, nil
 }
 
 // resolveInstanceDir returns the CUE package directory for an instance path:

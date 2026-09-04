@@ -14,8 +14,6 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	k8stesting "k8s.io/client-go/testing"
 
-	"github.com/open-platform-model/library/opm/helper/synth"
-
 	"github.com/open-platform-model/cli/internal/inventory"
 )
 
@@ -38,14 +36,15 @@ func clusterPlatformObj(spec map[string]any) *unstructured.Unstructured {
 	}}
 }
 
-func testInput() synth.PlatformInput {
-	return synth.PlatformInput{
+// testSpec is the seed document as SpecFromPlatform decodes it from a built
+// local platform: every entry carries its derived version and a concrete
+// enable.
+func testSpec() Spec {
+	return Spec{
 		Name: "cluster",
 		Type: "kubernetes",
-		Subscriptions: map[string]synth.SubscriptionSpec{
-			"opmodel.dev/catalogs/opm@v2": {
-				Version: "2.0.0-alpha.3",
-			},
+		Entries: []Entry{
+			{Path: "opmodel.dev/catalogs/opm@v2", Version: "2.0.0-alpha.3", Enable: true},
 		},
 	}
 }
@@ -86,7 +85,7 @@ func TestClusterSpecGetterFor_ForbiddenIsFallback(t *testing.T) {
 func TestEnsureClusterPlatform_CreatesWhenAbsent(t *testing.T) {
 	dyn := newFakeDynamic()
 
-	require.NoError(t, EnsureClusterPlatform(context.Background(), dyn, testInput()))
+	require.NoError(t, EnsureClusterPlatform(context.Background(), dyn, testSpec()))
 
 	created, err := dyn.Resource(inventory.PlatformGVR).Get(context.Background(),
 		inventory.PlatformSingletonName, metav1.GetOptions{})
@@ -101,7 +100,14 @@ func TestEnsureClusterPlatform_CreatesWhenAbsent(t *testing.T) {
 	version, _, err := unstructured.NestedString(created.Object,
 		"spec", "registry", "opmodel.dev/catalogs/opm@v2", "version")
 	require.NoError(t, err)
-	assert.Equal(t, "2.0.0-alpha.3", version)
+	assert.Equal(t, "2.0.0-alpha.3", version, "the seed carries the derived version")
+	enable, found, err := unstructured.NestedBool(created.Object,
+		"spec", "registry", "opmodel.dev/catalogs/opm@v2", "enable")
+	require.NoError(t, err)
+	assert.True(t, found, "the seed states enable explicitly")
+	assert.True(t, enable)
+	_, hasSkew := spec["skewPolicy"]
+	assert.False(t, hasSkew, "the seed writes no skew policy")
 }
 
 func TestEnsureClusterPlatform_AlreadyExistsIsNoop(t *testing.T) {
@@ -110,7 +116,7 @@ func TestEnsureClusterPlatform_AlreadyExistsIsNoop(t *testing.T) {
 	})
 	dyn := newFakeDynamic(existing)
 
-	require.NoError(t, EnsureClusterPlatform(context.Background(), dyn, testInput()))
+	require.NoError(t, EnsureClusterPlatform(context.Background(), dyn, testSpec()))
 
 	// The existing Platform must be untouched — never overwritten (D22).
 	after, err := dyn.Resource(inventory.PlatformGVR).Get(context.Background(),
@@ -130,7 +136,7 @@ func TestEnsureClusterPlatform_ForbiddenDegradesToWarning(t *testing.T) {
 	})
 
 	// D17: forbidden create is a warning, not an error.
-	require.NoError(t, EnsureClusterPlatform(context.Background(), dyn, testInput()))
+	require.NoError(t, EnsureClusterPlatform(context.Background(), dyn, testSpec()))
 }
 
 func TestEnsureClusterPlatform_OtherErrorIsFatal(t *testing.T) {
@@ -139,7 +145,7 @@ func TestEnsureClusterPlatform_OtherErrorIsFatal(t *testing.T) {
 		return true, nil, apierrors.NewInternalError(assert.AnError)
 	})
 
-	require.Error(t, EnsureClusterPlatform(context.Background(), dyn, testInput()))
+	require.Error(t, EnsureClusterPlatform(context.Background(), dyn, testSpec()))
 }
 
 func TestEnsureClusterPlatformForCatalog_CreatesWhenAbsent(t *testing.T) {

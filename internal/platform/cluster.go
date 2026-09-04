@@ -10,8 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 
-	"github.com/open-platform-model/library/opm/helper/synth"
-
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
 	pkgcore "github.com/open-platform-model/cli/pkg/core"
@@ -41,14 +39,15 @@ func ClusterSpecGetterFor(dyn dynamic.Interface) ClusterSpecGetter {
 	}
 }
 
-// EnsureClusterPlatform seeds the singleton cluster Platform from the
-// resolved local platform spec, write-if-absent (D12/D22): a plain create
-// with field manager opm-cli, treating AlreadyExists as success-noop.
-// Never SSA, never update — an existing Platform is never overwritten.
-// A Forbidden create degrades to a warning (D17: the render already
-// succeeded against the local platform).
-func EnsureClusterPlatform(ctx context.Context, dyn dynamic.Interface, in synth.PlatformInput) error {
-	outcome, err := createClusterPlatform(ctx, dyn, in)
+// EnsureClusterPlatform seeds the singleton cluster Platform from the spec
+// decoded off the built local platform the render consumed
+// (SpecFromPlatform), write-if-absent (D12/D22): a plain create with field
+// manager opm-cli, treating AlreadyExists as success-noop. Never SSA, never
+// update — an existing Platform is never overwritten. A Forbidden create
+// degrades to a warning (D17: the render already succeeded against the local
+// platform).
+func EnsureClusterPlatform(ctx context.Context, dyn dynamic.Interface, spec Spec) error {
+	outcome, err := createClusterPlatform(ctx, dyn, spec)
 	if err != nil {
 		return err
 	}
@@ -83,17 +82,14 @@ const (
 // identical for every caller: a plain create with field manager opm-cli,
 // never SSA and never update, AlreadyExists as success-noop, Forbidden as a
 // non-fatal outcome the caller reports in its own words.
-func createClusterPlatform(ctx context.Context, dyn dynamic.Interface, in synth.PlatformInput) (platformWriteOutcome, error) {
-	w := wireFromInput(in)
-
+func createClusterPlatform(ctx context.Context, dyn dynamic.Interface, spec Spec) (platformWriteOutcome, error) {
 	// The CR keeps the name in metadata; the singleton's name is fixed.
-	w.Name = ""
-	specRaw, err := json.Marshal(w)
+	specRaw, err := json.Marshal(wireFromSpec(spec))
 	if err != nil {
 		return platformWriteUnset, fmt.Errorf("encoding Platform spec: %w", err)
 	}
-	var spec map[string]any
-	if err := json.Unmarshal(specRaw, &spec); err != nil {
+	var specObj map[string]any
+	if err := json.Unmarshal(specRaw, &specObj); err != nil {
 		return platformWriteUnset, fmt.Errorf("encoding Platform spec: %w", err)
 	}
 
@@ -103,7 +99,7 @@ func createClusterPlatform(ctx context.Context, dyn dynamic.Interface, in synth.
 		"metadata": map[string]any{
 			"name": inventory.PlatformSingletonName,
 		},
-		"spec": spec,
+		"spec": specObj,
 	}}
 
 	_, err = dyn.Resource(inventory.PlatformGVR).Create(ctx, doc, metav1.CreateOptions{
@@ -134,19 +130,17 @@ const defaultPlatformType = "kubernetes"
 // an existing Platform left untouched.
 //
 // It differs from EnsureClusterPlatform only in provenance. The spec was
-// resolved from the registry rather than read from the local default
-// platform file, so the reporting names the catalog coordinate that was
-// pinned and never claims a file it did not read.
+// resolved from the registry rather than decoded from the local default
+// platform module, so the reporting names the catalog coordinate that was
+// pinned and never claims a platform it did not consume.
 func EnsureClusterPlatformForCatalog(ctx context.Context, dyn dynamic.Interface, catalogPath, version string) error {
-	in := synth.PlatformInput{
-		Name: inventory.PlatformSingletonName,
-		Type: defaultPlatformType,
-		Subscriptions: map[string]synth.SubscriptionSpec{
-			catalogPath: {Version: version},
-		},
+	spec := Spec{
+		Name:    inventory.PlatformSingletonName,
+		Type:    defaultPlatformType,
+		Entries: []Entry{{Path: catalogPath, Version: version, Enable: true}},
 	}
 
-	outcome, err := createClusterPlatform(ctx, dyn, in)
+	outcome, err := createClusterPlatform(ctx, dyn, spec)
 	if err != nil {
 		return err
 	}

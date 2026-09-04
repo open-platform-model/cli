@@ -1,152 +1,122 @@
-// Package platform resolves the platform spec every render consumes, by
-// precedence: --platform flag file > cluster Platform CR > local default
-// (enhancement 0006 D11/D12/D17/D21/D22/D39).
+// Package platform resolves the platform module every render consumes, by
+// precedence: --platform <dir> > cluster Platform CR > local default module
+// ~/.opm/platform/ (enhancement 0006 D11/D12/D17/D21/D22; 0019 D5/D7).
 //
-// Transitional: the local default still reads the legacy data-only
-// platform.cue beside the config file. `opm config init` writes the module
-// form ~/.opm/platform/ since cli-config-platform-module (0019 D5);
-// cli-render-switch moves this package onto platform module directories.
-//
-// All three sources decode through one wire mapping into synth.PlatformInput
-// and materialize via the same kernel calls the operator's PlatformReconciler
-// makes, so the CLI's platform ingestion is structurally the operator's own.
+// Every source resolves to a platform module directory the kernel acquires
+// with AcquirePlatformFromDir. The cluster CR is turned into such a module
+// first, through the library's generator (opm/helper/platformmodule): the
+// same helper and the same acquisition the operator's PlatformReconciler
+// runs, so the CLI's platform ingestion is structurally the operator's own.
 package platform
 
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
-
-	"github.com/open-platform-model/library/opm/helper/synth"
-
-	"github.com/open-platform-model/cli/internal/config"
+	"sort"
 )
 
-// wireSpec is the shared wire shape of a platform spec: the legacy data-only
-// platform.cue projection and the Platform CR's spec are the same document
-// (the file additionally carries name, which the CR keeps in metadata.name).
-type wireSpec struct {
-	Name     string                      `json:"name,omitempty"`
-	Type     string                      `json:"type"`
-	Registry map[string]wireSubscription `json:"registry,omitempty"`
+// Spec is the CLI's typed platform document: what a cluster Platform CR's
+// spec carries and what the write-if-absent seed writes back. It is the one
+// shape CR decode (DecodeCRSpec) and the seed decoded from a built platform
+// (SpecFromPlatform) share.
+type Spec struct {
+	// Name is the platform name (metadata.name of the CR form).
+	Name string
+	// Type is the informational platform discriminator (core #Platform.type).
+	Type string
+	// Entries are the catalog subscriptions in ascending Path order.
+	Entries []Entry
+	// SkewPolicy is the CR's spec.skewPolicy verbatim ("Warn", "Refuse" or
+	// empty when unset). Only DecodeCRSpec fills it; a seed never writes it.
+	SkewPolicy string
 }
 
-// wireSubscription mirrors core #Subscription / the CR Subscription shape:
-// optional enable plus the required scalar version naming exactly one
-// catalog build. Version is empty only on legacy stored CRs (see
-// DecodeCRSpec); synthesis enforces it via ErrSubscriptionMissingVersion.
+// Entry is one catalog subscription: the major-qualified catalog path (the
+// #registry key), the bare SemVer build it names and whether it is enabled.
+type Entry struct {
+	Path string
+	// Version is empty only on a legacy stored CR (see DecodeCRSpec).
+	Version string
+	Enable  bool
+}
+
+// wireSpec is the wire shape of a Platform CR's spec. Name is kept out: the
+// CR carries it in metadata.name.
+type wireSpec struct {
+	Type       string                      `json:"type"`
+	Registry   map[string]wireSubscription `json:"registry,omitempty"`
+	SkewPolicy string                      `json:"skewPolicy,omitempty"`
+}
+
+// wireSubscription mirrors the CR Subscription shape: optional enable plus
+// the scalar version naming exactly one catalog build.
 type wireSubscription struct {
 	Enable  *bool  `json:"enable,omitempty"`
 	Version string `json:"version,omitempty"`
 }
 
-// toInput converts the wire shape into the kernel's typed platform input.
-// SchemaCache is left nil: Kernel.SynthesizePlatform defaults it to the
-// kernel-owned cache.
-func (w wireSpec) toInput() synth.PlatformInput {
-	in := synth.PlatformInput{
-		Name: w.Name,
-		Type: w.Type,
-	}
+// toSpec converts the wire shape into the typed Spec. A nil enable resolves
+// to the schema default (true). Entries are sorted by path so the result is
+// deterministic whatever order the map iterates in.
+func (w wireSpec) toSpec(name string) Spec {
+	s := Spec{Name: name, Type: w.Type, SkewPolicy: w.SkewPolicy}
 	if len(w.Registry) > 0 {
-		in.Subscriptions = make(map[string]synth.SubscriptionSpec, len(w.Registry))
+		s.Entries = make([]Entry, 0, len(w.Registry))
 		for path, sub := range w.Registry {
-			in.Subscriptions[path] = synth.SubscriptionSpec{
-				Enable:  sub.Enable,
+			s.Entries = append(s.Entries, Entry{
+				Path:    path,
 				Version: sub.Version,
-			}
+				Enable:  sub.Enable == nil || *sub.Enable,
+			})
 		}
+		sort.Slice(s.Entries, func(i, j int) bool { return s.Entries[i].Path < s.Entries[j].Path })
 	}
-	return in
+	return s
 }
 
-// LegacyDefaultPlatformFile is the pre-0019 data-only local platform file
-// (what `opm config init` wrote before the local default became the module
-// at ~/.opm/platform/), pinning the same catalog builds as
-// config.DefaultCatalogPins so it never drifts from the seeded module.
-//
-// It keeps this render path and its integration mains exercisable while
-// resolution still reads the data shape; cli-render-switch moves resolution
-// onto platform module directories and deletes it together with DecodeFile.
-var LegacyDefaultPlatformFile = fmt.Sprintf(`name: "cluster"
-type: "kubernetes"
-
-registry: {
-	%q: {
-		version: %q
-	}
-	%q: {
-		version: %q
-	}
-}
-`, config.DefaultCatalogPaths[0], strings.TrimPrefix(config.DefaultCatalogPins[0], "v"),
-	config.DefaultCatalogPaths[1], strings.TrimPrefix(config.DefaultCatalogPins[1], "v"))
-
-// DecodeFile validates the legacy data-only platform file at path (embedded
-// projection schema — config.LoadLegacyPlatformFile, one read/compile) and
-// decodes it into a synth.PlatformInput. Deleted by cli-render-switch, which
-// acquires platform module directories instead.
-func DecodeFile(path string) (synth.PlatformInput, error) {
-	value, err := config.LoadLegacyPlatformFile(path)
-	if err != nil {
-		return synth.PlatformInput{}, err
-	}
-
-	var w wireSpec
-	if err := value.Decode(&w); err != nil {
-		return synth.PlatformInput{}, fmt.Errorf("decoding platform file %s: %w", path, err)
-	}
-	return w.toInput(), nil
-}
-
-// DecodeCRSpec decodes a cluster Platform CR's spec (as an unstructured map)
-// into a synth.PlatformInput. name is the CR's metadata.name.
-//
-// Deliberately lighter validation than DecodeFile: the CR spec was already
-// admitted by the CRD's OpenAPI schema server-side, so only the one field the
-// CRD cannot default (spec.type) is re-checked here. Shape errors that slip
-// through surface from Materialize.
-//
-// Legacy stored shapes are tolerated permanently (never for files): a `filter`
-// key is ignored (json.Unmarshal drops unknown fields), and a subscription
-// with no `version` decodes with Version "" and fails only at synthesis via
-// the kernel's ErrSubscriptionMissingVersion — wrapped with the legacy-CR hint
-// by WrapClusterMaterializeError. Stored CRs keep their pre-v2 shape in etcd
-// until their next spec write, so this tolerance is not transitional.
-func DecodeCRSpec(spec map[string]any, name string) (synth.PlatformInput, error) {
-	// JSON round-trip: the CR spec is the same wire shape, produced by the
-	// CRD's serialization, so this is an explicit, lossless mapping.
-	raw, err := json.Marshal(spec)
-	if err != nil {
-		return synth.PlatformInput{}, fmt.Errorf("encoding Platform CR spec: %w", err)
-	}
-	var w wireSpec
-	if err := json.Unmarshal(raw, &w); err != nil {
-		return synth.PlatformInput{}, fmt.Errorf("decoding Platform CR spec: %w", err)
-	}
-	if w.Type == "" {
-		return synth.PlatformInput{}, fmt.Errorf("cluster Platform %q has no spec.type", name)
-	}
-	w.Name = name
-	return w.toInput(), nil
-}
-
-// wireFromInput converts a typed platform input back into the wire shape —
-// the inverse of toInput, used to build the cluster Platform document for
-// write-if-absent (D12).
-func wireFromInput(in synth.PlatformInput) wireSpec {
-	w := wireSpec{
-		Name: in.Name,
-		Type: in.Type,
-	}
-	if len(in.Subscriptions) > 0 {
-		w.Registry = make(map[string]wireSubscription, len(in.Subscriptions))
-		for path, sub := range in.Subscriptions {
-			w.Registry[path] = wireSubscription{
-				Enable:  sub.Enable,
-				Version: sub.Version,
-			}
+// wireFromSpec converts a Spec into the wire shape the CR carries — the
+// document write-if-absent creates (D12). Every entry's enable is written
+// explicitly: the Spec came from a built platform where it is concrete, so
+// the CR states exactly what the render consumed.
+func wireFromSpec(s Spec) wireSpec {
+	w := wireSpec{Type: s.Type, SkewPolicy: s.SkewPolicy}
+	if len(s.Entries) > 0 {
+		w.Registry = make(map[string]wireSubscription, len(s.Entries))
+		for _, e := range s.Entries {
+			enable := e.Enable
+			w.Registry[e.Path] = wireSubscription{Enable: &enable, Version: e.Version}
 		}
 	}
 	return w
+}
+
+// DecodeCRSpec decodes a cluster Platform CR's spec (as an unstructured map)
+// into a Spec. name is the CR's metadata.name.
+//
+// Deliberately light validation: the CR spec was already admitted by the
+// CRD's OpenAPI schema server-side, so only the one field the CRD cannot
+// default (spec.type) is re-checked here. Anything else surfaces from
+// platform-module generation or the kernel's acquisition.
+//
+// Legacy stored shapes are tolerated permanently (this is a CR read, never a
+// module): a `filter` key is ignored (json.Unmarshal drops unknown fields),
+// and a subscription with no `version` decodes with an empty Version and
+// fails only at generation (GenerateClusterModule), wrapped with the
+// legacy-CR hint. Stored CRs keep their pre-v2 shape in etcd until their next
+// spec write, so this tolerance is not transitional.
+func DecodeCRSpec(spec map[string]any, name string) (Spec, error) {
+	// JSON round-trip: the CR spec is the wire shape the CRD serializes, so
+	// this is an explicit, lossless mapping.
+	raw, err := json.Marshal(spec)
+	if err != nil {
+		return Spec{}, fmt.Errorf("encoding Platform CR spec: %w", err)
+	}
+	var w wireSpec
+	if err := json.Unmarshal(raw, &w); err != nil {
+		return Spec{}, fmt.Errorf("decoding Platform CR spec: %w", err)
+	}
+	if w.Type == "" {
+		return Spec{}, fmt.Errorf("cluster Platform %q has no spec.type", name)
+	}
+	return w.toSpec(name), nil
 }
