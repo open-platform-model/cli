@@ -35,56 +35,6 @@ func runOPMWithEnv(t *testing.T, workDir, customHome string, timeout time.Durati
 	return stdoutBuf.String(), stderrBuf.String(), err
 }
 
-// makeBuildHome returns a HOME directory that mirrors the user's real ~/.opm
-// configuration so the binary loads providers via the published catalog. The
-// stub config used by other e2e tests is too minimal — it does not carry the
-// provider schema imports that the synthesis path's downstream render expects.
-//
-// Skips the test when no real ~/.opm/config.cue is available (CI must mount
-// one or otherwise pre-configure HOME).
-func makeBuildHome(t *testing.T) string {
-	t.Helper()
-
-	realHome, err := os.UserHomeDir()
-	if err != nil || realHome == "" {
-		t.Skip("no user home dir; skipping module build e2e")
-	}
-	srcOpm := filepath.Join(realHome, ".opm")
-	if _, statErr := os.Stat(filepath.Join(srcOpm, "config.cue")); statErr != nil {
-		t.Skipf("no real ~/.opm/config.cue at %q; skipping module build e2e", srcOpm)
-	}
-
-	dir, err := os.MkdirTemp("", "e2e-mod-build-home-*")
-	require.NoError(t, err)
-
-	dstOpm := filepath.Join(dir, ".opm")
-	require.NoError(t, copyDir(srcOpm, dstOpm))
-	return dir
-}
-
-// copyDir recursively copies src into dst. Created files are writable so a
-// test cleanup can later remove them (CUE cache files are extracted read-only).
-func copyDir(src, dst string) error {
-	return filepath.Walk(src, func(p string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, relErr := filepath.Rel(src, p)
-		if relErr != nil {
-			return relErr
-		}
-		target := filepath.Join(dst, rel)
-		if info.IsDir() {
-			return os.MkdirAll(target, 0o755)
-		}
-		data, readErr := os.ReadFile(p)
-		if readErr != nil {
-			return readErr
-		}
-		return os.WriteFile(target, data, 0o644)
-	})
-}
-
 // TestE2E_ModBuild_FromExampleModule renders a synthetic instance for a module
 // using its debugValues. It builds the repo-local podinfo fixture — a current
 // core@v2-line module (tests/fixtures/modules/podinfo) — so the test carries no
@@ -106,13 +56,13 @@ func TestE2E_ModBuild_FromExampleModule(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	customHome := makeBuildHome(t)
-	defer os.RemoveAll(customHome)
+	// A hermetic HOME seeded with what `opm config init` writes: the render
+	// resolves the local default platform module from it, never from the
+	// developer's real ~/.opm.
+	customHome := seedRenderHome(t)
 
-	stdout, stderr, err := runOPMWithEnv(t, tmpDir, customHome, 120*time.Second, "module", "build", modPath, "--name", "e2e-podinfo")
-	if err != nil {
-		t.Skipf("opm module build failed (likely registry/provider unavailable): err=%v stderr=%s", err, stderr)
-	}
+	stdout, stderr, err := runOPMWithEnv(t, tmpDir, customHome, 180*time.Second, "module", "build", modPath, "--name", "e2e-podinfo")
+	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Contains(t, stderr, "synthetic instance")
 	assert.Contains(t, stderr, "e2e-podinfo")
 	assert.NotEmpty(t, stdout, "expected manifest output on stdout")
