@@ -107,7 +107,7 @@ func run() error {
 	if err := os.WriteFile(configPath, []byte(config.DefaultConfigTemplate), 0o600); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "platform.cue"), []byte(config.DefaultPlatformTemplate), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "platform.cue"), []byte(platform.LegacyDefaultPlatformFile), 0o600); err != nil {
 		return err
 	}
 

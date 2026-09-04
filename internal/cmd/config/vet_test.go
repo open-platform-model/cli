@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,9 +18,8 @@ import (
 // directory as needed, and returns the file path.
 func writeOpmFile(t *testing.T, tmpHome, name, content string) {
 	t.Helper()
-	opmDir := filepath.Join(tmpHome, ".opm")
-	require.NoError(t, os.MkdirAll(opmDir, 0o700))
-	path := filepath.Join(opmDir, name)
+	path := filepath.Join(tmpHome, ".opm", name)
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 }
 
@@ -32,6 +32,43 @@ config: {
 	}
 }
 `
+
+// validVetConfigWithRegistry pins the registry the platform module build
+// resolves from, so registry-backed vet tests do not depend on the
+// process environment.
+var validVetConfigWithRegistry = `package config
+
+config: {
+	registry: "` + opmconfig.DefaultRegistry + `"
+	kubernetes: {
+		kubeconfig: "~/.kube/config"
+		namespace: "default"
+	}
+}
+`
+
+// skipIfRegistryUnavailable skips when err looks like the registry could
+// not be reached (the repo's posture for registry-backed unit tests).
+func skipIfRegistryUnavailable(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		return
+	}
+	msg := err.Error()
+	for _, needle := range []string{"dial tcp", "no such host", "connection refused", "i/o timeout", "context deadline exceeded", "TLS handshake", "network is unreachable"} {
+		if strings.Contains(msg, needle) {
+			t.Skipf("registry unavailable: %v", err)
+		}
+	}
+}
+
+// writePlatformModule seeds ~/.opm/platform under tmpHome and returns it.
+func writePlatformModule(t *testing.T, tmpHome string) string {
+	t.Helper()
+	dir := filepath.Join(tmpHome, ".opm", "platform")
+	require.NoError(t, opmconfig.WritePlatformModule(dir))
+	return dir
+}
 
 func TestNewConfigVetCmd(t *testing.T) {
 	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
@@ -54,8 +91,8 @@ func TestConfigVet_MissingConfigFile(t *testing.T) {
 	assert.Contains(t, err.Error(), "not found")
 }
 
-func TestConfigVet_ValidConfig_NoPlatformFile(t *testing.T) {
-	// A missing platform.cue is a note, not a failure (0006 D39).
+func TestConfigVet_ValidConfig_NoPlatformModule(t *testing.T) {
+	// A missing ~/.opm/platform/ is a note, not a failure.
 	tmpHome := setTempHome(t)
 	os.Unsetenv("OPM_CONFIG")
 	os.Unsetenv("OPM_REGISTRY")
@@ -69,49 +106,34 @@ func TestConfigVet_ValidConfig_NoPlatformFile(t *testing.T) {
 	require.NoError(t, cmd.Execute())
 }
 
-func TestConfigVet_ValidConfigAndPlatform(t *testing.T) {
+func TestConfigVet_ValidConfigAndPlatformModule(t *testing.T) {
+	// Registry-backed: the seeded module builds against the published core
+	// and catalogs, so vet passes end to end.
 	tmpHome := setTempHome(t)
 	os.Unsetenv("OPM_CONFIG")
 	os.Unsetenv("OPM_REGISTRY")
 
-	writeOpmFile(t, tmpHome, "config.cue", validVetConfig)
-	writeOpmFile(t, tmpHome, "platform.cue", opmconfig.DefaultPlatformTemplate)
-
-	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	require.NoError(t, cmd.Execute())
-}
-
-func TestConfigVet_InvalidPlatformFile(t *testing.T) {
-	tmpHome := setTempHome(t)
-	os.Unsetenv("OPM_CONFIG")
-	os.Unsetenv("OPM_REGISTRY")
-
-	writeOpmFile(t, tmpHome, "config.cue", validVetConfig)
-	// Missing required name/type
-	writeOpmFile(t, tmpHome, "platform.cue", `registry: {}
-`)
+	writeOpmFile(t, tmpHome, "config.cue", validVetConfigWithRegistry)
+	writePlatformModule(t, tmpHome)
 
 	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
 	err := cmd.Execute()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "platform")
+	skipIfRegistryUnavailable(t, err)
+	require.NoError(t, err)
 }
 
-func TestConfigVet_ImportBearingPlatformFile(t *testing.T) {
+func TestConfigVet_LegacyPlatformFileFails(t *testing.T) {
+	// A pre-0019 data-only platform.cue fails naming the file, with the
+	// --force migration hint; the config checks still pass first.
 	tmpHome := setTempHome(t)
 	os.Unsetenv("OPM_CONFIG")
 	os.Unsetenv("OPM_REGISTRY")
 
 	writeOpmFile(t, tmpHome, "config.cue", validVetConfig)
-	writeOpmFile(t, tmpHome, "platform.cue", `import "strings"
-
-name: strings.ToLower("Cluster")
+	writeOpmFile(t, tmpHome, "platform.cue", `name: "cluster"
 type: "kubernetes"
 `)
 
@@ -120,8 +142,56 @@ type: "kubernetes"
 	cmd.SetErr(&bytes.Buffer{})
 
 	err := cmd.Execute()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "data-only")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), filepath.Join(tmpHome, ".opm", "platform.cue"))
+	assert.Contains(t, err.Error(), "opm config init --force")
+}
+
+func TestConfigVet_PlatformDirNotAModule(t *testing.T) {
+	// A platform/ directory without cue.mod/module.cue is not a module.
+	tmpHome := setTempHome(t)
+	os.Unsetenv("OPM_CONFIG")
+	os.Unsetenv("OPM_REGISTRY")
+
+	writeOpmFile(t, tmpHome, "config.cue", validVetConfig)
+	writeOpmFile(t, tmpHome, filepath.Join("platform", "platform.cue"), `name: "cluster"
+`)
+
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "platform module")
+	assert.Contains(t, err.Error(), "cue.mod/module.cue")
+}
+
+func TestConfigVet_PlatformModuleUnpublishedPin(t *testing.T) {
+	// Registry-backed: a pin naming a build that does not exist fails vet
+	// naming the dependency and pointing at cue.mod.
+	tmpHome := setTempHome(t)
+	os.Unsetenv("OPM_CONFIG")
+	os.Unsetenv("OPM_REGISTRY")
+
+	writeOpmFile(t, tmpHome, "config.cue", validVetConfigWithRegistry)
+	dir := writePlatformModule(t, tmpHome)
+	modPath := filepath.Join(dir, "cue.mod", "module.cue")
+	content, err := os.ReadFile(modPath)
+	require.NoError(t, err)
+	bumped := strings.Replace(string(content), opmconfig.DefaultCatalogPins[0], "v4.9.9", 1)
+	require.NotEqual(t, string(content), bumped)
+	require.NoError(t, os.WriteFile(modPath, []byte(bumped), 0o600))
+
+	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	skipIfRegistryUnavailable(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "opmodel.dev/catalogs/opm@v4.9.9")
+	assert.Contains(t, err.Error(), modPath)
 }
 
 func TestConfigVet_StaleProvidersBlock(t *testing.T) {
@@ -292,8 +362,10 @@ config: {
 	}
 }
 `), 0o600))
-	// Invalid platform sibling must fail vet even at a custom path
-	require.NoError(t, os.WriteFile(filepath.Join(customDir, "platform.cue"), []byte(`bogus: true
+	// An invalid platform sibling (a platform/ that is not a module) must
+	// fail vet even at a custom path.
+	require.NoError(t, os.MkdirAll(filepath.Join(customDir, "platform"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(customDir, "platform", "platform.cue"), []byte(`bogus: true
 `), 0o600))
 
 	os.Setenv("OPM_CONFIG", customConfig)

@@ -3,7 +3,7 @@
 // Integration test for platform resolution + kernel materialization
 // (enhancement 0006 C2 Phase B, tasks 2.1/2.5).
 //
-// Verifies the seeded default ~/.opm/platform.cue resolves (offline
+// Verifies the legacy data-only ~/.opm/platform.cue resolves (offline
 // precedence, D21) and materializes through the kernel's
 // SynthesizePlatform → Materialize chain (the operator's own ingestion
 // path) against the registry in OPM_REGISTRY.
@@ -65,7 +65,7 @@ func run() error {
 	if err := os.WriteFile(configPath, []byte(config.DefaultConfigTemplate), 0o600); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "platform.cue"), []byte(config.DefaultPlatformTemplate), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "platform.cue"), []byte(platform.LegacyDefaultPlatformFile), 0o600); err != nil {
 		return err
 	}
 

@@ -38,6 +38,7 @@ import (
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/platform"
 )
 
 const (
@@ -252,9 +253,9 @@ func buildBinary() {
 	fmt.Println()
 }
 
-// itestHome is the temp HOME seeded with the post-D39 two-file ~/.opm
-// (config.cue + platform.cue) the binary renders against. Populated once by
-// seedHome.
+// itestHome is the temp HOME seeded with config.cue plus the legacy
+// data-only platform.cue the render path still reads (cli-render-switch
+// moves it onto the platform module). Populated once by seedHome.
 var itestHome string
 
 // realKubeconfig is the invoking user's kubeconfig path, resolved before the
@@ -279,7 +280,7 @@ func seedHome() {
 	if err := os.WriteFile(filepath.Join(opmDir, "config.cue"), []byte(config.DefaultConfigTemplate), 0o600); err != nil {
 		failf("writing temp config.cue: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(opmDir, "platform.cue"), []byte(config.DefaultPlatformTemplate), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(opmDir, "platform.cue"), []byte(platform.LegacyDefaultPlatformFile), 0o600); err != nil {
 		failf("writing temp platform.cue: %v", err)
 	}
 	itestHome = dir

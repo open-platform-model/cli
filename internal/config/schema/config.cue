@@ -13,7 +13,7 @@ package schema
 //
 // The config file is scalar data only — no CUE imports, no providers
 // (retired by enhancement 0006 D39; catalog selection lives in the
-// sibling ~/.opm/platform.cue, see schema/platform.cue).
+// sibling platform module ~/.opm/platform/, 0019 D5).
 #Config: {
 	// registry is the default registry for CUE module resolution.
 	// Can be overridden by --registry flag or OPM_REGISTRY env var.

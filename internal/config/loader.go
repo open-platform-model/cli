@@ -98,9 +98,10 @@ func loadConfigFile(cfg *GlobalConfig, configPath string) (string, error) {
 		return "", fmt.Errorf("reading config file: %w", err)
 	}
 
-	// Data-only contract (D39): reject CUE imports before evaluation, the
-	// same guard ValidatePlatformFile applies to platform.cue. CompileBytes
-	// would happily resolve stdlib imports otherwise.
+	// Data-only contract (D39): reject CUE imports before evaluation.
+	// CompileBytes would happily resolve stdlib imports otherwise. (The
+	// platform beside this file is a CUE module since 0019 D5 and is built,
+	// not parsed as data.)
 	astFile, err := parser.ParseFile(configPath, content)
 	if err != nil {
 		return "", &oerrors.DetailError{
@@ -260,7 +261,7 @@ func validateConfigSchema(ctx *cue.Context, value cue.Value, configPath string) 
 func removedFieldHint(errMsg string) string {
 	switch {
 	case strings.Contains(errMsg, "providers"):
-		return "The 'providers' field was removed — catalog selection now lives in ~/.opm/platform.cue. Re-run 'opm config init' (or delete the providers block and any ~/.opm/cue.mod/)"
+		return "The 'providers' field was removed — catalog selection now lives in the platform module ~/.opm/platform/. Re-run 'opm config init' (or delete the providers block and any ~/.opm/cue.mod/)"
 	case strings.Contains(errMsg, "cacheDir"):
 		return "The 'cacheDir' field was removed. Re-run 'opm config init' (or delete the field)"
 	default:

@@ -124,8 +124,8 @@ func createClusterPlatform(ctx context.Context, dyn dynamic.Interface, in synth.
 }
 
 // defaultPlatformType is the informational discriminator a seeded Platform
-// carries. It mirrors config.DefaultPlatformTemplate; the CRD requires the
-// field to be non-empty and nothing matches on its value.
+// carries. It mirrors the seeded platform module (config.DefaultPlatformCUE);
+// the CRD requires the field to be non-empty and nothing matches on its value.
 const defaultPlatformType = "kubernetes"
 
 // EnsureClusterPlatformForCatalog seeds the singleton cluster Platform with a

@@ -109,11 +109,18 @@ Read when entering `cli/`:
   carry the catalog's major suffix), and module identity is read verbatim from
   core-v2 metadata (`metadata.modulePath` is the complete registry address). CUE
   fixtures pin `opmodel.dev/core` `v2.0.0-alpha.6` and `opmodel.dev/catalogs/opm`
-  `v2.0.0`; the seeded platform template pins both first-party catalogs
-  (`opmodel.dev/catalogs/opm@v2`, `opmodel.dev/catalogs/k8s@v1`), each mirrored
-  in the same commit across four files: `internal/config/templates.go`
-  (source), `hack/platform.cue`, `hack/kind-platform.yaml`, and the operator's
-  sample Platform.
+  `v2.0.0`. The local default platform is a CUE module (0019 D5): `opm config
+  init` writes `~/.opm/platform/` (`cue.mod/module.cue` pinning core and both
+  first-party catalogs, `platform.cue` with one `#registry` entry per catalog
+  carrying it by import; module path `opmodel.dev/platforms/local@v0`). The
+  pins live in `internal/config/templates.go` (`DefaultCorePin`,
+  `DefaultCatalogPins`, rendered into the embedded `cue.mod`) and are mirrored
+  in the same commit across `hack/platform/cue.mod/module.cue` (kind dev flow,
+  offline commands) and `hack/kind-platform.yaml` (the cluster Platform CR);
+  the operator's sample Platform lives in its own repo. A pin bump is `fix(deps)`
+  (shipped content); the root `task deps:update` rewrites all three. Catalog
+  maintenance for users is editing the module's `cue.mod` pin and running
+  `opm config vet`, which builds the module through the kernel loader.
 - Integration + CUE workflows need registry config. Follow the Registry Policy in the root `CLAUDE.md` — both `opmodel.dev/*` and `testing.opmodel.dev/*` resolve from GHCR:
 
 ```bash
@@ -240,7 +247,7 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 - ASCII-safe output in docs, examples, terminal text.
 - Box-drawing: `[x]` / `[ ]` not Unicode checkmarks.
 - CLI docs: emphasize what happened + how to fix failures.
-- Follow SemVer + Conventional Commits for user-visible changes. The type decides the release: release-please hides `chore`, `test`, `ci` and `build`; `feat`, `fix`, `deps`, `perf`, `docs` and `refactor` release. Pins in `templates/*` and the `DefaultPlatformTemplate` seed in `internal/config/templates.go` are shipped, so bumping them is `fix(deps)`; `examples/*` and `tests/fixtures/*` bumps are `test(fixtures)` (no release). See the workspace commit skill.
+- Follow SemVer + Conventional Commits for user-visible changes. The type decides the release: release-please hides `chore`, `test`, `ci` and `build`; `feat`, `fix`, `deps`, `perf`, `docs` and `refactor` release. Pins in `templates/*` and the seeded platform module pins (`DefaultCorePin`, `DefaultCatalogPins`) in `internal/config/templates.go` are shipped, so bumping them is `fix(deps)`; `examples/*` and `tests/fixtures/*` bumps are `test(fixtures)` (no release). See the workspace commit skill.
 
 ## Agent Checklist
 

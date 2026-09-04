@@ -19,7 +19,8 @@ const (
 	SourceFlagFile Source = "flag"
 	// SourceClusterCR is the cluster Platform CR spec.
 	SourceClusterCR Source = "cluster"
-	// SourceLocalDefault is the local default ~/.opm/platform.cue.
+	// SourceLocalDefault is the local default beside the config file (the
+	// legacy platform.cue until cli-render-switch reads ~/.opm/platform/).
 	SourceLocalDefault Source = "local"
 )
 
@@ -61,7 +62,8 @@ type ResolveOptions struct {
 	// PlatformFlag is the --platform flag value (highest precedence).
 	PlatformFlag string
 	// ConfigPath is the resolved config file path; the local default
-	// platform file is its sibling platform.cue.
+	// platform is its sibling (legacy platform.cue here; the platform/
+	// module once cli-render-switch lands).
 	ConfigPath string
 	// Cluster is the cluster CR getter. nil means the command is offline
 	// (build/render) and MUST NOT read the cluster (D17/D21).
@@ -99,8 +101,10 @@ func Resolve(ctx context.Context, opts ResolveOptions) (synth.PlatformInput, Res
 		output.Warn(fallbackWarning)
 	}
 
-	// 3. Local default.
-	localPath := config.PlatformFilePath(opts.ConfigPath)
+	// 3. Local default. Still the legacy data-only file: cli-render-switch
+	// moves this onto config.PlatformDir (the module `opm config init`
+	// writes) and AcquirePlatformFromDir.
+	localPath := config.LegacyPlatformFilePath(opts.ConfigPath)
 	if _, err := os.Stat(localPath); os.IsNotExist(err) {
 		return synth.PlatformInput{}, Resolution{}, fmt.Errorf(
 			"no platform source available: no --platform flag%s and %s does not exist — run 'opm config init' to seed a local default platform",

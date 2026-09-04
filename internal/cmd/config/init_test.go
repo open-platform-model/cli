@@ -8,16 +8,25 @@ import (
 	"strings"
 	"testing"
 
-	"cuelang.org/go/cue"
+	"cuelang.org/go/mod/modfile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	opmconfig "github.com/open-platform-model/cli/internal/config"
 )
 
-// setTempHome points HOME at a fresh temp dir for the test.
+// setTempHome points HOME at a fresh temp dir for the test. The CUE module
+// cache stays where it is (CUE_CACHE_DIR pinned to the real user cache):
+// a registry-backed build would otherwise extract read-only module files
+// under the temp HOME and break t.TempDir's cleanup.
 func setTempHome(t *testing.T) string {
 	t.Helper()
+	if os.Getenv("CUE_CACHE_DIR") == "" {
+		if cacheDir, err := os.UserCacheDir(); err == nil {
+			os.Setenv("CUE_CACHE_DIR", filepath.Join(cacheDir, "cue"))
+			t.Cleanup(func() { os.Unsetenv("CUE_CACHE_DIR") })
+		}
+	}
 	tmpHome := t.TempDir()
 	origHome := os.Getenv("HOME")
 	os.Setenv("HOME", tmpHome)
@@ -47,11 +56,14 @@ func TestConfigInit_CreatesFiles(t *testing.T) {
 
 	require.NoError(t, cmd.Execute())
 
-	// Check files were created: config.cue + platform.cue, and NO cue.mod
+	// Check files were created: config.cue + the platform module, and NO
+	// data-only platform.cue and NO cue.mod beside config.cue (0019 D5).
 	opmDir := filepath.Join(tmpHome, ".opm")
 	assert.DirExists(t, opmDir)
 	assert.FileExists(t, filepath.Join(opmDir, "config.cue"))
-	assert.FileExists(t, filepath.Join(opmDir, "platform.cue"))
+	assert.FileExists(t, filepath.Join(opmDir, "platform", "cue.mod", "module.cue"))
+	assert.FileExists(t, filepath.Join(opmDir, "platform", "platform.cue"))
+	assert.NoFileExists(t, filepath.Join(opmDir, "platform.cue"))
 	assert.NoDirExists(t, filepath.Join(opmDir, "cue.mod"))
 }
 
@@ -66,13 +78,15 @@ func TestConfigInit_SecurePermissions(t *testing.T) {
 
 	// Check directory permissions (0700)
 	opmDir := filepath.Join(tmpHome, ".opm")
-	dirInfo, err := os.Stat(opmDir)
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o700), dirInfo.Mode().Perm())
+	for _, dir := range []string{opmDir, filepath.Join(opmDir, "platform"), filepath.Join(opmDir, "platform", "cue.mod")} {
+		dirInfo, err := os.Stat(dir)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o700), dirInfo.Mode().Perm(), dir)
+	}
 
 	// Check file permissions (0600)
-	for _, name := range []string{"config.cue", "platform.cue"} {
-		fileInfo, err := os.Stat(filepath.Join(opmDir, name))
+	for _, name := range []string{"config.cue", "platform/cue.mod/module.cue", "platform/platform.cue"} {
+		fileInfo, err := os.Stat(filepath.Join(opmDir, filepath.FromSlash(name)))
 		require.NoError(t, err)
 		assert.Equal(t, os.FileMode(0o600), fileInfo.Mode().Perm(), name)
 	}
@@ -137,18 +151,32 @@ func TestConfigInit_ConfigContent(t *testing.T) {
 	assert.NotContains(t, configStr, "providers")
 	assert.NotContains(t, configStr, "import")
 
-	// Check platform.cue content: both seeded catalog subscriptions, each
-	// with an explicit pinned version (enhancement 0006 D39; 0010 scalar
-	// subscriptions; seed-both-catalogs). No filter vocabulary, no retired
-	// kubernetes catalog.
-	platformFile := filepath.Join(tmpHome, ".opm", "platform.cue")
-	platformContent, err := os.ReadFile(platformFile)
+	// Check the platform module (0019 D5): cue.mod pins exactly one build
+	// for core and each seeded catalog; platform.cue carries one #registry
+	// entry per catalog embedding it by import, no version scalar, no
+	// filter vocabulary, no retired kubernetes catalog.
+	platformDir := filepath.Join(tmpHome, ".opm", "platform")
+	modContent, err := os.ReadFile(filepath.Join(platformDir, "cue.mod", "module.cue"))
 	require.NoError(t, err)
+	modFile, err := modfile.Parse(modContent, "cue.mod/module.cue")
+	require.NoError(t, err)
+	assert.Equal(t, "opmodel.dev/platforms/local@v0", modFile.Module)
+	require.Len(t, modFile.Deps, 3)
+	assert.Contains(t, modFile.Deps, "opmodel.dev/core@v2")
+	assert.Contains(t, modFile.Deps, "opmodel.dev/catalogs/opm@v4")
+	assert.Contains(t, modFile.Deps, "opmodel.dev/catalogs/k8s@v1")
+	for path, dep := range modFile.Deps {
+		assert.NotEmpty(t, dep.Version, path)
+	}
 
+	platformContent, err := os.ReadFile(filepath.Join(platformDir, "platform.cue"))
+	require.NoError(t, err)
 	platformStr := string(platformContent)
-	assert.Contains(t, platformStr, "opmodel.dev/catalogs/opm@v4")
-	assert.Contains(t, platformStr, "opmodel.dev/catalogs/k8s@v1")
-	assert.Equal(t, 2, strings.Count(platformStr, "version:"), "exactly two registry entries, each with a concrete version")
+	assert.Contains(t, platformStr, "core.#Platform")
+	assert.Contains(t, platformStr, `"opmodel.dev/catalogs/opm@v4": #catalog:`)
+	assert.Contains(t, platformStr, `"opmodel.dev/catalogs/k8s@v1": #catalog:`)
+	assert.Equal(t, 2, strings.Count(platformStr, "#catalog:"), "exactly two registry entries")
+	assert.NotContains(t, platformStr, "version:")
 	assert.NotContains(t, platformStr, "opmodel.dev/catalogs/kubernetes")
 	assert.NotContains(t, platformStr, "filter")
 }
@@ -163,18 +191,77 @@ func TestConfigInit_SeededPlatformOffersRawEscapeHatch(t *testing.T) {
 	require.NoError(t, cmd.Execute())
 
 	// A module demanding a contract from the raw passthrough catalog must
-	// already have a matching subscription in the seeded default, with no
-	// user edit to platform.cue.
-	platformFile := filepath.Join(tmpHome, ".opm", "platform.cue")
-	value, err := opmconfig.LoadPlatformFile(platformFile)
+	// already have a matching entry in the seeded default, with no user
+	// edit to the platform module: the entry imports the k8s catalog and
+	// its build is pinned in cue.mod.
+	platformDir := filepath.Join(tmpHome, ".opm", "platform")
+	platformContent, err := os.ReadFile(filepath.Join(platformDir, "platform.cue"))
 	require.NoError(t, err)
+	assert.Contains(t, string(platformContent), `"opmodel.dev/catalogs/k8s@v1": #catalog: k8s`,
+		"seeded platform must already subscribe to the raw escape-hatch catalog")
 
-	sub := value.LookupPath(cue.ParsePath(`registry."opmodel.dev/catalogs/k8s@v1"`))
-	require.True(t, sub.Exists(), "seeded platform must already subscribe to the raw escape-hatch catalog")
-
-	version, err := sub.LookupPath(cue.ParsePath("version")).String()
+	modContent, err := os.ReadFile(filepath.Join(platformDir, "cue.mod", "module.cue"))
 	require.NoError(t, err)
-	assert.NotEmpty(t, version)
+	modFile, err := modfile.Parse(modContent, "cue.mod/module.cue")
+	require.NoError(t, err)
+	require.Contains(t, modFile.Deps, "opmodel.dev/catalogs/k8s@v1")
+	assert.NotEmpty(t, modFile.Deps["opmodel.dev/catalogs/k8s@v1"].Version)
+}
+
+func TestConfigInit_RemovesLegacyPlatformFile(t *testing.T) {
+	// A pre-0019 data-only ~/.opm/platform.cue is removed when the module
+	// is written, whether init is fresh or forced (spec: legacy file is
+	// migrated).
+	tests := []struct {
+		name       string
+		withConfig bool
+		args       []string
+	}{
+		{name: "force over existing config", withConfig: true, args: []string{"--force"}},
+		{name: "fresh init with stale platform file", withConfig: false, args: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpHome := setTempHome(t)
+			opmDir := filepath.Join(tmpHome, ".opm")
+			require.NoError(t, os.MkdirAll(opmDir, 0o700))
+			if tt.withConfig {
+				require.NoError(t, os.WriteFile(filepath.Join(opmDir, "config.cue"), []byte("// old config"), 0o600))
+			}
+			legacy := filepath.Join(opmDir, "platform.cue")
+			require.NoError(t, os.WriteFile(legacy, []byte("name: \"cluster\"\ntype: \"kubernetes\"\n"), 0o600))
+
+			cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
+			cmd.SetArgs(tt.args)
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			require.NoError(t, cmd.Execute())
+
+			assert.NoFileExists(t, legacy, "legacy platform.cue must be removed")
+			assert.FileExists(t, filepath.Join(opmDir, "platform", "platform.cue"))
+			assert.FileExists(t, filepath.Join(opmDir, "platform", "cue.mod", "module.cue"))
+		})
+	}
+}
+
+func TestConfigInit_ForceRewritesPlatformModule(t *testing.T) {
+	// --force overwrites a hand-edited module with the seeded one.
+	tmpHome := setTempHome(t)
+	opmDir := filepath.Join(tmpHome, ".opm")
+	platformDir := filepath.Join(opmDir, "platform")
+	require.NoError(t, os.MkdirAll(filepath.Join(platformDir, "cue.mod"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(opmDir, "config.cue"), []byte("// old config"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(platformDir, "platform.cue"), []byte("bogus: true\n"), 0o600))
+
+	cmd := NewConfigInitCmd(&opmconfig.GlobalConfig{})
+	cmd.SetArgs([]string{"--force"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	require.NoError(t, cmd.Execute())
+
+	content, err := os.ReadFile(filepath.Join(platformDir, "platform.cue"))
+	require.NoError(t, err)
+	assert.Equal(t, opmconfig.DefaultPlatformCUE, string(content))
 }
 
 func TestConfigInit_OutputMessage(t *testing.T) {
@@ -191,5 +278,5 @@ func TestConfigInit_OutputMessage(t *testing.T) {
 	// Verify files exist (command worked correctly)
 	opmDir := filepath.Join(tmpHome, ".opm")
 	assert.FileExists(t, filepath.Join(opmDir, "config.cue"))
-	assert.FileExists(t, filepath.Join(opmDir, "platform.cue"))
+	assert.FileExists(t, filepath.Join(opmDir, "platform", "platform.cue"))
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,9 +25,10 @@ func writePlatformFile(t *testing.T, content string) string {
 	return path
 }
 
-func TestDecodeFile_DefaultTemplate(t *testing.T) {
-	// The seeded template must decode into a full PlatformInput.
-	path := writePlatformFile(t, config.DefaultPlatformTemplate)
+func TestDecodeFile_LegacyDefault(t *testing.T) {
+	// The legacy data file must decode into a full PlatformInput pinning
+	// the same builds the seeded platform module pins.
+	path := writePlatformFile(t, LegacyDefaultPlatformFile)
 
 	in, err := DecodeFile(path)
 	require.NoError(t, err)
@@ -38,12 +40,12 @@ func TestDecodeFile_DefaultTemplate(t *testing.T) {
 	opm, ok := in.Subscriptions["opmodel.dev/catalogs/opm@v4"]
 	require.True(t, ok)
 	assert.Nil(t, opm.Enable, "omitted enable defers to the schema default")
-	assert.Equal(t, "4.0.1", opm.Version)
+	assert.Equal(t, strings.TrimPrefix(config.DefaultCatalogPins[0], "v"), opm.Version)
 
 	k8s, ok := in.Subscriptions["opmodel.dev/catalogs/k8s@v1"]
 	require.True(t, ok)
 	assert.Nil(t, k8s.Enable, "omitted enable defers to the schema default")
-	assert.Equal(t, "1.0.0-alpha.2", k8s.Version)
+	assert.Equal(t, strings.TrimPrefix(config.DefaultCatalogPins[1], "v"), k8s.Version)
 }
 
 func TestDecodeFile_ExplicitEnableAndVersion(t *testing.T) {
@@ -183,13 +185,13 @@ func TestWrapClusterMaterializeError_LegacyCRHint(t *testing.T) {
 
 func TestWireRoundTrip_FileToInputToCRSpec(t *testing.T) {
 	// file → input → wire (write-if-absent doc) must preserve the document.
-	path := writePlatformFile(t, config.DefaultPlatformTemplate)
+	path := writePlatformFile(t, LegacyDefaultPlatformFile)
 	in, err := DecodeFile(path)
 	require.NoError(t, err)
 
 	w := wireFromInput(in)
 	assert.Equal(t, in.Type, w.Type)
 	assert.Len(t, w.Registry, len(in.Subscriptions))
-	assert.Equal(t, "4.0.1", w.Registry["opmodel.dev/catalogs/opm@v4"].Version)
-	assert.Equal(t, "1.0.0-alpha.2", w.Registry["opmodel.dev/catalogs/k8s@v1"].Version)
+	assert.Equal(t, strings.TrimPrefix(config.DefaultCatalogPins[0], "v"), w.Registry["opmodel.dev/catalogs/opm@v4"].Version)
+	assert.Equal(t, strings.TrimPrefix(config.DefaultCatalogPins[1], "v"), w.Registry["opmodel.dev/catalogs/k8s@v1"].Version)
 }

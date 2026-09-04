@@ -1,6 +1,11 @@
 // Package platform resolves the platform spec every render consumes, by
 // precedence: --platform flag file > cluster Platform CR > local default
-// ~/.opm/platform.cue (enhancement 0006 D11/D12/D17/D21/D22/D39).
+// (enhancement 0006 D11/D12/D17/D21/D22/D39).
+//
+// Transitional: the local default still reads the legacy data-only
+// platform.cue beside the config file. `opm config init` writes the module
+// form ~/.opm/platform/ since cli-config-platform-module (0019 D5);
+// cli-render-switch moves this package onto platform module directories.
 //
 // All three sources decode through one wire mapping into synth.PlatformInput
 // and materialize via the same kernel calls the operator's PlatformReconciler
@@ -10,6 +15,7 @@ package platform
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/open-platform-model/library/opm/helper/synth"
 
@@ -55,11 +61,34 @@ func (w wireSpec) toInput() synth.PlatformInput {
 	return in
 }
 
-// DecodeFile validates the platform file at path (data-only, embedded
-// projection schema — config.LoadPlatformFile, one read/compile) and
-// decodes it into a synth.PlatformInput.
+// LegacyDefaultPlatformFile is the pre-0019 data-only local platform file
+// (what `opm config init` wrote before the local default became the module
+// at ~/.opm/platform/), pinning the same catalog builds as
+// config.DefaultCatalogPins so it never drifts from the seeded module.
+//
+// It keeps this render path and its integration mains exercisable while
+// resolution still reads the data shape; cli-render-switch moves resolution
+// onto platform module directories and deletes it together with DecodeFile.
+var LegacyDefaultPlatformFile = fmt.Sprintf(`name: "cluster"
+type: "kubernetes"
+
+registry: {
+	%q: {
+		version: %q
+	}
+	%q: {
+		version: %q
+	}
+}
+`, config.DefaultCatalogPaths[0], strings.TrimPrefix(config.DefaultCatalogPins[0], "v"),
+	config.DefaultCatalogPaths[1], strings.TrimPrefix(config.DefaultCatalogPins[1], "v"))
+
+// DecodeFile validates the legacy data-only platform file at path (embedded
+// projection schema — config.LoadLegacyPlatformFile, one read/compile) and
+// decodes it into a synth.PlatformInput. Deleted by cli-render-switch, which
+// acquires platform module directories instead.
 func DecodeFile(path string) (synth.PlatformInput, error) {
-	value, err := config.LoadPlatformFile(path)
+	value, err := config.LoadLegacyPlatformFile(path)
 	if err != nil {
 		return synth.PlatformInput{}, err
 	}

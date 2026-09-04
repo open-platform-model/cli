@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/output"
 )
 
@@ -23,7 +22,7 @@ func tempOpmDir(t *testing.T, withLocalPlatform bool) string {
 	configPath := filepath.Join(dir, "config.cue")
 	if withLocalPlatform {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "platform.cue"),
-			[]byte(config.DefaultPlatformTemplate), 0o600))
+			[]byte(LegacyDefaultPlatformFile), 0o600))
 	}
 	return configPath
 }

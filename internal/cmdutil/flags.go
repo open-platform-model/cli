@@ -29,6 +29,8 @@ func (f *RenderFlags) AddTo(cmd *cobra.Command) {
 		"Target namespace")
 	cmd.Flags().StringVar(&f.InstanceName, "instance-name", "",
 		"Instance name (default: module name)") // Was: --release-name (enhancement 0002 D-X4.2)
+	// --platform still names the legacy data-only file; cli-render-switch
+	// makes it a platform module directory and rewrites this help text.
 	cmd.Flags().StringVar(&f.Platform, "platform", "",
 		"Path to a local platform file (overrides the cluster Platform and ~/.opm/platform.cue)")
 }
@@ -113,6 +115,7 @@ type InstanceFileFlags struct {
 func (f *InstanceFileFlags) AddTo(cmd *cobra.Command) {
 	cmd.Flags().StringArrayVarP(&f.Values, "values", "f", nil,
 		"Additional values files (can be repeated; default: values.cue next to the instance file)")
+	// See ModuleFlags.AddTo: the directory form lands with cli-render-switch.
 	cmd.Flags().StringVar(&f.Platform, "platform", "",
 		"Path to a local platform file (overrides the cluster Platform and ~/.opm/platform.cue)")
 }
