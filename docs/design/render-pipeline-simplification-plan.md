@@ -1,5 +1,7 @@
 # render pipeline simplification plan
 
+> **Historical (2026-09-04).** Written against the CLI's own render pipeline (`pkg/render`, `internal/instancefile`), which no longer exists: every render is now one `Kernel.Render` call in the library (OpenSpec change `cli-render-switch`, enhancement 0019). The present-tense statements below describe that retired pipeline. Kept for the record.
+
 ## Goal
 
 Reduce orchestration complexity around `instance build` and `instance apply` without changing user-visible behavior, render semantics, or Kubernetes functionality.

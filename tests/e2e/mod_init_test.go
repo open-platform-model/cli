@@ -178,8 +178,7 @@ func TestE2E_ModInit_ThenVet(t *testing.T) {
 	// literal, so metadata.version is concrete at the shape gate. A build that
 	// fails for any reason other than the gate (registry, platform) is skipped,
 	// but a gate refusal naming metadata.version is a hard failure.
-	buildHome := makeBuildHome(t)
-	defer os.RemoveAll(buildHome)
+	buildHome := seedRenderHome(t)
 	stdout, stderr, err = runOPMWithEnv(t, moduleDir, buildHome, 120*time.Second, "module", "build", moduleDir, "--name", "my-app")
 	assert.NotContains(t, stderr, `"metadata.version"`, "scaffold refused at the loader shape gate")
 	if err != nil {

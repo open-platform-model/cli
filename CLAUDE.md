@@ -93,10 +93,9 @@ Read when entering `cli/`:
 - `internal/dockercfg/` - single-entry read-modify-write of the standard OCI/docker credential file (`auths[host]` upsert; everything else passes through untouched; used by `registry login`).
 - `internal/kubernetes/` - cluster ops, status, apply, delete, events.
 - `internal/output/` - terminal formatting, log output, tables, manifests.
-- `internal/instancefile/` - instance file detection + loading.
-- `internal/workflow/` - shared render/apply/query orchestration.
-- `pkg/loader/` - CUE loading for modules, providers, releases.
-- `pkg/render/` - render pipeline logic.
+- `internal/platform/` - platform-source resolution by precedence (`--platform` dir > cluster Platform CR > `~/.opm/platform/`), cluster-CR module generation into the OPM home cache, the write-if-absent Platform seed, catalog version resolution for `operator install`.
+- `internal/workflow/` - shared render/apply/query orchestration; `render` holds the kernel env and the single `Kernel.Render` call.
+- `pkg/loader/` - instance-file values loading and local-replacement provenance.
 - `pkg/errors/` - shared structured errors; alias as `oerrors`.
 - `tests/integration/` - integration programs via `go run`.
 - `tests/e2e/` - end-to-end Go tests.
@@ -179,7 +178,7 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 - Direct: `go test -v ./... -run "TestName"`.
 - Narrow to one package for speed:
   - `go test ./internal/config -run TestLoad -v`
-  - `go test ./pkg/render -run TestFinalize -v`
+  - `go test ./internal/platform -run TestResolve -v`
 - Single subtest: use full regexp name via `go test -run`.
 
 ### Integration cluster helpers

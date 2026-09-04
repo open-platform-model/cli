@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Superseded (2026-09-04) by the library kernel render
+
+> **Superseded** by the OpenSpec change `cli-render-switch` (enhancement 0019 D8/D9): the CLI no longer owns a render pipeline. Every render is one `Kernel.Render` call in `github.com/open-platform-model/library`, which matches components and executes transformers inside a single CUE build; the CLI resolves a platform module directory, acquires the instance and platform through the kernel, and adapts the kernel's result (`internal/workflow/render`). The `Pipeline` interface, `RenderResult`, match plan and executor described below no longer exist. Kept for the record of why the earlier shape was chosen.
 
 ## Context
 

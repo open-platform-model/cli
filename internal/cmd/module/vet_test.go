@@ -105,12 +105,6 @@ func TestModVet_CUEValidationError(t *testing.T) {
 	// Integration tests with real fixtures would be better for this case.
 }
 
-func TestModVet_UnmatchedComponent(t *testing.T) {
-	t.Skip("Requires provider fixture with transformers — skipping for now")
-	// This test would require setting up a module with components that don't match
-	// any transformers in the provider, which requires a more complex test fixture.
-}
-
 // TestModVet_ValuesDetailLogic checks the display detail string assembled
 // for the "Values satisfy #config" vet check line.
 func TestModVet_ValuesDetailLogic(t *testing.T) {
