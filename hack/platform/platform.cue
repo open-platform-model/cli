@@ -2,9 +2,8 @@
 // 0019 D5), the sibling platform/ of hack/opm-config.cue (config.PlatformDir).
 // This is the D21 precedence source 3 — used only by offline commands
 // (`opm instance build`/`vet`) which never read the cluster; cluster-facing
-// commands resolve the Platform CR (hack/kind-platform.yaml) instead.
-// Transitional: resolution reads this directory only once cli-render-switch
-// lands; until then the offline dev flow needs --platform <file>.
+// commands resolve the Platform CR (hack/kind-platform.yaml) instead and
+// generate a platform module from it under the OPM home cache.
 //
 // Catalog builds are pinned in cue.mod/module.cue, never here. Those pins
 // MIRROR internal/config/templates.go's seeded module (DefaultCorePin,

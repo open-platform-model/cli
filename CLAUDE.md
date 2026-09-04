@@ -106,10 +106,9 @@ Read when entering `cli/`:
 - Go version in `go.mod`: `1.26.0`.
 - **Schema line: OPM v2.** The CLI embeds the library on the core v2 line; the
   cluster Platform CR surface is scalar subscriptions (`{enable?, version!}`,
-  registry keys carry the catalog's major suffix; the render path still reads
-  that shape until `cli-render-switch`), and module identity is read verbatim
-  from core-v2 metadata (`metadata.modulePath` is the complete registry
-  address). CUE fixtures pin `opmodel.dev/core` `v2.0.0-alpha.6` and
+  registry keys carry the catalog's major suffix), and module identity is read
+  verbatim from core-v2 metadata (`metadata.modulePath` is the complete
+  registry address). CUE fixtures pin `opmodel.dev/core` `v2.0.0-alpha.6` and
   `opmodel.dev/catalogs/opm` `v4.0.1`. The local default platform is a CUE module (0019 D5): `opm config
   init` writes `~/.opm/platform/` (`cue.mod/module.cue` pinning core and both
   first-party catalogs, `platform.cue` with one `#registry` entry per catalog
@@ -122,6 +121,20 @@ Read when entering `cli/`:
   (shipped content); the root `task deps:update` rewrites all three. Catalog
   maintenance for users is editing the module's `cue.mod` pin and running
   `opm config vet`, which builds the module through the kernel loader.
+- **Render path (0019 D5/D7/D8).** Every render-bearing command resolves a
+  platform *module directory* by precedence (`--platform <dir>` > cluster
+  Platform CR > `~/.opm/platform/`; `internal/platform.Resolve`), acquires it
+  once with the kernel's `AcquirePlatformFromDir` and renders with the single
+  `Kernel.Render` call (`internal/workflow/render`). The CLI holds no built
+  platform value and carries no matching or transformer execution. The cluster
+  CR is turned into a module first through the library's
+  `opm/helper/platformmodule` generator (byte-identical to the operator's),
+  cached under `~/.opm/cache/platforms/<content-hash>/` (idempotent, derived
+  state, safe to delete; moves with `--config`). The write-if-absent Platform
+  seed is decoded from the built platform the render consumed
+  (`platform.SpecFromPlatform`). Catalog version skew follows the config
+  file's `skewPolicy` (`warn` default, `refuse`) for local and flag platforms;
+  the cluster CR's `spec.skewPolicy` wins when it is the source.
 - Integration + CUE workflows need registry config. Follow the Registry Policy in the root `CLAUDE.md` — both `opmodel.dev/*` and `testing.opmodel.dev/*` resolve from GHCR:
 
 ```bash
