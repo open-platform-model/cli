@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-alpha.20](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.19...v1.0.0-alpha.20) (2026-09-05)
+
+
+### Code Refactoring
+
+* render-switch follow-ups from verification ([#204](https://github.com/open-platform-model/cli/issues/204)) ([31e5643](https://github.com/open-platform-model/cli/commit/31e56439193d85b8fb710e53e685596cb7f883ce))
+
 ## [1.0.0-alpha.19](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.18...v1.0.0-alpha.19) (2026-09-04)
 
 
