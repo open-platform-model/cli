@@ -4,7 +4,7 @@ Every task before 6.1 runs against a local `replace github.com/open-platform-mod
 
 ## 1. Acquire calls drop their load options
 
-- [ ] 1.1 Add `replace github.com/open-platform-model/library => ../library` to `go.mod`, then `go build ./...`; verify the only failures reported are the `opm/helper/loader/file` and `opm/helper/synth` import lines in the eleven files that name them (record the list — it is the work of tasks 1.2 to 2.3).
+- [ ] 1.1 Add `replace github.com/open-platform-model/library => ../library` to `go.mod`, then `go build ./...`; verify the only failures reported are the `opm/helper/loader/file` and `opm/helper/synth` import lines in the eleven files that name them (record the list — it is the work of tasks 1.2 to 2.3) plus the `opm/compat` import lines in `internal/publish/compat.go` and `internal/scaffold/scaffold.go`, which task 5 clears.
 - [ ] 1.2 `internal/workflow/render/kernel.go`, `render.go`: drop the `loaderfile.LoadOptions{Registry: ...}` argument from `AcquirePlatformFromDir` and `AcquireInstanceFromDir`, and pass the values sources as the trailing variadic arguments instead of `kernel.WithValues(sources...)`; drop the `loaderfile` import from both; verify `go build ./internal/workflow/render/` is green and `go test ./internal/workflow/render/...` passes.
 - [ ] 1.3 `internal/workflow/render/module.go`: replace `LoadModulePackage` + `NewModuleFromValue` with one `AcquireModuleFromDir(ctx, opts.ModulePath)`, and `synth.InstanceInput` with `kernel.InstanceInput`; drop both helper imports; verify `opm module build` against a fixture module directory renders the same resource set as before the edit.
 - [ ] 1.4 `internal/config/platform.go`: replace `LoadPlatformPackage` + `NewPlatformFromValue` with `AcquirePlatformFromDir(ctx, dir)` and the two `loaderfile.Err*` comparisons with `liberrors.Err*`; verify `go test ./internal/config/...` passes and a wrong-kind platform directory still produces the CLI's existing refusal message.
@@ -27,11 +27,17 @@ Every task before 6.1 runs against a local `replace github.com/open-platform-mod
 - [ ] 4.2 `internal/workflow/render/types.go`: reword the `Warnings` field doc to say the CLI composes it from the diagnostics rows; verify `grep -rn 'out.Warnings\|RenderResult.Warnings' --include=*.go .` is empty.
 - [ ] 4.3 Add a test in `internal/workflow/render` covering the formatter against a diagnostics value with one unhandled optional trait and one newer resolved-versions row; verify it asserts both lines and fails when either row is dropped.
 
-## 5. Integration programs and the gate
+## 5. Catalog compatibility moves in from the library
 
-- [ ] 5.1 `tests/integration/platform-build/main.go`, `tests/integration/render-parity/main.go`: apply the same acquire-surface edits (drop load options, `synth.InstanceInput` -> `kernel.InstanceInput`); verify both build and `go run ./tests/integration/render-parity` reports identical CLI and operator-sequence render digests.
-- [ ] 5.2 `task fmt`, `task lint`, `task test` green; verify `go vet ./...` is clean and no file under `internal/` or `tests/` imports `github.com/open-platform-model/library/opm/helper/loader/file`, `.../opm/helper/synth` or `.../opm/core`.
+- [x] 5.1 Copy `compat.go`, `level.go`, `compat_test.go` and `level_test.go` from the library's deleted `opm/compat` into `internal/compat/`, package name unchanged; edit the package doc so its consumer list names the publish gate and `opm catalog registry check --compat` only (library-matching no longer exists) and no longer advertises `HighestStable`; verify `go build ./internal/compat/` and `go test ./internal/compat/...` pass, including `TestAPIVersionPatternCoreParity`.
+- [x] 5.2 Declare `highestStable` in `internal/scaffold/predecessor.go` with `predecessor.go`'s doc comment (re-aiming its pointer at the gate-side rule from `the CLI` to `internal/publish`), add its four `predecessor_test.go` cases as `internal/scaffold/predecessor_test.go`, and change `scaffold.go:109` to call it, dropping the `compat` import and re-aiming the `ResolveTemplateVersion` doc comment's `compat.HighestStable` reference; verify `go test ./internal/scaffold/...` passes and `grep -n 'compat' internal/scaffold/*.go` is empty.
+- [x] 5.3 Repoint `internal/publish/compat.go`'s import to `github.com/open-platform-model/cli/internal/compat`, then `go mod tidy`; verify `go build ./...`, `go vet ./...` and `go test ./internal/publish/...` pass, `github.com/Masterminds/semver/v3` sits in the direct require block of `go.mod`, and `grep -rn 'library/opm/compat' --include='*.go' .` is empty.
 
-## 6. Pin the released library
+## 6. Integration programs and the gate
 
-- [ ] 6.1 Remove the `replace` directive and bump `github.com/open-platform-model/library` in `go.mod` to the published alpha carrying both `one-api-tier` and `cue-owned-verdicts`, then `task tidy`; verify `task check` is green with no `replace` directive present and `openspec validate migrate-kernel-api-and-verdicts` passes.
+- [ ] 6.1 `tests/integration/platform-build/main.go`, `tests/integration/render-parity/main.go`: apply the same acquire-surface edits (drop load options, `synth.InstanceInput` -> `kernel.InstanceInput`); verify both build and `go run ./tests/integration/render-parity` reports identical CLI and operator-sequence render digests.
+- [ ] 6.2 `task fmt`, `task lint`, `task test` green; verify `go vet ./...` is clean and no file under `internal/` or `tests/` imports `github.com/open-platform-model/library/opm/helper/loader/file`, `.../opm/helper/synth`, `.../opm/core` or `.../opm/compat`.
+
+## 7. Pin the released library
+
+- [ ] 7.1 Remove the `replace` directive and bump `github.com/open-platform-model/library` in `go.mod` to the published alpha carrying `one-api-tier`, `cue-owned-verdicts` and `move-compat-to-cli`, then `task tidy`; verify `task check` is green with no `replace` directive present and `openspec validate migrate-kernel-api-and-verdicts` passes.

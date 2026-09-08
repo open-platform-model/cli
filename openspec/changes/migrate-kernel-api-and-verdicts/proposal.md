@@ -5,7 +5,9 @@ The CLI pins `library v1.0.0-alpha.26` and cannot build against `library` main. 
 1. **`one-api-tier`** (merged, unreleased) folded the loader and synth helpers into one API tier. `opm/helper/loader/file` and `opm/helper/synth` are gone, the raw value tier (`LoadModulePackage`, `LoadPlatformPackage`, `LoadInstancePackage`, `Kernel.NewModuleFromValue`, `Kernel.NewPlatformFromValue`) is gone, no acquire verb takes a per-call `LoadOptions`, and the shape-gate sentinels moved to `opm/errors`. Eleven CLI files import one of the two deleted helper packages; `go build ./...` against `../library` fails at the import line before any type error is reachable.
 2. **`cue-owned-verdicts`** (in flight in `library`) makes the render build own every verdict. `RenderResult.Warnings` is removed, `RenderDiagnostics.Unmatched` / `.Unify` / `.OverSubscribed` change element type, and five `opm/errors` types are renamed or reshaped (`UnifyError` -> `UnifyRefusal`, `MatchResult` -> `CandidateVerdict`, `OverSubscribedContractError` -> the `OverSubscribedContract` row plus a `*OverSubscribedContractsError` aggregate, `UnmatchedComponentsError.Components` becomes `[]UnmatchedComponent`, `TransformError.ComponentName`/`.TransformerFQN` become `.Component`/`.Transformer`).
 
-Both land in the same library alpha, and the CLI cannot compile between them: the acquire-surface migration and the verdict migration touch the same four files under `internal/workflow/render/`. Splitting them into two changes would leave a red tree at the boundary, which is why this is one change per repo rather than two.
+3. **`move-compat-to-cli`** (archived in `library` on 2026-09-08) deleted `opm/compat`. Its only callers are this repo: the publish gate reads `ParseLevel` and `CheckAtLevel` (`internal/publish/compat.go:133,287`) and template version selection reads `HighestStable` (`internal/scaffold/scaffold.go:109`). The comparator ships here now, so a comparator change is one CLI PR instead of a library release plus a re-pin.
+
+All three land in the same library alpha, and the CLI cannot compile between them: the acquire-surface migration and the verdict migration touch the same four files under `internal/workflow/render/`. Splitting them would leave a red tree at the boundary, which is why this is one change per repo rather than three. Slice 5 joins for the same reason plus a second one: `internal/scaffold/scaffold.go` is edited by both the acquire-surface migration and the comparator adoption.
 
 The second change also hands the CLI a job it already wanted. `internal/cmdutil/output.go` reconstructs a `*UnresolvedDemandsError` from diagnostics rows purely to reach its own formatter, and `internal/workflow/render/validation.go` re-derives the unmatched line the kernel had already worded. With the kernel out of the prose business (library Principle IV), the CLI owns the wording outright: one formatter over rows, no aggregate reconstruction, and an unmatched component can finally say WHICH candidate was refused and why, because the candidate matrix now arrives on the diagnostics instead of only on the refusal.
 
@@ -28,13 +30,20 @@ The second change also hands the CLI a job it already wanted. `internal/cmdutil/
 - The over-subscription `errors.As` target becomes `*liberrors.OverSubscribedContractsError` (a pointer aggregate carrying every row), replacing the value-typed `OverSubscribedContractError` that was joined into the gate once per row.
 - `liberrors.TransformError` field reads become `.Component` / `.Transformer`.
 
+**Catalog compatibility (`move-compat-to-cli`):**
+
+- `internal/compat/compat.go` and `level.go` arrive verbatim from the library, package name unchanged; the package doc's consumer list drops library-matching, which no longer exists. `compat_test.go` and `level_test.go` arrive with them, including the core-grammar parity pin (`TestAPIVersionPatternCoreParity`).
+- `internal/publish/compat.go` imports `github.com/open-platform-model/cli/internal/compat`; nothing else about the gate changes.
+- `HighestStable` becomes an unexported `highestStable` in `internal/scaffold`, its only caller, carrying `predecessor.go`'s doc comment (which explains why the float selector is not the gate's predecessor rule) and the four cases of `predecessor_test.go`. `internal/scaffold/scaffold.go` drops its `compat` import.
+- `go.mod` promotes `github.com/Masterminds/semver/v3` from an indirect to a direct requirement.
+
 **Dependency:** `go.mod` moves `github.com/open-platform-model/library` to the alpha carrying both changes. That alpha does not exist yet, so this change is blocked on the `library` release.
 
 ## Capabilities
 
 ### New Capabilities
 
-None.
+- `catalog-compatibility`: the comparison walk, level ladder and predecessor selection the library removed with `move-compat-to-cli`, restated against `cli/internal/compat`. Semantics, signatures and tests are unchanged; only the owning repo moves.
 
 ### Modified Capabilities
 
@@ -43,9 +52,9 @@ None.
 
 ## Impact
 
-**SemVer:** PATCH on the CLI's own surface. Every changed symbol is under `internal/`; `pkg/errors` and `pkg/loader` are untouched, and no command, flag, output format or exit code changes. The library dependency bump is a MAJOR bump of a pre-GA dependency, absorbed here.
+**SemVer:** PATCH on the CLI's own surface. Every changed symbol, including the arriving comparator, is under `internal/`; `pkg/errors` and `pkg/loader` are untouched, and no command, flag, output format or exit code changes. The library dependency bump is a MAJOR bump of a pre-GA dependency, absorbed here.
 
-**Affected packages (11 files import a deleted helper package, 6 more read a reshaped verdict):**
+**Affected packages (11 files import a deleted helper package, 6 more read a reshaped verdict, 4 arrive from the library):**
 
 - `internal/workflow/render/` — `kernel.go` (platform acquire), `render.go` (instance acquire, `Result.Warnings` producer), `module.go` (module acquire + synth), `validation.go` (`formatRenderDiagnostics`), `types.go` (the `Warnings` doc comment), `output_internal.go` (reader, unchanged behavior).
 - `internal/config/platform.go` — platform acquire plus the two sentinel comparisons.
@@ -54,9 +63,12 @@ None.
 - `internal/cmdutil/output.go` — `FormatUnresolvedDemands` signature, the `errors.As` branch.
 - `internal/cmd/instance/diff.go` — reads `Result.Warnings`; unchanged if the producer keeps filling it.
 - `tests/integration/platform-build/main.go`, `tests/integration/render-parity/main.go`.
+- `internal/compat/` — four files added (`compat.go`, `level.go`, `compat_test.go`, `level_test.go`), copied from the library.
+- `internal/scaffold/predecessor.go`, `predecessor_test.go` — added; `scaffold.go:109` calls `highestStable` and drops the `compat` import.
+- `internal/publish/compat.go` — one import line.
 
 **Tests:** `internal/cmd/module/verbose_output_test.go` constructs a `Result` with `Warnings`; unchanged. Any test asserting on the kernel's exact warning wording moves to the CLI's wording. The render-parity integration program must keep producing identical digests: it renders, and this change does not touch what is rendered.
 
-**Blocked on:** a `library` release carrying both `one-api-tier` and `cue-owned-verdicts`. Until then the work is verifiable only against a local `replace` directive, which is how the tasks stage it.
+**Blocked on:** a `library` release carrying `one-api-tier`, `cue-owned-verdicts` and `move-compat-to-cli`. Until then the work is verifiable only against a local `replace` directive, which is how the tasks stage it.
 
 **Sibling change:** `opm-operator` carries the same migration for its own consumer surface, as a separate change in that repo.
