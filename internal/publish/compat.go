@@ -15,7 +15,7 @@ import (
 	"cuelang.org/go/cue/load"
 	"golang.org/x/mod/semver"
 
-	"github.com/open-platform-model/library/opm/compat"
+	"github.com/open-platform-model/cli/internal/compat"
 
 	"github.com/open-platform-model/cli/internal/output"
 )

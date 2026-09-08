@@ -124,6 +124,21 @@ linters:
           - revive
         text: "stutters; consider"
         path: internal/core/(component|module|modulerelease|provider|transformer)/
+      # internal/compat arrived byte-for-byte from library/opm/compat when the
+      # comparator moved to the home of its only callers. The files are kept
+      # identical to that history so the move reviews as a move and so a future
+      # library-side fix can be diffed straight across. One finding must never
+      # be "fixed": level.go's apiVersionPattern is pinned character-for-character
+      # to core's #APIVersionType declaration by TestAPIVersionPatternCoreParity,
+      # so rewriting [0-9] as \d would break the pin the test exists to hold.
+      - linters:
+          - errcheck
+          - exhaustive
+          - gocritic
+          - misspell
+          - prealloc
+          - unparam
+        path: internal/compat/
     paths:
       - third_party$
       - builtin$

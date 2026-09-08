@@ -14,7 +14,6 @@ import (
 	"cuelang.org/go/mod/modconfig"
 	"cuelang.org/go/mod/module"
 
-	"github.com/open-platform-model/library/opm/compat"
 	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
 	"github.com/open-platform-model/library/opm/kernel"
 
@@ -58,8 +57,8 @@ func Leaf(modulePath string) string {
 // ResolveTemplateVersion selects the version a reference resolves to over
 // the published history: an exact reference must exist; a floating one takes
 // the newest release within its constraint — stable preferred, prerelease
-// fallback on a prerelease-only history (compat.HighestStable, its first true
-// caller). Returns the `v`-prefixed tag.
+// fallback on a prerelease-only history ([highestStable], its only caller).
+// Returns the `v`-prefixed tag.
 //
 // Failure modes keep D25's honesty contract: a transport failure is a
 // *publish.ConnectivityError naming the lookup and registry; an empty or
@@ -106,7 +105,7 @@ func ResolveTemplateVersion(ctx context.Context, registry string, ref TemplateRe
 			Action:      "List the official templates:  opm module template list",
 		}}
 	}
-	return compat.HighestStable(versions), nil
+	return highestStable(versions), nil
 }
 
 // refEvidence renders the resolution inputs a refusal reports: the reference,

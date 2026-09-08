@@ -11,6 +11,9 @@ See `proposal.md` § Why for the motivation. The design-relevant state:
 - The CLI's `render.Result.Warnings []string` is read by `output_internal.go` and `cmd/instance/diff.go` and constructed in exactly one place (`render.go:201`). It is a CLI type, not a library type, so removing the library's field does not force the CLI's field to change shape.
 - `internal/cmdutil/output.go` already owns the unresolved-demand wording; it just takes the aggregate as its parameter and reconstructs one in `validation.go` to call it.
 
+- `internal/publish/compat.go` and `internal/scaffold/scaffold.go` are the only readers of `library/opm/compat`. The publish gate uses `ParseLevel` and `CheckAtLevel`; the scaffold uses `HighestStable` and nothing else. The operator has no import, and `catalog_opm`'s release workflow reaches the comparator through the pinned `opm` binary.
+- `internal/publish` already holds a file named `compat.go` — the gate — so that package cannot receive the pure walk without merging two concerns enhancement 0011 keeps apart.
+
 Constraint: the target library alpha does not exist yet. Every task must be verifiable against a local `replace` directive and must leave `go.mod` pinned to a real published version until the alpha lands.
 
 ## Goals / Non-Goals
@@ -31,12 +34,26 @@ Constraint: the target library alpha does not exist yet. Every task must be veri
 
 ## Decisions
 
-### The two library migrations land as one change, not two
+### The three library migrations land as one change, not three
 
-**Context**: `one-api-tier` and `cue-owned-verdicts` are separate library changes, and the repo's constitution prefers tiny batches.
-**Explored**: (A) two CLI changes, acquire-surface first; (B) one change.
+**Context**: `one-api-tier`, `cue-owned-verdicts` and `move-compat-to-cli` are separate library changes, and the repo's constitution prefers tiny batches.
+**Explored**: (A) one CLI change per library change, acquire-surface first; (B) one change.
 **Decision**: B.
-**Rationale**: both library changes ship in the same alpha, so there is no `go.mod` pin at which only the first is present. Under (A) the first change would have to be verified against a library commit rather than a release, and the four files under `internal/workflow/render/` that both changes touch would be edited twice. The batch is still small — seventeen files, almost all one-line deletions — and the task groups below are individually reviewable, which is what the small-batch principle is actually protecting.
+**Rationale**: all three library changes ship in the same alpha, so there is no `go.mod` pin at which only some are present. Under (A) the earlier changes would have to be verified against library commits rather than a release, the four files under `internal/workflow/render/` that the first two both touch would be edited twice, and `internal/scaffold/scaffold.go` — which the acquire-surface migration and the comparator adoption both edit — would be edited twice as well. The batch is still small: seventeen files of mostly one-line deletions, plus four files that arrive verbatim and are reviewed as a move rather than as new code. The task groups below are individually reviewable, which is what the small-batch principle is actually protecting.
+
+### The comparator lands in `internal/compat`, not `internal/publish`
+
+**Context**: `library/opm/compat` is deleted and its two callers are here. `internal/publish` already holds a `compat.go` (the publish gate), and `cli/pkg/compat` would keep the package importable by other Go programs.
+**Explored**: (A) merge the walk into `internal/publish`; (B) `cli/pkg/compat`; (C) `cli/internal/compat`.
+**Decision**: C, the destination the library change's own design settled on. The package name stays `compat`, so the four files move byte-for-byte and the two call sites change only an import path.
+**Rationale**: (A) joins the pure walk with gate policy, which enhancement 0011 deliberately keeps apart — the walk reports, the gate decides. (B) preserves a sharing that never existed: every consumer 0011 D9 named turned out to be this binary, and an exported package drags the CLI module's dependency graph into any importer. `internal` states the fact that no non-CLI consumer exists; the day one appears, promoting the directory is a rename inside this repo, because the package is pure and self-contained.
+
+### `HighestStable` becomes `scaffold.highestStable`
+
+**Context**: 0011 D23 kept `HighestStable` only because template resolution calls it. That caller is `scaffold.ResolveTemplateVersion`, and nothing else in this repo calls it.
+**Explored**: (A) keep it exported beside the ladder in `internal/compat`; (B) unexported in `internal/scaffold`.
+**Decision**: B, carrying `predecessor.go`'s doc comment and the four cases of `predecessor_test.go`.
+**Rationale**: it shares nothing with the comparator but the semver import, and it has no compatibility semantics at all — a "compat" package holding a float selector is the confusion D23 had to spend a paragraph explaining away. The doc comment travels because it is the thing that prevents the confusion returning; only its pointer to the gate-side rule is re-aimed at `internal/publish`.
 
 ### The publish gate takes a kernel rather than growing one
 
@@ -75,8 +92,9 @@ Constraint: the target library alpha does not exist yet. Every task must be veri
 
 1. Add `replace github.com/open-platform-model/library => ../library` locally. Land the acquire-surface group (tasks 1-2) — mechanical, compiler-guided, no behavior change.
 2. Land the verdict group (tasks 3-4): the formatters, then the `Result.Warnings` producer.
-3. Run the full gate plus the two integration programs (task 5).
-4. When the library alpha is published, replace the `replace` directive with the real pin and re-run the gate (task 6). Rollback is a re-pin to `v1.0.0-alpha.26` together with a revert of this change; no persisted state, cluster resource or output format changes shape.
+3. Land the comparator group (task 5): the copied package, then the scaffold selector, then the import repoint and `go mod tidy`. Independent of tasks 1-4 — it compiles against the current pin too — so it can be reviewed on its own.
+4. Run the full gate plus the two integration programs (task 6).
+5. When the library alpha is published, replace the `replace` directive with the real pin and re-run the gate (task 7). Rollback is a re-pin to `v1.0.0-alpha.26` together with a revert of this change; no persisted state, cluster resource or output format changes shape.
 
 ## Open Questions
 
