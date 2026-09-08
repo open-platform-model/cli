@@ -11,6 +11,7 @@ See `proposal.md` § Why for the motivation. The design-relevant state:
 - The CLI's `render.Result.Warnings []string` is read by `output_internal.go` and `cmd/instance/diff.go` and constructed in exactly one place (`render.go:201`). It is a CLI type, not a library type, so removing the library's field does not force the CLI's field to change shape.
 - `internal/cmdutil/output.go` already owns the unresolved-demand wording; it just takes the aggregate as its parameter and reconstructs one in `validation.go` to call it.
 
+- `publish.Options.Context` is the one `*cue.Context` the publish pipeline builds every catalog package in, and `Options.IdentitySchema` plus the catalog gate schemas are looked up in the schema value the same kernel served; the pipeline unifies the two, so they must share a context. Today both come from `k.CueContext()`. After `kernel-owns-no-build-context` the kernel has no context to hand out and the schema value's own (`Value.Context()`) is the one both halves already live in.
 - `internal/publish/compat.go` and `internal/scaffold/scaffold.go` are the only readers of `library/opm/compat`. The publish gate uses `ParseLevel` and `CheckAtLevel`; the scaffold uses `HighestStable` and nothing else. The operator has no import, and `catalog_opm`'s release workflow reaches the comparator through the pinned `opm` binary.
 - `internal/publish` already holds a file named `compat.go` — the gate — so that package cannot receive the pure walk without merging two concerns enhancement 0011 keeps apart.
 
@@ -34,12 +35,12 @@ Constraint: the target library alpha does not exist yet. Every task must be veri
 
 ## Decisions
 
-### The three library migrations land as one change, not three
+### The four library migrations land as one change, not four
 
-**Context**: `one-api-tier`, `cue-owned-verdicts` and `move-compat-to-cli` are separate library changes, and the repo's constitution prefers tiny batches.
+**Context**: `one-api-tier`, `cue-owned-verdicts`, `move-compat-to-cli` and `kernel-owns-no-build-context` are separate library changes, and the repo's constitution prefers tiny batches.
 **Explored**: (A) one CLI change per library change, acquire-surface first; (B) one change.
 **Decision**: B.
-**Rationale**: all three library changes ship in the same alpha, so there is no `go.mod` pin at which only some are present. Under (A) the earlier changes would have to be verified against library commits rather than a release, the four files under `internal/workflow/render/` that the first two both touch would be edited twice, and `internal/scaffold/scaffold.go` — which the acquire-surface migration and the comparator adoption both edit — would be edited twice as well. The batch is still small: seventeen files of mostly one-line deletions, plus four files that arrive verbatim and are reviewed as a move rather than as new code. The task groups below are individually reviewable, which is what the small-batch principle is actually protecting.
+**Rationale**: all four library changes ship in the same alpha, so there is no `go.mod` pin at which only some are present. Under (A) the earlier changes would have to be verified against library commits rather than a release, the four files under `internal/workflow/render/` that the first two both touch would be edited twice, and `internal/scaffold/scaffold.go` — which the acquire-surface migration and the comparator adoption both edit — would be edited twice as well. The batch is still small: seventeen files of mostly one-line deletions, plus four files that arrive verbatim and are reviewed as a move rather than as new code. The task groups below are individually reviewable, which is what the small-batch principle is actually protecting.
 
 ### The comparator lands in `internal/compat`, not `internal/publish`
 
@@ -75,6 +76,13 @@ Constraint: the target library alpha does not exist yet. Every task must be veri
 **Decision**: keep the existing one-line-per-component output as the default, and print the candidate verdicts underneath it in verbose mode only.
 **Rationale**: the default output must not grow for users who were not asking; but decoding evidence and discarding it is exactly the waste the library change was made to end. Verbose is where the CLI already prints match reasons, so the evidence lands beside its sibling.
 
+### The publish pipeline builds in the schema's context
+
+**Context**: `Options.Context` must be the context `IdentitySchema` and the gate schemas were built in, and the kernel no longer exposes one.
+**Explored**: (A) `cuecontext.New()` for the pipeline and a second schema load into it so the identity schema shares the new context; (B) `schemaVal.Context()`, the context the schema cache built the value in.
+**Decision**: B, at both call sites (`RunPublish` and `identitySchemaForVet`).
+**Rationale**: (A) is a second schema build per invocation, which the `kernel-render` spec's one-kernel rule exists to prevent, and it still leaves two contexts that must never meet. (B) is the accessor the kernel dropped, re-read off the value that carries it; the cache's context lives as long as the kernel, which is the invocation.
+
 ### Sentinel comparisons move package, not shape
 
 **Context**: `loaderfile.ErrWrongKind` and friends are now `liberrors.Err*`.
@@ -98,4 +106,4 @@ Constraint: the target library alpha does not exist yet. Every task must be veri
 
 ## Open Questions
 
-- Which alpha number carries both library changes. It does not affect the specs, the approach or the task breakdown — only the literal in `go.mod` at the last task.
+- Which alpha number carries all four library changes. It does not affect the specs, the approach or the task breakdown — only the literal in `go.mod` at the last task.
