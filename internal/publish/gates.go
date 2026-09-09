@@ -39,11 +39,8 @@ var (
 // rather than a refusal: the artifact was never judged, and no partial
 // verdict is rendered.
 func Run(ctx context.Context, opts Options) (*Plan, error) {
-	if opts.Context == nil {
-		return nil, fmt.Errorf("publish: Options.Context is required")
-	}
-	if !opts.IdentitySchema.Exists() {
-		return nil, fmt.Errorf("publish: Options.IdentitySchema is required")
+	if err := opts.requireInputs(); err != nil {
+		return nil, err
 	}
 	absDir, err := statArtifactDir(opts.Dir)
 	if err != nil {
@@ -94,7 +91,7 @@ func Run(ctx context.Context, opts Options) (*Plan, error) {
 	// Gate: the kernel's module loader accepts the tree (msg 12). Runs
 	// before the derivation gates so the plan reads top-down from "does it
 	// load" to "does it agree with itself"; accumulates like the rest.
-	gateKernelLoad(p, opts)
+	gateKernelLoad(ctx, p, opts)
 
 	// The remaining gates, in dependency order; all evaluable ones run.
 	gateSourceSelf(p, a)

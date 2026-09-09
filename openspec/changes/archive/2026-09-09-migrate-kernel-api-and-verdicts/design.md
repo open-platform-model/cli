@@ -61,7 +61,7 @@ Constraint: the target library alpha does not exist yet. Every task must be veri
 **Context**: `kernel_gate.go` calls the free function `loaderfile.LoadModulePackage`, which no longer exists; the replacement is a method on `*kernel.Kernel`, and the gate has none.
 **Explored**: (A) construct a throwaway kernel inside the gate; (B) thread the caller's kernel in through the existing options struct.
 **Decision**: B — add the kernel to the gate's options struct, supplied by the publish command that already builds one.
-**Rationale**: (A) would create a second kernel per invocation and a second schema cache, which the `kernel-render` spec forbids ("exactly one `kernel.Kernel` per invocation"). The gate's options struct already carries `Context` and `Registry`; the registry field becomes redundant once the kernel carries the mapping and is dropped with it.
+**Rationale**: (A) would create a second kernel per invocation and a second schema cache, which the `kernel-render` spec forbids ("exactly one `kernel.Kernel` per invocation"). The gate's options struct already carries `Context` and `Registry`. `Registry` stays: implementation showed it is the pipeline's field, not the gate's — it feeds the registry client (lookup, push, `registry check`) and the `cue/load` environment of every package build in `load.go` and `compat.go`; only the kernel gate's own use of it was redundant, and that went with the free function. `Run` and `VetChecks` require the kernel the way they require `Context`; `gateKernelLoad` takes the caller's `context.Context`, so `VetChecks` gains one (`Run` already had it). The scaffold's `DetectRepair` and `assertDerives` drop their `registry` parameter for the same reason the gate drops its use: the kernel they receive carries the mapping.
 
 ### `Result.Warnings` keeps its type; only its producer moves
 
@@ -83,6 +83,22 @@ Constraint: the target library alpha does not exist yet. Every task must be veri
 **Decision**: B, at both call sites (`RunPublish` and `identitySchemaForVet`).
 **Rationale**: (A) is a second schema build per invocation, which the `kernel-render` spec's one-kernel rule exists to prevent, and it still leaves two contexts that must never meet. (B) is the accessor the kernel dropped, re-read off the value that carries it; the cache's context lives as long as the kernel, which is the invocation.
 
+Implementation note (cue v0.17.1): `Value.Context()` is deprecated (staticcheck SA1019) because CUE now permits combining values from different contexts and recommends a one-off context instead. (B) is kept, with a `nolint` at both call sites, because it reproduces exactly the runtime the pipeline used when the kernel handed out its own context — this migration's no-behavior-change bar. Moving the pipeline to a fresh context is a candidate follow-up once the library's `kernel-owns-no-build-context` lands, since that change rests on the same CUE guarantee.
+
+### Refusal diagnostics read verbose from the logger level
+
+**Context**: `formatRenderDiagnostics` runs inside `printValidationError(err)`, which has no options; the `--verbose` flag reaches the render workflow only through `ShowOutputOpts`, after a render that succeeded.
+**Explored**: (A) thread a `Verbose` field through `InstanceFileOpts`/`ModuleOpts` and every `printValidationError` caller (six command sites, eight callers); (B) read back the level `SetupLogging` already derived from the flag, through a new `output.IsVerbose()`.
+**Decision**: B; the formatter itself takes an explicit `verbose bool`, so tests exercise both modes without touching global state.
+**Rationale**: the flag already has exactly one process-wide effect, the logger level. Reading it back adds one accessor instead of threading a bool through eight signatures for a refusal path.
+
+### debugValues become a byte-compiled values source
+
+**Context**: `kernel.InstanceInput.Values` is `[]Source`; `opm module build`'s default values are the module's `debugValues` field, a `cue.Value` on the acquired module. `AcquireModuleFromDir` also stages the directory as the module's source, so the CLI's own `stageLocalModuleSource` overlay builder is deleted.
+**Explored**: (A) hand-build `kernel.Source{Value: debugVal}` — positions point into `module.cue`, but it breaks the day `Source` carries bytes (`kernel-owns-no-build-context`); (B) render the field to canonical CUE with the same `format.Node(Syntax(Final, Concrete(false)))` the kernel's values-file renderer uses, and compile it through `LoadSourceFromBytes` under an origin naming the module's `debugValues`.
+**Decision**: B, as `render.DebugValuesSource`, shared with the render-parity program (whose path B needs the same values as path A).
+**Rationale**: it is the round trip the kernel performs on every values source anyway, so the rendered values are identical (render-parity digests match), and it survives the byte-carrying `Source`. Cost: a `#config` violation in debugValues is positioned in the rendered text under the `<module>/debugValues` origin rather than at the `module.cue` line.
+
 ### Sentinel comparisons move package, not shape
 
 **Context**: `loaderfile.ErrWrongKind` and friends are now `liberrors.Err*`.
@@ -94,7 +110,7 @@ Constraint: the target library alpha does not exist yet. Every task must be veri
 - [The target library alpha does not exist, so the work cannot be finished in one sitting] → every task is staged against a local `replace github.com/open-platform-model/library => ../library`, with the pin bump as the last task; a reviewer can run the whole change before the release exists.
 - [The render-parity digest could drift if an acquire-verb swap changes which bytes are staged] → the parity integration program is run explicitly as a task, not left to CI; `AcquireModuleFromDir` stages the same byte overlay `LoadModulePackage` built from, so a drift is a bug, not an expected difference.
 - [The CLI's warning wording diverges from the operator's for the same fact] → accepted, and the point of the library change: the two frontends want different dedup keys and different phrasing. The facts named are pinned by the `kernel-render` spec so neither can silently drop one.
-- [`kernel_gate.go` gaining a kernel field widens a struct the publish pipeline passes around] → it loses the `Registry` field in the same edit, so the struct does not grow.
+- [`kernel_gate.go` gaining a kernel field widens a struct the publish pipeline passes around] → accepted: `Registry` turned out to be load-bearing for the rest of the pipeline (see the gate decision), so `Options` grows by one pointer.
 
 ## Migration Plan
 

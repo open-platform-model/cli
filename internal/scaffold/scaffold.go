@@ -14,7 +14,6 @@ import (
 	"cuelang.org/go/mod/modconfig"
 	"cuelang.org/go/mod/module"
 
-	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/cueedit"
@@ -176,7 +175,7 @@ func Run(ctx context.Context, k *kernel.Kernel, registry, newPath string, ref Te
 		return nil, err
 	}
 
-	if err := assertDerives(ctx, k, registry, dest, newPath); err != nil {
+	if err := assertDerives(ctx, k, dest, newPath); err != nil {
 		_ = os.RemoveAll(dest)
 		return nil, err
 	}
@@ -269,18 +268,19 @@ func copyFetched(ctx context.Context, registry, modulePath, version, dest string
 	return files, nil
 }
 
-// assertDerives is the post-rewrite assertion: the scaffolded tree loads and
-// its metadata derives the new identity — modulePath the new path, version
-// the initial default. A load failure is an internal error (the writers left
-// an inconsistent tree). A value MISMATCH is a property of the clone source:
+// assertDerives is the post-rewrite assertion: the scaffolded tree acquires
+// through the kernel (its registry mapping resolves the imports) and its
+// metadata derives the new identity — modulePath the new path, version the
+// initial default. A load failure is an internal error (the writers left an
+// inconsistent tree). A value MISMATCH is a property of the clone source:
 // re-identification rewrote the identity package, so metadata still stating
 // the old values means the source carries literals instead of the D12
 // derivation — official templates cannot hit this (their derivation is
 // gate-enforced at publish), an arbitrary `--from` donor can, and it earns a
 // refusal naming the donor's defect rather than a blamed-wrong internal
 // error.
-func assertDerives(ctx context.Context, k *kernel.Kernel, registry, dir, newPath string) error {
-	val, err := k.LoadModulePackage(ctx, dir, loaderfile.LoadOptions{Registry: registry})
+func assertDerives(ctx context.Context, k *kernel.Kernel, dir, newPath string) error {
+	mod, err := k.AcquireModuleFromDir(ctx, dir)
 	if err != nil {
 		return fmt.Errorf("internal error: scaffolded tree does not load: %w", err)
 	}
@@ -288,7 +288,7 @@ func assertDerives(ctx context.Context, k *kernel.Kernel, registry, dir, newPath
 		"modulePath": newPath,
 		"version":    InitialVersion,
 	} {
-		got, err := val.LookupPath(cue.ParsePath("metadata." + field)).String()
+		got, err := mod.Package.LookupPath(cue.ParsePath("metadata." + field)).String()
 		if err != nil {
 			return fmt.Errorf("internal error: scaffolded metadata.%s does not evaluate: %w", field, err)
 		}

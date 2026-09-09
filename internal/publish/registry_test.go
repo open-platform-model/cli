@@ -13,8 +13,10 @@ import (
 
 	"cuelabs.dev/go/oci/ociregistry/ocimem"
 	"cuelang.org/go/cue/cuecontext"
+
 	"cuelang.org/go/mod/modregistrytest"
 	"cuelang.org/go/mod/module"
+	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,6 +64,7 @@ func TestGate_AlreadyPublished_UnreachableRegistryIsConnectivity(t *testing.T) {
 			Dir:            dir,
 			Kind:           KindModule,
 			Context:        cueCtx,
+			Kernel:         kernel.New(kernel.WithRegistry("127.0.0.1:1+insecure")),
 			IdentitySchema: stubSchema(t, cueCtx),
 			Registry:       "127.0.0.1:1+insecure",
 			// The override refusal below must not be waived.
@@ -109,6 +112,7 @@ func TestRun_NonexistentDirIsAnError(t *testing.T) {
 		Dir:            filepath.Join(t.TempDir(), "no-such-module"),
 		Kind:           KindModule,
 		Context:        cueCtx,
+		Kernel:         kernel.New(),
 		IdentitySchema: stubSchema(t, cueCtx),
 	}
 
@@ -117,7 +121,7 @@ func TestRun_NonexistentDirIsAnError(t *testing.T) {
 	assert.Nil(t, p)
 	assert.Contains(t, err.Error(), "does not exist")
 
-	_, _, err = VetChecks(opts)
+	_, _, err = VetChecks(context.Background(), opts)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "does not exist")
 }

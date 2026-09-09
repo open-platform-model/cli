@@ -140,7 +140,8 @@ func TestE2E_InstanceBuild_LayersValuesFile(t *testing.T) {
 // TestE2E_InstanceBuild_SkewWarnsByDefault covers "Render warnings reach the
 // user": with no skewPolicy configured, a module requiring a newer catalog
 // build than the platform pins renders against the platform's build and the
-// kernel's skew warning names the path and both versions.
+// CLI's skew warning (worded from the kernel's resolved-versions row) names
+// the path and both versions.
 func TestE2E_InstanceBuild_SkewWarnsByDefault(t *testing.T) {
 	repoRoot, instanceFile := podinfoExample(t)
 	home := seedRenderHome(t)

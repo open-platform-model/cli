@@ -84,7 +84,7 @@ func TestPrintValidationError_GroupedConfigError(t *testing.T) {
 }
 
 func TestFormatUnresolvedDemands(t *testing.T) {
-	aggregate := &liberrors.UnresolvedDemandsError{Demands: []liberrors.UnresolvedDemand{
+	demands := []liberrors.UnresolvedDemand{
 		{
 			Component:    "web",
 			FQN:          "opmodel.dev/catalogs/opm/resources/container@v1beta1",
@@ -96,9 +96,9 @@ func TestFormatUnresolvedDemands(t *testing.T) {
 			FQN:       "opmodel.dev/catalogs/opm/traits/expose@v1beta1",
 			Kind:      "trait",
 		},
-	}}
+	}
 
-	got := FormatUnresolvedDemands(aggregate)
+	got := FormatUnresolvedDemands(demands)
 	assert.Contains(t, got, `component "web": unresolved resource demand "opmodel.dev/catalogs/opm/resources/container@v1beta1"`)
 	assert.Contains(t, got, "implemented at: opmodel.dev/catalogs/opm/resources/container@v2")
 	assert.Contains(t, got, `component "api": unresolved trait demand`)

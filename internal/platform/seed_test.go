@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/open-platform-model/library/opm/kernel"
+	libplatform "github.com/open-platform-model/library/opm/platform"
 )
 
 // The values below mimic the shape of an acquired platform: metadata, type
@@ -15,7 +15,6 @@ import (
 // once the imported catalog fills them in a real build.
 
 func TestSpecFromPlatform_DecodesDerivedEntries(t *testing.T) {
-	k := kernel.New()
 	v := cuecontext.New().CompileString(`{
 		kind: "Platform"
 		metadata: name: "cluster"
@@ -26,7 +25,7 @@ func TestSpecFromPlatform_DecodesDerivedEntries(t *testing.T) {
 		}
 	}`)
 	require.NoError(t, v.Err())
-	p, err := k.NewPlatformFromValue(v)
+	p, err := libplatform.NewPlatformFromValue(v)
 	require.NoError(t, err)
 
 	s, err := SpecFromPlatform(p)
@@ -42,7 +41,6 @@ func TestSpecFromPlatform_DecodesDerivedEntries(t *testing.T) {
 }
 
 func TestSpecFromPlatform_EmptyRegistry(t *testing.T) {
-	k := kernel.New()
 	v := cuecontext.New().CompileString(`{
 		kind: "Platform"
 		metadata: name: "cluster"
@@ -50,7 +48,7 @@ func TestSpecFromPlatform_EmptyRegistry(t *testing.T) {
 		#registry: {}
 	}`)
 	require.NoError(t, v.Err())
-	p, err := k.NewPlatformFromValue(v)
+	p, err := libplatform.NewPlatformFromValue(v)
 	require.NoError(t, err)
 
 	s, err := SpecFromPlatform(p)
@@ -61,7 +59,6 @@ func TestSpecFromPlatform_EmptyRegistry(t *testing.T) {
 func TestSpecFromPlatform_NonConcreteVersionRefused(t *testing.T) {
 	// A version the build did not derive (no imported catalog) must never
 	// seed an empty pin.
-	k := kernel.New()
 	v := cuecontext.New().CompileString(`{
 		kind: "Platform"
 		metadata: name: "cluster"
@@ -69,7 +66,7 @@ func TestSpecFromPlatform_NonConcreteVersionRefused(t *testing.T) {
 		#registry: "opmodel.dev/catalogs/opm@v4": {enable: true, version: string}
 	}`)
 	require.NoError(t, v.Err())
-	p, err := k.NewPlatformFromValue(v)
+	p, err := libplatform.NewPlatformFromValue(v)
 	require.NoError(t, err)
 
 	_, err = SpecFromPlatform(p)

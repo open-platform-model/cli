@@ -51,8 +51,13 @@ func TestPrintValidationError_RenderErrorPrintsDiagnostics(t *testing.T) {
 			Unresolved: []liberrors.UnresolvedDemand{
 				{Component: "web", Kind: "trait", FQN: "opmodel.dev/catalogs/opm@v4#Expose", Alternatives: []string{"opmodel.dev/catalogs/k8s@v1#Expose"}},
 			},
-			Unmatched: []string{"worker"},
-			OverSubscribed: []liberrors.OverSubscribedContractError{
+			Unmatched: []liberrors.UnmatchedComponent{{
+				Component: "worker",
+				Candidates: []liberrors.CandidateVerdict{
+					{Transformer: "opmodel.dev/catalogs/opm@v4#DeploymentTransformer", MissingLabels: []string{"workload.opmodel.dev/type=stateless"}},
+				},
+			}},
+			OverSubscribed: []liberrors.OverSubscribedContract{
 				{Key: "opmodel.dev/contracts/ingress@v1", Catalogs: []string{"opmodel.dev/catalogs/a@v1", "opmodel.dev/catalogs/b@v1"}},
 			},
 			FailedPairs: []kernel.RenderPair{{Component: "db", Transformer: "opmodel.dev/catalogs/opm@v4#StatefulSetTransformer"}},
@@ -66,9 +71,38 @@ func TestPrintValidationError_RenderErrorPrintsDiagnostics(t *testing.T) {
 	assert.Contains(t, details, `component "web": unresolved trait demand "opmodel.dev/catalogs/opm@v4#Expose"`)
 	assert.Contains(t, details, "implemented at: opmodel.dev/catalogs/k8s@v1#Expose")
 	assert.Contains(t, details, `component "worker": no transformer matched`)
+	assert.NotContains(t, details, "candidate", "the default output stays one line per unmatched component")
 	assert.Contains(t, details, `contract "opmodel.dev/contracts/ingress@v1"`)
 	assert.Contains(t, details, "opmodel.dev/catalogs/a@v1, opmodel.dev/catalogs/b@v1")
 	assert.Contains(t, details, `component "db": transformer opmodel.dev/catalogs/opm@v4#StatefulSetTransformer failed`)
+}
+
+// The candidate matrix the kernel now carries on the unmatched rows is
+// printed in verbose mode only: the labels the predicate found missing, or
+// the FQNs the always-unify rung conflicted at (looked up on the Unify rows).
+func TestFormatRenderDiagnostics_UnmatchedCandidatesVerbose(t *testing.T) {
+	d := kernel.RenderDiagnostics{
+		Unmatched: []liberrors.UnmatchedComponent{{
+			Component: "worker",
+			Candidates: []liberrors.CandidateVerdict{
+				{Transformer: "opmodel.dev/catalogs/opm@v4#DeploymentTransformer", MissingLabels: []string{"workload.opmodel.dev/type=stateless"}},
+				{Transformer: "opmodel.dev/catalogs/opm@v4#StatefulSetTransformer"},
+				{Transformer: "opmodel.dev/catalogs/opm@v4#JobTransformer", Matched: true},
+			},
+		}},
+		Unify: []liberrors.UnifyRefusal{
+			{Component: "worker", Transformer: "opmodel.dev/catalogs/opm@v4#StatefulSetTransformer", Conflicts: []string{"opmodel.dev/catalogs/opm/resources/container@v1"}},
+		},
+	}
+
+	compact := formatRenderDiagnostics(d, false)
+	assert.Equal(t, `component "worker": no transformer matched`, compact)
+
+	verbose := formatRenderDiagnostics(d, true)
+	assert.Contains(t, verbose, `component "worker": no transformer matched`)
+	assert.Contains(t, verbose, `  candidate "opmodel.dev/catalogs/opm@v4#DeploymentTransformer" did not match: missing labels workload.opmodel.dev/type=stateless`)
+	assert.Contains(t, verbose, `  candidate "opmodel.dev/catalogs/opm@v4#StatefulSetTransformer" did not match: bodies conflict at opmodel.dev/catalogs/opm/resources/container@v1`)
+	assert.NotContains(t, verbose, "JobTransformer", "a matched candidate is not a refusal")
 }
 
 func TestPrintValidationError_SkewErrorVerbatim(t *testing.T) {
@@ -81,7 +115,7 @@ func TestPrintValidationError_SkewErrorVerbatim(t *testing.T) {
 }
 
 func TestFormatRenderDiagnostics_EmptyIsEmpty(t *testing.T) {
-	assert.Empty(t, formatRenderDiagnostics(kernel.RenderDiagnostics{Pairs: []kernel.RenderPair{{Component: "web", Transformer: "x"}}}),
+	assert.Empty(t, formatRenderDiagnostics(kernel.RenderDiagnostics{Pairs: []kernel.RenderPair{{Component: "web", Transformer: "x"}}}, true),
 		"matched pairs are not refusals and are not repeated")
 }
 

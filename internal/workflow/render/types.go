@@ -21,7 +21,8 @@ type Result struct {
 	// transformer-match output.
 	Pairs []kernel.RenderPair
 
-	// Warnings are the kernel's render warnings: unhandled optional traits
+	// Warnings are the render's advisory facts, worded by the CLI from the
+	// kernel's diagnostics rows (formatAdvisories): unhandled optional traits
 	// and, under the warn skew policy, catalog version skew. Non-empty is
 	// not failure; every entry is shown to the user.
 	Warnings []string

@@ -11,7 +11,6 @@ import (
 
 	"cuelang.org/go/cue"
 
-	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/cueedit"
@@ -63,10 +62,11 @@ type RepairPlan struct {
 // disagrees with itself with no argument to arbitrate is refused, as is a
 // tree that states no path at all.
 //
-// The kernel loads the tree best-effort to source a version for identity
-// creation from metadata.version — the tree's own statement. k may be nil
-// when no load should be attempted.
-func DetectRepair(ctx context.Context, k *kernel.Kernel, registry, dir, argPath string) (*RepairPlan, error) {
+// The kernel acquires the tree best-effort to source a version for identity
+// creation from metadata.version — the tree's own statement; its registry
+// mapping resolves the imports. k may be nil when no load should be
+// attempted.
+func DetectRepair(ctx context.Context, k *kernel.Kernel, dir, argPath string) (*RepairPlan, error) {
 	cueModPath, cueModErr := cueedit.ReadCueModModule(dir)
 	if cueModErr != nil && !errors.Is(cueModErr, cueedit.ErrCueModShape) {
 		return nil, cueModErr
@@ -89,7 +89,7 @@ func DetectRepair(ctx context.Context, k *kernel.Kernel, registry, dir, argPath 
 	if err := planCueMod(p, cueModPath, cueModErr, target); err != nil {
 		return nil, err
 	}
-	if err := planIdentity(ctx, k, registry, p, idPath, idErr, target); err != nil {
+	if err := planIdentity(ctx, k, p, idPath, idErr, target); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -192,7 +192,7 @@ func planCueMod(p *RepairPlan, cueModPath string, cueModErr error, target string
 // planIdentity plans the identity half: realign a present ModulePath, or
 // create the whole package when absent — sourcing the version from the
 // tree's own metadata.version, never choosing one.
-func planIdentity(ctx context.Context, k *kernel.Kernel, registry string, p *RepairPlan, idPath string, idErr error, target string) error {
+func planIdentity(ctx context.Context, k *kernel.Kernel, p *RepairPlan, idPath string, idErr error, target string) error {
 	file := filepath.Join("identity", "identity.cue")
 	dir := p.Dir
 
@@ -216,7 +216,7 @@ func planIdentity(ctx context.Context, k *kernel.Kernel, registry string, p *Rep
 		return fmt.Errorf("repair cannot rewrite a malformed %s: %w", file, idErr)
 	}
 
-	version, err := statedVersion(ctx, k, registry, dir)
+	version, err := statedVersion(ctx, k, dir)
 	if err != nil {
 		return err
 	}
@@ -236,7 +236,7 @@ func planIdentity(ctx context.Context, k *kernel.Kernel, registry string, p *Rep
 // statedVersion reads the version the tree itself states (metadata.version),
 // the only source identity creation may use — init does not choose versions
 // (D20).
-func statedVersion(ctx context.Context, k *kernel.Kernel, registry, dir string) (string, error) {
+func statedVersion(ctx context.Context, k *kernel.Kernel, dir string) (string, error) {
 	refuse := func(why string) error {
 		return &RefusalError{publish.Refusal{
 			Headline:    fmt.Sprintf("%s states no version init could adopt", dir),
@@ -248,11 +248,11 @@ func statedVersion(ctx context.Context, k *kernel.Kernel, registry, dir string) 
 	if k == nil {
 		return "", refuse("tree not loaded")
 	}
-	val, err := k.LoadModulePackage(ctx, dir, loaderfile.LoadOptions{Registry: registry})
+	mod, err := k.AcquireModuleFromDir(ctx, dir)
 	if err != nil {
 		return "", refuse(fmt.Sprintf("tree does not load: %v", err))
 	}
-	version, err := val.LookupPath(cue.ParsePath("metadata.version")).String()
+	version, err := mod.Package.LookupPath(cue.ParsePath("metadata.version")).String()
 	if err != nil || version == "" {
 		return "", refuse("not stated")
 	}

@@ -1,8 +1,4 @@
-## Purpose
-
-Defines the contract for loading and building a concrete `*moduleinstance.ModuleInstance` via the `pkg/loader` package. There is no separate builder phase — loading IS building, consistent with the `promote-factory-engine` architecture. The loader is responsible for value selection, schema validation (Module Gate), CUE-native evaluation of metadata and labels, and concreteness verification.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Loader validates consumer values and produces a concrete ModuleInstance
 
@@ -33,48 +29,6 @@ All paths run the kernel's shape gate and concreteness enforcement, producing a 
 
 - **WHEN** consumer values contain a field with the wrong type
 - **THEN** the kernel validation SHALL surface a structured config error identifying the offending field
-
-### Requirement: Values are validated against the module config schema before injection
-The builder SHALL validate the selected values against the module's `#config` schema and return a descriptive error if they do not conform.
-
-#### Scenario: Values match schema
-- **WHEN** the selected values satisfy all constraints in `#config`
-- **THEN** injection proceeds without error
-
-#### Scenario: Values violate schema
-- **WHEN** the selected values contain a field that violates a `#config` constraint (wrong type, out-of-range, missing required field)
-- **THEN** the builder SHALL return an error identifying the offending field and the constraint that was violated
-
-### Requirement: Instance metadata and labels are derived by CUE evaluation
-
-The builder SHALL load `#ModuleInstance` from `opmodel.dev/core@v2` (resolved from the module's own dependency cache) and inject the module, instance name, namespace, and values via `FillPath`. UUID, labels, and derived metadata fields SHALL be computed by CUE evaluation, not by Go code.
-
-#### Scenario: UUID is deterministic
-
-- **WHEN** the same module, instance name, and namespace are provided
-- **THEN** the resulting `ModuleInstance.Metadata.UUID` SHALL be identical across builds
-
-#### Scenario: Labels are populated from CUE evaluation
-
-- **WHEN** the instance is built successfully
-- **THEN** `ModuleInstance.Metadata.Labels` SHALL contain all expected OPM labels as evaluated by `#ModuleInstance`
-
-#### Scenario: Core v2 schema loaded
-
-- **WHEN** the builder loads the core schema
-- **THEN** it SHALL load `opmodel.dev/core@v2` (not `opmodel.dev/core@v1`)
-- **THEN** error messages SHALL reference `opmodel.dev/core@v2`
-
-### Requirement: The resulting instance must be fully concrete
-The builder SHALL validate that the `#ModuleInstance` value is fully concrete after injection, and return an error if any field remains abstract or unresolved.
-
-#### Scenario: Incomplete values leave instance non-concrete
-- **WHEN** the provided values do not satisfy all required fields in `#config`
-- **THEN** the builder SHALL return an error identifying which fields are not concrete
-
-#### Scenario: Fully provided values produce a concrete instance
-- **WHEN** all required fields in `#config` are satisfied by the selected values
-- **THEN** the builder SHALL return a `*core.ModuleInstance` where all components are concrete and ready for matching
 
 ### Requirement: Value selection falls back to module defaults when no files are given
 
@@ -118,25 +72,3 @@ When using `LoadInstanceFile()` (instance-file path), the `values` field is inli
 
 - **WHEN** more than one values file is provided via `--values`
 - **THEN** the builder SHALL unify all files together before injection
-
-### Requirement: `opm mod vet` uses `debugValues` by default
-
-The `opm mod vet` command SHALL use the module's `debugValues` field as the values source when no `-f` flag is provided. This validation SHALL happen in the module vet command itself rather than through `cmdutil.RenderRelease()`.
-
-#### Scenario: `debugValues` used when no `-f` flag
-
-- **WHEN** `opm mod vet` is run without `-f` flags
-- **THEN** the module's `debugValues` field is extracted and used as the values source
-- **AND** the vet output shows "debugValues" as the values source
-
-#### Scenario: `-f` flag overrides `debugValues`
-
-- **WHEN** `opm mod vet` is run with one or more `-f` flags
-- **THEN** the explicit values files are used
-- **AND** `debugValues` is ignored
-
-#### Scenario: `debugValues` is `_` (unconstrained)
-
-- **WHEN** `opm mod vet` is run without `-f` flags
-- **AND** the module's `debugValues` field is `_` (open/unconstrained, not filled by the author)
-- **THEN** `opm mod vet` returns an error: "debugValues is not concrete — module must provide complete test values"

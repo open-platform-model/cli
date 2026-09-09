@@ -32,7 +32,7 @@ func printValidationError(err error) {
 	var renderErr *kernel.RenderError
 	if errors.As(err, &renderErr) {
 		output.Error(fmt.Sprintf("%s: %s", renderFailedMsg, renderErr.Err))
-		if details := formatRenderDiagnostics(renderErr.Diagnostics); details != "" {
+		if details := formatRenderDiagnostics(renderErr.Diagnostics, output.IsVerbose()); details != "" {
 			output.Details(details)
 		}
 		return
@@ -52,14 +52,29 @@ func printValidationError(err error) {
 // for it, and each matched pair whose transformer output failed. Rows that
 // did not refuse (matched pairs, unhandled traits, version rows) are not
 // repeated here.
-func formatRenderDiagnostics(d kernel.RenderDiagnostics) string {
+//
+// In verbose mode each unmatched component is followed by the verdict on
+// every candidate transformer the build evaluated for it — the required
+// labels the predicate found missing, or the primitive FQNs the always-unify
+// rung conflicted at — the evidence the kernel now carries on the rows. The
+// default output keeps its one line per component.
+func formatRenderDiagnostics(d kernel.RenderDiagnostics, verbose bool) string {
 	var b strings.Builder
 	if len(d.Unresolved) > 0 {
-		b.WriteString(cmdutil.FormatUnresolvedDemands(&liberrors.UnresolvedDemandsError{Demands: d.Unresolved}))
+		b.WriteString(cmdutil.FormatUnresolvedDemands(d.Unresolved))
 		b.WriteString("\n")
 	}
 	for _, comp := range d.Unmatched {
-		fmt.Fprintf(&b, "component %q: no transformer matched\n", comp)
+		fmt.Fprintf(&b, "component %q: no transformer matched\n", comp.Component)
+		if !verbose {
+			continue
+		}
+		for _, v := range comp.Candidates {
+			if v.Matched {
+				continue
+			}
+			fmt.Fprintf(&b, "  candidate %q did not match: %s\n", v.Transformer, candidateReason(d.Unify, comp.Component, v))
+		}
 	}
 	for _, o := range d.OverSubscribed {
 		fmt.Fprintf(&b, "contract %q: provided by more than one enabled catalog: %s\n", o.Key, strings.Join(o.Catalogs, ", "))
@@ -68,4 +83,20 @@ func formatRenderDiagnostics(d kernel.RenderDiagnostics) string {
 		fmt.Fprintf(&b, "component %q: transformer %s failed\n", p.Component, p.Transformer)
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// candidateReason words why one candidate was refused for a component: the
+// labels the predicate rung found missing or divergent, else the primitive
+// FQNs its unify refusal (looked up on the diagnostics' Unify rows, which the
+// candidate verdict does not repeat) conflicted at.
+func candidateReason(unify []liberrors.UnifyRefusal, component string, v liberrors.CandidateVerdict) string {
+	if len(v.MissingLabels) > 0 {
+		return "missing labels " + strings.Join(v.MissingLabels, ", ")
+	}
+	for _, u := range unify {
+		if u.Component == component && u.Transformer == v.Transformer && len(u.Conflicts) > 0 {
+			return "bodies conflict at " + strings.Join(u.Conflicts, ", ")
+		}
+	}
+	return "bodies do not unify"
 }

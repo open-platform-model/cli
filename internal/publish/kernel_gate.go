@@ -1,23 +1,24 @@
 package publish
 
 import (
+	"context"
 	"errors"
 
-	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
+	liberrors "github.com/open-platform-model/library/opm/errors"
 )
 
-// gateKernelLoad (msg 12) loads a module tree through the kernel's module
-// loader — the same loader `opm module build` and the operator use — and
-// turns a loader refusal into a publish refusal carrying the loader's own
-// error. Publish must not judge a module loadable by any test the kernel
-// does not apply (enhancement 0011: publish never judges an artifact
-// differently from a consumer). Modules only: a catalog is acquired by a
-// platform's import, not loaded as a module.
+// gateKernelLoad (msg 12) acquires a module tree through the kernel's module
+// acquire — the same verb `opm module build` and the operator use — and
+// turns a refusal into a publish refusal carrying the kernel's own error.
+// Publish must not judge a module loadable by any test the kernel does not
+// apply (enhancement 0011: publish never judges an artifact differently from
+// a consumer). Modules only: a catalog is acquired by a platform's import,
+// not loaded as a module.
 //
 // Skipped when an identity field is open or absent: those trees are already
 // refused (or filled by --version) by the identity gates, and the loader
 // would name the same missing value a second time. One cause, one refusal.
-func gateKernelLoad(p *Plan, opts Options) {
+func gateKernelLoad(ctx context.Context, p *Plan, opts Options) {
 	if p.Kind != KindModule {
 		return
 	}
@@ -27,7 +28,7 @@ func gateKernelLoad(p *Plan, opts Options) {
 		}
 	}
 	p.KernelChecked = true
-	_, err := loaderfile.LoadModulePackage(opts.Context, p.Dir, loaderfile.LoadOptions{Registry: opts.Registry})
+	_, err := opts.Kernel.AcquireModuleFromDir(ctx, p.Dir)
 	if err == nil {
 		p.KernelAccepted = true
 		return
@@ -44,12 +45,12 @@ func gateKernelLoad(p *Plan, opts Options) {
 // kernelLoadAction maps the loader's sentinel to the runnable fix.
 func kernelLoadAction(err error) string {
 	switch {
-	case errors.Is(err, loaderfile.ErrMissingRequiredField):
+	case errors.Is(err, liberrors.ErrMissingRequiredField):
 		return "Make the field a concrete literal in identity/identity.cue and reference it\n" +
 			"from metadata (see opm module vet)"
-	case errors.Is(err, loaderfile.ErrWrongKind):
+	case errors.Is(err, liberrors.ErrWrongKind):
 		return "Publish the artifact with its own command: opm catalog publish for a catalog"
-	case errors.Is(err, loaderfile.ErrInvalidPackage):
+	case errors.Is(err, liberrors.ErrInvalidPackage):
 		return "Fix the package layout: exactly one CUE package at the module root"
 	default:
 		return "Fix the loader error above and re-run: opm module publish --dry-run"

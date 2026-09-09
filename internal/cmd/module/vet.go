@@ -1,6 +1,7 @@
 package modulecmd
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -51,7 +52,7 @@ func NewModuleVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 	  opm module vet ./my-module -f base.cue -f prod.cue`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runVet(cfg, args, &rf)
+			return runVet(c.Context(), cfg, args, &rf)
 		},
 	}
 
@@ -60,9 +61,9 @@ func NewModuleVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 	return c
 }
 
-func runVet(cfg *config.GlobalConfig, args []string, rf *cmdutil.RenderFlags) error {
+func runVet(ctx context.Context, cfg *config.GlobalConfig, args []string, rf *cmdutil.RenderFlags) error {
 	modulePath := cmdutil.ResolveModulePath(args)
-	return runVetModuleOnly(cfg, modulePath, rf)
+	return runVetModuleOnly(ctx, cfg, modulePath, rf)
 }
 
 // runVetModuleOnly validates a module directory without an instance.cue.
@@ -70,7 +71,7 @@ func runVet(cfg *config.GlobalConfig, args []string, rf *cmdutil.RenderFlags) er
 // identity/coordinate checks (D16/D18/D21), validates the schema, and checks
 // that the values (from -f flag or debugValues field) satisfy #config.
 // No instance wrapper, engine render, or cluster connection is required.
-func runVetModuleOnly(cfg *config.GlobalConfig, modulePath string, rf *cmdutil.RenderFlags) error {
+func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath string, rf *cmdutil.RenderFlags) error {
 	if err := cmdutil.ValidateModuleInputPath(modulePath); err != nil {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitGeneralError,
@@ -78,17 +79,22 @@ func runVetModuleOnly(cfg *config.GlobalConfig, modulePath string, rf *cmdutil.R
 		}
 	}
 
-	cueCtx, identitySchema, err := identitySchemaForVet(cfg)
+	k, identitySchema, err := identitySchemaForVet(cfg)
 	if err != nil {
 		return err
 	}
+	// Every load below builds in the runtime the schema lives in, so the
+	// module's identity package unifies with #IdentityPackage exactly as it
+	// did when the kernel handed out that context itself.
+	cueCtx := identitySchema.Context() //nolint:staticcheck // SA1019: the deprecation's alternative (a fresh context, relying on cross-context unification) is a behavior change this migration deliberately avoids
 
 	// Identity and coordinate checks run between module load and the values
 	// stanza, so a module with no debugValues still reports coordinate drift.
-	plan, modVal, err := publish.VetChecks(publish.Options{
+	plan, modVal, err := publish.VetChecks(ctx, publish.Options{
 		Dir:            modulePath,
 		Kind:           publish.KindModule,
 		Context:        cueCtx,
+		Kernel:         k,
 		IdentitySchema: identitySchema,
 		Registry:       cfg.Registry,
 	})
@@ -157,17 +163,17 @@ func runVetModuleOnly(cfg *config.GlobalConfig, modulePath string, rf *cmdutil.R
 	return nil
 }
 
-// identitySchemaForVet builds the per-invocation kernel — the CUE context
-// every load shares, and the schema cache the resolved registry threads into
-// (vet's loads no longer read only the ambient process environment) — and
-// resolves core's #IdentityPackage from it.
-func identitySchemaForVet(cfg *config.GlobalConfig) (*cue.Context, cue.Value, error) {
+// identitySchemaForVet builds the per-invocation kernel — the kernel-load
+// gate acquires through it, and its schema cache carries the resolved
+// registry (vet's loads no longer read only the ambient process environment)
+// — and resolves core's #IdentityPackage from that cache. The CUE context
+// every load shares is the schema value's own (identitySchema.Context()).
+func identitySchemaForVet(cfg *config.GlobalConfig) (*kernel.Kernel, cue.Value, error) {
 	k := kernel.New(
 		kernel.WithRegistry(cfg.Registry),
 		kernel.WithSchemaLoader(schema.OCILoader{Registry: cfg.Registry}),
 	)
-	cueCtx := k.CueContext()
-	schemaVal, err := k.SchemaCache().Get(cueCtx)
+	schemaVal, err := k.SchemaCache().Get()
 	if err != nil {
 		// A registry round-trip, same failure class as publish's lookup and
 		// push: connectivity (exit 3), not a verdict on the module.
@@ -183,7 +189,7 @@ func identitySchemaForVet(cfg *config.GlobalConfig) (*cue.Context, cue.Value, er
 			Err:  fmt.Errorf("resolved core schema (%s) does not define #IdentityPackage; vet requires a core v2 schema", k.SchemaCache().ResolvedVersion()),
 		}
 	}
-	return cueCtx, identitySchema, nil
+	return k, identitySchema, nil
 }
 
 // resolveVetValues resolves the values to validate against #config: explicit

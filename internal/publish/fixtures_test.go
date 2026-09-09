@@ -10,7 +10,9 @@ import (
 	"cuelabs.dev/go/oci/ociregistry/ocimem"
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
+
 	"cuelang.org/go/mod/modregistrytest"
+	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/stretchr/testify/require"
 )
 
@@ -195,14 +197,16 @@ func emptyTestRegistry(t *testing.T) string {
 func baseOptions(t *testing.T, dir string) Options {
 	t.Helper()
 	ctx := cuecontext.New()
+	registry := emptyTestRegistry(t)
 	return Options{
 		Dir:                     dir,
 		Kind:                    KindCatalog,
 		Context:                 ctx,
+		Kernel:                  kernel.New(kernel.WithRegistry(registry)),
 		IdentitySchema:          stubSchema(t, ctx),
 		MemberFQNGateSchema:     stubDef(t, ctx, "CatalogMemberFQNGate"),
 		TraitOptionalGateSchema: stubDef(t, ctx, "TraitOptionalGate"),
-		Registry:                emptyTestRegistry(t),
+		Registry:                registry,
 	}
 }
 
@@ -218,14 +222,16 @@ func runFixture(t *testing.T, kind Kind, files map[string]string, mutate ...func
 func runDir(t *testing.T, kind Kind, dir string, mutate ...func(*Options)) *Plan {
 	t.Helper()
 	ctx := cuecontext.New()
+	registry := emptyTestRegistry(t)
 	opts := Options{
 		Dir:                     dir,
 		Kind:                    kind,
 		Context:                 ctx,
+		Kernel:                  kernel.New(kernel.WithRegistry(registry)),
 		IdentitySchema:          stubSchema(t, ctx),
 		MemberFQNGateSchema:     stubDef(t, ctx, "CatalogMemberFQNGate"),
 		TraitOptionalGateSchema: stubDef(t, ctx, "TraitOptionalGate"),
-		Registry:                emptyTestRegistry(t),
+		Registry:                registry,
 	}
 	for _, m := range mutate {
 		m(&opts)

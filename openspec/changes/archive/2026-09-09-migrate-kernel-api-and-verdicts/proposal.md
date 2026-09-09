@@ -43,7 +43,7 @@ The second change also hands the CLI a job it already wanted. `internal/cmdutil/
 - `internal/cmd/module/vet.go` and `internal/cmdutil/publish.go` fetch the schema with `k.SchemaCache().Get()` and take the CUE context from the value (`schemaVal.Context()`); `publish.Options.Context` receives that context, so the pipeline keeps building catalog packages where the identity and gate schemas live. No behaviour changes: the same schema, the same unifications, one context per invocation as before.
 - `internal/workflow/render/module_test.go` and `internal/publish/realtree_test.go` build their values with `cuecontext.New()` or the schema value's context.
 
-**Dependency:** `go.mod` moves `github.com/open-platform-model/library` to the alpha carrying all four changes. That alpha does not exist yet, so this change is blocked on the `library` release.
+**Dependency:** `go.mod` moves `github.com/open-platform-model/library` to `v1.0.0-alpha.28` (released 2026-09-09), which carries all four changes (`one-api-tier`, `cue-owned-verdicts` and `move-compat-to-cli` since alpha.27, `kernel-owns-no-build-context` since alpha.28).
 
 ## Capabilities
 
@@ -76,6 +76,6 @@ The second change also hands the CLI a job it already wanted. `internal/cmdutil/
 
 **Tests:** `internal/cmd/module/verbose_output_test.go` constructs a `Result` with `Warnings`; unchanged. Any test asserting on the kernel's exact warning wording moves to the CLI's wording. The render-parity integration program must keep producing identical digests: it renders, and this change does not touch what is rendered.
 
-**Blocked on:** a `library` release carrying `one-api-tier`, `cue-owned-verdicts`, `move-compat-to-cli` and `kernel-owns-no-build-context`. Until then the work is verifiable only against a local `replace` directive, which is how the tasks stage it.
+**Blocked on:** nothing since 2026-09-09. The work was staged against a local `replace` directive, verified against the published `v1.0.0-alpha.27`, and closed on `v1.0.0-alpha.28`.
 
 **Sibling change:** `opm-operator` carries the same migration for its own consumer surface, as a separate change in that repo.

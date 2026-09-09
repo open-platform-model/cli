@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/config"
@@ -82,7 +81,7 @@ func run() error {
 	fmt.Println("resolved:", res.Describe())
 
 	k := kernel.New(kernel.WithRegistry(registry))
-	p, err := k.AcquirePlatformFromDir(ctx, platformDir, loaderfile.LoadOptions{Registry: registry})
+	p, err := k.AcquirePlatformFromDir(ctx, platformDir)
 	if err != nil {
 		if os.Getenv("OPM_ITEST_PLATFORM_BUILD") == "1" {
 			return fmt.Errorf("building default platform: %w", err)
