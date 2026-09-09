@@ -6,7 +6,6 @@ import (
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
-	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
 	"github.com/open-platform-model/library/opm/kernel"
 	libplatform "github.com/open-platform-model/library/opm/platform"
 	"github.com/open-platform-model/library/opm/schema"
@@ -21,9 +20,10 @@ import (
 const RuntimeName = "opm-cli"
 
 // NewKernel constructs the per-invocation library kernel (design LD1): one
-// Kernel per command, owning the CUE context and schema cache. The resolved
-// registry threads into module acquisition AND the schema OCILoader — the
-// latter otherwise reads only the process CUE_REGISTRY.
+// Kernel per command, owning the schema cache and the registry mapping (every
+// verb builds in a context of its own). The resolved registry threads into
+// module acquisition AND the schema OCILoader — the latter otherwise reads
+// only the process CUE_REGISTRY.
 func NewKernel(cfg *config.GlobalConfig) *kernel.Kernel {
 	return kernel.New(
 		kernel.WithRegistry(cfg.Registry),
@@ -69,7 +69,7 @@ func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.Globa
 	skew, skewNote := skewPolicyFor(res, cfg)
 	output.Info(res.Describe() + skewNote)
 
-	p, err := k.AcquirePlatformFromDir(ctx, dir, loaderfile.LoadOptions{Registry: cfg.Registry})
+	p, err := k.AcquirePlatformFromDir(ctx, dir)
 	if err != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("building platform module %s (source %s): %w", dir, res.Source, err)}
 	}

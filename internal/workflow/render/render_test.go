@@ -10,6 +10,7 @@ import (
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -94,8 +95,10 @@ func TestNewResult_CarriesResolvedPlatform(t *testing.T) {
 		spec:       spec,
 	}
 	out := &kernel.RenderResult{
-		Warnings:    []string{"w1"},
-		Diagnostics: kernel.RenderDiagnostics{Pairs: []kernel.RenderPair{{Component: "web", Transformer: "x#Deployment"}}},
+		Diagnostics: kernel.RenderDiagnostics{
+			Pairs:           []kernel.RenderPair{{Component: "web", Transformer: "x#Deployment"}},
+			UnhandledTraits: map[string][]string{"web": {"t@v1"}},
+		},
 	}
 
 	result := newResult(env, out, "digest", map[string]any{"k": "v"}, true)
@@ -106,7 +109,8 @@ func TestNewResult_CarriesResolvedPlatform(t *testing.T) {
 	for _, e := range result.PlatformSpec.Entries {
 		assert.NotEmpty(t, e.Version, "seed carries the derived version of %s", e.Path)
 	}
-	assert.Equal(t, []string{"w1"}, result.Warnings)
+	assert.Equal(t, formatAdvisories(out.Diagnostics), result.Warnings, "warnings are the CLI's wording of the advisory rows")
+	assert.Len(t, result.Warnings, 1)
 	assert.Equal(t, out.Diagnostics.Pairs, result.Pairs)
 	assert.Equal(t, "digest", result.RenderDigest)
 	assert.Equal(t, map[string]any{"k": "v"}, result.Values)
@@ -172,8 +176,14 @@ func TestLoadValuesSources_InOrderWithFileOrigin(t *testing.T) {
 	require.Len(t, sources, 2)
 	assert.Equal(t, f1, sources[0].Origin, "each source is attributed to its file")
 	assert.Equal(t, f2, sources[1].Origin)
-	replicas, err := sources[0].Value.LookupPath(cue.ParsePath("replicas")).Int64()
+	// A Source carries bytes the kernel compiles where it uses them; the
+	// top-level values field is unwrapped at that point.
+	schema := cuecontext.New().CompileString(`{replicas: int, image: string}`)
+	require.NoError(t, schema.Err())
+	merged, err := k.ValidateConfigDetailed(schema, sources)
 	require.NoError(t, err, "the top-level values field is unwrapped")
+	replicas, err := merged.LookupPath(cue.ParsePath("replicas")).Int64()
+	require.NoError(t, err)
 	assert.Equal(t, int64(3), replicas)
 }
 

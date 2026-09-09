@@ -45,7 +45,7 @@ func TestDetectRepair(t *testing.T) {
 			"cue.mod/module.cue":    repairCueMod,
 			"identity/identity.cue": repairIdentity,
 		})
-		plan, err := DetectRepair(ctx, nil, "", dir, "")
+		plan, err := DetectRepair(ctx, nil, dir, "")
 		require.NoError(t, err)
 		assert.Equal(t, "example.com/modules/app@v1", plan.ModulePath)
 		assert.Empty(t, plan.Actions)
@@ -55,7 +55,7 @@ func TestDetectRepair(t *testing.T) {
 		dir := repairTree(t, map[string]string{
 			"identity/identity.cue": repairIdentity,
 		})
-		plan, err := DetectRepair(ctx, nil, "", dir, "")
+		plan, err := DetectRepair(ctx, nil, dir, "")
 		require.NoError(t, err)
 		require.Len(t, plan.Actions, 1)
 		a := plan.Actions[0]
@@ -77,12 +77,12 @@ func TestDetectRepair(t *testing.T) {
 		})
 		// The argument wins over both; cue.mod also realigns. No self-imports
 		// exist, so no stranding.
-		plan, err := DetectRepair(ctx, nil, "", dir, "example.com/modules/renamed@v1")
+		plan, err := DetectRepair(ctx, nil, dir, "example.com/modules/renamed@v1")
 		require.NoError(t, err)
 		require.Len(t, plan.Actions, 2)
 
 		require.NoError(t, plan.Apply())
-		got, err := DetectRepair(ctx, nil, "", dir, "")
+		got, err := DetectRepair(ctx, nil, dir, "")
 		require.NoError(t, err)
 		assert.Equal(t, "example.com/modules/renamed@v1", got.ModulePath)
 		assert.Empty(t, got.Actions)
@@ -93,7 +93,7 @@ func TestDetectRepair(t *testing.T) {
 			"cue.mod/module.cue":    `module: "example.com/modules/other@v1"` + "\n",
 			"identity/identity.cue": repairIdentity,
 		})
-		_, err := DetectRepair(ctx, nil, "", dir, "")
+		_, err := DetectRepair(ctx, nil, dir, "")
 		var refusalErr *RefusalError
 		require.ErrorAs(t, err, &refusalErr)
 		assert.Contains(t, refusalErr.Refusal.Headline, "will not choose")
@@ -103,7 +103,7 @@ func TestDetectRepair(t *testing.T) {
 		dir := repairTree(t, map[string]string{
 			"module.cue": "package app\n\nx: 1\n",
 		})
-		_, err := DetectRepair(ctx, nil, "", dir, "")
+		_, err := DetectRepair(ctx, nil, dir, "")
 		var refusalErr *RefusalError
 		require.ErrorAs(t, err, &refusalErr)
 		assert.Contains(t, refusalErr.Refusal.Headline, "states no module path")
@@ -120,7 +120,7 @@ _p: id.ModulePath
 `,
 			"identity/identity.cue": repairIdentity,
 		})
-		_, err := DetectRepair(ctx, nil, "", dir, "example.com/modules/renamed@v1")
+		_, err := DetectRepair(ctx, nil, dir, "example.com/modules/renamed@v1")
 		var refusalErr *RefusalError
 		require.ErrorAs(t, err, &refusalErr)
 		assert.Contains(t, refusalErr.Refusal.Headline, "strand self-imports")
@@ -130,7 +130,7 @@ _p: id.ModulePath
 		dir := repairTree(t, map[string]string{
 			"cue.mod/module.cue": repairCueMod,
 		})
-		_, err := DetectRepair(ctx, nil, "", dir, "")
+		_, err := DetectRepair(ctx, nil, dir, "")
 		var refusalErr *RefusalError
 		require.ErrorAs(t, err, &refusalErr)
 		assert.Contains(t, refusalErr.Refusal.Headline, "states no version")
@@ -141,7 +141,7 @@ _p: id.ModulePath
 			"cue.mod/module.cue":    "language: { version: \"v0.17.0\" }\n",
 			"identity/identity.cue": repairIdentity,
 		})
-		_, err := DetectRepair(ctx, nil, "", dir, "")
+		_, err := DetectRepair(ctx, nil, dir, "")
 		require.Error(t, err)
 		assert.NotErrorAs(t, err, new(*RefusalError))
 	})
@@ -152,7 +152,7 @@ func TestRepairPlanDescribe(t *testing.T) {
 		"cue.mod/module.cue":    repairCueMod,
 		"identity/identity.cue": repairIdentity,
 	})
-	plan, err := DetectRepair(context.Background(), nil, "", dir, "example.com/modules/renamed@v1")
+	plan, err := DetectRepair(context.Background(), nil, dir, "example.com/modules/renamed@v1")
 	require.NoError(t, err)
 
 	out := plan.Describe()

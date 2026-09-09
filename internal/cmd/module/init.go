@@ -259,7 +259,7 @@ func runScaffold(c *cobra.Command, cfg *config.GlobalConfig, newPath, templateRe
 // be created or edited, confirm a second time, apply.
 func runRepair(c *cobra.Command, cfg *config.GlobalConfig, dir, pathArg string, yes bool) error {
 	k := kernel.New(kernel.WithRegistry(cfg.Registry))
-	plan, err := scaffold.DetectRepair(c.Context(), k, cfg.Registry, dir, pathArg)
+	plan, err := scaffold.DetectRepair(c.Context(), k, dir, pathArg)
 	if err != nil {
 		return initError(err)
 	}

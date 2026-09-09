@@ -11,7 +11,7 @@ import (
 
 	"cuelang.org/go/cue/ast"
 
-	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
+	liberrors "github.com/open-platform-model/library/opm/errors"
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/platform"
 
@@ -69,7 +69,7 @@ func WritePlatformModule(dir string) error {
 }
 
 // BuildPlatformModule builds the platform module at dir through the kernel's
-// shape-gated platform loader: imports resolve (from registry, or the CUE
+// shape-gated platform acquire: imports resolve (from registry, or the CUE
 // module cache when warm), the value is a well-formed #Platform, and the
 // schema's derived-entry tripwires (key-to-import binding, derived version)
 // evaluate. registry overrides CUE_REGISTRY for the build; empty means the
@@ -91,12 +91,10 @@ func BuildPlatformModule(ctx context.Context, dir, registry string) (*platform.P
 		}
 	}
 
+	// The registry mapping is supplied once, at kernel construction; the
+	// acquire verb takes no per-call override.
 	k := kernel.New(kernel.WithRegistry(registry))
-	val, err := k.LoadPlatformPackage(ctx, dir, loaderfile.LoadOptions{Registry: registry})
-	if err != nil {
-		return nil, platformBuildError(dir, err)
-	}
-	p, err := k.NewPlatformFromValue(val)
+	p, err := k.AcquirePlatformFromDir(ctx, dir)
 	if err != nil {
 		return nil, platformBuildError(dir, err)
 	}
@@ -121,7 +119,7 @@ func platformBuildHint(dir string, err error) string {
 	modFile := filepath.Join(dir, filepath.FromSlash(PlatformModuleFileName))
 	msg := err.Error()
 	switch {
-	case errors.Is(err, loaderfile.ErrWrongKind), errors.Is(err, loaderfile.ErrInvalidPackage):
+	case errors.Is(err, liberrors.ErrWrongKind), errors.Is(err, liberrors.ErrInvalidPackage):
 		return "platform.cue must be a single package embedding core.#Platform; re-run 'opm config init --force' for a fresh module"
 	case strings.Contains(msg, "module not found"), strings.Contains(msg, "cannot find package"), strings.Contains(msg, "cannot expand module graph"):
 		return "Pin a published build in " + modFile + ", then re-run 'opm config vet'"

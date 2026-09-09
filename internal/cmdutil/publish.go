@@ -50,7 +50,7 @@ func RunPublish(cmd *cobra.Command, cfg *config.GlobalConfig, kind publish.Kind,
 		kernel.WithRegistry(cfg.Registry),
 		kernel.WithSchemaLoader(schema.OCILoader{Registry: cfg.Registry}),
 	)
-	schemaVal, err := k.SchemaCache().Get(k.CueContext())
+	schemaVal, err := k.SchemaCache().Get()
 	if err != nil {
 		// The schema fetch is a registry round-trip like the lookup and the
 		// push: failing to reach it is a connectivity failure, not a verdict
@@ -65,10 +65,14 @@ func RunPublish(cmd *cobra.Command, cfg *config.GlobalConfig, kind publish.Kind,
 		}
 	}
 
+	// The pipeline builds every package in the runtime the identity and gate
+	// schemas live in — the schema value's own — so they unify exactly as
+	// they did when the kernel handed out that context itself.
 	opts := publish.Options{
 		Dir:               dir,
 		Kind:              kind,
-		Context:           k.CueContext(),
+		Context:           schemaVal.Context(), //nolint:staticcheck // SA1019: the deprecation's alternative (a fresh context, relying on cross-context unification) is a behavior change this migration deliberately avoids
+		Kernel:            k,
 		IdentitySchema:    identitySchema,
 		Registry:          cfg.Registry,
 		VersionFlag:       flags.Version,

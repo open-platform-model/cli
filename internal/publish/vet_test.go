@@ -1,9 +1,12 @@
 package publish
 
 import (
+	"context"
 	"testing"
 
 	"cuelang.org/go/cue/cuecontext"
+
+	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,10 +17,11 @@ func runVetChecks(t *testing.T, files map[string]string) *Plan {
 	t.Helper()
 	dir := writeTree(t, files)
 	ctx := cuecontext.New()
-	p, root, err := VetChecks(Options{
+	p, root, err := VetChecks(context.Background(), Options{
 		Dir:            dir,
 		Kind:           KindModule,
 		Context:        ctx,
+		Kernel:         kernel.New(),
 		IdentitySchema: stubSchema(t, ctx),
 	})
 	require.NoError(t, err)

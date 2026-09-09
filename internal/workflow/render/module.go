@@ -3,20 +3,12 @@ package render
 import (
 	"context"
 	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
-	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/load"
-
-	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
-	"github.com/open-platform-model/library/opm/helper/synth"
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
-	"github.com/open-platform-model/library/opm/schema"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
@@ -47,34 +39,24 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 
 	k := NewKernel(opts.Config)
 
-	modVal, err := k.LoadModulePackage(ctx, opts.ModulePath, loaderfile.LoadOptions{Registry: opts.Config.Registry})
+	// Acquire the module package through the kernel's shape gate. The acquire
+	// stages the local directory as the module's source tree, so synthesis
+	// builds the instance package inside the module's own root: the module
+	// import resolves locally (no registry round-trip for the module itself)
+	// and its cue.mod — including any local-module.cue replaceWith (D37) —
+	// drives transitive resolution.
+	mod, err := k.AcquireModuleFromDir(ctx, opts.ModulePath)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
-	mod, err := k.NewModuleFromValue(modVal)
-	if err != nil {
-		printValidationError(err)
-		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
-	}
-
-	// Stage the local directory as the module's source tree: synthesis
-	// builds the instance package inside the module's own root, so the
-	// module import resolves locally (no registry round-trip for the module
-	// itself) and its cue.mod — including any local-module.cue replaceWith
-	// (D37) — drives transitive resolution.
-	src, err := stageLocalModuleSource(opts.ModulePath)
-	if err != nil {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("staging module source: %w", err)}
-	}
-	mod.Source = src
 
 	// D19: a replaced dependency in the module's own cue.mod means demanded
 	// keys may not correspond to published bytes (distinct from this path's
 	// always-local render provenance below).
 	warnLocalReplacement(moduleContextHasLocalReplacement(opts.ModulePath))
 
-	values, err := resolveModuleValues(k, mod, opts.ValuesFiles)
+	values, err := resolveModuleValues(k, mod, opts.ModulePath, opts.ValuesFiles)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
@@ -84,7 +66,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 
 	output.Info(fmt.Sprintf("Building synthetic instance %q for module %q", synthName, modName))
 
-	inst, err := k.SynthesizeInstance(ctx, synth.InstanceInput{
+	inst, err := k.SynthesizeInstance(ctx, kernel.InstanceInput{
 		Module:    mod,
 		Name:      synthName,
 		Namespace: synthNamespace,
@@ -132,74 +114,31 @@ func syntheticIdentity(mod *module.Module, opts ModuleOpts, namespace string) (m
 	return modName, synthName, synthNamespace
 }
 
-// stageLocalModuleSource builds a module.Source overlay from a local module
-// directory so kernel synthesis can use it as the build's main module. Every
-// regular file under the directory is staged (VCS and build-artifact
-// directories skipped).
-func stageLocalModuleSource(dir string) (*module.Source, error) {
-	absDir, err := filepath.Abs(dir)
-	if err != nil {
-		return nil, err
-	}
-	// Root-scoped filesystem: every read stays inside the module directory
-	// even under concurrent symlink swaps (gosec G122).
-	root, err := os.OpenRoot(absDir)
-	if err != nil {
-		return nil, err
-	}
-	defer root.Close()
-
-	overlay := make(map[string]load.Source)
-	err = fs.WalkDir(root.FS(), ".", func(rel string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if d.IsDir() {
-			switch d.Name() {
-			case ".git", ".build", "node_modules":
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if !d.Type().IsRegular() {
-			return nil
-		}
-		content, readErr := fs.ReadFile(root.FS(), rel)
-		if readErr != nil {
-			return readErr
-		}
-		overlay[filepath.Join(absDir, filepath.FromSlash(rel))] = load.FromBytes(content)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(overlay) == 0 {
-		return nil, fmt.Errorf("module directory %s contains no files", dir)
-	}
-	return &module.Source{Root: absDir, Overlay: overlay}, nil
-}
-
 // resolveModuleValues mirrors `opm module vet`: -f files override debugValues.
-// The files are layered as kernel values sources through the kernel's
-// layered validation against the module's #config, so a conflict or a
-// violation is attributed to the file it came from; the returned value is
-// the single merged cue.Value the kernel's synthesis takes.
-func resolveModuleValues(k *kernel.Kernel, mod *module.Module, valuesFiles []string) (cue.Value, error) {
+// The files are layered as kernel values sources and checked through the
+// kernel's layered validation against the module's #config before synthesis,
+// so a conflict or a violation is attributed to the file it came from; the
+// returned sources are what synthesis renders into the instance's values
+// file. Without -f files the module's own debugValues are the single source
+// (DebugValuesSource), attributed to the module directory.
+func resolveModuleValues(k *kernel.Kernel, mod *module.Module, moduleDir string, valuesFiles []string) ([]kernel.Source, error) {
 	if len(valuesFiles) > 0 {
 		sources, err := loadValuesSources(k, valuesFiles)
 		if err != nil {
-			return cue.Value{}, err
+			return nil, err
 		}
 		schemaVal := mod.ConfigSchema()
 		if !schemaVal.Exists() {
-			return cue.Value{}, fmt.Errorf("module does not define #config; values files cannot be validated")
+			return nil, fmt.Errorf("module does not define #config; values files cannot be validated")
 		}
-		return k.ValidateConfigDetailed(schemaVal, sources)
+		if _, err := k.ValidateConfigDetailed(schemaVal, sources); err != nil {
+			return nil, err
+		}
+		return sources, nil
 	}
-	debugVal := mod.Package.LookupPath(schema.DebugValues)
-	if !debugVal.Exists() {
-		return cue.Value{}, fmt.Errorf("module does not define debugValues - add debugValues or provide values with -f")
+	src, err := DebugValuesSource(k, mod, filepath.Join(moduleDir, "debugValues"))
+	if err != nil {
+		return nil, err
 	}
-	return debugVal, nil
+	return []kernel.Source{src}, nil
 }

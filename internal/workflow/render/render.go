@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"sort"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"cuelang.org/go/cue"
 
-	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
 	"github.com/open-platform-model/library/opm/schema"
@@ -28,7 +28,7 @@ import (
 // #ModuleInstance CUE package through the library kernel (0006 D9). The
 // package directory containing the instance file is acquired as one CUE
 // package (instance.cue + values.cue + overlays) with any -f values files
-// layered through the kernel's values option, so the instance the render
+// passed as the acquire's trailing values sources, so the instance the render
 // imports already carries them; the kernel then renders it against the
 // resolved platform in one build.
 func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, error) {
@@ -62,7 +62,7 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
-	inst, err := k.AcquireInstanceFromDir(ctx, instanceDir, loaderfile.LoadOptions{Registry: opts.Config.Registry}, kernel.WithValues(sources...))
+	inst, err := k.AcquireInstanceFromDir(ctx, instanceDir, sources...)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
@@ -192,19 +192,52 @@ func renderInstance(
 // render environment. PlatformSpec is the seed document decoded from the
 // exact built platform the render consumed — the D12 write-if-absent seeding
 // writes it verbatim, with no re-read of the platform module at apply time.
-// Warnings are the kernel's render warnings (unhandled optional traits, skew
-// under the warn policy); the D19 local-replacement warning is emitted
-// directly by the entry points, before the render.
+// Warnings are the render's advisory facts worded by the CLI from the
+// diagnostics rows (unhandled optional traits, skew under the warn policy);
+// the D19 local-replacement warning is emitted directly by the entry points,
+// before the render.
 func newResult(env *renderEnv, out *kernel.RenderResult, renderDigest string, values map[string]any, sourceLocal bool) *Result {
 	return &Result{
 		Pairs:        out.Diagnostics.Pairs,
-		Warnings:     out.Warnings,
+		Warnings:     formatAdvisories(out.Diagnostics),
 		Platform:     env.resolution,
 		PlatformSpec: env.spec,
 		RenderDigest: renderDigest,
 		Values:       values,
 		SourceLocal:  sourceLocal,
 	}
+}
+
+// formatAdvisories words the render's advisory diagnostics as the CLI's
+// warnings (the kernel-render spec): one line per resolved-versions row
+// marked Newer — the warn skew policy let the render proceed against the
+// platform's build — followed by one line per unhandled optional trait, in
+// component order. The kernel reports both as rows and attaches no message
+// strings; the sentences are the CLI's, kept identical to the ones the kernel
+// used to word so existing output does not move. Never nil: no advisories is
+// an empty list.
+func formatAdvisories(d kernel.RenderDiagnostics) []string {
+	warnings := []string{}
+	for _, r := range d.ResolvedVersions {
+		if !r.Newer {
+			continue
+		}
+		warnings = append(warnings, fmt.Sprintf(
+			"version skew on %q: module requires %s, platform carries %s; rendering against the platform's build",
+			r.Path, r.ModuleVersion, r.PlatformVersion))
+	}
+	comps := make([]string, 0, len(d.UnhandledTraits))
+	for c := range d.UnhandledTraits {
+		comps = append(comps, c)
+	}
+	sort.Strings(comps)
+	for _, c := range comps {
+		for _, fqn := range d.UnhandledTraits[c] {
+			warnings = append(warnings, fmt.Sprintf(
+				"component %q: trait %q is not handled by any matched transformer (values will be ignored)", c, fqn))
+		}
+	}
+	return warnings
 }
 
 // decodeModuleMetadata decodes the CLI's module metadata from a module CUE

@@ -14,7 +14,9 @@ import (
 	"cuelabs.dev/go/oci/ociregistry/ocimem"
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
+
 	"cuelang.org/go/mod/modregistrytest"
+	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -302,12 +304,14 @@ func TestLogin_InversionAgainstRegistry(t *testing.T) {
 	cueCtx := cuecontext.New()
 	schema := cueCtx.CompileString(identitySchemaStub)
 	require.NoError(t, schema.Err())
+	registry := reg.Host() + "+insecure"
 	opts := publish.Options{
 		Dir:            dir,
 		Kind:           publish.KindModule,
 		Context:        cueCtx,
+		Kernel:         kernel.New(kernel.WithRegistry(registry)),
 		IdentitySchema: schema.LookupPath(cue.MakePath(cue.Def("IdentityPackage"))),
-		Registry:       reg.Host() + "+insecure",
+		Registry:       registry,
 	}
 	plan, err := publish.Run(context.Background(), opts)
 	require.NoError(t, err)

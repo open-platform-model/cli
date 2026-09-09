@@ -32,10 +32,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"cuelang.org/go/cue"
-
-	loaderfile "github.com/open-platform-model/library/opm/helper/loader/file"
-	"github.com/open-platform-model/library/opm/helper/synth"
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/schema"
 
@@ -137,7 +133,7 @@ func run() error {
 	)
 
 	// Acquire the same platform module directory the CLI path resolved.
-	plat, err := k.AcquirePlatformFromDir(ctx, platformDir, loaderfile.LoadOptions{Registry: registry})
+	plat, err := k.AcquirePlatformFromDir(ctx, platformDir)
 	if err != nil {
 		return skipOrFail("platform module build failed: %v", err)
 	}
@@ -148,16 +144,16 @@ func run() error {
 	}
 
 	// Same values source the CLI path used: the module's debugValues.
-	debugValues := mod.Package.LookupPath(cue.ParsePath("debugValues"))
-	if !debugValues.Exists() {
-		return fmt.Errorf("acquired module has no debugValues")
+	debugValues, err := workflowrender.DebugValuesSource(k, mod, modulePath+"/debugValues")
+	if err != nil {
+		return fmt.Errorf("acquired module has no usable debugValues: %w", err)
 	}
 
-	inst, err := k.SynthesizeInstance(ctx, synth.InstanceInput{
+	inst, err := k.SynthesizeInstance(ctx, kernel.InstanceInput{
 		Module:    mod,
 		Name:      instName,
 		Namespace: instNamespace,
-		Values:    debugValues,
+		Values:    []kernel.Source{debugValues},
 	})
 	if err != nil {
 		return fmt.Errorf("operator-path synthesis: %w", err)

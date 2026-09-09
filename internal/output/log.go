@@ -51,6 +51,14 @@ func SetupLogging(cfg LogConfig) {
 	})
 }
 
+// IsVerbose reports whether the logger runs at debug level — the invocation's
+// --verbose flag, which SetupLogging maps to the level. Output paths with no
+// verbose option in reach (a render refusal has no result to show through
+// ShowOutputOpts) read the setting here rather than threading a flag.
+func IsVerbose() bool {
+	return logger.GetLevel() <= log.DebugLevel
+}
+
 // InstanceLogger returns a child logger scoped to a instance name.
 // The prefix renders as: m:<name>:
 // with dim "m:" and cyan instance name. The trailing ":" is appended

@@ -47,7 +47,7 @@ func PrintValidationError(msg string, err error) {
 			noun = "demands"
 		}
 		output.Error(fmt.Sprintf("%s: %d unresolved %s", msg, n, noun))
-		output.Details(FormatUnresolvedDemands(demandsErr))
+		output.Details(FormatUnresolvedDemands(demandsErr.Demands))
 		return
 	}
 
@@ -63,13 +63,16 @@ func PrintValidationError(msg string, err error) {
 	output.Error(msg, "error", err)
 }
 
-// FormatUnresolvedDemands renders an unresolved-demands aggregate as one
-// block: per demand the component, kind, and contract key, followed by the
-// same-base alternatives the platform does implement (the actionable half of
-// the diagnostic) or an explicit nothing-implements line.
-func FormatUnresolvedDemands(demandsErr *liberrors.UnresolvedDemandsError) string {
+// FormatUnresolvedDemands renders unresolved-demand rows as one block: per
+// demand the component, kind, and contract key, followed by the same-base
+// alternatives the platform does implement (the actionable half of the
+// diagnostic) or an explicit nothing-implements line. It takes the rows
+// themselves — the render diagnostics carry them directly, and the typed
+// refusal carries the same rows — so no caller reconstructs an aggregate to
+// reach it.
+func FormatUnresolvedDemands(demands []liberrors.UnresolvedDemand) string {
 	var b strings.Builder
-	for _, d := range demandsErr.Demands {
+	for _, d := range demands {
 		fmt.Fprintf(&b, "component %q: unresolved %s demand %q\n", d.Component, d.Kind, d.FQN)
 		if len(d.Alternatives) > 0 {
 			fmt.Fprintf(&b, "  implemented at: %s\n", strings.Join(d.Alternatives, ", "))

@@ -1,6 +1,7 @@
 package publish
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -19,12 +20,9 @@ import (
 // a second load. A root that does not load is returned as an error — the
 // existing vet load-failure class — while a missing or broken identity
 // package is a check refusal.
-func VetChecks(opts Options) (*Plan, cue.Value, error) {
-	if opts.Context == nil {
-		return nil, cue.Value{}, fmt.Errorf("publish: Options.Context is required")
-	}
-	if !opts.IdentitySchema.Exists() {
-		return nil, cue.Value{}, fmt.Errorf("publish: Options.IdentitySchema is required")
+func VetChecks(ctx context.Context, opts Options) (*Plan, cue.Value, error) {
+	if err := opts.requireInputs(); err != nil {
+		return nil, cue.Value{}, err
 	}
 	absDir, err := statArtifactDir(opts.Dir)
 	if err != nil {
@@ -79,7 +77,7 @@ func VetChecks(opts Options) (*Plan, cue.Value, error) {
 
 	gateCueModAgreement(p, a)
 	gateDerivation(p, a)
-	gateKernelLoad(p, opts)
+	gateKernelLoad(ctx, p, opts)
 
 	return p, root, nil
 }

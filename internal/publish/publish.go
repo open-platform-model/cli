@@ -16,6 +16,8 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/mod/modregistry"
+
+	"github.com/open-platform-model/library/opm/kernel"
 )
 
 // Kind names the artifact kind being published. The two entry points differ
@@ -40,8 +42,19 @@ type Options struct {
 	// override-gate waiver).
 	Kind Kind
 
-	// Context is the CUE context every load and lookup runs in.
+	// Context is the CUE context every load and lookup runs in: the context
+	// IdentitySchema and the gate schemas were built in, so the loaded
+	// packages can unify with them.
 	Context *cue.Context
+
+	// Kernel is the invocation's kernel. The kernel-load gate acquires the
+	// module tree through it (Kernel.AcquireModuleFromDir — the same verb
+	// `opm module build` and the operator use), classifying a refusal by the
+	// shape-gate sentinels the library's errors package declares. The caller
+	// supplies the one kernel it already built for the invocation, carrying
+	// the registry mapping; the gate constructs none of its own. Required by
+	// Run and VetChecks.
+	Kernel *kernel.Kernel
 
 	// IdentitySchema is core's #IdentityPackage definition, resolved from the
 	// kernel's schema cache. The identity package is validated by unifying
@@ -68,6 +81,21 @@ type Options struct {
 	// SkipOverrideCheck waives the local-override gate. Module publish only;
 	// it never changes resolution — replacements are ignored either way.
 	SkipOverrideCheck bool
+}
+
+// requireInputs is the precondition Run and VetChecks share: without a
+// Context nothing builds, without a Kernel the kernel-load gate cannot
+// acquire, and without the IdentitySchema identity cannot be judged.
+func (o Options) requireInputs() error {
+	switch {
+	case o.Context == nil:
+		return fmt.Errorf("publish: Options.Context is required")
+	case o.Kernel == nil:
+		return fmt.Errorf("publish: Options.Kernel is required")
+	case !o.IdentitySchema.Exists():
+		return fmt.Errorf("publish: Options.IdentitySchema is required")
+	}
+	return nil
 }
 
 // IdentityFieldState classifies an identity field per D4's tristate.

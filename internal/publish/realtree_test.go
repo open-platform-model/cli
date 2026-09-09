@@ -43,7 +43,7 @@ func TestRealTree_CatalogOpm(t *testing.T) {
 		kernel.WithRegistry(realTreeRegistry),
 		kernel.WithSchemaLoader(schema.OCILoader{Registry: realTreeRegistry}),
 	)
-	schemaVal, err := k.SchemaCache().Get(k.CueContext())
+	schemaVal, err := k.SchemaCache().Get()
 	if err != nil {
 		t.Skipf("core v2 schema unavailable (registry/cache): %v", err)
 	}
@@ -51,7 +51,8 @@ func TestRealTree_CatalogOpm(t *testing.T) {
 	opts := Options{
 		Dir:                     src,
 		Kind:                    KindCatalog,
-		Context:                 k.CueContext(),
+		Context:                 schemaVal.Context(), //nolint:staticcheck // SA1019: the pipeline builds in the schema's runtime, as RunPublish does
+		Kernel:                  k,
 		IdentitySchema:          schemaVal.LookupPath(cue.MakePath(cue.Def("IdentityPackage"))),
 		MemberFQNGateSchema:     schemaVal.LookupPath(cue.MakePath(cue.Def("CatalogMemberFQNGate"))),
 		TraitOptionalGateSchema: schemaVal.LookupPath(cue.MakePath(cue.Def("TraitOptionalGate"))),
