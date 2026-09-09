@@ -52,7 +52,7 @@ func replacementWarnings(rows []kernel.Replacement, moduleRoot string) []string
 //     "local replacement of <Path> in <moduleRoot>/cue.mod/local-module.cue is ignored: the platform names that path; redirect it in the platform module's cue.mod/local-module.cue"
 ```
 
-`moduleRoot` is the existing D19 module context (`loader.ModuleRootFrom` of the instance file's directory, or the module directory). Platform-side entries are only ever reported through rows: the platform is authoritative, nothing of its file can be inert.
+`moduleRoot` is the existing D19 module context (`loader.ModuleRootFrom` of the instance file's directory, or the module directory). Platform-side entries are only ever reported through rows: the platform is authoritative, nothing of its file can be inert. An entry counts as honoured only when an `instance` row carries its path: a `platform` row on the same path is the platform's replacement in effect, and the module's own redirect of that path is still inert (the platform names it), so both lines are emitted.
 
 ### One reader in `pkg/loader`
 
