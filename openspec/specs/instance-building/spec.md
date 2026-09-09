@@ -6,23 +6,23 @@ Defines the contract for loading and building a concrete `*moduleinstance.Module
 
 ### Requirement: Loader validates consumer values and produces a concrete ModuleInstance
 
-The CLI SHALL produce validated, concrete instances exclusively through the `library` kernel. The three loading entry points map onto kernel calls:
+The CLI SHALL produce validated, concrete instances exclusively through the `library` kernel. The three loading entry points map onto kernel acquire verbs:
 
-1. **Module-directory path**: kernel `LoadModulePackage` + `SynthesizeInstance` — used by `opm mod`/`opm module` commands. Accepts a directory containing a module CUE package.
-2. **Standalone instance file**: kernel instance-package loading (`LoadInstancePackage`/`LoadSourceFromFile`) + `ProcessModuleInstance` — used by `opm instance` commands. Accepts a `.cue` file with CUE import resolution.
-3. **Module-package synthesis**: kernel `SynthesizeInstance` — used by `opm instance build <dir>` and `opm module build`. Accepts a module package directory (no `instance.cue`); the kernel unifies inputs against the resolved `#ModuleInstance` schema and lets CUE derive uuid, components, auto-secrets, and standard labels.
+1. **Module-directory path**: kernel `AcquireModuleFromDir` + `SynthesizeInstance` — used by `opm mod`/`opm module` commands. Accepts a directory containing a module CUE package; the acquire stages the directory as the module's source, so synthesis builds inside the module's own root.
+2. **Standalone instance file**: kernel `AcquireInstanceFromDir` on the file's package directory, with any `-f` files passed as trailing values sources (`LoadSourceFromFile`) — used by `opm instance` commands. Accepts a `.cue` file with CUE import resolution.
+3. **Module-package synthesis**: kernel `SynthesizeInstance` — used by `opm instance build <dir>` and `opm module build`. Accepts a module package directory (no `instance.cue`); its values are kernel sources — the `-f` files, or the module's `debugValues` rendered as one source by the CLI — and the kernel unifies inputs against the resolved `#ModuleInstance` schema and lets CUE derive uuid, components, auto-secrets, and standard labels.
 
-All paths run the kernel's Module Gate equivalent (`ValidateModuleValues*` / `ProcessModuleInstance` concreteness enforcement), producing a `*module.Instance`. The CLI SHALL NOT carry its own `LoadModuleInstanceFromValue` pipeline.
+All paths run the kernel's shape gate and concreteness enforcement, producing a `*module.Instance`. The CLI SHALL NOT carry its own `LoadModuleInstanceFromValue` pipeline and SHALL NOT reach for a raw-value loading tier.
 
 #### Scenario: Successful load from module directory
 
-- **WHEN** the module-directory path loads a directory containing a module package and values
+- **WHEN** the module-directory path acquires a directory containing a module package and values
 - **THEN** kernel synthesis returns a `*module.Instance` with all fields populated
 
 #### Scenario: Successful load from instance file
 
-- **WHEN** the instance-file path loads a `.cue` file where the module reference resolves via CUE import
-- **THEN** kernel processing returns a `*module.Instance` with all fields populated (including auto-secrets derived by CUE)
+- **WHEN** the instance-file path acquires the package directory of a `.cue` file where the module reference resolves via CUE import
+- **THEN** kernel acquisition returns a `*module.Instance` with all fields populated (including auto-secrets derived by CUE)
 
 #### Scenario: Successful synthesis from a module-package directory
 
@@ -90,7 +90,7 @@ When using `LoadInstanceFile()` (instance-file path), the `values` field is inli
 
 #### Scenario: No values file, `values.cue` exists in module directory
 
-- **WHEN** `LoadInstancePackage()` is called with no explicit values file
+- **WHEN** `AcquireInstanceFromDir` acquires an instance package with no trailing values source
 - **AND** `values.cue` exists in the module directory
 - **THEN** `values.cue` is loaded alongside `instance.cue` as part of the CUE instance
 
