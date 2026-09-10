@@ -51,11 +51,6 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	// D19: a replaced dependency in the module's own cue.mod means demanded
-	// keys may not correspond to published bytes (distinct from this path's
-	// always-local render provenance below).
-	warnLocalReplacement(moduleContextHasLocalReplacement(opts.ModulePath))
-
 	values, err := resolveModuleValues(k, mod, opts.ModulePath, opts.ValuesFiles)
 	if err != nil {
 		printValidationError(err)
@@ -85,8 +80,10 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	}
 
 	// A module apply always renders a local module directory (the main module is
-	// local), so render provenance is local (enhancement 0006 D7).
-	return renderInstance(ctx, env, inst, opts.K8sConfig, true)
+	// local), so render provenance is local (enhancement 0006 D7). The module
+	// directory is the D19 module context: a replaced dependency in its own
+	// cue.mod is worded from the kernel's rows after the render.
+	return renderInstance(ctx, env, inst, opts.K8sConfig, moduleContextRoot(opts.ModulePath), true)
 }
 
 // defaultNamespace is the synthetic-instance namespace when no

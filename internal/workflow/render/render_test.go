@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/open-platform-model/library/opm/kernel"
+	libmodule "github.com/open-platform-model/library/opm/module"
 
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/platform"
@@ -200,26 +201,32 @@ func writeD19File(t *testing.T, path, content string) {
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 }
 
-// The D19 warning fires exactly when the effective module context carries a
-// local replacement; both render entries share warnLocalReplacement, so the
-// warning string cannot diverge between them.
-func TestWarnLocalReplacement(t *testing.T) {
-	assert.True(t, warnLocalReplacement(true))
-	assert.False(t, warnLocalReplacement(false))
+// The CLI's one render call always opts into the kernel's local replacements
+// (the D19 spec: every render enables them): a developer's local-module.cue
+// is honored, never refused, and the kernel's rows are what the warnings
+// are worded from.
+func TestNewRenderInput_EnablesLocalReplacements(t *testing.T) {
+	env := &renderEnv{skew: kernel.SkewRefuse}
+	inst := &libmodule.Instance{}
+
+	in := newRenderInput(env, inst)
+
+	assert.True(t, in.LocalReplacements, "every CLI render opts into local replacements")
+	assert.Same(t, inst, in.Instance)
+	assert.Equal(t, RuntimeName, in.RuntimeName)
+	assert.Equal(t, kernel.SkewRefuse, in.Skew, "the resolved skew policy is carried through")
 }
 
-func TestModuleContextHasLocalReplacement_PresentWithReplaceWith(t *testing.T) {
+func TestModuleContextRoot_WalksUpToTheModuleRoot(t *testing.T) {
 	root := t.TempDir()
 	writeD19File(t, filepath.Join(root, "cue.mod", "module.cue"), `module: "example.com/main@v0"`)
-	writeD19File(t, filepath.Join(root, "cue.mod", "local-module.cue"),
-		`deps: "opmodel.dev/modules/podinfo@v0": replaceWith: "../podinfo"`)
+	nested := filepath.Join(root, "instances", "web")
+	require.NoError(t, os.MkdirAll(nested, 0o755))
 
-	assert.True(t, moduleContextHasLocalReplacement(root))
+	assert.Equal(t, root, moduleContextRoot(nested), "an instance file's directory resolves to its module root")
+	assert.Equal(t, root, moduleContextRoot(root), "a module directory is its own root")
 }
 
-func TestModuleContextHasLocalReplacement_AbsentStaysSilent(t *testing.T) {
-	root := t.TempDir()
-	writeD19File(t, filepath.Join(root, "cue.mod", "module.cue"), `module: "example.com/main@v0"`)
-
-	assert.False(t, moduleContextHasLocalReplacement(root))
+func TestModuleContextRoot_NoModuleIsEmpty(t *testing.T) {
+	assert.Equal(t, "", moduleContextRoot(t.TempDir()), "no cue.mod above the directory: no module context")
 }

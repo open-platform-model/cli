@@ -70,12 +70,10 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 
 	// Render provenance (enhancement 0006 D7): an instance apply is local when
 	// its module's cue.mod/local-module.cue replaces a dependency; otherwise it
-	// resolves from registries.
-	sourceLocal := false
-	if abs, absErr := filepath.Abs(opts.InstanceFilePath); absErr == nil {
-		sourceLocal = loader.HasLocalModuleReplacement(loader.ModuleRootFrom(filepath.Dir(abs)))
-	}
-	warnLocalReplacement(sourceLocal)
+	// resolves from registries. The same module root is the D19 module
+	// context the render's replacement warnings are worded against.
+	moduleRoot := moduleContextRoot(filepath.Dir(opts.InstanceFilePath))
+	sourceLocal := loader.HasLocalModuleReplacement(moduleRoot)
 
 	// Platform resolution + acquisition only after the instance itself
 	// validated: cheap failures never hit the cluster or registry.
@@ -84,60 +82,62 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 		return nil, err
 	}
 
-	return renderInstance(ctx, env, inst, opts.K8sConfig, sourceLocal)
+	return renderInstance(ctx, env, inst, opts.K8sConfig, moduleRoot, sourceLocal)
 }
 
-// localReplacementWarning is the D19 (enhancement 0010) render warning: a
-// local-path replacement in cue.mod/local-module.cue means demanded keys were
-// resolved against local bytes, which may not correspond to any published
-// build of the replaced module. One string, shared by both render entries.
-const localReplacementWarning = "module context carries cue.mod/local-module.cue replacements: demanded keys may not correspond to published bytes"
-
-// warnLocalReplacement emits the D19 warning when the effective module context
-// carries a local replacement. Reports whether it warned (for tests); it never
-// blocks or alters the render.
-func warnLocalReplacement(replaced bool) bool {
-	if replaced {
-		output.Warn(localReplacementWarning)
-	}
-	return replaced
-}
-
-// moduleContextHasLocalReplacement is the module-entry D19 predicate: whether
-// the module directory's own module root carries a local-module.cue
-// replacement. Distinct from the module path's render provenance (always
-// local — the main module is the local directory); this detects replaced
-// *dependencies*.
-func moduleContextHasLocalReplacement(moduleDir string) bool {
-	abs, err := filepath.Abs(moduleDir)
+// moduleContextRoot is the effective module context of a render entry: the
+// module root (nearest cue.mod/module.cue) above dir — the directory holding
+// an instance file, or the module directory itself. "" when dir is under no
+// module root. It is where a developer's cue.mod/local-module.cue lives, so
+// it drives both the render provenance signal (0006 D7) and the wording of
+// the render's replacement warnings (0010 D19).
+func moduleContextRoot(dir string) string {
+	abs, err := filepath.Abs(dir)
 	if err != nil {
-		return false
+		return ""
 	}
-	return loader.HasLocalModuleReplacement(loader.ModuleRootFrom(abs))
+	return loader.ModuleRootFrom(abs)
+}
+
+// newRenderInput assembles the kernel's render input for the resolved
+// environment. LocalReplacements is always on: the CLI renders a developer's
+// checkout, so a cue.mod/local-module.cue in the module context or the
+// platform module is the developer's request and the render honors it (the
+// kernel refuses such an input when the switch is off); the kernel reports
+// what it honored on the diagnostics and renderInstance words the rows.
+func newRenderInput(env *renderEnv, inst *module.Instance) kernel.RenderInput {
+	return kernel.RenderInput{
+		Instance:          inst,
+		Platform:          env.platform,
+		RuntimeName:       RuntimeName,
+		Skew:              env.skew,
+		LocalReplacements: true,
+	}
 }
 
 // renderInstance runs the kernel's single render verb on a source-carrying
 // instance and adapts the result to the workflow Result. Every failure the
-// kernel reports — a skew refusal before evaluation, or the fail-closed gate
-// after it (unresolved demands, unmatched components, an over-subscribed
-// provider contract, a failed pair) — exits as a validation failure with the
-// kernel's message and the diagnostics printed beside it.
+// kernel reports — a skew refusal before evaluation, a local-replacement
+// refusal, or the fail-closed gate after it (unresolved demands, unmatched
+// components, an over-subscribed provider contract, a failed pair) — exits
+// as a validation failure with the kernel's message and the diagnostics
+// printed beside it. After a successful render the D19 replacement warnings
+// are emitted from the kernel's rows against moduleRoot, the module context.
 func renderInstance(
 	ctx context.Context,
 	env *renderEnv,
 	inst *module.Instance,
 	k8sCfg *config.ResolvedKubernetesConfig,
+	moduleRoot string,
 	sourceLocal bool,
 ) (*Result, error) {
-	out, err := env.kernel.Render(ctx, kernel.RenderInput{
-		Instance:    inst,
-		Platform:    env.platform,
-		RuntimeName: RuntimeName,
-		Skew:        env.skew,
-	})
+	out, err := env.kernel.Render(ctx, newRenderInput(env, inst))
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+	}
+	for _, w := range replacementWarnings(out.Diagnostics.Replacements, moduleRoot) {
+		output.Warn(w)
 	}
 
 	converted := make([]*pkgcore.Resource, 0, len(out.Compiled))
@@ -194,8 +194,8 @@ func renderInstance(
 // writes it verbatim, with no re-read of the platform module at apply time.
 // Warnings are the render's advisory facts worded by the CLI from the
 // diagnostics rows (unhandled optional traits, skew under the warn policy);
-// the D19 local-replacement warning is emitted directly by the entry points,
-// before the render.
+// the D19 local-replacement warnings are emitted directly by renderInstance
+// from the replacement rows, after the render.
 func newResult(env *renderEnv, out *kernel.RenderResult, renderDigest string, values map[string]any, sourceLocal bool) *Result {
 	return &Result{
 		Pairs:        out.Diagnostics.Pairs,
