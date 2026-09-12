@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/open-platform-model/library/opm/kernel"
-	"github.com/open-platform-model/library/opm/schema"
 )
 
 // realTreeRegistry is the GHCR-first read mapping: opmodel.dev resolves from
@@ -39,10 +38,7 @@ func TestRealTree_CatalogOpm(t *testing.T) {
 		t.Skip("catalog_opm workspace checkout not present beside cli/")
 	}
 
-	k := kernel.New(
-		kernel.WithRegistry(realTreeRegistry),
-		kernel.WithSchemaLoader(schema.OCILoader{Registry: realTreeRegistry}),
-	)
+	k := kernel.New(kernel.WithRegistry(realTreeRegistry))
 	schemaVal, err := k.SchemaCache().Get()
 	if err != nil {
 		t.Skipf("core v2 schema unavailable (registry/cache): %v", err)

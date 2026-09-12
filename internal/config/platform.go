@@ -12,7 +12,6 @@ import (
 	"cuelang.org/go/cue/ast"
 
 	liberrors "github.com/open-platform-model/library/opm/errors"
-	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/platform"
 
 	oerrors "github.com/open-platform-model/cli/pkg/errors"
@@ -93,7 +92,7 @@ func BuildPlatformModule(ctx context.Context, dir, registry string) (*platform.P
 
 	// The registry mapping is supplied once, at kernel construction; the
 	// acquire verb takes no per-call override.
-	k := kernel.New(kernel.WithRegistry(registry))
+	k := NewKernel(registry)
 	p, err := k.AcquirePlatformFromDir(ctx, dir)
 	if err != nil {
 		return nil, platformBuildError(dir, err)

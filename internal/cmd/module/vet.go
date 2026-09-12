@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/open-platform-model/library/opm/kernel"
-	"github.com/open-platform-model/library/opm/schema"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
@@ -169,10 +168,7 @@ func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath 
 // — and resolves core's #IdentityPackage from that cache. The CUE context
 // every load shares is the schema value's own (identitySchema.Context()).
 func identitySchemaForVet(cfg *config.GlobalConfig) (*kernel.Kernel, cue.Value, error) {
-	k := kernel.New(
-		kernel.WithRegistry(cfg.Registry),
-		kernel.WithSchemaLoader(schema.OCILoader{Registry: cfg.Registry}),
-	)
+	k := config.NewKernel(cfg.Registry)
 	schemaVal, err := k.SchemaCache().Get()
 	if err != nil {
 		// A registry round-trip, same failure class as publish's lookup and

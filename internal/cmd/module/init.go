@@ -12,8 +12,6 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/open-platform-model/library/opm/kernel"
-
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -238,7 +236,7 @@ func runScaffold(c *cobra.Command, cfg *config.GlobalConfig, newPath, templateRe
 			"Choose another directory (--dir), or run inside a module tree to repair it.")
 	}
 
-	k := kernel.New(kernel.WithRegistry(cfg.Registry))
+	k := config.NewKernel(cfg.Registry)
 	result, err := scaffold.Run(c.Context(), k, cfg.Registry, newPath, ref, targetDir)
 	if err != nil {
 		return initError(err)
@@ -258,7 +256,7 @@ func runScaffold(c *cobra.Command, cfg *config.GlobalConfig, newPath, templateRe
 // runRepair is the adopt-and-repair path (D20): detect, show every file to
 // be created or edited, confirm a second time, apply.
 func runRepair(c *cobra.Command, cfg *config.GlobalConfig, dir, pathArg string, yes bool) error {
-	k := kernel.New(kernel.WithRegistry(cfg.Registry))
+	k := config.NewKernel(cfg.Registry)
 	plan, err := scaffold.DetectRepair(c.Context(), k, dir, pathArg)
 	if err != nil {
 		return initError(err)

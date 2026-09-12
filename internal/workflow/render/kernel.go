@@ -8,7 +8,6 @@ import (
 
 	"github.com/open-platform-model/library/opm/kernel"
 	libplatform "github.com/open-platform-model/library/opm/platform"
-	"github.com/open-platform-model/library/opm/schema"
 
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/output"
@@ -18,18 +17,6 @@ import (
 // RuntimeName is the runtime identity the CLI injects into every kernel
 // render (#context.#runtimeName) — the peer of the operator's "opm-controller".
 const RuntimeName = "opm-cli"
-
-// NewKernel constructs the per-invocation library kernel (design LD1): one
-// Kernel per command, owning the schema cache and the registry mapping (every
-// verb builds in a context of its own). The resolved registry threads into
-// module acquisition AND the schema OCILoader — the latter otherwise reads
-// only the process CUE_REGISTRY.
-func NewKernel(cfg *config.GlobalConfig) *kernel.Kernel {
-	return kernel.New(
-		kernel.WithRegistry(cfg.Registry),
-		kernel.WithSchemaLoader(schema.OCILoader{Registry: cfg.Registry}),
-	)
-}
 
 // renderEnv is the prepared per-invocation render environment: the kernel,
 // the acquired (source-carrying) platform with its provenance, the seed

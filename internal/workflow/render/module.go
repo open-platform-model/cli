@@ -37,7 +37,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	namespace := opts.K8sConfig.Namespace.Value
 	output.Debug("rendering from module", "path", opts.ModulePath, "namespace", namespace)
 
-	k := NewKernel(opts.Config)
+	k := config.NewKernel(opts.Config.Registry)
 
 	// Acquire the module package through the kernel's shape gate. The acquire
 	// stages the local directory as the module's source tree, so synthesis
