@@ -10,4 +10,4 @@
 ## 3. Gates
 
 - [x] 3.1 Run `task fmt`, `task lint`, `task test`; verify all green.
-- [ ] 3.2 Commit sections 1-3 as `refactor(config): construct every kernel through config.NewKernel`.
+- [x] 3.2 Commit sections 1-3 as `refactor(config): construct every kernel through config.NewKernel`.
