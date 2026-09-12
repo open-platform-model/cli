@@ -67,7 +67,7 @@ For coding agents working in `cli/`.
 
 ## Repository Rules
 
-- Small, independently verifiable changes; `CONSTITUTION.md` prefers tiny batches.
+- Changes ship as mergeable sections, each ending green and closing with its own commit (`CONSTITUTION.md` § VIII).
 - Update existing packages over new abstractions unless duplication/coupling justifies it.
 
 ## Entrypoint
