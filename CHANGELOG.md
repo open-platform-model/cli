@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.0-alpha.20](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.19...v1.0.0-alpha.20) (2026-09-12)
+
+
+### Features
+
+* **render:** honor local-module.cue replacements on library alpha.29 ([#209](https://github.com/open-platform-model/cli/issues/209)) ([7ae324f](https://github.com/open-platform-model/cli/commit/7ae324f80b24d1ddba3a6924c9a21e5f73df79ac))
+
+
+### Code Refactoring
+
+* **compat:** adopt the catalog comparator from the library ([#206](https://github.com/open-platform-model/cli/issues/206)) ([99a245f](https://github.com/open-platform-model/cli/commit/99a245f87ae3248531c23ece48616912c45d7ab1))
+* **kernel:** migrate to library alpha.28 acquire verbs and verdict rows ([#207](https://github.com/open-platform-model/cli/issues/207)) ([7a78b88](https://github.com/open-platform-model/cli/commit/7a78b8832c8eb58ee550de20a6567bca7e0269ee))
+* render-switch follow-ups from verification ([#204](https://github.com/open-platform-model/cli/issues/204)) ([31e5643](https://github.com/open-platform-model/cli/commit/31e56439193d85b8fb710e53e685596cb7f883ce))
+
 ## [1.0.0-alpha.19](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.18...v1.0.0-alpha.19) (2026-09-04)
 
 
