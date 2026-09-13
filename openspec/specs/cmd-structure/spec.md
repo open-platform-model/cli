@@ -123,6 +123,30 @@ The `module` command group SHALL register a `build` subcommand that accepts an o
 - **WHEN** the user runs `opm module build ./my-module/module.cue`
 - **THEN** the subcommand SHALL return an error stating that module build expects a directory and pointing the user to `opm instance build <file>` for instance files
 
+### Requirement: `opm module build` output format, split files and ordering
+
+The `opm module build` subcommand SHALL accept `--output`/`-o` with exactly the values `yaml` (default) and `json`; any other value SHALL exit with code 1 and the message `invalid output format "<value>" (valid: yaml, json)`. With `--split`, it SHALL write one file per resource into `--out-dir` (default `./manifests`) named `<lowercase-kind>-<name>.<yaml|json>`; the second resource that resolves to the same base name SHALL receive the suffix `-2`, the third `-3`, and so on. Resources SHALL be emitted in a deterministic order, by apply weight (`pkg/resourceorder.GetWeight`), then namespace, then name, so identical input always yields identical output.
+
+#### Scenario: Unsupported output format
+
+- **WHEN** the user runs `opm module build -o toml`
+- **THEN** the subcommand SHALL exit with code 1 and print `invalid output format "toml" (valid: yaml, json)`
+
+#### Scenario: Split output names files by kind and name
+
+- **WHEN** the user runs `opm module build --split --out-dir ./manifests` on a module rendering a Deployment `web` and a Service `web`
+- **THEN** `./manifests` SHALL contain `deployment-web.yaml` and `service-web.yaml`
+
+#### Scenario: Split output disambiguates colliding names
+
+- **WHEN** two rendered resources share kind and name
+- **THEN** the files SHALL be `<kind>-<name>.yaml` and `<kind>-<name>-2.yaml`
+
+#### Scenario: Output order is deterministic
+
+- **WHEN** the same module is built twice
+- **THEN** both outputs SHALL list resources in identical order: ascending weight, then namespace, then name
+
 ### Requirement: `--name` flag for synthetic-release builds
 
 The `opm instance build` subcommand (when used with a directory argument), the `opm module build` subcommand, and the `opm module apply` subcommand SHALL accept a `--name <string>` flag that overrides the synthetic `metadata.name`. Defaults are described in the `module-synthetic-instance` capability spec.

@@ -75,3 +75,18 @@ A template reference that is a bare word (letters, digits, underscores) before a
 
 - **WHEN** a name printed by `template list` is used as a shortcut
 - **THEN** it expands and resolves
+
+### Requirement: Module tree layout
+
+A module tree SHALL contain `cue.mod/module.cue` (the CUE module file) and `identity/identity.cue` (the identity package declaring `ModulePath` and `Version`). The module body SHALL be a single CUE package at the tree root; its file names are free. The official templates use `module.cue` and `components.cue` by convention, and every root `.cue` file carries the same `package` clause. There SHALL be no `values.cue`: default values for validation and debugging live in the module's `debugValues` field, which `opm module vet` requires.
+
+#### Scenario: Scaffold carries the mandatory files
+
+- **WHEN** `opm mod init example.com/modules/my_app@v0 standard` completes
+- **THEN** the scaffold SHALL contain `cue.mod/module.cue` and `identity/identity.cue`
+- **AND** every root `.cue` file SHALL declare `package my_app`
+
+#### Scenario: No values.cue is required
+
+- **WHEN** `opm module vet` runs on a tree that has no `values.cue`
+- **THEN** it SHALL validate the module with `debugValues` and SHALL NOT report a missing file
