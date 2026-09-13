@@ -47,7 +47,7 @@ Examples:
   opm instance status jellyfin -n media -o wide`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runInstanceStatus(args[0], cfg, &kf, namespace, outputFlag, detailsFlag)
+			return runInstanceStatus(c.Context(), args[0], cfg, &kf, namespace, outputFlag, detailsFlag)
 		},
 	}
 
@@ -59,10 +59,8 @@ Examples:
 	return c
 }
 
-func runInstanceStatus(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag, outputFmt string, verbose bool) error {
-	ctx := context.Background()
-
-	target, err := cmdutil.ResolveInstanceTarget(identifier, cfg, kf, namespaceFlag)
+func runInstanceStatus(ctx context.Context, identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag, outputFmt string, verbose bool) error {
+	target, err := cmdutil.ResolveInstanceTarget(ctx, identifier, cfg, kf, namespaceFlag)
 	if err != nil {
 		return err
 	}

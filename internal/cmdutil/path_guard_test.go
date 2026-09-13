@@ -1,6 +1,7 @@
 package cmdutil
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,7 +36,7 @@ func TestResolveInstanceArg_RejectsModulePackagePath(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "module.cue"), []byte("package test\n"), 0o600))
 
-	_, err := ResolveInstanceArg(dir, &config.GlobalConfig{})
+	_, err := ResolveInstanceArg(context.Background(), dir, &config.GlobalConfig{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "module package, not an instance")
 }

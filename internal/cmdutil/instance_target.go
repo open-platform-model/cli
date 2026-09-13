@@ -1,6 +1,7 @@
 package cmdutil
 
 import (
+	"context"
 	"fmt"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -19,9 +20,10 @@ type ResolvedInstanceTarget struct {
 }
 
 // ResolveInstanceTarget resolves an instance identifier into selector flags and
-// Kubernetes config. Was: ResolveReleaseTarget.
-func ResolveInstanceTarget(identifier string, cfg *config.GlobalConfig, kf *K8sFlags, namespaceFlag string) (*ResolvedInstanceTarget, error) {
-	ra, err := ResolveInstanceArg(identifier, cfg)
+// Kubernetes config. A path identifier is acquired through the kernel, so ctx
+// is the command's context. Was: ResolveReleaseTarget.
+func ResolveInstanceTarget(ctx context.Context, identifier string, cfg *config.GlobalConfig, kf *K8sFlags, namespaceFlag string) (*ResolvedInstanceTarget, error) {
+	ra, err := ResolveInstanceArg(ctx, identifier, cfg)
 	if err != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}

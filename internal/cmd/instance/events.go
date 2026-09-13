@@ -49,7 +49,7 @@ Examples:
   opm instance events jellyfin -n media --watch`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runInstanceEvents(args[0], cfg, &kf, namespace, sinceFlag, typeFlag, watchFlag, outputFlag)
+			return runInstanceEvents(c.Context(), args[0], cfg, &kf, namespace, sinceFlag, typeFlag, watchFlag, outputFlag)
 		},
 	}
 
@@ -63,15 +63,13 @@ Examples:
 	return c
 }
 
-func runInstanceEvents(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag, since, eventType string, watchMode bool, outputFmt string) error {
-	ctx := context.Background()
-
+func runInstanceEvents(ctx context.Context, identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag, since, eventType string, watchMode bool, outputFmt string) error {
 	eventsOpts, err := query.ParseEventsOptions(since, eventType, outputFmt, watchMode)
 	if err != nil {
 		return err
 	}
 
-	target, err := cmdutil.ResolveInstanceTarget(identifier, cfg, kf, namespaceFlag)
+	target, err := cmdutil.ResolveInstanceTarget(ctx, identifier, cfg, kf, namespaceFlag)
 	if err != nil {
 		return err
 	}

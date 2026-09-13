@@ -64,7 +64,7 @@ Examples:
   opm instance delete jellyfin -n media --force`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runInstanceDelete(args[0], cfg, &kf, namespace, forceFlag, dryRunFlag, timeoutFlag)
+			return runInstanceDelete(c.Context(), args[0], cfg, &kf, namespace, forceFlag, dryRunFlag, timeoutFlag)
 		},
 	}
 
@@ -78,10 +78,8 @@ Examples:
 	return c
 }
 
-func runInstanceDelete(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, force, dryRun bool, timeout time.Duration) error {
-	ctx := context.Background()
-
-	target, err := cmdutil.ResolveInstanceTarget(identifier, cfg, kf, namespaceFlag)
+func runInstanceDelete(ctx context.Context, identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, force, dryRun bool, timeout time.Duration) error {
+	target, err := cmdutil.ResolveInstanceTarget(ctx, identifier, cfg, kf, namespaceFlag)
 	if err != nil {
 		return err
 	}
