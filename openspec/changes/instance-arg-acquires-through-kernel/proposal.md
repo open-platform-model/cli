@@ -21,10 +21,13 @@ None.
 
 - `inst-commands`: "instance cluster-query commands accept an instance identifier as positional argument" gains the path form: acquired through the kernel, name and namespace from the acquired instance, `--namespace` precedence, invalid package refused.
 - `instance-file-loading`: "Instance file loader lives in `pkg/loader/`" is removed.
+- `instance-building` and `cmd-structure`: the two requirements that still named `LoadInstanceFile()` / "the existing instance-file loader" are reworded to the kernel acquire (`AcquireInstanceFromDir`); no behaviour change.
 
 ## Impact
 
 **SemVer:** PATCH for the command surface: no flag or syntax change. Behaviour change: a path whose instance carries no concrete namespace is refused instead of falling back to the configured default. For Go importers of `pkg/loader.LoadInstanceFile` this is a breaking removal.
+
+**Test fixtures:** `tests/integration/inst-tree/testdata/instance.cue` was identity-only (kind and metadata); the kernel's shape gate also requires a `#module` of kind `Module`, so the fixture gains an inline, import-free one and stays registry-free. The inst-tree program passes the command context to `ResolveInstanceArg`. `tests/e2e/testdata/operator-owned` is unchanged and serves the registry-backed unit test.
 
 **Packages:** `internal/cmdutil` (instance argument resolution, target resolution takes a context), `internal/cmd/instance` (four commands pass their context), `internal/workflow/render` (directory helper moves out), `pkg/loader` (one file deleted). Commands affected: `opm instance status`, `tree`, `events`, `delete` with a path argument.
 
