@@ -1,32 +1,32 @@
 ## Purpose
 
-Defines how OPM CLI commands discover and select resources in a Kubernetes cluster. Primary discovery reads the `ModuleInstance` CR (direct GET by name, or CR list matched on `status.instanceUUID`). Label-based discovery via `DiscoverResources()` is retained for commands that still require it (e.g., delete fallback). This covers the `delete` and `status` commands that operate on existing deployed resources.
+Defines how OPM CLI commands discover and select resources in a Kubernetes cluster. Primary discovery reads the `ModuleInstance` CR (direct GET by name, or CR list matched on `status.instanceUUID`). There is no label-based fallback: an instance without a `ModuleInstance` record is reported as not found. This covers the `delete`, `status`, `tree` and `events` commands that operate on existing deployed resources.
 
 ## Requirements
 
-### Requirement: Selector mutual exclusivity
+### Requirement: Selector resolution from the positional argument
 
-Commands that discover resources (`delete`, `status`) MUST accept exactly one selector type per invocation. Name selectors resolve by a direct `ModuleInstance` GET; instance-id selectors resolve by listing `ModuleInstance` CRs in the namespace and matching `status.instanceUUID`.
+Commands that discover resources (`delete`, `status`, `tree`, `events`) MUST take exactly one positional `<file|name|uuid>` argument per invocation and resolve it through `cmdutil.ResolveInstanceTarget`. A UUID argument resolves by listing `ModuleInstance` CRs in the namespace and matching `status.instanceUUID`; a name argument resolves by a direct `ModuleInstance` GET; an instance-file argument yields the instance name (and namespace) from the file.
 
-#### Scenario: Both --name and --instance-id provided
+#### Scenario: Missing argument
 
-- **WHEN** user provides both `--name` and `--instance-id` flags
-- **THEN** command exits with error: `"--name and --instance-id are mutually exclusive"`
+- **WHEN** the user provides no positional argument
+- **THEN** the command exits with a usage error
 
-#### Scenario: Neither --name nor --instance-id provided
+#### Scenario: Name argument
 
-- **WHEN** user provides neither `--name` nor `--instance-id` flag
-- **THEN** command exits with error: `"either --name or --instance-id is required"`
+- **WHEN** the user provides an instance name (and `--namespace`)
+- **THEN** the command resolves the instance by a direct `ModuleInstance` GET by name in the namespace
 
-#### Scenario: Only --name provided
+#### Scenario: UUID argument
 
-- **WHEN** user provides `--name` flag (and `--namespace`)
-- **THEN** command resolves the instance by a direct `ModuleInstance` GET by name in the namespace
+- **WHEN** the user provides an instance UUID (and `--namespace`)
+- **THEN** the command resolves the instance by listing `ModuleInstance` CRs in the namespace and matching `status.instanceUUID`
 
-#### Scenario: Only --instance-id provided
+#### Scenario: File argument
 
-- **WHEN** user provides `--instance-id` flag (and `--namespace`)
-- **THEN** command resolves the instance by listing `ModuleInstance` CRs in the namespace and matching `status.instanceUUID`
+- **WHEN** the user provides a path to an instance file
+- **THEN** the command reads the instance name and namespace from the file's metadata, with `--namespace` taking precedence when set
 
 ---
 
@@ -36,26 +36,26 @@ The `--namespace`/`-n` flag SHALL be optional for commands that discover resourc
 
 #### Scenario: Namespace omitted uses config default
 
-- **WHEN** the user runs `opm mod delete --instance-name my-app` without `-n`
+- **WHEN** the user runs `opm instance delete my-app` without `-n`
 - **AND** the config file sets `kubernetes: namespace: "staging"`
 - **THEN** the command SHALL operate in the `staging` namespace
 
 #### Scenario: Namespace omitted falls back to default
 
-- **WHEN** the user runs `opm mod status --instance-name my-app` without `-n`
+- **WHEN** the user runs `opm instance status my-app` without `-n`
 - **AND** no config or env sets a namespace
 - **THEN** the command SHALL operate in the `default` namespace
 
 ---
 
-### Requirement: Status command supports --instance-id
+### Requirement: Status command supports UUID identifiers
 
-The `status` command MUST support `--instance-id` flag with same semantics as `delete`.
+The `status` command MUST accept an instance UUID as its positional argument with the same semantics as `delete`.
 
-#### Scenario: Status with --instance-id
+#### Scenario: Status with a UUID argument
 
-- **WHEN** user runs `opm mod status --instance-id <uuid> --namespace bar`
-- **THEN** status displays resources matching the instance-id label selector
+- **WHEN** user runs `opm instance status <uuid> --namespace bar`
+- **THEN** status resolves the `ModuleInstance` whose `status.instanceUUID` matches and displays its resources
 
 ---
 

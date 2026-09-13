@@ -150,7 +150,7 @@ When the applied render's module bytes did not come from pure registry resolutio
 
 ### Requirement: CR CRUD semantics
 
-Reading inventory SHALL be a direct GET of the `ModuleInstance` by name and namespace, with NotFound returned as "no inventory" (first-apply). `--instance-id` selectors SHALL resolve by listing `ModuleInstance` CRs and matching `status.instanceUUID`. On `instance delete`, the CLI SHALL delete owned resources first (existing reverse-weight prune semantics) and delete the CR last; CR deletion SHALL treat NotFound as success.
+Reading inventory SHALL be a direct GET of the `ModuleInstance` by name and namespace, with NotFound returned as "no inventory" (first-apply). UUID identifiers SHALL resolve by listing `ModuleInstance` CRs and matching `status.instanceUUID`. On `instance delete`, the CLI SHALL delete owned resources first (existing reverse-weight prune semantics) and delete the CR last; CR deletion SHALL treat NotFound as success.
 
 #### Scenario: First apply finds no inventory
 

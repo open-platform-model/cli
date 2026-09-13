@@ -1,23 +1,23 @@
 ## Purpose
 
-Defines how `opm mod status` discovers tracked resources from persisted release inventory records and reports release health without requiring module source.
+Defines how `opm instance status` discovers tracked resources from persisted instance inventory records and reports instance health without requiring module source.
 
 ## Requirements
 
 ### Requirement: Status discovers resources via ownership inventory
 
-The `opm mod status` command SHALL read the persisted instance inventory record for the instance to discover its tracked resources. If `--instance-id` is provided, it SHALL use `inventory.GetInventory` (direct GET by name, with UUID label fallback). If only `--instance-name` is provided, it SHALL use `inventory.FindInventoryByInstanceName` (inventory-record lookup by instance-name label). Once the inventory is found, it SHALL perform one targeted GET per tracked entry via `inventory.DiscoverResourcesFromInventory`. It MUST NOT require module source or re-rendering. It MUST NOT use a cluster-wide label-scan to discover workload resources. <!-- Was: release inventory record, --release-id/--instance-name (0002 D8/D-X4.2) -->
+The `opm instance status` command SHALL read the persisted instance inventory record (the `ModuleInstance` CR) for the instance named by its positional `<file|name|uuid>` argument to discover its tracked resources. A UUID argument SHALL resolve via `inventory.FindRecordByInstanceUUID` (list the CRs in the namespace, match `status.instanceUUID`); a name argument SHALL resolve via `inventory.GetRecord` (direct GET by name). Once the record is found, it SHALL perform one targeted GET per tracked entry via `inventory.DiscoverResourcesFromInventory`. It MUST NOT require module source or re-rendering. It MUST NOT use a cluster-wide label-scan to discover workload resources. <!-- Was: release inventory record, --release-id/--instance-name (0002 D8/D-X4.2) -->
 
-#### Scenario: Discover by instance ID
+#### Scenario: Discover by instance UUID
 
-- **WHEN** the user runs `opm mod status --instance-id <uuid> -n production`
-- **THEN** the command SHALL resolve the instance inventory record via `inventory.GetInventory`
+- **WHEN** the user runs `opm instance status <uuid> -n production`
+- **THEN** the command SHALL resolve the instance inventory record via `inventory.FindRecordByInstanceUUID`
 - **AND** SHALL perform one targeted GET per tracked entry
 
 #### Scenario: Discover by instance name
 
-- **WHEN** the user runs `opm mod status --instance-name my-app -n production`
-- **THEN** the command SHALL resolve the instance inventory record by instance-name label
+- **WHEN** the user runs `opm instance status my-app -n production`
+- **THEN** the command SHALL resolve the instance inventory record by a direct GET by name
 - **AND** SHALL NOT require module source or re-rendering
 
 ### Requirement: Status evaluates health per resource category
@@ -62,7 +62,7 @@ The `--output`/`-o` flag SHALL accept `wide` as a valid value in addition to `ta
 
 #### Scenario: Default table output includes component column
 
-- **WHEN** the user runs `opm mod status --instance-name my-app -n production` without `--output`
+- **WHEN** the user runs `opm instance status my-app -n production` without `--output`
 - **THEN** the output SHALL be a formatted table with KIND, NAME, COMPONENT, STATUS, and AGE columns
 - **AND** the COMPONENT column SHALL show the component name from the inventory entry for each resource
 
@@ -73,7 +73,7 @@ The `--output`/`-o` flag SHALL accept `wide` as a valid value in addition to `ta
 
 #### Scenario: Wide format accepted as output value
 
-- **WHEN** the user runs `opm mod status --instance-name my-app -n production -o wide`
+- **WHEN** the user runs `opm instance status my-app -n production -o wide`
 - **THEN** the command SHALL render a table with additional columns beyond the default format
 
 ### Requirement: Status header does not depend on inventory change history
@@ -82,33 +82,33 @@ The status output SHALL display a metadata header above the resource table conta
 
 #### Scenario: Header sourced from persisted inventory
 
-- **WHEN** the user runs `opm mod status --instance-name my-app -n production`
+- **WHEN** the user runs `opm instance status my-app -n production`
 - **AND** a persisted instance inventory record exists
 - **THEN** the header SHALL display the instance name, namespace, aggregate health, and a resource summary sourced from `instanceMetadata`/`moduleMetadata`/`createdBy`
 
-### Requirement: Status header displays release ownership
+### Requirement: Status header displays instance ownership
 
-The `opm mod status` command SHALL display release ownership derived from inventory provenance in the metadata header.
+The `opm instance status` command SHALL display instance ownership derived from inventory provenance in the metadata header.
 
 #### Scenario: Header shows controller ownership
 
-- **WHEN** the user runs `opm mod status` for a release whose inventory records `createdBy: "controller"`
+- **WHEN** the user runs `opm instance status` for a instance whose inventory records `createdBy: "controller"`
 - **THEN** the metadata header SHALL include `Owner: controller`
 
 #### Scenario: Header shows legacy CLI ownership
 
-- **WHEN** the user runs `opm mod status` for a release whose inventory has no `createdBy`
+- **WHEN** the user runs `opm instance status` for a instance whose inventory has no `createdBy`
 - **THEN** the metadata header SHALL include `Owner: cli`
 
-### Requirement: Status warns for non-CLI-managed releases
+### Requirement: Status warns for non-CLI-managed instances
 
-When the CLI reads a controller-managed release, `opm mod status` SHALL surface a warning that the release is controller-managed and cannot be mutated by the CLI.
+When the CLI reads a controller-managed instance, `opm instance status` SHALL surface a warning that the instance is controller-managed and cannot be mutated by the CLI.
 
 #### Scenario: Controller-managed warning
 
-- **WHEN** the user runs `opm mod status` for a controller-managed release
-- **THEN** the command SHALL display a warning indicating that the release is controller-managed
-- **AND** the command SHALL still show the release status information
+- **WHEN** the user runs `opm instance status` for a controller-managed instance
+- **THEN** the command SHALL display a warning indicating that the instance is controller-managed
+- **AND** the command SHALL still show the instance status information
 
 ### Requirement: Status output uses color
 
@@ -124,14 +124,14 @@ The color mapping SHALL be:
 
 #### Scenario: Color output on TTY
 
-- **WHEN** the user runs `opm mod status` with stdout connected to a TTY
+- **WHEN** the user runs `opm instance status` with stdout connected to a TTY
 - **AND** the `NO_COLOR` environment variable is not set
 - **THEN** the STATUS column SHALL render `Ready` in green and `NotReady` in red
 - **AND** the COMPONENT column SHALL render component names in cyan
 
 #### Scenario: Color disabled on pipe
 
-- **WHEN** the user pipes the output (e.g., `opm mod status ... | cat`)
+- **WHEN** the user pipes the output (e.g., `opm instance status ... | cat`)
 - **THEN** all color/ANSI escape codes SHALL be stripped from the output
 
 #### Scenario: Color disabled by NO_COLOR
@@ -145,41 +145,27 @@ The command SHALL support `--output`/`-o` with values `table` (default), `yaml`,
 
 #### Scenario: JSON output
 
-- **WHEN** the user runs `opm mod status -n ns --name mod -o json`
+- **WHEN** the user runs `opm instance status mod -n ns -o json`
 - **THEN** the output SHALL be a valid JSON array of resource status objects
 
 #### Scenario: YAML output
 
-- **WHEN** the user runs `opm mod status -n ns --name mod -o yaml`
+- **WHEN** the user runs `opm instance status mod -n ns -o yaml`
 - **THEN** the output SHALL be valid YAML containing resource status entries
-
-### Requirement: Status supports watch mode
-
-The command SHALL support `--watch` for continuous monitoring. In watch mode, the status table SHALL refresh at a regular interval (2 seconds), clearing the previous output and displaying the updated table.
-
-#### Scenario: Watch mode updates on change
-
-- **WHEN** the user runs `opm mod status -n ns --name mod --watch`
-- **THEN** the status table SHALL refresh every 2 seconds until the user interrupts (Ctrl+C)
-
-#### Scenario: Watch mode exits cleanly on interrupt
-
-- **WHEN** the user presses Ctrl+C during watch mode
-- **THEN** the command SHALL exit with code 0 and restore the terminal state
 
 ### Requirement: Namespace defaults to config
 
-The `--namespace`/`-n` flag SHALL be optional for `opm mod status`. When omitted, the namespace SHALL be resolved using the precedence: flag → `OPM_NAMESPACE` environment variable → `~/.opm/config.cue` kubernetes.namespace → `"default"`.
+The `--namespace`/`-n` flag SHALL be optional for `opm instance status`. When omitted, the namespace SHALL be resolved using the precedence: flag → `OPM_NAMESPACE` environment variable → `~/.opm/config.cue` kubernetes.namespace → `"default"`.
 
 #### Scenario: Namespace omitted uses config default
 
-- **WHEN** the user runs `opm mod status --instance-name my-app` without `-n`
+- **WHEN** the user runs `opm instance status my-app` without `-n`
 - **AND** the config file sets `kubernetes: namespace: "production"`
 - **THEN** the command SHALL operate in the `production` namespace
 
 #### Scenario: Namespace omitted uses hardcoded default
 
-- **WHEN** the user runs `opm mod status --instance-name my-app` without `-n`
+- **WHEN** the user runs `opm instance status my-app` without `-n`
 - **AND** no config or env sets a namespace
 - **THEN** the command SHALL operate in the `default` namespace
 
@@ -189,7 +175,7 @@ The command SHALL accept `--kubeconfig` and `--context` flags for cluster connec
 
 #### Scenario: Custom kubeconfig
 
-- **WHEN** the user runs `opm mod status --kubeconfig /path/to/config -n ns --name mod`
+- **WHEN** the user runs `opm instance status mod -n ns --kubeconfig /path/to/config`
 - **THEN** the command SHALL use the specified kubeconfig file
 
 ### Requirement: Status fails fast on connectivity errors
@@ -203,11 +189,11 @@ The command SHALL fail immediately with a clear error message if the Kubernetes 
 
 ### Requirement: Status groups resources by component from inventory
 
-When a persisted release inventory record is available, the `opm mod status` command SHALL group resources by the `component` field from inventory entries. This eliminates the need to read `component.opmodel.dev/name` labels from the cluster.
+When a persisted instance inventory record is available, the `opm instance status` command SHALL group resources by the `component` field from inventory entries. This eliminates the need to read `component.opmodel.dev/name` labels from the cluster.
 
 #### Scenario: Resources grouped by component
 
-- **WHEN** the user runs `opm mod status` and a persisted release inventory record exists
+- **WHEN** the user runs `opm instance status` and a persisted instance inventory record exists
 - **AND** the ownership inventory tracks 3 resources under component `app` and 2 under component `cache`
 - **THEN** the output SHALL group the resources by component name
 

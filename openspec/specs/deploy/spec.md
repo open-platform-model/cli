@@ -2,12 +2,12 @@
 
 ## Purpose
 
-The `opm mod apply` and `opm mod delete` commands manage the deployment lifecycle of OPM modules on Kubernetes clusters. `mod apply` renders the module via the Pipeline interface and applies resources using server-side apply. `mod delete` discovers and removes module resources from the persisted instance inventory record when available, falling back to OPM labels without requiring the original source.
+The `opm mod apply` and `opm instance delete` commands manage the deployment lifecycle of OPM modules on Kubernetes clusters. `mod apply` renders the module via the Pipeline interface and applies resources using server-side apply. `instance delete` discovers and removes module resources from the persisted instance inventory record without requiring the original source.
 
 ## Design Rationale
 
 1. **Go API integration**: Commands call `build.NewPipeline().Render()` directly, not subprocess.
-2. **Inventory-first discovery**: `mod delete` discovers resources via the persisted instance inventory record when available, falling back to labels instead of re-rendering.
+2. **Inventory-first discovery**: `instance delete` discovers resources via the persisted instance inventory record instead of re-rendering.
 3. **Server-side apply**: Use SSA with force for idempotent operations.
 4. **Weighted ordering**: Resources applied/deleted in weight order for dependency handling.
 
@@ -29,7 +29,7 @@ A developer wants to deploy their rendered module to a Kubernetes cluster.
 **Acceptance Scenarios**:
 
 1. **Given** a valid module, **When** running `opm mod apply`, **Then** resources are deployed.
-2. **Given** a deployed module, **When** running `opm mod delete`, **Then** all resources are removed.
+2. **Given** a deployed module, **When** running `opm instance delete`, **Then** all resources are removed.
 3. **Given** a module with CRDs and CRs, **When** running `opm mod apply`, **Then** CRDs are created first.
 4. **Given** pending changes, **When** running `opm mod apply`, **Then** changes are applied.
 5. **Given** dry-run request, **When** running `opm mod apply --dry-run`, **Then** no changes are made.
@@ -38,12 +38,12 @@ A developer wants to deploy their rendered module to a Kubernetes cluster.
 
 A developer wants to delete a deployed module after deleting the source files.
 
-**Independent Test**: Deploy module, delete source, `opm mod delete` still works.
+**Independent Test**: Deploy module, delete source, `opm instance delete` still works.
 
 **Acceptance Scenarios**:
 
-1. **Given** a deployed module, **When** source is deleted and `opm mod delete -n <ns> --name <name>` runs, **Then** resources are removed.
-2. **Given** delete request, **When** running `opm mod delete --dry-run`, **Then** resources to delete are listed but not removed.
+1. **Given** a deployed module, **When** source is deleted and `opm instance delete <name> -n <ns>` runs, **Then** resources are removed.
+2. **Given** delete request, **When** running `opm instance delete --dry-run`, **Then** resources to delete are listed but not removed.
 
 ---
 
@@ -68,15 +68,15 @@ A developer wants to delete a deployed module after deleting the source files.
 
 | ID | Requirement |
 |----|-------------|
-| FR-D-020 | `mod delete` MUST discover resources via the persisted instance inventory record when available, falling back to OPM labels when no inventory exists. |
-| FR-D-021 | `mod delete` MUST NOT require module source. |
-| FR-D-022 | `mod delete` MUST delete in descending weight order. |
-| FR-D-023 | `mod delete` MUST support `--force` to skip confirmation. |
-| FR-D-024 | `mod delete` MUST support `--dry-run` to preview. |
-| FR-D-025 | `mod delete` MUST require at least one of `--instance-name` or `--instance-id` for identification. The `--namespace` / `-n` flag remains required in all cases. |
-| FR-D-026 | `mod delete` MUST prompt for confirmation (unless --force). |
-| FR-D-027 | `mod delete` MUST support `--instance-id` flag for discovery by instance identity UUID. |
-| FR-D-028 | `mod delete` MUST use ownership-inventory-based enumeration when a persisted instance inventory record exists. When no inventory exists, it MUST fall back to label-based discovery. Dual-strategy discovery (both instance-id and name+namespace selectors) applies only in the label-based fallback path. |
+| FR-D-020 | `instance delete` MUST discover resources via the persisted instance inventory record (the `ModuleInstance` CR); when none exists it MUST exit 5 (not found) rather than fall back to labels. |
+| FR-D-021 | `instance delete` MUST NOT require module source. |
+| FR-D-022 | `instance delete` MUST delete in descending weight order. |
+| FR-D-023 | `instance delete` MUST support `--force` to skip confirmation. |
+| FR-D-024 | `instance delete` MUST support `--dry-run` to preview. |
+| FR-D-025 | `instance delete` MUST take the instance as a positional `<file|name|uuid>` argument. The namespace comes from `--namespace` / `-n`, the instance file, or the configured default. |
+| FR-D-026 | `instance delete` MUST prompt for confirmation (unless --force). |
+| FR-D-027 | `instance delete` MUST accept an instance UUID as the positional argument, resolved by matching `status.instanceUUID` across the namespace's `ModuleInstance` CRs. |
+| FR-D-028 | `instance delete` MUST use ownership-inventory-based enumeration from the persisted instance inventory record; there is no label-based enumeration path. |
 
 ### Kubernetes Integration
 
@@ -164,22 +164,22 @@ The `--force` flag SHALL allow `opm mod apply` to proceed when the render produc
 
 ### Requirement: mod delete uses ownership inventory for resource enumeration
 
-`opm mod delete` SHALL use the ownership inventory stored in the persisted instance inventory record to enumerate resources for deletion when it exists. If an inventory exists, only resources tracked in that ownership inventory SHALL be deleted (no label-scan), and the inventory Secret itself SHALL be deleted last. If no inventory exists, the command SHALL fall back to label-based discovery.
+`opm instance delete` SHALL use the ownership inventory stored in the persisted instance inventory record to enumerate resources for deletion when it exists. If an inventory exists, only resources tracked in that ownership inventory SHALL be deleted (no label-scan), and the `ModuleInstance` record itself SHALL be deleted last. If no record exists, the command SHALL exit 5 (not found).
 
 #### Scenario: Delete with ownership inventory
 
-- **WHEN** running `opm mod delete` and a persisted instance inventory record exists
+- **WHEN** running `opm instance delete` and a persisted instance inventory record exists
 - **THEN** only resources listed in that record's ownership inventory SHALL be deleted
-- **AND** the inventory Secret SHALL be deleted after all tracked resources
+- **AND** the `ModuleInstance` record SHALL be deleted after all tracked resources
 
-#### Scenario: Delete without inventory (fallback)
+#### Scenario: Delete without inventory
 
-- **WHEN** running `opm mod delete` and no inventory Secret exists
-- **THEN** the command SHALL fall back to label-based discovery via `DiscoverResources()`
+- **WHEN** running `opm instance delete` and no `ModuleInstance` record exists for the instance
+- **THEN** the command SHALL exit with code 5 and report the instance as not found
 
 #### Scenario: Delete does not remove derived resources
 
-- **WHEN** running `opm mod delete` with ownership inventory
+- **WHEN** running `opm instance delete` with ownership inventory
 - **AND** derived resources (e.g., Endpoints) exist with OPM labels but are not in the inventory
 - **THEN** the derived resources SHALL NOT be deleted
 
@@ -195,7 +195,7 @@ Before mutating an existing instance, CLI workflows that apply or delete a insta
 
 #### Scenario: Delete blocked for controller-managed instance
 
-- **WHEN** the user runs `opm mod delete` for a instance whose inventory records `createdBy: "controller"`
+- **WHEN** the user runs `opm instance delete` for a instance whose inventory records `createdBy: "controller"`
 - **THEN** the command SHALL fail before deleting tracked resources
 - **AND** the error SHALL state that the instance is controller-managed and cannot be deleted by the CLI
 
@@ -236,9 +236,9 @@ If an existing inventory has `createdBy: "cli"` or does not contain `createdBy`,
 | Cluster unreachable | Fail fast with connectivity error |
 | RBAC denied | Pass through Kubernetes API error |
 | Field conflict | Log warning, take ownership |
-| Module source deleted | `mod delete` works via labels |
+| Module source deleted | `instance delete` works via the inventory record |
 | Empty RenderResult | Fail with error if previous inventory is non-empty (use --force to override) |
-| Delete with neither --name nor --instance-id | Return validation error: "either --name or --instance-id is required" |
+| Delete without an instance argument | Return a usage error: the positional `<file|name|uuid>` argument is required |
 | Catalog without identity support | Identity labels omitted; existing labeling unchanged |
 
 ---
@@ -257,28 +257,28 @@ Flags:
   -f, --values strings      Additional values files (can be repeated)
   -n, --namespace string    Target namespace
       --name string         Instance name (default: module name)
-      --provider string     Provider to use
+      --platform string     Platform module directory (overrides the cluster Platform and ~/.opm/platform/)
       --dry-run             Server-side dry run
-      --wait                Wait for resources to be ready
-      --timeout duration    Wait timeout (default: 5m)
+      --create-namespace    Create target namespace if it does not exist
       --no-prune            Skip stale resource pruning
       --force               Allow empty render to prune all resources
       --kubeconfig string   Path to kubeconfig
       --context string      Kubernetes context
 ```
 
-### mod delete
+### instance delete
 
 ```text
-opm mod delete [flags]
+opm instance delete <file|name|uuid> [flags]
+
+Arguments:
+  file|name|uuid        Instance file, instance name, or instance UUID
 
 Flags:
-  -n, --namespace string    Target namespace (required)
-      --instance-name string   Instance name (required if --instance-id not provided)
-      --instance-id string     Instance identity UUID (required if --instance-name not provided)
+  -n, --namespace string    Target namespace
       --force               Skip confirmation prompt
       --dry-run             Preview without deleting
-      --wait                Wait for resources to be deleted
+      --timeout duration    Wait for the operator to finish deleting an operator-owned instance
       --kubeconfig string   Path to kubeconfig
       --context string      Kubernetes context
 ```

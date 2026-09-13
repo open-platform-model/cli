@@ -88,13 +88,13 @@ After all rendered resources have been successfully applied, stale resources SHA
 
 ### Requirement: No prune and no inventory write on apply failure
 
-If any resource fails to apply, the system SHALL NOT prune stale resources and SHALL NOT write the inventory Secret. The inventory SHALL remain at the previous state, allowing a retry to converge naturally.
+If any resource fails to apply, the system SHALL NOT prune stale resources and SHALL NOT write the inventory record. The inventory SHALL remain at the previous state, allowing a retry to converge naturally.
 
 #### Scenario: Partial apply failure skips prune
 
 - **WHEN** 3 of 5 resources apply successfully and 2 fail
 - **THEN** no stale resources SHALL be pruned
-- **AND** the inventory Secret SHALL NOT be written
+- **AND** the inventory record SHALL NOT be written
 - **AND** the command SHALL exit with an error
 
 ### Requirement: Empty render safety gate
@@ -117,7 +117,7 @@ If the current render produces zero resources and the previous inventory is non-
 
 ### Requirement: --no-prune flag skips pruning
 
-The `--no-prune` flag SHALL skip the pruning step entirely. Stale resources SHALL remain on the cluster. The inventory Secret SHALL still be written with the current resource set.
+The `--no-prune` flag SHALL skip the pruning step entirely. Stale resources SHALL remain on the cluster. The inventory record SHALL still be written with the current resource set.
 
 #### Scenario: No-prune leaves stale resources
 
@@ -142,7 +142,7 @@ The `--max-history` flag SHALL control the maximum number of change entries reta
 
 ### Requirement: Apply flow orchestration
 
-The apply flow SHALL follow this sequence: (1) render resources, (2) compute manifest digest, (3) compute change ID, (4) read previous inventory, (5a) compute stale set, (5b) apply component-rename safety check, (5c) run pre-apply existence check if first install, (6) apply all rendered resources via SSA, (7a) prune stale resources if all applied successfully, (7b) skip prune and inventory write if any apply failed, (8) write inventory Secret with new change entry.
+The apply flow SHALL follow this sequence: (1) render resources, (2) compute manifest digest, (3) compute change ID, (4) read previous inventory, (5a) compute stale set, (5b) apply component-rename safety check, (5c) run pre-apply existence check if first install, (6) apply all rendered resources via SSA, (7a) prune stale resources if all applied successfully, (7b) skip prune and inventory write if any apply failed, (8) write the inventory record.
 
 #### Scenario: Normal apply with pruning
 
@@ -152,4 +152,4 @@ The apply flow SHALL follow this sequence: (1) render resources, (2) compute man
 #### Scenario: First-time apply
 
 - **WHEN** a module is applied for the first time
-- **THEN** the system SHALL render, compute digest and change ID, find no inventory, run pre-apply check, apply resources, skip pruning (empty stale set), and write a new inventory Secret
+- **THEN** the system SHALL render, compute digest and change ID, find no inventory, run pre-apply check, apply resources, skip pruning (empty stale set), and write a new inventory record

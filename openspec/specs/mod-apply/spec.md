@@ -1,6 +1,6 @@
 ## Purpose
 
-Defines the behavior of the `opm module apply` (alias `opm mod apply`) subcommand, which deploys a module package to a Kubernetes cluster via the synthetic-release flow. The subcommand reuses the same render/apply pipeline as `opm release apply`, with module-directory-specific inputs (values, synthetic name/namespace) and module-directory provenance recorded in the inventory.
+Defines the behavior of the `opm module apply` (alias `opm mod apply`) subcommand, which deploys a module package to a Kubernetes cluster via the synthetic-instance flow. The subcommand reuses the same render/apply pipeline as `opm instance apply`, with module-directory-specific inputs (values, synthetic name/namespace) and module-directory provenance recorded in the inventory.
 
 ## Requirements
 
@@ -8,7 +8,7 @@ Defines the behavior of the `opm module apply` (alias `opm mod apply`) subcomman
 
 The CLI SHALL provide a `module apply` subcommand (with alias `mod apply`) under the `module` command group that accepts an optional positional argument (the module-package directory, defaulting to `"."`) and deploys the synthesized `#ModuleInstance` to a Kubernetes cluster. The subcommand SHALL accept only directory inputs. <!-- Was: synthetic release flow / #ModuleRelease (0002 D8) -->
 
-The subcommand SHALL produce the same cluster-side effects as `opm instance apply` after the render stage: server-side apply of all rendered resources, inventory-secret read/write keyed on the instance UUID, stale-resource pruning, ownership checks, and dry-run support. <!-- Was: opm release apply, release UUID -->
+The subcommand SHALL produce the same cluster-side effects as `opm instance apply` after the render stage: server-side apply of all rendered resources, inventory record read/write keyed on the instance UUID, stale-resource pruning, ownership checks, and dry-run support. <!-- Was: opm release apply, release UUID -->
 
 #### Scenario: Default to current directory
 
@@ -21,14 +21,14 @@ The subcommand SHALL produce the same cluster-side effects as `opm instance appl
 - **THEN** the subcommand SHALL return an error stating that `module apply` expects a directory
 - **AND** SHALL point the user to `opm instance apply <file>` for instance files
 
-### Requirement: Flag surface matches `opm release apply` plus `--name`
+### Requirement: Flag surface matches `opm instance apply` plus `--name`
 
 The `module apply` subcommand SHALL accept the following flags with the listed behavior:
 
 | Flag | Type | Default | Behavior |
 | --- | --- | --- | --- |
 | `-f`, `--values` | repeatable string | empty | Values files overriding the module's `debugValues` |
-| `--provider` | string | from config | Provider override |
+| `--platform` | string | resolved by precedence | Platform module directory override |
 | `--name` | string | `<module>-debug` | Synthetic `metadata.name` override |
 | `-n`, `--namespace` | string | from config | Target namespace (also propagates to synthetic `metadata.namespace`) |
 | `--kubeconfig` | string | from env/config | Path to kubeconfig file |
@@ -44,25 +44,25 @@ The `module apply` subcommand SHALL accept the following flags with the listed b
 - **THEN** the subcommand SHALL use `overrides.cue` as the source of values
 - **AND** SHALL NOT fall back to the module's `debugValues`
 
-#### Scenario: Namespace flag participates in release identity
+#### Scenario: Namespace flag participates in instance identity
 
 - **WHEN** the user runs `opm module apply ./foo -n staging`
 - **AND** the user later runs `opm module apply ./foo -n production`
-- **THEN** the two invocations SHALL produce two distinct release UUIDs
-- **AND** SHALL write two independent inventory Secrets in their respective namespaces
+- **THEN** the two invocations SHALL produce two distinct instance UUIDs
+- **AND** SHALL write two independent inventory records in their respective namespaces
 
-#### Scenario: Name flag participates in release identity
+#### Scenario: Name flag participates in instance identity
 
 - **WHEN** the user runs `opm module apply ./foo --name myapp`
 - **AND** the user later runs `opm module apply ./foo` (no `--name`)
-- **THEN** the two invocations SHALL produce two distinct release UUIDs
+- **THEN** the two invocations SHALL produce two distinct instance UUIDs
 - **AND** SHALL not interfere with each other's inventory
 
 #### Scenario: Dry-run makes no cluster changes
 
 - **WHEN** the user runs `opm module apply ./my-module --dry-run`
 - **THEN** the subcommand SHALL perform a server-side dry-run apply
-- **AND** SHALL NOT write or modify any inventory Secret
+- **AND** SHALL NOT write or modify any inventory record
 - **AND** SHALL NOT prune any resources
 - **AND** SHALL log a summary of resources that would be applied
 
@@ -109,7 +109,7 @@ When the subcommand writes an inventory record, the embedded `ChangeDescriptor` 
 
 - **WHEN** the user runs `opm module apply /workspace/my-module`
 - **AND** the apply succeeds
-- **THEN** the inventory Secret SHALL record `Path = "/workspace/my-module"`
+- **THEN** the inventory record SHALL record `Path = "/workspace/my-module"`
 - **AND** SHALL record `Local = true`
 
 ### Requirement: Apply log surfaces the synthetic instance name

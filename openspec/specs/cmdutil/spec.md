@@ -2,29 +2,29 @@
 
 ## Purpose
 
-The `internal/cmdutil` package provides shared command utilities for `mod` subcommands. It centralizes flag group management, render pipeline orchestration, Kubernetes client creation, and output formatting helpers so that each command file contains only its unique logic.
+The `internal/cmdutil` package provides shared command utilities for the `module` and `instance` subcommands. It centralizes flag group management, render pipeline orchestration, Kubernetes client creation, and output formatting helpers so that each command file contains only its unique logic.
 
 ## Requirements
 
 ### Requirement: RenderFlags struct registers a consistent set of render-related flags
 
-The `RenderFlags` struct SHALL provide an `AddTo(*cobra.Command)` method that registers the flags `--values`/`-f` (string array, repeatable), `--namespace`/`-n` (string), `--release-name` (string), and `--provider` (string) on the given cobra command. Flag names, short aliases, and default values SHALL be identical to the current per-command registrations.
+The `RenderFlags` struct SHALL provide an `AddTo(*cobra.Command)` method that registers the flags `--values`/`-f` (string array, repeatable), `--namespace`/`-n` (string), `--instance-name` (string), and `--platform` (string, a platform module directory) on the given cobra command. Flag names, short aliases, and default values SHALL be identical to the current per-command registrations.
 
 #### Scenario: RenderFlags registers all four flags on a cobra command
 
 - **WHEN** `RenderFlags.AddTo(cmd)` is called on a new cobra command
 - **THEN** the command SHALL have a `--values` flag (short: `-f`) of type `StringArray` with default `nil`
 - **AND** the command SHALL have a `--namespace` flag (short: `-n`) of type `String` with default `""`
-- **AND** the command SHALL have a `--release-name` flag of type `String` with default `""`
-- **AND** the command SHALL have a `--provider` flag of type `String` with default `""`
+- **AND** the command SHALL have a `--instance-name` flag of type `String` with default `""`
+- **AND** the command SHALL have a `--platform` flag of type `String` with default `""`
 
 #### Scenario: RenderFlags values are accessible after flag parsing
 
-- **WHEN** a command using `RenderFlags` is invoked with `--values a.cue -f b.cue -n production --release-name my-app --provider kubernetes`
+- **WHEN** a command using `RenderFlags` is invoked with `--values a.cue -f b.cue -n production --instance-name my-app --platform ./platform`
 - **THEN** `RenderFlags.Values` SHALL equal `["a.cue", "b.cue"]`
 - **AND** `RenderFlags.Namespace` SHALL equal `"production"`
-- **AND** `RenderFlags.ReleaseName` SHALL equal `"my-app"`
-- **AND** `RenderFlags.Provider` SHALL equal `"kubernetes"`
+- **AND** `RenderFlags.InstanceName` SHALL equal `"my-app"`
+- **AND** `RenderFlags.Platform` SHALL equal `"./platform"`
 
 ### Requirement: K8sFlags struct registers Kubernetes connection flags
 
@@ -42,9 +42,9 @@ The `K8sFlags` struct SHALL provide an `AddTo(*cobra.Command)` method that regis
 - **THEN** `K8sFlags.Kubeconfig` SHALL equal `"/path/to/config"`
 - **AND** `K8sFlags.Context` SHALL equal `"staging"`
 
-### Requirement: InstanceSelectorFlags struct registers and validates instance identification flags
+### Requirement: InstanceSelectorFlags carries and validates the resolved instance selector
 
-The `InstanceSelectorFlags` struct SHALL provide an `AddTo(*cobra.Command)` method that registers `--instance-name` (string), `--instance-id` (string), and `--namespace`/`-n` (string). It SHALL also provide a `Validate()` method that enforces mutual exclusivity between `--instance-name` and `--instance-id`, and requires exactly one to be present. <!-- Was: ReleaseSelectorFlags, --release-name/--release-id (0002 D10/D-X4.2) -->
+The `InstanceSelectorFlags` struct SHALL carry the resolved instance selector (`InstanceName` or `InstanceID`, plus `Namespace`). Commands SHALL build it from their positional `<file|name|uuid>` argument through `InstanceArg.ToSelectorFlags`; no command registers `--instance-name`/`--instance-id` flags for cluster queries. It SHALL provide a `Validate()` method that enforces mutual exclusivity between `InstanceName` and `InstanceID`, and requires exactly one to be present. <!-- Was: ReleaseSelectorFlags, --release-name/--release-id (0002 D10/D-X4.2) -->
 
 #### Scenario: Both selectors set is rejected
 
@@ -74,35 +74,6 @@ The `InstanceSelectorFlags` struct SHALL provide a `LogName()` method that retur
 
 - **WHEN** `LogName()` is called with `InstanceName` set to `""` and `InstanceID` set to `"a1b2c3d4-e5f6-7890-abcd"`
 - **THEN** it SHALL return `"instance:a1b2c3d4"`
-
-### Requirement: RenderRelease orchestration
-
-`cmdutil.RenderRelease()` SHALL use the release-file loading path exclusively. There is no synthesis branch.
-
-**When `release.cue` is present** (unchanged):
-- Call `loader.LoadReleasePackage()`, `loader.DetectReleaseKind()`, `loader.LoadModuleReleaseFromValue()` (or bundle equivalent), then `engine.ModuleRenderer.Render()`.
-
-In all cases, resources are converted to `[]*unstructured.Unstructured` before passing to downstream packages. No CUE types cross this boundary.
-
-#### Scenario: CUE boundary enforcement (unchanged)
-- **WHEN** `RenderRelease()` passes resources to `internal/kubernetes/` or `internal/inventory/`
-- **THEN** resources are `[]*unstructured.Unstructured` — no CUE types cross this boundary
-
-### Requirement: Values file resolution stays in cmdutil
-
-Values file resolution SHALL remain in `internal/cmdutil/` as a CLI-layer concern. With the synthesis path removed, the resolution simplifies:
-
-- When `--values` files are provided: pass them to `LoadReleasePackage`.
-- When no `--values` files are provided: pass empty string to `LoadReleasePackage()`, which defaults to `values.cue` in the release directory (existing behavior).
-
-#### Scenario: Values flag resolution (unchanged)
-- **WHEN** the user provides `--values custom-values.cue`
-- **THEN** cmdutil resolves the path and passes it to `LoadReleasePackage`
-
-#### Scenario: Default values fallback with release.cue present
-- **WHEN** no `--values` flag is provided
-- **AND** `release.cue` is present
-- **THEN** cmdutil passes empty string to `LoadReleasePackage()`, which defaults to `values.cue` in the release directory
 
 ### Requirement: ShowRenderOutput checks for errors, shows transformer matches, and logs warnings
 
@@ -168,7 +139,7 @@ Multiple flag group structs SHALL be usable on the same cobra command without fl
 #### Scenario: RenderFlags and K8sFlags compose on one command
 
 - **WHEN** both `RenderFlags.AddTo(cmd)` and `K8sFlags.AddTo(cmd)` are called on the same command
-- **THEN** the command SHALL have all 6 flags registered (values, namespace, release-name, provider, kubeconfig, context)
+- **THEN** the command SHALL have all 6 flags registered (values, namespace, instance-name, platform, kubeconfig, context)
 - **AND** each flag SHALL be independently settable without conflict
 
 ### Requirement: PrintValidationError groups CUE positions on any error
@@ -212,35 +183,35 @@ The render refusal printer (`printValidationError`, funnelling into `cmdutil.Pri
 - **WHEN** the CLI formats a render refusal carrying unresolved demands
 - **THEN** the formatter SHALL take the demand rows directly, and its output SHALL name each component, kind and contract key with the same-base alternatives the platform implements, or an explicit nothing-implements line
 
-### Requirement: Refactored mod commands preserve exact behavioral equivalence
+### Requirement: Positional instance arguments preserve the selector semantics
 
-The `mod` subcommands that consume `InstanceSelectorFlags` SHALL preserve the same observable behavior after the rename: identical resolution, output, and exit codes for equivalent inputs, with the flag names updated to `--instance-name`/`--instance-id`. <!-- Was: --release-name/--release-id (0002 D-X4.2) -->
+The `instance` subcommands that consume `InstanceSelectorFlags` SHALL resolve their positional `<file|name|uuid>` argument to the same selector the former `--instance-name`/`--instance-id` flags carried: identical resolution, output, and exit codes for equivalent inputs. <!-- Was: --release-name/--release-id (0002 D-X4.2), then --instance-name/--instance-id flags -->
 
-#### Scenario: mod delete behavior preserved under renamed flags
+#### Scenario: instance delete resolves a name argument
 
-- **WHEN** `opm mod delete --instance-name my-app -n production` is run
-- **THEN** it SHALL produce the same resolution and deletion behavior the pre-rename `--release-name` form produced
+- **WHEN** `opm instance delete my-app -n production` is run
+- **THEN** it SHALL resolve and delete the instance exactly as a name selector for `my-app` in `production`
 
-#### Scenario: mod status behavior preserved under renamed flags
+#### Scenario: instance status resolves a name argument
 
-- **WHEN** `opm mod status --instance-name my-app -n production` is run
-- **THEN** it SHALL produce the same status output the pre-rename `--release-name` form produced
+- **WHEN** `opm instance status my-app -n production` is run
+- **THEN** it SHALL produce the same status output a name selector for `my-app` in `production` produces
 
-### Requirement: Shared inventory resolution helper in cmdutil
+### Requirement: Shared inventory resolution helper in the query workflow
 
-`cmdutil.ResolveInventory` SHALL resolve an inventory record from an `*InstanceSelectorFlags` (carrying instance name and/or instance ID). If `flags.InstanceID` is non-empty, it SHALL resolve via `inventory.GetInventory` using the instance ID; if `flags.InstanceName` is also set, that name SHALL be used as the display name. If only `flags.InstanceName` is non-empty, it SHALL resolve via `inventory.FindInventoryByInstanceName`. When no inventory Secret is found, it SHALL return an `InstanceNotFoundError`. <!-- Was: *ReleaseSelectorFlags, ReleaseID/ReleaseName, ReleaseNotFoundError (0002 D10) -->
+`query.ResolveInventory` (in `internal/workflow/query`) SHALL resolve a `ModuleInstance` record from an `*InstanceSelectorFlags`. If `InstanceID` is non-empty, it SHALL resolve via `inventory.FindRecordByInstanceUUID` (list the namespace's CRs, match `status.instanceUUID`); otherwise it SHALL resolve via `inventory.GetRecord` (direct GET by `InstanceName`). When no record is found, it SHALL return an `InstanceNotFoundError` with exit code 5. On success it SHALL also return the live resources and the missing entries from `inventory.DiscoverResourcesFromInventory`. <!-- Was: cmdutil.ResolveInventory over *ReleaseSelectorFlags, ReleaseID/ReleaseName, ReleaseNotFoundError (0002 D10) -->
 
 #### Scenario: Resolve by instance name
 
-- **WHEN** `InstanceSelectorFlags.InstanceName` is set and the inventory Secret exists
-- **THEN** `ResolveInventory` SHALL return the matching inventory record
+- **WHEN** `InstanceSelectorFlags.InstanceName` is set and the `ModuleInstance` record exists
+- **THEN** `ResolveInventory` SHALL return the matching inventory record with its live resources
 
-#### Scenario: Resolve by instance ID
+#### Scenario: Resolve by instance UUID
 
-- **WHEN** `InstanceSelectorFlags.InstanceID` is set and the inventory Secret exists
-- **THEN** `ResolveInventory` SHALL return the matching inventory record
+- **WHEN** `InstanceSelectorFlags.InstanceID` is set and a `ModuleInstance` in the namespace carries that `status.instanceUUID`
+- **THEN** `ResolveInventory` SHALL return the matching inventory record with its live resources
 
 #### Scenario: Instance not found
 
-- **WHEN** the underlying inventory lookup returns no Secret
-- **THEN** `ResolveInventory` SHALL return an `InstanceNotFoundError`
+- **WHEN** the underlying lookup finds no `ModuleInstance` record
+- **THEN** `ResolveInventory` SHALL return an `InstanceNotFoundError` carrying exit code 5

@@ -12,12 +12,12 @@ package-level variables or accessor functions.
 
 #### Scenario: Sub-command accesses OPMConfig
 
-- **WHEN** a sub-command in `internal/cmd/mod/` or `internal/cmd/config/` needs the loaded OPMConfig
+- **WHEN** a sub-command in `internal/cmd/module/`, `internal/cmd/instance/` or `internal/cmd/config/` needs the loaded OPMConfig
 - **THEN** it reads it from the `*GlobalConfig` parameter passed to its constructor, not from a package-level accessor
 
 #### Scenario: No package-level mutable state in sub-packages
 
-- **WHEN** any file in `internal/cmd/mod/` or `internal/cmd/config/` is inspected
+- **WHEN** any file in `internal/cmd/module/`, `internal/cmd/instance/` or `internal/cmd/config/` is inspected
 - **THEN** it contains no package-level `var` declarations for flags or configuration state
 
 ### Requirement: Command packages are organised by command group
@@ -69,21 +69,19 @@ The root command SHALL register `opm operator` as a top-level command group via 
 - **THEN** it SHALL contain `rootCmd.AddCommand(cmdoperator.NewOperatorCmd(&cfg))`
 - **AND** the root command SHALL NOT register `install` or `uninstall` as top-level commands
 
-### Requirement: Cluster-query commands migrate from mod to instance
+### Requirement: Cluster-query commands live only under instance
 
-The cluster-query commands (`status`, `tree`, `events`, `delete`, `list`) SHALL be implemented in `internal/cmd/instance/`. The `internal/cmd/mod/` package SHALL retain alias versions that delegate to `opm instance` equivalents and print a deprecation notice.
+The cluster-query commands (`status`, `tree`, `events`, `delete`, `list`) SHALL be implemented in `internal/cmd/instance/` and registered only under the `instance` command group. The `module` group (`internal/cmd/module/`) SHALL NOT carry them or aliases for them: it registers `init`, `template`, `vet`, `build`, `apply`, `publish` and `version` only.
 
-#### Scenario: opm mod status delegates to instance status
+#### Scenario: opm mod status is not a command
 
-- **WHEN** `opm mod status --instance-name jellyfin` is run
-- **THEN** the CLI SHALL print a deprecation notice suggesting `opm instance status jellyfin`
-- **AND** execute the same logic as `opm instance status jellyfin`
+- **WHEN** `opm mod status jellyfin` is run
+- **THEN** the CLI SHALL fail with an unknown-command error
 
-#### Scenario: opm mod delete delegates to instance delete
+#### Scenario: opm instance status is the command
 
-- **WHEN** `opm mod delete --instance-name jellyfin` is run
-- **THEN** the CLI SHALL print a deprecation notice suggesting `opm instance delete jellyfin`
-- **AND** execute the same logic as `opm instance delete jellyfin`
+- **WHEN** `opm instance status jellyfin` is run
+- **THEN** the CLI SHALL execute the status command for the instance `jellyfin`
 
 ### Requirement: `opm instance build` branches on argument type
 

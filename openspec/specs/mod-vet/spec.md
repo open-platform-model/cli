@@ -77,7 +77,7 @@ A `debugValues` field left open (`_`) is a values source, not a missing one: the
 
 ### Requirement: mod vet does not use the render pipeline
 
-The `opm mod vet` command SHALL NOT call the release render pipeline used by `mod build`, `mod apply`, or `opm rel vet`.
+The `opm mod vet` command SHALL NOT call the release render pipeline used by `mod build`, `mod apply`, or `opm instance vet`.
 
 It SHALL:
 

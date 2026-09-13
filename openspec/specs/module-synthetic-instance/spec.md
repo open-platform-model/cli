@@ -87,4 +87,4 @@ The synthesis SHALL only produce `#ModuleInstance` values. Bundle directories or
 #### Scenario: Bundle directory rejected
 
 - **WHEN** the synthesis input directory contains a `#Bundle`/`#BundleRelease`-shaped CUE package instead of a `#Module`
-- **THEN** the CLI SHALL return an error stating that bundle synthesis is not supported and pointing the user to `opm release build <file>` for bundle release files (when supported)
+- **THEN** the CLI SHALL return an error stating that bundle synthesis is not supported and pointing the user to `opm instance build <file>` for bundle instance files (when supported)

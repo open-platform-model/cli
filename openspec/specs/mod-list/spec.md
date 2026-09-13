@@ -1,121 +1,121 @@
 ## Purpose
 
-Defines how `opm mod list` discovers deployed releases from persisted release inventory records and reports release metadata and health without requiring module source.
+Defines how `opm instance list` discovers deployed instances from persisted instance inventory records and reports instance metadata and health without requiring module source.
 
 ## Requirements
 
 ### Requirement: List command discovers instances via persisted ownership inventory
 
-The `opm mod list` command SHALL discover all deployed module instances by listing persisted instance inventory records in the target namespace. It SHALL use the `ListInventories` function from the inventory package. It MUST NOT require module source, re-rendering, knowledge of specific instance names, or inventory change-history fields to identify the current owned resource set for an instance. <!-- Was: "discovers releases", "release inventory records", "release names" (0002 D9) -->
+The `opm instance list` command SHALL discover all deployed module instances by listing persisted instance inventory records in the target namespace. It SHALL use the `ListRecords` function from the inventory package. It MUST NOT require module source, re-rendering, knowledge of specific instance names, or inventory change-history fields to identify the current owned resource set for an instance. <!-- Was: "discovers releases", "release inventory records", "release names" (0002 D9) -->
 
-#### Scenario: List discovers via ListInventories
+#### Scenario: List discovers via ListRecords
 
-- **WHEN** the user runs `opm mod list -n production`
-- **THEN** the command SHALL list deployed module instances via `ListInventories` for `production`
+- **WHEN** the user runs `opm instance list -n production`
+- **THEN** the command SHALL list deployed module instances via `ListRecords` for `production`
 - **AND** SHALL NOT require module source or re-rendering
 
 ### Requirement: List command supports all-namespaces flag
 
-The command SHALL accept `-A` / `--all-namespaces` to list releases across all namespaces. When `-A` is used, the NAMESPACE column SHALL be included in the table output. When `-A` is not used, the NAMESPACE column SHALL be hidden.
+The command SHALL accept `-A` / `--all-namespaces` to list instances across all namespaces. When `-A` is used, the NAMESPACE column SHALL be included in the table output. When `-A` is not used, the NAMESPACE column SHALL be hidden.
 
 #### Scenario: All-namespaces listing
 
-- **WHEN** the user runs `opm mod list -A`
-- **AND** releases exist in namespaces `media` and `games`
-- **THEN** the output SHALL include releases from both namespaces
+- **WHEN** the user runs `opm instance list -A`
+- **AND** instances exist in namespaces `media` and `games`
+- **THEN** the output SHALL include instances from both namespaces
 - **AND** the table SHALL include a NAMESPACE column
 
 #### Scenario: Single namespace hides namespace column
 
-- **WHEN** the user runs `opm mod list -n media`
+- **WHEN** the user runs `opm instance list -n media`
 - **THEN** the table output SHALL NOT include a NAMESPACE column
 
-### Requirement: List command shows health status for each release
+### Requirement: List command shows health status for each instance
 
-The command SHALL evaluate the health of each release by discovering its tracked resources and evaluating their health status. The STATUS column SHALL display the aggregate health and ready/total count in the format `Ready (N/N)` or `NotReady (N/N)`.
+The command SHALL evaluate the health of each instance by discovering its tracked resources and evaluating their health status. The STATUS column SHALL display the aggregate health and ready/total count in the format `Ready (N/N)` or `NotReady (N/N)`.
 
 #### Scenario: All resources healthy
 
-- **WHEN** a release has 5 tracked resources and all are healthy
+- **WHEN** a instance has 5 tracked resources and all are healthy
 - **THEN** the STATUS column SHALL display `Ready (5/5)`
 
 #### Scenario: Some resources unhealthy
 
-- **WHEN** a release has 5 tracked resources and 2 are not healthy
+- **WHEN** a instance has 5 tracked resources and 2 are not healthy
 - **THEN** the STATUS column SHALL display `NotReady (3/5)`
 
 #### Scenario: Missing resource counts as unhealthy
 
-- **WHEN** a release tracks a resource that no longer exists on the cluster
+- **WHEN** a instance tracks a resource that no longer exists on the cluster
 - **THEN** that resource SHALL count toward the total but NOT toward the ready count
 
 #### Scenario: Zero resources
 
-- **WHEN** a release inventory record has no tracked resources in its ownership inventory
+- **WHEN** a instance inventory record has no tracked resources in its ownership inventory
 - **THEN** the STATUS column SHALL display `Unknown (0/0)`
 
-### Requirement: List command displays release ownership
+### Requirement: List command displays instance ownership
 
-The `opm mod list` command SHALL expose release ownership derived from inventory provenance. Table outputs SHALL include an OWNER column, and structured outputs SHALL include an `owner` field.
+The `opm instance list` command SHALL expose instance ownership derived from inventory provenance. Table outputs SHALL include an OWNER column, and structured outputs SHALL include an `owner` field.
 
 #### Scenario: Table output shows controller ownership
 
-- **WHEN** the user runs `opm mod list`
-- **AND** a release inventory records `createdBy: "controller"`
-- **THEN** the release row SHALL display `controller` in the OWNER column
+- **WHEN** the user runs `opm instance list`
+- **AND** a instance inventory records `createdBy: "controller"`
+- **THEN** the instance row SHALL display `controller` in the OWNER column
 
 #### Scenario: Legacy inventory shows CLI ownership
 
-- **WHEN** the user runs `opm mod list`
-- **AND** a release inventory has no `createdBy`
-- **THEN** the release row SHALL display `cli` in the OWNER column
+- **WHEN** the user runs `opm instance list`
+- **AND** a instance inventory has no `createdBy`
+- **THEN** the instance row SHALL display `cli` in the OWNER column
 
 ### Requirement: List command default table output
 
-The default output format SHALL be a table with columns: NAME, MODULE, OWNER, VERSION, STATUS, AGE. When `-A` is used, a NAMESPACE column SHALL be prepended. Results SHALL be sorted alphabetically by release name. The table SHALL use space-padded columns consistent with kubectl output conventions.
+The default output format SHALL be a table with columns: NAME, MODULE, OWNER, VERSION, STATUS, AGE. When `-A` is used, a NAMESPACE column SHALL be prepended. Results SHALL be sorted alphabetically by instance name. The table SHALL use space-padded columns consistent with kubectl output conventions.
 
 #### Scenario: Default table columns
 
-- **WHEN** the user runs `opm mod list -n production`
+- **WHEN** the user runs `opm instance list -n production`
 - **THEN** the table SHALL have columns: NAME, MODULE, OWNER, VERSION, STATUS, AGE
 
 #### Scenario: All-namespaces table columns
 
-- **WHEN** the user runs `opm mod list -A`
+- **WHEN** the user runs `opm instance list -A`
 - **THEN** the table SHALL have columns: NAMESPACE, NAME, MODULE, OWNER, VERSION, STATUS, AGE
 
 #### Scenario: Sorted by name
 
-- **WHEN** releases `zebra`, `alpha`, and `middle` exist
+- **WHEN** instances `zebra`, `alpha`, and `middle` exist
 - **THEN** the table SHALL display them in order: `alpha`, `middle`, `zebra`
 
 ### Requirement: List command supports wide output
 
-When `--output wide` / `-o wide` is specified, the table SHALL include additional columns: RELEASE-ID and LAST-APPLIED. RELEASE-ID SHALL display the full release UUID. LAST-APPLIED SHALL display the `LastTransitionTime` from the release metadata.
+When `--output wide` / `-o wide` is specified, the table SHALL include additional columns: INSTANCE-ID and LAST-APPLIED. INSTANCE-ID SHALL display the full instance UUID. LAST-APPLIED SHALL display the `LastTransitionTime` from the instance metadata.
 
 #### Scenario: Wide output columns without -A
 
-- **WHEN** the user runs `opm mod list -n production -o wide`
-- **THEN** the table SHALL have columns: NAME, MODULE, OWNER, VERSION, STATUS, AGE, RELEASE-ID, LAST-APPLIED
+- **WHEN** the user runs `opm instance list -n production -o wide`
+- **THEN** the table SHALL have columns: NAME, MODULE, OWNER, VERSION, STATUS, AGE, INSTANCE-ID, LAST-APPLIED
 
 #### Scenario: Wide output columns with -A
 
-- **WHEN** the user runs `opm mod list -A -o wide`
-- **THEN** the table SHALL have columns: NAMESPACE, NAME, MODULE, OWNER, VERSION, STATUS, AGE, RELEASE-ID, LAST-APPLIED
+- **WHEN** the user runs `opm instance list -A -o wide`
+- **THEN** the table SHALL have columns: NAMESPACE, NAME, MODULE, OWNER, VERSION, STATUS, AGE, INSTANCE-ID, LAST-APPLIED
 
 ### Requirement: List command supports structured output formats
 
-The command SHALL support `--output`/`-o` with values `json` and `yaml` for machine-readable output. The structured output SHALL include all fields: name, module, namespace, owner, version, status, readyCount, totalCount, releaseID, lastApplied.
+The command SHALL support `--output`/`-o` with values `json` and `yaml` for machine-readable output. The structured output SHALL include all fields: name, module, namespace, owner, version, status, readyCount, totalCount, instanceID, lastApplied.
 
 #### Scenario: JSON output
 
-- **WHEN** the user runs `opm mod list -n production -o json`
-- **THEN** the output SHALL be a valid JSON array of release summary objects
+- **WHEN** the user runs `opm instance list -n production -o json`
+- **THEN** the output SHALL be a valid JSON array of instance summary objects
 
 #### Scenario: YAML output
 
-- **WHEN** the user runs `opm mod list -n production -o yaml`
-- **THEN** the output SHALL be valid YAML containing release summary entries
+- **WHEN** the user runs `opm instance list -n production -o yaml`
+- **THEN** the output SHALL be valid YAML containing instance summary entries
 
 ### Requirement: List command namespace resolution
 
@@ -123,32 +123,32 @@ The `--namespace`/`-n` flag SHALL be optional. When omitted, the namespace SHALL
 
 #### Scenario: Namespace from config
 
-- **WHEN** the user runs `opm mod list` without `-n` or `-A`
+- **WHEN** the user runs `opm instance list` without `-n` or `-A`
 - **AND** the config file sets `kubernetes: namespace: "production"`
-- **THEN** the command SHALL list releases in the `production` namespace
+- **THEN** the command SHALL list instances in the `production` namespace
 
 #### Scenario: -A overrides namespace
 
-- **WHEN** the user runs `opm mod list -n production -A`
-- **THEN** the command SHALL list releases across ALL namespaces, ignoring `-n`
+- **WHEN** the user runs `opm instance list -n production -A`
+- **THEN** the command SHALL list instances across ALL namespaces, ignoring `-n`
 
 ### Requirement: List command accepts kubernetes connection flags
 
-The command SHALL accept `--kubeconfig` and `--context` flags for cluster connection, following the same resolution precedence as other `opm mod` commands.
+The command SHALL accept `--kubeconfig` and `--context` flags for cluster connection, following the same resolution precedence as the other `opm instance` commands.
 
 #### Scenario: Custom context
 
-- **WHEN** the user runs `opm mod list --context staging-cluster -n default`
+- **WHEN** the user runs `opm instance list --context staging-cluster -n default`
 - **THEN** the command SHALL connect to the `staging-cluster` context
 
 ### Requirement: List command evaluates health in parallel
 
-The command SHALL evaluate release health concurrently using a bounded worker pool to keep latency reasonable. The concurrency limit SHALL prevent overwhelming the Kubernetes API server.
+The command SHALL evaluate instance health concurrently using a bounded worker pool to keep latency reasonable. The concurrency limit SHALL prevent overwhelming the Kubernetes API server.
 
-#### Scenario: Multiple releases evaluated concurrently
+#### Scenario: Multiple instances evaluated concurrently
 
-- **WHEN** 10 releases exist in a namespace
-- **THEN** the command SHALL discover resources and evaluate health for multiple releases concurrently, not sequentially
+- **WHEN** 10 instances exist in a namespace
+- **THEN** the command SHALL discover resources and evaluate health for multiple instances concurrently, not sequentially
 
 ### Requirement: List metadata extraction does not depend on inventory change history
 
@@ -156,6 +156,6 @@ The command SHALL extract display metadata from each persisted instance inventor
 
 #### Scenario: Display metadata sourced from persisted inventory
 
-- **WHEN** the user runs `opm mod list -n production`
+- **WHEN** the user runs `opm instance list -n production`
 - **AND** a persisted instance inventory record exists
 - **THEN** each row SHALL source instance name from `instanceMetadata.name`, module name/version from `moduleMetadata`, and owner from top-level `createdBy` (defaulting to `cli` for legacy inventories)

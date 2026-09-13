@@ -92,13 +92,13 @@ The cluster-query commands (`status`, `tree`, `events`, `delete`) under `opm ins
 #### Scenario: status by instance name
 
 - **WHEN** `opm instance status jellyfin` is run
-- **THEN** the CLI SHALL look up the instance by name via label scan on inventory Secrets
+- **THEN** the CLI SHALL look up the instance by a direct `ModuleInstance` GET by name
 - **AND** display the instance health status
 
 #### Scenario: status by UUID
 
 - **WHEN** `opm instance status 550e8400-e29b-41d4-a716-446655440000` is run
-- **THEN** the CLI SHALL look up the instance by UUID via direct Secret GET
+- **THEN** the CLI SHALL look up the instance by listing `ModuleInstance` CRs and matching `status.instanceUUID`
 - **AND** display the instance health status
 
 #### Scenario: delete by instance name
@@ -120,7 +120,7 @@ The `opm instance list` command SHALL list all deployed instances in the target 
 #### Scenario: list instances in namespace
 
 - **WHEN** `opm instance list -n production` is run
-- **THEN** the CLI SHALL list all inventory Secrets in the `production` namespace
+- **THEN** the CLI SHALL list all `ModuleInstance` records in the `production` namespace
 - **AND** display instance names, UUIDs, and status
 
 #### Scenario: list with no instances
