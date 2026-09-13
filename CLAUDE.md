@@ -161,7 +161,8 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 - `task lint` - run `golangci-lint run ./...`.
 - `task lint:fix` - run `golangci-lint run --fix ./...`.
 - `task tidy` - run `go mod tidy`.
-- `task check` - run `fmt`, `vet`, `lint`, all tests.
+- `task openspec:check` - run `openspec validate --all --strict` over `openspec/` (main specs and active changes); `task openspec:install` installs the pinned openspec CLI once.
+- `task check` - run `fmt`, `vet`, `lint`, `openspec:check`, all tests.
 
 ### Tests
 

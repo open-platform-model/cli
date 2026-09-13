@@ -104,6 +104,7 @@ context: |
   1. task fmt — All Go files formatted
   2. task lint — golangci-lint passes
   3. task test — All tests pass
+  4. task openspec:check — main specs and active changes validate under --strict
   
   ## Commit Standards
   - Format: type(scope): description
