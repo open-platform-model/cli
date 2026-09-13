@@ -103,3 +103,30 @@ func TestE2E_ModuleVet_OpenDebugValues(t *testing.T) {
 	// Anti-regression: the retired per-input pre-check's wording is gone
 	assert.NotContains(t, stderr, "not concrete")
 }
+
+// TestE2E_ModuleVet_ValuesFilesWithoutConfig asserts that values files
+// supplied to a module that declares no #config are refused, the verdict
+// build reaches for the same input, instead of a vacuous "Values satisfy
+// #config" pass.
+func TestE2E_ModuleVet_ValuesFilesWithoutConfig(t *testing.T) {
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
+	testdataDir := filepath.Join(cwd, "testdata", "vet-errors")
+
+	tmpDir, err := os.MkdirTemp("", "e2e-mod-vet-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	_, stderr, err := runOPM(t, tmpDir, "mod", "vet",
+		filepath.Join(testdataDir, "no-config"),
+		"-f", filepath.Join(testdataDir, "instance", "values.cue"))
+
+	// Assert exit code 2
+	require.Error(t, err)
+	var exitErr *exec.ExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, 2, exitErr.ExitCode())
+
+	assert.Contains(t, stderr, "module does not define #config")
+	assert.NotContains(t, stderr, "Values satisfy #config")
+}

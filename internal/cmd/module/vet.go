@@ -142,13 +142,35 @@ func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath 
 		}
 		return &opmexit.ExitError{Code: code, Err: err}
 	}
-	valuesDetail := vetValuesDetail(rf.Values)
 
-	// The kernel unifies the sources in stack order, walks disallowed fields,
-	// and asserts concreteness on the merged value, so a stack whose base
-	// leaves a field open for an override to fill passes here as it does in
-	// build; an incomplete merge is a #config violation at its position.
-	if _, cfgErr := k.ValidateConfigDetailed(modVal.LookupPath(schema.Config), sources); cfgErr != nil {
+	if err := validateVetValues(k, modVal, modName, sources, len(rf.Values) > 0); err != nil {
+		return err
+	}
+
+	moduleLog.Info(output.FormatVetCheck("Values satisfy #config", vetValuesDetail(rf.Values)))
+	moduleLog.Info(output.FormatCheckmark("Module config valid"))
+
+	return nil
+}
+
+// validateVetValues checks the resolved sources against the module's
+// #config through the kernel. Values files need a #config to be checked
+// against; build refuses the same input, so vet does too rather than
+// reporting a vacuous pass. The kernel unifies the sources in stack order,
+// walks disallowed fields, and asserts concreteness on the merged value, so
+// a stack whose base leaves a field open for an override to fill passes
+// here as it does in build; an incomplete merge is a #config violation at
+// its position, printed as the grouped block and returned framed with the
+// module name.
+func validateVetValues(k *kernel.Kernel, modVal cue.Value, modName string, sources []kernel.Source, hasValuesFiles bool) error {
+	configSchema := modVal.LookupPath(schema.Config)
+	if hasValuesFiles && !configSchema.Exists() {
+		return &opmexit.ExitError{
+			Code: opmexit.ExitValidationError,
+			Err:  fmt.Errorf("module does not define #config; values files cannot be validated"),
+		}
+	}
+	if _, cfgErr := k.ValidateConfigDetailed(configSchema, sources); cfgErr != nil {
 		err := fmt.Errorf("module %q: values do not satisfy #config: %w", modName, cfgErr)
 		cmdutil.PrintValidationError("values do not satisfy #config", err)
 		return &opmexit.ExitError{
@@ -157,10 +179,6 @@ func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath 
 			Printed: true,
 		}
 	}
-
-	moduleLog.Info(output.FormatVetCheck("Values satisfy #config", valuesDetail))
-	moduleLog.Info(output.FormatCheckmark("Module config valid"))
-
 	return nil
 }
 
