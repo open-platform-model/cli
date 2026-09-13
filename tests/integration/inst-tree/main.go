@@ -445,7 +445,7 @@ func main() {
 	// ── Step 8: Name-based resolution (15.1) ─────────────────────────────────
 	step(8, "15.1: Resolve instance by name → inventory lookup")
 
-	nameArg, err := cmdutil.ResolveInstanceArg(instanceName, cfg)
+	nameArg, err := cmdutil.ResolveInstanceArg(ctx, instanceName, cfg)
 	check("ResolveInstanceArg(name)", err)
 	if nameArg.Name != instanceName || nameArg.UUID != "" {
 		failf("15.1: expected InstanceArg{Name:%q}, got Name=%q UUID=%q", instanceName, nameArg.Name, nameArg.UUID)
@@ -467,7 +467,7 @@ func main() {
 	// ── Step 9: UUID-based resolution (15.2) ─────────────────────────────────
 	step(9, "15.2: Resolve instance by UUID → inventory lookup")
 
-	uuidArg, err := cmdutil.ResolveInstanceArg(instanceID, cfg)
+	uuidArg, err := cmdutil.ResolveInstanceArg(ctx, instanceID, cfg)
 	check("ResolveInstanceArg(uuid)", err)
 	if uuidArg.UUID != instanceID || uuidArg.Name != "" {
 		failf("15.2: expected InstanceArg{UUID:%q}, got Name=%q UUID=%q", instanceID, uuidArg.Name, uuidArg.UUID)
@@ -490,7 +490,7 @@ func main() {
 	step(10, "15.3: Resolve instance from file path → inventory lookup")
 
 	fixturePath := "tests/integration/inst-tree/testdata/instance.cue"
-	pathArg, err := cmdutil.ResolveInstanceArg(fixturePath, cfg)
+	pathArg, err := cmdutil.ResolveInstanceArg(ctx, fixturePath, cfg)
 	check("ResolveInstanceArg(path)", err)
 	if pathArg.Name != instanceName {
 		failf("15.3: expected Name=%q from fixture, got %q", instanceName, pathArg.Name)

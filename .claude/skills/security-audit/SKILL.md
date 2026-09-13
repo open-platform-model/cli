@@ -35,14 +35,14 @@ Nine dimensions tailored to a registry- and cluster-facing Go CLI. Each is check
 - File paths are confined to an intended root where the command semantics expect it (no reading outside the working module/release dir without intent)
 - Flag/arg values (names, namespaces, versions) validated (type, length, charset) before use in paths, registry refs, or K8s object names
 - No unvalidated input concatenated into registry references, label selectors, or field selectors
-- Key files: `pkg/loader/release_file.go`, `internal/config/paths.go`, `internal/cmdutil/`
+- Key files: `internal/cmdutil/path_guard.go` (instance/module path guards, `InstanceDir`), `internal/config/paths.go`, `internal/cmdutil/`, `internal/workflow/render/`
 
 ### Dimension 2: Registry Authority & Insecure Transport
 
 The supply-chain front door.
 
-- Two-phase bootstrap (`BootstrapRegistry`) regex-extracts `registry:` from config then `os.Setenv("CUE_REGISTRY", ...)` **before** full validation — assess whether a malicious config can inject an attacker registry or extra mappings via the regex (newline/field injection into the env value)
-- `defer os.Unsetenv("CUE_REGISTRY")` cleanup is correct and the global env mutation is not racy across concurrent loads
+- The resolved registry (`internal/config.ResolveRegistry`: flag > `OPM_REGISTRY` > config file > default) rides the config struct into every kernel built by `internal/config.NewKernel` and into `internal/publish` — assess whether a malicious config file or env value can inject an attacker registry or extra host mappings (comma-separated mappings, `+insecure` suffixes) into every subsequent load
+- No load path sets `CUE_REGISTRY` on the process (`os.Setenv`); the registry reaches CUE only as a per-load env override (`kernel.WithRegistry`, `internal/publish.registryEnv`) — flag any reintroduction of process-env mutation
 - Workspace norm uses `+insecure` (plain HTTP, no TLS) registries — flag that artifact pulls over insecure transport are MITM-substitutable; confirm production guidance/guardrails distinguish insecure-local from real registries
 - Registry value from config/env is treated as security-relevant (it determines where code-like artifacts come from)
 - Key files: `internal/config/loader.go` (bootstrap + CUE load)
@@ -52,7 +52,7 @@ The supply-chain front door.
 - Modules/catalogs are pulled via CUE's OCI loader — assess that there is **no digest/checksum/signature verification** beyond registry + (often absent) TLS trust; mutable tags are trusted
 - Version resolution doesn't silently accept a downgraded or substituted module
 - Pulled artifact content is validated (kind/schema via the library) before being applied to a cluster
-- Key files: `internal/config/loader.go`, `pkg/loader/`
+- Key files: `internal/config/loader.go`, `internal/config/kernel.go` (kernel construction with the resolved registry), `internal/workflow/render/`
 
 ### Dimension 4: Scaffolding & Re-identification (mod init)
 
@@ -87,7 +87,7 @@ The CLI logs and handles cluster + registry credentials — secret hygiene appli
 - User CUE is loaded **with import resolution** — confirm imports resolve only to declared, trusted deps and the configured registry, not attacker-injected paths
 - Provider config is passed as **untyped CUE values** (typed/validated provider I/O is committed direction per CONSTITUTION but may be unimplemented) — flag the unvalidated-provider-content gap against that committed target
 - Provider values that influence file paths, registry targets, or K8s objects are validated before use
-- Key files: `pkg/loader/provider.go`, `internal/config/loader.go`
+- Key files: `internal/workflow/render/` (kernel acquire, `-f` values sources), `internal/config/loader.go`
 
 ### Dimension 8: Supply Chain & Build
 
@@ -136,12 +136,12 @@ Apply the relevant subset based on in-scope code.
 - All errors checked on security-sensitive calls (file open, registry load, K8s apply) — no silent `_`
 - `crypto/rand` not `math/rand` for any token/nonce; safe path handling (no raw `filepath.Join` of unvalidated user segments into a read/write)
 - No `os/exec` with user-interpolated args; no `text/template` for HTML/shell output
-- `os.Setenv` of `CUE_REGISTRY` is paired with cleanup and not racy; prefer per-load env config where possible
+- No `os.Setenv` on any load path; the registry reaches CUE loads only through `kernel.WithRegistry` or a per-load env override
 - Cobra flag parsing validates required args; no injection via flag values into selectors/paths
 
 ### CUE & Registry Handling
 
-- Registry regex (`registryRegex`) can't be tricked into capturing an injected multi-value/`+insecure` mapping from a hostile config
+- A hostile `registry` value in the config file or `OPM_REGISTRY` (injected multi-value mapping, `+insecure` suffix) is caught by config validation before it reaches a kernel
 - Import resolution confined to trusted deps; provider values validated before influencing behavior
 
 ### Kubernetes Client
@@ -182,8 +182,8 @@ Apply the relevant subset based on in-scope code.
 | Severity | Definition | Examples |
 |----------|-----------|----------|
 | **CRITICAL** | Exploitable vulnerability, privilege escalation, supply-chain compromise, or credential exfiltration. Must be addressed before release. | Config-injected attacker registry delivering substituted artifacts that get applied to the cluster, path traversal via crafted module name writing outside the target dir, kubeconfig/registry creds written to logs, applying attacker-authored privileged RBAC/ServiceAccount with operator credentials, hardcoded production credentials |
-| **WARNING** | Security weakness with material impact, or best-practice violation that increases attack surface. Should be addressed in the current cycle. | No digest verification on pulled modules (mutable-tag trust), `+insecure` registry use without a production guardrail, unvalidated provider CUE influencing apply, unbounded/symlink-following file reads, racy `os.Setenv("CUE_REGISTRY")`, secrets risk in verbose logging |
-| **SUGGESTION** | Defense-in-depth improvement, hardening recommendation, or theoretical risk with low current exploitability. Address when convenient. | Pin modules by digest, add module-name sanitization tests, validate kubeconfig context explicitly, tighten the registry regex, add a confirm prompt before cluster apply, minor log-redaction hardening |
+| **WARNING** | Security weakness with material impact, or best-practice violation that increases attack surface. Should be addressed in the current cycle. | No digest verification on pulled modules (mutable-tag trust), `+insecure` registry use without a production guardrail, unvalidated provider CUE influencing apply, unbounded/symlink-following file reads, a load path that mutates the process environment to pass the registry, secrets risk in verbose logging |
+| **SUGGESTION** | Defense-in-depth improvement, hardening recommendation, or theoretical risk with low current exploitability. Address when convenient. | Pin modules by digest, add module-name sanitization tests, validate kubeconfig context explicitly, validate the registry mapping syntax at config load, add a confirm prompt before cluster apply, minor log-redaction hardening |
 
 ### Classification Heuristics
 

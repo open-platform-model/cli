@@ -48,7 +48,7 @@ Examples:
   opm instance tree jellyfin -n media --depth 0`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runInstanceTree(args[0], cfg, &kf, namespace, depthFlag, outputFlag)
+			return runInstanceTree(c.Context(), args[0], cfg, &kf, namespace, depthFlag, outputFlag)
 		},
 	}
 
@@ -60,9 +60,7 @@ Examples:
 	return c
 }
 
-func runInstanceTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, depth int, outputFmt string) error {
-	ctx := context.Background()
-
+func runInstanceTree(ctx context.Context, identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, depth int, outputFmt string) error {
 	if depth < 0 || depth > 2 {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitGeneralError,
@@ -78,7 +76,7 @@ func runInstanceTree(identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8
 		}
 	}
 
-	target, err := cmdutil.ResolveInstanceTarget(identifier, cfg, kf, namespaceFlag)
+	target, err := cmdutil.ResolveInstanceTarget(ctx, identifier, cfg, kf, namespaceFlag)
 	if err != nil {
 		return err
 	}

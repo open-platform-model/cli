@@ -86,7 +86,7 @@ When no `--values` files are provided, the builder SHALL discover values using t
 
 The builder SHALL NOT read values from `Module.Values`. If `--values` files are provided, `values.cue` and `debugValues` SHALL both be ignored.
 
-When using `LoadInstanceFile()` (instance-file path), the `values` field is inline in the instance CUE file itself. There is no `values.cue` fallback — the instance file is self-contained.
+When an instance package is acquired from its directory (`AcquireInstanceFromDir`, the instance-file path), the `values` field is inline in the instance CUE file itself. There is no `values.cue` fallback — the instance package is self-contained.
 
 #### Scenario: No values file, `values.cue` exists in module directory
 
@@ -96,7 +96,7 @@ When using `LoadInstanceFile()` (instance-file path), the `values` field is inli
 
 #### Scenario: Instance file is self-contained
 
-- **WHEN** `LoadInstanceFile()` is called
+- **WHEN** `AcquireInstanceFromDir` acquires the package holding an instance file
 - **THEN** the `values` field is read from the instance CUE file's inline definition
 - **AND** no `values.cue` file is searched for or loaded
 

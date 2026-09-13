@@ -1,15 +1,12 @@
 package cmdutil
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
-	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/cuecontext"
-
 	"github.com/open-platform-model/cli/internal/config"
-	"github.com/open-platform-model/cli/pkg/loader"
 )
 
 // InstanceArg holds the resolved instance identifier from a positional CLI arg.
@@ -25,8 +22,8 @@ type InstanceArg struct {
 	// UUID is the instance UUID (set when arg matched the UUID v4/v5 pattern).
 	UUID string
 
-	// Namespace is the instance namespace extracted from the file's metadata.
-	// Only populated when the arg was a file or directory path.
+	// Namespace is the instance namespace read from the acquired instance's
+	// metadata. Only populated when the arg was a file or directory path.
 	Namespace string
 }
 
@@ -59,16 +56,17 @@ func (r InstanceArg) EffectiveNamespace(namespaceFlag string) string {
 // Was: ResolveReleaseArg. It accepts three forms:
 //
 //  1. A path to an instance.cue file or a directory containing one — the
-//     instance name and namespace are extracted by loading the CUE file.
+//     package is acquired through the kernel with the cfg registry, and the
+//     instance name and namespace are read from the acquired instance's
+//     metadata.
 //  2. An instance UUID — matched by the lowercase UUID v4/v5 pattern.
 //  3. An instance name — any other string.
 //
-// For form 1, the cfg registry and CUE context are used for CUE module
-// resolution. The caller's --namespace flag takes precedence over any namespace
-// found in the file.
-func ResolveInstanceArg(arg string, cfg *config.GlobalConfig) (InstanceArg, error) {
+// The caller's --namespace flag takes precedence over any namespace found in
+// the file (ToSelectorFlags, EffectiveNamespace).
+func ResolveInstanceArg(ctx context.Context, arg string, cfg *config.GlobalConfig) (InstanceArg, error) {
 	if isInstancePath(arg) {
-		return resolveInstanceArgFromFile(arg, cfg)
+		return resolveInstanceArgFromFile(ctx, arg, cfg)
 	}
 	name, uuid := ResolveInstanceIdentifier(arg)
 	return InstanceArg{Name: name, UUID: uuid}, nil
@@ -91,61 +89,26 @@ func isInstancePath(arg string) bool {
 		strings.HasPrefix(arg, "~")
 }
 
-// resolveInstanceArgFromFile loads an instance.cue file (or a directory
-// containing one) and extracts the instance name and namespace from its
-// metadata. Was: resolveReleaseArgFromFile.
-func resolveInstanceArgFromFile(arg string, cfg *config.GlobalConfig) (InstanceArg, error) {
+// resolveInstanceArgFromFile acquires the instance package at arg (an
+// instance.cue file, or a directory holding one) through the kernel and reads
+// the instance name and namespace from its metadata. The acquire is the one
+// the render path runs, so it refuses what a render would refuse: a package
+// whose kind is not ModuleInstance, whose metadata.name or metadata.namespace
+// is not concrete, or that fails to build. Was: resolveReleaseArgFromFile.
+func resolveInstanceArgFromFile(ctx context.Context, arg string, cfg *config.GlobalConfig) (InstanceArg, error) {
 	if err := ValidateInstanceInputPath(arg); err != nil {
 		return InstanceArg{}, err
 	}
 
-	cueCtx := cuecontext.New()
-
-	pkg, _, err := loader.LoadInstanceFile(cueCtx, arg, loader.LoadOptions{Registry: cfg.Registry})
+	dir, err := InstanceDir(arg)
 	if err != nil {
-		return InstanceArg{}, fmt.Errorf("loading instance file %q: %w", arg, err)
+		return InstanceArg{}, err
 	}
 
-	name, namespace, err := extractInstanceFileIdentity(pkg)
+	inst, err := config.NewKernel(cfg.Registry).AcquireInstanceFromDir(ctx, dir)
 	if err != nil {
-		return InstanceArg{}, fmt.Errorf("reading metadata from %q: %w", arg, err)
+		return InstanceArg{}, fmt.Errorf("loading instance %q: %w", arg, err)
 	}
 
-	return InstanceArg{Name: name, Namespace: namespace}, nil
-}
-
-// extractInstanceFileIdentity reads the instance name and namespace from the
-// metadata struct of an already-loaded CUE instance value. Was:
-// extractInstanceFileIdentity.
-//
-// name must be a concrete string; namespace is extracted best-effort (an
-// incomplete or constrained namespace value is silently ignored so the caller
-// can fall back to the configured default or --namespace flag).
-func extractInstanceFileIdentity(pkg cue.Value) (name, namespace string, err error) {
-	metaVal := pkg.LookupPath(cue.ParsePath("metadata"))
-	if !metaVal.Exists() {
-		return "", "", fmt.Errorf("no metadata field in instance file")
-	}
-
-	nameVal := metaVal.LookupPath(cue.ParsePath("name"))
-	if !nameVal.Exists() {
-		return "", "", fmt.Errorf("metadata.name not found in instance file")
-	}
-	name, err = nameVal.String()
-	if err != nil {
-		return "", "", fmt.Errorf("metadata.name is not a concrete string: %w", err)
-	}
-	if name == "" {
-		return "", "", fmt.Errorf("metadata.name is empty")
-	}
-
-	// Namespace is best-effort: if not concrete (e.g. still a CUE constraint),
-	// leave it empty so the caller falls back to the config default.
-	if nsVal := metaVal.LookupPath(cue.ParsePath("namespace")); nsVal.Exists() {
-		if ns, nsErr := nsVal.String(); nsErr == nil {
-			namespace = ns
-		}
-	}
-
-	return name, namespace, nil
+	return InstanceArg{Name: inst.Metadata.Name, Namespace: inst.Metadata.Namespace}, nil
 }
