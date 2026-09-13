@@ -1,47 +1,43 @@
-## ADDED Requirements
+# Capability: release-workflow
 
-### Requirement: Release triggers on version tags
-The release workflow SHALL trigger when a tag matching `v*` is pushed to the repository.
+## Purpose
 
-#### Scenario: Version tag pushed
-- **WHEN** a tag like `v0.1.0` is pushed
-- **THEN** the release workflow starts
+`.github/workflows/release.yml` turns merges to main into published releases: release-please maintains the version and changelog and opens the release PR, and once it cuts a tag, goreleaser builds and attaches the cross-platform archives and `checksums.txt` described by `.goreleaser.yml` while a second job publishes the bundled template modules to GHCR.
 
-#### Scenario: Non-version tag ignored
-- **WHEN** a tag not matching `v*` is pushed
-- **THEN** the release workflow does not trigger
+## Requirements
 
-### Requirement: Full test suite runs before release
-The release workflow SHALL run all test tiers (lint, unit, registry, integration, e2e) in a `test` job before the release job runs.
+### Requirement: Release runs from pushes to main through release-please
+The release workflow SHALL trigger on `push` to `main` only (no tag trigger, no `workflow_dispatch`) and SHALL run the `release-please` job first, driven by `release-please-config.json` and `.release-please-manifest.json`: a Go package named `opm` on a `v`-prefixed, `alpha` prerelease version line with `CHANGELOG.md` as the changelog. The job SHALL expose `releases_created` and `tag_name` as outputs for the downstream jobs.
 
-#### Scenario: Tests pass, release proceeds
-- **WHEN** all tests pass in the test job
-- **THEN** the release job runs goreleaser
+#### Scenario: Push without a merged release PR
+- **WHEN** a commit that is not a release PR merge lands on main
+- **THEN** release-please updates or opens the release PR and the goreleaser and publish-templates jobs are skipped
 
-#### Scenario: Tests fail, release is blocked
-- **WHEN** any test in the test job fails
-- **THEN** the release job does not run and no GitHub Release is created
+#### Scenario: Release PR merged
+- **WHEN** the release PR merges to main
+- **THEN** release-please creates the tag and the GitHub Release and reports `releases_created == 'true'` with the new `tag_name`
 
-### Requirement: Goreleaser builds raw binaries for five platforms
-The release job SHALL use goreleaser to produce raw binary executables (not tarballs) for: linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64.
+### Requirement: Binaries publish only when a release was created
+The `goreleaser` job SHALL `need` release-please, run only when `releases_created == 'true'`, check out `tag_name` with `fetch-depth: 0`, set up Go 1.26.0, and run `goreleaser release --clean` with `contents: write` and the repository `GITHUB_TOKEN`.
 
-#### Scenario: Binaries produced
-- **WHEN** goreleaser runs on a `v*` tag
-- **THEN** five binaries are attached to the GitHub Release: `opm-linux-amd64`, `opm-linux-arm64`, `opm-darwin-amd64`, `opm-darwin-arm64`, `opm-windows-amd64.exe`
+#### Scenario: Skipped on a non-release push
+- **WHEN** release-please reports no release created
+- **THEN** the goreleaser job does not run and no assets are attached
 
-### Requirement: Checksums file is published
-The release job SHALL produce a `checksums.txt` file containing SHA256 digests of all release binaries and attach it to the GitHub Release.
+#### Scenario: Runs on the release tag
+- **WHEN** release-please reports a release created
+- **THEN** goreleaser builds from the tagged commit with full git history available
 
-#### Scenario: Checksums attached
+### Requirement: Goreleaser produces per-platform archives, checksums and changelog
+Goreleaser SHALL build `opm` for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64 and windows/amd64 (windows/arm64 excluded), package each as an archive named `opm-<os>-<arch>` bundling `LICENSE`, and attach the archives, `checksums.txt` (SHA256 digests) and `LICENSE` to the GitHub Release. Its changelog SHALL group commits into Features, Bug Fixes, Performance, Refactoring and Other, excluding subjects starting with `docs:`, `test:`, `ci:` or `chore:`.
+
+#### Scenario: Five archives and checksums attached
 - **WHEN** goreleaser completes
-- **THEN** `checksums.txt` is present in the GitHub Release assets
+- **THEN** the GitHub Release assets include the five `opm-<os>-<arch>` archives, `checksums.txt` and `LICENSE`
 
-### Requirement: Changelog is auto-generated from conventional commits
-The release job SHALL generate a changelog from git history since the previous tag, grouping entries by conventional commit type (feat, fix, perf, refactor). Commits with types docs, test, ci, chore SHALL be excluded from the changelog.
-
-#### Scenario: Changelog in release notes
-- **WHEN** a GitHub Release is created
-- **THEN** the release notes contain grouped sections for Features, Bug Fixes, Performance, and Refactoring based on commit messages since the last tag
+#### Scenario: Changelog grouped by type
+- **WHEN** goreleaser generates its changelog
+- **THEN** entries are grouped by conventional commit type with the excluded types absent
 
 ### Requirement: Version ldflags are injected at build time
 The goreleaser build SHALL inject `Version`, `GitCommit`, and `BuildDate` via ldflags matching the variables in `internal/version/version.go`.
@@ -50,12 +46,16 @@ The goreleaser build SHALL inject `Version`, `GitCommit`, and `BuildDate` via ld
 - **WHEN** a released binary runs `opm version`
 - **THEN** the output shows the tag version, commit SHA, and build date
 
-### Requirement: Full git history is available during release
-The release job SHALL perform a full git checkout (`fetch-depth: 0`) to enable accurate changelog generation across all tags.
+### Requirement: Template modules publish on release
+The `publish-templates` job SHALL `need` release-please, run only when `releases_created == 'true'`, check out `tag_name`, build `opm` from it, install cue v0.17.1, log in to GHCR with the repository `GITHUB_TOKEN`, and run `.github/scripts/publish-templates.sh` with `packages: write`. The script SHALL publish only template versions GHCR does not hold yet, so a release with no template version bumped publishes nothing and succeeds.
 
-#### Scenario: Changelog spans multiple releases
-- **WHEN** goreleaser generates the changelog
-- **THEN** it compares against the previous tag correctly using full git history
+#### Scenario: No template version bumped
+- **WHEN** every template's declared version is already on GHCR
+- **THEN** nothing is published and the job succeeds
+
+#### Scenario: Template fails a gate
+- **WHEN** a template tree violates a publish gate
+- **THEN** the job fails and the release is marked with a failed job
 
 ### Requirement: Workflow targets GitHub-hosted runner
 The release workflow SHALL specify `runs-on: ubuntu-latest` for all jobs.
@@ -63,14 +63,3 @@ The release workflow SHALL specify `runs-on: ubuntu-latest` for all jobs.
 #### Scenario: GitHub-hosted runner assignment
 - **WHEN** the release workflow triggers
 - **THEN** all jobs are assigned to the `ubuntu-latest` runner pool
-
-### Requirement: Workflow is active immediately
-The release workflow SHALL use tags matching `v*` and `workflow_dispatch` as active triggers.
-
-#### Scenario: Manual trigger works
-- **WHEN** a user manually dispatches the release workflow
-- **THEN** tests run and goreleaser executes
-
-#### Scenario: Tag push triggers workflow automatically
-- **WHEN** a version tag is pushed
-- **THEN** the workflow runs automatically
