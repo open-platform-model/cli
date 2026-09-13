@@ -142,31 +142,6 @@ func TestModVet_ValuesDetailLogic(t *testing.T) {
 	}
 }
 
-func TestModVet_MultipleValuesAreMergedForValidation(t *testing.T) {
-	tests := []struct {
-		name           string
-		valuesFlags    []string
-		expectedDetail string
-	}{
-		{
-			name:           "single file",
-			valuesFlags:    []string{"prod-values.cue"},
-			expectedDetail: "prod-values.cue",
-		},
-		{
-			name:           "multiple files",
-			valuesFlags:    []string{"base.cue", "override.cue"},
-			expectedDetail: "base.cue, override.cue",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expectedDetail, vetValuesDetail(tt.valuesFlags))
-		})
-	}
-}
-
 // setupTestConfig creates a minimal test config in a temp directory.
 func setupTestConfig(t *testing.T) (tmpHome string, cleanup func()) {
 	tmpHome, err := os.MkdirTemp("", "mod-vet-config-*")
