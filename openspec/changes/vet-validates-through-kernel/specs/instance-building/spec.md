@@ -20,5 +20,5 @@ The `opm mod vet` command SHALL use the module's `debugValues` field as the valu
 
 - **WHEN** `opm mod vet` is run without `-f` flags
 - **AND** the module's `debugValues` field is `_` (open/unconstrained, not filled by the author)
-- **THEN** `opm mod vet` SHALL refuse with the standard "values do not satisfy #config" validation block, attributing the incomplete values to the module's `debugValues`
+- **THEN** `opm mod vet` SHALL refuse with the standard "values do not satisfy #config" validation block, naming the incomplete `#config` field at its schema position (an unconstrained `debugValues` carries no position of its own)
 - **AND** the exit code SHALL be 2
