@@ -2,7 +2,6 @@ package errors_test
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -73,25 +72,4 @@ func TestWrap(t *testing.T) {
 
 	assert.True(t, errors.Is(wrapped, oerrors.ErrValidation))
 	assert.Contains(t, wrapped.Error(), "schema check failed")
-}
-
-func TestConfigError_Error(t *testing.T) {
-	raw := fmt.Errorf("cannot use value 42 (type int) as string")
-	ce := &oerrors.ConfigError{
-		Context:  "module",
-		Name:     "my-app",
-		RawError: raw,
-	}
-
-	out := ce.Error()
-	assert.Contains(t, out, `module "my-app"`)
-	assert.Contains(t, out, "values do not satisfy #config")
-	assert.Contains(t, out, "cannot use value 42")
-}
-
-func TestConfigError_Unwrap(t *testing.T) {
-	raw := fmt.Errorf("type error")
-	ce := &oerrors.ConfigError{Context: "bundle", Name: "stack", RawError: raw}
-	assert.Equal(t, raw, ce.Unwrap())
-	assert.True(t, errors.Is(ce, raw))
 }

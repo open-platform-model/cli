@@ -7,9 +7,6 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/spf13/cobra"
 
-	"github.com/open-platform-model/library/opm/kernel"
-	"github.com/open-platform-model/library/opm/schema"
-
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/output"
@@ -46,10 +43,7 @@ func (f *PublishFlags) AddTo(cmd *cobra.Command) {
 func RunPublish(cmd *cobra.Command, cfg *config.GlobalConfig, kind publish.Kind, args []string, flags *PublishFlags) error {
 	dir := ResolveModulePath(args)
 
-	k := kernel.New(
-		kernel.WithRegistry(cfg.Registry),
-		kernel.WithSchemaLoader(schema.OCILoader{Registry: cfg.Registry}),
-	)
+	k := config.NewKernel(cfg.Registry)
 	schemaVal, err := k.SchemaCache().Get()
 	if err != nil {
 		// The schema fetch is a registry round-trip like the lookup and the

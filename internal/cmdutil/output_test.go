@@ -4,33 +4,72 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"testing"
 
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	liberrors "github.com/open-platform-model/library/opm/errors"
+	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/output"
 	pkgerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
-func TestPrintValidationError_ConfigError(t *testing.T) {
-	// Setup: capture log output.
-	var buf bytes.Buffer
+// captureOutput runs fn and returns the log stream and the details stream
+// (stderr) it wrote.
+func captureOutput(t *testing.T, fn func()) (logs, details string) {
+	t.Helper()
+	var logBuf bytes.Buffer
 	output.SetupLogging(output.LogConfig{})
-	output.SetLogWriter(&buf)
+	output.SetLogWriter(&logBuf)
 
-	// Create a ConfigError (with a nil RawError — simulates a gate error without CUE tree).
-	err := &pkgerrors.ConfigError{
-		Context: "module gate",
-		Name:    "test-module",
-	}
+	oldStderr := os.Stderr
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stderr = w
+	defer func() { os.Stderr = oldStderr }()
 
-	PrintValidationError("render failed", err)
+	fn()
+	require.NoError(t, w.Close())
+	raw, err := io.ReadAll(r)
+	require.NoError(t, err)
+	require.NoError(t, r.Close())
+	return logBuf.String(), string(raw)
+}
 
-	got := buf.String()
-	assert.Contains(t, got, "render failed", "should contain message")
+// TestPrintValidationError_KernelErrorGroupsPositions asserts the kernel's
+// values-validation error tree, framed by the caller, prints as one summary
+// line counting the distinct issues and a grouped block naming each source
+// position — never as one flattened log line per CUE error.
+func TestPrintValidationError_KernelErrorGroupsPositions(t *testing.T) {
+	k := kernel.New()
+	schema := cuecontext.New().CompileString(`close({
+		media?: [Name=string]: {
+			type: "pvc" | *"emptyDir"
+		}
+	})`, cue.Filename("module.cue"))
+	require.NoError(t, schema.Err())
+	src, err := k.LoadSourceFromBytes("values.cue", []byte("{\n\ttest: \"test\"\n\tmedia: test: \"test\"\n}\n"))
+	require.NoError(t, err)
+	_, cfgErr := k.ValidateConfigDetailed(schema, []kernel.Source{src})
+	require.Error(t, cfgErr)
+
+	logs, details := captureOutput(t, func() {
+		PrintValidationError("values do not satisfy #config", fmt.Errorf("module %q: values do not satisfy #config: %w", "demo", cfgErr))
+	})
+
+	assert.Contains(t, logs, "values do not satisfy #config: 2 issues")
+	assert.NotContains(t, logs, "values do not satisfy #config: - ", "the flattened one-line-per-error shape must not appear")
+	assert.Contains(t, details, "field not allowed")
+	assert.Contains(t, details, "values.test")
+	assert.Contains(t, details, "> values.cue:2:2", "the disallowed field is attributed to the source's origin")
+	assert.Contains(t, details, "conflicting values")
+	assert.Contains(t, details, "values.media.test")
 }
 
 func TestPrintValidationError_ValidationError(t *testing.T) {
@@ -64,23 +103,6 @@ func TestPrintValidationError_GenericError(t *testing.T) {
 	got := buf.String()
 	assert.Contains(t, got, "render failed", "should contain message")
 	assert.Contains(t, got, "something went wrong", "should contain error message")
-}
-
-func TestPrintValidationError_GroupedConfigError(t *testing.T) {
-	var buf bytes.Buffer
-	output.SetupLogging(output.LogConfig{})
-	output.SetLogWriter(&buf)
-
-	configErr := &pkgerrors.ConfigError{
-		Context:  "module gate",
-		Name:     "demo",
-		RawError: fmt.Errorf("field not allowed\nconflicting values"),
-	}
-
-	PrintValidationError("render failed", configErr)
-
-	got := buf.String()
-	assert.Contains(t, got, "render failed")
 }
 
 func TestFormatUnresolvedDemands(t *testing.T) {

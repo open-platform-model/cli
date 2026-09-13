@@ -1,30 +1,5 @@
 package errors
 
-import (
-	"fmt"
-)
-
-// TransformError indicates transformer execution failed.
-type TransformError struct {
-	ComponentName  string
-	TransformerFQN string
-	Cause          error
-}
-
-func (e *TransformError) Error() string {
-	return fmt.Sprintf("component %q, transformer %q: %v",
-		e.ComponentName, e.TransformerFQN, e.Cause)
-}
-
-func (e *TransformError) Unwrap() error {
-	return e.Cause
-}
-
-// Component returns the component name where the error occurred.
-func (e *TransformError) Component() string {
-	return e.ComponentName
-}
-
 // ValidationError indicates the instance failed validation.
 type ValidationError struct {
 	// Message describes what validation failed.
@@ -46,25 +21,6 @@ func (e *ValidationError) Error() string {
 
 func (e *ValidationError) Unwrap() error {
 	return e.Cause
-}
-
-// FieldError is a single validation error tied to a specific source location
-// in a values file.
-type FieldError struct {
-	// File is the values file name where the error occurred.
-	File string
-
-	// Line is the 1-based line number in File.
-	Line int
-
-	// Column is the 1-based column number in File.
-	Column int
-
-	// Path is the dot-joined field path from the values root (e.g. "values.db.port").
-	Path string
-
-	// Message is the human-readable error description.
-	Message string
 }
 
 // ErrorLocation is a source position paired with its CUE field path.

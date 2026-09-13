@@ -13,22 +13,17 @@ import (
 
 // PrintValidationError prints a render/validation error in a user-friendly format.
 //
-// For ConfigError (values schema failures), it prints a summary header with the
-// total grouped issue count, then a grouped block where each distinct error message
-// appears once followed by all source positions that report it. This naturally
-// surfaces conflicts (same message, multiple files) as a single entry.
+// For an error chain carrying CUE errors with at least one valid source
+// position — the kernel's values validation returns such a tree, wrapped or
+// not — it prints a summary header with the total grouped issue count, then
+// a grouped block where each distinct error message appears once followed by
+// all source positions that report it. This naturally surfaces conflicts
+// (same message, multiple files) as a single entry.
 //
-// For any error wrapping a CUE error (e.g. raw build errors), the same grouped
-// format is applied via GroupedErrorsFromError.
-//
-// For generic errors, it falls back to the standard key-value log format.
+// Typed kernel refusals (unresolved demands) and ValidationError values with
+// details keep their dedicated formats. For generic errors, it falls back to
+// the standard key-value log format.
 func PrintValidationError(msg string, err error) {
-	var configErr *pkgerrors.ConfigError
-	if errors.As(err, &configErr) {
-		printGrouped(msg, configErr.GroupedErrors())
-		return
-	}
-
 	var valErr *pkgerrors.ValidationError
 	if errors.As(err, &valErr) && valErr.Details != "" {
 		output.Error(fmt.Sprintf("%s: %s", msg, valErr.Message))
@@ -51,8 +46,8 @@ func PrintValidationError(msg string, err error) {
 		return
 	}
 
-	// Try to extract CUE errors from any wrapped error chain before falling back
-	// to the raw key-value format. Only use grouped display when at least one
+	// Extract CUE errors from any wrapped error chain before falling back to
+	// the raw key-value format. Only use grouped display when at least one
 	// location has a valid source position — plain errors promoted by CUE have
 	// no position and should not trigger this path.
 	if groups := pkgerrors.GroupedErrorsFromError(err); hasPositions(groups) {

@@ -18,8 +18,7 @@ import (
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/publish"
-	"github.com/open-platform-model/cli/pkg/loader"
-	"github.com/open-platform-model/cli/pkg/validate"
+	"github.com/open-platform-model/cli/internal/workflow/render"
 )
 
 // NewModuleVetCmd creates the module vet command.
@@ -68,9 +67,11 @@ func runVet(ctx context.Context, cfg *config.GlobalConfig, args []string, rf *cm
 
 // runVetModuleOnly validates a module directory without an instance.cue.
 // It loads the module CUE package with the resolved registry, runs the
-// identity/coordinate checks (D16/D18/D21), validates the schema, and checks
-// that the values (from -f flag or debugValues field) satisfy #config.
-// No instance wrapper, engine render, or cluster connection is required.
+// identity/coordinate checks (D16/D18/D21), then resolves the values (-f
+// files, else the debugValues field) as kernel sources exactly as `opm
+// module build` does and validates them against #config through the
+// kernel's layered validation, so vet and build agree on a verdict. No
+// instance wrapper, engine render, or cluster connection is required.
 func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath string, rf *cmdutil.RenderFlags) error {
 	if err := cmdutil.ValidateModuleInputPath(modulePath); err != nil {
 		return &opmexit.ExitError{
@@ -128,51 +129,66 @@ func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath 
 		moduleLog.Info(output.FormatVetCheck("Version matches path major", ver))
 	}
 
-	// Resolve the values to validate against #config.
-	valuesVals, valuesDetail, err := resolveVetValues(cueCtx, modVal, rf)
+	// Resolve the values to validate against #config: -f files as
+	// file-backed kernel sources, else debugValues as one source attributed
+	// to the module's debugValues.
+	sources, err := render.ResolveModuleValues(k, modVal, modulePath, rf.Values)
 	if err != nil {
+		// A -f file that cannot be read or parsed is an input error, not a
+		// verdict on the module; a module without debugValues is.
+		code := opmexit.ExitValidationError
+		if len(rf.Values) > 0 {
+			code = opmexit.ExitGeneralError
+		}
+		return &opmexit.ExitError{Code: code, Err: err}
+	}
+
+	if err := validateVetValues(k, modVal, modName, sources, len(rf.Values) > 0); err != nil {
 		return err
 	}
 
-	for _, valuesVal := range valuesVals {
-		if err := valuesVal.Validate(cue.Concrete(true)); err != nil {
-			cmdutil.PrintValidationError(valuesDetail+" not concrete", err)
-			return &opmexit.ExitError{
-				Code:    opmexit.ExitValidationError,
-				Err:     fmt.Errorf("%s values are not fully concrete", valuesDetail),
-				Printed: true,
-			}
-		}
-	}
-
-	configVal := modVal.LookupPath(cue.ParsePath("#config"))
-	if configVal.Exists() {
-		if _, cfgErr := validate.Config(configVal, valuesVals, "module", modName); cfgErr != nil {
-			cmdutil.PrintValidationError("values do not satisfy #config", cfgErr)
-			return &opmexit.ExitError{
-				Code:    opmexit.ExitValidationError,
-				Err:     cfgErr,
-				Printed: true,
-			}
-		}
-	}
-
-	moduleLog.Info(output.FormatVetCheck("Values satisfy #config", valuesDetail))
+	moduleLog.Info(output.FormatVetCheck("Values satisfy #config", vetValuesDetail(rf.Values)))
 	moduleLog.Info(output.FormatCheckmark("Module config valid"))
 
 	return nil
 }
 
+// validateVetValues checks the resolved sources against the module's
+// #config through the kernel. Values files need a #config to be checked
+// against; build refuses the same input, so vet does too rather than
+// reporting a vacuous pass. The kernel unifies the sources in stack order,
+// walks disallowed fields, and asserts concreteness on the merged value, so
+// a stack whose base leaves a field open for an override to fill passes
+// here as it does in build; an incomplete merge is a #config violation at
+// its position, printed as the grouped block and returned framed with the
+// module name.
+func validateVetValues(k *kernel.Kernel, modVal cue.Value, modName string, sources []kernel.Source, hasValuesFiles bool) error {
+	configSchema := modVal.LookupPath(schema.Config)
+	if hasValuesFiles && !configSchema.Exists() {
+		return &opmexit.ExitError{
+			Code: opmexit.ExitValidationError,
+			Err:  fmt.Errorf("module does not define #config; values files cannot be validated"),
+		}
+	}
+	if _, cfgErr := k.ValidateConfigDetailed(configSchema, sources); cfgErr != nil {
+		err := fmt.Errorf("module %q: values do not satisfy #config: %w", modName, cfgErr)
+		cmdutil.PrintValidationError("values do not satisfy #config", err)
+		return &opmexit.ExitError{
+			Code:    opmexit.ExitValidationError,
+			Err:     err,
+			Printed: true,
+		}
+	}
+	return nil
+}
+
 // identitySchemaForVet builds the per-invocation kernel — the kernel-load
 // gate acquires through it, and its schema cache carries the resolved
-// registry (vet's loads no longer read only the ambient process environment)
-// — and resolves core's #IdentityPackage from that cache. The CUE context
-// every load shares is the schema value's own (identitySchema.Context()).
+// registry — and resolves core's #IdentityPackage from that cache. The CUE
+// context every load shares is the schema value's own
+// (identitySchema.Context()).
 func identitySchemaForVet(cfg *config.GlobalConfig) (*kernel.Kernel, cue.Value, error) {
-	k := kernel.New(
-		kernel.WithRegistry(cfg.Registry),
-		kernel.WithSchemaLoader(schema.OCILoader{Registry: cfg.Registry}),
-	)
+	k := config.NewKernel(cfg.Registry)
 	schemaVal, err := k.SchemaCache().Get()
 	if err != nil {
 		// A registry round-trip, same failure class as publish's lookup and
@@ -192,34 +208,17 @@ func identitySchemaForVet(cfg *config.GlobalConfig) (*kernel.Kernel, cue.Value, 
 	return k, identitySchema, nil
 }
 
-// resolveVetValues resolves the values to validate against #config: explicit
-// -f files, or the module's debugValues.
-func resolveVetValues(cueCtx *cue.Context, modVal cue.Value, rf *cmdutil.RenderFlags) ([]cue.Value, string, error) {
-	if len(rf.Values) > 0 {
-		valuesVals := make([]cue.Value, 0, len(rf.Values))
-		basenames := make([]string, 0, len(rf.Values))
-		for _, valuesFile := range rf.Values {
-			valuesVal, loadErr := loader.LoadValuesFile(cueCtx, valuesFile)
-			if loadErr != nil {
-				return nil, "", &opmexit.ExitError{
-					Code: opmexit.ExitGeneralError,
-					Err:  fmt.Errorf("loading values file %q: %w", valuesFile, loadErr),
-				}
-			}
-			valuesVals = append(valuesVals, valuesVal)
-			basenames = append(basenames, filepath.Base(valuesFile))
-		}
-		return valuesVals, strings.Join(basenames, ", "), nil
+// vetValuesDetail names the values source for the "Values satisfy #config"
+// line: the -f basenames joined by ", ", else debugValues.
+func vetValuesDetail(valuesFiles []string) string {
+	if len(valuesFiles) == 0 {
+		return "debugValues"
 	}
-
-	debugVal := modVal.LookupPath(cue.ParsePath("debugValues"))
-	if !debugVal.Exists() {
-		return nil, "", &opmexit.ExitError{
-			Code: opmexit.ExitValidationError,
-			Err:  fmt.Errorf("module does not define debugValues - add debugValues or provide values with -f"),
-		}
+	basenames := make([]string, 0, len(valuesFiles))
+	for _, valuesFile := range valuesFiles {
+		basenames = append(basenames, filepath.Base(valuesFile))
 	}
-	return []cue.Value{debugVal}, "debugValues", nil
+	return strings.Join(basenames, ", ")
 }
 
 // versionState returns the concrete identity Version for the vet-check line,

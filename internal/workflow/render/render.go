@@ -46,7 +46,7 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 
 	output.Debug("rendering from instance file", "file", opts.InstanceFilePath, "namespace", opts.K8sConfig.Namespace.Value)
 
-	k := NewKernel(opts.Config)
+	k := config.NewKernel(opts.Config.Registry)
 
 	// Acquire the instance package (the directory containing the instance
 	// file) with the -f files layered as values sources: the schema's own

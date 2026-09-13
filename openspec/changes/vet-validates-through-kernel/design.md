@@ -60,6 +60,6 @@ debugValues ──► render.DebugValuesSource ─┘                           
 
 ## Risks / Trade-offs
 
-- [`debugValues` violations are attributed to `<module>/debugValues:line:col` of the rendered text, not to the module file's own line] → this is what `opm module build` already reports for the same input; the origin names the module directory so the author knows where to look. Carrying the field's original position is a library-side improvement, out of scope here.
+- [`debugValues` violations are attributed to `<module>/debugValues:line:col` of the rendered text, not to the module file's own line; an incomplete field is reported at the `#config` schema position instead, since an open value carries no position of its own] → this is what `opm module build` already reports for the same input; the origin names the module directory so the author knows where to look. Carrying the field's original position is a library-side improvement, out of scope here.
 - [The kernel's validator collects per-source schema errors and merge conflicts differently from the copy] → the copy was byte-identical to the kernel's validator at the time it was taken; the vet e2e cases behind the `validation-output` spec (grouped output, both error classes in one run) are the check, and task 2.1 runs them.
 - [Go importers of `pkg/validate` or `pkg/errors.ConfigError` break] → both were CLI-internal in practice; the proposal marks the removal as breaking for `pkg/` importers.
