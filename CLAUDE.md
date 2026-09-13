@@ -95,7 +95,7 @@ Read when entering `cli/`:
 - `internal/output/` - terminal formatting, log output, tables, manifests.
 - `internal/platform/` - platform-source resolution by precedence (`--platform` dir > cluster Platform CR > `~/.opm/platform/`), cluster-CR module generation into the OPM home cache, the write-if-absent Platform seed, catalog version resolution for `operator install`.
 - `internal/workflow/` - shared render/apply/query orchestration; `render` holds the kernel env and the single `Kernel.Render` call.
-- `pkg/loader/` - instance-file values loading and local-replacement provenance.
+- `pkg/loader/` - instance-file loading and local-replacement provenance.
 - `pkg/errors/` - shared structured errors; alias as `oerrors`.
 - `tests/integration/` - integration programs via `go run`.
 - `tests/e2e/` - end-to-end Go tests.
