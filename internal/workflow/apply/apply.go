@@ -270,7 +270,7 @@ func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory
 	namespace := result.Instance.Namespace
 	instanceID := result.Instance.UUID
 
-	modulePath, moduleVersion := result.Module.CanonicalModuleRef()
+	modulePath, moduleVersion := workflowrender.CanonicalModuleRef(result.Module)
 
 	if _, err := inventory.ApplySpec(ctx, req.K8sClient, inventory.SpecInput{
 		Name:          name,

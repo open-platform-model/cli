@@ -11,7 +11,7 @@ import (
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/version"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
-	pkgmodule "github.com/open-platform-model/cli/pkg/module"
+	"github.com/open-platform-model/library/opm/module"
 )
 
 // withReleasedCLIVersion overrides the ldflags-set CLI version for the duration
@@ -80,7 +80,7 @@ func TestExecute_DryRunSkipsClusterGates(t *testing.T) {
 		return Request{
 			Result: &workflowrender.Result{
 				Resources: nil,
-				Instance:  pkgmodule.InstanceMetadata{Name: "demo", Namespace: "default", UUID: ""},
+				Instance:  module.InstanceMetadata{Name: "demo", Namespace: "default", UUID: ""},
 			},
 			K8sClient: client,
 			Log:       output.InstanceLogger("gate-test"),

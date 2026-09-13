@@ -7,6 +7,7 @@ import (
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
+	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
 )
 
 // executeThinEditor is the apply path for an operator-owned instance
@@ -109,7 +110,7 @@ func resolveThinEditRef(req Request, name, namespace string) (path, version stri
 			name, namespace)}
 	}
 
-	modulePath, moduleVersion := req.Result.Module.CanonicalModuleRef()
+	modulePath, moduleVersion := workflowrender.CanonicalModuleRef(req.Result.Module)
 	if modulePath == "" || moduleVersion == "" {
 		return "", "", &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: fmt.Errorf(
 			"instance %q has no complete module reference to write (path %q, version %q)",

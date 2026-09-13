@@ -2,6 +2,7 @@ package apply
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -19,13 +20,14 @@ import (
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
-	pkgmodule "github.com/open-platform-model/cli/pkg/module"
+	"github.com/open-platform-model/library/opm/module"
 )
 
 // clientWithFailingStatusWrite returns a client whose ModuleInstance spec apply
 // succeeds but whose status-subresource apply fails, plus a clientset seeded
 // with the given legacy Secret. It backs the delete-after-status ordering test.
-func clientWithFailingStatusWrite(secret *corev1.Secret) *kubernetes.Client {
+// onSpecPatch, when non-nil, receives the spec apply's patch payload.
+func clientWithFailingStatusWrite(secret *corev1.Secret, onSpecPatch func([]byte)) *kubernetes.Client {
 	scheme := runtime.NewScheme()
 	fake := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme,
 		map[schema.GroupVersionResource]string{inventory.ModuleInstanceGVR: "ModuleInstanceList"})
@@ -37,6 +39,9 @@ func clientWithFailingStatusWrite(secret *corev1.Secret) *kubernetes.Client {
 		}
 		if patch.GetSubresource() == "status" {
 			return true, nil, errors.New("simulated status-subresource write failure")
+		}
+		if onSpecPatch != nil {
+			onSpecPatch(patch.GetPatch())
 		}
 		// The spec apply succeeds and hands back a generation.
 		return true, &unstructured.Unstructured{Object: map[string]any{
@@ -73,12 +78,13 @@ func TestWriteInstanceRecord_StatusFailureRetainsLegacySecret(t *testing.T) {
 		Data:       map[string][]byte{"inventory": []byte(`{"inventory":{"revision":4,"entries":[]}}`)},
 	}
 
-	client := clientWithFailingStatusWrite(secret)
+	var specPatch []byte
+	client := clientWithFailingStatusWrite(secret, func(p []byte) { specPatch = p })
 
 	req := Request{
 		Result: &workflowrender.Result{
-			Instance: pkgmodule.InstanceMetadata{Name: name, Namespace: namespace, UUID: instID},
-			Module:   pkgmodule.ModuleMetadata{ModulePath: "opmodel.dev/modules/" + name + "@v0", Name: name, Version: "0.1.0"},
+			Instance: module.InstanceMetadata{Name: name, Namespace: namespace, UUID: instID},
+			Module:   module.ModuleMetadata{ModulePath: "opmodel.dev/modules/" + name + "@v0", Name: name, Version: "0.1.0"},
 		},
 		K8sClient: client,
 		Log:       output.InstanceLogger("migrate-fail-test"),
@@ -92,6 +98,22 @@ func TestWriteInstanceRecord_StatusFailureRetainsLegacySecret(t *testing.T) {
 
 	err := WriteInstanceRecord(ctx, req, nil, legacy, currentEntries, "sha256:deadbeef", req.Log)
 	require.Error(t, err, "a failed status write must fail the record write")
+
+	// The spec write that preceded the failure carried the canonical module
+	// reference: the registry path verbatim and the v-prefixed version the
+	// operator resolves without normalising.
+	require.NotNil(t, specPatch, "the spec apply must have been issued")
+	var applied struct {
+		Spec struct {
+			Module struct {
+				Path    string `json:"path"`
+				Version string `json:"version"`
+			} `json:"module"`
+		} `json:"spec"`
+	}
+	require.NoError(t, json.Unmarshal(specPatch, &applied))
+	require.Equal(t, "opmodel.dev/modules/podinfo@v0", applied.Spec.Module.Path)
+	require.Equal(t, "v0.1.0", applied.Spec.Module.Version)
 
 	// The Secret must still exist — the delete comes only after the status write.
 	_, getErr := client.Clientset.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
