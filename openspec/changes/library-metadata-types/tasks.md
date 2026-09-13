@@ -10,3 +10,4 @@
 ## 3. Gates
 
 - [x] 3.1 Run `task fmt`, `task lint`, `task test`; verify all green.
+- [x] 3.2 Commit as `refactor(render): carry the library's metadata types and delete pkg/module`.

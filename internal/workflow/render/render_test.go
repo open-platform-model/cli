@@ -21,17 +21,13 @@ import (
 	"github.com/open-platform-model/cli/internal/platform"
 )
 
-func mustInstanceMetadata(name, namespace string) module.InstanceMetadata {
-	return module.InstanceMetadata{Name: name, Namespace: namespace}
-}
-
 func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
-	result := &Result{Instance: mustInstanceMetadata("demo", "default")}
+	result := &Result{Instance: module.InstanceMetadata{Name: "demo", Namespace: "default"}}
 	assert.NotPanics(t, func() { ShowOutput(result, ShowOutputOpts{}) })
 }
 
 func TestShowRenderOutput_Warnings(t *testing.T) {
-	result := &Result{Instance: mustInstanceMetadata("demo", "default"), Warnings: []string{"w1"}}
+	result := &Result{Instance: module.InstanceMetadata{Name: "demo", Namespace: "default"}, Warnings: []string{"w1"}}
 	assert.NotPanics(t, func() { ShowOutput(result, ShowOutputOpts{Verbose: true}) })
 }
 

@@ -8,6 +8,7 @@
 - The embedded module's metadata is still decoded from the instance package (the library keeps that decoder private and exposes no accessor on the instance), now into the library type.
 - `CanonicalModuleRef` becomes a function in `internal/workflow/render`, `CanonicalModuleRef(m module.ModuleMetadata) (path, version string)`, keeping the `v`-prefix rule and its doc: the pair is written verbatim to `ModuleInstance.spec.module`, which the operator reads without normalising. Its two callers in `internal/workflow/apply` are updated.
 - **BREAKING (Go importers of `pkg/`):** `pkg/module` is deleted.
+- The `core-module` spec loses its only requirement, so `openspec/specs/core-module/spec.md` is deleted at archive rather than left with a purpose and no requirements.
 
 **Not in this change:** a library accessor for the embedded module's metadata (a one-line library follow-up that would delete the CLI-side decode); any JSON output of `Result` (there is none).
 
