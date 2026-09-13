@@ -52,7 +52,7 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	// file) with the -f files layered as values sources: the schema's own
 	// values unification performs the merge inside the build, nothing is
 	// filled from Go, and a conflict names the file it came from.
-	instanceDir, err := resolveInstanceDir(opts.InstanceFilePath)
+	instanceDir, err := cmdutil.InstanceDir(opts.InstanceFilePath)
 	if err != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}

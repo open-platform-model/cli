@@ -71,3 +71,22 @@ func hasFile(dir, name string) bool {
 	_, err := os.Stat(filepath.Join(dir, name))
 	return err == nil
 }
+
+// InstanceDir returns the CUE package directory for an instance path: the
+// path itself when it is a directory, else its parent. A path that does not
+// exist resolves to its parent, so the kernel's acquire is what reports a
+// missing package. Shared by the render path and the instance argument
+// resolution of the cluster-query commands.
+func InstanceDir(path string) (string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return filepath.Dir(path), nil
+		}
+		return "", fmt.Errorf("stat instance path: %w", err)
+	}
+	if info.IsDir() {
+		return path, nil
+	}
+	return filepath.Dir(path), nil
+}

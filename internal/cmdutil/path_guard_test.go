@@ -39,3 +39,27 @@ func TestResolveInstanceArg_RejectsModulePackagePath(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "module package, not an instance")
 }
+
+func TestInstanceDir(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "instance.cue")
+	require.NoError(t, os.WriteFile(file, []byte("package test\n"), 0o600))
+
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{name: "directory resolves to itself", path: dir, want: dir},
+		{name: "file resolves to its parent", path: file, want: dir},
+		{name: "missing path resolves to its parent", path: filepath.Join(dir, "missing.cue"), want: dir},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := InstanceDir(tt.path)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

@@ -1,6 +1,6 @@
 ## 1. Shared directory resolution (internal/cmdutil, internal/workflow/render)
 
-- [ ] 1.1 Add `cmdutil.InstanceDir(path string) (string, error)` (the path when it is a directory, else its parent; a missing path resolves to its parent as `render.resolveInstanceDir` does today) with a unit test for file, directory and missing inputs; replace `resolveInstanceDir` in `internal/workflow/render/values.go` with it; verify `go test ./internal/cmdutil/... ./internal/workflow/render/...` pass.
+- [x] 1.1 Add `cmdutil.InstanceDir(path string) (string, error)` (the path when it is a directory, else its parent; a missing path resolves to its parent as `render.resolveInstanceDir` does today) with a unit test for file, directory and missing inputs; replace `resolveInstanceDir` in `internal/workflow/render/values.go` with it; verify `go test ./internal/cmdutil/... ./internal/workflow/render/...` pass.
 
 ## 2. Instance argument through the kernel (internal/cmdutil, internal/cmd/instance)
 
