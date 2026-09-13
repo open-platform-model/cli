@@ -171,15 +171,15 @@ Multiple flag group structs SHALL be usable on the same cobra command without fl
 - **THEN** the command SHALL have all 6 flags registered (values, namespace, release-name, provider, kubeconfig, context)
 - **AND** each flag SHALL be independently settable without conflict
 
-### Requirement: PrintValidationError formats render validation errors consistently
+### Requirement: PrintValidationError groups CUE positions on any error
 
-The `PrintValidationError` function SHALL accept a message string and an error. When the error is a `*errors.ConfigError` with field errors, it SHALL print a summary line followed by the CUE error details. For other errors, it SHALL use the standard key-value log format.
+The `PrintValidationError` function SHALL accept a message string and an error. When the error chain carries CUE errors with at least one valid source position, it SHALL print a summary line counting the distinct issues followed by the grouped CUE details (each distinct message once, with every source position that reports it). Typed kernel refusals (unresolved demands) and `ValidationError` values with details keep their dedicated formats. For other errors, it SHALL use the standard key-value log format.
 
-#### Scenario: ConfigError with CUE details
+#### Scenario: Kernel validation error with CUE positions
 
-- **WHEN** `PrintValidationError` is called with a `*errors.ConfigError` that has field errors
-- **THEN** the output SHALL include the summary message
-- **AND** the output SHALL include the CUE details as plain text on stderr
+- **WHEN** `PrintValidationError` is called with the error returned by the kernel's values validation for a values file that violates `#config`
+- **THEN** the output SHALL include the summary message with the issue count
+- **AND** the output SHALL include the grouped CUE details, each with the values file position, as plain text on stderr
 
 #### Scenario: Generic error without CUE details
 

@@ -139,4 +139,14 @@ The `opm mod vet` command SHALL use the module's `debugValues` field as the valu
 
 - **WHEN** `opm mod vet` is run without `-f` flags
 - **AND** the module's `debugValues` field is `_` (open/unconstrained, not filled by the author)
-- **THEN** `opm mod vet` returns an error: "debugValues is not concrete — module must provide complete test values"
+- **AND** `#config` has a field without a default
+- **THEN** `opm mod vet` SHALL refuse with the standard "values do not satisfy #config" validation block, naming the incomplete `#config` field at its schema position (an unconstrained `debugValues` carries no position of its own)
+- **AND** the exit code SHALL be 2
+
+#### Scenario: `debugValues` is `_` and every `#config` field has a default
+
+- **WHEN** `opm mod vet` is run without `-f` flags
+- **AND** the module's `debugValues` field is `_`
+- **AND** every `#config` field carries a default
+- **THEN** the kernel merges the open value with `#config` to a concrete result and `opm mod vet` SHALL report "Values satisfy #config" with `debugValues` as the source, the verdict `opm mod build` reaches for the same module
+- **AND** the exit code SHALL be 0
