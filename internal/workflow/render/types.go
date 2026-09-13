@@ -4,17 +4,23 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/library/opm/kernel"
+	"github.com/open-platform-model/library/opm/module"
 
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/platform"
-	pkgmodule "github.com/open-platform-model/cli/pkg/module"
 )
 
 // Result is the output of the shared render workflow.
 type Result struct {
 	Resources []*unstructured.Unstructured
-	Instance  pkgmodule.InstanceMetadata // Was: Release (enhancement 0002 D8/D9)
-	Module    pkgmodule.ModuleMetadata
+	// Instance is the acquired instance's metadata as the kernel decoded it,
+	// the library's type; only Namespace may differ, when the --namespace
+	// flag or env override applied. Was: Release (enhancement 0002 D8/D9).
+	Instance module.InstanceMetadata
+	// Module is the embedded module's metadata, the library's type, decoded
+	// from the instance package (the canonical spec.module reference is
+	// derived from it by CanonicalModuleRef).
+	Module module.ModuleMetadata
 
 	// Pairs are the matched (component, transformer) pairs the render
 	// evaluated, in build order — the kernel's diagnostics, shown by the

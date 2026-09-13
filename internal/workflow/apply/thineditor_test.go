@@ -10,7 +10,7 @@ import (
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
-	pkgmodule "github.com/open-platform-model/cli/pkg/module"
+	"github.com/open-platform-model/library/opm/module"
 )
 
 func operatorOwnedRequest(result *workflowrender.Result) Request {
@@ -21,8 +21,8 @@ func operatorOwnedRequest(result *workflowrender.Result) Request {
 // write, so the failure costs nothing and leaves the CR untouched.
 func TestThinEditor_RefusesLocalSourceModule(t *testing.T) {
 	result := &workflowrender.Result{
-		Instance:    pkgmodule.InstanceMetadata{Name: "podinfo", Namespace: "demo"},
-		Module:      pkgmodule.ModuleMetadata{Name: "podinfo"},
+		Instance:    module.InstanceMetadata{Name: "podinfo", Namespace: "demo"},
+		Module:      module.ModuleMetadata{Name: "podinfo"},
 		SourceLocal: true,
 	}
 
@@ -36,8 +36,8 @@ func TestThinEditor_RefusesLocalSourceModule(t *testing.T) {
 
 func TestThinEditor_RefusesIncompleteModuleReference(t *testing.T) {
 	result := &workflowrender.Result{
-		Instance: pkgmodule.InstanceMetadata{Name: "podinfo", Namespace: "demo"},
-		Module:   pkgmodule.ModuleMetadata{},
+		Instance: module.InstanceMetadata{Name: "podinfo", Namespace: "demo"},
+		Module:   module.ModuleMetadata{},
 	}
 
 	err := executeThinEditor(context.Background(), operatorOwnedRequest(result),
@@ -51,8 +51,8 @@ func TestThinEditor_RefusesIncompleteModuleReference(t *testing.T) {
 // the CLI-executor render-and-apply it will never perform.
 func TestPreviewThinEditor_DescribesTheSpecEditOnly(t *testing.T) {
 	result := &workflowrender.Result{
-		Instance: pkgmodule.InstanceMetadata{Name: "podinfo", Namespace: "demo"},
-		Module: pkgmodule.ModuleMetadata{
+		Instance: module.InstanceMetadata{Name: "podinfo", Namespace: "demo"},
+		Module: module.ModuleMetadata{
 			ModulePath: "testing.opmodel.dev/modules/cli/podinfo@v0", Name: "podinfo", Version: "0.1.4",
 		},
 	}
@@ -67,8 +67,8 @@ func TestPreviewThinEditor_DescribesTheSpecEditOnly(t *testing.T) {
 // rejected at dry-run rather than deferred to the apply that follows it.
 func TestPreviewThinEditor_RefusesLocalSourceModule(t *testing.T) {
 	result := &workflowrender.Result{
-		Instance:    pkgmodule.InstanceMetadata{Name: "podinfo", Namespace: "demo"},
-		Module:      pkgmodule.ModuleMetadata{Name: "podinfo"},
+		Instance:    module.InstanceMetadata{Name: "podinfo", Namespace: "demo"},
+		Module:      module.ModuleMetadata{Name: "podinfo"},
 		SourceLocal: true,
 	}
 

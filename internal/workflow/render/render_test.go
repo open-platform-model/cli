@@ -15,11 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/open-platform-model/library/opm/kernel"
-	libmodule "github.com/open-platform-model/library/opm/module"
+	"github.com/open-platform-model/library/opm/module"
 
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/platform"
-	"github.com/open-platform-model/cli/pkg/module"
 )
 
 func mustInstanceMetadata(name, namespace string) module.InstanceMetadata {
@@ -207,7 +206,7 @@ func writeD19File(t *testing.T, path, content string) {
 // are worded from.
 func TestNewRenderInput_EnablesLocalReplacements(t *testing.T) {
 	env := &renderEnv{skew: kernel.SkewRefuse}
-	inst := &libmodule.Instance{}
+	inst := &module.Instance{}
 
 	in := newRenderInput(env, inst)
 

@@ -21,7 +21,6 @@ import (
 	"github.com/open-platform-model/cli/internal/output"
 	pkgcore "github.com/open-platform-model/cli/pkg/core"
 	"github.com/open-platform-model/cli/pkg/loader"
-	pkgmodule "github.com/open-platform-model/cli/pkg/module"
 )
 
 // FromInstanceFile prepares and renders an instance from a declarative
@@ -165,15 +164,10 @@ func renderInstance(
 		result.Resources = append(result.Resources, u)
 	}
 
-	// Instance metadata from the kernel's decode; namespace flag/env override
-	// applies to the apply target, mirroring the legacy pipeline.
+	// Instance metadata is the kernel's decode, taken whole; the namespace
+	// flag/env override applies to the apply target after it.
 	if inst.Metadata != nil {
-		result.Instance = pkgmodule.InstanceMetadata{
-			Name:      inst.Metadata.Name,
-			Namespace: inst.Metadata.Namespace,
-			UUID:      inst.Metadata.UUID,
-			Labels:    inst.Metadata.Labels,
-		}
+		result.Instance = *inst.Metadata
 	}
 	if k8sCfg != nil {
 		if s := k8sCfg.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
@@ -240,10 +234,12 @@ func formatAdvisories(d kernel.RenderDiagnostics) []string {
 	return warnings
 }
 
-// decodeModuleMetadata decodes the CLI's module metadata from a module CUE
-// value.
-func decodeModuleMetadata(moduleVal cue.Value) pkgmodule.ModuleMetadata {
-	meta := pkgmodule.ModuleMetadata{}
+// decodeModuleMetadata decodes the embedded module's metadata from the
+// instance package's module value into the library's type. The library keeps
+// its own decoder private and the instance exposes no accessor for this
+// subtree, so the CLI reads it here.
+func decodeModuleMetadata(moduleVal cue.Value) module.ModuleMetadata {
+	meta := module.ModuleMetadata{}
 	if !moduleVal.Exists() {
 		return meta
 	}
