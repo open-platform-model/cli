@@ -92,7 +92,7 @@ The `opm instance build` subcommand SHALL stat its positional argument and choos
 #### Scenario: Argument is an instance file
 
 - **WHEN** the user runs `opm instance build ./jellyfin_instance.cue` and the path resolves to a regular file
-- **THEN** the subcommand SHALL load the file via the existing instance-file loader and render it (existing behaviour)
+- **THEN** the subcommand SHALL acquire the file's package through the library kernel (`AcquireInstanceFromDir` on the file's directory, with any `-f`/`--values` files layered as values sources) and render it
 
 #### Scenario: Argument is a module directory
 
