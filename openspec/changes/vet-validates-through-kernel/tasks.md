@@ -14,3 +14,9 @@
 ## 4. Gates
 
 - [x] 4.1 Run `task fmt`, `task lint`, `task test`; verify all green (e2e: the two operator-owned tests fail on the local kind cluster, whose released alpha.14 operator cannot reconcile a core v2 platform; a documented operator release gap that reproduces on main, not a CLI regression).
+
+## 5. Verify follow-ups
+
+- [x] 5.1 Add the spec deltas the verify pass found missing: retire `validation-gates` (REMOVED), rewrite `module-synthetic-instance` values selection over the shared resolver, list the surviving types in the `errors-domain` package-location requirement, and in `mod-vet` drop the `debugValues: _` parenthetical from "No debugValues and no -f flag" and add the no-`#config` scenario; verify `openspec validate` is green.
+- [x] 5.2 vet refuses values files against a module that declares no `#config`, the verdict build reaches (`validateVetValues` in `internal/cmd/module/vet.go`); verify with the e2e case `TestE2E_ModuleVet_ValuesFilesWithoutConfig` over the `no-config` testdata module.
+- [x] 5.3 Drop the unused `TransformError` and `FieldError` types from `pkg/errors`, delete the duplicate `TestModVet_MultipleValuesAreMergedForValidation`, describe `pkg/loader` without the deleted values loader in CLAUDE.md, and trim the `ConfigError.FieldErrors()` note from the build spec; verify `task lint` and the module, errors, cmdutil and render unit suites are green.

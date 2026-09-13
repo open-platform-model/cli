@@ -504,4 +504,4 @@ opm mod build ./my-module -o json
 ### Requirement: Values validation against #config in builder
 **Reason**: Values validation moves into the gate system in `pkg/loader/validate.go`. The Module Gate validates consumer values against `#module.#config` during loading.
 
-**Migration**: The loader's Module Gate replaces `builder.ValidateValues()`. Structured `FieldError` output is preserved via `ConfigError.FieldErrors()`.
+**Migration**: The loader's Module Gate replaces `builder.ValidateValues()`.
