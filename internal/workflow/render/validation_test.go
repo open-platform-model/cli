@@ -17,7 +17,6 @@ import (
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/output"
-	"github.com/open-platform-model/cli/pkg/validate"
 )
 
 // captureValidationOutput runs printValidationError and returns the log
@@ -119,47 +118,37 @@ func TestFormatRenderDiagnostics_EmptyIsEmpty(t *testing.T) {
 		"matched pairs are not refusals and are not repeated")
 }
 
+// The kernel's values-validation error tree (a -f file violating #config)
+// prints through the grouped branch: one summary line and every position
+// attributed to the source's origin.
 func TestPrintValidationError_UsesGroupedFormatting(t *testing.T) {
-	ctx := cuecontext.New()
-	schema := ctx.CompileString(`close({
+	k := kernel.New()
+	schema := cuecontext.New().CompileString(`close({
 		media?: [Name=string]: {
 			mountPath: string
 			type:      "pvc" | *"emptyDir"
 			size:      string
 		}
 	})`, cue.Filename("module.cue"))
-	values := ctx.CompileString(`{
+	require.NoError(t, schema.Err())
+	src, err := k.LoadSourceFromBytes("values.cue", []byte(`{
 		test: "test"
 		media: {
 			test: "test"
 		}
-	}`, cue.Filename("values.cue"))
-
-	_, cfgErr := validate.Config(schema, []cue.Value{values}, "module", "demo")
-	require.NotNil(t, cfgErr)
-
-	var logBuf bytes.Buffer
-	output.SetupLogging(output.LogConfig{})
-	output.SetLogWriter(&logBuf)
-
-	oldStderr := os.Stderr
-	r, w, err := os.Pipe()
+	}`))
 	require.NoError(t, err)
-	os.Stderr = w
-	defer func() { os.Stderr = oldStderr }()
 
-	printValidationError(cfgErr)
-	require.NoError(t, w.Close())
+	_, cfgErr := k.ValidateConfigDetailed(schema, []kernel.Source{src})
+	require.Error(t, cfgErr)
 
-	details, err := io.ReadAll(r)
-	require.NoError(t, err)
-	require.NoError(t, r.Close())
+	logs, details := captureValidationOutput(t, cfgErr)
 
-	assert.Contains(t, logBuf.String(), "render failed: 2 issues")
-	assert.Contains(t, string(details), "field not allowed")
-	assert.Contains(t, string(details), "values.test")
-	assert.Contains(t, string(details), "> values.cue:2:3")
-	assert.Contains(t, string(details), "> values.cue:4:10")
-	assert.Contains(t, string(details), "conflicting values \"test\"")
-	assert.NotContains(t, logBuf.String(), "values do not satisfy #config")
+	assert.Contains(t, logs, "render failed: 2 issues")
+	assert.Contains(t, details, "field not allowed")
+	assert.Contains(t, details, "values.test")
+	assert.Contains(t, details, "> values.cue:2:3")
+	assert.Contains(t, details, "> values.cue:4:10")
+	assert.Contains(t, details, "conflicting values \"test\"")
+	assert.NotContains(t, logs, "values do not satisfy #config")
 }

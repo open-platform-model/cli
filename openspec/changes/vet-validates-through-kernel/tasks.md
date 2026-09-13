@@ -9,7 +9,7 @@
 
 ## 3. Delete the copies
 
-- [ ] 3.1 Delete `pkg/validate/` (package, tests, `testdata/`); delete `LoadValuesFile` and its test cases from `pkg/loader/instance_file.go` and `instance_file_test.go`; delete the `ConfigError` type, its methods and the `errors.As(*ConfigError)` branch in `internal/cmdutil/output.go`, keeping `GroupedError`, `GroupedErrorsFromError`, `groupCUEErrors` and `normalizeCUEPath`; update `pkg/errors/errors_test.go` and `internal/cmdutil` tests accordingly; verify `go build ./...` is green and `grep -rn 'pkg/validate"\|ConfigError\|LoadValuesFile' --include='*.go' .` is empty.
+- [x] 3.1 Delete `pkg/validate/` (package, tests, `testdata/`); delete `LoadValuesFile` and its test cases from `pkg/loader/instance_file.go` and `instance_file_test.go`; delete the `ConfigError` type, its methods and the `errors.As(*ConfigError)` branch in `internal/cmdutil/output.go`, keeping `GroupedError`, `GroupedErrorsFromError`, `groupCUEErrors` and `normalizeCUEPath`; update `pkg/errors/errors_test.go` and `internal/cmdutil` tests accordingly; verify `go build ./...` is green and `grep -rn 'pkg/validate"\|ConfigError\|LoadValuesFile' --include='*.go' .` is empty.
 
 ## 4. Gates
 

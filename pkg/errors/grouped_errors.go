@@ -8,60 +8,12 @@ import (
 	cueerrors "cuelang.org/go/cue/errors"
 )
 
-// ConfigError is a structured validation error produced by the Bundle Gate or
-// Module Gate when supplied values do not satisfy a #config schema.
-//
-// It carries the raw CUE error tree so callers can obtain a human-readable
-// summary via Error() or grouped diagnostics via GroupedErrors().
-type ConfigError struct {
-	// Context is "bundle" or "module" — identifies which gate produced the error.
-	Context string
-
-	// Name is the instance/bundle name for display (e.g. "my-game-stack", "server").
-	Name string
-
-	// RawError is the original CUE unification or concreteness error.
-	RawError error
-}
-
-// Error implements the error interface.
-// Produces a human-readable summary: one line per unique CUE error position.
-func (e *ConfigError) Error() string {
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "%s %q: values do not satisfy #config:\n", e.Context, e.Name)
-
-	for _, ce := range cueerrors.Errors(e.RawError) {
-		pos := ce.Position()
-		msg := cueerrors.Details(ce, nil)
-		if pos.IsValid() {
-			fmt.Fprintf(&sb, "  - %s: %s\n", pos, strings.TrimSpace(msg))
-		} else {
-			fmt.Fprintf(&sb, "  - %s\n", strings.TrimSpace(msg))
-		}
-	}
-	return strings.TrimRight(sb.String(), "\n")
-}
-
-// Unwrap returns the underlying CUE error for errors.Is/As compatibility.
-func (e *ConfigError) Unwrap() error { return e.RawError }
-
-// GroupedErrors walks the raw CUE error tree and returns errors grouped by
-// message. Each GroupedError holds the message and all distinct source
-// positions (primary + contributing) that report it, so conflicts between
-// multiple files appear as a single entry with multiple locations.
-//
-// Returns nil if RawError is nil or produces no parseable errors.
-func (e *ConfigError) GroupedErrors() []GroupedError {
-	if e.RawError == nil {
-		return nil
-	}
-	return groupCUEErrors(e.RawError)
-}
-
-// GroupedErrorsFromError attempts to extract CUE errors from any error
-// (including wrapped ones such as fmt.Errorf("...: %w", cueErr)) and group
-// them by message. This handles cases where CUE errors are wrapped before
-// reaching the display layer.
+// GroupedErrorsFromError extracts the CUE errors carried by any error
+// (including wrapped ones such as fmt.Errorf("...: %w", cueErr)) and groups
+// them by message. Each GroupedError holds the message and all distinct
+// source positions (primary + contributing) that report it, so conflicts
+// between multiple files appear as a single entry with multiple locations.
+// The kernel's values validation returns exactly such a tree.
 //
 // Returns nil if no CUE error information can be extracted.
 func GroupedErrorsFromError(err error) []GroupedError {
@@ -71,9 +23,8 @@ func GroupedErrorsFromError(err error) []GroupedError {
 	return groupCUEErrors(err)
 }
 
-// groupCUEErrors is the shared implementation for GroupedErrors and
-// GroupedErrorsFromError. It walks the CUE error tree obtained from err and
-// groups errors by message, collecting all source positions (primary +
+// groupCUEErrors walks the CUE error tree obtained from err and groups
+// errors by message, collecting all source positions (primary +
 // contributing via InputPositions) per group.
 func groupCUEErrors(err error) []GroupedError {
 	cueErrs := cueerrors.Errors(err)
