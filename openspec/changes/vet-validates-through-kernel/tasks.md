@@ -13,4 +13,4 @@
 
 ## 4. Gates
 
-- [ ] 4.1 Run `task fmt`, `task lint`, `task test`; verify all green.
+- [x] 4.1 Run `task fmt`, `task lint`, `task test`; verify all green (e2e: the two operator-owned tests fail on the local kind cluster, whose released alpha.14 operator cannot reconcile a core v2 platform; a documented operator release gap that reproduces on main, not a CLI regression).

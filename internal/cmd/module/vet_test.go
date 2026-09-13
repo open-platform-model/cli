@@ -2,15 +2,16 @@ package modulecmd
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/open-platform-model/cli/internal/config"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 )
 
 func TestNewModuleVetCmd(t *testing.T) {
@@ -32,11 +33,15 @@ func TestNewModuleVetCmd_NoLocalVerboseFlag(t *testing.T) {
 }
 
 // TestModVet_ValidModule exercises the module vet path with the simple-module
-// fixture (core@v2 line, no instance.cue, no debugValues). The fixture imports
-// opmodel.dev/core@v2, so it resolves only when a registry (or a warm CUE cache)
-// is available; without one the load fails before the vet check is reached, and
-// the test skips rather than false-failing — matching the repo's other
-// registry-backed tests.
+// fixture (core@v2 line, no instance.cue, no debugValues of its own). Core's
+// #Module declares `debugValues: _`, and every #config field of the fixture
+// carries a default, so the kernel merges the open debugValues with #config
+// to a concrete value and vet accepts the module — the verdict build reaches
+// for the same input. The fixture imports opmodel.dev/core@v2, so it resolves
+// only when a registry (or a warm CUE cache) is available; without one the
+// core schema load fails with a connectivity error before the vet check is
+// reached, and the test skips rather than false-failing — matching the
+// repo's other registry-backed tests.
 func TestModVet_ValidModule(t *testing.T) {
 	fixtureDir := filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "simple-module")
 	if _, err := os.Stat(fixtureDir); os.IsNotExist(err) {
@@ -57,16 +62,11 @@ func TestModVet_ValidModule(t *testing.T) {
 	cmd.SetArgs([]string{fixtureDir})
 
 	err := cmd.Execute()
-	require.Error(t, err, "module without concrete debugValues should fail vet")
-	// On the core@v2 line #Module declares `debugValues: _`, so a module that
-	// leaves it unset is rejected for non-concrete debugValues rather than for a
-	// missing field — the same behavior (vet refuses a module without usable
-	// debugValues) surfacing through the concreteness gate. When core@v2 can't be
-	// resolved the vet never reaches that check; skip instead of asserting.
-	if !strings.Contains(err.Error(), "not fully concrete") {
-		t.Skipf("core@v2 fixture did not reach the vet check (registry/cache unavailable?): %v", err)
+	var exitErr *opmexit.ExitError
+	if errors.As(err, &exitErr) && exitErr.Code == opmexit.ExitConnectivityError {
+		t.Skipf("core@v2 not resolvable (registry/cache unavailable?): %v", err)
 	}
-	assert.Contains(t, err.Error(), "debugValues")
+	require.NoError(t, err, "an all-defaults #config merges open debugValues to a concrete value")
 }
 
 func TestModVet_RejectsInstancePackage(t *testing.T) {
@@ -105,8 +105,8 @@ func TestModVet_CUEValidationError(t *testing.T) {
 	// Integration tests with real fixtures would be better for this case.
 }
 
-// TestModVet_ValuesDetailLogic checks the display detail string assembled
-// for the "Values satisfy #config" vet check line.
+// TestModVet_ValuesDetailLogic checks the display detail string vetValuesDetail
+// assembles for the "Values satisfy #config" vet check line.
 func TestModVet_ValuesDetailLogic(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -137,17 +137,7 @@ func TestModVet_ValuesDetailLogic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var detail string
-			if len(tt.valuesFlags) > 0 {
-				basenames := make([]string, len(tt.valuesFlags))
-				for i, vf := range tt.valuesFlags {
-					basenames[i] = filepath.Base(vf)
-				}
-				detail = strings.Join(basenames, ", ")
-			} else {
-				detail = "debugValues"
-			}
-			assert.Equal(t, tt.expectedDetail, detail)
+			assert.Equal(t, tt.expectedDetail, vetValuesDetail(tt.valuesFlags))
 		})
 	}
 }
@@ -172,11 +162,7 @@ func TestModVet_MultipleValuesAreMergedForValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			basenames := make([]string, 0, len(tt.valuesFlags))
-			for _, vf := range tt.valuesFlags {
-				basenames = append(basenames, filepath.Base(vf))
-			}
-			assert.Equal(t, tt.expectedDetail, strings.Join(basenames, ", "))
+			assert.Equal(t, tt.expectedDetail, vetValuesDetail(tt.valuesFlags))
 		})
 	}
 }

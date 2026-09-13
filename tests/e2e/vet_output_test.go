@@ -70,3 +70,36 @@ func TestE2E_ModuleVet_Output(t *testing.T) {
 	// Anti-regression: Assert flattened shape does NOT exist
 	assert.NotContains(t, stderr, "ERRO values do not satisfy #config: - ")
 }
+
+// TestE2E_ModuleVet_OpenDebugValues asserts that a module whose debugValues
+// is left open (`_`) against a #config field with no default is refused as a
+// #config violation through the standard grouped block: the kernel's
+// concreteness check on the merged value names the incomplete field at its
+// schema position. No per-input "not concrete" pre-check runs any more.
+func TestE2E_ModuleVet_OpenDebugValues(t *testing.T) {
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
+	testdataDir := filepath.Join(cwd, "testdata", "vet-errors")
+
+	tmpDir, err := os.MkdirTemp("", "e2e-mod-vet-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	_, stderr, err := runOPM(t, tmpDir, "mod", "vet",
+		filepath.Join(testdataDir, "open-debug-values"))
+
+	// Assert exit code 2
+	require.Error(t, err)
+	var exitErr *exec.ExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, 2, exitErr.ExitCode())
+
+	// Assert the standard grouped block names the incomplete field
+	assert.Contains(t, stderr, "values do not satisfy #config: 1 issue")
+	assert.Contains(t, stderr, "incomplete value int")
+	assert.Contains(t, stderr, "values.replicas")
+	assert.Contains(t, stderr, "> module.cue:")
+
+	// Anti-regression: the retired per-input pre-check's wording is gone
+	assert.NotContains(t, stderr, "not concrete")
+}
