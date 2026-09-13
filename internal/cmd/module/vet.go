@@ -164,9 +164,9 @@ func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath 
 
 // identitySchemaForVet builds the per-invocation kernel — the kernel-load
 // gate acquires through it, and its schema cache carries the resolved
-// registry (vet's loads no longer read only the ambient process environment)
-// — and resolves core's #IdentityPackage from that cache. The CUE context
-// every load shares is the schema value's own (identitySchema.Context()).
+// registry — and resolves core's #IdentityPackage from that cache. The CUE
+// context every load shares is the schema value's own
+// (identitySchema.Context()).
 func identitySchemaForVet(cfg *config.GlobalConfig) (*kernel.Kernel, cue.Value, error) {
 	k := config.NewKernel(cfg.Registry)
 	schemaVal, err := k.SchemaCache().Get()

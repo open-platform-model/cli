@@ -33,7 +33,6 @@ import (
 	"time"
 
 	"github.com/open-platform-model/library/opm/kernel"
-	"github.com/open-platform-model/library/opm/schema"
 
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/inventory"
@@ -127,10 +126,7 @@ func run() error {
 	fmt.Printf("path A (CLI workflow, local dir):        %s (%d resources)\n", digestA, len(resultA.Resources))
 
 	// ── Path B: operator call sequence (registry acquisition) ─────────────
-	k := kernel.New(
-		kernel.WithRegistry(registry),
-		kernel.WithSchemaLoader(schema.OCILoader{Registry: registry}),
-	)
+	k := kernel.New(kernel.WithRegistry(registry))
 
 	// Acquire the same platform module directory the CLI path resolved.
 	plat, err := k.AcquirePlatformFromDir(ctx, platformDir)

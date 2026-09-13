@@ -18,6 +18,9 @@ import (
 // render (#context.#runtimeName) — the peer of the operator's "opm-controller".
 const RuntimeName = "opm-cli"
 
+// The per-invocation kernel itself is constructed by config.NewKernel; this
+// file holds the render environment built on top of it.
+
 // renderEnv is the prepared per-invocation render environment: the kernel,
 // the acquired (source-carrying) platform with its provenance, the seed
 // document decoded from it and the skew policy the render runs under.
