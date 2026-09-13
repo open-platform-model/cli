@@ -14,3 +14,4 @@
 ## 4. Gates
 
 - [ ] 4.1 Run `task fmt`, `task lint`, `task test`; run the e2e instance tests that delete by identifier (`tests/e2e/instance_operator_owned_test.go`); verify all green.
+  - 2026-09-13: fmt, lint, unit and the integration programs (including inst-tree's path resolution through the kernel) are green. e2e is green except `TestE2E_ThinEditor_ValuesRoundTrip` and `TestE2E_Delete_OperatorOwnedDelegates`, which fail at the reconcile wait (`operator did not reconcile generation 2 ... within 3m`) before any delete runs: the deployed operator v1.0.0-alpha.14 stalls on the D5 Platform (`MaterializeFailed`), an operator release gap that produced the same two failures before this change. The delete-by-identifier resolution is covered by the registry-backed cmdutil test on the same fixture.
