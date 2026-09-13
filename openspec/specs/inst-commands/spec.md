@@ -138,14 +138,14 @@ All cluster-query commands (`status`, `tree`, `events`, `delete`, `list`) SHALL 
 - **WHEN** `opm instance status jellyfin -n media` is run
 - **THEN** the CLI SHALL look up the instance named `jellyfin` in the `media` namespace
 
-### Requirement: instance render commands accept --provider flag
+### Requirement: instance render commands accept --platform flag
 
-Render commands (`vet`, `build`, `apply`, `diff`) SHALL accept `--provider` flag for provider selection, consistent with the existing render pipeline. Provider SHALL NOT be specified in the instance file.
+Render commands (`vet`, `build`, `apply`, `diff`) SHALL accept a `--platform <dir>` flag naming a platform module directory, the highest-precedence platform source (see the `platform-resolution` capability), through the shared `cmdutil.InstanceFileFlags` set alongside `-f`/`--values`. The platform SHALL NOT be specified in the instance file, and there SHALL be no `--provider` flag: it was retired together with the provider concept.
 
-#### Scenario: provider flag overrides config default
+#### Scenario: platform flag overrides the resolved platform source
 
-- **WHEN** `opm instance build instance.cue --provider kubernetes` is run
-- **THEN** the render pipeline SHALL use the `kubernetes` provider regardless of config defaults
+- **WHEN** `opm instance build instance.cue --platform ./my-platform` is run
+- **THEN** the render SHALL use the platform module in `./my-platform` regardless of the cluster Platform CR or the local default platform module
 
 ### Requirement: instance cluster-connectivity commands accept K8s flags
 
