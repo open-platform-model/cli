@@ -1,4 +1,10 @@
-## ADDED Requirements
+# Capability: health-export
+
+## Purpose
+
+`internal/kubernetes/health.go` exports the health vocabulary that the status, tree, and list commands share: the `HealthStatus` type and its constants, `EvaluateHealth` for a single resource, `IsHealthy` for the "what counts as healthy" rule, and `QuickInstanceHealth` for folding a pre-fetched resource set into one aggregate verdict. Exporting them keeps a single definition of health for every command and for the integration programs under `tests/integration/`.
+
+## Requirements
 
 ### Requirement: Health status type is exported
 
@@ -6,7 +12,7 @@ The kubernetes package SHALL export the `healthStatus` type as `HealthStatus` an
 
 #### Scenario: External package uses HealthStatus
 
-- **WHEN** the `internal/cmd/mod/` package imports `internal/kubernetes`
+- **WHEN** the `internal/cmd/module/` package imports `internal/kubernetes`
 - **THEN** it SHALL be able to reference `kubernetes.HealthStatus`, `kubernetes.HealthReady`, etc.
 
 #### Scenario: Existing behavior unchanged
@@ -28,28 +34,28 @@ The `evaluateHealth` function SHALL be exported as `EvaluateHealth` with the sig
 - **WHEN** `EvaluateHealth` is called with an unstructured ConfigMap
 - **THEN** it SHALL return `HealthReady`
 
-### Requirement: QuickReleaseHealth aggregates health from pre-fetched resources
+### Requirement: QuickInstanceHealth aggregates health from pre-fetched resources
 
-The kubernetes package SHALL provide a `QuickReleaseHealth` function that accepts a slice of live unstructured resources and a missing resource count, and returns the aggregate `HealthStatus`, a ready count, and a total count. A resource SHALL count as ready if its `EvaluateHealth` result is `HealthReady`, `HealthComplete`, or `HealthBound`. The aggregate SHALL be `HealthReady` when all resources are ready and missing count is zero, `HealthNotReady` when any resource is not ready or missing count is greater than zero, and `HealthUnknown` when the total is zero.
+The kubernetes package SHALL provide a `QuickInstanceHealth` function that accepts a slice of live unstructured resources and a missing resource count, and returns the aggregate `HealthStatus`, a ready count, and a total count. A resource SHALL count as ready if its `EvaluateHealth` result is `HealthReady`, `HealthComplete`, or `HealthBound`. The aggregate SHALL be `HealthReady` when all resources are ready and missing count is zero, `HealthNotReady` when any resource is not ready or missing count is greater than zero, and `HealthUnknown` when the total is zero.
 
 #### Scenario: All resources healthy
 
-- **WHEN** `QuickReleaseHealth` is called with 5 live resources all evaluating to `HealthReady` and missing count 0
+- **WHEN** `QuickInstanceHealth` is called with 5 live resources all evaluating to `HealthReady` and missing count 0
 - **THEN** it SHALL return `(HealthReady, 5, 5)`
 
 #### Scenario: Some resources unhealthy
 
-- **WHEN** `QuickReleaseHealth` is called with 4 live resources (3 ready, 1 not ready) and missing count 1
+- **WHEN** `QuickInstanceHealth` is called with 4 live resources (3 ready, 1 not ready) and missing count 1
 - **THEN** it SHALL return `(HealthNotReady, 3, 5)`
 
 #### Scenario: No resources
 
-- **WHEN** `QuickReleaseHealth` is called with 0 live resources and missing count 0
+- **WHEN** `QuickInstanceHealth` is called with 0 live resources and missing count 0
 - **THEN** it SHALL return `(HealthUnknown, 0, 0)`
 
 #### Scenario: Missing resources count in total
 
-- **WHEN** `QuickReleaseHealth` is called with 3 live healthy resources and missing count 2
+- **WHEN** `QuickInstanceHealth` is called with 3 live healthy resources and missing count 2
 - **THEN** it SHALL return `(HealthNotReady, 3, 5)`
 
 ### Requirement: IsHealthy helper function

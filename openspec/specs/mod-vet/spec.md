@@ -117,6 +117,8 @@ The `opm mod vet` command SHALL support `--values` / `-f` flags for providing ex
 
 ### Requirement: mod vet command flags and syntax
 
+The `opm mod vet` command SHALL accept an optional module path argument that defaults to the current directory, and SHALL expose the shared render flags registered by `cmdutil.RenderFlags` (`-f`/`--values`, repeatable; `-n`/`--namespace`; `--instance-name`; `--platform`), of which only `-f`/`--values` affects the validation it performs.
+
 ```text
 opm mod vet [path] [flags]
 
@@ -124,8 +126,11 @@ Arguments:
   path    Path to module directory (default: .)
 
 Flags:
-  -f, --values strings      Additional values files (can be repeated)
-  -h, --help                Help for vet
+  -f, --values strings        Additional values files (can be repeated)
+  -n, --namespace string      Target namespace (shared render flag; unused by vet)
+      --instance-name string  Instance name (shared render flag; unused by vet)
+      --platform string       Platform module directory (shared render flag; unused by vet)
+  -h, --help                  Help for vet
 ```
 
 #### Scenario: Default flags match expected behavior
@@ -134,6 +139,8 @@ Flags:
 - **THEN** path SHALL default to `"."`
 
 ### Requirement: mod vet exit codes
+
+The `opm mod vet` command SHALL signal its verdict through the process exit code: 0 when validation passes, 1 on a usage error, 2 on any validation failure, and 3 when the registry cannot be reached, as the table below details.
 
 | Code | Meaning |
 |------|---------|
