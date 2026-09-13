@@ -1,33 +1,38 @@
+# Capability: status-verbose
+
+## Purpose
+
+`opm instance status --details` explains an unhealthy workload instead of merely flagging it. For each Deployment, StatefulSet, or DaemonSet that evaluates to NotReady, it lists the workload's pods with their phase or container waiting reason, the last termination reason, and the restart count, as an indented block beneath the table or as a `verbose` object on the resource in JSON and YAML output.
 
 ## Requirements
 
 ### Requirement: Verbose mode shows pod details for unhealthy workloads
 
-The command SHALL accept a `--verbose` flag. When `--verbose` is set and a workload resource (Deployment, StatefulSet, DaemonSet) has a health status of `NotReady`, the output SHALL include a pod detail block for that workload below the resource table.
+The command SHALL accept a `--details` flag. When `--details` is set and a workload resource (Deployment, StatefulSet, DaemonSet) has a health status of `NotReady`, the output SHALL include a pod detail block for that workload below the resource table.
 
 The pod detail block SHALL list each pod belonging to the unhealthy workload with:
 - **Pod name**: the full pod name
 - **Phase**: the pod's phase (Running, Pending, Failed, Succeeded, Unknown) or a container-level waiting reason if more specific (CrashLoopBackOff, ImagePullBackOff, etc.)
 - **Detail**: for unhealthy pods, the reason and context (e.g., "OOMKilled, 5 restarts"). For healthy pods, "(ready)".
 
-Pods SHALL be discovered by listing pods in the workload's namespace using the workload's `.spec.selector.matchLabels` as a label selector.
+Pods SHALL be discovered by listing pods in the workload's namespace using the workload's `.spec.selector.matchLabels` as a label selector. (The global `--verbose` flag controls log verbosity only and does not affect status output.)
 
 #### Scenario: Verbose shows pod details for NotReady Deployment
 
-- **WHEN** the user runs `opm mod status --instance-name my-app -n prod --verbose`
+- **WHEN** the user runs `opm instance status my-app -n prod --details`
 - **AND** a Deployment `web` has health status `NotReady`
 - **AND** the Deployment has 3 pods: one Running/Ready, one in CrashLoopBackOff, one Pending
 - **THEN** the output SHALL include a pod detail block for `Deployment/web` showing all 3 pods with their phase and details
 
 #### Scenario: Verbose omits pod details for Ready workloads
 
-- **WHEN** `--verbose` is set
+- **WHEN** `--details` is set
 - **AND** a Deployment has health status `Ready`
 - **THEN** no pod detail block SHALL be rendered for that Deployment
 
 #### Scenario: Verbose omits pod details for non-workload resources
 
-- **WHEN** `--verbose` is set
+- **WHEN** `--details` is set
 - **AND** a ConfigMap has health status `Ready`
 - **THEN** no pod detail block SHALL be rendered for that ConfigMap
 
@@ -100,11 +105,11 @@ The ready ratio SHALL be color-coded: green (all ready), yellow (partial), red (
 
 ### Requirement: Verbose mode works with structured output
 
-When `--verbose` is combined with `-o json` or `-o yaml`, the pod details SHALL be included in the structured output under a `verbose` field on each resource, containing a `pods` array with name, phase, ready, reason, and restarts fields.
+When `--details` is combined with `-o json` or `-o yaml`, the pod details SHALL be included in the structured output under a `verbose` field on each resource, containing a `pods` array with name, phase, ready, reason, and restarts fields.
 
 #### Scenario: Verbose JSON output includes pods
 
-- **WHEN** the user runs `opm mod status --instance-name my-app -n prod --verbose -o json`
+- **WHEN** the user runs `opm instance status my-app -n prod --details -o json`
 - **AND** a Deployment is NotReady with 2 pods
 - **THEN** the JSON output for that resource SHALL include a `verbose` object with a `pods` array containing 2 entries with `name`, `phase`, `ready`, `reason`, and `restarts` fields
 

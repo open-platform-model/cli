@@ -1,23 +1,29 @@
+# Capability: mod-tree
+
+## Purpose
+
+`opm instance tree` shows the component and resource hierarchy of a deployed instance without touching module source. It reads the instance's inventory from its ModuleInstance CR, fetches each tracked resource, groups them by component, walks Kubernetes ownership references down through ReplicaSets to Pods, and renders the result as a column-aligned box-drawing tree or as JSON/YAML.
+
 ## Requirements
 
 ### Requirement: Tree discovers resources via inventory
 
-The `opm mod tree` command SHALL discover deployed resources by looking up the OPM inventory Secret for the instance (via `cmdutil.ResolveInventory` / `inventory.DiscoverResourcesFromInventory`), then fetching each tracked resource by GVK + name. It MUST NOT require module source or re-rendering.
+The `opm instance tree` command SHALL discover deployed resources by looking up the instance's ModuleInstance record (via `query.ResolveInventory` / `inventory.DiscoverResourcesFromInventory`), then fetching each tracked resource by GVK + name. It MUST NOT require module source or re-rendering. The instance is identified by the positional `<file|name|uuid>` argument defined in the `inst-commands` capability.
 
 #### Scenario: Tree shows deployed resources by instance name
 
-- **WHEN** the user runs `opm mod tree --instance-name jellyfin -n media`
-- **THEN** the command SHALL look up the inventory Secret for instance name `jellyfin` in namespace `media` and display all tracked resources
+- **WHEN** the user runs `opm instance tree jellyfin -n media`
+- **THEN** the command SHALL look up the ModuleInstance record for instance name `jellyfin` in namespace `media` and display all tracked resources
 
-#### Scenario: Tree shows deployed resources by instance ID
+#### Scenario: Tree shows deployed resources by instance UUID
 
-- **WHEN** the user runs `opm mod tree --instance-id abc123-def456 -n media`
-- **THEN** the command SHALL look up the inventory Secret for instance ID `abc123-def456` in namespace `media` and display all tracked resources
+- **WHEN** the user runs `opm instance tree abc123-def456 -n media`
+- **THEN** the command SHALL resolve the argument as an instance UUID, look up its ModuleInstance record in namespace `media`, and display all tracked resources
 
 #### Scenario: No resources found
 
-- **WHEN** no inventory Secret (or no tracked resources) is found for the given instance selector and namespace
-- **THEN** the command SHALL exit with code 5 and display error "no resources found for instance <name|id> in namespace <namespace>"
+- **WHEN** no ModuleInstance record (or no tracked resources) is found for the given instance and namespace
+- **THEN** the command SHALL exit with code 5 and report `instance "<name>" not found in namespace "<namespace>"`, or `no resources found` when the record tracks no live resources
 
 ---
 
@@ -88,7 +94,7 @@ The command SHALL walk Kubernetes `ownerReferences` to discover child resources 
 
 ### Requirement: Tree displays health status and replica counts
 
-The command SHALL display health status for each resource using the same evaluation logic as `mod status`. For workload resources (Deployment, StatefulSet, DaemonSet), it SHALL display replica counts in `ready/desired` format. For Pod nodes, the raw Kubernetes phase string SHALL be displayed (matching `mod status` pod display).
+The command SHALL display health status for each resource using the same evaluation logic as `instance status`. For workload resources (Deployment, StatefulSet, DaemonSet), it SHALL display replica counts in `ready/desired` format. For Pod nodes, the raw Kubernetes phase string SHALL be displayed (matching `instance status` pod display).
 
 #### Scenario: Workload shows replica count
 
@@ -148,28 +154,28 @@ The command SHALL support a `--depth` flag with values 0, 1, or 2 to control tre
 
 #### Scenario: Depth 0 shows component summary
 
-- **WHEN** the user runs `opm mod tree --instance-name app -n ns --depth 0`
+- **WHEN** the user runs `opm instance tree app -n ns --depth 0`
 - **THEN** the output SHALL display component names with resource counts and aggregate status
 - **AND** SHALL NOT display individual resources or Kubernetes-owned children
 - **AND** SHALL NOT query the cluster for child resources
 
 #### Scenario: Depth 1 shows components and OPM resources
 
-- **WHEN** the user runs `opm mod tree --instance-name app -n ns --depth 1`
+- **WHEN** the user runs `opm instance tree app -n ns --depth 1`
 - **THEN** the output SHALL display component groups and OPM-managed resources
 - **AND** SHALL NOT display Kubernetes-owned children (Pods, ReplicaSets)
 - **AND** SHALL NOT query the cluster for child resources
 
 #### Scenario: Depth 2 shows full hierarchy
 
-- **WHEN** the user runs `opm mod tree --instance-name app -n ns --depth 2` OR omits `--depth`
+- **WHEN** the user runs `opm instance tree app -n ns --depth 2` OR omits `--depth`
 - **THEN** the output SHALL display components, OPM-managed resources, and Kubernetes-owned children
 - **AND** SHALL query the cluster for ReplicaSets and Pods as needed
 
 #### Scenario: Invalid depth rejected
 
-- **WHEN** the user runs `opm mod tree --instance-name app -n ns --depth 5`
-- **THEN** the command SHALL exit with code 1 and display error "invalid depth: must be 0, 1, or 2"
+- **WHEN** the user runs `opm instance tree app -n ns --depth 5`
+- **THEN** the command SHALL exit with code 1 and display error `invalid --depth 5: must be 0, 1, or 2`
 
 ---
 
@@ -213,18 +219,18 @@ The command SHALL support `--output`/`-o` with values `table` (default), `json`,
 
 #### Scenario: Default table output
 
-- **WHEN** the user runs `opm mod tree --instance-name app -n ns` without `--output`
+- **WHEN** the user runs `opm instance tree app -n ns` without `--output`
 - **THEN** the output SHALL be a colored tree with box-drawing characters
 
 #### Scenario: JSON output
 
-- **WHEN** the user runs `opm mod tree --instance-name app -n ns -o json`
+- **WHEN** the user runs `opm instance tree app -n ns -o json`
 - **THEN** the output SHALL be valid JSON with structure: `{"instance": {...}, "components": [...]}`
 - **AND** SHALL contain no ANSI color codes
 
 #### Scenario: YAML output
 
-- **WHEN** the user runs `opm mod tree --instance-name app -n ns -o yaml`
+- **WHEN** the user runs `opm instance tree app -n ns -o yaml`
 - **THEN** the output SHALL be valid YAML with the same structure as JSON
 - **AND** SHALL contain no ANSI color codes
 
@@ -236,86 +242,55 @@ The command SHALL support `--output`/`-o` with values `table` (default), `json`,
 
 ---
 
-### Requirement: Tree accepts instance selector flags
-
-The command SHALL accept instance selector flags following the same pattern as `mod status` and `mod delete`: exactly one of `--instance-name` or `--instance-id` MUST be provided, and `--namespace` is required.
-
-#### Scenario: Instance name and namespace required
-
-- **WHEN** the user runs `opm mod tree --instance-name app -n production`
-- **THEN** the command SHALL discover resources using the instance name selector
-
-#### Scenario: Instance ID selector
-
-- **WHEN** the user runs `opm mod tree --instance-id abc123 -n production`
-- **THEN** the command SHALL discover resources using the instance ID selector
-
-#### Scenario: Both instance-name and instance-id rejected
-
-- **WHEN** the user provides both `--instance-name app` and `--instance-id abc123`
-- **THEN** the command SHALL exit with code 1 and error "--instance-name and --instance-id are mutually exclusive"
-
-#### Scenario: Neither instance-name nor instance-id provided
-
-- **WHEN** the user omits both `--instance-name` and `--instance-id`
-- **THEN** the command SHALL exit with code 1 and error "either --instance-name or --instance-id is required"
-
-#### Scenario: Missing namespace flag
-
-- **WHEN** the user runs `opm mod tree --instance-name app` without `-n`
-- **THEN** the command SHALL exit with code 1 and display a usage error indicating `-n` is required
-
----
-
 ### Requirement: Tree accepts Kubernetes connection flags
 
 The command SHALL accept `--kubeconfig` and `--context` flags for cluster connection. Kubeconfig resolution SHALL follow: explicit flag > `KUBECONFIG` env var > default path (`~/.kube/config`).
 
 #### Scenario: Custom kubeconfig
 
-- **WHEN** the user runs `opm mod tree --kubeconfig /custom/config --instance-name app -n ns`
+- **WHEN** the user runs `opm instance tree app -n ns --kubeconfig /custom/config`
 - **THEN** the command SHALL use the specified kubeconfig file
 
 #### Scenario: Custom context
 
-- **WHEN** the user runs `opm mod tree --context prod-cluster --instance-name app -n ns`
+- **WHEN** the user runs `opm instance tree app -n ns --context prod-cluster`
 - **THEN** the command SHALL use the specified Kubernetes context
 
 #### Scenario: Default kubeconfig resolution
 
-- **WHEN** the user runs `opm mod tree --instance-name app -n ns` without `--kubeconfig`
+- **WHEN** the user runs `opm instance tree app -n ns` without `--kubeconfig`
 - **THEN** the command SHALL resolve kubeconfig from `KUBECONFIG` env var if set, otherwise `~/.kube/config`
 
 ---
 
 ### Requirement: Tree fails fast on connectivity errors
 
-The command SHALL fail immediately with a clear error message if the Kubernetes cluster is unreachable or authentication fails.
+The command SHALL fail immediately with a clear error message if the Kubernetes cluster is unreachable or authentication fails, using the exit codes the shared helpers assign: 3 when `cmdutil.NewK8sClient` cannot build a client or the API server reports itself unavailable, 4 for authentication and RBAC failures, as mapped by `cmdutil.ExitCodeFromK8sError`.
 
 #### Scenario: Cluster unreachable
 
 - **WHEN** the cluster specified by kubeconfig/context is not reachable
-- **THEN** the command SHALL exit with code 1 and display a connectivity error message
+- **THEN** the command SHALL exit with code 3 and display a connectivity error message
 
 #### Scenario: Authentication failure
 
 - **WHEN** the kubeconfig credentials are invalid or expired
-- **THEN** the command SHALL exit with code 1 and display an authentication error message
+- **THEN** the command SHALL exit with code 4 and display an authentication error message
 
 ---
 
 ### Requirement: Tree displays instance metadata header
 
-The command SHALL display instance metadata in the header: instance name, module FQN (if available from labels), version, and namespace.
+The command SHALL display instance metadata in the header: instance name, module path and version (read from the ModuleInstance record), and namespace.
 
-#### Scenario: Header with module FQN and version
+#### Scenario: Header with module path and version
 
-- **WHEN** resources have labels `module-instance.opmodel.dev/name=jellyfin-media` and `module-instance.opmodel.dev/version=1.2.0`
+- **WHEN** the ModuleInstance record for `jellyfin-media` carries module path `opmodel.dev/community/jellyfin` and version `1.2.0`
 - **THEN** the tree header SHALL display `jellyfin-media (opmodel.dev/community/jellyfin@1.2.0)` or equivalent metadata
 
-#### Scenario: Header without module FQN
+#### Scenario: Header without module path
 
-- **WHEN** resources lack module FQN metadata
+- **WHEN** the ModuleInstance record carries no module path
 - **THEN** the tree header SHALL display instance name and version only
 
 ---
@@ -338,7 +313,7 @@ Within each component group, resources SHALL be sorted by OPM weight (ascending)
 
 ### Requirement: Tree exit codes match CLI conventions
 
-The command SHALL use exit codes consistently with other CLI commands: 0 for success, 1 for general errors (invalid flags, connectivity failures), 5 for resource not found.
+The command SHALL use exit codes consistently with other CLI commands: 0 for success, 1 for general errors (invalid flags), 3 for connectivity failures and 4 for permission errors (mapped by `cmdutil.ExitCodeFromK8sError`), 5 for resource not found.
 
 #### Scenario: Successful tree display
 
@@ -347,15 +322,15 @@ The command SHALL use exit codes consistently with other CLI commands: 0 for suc
 
 #### Scenario: Invalid flags
 
-- **WHEN** the user provides invalid or mutually exclusive flags
+- **WHEN** the user provides an invalid flag value such as an out-of-range `--depth`
 - **THEN** the command SHALL exit with code 1
 
 #### Scenario: No resources found
 
-- **WHEN** no resources match the selector
+- **WHEN** no ModuleInstance record or tracked resources exist for the instance
 - **THEN** the command SHALL exit with code 5
 
 #### Scenario: Cluster connectivity error
 
 - **WHEN** the cluster is unreachable
-- **THEN** the command SHALL exit with code 1
+- **THEN** the command SHALL exit with code 3
