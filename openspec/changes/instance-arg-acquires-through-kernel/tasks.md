@@ -9,7 +9,7 @@
 
 ## 3. Delete the loader copy (pkg/loader)
 
-- [ ] 3.1 Delete `pkg/loader/instance_file.go`, `instance_file_test.go` and `local_module_resolution_test.go`; keep `provenance.go` and `provenance_test.go`; verify `go build ./...` and `go test ./pkg/loader/...` pass and `grep -rn 'LoadInstanceFile\|loader.LoadOptions\|os.Setenv' --include='*.go' internal/ pkg/` is empty.
+- [x] 3.1 Delete `pkg/loader/instance_file.go`, `instance_file_test.go` and `local_module_resolution_test.go`; keep `provenance.go` and `provenance_test.go`; verify `go build ./...` and `go test ./pkg/loader/...` pass and `grep -rn 'LoadInstanceFile\|loader.LoadOptions\|os.Setenv' --include='*.go' internal/ pkg/` is empty.
 
 ## 4. Gates
 
