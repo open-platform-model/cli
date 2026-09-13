@@ -1,6 +1,6 @@
 ## 1. Shared resolver (internal/workflow/render)
 
-- [ ] 1.1 Change `DebugValuesSource` to take the module package value (`pkg cue.Value`) instead of `*module.Module`, and export `ResolveModuleValues(k *kernel.Kernel, pkg cue.Value, moduleDir string, valuesFiles []string) ([]kernel.Source, error)` in place of `resolveModuleValues`, returning sources without validating them; update `FromModule` to pass `mod.Package` and to validate the `-f` sources against `mod.ConfigSchema()` before synthesis as it does today; verify `go test ./internal/workflow/render/...` passes and `opm module build <fixture> -f <bad-values>` still fails before "Building synthetic instance" is printed.
+- [x] 1.1 Change `DebugValuesSource` to take the module package value (`pkg cue.Value`) instead of `*module.Module`, and export `ResolveModuleValues(k *kernel.Kernel, pkg cue.Value, moduleDir string, valuesFiles []string) ([]kernel.Source, error)` in place of `resolveModuleValues`, returning sources without validating them; update `FromModule` to pass `mod.Package` and to validate the `-f` sources against `mod.ConfigSchema()` before synthesis as it does today; verify `go test ./internal/workflow/render/...` passes and `opm module build <fixture> -f <bad-values>` still fails before "Building synthetic instance" is printed.
 
 ## 2. vet (internal/cmd/module/vet.go)
 

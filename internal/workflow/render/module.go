@@ -7,6 +7,8 @@ import (
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
+	"cuelang.org/go/cue"
+
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
 
@@ -51,10 +53,21 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	values, err := resolveModuleValues(k, mod, opts.ModulePath, opts.ValuesFiles)
+	values, err := ResolveModuleValues(k, mod.Package, opts.ModulePath, opts.ValuesFiles)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+	}
+
+	// -f files are checked against #config before synthesis, so a conflict
+	// or a violation is attributed to the file it came from and a cheap
+	// failure never reaches the synthesized build. debugValues are left to
+	// the build itself.
+	if len(opts.ValuesFiles) > 0 {
+		if err := validateValuesFiles(k, mod.ConfigSchema(), values); err != nil {
+			printValidationError(err)
+			return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+		}
 	}
 
 	modName, synthName, synthNamespace := syntheticIdentity(mod, opts, namespace)
@@ -111,31 +124,14 @@ func syntheticIdentity(mod *module.Module, opts ModuleOpts, namespace string) (m
 	return modName, synthName, synthNamespace
 }
 
-// resolveModuleValues mirrors `opm module vet`: -f files override debugValues.
-// The files are layered as kernel values sources and checked through the
-// kernel's layered validation against the module's #config before synthesis,
-// so a conflict or a violation is attributed to the file it came from; the
-// returned sources are what synthesis renders into the instance's values
-// file. Without -f files the module's own debugValues are the single source
-// (DebugValuesSource), attributed to the module directory.
-func resolveModuleValues(k *kernel.Kernel, mod *module.Module, moduleDir string, valuesFiles []string) ([]kernel.Source, error) {
-	if len(valuesFiles) > 0 {
-		sources, err := loadValuesSources(k, valuesFiles)
-		if err != nil {
-			return nil, err
-		}
-		schemaVal := mod.ConfigSchema()
-		if !schemaVal.Exists() {
-			return nil, fmt.Errorf("module does not define #config; values files cannot be validated")
-		}
-		if _, err := k.ValidateConfigDetailed(schemaVal, sources); err != nil {
-			return nil, err
-		}
-		return sources, nil
+// validateValuesFiles checks -f sources against a module's #config through
+// the kernel's layered validation, which reports schema violations and merge
+// conflicts at their source positions. A module without #config cannot
+// validate values files.
+func validateValuesFiles(k *kernel.Kernel, configSchema cue.Value, sources []kernel.Source) error {
+	if !configSchema.Exists() {
+		return fmt.Errorf("module does not define #config; values files cannot be validated")
 	}
-	src, err := DebugValuesSource(k, mod, filepath.Join(moduleDir, "debugValues"))
-	if err != nil {
-		return nil, err
-	}
-	return []kernel.Source{src}, nil
+	_, err := k.ValidateConfigDetailed(configSchema, sources)
+	return err
 }

@@ -140,7 +140,7 @@ func run() error {
 	}
 
 	// Same values source the CLI path used: the module's debugValues.
-	debugValues, err := workflowrender.DebugValuesSource(k, mod, modulePath+"/debugValues")
+	debugValues, err := workflowrender.DebugValuesSource(k, mod.Package, modulePath+"/debugValues")
 	if err != nil {
 		return fmt.Errorf("acquired module has no usable debugValues: %w", err)
 	}
