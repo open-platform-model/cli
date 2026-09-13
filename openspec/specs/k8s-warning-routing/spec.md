@@ -1,4 +1,10 @@
-## ADDED Requirements
+# Capability: k8s-warning-routing
+
+## Purpose
+
+Kubernetes API deprecation warnings reach the user through the CLI's charmbracelet/log output rather than as raw klog writes to stderr: `internal/kubernetes/warnings.go` installs an `opmWarningHandler` as the REST client's `WarningHandler`, and the `log.kubernetes.apiWarnings` config field selects whether each warning is logged at WARN, at DEBUG (visible only with `--verbose`), or dropped entirely.
+
+## Requirements
 
 ### Requirement: K8s API warnings route through charmbracelet/log
 

@@ -37,3 +37,22 @@ jobs:
           go-version: '1.26.0'
       - name: Run unit tests
         run: go test ./internal/...
+
+  openspec:
+    # Spec-only work lands as direct commits on main, which pr.yml never sees,
+    # so this push workflow is the gate that keeps the main specs parseable.
+    # Local equivalent: task openspec:check (task openspec:install once).
+    name: OpenSpec Specs (strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24'
+      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
+        with:
+          version: 3.x
+      - name: Install openspec
+        run: npm install -g @fission-ai/openspec@1.12.0
+      - name: Validate main specs and active changes
+        run: task openspec:check

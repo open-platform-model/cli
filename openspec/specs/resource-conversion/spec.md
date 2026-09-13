@@ -65,13 +65,13 @@ The `Resource` type SHALL provide lazy conversion methods that transform the `cu
 - **WHEN** a conversion method is called on a Resource with a non-concrete or errored CUE value
 - **THEN** the method returns a descriptive error (not a panic)
 
-### Requirement: Label constants and GVK weights in pkg/core
-The `pkg/core` package SHALL export all label constants (`LabelManagedBy`, `LabelModuleInstanceName`, `LabelModuleInstanceNamespace`, `LabelModuleInstanceUUID`, `LabelComponent`, etc.) and the `GetWeight(gvk)` function for resource ordering. These MUST have identical values to the current `internal/core` constants.
+### Requirement: Label constants in pkg/core and GVK weights in pkg/resourceorder
+The `pkg/core` package SHALL export all label constants (`LabelManagedBy`, `LabelModuleInstanceName`, `LabelModuleInstanceNamespace`, `LabelModuleInstanceUUID`, `LabelComponent`, etc.). The `GetWeight(gvk)` function for resource ordering SHALL live in `pkg/resourceorder` (see the `pkg-resourceorder` capability); `pkg/core` SHALL NOT export a `GetWeight`. The label values MUST be identical to the former `internal/core` constants.
 
 #### Scenario: Label constants are accessible from pkg/core
 - **WHEN** code imports `pkg/core`
 - **THEN** all label constants (e.g., `core.LabelManagedBy`, `core.LabelModuleInstanceName`) are accessible with the same string values as before
 
 #### Scenario: GetWeight returns ordering weights
-- **WHEN** `core.GetWeight(gvk)` is called with a known GVK (e.g., CRD, Deployment)
-- **THEN** it returns the same integer weight as the current `internal/core.GetWeight()`
+- **WHEN** `resourceorder.GetWeight(gvk)` is called with a known GVK (e.g., CRD, Deployment)
+- **THEN** it returns the same integer weight as the former `internal/core.GetWeight()`

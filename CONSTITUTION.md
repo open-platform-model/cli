@@ -146,6 +146,7 @@ Before merge, the expected validation gates are:
 1. `task fmt`
 2. `task lint`
 3. `task test`
+4. `task openspec:check`
 
 ---
 

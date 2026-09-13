@@ -1,4 +1,8 @@
+# Capability: config
 
+## Purpose
+
+`internal/config` resolves every CLI-wide setting (registry, config path, kubeconfig, context, namespace, log timestamps, skew policy, and the Kubernetes API-warning level) through the single precedence chain flag > environment > `~/.opm/config.cue` > default. Resolution happens once in the root command's `PersistentPreRunE`, and the result rides a `*config.GlobalConfig` into every subcommand, recording where each value came from so `--verbose` can explain it.
 
 ## Requirements
 
@@ -14,12 +18,13 @@ The CLI SHALL resolve ALL configuration values using precedence: Flag > Environm
 | Context | `--context` | `OPM_CONTEXT` | `kubernetes.context` | current-context |
 | Namespace | `--namespace` | `OPM_NAMESPACE` | `kubernetes.namespace` | `default` |
 | Timestamps | `--timestamps` | (n/a) | `log.timestamps` | `true` |
+| Skew policy | (n/a) | (n/a) | `skewPolicy` | `warn` |
 
 There SHALL be no provider configuration value: the `providers` config field and provider auto-resolution do not exist. Platform selection is a per-command concern (`--platform`, see the `platform-resolution` capability), not a config-file field.
 
 Each resolved value SHALL record the final value, the source it came from, and any shadowed values from lower-precedence sources.
 
-Subcommands SHALL NOT call `config.Load()` independently. They SHALL access the pre-loaded configuration via the `*config.GlobalConfig` passed from the root command.
+Subcommands SHALL NOT call `config.Load()` independently. They SHALL access the pre-loaded configuration via the `*config.GlobalConfig` passed from the root command. The one exception is `opm config vet`, which loads the file named on its command line into a throwaway value to validate it without touching the resolved configuration.
 
 Subcommand-local flags (e.g., `opm mod apply --namespace production`) SHALL override the globally-resolved value for that invocation.
 
