@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.0.0-alpha.20](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.19...v1.0.0-alpha.20) (2026-09-14)
+
+
+### Features
+
+* **render:** honor local-module.cue replacements on library alpha.29 ([#209](https://github.com/open-platform-model/cli/issues/209)) ([7ae324f](https://github.com/open-platform-model/cli/commit/7ae324f80b24d1ddba3a6924c9a21e5f73df79ac))
+
+
+### Bug Fixes
+
+* **deps:** bump core to v2.0.0-alpha.9, the catalogs, and library to v1.0.0-alpha.30 ([#216](https://github.com/open-platform-model/cli/issues/216)) ([85cd36a](https://github.com/open-platform-model/cli/commit/85cd36ae442cbf19e3dfe31aa66d80c2e2c29e1f))
+
+
+### Code Refactoring
+
+* **cmdutil:** acquire the instance path argument through the kernel ([#215](https://github.com/open-platform-model/cli/issues/215)) ([789496f](https://github.com/open-platform-model/cli/commit/789496fe9700165d2f50be8d81be22d1161f49b3))
+* **compat:** adopt the catalog comparator from the library ([#206](https://github.com/open-platform-model/cli/issues/206)) ([99a245f](https://github.com/open-platform-model/cli/commit/99a245f87ae3248531c23ece48616912c45d7ab1))
+* **config:** construct every kernel through config.NewKernel ([#212](https://github.com/open-platform-model/cli/issues/212)) ([df5b05e](https://github.com/open-platform-model/cli/commit/df5b05e19ad71c1f044bedad0f0f6ec3600337d4))
+* **errors:** drop the last two unreferenced helpers ([#217](https://github.com/open-platform-model/cli/issues/217)) ([ecdc448](https://github.com/open-platform-model/cli/commit/ecdc44850dd08317417e70745808f9a11f13ea7a))
+* **kernel:** migrate to library alpha.28 acquire verbs and verdict rows ([#207](https://github.com/open-platform-model/cli/issues/207)) ([7a78b88](https://github.com/open-platform-model/cli/commit/7a78b8832c8eb58ee550de20a6567bca7e0269ee))
+* render-switch follow-ups from verification ([#204](https://github.com/open-platform-model/cli/issues/204)) ([31e5643](https://github.com/open-platform-model/cli/commit/31e56439193d85b8fb710e53e685596cb7f883ce))
+* **render:** carry the library's metadata types and delete pkg/module ([#211](https://github.com/open-platform-model/cli/issues/211)) ([0e6a462](https://github.com/open-platform-model/cli/commit/0e6a462a21aa24ec35bb3463da44ad98a884b7ac))
+
 ## [1.0.0-alpha.19](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.18...v1.0.0-alpha.19) (2026-09-04)
 
 
