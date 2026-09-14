@@ -75,18 +75,6 @@ func (e *DetailError) Unwrap() error {
 	return e.Cause
 }
 
-// NewValidationError creates a validation error with details.
-func NewValidationError(message, location, field, hint string) error {
-	return &DetailError{
-		Type:     "validation failed",
-		Message:  message,
-		Location: location,
-		Field:    field,
-		Hint:     hint,
-		Cause:    ErrValidation,
-	}
-}
-
 // Wrap wraps an error with a sentinel error type.
 func Wrap(sentinel error, message string) error {
 	return fmt.Errorf("%s: %w", message, sentinel)

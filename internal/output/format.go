@@ -33,11 +33,6 @@ func (f Format) Valid() bool {
 	}
 }
 
-// ValidFormats returns all valid format strings.
-func ValidFormats() []string {
-	return []string{string(FormatTable), string(FormatWide), string(FormatJSON), string(FormatYAML), string(FormatDir)}
-}
-
 // String returns the string representation.
 func (f Format) String() string {
 	return string(f)
