@@ -95,7 +95,7 @@ const DefaultCorePath = "opmodel.dev/core@v2"
 // first release carrying 0019 D5 (a #registry entry imports its catalog).
 // Hand-bumped alongside the library's verified release; the root
 // `task deps:update` (`.tasks/deps/platform-pins.sh`) rewrites it.
-const DefaultCorePin = "v2.0.0-alpha.7"
+const DefaultCorePin = "v2.0.0-alpha.9"
 
 // DefaultCatalogPins are the catalog builds the seeded platform module pins
 // in its cue.mod, index-aligned with DefaultCatalogPaths. These pins are
@@ -111,8 +111,8 @@ const DefaultCorePin = "v2.0.0-alpha.7"
 // so a pin bump here commits as `fix(deps)` and releases the CLI; the
 // mirrored fixture copies commit as `test(fixtures)`.
 var DefaultCatalogPins = []string{
-	"v4.0.1",         // opmodel.dev/catalogs/opm@v4
-	"v1.0.0-alpha.2", // opmodel.dev/catalogs/k8s@v1
+	"v4.1.0",         // opmodel.dev/catalogs/opm@v4
+	"v1.0.0-alpha.3", // opmodel.dev/catalogs/k8s@v1
 }
 
 // PlatformDirName is the name of the platform module directory beside the
