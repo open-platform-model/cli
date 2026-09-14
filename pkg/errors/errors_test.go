@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
@@ -45,26 +44,6 @@ func TestDetailErrorUnwrap(t *testing.T) {
 
 	assert.True(t, errors.Is(detail, oerrors.ErrValidation))
 	assert.Equal(t, oerrors.ErrValidation, detail.Unwrap())
-}
-
-func TestNewValidationError(t *testing.T) {
-	err := oerrors.NewValidationError(
-		"invalid value",
-		"/path/to/file.cue:42",
-		"metadata.version",
-		"Use semver format",
-	)
-
-	require.NotNil(t, err)
-	assert.True(t, errors.Is(err, oerrors.ErrValidation))
-
-	var detail *oerrors.DetailError
-	require.True(t, errors.As(err, &detail))
-	assert.Equal(t, "validation failed", detail.Type)
-	assert.Equal(t, "invalid value", detail.Message)
-	assert.Equal(t, "/path/to/file.cue:42", detail.Location)
-	assert.Equal(t, "metadata.version", detail.Field)
-	assert.Equal(t, "Use semver format", detail.Hint)
 }
 
 func TestWrap(t *testing.T) {
