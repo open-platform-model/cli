@@ -49,6 +49,12 @@ The `internal/cmd/` package SHALL be split into sub-packages that mirror the cob
 - **THEN** it SHALL contain the `operator` sub-command implementations: `install`, `uninstall`
 - **AND** the commands SHALL be thin cobra wiring that delegates all behavior to `internal/operator/`
 
+#### Scenario: platform commands are in their own package
+
+- **WHEN** the `internal/cmd/platform/` directory is inspected
+- **THEN** it SHALL contain the `platform` sub-command implementations: `check`
+- **AND** the commands SHALL be thin cobra wiring that delegates the report to `internal/platform/`
+
 ### Requirement: Instance command group registered at root level
 
 The root command SHALL register `opm instance` (alias: `inst`) as a top-level command group via `cmdinstance.NewInstanceCmd(&cfg)`. This SHALL follow the same dependency injection pattern as `mod` and `config` groups. The former `cmdrelease.NewReleaseCmd` registration is removed (no back-compat alias — enhancement 0002 D8).
@@ -68,6 +74,20 @@ The root command SHALL register `opm operator` as a top-level command group via 
 - **WHEN** `internal/cmd/root.go` is inspected
 - **THEN** it SHALL contain `rootCmd.AddCommand(cmdoperator.NewOperatorCmd(&cfg))`
 - **AND** the root command SHALL NOT register `install` or `uninstall` as top-level commands
+
+### Requirement: Platform command group registered at root level
+
+The root command SHALL register `opm platform` as a top-level command group via `cmdplatform.NewPlatformCmd(&cfg)`, following the same `GlobalConfig` dependency-injection pattern as the `module`, `instance`, `config` and `operator` groups. The group is noun-first: there is no `opm check` verb group at root level.
+
+#### Scenario: Root command registers platform group
+
+- **WHEN** `internal/cmd/root.go` is inspected
+- **THEN** it SHALL contain `rootCmd.AddCommand(cmdplatform.NewPlatformCmd(&cfg))`
+
+#### Scenario: The group lists its subcommands
+
+- **WHEN** `opm platform --help` is run
+- **THEN** it SHALL list `check`
 
 ### Requirement: Cluster-query commands live only under instance
 
