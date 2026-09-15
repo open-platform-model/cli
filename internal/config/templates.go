@@ -111,7 +111,7 @@ const DefaultCorePin = "v2.0.0-alpha.9"
 // so a pin bump here commits as `fix(deps)` and releases the CLI; the
 // mirrored fixture copies commit as `test(fixtures)`.
 var DefaultCatalogPins = []string{
-	"v4.1.0",         // opmodel.dev/catalogs/opm@v4
+	"v4.3.1",         // opmodel.dev/catalogs/opm@v4
 	"v1.0.0-alpha.3", // opmodel.dev/catalogs/k8s@v1
 }
 
