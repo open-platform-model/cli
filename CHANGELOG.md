@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-alpha.21](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.20...v1.0.0-alpha.21) (2026-09-15)
+
+
+### Features
+
+* **platform:** add opm platform check ([#218](https://github.com/open-platform-model/cli/issues/218)) ([2bfebd9](https://github.com/open-platform-model/cli/commit/2bfebd98ef54b98fd68627a24c89a059b400616a))
+
 ## [1.0.0-alpha.20](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.19...v1.0.0-alpha.20) (2026-09-14)
 
 
