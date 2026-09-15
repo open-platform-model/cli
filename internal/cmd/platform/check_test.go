@@ -76,7 +76,8 @@ _k8upSchedule: c.#ComponentTransformer & {
 		name: "schedule"
 		fqn:  "testing.opmodel.dev/catalogs/k8up/transformers/schedule@2.0.0"
 	}
-	requiredTraits: (_backup.metadata.fqn): _backup
+	requiredResources: (_container.metadata.fqn): _container
+	requiredTraits: (_backup.metadata.fqn):       _backup
 }
 
 _k8upCatalog: c.#Catalog & {
@@ -91,6 +92,42 @@ _k8upCatalog: c.#Catalog & {
 	(_baseCatalog.metadata.modulePath): #catalog: _baseCatalog
 	(_k8upCatalog.metadata.modulePath): #catalog: _k8upCatalog
 }
+`
+
+// baseOnlyPlatform: the base catalog defines the provider-fulfilled contract
+// and no enabled catalog implements it. Unfulfilled, and still routable.
+const baseOnlyPlatform = `package platform
+
+import c "opmodel.dev/core@v2"
+
+c.#Platform
+metadata: name: "base-only"
+type: "kubernetes"
+` + fixtureContracts + `
+#registry: (_baseCatalog.metadata.modulePath): #catalog: _baseCatalog
+`
+
+// catalogFulfilledPluralityPlatform: two catalogs' transformers require the
+// same CATALOG-fulfilled contract. Only a provider-fulfilled contract can be
+// over-subscribed, so this platform stays routable.
+const catalogFulfilledPluralityPlatform = routablePlatform + `
+_veleroMirror: c.#ComponentTransformer & {
+	metadata: {
+		name: "mirror"
+		fqn:  "testing.opmodel.dev/catalogs/velero/transformers/mirror@1.4.0"
+	}
+	requiredResources: (_container.metadata.fqn): _container
+}
+
+_veleroMirrorCatalog: c.#Catalog & {
+	metadata: {
+		modulePath: "testing.opmodel.dev/catalogs/velero@v1"
+		version:    "1.4.0"
+	}
+	#transformers: (_veleroMirror.metadata.fqn): _veleroMirror
+}
+
+#registry: (_veleroMirrorCatalog.metadata.modulePath): #catalog: _veleroMirrorCatalog
 `
 
 // overSubscribedPlatform: two provider catalogs compete for one
@@ -214,6 +251,40 @@ func TestPlatformCheck_OverSubscribedPlatformExitsValidation(t *testing.T) {
 	assert.Contains(t, report, "testing.opmodel.dev/catalogs/k8up/transformers/schedule@2.0.0")
 	assert.Contains(t, report, "testing.opmodel.dev/catalogs/velero/transformers/backup@1.4.0")
 	assert.Contains(t, report, "routable:  no — 1 contract is over-subscribed")
+}
+
+// An unfulfilled contract is a report and never a gate (enhancement 0015
+// D18): the command names it and still exits zero, because the refusal for an
+// unmet demand belongs to the render that demands it.
+func TestPlatformCheck_UnfulfilledPlatformExitsZero(t *testing.T) {
+	dir := writePlatformDir(t, fixtureModule, baseOnlyPlatform)
+
+	report, _, err := runCheck(t, dir)
+	skipIfRegistryUnavailable(t, err)
+	require.NoError(t, err, "an unfulfilled contract never changes the exit status")
+
+	assert.Contains(t, report, "unfulfilled contracts: 1")
+	assert.Contains(t, report, "testing.opmodel.dev/catalogs/base/traits/backup@v1alpha1 (defined by testing.opmodel.dev/catalogs/base@v1)")
+	assert.Contains(t, report, "enhancement 0015 D18")
+	assert.Contains(t, report, "fulfilled: no — 1 contract is unfulfilled")
+	assert.Contains(t, report, "routable:  yes")
+	assert.NotContains(t, report, "over-subscribed contracts")
+}
+
+// Over-subscription counts only PROVIDER-fulfilled contracts: any number of
+// catalogs may require a catalog-fulfilled one, and the report shows them as
+// implementations rather than as competitors.
+func TestPlatformCheck_CatalogFulfilledPluralityIsNotOverSubscription(t *testing.T) {
+	dir := writePlatformDir(t, fixtureModule, catalogFulfilledPluralityPlatform)
+
+	report, _, err := runCheck(t, dir)
+	skipIfRegistryUnavailable(t, err)
+	require.NoError(t, err)
+
+	assert.Contains(t, report, "implemented by  testing.opmodel.dev/catalogs/k8up/transformers/schedule@2.0.0, testing.opmodel.dev/catalogs/velero/transformers/mirror@1.4.0",
+		"the catalog-fulfilled container admits any number of suppliers")
+	assert.NotContains(t, report, "over-subscribed contracts")
+	assert.Contains(t, report, "routable:  yes")
 }
 
 func TestPlatformCheck_NotAPlatformModuleFailsBeforeAnyBuild(t *testing.T) {

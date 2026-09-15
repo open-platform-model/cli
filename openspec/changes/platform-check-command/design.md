@@ -37,21 +37,26 @@ Current state, read 2026-09-15 against cli `v1.0.0-alpha.20` (library `v1.0.0-al
 // Report is what `opm platform check` prints: the platform's contract
 // inventory, plus where the platform came from.
 type Report struct {
-	Resolution  Resolution          // provenance, already carried by Resolve
-	Defined     map[string]string   // contract FQN -> defining catalog registry key
-	RequiredBy  map[string][]string // contract FQN -> implementation FQNs
-	Unfulfilled []string
+	Resolution     Resolution          // provenance, already carried by Resolve
+	Defined        map[string]string   // contract FQN -> defining catalog registry key
+	RequiredBy     map[string][]string // contract FQN -> implementation FQNs
+	Unfulfilled    []string
 	OverSubscribed []string
-	Fulfilled   bool
-	Routable    bool
+
+	// The inventory's two verdicts, unexported so NewReport stays the only
+	// constructor and the lists cannot drift from the booleans.
+	fulfilled bool
+	routable  bool
 }
 
 func NewReport(res Resolution, inv *libplatform.ContractInventory) Report
 func (r Report) Render() string
 // Routable reports whether the platform may be generated from; it is the
-// only field that decides the command's exit status (0015 D18).
+// only value that decides the command's exit status (0015 D18).
 func (r Report) Routable() bool
 ```
+
+The two booleans are unexported deliberately: `Routable` cannot be both a field and the accessor the exit-code rule needs, and keeping them off the exported surface makes `NewReport` the only way to build a `Report`, so no caller can hand `Render()` a verdict its own lists contradict. `fulfilled` has no accessor because nothing outside `Render()` reads it; adding one would be surface without a reader.
 
 The command builds the platform, reads `Contracts()`, constructs the report, prints `Render()`, and returns nil or a validation `ExitError`. Splitting the value from the command is what `internal/publish/check.go` already does here, and it is what lets the exit-code asymmetry be unit-tested without cobra.
 
@@ -67,14 +72,18 @@ The command takes an optional positional platform directory. Present, it wins; a
 
 ### The formatter change is additive
 
-`cmdutil.FormatUnresolvedDemands` currently prints either the alternatives line or the nothing-implements line. It gains a third case, taken when the row's `DefinedBy` is non-empty:
+`cmdutil.FormatUnresolvedDemands` currently prints either the alternatives line or the nothing-implements line. The defining catalog is orthogonal to that choice — the capability requires every row carrying one to name it — so each of the two existing branches gains a defined-by variant rather than the formatter gaining a single third case:
 
 ```
-component "web": unresolved trait demand "…/traits/backup@v1alpha1"
+component "api": unresolved trait demand "…/traits/backup@v1alpha1"
   defined by "opmodel.dev/catalogs/opm@v4", implemented by nothing on this platform
+
+component "web": unresolved resource demand "…/resources/container@v1beta1"
+  defined by "opmodel.dev/catalogs/opm@v4"
+  implemented at: …/resources/container@v2
 ```
 
-Rows without a defining catalog keep today's wording exactly, so the only tests that move are the ones asserting a defined-but-unimplemented case, which is the case that could not previously be distinguished.
+Folding both into one case would drop the alternatives line — the actionable half of the diagnostic — from exactly the rows that have one. Rows without a defining catalog keep today's wording exactly, so the only tests that move are the ones asserting a defined-but-unimplemented case, which is the case that could not previously be distinguished.
 
 ## Research & Decisions
 
