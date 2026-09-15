@@ -17,6 +17,9 @@ import (
 type Source string
 
 const (
+	// SourceArgumentDir is a platform module directory named as a command
+	// argument (`opm platform check <dir>`), above every other source.
+	SourceArgumentDir Source = "argument"
 	// SourceFlagDir is the explicit --platform <dir> override.
 	SourceFlagDir Source = "flag"
 	// SourceClusterCR is the cluster Platform CR spec, generated into a
@@ -53,6 +56,8 @@ type Resolution struct {
 // naming the directory the render acquires.
 func (r Resolution) Describe() string {
 	switch r.Source {
+	case SourceArgumentDir:
+		return "platform: " + r.Dir + " (argument)"
 	case SourceFlagDir:
 		return "platform: " + r.Dir + " (--platform)"
 	case SourceClusterCR:
@@ -72,8 +77,12 @@ type ClusterSpecGetter func(ctx context.Context) (spec map[string]any, name stri
 
 // ResolveOptions selects the platform sources for one command invocation.
 type ResolveOptions struct {
-	// PlatformFlag is the --platform flag value (highest precedence): a
-	// platform module directory.
+	// Argument is a platform module directory named as a positional command
+	// argument. Highest precedence, and set only by commands that take one
+	// (`opm platform check <dir>`); empty everywhere else.
+	Argument string
+	// PlatformFlag is the --platform flag value: a platform module
+	// directory, above the cluster CR and the configured default.
 	PlatformFlag string
 	// ConfigPath is the resolved config file path; the local default
 	// platform module and the generated-module cache are its siblings, so
@@ -97,6 +106,16 @@ type ResolveOptions struct {
 // through the registry. Nothing is built here; acquisition is the caller's
 // one call after resolution, so every source fails the same way.
 func Resolve(ctx context.Context, opts ResolveOptions) (string, Resolution, error) {
+	// 0. A directory named as a command argument outranks every configured
+	// source; it gets the same module-shape check as the flag, so a
+	// non-module directory fails before anything is built.
+	if opts.Argument != "" {
+		if err := checkPlatformModuleDir(opts.Argument, "platform directory "+opts.Argument); err != nil {
+			return "", Resolution{}, err
+		}
+		return opts.Argument, Resolution{Source: SourceArgumentDir, Location: opts.Argument, Dir: opts.Argument}, nil
+	}
+
 	// 1. Explicit local override.
 	if opts.PlatformFlag != "" {
 		if err := checkPlatformModuleDir(opts.PlatformFlag, "--platform "+opts.PlatformFlag); err != nil {

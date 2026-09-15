@@ -64,6 +64,45 @@ func TestResolve_FlagWinsOverEverything(t *testing.T) {
 	assert.False(t, clusterCalled, "flag override must not read the cluster")
 }
 
+func TestResolve_ArgumentWinsOverFlagAndEverything(t *testing.T) {
+	configPath := tempOpmDir(t, true)
+	argDir := platformModuleDir(t)
+	flagDir := platformModuleDir(t)
+
+	clusterCalled := false
+	getter := func(context.Context) (map[string]any, string, string, error) {
+		clusterCalled = true
+		return map[string]any{"type": "kubernetes"}, "cluster", "", nil
+	}
+
+	dir, res, err := Resolve(context.Background(), ResolveOptions{
+		Argument:     argDir,
+		PlatformFlag: flagDir,
+		ConfigPath:   configPath,
+		Cluster:      getter,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, argDir, dir)
+	assert.Equal(t, SourceArgumentDir, res.Source)
+	assert.Equal(t, argDir, res.Location)
+	assert.Equal(t, argDir, res.Dir)
+	assert.False(t, clusterCalled, "a directory argument must not read the cluster")
+}
+
+// A directory argument gets the same module-shape check the flag gets, so a
+// non-module directory is refused before anything is built.
+func TestResolve_ArgumentDirWithoutModuleRefused(t *testing.T) {
+	configPath := tempOpmDir(t, true)
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "platform.cue"), []byte("package platform\n"), 0o600))
+
+	_, _, err := Resolve(context.Background(), ResolveOptions{Argument: dir, ConfigPath: configPath})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), dir)
+	assert.Contains(t, err.Error(), "not a platform module")
+	assert.Contains(t, err.Error(), "opm config init")
+}
+
 func TestResolve_FlagFileRefused(t *testing.T) {
 	configPath := tempOpmDir(t, true)
 	file := filepath.Join(t.TempDir(), "platform.cue")
@@ -229,6 +268,7 @@ func TestResolve_LocalDefaultMalformedRefused(t *testing.T) {
 }
 
 func TestResolution_Describe(t *testing.T) {
+	assert.Equal(t, "platform: /p (argument)", Resolution{Source: SourceArgumentDir, Location: "/p", Dir: "/p"}.Describe())
 	assert.Equal(t, "platform: /p (--platform)", Resolution{Source: SourceFlagDir, Location: "/p", Dir: "/p"}.Describe())
 	assert.Equal(t, "platform: cluster Platform CR cluster (generated module /c/abc)", Resolution{Source: SourceClusterCR, Location: "cluster", Dir: "/c/abc"}.Describe())
 	assert.Equal(t, "platform: /home/x/.opm/platform (local default)", Resolution{Source: SourceLocalDefault, Location: "/home/x/.opm/platform", Dir: "/home/x/.opm/platform"}.Describe())
