@@ -19,6 +19,6 @@ Three sections. design.md carries no unverified assumption: the library surface 
 
 ## 3. The defining catalog on unresolved demands
 
-- [ ] 3.1 Extend `cmdutil.FormatUnresolvedDemands` with the defined-by clause per design.md § The formatter change is additive; rows without a defining catalog keep today's wording byte-for-byte. Verify: the existing formatter tests pass unchanged, and a new case asserts the defined-by line.
-- [ ] 3.2 Run the cross-cutting checks: `task test` in full, and confirm no other test asserted the nothing-implements sentence for a row that now carries a catalog. Verify: `task check` green, including `openspec:check`.
-- [ ] 3.3 `task check` green, then commit `feat(cmdutil): name the defining catalog on unresolved demands`.
+- [x] 3.1 Extend `cmdutil.FormatUnresolvedDemands` with the defined-by clause per design.md § The formatter change is additive; rows without a defining catalog keep today's wording byte-for-byte. Verify: the existing formatter tests pass unchanged, and a new case asserts the defined-by line.
+- [x] 3.2 Run the cross-cutting checks: `task test` in full, and confirm no other test asserted the nothing-implements sentence for a row that now carries a catalog. Verify: `task check` green, including `openspec:check`.
+- [x] 3.3 `task check` green, then commit `feat(cmdutil): name the defining catalog on unresolved demands`.

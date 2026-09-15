@@ -127,6 +127,41 @@ func TestFormatUnresolvedDemands(t *testing.T) {
 	assert.Contains(t, got, "nothing on this platform implements this contract")
 }
 
+// TestFormatUnresolvedDemands_DefinedByNamesTheCatalog covers the arm the row
+// could not previously express: the demanded contract IS defined by an
+// enabled catalog and implemented by nothing, which is a different situation
+// from a contract no enabled catalog defines at all.
+func TestFormatUnresolvedDemands_DefinedByNamesTheCatalog(t *testing.T) {
+	got := FormatUnresolvedDemands([]liberrors.UnresolvedDemand{
+		{
+			Component: "api",
+			FQN:       "opmodel.dev/catalogs/opm/traits/backup@v1alpha1",
+			Kind:      "trait",
+			DefinedBy: "opmodel.dev/catalogs/opm@v4",
+		},
+		{
+			Component:    "web",
+			FQN:          "opmodel.dev/catalogs/opm/resources/container@v1beta1",
+			Kind:         "resource",
+			Alternatives: []string{"opmodel.dev/catalogs/opm/resources/container@v2"},
+			DefinedBy:    "opmodel.dev/catalogs/opm@v4",
+		},
+		{
+			Component: "worker",
+			FQN:       "example.com/catalogs/other/traits/mesh@v1",
+			Kind:      "trait",
+		},
+	})
+
+	assert.Contains(t, got, `  defined by "opmodel.dev/catalogs/opm@v4", implemented by nothing on this platform`)
+	// A row that also carries alternatives keeps the actionable line and
+	// gains the catalog beside it.
+	assert.Contains(t, got, "  defined by \"opmodel.dev/catalogs/opm@v4\"\n  implemented at: opmodel.dev/catalogs/opm/resources/container@v2")
+	// A row no enabled catalog defines keeps today's wording, naming no
+	// catalog.
+	assert.Contains(t, got, "  nothing on this platform implements this contract")
+}
+
 func TestPrintValidationError_RoutesUnresolvedDemands(t *testing.T) {
 	// The aggregate stays reachable through wrapping, as the compile path
 	// delivers it; the typed branch must not panic and must not fall through
