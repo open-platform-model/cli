@@ -4,10 +4,10 @@ Three sections. design.md carries no unverified assumption: the library surface 
 
 ## 1. The report value
 
-- [ ] 1.1 Add `internal/platform/check.go` per design.md § The report is a value: a `Report` carrying the resolution, the defined-to-catalog map, the per-contract implementations, the two lists and the two booleans, built from a `*libplatform.ContractInventory` by a constructor. Verify: `go build ./internal/...` passes and nothing outside the package constructs a `Report` field-by-field.
-- [ ] 1.2 Add `Render()` producing the report text: the provenance line first, then the defined contracts with their defining catalogs, the implementations per contract, and the two lists under separate headings, with the empty-inventory case worded as "these catalogs define no contracts" rather than as a clean result. Verify: table tests cover clean, unfulfilled-only, over-subscribed-only, both, and empty.
-- [ ] 1.3 Add the verdict accessor that reports routability alone, and a test asserting the asymmetry directly: an unfulfilled-only report is routable, an over-subscribed one is not. Verify: the test names enhancement 0015 D18 in a comment so the asymmetry is not "fixed" later.
-- [ ] 1.4 `task fmt lint test:unit` green, then commit `feat(platform): add the contract-inventory check report`.
+- [x] 1.1 Add `internal/platform/check.go` per design.md § The report is a value: a `Report` carrying the resolution, the defined-to-catalog map, the per-contract implementations, the two lists and the two booleans, built from a `*libplatform.ContractInventory` by a constructor. Verify: `go build ./internal/...` passes and nothing outside the package constructs a `Report` field-by-field.
+- [x] 1.2 Add `Render()` producing the report text: the provenance line first, then the defined contracts with their defining catalogs, the implementations per contract, and the two lists under separate headings, with the empty-inventory case worded as "these catalogs define no contracts" rather than as a clean result. Verify: table tests cover clean, unfulfilled-only, over-subscribed-only, both, and empty.
+- [x] 1.3 Add the verdict accessor that reports routability alone, and a test asserting the asymmetry directly: an unfulfilled-only report is routable, an over-subscribed one is not. Verify: the test names enhancement 0015 D18 in a comment so the asymmetry is not "fixed" later.
+- [x] 1.4 `task fmt lint test:unit` green, then commit `feat(platform): add the contract-inventory check report`.
 
 ## 2. The command
 
