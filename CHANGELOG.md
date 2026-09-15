@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0-alpha.22](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.21...v1.0.0-alpha.22) (2026-09-15)
+
+
+### Bug Fixes
+
+* **deps:** bump library to v1.0.0-alpha.31 ([dd10166](https://github.com/open-platform-model/cli/commit/dd10166c50c8dcedea278b61dcc302051862319c))
+* **deps:** bump seeded catalog pin and template deps ([dd88a56](https://github.com/open-platform-model/cli/commit/dd88a5677529f3bad6faf1d2b823ae15f117dec0))
+
 ## [1.0.0-alpha.21](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.20...v1.0.0-alpha.21) (2026-09-15)
 
 
