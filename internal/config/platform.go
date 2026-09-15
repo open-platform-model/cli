@@ -113,19 +113,22 @@ func platformBuildError(dir string, err error) error {
 }
 
 // platformBuildHint picks the remediation for a platform module build
-// failure from the shape of the underlying error.
+// failure from the shape of the underlying error. The hints name no command
+// to re-run: the same failure reaches `opm config vet` for the local default
+// module and `opm platform check` for any platform module, so a hint naming
+// one of them misdirects callers of the other.
 func platformBuildHint(dir string, err error) string {
 	modFile := filepath.Join(dir, filepath.FromSlash(PlatformModuleFileName))
 	msg := err.Error()
 	switch {
 	case errors.Is(err, liberrors.ErrWrongKind), errors.Is(err, liberrors.ErrInvalidPackage):
-		return "platform.cue must be a single package embedding core.#Platform; re-run 'opm config init --force' for a fresh module"
+		return "platform.cue must be a single package embedding core.#Platform; for the local default module, 'opm config init --force' writes a fresh one"
 	case strings.Contains(msg, "module not found"), strings.Contains(msg, "cannot find package"), strings.Contains(msg, "cannot expand module graph"):
-		return "Pin a published build in " + modFile + ", then re-run 'opm config vet'"
+		return "Pin a published build in " + modFile + ", then try again"
 	case strings.Contains(msg, "#registry"):
 		return "Each #registry entry's key must equal the module path of the catalog it imports (#catalog); fix the entry named above in " + filepath.Join(dir, PlatformCUEFileName)
 	default:
-		return "Fix the platform module at " + dir + " (pins in " + modFile + "), then re-run 'opm config vet'"
+		return "Fix the platform module at " + dir + " (pins in " + modFile + "), then try again"
 	}
 }
 
