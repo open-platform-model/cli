@@ -11,6 +11,7 @@ import (
 	cmdinstance "github.com/open-platform-model/cli/internal/cmd/instance" // Was: cmdrelease "…/internal/cmd/release" (enhancement 0002 D6)
 	cmdmodule "github.com/open-platform-model/cli/internal/cmd/module"
 	cmdoperator "github.com/open-platform-model/cli/internal/cmd/operator"
+	cmdplatform "github.com/open-platform-model/cli/internal/cmd/platform"
 	cmdregistry "github.com/open-platform-model/cli/internal/cmd/registry"
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
@@ -57,6 +58,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(cmdconfig.NewConfigCmd(&cfg))
 	rootCmd.AddCommand(cmdinstance.NewInstanceCmd(&cfg))
 	rootCmd.AddCommand(cmdoperator.NewOperatorCmd(&cfg))
+	rootCmd.AddCommand(cmdplatform.NewPlatformCmd(&cfg))
 	rootCmd.AddCommand(cmdregistry.NewRegistryCmd(&cfg))
 
 	return rootCmd

@@ -11,11 +11,11 @@ Three sections. design.md carries no unverified assumption: the library surface 
 
 ## 2. The command
 
-- [ ] 2.1 Add `internal/cmd/platform/platform.go` (group constructor taking `*config.GlobalConfig`) and `internal/cmd/platform/check.go` (the `check` subcommand, optional positional platform directory), following the `config vet` template: flags wired in the constructor, `RunE` delegating to a package-level runner, `c.Context()` for the context. Verify: `opm platform --help` lists `check`.
-- [ ] 2.2 Register the group in `internal/cmd/root.go` beside the existing five. Verify: a structural test in the new package asserts the group's `Use`, its `check` subcommand and its flag set, following the `catalog_test.go` pattern.
-- [ ] 2.3 Wire the runner: resolve the platform (positional argument first, else the existing precedence, cluster-CR arm deliberately not passed), build it through the kernel, read `Contracts()`, print the report, and return nil or a validation `ExitError` with `Printed: true` when it is not routable. Verify: a test drives the command in-process against a temp platform module and asserts both the printed report and the exit code for a routable and a non-routable platform.
-- [ ] 2.4 Error paths: a resolved directory that is not a platform module fails before any build; a platform that does not build reports the grouped CUE diagnostic and the validation code; a platform whose core predates the inventory fails naming the missing field and the required core release. Verify: one test per path, each asserting the message and not only the error.
-- [ ] 2.5 `task fmt lint test:unit` green, then commit `feat(cmd): add opm platform check`.
+- [x] 2.1 Add `internal/cmd/platform/platform.go` (group constructor taking `*config.GlobalConfig`) and `internal/cmd/platform/check.go` (the `check` subcommand, optional positional platform directory), following the `config vet` template: flags wired in the constructor, `RunE` delegating to a package-level runner, `c.Context()` for the context. Verify: `opm platform --help` lists `check`.
+- [x] 2.2 Register the group in `internal/cmd/root.go` beside the existing five. Verify: a structural test in the new package asserts the group's `Use`, its `check` subcommand and its flag set, following the `catalog_test.go` pattern.
+- [x] 2.3 Wire the runner: resolve the platform (positional argument first, else the existing precedence, cluster-CR arm deliberately not passed), build it through the kernel, read `Contracts()`, print the report, and return nil or a validation `ExitError` with `Printed: true` when it is not routable. Verify: a test drives the command in-process against a temp platform module and asserts both the printed report and the exit code for a routable and a non-routable platform.
+- [x] 2.4 Error paths: a resolved directory that is not a platform module fails before any build; a platform that does not build reports the grouped CUE diagnostic and the validation code; a platform whose core predates the inventory fails naming the missing field and the required core release. Verify: one test per path, each asserting the message and not only the error.
+- [x] 2.5 `task fmt lint test:unit` green, then commit `feat(cmd): add opm platform check`.
 
 ## 3. The defining catalog on unresolved demands
 
