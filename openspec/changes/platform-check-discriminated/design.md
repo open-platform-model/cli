@@ -43,15 +43,28 @@ Current state, read 2026-09-18 against cli main (library `v1.0.0-alpha.31`, `Def
   `task deps:pins:fixtures`' business and was left alone.
 
 **Gate result (task 3.4), 2026-09-18:** `task fmt`, `task vet`, `task lint`, `task openspec:check`
-(58 passed, 0 failed) and `task test:unit` are green. `task check` does not reach the end: the
-cluster-dependent suites fail because the local kind cluster carries no operator — `task
-test:integration` at `applying ModuleInstance … the server could not find the requested resource`
-(the CRD is absent), and `TestE2E_ThinEditor_ValuesRoundTrip` and
-`TestE2E_Delete_OperatorOwnedDelegates` at `operator did not reconcile … within 3m`. All three are
-the gap `task cluster:operator` closes, tracked in cli issue 214; none touches
-`internal/platform` or `internal/cmd/platform`, and the other 29 e2e tests pass. No other test in
-the repo asserted the two-verdict report shape — `Routable()`, `NewReport` and the verdict lines
-appear only in the two packages this change edits.
+(58 passed, 0 failed), `task test:unit` and `task test:integration` are green. Two e2e tests fail,
+both pre-existing and both already tracked as cli issue 214:
+`TestE2E_ThinEditor_ValuesRoundTrip` and `TestE2E_Delete_OperatorOwnedDelegates`, at `operator did
+not reconcile generation 2 … within 3m`. The cause is not this change and not a missing operator —
+with a verified-reconciling opm-operator `v1.0.0-alpha.14` the cluster Platform still stalls:
+
+```
+Platform cluster: Stalled=True MaterializeFailed:
+  subscription version is not a concrete string:
+  platform.#registry."opmodel.dev/catalogs/opm@v4".version: required field missing: version
+ModuleInstance default/e2e-operator-owned: Ready=False PlatformNotReady
+```
+
+That release still materializes the Platform against the retired scalar-subscription shape; the
+render switch that replaces it is on opm-operator `main` (PR 119) and in no release yet. Failing
+since at least 2026-09-12, independent of any CLI change. The other 29 e2e tests pass. Note also
+that `TestE2E_Operator_InstallUninstallLifecycle` is destructive by design and restores the dev
+operator in a `t.Cleanup`; a suite run that hits go's default 10-minute test timeout is killed
+before that cleanup, leaving the cluster without an operator for the next run.
+
+No other test in the repo asserted the two-verdict report shape — `Routable()`, `NewReport` and the
+verdict lines appear only in the two packages this change edits.
 
 ## Goals / Non-Goals
 
