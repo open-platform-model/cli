@@ -42,14 +42,14 @@ that baseline*, not an unconditionally green e2e run.
 
 ## 3. A failed operator restore fails its own run (tests/e2e)
 
-- [ ] 3.1 Change `restoreDevOperator` in `tests/e2e/operator_test.go` to report through `t.Errorf`
+- [x] 3.1 Change `restoreDevOperator` in `tests/e2e/operator_test.go` to report through `t.Errorf`
       instead of `t.Logf`, keeping the message's underlying error and the by-hand repair command
       (design.md § Decision 3). Verify: with the restore forced to fail (invoke it with a `PATH` that
       omits `task`, or point it at a task name that does not exist), the suite exits non-zero and the
       message names the failed restore, the error and the remedy; with the restore working, the run
       reports nothing from it.
-- [ ] 3.2 Cross-cutting: run `task check` in full against a prepared cluster and compare every
+- [x] 3.2 Cross-cutting: run `task check` in full against a prepared cluster and compare every
       failure against the 1.1 baseline. Verify: no failure is new, and each remaining one is
       attributable to the pinned operator; record that comparison in the PR description.
-- [ ] 3.3 `task lint` and `task test:unit` green, then commit
+- [x] 3.3 `task lint` and `task test:unit` green, then commit
       `test(e2e): fail the run when the dev operator cannot be restored`.

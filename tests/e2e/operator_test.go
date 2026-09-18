@@ -158,10 +158,11 @@ func stripAllModuleInstanceFinalizers(t *testing.T, kubeconfig string) {
 
 // restoreDevOperator rebuilds the reconciling dev operator this suite's
 // destructive tests tear down, by re-running the one target that owns that
-// setup rather than duplicating its steps here. Best-effort: a failure is
-// reported as a test log, not a failure, since the lifecycle test itself has
-// already passed by this point — but it is logged loudly, because a silent
-// failure here shows up as an unrelated hard-fail in the next run.
+// setup rather than duplicating its steps here. A failure here fails the run:
+// the test's own assertions have already passed, but the cluster is left
+// without an operator, and reporting that without failing would push the
+// consequence into someone else's next run as an unrelated hard-fail. This runs
+// from t.Cleanup, where t.Errorf still fails the test.
 func restoreDevOperator(t *testing.T) {
 	t.Helper()
 
@@ -171,8 +172,9 @@ func restoreDevOperator(t *testing.T) {
 	cmd := exec.CommandContext(ctx, "task", "cluster:operator")
 	cmd.Dir = repoPath(t, ".")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Logf("WARNING: could not restore the dev operator via `task cluster:operator`: %v\n%s\n"+
-			"Run it by hand before the next e2e run, or the adoption tests will fail.", err, out)
+		t.Errorf("could not restore the dev operator via `task cluster:operator`: %v\n%s\n"+
+			"The cluster is left without a reconciling operator. Run `task cluster:operator` by "+
+			"hand before the next e2e run, or the adoption tests will fail.", err, out)
 	}
 }
 

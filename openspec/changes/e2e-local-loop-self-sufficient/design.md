@@ -72,6 +72,22 @@ this change touches:
 These are the failures cli issue 214 tracks. Sections 2 and 3 are measured against this list: the
 bar is no failure absent from it.
 
+### After all three sections (task 3.2)
+
+`task check` run in full 2026-09-19 against the same prepared cluster: `fmt`, `vet`, `lint`
+(0 issues), `openspec:check` (`=== ALL SCENARIOS PASSED ===`), `test:unit` and `test:integration`
+all green. `test:e2e` fails with exactly the three baseline failures above and nothing else:
+
+- `TestE2E_ThinEditor_ValuesRoundTrip` (191.7s)
+- `TestE2E_Delete_OperatorOwnedDelegates` both subtests (182.9s, 187.4s)
+
+each still `operator did not reconcile generation 2 of default/e2e-operator-owned within 3m`, and
+each still the pinned `v1.0.0-alpha.14` operator, not anything this change touches.
+
+The four baseline failures this change owns are gone: all five
+`TestE2E_Operator_InstallUninstallLifecycle` subtests pass, and the run contains no restore report
+at all — `task cluster:operator` now builds the binary it needs and succeeds unattended.
+
 ## Goals / Non-Goals
 
 **Goals**
