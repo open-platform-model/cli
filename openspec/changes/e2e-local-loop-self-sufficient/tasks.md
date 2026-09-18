@@ -26,17 +26,17 @@ that baseline*, not an unconditionally green e2e run.
 
 ## 2. The e2e suite resolves through the shipped default registry (tests/e2e)
 
-- [ ] 2.1 Remove the `registry` key from the stub `~/.opm/config.cue` that `TestMain` writes in
-      `tests/e2e/mod_init_test.go`, leaving the rest of the stub intact, so `config.DefaultRegistry`
-      applies (design.md § Decision 1). Verify:
+- [x] 2.1 Set the `registry` key of the stub `~/.opm/config.cue` that `TestMain` writes in
+      `tests/e2e/mod_init_test.go` from the `config.DefaultRegistry` constant, leaving the rest of
+      the stub intact (design.md § Decision 1). Verify:
       `go test ./tests/e2e/ -run 'TestE2E_Operator_InstallUninstallLifecycle/install' -v` passes
       against a prepared cluster, where it previously failed with
       `opmodel.dev/catalogs/opm@v4 has no published release`.
-- [ ] 2.2 Confirm no test is left depending on a registry it does not start: grep `tests/` for a
+- [x] 2.2 Confirm no test is left depending on a registry it does not start: grep `tests/` for a
       hardcoded local registry address. Verify: no match under `tests/e2e/`, and the only remaining
       matches are the deliberate fixture-seeding paths (`hack/fixtures.sh`, the PR workflow's mixed
       mapping), which are outside this suite and unchanged.
-- [ ] 2.3 `task lint` and `task test:unit` green, and `task test:e2e` shows no failure absent from
+- [x] 2.3 `task lint` and `task test:unit` green, and `task test:e2e` shows no failure absent from
       the 1.1 baseline, then commit
       `test(e2e): resolve the suite through the shipped default registry`.
 

@@ -92,29 +92,42 @@ bar is no failure absent from it.
 
 ## Decisions
 
-### 1. Delete the stub's registry key rather than restate the mapping
+### 1. Point the stub at `config.DefaultRegistry` by reference, not by copy
 
-The stub config's `registry` key is removed outright, leaving `config.DefaultRegistry` to apply.
+The stub config's `registry` key is set from the Go constant `config.DefaultRegistry` via
+`fmt.Sprintf`, the pattern `internal/cmd/config/vet_test.go:42` already uses.
 
 **Alternatives considered**
 
-1. *Write the GHCR mapping into the stub.* Works, but creates a third copy of a string that already
-   lives in `internal/config/templates.go` and `hack/opm-config.cue`. A copy is a thing that drifts,
-   and the drift would be invisible until a cluster test failed on a registry error again.
+1. *Write the GHCR mapping into the stub as a literal.* Creates a third copy of a string that
+   already lives in `internal/config/templates.go` and `hack/opm-config.cue`. A copy is a thing that
+   drifts, and the drift would be invisible until a cluster test failed on a registry error again.
 2. *Point the stub at a deliberately unroutable address and require every test to declare its
    registry.* Maximum hermeticity: a test that forgets would fail loudly instead of reaching the
    network. But it rewrites every currently-passing cluster test for a property nothing has asked
    for, and it would fail the lifecycle test in a new way rather than fixing it.
-3. *Delete the key.* The stub then exercises the same resolution a user gets from
-   `opm config init`, which is the behaviour the suite is there to check.
+3. *Delete the key.* **Does not work, measured 2026-09-19.** `ResolveRegistry`
+   (`internal/config/resolver.go:52-75`) is flag > env > config with no default arm: unset in all
+   three leaves `cfg.Registry` empty, and `opmodel.dev` never routes to GHCR. `DefaultRegistry` is
+   only the literal `opm config init` interpolates into `DefaultConfigTemplate`, and
+   `TestLoadConfigFile_DefaultTemplateIsValid` asserts that the *template* carries it — not that an
+   absent key resolves to it. With the key deleted, `install` still fails; only the message changes,
+   from `registry localhost:5000` to `registry ` (empty).
+4. *Give the lifecycle test `--config hack/opm-config.cue`, as `runOperatorOwnedOPM` does.* Fixes
+   the one test, but leaves the stub naming no registry at all, so the next test written without an
+   explicit one hits the same empty-registry failure this change exists to remove.
+5. *Add a default arm to `ResolveRegistry`.* Would make option 3 work and fix it for end users too,
+   but it changes shipped behaviour for every `opm` invocation. That is a releasing `fix`, and it
+   belongs in its own change.
 
-**Decision**: 3. The stub exists to make the suite independent of the developer's real `~/.opm`, not
-to override the shipped default; overriding it with a dead address was never the point and is the
-whole defect. Deleting a line also removes the duplicated constant, so there is nothing left to
-drift.
+**Decision**: 1-by-reference. The stub exists to make the suite independent of the developer's real
+`~/.opm`, not to override the shipped default; pinning it to a dead address was never the point and
+is the whole defect. Interpolating the constant gives the suite exactly the resolution a user gets
+from `opm config init` while adding no copy that can drift — the objection that ruled out the
+literal form does not reach a Go constant reference.
 
-**Consequence worth stating**: an e2e invocation that names no registry now reaches GHCR where it
-previously failed fast. That is already true of every migrated test in the suite, and
+**Consequence worth stating**: an e2e invocation that names no registry of its own now reaches GHCR
+where it previously failed fast. That is already true of every migrated test in the suite, and
 `skipWithoutCoreSchema` is the established handling for an unreachable registry.
 
 ### 2. `deps: [build]` rather than a precondition or `go run`

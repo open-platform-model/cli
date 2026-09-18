@@ -4,8 +4,9 @@
 
 The cluster-backed e2e suite SHALL resolve published modules through the registry mapping the CLI
 ships as its default, and SHALL NOT depend on a registry process that no part of the suite starts.
-The suite's stub home configuration SHALL NOT name a registry address, so that an invocation which
-does not choose a registry for itself resolves exactly as an end user's would.
+The suite's stub home configuration SHALL take its registry from that shipped default by reference
+rather than restating an address, so that an invocation which does not choose a registry for itself
+resolves exactly as an end user's would and the suite cannot drift from what the CLI ships.
 
 A test that needs to write to a registry — publishing a module, or scaffolding from a template it
 publishes first — SHALL provide one it owns for the duration of that test, routing only the domains
@@ -41,6 +42,8 @@ require a developer to start one by hand.
 - **WHEN** the e2e suite's own configuration and helpers are inspected for a hardcoded local
   registry address
 - **THEN** no such address is named as a default any test would fall through to
+- **AND** the default the suite does fall through to is the shipped one, taken by reference, so it
+  cannot be changed in one place and not the other
 
 ### Requirement: A destructive test that cannot restore the cluster fails its own run
 
