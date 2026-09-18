@@ -115,8 +115,18 @@ tasks:
 
   test:e2e:
     desc: Run end-to-end tests
+    summary: |
+      The explicit -timeout is load-bearing, not padding. Go's default is 10
+      minutes, and against a cluster whose operator cannot reconcile, the two
+      operator-owned tests alone burn ~9.5 minutes waiting out their 3m
+      deadlines (cli issue 214). The suite then times out inside
+      TestE2E_Operator_InstallUninstallLifecycle, which is destructive by
+      design and rebuilds the dev operator in a t.Cleanup — a timeout kills the
+      process before that cleanup runs, so the cluster is left without an
+      operator and the NEXT run fails for a reason that has nothing to do with
+      it. Give the suite room to reach its own cleanups.
     cmds:
-      - go test ./tests/e2e/... -v
+      - go test ./tests/e2e/... -v -timeout 25m
 
   test:fixtures:
     desc: 'What PR CI runs over tests/fixtures/modules: publish gates + changed-implies-bumped (hack/fixtures.sh check), seed the local registry from the tree (task registry:start at the workspace root), then render parity against it. Fixtures from localhost:5000, core and catalogs from GHCR.'
