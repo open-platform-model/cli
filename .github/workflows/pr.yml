@@ -178,5 +178,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.0'
+      # -timeout matches task test:e2e; see that task's summary for why the
+      # 10-minute default truncates a destructive test's cleanup.
       - name: Run E2E tests
-        run: go test ./tests/e2e/... -v
+        run: go test ./tests/e2e/... -v -timeout 25m

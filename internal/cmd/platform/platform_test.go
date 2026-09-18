@@ -30,6 +30,13 @@ func TestNewPlatformCheckCmd(t *testing.T) {
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotEmpty(t, cmd.Long)
 
+	// The help text states the exit-code contract, and both refusals belong
+	// in it: a reader who only knows over-subscription would read a
+	// non-zero exit on a comparable pair as a bug.
+	assert.Contains(t, cmd.Long, "over-subscribed   exits with the validation error code")
+	assert.Contains(t, cmd.Long, "comparable        exits with the validation error code")
+	assert.Contains(t, cmd.Long, "unfulfilled       exits 0")
+
 	require.NotNil(t, cmd.Flags().Lookup("platform"))
 	// The check reads a platform module offline: no cluster connection flags
 	// and no render flags belong on it.
