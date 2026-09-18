@@ -1,0 +1,10 @@
+# Declares which enhancement decisions this change implements. Consumed by
+# `task enhancements:delivery:log` at archive time.
+implements:
+  - enhancement: "0015"
+    # D6: a cluster's render is reproduced by pulling the operator-generated
+    # platform package. This change is the whole of it on the cli side: the
+    # cluster arm of platform resolution reads the effective registry the
+    # operator recorded, and `opm platform pull` writes the regenerated
+    # package to a directory a local build consumes. Nothing else remains.
+    decisions: [D6]
