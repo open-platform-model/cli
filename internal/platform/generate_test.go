@@ -42,13 +42,18 @@ func (f *fakeModFiles) ModFile(_ context.Context, mv module.Version) (*modfile.F
 
 // fixtureGraph publishes core at the kernel's verified release (what Roots
 // pins) and one catalog build requiring an older core plus a transitive
-// dependency.
+// dependency. The second catalog is the one a TransformerRegistration
+// contributes in the effective-registry tests: it is published, but nothing
+// subscribes to it.
 func fixtureGraph() *fakeModFiles {
 	return &fakeModFiles{graph: map[string][]platformmodule.Dep{
 		"opmodel.dev/core@" + schema.DefaultSchemaVersion(): nil,
 		"opmodel.dev/core@v2.0.0-alpha.6":                   nil,
 		"opmodel.dev/catalogs/opm@v4.0.1": {
 			{Path: "cue.dev/x/k8s.io@v0", Version: "v0.10.0"},
+			{Path: platformmodule.CorePath, Version: "v2.0.0-alpha.6"},
+		},
+		"opmodel.dev/catalogs/k8s@v1.0.0-alpha.2": {
 			{Path: platformmodule.CorePath, Version: "v2.0.0-alpha.6"},
 		},
 		"cue.dev/x/k8s.io@v0.10.0": nil,

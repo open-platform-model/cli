@@ -46,7 +46,7 @@ type renderEnv struct {
 // Acquisition is the build: a bad pin, a key-to-import mismatch or an
 // unpublished catalog fails here naming the entry or dependency, identically
 // for the flag, cluster and local sources (0019 D5).
-func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.GlobalConfig, platformFlag string, clusterGetter platform.ClusterSpecGetter) (*renderEnv, error) {
+func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.GlobalConfig, platformFlag string, clusterGetter platform.ClusterPlatformGetter) (*renderEnv, error) {
 	dir, res, err := platform.Resolve(ctx, platform.ResolveOptions{
 		PlatformFlag: platformFlag,
 		ConfigPath:   cfg.ConfigPath,
