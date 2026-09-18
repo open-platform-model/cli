@@ -1,5 +1,7 @@
 # Build artifacts
 bin/
+# go-task's up-to-date checksums, written by any task with sources/generates
+.task/
 dist/
 !internal/operator/dist/
 !internal/operator/dist/install.yaml

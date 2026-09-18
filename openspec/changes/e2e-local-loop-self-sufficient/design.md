@@ -27,6 +27,51 @@ See `proposal.md` § Why for motivation. Current state, read 2026-09-18 against 
 - The PR `e2e` job (`.github/workflows/pr.yml`) creates no cluster, and `requireKindCluster` calls
   `t.Skipf`, so none of the cluster-backed tests have ever run in CI.
 
+### Baseline: the cluster-backed suite before any edit (task 1.1)
+
+Recorded 2026-09-19 with `go test ./tests/e2e/... -v -timeout 25m` from this worktree — a clean
+tree with no `bin/opm` — against `kind-opm-dev` prepared and left as `task cluster:operator`
+leaves it: CRDs present, `opm-operator-controller-manager` 1/1 available,
+`Platform/cluster` at `Ready=False` / `Stalled=True`, reason `MaterializeFailed`,
+`status.operatorVersion: v1.0.0-alpha.14`. Suite result `FAIL` in 616s. Every other test passed.
+
+**Failures this change addresses**
+
+- `TestE2E_Operator_InstallUninstallLifecycle/install` — `refused: opmodel.dev/catalogs/opm@v4 has
+  no published release`, reported against `registry localhost:5000`. The stub config's registry key,
+  fixed by section 2.
+- `TestE2E_Operator_InstallUninstallLifecycle/idempotent re-install reports unchanged` — expected 3
+  changed resources, got 0; the run installed CRDs only. Cascade of the failed `install`, so it
+  clears with section 2.
+- `TestE2E_Operator_InstallUninstallLifecycle/uninstall refuses while a finalizer is armed, then
+  --remove-finalizers proceeds` — `kubectl get deployment opm-operator-controller-manager` exits 1
+  because the Deployment was never created. Same cascade, same fix.
+- The restore step, reported but not failed:
+  `WARNING: could not restore the dev operator via ...: exit status 201` /
+  `stat .../bin/opm: no such file or directory` / `task: Failed to run task "cluster:operator":
+  exit status 127`. The clean-tree exit 127 is section 1; the fact that it was a warning rather than
+  a failure is section 3. Note the run still exited non-zero here only because the three subtests
+  above had already failed — with section 2 landed and section 3 not, a broken restore would leave
+  the cluster stripped and the suite green.
+
+  The two subtests after the restore warning, `install immediately after uninstall waits out the
+  terminating Deployment` and `crds-only on a fresh cluster installs only the CRDs`, both passed;
+  the restore runs last, so nothing in this run observed the stripped cluster.
+
+**Failures blocked on the pinned operator (`proposal.md` § Not in this change)**
+
+Each is `operator did not reconcile generation 2 of default/e2e-operator-owned within 3m`
+(`instance_operator_owned_test.go`), which is the `MaterializeFailed` Platform above, not anything
+this change touches:
+
+- `TestE2E_ThinEditor_ValuesRoundTrip` (193s)
+- `TestE2E_Delete_OperatorOwnedDelegates/without spec.prune the operator orphans the workloads, and
+  the CLI says so` (183s)
+- `TestE2E_Delete_OperatorOwnedDelegates/with spec.prune the operator removes the workloads` (186s)
+
+These are the failures cli issue 214 tracks. Sections 2 and 3 are measured against this list: the
+bar is no failure absent from it.
+
 ## Goals / Non-Goals
 
 **Goals**

@@ -12,16 +12,16 @@ that baseline*, not an unconditionally green e2e run.
 
 ## 1. cluster:operator builds the CLI it runs (Taskfile.yml)
 
-- [ ] 1.1 Against a prepared `kind-opm-dev` cluster, record the current cluster-backed e2e baseline
+- [x] 1.1 Against a prepared `kind-opm-dev` cluster, record the current cluster-backed e2e baseline
       in `design.md` § Context: every failing test, its subtests, and the cause of each. This is the
       reference sections 2 and 3 are measured against, and it must be taken before any edit. Verify:
       `design.md` names each failing test with its cause, and distinguishes failures this change
       addresses from those blocked on the operator pin.
-- [ ] 1.2 Add `deps: [build]` to the `cluster:operator` task in `Taskfile.yml` per design.md
+- [x] 1.2 Add `deps: [build]` to the `cluster:operator` task in `Taskfile.yml` per design.md
       § Decision 2. Verify: with `bin/opm` deleted, `task cluster:operator` against a running cluster
       builds the binary and completes the install; a second run rebuilds nothing and completes
       without duplicating operator arguments (the idempotence `kind-cluster-tasks` already requires).
-- [ ] 1.3 `task lint` and `task test:unit` green, then commit
+- [x] 1.3 `task lint` and `task test:unit` green, then commit
       `chore(taskfile): build the CLI cluster:operator installs with`.
 
 ## 2. The e2e suite resolves through the shipped default registry (tests/e2e)

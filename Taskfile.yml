@@ -241,6 +241,11 @@ tasks:
     preconditions:
       - sh: kubectl cluster-info --context kind-{{.CLUSTER_NAME}} &>/dev/null
         msg: "Cluster 'kind-{{.CLUSTER_NAME}}' is not running. Run: task cluster:create"
+    # The binary below is this task's own tool, so the task builds it. `build`
+    # is checksummed by its sources/generates, so this is a no-op when the
+    # binary is current — and it is what lets an unattended caller (the e2e
+    # suite's restore cleanup) work from a tree that was never built.
+    deps: [build]
     cmds:
       # --config keeps this hermetic: the dev-cluster tooling must not depend on
       # a developer's personal ~/.opm being present or in the post-D39 format.
