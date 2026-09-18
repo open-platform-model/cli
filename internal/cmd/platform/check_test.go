@@ -110,7 +110,43 @@ type: "kubernetes"
 // catalogFulfilledPluralityPlatform: two catalogs' transformers require the
 // same CATALOG-fulfilled contract. Only a provider-fulfilled contract can be
 // over-subscribed, so this platform stays routable.
+//
+// The mirror transformer declares a required label that k8up's schedule does
+// not, which is what keeps the pair DISCRIMINATED: schedule requires the
+// container plus the backup trait, and on labels alone mirror would be the
+// broader of the two. Without the label this platform is
+// undiscriminatedPlatform below, and the "many suppliers, still routable"
+// claim would be read on a platform the operator refuses for a different
+// reason.
 const catalogFulfilledPluralityPlatform = routablePlatform + `
+_veleroMirror: c.#ComponentTransformer & {
+	metadata: {
+		name: "mirror"
+		fqn:  "testing.opmodel.dev/catalogs/velero/transformers/mirror@1.4.0"
+	}
+	requiredResources: (_container.metadata.fqn): _container
+	requiredLabels: "testing.opmodel.dev/mirror": "true"
+}
+
+_veleroMirrorCatalog: c.#Catalog & {
+	metadata: {
+		modulePath: "testing.opmodel.dev/catalogs/velero@v1"
+		version:    "1.4.0"
+	}
+	#transformers: (_veleroMirror.metadata.fqn): _veleroMirror
+}
+
+#registry: (_veleroMirrorCatalog.metadata.modulePath): #catalog: _veleroMirrorCatalog
+`
+
+// undiscriminatedPlatform: catalogFulfilledPluralityPlatform's shape without
+// the required label. mirror requires the container alone and schedule
+// requires the container plus the backup trait, so mirror's predicate
+// contains schedule's: every component schedule matches, mirror matches too,
+// and no component's shape tells them apart (enhancement 0015 D5). Still
+// routable — the container is catalog-fulfilled, so nothing is
+// over-subscribed.
+const undiscriminatedPlatform = routablePlatform + `
 _veleroMirror: c.#ComponentTransformer & {
 	metadata: {
 		name: "mirror"
@@ -150,6 +186,32 @@ _veleroCatalog: c.#Catalog & {
 }
 
 #registry: (_veleroCatalog.metadata.modulePath): #catalog: _veleroCatalog
+`
+
+// overSubscribedAndUndiscriminatedPlatform fails both gates at once, on
+// different contracts: velero and k8up compete for the provider-fulfilled
+// backup trait, and harbor's mirror contains k8up's schedule over the
+// catalog-fulfilled container. velero's backup transformer requires no
+// catalog-fulfilled contract, so it is in no comparable pair — the two
+// refusals really are about different things.
+const overSubscribedAndUndiscriminatedPlatform = overSubscribedPlatform + `
+_harborMirror: c.#ComponentTransformer & {
+	metadata: {
+		name: "mirror"
+		fqn:  "testing.opmodel.dev/catalogs/harbor/transformers/mirror@1.0.0"
+	}
+	requiredResources: (_container.metadata.fqn): _container
+}
+
+_harborCatalog: c.#Catalog & {
+	metadata: {
+		modulePath: "testing.opmodel.dev/catalogs/harbor@v1"
+		version:    "1.0.0"
+	}
+	#transformers: (_harborMirror.metadata.fqn): _harborMirror
+}
+
+#registry: (_harborCatalog.metadata.modulePath): #catalog: _harborCatalog
 `
 
 // writePlatformDir writes a platform module holding platformCUE and returns
@@ -285,6 +347,61 @@ func TestPlatformCheck_CatalogFulfilledPluralityIsNotOverSubscription(t *testing
 		"the catalog-fulfilled container admits any number of suppliers")
 	assert.NotContains(t, report, "over-subscribed contracts")
 	assert.Contains(t, report, "routable:  yes")
+	// The suppliers are told apart by mirror's required label, so the
+	// platform this assertion is made on is one the operator generates from
+	// (enhancement 0015 D5).
+	assert.Contains(t, report, "discriminated: yes")
+	assert.NotContains(t, report, "comparable transformer pairs")
+}
+
+// A comparable pair is what platform-package generation refuses on
+// (enhancement 0015 D5), so the pre-flight refuses it too — even though every
+// contract here has exactly one supplier and the platform is routable.
+func TestPlatformCheck_UndiscriminatedPlatformExitsValidation(t *testing.T) {
+	dir := writePlatformDir(t, fixtureModule, undiscriminatedPlatform)
+
+	report, _, err := runCheck(t, dir)
+	skipIfRegistryUnavailable(t, err)
+	require.Error(t, err)
+
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
+	assert.True(t, exitErr.Printed, "the report already carries the verdict")
+
+	assert.Contains(t, report, "comparable transformer pairs: 1")
+	assert.Contains(t, report, "enhancement 0015")
+	assert.Contains(t, report, "testing.opmodel.dev/catalogs/velero/transformers/mirror@1.4.0 (broader)")
+	assert.Contains(t, report, "and  testing.opmodel.dev/catalogs/k8up/transformers/schedule@2.0.0 (narrower)")
+	assert.Contains(t, report, "over  testing.opmodel.dev/catalogs/base/resources/container@v1beta1")
+	assert.Contains(t, report, "routable:  yes", "a comparable pair is not over-subscription")
+	assert.Contains(t, report, "discriminated: no — 1 pair is comparable")
+
+	// Both counts are named whichever gate fired, so the message never
+	// leaves the reader guessing which one is zero.
+	assert.Contains(t, err.Error(), "0 over-subscribed contract(s), 1 comparable transformer pair(s)")
+	assert.Contains(t, err.Error(), dir)
+}
+
+// The two refusals are independent: a platform failing both is reported under
+// both headings and exits once.
+func TestPlatformCheck_OverSubscribedAndUndiscriminatedExitsOnce(t *testing.T) {
+	dir := writePlatformDir(t, fixtureModule, overSubscribedAndUndiscriminatedPlatform)
+
+	report, _, err := runCheck(t, dir)
+	skipIfRegistryUnavailable(t, err)
+	require.Error(t, err)
+
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
+
+	assert.Contains(t, report, "over-subscribed contracts: 1")
+	assert.Contains(t, report, "comparable transformer pairs: 1")
+	assert.Contains(t, report, "testing.opmodel.dev/catalogs/harbor/transformers/mirror@1.0.0 (broader)")
+	assert.Contains(t, report, "routable:  no — 1 contract is over-subscribed")
+	assert.Contains(t, report, "discriminated: no — 1 pair is comparable")
+	assert.Contains(t, err.Error(), "1 over-subscribed contract(s), 1 comparable transformer pair(s)")
 }
 
 func TestPlatformCheck_NotAPlatformModuleFailsBeforeAnyBuild(t *testing.T) {
@@ -358,4 +475,27 @@ type: "kubernetes"
 	assert.Contains(t, err.Error(), "2.0.0-alpha.9")
 	assert.Contains(t, err.Error(), dir)
 	assert.Empty(t, report)
+}
+
+// A report the inventory does not carry is never defaulted: core alpha.9
+// derives the inventory but not its comparable-predicate report, and a
+// missing `discriminated` defaulted to true would read as a pass on exactly
+// the platforms this command now refuses.
+func TestPlatformCheck_CoreWithoutTheComparableReportNamesTheRelease(t *testing.T) {
+	dir := writePlatformDir(t, `module: "testing.opmodel.dev/platforms/check-fixture@v0"
+language: version: "v0.17.0"
+deps: "opmodel.dev/core@v2": v: "v2.0.0-alpha.9"
+`, undiscriminatedPlatform)
+
+	report, _, err := runCheck(t, dir)
+	skipIfRegistryUnavailable(t, err)
+	require.Error(t, err)
+
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
+	assert.Contains(t, err.Error(), `"comparable"`)
+	assert.Contains(t, err.Error(), "2.0.0-alpha.10")
+	assert.Contains(t, err.Error(), dir)
+	assert.Empty(t, report, "no partial report is printed")
 }

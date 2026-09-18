@@ -25,17 +25,23 @@ func NewPlatformCheckCmd(cfg *config.GlobalConfig) *cobra.Command {
 Builds the resolved platform module and reports the contract inventory core
 derives from it: every contract the enabled catalogs define and the catalog
 that defines each, the transformers that implement it, the provider-fulfilled
-contracts nothing implements, and the provider-fulfilled contracts required by
-transformers from more than one catalog.
+contracts nothing implements, the provider-fulfilled contracts required by
+transformers from more than one catalog, and every pair of transformers whose
+match predicates are comparable over a shared catalog-fulfilled contract.
 
 Offline: the command applies nothing, renders nothing and contacts no cluster.
 A cold module cache still fetches the platform's pinned core and catalogs.
 
-The exit code carries the routability verdict, not the severity of the word:
+The exit code carries what platform-package generation refuses on, not the
+severity of the word:
 
   over-subscribed   exits with the validation error code, because a platform
                     package cannot be generated from an over-subscribed
                     platform
+  comparable        exits with the validation error code — every component
+                    the narrower transformer matches is also matched by the
+                    broader one, so both would render and nothing tells them
+                    apart (enhancement 0015 D5)
   unfulfilled       exits 0 — a platform may define a contract ahead of the
                     provider that implements it, and an unmet demand is
                     refused by the render that demands it
@@ -63,8 +69,9 @@ Examples:
 }
 
 // runPlatformCheck resolves the platform, builds it, and prints the contract
-// inventory report. Only routability decides the exit status (enhancement
-// 0015 D18).
+// inventory report. Routability and discrimination decide the exit status —
+// the two conditions platform-package generation refuses on (enhancement 0015
+// D5, D37); an unfulfilled contract never does (D18).
 func runPlatformCheck(ctx context.Context, args []string, cfg *config.GlobalConfig, platformFlag string) error {
 	argDir := ""
 	if len(args) > 0 {
@@ -99,11 +106,15 @@ func runPlatformCheck(ctx context.Context, args []string, cfg *config.GlobalConf
 
 	report := platform.NewReport(res, inv)
 	output.Println(report.Render())
-	if !report.Routable() {
+	// Both counts are named, whichever refusal fired: the two have
+	// different fixes (disable a competing catalog; discriminate the
+	// predicates), so a single combined verdict would hide which one is
+	// being reported.
+	if !report.Routable() || !report.Discriminated() {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitValidationError,
-			Err: fmt.Errorf("platform %s is not routable: %d over-subscribed contract(s) — a platform package cannot be generated from it",
-				dir, len(report.OverSubscribed)),
+			Err: fmt.Errorf("platform %s cannot generate a platform package: %d over-subscribed contract(s), %d comparable transformer pair(s)",
+				dir, len(report.OverSubscribed), len(report.Comparable)),
 			Printed: true,
 		}
 	}

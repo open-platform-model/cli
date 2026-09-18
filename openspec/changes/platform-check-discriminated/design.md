@@ -42,6 +42,17 @@ Current state, read 2026-09-18 against cli main (library `v1.0.0-alpha.31`, `Def
   — so no pin was hand-picked and no sibling repo's tree was disturbed. `examples/cue.mod` is
   `task deps:pins:fixtures`' business and was left alone.
 
+**Gate result (task 3.4), 2026-09-18:** `task fmt`, `task vet`, `task lint`, `task openspec:check`
+(58 passed, 0 failed) and `task test:unit` are green. `task check` does not reach the end: the
+cluster-dependent suites fail because the local kind cluster carries no operator — `task
+test:integration` at `applying ModuleInstance … the server could not find the requested resource`
+(the CRD is absent), and `TestE2E_ThinEditor_ValuesRoundTrip` and
+`TestE2E_Delete_OperatorOwnedDelegates` at `operator did not reconcile … within 3m`. All three are
+the gap `task cluster:operator` closes, tracked in cli issue 214; none touches
+`internal/platform` or `internal/cmd/platform`, and the other 29 e2e tests pass. No other test in
+the repo asserted the two-verdict report shape — `Routable()`, `NewReport` and the verdict lines
+appear only in the two packages this change edits.
+
 ## Goals / Non-Goals
 
 **Goals**
