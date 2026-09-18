@@ -13,6 +13,35 @@ Current state, read 2026-09-18 against cli main (library `v1.0.0-alpha.31`, `Def
 - The operator's refusal wording (`internal/controller/platform_inventory.go`): `<broader> (broader) and <narrower> (narrower) over <contracts>`, lists sorted.
 - The workspace `task deps:update` is the only sanctioned way to move `cue.mod` pins and `DefaultCorePin`; it rewrites every sibling repo's pins in one pass, and `catalog_opm` still pins core alpha.9, so a workspace bump is due regardless of this change.
 
+**Spike (task 1.2), run 2026-09-18 on library `v1.0.0-alpha.32` with the pins at core
+`v2.0.0-alpha.10` / `opmodel.dev/catalogs/opm` `v4.4.0` / `opmodel.dev/catalogs/k8s`
+`v1.0.0-alpha.3`:**
+
+- Every command fixture decodes `comparable` and `discriminated` — none is refused by
+  `Contracts()`, because they all pin `config.DefaultCorePin`, which now reads alpha.10.
+- Exactly one fixture carries a row, as predicted:
+
+  | Fixture | `discriminated` | `comparable` |
+  | --- | --- | --- |
+  | `routablePlatform` | `true` | 0 |
+  | `baseOnlyPlatform` | `true` | 0 |
+  | `catalogFulfilledPluralityPlatform` | `false` | 1 — broader `…/velero/transformers/mirror@1.4.0`, narrower `…/k8up/transformers/schedule@2.0.0`, over `…/base/resources/container@v1beta1` |
+  | `overSubscribedPlatform` | `true` | 0 |
+
+  `overSubscribedPlatform`'s two transformers are incomparable (velero requires the trait
+  alone, k8up the resource plus the trait — neither predicate contains the other), which is
+  why over-subscription and undiscrimination are separate verdicts on separate fixtures.
+- `go test ./internal/cmd/platform/... ./internal/platform/... ./internal/config/...` is green
+  on the new pins with no source change: nothing reads the row yet, and the sole row lands on a
+  fixture whose assertions are about over-subscription. § The plurality fixture is split is
+  therefore about keeping that fixture's *claim* honest, not about repairing a failure.
+- Deviation from task 1.1 as written: the workspace `task deps:update` deliberately skips
+  `.claude/worktrees`, so it cannot rewrite this checkout. The same tooling was run scoped to
+  this worktree instead — `cue mod get` per `cue.mod` directory (`hack/platform`, the three
+  templates), and `platform-pins.sh`'s own `awk` rewrite applied to `internal/config/templates.go`
+  — so no pin was hand-picked and no sibling repo's tree was disturbed. `examples/cue.mod` is
+  `task deps:pins:fixtures`' business and was left alone.
+
 ## Goals / Non-Goals
 
 **Goals**
