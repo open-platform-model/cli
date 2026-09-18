@@ -1,0 +1,9 @@
+# Declares which enhancement decisions this change implements. Consumed by
+# `task enhancements:delivery:log` at archive time.
+#
+# No decision is claimed. D5 was completed by the operator's generation gate
+# (platform-inventory-gate); this change lands the same verdict in the offline
+# pre-flight, as OQ9's resolution asked ("land the check identically in the
+# operator and opm platform check"). A re-claim would duplicate, not complete.
+implements:
+  - enhancement: "0015"
