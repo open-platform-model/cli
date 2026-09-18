@@ -15,11 +15,16 @@ func NewPlatformCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Short: "Inspect platform modules",
 		Long: `Inspect the platform a render would run against.
 
-opm platform reads a platform module offline: it applies nothing, renders
-nothing and contacts no cluster.`,
+opm platform check reads a platform module offline: it applies nothing,
+renders nothing and contacts no cluster.
+
+opm platform pull reads the cluster Platform CR and writes the platform
+module the cluster renders against to a directory. It reads the cluster; it
+never writes to it and publishes nothing.`,
 	}
 
 	c.AddCommand(NewPlatformCheckCmd(cfg))
+	c.AddCommand(NewPlatformPullCmd(cfg))
 
 	return c
 }

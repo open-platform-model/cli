@@ -21,6 +21,12 @@ func TestNewPlatformCmd(t *testing.T) {
 		names = append(names, c.Name())
 	}
 	assert.Contains(t, names, "check")
+	assert.Contains(t, names, "pull")
+
+	// The group help no longer claims the whole group is offline: pull
+	// reads the cluster.
+	assert.Contains(t, cmd.Long, "opm platform check reads a platform module offline")
+	assert.Contains(t, cmd.Long, "opm platform pull reads the cluster Platform CR")
 }
 
 func TestNewPlatformCheckCmd(t *testing.T) {
