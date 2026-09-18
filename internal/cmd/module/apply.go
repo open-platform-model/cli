@@ -127,7 +127,7 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 		ValuesFiles:     rf.Values,
 		Name:            nameFlag,
 		PlatformFlag:    rf.Platform,
-		ClusterPlatform: platform.ClusterSpecGetterFor(k8sClient.Dynamic),
+		ClusterPlatform: platform.ClusterPlatformGetterFor(k8sClient.Dynamic),
 		K8sConfig:       k8sConfig,
 		Config:          cfg,
 	})

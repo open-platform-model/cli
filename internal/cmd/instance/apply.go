@@ -111,7 +111,7 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 		InstanceFilePath: instanceFile,
 		ValuesFiles:      rff.Values,
 		PlatformFlag:     rff.Platform,
-		ClusterPlatform:  platform.ClusterSpecGetterFor(k8sClient.Dynamic),
+		ClusterPlatform:  platform.ClusterPlatformGetterFor(k8sClient.Dynamic),
 		K8sConfig:        k8sConfig,
 		Config:           cfg,
 	})

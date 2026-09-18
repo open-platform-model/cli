@@ -47,10 +47,33 @@ type Resolution struct {
 	// "Refuse" or empty when unset). Set only for SourceClusterCR; the
 	// render layer maps it, and the config key, onto the kernel's policy.
 	SkewPolicy string
+	// RegistryOrigin names which half of the cluster CR the module was
+	// generated from: RegistryOriginEffective (the registry the operator
+	// recorded on status) or RegistryOriginSpec (the authored
+	// subscriptions, because no operator has recorded one). Set only for
+	// SourceClusterCR.
+	RegistryOrigin string
+	// PackageIdentity is status.packageIdentity as the operator recorded
+	// it, reported and never verified (the CLI cannot recompute it: the
+	// identity covers every active claim coordinate, and a claim that
+	// overlaps a subscription leaves no trace on the recorded registry).
+	// Set only for SourceClusterCR, empty when none is recorded.
+	PackageIdentity string
 	// Warning is non-empty when resolution fell back from the cluster CR
 	// to the local default.
 	Warning string
 }
+
+// Registry origins for Resolution.RegistryOrigin.
+const (
+	// RegistryOriginEffective is the resolved registry the operator
+	// recorded on the Platform's status: its own union of the authored
+	// subscriptions and the catalogs active claims contributed.
+	RegistryOriginEffective = "effective"
+	// RegistryOriginSpec is the CR's authored subscriptions, used when the
+	// status records no registry.
+	RegistryOriginSpec = "spec"
+)
 
 // Describe returns the one-line provenance description for command output,
 // naming the directory the render acquires.
@@ -61,7 +84,7 @@ func (r Resolution) Describe() string {
 	case SourceFlagDir:
 		return "platform: " + r.Dir + " (--platform)"
 	case SourceClusterCR:
-		return "platform: cluster Platform CR " + r.Location + " (generated module " + r.Dir + ")"
+		return "platform: cluster Platform CR " + r.Location + " (" + r.describeRegistry() + "generated module " + r.Dir + ")"
 	case SourceLocalDefault:
 		return "platform: " + r.Dir + " (local default)"
 	default:
@@ -69,11 +92,52 @@ func (r Resolution) Describe() string {
 	}
 }
 
-// ClusterSpecGetter fetches the cluster Platform CR's spec. It returns
-// (spec, name, "", nil) on success and ("", unavailable-reason, nil) when the
-// CR is absent or unreadable in a way that permits warn-fallback (NotFound,
+// describeRegistry is the cluster CR's registry provenance, as a prefix
+// ending in ", ": which half of the CR the module was generated from and,
+// for the effective registry, the package identity the operator recorded.
+// Empty for a Resolution that carries no origin.
+func (r Resolution) describeRegistry() string {
+	switch r.RegistryOrigin {
+	case RegistryOriginEffective:
+		if r.PackageIdentity == "" {
+			return "effective registry, no package identity recorded, "
+		}
+		return "effective registry, package " + r.PackageIdentity + ", "
+	case RegistryOriginSpec:
+		return "spec registry, no operator generation recorded, "
+	default:
+		return ""
+	}
+}
+
+// ClusterPlatform is the singleton cluster Platform document as the getter
+// read it: name, generation, spec and status, all undecoded. The status
+// half carries the effective registry the operator generated the running
+// package from (DecodeCR); it is nil on a cluster no operator has
+// reconciled.
+type ClusterPlatform struct {
+	Name       string
+	Generation int64
+	Spec       map[string]any
+	Status     map[string]any
+}
+
+// ClusterPlatformGetter fetches the cluster Platform CR. It returns
+// (doc, "", nil) on success and (nil, unavailable-reason, nil) when the CR
+// is absent or unreadable in a way that permits warn-fallback (NotFound,
 // Forbidden — D21). Any other error is fatal to resolution.
-type ClusterSpecGetter func(ctx context.Context) (spec map[string]any, name string, unavailable string, err error)
+type ClusterPlatformGetter func(ctx context.Context) (doc *ClusterPlatform, unavailable string, err error)
+
+// ErrClusterRead marks a fatal failure to read the cluster Platform: the
+// cluster is unreachable or the API rejected the read. NotFound and
+// Forbidden never reach it — they are warn-fallback conditions.
+var ErrClusterRead = errors.New("reading cluster Platform")
+
+// ErrNoClusterPlatform is returned instead of the local fallback when the
+// cluster Platform is absent or unreadable and ResolveOptions.NoLocalFallback
+// is set: a command whose subject is the cluster's own platform has nothing
+// to resolve, and the local default is not a stand-in for it.
+var ErrNoClusterPlatform = errors.New("no readable cluster Platform")
 
 // ResolveOptions selects the platform sources for one command invocation.
 type ResolveOptions struct {
@@ -90,7 +154,13 @@ type ResolveOptions struct {
 	ConfigPath string
 	// Cluster is the cluster CR getter. nil means the command is offline
 	// (build/render) and MUST NOT read the cluster (D17/D21).
-	Cluster ClusterSpecGetter
+	Cluster ClusterPlatformGetter
+	// NoLocalFallback refuses the local-default step when the cluster
+	// Platform is unavailable, returning ErrNoClusterPlatform instead. Set
+	// by commands whose subject is the cluster's platform (`opm platform
+	// pull`), for which the local default would be a different platform
+	// wearing the cluster's name.
+	NoLocalFallback bool
 	// Registry is the CUE registry mapping the cluster CR's dependency
 	// closure resolves through (the CLI's configured registry).
 	Registry string
@@ -127,24 +197,15 @@ func Resolve(ctx context.Context, opts ResolveOptions) (string, Resolution, erro
 	// 2. Cluster Platform CR (cluster-facing commands only).
 	fallbackWarning := ""
 	if opts.Cluster != nil {
-		spec, name, unavailable, err := opts.Cluster(ctx)
+		doc, unavailable, err := opts.Cluster(ctx)
 		if err != nil {
-			return "", Resolution{}, fmt.Errorf("reading cluster Platform: %w", err)
+			return "", Resolution{}, fmt.Errorf("%w: %w", ErrClusterRead, err)
 		}
 		if unavailable == "" {
-			s, err := DecodeCRSpec(spec, name)
-			if err != nil {
-				return "", Resolution{}, err
-			}
-			dir, err := GenerateClusterModule(ctx, s, GenerateOptions{
-				CacheDir: config.PlatformCacheDir(opts.ConfigPath),
-				Registry: opts.Registry,
-				ModFiles: opts.ModFiles,
-			})
-			if err != nil {
-				return "", Resolution{}, fmt.Errorf("cluster Platform %q: %w", name, err)
-			}
-			return dir, Resolution{Source: SourceClusterCR, Location: name, Dir: dir, SkewPolicy: s.SkewPolicy}, nil
+			return resolveClusterCR(ctx, doc, opts)
+		}
+		if opts.NoLocalFallback {
+			return "", Resolution{}, fmt.Errorf("%w (%s)", ErrNoClusterPlatform, unavailable)
 		}
 		fallbackWarning = "cluster Platform not used (" + unavailable + ") — falling back to the local default platform"
 		output.Warn(fallbackWarning)
@@ -165,6 +226,62 @@ func Resolve(ctx context.Context, opts ResolveOptions) (string, Resolution, erro
 	}
 	return localDir, Resolution{Source: SourceLocalDefault, Location: localDir, Dir: localDir, Warning: fallbackWarning}, nil
 }
+
+// resolveClusterCR generates the platform module the cluster renders
+// against. The registry the operator recorded on status wins over the
+// authored spec whenever it holds entries: it is the union the operator
+// resolved from the subscriptions and the active TransformerRegistration
+// claims, and it is what the running package was generated from (0015
+// D13/D17). The spec is the fallback for a cluster no operator has
+// generated for.
+//
+// Two divergences between spec and effective package are warned, never
+// silently substituted: a status behind the spec's generation, and a
+// Platform the operator refused. Neither changes which registry is used —
+// the effective package is what the cluster renders against in both cases,
+// and the warning says why the laptop is deliberately behind.
+func resolveClusterCR(ctx context.Context, doc *ClusterPlatform, opts ResolveOptions) (string, Resolution, error) {
+	s, eff, err := DecodeCR(doc)
+	if err != nil {
+		return "", Resolution{}, err
+	}
+
+	entries, origin, identity := s.Entries, RegistryOriginSpec, ""
+	if eff != nil && len(eff.Entries) > 0 {
+		entries, origin, identity = eff.Entries, RegistryOriginEffective, eff.PackageIdentity
+		if eff.ObservedGeneration < doc.Generation {
+			output.Warn(fmt.Sprintf(
+				"cluster Platform generation %d is not yet generated by the operator (status describes generation %d); rendering against the effective package",
+				doc.Generation, eff.ObservedGeneration))
+		}
+		if eff.Ready != nil && eff.Ready.Status == conditionFalse {
+			output.Warn(fmt.Sprintf(
+				"cluster Platform is Ready=False (%s); rendering against the last good package the operator recorded",
+				eff.Ready.Reason))
+		}
+	}
+
+	dir, err := GenerateClusterModule(ctx, Spec{Name: s.Name, Type: s.Type, Entries: entries}, GenerateOptions{
+		CacheDir: config.PlatformCacheDir(opts.ConfigPath),
+		Registry: opts.Registry,
+		ModFiles: opts.ModFiles,
+	})
+	if err != nil {
+		return "", Resolution{}, fmt.Errorf("cluster Platform %q: %w", s.Name, err)
+	}
+	return dir, Resolution{
+		Source:          SourceClusterCR,
+		Location:        s.Name,
+		Dir:             dir,
+		SkewPolicy:      s.SkewPolicy,
+		RegistryOrigin:  origin,
+		PackageIdentity: identity,
+	}, nil
+}
+
+// conditionFalse is metav1.ConditionFalse's value, the one status the two
+// registry warnings key off.
+const conditionFalse = "False"
 
 // checkPlatformModuleDir refuses anything but a directory holding
 // cue.mod/module.cue, naming the expected shape and the migration. The

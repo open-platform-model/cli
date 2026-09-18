@@ -36,6 +36,18 @@ func clusterPlatformObj(spec map[string]any) *unstructured.Unstructured {
 	}}
 }
 
+// clusterPlatformObjWithStatus is the reconciled document: a generation on
+// metadata and the operator's recorded status beside the spec.
+func clusterPlatformObjWithStatus(spec, status map[string]any, generation int64) *unstructured.Unstructured {
+	obj := clusterPlatformObj(spec)
+	obj.Object["metadata"] = map[string]any{
+		"name":       inventory.PlatformSingletonName,
+		"generation": generation,
+	}
+	obj.Object["status"] = status
+	return obj
+}
+
 // testSpec is the seed document as SpecFromPlatform decodes it from a built
 // local platform: every entry carries its derived version and a concrete
 // enable.
@@ -49,27 +61,56 @@ func testSpec() Spec {
 	}
 }
 
-func TestClusterSpecGetterFor_ReadsSingleton(t *testing.T) {
-	dyn := newFakeDynamic(clusterPlatformObj(map[string]any{
-		"type": "kubernetes",
-	}))
+func TestClusterPlatformGetterFor_ReadsSpecAndStatus(t *testing.T) {
+	dyn := newFakeDynamic(clusterPlatformObjWithStatus(
+		map[string]any{"type": "kubernetes"},
+		map[string]any{
+			"observedGeneration": int64(7),
+			"packageIdentity":    "gen-7-3f9a1c2b",
+			"operatorVersion":    "v1.0.0-alpha.20",
+			"registry": []any{
+				map[string]any{
+					"catalog": "opmodel.dev/catalogs/opm@v4",
+					"version": "4.4.0",
+					"enabled": true,
+					"source":  EntrySourceSubscription,
+				},
+			},
+		}, 7))
 
-	spec, name, unavailable, err := ClusterSpecGetterFor(dyn)(context.Background())
+	doc, unavailable, err := ClusterPlatformGetterFor(dyn)(context.Background())
 	require.NoError(t, err)
 	assert.Empty(t, unavailable)
-	assert.Equal(t, inventory.PlatformSingletonName, name)
-	assert.Equal(t, "kubernetes", spec["type"])
+	require.NotNil(t, doc)
+	assert.Equal(t, inventory.PlatformSingletonName, doc.Name)
+	assert.Equal(t, int64(7), doc.Generation)
+	assert.Equal(t, "kubernetes", doc.Spec["type"])
+	require.NotNil(t, doc.Status, "the getter returns the status half undecoded")
+	assert.Equal(t, "gen-7-3f9a1c2b", doc.Status["packageIdentity"])
 }
 
-func TestClusterSpecGetterFor_NotFoundIsFallback(t *testing.T) {
+// A Platform no operator has reconciled carries no status: the solo-cluster
+// case, which resolution answers by generating from the spec.
+func TestClusterPlatformGetterFor_NoStatusIsNotAnError(t *testing.T) {
+	dyn := newFakeDynamic(clusterPlatformObj(map[string]any{"type": "kubernetes"}))
+
+	doc, unavailable, err := ClusterPlatformGetterFor(dyn)(context.Background())
+	require.NoError(t, err)
+	assert.Empty(t, unavailable)
+	require.NotNil(t, doc)
+	assert.Nil(t, doc.Status)
+}
+
+func TestClusterPlatformGetterFor_NotFoundIsFallback(t *testing.T) {
 	dyn := newFakeDynamic()
 
-	_, _, unavailable, err := ClusterSpecGetterFor(dyn)(context.Background())
+	doc, unavailable, err := ClusterPlatformGetterFor(dyn)(context.Background())
 	require.NoError(t, err)
+	assert.Nil(t, doc)
 	assert.Contains(t, unavailable, "no Platform CR")
 }
 
-func TestClusterSpecGetterFor_ForbiddenIsFallback(t *testing.T) {
+func TestClusterPlatformGetterFor_ForbiddenIsFallback(t *testing.T) {
 	dyn := newFakeDynamic()
 	dyn.PrependReactor("get", "platforms", func(k8stesting.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewForbidden(
@@ -77,8 +118,9 @@ func TestClusterSpecGetterFor_ForbiddenIsFallback(t *testing.T) {
 			inventory.PlatformSingletonName, nil)
 	})
 
-	_, _, unavailable, err := ClusterSpecGetterFor(dyn)(context.Background())
+	doc, unavailable, err := ClusterPlatformGetterFor(dyn)(context.Background())
 	require.NoError(t, err)
+	assert.Nil(t, doc)
 	assert.Contains(t, unavailable, "RBAC")
 }
 

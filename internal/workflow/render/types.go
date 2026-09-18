@@ -83,7 +83,7 @@ type InstanceFileOpts struct {
 	PlatformFlag string
 	// ClusterPlatform reads the cluster Platform CR spec. nil marks the
 	// command offline: the cluster is never consulted (D17/D21).
-	ClusterPlatform platform.ClusterSpecGetter
+	ClusterPlatform platform.ClusterPlatformGetter
 
 	K8sConfig *config.ResolvedKubernetesConfig
 	Config    *config.GlobalConfig
@@ -107,7 +107,7 @@ type ModuleOpts struct {
 	PlatformFlag string
 	// ClusterPlatform reads the cluster Platform CR spec. nil marks the
 	// command offline: the cluster is never consulted (D17/D21).
-	ClusterPlatform platform.ClusterSpecGetter
+	ClusterPlatform platform.ClusterPlatformGetter
 
 	K8sConfig *config.ResolvedKubernetesConfig
 	Config    *config.GlobalConfig

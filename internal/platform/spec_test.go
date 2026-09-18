@@ -96,3 +96,146 @@ func TestWireRoundTrip_SpecToWireToSpec(t *testing.T) {
 
 	assert.Equal(t, in, w.toSpec("cluster"))
 }
+
+// crDoc is a Platform document as the cluster getter returns it.
+func crDoc(spec, status map[string]any, generation int64) *ClusterPlatform {
+	return &ClusterPlatform{Name: "cluster", Generation: generation, Spec: spec, Status: status}
+}
+
+func specWithOneSubscription() map[string]any {
+	return map[string]any{
+		"type": "kubernetes",
+		"registry": map[string]any{
+			"opmodel.dev/catalogs/opm@v4": map[string]any{"version": "4.4.0"},
+		},
+	}
+}
+
+func TestDecodeCR_EffectiveRegistryCarriesBothSources(t *testing.T) {
+	spec, eff, err := DecodeCR(crDoc(specWithOneSubscription(), map[string]any{
+		"observedGeneration": int64(7),
+		"packageIdentity":    "gen-7-3f9a1c2b",
+		"operatorVersion":    "v1.0.0-alpha.20",
+		"registry": []any{
+			map[string]any{
+				"catalog": "opmodel.dev/catalogs/k8up@v1",
+				"version": "1.2.0",
+				"enabled": true,
+				"source":  EntrySourceRegistration,
+			},
+			map[string]any{
+				"catalog": "opmodel.dev/catalogs/opm@v4",
+				"version": "4.4.0",
+				"enabled": true,
+				"source":  EntrySourceSubscription,
+			},
+		},
+		"conditions": []any{
+			map[string]any{"type": "Ready", "status": "True", "reason": "Generated"},
+		},
+	}, 7))
+	require.NoError(t, err)
+
+	// The spec half is untouched: the authored subscription only.
+	require.Len(t, spec.Entries, 1)
+	assert.Equal(t, "opmodel.dev/catalogs/opm@v4", spec.Entries[0].Path)
+
+	require.NotNil(t, eff)
+	require.Equal(t, []Entry{
+		{Path: "opmodel.dev/catalogs/k8up@v1", Version: "1.2.0", Enable: true},
+		{Path: "opmodel.dev/catalogs/opm@v4", Version: "4.4.0", Enable: true},
+	}, eff.Entries, "effective entries are sorted by path")
+	assert.Equal(t, map[string]string{
+		"opmodel.dev/catalogs/k8up@v1": EntrySourceRegistration,
+		"opmodel.dev/catalogs/opm@v4":  EntrySourceSubscription,
+	}, eff.Sources)
+	assert.Equal(t, "gen-7-3f9a1c2b", eff.PackageIdentity)
+	assert.Equal(t, int64(7), eff.ObservedGeneration)
+	assert.Equal(t, "v1.0.0-alpha.20", eff.OperatorVersion)
+	require.NotNil(t, eff.Ready)
+	assert.Equal(t, "True", eff.Ready.Status)
+	assert.Equal(t, "Generated", eff.Ready.Reason)
+}
+
+// A disabled catalog is recorded with enabled omitted (the operator's
+// omitzero), so the decode default must be false — the opposite of
+// spec.registry's enable.
+func TestDecodeCR_OmittedEnabledIsFalse(t *testing.T) {
+	_, eff, err := DecodeCR(crDoc(specWithOneSubscription(), map[string]any{
+		"registry": []any{
+			map[string]any{
+				"catalog": "opmodel.dev/catalogs/k8s@v1",
+				"version": "1.0.0-alpha.3",
+				"source":  EntrySourceSubscription,
+			},
+		},
+	}, 3))
+	require.NoError(t, err)
+	require.NotNil(t, eff)
+	require.Len(t, eff.Entries, 1)
+	assert.False(t, eff.Entries[0].Enable, "an omitted enabled means a disabled catalog")
+}
+
+func TestDecodeCR_NoStatusMeansNoEffective(t *testing.T) {
+	spec, eff, err := DecodeCR(crDoc(specWithOneSubscription(), nil, 1))
+	require.NoError(t, err)
+	assert.Nil(t, eff, "a Platform no operator reconciled has no effective registry")
+	assert.Equal(t, "kubernetes", spec.Type)
+}
+
+// A status without a registry still carries what the operator recorded, so
+// the operator version and the observed generation stay reportable.
+func TestDecodeCR_StatusWithoutRegistry(t *testing.T) {
+	_, eff, err := DecodeCR(crDoc(specWithOneSubscription(), map[string]any{
+		"observedGeneration": int64(2),
+		"operatorVersion":    "v1.0.0-alpha.20",
+	}, 2))
+	require.NoError(t, err)
+	require.NotNil(t, eff)
+	assert.Empty(t, eff.Entries, "no recorded registry: resolution falls back to the spec")
+	assert.Equal(t, "v1.0.0-alpha.20", eff.OperatorVersion)
+}
+
+func TestDecodeCR_ReadyFalseIsDecoded(t *testing.T) {
+	_, eff, err := DecodeCR(crDoc(specWithOneSubscription(), map[string]any{
+		"registry": []any{
+			map[string]any{
+				"catalog": "opmodel.dev/catalogs/opm@v4",
+				"version": "4.4.0",
+				"enabled": true,
+				"source":  EntrySourceSubscription,
+			},
+		},
+		"conditions": []any{
+			map[string]any{"type": "ContractsFulfilled", "status": "True", "reason": "ContractsFulfilled"},
+			map[string]any{"type": "Ready", "status": "False", "reason": "OverSubscribedContracts"},
+		},
+	}, 4))
+	require.NoError(t, err)
+	require.NotNil(t, eff)
+	require.NotNil(t, eff.Ready)
+	assert.Equal(t, "False", eff.Ready.Status)
+	assert.Equal(t, "OverSubscribedContracts", eff.Ready.Reason)
+}
+
+// The operator never records a row without a version, so one means the
+// status was written by hand; generating from it would drop the pin.
+func TestDecodeCR_StatusEntryWithoutVersionRefused(t *testing.T) {
+	_, _, err := DecodeCR(crDoc(specWithOneSubscription(), map[string]any{
+		"registry": []any{
+			map[string]any{
+				"catalog": "opmodel.dev/catalogs/opm@v4",
+				"source":  EntrySourceSubscription,
+			},
+		},
+	}, 1))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "opmodel.dev/catalogs/opm@v4")
+	assert.Contains(t, err.Error(), "no version")
+}
+
+func TestDecodeCR_SpecFailureSurfaces(t *testing.T) {
+	_, _, err := DecodeCR(crDoc(map[string]any{}, nil, 1))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec.type")
+}

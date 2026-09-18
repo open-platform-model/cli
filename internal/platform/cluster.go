@@ -15,27 +15,43 @@ import (
 	pkgcore "github.com/open-platform-model/cli/pkg/core"
 )
 
-// ClusterSpecGetterFor returns a ClusterSpecGetter that reads the singleton
-// cluster Platform CR via the dynamic client. NotFound and Forbidden are
-// reported as warn-fallback conditions, not errors (D21).
-func ClusterSpecGetterFor(dyn dynamic.Interface) ClusterSpecGetter {
-	return func(ctx context.Context) (map[string]any, string, string, error) {
+// ClusterPlatformGetterFor returns a ClusterPlatformGetter that reads the
+// singleton cluster Platform CR via the dynamic client. NotFound and
+// Forbidden are reported as warn-fallback conditions, not errors (D21).
+//
+// The whole document is returned, spec and status undecoded: the effective
+// registry the operator recorded lives on status, and resolution generates
+// from it in preference to the spec (DecodeCR).
+func ClusterPlatformGetterFor(dyn dynamic.Interface) ClusterPlatformGetter {
+	return func(ctx context.Context) (*ClusterPlatform, string, error) {
 		plat, err := dyn.Resource(inventory.PlatformGVR).Get(ctx, inventory.PlatformSingletonName, metav1.GetOptions{})
 		if err != nil {
 			switch {
 			case apierrors.IsNotFound(err):
-				return nil, "", "no Platform CR in the cluster", nil
+				return nil, "no Platform CR in the cluster", nil
 			case apierrors.IsForbidden(err):
-				return nil, "", "reading the Platform CR was denied by RBAC", nil
+				return nil, "reading the Platform CR was denied by RBAC", nil
 			default:
-				return nil, "", "", err
+				return nil, "", err
 			}
 		}
 		spec, found, err := unstructured.NestedMap(plat.Object, "spec")
 		if err != nil || !found {
-			return nil, "", "", fmt.Errorf("cluster Platform %q has no readable spec", plat.GetName())
+			return nil, "", fmt.Errorf("cluster Platform %q has no readable spec", plat.GetName())
 		}
-		return spec, plat.GetName(), "", nil
+		// A Platform no operator has reconciled carries no status; that is
+		// the solo-cluster case, not an error (DecodeCR returns no
+		// effective registry and resolution falls back to the spec).
+		status, found, err := unstructured.NestedMap(plat.Object, "status")
+		if err != nil || !found {
+			status = nil
+		}
+		return &ClusterPlatform{
+			Name:       plat.GetName(),
+			Generation: plat.GetGeneration(),
+			Spec:       spec,
+			Status:     status,
+		}, "", nil
 	}
 }
 
