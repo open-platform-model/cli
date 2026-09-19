@@ -4,8 +4,8 @@ Two sections per design.md. design.md carries no unverified assumption: the rend
 
 ## 1. Library pin to v1.0.0-alpha.33 (go.mod)
 
-- [ ] 1.1 `go get github.com/open-platform-model/library@v1.0.0-alpha.33 && go mod tidy`, then `go build ./...`. Verify: `go.mod` names alpha.33 and `go doc github.com/open-platform-model/library/opm/helper/objectset` lists `Duplicates` and `DuplicateIdentitiesError`.
-- [ ] 1.2 `task fmt lint test:unit` green, then commit `fix(deps): bump library to v1.0.0-alpha.33`.
+- [x] 1.1 `go get github.com/open-platform-model/library@v1.0.0-alpha.33 && go mod tidy`, then `go build ./...`. Verify: `go.mod` names alpha.33 and `go doc github.com/open-platform-model/library/opm/helper/objectset` lists `Duplicates` and `DuplicateIdentitiesError`.
+- [x] 1.2 `task fmt lint test:unit` green, then commit `fix(deps): bump library to v1.0.0-alpha.33`.
 
 ## 2. The refusal (internal/workflow/render)
 
