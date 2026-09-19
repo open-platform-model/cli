@@ -11,8 +11,8 @@ func TestEmbeddedManifest_ParsesAllDocuments(t *testing.T) {
 	objs, err := EmbeddedManifest()
 	require.NoError(t, err)
 
-	// The pinned dist/install.yaml: 1 Namespace, 3 CRDs, RBAC set, Service, Deployment.
-	assert.Len(t, objs, 17)
+	// The pinned dist/install.yaml: 1 Namespace, 4 CRDs, RBAC set, Service, Deployment.
+	assert.Len(t, objs, 19)
 
 	kindCounts := map[string]int{}
 	for _, obj := range objs {
@@ -20,7 +20,7 @@ func TestEmbeddedManifest_ParsesAllDocuments(t *testing.T) {
 	}
 
 	assert.Equal(t, 1, kindCounts["Namespace"])
-	assert.Equal(t, 3, kindCounts["CustomResourceDefinition"])
+	assert.Equal(t, 4, kindCounts["CustomResourceDefinition"])
 	assert.Equal(t, 1, kindCounts["ServiceAccount"])
 	assert.Equal(t, 1, kindCounts["Service"])
 	assert.Equal(t, 1, kindCounts["Deployment"])
@@ -43,6 +43,7 @@ func TestEmbeddedManifest_CRDNamesAreExpected(t *testing.T) {
 		"moduleinstances.opmodel.dev",
 		"modulepackages.opmodel.dev",
 		"platforms.opmodel.dev",
+		"transformerregistrations.opmodel.dev",
 	}, crdNames)
 }
 

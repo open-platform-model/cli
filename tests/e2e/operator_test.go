@@ -247,6 +247,7 @@ func TestE2E_Operator_InstallUninstallLifecycle(t *testing.T) {
 		assertCRDEstablished(t, kubeconfig, "moduleinstances.opmodel.dev")
 		assertCRDEstablished(t, kubeconfig, "modulepackages.opmodel.dev")
 		assertCRDEstablished(t, kubeconfig, "platforms.opmodel.dev")
+		assertCRDEstablished(t, kubeconfig, "transformerregistrations.opmodel.dev")
 		assertResourceExists(t, kubeconfig, "namespace", "", "opm-operator-system")
 		assertResourceExists(t, kubeconfig, "deployment", "opm-operator-system", "opm-operator-controller-manager")
 	})
@@ -256,7 +257,7 @@ func TestE2E_Operator_InstallUninstallLifecycle(t *testing.T) {
 			"operator", "install", "--crds-only",
 			"--kubeconfig", kubeconfig, "--context", kindContext, "--timeout", "15s")
 		require.NoError(t, err, "stderr=%s", stderr)
-		assert.Equal(t, 3, strings.Count(stderr, "unchanged"), "stderr=%s", stderr)
+		assert.Equal(t, 4, strings.Count(stderr, "unchanged"), "stderr=%s", stderr)
 	})
 
 	t.Run("uninstall refuses while a finalizer is armed, then --remove-finalizers proceeds", func(t *testing.T) {
@@ -330,6 +331,7 @@ func TestE2E_Operator_InstallUninstallLifecycle(t *testing.T) {
 		assertCRDEstablished(t, kubeconfig, "moduleinstances.opmodel.dev")
 		assertCRDEstablished(t, kubeconfig, "modulepackages.opmodel.dev")
 		assertCRDEstablished(t, kubeconfig, "platforms.opmodel.dev")
+		assertCRDEstablished(t, kubeconfig, "transformerregistrations.opmodel.dev")
 
 		out := kubectlOut(t, kubeconfig, "get", "namespace", "opm-operator-system", "--ignore-not-found", "-o", "name")
 		assert.Empty(t, out, "no Namespace should exist after a --crds-only install")

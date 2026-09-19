@@ -25,7 +25,7 @@ func TestResolveManifest_EmptyVersionUsesEmbedded(t *testing.T) {
 
 	assert.Equal(t, PinnedOperatorVersion, version)
 	assert.Equal(t, "embedded", source)
-	assert.Len(t, objs, 17)
+	assert.Len(t, objs, 19)
 }
 
 func TestResolveManifest_VersionFetchesInstead(t *testing.T) {
@@ -126,8 +126,8 @@ func TestInstall_TerminatingObjectDelaysApplyUntilGone(t *testing.T) {
 
 	result, err := Install(context.Background(), client, InstallOptions{Timeout: 2 * time.Second})
 	require.NoError(t, err)
-	assert.Equal(t, 17, result.Applied)
-	assert.Equal(t, 17, *applied)
+	assert.Equal(t, 19, result.Applied)
+	assert.Equal(t, 19, *applied)
 }
 
 func TestInstall_TerminatingObjectBeyondBudgetFailsWithNothingApplied(t *testing.T) {
@@ -153,8 +153,8 @@ func TestInstall_AbsentAndLiveObjectsDoNotDelayApply(t *testing.T) {
 	start := time.Now()
 	result, err := Install(context.Background(), client, InstallOptions{Timeout: 2 * time.Second})
 	require.NoError(t, err)
-	assert.Equal(t, 17, result.Applied)
-	assert.Equal(t, 17, *applied)
+	assert.Equal(t, 19, result.Applied)
+	assert.Equal(t, 19, *applied)
 	assert.Less(t, time.Since(start), time.Second)
 }
 
@@ -173,7 +173,7 @@ func TestInstall_CRDsOnlyPlanIsGuarded(t *testing.T) {
 	deleteLater(t, client, doomed, 30*time.Millisecond)
 	result, err = Install(context.Background(), client, InstallOptions{CRDsOnly: true, Timeout: 2 * time.Second})
 	require.NoError(t, err)
-	assert.Equal(t, 3, result.Applied)
+	assert.Equal(t, 4, result.Applied)
 }
 
 func TestInstall_RBACPlanIsGuarded(t *testing.T) {
@@ -192,7 +192,7 @@ func TestInstall_RBACPlanIsGuarded(t *testing.T) {
 	deleteLater(t, client, doomed, 30*time.Millisecond)
 	result, err = Install(context.Background(), client, InstallOptions{CRDsOnly: true, RBAC: rbac, Timeout: 2 * time.Second})
 	require.NoError(t, err)
-	assert.Equal(t, 5, result.Applied, "3 CRDs + ClusterRole + ClusterRoleBinding")
+	assert.Equal(t, 6, result.Applied, "4 CRDs + ClusterRole + ClusterRoleBinding")
 }
 
 func TestInstall_AppliedObjectDisappearingFailsFast(t *testing.T) {
