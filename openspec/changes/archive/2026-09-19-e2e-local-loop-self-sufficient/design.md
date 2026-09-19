@@ -27,6 +27,67 @@ See `proposal.md` § Why for motivation. Current state, read 2026-09-18 against 
 - The PR `e2e` job (`.github/workflows/pr.yml`) creates no cluster, and `requireKindCluster` calls
   `t.Skipf`, so none of the cluster-backed tests have ever run in CI.
 
+### Baseline: the cluster-backed suite before any edit (task 1.1)
+
+Recorded 2026-09-19 with `go test ./tests/e2e/... -v -timeout 25m` from this worktree — a clean
+tree with no `bin/opm` — against `kind-opm-dev` prepared and left as `task cluster:operator`
+leaves it: CRDs present, `opm-operator-controller-manager` 1/1 available,
+`Platform/cluster` at `Ready=False` / `Stalled=True`, reason `MaterializeFailed`,
+`status.operatorVersion: v1.0.0-alpha.14`. Suite result `FAIL` in 616s. Every other test passed.
+
+**Failures this change addresses**
+
+- `TestE2E_Operator_InstallUninstallLifecycle/install` — `refused: opmodel.dev/catalogs/opm@v4 has
+  no published release`, reported against `registry localhost:5000`. The stub config's registry key,
+  fixed by section 2.
+- `TestE2E_Operator_InstallUninstallLifecycle/idempotent re-install reports unchanged` — expected 3
+  changed resources, got 0; the run installed CRDs only. Cascade of the failed `install`, so it
+  clears with section 2.
+- `TestE2E_Operator_InstallUninstallLifecycle/uninstall refuses while a finalizer is armed, then
+  --remove-finalizers proceeds` — `kubectl get deployment opm-operator-controller-manager` exits 1
+  because the Deployment was never created. Same cascade, same fix.
+- The restore step, reported but not failed:
+  `WARNING: could not restore the dev operator via ...: exit status 201` /
+  `stat .../bin/opm: no such file or directory` / `task: Failed to run task "cluster:operator":
+  exit status 127`. The clean-tree exit 127 is section 1; the fact that it was a warning rather than
+  a failure is section 3. Note the run still exited non-zero here only because the three subtests
+  above had already failed — with section 2 landed and section 3 not, a broken restore would leave
+  the cluster stripped and the suite green.
+
+  The two subtests after the restore warning, `install immediately after uninstall waits out the
+  terminating Deployment` and `crds-only on a fresh cluster installs only the CRDs`, both passed;
+  the restore runs last, so nothing in this run observed the stripped cluster.
+
+**Failures blocked on the pinned operator (`proposal.md` § Not in this change)**
+
+Each is `operator did not reconcile generation 2 of default/e2e-operator-owned within 3m`
+(`instance_operator_owned_test.go`), which is the `MaterializeFailed` Platform above, not anything
+this change touches:
+
+- `TestE2E_ThinEditor_ValuesRoundTrip` (193s)
+- `TestE2E_Delete_OperatorOwnedDelegates/without spec.prune the operator orphans the workloads, and
+  the CLI says so` (183s)
+- `TestE2E_Delete_OperatorOwnedDelegates/with spec.prune the operator removes the workloads` (186s)
+
+These are the failures cli issue 214 tracks. Sections 2 and 3 are measured against this list: the
+bar is no failure absent from it.
+
+### After all three sections (task 3.2)
+
+`task check` run in full 2026-09-19 against the same prepared cluster: `fmt`, `vet`, `lint`
+(0 issues), `openspec:check` (`=== ALL SCENARIOS PASSED ===`), `test:unit` and `test:integration`
+all green. `test:e2e` fails with exactly the three baseline failures above and nothing else:
+
+- `TestE2E_ThinEditor_ValuesRoundTrip` (191.7s)
+- `TestE2E_Delete_OperatorOwnedDelegates` both subtests (182.9s, 187.4s)
+
+each still `operator did not reconcile generation 2 of default/e2e-operator-owned within 3m`, and
+each still the pinned `v1.0.0-alpha.14` operator, not anything this change touches.
+
+The four baseline failures this change owns are gone: all five
+`TestE2E_Operator_InstallUninstallLifecycle` subtests pass, and the run contains no restore report
+at all — `task cluster:operator` now builds the binary it needs and succeeds unattended.
+
 ## Goals / Non-Goals
 
 **Goals**
@@ -47,29 +108,42 @@ See `proposal.md` § Why for motivation. Current state, read 2026-09-18 against 
 
 ## Decisions
 
-### 1. Delete the stub's registry key rather than restate the mapping
+### 1. Point the stub at `config.DefaultRegistry` by reference, not by copy
 
-The stub config's `registry` key is removed outright, leaving `config.DefaultRegistry` to apply.
+The stub config's `registry` key is set from the Go constant `config.DefaultRegistry` via
+`fmt.Sprintf`, the pattern `internal/cmd/config/vet_test.go:42` already uses.
 
 **Alternatives considered**
 
-1. *Write the GHCR mapping into the stub.* Works, but creates a third copy of a string that already
-   lives in `internal/config/templates.go` and `hack/opm-config.cue`. A copy is a thing that drifts,
-   and the drift would be invisible until a cluster test failed on a registry error again.
+1. *Write the GHCR mapping into the stub as a literal.* Creates a third copy of a string that
+   already lives in `internal/config/templates.go` and `hack/opm-config.cue`. A copy is a thing that
+   drifts, and the drift would be invisible until a cluster test failed on a registry error again.
 2. *Point the stub at a deliberately unroutable address and require every test to declare its
    registry.* Maximum hermeticity: a test that forgets would fail loudly instead of reaching the
    network. But it rewrites every currently-passing cluster test for a property nothing has asked
    for, and it would fail the lifecycle test in a new way rather than fixing it.
-3. *Delete the key.* The stub then exercises the same resolution a user gets from
-   `opm config init`, which is the behaviour the suite is there to check.
+3. *Delete the key.* **Does not work, measured 2026-09-19.** `ResolveRegistry`
+   (`internal/config/resolver.go:52-75`) is flag > env > config with no default arm: unset in all
+   three leaves `cfg.Registry` empty, and `opmodel.dev` never routes to GHCR. `DefaultRegistry` is
+   only the literal `opm config init` interpolates into `DefaultConfigTemplate`, and
+   `TestLoadConfigFile_DefaultTemplateIsValid` asserts that the *template* carries it — not that an
+   absent key resolves to it. With the key deleted, `install` still fails; only the message changes,
+   from `registry localhost:5000` to `registry ` (empty).
+4. *Give the lifecycle test `--config hack/opm-config.cue`, as `runOperatorOwnedOPM` does.* Fixes
+   the one test, but leaves the stub naming no registry at all, so the next test written without an
+   explicit one hits the same empty-registry failure this change exists to remove.
+5. *Add a default arm to `ResolveRegistry`.* Would make option 3 work and fix it for end users too,
+   but it changes shipped behaviour for every `opm` invocation. That is a releasing `fix`, and it
+   belongs in its own change.
 
-**Decision**: 3. The stub exists to make the suite independent of the developer's real `~/.opm`, not
-to override the shipped default; overriding it with a dead address was never the point and is the
-whole defect. Deleting a line also removes the duplicated constant, so there is nothing left to
-drift.
+**Decision**: 1-by-reference. The stub exists to make the suite independent of the developer's real
+`~/.opm`, not to override the shipped default; pinning it to a dead address was never the point and
+is the whole defect. Interpolating the constant gives the suite exactly the resolution a user gets
+from `opm config init` while adding no copy that can drift — the objection that ruled out the
+literal form does not reach a Go constant reference.
 
-**Consequence worth stating**: an e2e invocation that names no registry now reaches GHCR where it
-previously failed fast. That is already true of every migrated test in the suite, and
+**Consequence worth stating**: an e2e invocation that names no registry of its own now reaches GHCR
+where it previously failed fast. That is already true of every migrated test in the suite, and
 `skipWithoutCoreSchema` is the established handling for an unreachable registry.
 
 ### 2. `deps: [build]` rather than a precondition or `go run`

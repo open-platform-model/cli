@@ -27,9 +27,11 @@ at its own cause.
 ## What Changes
 
 - **The e2e suite stops naming a registry that does not exist.** The stub config's `registry` key is
-  removed so `config.DefaultRegistry` — the GHCR mapping the CLI actually ships — applies, which is
-  already the asserted fallback (`internal/config/loader_test.go`). Tests that need a writable
-  registry keep building their own in-process one; nothing gains a dependency on a running daemon.
+  set from `config.DefaultRegistry` — the GHCR mapping the CLI actually ships — by interpolating the
+  Go constant, so there is no second copy of the string to drift. (Deleting the key outright does
+  not work: `ResolveRegistry` has no default arm, so an unset registry resolves to empty rather than
+  to the shipped default; see design.md § Decision 1.) Tests that need a writable registry keep
+  building their own in-process one; nothing gains a dependency on a running daemon.
 - **`cluster:operator` builds the CLI it installs with.** The task gains `deps: [build]`. `build` is
   checksum-cached through its `sources`/`generates`, so this is a no-op whenever the binary is
   current, and it makes the task work unattended — which is what a test cleanup calling it requires.
@@ -77,6 +79,6 @@ None. Both behaviours already have a capability that owns them.
   cluster now exits non-zero.
 - **SemVer:** none — tests and dev tooling only, no shipped surface. Section commits are
   `chore(taskfile)` and `test(e2e)`, neither of which releases.
-- **Complexity (Principle VII):** net negative. One config key removed, one duplicated registry
-  constant removed, one `deps:` entry added, one log call changed to an error call. No new
-  machinery, no new flags, and no new dependency on a registry daemon.
+- **Complexity (Principle VII):** net negative. One hardcoded registry address replaced by a
+  reference to the constant that already defines it, one `deps:` entry added, one log call changed
+  to an error call. No new machinery, no new flags, and no new dependency on a registry daemon.

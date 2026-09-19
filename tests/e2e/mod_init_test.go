@@ -4,6 +4,7 @@ package e2e
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 
 	"cuelabs.dev/go/oci/ociregistry/ocimem"
 	"cuelang.org/go/mod/modregistrytest"
+	opmconfig "github.com/open-platform-model/cli/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,15 +50,21 @@ func TestMain(m *testing.M) {
 		panic("failed to create .opm dir: " + err.Error())
 	}
 
-	dummyConfig := `package config
+	// The registry comes from the constant `opm config init` writes, not from an
+	// address spelled out here: the suite then resolves exactly as an end user
+	// does, and there is no copy to drift. Deleting the key instead would not
+	// work — ResolveRegistry has no default arm, so an unset registry resolves
+	// to empty. A test that needs to WRITE to a registry starts its own
+	// in-process one and passes OPM_REGISTRY (see templatesRegistryEnv below).
+	dummyConfig := fmt.Sprintf(`package config
 config: {
-	registry: "localhost:5000"
+	registry: %q
 	kubernetes: {
 		context:    "kind-opm-dev"
 		kubeconfig: "~/.kube/config"
 		namespace:  "default"
 	}
-}`
+}`, opmconfig.DefaultRegistry)
 	if err := os.WriteFile(filepath.Join(opmDir, "config.cue"), []byte(dummyConfig), 0o644); err != nil {
 		os.RemoveAll(tmpDir)
 		panic("failed to write dummy config.cue: " + err.Error())
