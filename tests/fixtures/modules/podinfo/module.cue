@@ -7,7 +7,7 @@
 // copy on its own coordinate. The two are independent artifacts and are meant
 // to drift: render-parity's correctness comes from comparing the CLI and
 // kernel render paths over the SAME fixture, not from matching the operator's
-// copy (enhancement 0006 slice C2, design LD3).
+// copy.
 //
 // Stateless web example module (opmodel.dev/core@v2). Renders a Deployment +
 // Service via the catalog's deployment- and service-transformers, with an HTTP
@@ -28,7 +28,7 @@ import (
 m.#Module
 
 // Module metadata — modulePath and version are the identity package's values,
-// and name is the path's leaf (enhancements 0010 D8, 0011 D12). Edit
+// and name is the path's leaf (0010:D8, 0011:D12). Edit
 // identity/identity.cue, not this block.
 metadata: {
 	_segments:  strings.Split(strings.SplitN(id.ModulePath, "@", 2)[0], "/")
