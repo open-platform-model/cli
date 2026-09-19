@@ -74,7 +74,7 @@ Example:
 ```
 ERROR render failed: 2 rendered objects share one identity, so the last apply would silently overwrite the first:
 
-  opmodel.dev/v1alpha1 TransformerRegistration backup-system.k8up rendered by component "registration" (opmodel.dev/catalogs/opm/transformers/transformer-registration-transformer@4.4.0) and component "registration-copy" (opmodel.dev/catalogs/opm/transformers/transformer-registration-transformer@4.4.0)
+  opmodel.dev/v1alpha1 TransformerRegistration backup-system/backup-system.k8up rendered by component "registration" (opmodel.dev/catalogs/opm/transformers/transformer-registration-transformer@4.4.0) and component "registration-copy" (opmodel.dev/catalogs/opm/transformers/transformer-registration-transformer@4.4.0)
 ```
 
 Exit code 2 (`ExitValidationError`), `Printed: true`, as every other render refusal.
@@ -86,6 +86,7 @@ Exit code 2 (`ExitValidationError`), `Printed: true`, as every other render refu
 | `go.mod`, `go.sum` | library `v1.0.0-alpha.33` |
 | `internal/workflow/render/render.go`, `render_test.go` | `refuseDuplicateIdentities` and its call; tests over hand-built `kernel.RenderResult` values |
 | `internal/workflow/render/validation.go`, `validation_test.go` | the printing arm; a capture test for header and details |
+| `tests/e2e/testdata/duplicate-identities/`, `tests/e2e/duplicate_identities_test.go` | the unpublished colliding module and the command-level refusal test |
 
 ## Research & Decisions
 
@@ -95,8 +96,10 @@ Exit code 2 (`ExitValidationError`), `Printed: true`, as every other render refu
 **Explored**:
 1. A new e2e fixture module with two registration components, published through the fixture pipeline: moves the fixture catalog pin for one test and runs only where the registry is reachable.
 2. `refuseDuplicateIdentities` as a pure function over `*kernel.RenderResult`, unit-tested with `cuecontext` values (two `TransformerRegistration` objects with one name from two components; distinct objects; a value without a name beside a duplicate), plus the print arm under `captureValidationOutput`.
-**Decision**: 2.
+**Decision**: 2, plus a repo-local e2e fixture that is neither published nor a registration module.
 **Rationale**: the check reads four fields off values the kernel already returned; the two-registration case is expressible exactly, and the same shape proved the operator's refusal. The healthy path is what every existing render test exercises.
+
+What option 1 costs is the fixture *pipeline*: a published module moves the fixture catalog pin and needs a reachable registry to be republished. A third option avoids that entirely — `tests/e2e/testdata/duplicate-identities`, a module on `test.example.com` that nothing publishes, rendered by `opm module build` the way `tests/e2e/testdata/vet-errors` is. It collides two `StatelessWorkload` components on one `metadata.name` rather than two registrations, because the collision the check refuses is a shared apply identity, not a registration: `TransformerRegistration` is the instance D15 was written from, not the class. That keeps the unit tests as the proof of the helper call and the wording, and makes `TestE2E_ModBuild_RefusesDuplicateIdentities` the proof that the refusal reaches a whole command — the exit code, the two streams, and an empty stdout, which no unit test over `renderInstance`'s callee can show.
 
 ### The library's wording, split, not rewritten
 
