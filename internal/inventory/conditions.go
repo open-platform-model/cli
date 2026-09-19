@@ -5,8 +5,8 @@ import (
 )
 
 // ConditionTypeReady is the ModuleInstance status condition the operator sets
-// to report reconcile outcome. The CLI only ever reads it (enhancement 0006
-// D2/D25: conditions are operator-owned status).
+// to report reconcile outcome. The CLI only ever reads it (0006:D2/D25:
+// conditions are operator-owned status).
 const ConditionTypeReady = "Ready"
 
 // Condition status values, matching metav1.ConditionStatus.

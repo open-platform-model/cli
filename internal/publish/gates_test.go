@@ -179,7 +179,7 @@ metadata: {
 }
 
 // TestGate_Namespace pins the four passing cases from 0011's
-// schemas/target.cue — the constraint D13 exists to keep from growing until
+// schemas/target.cue — the constraint 0011:D13 exists to keep from growing until
 // it refuses a third party's own domain — and the measured must-fail shapes.
 func TestGate_Namespace(t *testing.T) {
 	passing := []struct {
@@ -266,7 +266,7 @@ metadata: {
 }
 
 // TestGate_Override covers all four presence/flag states for both kinds
-// (D6). The flag waives the gate for modules only, and changes nothing else.
+// (0011:D6). The flag waives the gate for modules only, and changes nothing else.
 func TestGate_Override(t *testing.T) {
 	// The override entry names a dep that is pinned but never imported, so
 	// the tree still loads without resolving it.

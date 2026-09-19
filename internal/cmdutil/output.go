@@ -31,7 +31,7 @@ func PrintValidationError(msg string, err error) {
 		return
 	}
 
-	// Unresolved demands (kernel matcher, 0010 D28): render one line per
+	// Unresolved demands (kernel matcher, 0010:D28): render one line per
 	// demand with its contract key and same-base alternatives instead of the
 	// flat error blob the CUE-position heuristic would produce.
 	var demandsErr *liberrors.UnresolvedDemandsError
@@ -67,7 +67,7 @@ func PrintValidationError(msg string, err error) {
 // reach it.
 //
 // A row whose contract an enabled catalog defines names that catalog
-// (enhancement 0015 D18): "defined by this catalog and implemented by
+// (0015:D18): "defined by this catalog and implemented by
 // nothing" is a different situation from a contract no enabled catalog
 // defines at all, and the row has carried the distinction since library
 // v1.0.0-alpha.30. A row without a defining catalog keeps its wording

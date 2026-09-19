@@ -11,15 +11,15 @@ import (
 )
 
 // executeThinEditor is the apply path for an operator-owned instance
-// (enhancement 0006 D18, design LD6). The CLI acts as a spec editor and
+// (0006:D18). The CLI acts as a spec editor and
 // nothing more: it writes spec.module and spec.values, then watches the
 // operator reconcile them.
 //
 // Deliberately skipped here, because the operator does them: applying
 // resources, pruning stale ones, writing status, and the status-RBAC
-// pre-flight (D23 — the CLI writes no status in this mode, so proving it may
+// pre-flight (0006:D23 — the CLI writes no status in this mode, so proving it may
 // would be theater). Still enforced by the caller before this point: the CRD
-// gates and the version-skew ceiling (D24), since an old CLI writing spec for
+// gates and the version-skew ceiling (0006:D24), since an old CLI writing spec for
 // a newer operator is the unsafe skew direction.
 func executeThinEditor(ctx context.Context, req Request, rec *inventory.Record) error {
 	result := req.Result
@@ -39,7 +39,7 @@ func executeThinEditor(ctx context.Context, req Request, rec *inventory.Record) 
 	// intent, so omitting spec.owner would release the field and let the API
 	// server prune the operator's ownership marker — the precise outcome the
 	// thin editor exists to avoid. Restating the value it already holds is a
-	// no-op (design LD6, corrected).
+	// no-op.
 	generation, err := inventory.ApplySpec(ctx, req.K8sClient, inventory.SpecInput{
 		Name:          name,
 		Namespace:     namespace,
@@ -75,7 +75,7 @@ func executeThinEditor(ctx context.Context, req Request, rec *inventory.Record) 
 // previewThinEditor is the dry-run counterpart of executeThinEditor. Without
 // it a dry-run against an operator-owned instance would resolve to
 // CLI-executor mode and preview a render-and-apply the CLI will never perform
-// (design LD6). It runs the same refusals, so a dry-run surfaces the local-bytes
+// It runs the same refusals, so a dry-run surfaces the local-bytes
 // rejection rather than deferring it to the real apply.
 func previewThinEditor(req Request, rec *inventory.Record) error {
 	name := req.Result.Instance.Name

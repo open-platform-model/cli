@@ -95,7 +95,7 @@ func runModuleBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 		ModulePath:   modulePath,
 		ValuesFiles:  rf.Values,
 		Name:         nameFlag,
-		PlatformFlag: rf.Platform, // offline: no cluster read (0006 D21)
+		PlatformFlag: rf.Platform, // offline: no cluster read (0006:D21)
 		K8sConfig:    k8sConfig,
 		Config:       cfg,
 	})

@@ -115,7 +115,7 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 	}
 
 	// Cluster client before render: apply resolves its platform from the
-	// cluster Platform CR by default (0006 D21).
+	// cluster Platform CR by default (0006:D21).
 	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
 		output.Error("connecting to cluster", "error", err)

@@ -1,6 +1,6 @@
 //go:build ignore
 
-// Render-digest parity check (enhancement 0006 D30 gate, slice C2 task 4.2).
+// Render-digest parity check (0006:D30 gate).
 //
 // Renders the SAME module two ways and requires byte-identical render digests:
 //
@@ -16,7 +16,7 @@
 // (app.kubernetes.io/managed-by), so a cross-actor comparison with different
 // runtime names differs by construction — the per-actor label is the KNOWN
 // delta, load-path equivalence is what this check proves (local staging ≡
-// registry acquisition; D37/D6).
+// registry acquisition; 0006:D37/D6).
 //
 // Requires: registry serving testing.opmodel.dev/modules/cli/podinfo@v0 at the
 // fixture's version, the catalogs, and core — SKIPs otherwise unless

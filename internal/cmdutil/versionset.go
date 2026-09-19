@@ -12,7 +12,7 @@ import (
 
 // RunVersionSet is the shared body of `opm module version set` and
 // `opm catalog version set`: rewrite identity/identity.cue's Version in
-// place, idempotently and offline (0011 D3, D8). Setting the already-declared
+// place, idempotently and offline (0011:D3, D8). Setting the already-declared
 // version touches nothing — no write, no mtime change — and reports the no-op
 // as success; both outcomes exit 0. A structurally non-conformant identity
 // file is refused (exit 2) through the standard funnel, pointing at the

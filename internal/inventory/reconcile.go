@@ -10,7 +10,7 @@ import (
 )
 
 // reconcilePollInterval is how often the reconcile waits re-read the CR. Poll
-// based rather than watch based (design LD1): the CLI's dynamic client usage
+// based rather than watch based: the CLI's dynamic client usage
 // stays get/list-only, and a one-shot wait does not justify informer caches.
 const reconcilePollInterval = 2 * time.Second
 
@@ -32,7 +32,7 @@ func ResolveTimeout(timeout time.Duration) time.Duration {
 
 // ReconcileOutcome is what a bounded reconcile wait observed. It is always
 // returned — including on timeout — so callers can report the operator's last
-// known verdict instead of a bare deadline error (design LD1).
+// known verdict instead of a bare deadline error.
 type ReconcileOutcome struct {
 	// Record is the last successfully read CR state, or nil when the CR was
 	// never readable during the wait.
@@ -125,7 +125,7 @@ func waitForReconcile(ctx context.Context, client *kubernetes.Client, name, name
 
 // WaitForAbsence polls until the ModuleInstance CR no longer exists — the
 // completion signal for an operator-finalized delete, whose cleanup finalizer
-// keeps the CR present until every workload is pruned (design LD7).
+// keeps the CR present until every workload is pruned.
 func WaitForAbsence(ctx context.Context, client *kubernetes.Client, name, namespace string, timeout time.Duration) error {
 	return waitForAbsence(ctx, client, name, namespace, timeout, reconcilePollInterval)
 }

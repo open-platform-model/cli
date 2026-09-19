@@ -19,22 +19,22 @@ type CatalogGateOutcomes struct {
 	TraitsChecked int
 	TraitsRefused int
 	// Compat counts: members compared against a predecessor, refused by the
-	// comparison, skipped as alpha (D34), and passing as new at their
+	// comparison, skipped as alpha (0010:D34), and passing as new at their
 	// name-and-apiVersion key.
 	CompatCompared int
 	CompatRefused  int
 	CompatAlpha    int
 	CompatNew      int
 	// CompatPrerelease: beta/GA members exempt because the module line is a
-	// release prerelease (D26 clause 2); always rendered, 0 on a stable line.
+	// release prerelease (0011:D26 clause 2); always rendered, 0 on a stable line.
 	CompatPrerelease int
-	// CompatDevExempt reports the build is a dev tag (D26): the gate ran and
+	// CompatDevExempt reports the build is a dev tag (0011:D26): the gate ran and
 	// decided not to judge it, and the counts above are all zero.
 	CompatDevExempt bool
 }
 
-// gateMemberFQN is D22's structural gate (refusal 11): every member of the
-// tree — all four kinds, all levels; D34's alpha carve-out is compat-only —
+// gateMemberFQN is 0011:D22's structural gate (refusal 11): every member of the
+// tree — all four kinds, all levels; 0010:D34's alpha carve-out is compat-only —
 // is unified against core's #CatalogMemberFQNGate and validated CONCRETELY.
 // The pipeline's incomplete-value filter (conformIdentity) is deliberately
 // not reused: here incompleteness is the finding — a missing
@@ -77,7 +77,7 @@ func fillFromMember(gate cue.Value, m Member, gateField, memberPath string) cue.
 	return gate.FillPath(cue.ParsePath(gateField), v)
 }
 
-// gateTraitOptional is D22's posture gate: every trait's `optional` FIELD —
+// gateTraitOptional is 0011:D22's posture gate: every trait's `optional` FIELD —
 // never the whole member, which would drag its schema `spec` into
 // concreteness — is unified against core's #TraitOptionalGate. An unstated
 // posture is an incomplete value (rule 1, visible only concretely) and a

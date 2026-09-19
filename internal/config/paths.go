@@ -13,7 +13,7 @@ type Paths struct {
 
 	// PlatformDir is the local default platform module directory
 	// (~/.opm/platform/): a CUE module holding cue.mod/module.cue and
-	// platform.cue (enhancement 0019 D5).
+	// platform.cue (0019:D5).
 	PlatformDir string
 
 	// HomeDir is the path to the OPM home directory (~/.opm).

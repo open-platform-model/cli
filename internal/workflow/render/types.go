@@ -15,7 +15,7 @@ type Result struct {
 	Resources []*unstructured.Unstructured
 	// Instance is the acquired instance's metadata as the kernel decoded it,
 	// the library's type; only Namespace may differ, when the --namespace
-	// flag or env override applied. Was: Release (enhancement 0002 D8/D9).
+	// flag or env override applied. Was: Release (0002:D8/D9).
 	Instance module.InstanceMetadata
 	// Module is the embedded module's metadata, the library's type, decoded
 	// from the instance package (the canonical spec.module reference is
@@ -33,13 +33,13 @@ type Result struct {
 	// not failure; every entry is shown to the user.
 	Warnings []string
 
-	// Platform is the resolved platform-source provenance (0006 D21). The
-	// apply workflow uses it for the D12 write-if-absent decision.
+	// Platform is the resolved platform-source provenance (0006:D21). The
+	// apply workflow uses it for the 0006:D12 write-if-absent decision.
 	Platform platform.Resolution
 
 	// PlatformSpec is the seed document decoded from the built platform the
 	// render consumed (type, and per #registry entry its key, enable and the
-	// derived version) — the exact document the D12 write-if-absent seeds,
+	// derived version) — the exact document the 0006:D12 write-if-absent seeds,
 	// with no re-read of the platform module at apply time.
 	PlatformSpec platform.Spec
 
@@ -47,16 +47,16 @@ type Result struct {
 	// kernel-rendered resources (CUE-value serialization, operator sort
 	// order — see inventory.ComputeRenderDigest). Written verbatim to
 	// status.lastAppliedRenderDigest so a future ownership transfer has a
-	// recorded value to verify against (0006 D9/D30).
+	// recorded value to verify against (0006:D9/D30).
 	RenderDigest string
 
 	// Values is the single unified values blob the render consumed, decoded to
 	// a JSON-shaped map. The apply workflow writes it verbatim to the
-	// ModuleInstance CR's spec.values (enhancement 0006 D19). Nil when the
+	// ModuleInstance CR's spec.values (0006:D19). Nil when the
 	// instance carries no values or they could not be decoded.
 	Values map[string]any
 
-	// SourceLocal is the render-provenance signal (enhancement 0006 D7): true
+	// SourceLocal is the render-provenance signal (0006:D7): true
 	// when the module bytes did not come from pure registry resolution — the
 	// main module is a local directory, or its cue.mod/local-module.cue carries
 	// a replaceWith. The apply workflow stamps
@@ -78,11 +78,11 @@ type InstanceFileOpts struct {
 	// values sources, in order.
 	ValuesFiles []string
 
-	// PlatformFlag is the --platform platform module directory (0006 D21;
+	// PlatformFlag is the --platform platform module directory (0006:D21;
 	// highest platform-source precedence).
 	PlatformFlag string
 	// ClusterPlatform reads the cluster Platform CR spec. nil marks the
-	// command offline: the cluster is never consulted (D17/D21).
+	// command offline: the cluster is never consulted (0006:D17/D21).
 	ClusterPlatform platform.ClusterPlatformGetter
 
 	K8sConfig *config.ResolvedKubernetesConfig
@@ -102,11 +102,11 @@ type ModuleOpts struct {
 	// "<module.metadata.name>-debug".
 	Name string
 
-	// PlatformFlag is the --platform platform module directory (0006 D21;
+	// PlatformFlag is the --platform platform module directory (0006:D21;
 	// highest platform-source precedence).
 	PlatformFlag string
 	// ClusterPlatform reads the cluster Platform CR spec. nil marks the
-	// command offline: the cluster is never consulted (D17/D21).
+	// command offline: the cluster is never consulted (0006:D17/D21).
 	ClusterPlatform platform.ClusterPlatformGetter
 
 	K8sConfig *config.ResolvedKubernetesConfig

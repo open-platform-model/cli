@@ -8,7 +8,7 @@ import (
 
 	cmdcatalog "github.com/open-platform-model/cli/internal/cmd/catalog"
 	cmdconfig "github.com/open-platform-model/cli/internal/cmd/config"
-	cmdinstance "github.com/open-platform-model/cli/internal/cmd/instance" // Was: cmdrelease "…/internal/cmd/release" (enhancement 0002 D6)
+	cmdinstance "github.com/open-platform-model/cli/internal/cmd/instance"
 	cmdmodule "github.com/open-platform-model/cli/internal/cmd/module"
 	cmdoperator "github.com/open-platform-model/cli/internal/cmd/operator"
 	cmdplatform "github.com/open-platform-model/cli/internal/cmd/platform"
@@ -76,7 +76,7 @@ func initializeConfig(cmd *cobra.Command, cfg *config.GlobalConfig, configFlag, 
 
 	// Load configuration — sets cfg.ConfigPath, cfg.Registry, cfg.Kubernetes,
 	// cfg.Log, cfg.CueContext based on flag > env > config precedence (single
-	// pass; no providers — enhancement 0006 D39).
+	// pass; no providers — 0006:D39).
 	err := config.Load(cfg, config.LoaderOptions{
 		RegistryFlag: registryFlag,
 		ConfigFlag:   configFlag,

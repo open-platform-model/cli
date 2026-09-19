@@ -160,7 +160,7 @@ func TestEnsureClusterPlatform_AlreadyExistsIsNoop(t *testing.T) {
 
 	require.NoError(t, EnsureClusterPlatform(context.Background(), dyn, testSpec()))
 
-	// The existing Platform must be untouched — never overwritten (D22).
+	// The existing Platform must be untouched — never overwritten (0006:D22).
 	after, err := dyn.Resource(inventory.PlatformGVR).Get(context.Background(),
 		inventory.PlatformSingletonName, metav1.GetOptions{})
 	require.NoError(t, err)
@@ -177,7 +177,7 @@ func TestEnsureClusterPlatform_ForbiddenDegradesToWarning(t *testing.T) {
 			inventory.PlatformSingletonName, nil)
 	})
 
-	// D17: forbidden create is a warning, not an error.
+	// 0006:D17: forbidden create is a warning, not an error.
 	require.NoError(t, EnsureClusterPlatform(context.Background(), dyn, testSpec()))
 }
 

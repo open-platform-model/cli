@@ -141,7 +141,7 @@ Version: #VersionType & "0.9.1"
 	}
 }
 
-// TestSetIdentityVersion_NoOp is D3's idempotency contract: setting the
+// TestSetIdentityVersion_NoOp is 0011:D3's idempotency contract: setting the
 // version the file already declares writes nothing — identical bytes, no
 // mtime change — and reports changed false.
 func TestSetIdentityVersion_NoOp(t *testing.T) {
@@ -350,7 +350,7 @@ Version: "1.0.0
 // including doc comments, inline comments, alignment, and field order.
 func TestSetIdentityVersion_PreservesCommentsAndAlignment(t *testing.T) {
 	in := `// Package identity is the single source of this module's path and version
-// (core #IdentityPackage, enhancements 0010 D38 / 0011 D12).
+// (core #IdentityPackage).
 package identity
 
 // #VersionType mirrors core.#VersionType (SemVer 2.0), duplicated so this
@@ -364,7 +364,7 @@ ModulePath: "opmodel.dev/modules/web_app@v1"
 Version: #VersionType | *"1.0.0"
 `
 	want := `// Package identity is the single source of this module's path and version
-// (core #IdentityPackage, enhancements 0010 D38 / 0011 D12).
+// (core #IdentityPackage).
 package identity
 
 // #VersionType mirrors core.#VersionType (SemVer 2.0), duplicated so this
@@ -404,7 +404,7 @@ func readCueMod(t *testing.T, dir string) string {
 
 func TestSetCueModModule(t *testing.T) {
 	t.Run("module line replaced, everything else preserved", func(t *testing.T) {
-		in := `// This file declares the module's registry address (0010 D1: byte-identical
+		in := `// This file declares the module's registry address (0010:D1: byte-identical
 // to identity's ModulePath).
 module: "opmodel.dev/modules/web_app@v1" // trailing comment survives
 
@@ -412,7 +412,7 @@ language: {
 	version: "v0.17.0"
 }
 `
-		want := `// This file declares the module's registry address (0010 D1: byte-identical
+		want := `// This file declares the module's registry address (0010:D1: byte-identical
 // to identity's ModulePath).
 module: "opmodel.dev/modules/web_app@v2" // trailing comment survives
 

@@ -64,7 +64,7 @@ func (p *Plan) Render() string {
 		row("kernel loader", kernel)
 	}
 
-	// The catalog gates' per-gate outcomes (D22, D9). Text-only — plan --json
+	// The catalog gates' per-gate outcomes (0011:D22, D9). Text-only — plan --json
 	// remains deferred.
 	if p.Kind == KindCatalog {
 		p.renderCatalogGates(row)
@@ -93,7 +93,7 @@ func (p *Plan) Render() string {
 	return b.String()
 }
 
-// compatDevExemptRow is the compat row for a dev build (D26): the gate ran,
+// compatDevExemptRow is the compat row for a dev build (0011:D26): the gate ran,
 // and the exemption is stated rather than left to look like a clean compare.
 const compatDevExemptRow = "dev-exempt (dev builds are neither judged nor a baseline)"
 

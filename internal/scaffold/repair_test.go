@@ -156,7 +156,7 @@ func TestRepairPlanDescribe(t *testing.T) {
 	require.NoError(t, err)
 
 	out := plan.Describe()
-	// Aligned current → replacement pairs for every edit (D20: the author
+	// Aligned current → replacement pairs for every edit (0011:D20: the author
 	// must have something to judge).
 	assert.Contains(t, out, "example.com/modules/renamed@v1")
 	assert.Contains(t, out, "example.com/modules/app@v1 -> example.com/modules/renamed@v1")

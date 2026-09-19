@@ -10,8 +10,8 @@ import (
 )
 
 // InstanceArg holds the resolved instance identifier from a positional CLI arg.
-// Was: ReleaseArg (enhancement 0002 D9/D10). The arg may be a file path
-// (instance.cue or directory), an instance name, or an instance UUID.
+// The arg may be a file path (instance.cue or directory), an instance name,
+// or an instance UUID.
 //
 // Exactly one of Name or UUID will be non-empty. Namespace is only set when the
 // identifier was resolved from a file path.
@@ -53,7 +53,7 @@ func (r InstanceArg) EffectiveNamespace(namespaceFlag string) string {
 }
 
 // ResolveInstanceArg resolves a positional CLI argument into an InstanceArg.
-// Was: ResolveReleaseArg. It accepts three forms:
+// It accepts three forms:
 //
 //  1. A path to an instance.cue file or a directory containing one — the
 //     package is acquired through the kernel with the cfg registry, and the

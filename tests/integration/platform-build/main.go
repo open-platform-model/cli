@@ -1,10 +1,10 @@
 //go:build ignore
 
 // Integration test for platform resolution + kernel acquisition
-// (enhancement 0006 C2 Phase B; 0019 D5 platform modules).
+// (0019:D5 platform modules).
 //
 // Verifies the seeded local default platform module (~/.opm/platform/, what
-// `opm config init` writes) resolves offline (precedence source 3, D21),
+// `opm config init` writes) resolves offline (precedence source 3, 0006:D21),
 // builds through the kernel's shape-gated directory acquisition
 // (AcquirePlatformFromDir — the operator's own ingestion path) against the
 // registry in OPM_REGISTRY, and that every #registry entry's derived version

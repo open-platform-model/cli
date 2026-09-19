@@ -1,5 +1,5 @@
 // Package cueedit performs surgical, position-based rewrites of OPM authoring
-// files. It implements enhancement 0011 D8's Version write: locate the field
+// files. It implements 0011:D8's Version write: locate the field
 // by its schema-fixed path in identity/identity.cue, splice the new value into
 // the original bytes, and leave every other byte — comments, alignment, field
 // order — exactly as committed. `opm ... publish --version` fills through this
@@ -62,7 +62,7 @@ func CheckVersion(version string) error {
 //
 // Setting the version the file already declares splices to identical bytes:
 // the file is not written — no mtime change, nothing for a pre-commit hook to
-// react to (D3's idempotent no-op) — and changed is false.
+// react to (0011:D3's idempotent no-op) — and changed is false.
 //
 // An absent file, an unparseable file, or a missing Version field is a shape
 // refusal (ErrIdentityShape) — a malformed artifact, not an unfinished one.
@@ -166,7 +166,7 @@ func ReadCueModModule(dir string) (string, error) {
 // given module path (major suffix included), preserving all surrounding bytes
 // — comments, field order, the language stanza. Declaring the path the file
 // already declares writes nothing and returns changed false. The pipeline's
-// own reader stays read-only over this file (D16); consumers of this writer
+// own reader stays read-only over this file (0011:D16); consumers of this writer
 // land with cli-template-modules (repair and re-identification).
 func SetCueModModule(dir, modulePath string) (changed bool, err error) {
 	if modulePath == "" {

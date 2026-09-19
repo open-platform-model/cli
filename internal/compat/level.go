@@ -1,13 +1,13 @@
 // Package compat implements publish-side catalog compatibility logic:
-// enhancement 0010 D27's additive-only comparison walk ([Check],
-// [CheckAtLevel]) and the D34 contract-level ladder ([Level], [ParseLevel],
-// [CompareAPIVersions]). 0010 D30's provenance exclusion is built into the
+// 0010:D27's additive-only comparison walk ([Check],
+// [CheckAtLevel]) and the 0010:D34 contract-level ladder ([Level], [ParseLevel],
+// [CompareAPIVersions]). 0010:D30's provenance exclusion is built into the
 // walk, which skips the denylisted metadata fields at every depth.
 //
 // The package is pure logic: no I/O, no registry access, no schema-cache
 // dependency, no state. Callers compose it with member enumeration, predecessor
 // pulling, and gate policy. Its consumers are the 0011 publish gate
-// (`opm catalog publish`) and `opm catalog registry check --compat` (0011 D7).
+// (`opm catalog publish`) and `opm catalog registry check --compat` (0011:D7).
 package compat
 
 import (
@@ -18,8 +18,8 @@ import (
 )
 
 // Level is a contract apiVersion's position on the Kubernetes ladder
-// (enhancement 0010 D34): vNalphaM → vNbetaM → vN. The level decides whether
-// D27's additive-only promise binds — see [Level.Enforced].
+// (0010:D34): vNalphaM → vNbetaM → vN. The level decides whether
+// 0010:D27's additive-only promise binds — see [Level.Enforced].
 type Level int
 
 const (
@@ -51,9 +51,9 @@ var (
 	parseRE   = regexp.MustCompile(`^v([0-9]+)(?:(alpha|beta)([0-9]+))?$`)
 )
 
-// ParseLevel classifies a contract's apiVersion on the D34 ladder and reports
+// ParseLevel classifies a contract's apiVersion on the 0010:D34 ladder and reports
 // its major. ok is false when the string is outside #APIVersionType's grammar
-// ("v1alpha", "V1", "1.2.0"); D34 keys enforcement to the primitive's own
+// ("v1alpha", "V1", "1.2.0"); 0010:D34 keys enforcement to the primitive's own
 // apiVersion, never to the catalog's release version, which is an independent
 // axis.
 func ParseLevel(apiVersion string) (major int, l Level, ok bool) {
@@ -77,8 +77,8 @@ func ParseLevel(apiVersion string) (major int, l Level, ok bool) {
 	return major, LevelGA, true
 }
 
-// Enforced reports whether D27's additive-only promise binds at this level
-// (D34): beta and GA yes, alpha no — alpha's definition is that it promises
+// Enforced reports whether 0010:D27's additive-only promise binds at this level
+// (0010:D34): beta and GA yes, alpha no — alpha's definition is that it promises
 // nothing, so the publish gate is off there.
 func (l Level) Enforced() bool { return l != LevelAlpha }
 
@@ -89,7 +89,7 @@ func (l Level) Enforced() bool { return l != LevelAlpha }
 //
 // This exists because SemVer cannot order the ladder — measured against
 // Masterminds v3, a per-pair rule switch makes v1alpha1 < v2, v2 < v10 and
-// v10 < v1alpha1 all true at once (0010 D34). Strings outside the grammar
+// v10 < v1alpha1 all true at once (0010:D34). Strings outside the grammar
 // sort before every valid one, lexically among themselves; that branch keeps
 // the ordering total and is not part of the contract.
 func CompareAPIVersions(a, b string) int {

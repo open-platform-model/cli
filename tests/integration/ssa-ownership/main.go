@@ -1,7 +1,6 @@
 //go:build ignore
 
-// Server-side-apply field-ownership integration test (enhancement 0006 slice
-// C3, design LD4/LD6 as corrected).
+// Server-side-apply field-ownership integration test.
 //
 // This exists because a fake dynamic client cannot catch the bug it guards
 // against. Under server-side apply, a field manager's document is its COMPLETE
@@ -23,7 +22,7 @@
 //  3. A thin-editor apply that restates the operator's owner preserves it.
 //  4. A local render stamps the source-provenance annotation and a following
 //     registry render (which omits it) has it pruned by SSA — the fail-closed
-//     provenance signal (0006 D38) that patch_test.go's fake client cannot
+//     provenance signal (0006:D38) that patch_test.go's fake client cannot
 //     model.
 //
 // Requires a running kind cluster at context "kind-opm-dev" with the

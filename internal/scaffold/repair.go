@@ -18,12 +18,12 @@ import (
 )
 
 // repairLanguageVersion is the CUE language version a created cue.mod
-// declares — structure, not identity, so writing it invents nothing (D20).
+// declares — structure, not identity, so writing it invents nothing (0011:D20).
 const repairLanguageVersion = "v0.17.0"
 
 // RepairAction is one file `init` will create or edit, stated so the second
 // confirmation gives the author something to judge: the file, and for an
-// edit, the current value beside its replacement (D20).
+// edit, the current value beside its replacement (0011:D20).
 type RepairAction struct {
 	// File is the dir-relative path.
 	File string
@@ -52,7 +52,7 @@ type RepairPlan struct {
 
 // DetectRepair inspects an existing tree and builds the repair plan: a
 // missing or disagreeing cue.mod `module:` line, a missing identity package,
-// or a disagreeing identity ModulePath (D20's repairable set — deeper
+// or a disagreeing identity ModulePath (0011:D20's repairable set — deeper
 // conformance stays with `opm module vet`, which the command points at
 // afterwards).
 //
@@ -118,7 +118,7 @@ func resolveRepairPath(argPath, idPath, cueModPath, dir string) (string, error) 
 	default:
 		return "", &RefusalError{publish.Refusal{
 			Headline:    fmt.Sprintf("%s states no module path anywhere", dir),
-			Consequence: "Repair writes structure; only you supply identity (D20). There is nothing\nin this tree to align to.",
+			Consequence: "Repair writes structure; only you supply identity. There is nothing\nin this tree to align to.",
 			Action:      "Pass the path:  opm mod init <module-path>",
 		}}
 	}
@@ -235,13 +235,13 @@ func planIdentity(ctx context.Context, k *kernel.Kernel, p *RepairPlan, idPath s
 
 // statedVersion reads the version the tree itself states (metadata.version),
 // the only source identity creation may use — init does not choose versions
-// (D20).
+// (0011:D20).
 func statedVersion(ctx context.Context, k *kernel.Kernel, dir string) (string, error) {
 	refuse := func(why string) error {
 		return &RefusalError{publish.Refusal{
 			Headline:    fmt.Sprintf("%s states no version init could adopt", dir),
 			Evidence:    [][]string{{"looked at", "metadata.version", why}},
-			Consequence: "Creating identity/identity.cue needs a Version, and init does not choose\none (D20) — that would move the invention upstream of the publish gates.",
+			Consequence: "Creating identity/identity.cue needs a Version, and init does not choose\none — that would move the invention upstream of the publish gates.",
 			Action:      "State it in module.cue (metadata.version) or write identity/identity.cue\nyourself, then rerun.",
 		}}
 	}
@@ -266,10 +266,9 @@ func statedVersion(ctx context.Context, k *kernel.Kernel, dir string) (string, e
 // shape the templates carry, with the tree's own values.
 func identityFileContent(modulePath, version string) string {
 	return fmt.Sprintf(`// Package identity is the single source of this module's path and version
-// (core #IdentityPackage, enhancements 0010 D38 / 0011 D12). It sits at the
-// bottom of the module's import graph — no intra-module imports, no core
-// import; validation is external (a publishing tool unifies this package
-// against core's #IdentityPackage).
+// (core #IdentityPackage). It sits at the bottom of the module's import graph
+// — no intra-module imports, no core import; validation is external (a
+// publishing tool unifies this package against core's #IdentityPackage).
 package identity
 
 // ModulePath is the module's complete CUE module path, major suffix included
@@ -295,7 +294,7 @@ func (p *RepairPlan) Apply() error {
 
 // Describe renders the plan for the second confirmation: every file to be
 // created or edited, and for an edit the current value beside its
-// replacement — the author must have something to judge (D20).
+// replacement — the author must have something to judge (0011:D20).
 func (p *RepairPlan) Describe() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Repair %s to %s:\n\n", p.Dir, p.ModulePath)

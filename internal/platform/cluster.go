@@ -17,7 +17,7 @@ import (
 
 // ClusterPlatformGetterFor returns a ClusterPlatformGetter that reads the
 // singleton cluster Platform CR via the dynamic client. NotFound and
-// Forbidden are reported as warn-fallback conditions, not errors (D21).
+// Forbidden are reported as warn-fallback conditions, not errors (0006:D21).
 //
 // The whole document is returned, spec and status undecoded: the effective
 // registry the operator recorded lives on status, and resolution generates
@@ -57,10 +57,10 @@ func ClusterPlatformGetterFor(dyn dynamic.Interface) ClusterPlatformGetter {
 
 // EnsureClusterPlatform seeds the singleton cluster Platform from the spec
 // decoded off the built local platform the render consumed
-// (SpecFromPlatform), write-if-absent (D12/D22): a plain create with field
+// (SpecFromPlatform), write-if-absent (0006:D12/D22): a plain create with field
 // manager opm-cli, treating AlreadyExists as success-noop. Never SSA, never
 // update — an existing Platform is never overwritten. A Forbidden create
-// degrades to a warning (D17: the render already succeeded against the local
+// degrades to a warning (0006:D17: the render already succeeded against the local
 // platform).
 func EnsureClusterPlatform(ctx context.Context, dyn dynamic.Interface, spec Spec) error {
 	outcome, err := createClusterPlatform(ctx, dyn, spec)
@@ -126,7 +126,7 @@ func createClusterPlatform(ctx context.Context, dyn dynamic.Interface, spec Spec
 		return platformCreated, nil
 	case apierrors.IsAlreadyExists(err):
 		// The API server's name-uniqueness check is the synchronization
-		// primitive (D22): a concurrent create won the race — success-noop.
+		// primitive (0006:D22): a concurrent create won the race — success-noop.
 		return platformAlreadyPresent, nil
 	case apierrors.IsForbidden(err):
 		return platformWriteForbidden, nil

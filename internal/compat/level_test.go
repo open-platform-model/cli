@@ -49,7 +49,7 @@ func TestLevelEnforced(t *testing.T) {
 }
 
 // TestCompareAPIVersionsTransitive pins the fix for the measured
-// non-transitivity in sortFQNsBySemVer (0010 D34): under a per-pair rule
+// non-transitivity in sortFQNsBySemVer (0010:D34): under a per-pair rule
 // switch, v1alpha1 < v2, v2 < v10 and v10 < v1alpha1 are all true at once, so
 // the same three strings sort differently depending on input order. The
 // kube-aware ordering must produce one order from every permutation.

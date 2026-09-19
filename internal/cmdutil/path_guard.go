@@ -20,7 +20,6 @@ func ValidateModuleInputPath(path string) error {
 		return fmt.Errorf("checking module path %q: %w", absPath, err)
 	}
 
-	// Was: detected release.cue (enhancement 0002 D9; instance-file convention).
 	if info.IsDir() {
 		if hasFile(absPath, "instance.cue") {
 			return fmt.Errorf("path %q is an instance package, not a module - use 'opm instance'", absPath)
@@ -49,7 +48,6 @@ func ValidateInstanceInputPath(path string) error {
 		return fmt.Errorf("checking instance path %q: %w", absPath, err)
 	}
 
-	// Was: detected release.cue (enhancement 0002 D9; instance-file convention).
 	if info.IsDir() {
 		if hasFile(absPath, "instance.cue") {
 			return nil

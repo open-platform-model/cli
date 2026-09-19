@@ -16,7 +16,7 @@ type RenderFlags struct {
 	Values       []string
 	Namespace    string
 	InstanceName string
-	// Platform is the --platform platform module directory (0006 D21;
+	// Platform is the --platform platform module directory (0006:D21;
 	// highest platform-source precedence). Supersedes the retired --provider
 	// flag.
 	Platform string
@@ -29,13 +29,13 @@ func (f *RenderFlags) AddTo(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&f.Namespace, "namespace", "n", "",
 		"Target namespace")
 	cmd.Flags().StringVar(&f.InstanceName, "instance-name", "",
-		"Instance name (default: module name)") // Was: --release-name (enhancement 0002 D-X4.2)
+		"Instance name (default: module name)")
 	cmd.Flags().StringVar(&f.Platform, "platform", "",
 		platformFlagHelp)
 }
 
 // platformFlagHelp is the --platform help text shared by every render-bearing
-// command: the flag names a platform module directory (0019 D5), never a
+// command: the flag names a platform module directory (0019:D5), never a
 // data file.
 const platformFlagHelp = "Path to a platform module directory (overrides the cluster Platform and ~/.opm/platform/)"
 
@@ -55,7 +55,7 @@ func (f *K8sFlags) AddTo(cmd *cobra.Command) {
 }
 
 // InstanceSelectorFlags holds flags for identifying an instance on the cluster
-// (delete, status). Was: ReleaseSelectorFlags (enhancement 0002 D10).
+// (delete, status). Was: ReleaseSelectorFlags (0002:D10).
 type InstanceSelectorFlags struct {
 	InstanceName string
 	InstanceID   string
@@ -63,7 +63,6 @@ type InstanceSelectorFlags struct {
 }
 
 // AddTo registers the instance selector flags on the given cobra command.
-// Was: --release-name/--release-id (enhancement 0002 D-X4.2; hard rename, no alias).
 func (f *InstanceSelectorFlags) AddTo(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&f.Namespace, "namespace", "n", "",
 		"Target namespace (default: from config)")
@@ -110,7 +109,7 @@ type InstanceFileFlags struct {
 	// Values are additional values CUE files (-f/--values flag).
 	// When empty, values.cue next to the instance file is used if it exists.
 	Values []string
-	// Platform is the --platform platform module directory (0006 D21;
+	// Platform is the --platform platform module directory (0006:D21;
 	// highest platform-source precedence). Supersedes the retired --provider
 	// flag.
 	Platform string

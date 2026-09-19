@@ -38,7 +38,7 @@ func operatorOwnedRecord() *inventory.Record {
 // Deleting a finalizer-armed ModuleInstance with no controller running does not
 // delete anything — it wedges the CR in Terminating with its workloads
 // orphaned. So the readiness guard refuses rather than proceeding, and it says
-// why (design LD7).
+// why.
 func TestDeleteOperatorOwned_RefusesWhenOperatorIsNotReady(t *testing.T) {
 	err := deleteOperatorOwned(context.Background(), emptyClusterClient(), operatorOwnedRecord(),
 		time.Second, false, output.InstanceLogger("test"))

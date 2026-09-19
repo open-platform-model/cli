@@ -109,7 +109,7 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 		return err
 	}
 
-	// Ownership is the single branch point (0006 D18): an operator-owned
+	// Ownership is the single branch point (0006:D18): an operator-owned
 	// instance is deleted by deleting its CR and letting the operator's
 	// finalizer prune the workloads.
 	if inventory.ResolveOwnership(inv) == inventory.ModeOperatorOwned {
@@ -121,7 +121,7 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 
 // deleteOperatorOwned deletes an operator-managed instance by removing its
 // ModuleInstance CR and waiting for the operator's cleanup finalizer to prune
-// the workloads (design LD7).
+// the workloads.
 //
 // The readiness guard is the point of this function. A ModuleInstance carries
 // the operator's cleanup finalizer, so deleting the CR with no controller
@@ -220,7 +220,7 @@ func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rs
 	}
 
 	// Delete the ModuleInstance CR last — only after every tracked workload
-	// resource is gone (enhancement 0006 D1). Skipped on dry-run and on partial
+	// resource is gone (0006:D1). Skipped on dry-run and on partial
 	// failure (so a re-run can retry the remaining workloads).
 	if !dryRun && inv != nil && len(deleteResult.Errors) == 0 {
 		if err := inventory.DeleteCR(ctx, k8sClient, inv.Name, inv.Namespace); err != nil {

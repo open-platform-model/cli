@@ -41,7 +41,7 @@ func TestMain(m *testing.M) {
 	cancel() // Call cancel explicitly before os.Exit
 
 	// Write a stub config.cue directly — scalar data only, matching the
-	// post-D39 schema (no providers, no imports, no cue.mod).
+	// schema 0006:D39 settled on (no providers, no imports, no cue.mod).
 	opmDir := filepath.Join(homeDir, ".opm")
 	if err := os.MkdirAll(opmDir, 0o755); err != nil {
 		os.RemoveAll(tmpDir)
@@ -231,7 +231,7 @@ func TestE2E_ModInit_FromClonesAnyPublishedModule(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	donor := publishModuleFixture(t, func(files map[string]string) {
-		// The donor derives its metadata from its identity package (D12) —
+		// The donor derives its metadata from its identity package (0011:D12) —
 		// what makes a clone follow the rewritten identity. kind is required
 		// by the registry loader's shape gate.
 		files["module.cue"] = `package demo
@@ -284,7 +284,7 @@ metadata: {
 }
 
 // TestE2E_ModInit_NonDerivingDonorRefuses pins the mismatch half: a donor
-// whose metadata carries literals instead of the D12 derivation cannot be
+// whose metadata carries literals instead of the 0011:D12 derivation cannot be
 // re-identified — init refuses naming the defect and leaves nothing behind.
 func TestE2E_ModInit_NonDerivingDonorRefuses(t *testing.T) {
 	env := []string{templatesRegistryEnv(t)}

@@ -75,7 +75,7 @@ func TestRenderFromInstanceFile_RejectsModulePackagePath(t *testing.T) {
 
 func TestNewResult_CarriesResolvedPlatform(t *testing.T) {
 	// The apply workflow seeds the cluster Platform from Result.PlatformSpec
-	// (0006 D12): the assembly must carry the spec decoded from the built
+	// (0006:D12): the assembly must carry the spec decoded from the built
 	// platform verbatim — every entry with its derived version — or the
 	// seeded document degrades to the zero value.
 	spec := platform.Spec{
@@ -197,7 +197,7 @@ func writeD19File(t *testing.T, path, content string) {
 }
 
 // The CLI's one render call always opts into the kernel's local replacements
-// (the D19 spec: every render enables them): a developer's local-module.cue
+// (the 0010:D19 spec: every render enables them): a developer's local-module.cue
 // is honored, never refused, and the kernel's rows are what the warnings
 // are worded from.
 func TestNewRenderInput_EnablesLocalReplacements(t *testing.T) {

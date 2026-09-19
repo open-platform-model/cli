@@ -9,7 +9,7 @@ import (
 // CRD's OpenAPI field names (group/kind/namespace/name/v/component and
 // revision/digest/count/entries) explicitly — never Go struct-tag marshaling —
 // because the CRD schema, not the Go tags, anchors cross-actor shape parity
-// (enhancement 0006 D2/D31). All integer values use int64, the only integer
+// (0006:D2/D31). All integer values use int64, the only integer
 // type the unstructured converter accepts.
 
 // entryToWire converts an InventoryEntry into the CRD entry object. Optional

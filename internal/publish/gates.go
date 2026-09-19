@@ -13,10 +13,10 @@ import (
 	"github.com/open-platform-model/cli/pkg/loader"
 )
 
-// Owned-domain shapes (D13/D14/D25): the namespace rules bind only where OPM
+// Owned-domain shapes (0011:D13/D14/D25): the namespace rules bind only where OPM
 // owns the domain. Outside opmodel.dev and community.opmodel.dev publish
 // asserts nothing about the path — path ownership is domain ownership.
-// templates/ is D25's reserved segment: official scaffold templates as
+// templates/ is 0011:D25's reserved segment: official scaffold templates as
 // module-kind artifacts, exactly one name deep (no nesting — that is part of
 // what keeps shortcut expansion unambiguous), with no community mirror.
 var (
@@ -49,7 +49,7 @@ func Run(ctx context.Context, opts Options) (*Plan, error) {
 
 	p := &Plan{Kind: opts.Kind, Dir: absDir}
 
-	// Gate: a tree without cue.mod is not a CUE module (D16, D20). Publish
+	// Gate: a tree without cue.mod is not a CUE module (0011:D16, D20). Publish
 	// reads the module path from cue.mod and refuses to invent one, so
 	// nothing downstream is evaluable — short-circuit.
 	if !hasCueMod(absDir) {
@@ -71,16 +71,16 @@ func Run(ctx context.Context, opts Options) (*Plan, error) {
 	}
 	p.CueModPath, p.CueModPos = a.cueModPath, a.cueModPos
 
-	// Gate: identity conforms to #IdentityPackage (D21) — CUE's diagnostic,
+	// Gate: identity conforms to #IdentityPackage (0011:D21) — CUE's diagnostic,
 	// through the grouped funnel (refusal 10). Downstream gates still read
 	// the fields that do resolve.
 	if r := conformIdentity(a, opts.IdentitySchema); r != nil {
 		p.refuse(*r)
 	}
 
-	// Identity states (D4 tristate, defaults are concrete), coordinate
+	// Identity states (0011:D4 tristate, defaults are concrete), coordinate
 	// derivation (read and split the declared path — never composed), and
-	// --version assert/fill (D3/D12).
+	// --version assert/fill (0011:D3/D12).
 	p.Identity = identityStates(a)
 	p.DeclaredPath = requireConcreteModulePath(p)
 	if before, after, ok := strings.Cut(p.DeclaredPath, "@"); ok {
@@ -103,7 +103,7 @@ func Run(ctx context.Context, opts Options) (*Plan, error) {
 	gatePackageName(p, a)
 	gateOverride(p, opts)
 
-	// The catalog-only local gates (D22): enumerate the member tree once,
+	// The catalog-only local gates (0011:D22): enumerate the member tree once,
 	// unify every member against the FQN gate and every trait's posture
 	// against the optional gate. Both are local — no registry is touched.
 	if p.Kind == KindCatalog {
@@ -119,14 +119,14 @@ func Run(ctx context.Context, opts Options) (*Plan, error) {
 		gateTraitOptional(p, opts, p.members)
 	}
 
-	// Gate: the tag must not already be published (D15) — the first registry
+	// Gate: the tag must not already be published (0011:D15) — the first registry
 	// round-trip, and the enumeration the predecessor scan reuses. The dry
 	// run runs it too: a dry run surfaces rejections, never defers them.
 	if err := gateAlreadyPublished(ctx, p, opts); err != nil {
 		return p, err
 	}
 
-	// Gate: the compatibility walk (D9) — catalogs only, and the reason the
+	// Gate: the compatibility walk (0011:D9) — catalogs only, and the reason the
 	// enumeration above is kept on the plan.
 	if err := gateCompat(p, opts); err != nil {
 		return p, err
@@ -191,7 +191,7 @@ func gateCueModAgreement(p *Plan, a *artifact) {
 	})
 }
 
-// gateDerivation is msg 7 (D12): metadata.modulePath and metadata.version
+// gateDerivation is msg 7 (0011:D12): metadata.modulePath and metadata.version
 // must derive from the identity package. core cannot enforce the wiring — a
 // developer who replaces `id.Version` with a literal leaves nothing to
 // conflict — so publish compares the evaluated values. The identity side uses
@@ -236,7 +236,7 @@ func gateDerivation(p *Plan, a *artifact) {
 // gateTagMajor is msg 6's evaluable half plus #TagRef's binding: the tag is
 // constructed from the effective version, so tag == version holds by
 // construction, and what remains checkable is that the tag's major names the
-// major the path declares (D18).
+// major the path declares (0011:D18).
 func gateTagMajor(p *Plan) {
 	if p.Tag == "" || p.Major == "" {
 		return
@@ -257,7 +257,7 @@ func gateTagMajor(p *Plan) {
 	})
 }
 
-// gateNamespace enforces the owned-domain path shapes (D13): exact inside
+// gateNamespace enforces the owned-domain path shapes (0011:D13): exact inside
 // opmodel.dev and community.opmodel.dev, silent everywhere else — a vanity
 // domain or a self-hosted registry may use any valid CUE module path.
 // opmodel.dev/core is the fixed path outside the kind pattern;
@@ -289,8 +289,8 @@ func gateNamespace(p *Plan) {
 // gateKindSegment: inside the owned domains the kind segment must agree with
 // what is being published — one implementation with two entry points means
 // nothing else stops `opm module publish` landing where consumers look for
-// catalogs. No platforms arm: nothing publishes a platform today (D14).
-// templates/ sits in the module arm: D25 makes the segment module-kind, so a
+// catalogs. No platforms arm: nothing publishes a platform today (0011:D14).
+// templates/ sits in the module arm: 0011:D25 makes the segment module-kind, so a
 // template publishes as an ordinary module and a catalog can never land there.
 func gateKindSegment(p *Plan) {
 	repo := p.RegistryRepo
@@ -338,7 +338,7 @@ func expectedSegment(kind Kind, repo string) string {
 	return "modules/"
 }
 
-// gatePackageName is D1's module package-name rule: the module's root package
+// gatePackageName is 0011:D1's module package-name rule: the module's root package
 // must bind to its metadata.name, because a consumer's bare import binds the
 // package name. The catalog entry point skips it — a catalog's importable
 // surface is its subpackages.
@@ -366,7 +366,7 @@ func gatePackageName(p *Plan, a *artifact) {
 	})
 }
 
-// gateOverride is D6: local overrides are never honored — CUE strips the file
+// gateOverride is 0011:D6: local overrides are never honored — CUE strips the file
 // and the artifact always resolves as published. What is in question is
 // whether what was tested matches what is shipped. The condition is the
 // file's presence; --skip-override-check waives the gate for modules only and

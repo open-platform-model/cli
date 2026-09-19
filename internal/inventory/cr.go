@@ -8,7 +8,7 @@ import (
 
 // The ModuleInstance and Platform CRD coordinates. These are hardcoded rather
 // than imported from opm-operator's types package — the CLI has no Go module
-// dependency on opm-operator (enhancement 0006 D13). This package is the single
+// dependency on opm-operator (0006:D13). This package is the single
 // definition; other CLI packages (e.g. internal/operator) consume it from here
 // instead of keeping private copies.
 const (
@@ -38,7 +38,7 @@ const (
 	// CleanupFinalizer is the operator's finalizer on the ModuleInstance CR. It
 	// blocks the CR's removal until the operator has pruned the instance's
 	// workloads — which is what makes an operator-owned delete a CR delete
-	// (enhancement 0006 D18), and what wedges the CR if no operator is running.
+	// (0006:D18), and what wedges the CR if no operator is running.
 	CleanupFinalizer = GroupOpmodel + "/cleanup"
 )
 

@@ -103,7 +103,7 @@ func runConfigInit(_ []string, force bool) error {
 	}
 
 	// Write the platform module (0700 dirs, 0600 files); offline, nothing
-	// is resolved (0019 D5: the module's cue.mod pins are the platform).
+	// is resolved (0019:D5: the module's cue.mod pins are the platform).
 	if err := config.WritePlatformModule(paths.PlatformDir); err != nil {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitPermissionDenied,

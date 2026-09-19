@@ -41,7 +41,7 @@ severity of the word:
   comparable        exits with the validation error code — every component
                     the narrower transformer matches is also matched by the
                     broader one, so both would render and nothing tells them
-                    apart (enhancement 0015 D5)
+                    apart (0015:D5)
   unfulfilled       exits 0 — a platform may define a contract ahead of the
                     provider that implements it, and an unmet demand is
                     refused by the render that demands it
@@ -70,8 +70,8 @@ Examples:
 
 // runPlatformCheck resolves the platform, builds it, and prints the contract
 // inventory report. Routability and discrimination decide the exit status —
-// the two conditions platform-package generation refuses on (enhancement 0015
-// D5, D37); an unfulfilled contract never does (D18).
+// the two conditions platform-package generation refuses on (0015:D5,
+// 0010:D37); an unfulfilled contract never does (0015:D18).
 func runPlatformCheck(ctx context.Context, args []string, cfg *config.GlobalConfig, platformFlag string) error {
 	argDir := ""
 	if len(args) > 0 {
@@ -79,7 +79,7 @@ func runPlatformCheck(ctx context.Context, args []string, cfg *config.GlobalConf
 	}
 
 	// Cluster is deliberately nil: a cluster's effective registry is its own
-	// subject (0015 D6), and this command reads a platform module.
+	// subject (0015:D6), and this command reads a platform module.
 	dir, res, err := platform.Resolve(ctx, platform.ResolveOptions{
 		Argument:     argDir,
 		PlatformFlag: platformFlag,

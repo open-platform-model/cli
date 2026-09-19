@@ -31,7 +31,7 @@ const (
 )
 
 // Resolution reports where the platform came from — the provenance every
-// render-bearing command surfaces (D21: the fallback warns, it never
+// render-bearing command surfaces (0006:D21: the fallback warns, it never
 // silently swaps platforms).
 type Resolution struct {
 	// Source is the precedence step that produced the platform.
@@ -125,7 +125,7 @@ type ClusterPlatform struct {
 // ClusterPlatformGetter fetches the cluster Platform CR. It returns
 // (doc, "", nil) on success and (nil, unavailable-reason, nil) when the CR
 // is absent or unreadable in a way that permits warn-fallback (NotFound,
-// Forbidden — D21). Any other error is fatal to resolution.
+// Forbidden — 0006:D21). Any other error is fatal to resolution.
 type ClusterPlatformGetter func(ctx context.Context) (doc *ClusterPlatform, unavailable string, err error)
 
 // ErrClusterRead marks a fatal failure to read the cluster Platform: the
@@ -153,7 +153,7 @@ type ResolveOptions struct {
 	// --config overrides move them together.
 	ConfigPath string
 	// Cluster is the cluster CR getter. nil means the command is offline
-	// (build/render) and MUST NOT read the cluster (D17/D21).
+	// (build/render) and MUST NOT read the cluster (0006:D17/D21).
 	Cluster ClusterPlatformGetter
 	// NoLocalFallback refuses the local-default step when the cluster
 	// Platform is unavailable, returning ErrNoClusterPlatform instead. Set
@@ -227,19 +227,18 @@ func Resolve(ctx context.Context, opts ResolveOptions) (string, Resolution, erro
 	return localDir, Resolution{Source: SourceLocalDefault, Location: localDir, Dir: localDir, Warning: fallbackWarning}, nil
 }
 
-// resolveClusterCR generates the platform module the cluster renders
-// against. The registry the operator recorded on status wins over the
-// authored spec whenever it holds entries: it is the union the operator
-// resolved from the subscriptions and the active TransformerRegistration
-// claims, and it is what the running package was generated from (0015
-// D13/D17). The spec is the fallback for a cluster no operator has
-// generated for.
+// resolveClusterCR generates the platform module the cluster renders against.
+// The registry the operator recorded on status wins over the authored spec
+// whenever it holds entries: it is the union the operator resolved from the
+// subscriptions and the active TransformerRegistration claims, and it is what
+// the running package was generated from (0015:D13/D17). The spec is the
+// fallback for a cluster no operator has generated for.
 //
 // Two divergences between spec and effective package are warned, never
-// silently substituted: a status behind the spec's generation, and a
-// Platform the operator refused. Neither changes which registry is used —
-// the effective package is what the cluster renders against in both cases,
-// and the warning says why the laptop is deliberately behind.
+// silently substituted: a status behind the spec's generation, and a Platform
+// the operator refused. Neither changes which registry is used — the effective
+// package is what the cluster renders against in both cases, and the warning
+// says why the laptop is deliberately behind.
 func resolveClusterCR(ctx context.Context, doc *ClusterPlatform, opts ResolveOptions) (string, Resolution, error) {
 	s, eff, err := DecodeCR(doc)
 	if err != nil {

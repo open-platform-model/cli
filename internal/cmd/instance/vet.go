@@ -65,7 +65,7 @@ func runInstanceVet(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.
 	result, err := render.FromInstanceFile(ctx, render.InstanceFileOpts{
 		InstanceFilePath: instanceFile,
 		ValuesFiles:      rff.Values,
-		PlatformFlag:     rff.Platform, // offline: no cluster read (0006 D21)
+		PlatformFlag:     rff.Platform, // offline: no cluster read (0006:D21)
 		K8sConfig:        k8sConfig,
 		Config:           cfg,
 	})

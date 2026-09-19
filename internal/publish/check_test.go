@@ -15,7 +15,7 @@ import (
 
 // rawPush publishes a tree through CUE's module machinery directly, gates
 // bypassed — what `cue mod publish` does. The check exists precisely for
-// builds that arrived this way (D7: publish-side enforcement only protects
+// builds that arrived this way (0011:D7: publish-side enforcement only protects
 // artifacts pushed through OPM tooling).
 func rawPush(t *testing.T, registry string, files map[string]string, path, tag string) {
 	t.Helper()
@@ -143,7 +143,7 @@ func TestRegistryCheck_BadCoordinate(t *testing.T) {
 }
 
 func TestRegistryCheck_DevBuildIsExempt(t *testing.T) {
-	// D26: --compat on a published dev build reports the exemption, does no
+	// 0011:D26: --compat on a published dev build reports the exemption, does no
 	// history work, and agrees with publish.
 	coldCUECache(t)
 	registry := emptyTestRegistry(t)
@@ -185,7 +185,7 @@ func TestRegistryCheck_ReleaseIgnoresDevHistory(t *testing.T) {
 }
 
 func TestRegistryCheck_PrereleaseLineExempt(t *testing.T) {
-	// D26 clause 2 in the check: a prerelease build's narrowed beta member is
+	// 0011:D26 clause 2 in the check: a prerelease build's narrowed beta member is
 	// counted prerelease-exempt, not listed; the same break at a stable
 	// version is a finding.
 	coldCUECache(t)

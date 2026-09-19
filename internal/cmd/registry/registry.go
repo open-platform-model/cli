@@ -1,5 +1,5 @@
 // Package registrycmd provides the registry command group — authenticating
-// to the OCI registries OPM publishes to and pulls from (0011 D11/D24).
+// to the OCI registries OPM publishes to and pulls from (0011:D11/D24).
 package registrycmd
 
 import (
@@ -9,7 +9,7 @@ import (
 )
 
 // NewRegistryCmd creates the registry command group. Login is its first
-// member; the group names what is authenticated to (D24 — a bare `opm
+// member; the group names what is authenticated to (0011:D24 — a bare `opm
 // login` reads as logging in to an OPM service that does not exist) and
 // gives logout and the credential-helper flow a home when they arrive.
 func NewRegistryCmd(cfg *config.GlobalConfig) *cobra.Command {

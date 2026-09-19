@@ -1,7 +1,7 @@
 //go:build ignore
 
 // Integration test for the one-time Secret→CR inventory migration (enhancement
-// 0006 C1, D6/D8). Exercises the real migration helpers against a live cluster:
+// 0006:D6/D8). Exercises the real migration helpers against a live cluster:
 // a legacy inventory Secret is ported to a ModuleInstance CR, a stale entry is
 // pruned, the Secret is deleted only after the CR status write, and
 // status/list read CRs only (an unmigrated Secret is invisible).

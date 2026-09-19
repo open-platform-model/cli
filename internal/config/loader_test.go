@@ -318,8 +318,8 @@ config: {
 }
 
 func TestValidateConfigSchema_ProvidersRejected(t *testing.T) {
-	// The providers field was removed by enhancement 0006 D39. A pre-D39
-	// config must fail with a migration hint naming the removed field.
+	// The providers field was removed by 0006:D39. A config predating it
+	// must fail with a migration hint naming the removed field.
 	ctx := cuecontext.New()
 	configCUE := `package config
 
@@ -438,7 +438,7 @@ config: {
 }
 
 func TestLoadConfigFile_ImportsRejected(t *testing.T) {
-	// Data-only contract (0006 D39): even CUE stdlib imports are rejected,
+	// Data-only contract (0006:D39): even CUE stdlib imports are rejected,
 	// mirroring the platform-file guard.
 	configPath := writeConfig(t, `package config
 
@@ -471,7 +471,7 @@ func TestLoad_NoConfigFile_SkewPolicyDefaultsToWarn(t *testing.T) {
 }
 
 func TestLoadConfigFile_SkewPolicy(t *testing.T) {
-	// 0019 D18: absent means warn; the two allowed values are read verbatim.
+	// 0019:D18: absent means warn; the two allowed values are read verbatim.
 	tests := []struct {
 		name    string
 		content string

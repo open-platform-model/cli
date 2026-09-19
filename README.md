@@ -60,7 +60,7 @@ Use `opm catalog` when you are starting from catalog source: declare a version o
 
 ### Instance Operations (`opm instance`)
 
-<!-- Renamed from `opm release` / `opm rel` (enhancement 0002 D6). The old `release`/`rel` verb is removed — no back-compat alias (D8). -->
+<!-- Renamed from `opm release` / `opm rel` (0002:D6). The old `release`/`rel` verb is removed — no back-compat alias (D8). -->
 
 `opm i`, `opm ins`, and `opm inst` are the short aliases.
 

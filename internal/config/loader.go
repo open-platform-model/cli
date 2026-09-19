@@ -32,7 +32,7 @@ type LoaderOptions struct {
 // Load loads the OPM configuration into cfg, applying precedence rules.
 //
 // Loading is single-pass: ~/.opm/config.cue is import-free scalar data
-// (enhancement 0006 D39), so the file is parsed and validated exactly once
+// (0006:D39), so the file is parsed and validated exactly once
 // and the registry resolves by ordinary flag > env > config precedence
 // afterwards. There is no registry-bootstrap pre-pass.
 //
@@ -98,9 +98,9 @@ func loadConfigFile(cfg *GlobalConfig, configPath string) (string, error) {
 		return "", fmt.Errorf("reading config file: %w", err)
 	}
 
-	// Data-only contract (D39): reject CUE imports before evaluation.
+	// Data-only contract (0006:D39): reject CUE imports before evaluation.
 	// CompileBytes would happily resolve stdlib imports otherwise. (The
-	// platform beside this file is a CUE module since 0019 D5 and is built,
+	// platform beside this file is a CUE module since 0019:D5 and is built,
 	// not parsed as data.)
 	astFile, err := parser.ParseFile(configPath, content)
 	if err != nil {
@@ -117,7 +117,7 @@ func loadConfigFile(cfg *GlobalConfig, configPath string) (string, error) {
 			Type:     configErrType,
 			Message:  "the config file must be data-only — CUE imports are not allowed",
 			Location: configPath,
-			Hint:     "Remove the import declarations (config.cue is scalar data since 0006 D39); re-run 'opm config init' for a fresh template",
+			Hint:     "Remove the import declarations (config.cue is scalar data); re-run 'opm config init' for a fresh template",
 			Cause:    oerrors.ErrValidation,
 		}
 	}
@@ -146,7 +146,7 @@ func loadConfigFile(cfg *GlobalConfig, configPath string) (string, error) {
 		cfg.Log.Kubernetes.APIWarnings = APIWarningsWarn
 	}
 
-	// Absent skewPolicy means warn (0019 D18).
+	// Absent skewPolicy means warn (0019:D18).
 	if cfg.SkewPolicy == "" {
 		cfg.SkewPolicy = SkewPolicyWarn
 	}
@@ -254,7 +254,7 @@ func validateConfigSchema(ctx *cue.Context, value cue.Value, configPath string) 
 }
 
 // removedFieldHint returns a targeted hint when the validation error points
-// at a field removed by enhancement 0006 D39 (providers, cacheDir) or at a
+// at a field removed by 0006:D39 (providers, cacheDir) or at a
 // closed-enum key whose CUE error elides the allowed values (skewPolicy),
 // and the generic vet hint otherwise.
 func removedFieldHint(errMsg string) string {

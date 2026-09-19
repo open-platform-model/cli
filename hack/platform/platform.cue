@@ -1,6 +1,6 @@
 // Local default platform for the kind dev cluster tooling (module form,
-// 0019 D5), the sibling platform/ of hack/opm-config.cue (config.PlatformDir).
-// This is the D21 precedence source 3 — used only by offline commands
+// 0019:D5), the sibling platform/ of hack/opm-config.cue (config.PlatformDir).
+// This is the 0006:D21 precedence source 3 — used only by offline commands
 // (`opm instance build`/`vet`) which never read the cluster; cluster-facing
 // commands resolve the Platform CR (hack/kind-platform.yaml) instead and
 // generate a platform module from it under the OPM home cache.

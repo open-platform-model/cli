@@ -16,7 +16,7 @@ import (
 )
 
 // Thin-editor apply and operator-owned delete, end to end against a live kind
-// cluster with a REAL reconciling operator (enhancement 0006 slice C3).
+// cluster with a REAL reconciling operator.
 //
 // These require an operator that can actually reconcile — not just the CRDs.
 // Bring one up with `task cluster:operator`, which installs the operator,
@@ -261,7 +261,7 @@ func swapFixtureReplicas(t *testing.T, path, old, replacement string) func() {
 	}
 }
 
-// TestE2E_ThinEditor_ValuesRoundTrip covers D18's thin-editor mode against a
+// TestE2E_ThinEditor_ValuesRoundTrip covers 0006:D18's thin-editor mode against a
 // live operator: the CLI edits spec only, and the operator acts on the edit.
 func TestE2E_ThinEditor_ValuesRoundTrip(t *testing.T) {
 	kubeconfig := requireKindCluster(t)

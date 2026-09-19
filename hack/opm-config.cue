@@ -3,7 +3,7 @@
 // `opm ... --config hack/opm-config.cue` invocation against kind-opm-dev.
 //
 // This exists so the dev-cluster tooling is hermetic: it does not depend on a
-// developer's personal ~/.opm being present, current, or in the post-D39
+// developer's personal ~/.opm being present, current, or in the 0006:D39
 // data-only format. Data only — CUE imports are not allowed here.
 package config
 

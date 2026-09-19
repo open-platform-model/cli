@@ -26,11 +26,11 @@ const realTreeRegistry = "opmodel.dev=ghcr.io/open-platform-model,registry.cue.w
 // must run clean against the live GHCR history.
 //
 // KNOWN BOUND (documented, deliberate): the predecessor scan probes by the
-// D49 filing convention (<kind>/<apiVersion> packages). The published history
-// below the alpha releases includes pre-D49 `-0.dev.*` builds whose trees the
+// 0010:D49 filing convention (<kind>/<apiVersion> packages). The published history
+// below the alpha releases includes `-0.dev.*` builds predating 0010:D49, whose trees the
 // convention cannot see into — probes there return the scan's negative
 // signal and the walk continues. Acceptable: that horizon is entirely
-// alpha-era, and alpha promises nothing (D34).
+// alpha-era, and alpha promises nothing (0010:D34).
 func TestRealTree_CatalogOpm(t *testing.T) {
 	src, err := filepath.Abs(filepath.Join("..", "..", "..", "catalog_opm", "opm"))
 	require.NoError(t, err)
@@ -92,7 +92,7 @@ func TestRealTree_CatalogOpm(t *testing.T) {
 	require.NotEmpty(t, preds, "the live history should hold at least one predecessor build")
 
 	// lineIsPrerelease=false on purpose: the tree's own version is a
-	// release prerelease, which D26 clause 2 would exempt; forcing the stable
+	// release prerelease, which 0011:D26 clause 2 would exempt; forcing the stable
 	// line proves the walk itself is clean over the real members.
 	if err := compatScan(opts, repo, preds, false, members, &p.CatalogGates, p.refuse); err != nil {
 		var connErr *ConnectivityError

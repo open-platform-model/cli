@@ -21,7 +21,7 @@ import (
 )
 
 // InitialVersion is the version every scaffold starts at, written in the
-// defaulted form so release automation owns it from the first commit (D12).
+// defaulted form so release automation owns it from the first commit (0011:D12).
 const InitialVersion = "0.1.0"
 
 // modulePathRE is the shape a new module path must have: a dotted first
@@ -36,7 +36,7 @@ var packageNameRE = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 // ValidateNewModulePath checks the path a scaffold will be re-identified to:
 // module-path shaped with an explicit major (init never invents one), and a
 // leaf that is a valid CUE package name, because the leaf becomes the root
-// package, metadata.name, and the identity's path leaf all at once (0010 D8).
+// package, metadata.name, and the identity's path leaf all at once (0010:D8).
 func ValidateNewModulePath(path string) error {
 	if !modulePathRE.MatchString(path) {
 		return fmt.Errorf("module path %q must be <domain>/<...>/<name>@v<major> (e.g. example.com/modules/my_app@v0)", path)
@@ -59,7 +59,7 @@ func Leaf(modulePath string) string {
 // fallback on a prerelease-only history ([highestStable], its only caller).
 // Returns the `v`-prefixed tag.
 //
-// Failure modes keep D25's honesty contract: a transport failure is a
+// Failure modes keep 0011:D25's honesty contract: a transport failure is a
 // *publish.ConnectivityError naming the lookup and registry; an empty or
 // non-matching history is a *publish.Refusal naming the expanded path — a
 // shortcut typo 404s inside the reserved segment, never falling back.
@@ -188,10 +188,10 @@ func Run(ctx context.Context, k *kernel.Kernel, registry, newPath string, ref Te
 // newPath's: the cue.mod `module:` line, the identity package's ModulePath
 // and Version (set to the initial version as a plain literal), every literal
 // self-import, and every root-package clause (old leaf → new leaf). This is
-// D16's statement set plus the package clause, applied wholesale — correct
+// 0011:D16's statement set plus the package clause, applied wholesale — correct
 // exactly because the user owns nothing in the tree yet; repair mode refuses
 // the same rewrite for the opposite reason. Metadata is untouched: it
-// derives (D12).
+// derives (0011:D12).
 func Reidentify(dir, oldPath, newPath string) error {
 	if _, err := cueedit.SetCueModModule(dir, newPath); err != nil {
 		return fmt.Errorf("re-identifying cue.mod: %w", err)
@@ -274,7 +274,7 @@ func copyFetched(ctx context.Context, registry, modulePath, version, dest string
 // initial default. A load failure is an internal error (the writers left an
 // inconsistent tree). A value MISMATCH is a property of the clone source:
 // re-identification rewrote the identity package, so metadata still stating
-// the old values means the source carries literals instead of the D12
+// the old values means the source carries literals instead of the 0011:D12
 // derivation — official templates cannot hit this (their derivation is
 // gate-enforced at publish), an arbitrary `--from` donor can, and it earns a
 // refusal naming the donor's defect rather than a blamed-wrong internal
@@ -299,7 +299,7 @@ func assertDerives(ctx context.Context, k *kernel.Kernel, dir, newPath string) e
 					{"metadata." + field, got},
 					{"expected", want, "derived from identity/identity.cue after re-identification"},
 				},
-				Consequence: "Re-identification rewrites the identity package and everything that\nderives from it; metadata carrying literals stays stamped with the\nsource's old identity (D12).",
+				Consequence: "Re-identification rewrites the identity package and everything that\nderives from it; metadata carrying literals stays stamped with the\nsource's old identity.",
 				Action:      fmt.Sprintf("Clone a module whose metadata derives (%s: id.%s), or start\nfrom an official template:  opm module template list", field, deriveField(field)),
 			}}
 		}

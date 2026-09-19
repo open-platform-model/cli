@@ -115,12 +115,12 @@ Read when entering `cli/`:
 
 - `adr/` - Architecture Decision Records
 - `cmd/opm/` - CLI entrypoint + root command wiring.
-- `internal/cmd/` - Cobra command implementations (command groups: `module`, `catalog`, `instance`, `config`, `operator`, `registry`; `module`/`catalog` each carry a `version set` subgroup — offline, idempotent identity Version writes; `module` also carries `template list` — the baked official-template table — and an `init` that scaffolds by fetch-and-re-identify or repairs an existing tree behind a second confirmation (0011 D20/D25); `registry` carries `login` — interactive credential entry into the docker config file, 0011 D11/D24).
+- `internal/cmd/` - Cobra command implementations (command groups: `module`, `catalog`, `instance`, `config`, `operator`, `registry`; `module`/`catalog` each carry a `version set` subgroup — offline, idempotent identity Version writes; `module` also carries `template list` — the baked official-template table — and an `init` that scaffolds by fetch-and-re-identify or repairs an existing tree behind a second confirmation (0011:D20/D25); `registry` carries `login` — interactive credential entry into the docker config file, 0011:D11/D24).
 - `internal/cmdutil/` - shared flags, annotations, command-facing helpers.
 - `internal/config/` - config resolution, schema validation, defaults.
 - `internal/publish/` - identity-driven publish pipeline (enhancement 0011): gates, refusal catalog, plan/dry-run, registry lookup + push; also the vet-shared identity/coordinate checks.
 - `internal/cueedit/` - surgical authoring-file rewrites (D8's schema-fixed-path identity `Version` write — idempotent, with a read — the identity `ModulePath` writer, the cue.mod `module:` writer/reader, and the tree-wide re-identification set: self-import rewriter, package-clause renamer, self-import scanner; used by `publish --version`, `version set`, and `mod init`).
-- `internal/scaffold/` - fetch-based init engine (0011 D20/D25): template-ref grammar + shortcut expansion, the baked official-template table, stable-float version resolution (`compat.HighestStable`), staged-tree copy, wholesale re-identification, and repair-plan detection.
+- `internal/scaffold/` - fetch-based init engine (0011:D20/D25): template-ref grammar + shortcut expansion, the baked official-template table, stable-float version resolution (`compat.HighestStable`), staged-tree copy, wholesale re-identification, and repair-plan detection.
 - `templates/` - the official template module trees (`minimal`, `standard`, `advanced`) — real CUE modules at `opmodel.dev/templates/<name>` published by release CI through `opm module publish`; deps maintained by the workspace `deps:update:templates` task.
 - `internal/dockercfg/` - single-entry read-modify-write of the standard OCI/docker credential file (`auths[host]` upsert; everything else passes through untouched; used by `registry login`).
 - `internal/kubernetes/` - cluster ops, status, apply, delete, events.
@@ -140,7 +140,7 @@ Read when entering `cli/`:
   registry keys carry the catalog's major suffix), and module identity is read
   verbatim from core-v2 metadata (`metadata.modulePath` is the complete
   registry address). CUE fixtures pin `opmodel.dev/core` `v2.0.0-alpha.6` and
-  `opmodel.dev/catalogs/opm` `v4.0.1`. The local default platform is a CUE module (0019 D5): `opm config
+  `opmodel.dev/catalogs/opm` `v4.0.1`. The local default platform is a CUE module (0019:D5): `opm config
   init` writes `~/.opm/platform/` (`cue.mod/module.cue` pinning core and both
   first-party catalogs, `platform.cue` with one `#registry` entry per catalog
   carrying it by import; module path `opmodel.dev/platforms/local@v0`). The
@@ -152,7 +152,7 @@ Read when entering `cli/`:
   (shipped content); the root `task deps:update` rewrites all three. Catalog
   maintenance for users is editing the module's `cue.mod` pin and running
   `opm config vet`, which builds the module through the kernel loader.
-- **Render path (0019 D5/D7/D8).** Every render-bearing command resolves a
+- **Render path (0019:D5/D7/D8).** Every render-bearing command resolves a
   platform *module directory* by precedence (`--platform <dir>` > cluster
   Platform CR > `~/.opm/platform/`; `internal/platform.Resolve`), acquires it
   once with the kernel's `AcquirePlatformFromDir` and renders with the single
@@ -294,6 +294,17 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 - Box-drawing: `[x]` / `[ ]` not Unicode checkmarks.
 - CLI docs: emphasize what happened + how to fix failures.
 - Follow SemVer + Conventional Commits for user-visible changes. The type decides the release: release-please hides `chore`, `test`, `ci` and `build`; `feat`, `fix`, `deps`, `perf`, `docs` and `refactor` release. Pins in `templates/*` and the seeded platform module pins (`DefaultCorePin`, `DefaultCatalogPins`) in `internal/config/templates.go` are shipped, so bumping them is `fix(deps)`; `examples/*` and `tests/fixtures/*` bumps are `test(fixtures)` (no release). See the workspace commit skill.
+
+### Enhancement references in comments
+
+Default is none: a comment says what the code does and why, in its own words.
+
+- When a rationale genuinely lives in an enhancement, cite it **once at the symbol** as `0011:D9` — enhancement id, colon, decision id, no space. Several decisions of one enhancement share a head: `0011:D16/D18/D21`. Across enhancements, repeat the head: `0011:D9, 0010:D34`.
+- Decision numbers restart per enhancement, so a bare `D9` names nothing. Never write one.
+- Never a section, slice, phase, task or design-doc-local number (`§8.1`, `slice C2`, `task 4.2`, `design LD3`). They are not stable identifiers.
+- Never in scaffold templates, generated files, fixtures a user copies, or CLI output strings. Those reach people who have no access to the enhancements repo.
+- No `Was:` rename history. `git log` owns it.
+- In CUE files the reference goes in a `// WHY` block separated from the doc comment by one blank line, never in the doc comment itself: `cue lsp` hover, `Value.Doc()` and `cue def` replay a doc comment verbatim.
 
 ## Agent Checklist
 

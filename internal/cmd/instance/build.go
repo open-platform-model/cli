@@ -101,7 +101,7 @@ func runInstanceBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.In
 			ModulePath:   buildArg,
 			ValuesFiles:  rff.Values,
 			Name:         nameFlag,
-			PlatformFlag: rff.Platform, // offline: no cluster read (0006 D21)
+			PlatformFlag: rff.Platform, // offline: no cluster read (0006:D21)
 			K8sConfig:    k8sConfig,
 			Config:       cfg,
 		})
@@ -110,7 +110,7 @@ func runInstanceBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.In
 			output.Warn("--name is ignored for instance-file builds; it only applies to module-directory builds")
 		}
 		result, err = render.FromInstanceFile(ctx, render.InstanceFileOpts{
-			PlatformFlag:     rff.Platform, // offline: no cluster read (0006 D21)
+			PlatformFlag:     rff.Platform, // offline: no cluster read (0006:D21)
 			InstanceFilePath: buildArg,
 			ValuesFiles:      rff.Values,
 			K8sConfig:        k8sConfig,

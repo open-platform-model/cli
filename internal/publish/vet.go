@@ -9,7 +9,7 @@ import (
 )
 
 // VetChecks runs the subset of the publish gates `opm module vet` shares with
-// publish (D16, D18, D21): identity conformance against #IdentityPackage,
+// publish (0011:D16, D18, D21): identity conformance against #IdentityPackage,
 // metadata ↔ identity derivation, cue.mod ↔ declared-path agreement, and the
 // version-major/path-major half of the tag rule. Concreteness is deliberately
 // not enforced — an open Version is a valid authoring state; publish is where
@@ -67,7 +67,7 @@ func VetChecks(ctx context.Context, opts Options) (*Plan, cue.Value, error) {
 		p.RegistryRepo, p.Major = before, after
 	}
 
-	// D18's evaluable half at vet: no tag argument exists, so the check is
+	// 0011:D18's evaluable half at vet: no tag argument exists, so the check is
 	// that the declared version's major names the path's.
 	if ver := p.identityField("Version"); ver != nil && ver.State == StateConcrete {
 		p.Tag = "v" + ver.Value

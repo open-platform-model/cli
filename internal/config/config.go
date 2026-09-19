@@ -5,7 +5,7 @@ package config
 // It causes Kubernetes API deprecation warnings to be logged at WARN level.
 const APIWarningsWarn = "warn"
 
-// Skew policy values for GlobalConfig.SkewPolicy (enhancement 0019 D18):
+// Skew policy values for GlobalConfig.SkewPolicy (0019:D18):
 // the render's response when a module requires a newer build of an
 // OPM-namespace path than the platform pins.
 const (

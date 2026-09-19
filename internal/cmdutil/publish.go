@@ -73,7 +73,7 @@ func RunPublish(cmd *cobra.Command, cfg *config.GlobalConfig, kind publish.Kind,
 		SkipOverrideCheck: flags.SkipOverrideCheck,
 	}
 
-	// The catalog gates' schemas (D22), resolved beside #IdentityPackage from
+	// The catalog gates' schemas (0011:D22), resolved beside #IdentityPackage from
 	// the same schema build. Catalog-only: module publish never reads them.
 	if kind == publish.KindCatalog {
 		for _, s := range []struct {

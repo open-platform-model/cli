@@ -62,7 +62,7 @@ func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil
 	}
 
 	// Cluster client before render: diff follows apply's platform-source
-	// precedence so the diff reflects what apply would do (0006 D21/OQ12).
+	// precedence so the diff reflects what apply would do (0006:D21/OQ12).
 	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
 		output.Error("connecting to cluster", "error", err)

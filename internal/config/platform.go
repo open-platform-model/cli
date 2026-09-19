@@ -23,7 +23,7 @@ const platformModuleErrType = "platform module error"
 
 // PlatformDir returns the platform module directory that is sibling to the
 // given (resolved) config file path, so --config/OPM_CONFIG overrides move
-// both together (enhancement 0019 D5: the local default platform is a CUE
+// both together (0019:D5: the local default platform is a CUE
 // module, not a data file).
 func PlatformDir(configPath string) string {
 	return filepath.Join(filepath.Dir(configPath), PlatformDirName)
@@ -133,8 +133,7 @@ func platformBuildHint(dir string, err error) string {
 }
 
 // fileHasImports reports whether the parsed CUE file contains any import
-// declaration. The config file is data-only by contract (enhancement 0006
-// D39).
+// declaration. The config file is data-only by contract (0006:D39).
 func fileHasImports(f *ast.File) bool {
 	for _, decl := range f.Decls {
 		if _, ok := decl.(*ast.ImportDecl); ok {

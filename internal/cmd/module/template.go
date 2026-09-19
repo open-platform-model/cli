@@ -16,7 +16,7 @@ func NewModuleTemplateCmd() *cobra.Command {
 		Short: "Work with the official module templates",
 		Long: `Work with the official module templates — the curated set published to
 the reserved opmodel.dev/templates segment by the cli's own release
-pipeline (0011 D25).`,
+pipeline (0011:D25).`,
 	}
 	c.AddCommand(newModuleTemplateListCmd())
 	return c

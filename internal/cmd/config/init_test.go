@@ -42,7 +42,7 @@ func TestNewConfigInitCmd(t *testing.T) {
 	assert.NotEmpty(t, cmd.Long)
 
 	// Check flags exist; --no-tidy is gone with the CUE-module retirement
-	// (enhancement 0006 D39).
+	// (0006:D39).
 	assert.NotNil(t, cmd.Flags().Lookup("force"))
 	assert.Nil(t, cmd.Flags().Lookup("no-tidy"))
 }
@@ -57,7 +57,7 @@ func TestConfigInit_CreatesFiles(t *testing.T) {
 	require.NoError(t, cmd.Execute())
 
 	// Check files were created: config.cue + the platform module, and NO
-	// data-only platform.cue and NO cue.mod beside config.cue (0019 D5).
+	// data-only platform.cue and NO cue.mod beside config.cue (0019:D5).
 	opmDir := filepath.Join(tmpHome, ".opm")
 	assert.DirExists(t, opmDir)
 	assert.FileExists(t, filepath.Join(opmDir, "config.cue"))
@@ -151,7 +151,7 @@ func TestConfigInit_ConfigContent(t *testing.T) {
 	assert.NotContains(t, configStr, "providers")
 	assert.NotContains(t, configStr, "import")
 
-	// Check the platform module (0019 D5): cue.mod pins exactly one build
+	// Check the platform module (0019:D5): cue.mod pins exactly one build
 	// for core and each seeded catalog; platform.cue carries one #registry
 	// entry per catalog embedding it by import, no version scalar, no
 	// filter vocabulary, no retired kubernetes catalog.

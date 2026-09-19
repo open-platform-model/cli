@@ -170,7 +170,7 @@ Version:    "1.0.0"
 
 // TestInit_TemplateOnlyPromptsForThePath pins the interactive form: the
 // template-only invocation reads the new module path from stdin before
-// writing anything (D20's "asks for one"). The injected paths steer the run
+// writing anything (0011:D20's "asks for one"). The injected paths steer the run
 // into deterministic offline refusals, proving the prompt was consumed and
 // nothing was scaffolded.
 func TestInit_TemplateOnlyPromptsForThePath(t *testing.T) {

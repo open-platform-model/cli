@@ -36,16 +36,16 @@ type renderEnv struct {
 	skew kernel.SkewPolicy
 }
 
-// resolvePlatformEnv resolves the platform by precedence (D11/D21), acquires
+// resolvePlatformEnv resolves the platform by precedence (0006:D11/D21), acquires
 // the resolved module directory on the given kernel and reports provenance.
 // It runs AFTER the instance is loaded and its values validated, so cheap
 // validation failures surface before any platform/registry work.
-// clusterGetter is nil for offline commands (build/render — D17: they never
+// clusterGetter is nil for offline commands (build/render — 0006:D17: they never
 // read the cluster).
 //
 // Acquisition is the build: a bad pin, a key-to-import mismatch or an
 // unpublished catalog fails here naming the entry or dependency, identically
-// for the flag, cluster and local sources (0019 D5).
+// for the flag, cluster and local sources (0019:D5).
 func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.GlobalConfig, platformFlag string, clusterGetter platform.ClusterPlatformGetter) (*renderEnv, error) {
 	dir, res, err := platform.Resolve(ctx, platform.ResolveOptions{
 		PlatformFlag: platformFlag,
@@ -75,7 +75,7 @@ func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.Globa
 // (the operator's SkewPolicyRefuse); anything else, including unset, warns.
 const clusterSkewRefuse = "Refuse"
 
-// skewPolicyFor chooses the kernel's skew policy (0019 D7/D18): when the
+// skewPolicyFor chooses the kernel's skew policy (0019:D7/D18): when the
 // cluster Platform CR is the source its spec.skewPolicy wins, so CLI and
 // operator judge the same platform the same way; otherwise the config file's
 // skewPolicy applies. Absent means warn on both. The returned note is

@@ -56,12 +56,12 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	}
 
 	// Operator-parity render digest, computed by the render workflow over the
-	// kernel-compiled resources (0006 D9/D30 — see inventory.ComputeRenderDigest).
+	// kernel-compiled resources (0006:D9/D30 — see inventory.ComputeRenderDigest).
 	manifestDigest := result.RenderDigest
 	output.Debug("render digest computed", "digest", manifestDigest)
 
 	// Pre-apply gates 1-3 (cluster probes). Skipped entirely on dry-run — they
-	// exist to protect writes, and a dry-run writes nothing (enhancement 0006 D5).
+	// exist to protect writes, and a dry-run writes nothing (0006:D5).
 	if !dryRun {
 		if err := RunClusterGates(ctx, req.K8sClient); err != nil {
 			// Not Printed: the gates return bare errors without logging, so
@@ -89,7 +89,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	// Secret to migrate. Both are read-only.
 	prevRecord, legacy := LoadPreviousInventory(ctx, req.K8sClient, name, namespace, instanceID, dryRun, instanceLog)
 
-	// Gate 4: ownership — the single branch point (0006 D18). An operator-owned
+	// Gate 4: ownership — the single branch point (0006:D18). An operator-owned
 	// instance takes the thin-editor path and returns; everything below this
 	// point is CLI-executor mode.
 	if inventory.ResolveOwnership(prevRecord) == inventory.ModeOperatorOwned {
@@ -178,7 +178,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			output.Println(output.FormatCheckmark(req.Options.SuccessAppliedMessage))
 		}
 
-		// Solo-cluster Platform seeding (0006 D12/D22): when the render fell
+		// Solo-cluster Platform seeding (0006:D12/D22): when the render fell
 		// back from the cluster to the local default platform, seed the
 		// singleton cluster Platform write-if-absent so the operator adopts
 		// it on install. The seeded document is the exact resolved spec the
@@ -231,10 +231,10 @@ func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Clien
 	return nil
 }
 
-// LoadPreviousInventory reads the ModuleInstance CR for an instance. When no CR
-// exists, it looks for a legacy inventory Secret to migrate (enhancement 0006
-// D6). Returns (nil, nil) on dry-run, missing instance ID, or a first apply
-// with no legacy Secret.
+// LoadPreviousInventory reads the ModuleInstance CR for an instance. When no
+// CR exists, it looks for a legacy inventory Secret to migrate (0006:D6).
+// Returns (nil, nil) on dry-run, missing instance ID, or a first apply with no
+// legacy Secret.
 func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, name, namespace, instanceID string, dryRun bool, instanceLog *log.Logger) (*inventory.Record, *inventory.LegacyInventory) {
 	if instanceID == "" || dryRun {
 		return nil, nil
@@ -415,7 +415,7 @@ func FormatApplySummary(r *kubernetes.ApplyResult) string {
 // resolution path BOTH actors use the reference-identity digest — there is no
 // Flux artifact content digest here. Do not change one side without the
 // other. The empty-reference guard below is CLI-only (omits the status field
-// instead of hashing "@"); D6 guarantees a non-empty canonical reference on
+// instead of hashing "@"); 0006:D6 guarantees a non-empty canonical reference on
 // every real apply, so the divergence is unreachable in practice.
 func sourceDigest(modulePath, moduleVersion string) string {
 	if modulePath == "" && moduleVersion == "" {

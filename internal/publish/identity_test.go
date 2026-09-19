@@ -61,7 +61,7 @@ Version:    #VersionType | *"1.2.0"
 	assert.Contains(t, p.TagSource, "(default)")
 }
 
-// TestRun_VersionStateMatrix covers D3/D12's assert-vs-fill semantics.
+// TestRun_VersionStateMatrix covers 0011:D3/D12's assert-vs-fill semantics.
 func TestRun_VersionStateMatrix(t *testing.T) {
 	openIdentity := `package identity
 
@@ -186,7 +186,7 @@ Version: "1.2.0"
 
 // TestConformIdentity_IncompleteWordingCanary pins the CUE SDK error wording
 // conformIdentity's filter depends on: openness must keep reading as
-// "incomplete value" so it stays D4's gate rather than a conformance failure.
+// "incomplete value" so it stays 0011:D4's gate rather than a conformance failure.
 // If a cuelang.org/go bump rewords the diagnostic, this fails in CI instead
 // of publish silently misclassifying refusals.
 func TestConformIdentity_IncompleteWordingCanary(t *testing.T) {

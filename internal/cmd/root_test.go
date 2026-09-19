@@ -97,7 +97,7 @@ language: version: "v0.15.0"
 	assert.NotContains(t, err.Error(), "configuration error:")
 }
 
-// TestRootCmdCarriesRegistryGroup: the registry group (0011 D24) is a root
+// TestRootCmdCarriesRegistryGroup: the registry group (0011:D24) is a root
 // command — `opm registry login` is reachable.
 func TestRootCmdCarriesRegistryGroup(t *testing.T) {
 	cmd := NewRootCmd()

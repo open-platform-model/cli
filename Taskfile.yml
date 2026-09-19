@@ -243,7 +243,7 @@ tasks:
         msg: "Cluster 'kind-{{.CLUSTER_NAME}}' is not running. Run: task cluster:create"
     cmds:
       # --config keeps this hermetic: the dev-cluster tooling must not depend on
-      # a developer's personal ~/.opm being present or in the post-D39 format.
+      # a developer's personal ~/.opm being present or in the 0006:D39 format.
       - ./{{.BUILD_DIR}}/{{.BINARY_NAME}} operator install --config hack/opm-config.cue --context kind-{{.CLUSTER_NAME}} --timeout 180s
       # Local-registry opt-in. No-op unless KIND_CUE_REGISTRY is set; append
       # --registry only if it is not already there, so re-runs do not stack

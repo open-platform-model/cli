@@ -6,7 +6,7 @@
 // declares — decode the tree, read identity/identity.cue, unify it against
 // core's #IdentityPackage, split metadata.modulePath into repository and
 // major — and never edits the artifact to match a coordinate. What is
-// published is exactly the committed tree (D2). Every evaluable gate runs,
+// published is exactly the committed tree (0011:D2). Every evaluable gate runs,
 // refusals accumulate into one list, and the resolved plan prints before any
 // push; --dry-run stops after the plan.
 package publish
@@ -98,7 +98,7 @@ func (o Options) requireInputs() error {
 	return nil
 }
 
-// IdentityFieldState classifies an identity field per D4's tristate.
+// IdentityFieldState classifies an identity field per 0011:D4's tristate.
 type IdentityFieldState string
 
 // The three states an identity field can be in. Only concrete is publishable;
@@ -114,7 +114,7 @@ const (
 type IdentityField struct {
 	// Name is the schema-fixed field name ("ModulePath", "Version").
 	Name string
-	// State is the D4 tristate.
+	// State is the 0011:D4 tristate.
 	State IdentityFieldState
 	// Value is the concrete value, when State is concrete.
 	Value string
@@ -180,7 +180,7 @@ type Plan struct {
 	Replacements   []Replacement
 
 	// FillVersion, when non-empty, is the version Push writes into
-	// identity/identity.cue (through internal/cueedit) before zipping — D12:
+	// identity/identity.cue (through internal/cueedit) before zipping — 0011:D12:
 	// the fill writes the working tree, because the pushed bytes come from
 	// disk.
 	FillVersion string
@@ -196,7 +196,7 @@ type Plan struct {
 
 	// CompatChecked reports the compatibility walk completed (catalogs only).
 	// A walk aborted mid-flight by a transport failure leaves it false, and a
-	// refusal-free plan renders INCOMPLETE — no partial verdict (D35's
+	// refusal-free plan renders INCOMPLETE — no partial verdict (0010:D35's
 	// connectivity contract extends to the member walk).
 	CompatChecked bool
 

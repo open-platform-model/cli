@@ -74,7 +74,7 @@ func TestDefaultPaths_PlatformDirUnderOpmHome(t *testing.T) {
 }
 
 func TestDefaultPlatformModuleFile_PinsCoreAndBothCatalogs(t *testing.T) {
-	// The seeded cue.mod is the platform's catalog selection (0019 D5): it
+	// The seeded cue.mod is the platform's catalog selection (0019:D5): it
 	// must parse as a module file, carry the reserved module path, and pin
 	// exactly one build for core and for each first-party catalog.
 	f, err := modfile.Parse([]byte(DefaultPlatformModuleFile), PlatformModuleFileName)
@@ -172,7 +172,7 @@ func TestBuildPlatformModule_NotAModule(t *testing.T) {
 func TestBuildPlatformModule_DefaultTemplateBuilds(t *testing.T) {
 	// Registry-backed: the seeded module must build against the published
 	// core and catalogs, and each entry's version must be the build its
-	// cue.mod pins (derived readout, 0019 D5).
+	// cue.mod pins (derived readout, 0019:D5).
 	dir := seedPlatformModule(t)
 
 	p, err := BuildPlatformModule(buildCtx(t), dir, DefaultRegistry)
@@ -218,7 +218,7 @@ func TestBuildPlatformModule_UnpublishedPinNamesTheDependency(t *testing.T) {
 
 func TestBuildPlatformModule_KeyImportDriftNamesTheEntry(t *testing.T) {
 	// Registry-backed: an entry keyed at one catalog but embedding the other
-	// fails the D5 binding at a path naming the entry.
+	// fails the 0019:D5 binding at a path naming the entry.
 	dir := seedPlatformModule(t)
 	cuePath := filepath.Join(dir, "platform.cue")
 	content, err := os.ReadFile(cuePath)

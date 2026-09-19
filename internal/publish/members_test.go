@@ -122,7 +122,7 @@ func memberCatalogFiles() map[string]string {
 `
 	// A member-shaped definition outside the kind directories: the walk never
 	// visits schemas/, so it is excluded structurally — the same mechanism
-	// that keeps referenced foreign primitives out (0010 D17).
+	// that keeps referenced foreign primitives out (0010:D17).
 	files["schemas/foreign.cue"] = `package schemas
 
 #ForeignResource: {
@@ -209,7 +209,7 @@ func TestEnumerateMembers_ModelFields(t *testing.T) {
 }
 
 func TestEnumerateMembers_FlatFiledContractMemberStillReached(t *testing.T) {
-	// A contract member filed flat at its kind prefix (the pre-D49 shape)
+	// A contract member filed flat at its kind prefix (the shape 0010:D49 replaced)
 	// must be enumerated so the FQN gate can refuse it — invisible would mean
 	// unrefusable.
 	files := catalogFiles()

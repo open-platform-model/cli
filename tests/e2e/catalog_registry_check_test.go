@@ -22,7 +22,7 @@ import (
 
 // catalogFixture writes a minimal catalog tree that conforms to the real core
 // v2 gates: identity authors the two release-owned fields, the root derives
-// its metadata literally, and the one member files per D49 with an authored
+// its metadata literally, and the one member files per 0010:D49 with an authored
 // fqn the FQN gate accepts. No member imports core — the gates read shape,
 // not types — so the tree publishes hermetically. mutate edits the files
 // before they are written (nil for the conformant tree).
@@ -130,7 +130,7 @@ func TestE2E_CatalogRegistryCheck_HelpCarriesAidFraming(t *testing.T) {
 	stdout, stderr, err := runOPMPublish(t, t.TempDir(), nil, "catalog", "registry", "check", "--help")
 	require.NoError(t, err, "stderr: %s", stderr)
 
-	// D35's sentence, verbatim — the aid-not-guarantee distinction belongs
+	// 0010:D35's sentence, verbatim — the aid-not-guarantee distinction belongs
 	// where a catalog author meets it.
 	assert.Contains(t, stdout, "This check is an aid, not a guarantee: nothing requires it to have been run, and enforcement exists only at publish — it does not make an unchecked catalog trustworthy; it makes it checkable.")
 	assert.Contains(t, stdout, "Exit codes: 0 clean, 2 findings, 3 registry unreachable.")

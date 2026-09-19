@@ -220,7 +220,7 @@ func TestResolve_FallbackToLocalWarns(t *testing.T) {
 	assert.Contains(t, res.Warning, "no Platform CR in the cluster")
 }
 
-// The D21 fallback is never silent: when the cluster Platform is unavailable
+// The 0006:D21 fallback is never silent: when the cluster Platform is unavailable
 // and resolution drops to the local default, the provenance warning banner must
 // actually reach the CLI's output sink — not merely land in Resolution.Warning.
 func TestResolve_FallbackEmitsProvenanceBanner(t *testing.T) {

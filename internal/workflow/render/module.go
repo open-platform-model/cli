@@ -19,7 +19,7 @@ import (
 
 // FromModule synthesizes an instance from a module-package directory through
 // kernel SynthesizeInstance and renders it through the same render path as
-// FromInstanceFile (0006 D9; retires the CLI's synthetic-wrapper module and
+// FromInstanceFile (0006:D9; retires the CLI's synthetic-wrapper module and
 // the last #ModuleRelease application — 0002 carryover). Values come from
 // `-f` files when supplied, else from the module's `debugValues`.
 func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
@@ -45,7 +45,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	// stages the local directory as the module's source tree, so synthesis
 	// builds the instance package inside the module's own root: the module
 	// import resolves locally (no registry round-trip for the module itself)
-	// and its cue.mod — including any local-module.cue replaceWith (D37) —
+	// and its cue.mod — including any local-module.cue replaceWith (0006:D37) —
 	// drives transitive resolution.
 	mod, err := k.AcquireModuleFromDir(ctx, opts.ModulePath)
 	if err != nil {
@@ -93,8 +93,8 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	}
 
 	// A module apply always renders a local module directory (the main module is
-	// local), so render provenance is local (enhancement 0006 D7). The module
-	// directory is the D19 module context: a replaced dependency in its own
+	// local), so render provenance is local (0006:D7). The module
+	// directory is the 0010:D19 module context: a replaced dependency in its own
 	// cue.mod is worded from the kernel's rows after the render.
 	return renderInstance(ctx, env, inst, opts.K8sConfig, moduleContextRoot(opts.ModulePath), true)
 }

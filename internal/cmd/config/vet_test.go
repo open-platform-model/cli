@@ -195,7 +195,7 @@ func TestConfigVet_PlatformModuleUnpublishedPin(t *testing.T) {
 }
 
 func TestConfigVet_StaleProvidersBlock(t *testing.T) {
-	// A pre-D39 config with a providers block fails with the migration hint.
+	// A config predating 0006:D39, with a providers block, fails with the migration hint.
 	tmpHome := setTempHome(t)
 	os.Unsetenv("OPM_CONFIG")
 	os.Unsetenv("OPM_REGISTRY")

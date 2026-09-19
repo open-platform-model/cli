@@ -16,7 +16,7 @@ import (
 
 // This file is the only surviving reader of the deprecated inventory Secret
 // backend. It exists solely to power the one-time Secret→CR migration on apply
-// (enhancement 0006 D8/D14); no other command reads Secrets.
+// (0006:D8/D14); no other command reads Secrets.
 
 const legacySecretKeyRecord = "inventory"
 

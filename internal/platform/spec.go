@@ -1,6 +1,6 @@
 // Package platform resolves the platform module every render consumes, by
 // precedence: --platform <dir> > cluster Platform CR > local default module
-// ~/.opm/platform/ (enhancement 0006 D11/D12/D17/D21/D22; 0019 D5/D7).
+// ~/.opm/platform/ (0006:D11/D12/D17/D21/D22; 0019:D5/D7).
 //
 // Every source resolves to a platform module directory the kernel acquires
 // with AcquirePlatformFromDir. The cluster CR is turned into such a module
@@ -76,7 +76,7 @@ func (w wireSpec) toSpec(name string) Spec {
 }
 
 // wireFromSpec converts a Spec into the wire shape the CR carries — the
-// document write-if-absent creates (D12). Every entry's enable is written
+// document write-if-absent creates (0006:D12). Every entry's enable is written
 // explicitly: the Spec came from a built platform where it is concrete, so
 // the CR states exactly what the render consumed.
 func wireFromSpec(s Spec) wireSpec {
@@ -124,7 +124,7 @@ func DecodeCRSpec(spec map[string]any, name string) (Spec, error) {
 
 // Registry entry sources, as the operator records them on
 // status.registry[].source: an authored subscription, or a catalog an
-// accepted-and-active TransformerRegistration contributed (0015 D3).
+// accepted-and-active TransformerRegistration contributed (0015:D3).
 const (
 	EntrySourceSubscription = "Subscription"
 	EntrySourceRegistration = "Registration"
@@ -140,7 +140,7 @@ type ReadyState struct {
 }
 
 // Effective is the registry the operator generated the running package
-// from, decoded off the Platform CR's status (0015 D13/D17). Entries is
+// from, decoded off the Platform CR's status (0015:D13/D17). Entries is
 // empty when the operator has recorded no registry - a solo cluster, or an
 // operator predating the field - and resolution then generates from the
 // spec.

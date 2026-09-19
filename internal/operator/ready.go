@@ -31,7 +31,7 @@ func (e *NotReadyError) Error() string {
 
 // CheckReady reports whether the operator is installed and serving: its CRDs
 // Established and its controller Deployment rolled out. It is the single-shot
-// form of the readiness machinery Install waits on (enhancement 0006 D35 built
+// form of the readiness machinery Install waits on (0006:D35 built
 // it for this reuse) — a gate, not a wait, so a down operator fails fast
 // instead of burning a timeout.
 //

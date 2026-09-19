@@ -8,7 +8,7 @@ import (
 )
 
 // NewModuleVersionCmd creates the module version command group. It takes no
-// config: version commands are offline by design (0011 D3/D8) — no registry,
+// config: version commands are offline by design (0011:D3/D8) — no registry,
 // no schema fetch.
 func NewModuleVersionCmd() *cobra.Command {
 	c := &cobra.Command{

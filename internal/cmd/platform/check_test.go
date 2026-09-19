@@ -143,7 +143,7 @@ _veleroMirrorCatalog: c.#Catalog & {
 // the required label. mirror requires the container alone and schedule
 // requires the container plus the backup trait, so mirror's predicate
 // contains schedule's: every component schedule matches, mirror matches too,
-// and no component's shape tells them apart (enhancement 0015 D5). Still
+// and no component's shape tells them apart (0015:D5). Still
 // routable — the container is catalog-fulfilled, so nothing is
 // over-subscribed.
 const undiscriminatedPlatform = routablePlatform + `
@@ -315,9 +315,9 @@ func TestPlatformCheck_OverSubscribedPlatformExitsValidation(t *testing.T) {
 	assert.Contains(t, report, "routable:  no — 1 contract is over-subscribed")
 }
 
-// An unfulfilled contract is a report and never a gate (enhancement 0015
-// D18): the command names it and still exits zero, because the refusal for an
-// unmet demand belongs to the render that demands it.
+// An unfulfilled contract is a report and never a gate (0015:D18): the command
+// names it and still exits zero, because the refusal for an unmet demand
+// belongs to the render that demands it.
 func TestPlatformCheck_UnfulfilledPlatformExitsZero(t *testing.T) {
 	dir := writePlatformDir(t, fixtureModule, baseOnlyPlatform)
 
@@ -327,7 +327,7 @@ func TestPlatformCheck_UnfulfilledPlatformExitsZero(t *testing.T) {
 
 	assert.Contains(t, report, "unfulfilled contracts: 1")
 	assert.Contains(t, report, "testing.opmodel.dev/catalogs/base/traits/backup@v1alpha1 (defined by testing.opmodel.dev/catalogs/base@v1)")
-	assert.Contains(t, report, "enhancement 0015 D18")
+	assert.Contains(t, report, "not fail this check")
 	assert.Contains(t, report, "fulfilled: no — 1 contract is unfulfilled")
 	assert.Contains(t, report, "routable:  yes")
 	assert.NotContains(t, report, "over-subscribed contracts")
@@ -349,13 +349,13 @@ func TestPlatformCheck_CatalogFulfilledPluralityIsNotOverSubscription(t *testing
 	assert.Contains(t, report, "routable:  yes")
 	// The suppliers are told apart by mirror's required label, so the
 	// platform this assertion is made on is one the operator generates from
-	// (enhancement 0015 D5).
+	// (0015:D5).
 	assert.Contains(t, report, "discriminated: yes")
 	assert.NotContains(t, report, "comparable transformer pairs")
 }
 
 // A comparable pair is what platform-package generation refuses on
-// (enhancement 0015 D5), so the pre-flight refuses it too — even though every
+// (0015:D5), so the pre-flight refuses it too — even though every
 // contract here has exactly one supplier and the platform is routable.
 func TestPlatformCheck_UndiscriminatedPlatformExitsValidation(t *testing.T) {
 	dir := writePlatformDir(t, fixtureModule, undiscriminatedPlatform)
@@ -370,7 +370,7 @@ func TestPlatformCheck_UndiscriminatedPlatformExitsValidation(t *testing.T) {
 	assert.True(t, exitErr.Printed, "the report already carries the verdict")
 
 	assert.Contains(t, report, "comparable transformer pairs: 1")
-	assert.Contains(t, report, "enhancement 0015")
+	assert.Contains(t, report, "so both would render")
 	assert.Contains(t, report, "testing.opmodel.dev/catalogs/velero/transformers/mirror@1.4.0 (broader)")
 	assert.Contains(t, report, "and  testing.opmodel.dev/catalogs/k8up/transformers/schedule@2.0.0 (narrower)")
 	assert.Contains(t, report, "over  testing.opmodel.dev/catalogs/base/resources/container@v1beta1")

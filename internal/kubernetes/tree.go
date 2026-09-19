@@ -153,7 +153,7 @@ type ResourceNode struct {
 // TreeResult is the intermediate data structure produced by BuildTree.
 // It can be rendered as a terminal tree or serialized to JSON/YAML.
 type TreeResult struct {
-	Instance   InstanceInfo `json:"instance" yaml:"instance"` // Was: Release (enhancement 0002 D8/D9)
+	Instance   InstanceInfo `json:"instance" yaml:"instance"`
 	Components []Component  `json:"components" yaml:"components"`
 }
 

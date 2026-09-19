@@ -1,5 +1,5 @@
 // Package dockercfg edits the standard OCI/docker credential file — the
-// store CUE's resolver reads for both push and pull (0011 D11). The file is
+// store CUE's resolver reads for both push and pull (0011:D11). The file is
 // shared property (docker, podman, credential helpers, future tools), so the
 // writer edits exactly one auths entry and passes every other key through a
 // raw-message envelope untouched.

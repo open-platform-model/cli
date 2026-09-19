@@ -27,7 +27,7 @@ func conformIdentity(a *artifact, schema cue.Value) *Refusal {
 
 	// Concrete validation is what makes CUE name a missing required field
 	// ("field is required but not present"). It also flags open fields as
-	// incomplete — but openness is D4's gate (refusal 1, fillable by
+	// incomplete — but openness is 0011:D4's gate (refusal 1, fillable by
 	// --version), not a conformance failure, so incompleteness errors are
 	// dropped here. One cause, one refusal.
 	var kept cueerrors.Error
@@ -46,7 +46,7 @@ func conformIdentity(a *artifact, schema cue.Value) *Refusal {
 	}
 }
 
-// identityStates classifies each schema-fixed identity field per D4's
+// identityStates classifies each schema-fixed identity field per 0011:D4's
 // tristate, evaluating with CUE defaults: a defaulted field is concrete with
 // the default as its value — that is the committed, release-automation-owned
 // declaration.
@@ -68,7 +68,7 @@ func identityStates(a *artifact) []IdentityField {
 	return out
 }
 
-// resolveVersion applies D3/D12's --version semantics to the Version field
+// resolveVersion applies 0011:D3/D12's --version semantics to the Version field
 // and sets the plan's tag: fill an open field (recording the pending
 // working-tree write), assert a concrete one, never overwrite. One cause,
 // one refusal: an absent field is refusal 10's finding and produces nothing
@@ -98,7 +98,7 @@ func resolveVersion(p *Plan, opts Options) {
 			p.TagSource += " (default)"
 		}
 	case flag != "":
-		// Open + flag: the fill writes the working tree (D12) — an in-memory
+		// Open + flag: the fill writes the working tree (0011:D12) — an in-memory
 		// overlay would publish bytes the tree does not hold. Push performs
 		// the write; the plan records it.
 		ver.Filled = true

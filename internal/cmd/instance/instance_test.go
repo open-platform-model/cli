@@ -41,7 +41,7 @@ func TestNewInstanceVetCmd(t *testing.T) {
 
 func TestNewInstanceVetCmd_Flags(t *testing.T) {
 	cmd := NewInstanceVetCmd(&config.GlobalConfig{})
-	assert.Nil(t, cmd.Flags().Lookup("provider"), "--provider is retired (0006 D21)")
+	assert.Nil(t, cmd.Flags().Lookup("provider"), "--provider is retired (0006:D21)")
 	assert.NotNil(t, cmd.Flags().Lookup("platform"))
 	assert.NotNil(t, cmd.Flags().Lookup("namespace"), "--namespace/-n flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("values"), "--values/-f flag should be registered")
@@ -115,7 +115,7 @@ func TestNewInstanceDeleteCmd(t *testing.T) {
 }
 
 // Operator-owned instances are no longer refused by delete — they route to the
-// finalizer-delegating path (enhancement 0006 D18). Ownership routing itself is
+// finalizer-delegating path (0006:D18). Ownership routing itself is
 // covered by inventory.ResolveOwnership's tests; here we only assert that
 // delete consumes that resolver rather than a private rule of its own.
 func TestInstanceDelete_OperatorOwnedRoutesToDelegation(t *testing.T) {
@@ -164,8 +164,7 @@ func TestInstanceClusterQueryArgParsing(t *testing.T) {
 }
 
 // --- 8.6 Unknown-kind rejection ---
-// Was: TestReleaseVetCmd_RejectsBundleRelease (enhancement 0002 D-X3.2). X2 removed
-// bundle support; a stray kind: "BundleRelease" file now errors via DetectInstanceKind's
+// Bundle support was removed; a stray kind: "BundleRelease" file now errors via DetectInstanceKind's
 // default ("unknown instance kind"). This test only verifies arg-count enforcement.
 
 func TestInstanceVetCmd_RejectsMissingArg(t *testing.T) {

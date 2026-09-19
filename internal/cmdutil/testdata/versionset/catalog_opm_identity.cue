@@ -4,7 +4,7 @@
 // subpackages can source `ModulePath`/`Version` without a circular import,
 // and the root `catalog.cue` can stamp transformer metadata in lockstep.
 //
-// Committed with the REAL values (enhancement 0010 D5): a checkout and a
+// Committed with the REAL values (0010:D5): a checkout and a
 // published artifact compute the same FQNs — the `0.0.0-dev` sentinel is
 // gone. `Version` stays a CUE *default* so the publish task's transient
 // `version_override.cue` can still stamp `-dev.*` branch builds; release
@@ -18,7 +18,7 @@ package identity
 #VersionType: string & =~"^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
 
 // ModulePath is the catalog's complete CUE module path, major suffix included
-// — byte-identical to cue.mod's `module:` field (enhancement 0010 D1).
+// — byte-identical to cue.mod's `module:` field (0010:D1).
 ModulePath: "opmodel.dev/catalogs/opm@v2"
 
 // Version is the catalog's bare SemVer — the build every implementation key
@@ -31,7 +31,7 @@ Version: #VersionType | *"2.0.0-alpha.3" // x-release-please-version
 RegistryPath: "opmodel.dev/catalogs/opm"
 
 // kindPrefix mirrors core's #IdentityPackage.kindPrefix — one BASE prefix per
-// kind (enhancement 0010 D42 as amended by D49). Contract members file exactly
+// kind (0010:D42, amended by 0010:D49). Contract members file exactly
 // one segment beneath it, under their own apiVersion — a segment derived from
 // the member's key, so filing and key cannot drift — while transformers file
 // at the prefix itself. Every member's metadata.modulePath carries the

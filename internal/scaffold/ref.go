@@ -16,7 +16,7 @@ import (
 )
 
 // Segment is the reserved registry segment shortcut expansion targets
-// (0011 D25). Reserved and gate-curated: only the cli's own release CI
+// (0011:D25). Reserved and gate-curated: only the cli's own release CI
 // publishes under it, which is what makes expanding a bare word into it safe
 // rather than a typosquat surface.
 const Segment = "opmodel.dev/templates"

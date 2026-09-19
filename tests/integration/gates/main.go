@@ -1,7 +1,7 @@
 //go:build ignore
 
-// Integration test for the pre-apply gate battery (enhancement 0006 C1,
-// D5/D24/D27/D23) against a live cluster with the ModuleInstance CRD installed.
+// Integration test for the pre-apply gate battery (0006:D5/D24/D27/D23)
+// against a live cluster with the ModuleInstance CRD installed.
 //
 // This covers the happy paths that require a real API server: CRD presence,
 // the CRD field floor, the operator-version ceiling being inert (skip) against

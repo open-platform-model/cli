@@ -18,7 +18,7 @@ func TestNewModulePublishCmd(t *testing.T) {
 
 	require.NotNil(t, cmd.Flags().Lookup("version"))
 	require.NotNil(t, cmd.Flags().Lookup("dry-run"))
-	// D6's waiver is module-only, and its name says what it does: the gate is
+	// 0011:D6's waiver is module-only, and its name says what it does: the gate is
 	// skipped, resolution never changes.
 	require.NotNil(t, cmd.Flags().Lookup("skip-override-check"))
 }

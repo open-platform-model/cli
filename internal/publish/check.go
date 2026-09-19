@@ -25,7 +25,7 @@ type CheckOptions struct {
 	// the "v" may be omitted).
 	Coordinate string
 
-	// Compat additionally runs the predecessor comparison (D9's rule) for
+	// Compat additionally runs the predecessor comparison (0011:D9's rule) for
 	// the fetched build, exactly as publish would have.
 	Compat bool
 
@@ -41,7 +41,7 @@ type CheckOptions struct {
 // identity, its member inventory, and every finding. Findings reuse the
 // publish Refusal shape — the check is the consumer's side of the same
 // contract — but the command frames them as findings: this is an aid, and
-// nothing was refused (D35, enforcement exists only at publish).
+// nothing was refused (0010:D35, enforcement exists only at publish).
 type CheckReport struct {
 	// Repo and Version are the fetched coordinate, split.
 	Repo    string
@@ -71,7 +71,7 @@ func (r *CheckReport) Clean() bool { return len(r.Findings) == 0 }
 func (r *CheckReport) finding(f Refusal) { r.Findings = append(r.Findings, f) }
 
 // RegistryCheck pulls a published catalog by path@version and verifies, out
-// of band, what a consumer verifies when a platform acquires it (D7): the
+// of band, what a consumer verifies when a platform acquires it (0011:D7): the
 // declared identity is concrete and its modulePath/version agree with the
 // coordinate the build was fetched by — read from the pulled catalog's
 // metadata, like the platform build's key-to-import binding; a published
@@ -132,7 +132,7 @@ func RegistryCheck(ctx context.Context, opts CheckOptions) (*CheckReport, error)
 }
 
 // checkCompat runs the --compat walk over the fetched build exactly as
-// publish would have: a dev build is exempt (D26) and does no history work;
+// publish would have: a dev build is exempt (0011:D26) and does no history work;
 // a release-prerelease build counts its beta/GA members prerelease-exempt;
 // a stable build is compared against its dev-free predecessor window.
 func checkCompat(ctx context.Context, opts CheckOptions, lopts Options, repo, version string, report *CheckReport) error {

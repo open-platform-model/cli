@@ -165,7 +165,7 @@ func parseHostArg(arg string) target {
 
 // reportResolution prints the resolution line for the no-arg form: the
 // winning source and any value it shadows — ResolveRegistry.Shadowed's
-// first consumer (D11: an override is reportable rather than silent).
+// first consumer (0011:D11: an override is reportable rather than silent).
 func reportResolution(cfg *config.GlobalConfig) {
 	res := cfg.RegistryResolution
 	if res.Registry == "" {

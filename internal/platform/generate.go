@@ -15,7 +15,7 @@ import (
 )
 
 // ClusterPlatformModulePath is the generated cluster platform module's own
-// identity: the reserved, never-published platforms namespace (0019 D6), the
+// identity: the reserved, never-published platforms namespace (0019:D6), the
 // same path the operator generates under, so a CR that renders in-cluster
 // renders from a byte-identical module here.
 const ClusterPlatformModulePath = "opmodel.dev/platforms/cluster@v0"

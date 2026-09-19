@@ -9,7 +9,7 @@ import (
 )
 
 // Report is what `opm platform check` prints: the contract inventory core
-// derives for a platform (enhancement 0015 D1, D2, D5, D18), plus the
+// derives for a platform (0015:D1, D2, D5, D18), plus the
 // provenance of the platform it was read from.
 //
 // Every field is a report. A platform that is not fulfilled, not routable or
@@ -42,7 +42,7 @@ type Report struct {
 
 	// Comparable lists every pair of enabled transformers whose match
 	// predicates are comparable over a shared catalog-fulfilled contract
-	// (enhancement 0015 D5). The library's row type is carried directly:
+	// (0015:D5). The library's row type is carried directly:
 	// the rows are data this report only prints, so a CLI copy would exist
 	// only to be converted into.
 	Comparable []libplatform.ComparablePredicates
@@ -74,7 +74,7 @@ func NewReport(res Resolution, inv *libplatform.ContractInventory) Report {
 
 // Routable reports whether any provider-fulfilled contract is over-subscribed.
 // It is one of the two values that decide `opm platform check`'s exit status,
-// [Report.Discriminated] being the other: enhancement 0015 D18 makes an
+// [Report.Discriminated] being the other: 0015:D18 makes an
 // unfulfilled contract a report and never a gate, so a report that is not
 // fulfilled still exits zero.
 func (r Report) Routable() bool { return r.routable }
@@ -83,7 +83,7 @@ func (r Report) Routable() bool { return r.routable }
 // apart by some component's shape. It is false exactly when [Report.Comparable]
 // carries a row, and it is the second value deciding the command's exit
 // status: platform-package generation refuses an undiscriminated platform
-// exactly as it refuses an over-subscribed one (enhancement 0015 D5).
+// exactly as it refuses an over-subscribed one (0015:D5).
 func (r Report) Discriminated() bool { return r.discriminated }
 
 // Render returns the report text.
@@ -112,8 +112,8 @@ func (r Report) Render() string {
 	if len(r.Unfulfilled) > 0 {
 		fmt.Fprintf(&b, "\nunfulfilled contracts: %d\n", len(r.Unfulfilled))
 		b.WriteString("  Provider-fulfilled contracts no enabled transformer implements. These do\n" +
-			"  not fail this check (enhancement 0015 D18): a platform may define a\n" +
-			"  contract ahead of the provider that implements it, and an unmet demand is\n" +
+			"  not fail this check: a platform may define a contract ahead of the\n" +
+			"  provider that implements it, and an unmet demand is\n" +
 			"  refused by the render that demands it.\n")
 		for _, fqn := range sortedCopy(r.Unfulfilled) {
 			fmt.Fprintf(&b, "  %s%s\n", fqn, definedByClause(r.Defined[fqn]))
@@ -135,8 +135,8 @@ func (r Report) Render() string {
 		fmt.Fprintf(&b, "\ncomparable transformer pairs: %d\n", len(r.Comparable))
 		b.WriteString("  Enabled transformers whose match predicates are comparable over a shared\n" +
 			"  catalog-fulfilled contract: every component the narrower one matches is\n" +
-			"  also matched by the broader one, so both would render (enhancement 0015\n" +
-			"  D5). A platform package cannot be generated from this platform until one\n" +
+			"  also matched by the broader one, so both would render. A platform\n" +
+			"  package cannot be generated from this platform until one\n" +
 			"  catalog is disabled or the transformers are discriminated by a required\n" +
 			"  label value or a required trait.\n")
 		for _, row := range sortedRows(r.Comparable) {

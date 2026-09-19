@@ -21,7 +21,7 @@ import (
 )
 
 // NewModuleInitCmd creates the module init command: fetch-based scaffolding
-// from published template modules, and repair of an existing tree (0011 D20,
+// from published template modules, and repair of an existing tree (0011:D20,
 // D25; the cli-template-modules change).
 func NewModuleInitCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var fromFlag, templateFlag, dirFlag string
@@ -103,7 +103,7 @@ func runModuleInit(c *cobra.Command, cfg *config.GlobalConfig, args []string, fl
 	}
 
 	// Interactive form: a template named but no module path — ask for one
-	// (D20's "asks for one"); without a terminal there is nothing to ask.
+	// (0011:D20's "asks for one"); without a terminal there is nothing to ask.
 	if pathArg == "" && templateRef != "" {
 		pathArg, err = promptModulePath(c)
 		if err != nil {
@@ -253,7 +253,7 @@ func runScaffold(c *cobra.Command, cfg *config.GlobalConfig, newPath, templateRe
 	return nil
 }
 
-// runRepair is the adopt-and-repair path (D20): detect, show every file to
+// runRepair is the adopt-and-repair path (0011:D20): detect, show every file to
 // be created or edited, confirm a second time, apply.
 func runRepair(c *cobra.Command, cfg *config.GlobalConfig, dir, pathArg string, yes bool) error {
 	k := config.NewKernel(cfg.Registry)
@@ -312,14 +312,14 @@ func promptModulePath(c *cobra.Command) (string, error) {
 }
 
 // confirm reads a yes/no answer, refusing on a plain non-interactive stdin —
-// the second confirmation cannot be defaulted through a pipe (D20); --yes is
+// the second confirmation cannot be defaulted through a pipe (0011:D20); --yes is
 // the explicit bypass.
 func confirm(c *cobra.Command, prompt string) (bool, error) {
 	r, interactive := stdinReader(c)
 	if !interactive {
 		return false, refusal(publish.Refusal{
 			Headline:    "standard input is not a terminal, so the repair confirmation cannot be asked",
-			Consequence: "Repair writes into a tree you own; the second confirmation is the whole\nof the safety mechanism (D20).",
+			Consequence: "Repair writes into a tree you own; the second confirmation is the whole\nof the safety mechanism.",
 			Action:      "Rerun with --yes to consent up front.",
 		})
 	}

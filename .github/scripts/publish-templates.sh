@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish the official template modules (enhancement 0011 D25) through
+# Publish the official template modules (0011:D25) through
 # `opm module publish` — dogfooding the pipeline, so a template that violates
 # any publish gate fails the cli release.
 #
@@ -7,7 +7,7 @@
 # package (grep-free — cue eval), check tag existence against GHCR, and invoke
 # publish only for unpublished versions. The skip lives HERE, in the caller,
 # because publish itself never skips: an already-published tag is always a
-# refusal (D15) — idempotency is the caller-side filter.
+# refusal (0011:D15) — idempotency is the caller-side filter.
 #
 # With --dry-run (PR CI): run every gate without pushing. A dry run whose only
 # refusal is already-published still passes — on a PR the committed version
@@ -49,7 +49,7 @@ for dir in templates/*/; do
 
   if [ "$mode" = publish ]; then
     if published "$repo" "$tag"; then
-      echo "==> ${t}: ${tag} already published — skipped by the caller-side filter (D15)"
+      echo "==> ${t}: ${tag} already published — skipped by the caller-side filter"
       continue
     fi
     echo "==> ${t}: publishing ${tag}"

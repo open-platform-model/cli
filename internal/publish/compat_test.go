@@ -140,7 +140,7 @@ func TestGateCompat_FieldRemovedRefused(t *testing.T) {
 }
 
 func TestGateCompat_RemoveThenReaddRefused(t *testing.T) {
-	// The laundering hole D9's literal rule closes: remove the member in one
+	// The laundering hole 0011:D9's literal rule closes: remove the member in one
 	// build, re-add it reshaped in the next. The immediate predecessor does
 	// not carry it — the scan probes past the absent package (the negative
 	// signal) and finds the older build.
@@ -165,7 +165,7 @@ func TestGateCompat_PrereleasePredecessorCompared(t *testing.T) {
 	// The divergence from a stable-preferring selector (the struck
 	// highestStable note): the newest build carrying the member is a
 	// prerelease, and the comparison runs against IT — a break only
-	// prerelease pinners (D14-blessed) can see is still a break.
+	// prerelease pinners (0010:D14-blessed) can see is still a break.
 	coldCUECache(t)
 	registry := emptyTestRegistry(t)
 	pushCatalog(t, registry, memberCatalogFilesAt("1.0.0"))
@@ -293,7 +293,7 @@ func TestIsDevTag(t *testing.T) {
 }
 
 func TestPredecessorVersions_DevTagsExcluded(t *testing.T) {
-	// The measured ordering: -0.dev.* sorts below -alpha.N, so before D26 a
+	// The measured ordering: -0.dev.* sorts below -alpha.N, so before 0011:D26 a
 	// dev tag's window held only older dev tags and a release tag's window
 	// reached dev tags only behind every release. Now dev tags are out of
 	// every window; alpha/beta/rc release prereleases stay, newest first.
@@ -312,7 +312,7 @@ func TestPredecessorVersions_DevTagsExcluded(t *testing.T) {
 }
 
 func TestGateCompat_DevBuildNotJudged(t *testing.T) {
-	// D26 clause 1: a dev-tagged tree that breaks a beta contract is not
+	// 0011:D26 clause 1: a dev-tagged tree that breaks a beta contract is not
 	// refused on compatibility, and the plan says so rather than reading as
 	// a clean compare.
 	coldCUECache(t)
@@ -373,7 +373,7 @@ func TestIsReleasePrerelease(t *testing.T) {
 }
 
 func TestGateCompat_PrereleaseLineExempt(t *testing.T) {
-	// D26 clause 2: on a release-prerelease module line a narrowed beta field
+	// 0011:D26 clause 2: on a release-prerelease module line a narrowed beta field
 	// is not compared; the exemption is counted and printed, and no registry
 	// history is loaded.
 	coldCUECache(t)

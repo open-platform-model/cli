@@ -17,7 +17,7 @@ import (
 // NewRegistryClient builds a module-registry client through the same resolver
 // chain reads use: modconfig routes by CUE registry syntax and layers Docker
 // and Podman credentials under CUE's logins.json, so push and pull share one
-// path (D11). No os.Setenv — the resolved registry rides the config struct.
+// path (0011:D11). No os.Setenv — the resolved registry rides the config struct.
 func NewRegistryClient(registry string) (*modregistry.Client, error) {
 	resolver, err := modconfig.NewResolver(&modconfig.Config{CUERegistry: registry})
 	if err != nil {
@@ -26,7 +26,7 @@ func NewRegistryClient(registry string) (*modregistry.Client, error) {
 	return modregistry.NewClientWithResolver(resolver), nil
 }
 
-// gateAlreadyPublished is D15's refusal 8: a published tag names fixed bytes
+// gateAlreadyPublished is 0011:D15's refusal 8: a published tag names fixed bytes
 // permanently, so publishing over one is refused — no flag or mode turns it
 // into a success. An unreachable registry is a *ConnectivityError, not a
 // refusal: the artifact was never judged.
@@ -63,7 +63,7 @@ func gateAlreadyPublished(ctx context.Context, p *Plan, opts Options) error {
 }
 
 // Push publishes the plan: write the --version fill into the working tree
-// when one is pending (D12 — the pushed bytes come from disk), zip the
+// when one is pending (0011:D12 — the pushed bytes come from disk), zip the
 // committed directory, and put it through CUE's own module machinery. Callers
 // invoke it only on a GO plan outside --dry-run.
 func Push(ctx context.Context, opts Options, p *Plan) error {

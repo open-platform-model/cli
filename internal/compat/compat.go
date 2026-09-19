@@ -9,8 +9,8 @@ import (
 	"cuelang.org/go/cue/format"
 )
 
-// provenanceDenylist is 0010 D30's exact set: the metadata fields that change
-// per catalog release by construction (D25 — provenance only) and are
+// provenanceDenylist is 0010:D30's exact set: the metadata fields that change
+// per catalog release by construction (0010:D25 — provenance only) and are
 // therefore never contract surface. The comparison walk skips them directly
 // under any metadata field at every depth; nothing else is excluded —
 // identity fields and labels stay.
@@ -19,7 +19,7 @@ var provenanceDenylist = map[string]bool{
 	"description":    true,
 }
 
-// Violation is one breach of 0010 D27's additive-only rule, located by the
+// Violation is one breach of 0010:D27's additive-only rule, located by the
 // dotted path from the compared root. Violations are results, not errors
 // (opm/errors doctrine): the walk reports every breach it finds and never
 // fails. The primitive's name, apiVersion, and predecessor coordinate are
@@ -51,7 +51,7 @@ var (
 	ErrNotStruct             = errors.New("operand is not a struct")
 )
 
-// CheckAtLevel is the level-aware entry point (0010 D34): the additive-only
+// CheckAtLevel is the level-aware entry point (0010:D34): the additive-only
 // promise binds at beta and GA only, so an alpha apiVersion returns (nil, nil)
 // without evaluating the operands. The apiVersion is the primitive's own — a
 // catalog's release version is an independent axis and must not be passed
@@ -74,7 +74,7 @@ func CheckAtLevel(apiVersion string, prev, next cue.Value) ([]Violation, error) 
 	return Check(prev, next), nil
 }
 
-// Check reports every violation of D27's additive-only rule in next relative
+// Check reports every violation of 0010:D27's additive-only rule in next relative
 // to prev: fields and options may be added and never removed; a newly added
 // field must be optional or defaulted; an existing field's default is
 // immutable. It is level-blind — see [CheckAtLevel] — and cannot fail given
@@ -82,9 +82,9 @@ func CheckAtLevel(apiVersion string, prev, next cue.Value) ([]Violation, error) 
 //
 // The comparison is a field-wise walk, deliberately not a single Subsume call
 // in either direction: adding a struct field makes a value more specific while
-// adding a disjunct makes it less specific, and D27 calls both "additive", so
+// adding a disjunct makes it less specific, and 0010:D27 calls both "additive", so
 // the rule spans both directions of the lattice while one subsume call tests
-// one (measured 10/14 and 8/14 against the D27 change classes in
+// one (measured 10/14 and 8/14 against the 0010:D27 change classes in
 // enhancements/0011/experiments/03-d27-compat-gate; the walk is 14/14).
 // Structs recurse; leaves get a forward subsume, where it is correct for the
 // value domain; defaults are compared explicitly at every level, because
@@ -93,7 +93,7 @@ func CheckAtLevel(apiVersion string, prev, next cue.Value) ([]Violation, error) 
 // Three rules keep the walk from reporting non-changes (measured on
 // catalog_opm PR 51, cli issue 165):
 //
-//   - 0010 D30's provenance fields are skipped at every depth: catalogVersion
+//   - 0010:D30's provenance fields are skipped at every depth: catalogVersion
 //     and description directly under any field named metadata, so a member
 //     reference embedded in another member (appliesTo, composedResources)
 //     does not report the referenced member's per-release provenance.
@@ -108,7 +108,7 @@ func Check(prev, next cue.Value) []Violation {
 }
 
 // walk compares one position. underMetadata is true when path names a direct
-// child of a field called metadata, which is where D30's denylist applies.
+// child of a field called metadata, which is where 0010:D30's denylist applies.
 func walk(path string, prev, next cue.Value, underMetadata bool, acc []Violation) []Violation {
 	// Defaults first, at every level — no subsume direction can see them.
 	acc = checkDefaults(path, prev, next, acc)
@@ -189,7 +189,7 @@ func walkStruct(path string, pit, nit *cue.Iterator, next cue.Value, underMetada
 		}
 		name := fieldName(sel)
 		if underMetadata && provenanceDenylist[name] {
-			continue // D30: per-release provenance, never contract surface
+			continue // 0010:D30: per-release provenance, never contract surface
 		}
 		nf, present := added[name]
 		delete(added, name)
@@ -198,7 +198,7 @@ func walkStruct(path string, pit, nit *cue.Iterator, next cue.Value, underMetada
 			continue
 		}
 		// An optional field that becomes required breaks every consumer
-		// that omitted it (0010 D27). Judged on the selectors: the leaf
+		// that omitted it (0010:D27). Judged on the selectors: the leaf
 		// subsume below compares value domains and cannot see a constraint
 		// marker. A defaulted field that loses its default is the default
 		// rule's finding, not this one's.
@@ -222,7 +222,7 @@ func walkStruct(path string, pit, nit *cue.Iterator, next cue.Value, underMetada
 	return acc
 }
 
-// required reports 0010 D27's posture of a field: a `!` field, or a regular
+// required reports 0010:D27's posture of a field: a `!` field, or a regular
 // field with no default, is required — a consumer must supply it. A `?` field
 // or a defaulted one is optional.
 func required(sel cue.Selector, v cue.Value) bool {
@@ -240,7 +240,7 @@ func required(sel cue.Selector, v cue.Value) bool {
 // walkList walks two closed lists of equal length element-wise, paths
 // name[i], and reports ok=false for any other pair (open lists, differing
 // lengths, non-lists), which the caller judges as a leaf. Element-wise is the
-// member-reference case (appliesTo, composedResources); D27 states no list
+// member-reference case (appliesTo, composedResources); 0010:D27 states no list
 // semantics, so addition and removal keep their subsume verdict.
 func walkList(path string, prev, next cue.Value, acc []Violation) ([]Violation, bool) {
 	if prev.IncompleteKind() != cue.ListKind || next.IncompleteKind() != cue.ListKind {
@@ -280,7 +280,7 @@ func leafIdentical(prev, next cue.Value) bool {
 	return bytes.Equal(pb, nb)
 }
 
-// checkDefaults enforces default immutability (D27). Defaults are compared
+// checkDefaults enforces default immutability (0010:D27). Defaults are compared
 // only when the prior build has one — adding a default where none existed is
 // additive. When either side's default is non-concrete, equality is judged by
 // mutual subsumption so a merely-reordered disjunction does not report.

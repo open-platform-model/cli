@@ -15,7 +15,7 @@ import (
 // JSON (Resource.MarshalJSON — CUE field order, NOT sorted-key Go-map
 // JSON). Byte-for-byte parity with the operator's digest is kept so a
 // future ownership transfer has a recorded value to verify against
-// (enhancement 0006 D9/D30); do not change one side without the other.
+// (0006:D9/D30); do not change one side without the other.
 func ComputeRenderDigest(resources []*pkgcore.Resource) (string, error) {
 	sorted := make([]*pkgcore.Resource, len(resources))
 	copy(sorted, resources)

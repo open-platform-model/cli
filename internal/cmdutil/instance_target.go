@@ -10,8 +10,6 @@ import (
 )
 
 // ResolvedInstanceTarget bundles selector and Kubernetes config for instance commands.
-// Was: ResolvedReleaseTarget (enhancement 0002 D10). The Selector type
-// (InstanceSelectorFlags) is renamed in the X4 slice.
 type ResolvedInstanceTarget struct {
 	Selector  *InstanceSelectorFlags
 	K8sConfig *config.ResolvedKubernetesConfig

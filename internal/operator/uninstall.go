@@ -18,7 +18,7 @@ import (
 )
 
 // The ModuleInstance CRD coordinates are defined once in internal/inventory
-// (enhancement 0006 D1/D13); these package-local aliases keep the existing
+// (0006:D1/D13); these package-local aliases keep the existing
 // call sites (RBAC rule construction, finalizer name) readable.
 const (
 	opmodelAPIGroup         = inventory.GroupOpmodel

@@ -4,7 +4,7 @@
 
 Accepted
 
-> **Partially superseded (2026-08-18)** by the `cli-template-modules` change (enhancement 0011 D25): the `simple` tier is renamed `minimal`, and templates are no longer embedded in the binary — they are real CUE modules published to the reserved `opmodel.dev/templates` segment, fetched and re-identified by `opm mod init`. The layout conventions below otherwise stand.
+> **Partially superseded (2026-08-18)** by the `cli-template-modules` change (0011:D25): the `simple` tier is renamed `minimal`, and templates are no longer embedded in the binary — they are real CUE modules published to the reserved `opmodel.dev/templates` segment, fetched and re-identified by `opm mod init`. The layout conventions below otherwise stand.
 
 ## Context
 

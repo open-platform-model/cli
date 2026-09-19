@@ -1,5 +1,4 @@
 // Package instance provides CLI command implementations for the instance command group.
-// Was: package release / "opm release" command group (renamed for enhancement 0002 D6).
 package instance
 
 import (
@@ -9,7 +8,6 @@ import (
 )
 
 // NewInstanceCmd creates the instance command group.
-// Was: NewReleaseCmd ("opm release", alias "rel"). The old verb/alias are dropped — no back-compat (enhancement 0002 D8).
 func NewInstanceCmd(cfg *config.GlobalConfig) *cobra.Command {
 	c := &cobra.Command{
 		Use:     "instance",

@@ -116,7 +116,7 @@ func runConfigVet(c *cobra.Command, _ []string, cfg *config.GlobalConfig) error 
 			Code: opmexit.ExitValidationError,
 			Err: &oerrors.DetailError{
 				Type:     "validation failed",
-				Message:  "legacy data-only platform file found; the local default platform is a CUE module since 0019",
+				Message:  "legacy data-only platform file found; the local default platform is a CUE module",
 				Location: legacy,
 				Hint:     "Run 'opm config init --force' to migrate to the platform module at " + config.PlatformDir(configPath),
 				Cause:    oerrors.ErrValidation,

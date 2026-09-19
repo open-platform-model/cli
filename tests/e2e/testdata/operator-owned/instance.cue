@@ -5,7 +5,7 @@
 // ModuleInstance carries a registry-resolvable spec.module and a real render
 // digest — what the operator needs to reconcile it once the tests patch
 // spec.owner to "operator" (the thin-editor path refuses a locally-sourced
-// module, 0006 D38).
+// module, 0006:D38).
 //
 // Requires testing.opmodel.dev/modules/cli/podinfo@v0 v0.1.4 in the configured
 // registry. It is published to GHCR by .github/workflows/publish-fixtures.yml,

@@ -15,7 +15,7 @@ import (
 var registryPath = cue.MakePath(cue.Def("registry"))
 
 // SpecFromPlatform decodes the seed document from a built platform value
-// (D12): metadata.name and type from the decoded metadata, and for each
+// (0006:D12): metadata.name and type from the decoded metadata, and for each
 // #registry entry its key, enable and the version core derived from the
 // embedded catalog. The module the render consumed is the source of truth,
 // so the derived version is the only correct one; parsing cue.mod would be a

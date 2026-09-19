@@ -24,7 +24,7 @@ import (
 )
 
 // FromInstanceFile prepares and renders an instance from a declarative
-// #ModuleInstance CUE package through the library kernel (0006 D9). The
+// #ModuleInstance CUE package through the library kernel (0006:D9). The
 // package directory containing the instance file is acquired as one CUE
 // package (instance.cue + values.cue + overlays) with any -f values files
 // passed as the acquire's trailing values sources, so the instance the render
@@ -67,9 +67,9 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	// Render provenance (enhancement 0006 D7): an instance apply is local when
+	// Render provenance (0006:D7): an instance apply is local when
 	// its module's cue.mod/local-module.cue replaces a dependency; otherwise it
-	// resolves from registries. The same module root is the D19 module
+	// resolves from registries. The same module root is the 0010:D19 module
 	// context the render's replacement warnings are worded against.
 	moduleRoot := moduleContextRoot(filepath.Dir(opts.InstanceFilePath))
 	sourceLocal := loader.HasLocalModuleReplacement(moduleRoot)
@@ -88,8 +88,8 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 // module root (nearest cue.mod/module.cue) above dir — the directory holding
 // an instance file, or the module directory itself. "" when dir is under no
 // module root. It is where a developer's cue.mod/local-module.cue lives, so
-// it drives both the render provenance signal (0006 D7) and the wording of
-// the render's replacement warnings (0010 D19).
+// it drives both the render provenance signal (0006:D7) and the wording of
+// the render's replacement warnings (0010:D19).
 func moduleContextRoot(dir string) string {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
@@ -120,7 +120,7 @@ func newRenderInput(env *renderEnv, inst *module.Instance) kernel.RenderInput {
 // refusal, or the fail-closed gate after it (unresolved demands, unmatched
 // components, an over-subscribed provider contract, a failed pair) — exits
 // as a validation failure with the kernel's message and the diagnostics
-// printed beside it. After a successful render the D19 replacement warnings
+// printed beside it. After a successful render the 0010:D19 replacement warnings
 // are emitted from the kernel's rows against moduleRoot, the module context.
 func renderInstance(
 	ctx context.Context,
@@ -184,11 +184,11 @@ func renderInstance(
 
 // newResult assembles the workflow Result from the render output and the
 // render environment. PlatformSpec is the seed document decoded from the
-// exact built platform the render consumed — the D12 write-if-absent seeding
+// exact built platform the render consumed — the 0006:D12 write-if-absent seeding
 // writes it verbatim, with no re-read of the platform module at apply time.
 // Warnings are the render's advisory facts worded by the CLI from the
 // diagnostics rows (unhandled optional traits, skew under the warn policy);
-// the D19 local-replacement warnings are emitted directly by renderInstance
+// the 0010:D19 local-replacement warnings are emitted directly by renderInstance
 // from the replacement rows, after the render.
 func newResult(env *renderEnv, out *kernel.RenderResult, renderDigest string, values map[string]any, sourceLocal bool) *Result {
 	return &Result{

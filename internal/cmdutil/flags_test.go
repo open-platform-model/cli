@@ -28,7 +28,7 @@ func TestRenderFlags_AddTo(t *testing.T) {
 	require.NotNil(t, rnFlag)
 	assert.Equal(t, "", rnFlag.DefValue)
 
-	require.Nil(t, cmd.Flags().Lookup("provider"), "--provider is retired (0006 D21)")
+	require.Nil(t, cmd.Flags().Lookup("provider"), "--provider is retired (0006:D21)")
 	platformFlag := cmd.Flags().Lookup("platform")
 	require.NotNil(t, platformFlag)
 	assert.Equal(t, "", platformFlag.DefValue)
@@ -149,7 +149,7 @@ func TestInstanceFileFlags_AddTo(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
 	rff.AddTo(cmd)
 
-	require.Nil(t, cmd.Flags().Lookup("provider"), "--provider is retired (0006 D21)")
+	require.Nil(t, cmd.Flags().Lookup("provider"), "--provider is retired (0006:D21)")
 	platformFlag := cmd.Flags().Lookup("platform")
 	require.NotNil(t, platformFlag)
 	assert.Equal(t, "", platformFlag.DefValue)
