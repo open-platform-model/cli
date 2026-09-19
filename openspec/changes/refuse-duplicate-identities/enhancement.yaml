@@ -1,0 +1,10 @@
+# Declares which enhancement decisions this change implements. Consumed by
+# `task enhancements:delivery:log` at archive time.
+#
+# No decision is claimed. 0015 D15 (one registration per module, refused
+# before apply naming both carrying components) was completed by the
+# operator's refusal; this change lands the same refusal, with the same
+# library wording, in the CLI's render path so a laptop build refuses what
+# the cluster refuses. A claim would duplicate, not complete.
+implements:
+  - enhancement: "0015"
