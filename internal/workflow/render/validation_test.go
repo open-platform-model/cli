@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"cuelang.org/go/cue"
@@ -14,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	liberrors "github.com/open-platform-model/library/opm/errors"
+	"github.com/open-platform-model/library/opm/helper/objectset"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/output"
@@ -151,4 +153,33 @@ func TestPrintValidationError_UsesGroupedFormatting(t *testing.T) {
 	assert.Contains(t, details, "> values.cue:4:10")
 	assert.Contains(t, details, "conflicting values \"test\"")
 	assert.NotContains(t, logs, "values do not satisfy #config")
+}
+
+// A duplicate-identity refusal reaches the user in the CLI's two streams:
+// the library's header line under render failed, every shared identity with
+// both producing components as details. The words are the library's, so the
+// operator refuses the same module identically; only the split is the CLI's.
+func TestPrintValidationError_DuplicateIdentitiesSplitsHeaderAndRows(t *testing.T) {
+	dupErr := &objectset.DuplicateIdentitiesError{Duplicates: []objectset.Duplicate{{
+		Identity: objectset.Identity{
+			APIVersion: "opmodel.dev/v1alpha1",
+			Kind:       "TransformerRegistration",
+			Namespace:  "backup-system",
+			Name:       "backup-system.k8up",
+		},
+		Producers: []objectset.Producer{
+			{Component: "registration", Transformer: "opmodel.dev/catalogs/opm/transformers/transformer-registration-transformer@4.4.0"},
+			{Component: "registration-copy", Transformer: "opmodel.dev/catalogs/opm/transformers/transformer-registration-transformer@4.4.0"},
+		},
+	}}}
+
+	logs, details := captureValidationOutput(t, fmt.Errorf("wrapped: %w", dupErr))
+
+	header, rows, found := strings.Cut(dupErr.Error(), "\n")
+	require.True(t, found, "the library's message is a header line plus at least one identity row")
+	assert.Contains(t, logs, "render failed: "+header)
+	assert.NotContains(t, logs, rows, "the identity rows are details, not part of the header line")
+	assert.Contains(t, details, "opmodel.dev/v1alpha1 TransformerRegistration backup-system/backup-system.k8up")
+	assert.Contains(t, details, `component "registration"`)
+	assert.Contains(t, details, `component "registration-copy"`)
 }

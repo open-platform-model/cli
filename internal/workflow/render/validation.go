@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	liberrors "github.com/open-platform-model/library/opm/errors"
+	"github.com/open-platform-model/library/opm/helper/objectset"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
@@ -22,9 +23,13 @@ const renderFailedMsg = "render failed"
 // failed pair) prints the kernel's message followed by the diagnostics rows
 // it carries. A skew refusal (*liberrors.SkewError, before evaluation)
 // prints the kernel's message verbatim: it already names the path and both
-// versions. Everything else goes through the shared validation funnel
-// (grouped CUE positions, values schema failures, unresolved demands raised
-// outside a render).
+// versions. A duplicate-identity refusal (*objectset.DuplicateIdentitiesError,
+// raised by the CLI from the library's helper after the render) is the
+// library's message split at its first newline: the header under the
+// render-failed header, the identity rows as details, so the CLI and the
+// operator refuse the same module in the same words. Everything else goes
+// through the shared validation funnel (grouped CUE positions, values schema
+// failures, unresolved demands raised outside a render).
 func printValidationError(err error) {
 	if err == nil {
 		return
@@ -40,6 +45,15 @@ func printValidationError(err error) {
 	var skewErr *liberrors.SkewError
 	if errors.As(err, &skewErr) {
 		output.Error(fmt.Sprintf("%s: %s", renderFailedMsg, err))
+		return
+	}
+	var dupErr *objectset.DuplicateIdentitiesError
+	if errors.As(err, &dupErr) {
+		header, rows, _ := strings.Cut(dupErr.Error(), "\n")
+		output.Error(fmt.Sprintf("%s: %s", renderFailedMsg, header))
+		if rows != "" {
+			output.Details(rows)
+		}
 		return
 	}
 	cmdutil.PrintValidationError(renderFailedMsg, err)

@@ -11,6 +11,7 @@ import (
 
 	"cuelang.org/go/cue"
 
+	"github.com/open-platform-model/library/opm/helper/objectset"
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
 	"github.com/open-platform-model/library/opm/schema"
@@ -120,8 +121,10 @@ func newRenderInput(env *renderEnv, inst *module.Instance) kernel.RenderInput {
 // refusal, or the fail-closed gate after it (unresolved demands, unmatched
 // components, an over-subscribed provider contract, a failed pair) — exits
 // as a validation failure with the kernel's message and the diagnostics
-// printed beside it. After a successful render the 0010:D19 replacement warnings
-// are emitted from the kernel's rows against moduleRoot, the module context.
+// printed beside it. A successful render is then refused when two of its
+// objects share one apply identity, before anything downstream can receive
+// the set. After that the 0010:D19 replacement warnings are emitted from the
+// kernel's rows against moduleRoot, the module context.
 func renderInstance(
 	ctx context.Context,
 	env *renderEnv,
@@ -132,6 +135,10 @@ func renderInstance(
 ) (*Result, error) {
 	out, err := env.kernel.Render(ctx, newRenderInput(env, inst))
 	if err != nil {
+		printValidationError(err)
+		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+	}
+	if err := refuseDuplicateIdentities(out); err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
@@ -180,6 +187,19 @@ func renderInstance(
 	result.Module = decodeModuleMetadata(inst.Package.LookupPath(schema.Module))
 
 	return result, nil
+}
+
+// refuseDuplicateIdentities returns the library's duplicate-identity error
+// when two of a render's compiled objects share one apply identity, nil
+// otherwise. A build refuses exactly what an apply would have written twice,
+// and the CLI and the operator word the refusal identically because both
+// raise the library's error (0015:D15). Pure over the render output, so it is
+// tested without a render.
+func refuseDuplicateIdentities(out *kernel.RenderResult) error {
+	if dups := objectset.Duplicates(out.Compiled); len(dups) > 0 {
+		return &objectset.DuplicateIdentitiesError{Duplicates: dups}
+	}
+	return nil
 }
 
 // newResult assembles the workflow Result from the render output and the
