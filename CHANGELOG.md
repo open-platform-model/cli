@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.0.0-alpha.22](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.21...v1.0.0-alpha.22) (2026-09-19)
+
+
+### Features
+
+* **platform:** fail opm platform check on comparable transformer predicates ([#223](https://github.com/open-platform-model/cli/issues/223)) ([548f588](https://github.com/open-platform-model/cli/commit/548f5880439bcd0d2455ef41b65751203e32b767))
+* **platform:** render against the cluster's effective registry and add opm platform pull ([#224](https://github.com/open-platform-model/cli/issues/224)) ([ceb1872](https://github.com/open-platform-model/cli/commit/ceb1872cb64547479113d8844dc6de48c2196d5a))
+* **render:** refuse a render whose objects share one apply identity ([#226](https://github.com/open-platform-model/cli/issues/226)) ([44ad8f1](https://github.com/open-platform-model/cli/commit/44ad8f1a062ed1d615a168aa879c6ee1f00ee3bf))
+
+
+### Bug Fixes
+
+* **deps:** bump library to v1.0.0-alpha.31 ([dd10166](https://github.com/open-platform-model/cli/commit/dd10166c50c8dcedea278b61dcc302051862319c))
+* **deps:** bump seeded catalog pin and template deps ([dd88a56](https://github.com/open-platform-model/cli/commit/dd88a5677529f3bad6faf1d2b823ae15f117dec0))
+* **deps:** embed opm-operator v1.0.0-alpha.19 ([7cd50cb](https://github.com/open-platform-model/cli/commit/7cd50cbfbb9817a7b3993fc3c4bce84a0dc326a8)), closes [#214](https://github.com/open-platform-model/cli/issues/214)
+
 ## [1.0.0-alpha.21](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.20...v1.0.0-alpha.21) (2026-09-15)
 
 
