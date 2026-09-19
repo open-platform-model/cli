@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/open-platform-model/library/opm/helper/objectset"
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
 
@@ -224,4 +225,92 @@ func TestModuleContextRoot_WalksUpToTheModuleRoot(t *testing.T) {
 
 func TestModuleContextRoot_NoModuleIsEmpty(t *testing.T) {
 	assert.Equal(t, "", moduleContextRoot(t.TempDir()), "no cue.mod above the directory: no module context")
+}
+
+// compiledObject builds one rendered object the way the kernel hands it to
+// the render workflow: a concrete CUE value plus its component provenance.
+func compiledObject(t *testing.T, component, src string) *kernel.Compiled {
+	t.Helper()
+	v := cuecontext.New().CompileString(src)
+	require.NoError(t, v.Err())
+	return &kernel.Compiled{
+		Value:       v,
+		Instance:    "backup-system",
+		Component:   component,
+		Transformer: "opmodel.dev/catalogs/opm/transformers/transformer-registration-transformer@4.4.0",
+	}
+}
+
+// registrationObject is the object a transformer-registration component
+// renders: its name is derived from the instance, so two such components in
+// one module render it twice.
+const registrationObject = `{
+	apiVersion: "opmodel.dev/v1alpha1"
+	kind:       "TransformerRegistration"
+	metadata: {name: "backup-system.k8up", namespace: "backup-system"}
+}`
+
+// A module shipping two transformer-registration components renders two
+// TransformerRegistration objects under one instance-derived name; the last
+// apply would silently overwrite the first, so the render is refused naming
+// the identity and both producers.
+func TestRefuseDuplicateIdentities_TwoRegistrations(t *testing.T) {
+	out := &kernel.RenderResult{Compiled: []*kernel.Compiled{
+		compiledObject(t, "registration", registrationObject),
+		compiledObject(t, "registration-copy", registrationObject),
+	}}
+
+	err := refuseDuplicateIdentities(out)
+
+	require.Error(t, err)
+	var dupErr *objectset.DuplicateIdentitiesError
+	require.ErrorAs(t, err, &dupErr)
+	require.Len(t, dupErr.Duplicates, 1)
+	assert.Equal(t, "TransformerRegistration", dupErr.Duplicates[0].Identity.Kind)
+	assert.Equal(t, "backup-system.k8up", dupErr.Duplicates[0].Identity.Name)
+	assert.Contains(t, err.Error(), "component \"registration\"")
+	assert.Contains(t, err.Error(), "component \"registration-copy\"")
+}
+
+// Every render whose objects address distinct apply identities proceeds
+// unchanged: the check is the only thing between a successful render and the
+// resources built from it.
+func TestRefuseDuplicateIdentities_DistinctIdentities(t *testing.T) {
+	out := &kernel.RenderResult{Compiled: []*kernel.Compiled{
+		compiledObject(t, "web", `{
+	apiVersion: "apps/v1"
+	kind:       "Deployment"
+	metadata: {name: "web", namespace: "default"}
+}`),
+		compiledObject(t, "web", `{
+	apiVersion: "v1"
+	kind:       "Service"
+	metadata: {name: "web", namespace: "default"}
+}`),
+	}}
+
+	assert.NoError(t, refuseDuplicateIdentities(out))
+}
+
+// A value carrying no metadata.name is not a Kubernetes object: the helper
+// skips it rather than refusing on it, and the real duplicate beside it is
+// still the only row.
+func TestRefuseDuplicateIdentities_NamelessValueIsSkipped(t *testing.T) {
+	out := &kernel.RenderResult{Compiled: []*kernel.Compiled{
+		compiledObject(t, "nameless", `{apiVersion: "v1", kind: "ConfigMap"}`),
+		compiledObject(t, "registration", registrationObject),
+		compiledObject(t, "registration-copy", registrationObject),
+	}}
+
+	err := refuseDuplicateIdentities(out)
+
+	var dupErr *objectset.DuplicateIdentitiesError
+	require.ErrorAs(t, err, &dupErr)
+	require.Len(t, dupErr.Duplicates, 1)
+	assert.Equal(t, "backup-system.k8up", dupErr.Duplicates[0].Identity.Name)
+}
+
+// A render with no compiled objects carries no duplicate.
+func TestRefuseDuplicateIdentities_EmptyRender(t *testing.T) {
+	assert.NoError(t, refuseDuplicateIdentities(&kernel.RenderResult{}))
 }

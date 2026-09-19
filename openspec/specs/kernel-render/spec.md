@@ -10,6 +10,8 @@ The CLI renders every instance through the `library` kernel — the same kernel 
 
 The CLI SHALL render instances exclusively through `github.com/open-platform-model/library`'s kernel: one `Kernel.Render` call per render, taking a source-carrying instance and a source-carrying platform module, the CLI's runtime identity and the resolved skew policy; matching, execution and diagnostics happen inside that single build. The CLI MUST NOT carry its own component-matching, transformer-execution, or render-finalization implementation, MUST NOT hold any built platform value between renders, and MUST NOT import `opm-operator` Go packages (0006 D13). The rendered resource set is the render result's compiled objects.
 
+After a successful render and before any resource, digest or output is built, the CLI SHALL check the compiled objects for shared Kubernetes apply identities (apiVersion, kind, namespace and name) through the library's duplicate-identity helper, and SHALL refuse the render as a validation failure carrying the library's error when any identity is shared, so a build refuses exactly what an apply would have written twice and the CLI and the operator refuse the same module with the same wording (enhancement 0015 D15). The refusal SHALL print the library's header line under the render-failed header and each shared identity, with every producing component and transformer, as details.
+
 The kernel reports advisory facts as structured rows and attaches no message strings to a render result. The CLI SHALL word them itself and surface them to the user as warnings, never dropping one: an unhandled optional trait is read from the render diagnostics' unhandled-trait table, and a module requiring a newer OPM-namespace build than the platform carries is read from the resolved-versions row marked newer. Both warnings SHALL name the same facts the kernel previously named — for skew, the path and both versions.
 
 #### Scenario: Instance apply renders via the kernel
@@ -42,6 +44,16 @@ The kernel reports advisory facts as structured rows and attaches no message str
 
 - **WHEN** a render fails with unresolved demands or unmatched components
 - **THEN** the command exits as a validation failure with the kernel's message; a transform error or an over-subscribed provider contract exits the same way, with the diagnostics printed beside the refusal
+
+#### Scenario: Two registrations in one module are refused by every render
+
+- **WHEN** a module's components render two `TransformerRegistration` objects with one name and `opm module build`, `opm module apply` or `opm instance diff` runs against it
+- **THEN** the command exits as a validation failure, prints `render failed` with the library's header, and lists the identity once with both components and their transformers as details, and no object is printed, written or compared
+
+#### Scenario: Distinct identities render as before
+
+- **WHEN** every compiled object has a distinct apiVersion, kind, namespace and name
+- **THEN** the render proceeds unchanged and no duplicate-identity output appears
 
 ### Requirement: CLI entry points map onto kernel entry points
 
