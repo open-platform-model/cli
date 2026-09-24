@@ -9,7 +9,7 @@ vars:
   CLUSTER_NAME: opm-dev
   K8S_NODE_IMAGE: "kindest/node:v1.34.3@sha256:08497ee19eace7b4b5348db5c6a1591d7752b164530a36f855cb0f2bdcbadd48"
   REGISTRY_CONTAINER: '{{.REGISTRY_CONTAINER | default "opm-registry"}}'
-  # Canonical mapping (Registry Policy, root CLAUDE.md): both opmodel.dev/* and
+  # Canonical mapping (Registry Policy, root AGENTS.md): both opmodel.dev/* and
   # testing.opmodel.dev/* read from GHCR. The testing domain carries this repo's
   # fixture modules, published by .github/workflows/publish-fixtures.yml — it is
   # a GHCR-backed domain, not a local-registry alias. An exported OPM_REGISTRY
