@@ -6,6 +6,8 @@
 | **Created** | 2026-02-16                         |
 | **Authors** | OPM Contributors                   |
 
+> **Superseded in part (2026-09-24):** the site is built with Astro, Starlight and the Black theme in `opmodel.dev`, not Hugo and Docsy. Everything below about Hugo, Docsy, Hugo modules and content adapters no longer applies. The `docgen` extraction design still does.
+
 ## Summary
 
 Introduce an automated documentation generation pipeline that produces a public-facing documentation site from CUE definitions in the catalog and CLI command definitions in the Go codebase. The pipeline lives in a dedicated docs repository containing a custom Go tool (`docgen`) for high-fidelity CUE schema extraction via the Go API, Cobra's built-in doc generation for CLI references, and Hugo with the Docsy theme as the static site generator.
