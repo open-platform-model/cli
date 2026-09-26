@@ -47,15 +47,15 @@ opm mod build --output ./dist/my-module.tar
 
 ## CUE References
 
-- When referencing CUE concepts, link to the glossary on first use per document: [`opm/docs/glossary.md`](../../opm/docs/glossary.md).
+- When referencing CUE concepts, link to the glossary on first use per document: [`opm/docs/legacy/glossary.md`](https://github.com/open-platform-model/opm/blob/main/docs/legacy/glossary.md).
 - Do not explain CUE internals inline; link to the catalog docs or glossary instead.
 
 ## Glossary
 
-Canonical glossary: [`opm/docs/glossary.md`](../../opm/docs/glossary.md).
+Canonical glossary: [`opm/docs/legacy/glossary.md`](https://github.com/open-platform-model/opm/blob/main/docs/legacy/glossary.md).
 
 ## What to Omit
 
 - CUE schema definitions (those belong in `catalog/docs/`).
-- End-user quickstarts (those belong in `opm/docs/`).
+- End-user quickstarts (those belong in `opm/docs/site/`).
 - Kubernetes operator procedures (those belong in `opm-operator/docs/`).
