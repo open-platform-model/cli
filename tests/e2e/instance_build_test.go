@@ -33,17 +33,30 @@ import (
 // the tree writable before t.TempDir removes it.
 func seedRenderHome(t *testing.T) string {
 	t.Helper()
+	home := seedConfigOnlyHome(t)
+	require.NoError(t, config.WritePlatformModule(config.PlatformDir(renderHomeConfigPath(home))))
+	return home
+}
+
+// seedConfigOnlyHome is seedRenderHome without the local default platform
+// module: ~/.opm holds config.cue and nothing else, the home of a machine
+// that never needed a platform (a module author's).
+func seedConfigOnlyHome(t *testing.T) string {
+	t.Helper()
 	home := t.TempDir()
 	t.Cleanup(func() { makeWritable(home) })
 	if userCache, err := os.UserCacheDir(); err == nil && os.Getenv("CUE_CACHE_DIR") == "" {
 		t.Setenv("CUE_CACHE_DIR", filepath.Join(userCache, "cue"))
 	}
-	opmDir := filepath.Join(home, ".opm")
-	require.NoError(t, os.MkdirAll(opmDir, 0o700))
-	configPath := filepath.Join(opmDir, "config.cue")
+	configPath := renderHomeConfigPath(home)
+	require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0o700))
 	require.NoError(t, os.WriteFile(configPath, []byte(config.DefaultConfigTemplate), 0o600))
-	require.NoError(t, config.WritePlatformModule(config.PlatformDir(configPath)))
 	return home
+}
+
+// renderHomeConfigPath is the config file inside a seeded HOME.
+func renderHomeConfigPath(home string) string {
+	return filepath.Join(home, ".opm", "config.cue")
 }
 
 // makeWritable chmods every entry under dir writable so a read-only tree

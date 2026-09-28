@@ -55,11 +55,14 @@ This writes, without fetching anything:
 - `~/.opm/config.cue` — CLI settings (registry, kubernetes, log), plain data
 - `~/.opm/platform/` — the local default platform as a CUE module:
   `cue.mod/module.cue` pins core and the official OPM catalogs, and
-  `platform.cue` subscribes to each catalog by import. Renders use it
-  whenever no `--platform` flag is given and no cluster `Platform` is
-  readable. Building the module resolves the pinned catalogs from the
-  registry, so `opm config vet` and `build` need registry access (or a warm
-  CUE module cache).
+  `platform.cue` subscribes to each catalog by import. The instance
+  commands (`opm instance build`, `vet`, `apply`, `diff`) and
+  `opm module apply` use it whenever no `--platform` flag is given and no
+  cluster `Platform` is readable. `opm module build` and `opm module vet`
+  never use it: they render against the module's own catalog pins (see
+  [Build](#build)). Building the module resolves the pinned catalogs from
+  the registry, so `opm config vet` and `build` need registry access (or a
+  warm CUE module cache).
 
 To move to a newer catalog release, edit the pin in
 `~/.opm/platform/cue.mod/module.cue` and run `opm config vet`.
@@ -123,6 +126,20 @@ opm module build
 do not need an `instance.cue` while iterating. The rendered YAML is written
 to stdout by default.
 
+The build answers one question: does the module render with the catalogs it
+declares? It renders against a platform generated from the module's own
+`cue.mod/module.cue`, one catalog per `opmodel.dev/catalogs/*` pin at the
+pinned version, and reads neither the cluster nor `~/.opm/platform/`. The
+log names that source:
+
+```text
+INFO platform: module deps (opmodel.dev/catalogs/opm@v4 v4.4.0; generated module ~/.opm/cache/platforms/3f2a...)
+```
+
+A `replaceWith` of a catalog in the module's `cue.mod/local-module.cue` is
+honoured, so you can render against a local catalog checkout. The checkout
+must declare the version the module pins.
+
 Useful variants:
 
 ```bash
@@ -137,11 +154,16 @@ opm module build ./my-app -f ./my-overrides.cue
 
 # Write each resource to its own file under ./manifests
 opm module build ./my-app --split --out-dir ./manifests
+
+# Render against a platform module instead of the module's own deps
+opm module build ./my-app --platform ./pulled-platform
 ```
 
-`opm instance build` accepts the same module-directory form, so
-`opm instance build ./my-app` is equivalent for symmetry with the instance
-workflow.
+`opm instance build` accepts the same module-directory form, but it answers
+the deployer's question instead: does the module render on my platform?
+`opm instance build ./my-app` renders against `--platform`, else
+`~/.opm/platform/`, so it can report version skew or an unmatched component
+that `opm module build` does not.
 
 `opm mod` is an alias for `opm module`, so all of the commands above also
 work as `opm mod init`, `opm mod build`, etc.

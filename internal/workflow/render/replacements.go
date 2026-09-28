@@ -29,14 +29,24 @@ const replacedByInstance = "instance"
 // root, or the module directory); "" reads no file. A local file the reader
 // cannot parse yields no inert entries: the kernel already refused such a
 // render, so the builder never sees one in practice.
-func replacementWarnings(rows []kernel.Replacement, moduleRoot string) []string {
+//
+// carried maps the module replacements a platform generated from the
+// module's deps carried into its own local file, to the target written
+// there. The kernel reports such a row as the platform's; it is the module's
+// redirect, so it is worded under the module side's label, and the module
+// file's entry for it is honored, not inert. Nil for every other platform.
+func replacementWarnings(rows []kernel.Replacement, moduleRoot string, carried map[string]string) []string {
 	warnings := make([]string, 0, len(rows))
 	honored := make(map[string]bool, len(rows))
 	for _, r := range rows {
+		by := r.By
+		if target, ok := carried[r.Path]; ok && target == r.Target {
+			by = replacedByInstance
+		}
 		warnings = append(warnings, fmt.Sprintf(
 			"local replacement in effect: %s served from %s (%s); rendered bytes may not correspond to any published build",
-			r.Path, r.Target, r.By))
-		if r.By == replacedByInstance {
+			r.Path, r.Target, by))
+		if by == replacedByInstance {
 			honored[r.Path] = true
 		}
 	}

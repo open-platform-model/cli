@@ -14,10 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/open-platform-model/library/opm/kernel"
+	"github.com/open-platform-model/library/opm/module"
 	"github.com/open-platform-model/library/opm/schema"
 
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/platform"
+	"github.com/open-platform-model/cli/pkg/loader"
 )
 
 func TestFromModule_NilConfig(t *testing.T) {
@@ -182,6 +185,74 @@ func TestResolveModuleValues_NoDebugValues(t *testing.T) {
 	_, err := ResolveModuleValues(k, pkg, "mod", nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "debugValues")
+}
+
+func TestModuleDepsOf_OverlayOnlySourceCarriesNoReplacements(t *testing.T) {
+	// The registry-acquired shape: a synthetic root, the tree in memory, no
+	// local module context.
+	root := filepath.Join(string(filepath.Separator), "opm-registry", "example.com", "app@v0.1.0")
+	modFile := []byte("module: \"example.com/app@v0\"\nlanguage: version: \"v0.17.0\"\n")
+	src := &module.Source{Root: root, Overlay: map[string][]byte{filepath.Join(root, "cue.mod", "module.cue"): modFile}}
+
+	deps, err := moduleDepsOf(src, "")
+	require.NoError(t, err)
+	assert.Equal(t, modFile, deps.ModFile)
+	assert.Equal(t, filepath.Join(root, "cue.mod", "module.cue"), deps.ModFileName)
+	assert.Empty(t, deps.Replacements)
+	assert.Empty(t, deps.ModuleRoot)
+}
+
+func TestModuleDepsOf_DirectoryModuleCarriesItsReplacements(t *testing.T) {
+	root := writeModuleContext(t, `deps: "opmodel.dev/catalogs/opm@v4": replaceWith: "../catalog_opm/opm"`)
+	modFile, err := os.ReadFile(filepath.Join(root, "cue.mod", "module.cue"))
+	require.NoError(t, err)
+	src := &module.Source{Root: root, Overlay: map[string][]byte{filepath.Join(root, "cue.mod", "module.cue"): modFile}}
+
+	deps, err := moduleDepsOf(src, root)
+	require.NoError(t, err)
+	assert.Equal(t, root, deps.ModuleRoot)
+	assert.Equal(t, []loader.LocalReplacement{{Path: "opmodel.dev/catalogs/opm@v4", ReplaceWith: "../catalog_opm/opm"}}, deps.Replacements)
+}
+
+func TestModuleDepsOf_MissingModFileIsAnError(t *testing.T) {
+	root := t.TempDir()
+	_, err := moduleDepsOf(&module.Source{Root: root, Overlay: map[string][]byte{filepath.Join(root, "x.cue"): nil}}, "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), filepath.Join(root, "cue.mod", "module.cue"))
+
+	_, err = moduleDepsOf(nil, "")
+	require.Error(t, err)
+}
+
+// TestFromModule_PlatformFromDepsNeedsNoLocalDefault renders the
+// module-with-debug-values fixture (no catalog, no components) with PlatformFromDeps and
+// an OPM home holding no platform/: the platform is generated from the
+// module's pins under the home's cache, and the render yields zero objects.
+func TestFromModule_PlatformFromDepsNeedsNoLocalDefault(t *testing.T) {
+	const registry = "opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"
+	dir, err := filepath.Abs(filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "module-with-debug-values"))
+	require.NoError(t, err)
+	if _, err := config.NewKernel(registry).SchemaCache().Get(); err != nil {
+		t.Skipf("core v2 schema unavailable (registry/cache): %v", err)
+	}
+	configPath := filepath.Join(t.TempDir(), "config.cue")
+
+	result, err := FromModule(context.Background(), ModuleOpts{
+		ModulePath:       dir,
+		Name:             "debug-values", // the default "<name>-debug" keeps the fixture's underscore
+		PlatformFromDeps: true,
+		Config:           &config.GlobalConfig{ConfigPath: configPath, Registry: registry},
+		K8sConfig:        &config.ResolvedKubernetesConfig{},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, platform.SourceModuleDeps, result.Platform.Source)
+	assert.Empty(t, result.Platform.Catalogs, "the fixture pins no catalog")
+	assert.Equal(t, config.PlatformCacheDir(configPath), filepath.Dir(result.Platform.Dir))
+	assert.Empty(t, result.Resources)
+	assert.Empty(t, result.Warnings, "no skew row against the module's own pins")
+	_, err = os.Stat(config.PlatformDir(configPath))
+	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 
 // TestModuleSource_CarriesCommittedModFile pins the input the module-deps

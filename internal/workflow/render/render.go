@@ -77,7 +77,7 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 
 	// Platform resolution + acquisition only after the instance itself
 	// validated: cheap failures never hit the cluster or registry.
-	env, err := resolvePlatformEnv(ctx, k, opts.Config, opts.PlatformFlag, opts.ClusterPlatform)
+	env, err := resolvePlatformEnv(ctx, k, opts.Config, opts.PlatformFlag, opts.ClusterPlatform, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -136,13 +136,16 @@ func renderInstance(
 	out, err := env.kernel.Render(ctx, newRenderInput(env, inst))
 	if err != nil {
 		printValidationError(err)
+		if hint := refusalHint(err, env.resolution); hint != "" {
+			output.Details("Hint: " + hint)
+		}
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 	if err := refuseDuplicateIdentities(out); err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
-	for _, w := range replacementWarnings(out.Diagnostics.Replacements, moduleRoot) {
+	for _, w := range replacementWarnings(out.Diagnostics.Replacements, moduleRoot, env.resolution.Carried) {
 		output.Warn(w)
 	}
 

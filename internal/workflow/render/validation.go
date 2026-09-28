@@ -11,6 +11,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/platform"
 )
 
 // renderFailedMsg is the header every render failure prints under.
@@ -57,6 +58,33 @@ func printValidationError(err error) {
 		return
 	}
 	cmdutil.PrintValidationError(renderFailedMsg, err)
+}
+
+// Hints for a render refused against a platform generated from the module's
+// own deps, where the fix is a pin or a platform rather than the module.
+const (
+	moduleDepsProviderHint  = "the module's own catalogs do not implement this contract; a provider-fulfilled contract comes from a platform: pass --platform <dir>"
+	moduleDepsNoCatalogHint = "the module pins no catalog under " + platform.CatalogPathPrefix + ": pin the catalogs it imports with 'opm module tidy', or pass --platform <dir>"
+)
+
+// refusalHint is the remediation a render refusal gets beside the kernel's
+// verdict, or "" when there is none: against a module-deps platform, an
+// unresolved demand names the provider-fulfilled route through --platform,
+// and an unmatched component under a platform with no catalog names the
+// missing pin.
+func refusalHint(err error, res platform.Resolution) string {
+	if res.Source != platform.SourceModuleDeps {
+		return ""
+	}
+	var unresolved *liberrors.UnresolvedDemandsError
+	if errors.As(err, &unresolved) {
+		return moduleDepsProviderHint
+	}
+	var unmatched *liberrors.UnmatchedComponentsError
+	if len(res.Catalogs) == 0 && errors.As(err, &unmatched) {
+		return moduleDepsNoCatalogHint
+	}
+	return ""
 }
 
 // formatRenderDiagnostics renders the refusing rows of a render's

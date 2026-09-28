@@ -2,6 +2,7 @@ package render
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -41,19 +42,26 @@ type renderEnv struct {
 // It runs AFTER the instance is loaded and its values validated, so cheap
 // validation failures surface before any platform/registry work.
 // clusterGetter is nil for offline commands (build/render — 0006:D17: they never
-// read the cluster).
+// read the cluster). moduleDeps, set only by a render for a module's author,
+// replaces the cluster and local-default sources with a platform generated
+// from the module's own deps; an unparseable committed module file is the
+// module's validation failure, every other generation failure a general one.
 //
 // Acquisition is the build: a bad pin, a key-to-import mismatch or an
 // unpublished catalog fails here naming the entry or dependency, identically
-// for the flag, cluster and local sources (0019:D5).
-func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.GlobalConfig, platformFlag string, clusterGetter platform.ClusterPlatformGetter) (*renderEnv, error) {
+// for every source (0019:D5).
+func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.GlobalConfig, platformFlag string, clusterGetter platform.ClusterPlatformGetter, moduleDeps *platform.ModuleDeps) (*renderEnv, error) {
 	dir, res, err := platform.Resolve(ctx, platform.ResolveOptions{
 		PlatformFlag: platformFlag,
 		ConfigPath:   cfg.ConfigPath,
 		Cluster:      clusterGetter,
+		ModuleDeps:   moduleDeps,
 		Registry:     cfg.Registry,
 	})
 	if err != nil {
+		if errors.Is(err, platform.ErrModuleDepsFile) {
+			return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err}
+		}
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}
 	skew, skewNote := skewPolicyFor(res, cfg)
@@ -81,8 +89,13 @@ const clusterSkewRefuse = "Refuse"
 // skewPolicy applies. Absent means warn on both. The returned note is
 // appended to the provenance line: it names a refuse policy and its source,
 // and names the CR as the policy's source when it overrode a config key
-// that would have refused.
+// that would have refused. A platform generated from the module's own deps
+// pins every path at least at the module's version, so skew cannot arise:
+// the policy is not applied and not named.
 func skewPolicyFor(res platform.Resolution, cfg *config.GlobalConfig) (policy kernel.SkewPolicy, note string) {
+	if res.Source == platform.SourceModuleDeps {
+		return kernel.SkewWarn, ""
+	}
 	if res.Source == platform.SourceClusterCR {
 		if res.SkewPolicy == clusterSkewRefuse {
 			return kernel.SkewRefuse, ", skew policy: refuse (cluster Platform)"

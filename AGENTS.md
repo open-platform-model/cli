@@ -126,7 +126,7 @@ Read when entering `cli/`:
 - `internal/dockercfg/` - single-entry read-modify-write of the standard OCI/docker credential file (`auths[host]` upsert; everything else passes through untouched; used by `registry login`).
 - `internal/kubernetes/` - cluster ops, status, apply, delete, events.
 - `internal/output/` - terminal formatting, log output, tables, manifests.
-- `internal/platform/` - platform-source resolution by precedence (`--platform` dir > cluster Platform CR > `~/.opm/platform/`), cluster-CR module generation into the OPM home cache, the write-if-absent Platform seed, catalog version resolution for `operator install`.
+- `internal/platform/` - platform-source resolution by precedence (`--platform` dir > cluster Platform CR > `~/.opm/platform/`; `module build`/`module vet`: `--platform` dir > the module-deps platform), cluster-CR and module-deps module generation into the OPM home cache, the write-if-absent Platform seed, catalog version resolution for `operator install`.
 - `internal/workflow/` - shared render/apply/query orchestration; `render` holds the kernel env and the single `Kernel.Render` call.
 - `pkg/loader/` - local-replacement provenance (module root lookup, `cue.mod/local-module.cue` replacements); instance packages load through the kernel.
 - `pkg/errors/` - shared structured errors; alias as `oerrors`.
@@ -167,6 +167,15 @@ Read when entering `cli/`:
   (`platform.SpecFromPlatform`). Catalog version skew follows the config
   file's `skewPolicy` (`warn` default, `refuse`) for local and flag platforms;
   the cluster CR's `spec.skewPolicy` wins when it is the source.
+  `opm module build` and `opm module vet` render for the module's author,
+  not for a deployment: without `--platform` they resolve the module-deps
+  source instead of the cluster and the local default. The platform is
+  generated from the module's committed `cue.mod/module.cue` (one registry
+  entry per `opmodel.dev/catalogs/*` pin, closed over with
+  `platformmodule.Closure`, core floored at the kernel's verified release)
+  into the same cache, and the module's own `local-module.cue` replacements of
+  paths it pins are carried into it. Skew cannot arise and is not checked.
+  `module apply` and every `instance` command keep the precedence above.
 - Integration + CUE workflows need registry config. Follow the Registry Policy in the root `AGENTS.md` — both `opmodel.dev/*` and `testing.opmodel.dev/*` resolve from GHCR:
 
 ```bash

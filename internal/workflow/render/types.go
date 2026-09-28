@@ -109,6 +109,12 @@ type ModuleOpts struct {
 	// command offline: the cluster is never consulted (0006:D17/D21).
 	ClusterPlatform platform.ClusterPlatformGetter
 
+	// PlatformFromDeps selects the author's platform: --platform, else a
+	// platform generated from the module's own deps. Set by module build
+	// and module vet; never by module apply. ClusterPlatform MUST be nil
+	// when it is set.
+	PlatformFromDeps bool
+
 	K8sConfig *config.ResolvedKubernetesConfig
 	Config    *config.GlobalConfig
 }

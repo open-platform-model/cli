@@ -120,6 +120,7 @@ func TestSkewPolicyFor(t *testing.T) {
 	}
 	local := platform.Resolution{Source: platform.SourceLocalDefault}
 	flag := platform.Resolution{Source: platform.SourceFlagDir}
+	deps := platform.Resolution{Source: platform.SourceModuleDeps}
 	warnCfg := &config.GlobalConfig{SkewPolicy: config.SkewPolicyWarn}
 	refuseCfg := &config.GlobalConfig{SkewPolicy: config.SkewPolicyRefuse}
 	absentCfg := &config.GlobalConfig{}
@@ -140,6 +141,8 @@ func TestSkewPolicyFor(t *testing.T) {
 		{"cluster Refuse", cr("Refuse"), warnCfg, kernel.SkewRefuse, "refuse (cluster Platform)"},
 		{"cluster Warn overrides refuse key", cr("Warn"), refuseCfg, kernel.SkewWarn, "cluster Platform overrides config skewPolicy"},
 		{"cluster unset overrides refuse key", cr(""), refuseCfg, kernel.SkewWarn, "cluster Platform overrides config skewPolicy"},
+		{"module deps is warn", deps, absentCfg, kernel.SkewWarn, ""},
+		{"module deps ignores and never names the refuse key", deps, refuseCfg, kernel.SkewWarn, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
