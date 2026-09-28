@@ -3,7 +3,8 @@
 ## Feature
 
 - [ ] Redesign "opm mod status" to print the summary status of all components and its resources. Should make use of <0001-release-inventory.md> entries.
-- [ ] Add "opm mod tidy" to tidy up CUE module dependencies in an OPM module. Investigate how to implement tidy without access to the CUE binary.
+- [x] ~~Add "opm mod tidy" to tidy up CUE module dependencies in an OPM module. Investigate how to implement tidy without access to the CUE binary.~~
+  - **Resolved:** `opm module tidy` and `opm catalog tidy` run `cue mod tidy` in process through `cuelang.org/go/cmd/cue/cmd` (`internal/cuemod`); no `cue` binary needed.
 - [ ] Add "opm mod vet" to validate an OPM module. Take inspiration from how Timoni solved it.
   - Include a "-c or --concrete" flag to force concreteness during validation
 - [ ] Add "opm mod eval" to evaluate the module printing the raw CUE code of the module.

@@ -11,140 +11,28 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"testing/fstest"
-	"time"
 
-	"cuelang.org/go/mod/modregistrytest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/open-platform-model/cli/internal/cuemod/cuemodtest"
 )
 
 // Tests in this package mutate the process working directory and
 // CUE_REGISTRY through Tidy; none of them may call t.Parallel.
 
-// unreachableRegistry refuses connections immediately.
-const unreachableRegistry = "127.0.0.1:1+insecure"
-
-// registryModules is what the in-memory registry serves: two versions of
-// the dependency (so "newest" is observable) and an unrelated module the
-// prune test pins without importing.
-var registryModules = fstest.MapFS{
-	"example.com_dep_v0.1.0/cue.mod/module.cue": {Data: []byte(`module: "example.com/dep@v0"
-language: version: "v0.9.0"
-`)},
-	"example.com_dep_v0.1.0/dep.cue": {Data: []byte(`package dep
-
-version: "v0.1.0"
-`)},
-	"example.com_dep_v0.2.0/cue.mod/module.cue": {Data: []byte(`module: "example.com/dep@v0"
-language: version: "v0.9.0"
-`)},
-	"example.com_dep_v0.2.0/dep.cue": {Data: []byte(`package dep
-
-version: "v0.2.0"
-`)},
-	"example.com_unused_v0.1.0/cue.mod/module.cue": {Data: []byte(`module: "example.com/unused@v0"
-language: version: "v0.9.0"
-`)},
-	"example.com_unused_v0.1.0/unused.cue": {Data: []byte(`package unused
-`)},
-}
-
-// consumerSource imports the dependency, so a tidy must pin it.
-const consumerSource = `package consumer
-
-import "example.com/dep@v0"
-
-v: dep.version
-`
-
-// testRegistry starts the in-memory registry and returns its CUE_REGISTRY
-// mapping. The mapping names no fallback registry, so any resolution that
-// escapes it fails instead of reaching the network.
-func testRegistry(t *testing.T) string {
-	t.Helper()
-	reg, err := modregistrytest.New(registryModules, "")
-	require.NoError(t, err)
-	t.Cleanup(reg.Close)
-	return reg.Host() + "+insecure"
-}
-
-// coldCUECache points CUE_CACHE_DIR at a fresh directory. The cache
-// extracts module files read-only, so t.TempDir's own cleanup would fail on
-// them; this cleanup chmods before removing.
-func coldCUECache(t *testing.T) {
-	t.Helper()
-	dir, err := os.MkdirTemp("", "opm-cuemod-cache-*")
-	require.NoError(t, err)
-	t.Setenv("CUE_CACHE_DIR", dir)
-	t.Cleanup(func() {
-		_ = filepath.WalkDir(dir, func(p string, _ fs.DirEntry, err error) error {
-			if err == nil {
-				_ = os.Chmod(p, 0o700)
-			}
-			return nil
-		})
-		_ = os.RemoveAll(dir)
-	})
-}
-
-// writeConsumer writes a module root holding module.cue (verbatim, so a
-// test controls its deps) and consumerSource.
-func writeConsumer(t *testing.T, dir, moduleCue string) string {
-	t.Helper()
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, "cue.mod"), 0o750))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "cue.mod", "module.cue"), []byte(moduleCue), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "consumer.cue"), []byte(consumerSource), 0o600))
-	return dir
-}
-
-const untidyModule = `module: "test.example/consumer@v0"
-language: version: "v0.9.0"
-`
-
-// newConsumer returns an untidy consumer (its import has no deps entry)
-// with a cold cache and a live test registry.
-func newConsumer(t *testing.T) (dir, registry string) {
-	t.Helper()
-	coldCUECache(t)
-	return writeConsumer(t, t.TempDir(), untidyModule), testRegistry(t)
-}
-
-func readModule(t *testing.T, dir string) string {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join(dir, "cue.mod", "module.cue"))
-	require.NoError(t, err)
-	return string(data)
-}
-
-// backdate sets module.cue's mtime to a fixed past instant, so "unchanged
-// mtime" is observable regardless of filesystem timestamp granularity.
-func backdate(t *testing.T, dir string) time.Time {
-	t.Helper()
-	past := time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
-	require.NoError(t, os.Chtimes(filepath.Join(dir, "cue.mod", "module.cue"), past, past))
-	return past
-}
-
-func mtime(t *testing.T, dir string) time.Time {
-	t.Helper()
-	info, err := os.Stat(filepath.Join(dir, "cue.mod", "module.cue"))
-	require.NoError(t, err)
-	return info.ModTime()
-}
-
 func TestTidy_HermeticHarness(t *testing.T) {
-	dir, registry := newConsumer(t)
+	dir, registry := cuemodtest.NewConsumer(t)
 
 	res, err := Tidy(context.Background(), dir, TidyOptions{Registry: registry})
 	require.NoError(t, err)
 	assert.True(t, res.ModuleUpdated)
 	assert.False(t, res.LocalUpdated)
-	assert.Contains(t, readModule(t, dir), `"example.com/dep@v0"`)
+	assert.Contains(t, cuemodtest.ReadModule(t, dir), `"example.com/dep@v0"`)
 }
 
 func TestTidy_RepeatedCallsInOneProcess(t *testing.T) {
-	dir, registry := newConsumer(t)
+	dir, registry := cuemodtest.NewConsumer(t)
 	ctx := context.Background()
 
 	first, err := Tidy(ctx, dir, TidyOptions{Registry: registry})
@@ -166,18 +54,18 @@ func checkTidy(ctx context.Context, t *testing.T, dir, registry string) error {
 }
 
 func TestTidy_RegistryOptionWinsOverAmbientEnv(t *testing.T) {
-	dir, registry := newConsumer(t)
+	dir, registry := cuemodtest.NewConsumer(t)
 	// The ambient mapping is dead: success proves cmd/cue read
 	// opts.Registry, which Tidy sets after New and before Run.
-	t.Setenv("CUE_REGISTRY", unreachableRegistry)
+	t.Setenv("CUE_REGISTRY", cuemodtest.UnreachableRegistry)
 
 	_, err := Tidy(context.Background(), dir, TidyOptions{Registry: registry})
 	require.NoError(t, err)
-	assert.Equal(t, unreachableRegistry, os.Getenv("CUE_REGISTRY"))
+	assert.Equal(t, cuemodtest.UnreachableRegistry, os.Getenv("CUE_REGISTRY"))
 }
 
 func TestTidy_NothingPrintedOnSuccess(t *testing.T) {
-	dir, registry := newConsumer(t)
+	dir, registry := cuemodtest.NewConsumer(t)
 	root, err := filepath.Abs(dir)
 	require.NoError(t, err)
 
@@ -191,22 +79,22 @@ func TestTidy_NothingPrintedOnSuccess(t *testing.T) {
 }
 
 func TestTidy_AddsMissingDependencyAtNewestVersion(t *testing.T) {
-	dir, registry := newConsumer(t)
+	dir, registry := cuemodtest.NewConsumer(t)
 
 	res, err := Tidy(context.Background(), dir, TidyOptions{Registry: registry})
 	require.NoError(t, err)
 	assert.Equal(t, TidyResult{ModuleUpdated: true}, res)
 
-	got := readModule(t, dir)
+	got := cuemodtest.ReadModule(t, dir)
 	assert.Contains(t, got, `"example.com/dep@v0"`)
 	assert.Contains(t, got, `"v0.2.0"`)
 	assert.NotContains(t, got, `"v0.1.0"`)
 }
 
 func TestTidy_PrunesUnusedDependency(t *testing.T) {
-	coldCUECache(t)
-	registry := testRegistry(t)
-	dir := writeConsumer(t, t.TempDir(), `module: "test.example/consumer@v0"
+	cuemodtest.ColdCache(t)
+	registry := cuemodtest.Registry(t)
+	dir := cuemodtest.WriteConsumer(t, t.TempDir(), `module: "test.example/consumer@v0"
 language: version: "v0.9.0"
 deps: {
 	"example.com/dep@v0": v: "v0.1.0"
@@ -218,7 +106,7 @@ deps: {
 	require.NoError(t, err)
 	assert.True(t, res.ModuleUpdated)
 
-	got := readModule(t, dir)
+	got := cuemodtest.ReadModule(t, dir)
 	assert.NotContains(t, got, "example.com/unused")
 	// Minimum version selection keeps the existing pin; tidy does not
 	// upgrade a dependency that is already satisfied.
@@ -226,23 +114,23 @@ deps: {
 }
 
 func TestTidy_AlreadyTidyWritesNothing(t *testing.T) {
-	dir, registry := newConsumer(t)
+	dir, registry := cuemodtest.NewConsumer(t)
 	ctx := context.Background()
 	_, err := Tidy(ctx, dir, TidyOptions{Registry: registry})
 	require.NoError(t, err)
-	before := readModule(t, dir)
-	past := backdate(t, dir)
+	before := cuemodtest.ReadModule(t, dir)
+	past := cuemodtest.Backdate(t, dir)
 
 	res, err := Tidy(ctx, dir, TidyOptions{Registry: registry})
 	require.NoError(t, err)
 	assert.Equal(t, TidyResult{}, res)
-	assert.Equal(t, before, readModule(t, dir))
-	assert.True(t, mtime(t, dir).Equal(past), "an already tidy module.cue must not be rewritten")
+	assert.Equal(t, before, cuemodtest.ReadModule(t, dir))
+	assert.True(t, cuemodtest.ModTime(t, dir).Equal(past), "an already tidy module.cue must not be rewritten")
 }
 
 func TestTidy_CheckOnUntidyModule(t *testing.T) {
-	dir, registry := newConsumer(t)
-	past := backdate(t, dir)
+	dir, registry := cuemodtest.NewConsumer(t)
+	past := cuemodtest.Backdate(t, dir)
 
 	err := checkTidy(context.Background(), t, dir, registry)
 
@@ -250,14 +138,14 @@ func TestTidy_CheckOnUntidyModule(t *testing.T) {
 	require.ErrorAs(t, err, &notTidy)
 	assert.Contains(t, notTidy.Reason, "example.com/dep@v0")
 	assert.NotContains(t, notTidy.Reason, "cue mod tidy", "the cue command suggestion is the caller's to replace")
-	assert.Equal(t, untidyModule, readModule(t, dir))
-	assert.True(t, mtime(t, dir).Equal(past), "--check must not touch module.cue")
+	assert.Equal(t, cuemodtest.UntidyModuleCue, cuemodtest.ReadModule(t, dir))
+	assert.True(t, cuemodtest.ModTime(t, dir).Equal(past), "--check must not touch module.cue")
 	_, statErr := os.Stat(filepath.Join(dir, "cue.mod", "local-module.cue"))
 	assert.ErrorIs(t, statErr, fs.ErrNotExist)
 }
 
 func TestTidy_CheckOnTidyModule(t *testing.T) {
-	dir, registry := newConsumer(t)
+	dir, registry := cuemodtest.NewConsumer(t)
 	ctx := context.Background()
 	_, err := Tidy(ctx, dir, TidyOptions{Registry: registry})
 	require.NoError(t, err)
@@ -279,10 +167,10 @@ func countingRegistry(t *testing.T) (string, *atomic.Int64) {
 }
 
 func TestTidy_NotModuleRoot(t *testing.T) {
-	coldCUECache(t)
+	cuemodtest.ColdCache(t)
 	registry, hits := countingRegistry(t)
 
-	parent := writeConsumer(t, t.TempDir(), untidyModule)
+	parent := cuemodtest.WriteConsumer(t, t.TempDir(), cuemodtest.UntidyModuleCue)
 	sub := filepath.Join(parent, "sub")
 	require.NoError(t, os.Mkdir(sub, 0o750))
 	file := filepath.Join(parent, "consumer.cue")
@@ -304,7 +192,7 @@ func TestTidy_NotModuleRoot(t *testing.T) {
 		})
 	}
 	assert.Zero(t, hits.Load(), "a refused root must not reach the registry")
-	assert.Equal(t, untidyModule, readModule(t, parent), "the parent module must not be tidied")
+	assert.Equal(t, cuemodtest.UntidyModuleCue, cuemodtest.ReadModule(t, parent), "the parent module must not be tidied")
 }
 
 func makeEmptyCueMod(t *testing.T) string {
@@ -345,19 +233,19 @@ func TestTidy_RestoresProcessState(t *testing.T) {
 
 			ctx := context.Background()
 
-			dir, registry := newConsumer(t)
+			dir, registry := cuemodtest.NewConsumer(t)
 			_, err = Tidy(ctx, dir, TidyOptions{Registry: registry})
 			require.NoError(t, err)
 			assertRestored(t, "successful tidy")
 
-			failing, _ := newConsumer(t)
-			_, err = Tidy(ctx, failing, TidyOptions{Registry: unreachableRegistry})
+			failing, _ := cuemodtest.NewConsumer(t)
+			_, err = Tidy(ctx, failing, TidyOptions{Registry: cuemodtest.UnreachableRegistry})
 			require.Error(t, err)
 			var notTidy *NotTidyError
 			require.NotErrorAs(t, err, &notTidy, "an unreachable registry is a resolution failure")
 			assertRestored(t, "failing tidy")
 
-			untidy, registry := newConsumer(t)
+			untidy, registry := cuemodtest.NewConsumer(t)
 			err = checkTidy(ctx, t, untidy, registry)
 			require.ErrorAs(t, err, &notTidy)
 			assertRestored(t, "check failure")
@@ -368,7 +256,7 @@ func TestTidy_RestoresProcessState(t *testing.T) {
 // TestTidy_NotTidyWordingPinned fails when the embedded CUE version stops
 // flattening modload.ErrModuleNotTidy into the text classify matches.
 func TestTidy_NotTidyWordingPinned(t *testing.T) {
-	dir, registry := newConsumer(t)
+	dir, registry := cuemodtest.NewConsumer(t)
 	root, err := filepath.Abs(dir)
 	require.NoError(t, err)
 
