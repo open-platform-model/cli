@@ -1,0 +1,9 @@
+# Enhancement declaration, read by `task enhancements:delivery:log` at archive time.
+# See enhancements/schema.cue #ChangeDeclaration.
+#
+# D3 and D4 are shared with core: core ships the optional initValues field
+# (D3:R1/R3, D4:R1/R2); this change lands the CLI side (D3:R2, D4:R3).
+implements:
+  - enhancement: "0016"
+    decisions: [D1, D2, D3, D4, D5, D6, D7, D8, D9]
+    resolves: []
