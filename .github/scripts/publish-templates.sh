@@ -41,6 +41,17 @@ published() {
   [ "$code" = "200" ]
 }
 
+# tidy <template> <dir> — refuses a template whose cue.mod/module.cue is not
+# what `opm module tidy` would write. A user's first command after
+# `opm module init` must not rewrite a file they never touched, and a pin
+# nothing imports is one more dependency to fetch.
+tidy() {
+  if ! "$opm" module tidy --check "./$2"; then
+    echo "==> $1: cue.mod/module.cue is not tidy — run 'opm module tidy ./$2'"
+    exit 1
+  fi
+}
+
 for dir in templates/*/; do
   t=$(basename "$dir")
   version=$(cd "$dir" && cue eval ./identity --out text -e Version)
@@ -52,9 +63,11 @@ for dir in templates/*/; do
       echo "==> ${t}: ${tag} already published — skipped by the caller-side filter"
       continue
     fi
+    tidy "$t" "$dir"
     echo "==> ${t}: publishing ${tag}"
     "$opm" module publish "./${dir}"
   else
+    tidy "$t" "$dir"
     echo "==> ${t}: dry-run at ${tag}"
     if out=$("$opm" module publish --dry-run "./${dir}" 2>&1); then
       echo "${out}"
