@@ -23,7 +23,7 @@ Delivered later, by other changes: instance tidy belongs to the planned `opm ins
 
 ### Modified Capabilities
 
-(none)
+- `platform-resolution`: the local default platform's maintenance loop names `opm module tidy` for pinning what a bumped catalog build needs; no behavior of platform resolution changes.
 
 ## Impact
 
@@ -31,4 +31,4 @@ Delivered later, by other changes: instance tidy belongs to the planned `opm ins
 - Packages: new `internal/cuemod` (tidy primitive), new `internal/cmdutil/tidy.go` (shared command body, the `RunVersionSet` pattern).
 - Dependencies: `go.mod` gains the `cmd/cue/cmd` import; indirect additions come from that package's own graph (for example `github.com/coder/websocket` via the LSP server). The binary grows by about 2.3 MB (79.1 MB to 81.4 MB, measured).
 - Process state: the primitive changes the working directory and `CUE_REGISTRY` for the duration of one tidy call and restores both. This is the first `os.Setenv` in the CLI and is confined to that one function (see design.md).
-- Docs: `README.md` command list and `AGENTS.md` package map; `TODO.md` line 6 item closed. The docs site's CLI reference is generated from the cobra tree, so it picks up the commands automatically.
+- Docs: `README.md` command list and `AGENTS.md` package map; `TODO.md` line 6 item closed; `docs/roadmap.md` records tidy as delivered; `opm config init` help and the seeded platform `module.cue` comment name `opm module tidy` in the pin-bump loop. The docs site's CLI reference is generated from the cobra tree, so it picks up the commands automatically.

@@ -310,3 +310,53 @@ func TestClassify(t *testing.T) {
 		})
 	}
 }
+
+// A replace written into module.cue belongs in local-module.cue: tidy moves
+// it there (creating the file), and the result reports both files.
+func TestTidy_CreatesLocalModuleForReplace(t *testing.T) {
+	cuemodtest.ColdCache(t)
+	registry := cuemodtest.Registry(t)
+	dir := cuemodtest.WriteConsumer(t, t.TempDir(), `module: "test.example/consumer@v0"
+language: version: "v0.17.0"
+deps: "example.com/dep@v0": {
+	v:           "v0.2.0"
+	replaceWith: "./local_dep"
+}
+`)
+	writeFile(t, filepath.Join(dir, "local_dep", "cue.mod", "module.cue"), "module: \"example.com/dep@v0\"\nlanguage: version: \"v0.9.0\"\n")
+	writeFile(t, filepath.Join(dir, "local_dep", "dep.cue"), "package dep\n\nversion: \"local\"\n")
+	ctx := context.Background()
+
+	res, err := Tidy(ctx, dir, TidyOptions{Registry: registry})
+	require.NoError(t, err)
+	assert.Equal(t, TidyResult{ModuleUpdated: true, LocalUpdated: true}, res)
+	assert.NotContains(t, cuemodtest.ReadModule(t, dir), "replaceWith")
+	local, err := os.ReadFile(filepath.Join(dir, "cue.mod", "local-module.cue"))
+	require.NoError(t, err)
+	assert.Contains(t, string(local), `replaceWith: "./local_dep"`)
+
+	again, err := Tidy(ctx, dir, TidyOptions{Registry: registry})
+	require.NoError(t, err)
+	assert.Equal(t, TidyResult{}, again, "a tidied replace is stable")
+}
+
+// A local-module.cue without any replaceWith serves no purpose; tidy
+// removes it and reports the removal as a local update.
+func TestTidy_RemovesPurposelessLocalModule(t *testing.T) {
+	cuemodtest.ColdCache(t)
+	registry := cuemodtest.Registry(t)
+	dir := cuemodtest.WriteConsumer(t, t.TempDir(), cuemodtest.UntidyModuleCue)
+	writeFile(t, filepath.Join(dir, "cue.mod", "local-module.cue"), "deps: \"example.com/dep@v0\": {\n\tv: \"v0.1.0\"\n}\n")
+
+	res, err := Tidy(context.Background(), dir, TidyOptions{Registry: registry})
+	require.NoError(t, err)
+	assert.True(t, res.LocalUpdated)
+	_, statErr := os.Stat(filepath.Join(dir, "cue.mod", "local-module.cue"))
+	assert.ErrorIs(t, statErr, fs.ErrNotExist)
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+}

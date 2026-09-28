@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -127,7 +128,7 @@ func TestRunTidy(t *testing.T) {
 			wantCode:    opmexit.ExitValidationError,
 			wantMsg:     "is not a CUE module root (no cue.mod/module.cue)",
 			wantAbsPath: true,
-			wantHint:    "Run 'opm module init' to create one",
+			wantHint:    "Run 'opm module init --dir %s' to create one", // %s: the path as given
 		},
 		{
 			name: "catalog dir without cue.mod names only the path",
@@ -211,7 +212,7 @@ func TestRunTidy(t *testing.T) {
 			var detail *oerrors.DetailError
 			if errors.As(err, &detail) {
 				assert.Contains(t, detail.Message, tc.wantMsg)
-				assert.Equal(t, tc.wantHint, detail.Hint)
+				assert.Equal(t, expandHint(tc.wantHint, dir), detail.Hint)
 				assert.NotContains(t, err.Error(), "cue mod tidy", "the cue tool's own suggestion must not leak")
 				if tc.wantAbsPath {
 					assert.Contains(t, detail.Message, abs)
@@ -223,6 +224,26 @@ func TestRunTidy(t *testing.T) {
 			assert.Contains(t, err.Error(), tc.wantMsg)
 		})
 	}
+}
+
+// expandHint fills a hint template's %s with the path the test passed.
+func expandHint(hint, dir string) string {
+	if strings.Contains(hint, "%s") {
+		return fmt.Sprintf(hint, dir)
+	}
+	return hint
+}
+
+// Without a path argument init already acts on the current directory, so
+// the hint carries no --dir.
+func TestRunTidy_NotModuleRootInCurrentDirectory(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	err := RunTidy(context.Background(), &config.GlobalConfig{Registry: cuemodtest.UnreachableRegistry}, publish.KindModule, nil, false)
+
+	var detail *oerrors.DetailError
+	require.ErrorAs(t, err, &detail)
+	assert.Equal(t, "Run 'opm module init' to create one", detail.Hint)
 }
 
 func TestRunTidy_DefaultsToCurrentDirectory(t *testing.T) {

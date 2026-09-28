@@ -101,7 +101,7 @@ Step 4 uses our own `os.Chdir`, not `cmd/cue`'s `-C` flag, because `-C` calls `o
 | Condition | Exit | Message shape |
 | --- | --- | --- |
 | Tidied, or already tidy, or check passed | 0 | outcome line |
-| Path missing, not a dir, or no `cue.mod/module.cue` | 2 | `<abs path> is not a CUE module root (no cue.mod/module.cue)`; hint `opm module init` when the dir exists and the kind is module (there is no `opm catalog init`) |
+| Path missing, not a dir, or no `cue.mod/module.cue` | 2 | `<abs path> is not a CUE module root (no cue.mod/module.cue)`; hint `opm module init` (with `--dir <path>` when a path was given) when the dir exists and the kind is module (there is no `opm catalog init`) |
 | `--check` and not tidy | 2 | `module is not tidy: <CUE reason>`; hint `run 'opm module tidy'` (or `opm catalog tidy`) |
 | Resolution or registry failure | 1 | CUE's resolver text, prefixed `tidying <abs path>:` |
 
@@ -117,17 +117,29 @@ $ opm module tidy
 Module already tidy; nothing written
 
 $ opm catalog tidy --check
-Error: catalog is not tidy: missing dependency providing package opmodel.dev/core@v2
-Hint: run 'opm catalog tidy'
+Error: not tidy
+
+  catalog is not tidy: missing dependency providing package opmodel.dev/core@v2
+
+Hint: Run 'opm catalog tidy'
+(exit 2)
+
+$ opm module tidy ./sub
+Error: not a module root
+
+  /home/me/src/app/sub is not a CUE module root (no cue.mod/module.cue)
+
+Hint: Run 'opm module init --dir ./sub' to create one
 (exit 2)
 
 $ opm module tidy ./nope
-Error: /home/me/src/app/nope is not a CUE module root (no cue.mod/module.cue)
-Hint: run 'opm module init' to create one
+Error: not a module root
+
+  /home/me/src/app/nope is not a CUE module root (no cue.mod/module.cue)
 (exit 2)
 ```
 
-The exact success glyph comes from `output.FormatCheckmark`, matching `version set`.
+Refusals use the CLI's standard `DetailError` block (type header, indented message, hint), like `opm config vet`. The init hint names the path through `--dir` when one was given, because `opm module init` otherwise acts on the current directory; a path that does not exist gets no hint. The exact success glyph comes from `output.FormatCheckmark`, matching `version set`.
 
 ## Research & Decisions
 

@@ -16,3 +16,11 @@
 - [x] 2.4 Add `tests/e2e/mod_tidy_test.go` following the existing e2e pattern: a temp module importing `opmodel.dev/core@v2` with empty `deps`; verify `opm module tidy --check` exits 2, `opm module tidy` exits 0 and pins core, and a second `--check` exits 0, all resolved from GHCR
 - [x] 2.5 Update `README.md` (command list), `AGENTS.md` (package map entry for `internal/cuemod`, noting it is the only `os.Setenv`/`os.Chdir` site and why) and close `TODO.md` line 6; verify `task openspec:check` passes
 - [x] 2.6 `task lint` and `task test` green, then commit `feat(cmd): add module and catalog tidy commands`
+
+## 3. Verify follow-ups
+
+- [x] 3.1 Record tidy as delivered in `docs/roadmap.md`, correct the stale `TODO.md` notes about `opm config init` and `opm mod init`, and name `opm module tidy` in the platform pin-bump loop (`opm config init` help, seeded platform `module.cue` comment, `platform-resolution` delta); verify `task openspec:check` passes
+- [x] 3.2 Carry the path through `--dir` in the not-a-module-root init hint when one was given; verify with the `RunTidy` table and a current-directory test
+- [x] 3.3 Cover `cue.mod/local-module.cue`: a replace in `module.cue` moves there (`LocalUpdated` true, idempotent), and a replace-less `local-module.cue` is removed; verify both tests pass against the in-memory registry
+- [x] 3.4 Add a hermetic e2e case proving the root `--registry` flag routes tidy while `CUE_REGISTRY` and `OPM_REGISTRY` point at a dead address, with a no-flag control that fails; bring design.md's example output in line with the CLI's error block
+- [x] 3.5 `task lint` and `task test` green, then commit `fix(cmd): name the path in tidy's init hint and refresh tidy docs`

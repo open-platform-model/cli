@@ -31,7 +31,7 @@ func RunTidy(ctx context.Context, cfg *config.GlobalConfig, kind publish.Kind, p
 	}
 	res, err := cuemod.Tidy(ctx, dir, cuemod.TidyOptions{Registry: registry, Check: check})
 	if err != nil {
-		return tidyError(kind, dir, err)
+		return tidyError(kind, dir, len(pathArgs) > 0, err)
 	}
 
 	updated := updatedFiles(res)
@@ -58,7 +58,7 @@ func updatedFiles(res cuemod.TidyResult) []string {
 // failed check are refusals (2) whose hint names the command that fixes
 // them; anything else is a resolution failure (1), prefixed with the
 // absolute path so the resolver's text says which tree it was resolving.
-func tidyError(kind publish.Kind, dir string, err error) error {
+func tidyError(kind publish.Kind, dir string, explicitPath bool, err error) error {
 	var notTidy *cuemod.NotTidyError
 	switch {
 	case errors.Is(err, cuemod.ErrNotModuleRoot):
@@ -67,7 +67,7 @@ func tidyError(kind publish.Kind, dir string, err error) error {
 			Err: &oerrors.DetailError{
 				Type:    "not a module root",
 				Message: err.Error(),
-				Hint:    notModuleRootHint(kind, dir),
+				Hint:    notModuleRootHint(kind, dir, explicitPath),
 				Cause:   err,
 			},
 		}
@@ -93,14 +93,19 @@ func tidyError(kind publish.Kind, dir string, err error) error {
 }
 
 // notModuleRootHint points an existing module directory without cue.mod at
-// `opm module init`. There is no catalog init, and a path that is not a
-// directory at all needs correcting rather than initializing.
-func notModuleRootHint(kind publish.Kind, dir string) string {
+// `opm module init`, carrying the path the user named through --dir (init
+// otherwise acts on the current directory). There is no catalog init, and a
+// path that is not a directory at all needs correcting rather than
+// initializing.
+func notModuleRootHint(kind publish.Kind, dir string, explicitPath bool) string {
 	if kind != publish.KindModule {
 		return ""
 	}
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 		return ""
+	}
+	if explicitPath {
+		return fmt.Sprintf("Run 'opm module init --dir %s' to create one", dir)
 	}
 	return "Run 'opm module init' to create one"
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/open-platform-model/cli/internal/cuemod/cuemodtest"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 )
 
@@ -56,4 +57,29 @@ _core: core
 
 	_, stderr, err = runOPMWithEnv(t, modDir, homeDir, timeout, "module", "tidy", "--check")
 	require.NoError(t, err, "a freshly tidied module must pass the check; stderr: %s", stderr)
+}
+
+// TestE2E_ModTidy_RegistryFlagRoutesResolution proves the root --registry
+// flag reaches tidy: both registry variables in the process environment
+// point at a dead address, so only the flag's in-process registry can
+// resolve the dependency. Hermetic: no network.
+func TestE2E_ModTidy_RegistryFlagRoutesResolution(t *testing.T) {
+	modDir, registry := cuemodtest.NewConsumer(t)
+	deadEnv := []string{
+		"CUE_REGISTRY=" + cuemodtest.UnreachableRegistry,
+		"OPM_REGISTRY=" + cuemodtest.UnreachableRegistry,
+	}
+
+	_, stderr, err := runOPMPublish(t, modDir, deadEnv, "--registry", registry, "module", "tidy")
+	require.NoError(t, err, "stderr: %s", stderr)
+	got := cuemodtest.ReadModule(t, modDir)
+	assert.Contains(t, got, `"`+cuemodtest.DepModule+`"`)
+	assert.Contains(t, got, `"`+cuemodtest.DepNewest+`"`)
+
+	// Control: without the flag the dead environment wins and resolution fails.
+	otherDir, _ := cuemodtest.NewConsumer(t)
+	_, stderr, err = runOPMPublish(t, otherDir, deadEnv, "module", "tidy")
+	require.Error(t, err)
+	assert.Equal(t, opmexit.ExitGeneralError, exitCode(t, err), "stderr: %s", stderr)
+	assert.Contains(t, stderr, "connection refused")
 }

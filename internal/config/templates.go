@@ -154,7 +154,8 @@ var DefaultPlatformModuleFile = fmt.Sprintf(`// OPM local default platform modul
 // each #registry entry in platform.cue imports its catalog, and the entry's
 // version is derived from the pinned build. To move to a newer catalog
 // release, edit the pin here (or run 'cue mod get <path>@<version>' in this
-// directory), then run 'opm config vet' to prove the module still builds.
+// directory), run 'opm module tidy' here to pin whatever the new build needs,
+// then run 'opm config vet' to prove the module still builds.
 module: %q
 language: {
 	version: "v0.17.0"

@@ -10,7 +10,7 @@
 - [ ] Add "opm mod eval" to evaluate the module printing the raw CUE code of the module.
 
 - [x] ~~Ensure "opm config init" also run "cue mod tidy" or similar to discover and download all dependencies.~~
-  - **Resolved:** Added prominent yellow-arrow notice reminding users to run `cue mod tidy` after init. Auto-running was rejected to maintain explicit user control (no shell-outs to `cue` binary).
+  - **Resolved:** `opm config init` stays offline and writes pins without resolving them (auto-resolving was rejected to keep init explicit); `opm config vet` proves the pins resolve. The platform module under `~/.opm/platform/` is a plain CUE module, so `opm module tidy ~/.opm/platform` fills in or prunes its dependencies without the `cue` binary.
 - [ ] Rework all tests to use cue.AST() instead of strings for test data and comparison.
   - Use pure CUE files, packages and modules for testadata
   - Look into using pure CUE files for comparison data as well.
@@ -24,7 +24,7 @@
   - Ensure that the log output is referencing the corret files and line relative to the execution directory. Meaning it MUST give the user the correct path to the file and line that fails the evaluator.
 - [ ] Add a "opm config update" command. It will extract the current values, initialize the latest config available, and reapply the values.
   - This is a helper command so that users can "upgrade" their configuration more easily.
-- [ ] During "opm mod init" the module.cue in cue.mod should initialize as a blank slate, allowing opm to grab the latest versions of all OPM modules. Either by running "opm mod tidy" (internally) or by running something similar to "cue mod get" on each dependency.
+- [ ] During "opm mod init" the module.cue in cue.mod should initialize as a blank slate, allowing opm to grab the latest versions of all OPM modules. The tidy engine exists (`internal/cuemod.Tidy`, behind `opm module tidy`); what remains is deciding whether `opm module init` should tidy the scaffolded tree instead of keeping the pins the published template carries.
 - [ ] Add "opm mod list". It should list all modules in the defined namespace (default ns is, default). "-A" should list in all namespaces.
   - Note: Can now leverage `instance-id` labels for discovery (see deterministic-release-identity).
 - [ ] Add check during processing: Check if a module author has referenced "values" and not "#config" in a component. This will not work and should warn the user.

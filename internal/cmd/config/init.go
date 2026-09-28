@@ -37,7 +37,9 @@ and proves the pins resolve.
 
 Maintenance: catalog builds are pinned in platform/cue.mod/module.cue.
 To move to a newer catalog release, edit the pin there (or run
-'cue mod get <path>@<version>' in that directory) and run 'opm config vet'.
+'cue mod get <path>@<version>' in that directory), run 'opm module tidy'
+on that directory to pin whatever the new build needs, and run
+'opm config vet'.
 
 A legacy data-only ~/.opm/platform.cue from an earlier release is removed
 when the module is written.
