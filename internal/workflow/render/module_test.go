@@ -183,3 +183,27 @@ func TestResolveModuleValues_NoDebugValues(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "debugValues")
 }
+
+// TestModuleSource_CarriesCommittedModFile pins the input the module-deps
+// platform is generated from: a module acquired from a directory carries its
+// committed cue.mod/module.cue in Source.Overlay, keyed under Source.Root,
+// so the dependency pins are read from the acquired source with no second
+// load, the same way a registry-acquired module's are.
+func TestModuleSource_CarriesCommittedModFile(t *testing.T) {
+	dir, err := filepath.Abs(filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "simple-module"))
+	require.NoError(t, err)
+	k := config.NewKernel("opmodel.dev=ghcr.io/open-platform-model,registry.cue.works")
+	if _, err := k.SchemaCache().Get(); err != nil {
+		t.Skipf("core v2 schema unavailable (registry/cache): %v", err)
+	}
+
+	mod, err := k.AcquireModuleFromDir(context.Background(), dir)
+	require.NoError(t, err)
+	require.True(t, mod.HasSource())
+
+	want, err := os.ReadFile(filepath.Join(dir, "cue.mod", "module.cue"))
+	require.NoError(t, err)
+	got, ok := mod.Source.Overlay[filepath.Join(mod.Source.Root, "cue.mod", "module.cue")]
+	require.True(t, ok, "overlay carries cue.mod/module.cue at Source.Root")
+	assert.Equal(t, string(want), string(got))
+}
