@@ -77,6 +77,7 @@ debugValues: {
 			}
 			scaling: count: #config.replicas
 			restartPolicy: "Always"
+			updateStrategy: type: "RollingUpdate"
 		}
 	}
 }
