@@ -22,6 +22,7 @@ func NewCatalogCmd(cfg *config.GlobalConfig) *cobra.Command {
 	c.AddCommand(NewCatalogPublishCmd(cfg))
 	c.AddCommand(NewCatalogRegistryCmd(cfg))
 	c.AddCommand(NewCatalogVersionCmd())
+	c.AddCommand(NewCatalogTidyCmd(cfg))
 
 	return c
 }

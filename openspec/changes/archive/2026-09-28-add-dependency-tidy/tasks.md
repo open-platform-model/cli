@@ -1,0 +1,26 @@
+## 1. Spike and tidy primitive (`internal/cuemod`)
+
+- [x] 1.1 Add `internal/cuemod/tidy.go` with `TidyOptions`, `TidyResult`, `ErrNotModuleRoot`, `NotTidyError` and `Tidy` as specified in design.md (root check, file snapshots, package mutex, own `os.Chdir` with deferred restore, `CUE_REGISTRY` set/restore only when `opts.Registry != ""`, `cuecmd.New(["mod","tidy"(,"--check")])` with `SetOut`/`SetErr` to a buffer, prefix classification of `module is not tidy`); run `go mod tidy` and verify `go build ./...` succeeds with `go.mod`/`go.sum` updated for the `cuelang.org/go/cmd/cue/cmd` import
+- [x] 1.2 Add a hermetic test harness in `internal/cuemod/tidy_test.go`: an in-memory registry from `cuelang.org/go/mod/modregistrytest` serving two versions of a small dependency module, `CUE_CACHE_DIR` set to `t.TempDir()`, and a consumer module written into `t.TempDir()`; verify the harness test passes with no network access
+- [x] 1.3 Spike the unverified assumptions from design.md as tests and verify each passes: two `Tidy` calls in one process both succeed (repeated `New`); the registry comes from `opts.Registry` even when the ambient `CUE_REGISTRY` points elsewhere (it is read at `Run`, not `New`); the output buffer is empty after a successful tidy. Record any finding that contradicts design.md in design.md before continuing
+- [x] 1.4 Add behavior tests and verify they pass: missing dependency added at the newest version (`ModuleUpdated` true); unused dependency pruned; already tidy gives an all-false `TidyResult` with `module.cue` mtime unchanged; `Check` on an untidy module returns `*NotTidyError` with a non-empty reason naming the missing package and leaves the file bytes and mtime unchanged; `Check` on a tidy module returns nil; a dir without `cue.mod/module.cue` returns `ErrNotModuleRoot` before any registry access
+- [x] 1.5 Add a process-state test and verify it passes: after a successful tidy, a failing tidy (unreachable registry) and a `Check` failure, `os.Getwd()` and `CUE_REGISTRY` (both set and unset beforehand) equal their pre-call values
+- [x] 1.6 Add a wording-pin test that fails if the embedded CUE version stops producing the `module is not tidy` prefix, and verify it passes on v0.17.1
+- [x] 1.7 `task lint` and `task test` green, then commit `feat(cue): add in-process cue mod tidy primitive`
+
+## 2. `opm module tidy` and `opm catalog tidy`
+
+- [x] 2.1 Add `internal/cmdutil/tidy.go` with `RunTidy(ctx, cfg, kind, pathArgs, check)`: resolve the path with `ResolveModulePath`, call `cuemod.Tidy` with `cfg.Registry`, print the outcome line through `output` (updated files named, or already tidy), and map errors to exit codes per design.md (`ErrNotModuleRoot` and `*NotTidyError` to 2 with the hint from design.md (`opm module init` for a module dir without `cue.mod`, never for a catalog; `opm <kind> tidy` for not-tidy), everything else to 1 prefixed with the absolute path); verify with table-driven tests in `internal/cmdutil/tidy_test.go` using the section 1 in-memory registry
+- [x] 2.2 Add `internal/cmd/module/tidy.go` (`tidy [path]`, `--check`, `cobra.MaximumNArgs(1)`, long help with exit codes and examples in the `version set` style) and register it in `mod.go`; verify `opm mod tidy --help` works through the alias and a command test asserts the flag and its default
+- [x] 2.3 Add `internal/cmd/catalog/tidy.go` with the same shape and register it in `catalog.go`; verify a command test asserts the flag, and that messages say "catalog" rather than "module"
+- [x] 2.4 Add `tests/e2e/mod_tidy_test.go` following the existing e2e pattern: a temp module importing `opmodel.dev/core@v2` with empty `deps`; verify `opm module tidy --check` exits 2, `opm module tidy` exits 0 and pins core, and a second `--check` exits 0, all resolved from GHCR
+- [x] 2.5 Update `README.md` (command list), `AGENTS.md` (package map entry for `internal/cuemod`, noting it is the only `os.Setenv`/`os.Chdir` site and why) and close `TODO.md` line 6; verify `task openspec:check` passes
+- [x] 2.6 `task lint` and `task test` green, then commit `feat(cmd): add module and catalog tidy commands`
+
+## 3. Verify follow-ups
+
+- [x] 3.1 Record tidy as delivered in `docs/roadmap.md`, correct the stale `TODO.md` notes about `opm config init` and `opm mod init`, and name `opm module tidy` in the platform pin-bump loop (`opm config init` help, seeded platform `module.cue` comment, `platform-resolution` delta); verify `task openspec:check` passes
+- [x] 3.2 Carry the path through `--dir` in the not-a-module-root init hint when one was given; verify with the `RunTidy` table and a current-directory test
+- [x] 3.3 Cover `cue.mod/local-module.cue`: a replace in `module.cue` moves there (`LocalUpdated` true, idempotent), and a replace-less `local-module.cue` is removed; verify both tests pass against the in-memory registry
+- [x] 3.4 Add a hermetic e2e case proving the root `--registry` flag routes tidy while `CUE_REGISTRY` and `OPM_REGISTRY` point at a dead address, with a no-flag control that fails; bring design.md's example output in line with the CLI's error block
+- [x] 3.5 `task lint` and `task test` green, then commit `fix(cmd): name the path in tidy's init hint and refresh tidy docs`
