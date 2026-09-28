@@ -4,6 +4,18 @@ on:
   push:
     branches:
       - main
+  # Recovery for a release that exists without its artifacts. release-please
+  # can create the tag and the GitHub release and then fail on a later API
+  # call (v1.0.0-alpha.21, 2026-09-15); its outputs are then unset, both jobs
+  # below are skipped, and every later run sees the release as done. Run this
+  # workflow by hand with that tag to build the binaries and publish the
+  # templates the tag carries.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag, for example v1.0.0-alpha.21
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -12,6 +24,7 @@ permissions:
 jobs:
   release-please:
     name: Release Please
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       releases_created: ${{ steps.release.outputs.releases_created }}
@@ -27,7 +40,9 @@ jobs:
   goreleaser:
     name: Build and publish release binaries
     needs: release-please
-    if: needs.release-please.outputs.releases_created == 'true'
+    # always(): on a manual run release-please is skipped, and a skipped need
+    # would skip this job too.
+    if: always() && (needs.release-please.outputs.releases_created == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -35,7 +50,7 @@ jobs:
       - name: Checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          ref: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
           fetch-depth: 0
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -57,7 +72,7 @@ jobs:
     # version bumped publishes nothing and succeeds.
     name: Publish template modules
     needs: release-please
-    if: needs.release-please.outputs.releases_created == 'true'
+    if: always() && (needs.release-please.outputs.releases_created == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -66,7 +81,7 @@ jobs:
       - name: Checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          ref: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
