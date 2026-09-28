@@ -12,7 +12,7 @@
 - The deps are read from the module's acquired source, so the same rule covers a module acquired from a directory and a published module acquired from the registry (`opm module build <published-path>`, added by `split-module-and-instance-inputs`).
 - Unchanged: `opm instance build` and `opm instance vet` (`--platform`, else `~/.opm/platform/`), and `opm instance apply`, `opm instance diff` and `opm module apply` (`--platform`, else the cluster Platform, else the local default).
 
-Release class: MINOR. No flag or command is removed. `opm module build` output changes only in its provenance line and the absence of skew warnings; `opm module vet` newly refuses a module whose components do not render against its own catalogs, which is a stricter check of the same command, not a removed interface.
+Release class: MINOR. No flag or command is removed. `opm module build` output changes only in its provenance line and the absence of skew warnings; `opm module vet` newly refuses a module whose components do not render against its own catalogs, which is a stricter check of the same command, not a removed interface. For the same reason it newly refuses what `opm module build` already refused at synthesis: a `debugValues` left open (`_`); the release note names the fix, `debugValues: {}`. The default synthetic instance name hyphenates the module name (`my_app` becomes `my-app-debug`): the old `my_app-debug` failed the instance-name pattern, so `module build` and `module apply` refused every multi-word module without `--name`, and `module vet` would have too.
 
 ## Capabilities
 
@@ -25,6 +25,7 @@ Release class: MINOR. No flag or command is removed. `opm module build` output c
 - `platform-resolution`: the precedence gains the module-deps source for `module build` and `module vet`; a new requirement defines how the deps platform is generated (catalog selection, closure, carried replacements, provenance, no skew).
 - `mod-vet`: `module vet` renders against the deps platform (or `--platform`) instead of stopping at `#config` validation; `--platform`, `-n` and `--instance-name` now affect it.
 - `kernel-render`: a module-side replacement of a path the deps platform pins is carried and honoured, no longer reported as ignored.
+- `module-synthetic-instance`: the default synthetic instance name hyphenates the module name, so it is a valid instance name for every valid module name.
 
 ## Impact
 

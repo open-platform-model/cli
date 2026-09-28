@@ -187,6 +187,30 @@ func TestResolveModuleValues_NoDebugValues(t *testing.T) {
 	assert.Contains(t, err.Error(), "debugValues")
 }
 
+func TestSyntheticIdentity_DefaultName(t *testing.T) {
+	k8s := &config.ResolvedKubernetesConfig{}
+	tests := []struct {
+		name    string
+		modName string
+		flag    string
+		want    string
+	}{
+		{"single word", "apprise", "", "apprise-debug"},
+		{"multi-word package name is hyphenated", "my_app", "", "my-app-debug"},
+		{"every underscore", "a_b_c", "", "a-b-c-debug"},
+		{"flag wins verbatim", "my_app", "custom", "custom"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mod := &module.Module{Metadata: &module.ModuleMetadata{Name: tt.modName}}
+			modName, synthName, ns := syntheticIdentity(mod, ModuleOpts{Name: tt.flag, K8sConfig: k8s}, "")
+			assert.Equal(t, tt.modName, modName, "the module's own name is reported unchanged")
+			assert.Equal(t, tt.want, synthName)
+			assert.Equal(t, "default", ns)
+		})
+	}
+}
+
 func TestModuleDepsOf_OverlayOnlySourceCarriesNoReplacements(t *testing.T) {
 	// The registry-acquired shape: a synthetic root, the tree in memory, no
 	// local module context.
@@ -239,7 +263,6 @@ func TestFromModule_PlatformFromDepsNeedsNoLocalDefault(t *testing.T) {
 
 	result, err := FromModule(context.Background(), ModuleOpts{
 		ModulePath:       dir,
-		Name:             "debug-values", // the default "<name>-debug" keeps the fixture's underscore
 		PlatformFromDeps: true,
 		Config:           &config.GlobalConfig{ConfigPath: configPath, Registry: registry},
 		K8sConfig:        &config.ResolvedKubernetesConfig{},

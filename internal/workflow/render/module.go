@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
@@ -144,8 +145,9 @@ func moduleDepsOf(src *module.Source, moduleRoot string) (*platform.ModuleDeps, 
 const defaultNamespace = "default"
 
 // syntheticIdentity derives the synthetic instance identity: caller-supplied
-// name or "<module.metadata.name>-debug"; namespace from --namespace/env
-// override, else "default".
+// name or "<module.metadata.name>-debug" with every "_" hyphenated (a module
+// name is a CUE package name, "my_app"; an instance name is a DNS label);
+// namespace from --namespace/env override, else "default".
 func syntheticIdentity(mod *module.Module, opts ModuleOpts, namespace string) (modName, synthName, synthNamespace string) {
 	if mod.Metadata != nil {
 		modName = mod.Metadata.Name
@@ -155,7 +157,7 @@ func syntheticIdentity(mod *module.Module, opts ModuleOpts, namespace string) (m
 	}
 	synthName = opts.Name
 	if synthName == "" {
-		synthName = modName + "-debug"
+		synthName = strings.ReplaceAll(modName, "_", "-") + "-debug"
 	}
 	synthNamespace = defaultNamespace
 	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {

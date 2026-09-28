@@ -9,6 +9,7 @@ import (
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"cuelang.org/go/cue"
+	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 
 	"github.com/open-platform-model/library/opm/kernel"
@@ -28,27 +29,36 @@ func NewModuleVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "vet [path]",
 		Short: "Validate module without generating manifests",
-		Long: `Validate an OPM module's config inputs without generating manifests.
+		Long: `Validate an OPM module without generating manifests.
 
 	This command first verifies the module's identity and coordinates — the
 	identity package conforms to core's #IdentityPackage, metadata derives from
 	it, and cue.mod agrees with the declared module path — then validates the
 	module's #config contract using either the module's debugValues (default) or
 	explicit values files passed with -f/--values.
-	It does not render resources, resolve providers, or validate instance files.
+
+	It then renders the module exactly as 'opm module build' does and reports
+	each rendered object without printing it, so vet and build reach the same
+	verdict. By default the render runs against a platform generated from the
+	module's own cue.mod/module.cue, one registry entry per catalog the module
+	pins, at the pinned version; neither the cluster nor ~/.opm/platform/ is
+	read. Pass --platform <dir> to render against a platform module instead.
 
 	Arguments:
 	  path    Path to module directory (default: current directory)
 
 	Examples:
-	  # Validate debugValues in current directory
+	  # Validate debugValues in current directory against the module's deps
 	  opm module vet
 
 	  # Validate module against explicit values
 	  opm module vet ./my-module -f prod-values.cue
 
 	  # Validate by merging multiple values files
-	  opm module vet ./my-module -f base.cue -f prod.cue`,
+	  opm module vet ./my-module -f base.cue -f prod.cue
+
+	  # Validate against a platform module instead of the module's deps
+	  opm module vet ./my-module --platform ./pulled-platform`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return runVet(c.Context(), cfg, args, &rf)
@@ -56,6 +66,7 @@ func NewModuleVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 	}
 
 	rf.AddTo(c)
+	useModuleDepsPlatformHelp(c)
 
 	return c
 }
@@ -70,8 +81,9 @@ func runVet(ctx context.Context, cfg *config.GlobalConfig, args []string, rf *cm
 // identity/coordinate checks (0011:D16/D18/D21), then resolves the values (-f
 // files, else the debugValues field) as kernel sources exactly as `opm
 // module build` does and validates them against #config through the
-// kernel's layered validation, so vet and build agree on a verdict. No
-// instance wrapper, engine render, or cluster connection is required.
+// kernel's layered validation. Once those pass it renders the synthesized
+// instance as build does (renderVetModule), so vet and build agree on a
+// verdict. No cluster connection is required.
 func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath string, rf *cmdutil.RenderFlags) error {
 	if err := cmdutil.ValidateModuleInputPath(modulePath); err != nil {
 		return &opmexit.ExitError{
@@ -150,6 +162,45 @@ func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath 
 	moduleLog.Info(output.FormatVetCheck("Values satisfy #config", vetValuesDetail(rf.Values)))
 	moduleLog.Info(output.FormatCheckmark("Module config valid"))
 
+	return renderVetModule(ctx, cfg, modulePath, rf, moduleLog)
+}
+
+// renderVetModule renders the module's synthesized instance exactly as `opm
+// module build` does, against --platform or the platform generated from the
+// module's own deps, and reports the rendered objects without printing them.
+// It runs only after the identity and #config checks passed, so a cheap
+// failure never reaches the registry for the platform.
+func renderVetModule(ctx context.Context, cfg *config.GlobalConfig, modulePath string, rf *cmdutil.RenderFlags, moduleLog *log.Logger) error {
+	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
+		Config:        cfg,
+		NamespaceFlag: rf.Namespace,
+	})
+	if err != nil {
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+	}
+
+	result, err := render.FromModule(ctx, render.ModuleOpts{
+		ModulePath:       modulePath,
+		ValuesFiles:      rf.Values,
+		Name:             rf.InstanceName,
+		PlatformFlag:     rf.Platform, // offline: no cluster read (0006:D21)
+		PlatformFromDeps: true,
+		K8sConfig:        k8sConfig,
+		Config:           cfg,
+	})
+	if err != nil {
+		return err
+	}
+
+	render.ShowOutput(result, render.ShowOutputOpts{Verbose: cfg.Flags.Verbose})
+
+	// Per-object lines, skipped when --verbose already showed them.
+	if !cfg.Flags.Verbose {
+		for _, res := range result.Resources {
+			moduleLog.Info(output.FormatResourceLine(res.GetKind(), res.GetNamespace(), res.GetName(), output.StatusValid))
+		}
+	}
+	moduleLog.Info(output.FormatCheckmark(fmt.Sprintf("Module valid (%d resources)", result.ResourceCount())))
 	return nil
 }
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/output"
 )
 
 func TestNewModuleVetCmd(t *testing.T) {
@@ -33,15 +34,15 @@ func TestNewModuleVetCmd_NoLocalVerboseFlag(t *testing.T) {
 }
 
 // TestModVet_ValidModule exercises the module vet path with the simple-module
-// fixture (core@v2 line, no instance.cue, no debugValues of its own). Core's
-// #Module declares `debugValues: _`, and every #config field of the fixture
-// carries a default, so the kernel merges the open debugValues with #config
-// to a concrete value and vet accepts the module — the verdict build reaches
-// for the same input. The fixture imports opmodel.dev/core@v2, so it resolves
-// only when a registry (or a warm CUE cache) is available; without one the
-// core schema load fails with a connectivity error before the vet check is
-// reached, and the test skips rather than false-failing — matching the
-// repo's other registry-backed tests.
+// fixture (core@v2 line, no instance.cue, empty debugValues, no catalog, no
+// components): the identity and #config checks pass, and the render against
+// a platform generated from the module's own deps yields zero objects — the
+// verdict build reaches for the same input. The fixture's module name carries
+// an underscore, which the default instance name hyphenates. The fixture imports
+// opmodel.dev/core@v2, so it resolves only when a registry (or a warm CUE
+// cache) is available; without one the core schema load fails with a
+// connectivity error before the vet check is reached, and the test skips
+// rather than false-failing — matching the repo's other registry-backed tests.
 func TestModVet_ValidModule(t *testing.T) {
 	fixtureDir := filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "simple-module")
 	if _, err := os.Stat(fixtureDir); os.IsNotExist(err) {
@@ -55,7 +56,12 @@ func TestModVet_ValidModule(t *testing.T) {
 	os.Setenv("HOME", tmpHome)
 	defer os.Setenv("HOME", origHome)
 
-	cfg := &config.GlobalConfig{}
+	var logs bytes.Buffer
+	output.SetLogWriter(&logs)
+	t.Cleanup(func() { output.SetLogWriter(os.Stderr) })
+
+	configPath := filepath.Join(tmpHome, ".opm", "config.cue")
+	cfg := &config.GlobalConfig{ConfigPath: configPath}
 	cmd := NewModuleVetCmd(cfg)
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -66,7 +72,21 @@ func TestModVet_ValidModule(t *testing.T) {
 	if errors.As(err, &exitErr) && exitErr.Code == opmexit.ExitConnectivityError {
 		t.Skipf("core@v2 not resolvable (registry/cache unavailable?): %v", err)
 	}
-	require.NoError(t, err, "an all-defaults #config merges open debugValues to a concrete value")
+	require.NoError(t, err, "identity, #config and a zero-object render all pass")
+	assert.Contains(t, logs.String(), "Module config valid")
+	assert.Contains(t, logs.String(), "platform: module deps (no catalogs; generated module "+config.PlatformCacheDir(configPath))
+	assert.Contains(t, logs.String(), "Module valid (0 resources)")
+	assert.Contains(t, logs.String(), `"simple-module-debug"`, "the default instance name hyphenates the module name")
+}
+
+func TestNewModuleVetCmd_PlatformFlagNamesTheModuleDeps(t *testing.T) {
+	cmd := NewModuleVetCmd(&config.GlobalConfig{})
+	assert.Equal(t, "Render against this platform module directory instead of the module's own deps",
+		cmd.Flags().Lookup("platform").Usage)
+	for _, name := range []string{"values", "namespace", "instance-name", "platform"} {
+		assert.NotNil(t, cmd.Flags().Lookup(name), "--%s is registered", name)
+	}
+	assert.Contains(t, cmd.Long, "--platform <dir>")
 }
 
 func TestModVet_RejectsInstancePackage(t *testing.T) {
