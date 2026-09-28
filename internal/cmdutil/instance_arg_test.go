@@ -57,6 +57,7 @@ func TestIsInstancePath(t *testing.T) {
 		{name: "relative dot path", arg: "./jellyfin", want: true},
 		{name: "home path", arg: "~/jellyfin", want: true},
 		{name: "path with separator", arg: filepath.Join("apps", "jellyfin"), want: true},
+		{name: "path with forward slash", arg: "apps/jellyfin/instance.cue", want: true},
 		{name: "instance name", arg: "jellyfin", want: false},
 		{name: "instance name with hyphens", arg: "my-app-prod", want: false},
 		{name: "uuid", arg: "550e8400-e29b-41d4-a716-446655440000", want: false},
@@ -67,6 +68,23 @@ func TestIsInstancePath(t *testing.T) {
 			assert.Equal(t, tt.want, isInstancePath(tt.arg))
 		})
 	}
+}
+
+// A bare word is a name even when a directory of that name sits in the
+// working directory: `opm instance status hello` run next to the ./hello
+// module directory `opm module init` created.
+func TestResolveInstanceArg_BareWordMatchingADirectoryIsAName(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "hello"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "hello", "module.cue"), []byte("package hello\n"), 0o600))
+	t.Chdir(dir)
+
+	assert.False(t, isInstancePath("hello"))
+	assert.True(t, isInstancePath("./hello"))
+
+	ra, err := ResolveInstanceArg(context.Background(), "hello", nil)
+	require.NoError(t, err)
+	assert.Equal(t, InstanceArg{Name: "hello"}, ra)
 }
 
 func TestResolveInstanceArg_NameAndUUIDForms(t *testing.T) {

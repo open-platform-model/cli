@@ -75,16 +75,16 @@ func ResolveInstanceArg(ctx context.Context, arg string, cfg *config.GlobalConfi
 // isInstancePath reports whether arg should be treated as a filesystem path
 // rather than an instance name or UUID. Was: isReleasePath.
 //
-// Detection order:
-//  1. os.Stat succeeds — path exists on disk (file or directory).
-//  2. arg ends with ".cue" — explicit file extension.
-//  3. arg contains a path separator, or starts with "." or "~" — path-like.
+// Only the argument's shape decides, never what exists on disk: arg is a
+// path when it ends with ".cue", contains "/" or the OS path separator, or
+// starts with "." or "~". A bare word is always a name or UUID, even when a
+// file or directory of that name sits in the working directory — otherwise
+// `opm instance delete hello` next to a ./hello directory acts on whatever
+// instance ./hello holds instead of the instance named hello. A user who
+// means the directory writes ./hello.
 func isInstancePath(arg string) bool {
-	if _, err := os.Stat(arg); err == nil {
-		return true
-	}
 	return strings.HasSuffix(arg, ".cue") ||
-		strings.ContainsRune(arg, os.PathSeparator) ||
+		strings.ContainsAny(arg, "/"+string(os.PathSeparator)) ||
 		strings.HasPrefix(arg, ".") ||
 		strings.HasPrefix(arg, "~")
 }

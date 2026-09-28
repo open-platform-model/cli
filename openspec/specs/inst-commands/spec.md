@@ -87,7 +87,7 @@ The render commands (`vet`, `build`, `apply`, `diff`) under `opm instance` SHALL
 
 ### Requirement: instance cluster-query commands accept an instance identifier as positional argument
 
-The cluster-query commands (`status`, `tree`, `events`, `delete`) under `opm instance` SHALL accept an instance identifier as a required positional argument. The CLI SHALL auto-detect whether the identifier is a path, a UUID or an instance name. A path (an `instance.cue` file, or a directory holding one) SHALL be acquired through the library kernel as an instance package with the invocation's resolved registry, and the instance name and namespace SHALL be read from the acquired instance's metadata; the `--namespace` flag SHALL take precedence over the namespace in the file. A path whose package is not a valid instance (wrong kind, no concrete `metadata.name` or `metadata.namespace`, build failure) SHALL be refused with exit code 1 and an error naming the path.
+The cluster-query commands (`status`, `tree`, `events`, `delete`) under `opm instance` SHALL accept an instance identifier as a required positional argument. The CLI SHALL auto-detect whether the identifier is a path, a UUID or an instance name, from the identifier's shape alone and never from what exists on disk. A path (an `instance.cue` file, or a directory holding one) SHALL be acquired through the library kernel as an instance package with the invocation's resolved registry, and the instance name and namespace SHALL be read from the acquired instance's metadata; the `--namespace` flag SHALL take precedence over the namespace in the file. A path whose package is not a valid instance (wrong kind, no concrete `metadata.name` or `metadata.namespace`, build failure) SHALL be refused with exit code 1 and an error naming the path.
 
 #### Scenario: status by instance name
 
@@ -123,12 +123,20 @@ The cluster-query commands (`status`, `tree`, `events`, `delete`) under `opm ins
 
 #### Scenario: identifier auto-detection
 
-- **WHEN** the positional argument exists on disk, ends with `.cue`, contains a path separator, or starts with `.` or `~`
+- **WHEN** the positional argument ends with `.cue`, contains `/` or the OS path separator, or starts with `.` or `~`
 - **THEN** the CLI SHALL treat it as a path
 - **WHEN** the positional argument matches the pattern `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
 - **THEN** the CLI SHALL treat it as a UUID
 - **WHEN** the positional argument is neither
 - **THEN** the CLI SHALL treat it as an instance name
+
+#### Scenario: a bare word is a name even when a directory of that name exists
+
+- **WHEN** `opm instance status hello` is run in a directory that contains a `hello` directory
+- **THEN** the CLI SHALL look up the instance named `hello`
+- **AND** SHALL NOT read the `hello` directory
+- **WHEN** `opm instance status ./hello` is run in the same directory
+- **THEN** the CLI SHALL treat `./hello` as a path
 
 ### Requirement: instance list command lists deployed instances
 
