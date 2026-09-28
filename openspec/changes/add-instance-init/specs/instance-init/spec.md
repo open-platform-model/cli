@@ -105,7 +105,7 @@ A concrete non-struct source SHALL be rendered verbatim. `values.cue` SHALL open
 
 ### Requirement: Init writes all or nothing, and only where a standalone package belongs
 
-The command SHALL refuse with exit 2, before any registry access, when the target directory already exists (whether empty or holding a module or instance package), or when the target directory would sit inside an existing CUE module (a parent directory holds `cue.mod/module.cue`). The package SHALL be written completely or not at all: on any failure after writing starts, nothing is left at the target path or beside it, so a retry into the same directory is never refused because of init's own leftovers. Source: 0016:D5:R5/R6.
+The command SHALL refuse with exit 2, before any registry access, when the target directory already exists (whether empty or holding a module or instance package), or when the target directory would sit inside an existing CUE module (a parent directory holds `cue.mod/module.cue`). The package SHALL be written completely or not at all: on any failure after writing starts, nothing is left at the target path or beside it, so a retry into the same directory is never refused because of init's own leftovers. Source: 0016:D5:R5/R6, 0016:D10:R1.
 
 #### Scenario: Existing directory refused
 
@@ -124,7 +124,7 @@ The command SHALL refuse with exit 2, before any registry access, when the targe
 
 ### Requirement: Init reports what it wrote and does not validate it
 
-Init SHALL NOT evaluate the generated package against the module's `#config`. On success it SHALL report: the resolution (module path, selected major and version, and how it was chosen, with every skipped higher major and its reason); the values source and any warning; the files written; and a closing line naming `opm instance vet <dir>/instance.cue`. The pinned version SHALL appear in the report; pins never float. Exit codes SHALL be those of `opm module init`: 0 written, 2 refused, 3 registry unreachable; an unexpected internal failure exits 1. Source: 0016:D5:R3/R7, 0016:D9:R4, 0016:D8.
+Init SHALL NOT evaluate the generated package against the module's `#config`. On success it SHALL report: the resolution (module path, selected major and version, and how it was chosen, with every skipped higher major and its reason); the values source and any warning; the files written; and a closing line naming `opm instance vet <dir>/instance.cue`. The pinned version SHALL appear in the report; pins never float. Exit codes SHALL be those of `opm module init`: 0 written, 2 refused, 3 registry unreachable at any stage, including while the dependency closure is resolved; an unexpected internal failure exits 1. Source: 0016:D5:R3/R7, 0016:D9:R4, 0016:D8.
 
 #### Scenario: Success report
 
@@ -135,6 +135,11 @@ Init SHALL NOT evaluate the generated package against the module's `#config`. On
 
 - **WHEN** the registry serving the module path cannot be reached
 - **THEN** init exits 3 naming the module path and the registry, and writes nothing
+
+#### Scenario: Registry unreachable while resolving dependencies
+
+- **WHEN** the module was acquired, and the registry cannot be reached while the staged package's dependency closure is resolved
+- **THEN** init exits 3 naming the registry, and nothing is left at the target path or beside it
 
 #### Scenario: Values that violate the contract still initialize
 

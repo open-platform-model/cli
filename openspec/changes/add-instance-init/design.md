@@ -118,7 +118,8 @@ Step 9 writes the core pin explicitly at the module's own version, and tidy only
 | Target inside a CUE module | 2 | `<dir> is inside the CUE module at <root>`; action: initialize outside it |
 | Pin not published, nothing compatible | 2 | refusal from `modref`, listing skipped majors |
 | Registry unreachable (resolve, acquire) | 3 | `listing published versions of <path> (registry <registry>): <cause>` |
-| Tidy or write failure after staging | 1 | `initializing <dir>: <cause>`; nothing left behind |
+| Registry unreachable while tidy resolves the closure | 3 | `resolving the dependencies of <dir> (registry <registry>): <cause>`; nothing left behind |
+| Any other tidy or write failure after staging | 1 | `initializing <dir>: <cause>`; nothing left behind |
 
 ### Example output
 
@@ -170,8 +171,17 @@ Error: standard input is not a terminal, so the namespace cannot be asked
 ### Refusing a target inside a CUE module
 
 **Context**: 0016 D5 refuses only an existing directory. A standalone package nested in another CUE module's tree is legal CUE, but the enclosing module's tooling may walk into it.
-**Decision**: Refuse (user decision 2026-09-28), beyond 0016 D5:R5.
+**Decision**: Refuse (user decision 2026-09-28). The enhancement records it as 0016 D10, which amends D5.
 **Rationale**: Relaxing a refusal later is non-breaking; tightening one later is breaking. Colocated instances, which need no `cue.mod` of their own, stay out of scope.
+
+### A registry failure during tidy exits 3
+
+**Context**: 0016 D5:R7 gives an unreachable registry exit 3, at any stage. `cuemod.Tidy` returns cmd/cue's error as it came, with no connectivity type, and `opm module tidy` maps every resolution or registry failure to exit 1.
+**Options considered**:
+1. Exit 1 for every tidy failure: matches `opm module tidy`, but breaks D5:R7 when the registry drops between acquire and tidy.
+2. Classify a tidy error as a connectivity failure and return a `*publish.ConnectivityError` (exit 3): `errors.As` to `net.Error` first, cmd/cue's error text as the fallback.
+**Decision**: Option 2 (user decision 2026-09-28). The classifier sits beside `cuemod.Tidy` so `opm module tidy` can adopt it later; this change leaves that command's exit codes as they are.
+**Rationale**: A script that retries on exit 3 then treats a registry outage the same at every stage of init.
 
 ## Risks / Trade-offs
 
@@ -179,7 +189,8 @@ Error: standard input is not a terminal, so the namespace cannot be asked
 - [Assumption: tidy keeps the written language version (`v0.17.0`, the seeded platform's)] -> Proven in section 1; if tidy canonicalizes it, the renderer writes the canonical form so the staged and final bytes match.
 - [Staging and rename across filesystems] -> Staging lives in the target's parent, so the rename never crosses a device.
 - [`debugValues` may hold throwaway credentials or hostnames] -> The report warns to review it (0016 D2:R3). `initValues` is the author's fix, landing in section 4.
-- [Section 4 waits on a core release] -> Sections 1 to 3 are releasable on their own. If core lags, section 4 splits into its own change rather than holding the PR.
+- [Assumption: a registry failure inside `cuemod.Tidy` is recognisable as one (`errors.As` to `net.Error`, else cmd/cue's error text)] -> Section 1 proves it on an empty module cache with the registry mapped to an unreachable host; the error shape that matched is recorded here.
+- [Section 4 waits on a core release] -> Sections 1 to 3 are releasable on their own. If core lags, section 4 splits into its own change rather than holding the PR; that change then claims 0016 D3 and D4 in its `enhancement.yaml`, and they are removed from this one.
 - [Tidy mutates process state (working directory, `CUE_REGISTRY`)] -> Contained and restored inside `cuemod.Tidy`; init makes exactly one call.
 
 ## Migration Plan

@@ -1,9 +1,12 @@
 # Enhancement declaration, read by `task enhancements:delivery:log` at archive time.
 # See enhancements/schema.cue #ChangeDeclaration.
 #
-# D3 and D4 are shared with core: core ships the optional initValues field
-# (D3:R1/R3, D4:R1/R2); this change lands the CLI side (D3:R2, D4:R3).
+# D3 and D4 span core and cli: core ships the optional initValues field
+# (D3:R1/R3, D4:R1/R2) and claims neither; this change completes both with
+# the reader in section 4 (D3:R2, D4:R3), so it claims them. If section 4
+# moves to its own change, D3 and D4 move with it. D10 amends D5 with the
+# refusal of a target inside an existing CUE module.
 implements:
   - enhancement: "0016"
-    decisions: [D1, D2, D3, D4, D5, D6, D7, D8, D9]
+    decisions: [D1, D2, D3, D4, D5, D6, D7, D8, D9, D10]
     resolves: []
