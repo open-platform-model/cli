@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/open-platform-model/library/opm/helper/platformmodule"
 
@@ -28,6 +29,10 @@ const (
 	// SourceLocalDefault is the local default platform module beside the
 	// config file (~/.opm/platform/).
 	SourceLocalDefault Source = "local"
+	// SourceModuleDeps is a platform generated from a module's own
+	// dependency pins, for a render answering its author (module build,
+	// module vet), generated into a module under the OPM home cache.
+	SourceModuleDeps Source = "module-deps"
 )
 
 // Resolution reports where the platform came from — the provenance every
@@ -59,6 +64,13 @@ type Resolution struct {
 	// overlaps a subscription leaves no trace on the recorded registry).
 	// Set only for SourceClusterCR, empty when none is recorded.
 	PackageIdentity string
+	// Catalogs names each registry entry of a module-deps platform as
+	// "<path> <version>", in path order. Set only for SourceModuleDeps.
+	Catalogs []string
+	// Carried maps each module replacement a module-deps platform carried
+	// to the target written into its cue.mod/local-module.cue. Set only
+	// for SourceModuleDeps; the render words these rows as the module's.
+	Carried map[string]string
 	// Warning is non-empty when resolution fell back from the cluster CR
 	// to the local default.
 	Warning string
@@ -87,6 +99,12 @@ func (r Resolution) Describe() string {
 		return "platform: cluster Platform CR " + r.Location + " (" + r.describeRegistry() + "generated module " + r.Dir + ")"
 	case SourceLocalDefault:
 		return "platform: " + r.Dir + " (local default)"
+	case SourceModuleDeps:
+		catalogs := "no catalogs"
+		if len(r.Catalogs) > 0 {
+			catalogs = strings.Join(r.Catalogs, ", ")
+		}
+		return "platform: module deps (" + catalogs + "; generated module " + r.Dir + ")"
 	default:
 		return "platform: unknown source"
 	}
@@ -155,6 +173,11 @@ type ResolveOptions struct {
 	// Cluster is the cluster CR getter. nil means the command is offline
 	// (build/render) and MUST NOT read the cluster (0006:D17/D21).
 	Cluster ClusterPlatformGetter
+	// ModuleDeps, when non-nil, replaces the cluster and local-default
+	// steps: a command rendering for its author (module build, module vet)
+	// resolves --platform, else a platform generated from these deps.
+	// Cluster MUST be nil when it is set.
+	ModuleDeps *ModuleDeps
 	// NoLocalFallback refuses the local-default step when the cluster
 	// Platform is unavailable, returning ErrNoClusterPlatform instead. Set
 	// by commands whose subject is the cluster's platform (`opm platform
@@ -170,12 +193,17 @@ type ResolveOptions struct {
 }
 
 // Resolve resolves the platform by precedence and returns the platform
-// module directory the kernel acquires plus its provenance. Only the cluster
-// CR source performs I/O beyond a stat: it is generated into a module under
-// the cache (GenerateClusterModule), which derives the dependency closure
-// through the registry. Nothing is built here; acquisition is the caller's
-// one call after resolution, so every source fails the same way.
+// module directory the kernel acquires plus its provenance. Only the
+// generated sources perform I/O beyond a stat: the cluster CR and the module
+// deps are generated into a module under the cache (GenerateClusterModule,
+// GenerateModuleDepsModule), which derives the dependency closure through the
+// registry. Nothing is built here; acquisition is the caller's one call after
+// resolution, so every source fails the same way.
 func Resolve(ctx context.Context, opts ResolveOptions) (string, Resolution, error) {
+	if opts.ModuleDeps != nil && opts.Cluster != nil {
+		return "", Resolution{}, errors.New("platform resolution: module deps and a cluster Platform getter are exclusive; a render for a module's author never reads the cluster")
+	}
+
 	// 0. A directory named as a command argument outranks every configured
 	// source; it gets the same module-shape check as the flag, so a
 	// non-module directory fails before anything is built.
@@ -194,7 +222,13 @@ func Resolve(ctx context.Context, opts ResolveOptions) (string, Resolution, erro
 		return opts.PlatformFlag, Resolution{Source: SourceFlagDir, Location: opts.PlatformFlag, Dir: opts.PlatformFlag}, nil
 	}
 
-	// 2. Cluster Platform CR (cluster-facing commands only).
+	// 2. A module's own deps, for a render answering its author. The
+	// cluster and the local default are never read.
+	if opts.ModuleDeps != nil {
+		return resolveModuleDeps(ctx, *opts.ModuleDeps, opts)
+	}
+
+	// 3. Cluster Platform CR (cluster-facing commands only).
 	fallbackWarning := ""
 	if opts.Cluster != nil {
 		doc, unavailable, err := opts.Cluster(ctx)
@@ -211,7 +245,7 @@ func Resolve(ctx context.Context, opts ResolveOptions) (string, Resolution, erro
 		output.Warn(fallbackWarning)
 	}
 
-	// 3. Local default: the module `opm config init` writes.
+	// 4. Local default: the module `opm config init` writes.
 	localDir := config.PlatformDir(opts.ConfigPath)
 	if _, err := os.Stat(localDir); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
@@ -275,6 +309,31 @@ func resolveClusterCR(ctx context.Context, doc *ClusterPlatform, opts ResolveOpt
 		SkewPolicy:      s.SkewPolicy,
 		RegistryOrigin:  origin,
 		PackageIdentity: identity,
+	}, nil
+}
+
+// resolveModuleDeps generates the platform a module renders against for its
+// author: one registry entry per catalog the module pins, at the pinned
+// version, with the module's replacements of pinned paths carried.
+func resolveModuleDeps(ctx context.Context, deps ModuleDeps, opts ResolveOptions) (string, Resolution, error) {
+	dir, entries, carried, err := GenerateModuleDepsModule(ctx, deps, GenerateOptions{
+		CacheDir: config.PlatformCacheDir(opts.ConfigPath),
+		Registry: opts.Registry,
+		ModFiles: opts.ModFiles,
+	})
+	if err != nil {
+		return "", Resolution{}, err
+	}
+	catalogs := make([]string, 0, len(entries))
+	for _, e := range entries {
+		catalogs = append(catalogs, e.Path+" v"+e.Version)
+	}
+	return dir, Resolution{
+		Source:   SourceModuleDeps,
+		Location: deps.ModFileName,
+		Dir:      dir,
+		Catalogs: catalogs,
+		Carried:  carried,
 	}, nil
 }
 

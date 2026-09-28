@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"cuelang.org/go/mod/modfile"
 )
@@ -35,6 +36,11 @@ func ModuleRootFrom(startDir string) string {
 type LocalReplacement struct {
 	Path        string
 	ReplaceWith string
+	// TargetVersion is the version a module-path target resolves at: the
+	// version the file pins for the target's major-qualified path, which is
+	// where cue/load takes it from, else the full version the target itself
+	// carries. Empty for a directory target.
+	TargetVersion string
 }
 
 // LocalReplacements reads the `replaceWith` entries of the module rooted at
@@ -76,10 +82,39 @@ func LocalReplacements(moduleRoot string) ([]LocalReplacement, error) {
 		if dep == nil || dep.ReplaceWith == "" {
 			continue
 		}
-		out = append(out, LocalReplacement{Path: path, ReplaceWith: dep.ReplaceWith})
+		out = append(out, LocalReplacement{Path: path, ReplaceWith: dep.ReplaceWith, TargetVersion: targetVersion(dep.ReplaceWith, eff)})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
 	return out, nil
+}
+
+// IsDirectoryTarget reports whether a replaceWith value names a directory
+// rather than a module path, by cue/load's rule: a directory target starts
+// with "." or "/", or is an absolute path on the host.
+func IsDirectoryTarget(target string) bool {
+	return strings.HasPrefix(target, ".") || strings.HasPrefix(target, "/") || filepath.IsAbs(target)
+}
+
+// targetVersion is the version a module-path replaceWith resolves at: the
+// effective file's pin for the target's major-qualified path, else the full
+// version written on the target ("example.com/fork@v0.1.0"). Empty for a
+// directory target, and for a module target nothing pins.
+func targetVersion(target string, eff *modfile.File) string {
+	if IsDirectoryTarget(target) {
+		return ""
+	}
+	path, version, ok := strings.Cut(target, "@")
+	if !ok {
+		return ""
+	}
+	major, _, _ := strings.Cut(version, ".")
+	if dep, listed := eff.Deps[path+"@"+major]; listed && dep != nil && dep.Version != "" {
+		return dep.Version
+	}
+	if major != version {
+		return version
+	}
+	return ""
 }
 
 // HasLocalModuleReplacement reports whether the module rooted at moduleRoot

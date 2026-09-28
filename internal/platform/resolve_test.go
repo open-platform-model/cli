@@ -306,6 +306,82 @@ func TestResolution_Describe(t *testing.T) {
 		Resolution{Source: SourceClusterCR, Location: "cluster", Dir: "/c/abc",
 			RegistryOrigin: RegistryOriginSpec}.Describe())
 	assert.Equal(t, "platform: /home/x/.opm/platform (local default)", Resolution{Source: SourceLocalDefault, Location: "/home/x/.opm/platform", Dir: "/home/x/.opm/platform"}.Describe())
+	assert.Equal(t, "platform: module deps (opmodel.dev/catalogs/k8s@v1 v1.0.0, opmodel.dev/catalogs/opm@v4 v4.4.0; generated module /c/abc)",
+		Resolution{Source: SourceModuleDeps, Dir: "/c/abc",
+			Catalogs: []string{"opmodel.dev/catalogs/k8s@v1 v1.0.0", "opmodel.dev/catalogs/opm@v4 v4.4.0"}}.Describe())
+	assert.Equal(t, "platform: module deps (no catalogs; generated module /c/abc)",
+		Resolution{Source: SourceModuleDeps, Dir: "/c/abc"}.Describe())
+}
+
+// moduleDepsOpts is ResolveOptions for a module render with no --platform:
+// the module pins one catalog and an older core.
+func moduleDepsOpts(t *testing.T, configPath string) ResolveOptions {
+	t.Helper()
+	return ResolveOptions{
+		ConfigPath: configPath,
+		ModuleDeps: &ModuleDeps{
+			ModFile: moduleFileWith(t, map[string]string{
+				"opmodel.dev/catalogs/opm@v4": "v4.0.1",
+				"opmodel.dev/core@v2":         "v2.0.0-alpha.6",
+			}),
+			ModFileName: "/m/cue.mod/module.cue",
+		},
+		ModFiles: depsGraph(),
+	}
+}
+
+func TestResolve_ModuleDepsGeneratesUnderCache(t *testing.T) {
+	configPath := tempOpmDir(t, false) // no ~/.opm/platform/: not needed
+
+	dir, res, err := Resolve(context.Background(), moduleDepsOpts(t, configPath))
+	require.NoError(t, err)
+
+	assert.Equal(t, SourceModuleDeps, res.Source)
+	assert.Equal(t, config.PlatformCacheDir(configPath), filepath.Dir(dir))
+	assert.Equal(t, dir, res.Dir)
+	assert.Equal(t, []string{"opmodel.dev/catalogs/opm@v4 v4.0.1"}, res.Catalogs)
+	assert.Empty(t, res.Carried)
+	assert.Empty(t, res.Warning)
+	assert.Equal(t, "platform: module deps (opmodel.dev/catalogs/opm@v4 v4.0.1; generated module "+dir+")", res.Describe())
+	_, err = os.Stat(config.PlatformDir(configPath))
+	assert.ErrorIs(t, err, os.ErrNotExist, "resolution never seeds or reads the local default")
+}
+
+func TestResolve_ModuleDepsFlagWins(t *testing.T) {
+	flagDir := platformModuleDir(t)
+	opts := moduleDepsOpts(t, tempOpmDir(t, false))
+	opts.PlatformFlag = flagDir
+	graph := depsGraph()
+	opts.ModFiles = graph
+
+	dir, res, err := Resolve(context.Background(), opts)
+	require.NoError(t, err)
+	assert.Equal(t, SourceFlagDir, res.Source)
+	assert.Equal(t, flagDir, dir)
+	assert.Empty(t, graph.calls, "no platform is generated from the deps when the flag is set")
+}
+
+func TestResolve_ModuleDepsWithClusterGetterRefused(t *testing.T) {
+	opts := moduleDepsOpts(t, tempOpmDir(t, true))
+	clusterCalled := false
+	opts.Cluster = func(context.Context) (*ClusterPlatform, string, error) {
+		clusterCalled = true
+		return nil, "", nil
+	}
+
+	_, _, err := Resolve(context.Background(), opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exclusive")
+	assert.False(t, clusterCalled)
+}
+
+func TestResolve_ModuleDepsUnpublishedPinFails(t *testing.T) {
+	opts := moduleDepsOpts(t, tempOpmDir(t, true))
+	opts.ModuleDeps.ModFile = moduleFileWith(t, map[string]string{"opmodel.dev/catalogs/opm@v4": "v4.9.9"})
+
+	_, _, err := Resolve(context.Background(), opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "opmodel.dev/catalogs/opm@v4.9.9")
 }
 
 // The effective registry the operator recorded is what the cluster renders
