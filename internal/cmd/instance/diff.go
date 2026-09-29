@@ -74,6 +74,7 @@ func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil
 		ValuesFiles:      rff.Values,
 		PlatformFlag:     rff.Platform,
 		ClusterPlatform:  platform.ClusterPlatformGetterFor(k8sClient.Dynamic),
+		SkipUnprovided:   rff.SkipUnprovided,
 		K8sConfig:        k8sConfig,
 		Config:           cfg,
 	})

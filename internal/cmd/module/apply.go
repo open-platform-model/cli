@@ -150,6 +150,7 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 		Name:            opts.name,
 		PlatformFlag:    rf.Platform,
 		ClusterPlatform: platform.ClusterPlatformGetterFor(k8sClient.Dynamic),
+		SkipUnprovided:  rf.SkipUnprovided,
 		K8sConfig:       k8sConfig,
 		Config:          cfg,
 	})

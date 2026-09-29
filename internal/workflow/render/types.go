@@ -56,6 +56,11 @@ type Result struct {
 	// a replaceWith. The apply workflow stamps
 	// module-instance.opmodel.dev/source: local on the CR accordingly.
 	SourceLocal bool
+
+	// Skipped is every demand the kernel skipped under --skip-unprovided,
+	// in build order (the kernel's rows, taken whole). Empty without the
+	// flag. The apply workflow records them on the ModuleInstance.
+	Skipped []kernel.SkippedDemand
 }
 
 func (r *Result) HasWarnings() bool {
@@ -90,6 +95,10 @@ type InstanceFileOpts struct {
 	// the deps instead of failing the render (instance build and vet).
 	ClusterOptional bool
 
+	// SkipUnprovided is --skip-unprovided: the kernel's switch to skip
+	// provider-fulfilled demands nothing on the platform provides.
+	SkipUnprovided bool
+
 	K8sConfig *config.ResolvedKubernetesConfig
 	Config    *config.GlobalConfig
 }
@@ -121,6 +130,10 @@ type ModuleOpts struct {
 	// module's own deps. module apply sets it, and falls back to the deps
 	// when the cluster has no readable Platform.
 	ClusterPlatform platform.ClusterPlatformGetter
+
+	// SkipUnprovided is --skip-unprovided: the kernel's switch to skip
+	// provider-fulfilled demands nothing on the platform provides.
+	SkipUnprovided bool
 
 	K8sConfig *config.ResolvedKubernetesConfig
 	Config    *config.GlobalConfig

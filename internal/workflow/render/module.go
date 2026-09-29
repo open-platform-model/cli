@@ -111,6 +111,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	env.skipUnprovided = opts.SkipUnprovided
 
 	// A local module directory is the main module, so render provenance is
 	// local (0006:D7), and the directory is the 0010:D19 module context: a

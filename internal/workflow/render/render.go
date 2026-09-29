@@ -109,6 +109,7 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	if err != nil {
 		return nil, err
 	}
+	env.skipUnprovided = opts.SkipUnprovided
 
 	return renderInstance(ctx, env, inst, opts.K8sConfig, moduleRoot, sourceLocal)
 }
@@ -177,6 +178,8 @@ func moduleContextRoot(dir string) string {
 // platform module is the developer's request and the render honors it (the
 // kernel refuses such an input when the switch is off); the kernel reports
 // what it honored on the diagnostics and renderInstance words the rows.
+// SkipUnprovided is the caller's --skip-unprovided, passed through: which
+// demands are skippable is the kernel's rule.
 func newRenderInput(env *renderEnv, inst *module.Instance) kernel.RenderInput {
 	return kernel.RenderInput{
 		Instance:          inst,
@@ -184,6 +187,7 @@ func newRenderInput(env *renderEnv, inst *module.Instance) kernel.RenderInput {
 		RuntimeName:       RuntimeName,
 		Skew:              env.skew,
 		LocalReplacements: true,
+		SkipUnprovided:    env.skipUnprovided,
 	}
 }
 
@@ -290,6 +294,7 @@ func newResult(env *renderEnv, out *kernel.RenderResult, renderDigest string, va
 		RenderDigest: renderDigest,
 		Values:       values,
 		SourceLocal:  sourceLocal,
+		Skipped:      out.Diagnostics.Skipped,
 	}
 }
 

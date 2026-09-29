@@ -1,9 +1,10 @@
 ## 1. Pass --skip-unprovided to the kernel
 
-- [ ] 1.1 Raise the library to the head of `feat/render-skips-unprovided-provider-demands` as a pseudo-version (`go get github.com/open-platform-model/library@<sha>`, sha from B's report), then `go mod tidy`; verify `go build ./...` and that `kernel.RenderInput.SkipUnprovided`, `kernel.SkippedDemand` and `UnresolvedDemand.Unprovided` resolve
-- [ ] 1.2 `internal/cmdutil/flags.go`: add `SkipUnprovided` and `--skip-unprovided` (default false, help text from design.md) to `RenderFlags` and `InstanceFileFlags`; verify with a flags test and `opm instance build --help` / `opm module build --help` listing the flag
-- [ ] 1.3 `internal/workflow/render`: carry the flag through the instance and module render opts into `newRenderInput`, and add `Skipped []kernel.SkippedDemand` to `Result`; verify with a unit test that the kernel input carries the switch for both entry points and that a render without the flag is byte-identical to before
-- [ ] 1.4 `task lint` and `task test` green, then commit `feat(render): pass --skip-unprovided to the kernel`
+- [x] 1.1 Raise the library to the head of `feat/render-skips-unprovided-provider-demands` as a pseudo-version (`go get github.com/open-platform-model/library@<sha>`, sha from B's report), then `go mod tidy`; verify `go build ./...` and that `kernel.RenderInput.SkipUnprovided`, `kernel.SkippedDemand` and `UnresolvedDemand.Unprovided` resolve
+  - Note: the library was already released when this section ran, so 1.1 pinned `v1.0.0-alpha.34` directly (no pseudo-version); section 5 has nothing left to change.
+- [x] 1.2 `internal/cmdutil/flags.go`: add `SkipUnprovided` and `--skip-unprovided` (default false, help text from design.md) to `RenderFlags` and `InstanceFileFlags`; verify with a flags test and `opm instance build --help` / `opm module build --help` listing the flag
+- [x] 1.3 `internal/workflow/render`: carry the flag through the instance and module render opts into `newRenderInput`, and add `Skipped []kernel.SkippedDemand` to `Result`; verify with a unit test that the kernel input carries the switch for both entry points and that a render without the flag is byte-identical to before
+- [x] 1.4 `task lint` and `task test` green, then commit `feat(render): pass --skip-unprovided to the kernel`
 
 ## 2. Report skips and name the flag in refusals
 

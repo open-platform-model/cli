@@ -159,6 +159,36 @@ func TestInstanceFileFlags_AddTo(t *testing.T) {
 	assert.Equal(t, "stringArray", valuesFlag.Value.Type())
 }
 
+// TestSkipUnprovidedFlag_BothGroups checks both render flag groups register
+// --skip-unprovided as a bool defaulting to false, with the shared help text,
+// and that parsing it sets the group's field.
+func TestSkipUnprovidedFlag_BothGroups(t *testing.T) {
+	var rf RenderFlags
+	var rff InstanceFileFlags
+	groups := []struct {
+		name  string
+		add   func(*cobra.Command)
+		value func() bool
+	}{
+		{"RenderFlags", rf.AddTo, func() bool { return rf.SkipUnprovided }},
+		{"InstanceFileFlags", rff.AddTo, func() bool { return rff.SkipUnprovided }},
+	}
+	for _, g := range groups {
+		t.Run(g.name, func(t *testing.T) {
+			cmd := &cobra.Command{Use: "test"}
+			g.add(cmd)
+			f := cmd.Flags().Lookup("skip-unprovided")
+			require.NotNil(t, f)
+			assert.Equal(t, "bool", f.Value.Type())
+			assert.Equal(t, "false", f.DefValue)
+			assert.Equal(t, skipUnprovidedHelp, f.Usage)
+			assert.False(t, g.value())
+			require.NoError(t, cmd.ParseFlags([]string{"--skip-unprovided"}))
+			assert.True(t, g.value())
+		})
+	}
+}
+
 func TestResolveInstanceIdentifier(t *testing.T) {
 	tests := []struct {
 		name     string
