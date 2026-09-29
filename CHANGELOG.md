@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0-alpha.23](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.22...v1.0.0-alpha.23) (2026-09-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **cmd:** opm instance build <module-dir> is refused; run opm module build <module-dir> (same flags and output). opm instance build no longer accepts --name.
+
+### Features
+
+* **cmd:** add opm instance init ([#235](https://github.com/open-platform-model/cli/issues/235)) ([50795da](https://github.com/open-platform-model/cli/commit/50795da9873e3afe96f919de056efe2dfd220c3a))
+* **cmd:** build and apply published modules; decide instance build by package kind ([#234](https://github.com/open-platform-model/cli/issues/234)) ([d221753](https://github.com/open-platform-model/cli/commit/d22175364ca95431bbce05529bc5c3135968c0e1))
+* **cmd:** render module build and vet against the module's own deps ([#232](https://github.com/open-platform-model/cli/issues/232)) ([874bce8](https://github.com/open-platform-model/cli/commit/874bce8393cf9a5c1e02588fa79a2d02169a2749))
+
 ## [1.0.0-alpha.22](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.21...v1.0.0-alpha.22) (2026-09-28)
 
 
