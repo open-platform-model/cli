@@ -1,8 +1,8 @@
 ## 1. Spike: instance deps and the optional cluster lookup
 
-- [ ] 1.1 In `internal/workflow/render`, add a test that writes an instance package the way `opm instance init` does (a tidied `cue.mod/module.cue` pinning a published test module, core and, transitively, `opmodel.dev/catalogs/opm@v4`), builds `platform.ModuleDeps` from the package's own `cue.mod/module.cue` with the existing `moduleDepsOf` reader, and renders it through `GenerateModuleDepsModule` and the kernel; verify the package's `cue.mod/module.cue` lists the catalog and the render succeeds. If it does not list the catalog, stop and record the finding in `design.md` ("Which deps an instance render uses") before section 2
-- [ ] 1.2 In `internal/cmdutil` (or beside `K8sFlags`), add a test pinning how the CLI detects "no kubeconfig context" (an empty `KUBECONFIG` file and a missing one both yield clientcmd's empty-config error) and that a request to an unroutable server honours a context deadline; verify with `go test ./internal/cmdutil -run <name>`
-- [ ] 1.3 `task lint` and `task test` green, then commit `test(platform): pin instance-package deps and kubeconfig detection`
+- [x] 1.1 In `internal/workflow/render`, add a test that writes an instance package the way `opm instance init` does (a tidied `cue.mod/module.cue` pinning a published test module, core and, transitively, `opmodel.dev/catalogs/opm@v4`), builds `platform.ModuleDeps` from the package's own `cue.mod/module.cue` with the existing `moduleDepsOf` reader, and renders it through `GenerateModuleDepsModule` and the kernel; verify the package's `cue.mod/module.cue` lists the catalog and the render succeeds. If it does not list the catalog, stop and record the finding in `design.md` ("Which deps an instance render uses") before section 2
+- [x] 1.2 In `internal/cmdutil` (or beside `K8sFlags`), add a test pinning how the CLI detects "no kubeconfig context" (an empty `KUBECONFIG` file and a missing one both yield clientcmd's empty-config error) and that a request to an unroutable server honours a context deadline; verify with `go test ./internal/cmdutil -run <name>`
+- [x] 1.3 `task lint` and `task test` green, then commit `test(platform): pin instance-package deps and kubeconfig detection`
 
 ## 2. Resolve instance platforms from the cluster, then their own deps
 

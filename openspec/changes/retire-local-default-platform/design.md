@@ -114,6 +114,8 @@ func optionalClusterGetter(ctx context.Context, cfg *config.GlobalConfig, kf cmd
 const clusterLookupTimeout = 10 * time.Second
 ```
 
+Spike finding (section 1, `internal/cmdutil/kubeconfig_test.go`): the CLI always passes the resolved kubeconfig path (flag, `OPM_KUBECONFIG`, config, else the `~/.kube/config` default) to client-go as an explicit path. An empty kubeconfig file then yields clientcmd's empty-config error, but a path that does not exist yields a not-exist error, not the empty-config one. `optionalClusterGetter` therefore treats both the empty-config error and a not-exist error as "no kubeconfig context" (no warning); any other client-building failure warns.
+
 `instance diff` and `instance apply` build their client as today and fail on an unreachable cluster, because they need it for their own work.
 
 **Options considered:**
