@@ -43,9 +43,9 @@ func main() {
 	}
 }
 
-// hackPlatformDir is hack/platform/ in this checkout, located from this
+// hackPlatformPath is hack/platform/ in this checkout, located from this
 // source file so the program runs from any working directory.
-func hackPlatformDir() (string, error) {
+func hackPlatformPath() (string, error) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		return "", fmt.Errorf("cannot locate this source file")
@@ -84,7 +84,7 @@ func run() error {
 		return nil
 	}
 
-	platformDir, err := hackPlatformDir()
+	platformDir, err := hackPlatformPath()
 	if err != nil {
 		return err
 	}

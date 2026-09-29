@@ -2,7 +2,6 @@ package config
 
 import (
 	"os"
-	"path/filepath"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
@@ -24,25 +23,16 @@ func NewConfigInitCmd(_ *config.GlobalConfig) *cobra.Command {
 		Short: "Initialize default configuration",
 		Long: `Initialize the OPM CLI configuration.
 
-Creates the following in ~/.opm/:
-  config.cue                  CLI configuration (registry, kubernetes, log)
-  platform/cue.mod/module.cue Local default platform: pinned core + catalogs
-  platform/platform.cue       Local default platform: one entry per catalog
+Creates ~/.opm/config.cue: the CLI configuration (registry, kubernetes, log),
+plain data. Init is offline; nothing is resolved.
 
-config.cue is plain data. platform/ is a real CUE module that subscribes
-to the official OPM catalogs by import; it is used whenever no --platform
-flag is given and no cluster Platform is readable. Init writes the pins
-without resolving anything (offline); 'opm config vet' builds the module
-and proves the pins resolve.
+Init writes no platform. A render resolves its platform from --platform
+<dir>, else the cluster's Platform, else a platform generated from the
+render's own dependency pins. An existing ~/.opm/platform/ from an earlier
+release is left untouched and no longer read; pass it with
+--platform ~/.opm/platform to keep rendering against it.
 
-Maintenance: catalog builds are pinned in platform/cue.mod/module.cue.
-To move to a newer catalog release, edit the pin there (or run
-'cue mod get <path>@<version>' in that directory), run 'opm module tidy'
-on that directory to pin whatever the new build needs, and run
-'opm config vet'.
-
-A legacy data-only ~/.opm/platform.cue from an earlier release is removed
-when the module is written.
+A legacy data-only ~/.opm/platform.cue from an earlier release is removed.
 
 Examples:
   # Initialize configuration
@@ -104,17 +94,8 @@ func runConfigInit(_ []string, force bool) error {
 		}
 	}
 
-	// Write the platform module (0700 dirs, 0600 files); offline, nothing
-	// is resolved (0019:D5: the module's cue.mod pins are the platform).
-	if err := config.WritePlatformModule(paths.PlatformDir); err != nil {
-		return &opmexit.ExitError{
-			Code: opmexit.ExitPermissionDenied,
-			Err:  oerrors.Wrap(oerrors.ErrPermission, "could not write the platform module: "+err.Error()),
-		}
-	}
-
-	// A pre-0019 data-only platform.cue beside the module would be a silent
-	// second answer; remove it and say so.
+	// A pre-0019 data-only platform.cue is a stale artifact of an earlier
+	// release; remove it and say so.
 	removedLegacy, err := removeLegacyPlatformFile(config.LegacyPlatformFilePath(paths.ConfigFile))
 	if err != nil {
 		return &opmexit.ExitError{
@@ -127,11 +108,9 @@ func runConfigInit(_ []string, force bool) error {
 	output.Println("")
 	output.Println("Created files:")
 	output.Println("  " + paths.ConfigFile)
-	output.Println("  " + filepath.Join(paths.PlatformDir, filepath.FromSlash(config.PlatformModuleFileName)))
-	output.Println("  " + filepath.Join(paths.PlatformDir, config.PlatformCUEFileName))
 	if removedLegacy != "" {
 		output.Println("")
-		output.Println(output.FormatNotice("Removed legacy platform file " + removedLegacy + " (the local default platform is now the module at " + paths.PlatformDir + ")"))
+		output.Println(output.FormatNotice("Removed legacy platform file " + removedLegacy + " (no command reads it)"))
 	}
 	output.Println("")
 	output.Println("Validate with: opm config vet")

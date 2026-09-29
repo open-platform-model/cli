@@ -22,9 +22,10 @@ import (
 )
 
 // seedRenderHome returns a hermetic HOME whose ~/.opm holds exactly what
-// `opm config init` writes (config.cue against the public registry mapping
-// and the local default platform module), so render-bearing e2e tests never
-// depend on the developer's real ~/.opm. Cleaned up with the test.
+// `opm config init` writes (config.cue against the public registry mapping),
+// so render-bearing e2e tests never depend on the developer's real ~/.opm.
+// The HOME has no ~/.kube, so a render there resolves no kubeconfig context.
+// Cleaned up with the test.
 //
 // The CUE module cache is not test state: the child process is pointed at
 // the invoking user's cache (CUE_CACHE_DIR) so a cold temp HOME does not
@@ -32,16 +33,6 @@ import (
 // the temp directory. Should anything still land there, the cleanup makes
 // the tree writable before t.TempDir removes it.
 func seedRenderHome(t *testing.T) string {
-	t.Helper()
-	home := seedConfigOnlyHome(t)
-	require.NoError(t, config.WritePlatformModule(config.PlatformDir(renderHomeConfigPath(home))))
-	return home
-}
-
-// seedConfigOnlyHome is seedRenderHome without the local default platform
-// module: ~/.opm holds config.cue and nothing else, the home of a machine
-// that never needed a platform (a module author's).
-func seedConfigOnlyHome(t *testing.T) string {
 	t.Helper()
 	home := t.TempDir()
 	t.Cleanup(func() { makeWritable(home) })
@@ -81,18 +72,60 @@ func makeWritable(dir string) {
 // v4.0.1 or newer), so a platform pinning it exhibits catalog version skew.
 const olderCatalogPin = "v4.0.0"
 
-// seedSkewPlatform writes a platform module identical to the seeded default
-// except that the abstraction catalog is pinned at olderCatalogPin, and
-// returns its directory.
+// hackPlatformPath is the repo's maintained platform module, the one the
+// kind dev flow mirrors into the cluster Platform.
+func hackPlatformPath(t *testing.T) string {
+	t.Helper()
+	dir, err := filepath.Abs(filepath.Join("..", "..", "hack", "platform"))
+	require.NoError(t, err)
+	return dir
+}
+
+// hackCatalogPin reads the version hack/platform/ pins path at.
+func hackCatalogPin(t *testing.T, path string) string {
+	t.Helper()
+	pins := modDeps(t, filepath.Join(hackPlatformPath(t), filepath.FromSlash(config.PlatformModuleFileName)))
+	require.Contains(t, pins, path, "hack/platform pins %s", path)
+	return pins[path]
+}
+
+// seedPlatform copies hack/platform/ into a fresh, writable directory and
+// returns it, so a test can edit its pins or its local-module.cue.
+func seedPlatform(t *testing.T) string {
+	t.Helper()
+	src := hackPlatformPath(t)
+	dst := t.TempDir()
+	require.NoError(t, filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		out := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(out, 0o755)
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(out, data, 0o644)
+	}))
+	return dst
+}
+
+// seedSkewPlatform writes a copy of hack/platform/ whose abstraction catalog
+// is pinned at olderCatalogPin, and returns its directory.
 func seedSkewPlatform(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
-	require.NoError(t, config.WritePlatformModule(dir))
+	dir := seedPlatform(t)
 	modFile := filepath.Join(dir, filepath.FromSlash(config.PlatformModuleFileName))
 	content, err := os.ReadFile(modFile)
 	require.NoError(t, err)
-	skewed := strings.Replace(string(content), config.DefaultCatalogPins[0], olderCatalogPin, 1)
-	require.NotEqual(t, string(content), skewed, "the seeded module must pin the abstraction catalog")
+	skewed := strings.Replace(string(content), hackCatalogPin(t, config.DefaultCatalogPaths[0]), olderCatalogPin, 1)
+	require.NotEqual(t, string(content), skewed, "hack/platform must pin the abstraction catalog")
 	require.NoError(t, os.WriteFile(modFile, []byte(skewed), 0o600))
 	return dir
 }
@@ -327,17 +360,8 @@ values: {
 	return filepath.Join(dir, "instance.cue")
 }
 
-// seedPlatform writes the seeded default platform module into a fresh
-// directory and returns it.
-func seedPlatform(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	require.NoError(t, config.WritePlatformModule(dir))
-	return dir
-}
-
-// catalogCopyWithLabel copies the abstraction catalog build the seeded
-// platform pins out of the CUE module cache into a writable directory and
+// catalogCopyWithLabel copies the abstraction catalog build hack/platform/
+// pins out of the CUE module cache into a writable directory and
 // stamps one extra label on its deployment transformer's output. The cache
 // is the invoking user's (seedRenderHome); a cold cache is warmed by one
 // plain render of the podinfo example against platformDir first.
@@ -345,7 +369,7 @@ func catalogCopyWithLabel(t *testing.T, home, platformDir, instanceFile string) 
 	t.Helper()
 	catalogPath, _, _ := strings.Cut(config.DefaultCatalogPaths[0], "@")
 	src := filepath.Join(os.Getenv("CUE_CACHE_DIR"), "mod", "extract",
-		filepath.FromSlash(catalogPath)+"@"+config.DefaultCatalogPins[0])
+		filepath.FromSlash(catalogPath)+"@"+hackCatalogPin(t, config.DefaultCatalogPaths[0]))
 	if _, err := os.Stat(src); err != nil {
 		_, stderr, runErr := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
 			"instance", "build", instanceFile, "--platform", platformDir)

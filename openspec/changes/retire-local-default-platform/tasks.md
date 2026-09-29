@@ -17,10 +17,10 @@
 
 ## 3. Stop writing and reading ~/.opm/platform/
 
-- [ ] 3.1 `internal/config`: remove `PlatformDir`, `WritePlatformModule`, `Paths.PlatformDir`, the platform-module templates, `DefaultCorePin` and `DefaultCatalogPins`; keep everything `operator install` reads; verify `go build ./...`
-- [ ] 3.2 `internal/cmd/config/init.go`: write `config.cue` only, keep the legacy `platform.cue` removal under `--force`, never touch `~/.opm/platform/`; `vet.go`: drop the platform check and warn when a `platform/` directory sits beside the config file; verify with config command tests covering a fresh init, `--force` with an existing `platform/` directory (unchanged afterwards), and vet with and without the leftover directory
-- [ ] 3.3 Convert the remaining `WritePlatformModule` and `DefaultCatalogPins` users to `hack/platform/`: `tests/e2e/instance_build_test.go` (the skew test copies `hack/platform/` and lowers its catalog pin), `tests/e2e/mod_build_test.go`, `internal/workflow/render/module_test.go`, `tests/integration/render-parity`, `tests/integration/module-apply`, and retarget `tests/integration/platform-build` to build `hack/platform/` offline; verify `grep -rn "WritePlatformModule\|DefaultCatalogPins\|PlatformDir(" --include=*.go .` returns nothing and `task test:integration` passes on `kind-opm-dev`
-- [ ] 3.4 `task lint` and `task test` green, then commit `feat(config)!: stop writing and reading ~/.opm/platform/`
+- [x] 3.1 `internal/config`: remove `PlatformDir`, `WritePlatformModule`, `Paths.PlatformDir`, the platform-module templates, `DefaultCorePin` and `DefaultCatalogPins`; keep everything `operator install` reads; verify `go build ./...`
+- [x] 3.2 `internal/cmd/config/init.go`: write `config.cue` only, keep the legacy `platform.cue` removal under `--force`, never touch `~/.opm/platform/`; `vet.go`: drop the platform check and warn when a `platform/` directory sits beside the config file; verify with config command tests covering a fresh init, `--force` with an existing `platform/` directory (unchanged afterwards), and vet with and without the leftover directory
+- [x] 3.3 Convert the remaining `WritePlatformModule` and `DefaultCatalogPins` users to `hack/platform/`: `tests/e2e/instance_build_test.go` (the skew test copies `hack/platform/` and lowers its catalog pin), `tests/e2e/mod_build_test.go`, `internal/workflow/render/module_test.go`, `tests/integration/render-parity`, `tests/integration/module-apply`, and retarget `tests/integration/platform-build` to build `hack/platform/` offline; verify `grep -rn "WritePlatformModule\|DefaultCatalogPins\|PlatformDir(" --include=*.go .` returns nothing and `task test:integration` passes on `kind-opm-dev`
+- [x] 3.4 `task lint` and `task test` green, then commit `feat(config)!: stop writing and reading ~/.opm/platform/`
 
 ## 4. Describe the new precedence
 

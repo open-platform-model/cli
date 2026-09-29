@@ -300,17 +300,17 @@ func buildBinary() {
 	fmt.Println()
 }
 
-// itestHome is the temp HOME seeded with config.cue plus the local default
-// platform module the render path resolves. Populated once by seedHome.
+// itestHome is the temp HOME seeded with config.cue, the file
+// `opm config init` writes. Populated once by seedHome.
 var itestHome string
 
 // realKubeconfig is the invoking user's kubeconfig path, resolved before the
 // binary's HOME is redirected to the temp dir.
 var realKubeconfig string
 
-// seedHome creates a temp HOME with the default config + platform module
-// (the same files `opm config init` writes), so the binary resolves the local
-// default platform and never trips over the invoking user's real ~/.opm.
+// seedHome creates a temp HOME with the default config (what `opm config
+// init` writes), so the binary never trips over the invoking user's real
+// ~/.opm. The render resolves the cluster Platform, else the module's deps.
 func seedHome() {
 	if home, err := os.UserHomeDir(); err == nil {
 		realKubeconfig = filepath.Join(home, ".kube", "config")
@@ -325,9 +325,6 @@ func seedHome() {
 	}
 	if err := os.WriteFile(filepath.Join(opmDir, "config.cue"), []byte(config.DefaultConfigTemplate), 0o600); err != nil {
 		failf("writing temp config.cue: %v", err)
-	}
-	if err := config.WritePlatformModule(config.PlatformDir(filepath.Join(opmDir, "config.cue"))); err != nil {
-		failf("writing temp platform module: %v", err)
 	}
 	itestHome = dir
 }

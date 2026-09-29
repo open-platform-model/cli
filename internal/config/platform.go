@@ -21,19 +21,12 @@ import (
 // build failures.
 const platformModuleErrType = "platform module error"
 
-// PlatformDir returns the platform module directory that is sibling to the
-// given (resolved) config file path, so --config/OPM_CONFIG overrides move
-// both together (0019:D5: the local default platform is a CUE
-// module, not a data file).
-func PlatformDir(configPath string) string {
-	return filepath.Join(filepath.Dir(configPath), PlatformDirName)
-}
-
 // PlatformCacheDir returns the directory generated platform modules are
 // cached under: cache/platforms beside the config file, so --config/OPM_CONFIG
-// overrides move it together with the platform module. A cluster Platform CR
-// is generated into <PlatformCacheDir>/<content-hash>/ before a render
-// acquires it. Derived state: safe to delete at any time.
+// overrides move it together with the config. A cluster Platform CR or a
+// render's own deps are generated into <PlatformCacheDir>/<content-hash>/
+// before a render acquires the module. Derived state: safe to delete at any
+// time.
 func PlatformCacheDir(configPath string) string {
 	return filepath.Join(filepath.Dir(configPath), "cache", "platforms")
 }
@@ -46,25 +39,11 @@ func LegacyPlatformFilePath(configPath string) string {
 	return filepath.Join(filepath.Dir(configPath), "platform.cue")
 }
 
-// WritePlatformModule writes the seeded local default platform module into
-// dir: cue.mod/module.cue (DefaultPlatformModuleFile) and platform.cue
-// (DefaultPlatformCUE). Directories are created 0700 and files written 0600,
-// matching the config file. Existing files are overwritten; nothing else in
-// dir is touched. It is normatively offline: nothing is resolved.
-func WritePlatformModule(dir string) error {
-	if err := os.MkdirAll(filepath.Join(dir, filepath.Dir(PlatformModuleFileName)), 0o700); err != nil {
-		return fmt.Errorf("creating platform module directory: %w", err)
-	}
-	files := map[string]string{
-		PlatformModuleFileName: DefaultPlatformModuleFile,
-		PlatformCUEFileName:    DefaultPlatformCUE,
-	}
-	for name, content := range files {
-		if err := os.WriteFile(filepath.Join(dir, filepath.FromSlash(name)), []byte(content), 0o600); err != nil {
-			return fmt.Errorf("writing %s: %w", name, err)
-		}
-	}
-	return nil
+// LegacyPlatformDirPath returns the directory the retired local default
+// platform module lived at: platform/ beside the config file. No command
+// reads it; `opm config vet` warns when it is still on disk.
+func LegacyPlatformDirPath(configPath string) string {
+	return filepath.Join(filepath.Dir(configPath), "platform")
 }
 
 // BuildPlatformModule builds the platform module at dir through the kernel's
@@ -76,16 +55,16 @@ func WritePlatformModule(dir string) error {
 //
 // Failures surface as a DetailError naming the module directory, with the
 // loader/CUE cause kept for errors.Is/As and a hint keyed on the cause: a
-// missing directory or a directory that is not a CUE module points at
-// `opm config init`, an unresolvable dependency at the cue.mod pin, and a
-// #registry conflict at the entry's key/import pairing.
+// missing directory or a directory that is not a CUE module names the
+// expected shape, an unresolvable dependency the cue.mod pin, and a
+// #registry conflict the entry's key/import pairing.
 func BuildPlatformModule(ctx context.Context, dir, registry string) (*platform.Platform, error) {
 	if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(PlatformModuleFileName))); err != nil {
 		return nil, &oerrors.DetailError{
 			Type:     platformModuleErrType,
 			Message:  fmt.Sprintf("%s is not a platform module: %s not found", dir, PlatformModuleFileName),
 			Location: dir,
-			Hint:     "A platform module is a directory holding cue.mod/module.cue and a platform.cue package embedding core.#Platform. Run 'opm config init' (or --force) to seed the local default",
+			Hint:     "A platform module is a directory holding cue.mod/module.cue and a platform.cue package embedding core.#Platform; 'opm platform pull <dir>' captures a cluster's",
 			Cause:    oerrors.ErrValidation,
 		}
 	}
@@ -114,15 +93,13 @@ func platformBuildError(dir string, err error) error {
 
 // platformBuildHint picks the remediation for a platform module build
 // failure from the shape of the underlying error. The hints name no command
-// to re-run: the same failure reaches `opm config vet` for the local default
-// module and `opm platform check` for any platform module, so a hint naming
-// one of them misdirects callers of the other.
+// to re-run: the caller decides what the user runs next.
 func platformBuildHint(dir string, err error) string {
 	modFile := filepath.Join(dir, filepath.FromSlash(PlatformModuleFileName))
 	msg := err.Error()
 	switch {
 	case errors.Is(err, liberrors.ErrWrongKind), errors.Is(err, liberrors.ErrInvalidPackage):
-		return "platform.cue must be a single package embedding core.#Platform; for the local default module, 'opm config init --force' writes a fresh one"
+		return "platform.cue must be a single package embedding core.#Platform"
 	case strings.Contains(msg, "module not found"), strings.Contains(msg, "cannot find package"), strings.Contains(msg, "cannot expand module graph"):
 		return "Pin a published build in " + modFile + ", then try again"
 	case strings.Contains(msg, "#registry"):

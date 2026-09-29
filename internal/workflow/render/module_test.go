@@ -275,7 +275,7 @@ func TestFromModule_RendersAgainstModuleDeps(t *testing.T) {
 	assert.Equal(t, config.PlatformCacheDir(configPath), filepath.Dir(result.Platform.Dir))
 	assert.Empty(t, result.Resources)
 	assert.Empty(t, result.Warnings, "no skew row against the module's own pins")
-	_, err = os.Stat(config.PlatformDir(configPath))
+	_, err = os.Stat(config.LegacyPlatformDirPath(configPath))
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 

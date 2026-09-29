@@ -11,8 +11,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/open-platform-model/cli/internal/config"
 )
 
 // runOPMWithEnv runs the opm binary with a custom HOME and configurable
@@ -58,10 +56,10 @@ func TestE2E_ModBuild_FromExampleModule(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	// A hermetic HOME holding config.cue but no platform/: an author's build
-	// renders against a platform generated from the module's own deps, so it
-	// needs no local default and reads nothing from the developer's ~/.opm.
-	customHome := seedConfigOnlyHome(t)
+	// A hermetic HOME holding config.cue only: an author's build renders
+	// against a platform generated from the module's own deps and reads
+	// nothing from the developer's ~/.opm.
+	customHome := seedRenderHome(t)
 
 	stdout, stderr, err := runOPMWithEnv(t, tmpDir, customHome, 180*time.Second, "module", "build", modPath, "--name", "e2e-podinfo")
 	require.NoError(t, err, "stderr: %s", stderr)
@@ -88,7 +86,7 @@ func TestE2E_ModBuild_PlatformFlagOverridesDeps(t *testing.T) {
 	}
 
 	customHome := seedRenderHome(t)
-	platformDir := config.PlatformDir(renderHomeConfigPath(customHome))
+	platformDir := hackPlatformPath(t)
 
 	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), customHome, 180*time.Second, "module", "build", modPath, "--name", "e2e-podinfo", "--platform", platformDir)
 	require.NoError(t, err, "stderr: %s", stderr)

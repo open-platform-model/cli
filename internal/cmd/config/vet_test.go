@@ -5,13 +5,13 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	opmconfig "github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/output"
 )
 
 // writeOpmFile writes content into ~/.opm/<name> under tmpHome, creating the
@@ -32,43 +32,6 @@ config: {
 	}
 }
 `
-
-// validVetConfigWithRegistry pins the registry the platform module build
-// resolves from, so registry-backed vet tests do not depend on the
-// process environment.
-var validVetConfigWithRegistry = `package config
-
-config: {
-	registry: "` + opmconfig.DefaultRegistry + `"
-	kubernetes: {
-		kubeconfig: "~/.kube/config"
-		namespace: "default"
-	}
-}
-`
-
-// skipIfRegistryUnavailable skips when err looks like the registry could
-// not be reached (the repo's posture for registry-backed unit tests).
-func skipIfRegistryUnavailable(t *testing.T, err error) {
-	t.Helper()
-	if err == nil {
-		return
-	}
-	msg := err.Error()
-	for _, needle := range []string{"dial tcp", "no such host", "connection refused", "i/o timeout", "context deadline exceeded", "TLS handshake", "network is unreachable"} {
-		if strings.Contains(msg, needle) {
-			t.Skipf("registry unavailable: %v", err)
-		}
-	}
-}
-
-// writePlatformModule seeds ~/.opm/platform under tmpHome and returns it.
-func writePlatformModule(t *testing.T, tmpHome string) string {
-	t.Helper()
-	dir := filepath.Join(tmpHome, ".opm", "platform")
-	require.NoError(t, opmconfig.WritePlatformModule(dir))
-	return dir
-}
 
 func TestNewConfigVetCmd(t *testing.T) {
 	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
@@ -92,10 +55,12 @@ func TestConfigVet_MissingConfigFile(t *testing.T) {
 }
 
 func TestConfigVet_ValidConfig_NoPlatformModule(t *testing.T) {
-	// A missing ~/.opm/platform/ is a note, not a failure.
+	// Without a leftover ~/.opm/platform/ vet passes silently: no platform
+	// is checked.
 	tmpHome := setTempHome(t)
 	os.Unsetenv("OPM_CONFIG")
 	os.Unsetenv("OPM_REGISTRY")
+	logs := captureVetLog(t)
 
 	writeOpmFile(t, tmpHome, "config.cue", validVetConfig)
 
@@ -104,25 +69,40 @@ func TestConfigVet_ValidConfig_NoPlatformModule(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	require.NoError(t, cmd.Execute())
+	assert.NotContains(t, logs.String(), "no longer read")
 }
 
-func TestConfigVet_ValidConfigAndPlatformModule(t *testing.T) {
-	// Registry-backed: the seeded module builds against the published core
-	// and catalogs, so vet passes end to end.
+// captureVetLog redirects the CLI's log sink for the test and returns it.
+func captureVetLog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	output.SetLogWriter(&buf)
+	t.Cleanup(func() { output.SetLogWriter(os.Stderr) })
+	return &buf
+}
+
+// TestConfigVet_LeftoverPlatformDirWarns covers "A leftover platform
+// directory warns": vet passes, warns that the directory is no longer read,
+// and neither builds nor changes it (it need not even be a module).
+func TestConfigVet_LeftoverPlatformDirWarns(t *testing.T) {
 	tmpHome := setTempHome(t)
 	os.Unsetenv("OPM_CONFIG")
 	os.Unsetenv("OPM_REGISTRY")
+	logs := captureVetLog(t)
 
-	writeOpmFile(t, tmpHome, "config.cue", validVetConfigWithRegistry)
-	writePlatformModule(t, tmpHome)
+	writeOpmFile(t, tmpHome, "config.cue", validVetConfig)
+	writeOpmFile(t, tmpHome, filepath.Join("platform", "platform.cue"), "not a module: true\n")
 
 	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
+	require.NoError(t, cmd.Execute())
 
-	err := cmd.Execute()
-	skipIfRegistryUnavailable(t, err)
+	platformDir := filepath.Join(tmpHome, ".opm", "platform")
+	assert.Contains(t, logs.String(), platformDir+" is no longer read by any command; pass it with --platform <dir> or delete it")
+	entries, err := os.ReadDir(platformDir)
 	require.NoError(t, err)
+	assert.Len(t, entries, 1, "the directory is not built or written")
 }
 
 func TestConfigVet_LegacyPlatformFileFails(t *testing.T) {
@@ -145,53 +125,6 @@ type: "kubernetes"
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), filepath.Join(tmpHome, ".opm", "platform.cue"))
 	assert.Contains(t, err.Error(), "opm config init --force")
-}
-
-func TestConfigVet_PlatformDirNotAModule(t *testing.T) {
-	// A platform/ directory without cue.mod/module.cue is not a module.
-	tmpHome := setTempHome(t)
-	os.Unsetenv("OPM_CONFIG")
-	os.Unsetenv("OPM_REGISTRY")
-
-	writeOpmFile(t, tmpHome, "config.cue", validVetConfig)
-	writeOpmFile(t, tmpHome, filepath.Join("platform", "platform.cue"), `name: "cluster"
-`)
-
-	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	err := cmd.Execute()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "platform module")
-	assert.Contains(t, err.Error(), "cue.mod/module.cue")
-}
-
-func TestConfigVet_PlatformModuleUnpublishedPin(t *testing.T) {
-	// Registry-backed: a pin naming a build that does not exist fails vet
-	// naming the dependency and pointing at cue.mod.
-	tmpHome := setTempHome(t)
-	os.Unsetenv("OPM_CONFIG")
-	os.Unsetenv("OPM_REGISTRY")
-
-	writeOpmFile(t, tmpHome, "config.cue", validVetConfigWithRegistry)
-	dir := writePlatformModule(t, tmpHome)
-	modPath := filepath.Join(dir, "cue.mod", "module.cue")
-	content, err := os.ReadFile(modPath)
-	require.NoError(t, err)
-	bumped := strings.Replace(string(content), opmconfig.DefaultCatalogPins[0], "v4.9.9", 1)
-	require.NotEqual(t, string(content), bumped)
-	require.NoError(t, os.WriteFile(modPath, []byte(bumped), 0o600))
-
-	cmd := NewConfigVetCmd(&opmconfig.GlobalConfig{})
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	err = cmd.Execute()
-	skipIfRegistryUnavailable(t, err)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "opmodel.dev/catalogs/opm@v4.9.9")
-	assert.Contains(t, err.Error(), modPath)
 }
 
 func TestConfigVet_StaleProvidersBlock(t *testing.T) {
@@ -346,12 +279,13 @@ config: {
 }
 
 func TestConfigVet_CustomPathPlatformSibling(t *testing.T) {
-	// The platform module resolves as the sibling platform/ of the resolved
-	// config path, so --config/OPM_CONFIG overrides move both together.
+	// The leftover platform/ is looked for beside the resolved config path,
+	// so --config/OPM_CONFIG overrides move the warning with it.
 	tmpHome := setTempHome(t)
+	logs := captureVetLog(t)
 
 	customDir := filepath.Join(tmpHome, "custom")
-	require.NoError(t, os.MkdirAll(customDir, 0o700))
+	require.NoError(t, os.MkdirAll(filepath.Join(customDir, "platform"), 0o700))
 
 	customConfig := filepath.Join(customDir, "config.cue")
 	require.NoError(t, os.WriteFile(customConfig, []byte(`package config
@@ -362,11 +296,6 @@ config: {
 	}
 }
 `), 0o600))
-	// An invalid platform sibling (a platform/ that is not a module) must
-	// fail vet even at a custom path.
-	require.NoError(t, os.MkdirAll(filepath.Join(customDir, "platform"), 0o700))
-	require.NoError(t, os.WriteFile(filepath.Join(customDir, "platform", "platform.cue"), []byte(`bogus: true
-`), 0o600))
 
 	os.Setenv("OPM_CONFIG", customConfig)
 	defer os.Unsetenv("OPM_CONFIG")
@@ -376,7 +305,6 @@ config: {
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	err := cmd.Execute()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "platform")
+	require.NoError(t, cmd.Execute())
+	assert.Contains(t, logs.String(), filepath.Join(customDir, "platform")+" is no longer read by any command")
 }

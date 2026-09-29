@@ -23,11 +23,14 @@ func tempOpmDir(t *testing.T) string {
 }
 
 // platformModuleDir writes a minimal platform module (cue.mod/module.cue and
-// platform.cue) into a fresh directory and returns it.
+// platform.cue) into a fresh directory and returns it. Resolution checks the
+// shape only; nothing here is built.
 func platformModuleDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	require.NoError(t, config.WritePlatformModule(dir))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "cue.mod"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "cue.mod", "module.cue"), []byte("module: \"example.com/platform@v0\"\nlanguage: version: \"v0.17.0\"\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "platform.cue"), []byte("package platform\n"), 0o600))
 	return dir
 }
 
@@ -268,7 +271,7 @@ func TestResolve_ModuleDepsGeneratesUnderCache(t *testing.T) {
 	assert.Empty(t, res.Carried)
 	assert.Empty(t, res.Warning)
 	assert.Equal(t, "platform: module deps (opmodel.dev/catalogs/opm@v4 v4.0.1; generated module "+dir+")", res.Describe())
-	_, err = os.Stat(config.PlatformDir(configPath))
+	_, err = os.Stat(config.LegacyPlatformDirPath(configPath))
 	assert.ErrorIs(t, err, os.ErrNotExist, "resolution never seeds or reads a platform in the OPM home")
 }
 

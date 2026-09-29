@@ -11,7 +11,8 @@
 //	         digested with the same inventory.ComputeRenderDigest.
 //
 // Both paths render through Kernel.Render against the same platform module
-// directory (the seeded local default) with RuntimeName "opm-cli": the
+// directory (hack/platform/, passed to path A as --platform) with
+// RuntimeName "opm-cli": the
 // runtime identity is stamped into rendered labels
 // (app.kubernetes.io/managed-by), so a cross-actor comparison with different
 // runtime names differs by construction — the per-actor label is the KNOWN
@@ -30,6 +31,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/open-platform-model/library/opm/kernel"
@@ -94,8 +96,8 @@ func run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
-	// Seed a temp ~/.opm (config + default platform module) for the CLI path;
-	// path B acquires the same directory.
+	// Seed a temp ~/.opm (config only) for the CLI path; both paths render
+	// against the repo's maintained platform module.
 	dir, err := os.MkdirTemp("", "opm-render-parity-*")
 	if err != nil {
 		return err
@@ -105,8 +107,8 @@ func run() error {
 	if err := os.WriteFile(configPath, []byte(config.DefaultConfigTemplate), 0o600); err != nil {
 		return err
 	}
-	platformDir := config.PlatformDir(configPath)
-	if err := config.WritePlatformModule(platformDir); err != nil {
+	platformDir, err := hackPlatformPath()
+	if err != nil {
 		return err
 	}
 
@@ -114,10 +116,11 @@ func run() error {
 
 	// ── Path A: CLI workflow (local module directory) ─────────────────────
 	resultA, err := workflowrender.FromModule(ctx, workflowrender.ModuleOpts{
-		ModulePath: absModuleDir,
-		Name:       instName,
-		K8sConfig:  &config.ResolvedKubernetesConfig{},
-		Config:     cfg,
+		ModulePath:   absModuleDir,
+		Name:         instName,
+		PlatformFlag: platformDir,
+		K8sConfig:    &config.ResolvedKubernetesConfig{},
+		Config:       cfg,
 	})
 	if err != nil {
 		return skipOrFail("CLI render path failed (registry/catalogs unavailable?): %v", err)
@@ -182,4 +185,14 @@ func run() error {
 
 	fmt.Println("PASS: render-parity — local staging and registry acquisition are byte-identical")
 	return nil
+}
+
+// hackPlatformPath is hack/platform/ in this checkout, located from this
+// source file so the program runs from any working directory.
+func hackPlatformPath() (string, error) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", fmt.Errorf("cannot locate this source file")
+	}
+	return filepath.Abs(filepath.Join(filepath.Dir(file), "..", "..", "..", "hack", "platform"))
 }

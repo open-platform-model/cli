@@ -94,7 +94,7 @@ func TestE2E_ModuleVet_RendersAgainstModuleDeps(t *testing.T) {
 		t.Skipf("tests/fixtures/modules/podinfo not available: %v", statErr)
 	}
 
-	customHome := seedConfigOnlyHome(t)
+	customHome := seedRenderHome(t)
 
 	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), customHome, 180*time.Second, "module", "vet", modPath, "--instance-name", "e2e-podinfo")
 	require.NoError(t, err, "stderr: %s", stderr)
@@ -160,7 +160,7 @@ func TestE2E_ModuleVet_OpenDebugValuesRefusedAtSynthesis(t *testing.T) {
 	require.NotEqual(t, string(src), open, "the fixture declares debugValues: {}")
 	require.NoError(t, os.WriteFile(modFile, []byte(open), 0o600))
 
-	_, stderr, err := runOPMWithEnv(t, t.TempDir(), seedConfigOnlyHome(t), 180*time.Second, "module", "vet", modDir)
+	_, stderr, err := runOPMWithEnv(t, t.TempDir(), seedRenderHome(t), 180*time.Second, "module", "vet", modDir)
 
 	require.Error(t, err)
 	var exitErr *exec.ExitError

@@ -75,9 +75,10 @@ type GlobalConfig struct {
 	Log LogConfig
 
 	// SkewPolicy is the config file's skewPolicy (SkewPolicyWarn when
-	// absent). It governs renders against the local default platform and
-	// --platform directories; when the cluster Platform CR is the source,
-	// the CR's spec.skewPolicy takes precedence. There is no flag.
+	// absent). It governs renders against --platform directories; when the
+	// cluster Platform CR is the source, the CR's spec.skewPolicy takes
+	// precedence, and a platform generated from the render's own deps cannot
+	// skew. There is no flag.
 	SkewPolicy string
 
 	// Registry is the resolved registry URL after applying precedence.

@@ -17,13 +17,50 @@ import (
 	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
-// seedPlatformModule writes the default platform module into a fresh temp
-// dir and returns the directory.
-func seedPlatformModule(t *testing.T) string {
+// hackPlatformDir is the repo's maintained platform module (hack/platform/),
+// pinned by the root deps task and mirrored by hack/kind-platform.yaml.
+const hackPlatformDir = "../../hack/platform"
+
+// copyHackPlatform copies hack/platform/ into a fresh temp dir and returns
+// it, so a test can edit its pins or entries.
+func copyHackPlatform(t *testing.T) string {
 	t.Helper()
-	dir := filepath.Join(t.TempDir(), PlatformDirName)
-	require.NoError(t, WritePlatformModule(dir))
-	return dir
+	dst := filepath.Join(t.TempDir(), "platform")
+	require.NoError(t, filepath.WalkDir(hackPlatformDir, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(hackPlatformDir, p)
+		if err != nil {
+			return err
+		}
+		out := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(out, 0o700)
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(out, data, 0o600)
+	}))
+	return dst
+}
+
+// hackCatalogPins reads the catalog pins of a platform module's cue.mod.
+func hackCatalogPins(t *testing.T, dir string) map[string]string {
+	t.Helper()
+	name := filepath.Join(dir, filepath.FromSlash(PlatformModuleFileName))
+	data, err := os.ReadFile(name)
+	require.NoError(t, err)
+	f, err := modfile.Parse(data, name)
+	require.NoError(t, err)
+	pins := map[string]string{}
+	for _, path := range DefaultCatalogPaths {
+		require.Contains(t, f.Deps, path)
+		pins[path] = f.Deps[path].Version
+	}
+	return pins
 }
 
 // buildCtx returns a bounded context for registry-backed builds.
@@ -51,99 +88,16 @@ func skipIfRegistryUnavailable(t *testing.T, err error) {
 	}
 }
 
-func TestPlatformDir_SiblingOfConfig(t *testing.T) {
-	dir := filepath.Join("custom", "dir")
-	got := PlatformDir(filepath.Join(dir, "config.cue"))
-	assert.Equal(t, filepath.Join(dir, "platform"), got)
-}
-
 func TestLegacyPlatformFilePath_SiblingOfConfig(t *testing.T) {
 	dir := filepath.Join("custom", "dir")
 	got := LegacyPlatformFilePath(filepath.Join(dir, "config.cue"))
 	assert.Equal(t, filepath.Join(dir, "platform.cue"), got)
 }
 
-func TestDefaultPaths_PlatformDirUnderOpmHome(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-
-	paths, err := DefaultPaths()
-	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(home, ".opm", "platform"), paths.PlatformDir)
-	assert.Equal(t, PlatformDir(paths.ConfigFile), paths.PlatformDir, "DefaultPaths and PlatformDir agree on the sibling rule")
-}
-
-func TestDefaultPlatformModuleFile_PinsCoreAndBothCatalogs(t *testing.T) {
-	// The seeded cue.mod is the platform's catalog selection (0019:D5): it
-	// must parse as a module file, carry the reserved module path, and pin
-	// exactly one build for core and for each first-party catalog.
-	f, err := modfile.Parse([]byte(DefaultPlatformModuleFile), PlatformModuleFileName)
-	require.NoError(t, err)
-
-	assert.Equal(t, DefaultPlatformModulePath, f.Module)
-	require.Len(t, f.Deps, 3)
-	require.Contains(t, f.Deps, DefaultCorePath)
-	assert.Equal(t, DefaultCorePin, f.Deps[DefaultCorePath].Version)
-	for i, path := range DefaultCatalogPaths {
-		require.Contains(t, f.Deps, path)
-		assert.Equal(t, DefaultCatalogPins[i], f.Deps[path].Version, path)
-	}
-}
-
-func TestDefaultPlatformCUE_EntriesImportTheirCatalogs(t *testing.T) {
-	// Exactly two #registry entries keyed by the catalog paths, each
-	// carrying its catalog by import; no version scalar, no filter
-	// vocabulary, no retired kubernetes catalog.
-	src := DefaultPlatformCUE
-	assert.Contains(t, src, "core.#Platform")
-	assert.Contains(t, src, `metadata: name: "cluster"`)
-	assert.Contains(t, src, `type: "kubernetes"`)
-	for _, path := range DefaultCatalogPaths {
-		assert.Contains(t, src, "\t"+catalogImportName(path)+" \""+path+"\"", "catalog imported under its package name")
-		assert.Contains(t, src, "\t\""+path+"\": #catalog: "+catalogImportName(path), "entry keyed by path carries the import")
-	}
-	assert.Equal(t, 2, strings.Count(src, "#catalog:"), "exactly two registry entries")
-	assert.NotContains(t, src, "version:")
-	assert.NotContains(t, src, "filter")
-	assert.NotContains(t, src, "opmodel.dev/catalogs/kubernetes")
-}
-
-func TestCatalogImportName(t *testing.T) {
-	assert.Equal(t, "opm", catalogImportName("opmodel.dev/catalogs/opm@v4"))
-	assert.Equal(t, "k8s", catalogImportName("opmodel.dev/catalogs/k8s@v1"))
-	assert.Equal(t, "core", catalogImportName("opmodel.dev/core@v2"))
-}
-
-func TestWritePlatformModule_WritesBothFilesSecurely(t *testing.T) {
-	dir := seedPlatformModule(t)
-
-	for _, name := range []string{PlatformModuleFileName, PlatformCUEFileName} {
-		info, err := os.Stat(filepath.Join(dir, filepath.FromSlash(name)))
-		require.NoError(t, err, name)
-		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(), name)
-	}
-	for _, sub := range []string{"", "cue.mod"} {
-		info, err := os.Stat(filepath.Join(dir, sub))
-		require.NoError(t, err)
-		assert.Equal(t, os.FileMode(0o700), info.Mode().Perm(), sub)
-	}
-
-	modContent, err := os.ReadFile(filepath.Join(dir, "cue.mod", "module.cue"))
-	require.NoError(t, err)
-	assert.Equal(t, DefaultPlatformModuleFile, string(modContent))
-	cueContent, err := os.ReadFile(filepath.Join(dir, "platform.cue"))
-	require.NoError(t, err)
-	assert.Equal(t, DefaultPlatformCUE, string(cueContent))
-}
-
-func TestWritePlatformModule_OverwritesInPlace(t *testing.T) {
-	dir := seedPlatformModule(t)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "platform.cue"), []byte("bogus: true\n"), 0o600))
-
-	require.NoError(t, WritePlatformModule(dir))
-	cueContent, err := os.ReadFile(filepath.Join(dir, "platform.cue"))
-	require.NoError(t, err)
-	assert.Equal(t, DefaultPlatformCUE, string(cueContent))
+func TestLegacyPlatformDirPath_SiblingOfConfig(t *testing.T) {
+	dir := filepath.Join("custom", "dir")
+	got := LegacyPlatformDirPath(filepath.Join(dir, "config.cue"))
+	assert.Equal(t, filepath.Join(dir, "platform"), got)
 }
 
 func TestBuildPlatformModule_MissingDirectory(t *testing.T) {
@@ -152,7 +106,7 @@ func TestBuildPlatformModule_MissingDirectory(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, oerrors.ErrValidation)
 	assert.Contains(t, err.Error(), dir)
-	assert.Contains(t, err.Error(), "opm config init")
+	assert.Contains(t, err.Error(), "opm platform pull")
 }
 
 func TestBuildPlatformModule_NotAModule(t *testing.T) {
@@ -166,14 +120,15 @@ func TestBuildPlatformModule_NotAModule(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, oerrors.ErrValidation)
 	assert.Contains(t, err.Error(), "cue.mod/module.cue")
-	assert.Contains(t, err.Error(), "opm config init")
+	assert.Contains(t, err.Error(), "opm platform pull")
 }
 
-func TestBuildPlatformModule_DefaultTemplateBuilds(t *testing.T) {
-	// Registry-backed: the seeded module must build against the published
-	// core and catalogs, and each entry's version must be the build its
-	// cue.mod pins (derived readout, 0019:D5).
-	dir := seedPlatformModule(t)
+func TestBuildPlatformModule_HackPlatformBuilds(t *testing.T) {
+	// Registry-backed: the maintained hack/platform/ module must build
+	// against the published core and catalogs, and each entry's version
+	// must be the build its cue.mod pins (derived readout, 0019:D5).
+	dir := copyHackPlatform(t)
+	pins := hackCatalogPins(t, dir)
 
 	p, err := BuildPlatformModule(buildCtx(t), dir, DefaultRegistry)
 	skipIfRegistryUnavailable(t, err)
@@ -185,12 +140,12 @@ func TestBuildPlatformModule_DefaultTemplateBuilds(t *testing.T) {
 
 	registry := p.Package.LookupPath(cue.MakePath(cue.Def("registry")))
 	require.True(t, registry.Exists())
-	for i, path := range DefaultCatalogPaths {
+	for _, path := range DefaultCatalogPaths {
 		entry := registry.LookupPath(cue.MakePath(cue.Str(path)))
 		require.True(t, entry.Exists(), path)
 		version, err := entry.LookupPath(cue.ParsePath("version")).String()
 		require.NoError(t, err, path)
-		assert.Equal(t, strings.TrimPrefix(DefaultCatalogPins[i], "v"), version, "%s version derived from the pinned catalog", path)
+		assert.Equal(t, strings.TrimPrefix(pins[path], "v"), version, "%s version derived from the pinned catalog", path)
 		enable, err := entry.LookupPath(cue.ParsePath("enable")).Bool()
 		require.NoError(t, err, path)
 		assert.True(t, enable, "%s enabled by default", path)
@@ -200,11 +155,12 @@ func TestBuildPlatformModule_DefaultTemplateBuilds(t *testing.T) {
 func TestBuildPlatformModule_UnpublishedPinNamesTheDependency(t *testing.T) {
 	// Registry-backed: a pin naming a build that does not exist fails the
 	// build naming the dependency, with the hint pointing at cue.mod.
-	dir := seedPlatformModule(t)
+	dir := copyHackPlatform(t)
+	pins := hackCatalogPins(t, dir)
 	modPath := filepath.Join(dir, "cue.mod", "module.cue")
 	content, err := os.ReadFile(modPath)
 	require.NoError(t, err)
-	bumped := strings.Replace(string(content), DefaultCatalogPins[0], "v4.9.9", 1)
+	bumped := strings.Replace(string(content), pins[DefaultCatalogPaths[0]], "v4.9.9", 1)
 	require.NotEqual(t, string(content), bumped)
 	require.NoError(t, os.WriteFile(modPath, []byte(bumped), 0o600))
 
@@ -219,11 +175,11 @@ func TestBuildPlatformModule_UnpublishedPinNamesTheDependency(t *testing.T) {
 func TestBuildPlatformModule_KeyImportDriftNamesTheEntry(t *testing.T) {
 	// Registry-backed: an entry keyed at one catalog but embedding the other
 	// fails the 0019:D5 binding at a path naming the entry.
-	dir := seedPlatformModule(t)
+	dir := copyHackPlatform(t)
 	cuePath := filepath.Join(dir, "platform.cue")
 	content, err := os.ReadFile(cuePath)
 	require.NoError(t, err)
-	opmName, k8sName := catalogImportName(DefaultCatalogPaths[0]), catalogImportName(DefaultCatalogPaths[1])
+	opmName, k8sName := "opm", "k8s"
 	swapped := strings.NewReplacer(
 		"#catalog: "+opmName+"\n", "#catalog: "+k8sName+"\n",
 		"#catalog: "+k8sName+"\n", "#catalog: "+opmName+"\n",

@@ -53,7 +53,7 @@ func requireYAMLDocuments(t *testing.T, out string) {
 func TestE2E_ModBuild_PublishedModuleWithMajor(t *testing.T) {
 	path, major := publishedPodinfo(t)
 
-	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), seedConfigOnlyHome(t), 180*time.Second,
+	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), seedRenderHome(t), 180*time.Second,
 		"module", "build", path, "--version", major)
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Contains(t, stderr, "Resolved "+path+" -> "+major)
@@ -67,7 +67,7 @@ func TestE2E_ModBuild_PublishedModuleWithMajor(t *testing.T) {
 func TestE2E_ModBuild_PublishedModuleWithoutVersion(t *testing.T) {
 	path, major := publishedPodinfo(t)
 
-	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), seedConfigOnlyHome(t), 180*time.Second,
+	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), seedRenderHome(t), 180*time.Second,
 		"module", "build", path)
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Contains(t, stderr, "Resolved "+path+" -> "+major)
@@ -91,7 +91,7 @@ func TestE2E_ModBuild_PublishedModulePinnedWithValues(t *testing.T) {
 }
 `), 0o600))
 
-	stdout, stderr, err := runOPMWithEnv(t, workDir, seedConfigOnlyHome(t), 180*time.Second,
+	stdout, stderr, err := runOPMWithEnv(t, workDir, seedRenderHome(t), 180*time.Second,
 		"module", "build", path, "--version", c.Version, "-f", values)
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Contains(t, stderr, "Resolved "+path+" -> "+major+" "+c.Version+" (pinned)")
@@ -105,7 +105,7 @@ func TestE2E_ModBuild_PublishedModulePinnedWithValues(t *testing.T) {
 func TestE2E_ModBuild_PublishedModuleMajorSuffixRefused(t *testing.T) {
 	path, major := publishedPodinfo(t)
 
-	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), seedConfigOnlyHome(t), 60*time.Second,
+	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), seedRenderHome(t), 60*time.Second,
 		"module", "build", path+"@"+major)
 	require.Error(t, err, "stdout: %s", stdout)
 	var exitErr *exec.ExitError
