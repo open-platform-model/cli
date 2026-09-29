@@ -7,6 +7,7 @@ import (
 	"github.com/open-platform-model/library/opm/module"
 
 	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/modref"
 	"github.com/open-platform-model/cli/internal/platform"
 )
 
@@ -73,7 +74,15 @@ func (r *Result) ResourceCount() int {
 }
 
 type InstanceFileOpts struct {
+	// InstanceFilePath names the instance: a .cue file or its package
+	// directory.
 	InstanceFilePath string
+
+	// ModuleCommand is the module command a module package is pointed at
+	// when one is given in place of an instance ("opm module build" for
+	// instance build). Empty points at the module command group.
+	ModuleCommand string
+
 	// ValuesFiles are -f files layered onto the instance package as kernel
 	// values sources, in order.
 	ValuesFiles []string
@@ -89,11 +98,17 @@ type InstanceFileOpts struct {
 	Config    *config.GlobalConfig
 }
 
-// ModuleOpts configures rendering from a module-package directory through the
-// synthesis path (no instance.cue on disk).
+// ModuleOpts configures rendering a module through the synthesis path (no
+// instance.cue on disk): a local module-package directory (ModulePath) or a
+// published module resolved from the registry (Published).
 type ModuleOpts struct {
 	// ModulePath is the directory containing the user's module CUE package.
+	// Unused when Published is set.
 	ModulePath string
+
+	// Published, when set, is the resolved published module to acquire from
+	// the registry instead of a local directory.
+	Published *modref.Resolution
 
 	// ValuesFiles, when non-empty, override the module's debugValues.
 	ValuesFiles []string

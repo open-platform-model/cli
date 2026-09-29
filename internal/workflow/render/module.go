@@ -3,6 +3,7 @@ package render
 import (
 	"context"
 	"fmt"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -20,8 +21,10 @@ import (
 	"github.com/open-platform-model/cli/pkg/loader"
 )
 
-// FromModule synthesizes an instance from a module-package directory through
-// kernel SynthesizeInstance and renders it through the same render path as
+// FromModule synthesizes an instance from a module (a local module-package
+// directory, or a published module acquired from the registry when
+// opts.Published is set) through kernel SynthesizeInstance and renders it
+// through the same render path as
 // FromInstanceFile (0006:D9; retires the CLI's synthetic-wrapper module and
 // the last #ModuleRelease application — 0002 carryover). Values come from
 // `-f` files when supplied, else from the module's `debugValues`.
@@ -32,31 +35,28 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	if opts.K8sConfig == nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("kubernetes config not resolved")}
 	}
-	if opts.ModulePath == "" {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("module path is required")}
-	}
-	if pathErr := cmdutil.ValidateModuleInputPath(opts.ModulePath); pathErr != nil {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: pathErr}
+	if opts.Published == nil {
+		if opts.ModulePath == "" {
+			return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("module path is required")}
+		}
+		if pathErr := cmdutil.ValidateModuleInputPath(opts.ModulePath); pathErr != nil {
+			return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: pathErr}
+		}
 	}
 
 	namespace := opts.K8sConfig.Namespace.Value
-	output.Debug("rendering from module", "path", opts.ModulePath, "namespace", namespace)
+	output.Debug("rendering from module", "module", opts.moduleLabel(), "namespace", namespace)
 
 	k := config.NewKernel(opts.Config.Registry)
 
-	// Acquire the module package through the kernel's shape gate. The acquire
-	// stages the local directory as the module's source tree, so synthesis
-	// builds the instance package inside the module's own root: the module
-	// import resolves locally (no registry round-trip for the module itself)
-	// and its cue.mod — including any local-module.cue replaceWith (0006:D37) —
-	// drives transitive resolution.
-	mod, err := k.AcquireModuleFromDir(ctx, opts.ModulePath)
+	src, err := acquireModule(ctx, k, opts)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
+	mod := src.module
 
-	values, err := ResolveModuleValues(k, mod.Package, opts.ModulePath, opts.ValuesFiles)
+	values, err := ResolveModuleValues(k, mod.Package, src.valuesOrigin, opts.ValuesFiles)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
@@ -90,10 +90,9 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 
 	// The author's platform is generated from the module's own deps unless
 	// --platform names one; the deps are read from the acquired source.
-	moduleRoot := moduleContextRoot(opts.ModulePath)
 	var deps *platform.ModuleDeps
 	if opts.PlatformFromDeps && opts.PlatformFlag == "" {
-		deps, err = moduleDepsOf(mod.Source, moduleRoot)
+		deps, err = moduleDepsOf(mod.Source, src.moduleRoot)
 		if err != nil {
 			printValidationError(err)
 			return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
@@ -107,11 +106,60 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 		return nil, err
 	}
 
-	// A module apply always renders a local module directory (the main module is
-	// local), so render provenance is local (0006:D7). The module
-	// directory is the 0010:D19 module context: a replaced dependency in its own
-	// cue.mod is worded from the kernel's rows after the render.
-	return renderInstance(ctx, env, inst, opts.K8sConfig, moduleRoot, true)
+	// A local module directory is the main module, so render provenance is
+	// local (0006:D7), and the directory is the 0010:D19 module context: a
+	// replaced dependency in its own cue.mod is worded from the kernel's rows
+	// after the render. A published module's bytes come from the registry: no
+	// local provenance, no module context.
+	return renderInstance(ctx, env, inst, opts.K8sConfig, src.moduleRoot, src.local)
+}
+
+// moduleLabel names the module for logs: the directory, or
+// "<path>@<version>" for a published module.
+func (o ModuleOpts) moduleLabel() string {
+	if p := o.Published; p != nil {
+		return p.Path + "@" + p.Version
+	}
+	return o.ModulePath
+}
+
+// acquiredModule is a module acquired for synthesis, with what the rest of
+// the pipeline needs to know about where it came from.
+type acquiredModule struct {
+	module *module.Module
+	// valuesOrigin prefixes the debugValues source's origin: the module
+	// directory, or "<path>@<version>" for a published module.
+	valuesOrigin string
+	// moduleRoot is the local module context, "" for a published module.
+	moduleRoot string
+	// local marks a module read from disk (local render provenance).
+	local bool
+}
+
+// acquireModule acquires the module through the kernel's shape gate, from
+// the registry when opts.Published is set, else from the local directory.
+// Either way the acquire stages the module's source tree, so synthesis builds
+// the instance package inside the module's own root and its cue.mod drives
+// transitive resolution; for a local directory that includes any
+// local-module.cue replaceWith (0006:D37).
+func acquireModule(ctx context.Context, k *kernel.Kernel, opts ModuleOpts) (*acquiredModule, error) {
+	if p := opts.Published; p != nil {
+		mod, err := k.AcquireModuleFromRegistry(ctx, p.Import(), p.Version)
+		if err != nil {
+			return nil, err
+		}
+		return &acquiredModule{module: mod, valuesOrigin: opts.moduleLabel()}, nil
+	}
+	mod, err := k.AcquireModuleFromDir(ctx, opts.ModulePath)
+	if err != nil {
+		return nil, err
+	}
+	return &acquiredModule{
+		module:       mod,
+		valuesOrigin: opts.ModulePath,
+		moduleRoot:   moduleContextRoot(opts.ModulePath),
+		local:        true,
+	}, nil
 }
 
 // moduleDepsOf reads what a module-deps platform is generated from out of
@@ -153,7 +201,11 @@ func syntheticIdentity(mod *module.Module, opts ModuleOpts, namespace string) (m
 		modName = mod.Metadata.Name
 	}
 	if modName == "" {
-		modName = filepath.Base(opts.ModulePath)
+		if opts.Published != nil {
+			modName = path.Base(opts.Published.Path)
+		} else {
+			modName = filepath.Base(opts.ModulePath)
+		}
 	}
 	synthName = opts.Name
 	if synthName == "" {

@@ -14,7 +14,7 @@ import (
 
 func TestNewModuleBuildCmd(t *testing.T) {
 	cmd := NewModuleBuildCmd(&config.GlobalConfig{})
-	assert.Equal(t, "build [path]", cmd.Use)
+	assert.Equal(t, "build [path | module-path]", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 }
 
@@ -43,14 +43,14 @@ func TestRunModuleBuild_RejectsFileArgument(t *testing.T) {
 	filePath := filepath.Join(dir, "module.cue")
 	require.NoError(t, os.WriteFile(filePath, []byte("package x\n"), 0o644))
 
-	err := runModuleBuild([]string{filePath}, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, "", "yaml", false, "")
+	err := runModuleBuild([]string{filePath}, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, "", "", "yaml", false, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "expects a directory")
 	assert.Contains(t, err.Error(), "opm instance build")
 }
 
 func TestRunModuleBuild_MissingPath(t *testing.T) {
-	err := runModuleBuild([]string{"/nonexistent/module/dir"}, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, "", "yaml", false, "")
+	err := runModuleBuild([]string{"/nonexistent/module/dir"}, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, "", "", "yaml", false, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }
@@ -70,7 +70,7 @@ func TestRunModuleBuild_DefaultsToCwd(t *testing.T) {
 	// "." is a directory — module build should attempt synthesis (and fail
 	// because there is no module package). We assert it does NOT fail with
 	// the "expects a directory" error path.
-	err = runModuleBuild(nil, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, "", "yaml", false, "")
+	err = runModuleBuild(nil, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, "", "", "yaml", false, "")
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "expects a directory")
 }

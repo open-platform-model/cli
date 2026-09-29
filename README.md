@@ -46,6 +46,8 @@ Use `opm module` when you are starting from module source. For rendering, deploy
 |---------|-------------|
 | `module init` | Create a new module from a template |
 | `module vet` | Validate a module without rendering manifests |
+| `module build` | Render a module directory or a published module to manifests through a synthetic instance (`debugValues` or `-f` values) |
+| `module apply` | Deploy a module directory or a published module to a cluster through a synthetic instance |
 | `module tidy` | Resolve, pin and prune the module's CUE dependencies as `cue mod tidy` does, without the `cue` binary; `--check` fails without writing |
 | `module version set` | Set the version the module declares in `identity/identity.cue` — surgical, idempotent, offline |
 | `module publish` | Publish the module from its committed source, at the coordinates it declares |
@@ -71,7 +73,7 @@ Use `opm instance` when you are starting from an instance file or when you want 
 | Command | Description |
 |---------|-------------|
 | `instance vet` | Validate an instance file without generating manifests |
-| `instance build` | Render an instance file to manifests |
+| `instance build` | Render an instance file or instance package directory to manifests (a module directory is refused: use `module build`) |
 | `instance apply` | Deploy an instance file to a cluster |
 | `instance diff` | Compare an instance file with live cluster state |
 | `instance status` | Show resource status for a deployed instance |
@@ -154,6 +156,29 @@ opm operator install --crds-only --rbac --user alice
 # Remove the operator (refuses while any ModuleInstance is still active)
 opm operator uninstall
 ```
+
+## Example Published Module Workflow
+
+`module build` and `module apply` take a published module by its module path,
+without a major. `--version v1` takes the newest release of major 1,
+`--version 1.0.4` pins that release, and no `--version` takes the newest
+release of the highest major built on this CLI's core. The chosen version is
+reported on standard error, so manifests on standard output stay parseable.
+
+```bash
+# Render the newest compatible release
+opm module build opmodel.dev/modules/web_app > manifests.yaml
+
+# Render a pinned release with your own values
+opm module build opmodel.dev/modules/web_app --version 1.0.4 -f values.cue
+
+# Deploy the newest v1 release; without -f this applies the module's
+# debugValues and warns about it
+opm module apply opmodel.dev/modules/web_app --version v1 --name hello -n demo
+```
+
+A local directory is always spelled as a path (`.`, `./web.app`, `../x`, or
+absolute); a bare argument whose first element holds a dot is a module path.
 
 ## Example Instance Workflow
 

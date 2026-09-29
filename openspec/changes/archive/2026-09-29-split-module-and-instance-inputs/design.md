@@ -95,13 +95,27 @@ type Resolution struct {
 // Import returns the major-qualified module path ("…/web_app@v1").
 func (r *Resolution) Import() string
 
-func Resolve(ctx context.Context, src Source, path string, sel Selector, coreMajor string) (*Resolution, error)
+// Request carries the path, selector, the CLI's core major, and the
+// registry route named in refusals and connectivity errors.
+type Request struct {
+	Path      string
+	Selector  Selector
+	CoreMajor string
+	Registry  string
+}
 
-// NewSource builds a Source over the CLI's registry mapping.
+func Resolve(ctx context.Context, src Source, req Request) (*Resolution, error)
+
+// NewSource builds a Source over the CLI's registry mapping; Route names
+// where that mapping sends a path, for messages.
 func NewSource(registry string) (Source, error)
+func Route(registry, path string) string
+
+// RefusalError carries a publish.Refusal (exit 2).
+type RefusalError struct{ Refusal publish.Refusal }
 ```
 
-`Resolve` returns a `*publish.ConnectivityError` for transport failures (exit 3) and a refusal carried as `publish.Refusal` for everything the user must fix (exit 2), the funnels `opm module init` already uses. The selection predicate is `publish`'s dev-tag rule, moved into `modref` and called back from `publish` so there is one definition.
+`Resolve` returns a `*publish.ConnectivityError` for transport failures (exit 3) and a `*modref.RefusalError` carrying a `publish.Refusal` for everything the user must fix (exit 2), the funnels `opm module init` already uses. The selection predicate is `publish`'s dev-tag rule, exported as `publish.IsDevTag` and called from `modref.Newest`, so there is one definition. (Planned as a move into `modref`; implementation found that `modref` imports `publish` for both error types, so a move would be an import cycle.)
 
 **Why a new package and not `internal/scaffold`**: `scaffold` owns template references, whose grammar expands bare words into `opmodel.dev/templates/<name>` and whose selector deliberately differs (experiment 07). Sharing it would couple deployment to template policy.
 
@@ -140,7 +154,7 @@ A published module has no local module context, so `moduleRoot` is empty: replac
 | Ambiguous dotted argument | 2 | `"<arg>" is both a directory and a module path; use ./<arg> for the directory` |
 | Pin not published, no versions, nothing compatible | 2 | refusal naming path, registry and (for the walk) every skipped major with its reason |
 | Registry unreachable | 3 | `listing published versions of <path> (registry <registry>): <cause>` |
-| `instance build` on a module package | 2 | `<path> is a module, not an instance; build it with: opm module build <path>` |
+| `instance build` on a module package | 2 | `<path> is a module, not an instance; run: opm module build <path>` (`instance apply` names `opm module apply`, `instance vet` names `opm module vet`; `instance diff` and the cluster queries, with no module counterpart, name the `opm module` group) |
 
 ### Example output
 
@@ -202,10 +216,12 @@ Error: /home/me/src/my_app is a module, not an instance; build it with: opm modu
 ## Risks / Trade-offs
 
 - [No-version resolution costs one module-file read per major walked] -> Only majors above the selected one are read; the CUE cache serves repeats. `--version` skips the walk.
-- [Assumption: `AcquireInstanceFromDir` on a module package wraps `ErrWrongKind`] -> Section 1 proves it with a test before section 3 relies on it; if it wraps something else, the refusal keys on that sentinel instead and the finding goes here.
-- [Assumption: `ModuleVersions` on a major-free path lists every major against an in-memory `modregistrytest` registry as it does against GHCR] -> Proven in section 1; if not, the resolver lists per major by probing `@v0`..`@vN`, recorded here.
+- [Assumption: `AcquireInstanceFromDir` on a module package wraps `ErrWrongKind`] -> Section 1 proves it with a test before section 3 relies on it; if it wraps something else, the refusal keys on that sentinel instead and the finding goes here. Proven by `TestAcquireInstanceFromDir_ModulePackageIsWrongKind` (library alpha.33).
+- [Assumption: `ModuleVersions` on a major-free path lists every major against an in-memory `modregistrytest` registry as it does against GHCR] -> Proven in section 1; if not, the resolver lists per major by probing `@v0`..`@vN`, recorded here. Proven by `TestModuleVersions_MajorFreePathListsEveryMajor`.
 - [A bare dotted relative directory changes from "built" to "refused as ambiguous"] -> The refusal names the `./` spelling. The directory forms `opm mod init` scaffolds (`./my_app`, `.`) are unaffected.
 - [`opm instance build <module-dir>` breaks existing scripts] -> The refusal message names the exact replacement command.
+- [The `debugValues` warning of `opm module apply` names `opm instance init`, which the planned change `add-instance-init` delivers] -> Release-order constraint: `add-instance-init` ships in the same CLI release as this change, or the warning points at a command that does not exist yet. Recorded 2026-09-29 at verify.
+- [The module refusal in instance commands asks the kernel's module acquire] -> A package with `kind: "Module"` but no concrete `metadata.name`, `modulePath` or `version` fails that acquire too, so it gets the plain wrong-kind error rather than the `opm module` hint.
 
 ## Migration Plan
 

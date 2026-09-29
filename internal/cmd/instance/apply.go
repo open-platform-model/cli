@@ -109,6 +109,7 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 
 	result, err := render.FromInstanceFile(ctx, render.InstanceFileOpts{
 		InstanceFilePath: instanceFile,
+		ModuleCommand:    "opm module apply",
 		ValuesFiles:      rff.Values,
 		PlatformFlag:     rff.Platform,
 		ClusterPlatform:  platform.ClusterPlatformGetterFor(k8sClient.Dynamic),

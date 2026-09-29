@@ -159,11 +159,16 @@ opm module build ./my-app --split --out-dir ./manifests
 opm module build ./my-app --platform ./pulled-platform
 ```
 
-`opm instance build` accepts the same module-directory form, but it answers
-the deployer's question instead: does the module render on my platform?
-`opm instance build ./my-app` renders against `--platform`, else
-`~/.opm/platform/`, so it can report version skew or an unmatched component
-that `opm module build` does not.
+`opm module build` answers the author's question: does the module render
+with the catalogs it pins? For the deployer's question, does the module
+render on my platform, pass that platform with `--platform` (for example
+`opm module build ./my-app --platform ~/.opm/platform`), or write an instance
+package and build it with `opm instance build`. Both report version skew or
+an unmatched component. `opm instance build` takes only instance packages; a
+module directory is refused with the `opm module build` command to run.
+
+`opm module build` also takes a published module by its module path, for
+example `opm module build opmodel.dev/modules/web_app --version v1`.
 
 `opm mod` is an alias for `opm module`, so all of the commands above also
 work as `opm mod init`, `opm mod build`, etc.

@@ -3,7 +3,6 @@ package modulecmd
 import (
 	"context"
 	"fmt"
-	"os"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
@@ -17,7 +16,7 @@ import (
 // NewModuleBuildCmd creates the module build command.
 func NewModuleBuildCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var rf cmdutil.RenderFlags
-	var nameFlag string
+	var nameFlag, versionFlag string
 
 	var (
 		outputFlag string
@@ -26,11 +25,12 @@ func NewModuleBuildCmd(cfg *config.GlobalConfig) *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use:   "build [path]",
+		Use:   "build [path | module-path]",
 		Short: "Render a module to manifests via synthetic instance",
-		Long: `Render an OPM module package to Kubernetes manifests by synthesizing
-a #ModuleInstance around it. Values come from the module's debugValues (default)
-or from -f/--values files.
+		Long: `Render an OPM module to Kubernetes manifests by synthesizing a
+#ModuleInstance around it. The module is a package directory on disk or a
+published module named by its module path. Values come from the module's
+debugValues (default) or from -f/--values files.
 
 The render answers whether the module renders with the catalogs it declares:
 by default it runs against a platform generated from the module's own
@@ -39,8 +39,17 @@ pinned version. Neither the cluster nor ~/.opm/platform/ is read. Pass
 --platform <dir> to render against a platform module instead, for example one
 pulled with 'opm platform pull'.
 
+A published module is fetched from the registry; nothing is written to disk
+except CUE's module cache. --version v1 takes the newest release of major 1,
+--version 1.0.4 pins that release, and no --version takes the newest release
+of the highest major built on this CLI's core. The chosen version is reported
+on standard error.
+
 Arguments:
-  path    Path to a module package directory (default: current directory)
+  path          Module package directory (default: current directory).
+                "." or a ./, ../ or absolute path is always a directory.
+  module-path   Published module path without a major, e.g.
+                opmodel.dev/modules/web_app
 
 Examples:
   # Build the current module against its own deps using debugValues
@@ -53,16 +62,23 @@ Examples:
   opm module build ./my-module --platform ./pulled-platform
 
   # Build with a custom synthetic instance name
-  opm module build ./my-module --name my-debug`,
+  opm module build ./my-module --name my-debug
+
+  # Build the newest compatible release of a published module
+  opm module build opmodel.dev/modules/web_app
+
+  # Build a pinned release of a published module with custom values
+  opm module build opmodel.dev/modules/web_app --version 1.0.4 -f values.cue`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runModuleBuild(args, cfg, &rf, nameFlag, outputFlag, splitFlag, outDirFlag)
+			return runModuleBuild(args, cfg, &rf, nameFlag, versionFlag, outputFlag, splitFlag, outDirFlag)
 		},
 	}
 
 	rf.AddTo(c)
 	useModuleDepsPlatformHelp(c)
 	c.Flags().StringVar(&nameFlag, "name", "", "Override synthetic instance name")
+	c.Flags().StringVar(&versionFlag, "version", "", versionFlagHelp)
 	c.Flags().StringVarP(&outputFlag, "output", "o", "yaml", "Output format: yaml, json")
 	c.Flags().BoolVar(&splitFlag, "split", false, "Write separate files per resource")
 	c.Flags().StringVar(&outDirFlag, "out-dir", "./manifests", "Directory for split output")
@@ -81,23 +97,15 @@ func useModuleDepsPlatformHelp(c *cobra.Command) {
 	c.Flags().Lookup("platform").Usage = moduleDepsPlatformHelp
 }
 
-func runModuleBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, nameFlag, outputFmt string, split bool, outDir string) error {
+// versionFlagHelp is the --version usage text of module build and apply.
+const versionFlagHelp = "Version of a published module: vN takes the newest in major N, X.Y.Z pins (default: highest major on this CLI's core)"
+
+func runModuleBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, nameFlag, versionFlag, outputFmt string, split bool, outDir string) error {
 	ctx := context.Background()
 
-	modulePath := cmdutil.ResolveModulePath(args)
-
-	info, statErr := os.Stat(modulePath)
-	if statErr != nil {
-		if os.IsNotExist(statErr) {
-			return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("module path %q not found", modulePath)}
-		}
-		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("stat %q: %w", modulePath, statErr)}
-	}
-	if !info.IsDir() {
-		return &opmexit.ExitError{
-			Code: opmexit.ExitGeneralError,
-			Err:  fmt.Errorf("module build expects a directory; CUE packages span all files in a dir. Use 'opm instance build %s' for a instance file", modulePath),
-		}
+	moduleArg, err := cmdutil.ResolveModuleArg(ctx, cfg, args, versionFlag, "build")
+	if err != nil {
+		return err
 	}
 
 	outputFormat, err := render.ParseManifestOutputFormat(outputFmt)
@@ -114,7 +122,8 @@ func runModuleBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 	}
 
 	result, err := render.FromModule(ctx, render.ModuleOpts{
-		ModulePath:       modulePath,
+		ModulePath:       moduleArg.Dir,
+		Published:        moduleArg.Published,
 		ValuesFiles:      rf.Values,
 		Name:             nameFlag,
 		PlatformFlag:     rf.Platform, // offline: no cluster read (0006:D21)

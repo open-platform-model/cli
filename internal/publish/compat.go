@@ -45,7 +45,7 @@ func gateCompat(p *Plan, opts Options) error {
 	if p.Kind != KindCatalog || !p.RegistryChecked {
 		return nil // never judged: the lookup's ConnectivityError already reported it
 	}
-	if isDevTag(p.Tag) {
+	if IsDevTag(p.Tag) {
 		p.CatalogGates.CompatDevExempt = true
 		p.CompatChecked = true
 		return nil
@@ -165,7 +165,7 @@ func eligibleByPackage(members []Member, lineIsPrerelease bool, g *CatalogGateOu
 func predecessorVersions(published []string, tag, major string) []string {
 	var out []string
 	for _, v := range published {
-		if !semver.IsValid(v) || semver.Major(v) != major || isDevTag(v) {
+		if !semver.IsValid(v) || semver.Major(v) != major || IsDevTag(v) {
 			continue
 		}
 		if tag != "" && semver.Compare(v, tag) >= 0 {
@@ -180,13 +180,15 @@ func predecessorVersions(published []string, tag, major string) []string {
 	return out
 }
 
-// isDevTag reports whether a tag is a dev build: any dot-separated identifier
+// IsDevTag reports whether a tag is a dev build: any dot-separated identifier
 // of its prerelease segment is "dev". This recognizes catalog_opm's
 // branch-tag.sh shape v<M>.<m>.<p>-0.dev.<count>.g<sha> and the plain
 // -dev.N form without pinning either; release prereleases use alpha, beta and
 // rc counters and never carry the identifier. 0011:D26 clause 1: a dev build is
-// neither judged by the compat gate nor used as a baseline.
-func isDevTag(tag string) bool {
+// neither judged by the compat gate nor used as a baseline. It is also the
+// one definition of "development build" the published-module resolver
+// (internal/modref) excludes from a float (0016:D5:R2).
+func IsDevTag(tag string) bool {
 	pre := strings.TrimPrefix(semver.Prerelease(tag), "-")
 	if pre == "" {
 		return false
@@ -204,7 +206,7 @@ func isDevTag(tag string) bool {
 // clause 2 suspends the beta/GA compare while the module line is one; the
 // member-level model (0010:D34) is unchanged, only when publish enforces it.
 func isReleasePrerelease(tag string) bool {
-	return semver.Prerelease(tag) != "" && !isDevTag(tag)
+	return semver.Prerelease(tag) != "" && !IsDevTag(tag)
 }
 
 // loadPublishedPackage loads one published subpackage by

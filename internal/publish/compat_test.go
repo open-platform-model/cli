@@ -288,7 +288,7 @@ func TestIsDevTag(t *testing.T) {
 		"":                                 false,
 	}
 	for tag, want := range cases {
-		assert.Equal(t, want, isDevTag(tag), tag)
+		assert.Equal(t, want, IsDevTag(tag), tag)
 	}
 }
 

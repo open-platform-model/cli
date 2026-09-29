@@ -16,7 +16,7 @@ import (
 
 func TestNewModuleApplyCmd(t *testing.T) {
 	cmd := NewModuleApplyCmd(&config.GlobalConfig{})
-	assert.Equal(t, "apply [path]", cmd.Use)
+	assert.Equal(t, "apply [path | module-path]", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotEmpty(t, cmd.Long)
 	assert.NotNil(t, cmd.Args, "should accept at most 1 positional arg")
@@ -90,7 +90,7 @@ func TestRunModuleApply_RejectsFileArgument(t *testing.T) {
 	filePath := filepath.Join(dir, "module.cue")
 	require.NoError(t, os.WriteFile(filePath, []byte("package x\n"), 0o644))
 
-	err := runModuleApply([]string{filePath}, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, &cmdutil.K8sFlags{}, "", false, false, false, false)
+	err := runModuleApply([]string{filePath}, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, &cmdutil.K8sFlags{}, applyOpts{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "expects a directory")
 	assert.Contains(t, err.Error(), "opm instance apply", "error must point users at instance apply for files")
@@ -101,7 +101,7 @@ func TestRunModuleApply_RejectsFileArgument(t *testing.T) {
 }
 
 func TestRunModuleApply_MissingPath(t *testing.T) {
-	err := runModuleApply([]string{"/nonexistent/module/dir"}, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, &cmdutil.K8sFlags{}, "", false, false, false, false)
+	err := runModuleApply([]string{"/nonexistent/module/dir"}, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, &cmdutil.K8sFlags{}, applyOpts{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 
@@ -143,7 +143,7 @@ func TestRunModuleApply_PathValidation_TableDriven(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := runModuleApply(tc.args, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, &cmdutil.K8sFlags{}, "", false, false, false, false)
+			err := runModuleApply(tc.args, &config.GlobalConfig{}, &cmdutil.RenderFlags{}, &cmdutil.K8sFlags{}, applyOpts{})
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.wantContains)
 

@@ -18,6 +18,7 @@ import (
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
 
+	"github.com/open-platform-model/cli/internal/cmdutil/cmdutiltest"
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/platform"
 )
@@ -59,19 +60,50 @@ func TestRenderFromInstanceFile_NilK8sConfig(t *testing.T) {
 	assert.Contains(t, exitErr.Error(), "kubernetes config not resolved")
 }
 
-func TestRenderFromInstanceFile_RejectsModulePackagePath(t *testing.T) {
-	// The path guard fires before platform resolution, so no registry or
-	// platform module is needed.
-	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "module.cue"), []byte("package test\n"), 0o644))
+// A module package is refused by kind, before platform resolution, so no
+// registry or platform module is needed; the refusal names the module
+// command the caller passed. A module file argument is judged by its package.
+func TestRenderFromInstanceFile_RefusesModulePackage(t *testing.T) {
+	dir := cmdutiltest.WriteMinimalModule(t)
+	for _, arg := range []string{dir, filepath.Join(dir, "module.cue")} {
+		_, err := FromInstanceFile(context.Background(), InstanceFileOpts{
+			InstanceFilePath: arg,
+			ModuleCommand:    "opm module build",
+			Config:           &config.GlobalConfig{},
+			K8sConfig:        &config.ResolvedKubernetesConfig{},
+		})
+		var exitErr *opmexit.ExitError
+		require.True(t, errors.As(err, &exitErr), arg)
+		assert.Equal(t, opmexit.ExitValidationError, exitErr.Code, arg)
+		assert.Contains(t, err.Error(), dir+" is a module, not an instance", arg)
+		assert.Contains(t, err.Error(), "opm module build "+dir, arg)
+	}
+}
 
-	_, err := FromInstanceFile(context.Background(), InstanceFileOpts{
-		InstanceFilePath: dir,
-		Config:           &config.GlobalConfig{},
-		K8sConfig:        &config.ResolvedKubernetesConfig{},
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "module package, not an instance")
+func TestInstanceContext_DirectoryWithItsOwnCueMod(t *testing.T) {
+	// An instance package directory inside a module tree that carries its
+	// own cue.mod: the directory is its own context, not the tree's root.
+	outer := t.TempDir()
+	writeD19File(t, filepath.Join(outer, "cue.mod", "module.cue"), `module: "example.com/outer@v0"`)
+	inst := filepath.Join(outer, "instances", "hello")
+	writeD19File(t, filepath.Join(inst, "cue.mod", "module.cue"), `module: "example.com/hello@v0"`)
+
+	dir, root, err := instanceContext(inst)
+	require.NoError(t, err)
+	assert.Equal(t, inst, dir)
+	assert.Equal(t, inst, root)
+}
+
+func TestInstanceContext_FileArgument(t *testing.T) {
+	root := t.TempDir()
+	writeD19File(t, filepath.Join(root, "cue.mod", "module.cue"), `module: "example.com/hello@v0"`)
+	file := filepath.Join(root, "instance.cue")
+	writeD19File(t, file, "package hello\n")
+
+	dir, gotRoot, err := instanceContext(file)
+	require.NoError(t, err)
+	assert.Equal(t, root, dir)
+	assert.Equal(t, root, gotRoot)
 }
 
 func TestNewResult_CarriesResolvedPlatform(t *testing.T) {
