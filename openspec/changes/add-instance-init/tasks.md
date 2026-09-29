@@ -14,12 +14,12 @@
 
 ## 3. `opm instance init`
 
-- [ ] 3.1 Move the terminal and prompt helpers (`stdinReader`, the prompt and refusal funnels) from `internal/cmd/module/init.go` to `internal/cmdutil`; verify `go test ./internal/cmd/module/...` passes unchanged
-- [ ] 3.2 Add `internal/cmd/instance/init.go`: positional classification and `--from` merging, prompts (name, then module path, then namespace; each prompted value checked like its flag), name and namespace checks against the core name rule, `--module-path` check, the existing-directory and enclosing-CUE-module refusals, then resolve, acquire, read the core pin, pick values, render, write and report, with exit codes per design.md; verify command tests cover every refusal scenario of the `instance-init` spec without registry access
-- [ ] 3.3 Register the command in the instance group with long help and examples (cert_manager and web_app only); verify a command test asserts every flag and its default, and that `opm instance --help` lists `init`
-- [ ] 3.4 Extend `tests/e2e/instance_init_test.go`: `opm instance init` on the podinfo fixture's major-free path with `-n` exits 0, prints the resolution line, the values source and the vet hint; the three files exist; `opm instance build <dir>/instance.cue` renders against the e2e platform and `opm instance vet <dir>/instance.cue` exits 0; `cuemod.Tidy` in `Check` mode passes on the result; a rerun into the same directory exits 2; an unpublished `--version` exits 2 and leaves nothing. Verify `task test:e2e` passes against GHCR
-- [ ] 3.5 Update `README.md` (instance init in the command list and quickstart) and the `AGENTS.md` package map (`internal/instinit`); verify `task openspec:check` passes
-- [ ] 3.6 `task lint` and `task test` green, then commit `feat(cmd): add opm instance init`
+- [x] 3.1 Move the terminal and prompt helpers (`stdinReader`, the prompt and refusal funnels) from `internal/cmd/module/init.go` to `internal/cmdutil`; verify `go test ./internal/cmd/module/...` passes unchanged
+- [x] 3.2 Add `internal/cmd/instance/init.go`: positional classification and `--from` merging, prompts (name, then module path, then namespace; each prompted value checked like its flag), name and namespace checks against the core name rule, `--module-path` check, the existing-directory and enclosing-CUE-module refusals, then resolve, acquire, read the core pin, pick values, render, write and report, with exit codes per design.md; verify command tests cover every refusal scenario of the `instance-init` spec without registry access
+- [x] 3.3 Register the command in the instance group with long help and examples (cert_manager and web_app only); verify a command test asserts every flag and its default, and that `opm instance --help` lists `init`
+- [x] 3.4 Extend `tests/e2e/instance_init_test.go`: `opm instance init` on the podinfo fixture's major-free path with `-n` exits 0, prints the resolution line, the values source and the vet hint; the three files exist; `opm instance build <dir>/instance.cue` renders against the e2e platform and `opm instance vet <dir>/instance.cue` exits 0; `cuemod.Tidy` in `Check` mode passes on the result; a rerun into the same directory exits 2; an unpublished `--version` exits 2 and leaves nothing. Verify `task test:e2e` passes against GHCR
+- [x] 3.5 Update `README.md` (instance init in the command list and quickstart) and the `AGENTS.md` package map (`internal/instinit`); verify `task openspec:check` passes
+- [x] 3.6 `task lint` and `task test` green, then commit `feat(cmd): add opm instance init`
 
 ## 4. `initValues` rung (gated on core)
 

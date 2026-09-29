@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -134,9 +135,10 @@ func TestE2E_InstanceInit_GeneratedPackageTidiesAndLoads(t *testing.T) {
 	require.NoError(t, err, "the tidied package must load from a warm cache with the registry unreachable")
 }
 
-// TestE2E_InstanceInit_TidyRegistryFailureShape records how a registry
-// failure surfaces from cuemod.Tidy on an empty module cache, the shape the
-// init command's connectivity classifier matches on.
+// TestE2E_InstanceInit_TidyRegistryFailureShape shows how a registry
+// failure surfaces from cuemod.Tidy on an empty module cache for a real
+// instance package: flattened to text, so only cuemod.IsConnectivityError's
+// text match recognizes it.
 func TestE2E_InstanceInit_TidyRegistryFailureShape(t *testing.T) {
 	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
 		t.Skip("skipping registry-backed e2e tests")
@@ -149,6 +151,65 @@ func TestE2E_InstanceInit_TidyRegistryFailureShape(t *testing.T) {
 	_, err := cuemod.Tidy(ctx, dir, cuemod.TidyOptions{Registry: cuemodtest.UnreachableRegistry})
 	require.Error(t, err)
 	var netErr net.Error
-	t.Logf("tidy error (errors.As net.Error: %v, type %T): %v", errors.As(err, &netErr), err, err)
-	assert.Contains(t, err.Error(), "connection refused")
+	assert.False(t, errors.As(err, &netErr), "cmd/cue now keeps the net.Error; the text match may be retired: %v", err)
+	assert.True(t, cuemod.IsConnectivityError(err), "unrecognized registry failure: %v", err)
+}
+
+// TestE2E_InstanceInit_PublishedFixture runs `opm instance init` on the
+// podinfo fixture's major-free path and proves the package it writes builds
+// and vets with no step in between, is tidy, and that init refuses a rerun
+// into the same directory and an unpublished pin.
+func TestE2E_InstanceInit_PublishedFixture(t *testing.T) {
+	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
+		t.Skip("skipping registry-backed e2e tests")
+	}
+	coord := fixtures.Must(t, "podinfo")
+	path, _, _ := strings.Cut(coord.ModulePath, "@")
+	home := seedRenderHome(t)
+	workDir := t.TempDir()
+	const timeout = 180 * time.Second
+
+	stdout, stderr, err := runOPMWithEnv(t, workDir, home, timeout, "instance", "init", "podinfo", path, "-n", "demo")
+	require.NoError(t, err, "stderr: %s", stderr)
+	assert.Contains(t, stderr, "Resolved "+path+" -> v0 ")
+	assert.Contains(t, stdout, "Values template: debugValues")
+	assert.Contains(t, stdout, "Validate it:  opm instance vet "+filepath.Join("podinfo", "instance.cue"))
+
+	pkgDir := filepath.Join(workDir, "podinfo")
+	for _, f := range []string{"cue.mod/module.cue", "instance.cue", "values.cue"} {
+		_, statErr := os.Stat(filepath.Join(pkgDir, filepath.FromSlash(f)))
+		assert.NoError(t, statErr, f)
+	}
+	entries, err := os.ReadDir(workDir)
+	require.NoError(t, err)
+	assert.Len(t, entries, 1, "no staging directory remains beside the package")
+
+	instanceFile := filepath.Join(pkgDir, "instance.cue")
+	stdout, stderr, err = runOPMWithEnv(t, workDir, home, timeout, "instance", "build", instanceFile)
+	require.NoError(t, err, "stderr: %s", stderr)
+	assert.Contains(t, stdout, "kind: Deployment")
+	assert.Contains(t, stdout, "namespace: demo")
+
+	_, stderr, err = runOPMWithEnv(t, workDir, home, timeout, "instance", "vet", instanceFile)
+	require.NoError(t, err, "stderr: %s", stderr)
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err = cuemod.Tidy(ctx, pkgDir, cuemod.TidyOptions{Registry: config.DefaultRegistry, Check: true})
+	require.NoError(t, err, "the generated package must be tidy")
+
+	_, stderr, err = runOPMWithEnv(t, workDir, home, timeout, "instance", "init", "podinfo", path, "-n", "demo")
+	require.Error(t, err)
+	assert.Equal(t, 2, exitCode(t, err), "stderr: %s", stderr)
+	assert.Contains(t, stderr, "already exists")
+
+	_, stderr, err = runOPMWithEnv(t, workDir, home, timeout, "instance", "init", "other", path, "-n", "demo", "--version", "0.0.999")
+	require.Error(t, err)
+	assert.Equal(t, 2, exitCode(t, err), "stderr: %s", stderr)
+	assert.Contains(t, stderr, "no published version 0.0.999")
+	_, statErr := os.Stat(filepath.Join(workDir, "other"))
+	assert.True(t, os.IsNotExist(statErr), "an unpublished pin writes nothing")
+	entries, err = os.ReadDir(workDir)
+	require.NoError(t, err)
+	assert.Len(t, entries, 1)
 }

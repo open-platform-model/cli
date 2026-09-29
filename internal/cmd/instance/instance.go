@@ -15,11 +15,15 @@ func NewInstanceCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Short:   "Work with instance files and deployed instances",
 		Long: `Work with OPM instance files.
 
-Use this command group when you are starting from an instance definition: render
-it, validate it, diff it, apply it, or inspect an already deployed instance.
+Use this command group when you are starting from an instance definition: create
+one for a published module, render it, validate it, diff it, apply it, or
+inspect an already deployed instance.
 
 For operations that start from module source, use 'opm module'.`,
 	}
+
+	// Package creation (positional args = instance name, module path)
+	c.AddCommand(NewInstanceInitCmd(cfg))
 
 	// Render commands (positional arg = instance file path)
 	c.AddCommand(NewInstanceVetCmd(cfg))

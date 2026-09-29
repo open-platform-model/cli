@@ -16,14 +16,17 @@ task build
 # Validate a module
 ./bin/opm module vet ./my_module
 
-# Validate an instance file
-./bin/opm instance vet ./instance.cue
+# Create an instance package for a published module
+./bin/opm instance init web opmodel.dev/modules/web_app -n demo
 
-# Render an instance file
-./bin/opm instance build ./instance.cue
+# Validate the instance
+./bin/opm instance vet ./web/instance.cue
 
-# Apply an instance file
-./bin/opm instance apply ./instance.cue
+# Render the instance
+./bin/opm instance build ./web/instance.cue
+
+# Apply the instance
+./bin/opm instance apply ./web/instance.cue
 ```
 
 ## Features
@@ -72,6 +75,7 @@ Use `opm instance` when you are starting from an instance file or when you want 
 
 | Command | Description |
 |---------|-------------|
+| `instance init` | Create a standalone instance package (`cue.mod/module.cue`, `instance.cue`, `values.cue`) for a published module, pinned and ready to build |
 | `instance vet` | Validate an instance file without generating manifests |
 | `instance build` | Render an instance file or instance package directory to manifests (a module directory is refused: use `module build`) |
 | `instance apply` | Deploy an instance file to a cluster |
@@ -182,19 +186,29 @@ absolute); a bare argument whose first element holds a dot is a module path.
 
 ## Example Instance Workflow
 
+`instance init` writes a package that pins the module at the resolved
+version, core at the version the module declares, and the rest of their
+dependencies, so it builds with no `cue` command. `values.cue` starts from the
+module's `debugValues` when they are fully concrete and is empty otherwise;
+review it before deploying. The target directory must not exist or sit inside
+another CUE module.
+
 ```bash
+# Create the package in ./web (--version and --dir work as elsewhere)
+opm instance init web opmodel.dev/modules/web_app -n demo
+
 # Validate an instance file
-opm instance vet ./instances/jellyfin/instance.cue
+opm instance vet ./web/instance.cue
 
 # Render manifests from an instance file
-opm instance build ./instances/jellyfin/instance.cue
+opm instance build ./web/instance.cue
 
 # Apply an instance file to the cluster
-opm instance apply ./instances/jellyfin/instance.cue
+opm instance apply ./web/instance.cue
 
 # Inspect deployed state by file, name, or UUID
-opm instance status ./instances/jellyfin/instance.cue
-opm instance status jellyfin -n media
+opm instance status ./web/instance.cue
+opm instance status web -n demo
 ```
 
 ## Documentation
