@@ -71,12 +71,23 @@ An argument classified as a published module path that also names an existing lo
 
 ### Requirement: `opm module apply` (alias `opm mod apply`) accepts a module directory or a published module
 
-The `module` command group SHALL register an `apply` subcommand with an optional positional argument defaulting to `"."`, classified exactly as `opm module build` classifies its argument, and the same `--version` flag. The subcommand SHALL synthesize a `#ModuleInstance` from the module (reusing the `module-synthetic-instance` capability), render the result through the same pipeline as `opm instance apply`, and apply the produced resources to a Kubernetes cluster with full inventory, prune, dry-run, and ownership semantics. Version resolution SHALL complete before any cluster contact. An apply from a published module SHALL record the module's declared path and version in the instance's spec as any apply does, and SHALL NOT carry the local-render provenance annotation, because its module bytes come from the registry.
+The `module` command group SHALL register an `apply` subcommand with an optional positional argument defaulting to `"."`, classified exactly as `opm module build` classifies its argument, and the same `--version` flag. The subcommand SHALL synthesize a `#ModuleInstance` from the module (reusing the `module-synthetic-instance` capability), render the result through the same pipeline as `opm instance apply`, and apply the produced resources to a Kubernetes cluster with full inventory, prune, dry-run, and ownership semantics. Version resolution SHALL complete before any cluster contact. An apply from a published module SHALL record the module's declared path and version in the instance's spec as any apply does, and SHALL NOT carry the local-render provenance annotation, because its module bytes come from the registry. When the values come from the module's `debugValues` (no `-f`/`--values`), from a local directory or a published module alike, the subcommand SHALL print one warning on standard error before applying: the values are the module's test values, they should be reviewed before a real deployment, and `opm instance init` writes an editable instance package. `opm module build` SHALL NOT print this warning, because it changes nothing.
 
 #### Scenario: Default to current directory
 
 - **WHEN** the user runs `opm module apply` with no positional argument from inside a module package directory
 - **THEN** the subcommand SHALL synthesize and apply that directory
+
+#### Scenario: Apply warns when it deploys debugValues
+
+- **WHEN** the user runs `opm module apply opmodel.dev/modules/web_app -n demo` with no `-f`
+- **THEN** standard error SHALL carry one warning that the module's `debugValues` are being applied, to review them before a real deployment, naming `opm instance init`
+- **AND** the warning SHALL appear before any resource is applied
+
+#### Scenario: No warning with values files
+
+- **WHEN** the user runs `opm module apply ./my-module -f values.cue`
+- **THEN** no `debugValues` warning SHALL be printed
 
 #### Scenario: Explicit module directory
 

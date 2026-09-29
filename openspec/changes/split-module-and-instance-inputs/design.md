@@ -172,14 +172,14 @@ Error: /home/me/src/my_app is a module, not an instance; build it with: opm modu
 **Explored**: 0016 `03-decisions.md` D5 and experiments 01, 02 and 07; the conversation that produced this change.
 **Options considered**:
 1. `path@vN` / `path@vX.Y.Z` positional: familiar from CUE, but a second spelling beside init's.
-2. Major-free path plus `--version` (0016 D5): one spelling across the CLI; no version picks the newest line this CLI can build.
+2. Major-free path plus `--version` (0016 D5): one spelling for every command that deploys a published module; no version picks the newest line this CLI can build. `opm module init --from` keeps its `@vN` template grammar, which `internal/scaffold` owns.
 **Decision**: Option 2, user decision 2026-09-28.
-**Rationale**: One resolver and one spelling. The core-compatible default is the answer a deployer wants and is cheap to compute (one module-file read per candidate major).
+**Rationale**: One resolver, and one spelling for deploying a published module. The core-compatible default is the answer a deployer wants and is cheap to compute (one module-file read per candidate major).
 
 ### Floating selection rule
 
 **Context**: "Newest" was agreed for floats; `scaffold`'s rule can return a dev build on a dev-only major (0016 experiment 07).
-**Decision**: Newest stable, else newest release prerelease, never a dev build; an exact pin may name any published tag.
+**Decision**: Newest stable, else the newest prerelease that is not a dev build; a float never picks a dev build; an exact pin may name any published tag.
 **Rationale**: Same rule as 0016 D5:R2, so `module apply` and `instance init` never disagree about "newest".
 
 ### Removing the module-directory branch from `opm instance build`
@@ -189,6 +189,15 @@ Error: /home/me/src/my_app is a module, not an instance; build it with: opm modu
 1. Keep the branch, try instance first and fall back to module: keeps compatibility, but the command's meaning then depends on what happens to be in a directory.
 2. Remove it (chosen): one meaning per command group, at the cost of a breaking change.
 **Decision**: Option 2, user decision 2026-09-28. It lands as its own section and commit, marked breaking.
+
+### Warning when `module apply` deploys `debugValues`
+
+**Context**: Without `-f`, `module apply` deploys the module's `debugValues`, the author's test fixture, which may hold throwaway hostnames or dummy credentials. Nothing is printed about it today. The published form makes `module apply` look like a real way to deploy, and `--name`/`-n` hide the `-debug` default name. Enhancement 0016 names this risk for `opm instance init` and answers it with a review warning (0016 D2:R3).
+**Options considered**:
+1. Warn only for a published module: the local-directory form has the same gap.
+2. Refuse a published apply without `-f`: blocks a quick try from the registry.
+3. Warn on every apply that uses `debugValues` (chosen): one stderr line, local and published alike, pointing at `opm instance init`.
+**Decision**: Option 3, user decision 2026-09-28. `module build` stays quiet: it renders and changes nothing.
 
 ## Risks / Trade-offs
 
