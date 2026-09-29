@@ -109,6 +109,7 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	if err != nil {
 		return nil, err
 	}
+	env.skipUnprovided = opts.SkipUnprovided
 
 	return renderInstance(ctx, env, inst, opts.K8sConfig, moduleRoot, sourceLocal)
 }
@@ -177,6 +178,8 @@ func moduleContextRoot(dir string) string {
 // platform module is the developer's request and the render honors it (the
 // kernel refuses such an input when the switch is off); the kernel reports
 // what it honored on the diagnostics and renderInstance words the rows.
+// SkipUnprovided is the caller's --skip-unprovided, passed through: which
+// demands are skippable is the kernel's rule.
 func newRenderInput(env *renderEnv, inst *module.Instance) kernel.RenderInput {
 	return kernel.RenderInput{
 		Instance:          inst,
@@ -184,6 +187,7 @@ func newRenderInput(env *renderEnv, inst *module.Instance) kernel.RenderInput {
 		RuntimeName:       RuntimeName,
 		Skew:              env.skew,
 		LocalReplacements: true,
+		SkipUnprovided:    env.skipUnprovided,
 	}
 }
 
@@ -196,7 +200,8 @@ func newRenderInput(env *renderEnv, inst *module.Instance) kernel.RenderInput {
 // printed beside it. A successful render is then refused when two of its
 // objects share one apply identity, before anything downstream can receive
 // the set. After that the 0010:D19 replacement warnings are emitted from the
-// kernel's rows against moduleRoot, the module context.
+// kernel's rows against moduleRoot, the module context, and every demand
+// skipped under --skip-unprovided is warned about on the log stream.
 func renderInstance(
 	ctx context.Context,
 	env *renderEnv,
@@ -218,6 +223,9 @@ func renderInstance(
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 	for _, w := range replacementWarnings(out.Diagnostics.Replacements, moduleRoot, env.resolution.Carried) {
+		output.Warn(w)
+	}
+	for _, w := range formatSkipped(out.Diagnostics.Skipped) {
 		output.Warn(w)
 	}
 
@@ -290,6 +298,7 @@ func newResult(env *renderEnv, out *kernel.RenderResult, renderDigest string, va
 		RenderDigest: renderDigest,
 		Values:       values,
 		SourceLocal:  sourceLocal,
+		Skipped:      out.Diagnostics.Skipped,
 	}
 }
 

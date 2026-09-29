@@ -113,6 +113,7 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 		ValuesFiles:      rff.Values,
 		PlatformFlag:     rff.Platform,
 		ClusterPlatform:  platform.ClusterPlatformGetterFor(k8sClient.Dynamic),
+		SkipUnprovided:   rff.SkipUnprovided,
 		K8sConfig:        k8sConfig,
 		Config:           cfg,
 	})
@@ -134,6 +135,7 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 			NoPrune:                flags.NoPrune,
 			Force:                  flags.Force,
 			Timeout:                flags.Timeout,
+			SkipUnprovided:         rff.SkipUnprovided,
 			SuccessUpToDateMessage: "Instance up to date",
 			SuccessAppliedMessage:  "Instance applied",
 		},

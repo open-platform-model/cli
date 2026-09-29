@@ -40,20 +40,25 @@ Both `AddTo` methods register `--skip-unprovided`. The render opts (`InstanceFil
 
 ### Wording the skipped rows
 
-A new formatter beside `formatRenderDiagnostics` groups rows by component, in build order:
+A new formatter, `formatSkipped` in `internal/workflow/render/skipped.go`, words the rows in build order:
 
 ```go
-// formatSkipped returns one warning line per skipped trait, and one line per
-// omitted component naming all of its skipped resources.
+// formatSkipped returns one warning line per skipped trait of a component
+// that rendered, and one line per omitted component (every row of it is
+// ComponentOmitted) naming all of its skipped resources and any trait it
+// also skipped, at the position of its first row. Never nil.
 func formatSkipped(rows []kernel.SkippedDemand) []string
 ```
+
+The lines, as the code emits them (`output.Warn` adds the `WARN` level):
 
 ```text
 WARN component "db": skipped provider-fulfilled trait "opmodel.dev/catalogs/opm/traits/backup@v1alpha1" (no provider on this platform)
 WARN component "archive" not rendered: provider-fulfilled resource "example.dev/catalogs/k8up/resources/backup-store@v1alpha1" has no provider on this platform
+WARN component "archive" not rendered: provider-fulfilled resources "<fqn>", "<fqn>" have no provider on this platform
 ```
 
-A row whose `Alternatives` is non-empty appends `; implemented at: <keys>`. The lines go through `output.Warn`, so `opm instance build -o yaml > out.yaml` keeps a clean manifest on stdout.
+An omitted component that also skipped traits appends `; also skipped provider-fulfilled trait(s) "<fqn>", "<fqn>"` to its line. Alternatives: a trait line, or an omitted-component line built from a single row, whose row carries `Alternatives` appends `; implemented at: <keys>`; an omitted-component line built from several rows appends one `; "<fqn>" implemented at: <keys>` per row that carries alternatives, so each list names the contract it belongs to. Keys are joined with `, `. The lines go through `output.Warn`, so `opm instance build -o yaml > out.yaml` keeps a clean manifest on stdout.
 
 ### The refusal hint
 
@@ -70,9 +75,10 @@ The existing deps-source hints stay for the cases the kernel does not mark unpro
 ### Recording skips on apply
 
 ```go
-// internal/inventory/store.go
+// internal/inventory/cr.go, beside AnnotationSource
 const AnnotationSkippedContracts = "module-instance.opmodel.dev/skipped-contracts"
 
+// internal/inventory/store.go
 type SpecInput struct {
 	// ...
 	// SkippedContracts are "<component>=<fqn>" pairs; empty omits the
@@ -81,15 +87,17 @@ type SpecInput struct {
 }
 ```
 
-`ApplySpec` builds one annotations map holding the source annotation (when `SourceLocal`) and the skipped annotation (when non-empty), sorted and deduplicated, and sets it once. The apply workflow fills `SkippedContracts` from `Result.Skipped`.
+The constant lives in `cr.go` with the other ModuleInstance annotation keys. `ApplySpec` takes its annotations from one helper, `specAnnotations(in SpecInput) map[string]string` in `store.go`, which holds the source annotation (when `SourceLocal`) and the skipped annotation (when non-empty, its pairs sorted and deduplicated), and sets them once. The apply workflow fills `SkippedContracts` from `Result.Skipped` through `apply.SkippedContracts(result)`.
 
 ### Operator-managed instances
 
-`executeThinEditor` writes the spec and lets the operator render; the operator never skips. With `--skip-unprovided`, apply refuses before `executeThinEditor` writes anything:
+`executeThinEditor` writes the spec and lets the operator render; the operator never skips. With `--skip-unprovided`, apply refuses in `resolveThinEditRef`, the checks both `executeThinEditor` and its dry-run counterpart `previewThinEditor` run first, so the real apply refuses before it writes anything and `--dry-run` refuses instead of previewing a spec edit the real apply would refuse. The error reads:
 
 ```text
-Error: --skip-unprovided has no effect on instance "hello": the opm-operator renders it and does not skip provider-fulfilled contracts. Install a provider for the contract instead.
+--skip-unprovided has no effect on instance "hello": the opm-operator renders it and does not skip provider-fulfilled contracts. Install a provider for the contract instead
 ```
+
+It carries no trailing period: it is a Go error string, and the repo's lint (staticcheck ST1005) rejects error strings that end in punctuation.
 
 Exit code 2 (validation).
 
@@ -108,7 +116,7 @@ opm instance build|vet|diff|apply <instance> [flags]
 | Flag off, unprovided demand | refusal, rows printed, unprovided hint | 2 |
 | Flag on, only skippable gaps | success, one warning per skip | 0 |
 | Flag on, a catalog-fulfilled or matched-but-refused gap remains | refusal as without the flag; the unprovided hint only if another row is unprovided | 2 |
-| Flag on, operator-managed instance on apply | refusal before any write | 2 |
+| Flag on, operator-managed instance on apply or `apply --dry-run` | refusal before any write or preview | 2 |
 
 ## Data Flow
 

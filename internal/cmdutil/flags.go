@@ -20,6 +20,9 @@ type RenderFlags struct {
 	// highest platform-source precedence). Supersedes the retired --provider
 	// flag.
 	Platform string
+	// SkipUnprovided is --skip-unprovided: the kernel's switch to skip
+	// provider-fulfilled demands nothing on the platform provides.
+	SkipUnprovided bool
 }
 
 // AddTo registers the render flags on the given cobra command.
@@ -32,6 +35,8 @@ func (f *RenderFlags) AddTo(cmd *cobra.Command) {
 		"Instance name (default: module name)")
 	cmd.Flags().StringVar(&f.Platform, "platform", "",
 		modulePlatformFlagHelp)
+	cmd.Flags().BoolVar(&f.SkipUnprovided, "skip-unprovided", false,
+		skipUnprovidedHelp)
 }
 
 // The --platform help text of the render-bearing commands: the flag names a
@@ -42,6 +47,11 @@ const (
 	modulePlatformFlagHelp   = "Platform module directory (overrides the cluster Platform and the module's own deps)"
 	instancePlatformFlagHelp = "Platform module directory (overrides the cluster Platform and the instance's own deps)"
 )
+
+// skipUnprovidedHelp is the --skip-unprovided help text of every
+// render-bearing command. Which demands are skippable is the kernel's rule;
+// the flag only sets its switch.
+const skipUnprovidedHelp = "Render what the platform can: skip provider-fulfilled contracts nothing on the platform provides, and report each one"
 
 // K8sFlags holds flags for Kubernetes cluster connection
 // (apply, delete, status).
@@ -117,6 +127,9 @@ type InstanceFileFlags struct {
 	// highest platform-source precedence). Supersedes the retired --provider
 	// flag.
 	Platform string
+	// SkipUnprovided is --skip-unprovided: the kernel's switch to skip
+	// provider-fulfilled demands nothing on the platform provides.
+	SkipUnprovided bool
 }
 
 // AddTo registers the instance file flags on the given cobra command.
@@ -125,6 +138,8 @@ func (f *InstanceFileFlags) AddTo(cmd *cobra.Command) {
 		"Additional values files (can be repeated; default: values.cue next to the instance file)")
 	cmd.Flags().StringVar(&f.Platform, "platform", "",
 		instancePlatformFlagHelp)
+	cmd.Flags().BoolVar(&f.SkipUnprovided, "skip-unprovided", false,
+		skipUnprovidedHelp)
 }
 
 // uuidPattern matches a UUID v4/v5: 8-4-4-4-12 lowercase hex digits.

@@ -112,6 +112,7 @@ func runInstanceBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.In
 		InstanceFilePath: buildArg,
 		ModuleCommand:    "opm module build",
 		ValuesFiles:      rff.Values,
+		SkipUnprovided:   rff.SkipUnprovided,
 		K8sConfig:        k8sConfig,
 		Config:           cfg,
 	})

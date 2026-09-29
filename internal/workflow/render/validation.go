@@ -60,6 +60,12 @@ func printValidationError(err error) {
 	cmdutil.PrintValidationError(renderFailedMsg, err)
 }
 
+// unprovidedHint is the remediation for a refusal with at least one
+// unresolved demand the kernel marks unprovided: a provider-fulfilled
+// contract nothing on the platform provides. It holds for every platform
+// source.
+const unprovidedHint = "a provider-fulfilled contract has no provider on this platform: install one, pass --platform <dir> with a platform that carries one, or pass --skip-unprovided to render the rest"
+
 // Hints for a render refused against a platform generated from the render's
 // own deps, where the fix is a pin or a platform rather than the module.
 const (
@@ -70,12 +76,19 @@ const (
 )
 
 // refusalHint is the remediation a render refusal gets beside the kernel's
-// verdict, or "" when there is none: against a platform generated from the
-// render's own deps (a module's or an instance package's), an unresolved
-// demand names the provider-fulfilled route through --platform, and an
-// unmatched component under a platform with no catalog names the missing pin
-// and the tidy command for the kind.
+// verdict, or "" when there is none. An unresolved demand the kernel marks
+// unprovided names the three ways out, whatever the platform source.
+// Otherwise, against a platform generated from the render's own deps (a
+// module's or an instance package's), an unresolved demand names the
+// provider-fulfilled route through --platform, and an unmatched component
+// under a platform with no catalog names the missing pin and the tidy
+// command for the kind.
 func refusalHint(err error, res platform.Resolution) string {
+	var unresolved *liberrors.UnresolvedDemandsError
+	isUnresolved := errors.As(err, &unresolved)
+	if isUnresolved && anyUnprovided(unresolved.Demands) {
+		return unprovidedHint
+	}
 	if res.Source != platform.SourceModuleDeps {
 		return ""
 	}
@@ -83,8 +96,7 @@ func refusalHint(err error, res platform.Resolution) string {
 	if res.DepsKind == platform.DepsInstance {
 		providerHint, noCatalogHint = instanceDepsProviderHint, instanceDepsNoCatalogHint
 	}
-	var unresolved *liberrors.UnresolvedDemandsError
-	if errors.As(err, &unresolved) {
+	if isUnresolved {
 		return providerHint
 	}
 	var unmatched *liberrors.UnmatchedComponentsError
@@ -92,6 +104,17 @@ func refusalHint(err error, res platform.Resolution) string {
 		return noCatalogHint
 	}
 	return ""
+}
+
+// anyUnprovided reports whether any demand is one --skip-unprovided would
+// have skipped.
+func anyUnprovided(demands []liberrors.UnresolvedDemand) bool {
+	for _, d := range demands {
+		if d.Unprovided {
+			return true
+		}
+	}
+	return false
 }
 
 // formatRenderDiagnostics renders the refusing rows of a render's

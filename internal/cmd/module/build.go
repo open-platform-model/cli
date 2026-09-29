@@ -122,13 +122,14 @@ func runModuleBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 	}
 
 	result, err := render.FromModule(ctx, render.ModuleOpts{
-		ModulePath:   moduleArg.Dir,
-		Published:    moduleArg.Published,
-		ValuesFiles:  rf.Values,
-		Name:         nameFlag,
-		PlatformFlag: rf.Platform, // else the module's own deps; never the cluster
-		K8sConfig:    k8sConfig,
-		Config:       cfg,
+		ModulePath:     moduleArg.Dir,
+		Published:      moduleArg.Published,
+		ValuesFiles:    rf.Values,
+		Name:           nameFlag,
+		PlatformFlag:   rf.Platform, // else the module's own deps; never the cluster
+		SkipUnprovided: rf.SkipUnprovided,
+		K8sConfig:      k8sConfig,
+		Config:         cfg,
 	})
 	if err != nil {
 		return err

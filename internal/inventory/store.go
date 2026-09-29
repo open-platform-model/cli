@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
+	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -107,11 +109,15 @@ type SpecInput struct {
 	// SourceLocal stamps the render-provenance annotation when true; when false
 	// the annotation is omitted so SSA field ownership removes any prior value.
 	SourceLocal bool
+	// SkippedContracts are "<component>=<fqn>" pairs; empty omits the
+	// skipped-contracts annotation so server-side apply removes any prior
+	// value.
+	SkippedContracts []string
 }
 
 // ApplySpec server-side-applies the complete CLI-owned ModuleInstance spec
 // document (owner, module reference, values, managed labels, and the
-// provenance annotation) and returns the resulting metadata.generation.
+// provenance and skipped-contracts annotations) and returns the resulting metadata.generation.
 // Create-or-update is handled by the apply semantics.
 //
 // This is the single writer for the CLI-owned spec. Targeted single-field
@@ -145,8 +151,8 @@ func ApplySpec(ctx context.Context, client *kubernetes.Client, in SpecInput) (in
 		}
 	}
 
-	if in.SourceLocal {
-		obj.SetAnnotations(map[string]string{AnnotationSource: SourceLocal})
+	if annotations := specAnnotations(in); len(annotations) > 0 {
+		obj.SetAnnotations(annotations)
 	}
 
 	applied, err := ssaApplyReturning(ctx, client, obj, in.Name, in.Namespace)
@@ -155,6 +161,23 @@ func ApplySpec(ctx context.Context, client *kubernetes.Client, in SpecInput) (in
 	}
 	output.Debug("applied ModuleInstance spec", "name", in.Name, "namespace", in.Namespace, "owner", in.Owner)
 	return applied.GetGeneration(), nil
+}
+
+// specAnnotations is the one annotations map a spec apply carries: the
+// render-provenance annotation for a local render and the skipped-contracts
+// annotation when the render skipped anything (its pairs sorted and
+// deduplicated). An annotation left out is removed by server-side apply.
+func specAnnotations(in SpecInput) map[string]string {
+	annotations := map[string]string{}
+	if in.SourceLocal {
+		annotations[AnnotationSource] = SourceLocal
+	}
+	if len(in.SkippedContracts) > 0 {
+		pairs := append([]string(nil), in.SkippedContracts...)
+		sort.Strings(pairs)
+		annotations[AnnotationSkippedContracts] = strings.Join(slices.Compact(pairs), ",")
+	}
+	return annotations
 }
 
 // StatusInput is the CLI-owned status subset written on the status subresource.

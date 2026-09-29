@@ -180,12 +180,13 @@ func renderVetModule(ctx context.Context, cfg *config.GlobalConfig, modulePath s
 	}
 
 	result, err := render.FromModule(ctx, render.ModuleOpts{
-		ModulePath:   modulePath,
-		ValuesFiles:  rf.Values,
-		Name:         rf.InstanceName,
-		PlatformFlag: rf.Platform, // else the module's own deps; never the cluster
-		K8sConfig:    k8sConfig,
-		Config:       cfg,
+		ModulePath:     modulePath,
+		ValuesFiles:    rf.Values,
+		Name:           rf.InstanceName,
+		PlatformFlag:   rf.Platform, // else the module's own deps; never the cluster
+		SkipUnprovided: rf.SkipUnprovided,
+		K8sConfig:      k8sConfig,
+		Config:         cfg,
 	})
 	if err != nil {
 		return err

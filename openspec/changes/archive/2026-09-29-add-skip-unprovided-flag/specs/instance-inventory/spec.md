@@ -11,7 +11,7 @@ When an apply rendered with `--skip-unprovided` and the kernel skipped at least 
 
 #### Scenario: A complete apply clears the record
 
-- **WHEN** the same instance is applied again against a platform that provides the backup contract
+- **WHEN** the same instance is applied again and its render skips nothing, for example because the component `db` no longer attaches the backup trait
 - **THEN** the annotation SHALL no longer be present on the ModuleInstance
 
 #### Scenario: A flag that skipped nothing writes nothing

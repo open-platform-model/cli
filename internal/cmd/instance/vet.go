@@ -82,6 +82,7 @@ func runInstanceVet(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.
 		PlatformFlag:     rff.Platform,
 		ClusterPlatform:  optionalClusterGetter(cfg, lookup.k8s, rff.Platform, lookup.offline),
 		ClusterOptional:  true,
+		SkipUnprovided:   rff.SkipUnprovided,
 		K8sConfig:        k8sConfig,
 		Config:           cfg,
 	})

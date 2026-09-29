@@ -23,13 +23,14 @@ const RuntimeName = "opm-cli"
 // file holds the render environment built on top of it.
 
 // renderEnv is the prepared per-invocation render environment: the kernel,
-// the acquired (source-carrying) platform with its provenance, and the skew
-// policy the render runs under.
+// the acquired (source-carrying) platform with its provenance, the skew
+// policy the render runs under, and the caller's --skip-unprovided switch.
 type renderEnv struct {
-	kernel     *kernel.Kernel
-	platform   *libplatform.Platform
-	resolution platform.Resolution
-	skew       kernel.SkewPolicy
+	kernel         *kernel.Kernel
+	platform       *libplatform.Platform
+	resolution     platform.Resolution
+	skew           kernel.SkewPolicy
+	skipUnprovided bool
 }
 
 // resolvePlatformEnv resolves the platform by precedence (--platform, the

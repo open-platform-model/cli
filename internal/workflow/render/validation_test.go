@@ -190,6 +190,11 @@ func TestRefusalHint(t *testing.T) {
 		{Component: "web", Kind: "trait", FQN: "opmodel.dev/core/contracts/backup@v1#Backup"},
 	}}}
 	unmatched := &kernel.RenderError{Err: &liberrors.UnmatchedComponentsError{}}
+	backup := liberrors.UnresolvedDemand{Component: "db", Kind: "trait", FQN: "opmodel.dev/catalogs/opm/traits/backup@v1alpha1", DefinedBy: "opmodel.dev/catalogs/opm@v4", Unprovided: true}
+	unprovided := &kernel.RenderError{Err: &liberrors.UnresolvedDemandsError{Demands: []liberrors.UnresolvedDemand{backup}}}
+	mixed := &kernel.RenderError{Err: &liberrors.UnresolvedDemandsError{Demands: []liberrors.UnresolvedDemand{
+		{Component: "web", Kind: "trait", FQN: "opmodel.dev/catalogs/opm/traits/expose@v1beta1"}, backup,
+	}}}
 	deps := platform.Resolution{Source: platform.SourceModuleDeps, DepsKind: platform.DepsModule}
 	depsWithCatalog := platform.Resolution{Source: platform.SourceModuleDeps, DepsKind: platform.DepsModule, Catalogs: []string{"opmodel.dev/catalogs/opm@v4 v4.4.0"}}
 	instDeps := platform.Resolution{Source: platform.SourceModuleDeps, DepsKind: platform.DepsInstance}
@@ -213,6 +218,11 @@ func TestRefusalHint(t *testing.T) {
 		{"instance deps: unmatched with no catalog names cue mod tidy", unmatched, instDeps, instanceDepsNoCatalogHint},
 		{"instance deps: unmatched with a catalog has no hint", unmatched, instDepsWithCatalog, ""},
 		{"a cluster platform has no hint", unresolved, cluster, ""},
+		{"unprovided against the module deps names the three ways out", unprovided, depsWithCatalog, unprovidedHint},
+		{"unprovided against the instance deps names the three ways out", fmt.Errorf("wrapped: %w", unprovided), instDepsWithCatalog, unprovidedHint},
+		{"unprovided against the cluster names the three ways out", unprovided, cluster, unprovidedHint},
+		{"unprovided against --platform names the three ways out", unprovided, flag, unprovidedHint},
+		{"one unprovided row among others names the three ways out", mixed, flag, unprovidedHint},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -225,4 +235,7 @@ func TestRefusalHint(t *testing.T) {
 	assert.Contains(t, instanceDepsProviderHint, "--platform <dir>")
 	assert.Contains(t, instanceDepsNoCatalogHint, "'cue mod tidy' in the package directory")
 	assert.Contains(t, instanceDepsNoCatalogHint, "--platform <dir>")
+	assert.Contains(t, unprovidedHint, "install one")
+	assert.Contains(t, unprovidedHint, "--platform <dir>")
+	assert.Contains(t, unprovidedHint, "--skip-unprovided")
 }
