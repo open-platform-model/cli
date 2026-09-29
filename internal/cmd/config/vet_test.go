@@ -3,6 +3,7 @@ package config
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -68,8 +69,31 @@ func TestConfigVet_ValidConfig_NoPlatformModule(t *testing.T) {
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	require.NoError(t, cmd.Execute())
+	stdout := captureVetStdout(t, func() { require.NoError(t, cmd.Execute()) })
+	configPath := filepath.Join(tmpHome, ".opm", "config.cue")
+	assert.Equal(t,
+		output.FormatVetCheck("Config file found", configPath)+"\n"+
+			output.FormatVetCheck("Config schema validation passed", "")+"\n",
+		stdout, "exactly the two config checks, in order")
+	assert.NotContains(t, stdout, "Platform module builds", "no platform check line")
 	assert.NotContains(t, logs.String(), "no longer read")
+}
+
+// captureVetStdout runs fn with os.Stdout redirected, where the vet check
+// lines are printed, and returns what it wrote.
+func captureVetStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	oldOut := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = w
+	defer func() { os.Stdout = oldOut }()
+	fn()
+	require.NoError(t, w.Close())
+	raw, err := io.ReadAll(r)
+	require.NoError(t, err)
+	require.NoError(t, r.Close())
+	return string(raw)
 }
 
 // captureVetLog redirects the CLI's log sink for the test and returns it.
