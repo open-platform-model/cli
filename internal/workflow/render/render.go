@@ -200,7 +200,8 @@ func newRenderInput(env *renderEnv, inst *module.Instance) kernel.RenderInput {
 // printed beside it. A successful render is then refused when two of its
 // objects share one apply identity, before anything downstream can receive
 // the set. After that the 0010:D19 replacement warnings are emitted from the
-// kernel's rows against moduleRoot, the module context.
+// kernel's rows against moduleRoot, the module context, and every demand
+// skipped under --skip-unprovided is warned about on the log stream.
 func renderInstance(
 	ctx context.Context,
 	env *renderEnv,
@@ -222,6 +223,9 @@ func renderInstance(
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 	for _, w := range replacementWarnings(out.Diagnostics.Replacements, moduleRoot, env.resolution.Carried) {
+		output.Warn(w)
+	}
+	for _, w := range formatSkipped(out.Diagnostics.Skipped) {
 		output.Warn(w)
 	}
 

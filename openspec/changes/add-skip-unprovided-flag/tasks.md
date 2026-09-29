@@ -8,10 +8,11 @@
 
 ## 2. Report skips and name the flag in refusals
 
-- [ ] 2.1 `internal/workflow/render`: add `formatSkipped` and print its lines with `output.Warn` after a successful render; unit tests cover a skipped trait, an omitted component with two skipped resources (one line naming both), and a row with alternatives
-- [ ] 2.2 `internal/workflow/render/validation.go`: add the unprovided branch to `refusalHint`, ahead of the deps-source hints and independent of the source; unit tests cover the deps, cluster and `--platform` sources, and a refusal with no unprovided row keeping today's hint
-- [ ] 2.3 Add a test module under `internal/workflow/render/testdata` whose component attaches the `backup` trait from `opmodel.dev/catalogs/opm@v4` (first published in `v4.2.0`; pin the version `hack/platform/` uses) when a `backup` value is true, its default; e2e: `opm module build` refuses with exit 2 and the unprovided hint, `opm module build --skip-unprovided` exits 0 with the component's objects on stdout and the skip warning on stderr only; verify `task test:e2e`
-- [ ] 2.4 `task lint` and `task test` green, then commit `feat(render): report skipped provider demands and name --skip-unprovided in refusals`
+- [x] 2.1 `internal/workflow/render`: add `formatSkipped` and print its lines with `output.Warn` after a successful render; unit tests cover a skipped trait, an omitted component with two skipped resources (one line naming both), and a row with alternatives
+- [x] 2.2 `internal/workflow/render/validation.go`: add the unprovided branch to `refusalHint`, ahead of the deps-source hints and independent of the source; unit tests cover the deps, cluster and `--platform` sources, and a refusal with no unprovided row keeping today's hint
+- [x] 2.3 Add a test module under `internal/workflow/render/testdata` whose component attaches the `backup` trait from `opmodel.dev/catalogs/opm@v4` (first published in `v4.2.0`; pin the version `hack/platform/` uses) when a `backup` value is true, its default; e2e: `opm module build` refuses with exit 2 and the unprovided hint, `opm module build --skip-unprovided` exits 0 with the component's objects on stdout and the skip warning on stderr only; verify `task test:e2e`
+  - Note: the module landed in section 1 (`testdata/skip-unprovided`, with an `instance/` package in the same CUE module), where the unit tests for both render entry points use it.
+- [x] 2.4 `task lint` and `task test` green, then commit `feat(render): report skipped provider demands and name --skip-unprovided in refusals`
 
 ## 3. Record skips on apply
 
