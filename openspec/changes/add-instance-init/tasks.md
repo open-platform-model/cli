@@ -23,7 +23,7 @@
 
 ## 4. `initValues` rung (gated on core)
 
-- [ ] 4.1 Gate: verify a core release on the CLI's core major accepts `initValues` on `#Module` (the core change for 0016 D3/D4 is released; a module setting `initValues` vets against it). If none is released, stop and report the gate as open
-- [ ] 4.2 Add a test module under `internal/instinit/testdata` carrying `initValues` (a defaulted field, an undefaulted disjunction, an optional field) and different `debugValues`, its `cue.mod` written by `opm module tidy`, never by hand; verify it vets
-- [ ] 4.3 Put the `initValues` rung first in `PickValues` and name it in the report; verify tests show `initValues` wins over `debugValues`, no `debugValues` content reaches the file, and the rendering keeps the default, keeps the disjunction and omits the optional field
-- [ ] 4.4 `task lint` and `task test` green, then commit `feat(cmd): scaffold instance values from initValues`
+- [x] 4.1 Gate: verify a core release on the CLI's core major accepts `initValues` on `#Module` (the core change for 0016 D3/D4 is released; a module setting `initValues` vets against it). If none is released, stop and report the gate as open
+- [x] 4.2 Add a test module under `internal/instinit/testdata` carrying `initValues` (a defaulted field, an undefaulted disjunction, an optional field) and different `debugValues`, its `cue.mod` written by `opm module tidy`, never by hand; verify it vets
+- [x] 4.3 Put the `initValues` rung first in `PickValues` and name it in the report; verify tests show `initValues` wins over `debugValues`, no `debugValues` content reaches the file, and the rendering keeps the default, keeps the disjunction and omits the optional field
+- [x] 4.4 `task lint` and `task test` green, then commit `feat(cmd): scaffold instance values from initValues`

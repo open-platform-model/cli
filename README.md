@@ -189,8 +189,8 @@ absolute); a bare argument whose first element holds a dot is a module path.
 `instance init` writes a package that pins the module at the resolved
 version, core at the version the module declares, and the rest of their
 dependencies, so it builds with no `cue` command. `values.cue` starts from the
-module's `debugValues` when they are fully concrete and is empty otherwise;
-review it before deploying. The target directory must not exist or sit inside
+module's `initValues`, else its `debugValues` when they are fully concrete,
+else empty; review it before deploying. The target directory must not exist or sit inside
 another CUE module.
 
 ```bash

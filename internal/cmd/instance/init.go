@@ -58,8 +58,8 @@ The package is a directory holding three files:
                       version the module declares, and their dependencies
   instance.cue        binds the module to a #ModuleInstance with the name
                       and namespace
-  values.cue          starting values: the module's debugValues when fully
-                      concrete, otherwise empty
+  values.cue          starting values: the module's initValues, else its
+                      debugValues when fully concrete, else empty
 
 The module path carries no major. Without --version the newest release of the
 highest major built on this CLI's core major is chosen; --version vN floats
@@ -338,7 +338,7 @@ func report(dir string, source instinit.ValuesSource, empty bool) {
 	vetPath := filepath.Join(dir, instinit.InstanceFile)
 	switch source {
 	case instinit.FromInitValues:
-		output.Println("Values template: initValues")
+		output.Println("Values template: initValues (the module's starting values; edit them for this instance)")
 	case instinit.FromDebugValues:
 		output.Println("Values template: debugValues (module declares no initValues; review before deploying)")
 	case instinit.FromEmpty:
