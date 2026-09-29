@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0-alpha.24](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.23...v1.0.0-alpha.24) (2026-09-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **platform:** renders no longer fall back to ~/.opm/platform/. Pass it with --platform ~/.opm/platform to keep rendering against it.
+
+### Features
+
+* **platform:** resolve instance platforms from the cluster, then their own deps ([#236](https://github.com/open-platform-model/cli/issues/236)) ([bef84a0](https://github.com/open-platform-model/cli/commit/bef84a0f3d7f4fd339d31f0d92a275e87ab2f3d5))
+* **render:** add --skip-unprovided to render what the platform can ([#238](https://github.com/open-platform-model/cli/issues/238)) ([da2dc42](https://github.com/open-platform-model/cli/commit/da2dc423392c71e1908c6302b1c98051a2065220))
+
 ## [1.0.0-alpha.23](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.22...v1.0.0-alpha.23) (2026-09-29)
 
 
