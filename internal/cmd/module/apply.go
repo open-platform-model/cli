@@ -3,7 +3,6 @@ package modulecmd
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -26,7 +25,7 @@ import (
 func NewModuleApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var rf cmdutil.RenderFlags
 	var kf cmdutil.K8sFlags
-	var nameFlag string
+	var nameFlag, versionFlag string
 
 	var (
 		dryRunFlag   bool
@@ -36,11 +35,19 @@ func NewModuleApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use:   "apply [path]",
+		Use:   "apply [path | module-path]",
 		Short: "Deploy a module to a cluster via synthetic instance",
-		Long: `Deploy an OPM module package to a Kubernetes cluster by synthesizing
-a #ModuleInstance around it and applying the result. Values come from the
-module's debugValues (default) or from -f/--values files.
+		Long: `Deploy an OPM module to a Kubernetes cluster by synthesizing a
+#ModuleInstance around it and applying the result. The module is a package
+directory on disk or a published module named by its module path. Values come
+from the module's debugValues (default) or from -f/--values files. debugValues
+are the module author's test values: apply warns when it deploys them, and
+'opm instance init' writes an editable instance package instead.
+
+A published module is fetched from the registry at the version --version
+selects (v1: newest in major 1; 1.0.4: that release; none: newest release of
+the highest major built on this CLI's core), resolved before the cluster is
+contacted.
 
 The synthetic instance defaults to "<module>-debug". --name and --namespace
 participate in instance identity (different values produce different instances,
@@ -55,7 +62,10 @@ orphan inventory:
   opm instance delete <module>-debug
 
 Arguments:
-  path    Path to a module package directory (default: current directory)
+  path          Module package directory (default: current directory).
+                "." or a ./, ../ or absolute path is always a directory.
+  module-path   Published module path without a major, e.g.
+                opmodel.dev/modules/web_app
 
 Examples:
   # Apply the current module using debugValues
@@ -65,16 +75,23 @@ Examples:
   opm module apply ./my-module --name my-debug
 
   # Dry run against a specific namespace
-  opm module apply ./my-module -n staging --dry-run`,
+  opm module apply ./my-module -n staging --dry-run
+
+  # Apply the newest v1 release of a published module
+  opm module apply opmodel.dev/modules/web_app --version v1 --name hello -n demo`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runModuleApply(args, cfg, &rf, &kf, nameFlag, dryRunFlag, createNSFlag, noPruneFlag, forceFlag)
+			return runModuleApply(args, cfg, &rf, &kf, applyOpts{
+				name: nameFlag, version: versionFlag,
+				dryRun: dryRunFlag, createNS: createNSFlag, noPrune: noPruneFlag, force: forceFlag,
+			})
 		},
 	}
 
 	rf.AddTo(c)
 	kf.AddTo(c)
 	c.Flags().StringVar(&nameFlag, "name", "", "Override synthetic instance name")
+	c.Flags().StringVar(&versionFlag, "version", "", versionFlagHelp)
 	c.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Server-side dry run (no changes made)")
 	c.Flags().BoolVar(&createNSFlag, "create-namespace", false, "Create target namespace if it does not exist")
 	c.Flags().BoolVar(&noPruneFlag, "no-prune", false, "Skip stale resource pruning")
@@ -83,25 +100,29 @@ Examples:
 	return c
 }
 
+// applyOpts are the module apply flags beyond the shared render and
+// Kubernetes flag sets.
+type applyOpts struct {
+	name, version                    string
+	dryRun, createNS, noPrune, force bool
+}
+
+// debugValuesWarning is printed whenever module apply deploys the module's
+// debugValues, from a local directory and a published module alike.
+const debugValuesWarning = "applying the module's debugValues, the author's test values; review them before a real deployment, or write an editable instance package with 'opm instance init'"
+
 // runModuleApply executes the module apply command.
-func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, kf *cmdutil.K8sFlags,
-	nameFlag string, dryRun, createNS, noPrune, force bool) error {
+func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderFlags, kf *cmdutil.K8sFlags, opts applyOpts) error {
 	ctx := context.Background()
 
-	modulePath := cmdutil.ResolveModulePath(args)
-
-	info, statErr := os.Stat(modulePath)
-	if statErr != nil {
-		if os.IsNotExist(statErr) {
-			return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("module path %q not found", modulePath)}
-		}
-		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("stat %q: %w", modulePath, statErr)}
+	// Resolution precedes every cluster contact: a module that cannot be
+	// resolved never reaches kubeconfig or the apiserver.
+	moduleArg, err := cmdutil.ResolveModuleArg(ctx, cfg, args, opts.version, "apply")
+	if err != nil {
+		return err
 	}
-	if !info.IsDir() {
-		return &opmexit.ExitError{
-			Code: opmexit.ExitGeneralError,
-			Err:  fmt.Errorf("module apply expects a directory; CUE packages span all files in a dir. Use 'opm instance apply %s' for a instance file", modulePath),
-		}
+	if len(rf.Values) == 0 {
+		output.Warn(debugValuesWarning)
 	}
 
 	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
@@ -123,9 +144,10 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 	}
 
 	result, err := render.FromModule(ctx, render.ModuleOpts{
-		ModulePath:      modulePath,
+		ModulePath:      moduleArg.Dir,
+		Published:       moduleArg.Published,
 		ValuesFiles:     rf.Values,
-		Name:            nameFlag,
+		Name:            opts.name,
 		PlatformFlag:    rf.Platform,
 		ClusterPlatform: platform.ClusterPlatformGetterFor(k8sClient.Dynamic),
 		K8sConfig:       k8sConfig,
@@ -144,10 +166,10 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 		K8sClient: k8sClient,
 		Log:       instanceLog,
 		Options: workflowapply.Options{
-			DryRun:                 dryRun,
-			CreateNS:               createNS,
-			NoPrune:                noPrune,
-			Force:                  force,
+			DryRun:                 opts.dryRun,
+			CreateNS:               opts.createNS,
+			NoPrune:                opts.noPrune,
+			Force:                  opts.force,
 			SuccessUpToDateMessage: "Instance up to date",
 			SuccessAppliedMessage:  "Instance applied",
 		},

@@ -7,6 +7,7 @@ import (
 	"github.com/open-platform-model/library/opm/module"
 
 	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/modref"
 	"github.com/open-platform-model/cli/internal/platform"
 )
 
@@ -93,7 +94,12 @@ type InstanceFileOpts struct {
 // synthesis path (no instance.cue on disk).
 type ModuleOpts struct {
 	// ModulePath is the directory containing the user's module CUE package.
+	// Unused when Published is set.
 	ModulePath string
+
+	// Published, when set, is the resolved published module to acquire from
+	// the registry instead of a local directory.
+	Published *modref.Resolution
 
 	// ValuesFiles, when non-empty, override the module's debugValues.
 	ValuesFiles []string

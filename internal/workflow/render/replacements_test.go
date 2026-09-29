@@ -39,6 +39,20 @@ func TestReplacementWarnings_NoModuleContextReadsNoFile(t *testing.T) {
 	assert.Empty(t, replacementWarnings(nil, "", nil))
 }
 
+// A published module renders with no module context: only the platform's
+// rows are worded, and a local-module.cue in the working directory is not
+// read.
+func TestReplacementWarnings_PublishedModuleWordsOnlyPlatformRows(t *testing.T) {
+	t.Chdir(writeModuleContext(t, `deps: "test.example/lib@v0": replaceWith: "../lib"`))
+	rows := []kernel.Replacement{{Path: "opmodel.dev/catalogs/opm@v4", Target: "/home/dev/catalog_opm", By: "platform"}}
+
+	got := replacementWarnings(rows, "", nil)
+
+	assert.Equal(t, []string{
+		"local replacement in effect: opmodel.dev/catalogs/opm@v4 served from /home/dev/catalog_opm (platform); rendered bytes may not correspond to any published build",
+	}, got)
+}
+
 func TestReplacementWarnings_HonoredPlatformRow(t *testing.T) {
 	rows := []kernel.Replacement{{Path: "opmodel.dev/catalogs/opm@v4", Target: "/home/dev/catalog_opm", By: "platform"}}
 

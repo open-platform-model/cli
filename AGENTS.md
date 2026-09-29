@@ -122,6 +122,7 @@ Read when entering `cli/`:
 - `internal/cuemod/` - in-process `cue mod tidy [--check]` through the public `cuelang.org/go/cmd/cue/cmd` tree (the tidy engine is CUE-internal); used by `module tidy` and `catalog tidy`. The only `os.Chdir`/`os.Setenv` site in the CLI: `cmd/cue` reads the module root from the working directory and the registry from `CUE_REGISTRY`, so `Tidy` sets both under a package mutex and restores them on every return path. `cuemodtest/` is its hermetic in-memory-registry harness.
 - `internal/cueedit/` - surgical authoring-file rewrites (D8's schema-fixed-path identity `Version` write — idempotent, with a read — the identity `ModulePath` writer, the cue.mod `module:` writer/reader, and the tree-wide re-identification set: self-import rewriter, package-clause renamer, self-import scanner; used by `publish --version`, `version set`, and `mod init`).
 - `internal/scaffold/` - fetch-based init engine (0011:D20/D25): template-ref grammar + shortcut expansion, the baked official-template table, stable-float version resolution (`compat.HighestStable`), staged-tree copy, wholesale re-identification, and repair-plan detection.
+- `internal/modref/` - published-module resolution (0016:D5): the major-free module path grammar, the `--version` selector (`vN` floats, `X.Y.Z` pins), the float rule (newest stable, else newest non-dev prerelease; the dev predicate is `publish.IsDevTag`), the highest-core-compatible major walk over each candidate's module file, and the stderr report. Shared by `module build`/`module apply` (via `cmdutil.ResolveModuleArg`, which also classifies the positional argument) and the planned `instance init`. Distinct from `scaffold`, whose template grammar and selector differ on purpose.
 - `templates/` - the official template module trees (`minimal`, `standard`, `advanced`) — real CUE modules at `opmodel.dev/templates/<name>` published by release CI through `opm module publish`; deps maintained by the workspace `deps:update:templates` task.
 - `internal/dockercfg/` - single-entry read-modify-write of the standard OCI/docker credential file (`auths[host]` upsert; everything else passes through untouched; used by `registry login`).
 - `internal/kubernetes/` - cluster ops, status, apply, delete, events.
@@ -175,6 +176,10 @@ Read when entering `cli/`:
   `platformmodule.Closure`, core floored at the kernel's verified release)
   into the same cache, and the module's own `local-module.cue` replacements of
   paths it pins are carried into it. Skew cannot arise and is not checked.
+  Both commands also take a published module path (`internal/modref`): the
+  module is acquired with `AcquireModuleFromRegistry` and synthesized exactly
+  as a directory module, with no local module context (no replacements, no
+  local render provenance).
   `module apply` and every `instance` command keep the precedence above.
 - Integration + CUE workflows need registry config. Follow the Registry Policy in the root `AGENTS.md` — both `opmodel.dev/*` and `testing.opmodel.dev/*` resolve from GHCR:
 
