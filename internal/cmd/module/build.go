@@ -35,9 +35,9 @@ debugValues (default) or from -f/--values files.
 The render answers whether the module renders with the catalogs it declares:
 by default it runs against a platform generated from the module's own
 cue.mod/module.cue, one registry entry per catalog the module pins, at the
-pinned version. Neither the cluster nor ~/.opm/platform/ is read. Pass
---platform <dir> to render against a platform module instead, for example one
-pulled with 'opm platform pull'.
+pinned version. The cluster is not read. Pass --platform <dir> to render
+against a platform module instead, for example one pulled with
+'opm platform pull'.
 
 A published module is fetched from the registry; nothing is written to disk
 except CUE's module cache. --version v1 takes the newest release of major 1,
@@ -122,14 +122,13 @@ func runModuleBuild(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 	}
 
 	result, err := render.FromModule(ctx, render.ModuleOpts{
-		ModulePath:       moduleArg.Dir,
-		Published:        moduleArg.Published,
-		ValuesFiles:      rf.Values,
-		Name:             nameFlag,
-		PlatformFlag:     rf.Platform, // offline: no cluster read (0006:D21)
-		PlatformFromDeps: true,
-		K8sConfig:        k8sConfig,
-		Config:           cfg,
+		ModulePath:   moduleArg.Dir,
+		Published:    moduleArg.Published,
+		ValuesFiles:  rf.Values,
+		Name:         nameFlag,
+		PlatformFlag: rf.Platform, // else the module's own deps; never the cluster
+		K8sConfig:    k8sConfig,
+		Config:       cfg,
 	})
 	if err != nil {
 		return err

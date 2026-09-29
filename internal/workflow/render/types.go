@@ -34,15 +34,8 @@ type Result struct {
 	// not failure; every entry is shown to the user.
 	Warnings []string
 
-	// Platform is the resolved platform-source provenance (0006:D21). The
-	// apply workflow uses it for the 0006:D12 write-if-absent decision.
+	// Platform is the resolved platform-source provenance (0006:D21).
 	Platform platform.Resolution
-
-	// PlatformSpec is the seed document decoded from the built platform the
-	// render consumed (type, and per #registry entry its key, enable and the
-	// derived version) — the exact document the 0006:D12 write-if-absent seeds,
-	// with no re-read of the platform module at apply time.
-	PlatformSpec platform.Spec
 
 	// RenderDigest is the operator-parity render digest computed over the
 	// kernel-rendered resources (CUE-value serialization, operator sort
@@ -90,9 +83,12 @@ type InstanceFileOpts struct {
 	// PlatformFlag is the --platform platform module directory (0006:D21;
 	// highest platform-source precedence).
 	PlatformFlag string
-	// ClusterPlatform reads the cluster Platform CR spec. nil marks the
-	// command offline: the cluster is never consulted (0006:D17/D21).
+	// ClusterPlatform reads the cluster Platform CR. nil skips the cluster:
+	// the render resolves --platform, else the instance package's own deps.
 	ClusterPlatform platform.ClusterPlatformGetter
+	// ClusterOptional makes any cluster read failure warn and fall back to
+	// the deps instead of failing the render (instance build and vet).
+	ClusterOptional bool
 
 	K8sConfig *config.ResolvedKubernetesConfig
 	Config    *config.GlobalConfig
@@ -120,15 +116,11 @@ type ModuleOpts struct {
 	// PlatformFlag is the --platform platform module directory (0006:D21;
 	// highest platform-source precedence).
 	PlatformFlag string
-	// ClusterPlatform reads the cluster Platform CR spec. nil marks the
-	// command offline: the cluster is never consulted (0006:D17/D21).
+	// ClusterPlatform reads the cluster Platform CR. nil (module build and
+	// vet) skips the cluster: the render resolves --platform, else the
+	// module's own deps. module apply sets it, and falls back to the deps
+	// when the cluster has no readable Platform.
 	ClusterPlatform platform.ClusterPlatformGetter
-
-	// PlatformFromDeps selects the author's platform: --platform, else a
-	// platform generated from the module's own deps. Set by module build
-	// and module vet; never by module apply. ClusterPlatform MUST be nil
-	// when it is set.
-	PlatformFromDeps bool
 
 	K8sConfig *config.ResolvedKubernetesConfig
 	Config    *config.GlobalConfig

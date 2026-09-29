@@ -65,8 +65,10 @@ func NewClient(opts ClientOptions) (*Client, error) {
 
 	restConfig, err := buildRestConfig(opts)
 	if err != nil {
+		// The cause stays in the chain (same text as oerrors.Wrap) so a
+		// caller can tell a missing or empty kubeconfig from a broken one.
 		return nil, fmt.Errorf("building kubernetes config: %w",
-			oerrors.Wrap(oerrors.ErrConnectivity, err.Error()))
+			fmt.Errorf("%w: %w", err, oerrors.ErrConnectivity))
 	}
 
 	// Set custom warning handler based on config

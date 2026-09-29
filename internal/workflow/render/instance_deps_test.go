@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/open-platform-model/library/opm/kernel"
-	libmodule "github.com/open-platform-model/library/opm/module"
 
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/instinit"
@@ -92,13 +91,15 @@ func TestInstanceDeps_InitPackageListsItsCatalogsAndRenders(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, mf.Deps, "opmodel.dev/catalogs/opm@v4", "the tidied package lists its module's catalog transitively")
 
-	deps, err := moduleDepsOf(&libmodule.Source{Root: dir, Overlay: map[string][]byte{modFileName: data}}, dir)
+	deps, err := instanceDepsOf(dir, dir)
 	require.NoError(t, err)
+	assert.Equal(t, data, deps.ModFile, "the deps are the package's own committed module file")
 
 	cfg := &config.GlobalConfig{ConfigPath: filepath.Join(t.TempDir(), "config.cue"), Registry: instanceDepsRegistry}
-	env, err := resolvePlatformEnv(ctx, k, cfg, "", nil, deps)
+	env, err := resolvePlatformEnv(ctx, k, cfg, platform.ResolveOptions{Deps: deps, DepsKind: platform.DepsInstance})
 	require.NoError(t, err)
 	assert.Equal(t, platform.SourceModuleDeps, env.resolution.Source)
+	assert.Equal(t, platform.DepsInstance, env.resolution.DepsKind)
 	require.NotEmpty(t, env.resolution.Catalogs)
 	assert.Contains(t, env.resolution.Catalogs[0], "opmodel.dev/catalogs/opm@v4")
 
@@ -107,4 +108,27 @@ func TestInstanceDeps_InitPackageListsItsCatalogsAndRenders(t *testing.T) {
 	result, err := renderInstance(ctx, env, inst, &config.ResolvedKubernetesConfig{}, dir, false)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Resources, "the instance renders against the platform generated from its own pins")
+}
+
+// TestInstanceDepsOf_NoModuleRootIsAnError asserts a package under no CUE
+// module has no pins to fall back to, and the error names the directory.
+func TestInstanceDepsOf_NoModuleRootIsAnError(t *testing.T) {
+	dir := t.TempDir()
+	_, err := instanceDepsOf(dir, "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), dir)
+	assert.Contains(t, err.Error(), "under no CUE module")
+}
+
+// TestInstanceDepsOf_CarriesThePackageReplacements asserts the instance
+// package's own cue.mod/local-module.cue is read beside its module file.
+func TestInstanceDepsOf_CarriesThePackageReplacements(t *testing.T) {
+	root := writeModuleContext(t, `deps: "opmodel.dev/catalogs/opm@v4": replaceWith: "../catalog_opm/opm"`)
+
+	deps, err := instanceDepsOf(root, root)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(root, "cue.mod", "module.cue"), deps.ModFileName)
+	assert.Equal(t, root, deps.ModuleRoot)
+	require.Len(t, deps.Replacements, 1)
+	assert.Equal(t, "opmodel.dev/catalogs/opm@v4", deps.Replacements[0].Path)
 }

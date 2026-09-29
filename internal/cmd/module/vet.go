@@ -41,8 +41,8 @@ func NewModuleVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 	each rendered object without printing it, so vet and build reach the same
 	verdict. By default the render runs against a platform generated from the
 	module's own cue.mod/module.cue, one registry entry per catalog the module
-	pins, at the pinned version; neither the cluster nor ~/.opm/platform/ is
-	read. Pass --platform <dir> to render against a platform module instead.
+	pins, at the pinned version; the cluster is not read. Pass --platform <dir>
+	to render against a platform module instead.
 
 	Arguments:
 	  path    Path to module directory (default: current directory)
@@ -180,13 +180,12 @@ func renderVetModule(ctx context.Context, cfg *config.GlobalConfig, modulePath s
 	}
 
 	result, err := render.FromModule(ctx, render.ModuleOpts{
-		ModulePath:       modulePath,
-		ValuesFiles:      rf.Values,
-		Name:             rf.InstanceName,
-		PlatformFlag:     rf.Platform, // offline: no cluster read (0006:D21)
-		PlatformFromDeps: true,
-		K8sConfig:        k8sConfig,
-		Config:           cfg,
+		ModulePath:   modulePath,
+		ValuesFiles:  rf.Values,
+		Name:         rf.InstanceName,
+		PlatformFlag: rf.Platform, // else the module's own deps; never the cluster
+		K8sConfig:    k8sConfig,
+		Config:       cfg,
 	})
 	if err != nil {
 		return err

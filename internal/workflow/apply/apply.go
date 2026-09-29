@@ -14,7 +14,6 @@ import (
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
-	"github.com/open-platform-model/cli/internal/platform"
 	"github.com/open-platform-model/cli/internal/version"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
 	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
@@ -176,19 +175,6 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			output.Println(output.FormatCheckmark(req.Options.SuccessUpToDateMessage))
 		} else {
 			output.Println(output.FormatCheckmark(req.Options.SuccessAppliedMessage))
-		}
-
-		// Solo-cluster Platform seeding (0006:D12/D22): when the render fell
-		// back from the cluster to the local default platform, seed the
-		// singleton cluster Platform write-if-absent so the operator adopts
-		// it on install. The seeded document is the exact resolved spec the
-		// render consumed (Result.PlatformSpec — no file re-read, no TOCTOU).
-		// Best-effort — Ensure degrades on RBAC and no-ops on AlreadyExists;
-		// only unexpected errors surface as warnings.
-		if result.Platform.Source == platform.SourceLocalDefault && result.Platform.Warning != "" {
-			if seedErr := platform.EnsureClusterPlatform(ctx, req.K8sClient.Dynamic, result.PlatformSpec); seedErr != nil {
-				instanceLog.Warn("could not seed cluster Platform", "error", seedErr)
-			}
 		}
 	}
 

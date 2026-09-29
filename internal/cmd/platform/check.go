@@ -2,6 +2,7 @@ package platformcmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -16,6 +17,7 @@ import (
 // NewPlatformCheckCmd creates the platform check command.
 func NewPlatformCheckCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var platformFlag string
+	var kf cmdutil.K8sFlags
 
 	c := &cobra.Command{
 		Use:   "check [dir]",
@@ -29,8 +31,9 @@ contracts nothing implements, the provider-fulfilled contracts required by
 transformers from more than one catalog, and every pair of transformers whose
 match predicates are comparable over a shared catalog-fulfilled contract.
 
-Offline: the command applies nothing, renders nothing and contacts no cluster.
-A cold module cache still fetches the platform's pinned core and catalogs.
+The command applies and renders nothing. It contacts a cluster only to read
+its Platform, when neither [dir] nor --platform is given. A cold module cache
+still fetches the platform's pinned core and catalogs.
 
 The exit code carries what platform-package generation refuses on, not the
 severity of the word:
@@ -46,24 +49,25 @@ severity of the word:
                     provider that implements it, and an unmet demand is
                     refused by the render that demands it
 
-The platform is resolved by the usual precedence, with a directory argument
-above all of it: [dir] > --platform > ~/.opm/platform/. The cluster Platform
-CR is never read here; this command checks a platform module.
+The platform is resolved as [dir] > --platform > the cluster's Platform,
+read through --kubeconfig/--context. With none of the three the command
+refuses; it never checks a platform from the OPM home directory.
 
 Examples:
-  # Check the configured default platform
+  # Check the platform of the current kubeconfig context's cluster
   opm platform check
 
   # Check a platform module in a repository
   opm platform check ./platforms/staging`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runPlatformCheck(c.Context(), args, cfg, platformFlag)
+			return runPlatformCheck(c.Context(), args, cfg, platformFlag, kf)
 		},
 	}
 
 	c.Flags().StringVar(&platformFlag, "platform", "",
-		"Path to a platform module directory (overrides ~/.opm/platform/)")
+		"Platform module directory")
+	kf.AddTo(c)
 
 	return c
 }
@@ -72,22 +76,33 @@ Examples:
 // inventory report. Routability and discrimination decide the exit status —
 // the two conditions platform-package generation refuses on (0015:D5,
 // 0010:D37); an unfulfilled contract never does (0015:D18).
-func runPlatformCheck(ctx context.Context, args []string, cfg *config.GlobalConfig, platformFlag string) error {
+func runPlatformCheck(ctx context.Context, args []string, cfg *config.GlobalConfig, platformFlag string, kf cmdutil.K8sFlags) error {
 	argDir := ""
 	if len(args) > 0 {
 		argDir = args[0]
 	}
 
-	// Cluster is deliberately nil: a cluster's effective registry is its own
-	// subject (0015:D6), and this command reads a platform module.
+	// The cluster is read only when neither a directory argument nor
+	// --platform names the platform.
+	var cluster platform.ClusterPlatformGetter
+	if argDir == "" && platformFlag == "" {
+		getter, err := checkClusterGetter(cfg, kf)
+		if err != nil {
+			return err
+		}
+		cluster = getter
+	}
+
 	dir, res, err := platform.Resolve(ctx, platform.ResolveOptions{
 		Argument:     argDir,
 		PlatformFlag: platformFlag,
 		ConfigPath:   cfg.ConfigPath,
+		Cluster:      cluster,
+		NoFallback:   true,
 		Registry:     cfg.Registry,
 	})
 	if err != nil {
-		return &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: err}
+		return checkResolveError(err)
 	}
 
 	p, err := config.BuildPlatformModule(ctx, dir, cfg.Registry)
@@ -119,4 +134,46 @@ func runPlatformCheck(ctx context.Context, args []string, cfg *config.GlobalConf
 		}
 	}
 	return nil
+}
+
+// noPlatformToCheck is the refusal when none of the three sources yields a
+// platform.
+const noPlatformToCheck = "no platform to check: pass [dir] or --platform <dir>, or point --context at a cluster with a Platform"
+
+// checkClusterGetter builds the cluster Platform getter for the cluster
+// step. A kubeconfig with no context yields no getter (the resolver then
+// refuses naming all three sources); a kubeconfig that cannot be used is a
+// connectivity failure.
+func checkClusterGetter(cfg *config.GlobalConfig, kf cmdutil.K8sFlags) (platform.ClusterPlatformGetter, error) {
+	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
+		Config:         cfg,
+		KubeconfigFlag: kf.Kubeconfig,
+		ContextFlag:    kf.Context,
+	})
+	if err != nil {
+		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("resolving kubernetes config: %w", err)}
+	}
+	client, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
+	if err != nil {
+		if cmdutil.IsNoKubeContext(err) {
+			return nil, nil
+		}
+		return nil, &opmexit.ExitError{Code: opmexit.ExitConnectivityError, Err: fmt.Errorf("connecting to cluster: %w", err)}
+	}
+	return platform.ClusterPlatformGetterFor(client.Dynamic), nil
+}
+
+// checkResolveError maps a resolution failure onto the command's exit codes:
+// no source at all, or no readable cluster Platform, is not-found naming the
+// three sources; an unreachable cluster is a connectivity failure; anything
+// else (a directory that is not a platform module) is not-found as before.
+func checkResolveError(err error) error {
+	switch {
+	case errors.Is(err, platform.ErrNoPlatformSource), errors.Is(err, platform.ErrNoClusterPlatform):
+		return &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: fmt.Errorf("%s (%w)", noPlatformToCheck, err)}
+	case errors.Is(err, platform.ErrClusterRead):
+		return &opmexit.ExitError{Code: opmexit.ExitConnectivityError, Err: err}
+	default:
+		return &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: err}
+	}
 }

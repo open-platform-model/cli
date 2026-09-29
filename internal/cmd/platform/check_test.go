@@ -13,6 +13,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 )
 
@@ -498,4 +499,28 @@ deps: "opmodel.dev/core@v2": v: "v2.0.0-alpha.9"
 	assert.Contains(t, err.Error(), "2.0.0-alpha.10")
 	assert.Contains(t, err.Error(), dir)
 	assert.Empty(t, report, "no partial report is printed")
+}
+
+// TestPlatformCheck_NoSourceRefuses covers "platform check with no source
+// refuses": no argument, no --platform and a kubeconfig with no context
+// exit not-found naming all three sources, and nothing under the OPM home is
+// read.
+func TestPlatformCheck_NoSourceRefuses(t *testing.T) {
+	kubernetes.ResetClient()
+	t.Cleanup(kubernetes.ResetClient)
+	home := t.TempDir()
+	cmd := NewPlatformCheckCmd(&config.GlobalConfig{Registry: config.DefaultRegistry, ConfigPath: filepath.Join(home, "config.cue")})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--kubeconfig", filepath.Join(t.TempDir(), "missing")})
+
+	err := cmd.Execute()
+	require.Error(t, err)
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitNotFound, exitErr.Code)
+	assert.Contains(t, err.Error(), "pass [dir] or --platform <dir>, or point --context at a cluster with a Platform")
+	entries, rerr := os.ReadDir(home)
+	require.NoError(t, rerr)
+	assert.Empty(t, entries, "nothing is generated or read under the OPM home")
 }

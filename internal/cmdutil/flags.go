@@ -31,13 +31,17 @@ func (f *RenderFlags) AddTo(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.InstanceName, "instance-name", "",
 		"Instance name (default: module name)")
 	cmd.Flags().StringVar(&f.Platform, "platform", "",
-		platformFlagHelp)
+		modulePlatformFlagHelp)
 }
 
-// platformFlagHelp is the --platform help text shared by every render-bearing
-// command: the flag names a platform module directory (0019:D5), never a
-// data file.
-const platformFlagHelp = "Path to a platform module directory (overrides the cluster Platform and ~/.opm/platform/)"
+// The --platform help text of the render-bearing commands: the flag names a
+// platform module directory (0019:D5), never a data file, and outranks every
+// other platform source. The module commands fall back to the module's own
+// deps, the instance commands to the instance package's.
+const (
+	modulePlatformFlagHelp   = "Platform module directory (overrides the cluster Platform and the module's own deps)"
+	instancePlatformFlagHelp = "Platform module directory (overrides the cluster Platform and the instance's own deps)"
+)
 
 // K8sFlags holds flags for Kubernetes cluster connection
 // (apply, delete, status).
@@ -120,7 +124,7 @@ func (f *InstanceFileFlags) AddTo(cmd *cobra.Command) {
 	cmd.Flags().StringArrayVarP(&f.Values, "values", "f", nil,
 		"Additional values files (can be repeated; default: values.cue next to the instance file)")
 	cmd.Flags().StringVar(&f.Platform, "platform", "",
-		platformFlagHelp)
+		instancePlatformFlagHelp)
 }
 
 // uuidPattern matches a UUID v4/v5: 8-4-4-4-12 lowercase hex digits.

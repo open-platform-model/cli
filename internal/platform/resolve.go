@@ -26,13 +26,24 @@ const (
 	// SourceClusterCR is the cluster Platform CR spec, generated into a
 	// module under the OPM home cache.
 	SourceClusterCR Source = "cluster"
-	// SourceLocalDefault is the local default platform module beside the
-	// config file (~/.opm/platform/).
-	SourceLocalDefault Source = "local"
-	// SourceModuleDeps is a platform generated from a module's own
-	// dependency pins, for a render answering its author (module build,
-	// module vet), generated into a module under the OPM home cache.
+	// SourceModuleDeps is a platform generated from the render's own
+	// dependency pins (a module's or an instance package's; Resolution.
+	// DepsKind says which), generated into a module under the OPM home
+	// cache.
 	SourceModuleDeps Source = "module-deps"
+)
+
+// DepsKind names whose committed dependency pins a deps platform is
+// generated from, for the provenance line and the fallback warning.
+type DepsKind string
+
+const (
+	// DepsModule is a module's own cue.mod/module.cue (module build, vet
+	// and apply).
+	DepsModule DepsKind = "module"
+	// DepsInstance is an instance package's own cue.mod/module.cue (every
+	// instance render).
+	DepsInstance DepsKind = "instance"
 )
 
 // Resolution reports where the platform came from — the provenance every
@@ -42,11 +53,11 @@ type Resolution struct {
 	// Source is the precedence step that produced the platform.
 	Source Source
 	// Location names the concrete origin: the --platform argument, the CR
-	// name, or the local default directory.
+	// name, or the committed module file of a deps platform.
 	Location string
 	// Dir is the platform module directory the kernel acquires. For the
-	// flag and local sources it equals Location; for the cluster CR it is
-	// the generated module under the cache.
+	// argument and flag sources it equals Location; for the cluster CR and
+	// the deps it is the generated module under the cache.
 	Dir string
 	// SkewPolicy is the cluster CR's spec.skewPolicy verbatim ("Warn",
 	// "Refuse" or empty when unset). Set only for SourceClusterCR; the
@@ -64,6 +75,9 @@ type Resolution struct {
 	// overlaps a subscription leaves no trace on the recorded registry).
 	// Set only for SourceClusterCR, empty when none is recorded.
 	PackageIdentity string
+	// DepsKind names whose pins a deps platform was generated from. Set
+	// only for SourceModuleDeps.
+	DepsKind DepsKind
 	// Catalogs names each registry entry of a module-deps platform as
 	// "<path> <version>", in path order. Set only for SourceModuleDeps.
 	Catalogs []string
@@ -72,7 +86,7 @@ type Resolution struct {
 	// for SourceModuleDeps; the render words these rows as the module's.
 	Carried map[string]string
 	// Warning is non-empty when resolution fell back from the cluster CR
-	// to the local default.
+	// to the deps.
 	Warning string
 }
 
@@ -97,14 +111,12 @@ func (r Resolution) Describe() string {
 		return "platform: " + r.Dir + " (--platform)"
 	case SourceClusterCR:
 		return "platform: cluster Platform CR " + r.Location + " (" + r.describeRegistry() + "generated module " + r.Dir + ")"
-	case SourceLocalDefault:
-		return "platform: " + r.Dir + " (local default)"
 	case SourceModuleDeps:
 		catalogs := "no catalogs"
 		if len(r.Catalogs) > 0 {
 			catalogs = strings.Join(r.Catalogs, ", ")
 		}
-		return "platform: module deps (" + catalogs + "; generated module " + r.Dir + ")"
+		return "platform: " + r.DepsKind.label() + " deps (" + catalogs + "; generated module " + r.Dir + ")"
 	default:
 		return "platform: unknown source"
 	}
@@ -148,43 +160,51 @@ type ClusterPlatformGetter func(ctx context.Context) (doc *ClusterPlatform, unav
 
 // ErrClusterRead marks a fatal failure to read the cluster Platform: the
 // cluster is unreachable or the API rejected the read. NotFound and
-// Forbidden never reach it — they are warn-fallback conditions.
+// Forbidden never reach it: they are warn-fallback conditions.
 var ErrClusterRead = errors.New("reading cluster Platform")
 
-// ErrNoClusterPlatform is returned instead of the local fallback when the
-// cluster Platform is absent or unreadable and ResolveOptions.NoLocalFallback
-// is set: a command whose subject is the cluster's own platform has nothing
-// to resolve, and the local default is not a stand-in for it.
+// ErrNoClusterPlatform is returned instead of the deps fallback when the
+// cluster Platform is absent or unreadable and ResolveOptions.NoFallback is
+// set: a command whose subject is the cluster's own platform has nothing to
+// resolve.
 var ErrNoClusterPlatform = errors.New("no readable cluster Platform")
 
+// ErrNoPlatformSource is returned when no step of the precedence yields a
+// platform: no argument, no --platform, no cluster Platform and no deps.
+var ErrNoPlatformSource = errors.New("no platform source available")
+
 // ResolveOptions selects the platform sources for one command invocation.
+// The precedence is Argument > PlatformFlag > Cluster > Deps; a step that
+// is unset is skipped.
 type ResolveOptions struct {
 	// Argument is a platform module directory named as a positional command
 	// argument. Highest precedence, and set only by commands that take one
 	// (`opm platform check <dir>`); empty everywhere else.
 	Argument string
 	// PlatformFlag is the --platform flag value: a platform module
-	// directory, above the cluster CR and the configured default.
+	// directory, above the cluster CR and the deps.
 	PlatformFlag string
-	// ConfigPath is the resolved config file path; the local default
-	// platform module and the generated-module cache are its siblings, so
-	// --config overrides move them together.
+	// ConfigPath is the resolved config file path; it locates the
+	// generated-module cache beside it, so --config overrides move it.
 	ConfigPath string
-	// Cluster is the cluster CR getter. nil means the command is offline
-	// (build/render) and MUST NOT read the cluster (0006:D17/D21).
+	// Cluster is the cluster CR getter. nil skips the cluster step (module
+	// build and vet, an offline instance build or vet, a machine with no
+	// kubeconfig context).
 	Cluster ClusterPlatformGetter
-	// ModuleDeps, when non-nil, replaces the cluster and local-default
-	// steps: a command rendering for its author (module build, module vet)
-	// resolves --platform, else a platform generated from these deps.
-	// Cluster MUST be nil when it is set.
-	ModuleDeps *ModuleDeps
-	// NoLocalFallback refuses the local-default step when the cluster
-	// Platform is unavailable, returning ErrNoClusterPlatform instead. Set
-	// by commands whose subject is the cluster's platform (`opm platform
-	// pull`), for which the local default would be a different platform
-	// wearing the cluster's name.
-	NoLocalFallback bool
-	// Registry is the CUE registry mapping the cluster CR's dependency
+	// ClusterOptional makes every cluster failure, not only an absent or
+	// forbidden Platform, warn and fall through to Deps. Set by instance
+	// build and vet, which never fail because of the cluster.
+	ClusterOptional bool
+	// Deps is the last step: a platform generated from the render's own
+	// committed dependency pins. DepsKind names whose pins they are.
+	Deps     *ModuleDeps
+	DepsKind DepsKind
+	// NoFallback makes a cluster that yields no Platform an error
+	// (ErrNoClusterPlatform) instead of a fall-through. Set by commands
+	// whose subject is the cluster's platform (`opm platform pull`,
+	// `opm platform check` without a directory).
+	NoFallback bool
+	// Registry is the CUE registry mapping the generated modules' dependency
 	// closure resolves through (the CLI's configured registry).
 	Registry string
 	// ModFiles serves published module files for the closure derivation.
@@ -194,16 +214,12 @@ type ResolveOptions struct {
 
 // Resolve resolves the platform by precedence and returns the platform
 // module directory the kernel acquires plus its provenance. Only the
-// generated sources perform I/O beyond a stat: the cluster CR and the module
-// deps are generated into a module under the cache (GenerateClusterModule,
+// generated sources perform I/O beyond a stat: the cluster CR and the deps
+// are generated into a module under the cache (GenerateClusterModule,
 // GenerateModuleDepsModule), which derives the dependency closure through the
 // registry. Nothing is built here; acquisition is the caller's one call after
 // resolution, so every source fails the same way.
 func Resolve(ctx context.Context, opts ResolveOptions) (string, Resolution, error) {
-	if opts.ModuleDeps != nil && opts.Cluster != nil {
-		return "", Resolution{}, errors.New("platform resolution: module deps and a cluster Platform getter are exclusive; a render for a module's author never reads the cluster")
-	}
-
 	// 0. A directory named as a command argument outranks every configured
 	// source; it gets the same module-shape check as the flag, so a
 	// non-module directory fails before anything is built.
@@ -222,43 +238,77 @@ func Resolve(ctx context.Context, opts ResolveOptions) (string, Resolution, erro
 		return opts.PlatformFlag, Resolution{Source: SourceFlagDir, Location: opts.PlatformFlag, Dir: opts.PlatformFlag}, nil
 	}
 
-	// 2. A module's own deps, for a render answering its author. The
-	// cluster and the local default are never read.
-	if opts.ModuleDeps != nil {
-		return resolveModuleDeps(ctx, *opts.ModuleDeps, opts)
-	}
-
-	// 3. Cluster Platform CR (cluster-facing commands only).
-	fallbackWarning := ""
+	// 2. Cluster Platform CR.
+	unavailable := ""
 	if opts.Cluster != nil {
-		doc, unavailable, err := opts.Cluster(ctx)
-		if err != nil {
-			return "", Resolution{}, fmt.Errorf("%w: %w", ErrClusterRead, err)
+		dir, res, why, err := resolveCluster(ctx, opts)
+		if err != nil || dir != "" {
+			return dir, res, err
 		}
-		if unavailable == "" {
-			return resolveClusterCR(ctx, doc, opts)
-		}
-		if opts.NoLocalFallback {
-			return "", Resolution{}, fmt.Errorf("%w (%s)", ErrNoClusterPlatform, unavailable)
-		}
-		fallbackWarning = "cluster Platform not used (" + unavailable + ") — falling back to the local default platform"
-		output.Warn(fallbackWarning)
+		unavailable = why
+	} else if opts.NoFallback {
+		return "", Resolution{}, fmt.Errorf("%w: no --platform directory and no cluster to read a Platform from", ErrNoPlatformSource)
 	}
 
-	// 4. Local default: the module `opm config init` writes.
-	localDir := config.PlatformDir(opts.ConfigPath)
-	if _, err := os.Stat(localDir); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return "", Resolution{}, fmt.Errorf("checking the local default platform at %s: %w", localDir, err)
+	// 3. The render's own deps.
+	if opts.Deps != nil {
+		warning := ""
+		if unavailable != "" {
+			warning = "cluster Platform not used (" + unavailable + ") — rendering against the " + opts.DepsKind.owner() + " own deps"
+			output.Warn(warning)
 		}
-		return "", Resolution{}, fmt.Errorf(
-			"no platform source available: no --platform flag%s and no local default platform module at %s — run 'opm config init' to seed one, or pass --platform <dir>",
-			clusterCloseParen(opts.Cluster != nil), localDir)
+		dir, res, err := resolveModuleDeps(ctx, *opts.Deps, opts)
+		if err != nil {
+			return "", Resolution{}, err
+		}
+		res.Warning = warning
+		return dir, res, nil
 	}
-	if err := checkPlatformModuleDir(localDir, "local default platform "+localDir); err != nil {
-		return "", Resolution{}, err
+
+	cluster := "no cluster Platform"
+	if unavailable != "" {
+		cluster += " (" + unavailable + ")"
 	}
-	return localDir, Resolution{Source: SourceLocalDefault, Location: localDir, Dir: localDir, Warning: fallbackWarning}, nil
+	return "", Resolution{}, fmt.Errorf("%w: no --platform directory, %s and no dependency pins to generate one from; pass --platform <dir>", ErrNoPlatformSource, cluster)
+}
+
+// resolveCluster runs the cluster step: the platform generated from a
+// readable Platform, or why the cluster yields none when resolution may fall
+// through to the deps. A read failure is fatal unless the cluster is
+// optional; a cluster that yields no Platform is fatal under NoFallback.
+func resolveCluster(ctx context.Context, opts ResolveOptions) (dir string, res Resolution, unavailable string, err error) {
+	doc, why, err := opts.Cluster(ctx)
+	switch {
+	case err != nil && !opts.ClusterOptional:
+		return "", Resolution{}, "", fmt.Errorf("%w: %w", ErrClusterRead, err)
+	case err != nil:
+		unavailable = "could not reach the cluster: " + err.Error()
+	case why == "":
+		dir, res, err := resolveClusterCR(ctx, doc, opts)
+		return dir, res, "", err
+	default:
+		unavailable = why
+	}
+	if opts.NoFallback {
+		return "", Resolution{}, "", fmt.Errorf("%w (%s)", ErrNoClusterPlatform, unavailable)
+	}
+	return "", Resolution{}, unavailable, nil
+}
+
+// label is the deps kind as the provenance line names it.
+func (k DepsKind) label() string {
+	if k == DepsInstance {
+		return "instance"
+	}
+	return "module"
+}
+
+// owner is the deps kind as the fallback warning names it.
+func (k DepsKind) owner() string {
+	if k == DepsInstance {
+		return "instance's"
+	}
+	return "module's"
 }
 
 // resolveClusterCR generates the platform module the cluster renders against.
@@ -312,9 +362,9 @@ func resolveClusterCR(ctx context.Context, doc *ClusterPlatform, opts ResolveOpt
 	}, nil
 }
 
-// resolveModuleDeps generates the platform a module renders against for its
-// author: one registry entry per catalog the module pins, at the pinned
-// version, with the module's replacements of pinned paths carried.
+// resolveModuleDeps generates the platform a render falls back to: one
+// registry entry per catalog the module or instance package pins, at the
+// pinned version, with its replacements of pinned paths carried.
 func resolveModuleDeps(ctx context.Context, deps ModuleDeps, opts ResolveOptions) (string, Resolution, error) {
 	dir, entries, carried, err := GenerateModuleDepsModule(ctx, deps, GenerateOptions{
 		CacheDir: config.PlatformCacheDir(opts.ConfigPath),
@@ -330,6 +380,7 @@ func resolveModuleDeps(ctx context.Context, deps ModuleDeps, opts ResolveOptions
 	}
 	return dir, Resolution{
 		Source:   SourceModuleDeps,
+		DepsKind: opts.DepsKind,
 		Location: deps.ModFileName,
 		Dir:      dir,
 		Catalogs: catalogs,
@@ -346,7 +397,7 @@ const conditionFalse = "False"
 // package itself is not evaluated here: the kernel's acquisition is the
 // build, and it fails identically for every source.
 func checkPlatformModuleDir(dir, what string) error {
-	const shape = "expected a platform module directory: cue.mod/module.cue plus a platform.cue package embedding core.#Platform — 'opm config init' seeds one at ~/.opm/platform/"
+	const shape = "expected a platform module directory: cue.mod/module.cue plus a platform.cue package embedding core.#Platform ('opm platform pull <dir>' captures a cluster's)"
 	info, err := os.Stat(dir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -365,13 +416,4 @@ func checkPlatformModuleDir(dir, what string) error {
 		return fmt.Errorf("%s: %w", what, err)
 	}
 	return nil
-}
-
-// clusterCloseParen phrases the no-source error for cluster-facing vs
-// offline commands.
-func clusterCloseParen(clusterTried bool) string {
-	if clusterTried {
-		return ", no readable cluster Platform,"
-	}
-	return ""
 }

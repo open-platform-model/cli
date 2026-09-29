@@ -55,31 +55,6 @@ func ClusterPlatformGetterFor(dyn dynamic.Interface) ClusterPlatformGetter {
 	}
 }
 
-// EnsureClusterPlatform seeds the singleton cluster Platform from the spec
-// decoded off the built local platform the render consumed
-// (SpecFromPlatform), write-if-absent (0006:D12/D22): a plain create with field
-// manager opm-cli, treating AlreadyExists as success-noop. Never SSA, never
-// update — an existing Platform is never overwritten. A Forbidden create
-// degrades to a warning (0006:D17: the render already succeeded against the local
-// platform).
-func EnsureClusterPlatform(ctx context.Context, dyn dynamic.Interface, spec Spec) error {
-	outcome, err := createClusterPlatform(ctx, dyn, spec)
-	if err != nil {
-		return err
-	}
-	switch outcome {
-	case platformCreated:
-		output.Info("seeded cluster Platform from the local default platform (write-if-absent)")
-	case platformAlreadyPresent:
-		output.Debug("cluster Platform already exists; write-if-absent is a no-op")
-	case platformWriteForbidden:
-		output.Warn("could not seed the cluster Platform (create denied by RBAC); continuing against the local platform")
-	case platformWriteUnset:
-		// Unreachable: the zero value is only ever returned beside an error.
-	}
-	return nil
-}
-
 // platformWriteOutcome is what the write-if-absent create actually did, so
 // each caller narrates its own provenance instead of inheriting another
 // caller's message.
@@ -136,19 +111,16 @@ func createClusterPlatform(ctx context.Context, dyn dynamic.Interface, spec Spec
 }
 
 // defaultPlatformType is the informational discriminator a seeded Platform
-// carries. It mirrors the seeded platform module (config.DefaultPlatformCUE);
-// the CRD requires the field to be non-empty and nothing matches on its value.
+// carries; the CRD requires the field to be non-empty and nothing matches on
+// its value.
 const defaultPlatformType = "kubernetes"
 
 // EnsureClusterPlatformForCatalog seeds the singleton cluster Platform with a
-// single subscription to catalogPath at version, under exactly the write
-// contract of EnsureClusterPlatform: plain create, never SSA, never update,
-// an existing Platform left untouched.
-//
-// It differs from EnsureClusterPlatform only in provenance. The spec was
-// resolved from the registry rather than decoded from the local default
-// platform module, so the reporting names the catalog coordinate that was
-// pinned and never claims a platform it did not consume.
+// single subscription to catalogPath at version, write-if-absent (0006:D22):
+// plain create with field manager opm-cli, never SSA, never update, an
+// existing Platform left untouched, a Forbidden create degraded to a warning.
+// The spec was resolved from the registry, so the reporting names the catalog
+// coordinate that was pinned. It is the only Platform write the CLI makes.
 func EnsureClusterPlatformForCatalog(ctx context.Context, dyn dynamic.Interface, catalogPath, version string) error {
 	spec := Spec{
 		Name:    inventory.PlatformSingletonName,

@@ -190,8 +190,11 @@ func TestRefusalHint(t *testing.T) {
 		{Component: "web", Kind: "trait", FQN: "opmodel.dev/core/contracts/backup@v1#Backup"},
 	}}}
 	unmatched := &kernel.RenderError{Err: &liberrors.UnmatchedComponentsError{}}
-	deps := platform.Resolution{Source: platform.SourceModuleDeps}
-	depsWithCatalog := platform.Resolution{Source: platform.SourceModuleDeps, Catalogs: []string{"opmodel.dev/catalogs/opm@v4 v4.4.0"}}
+	deps := platform.Resolution{Source: platform.SourceModuleDeps, DepsKind: platform.DepsModule}
+	depsWithCatalog := platform.Resolution{Source: platform.SourceModuleDeps, DepsKind: platform.DepsModule, Catalogs: []string{"opmodel.dev/catalogs/opm@v4 v4.4.0"}}
+	instDeps := platform.Resolution{Source: platform.SourceModuleDeps, DepsKind: platform.DepsInstance}
+	instDepsWithCatalog := platform.Resolution{Source: platform.SourceModuleDeps, DepsKind: platform.DepsInstance, Catalogs: []string{"opmodel.dev/catalogs/opm@v4 v4.4.0"}}
+	cluster := platform.Resolution{Source: platform.SourceClusterCR}
 	flag := platform.Resolution{Source: platform.SourceFlagDir}
 
 	tests := []struct {
@@ -206,6 +209,10 @@ func TestRefusalHint(t *testing.T) {
 		{"a flag platform has no hint", unresolved, flag, ""},
 		{"a flag platform with no catalog has no hint", unmatched, flag, ""},
 		{"another refusal has no hint", errors.New("boom"), deps, ""},
+		{"instance deps: unresolved demand names the platform flag", unresolved, instDepsWithCatalog, instanceDepsProviderHint},
+		{"instance deps: unmatched with no catalog names cue mod tidy", unmatched, instDeps, instanceDepsNoCatalogHint},
+		{"instance deps: unmatched with a catalog has no hint", unmatched, instDepsWithCatalog, ""},
+		{"a cluster platform has no hint", unresolved, cluster, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -215,4 +222,7 @@ func TestRefusalHint(t *testing.T) {
 	assert.Contains(t, moduleDepsProviderHint, "--platform <dir>")
 	assert.Contains(t, moduleDepsNoCatalogHint, "'opm module tidy'")
 	assert.Contains(t, moduleDepsNoCatalogHint, "--platform <dir>")
+	assert.Contains(t, instanceDepsProviderHint, "--platform <dir>")
+	assert.Contains(t, instanceDepsNoCatalogHint, "'cue mod tidy' in the package directory")
+	assert.Contains(t, instanceDepsNoCatalogHint, "--platform <dir>")
 }

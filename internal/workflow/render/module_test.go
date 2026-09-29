@@ -248,11 +248,12 @@ func TestModuleDepsOf_MissingModFileIsAnError(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestFromModule_PlatformFromDepsNeedsNoLocalDefault renders the
-// module-with-debug-values fixture (no catalog, no components) with PlatformFromDeps and
-// an OPM home holding no platform/: the platform is generated from the
-// module's pins under the home's cache, and the render yields zero objects.
-func TestFromModule_PlatformFromDepsNeedsNoLocalDefault(t *testing.T) {
+// TestFromModule_RendersAgainstModuleDeps renders the
+// module-with-debug-values fixture (no catalog, no components) with no
+// --platform and no cluster, from an OPM home holding no platform/: the
+// platform is generated from the module's pins under the home's cache, and
+// the render yields zero objects.
+func TestFromModule_RendersAgainstModuleDeps(t *testing.T) {
 	const registry = "opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"
 	dir, err := filepath.Abs(filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "module-with-debug-values"))
 	require.NoError(t, err)
@@ -262,14 +263,14 @@ func TestFromModule_PlatformFromDepsNeedsNoLocalDefault(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.cue")
 
 	result, err := FromModule(context.Background(), ModuleOpts{
-		ModulePath:       dir,
-		PlatformFromDeps: true,
-		Config:           &config.GlobalConfig{ConfigPath: configPath, Registry: registry},
-		K8sConfig:        &config.ResolvedKubernetesConfig{},
+		ModulePath: dir,
+		Config:     &config.GlobalConfig{ConfigPath: configPath, Registry: registry},
+		K8sConfig:  &config.ResolvedKubernetesConfig{},
 	})
 	require.NoError(t, err)
 
 	assert.Equal(t, platform.SourceModuleDeps, result.Platform.Source)
+	assert.Equal(t, platform.DepsModule, result.Platform.DepsKind)
 	assert.Empty(t, result.Platform.Catalogs, "the fixture pins no catalog")
 	assert.Equal(t, config.PlatformCacheDir(configPath), filepath.Dir(result.Platform.Dir))
 	assert.Empty(t, result.Resources)

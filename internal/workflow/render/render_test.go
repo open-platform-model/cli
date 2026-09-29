@@ -107,21 +107,8 @@ func TestInstanceContext_FileArgument(t *testing.T) {
 }
 
 func TestNewResult_CarriesResolvedPlatform(t *testing.T) {
-	// The apply workflow seeds the cluster Platform from Result.PlatformSpec
-	// (0006:D12): the assembly must carry the spec decoded from the built
-	// platform verbatim — every entry with its derived version — or the
-	// seeded document degrades to the zero value.
-	spec := platform.Spec{
-		Name: "cluster",
-		Type: "kubernetes",
-		Entries: []platform.Entry{
-			{Path: "opmodel.dev/catalogs/k8s@v1", Version: "1.0.0-alpha.2", Enable: true},
-			{Path: "opmodel.dev/catalogs/opm@v4", Version: "4.0.1", Enable: true},
-		},
-	}
 	env := &renderEnv{
-		resolution: platform.Resolution{Source: platform.SourceLocalDefault, Location: "/home/x/.opm/platform", Dir: "/home/x/.opm/platform", Warning: "cluster Platform not found"},
-		spec:       spec,
+		resolution: platform.Resolution{Source: platform.SourceModuleDeps, DepsKind: platform.DepsInstance, Dir: "/home/x/.opm/cache/platforms/abc", Warning: "cluster Platform not used (no Platform CR in the cluster)"},
 	}
 	out := &kernel.RenderResult{
 		Diagnostics: kernel.RenderDiagnostics{
@@ -133,11 +120,6 @@ func TestNewResult_CarriesResolvedPlatform(t *testing.T) {
 	result := newResult(env, out, "digest", map[string]any{"k": "v"}, true)
 
 	assert.Equal(t, env.resolution, result.Platform)
-	assert.Equal(t, spec, result.PlatformSpec)
-	assert.NotEmpty(t, result.PlatformSpec.Type, "seeded spec must never carry an empty type")
-	for _, e := range result.PlatformSpec.Entries {
-		assert.NotEmpty(t, e.Version, "seed carries the derived version of %s", e.Path)
-	}
 	assert.Equal(t, formatAdvisories(out.Diagnostics), result.Warnings, "warnings are the CLI's wording of the advisory rows")
 	assert.Len(t, result.Warnings, 1)
 	assert.Equal(t, out.Diagnostics.Pairs, result.Pairs)
@@ -150,7 +132,7 @@ func TestSkewPolicyFor(t *testing.T) {
 	cr := func(policy string) platform.Resolution {
 		return platform.Resolution{Source: platform.SourceClusterCR, SkewPolicy: policy}
 	}
-	local := platform.Resolution{Source: platform.SourceLocalDefault}
+	arg := platform.Resolution{Source: platform.SourceArgumentDir}
 	flag := platform.Resolution{Source: platform.SourceFlagDir}
 	deps := platform.Resolution{Source: platform.SourceModuleDeps}
 	warnCfg := &config.GlobalConfig{SkewPolicy: config.SkewPolicyWarn}
@@ -164,9 +146,9 @@ func TestSkewPolicyFor(t *testing.T) {
 		want     kernel.SkewPolicy
 		wantNote string
 	}{
-		{"local default is warn", local, absentCfg, kernel.SkewWarn, ""},
-		{"local with warn key", local, warnCfg, kernel.SkewWarn, ""},
-		{"local with refuse key", local, refuseCfg, kernel.SkewRefuse, "refuse (config)"},
+		{"flag default is warn", flag, absentCfg, kernel.SkewWarn, ""},
+		{"flag with warn key", flag, warnCfg, kernel.SkewWarn, ""},
+		{"argument with refuse key", arg, refuseCfg, kernel.SkewRefuse, "refuse (config)"},
 		{"flag with refuse key", flag, refuseCfg, kernel.SkewRefuse, "refuse (config)"},
 		{"cluster unset is warn", cr(""), absentCfg, kernel.SkewWarn, ""},
 		{"cluster Warn", cr("Warn"), absentCfg, kernel.SkewWarn, ""},

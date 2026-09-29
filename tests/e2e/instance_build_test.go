@@ -151,7 +151,8 @@ func TestE2E_InstanceBuild_LayersValuesFile(t *testing.T) {
 	assert.Contains(t, stdout, "ghcr.io/stefanprodan/podinfo:6.7.0", "the -f override must reach the rendered Deployment")
 	assert.NotContains(t, stdout, "podinfo:6.7.1", "the module default must be overridden")
 	assert.Contains(t, stdout, "replicas: 2", "the package's own values.cue still applies beside the override")
-	assert.Contains(t, stderr, "(local default)", "provenance names the local default platform module")
+	assert.Contains(t, stderr, "platform: instance deps (", "with no --platform and no kubeconfig context the render uses the instance package's own deps")
+	assert.NotContains(t, stderr, "cluster Platform not used", "no kubeconfig context is not a fallback: nothing is warned")
 }
 
 // TestE2E_InstanceBuild_SkewWarnsByDefault covers "Render warnings reach the
@@ -500,4 +501,68 @@ func TestE2E_InstanceBuild_ModuleDirectoryRefused(t *testing.T) {
 	assert.Contains(t, stderr, "is a module, not an instance")
 	assert.Contains(t, stderr, "opm module build "+modDir)
 	assert.Empty(t, stdout)
+}
+
+// writeBlackholeKubeconfig writes a kubeconfig whose only context names an
+// API server that never answers (TEST-NET-1, RFC 5737).
+func writeBlackholeKubeconfig(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "kubeconfig")
+	writeE2EFile(t, path, `apiVersion: v1
+kind: Config
+clusters:
+- name: blackhole
+  cluster:
+    server: https://192.0.2.1:6443
+contexts:
+- name: blackhole
+  context:
+    cluster: blackhole
+    user: u
+current-context: blackhole
+users:
+- name: u
+  user:
+    token: t
+`)
+	return path
+}
+
+// TestE2E_InstanceBuild_OfflineNeverContactsTheCluster covers "offline never
+// contacts the cluster": with a kubeconfig context pointing at a server that
+// never answers, --offline renders against the instance's own deps with no
+// cluster warning and without waiting out the lookup bound.
+func TestE2E_InstanceBuild_OfflineNeverContactsTheCluster(t *testing.T) {
+	_, instanceFile := podinfoExample(t)
+	home := seedRenderHome(t)
+	kubeconfig := writeBlackholeKubeconfig(t)
+
+	start := time.Now()
+	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
+		"instance", "build", instanceFile, "--offline", "--kubeconfig", kubeconfig)
+	elapsed := time.Since(start)
+	require.NoError(t, err, "stderr: %s", stderr)
+
+	assert.NotEmpty(t, stdout)
+	assert.Contains(t, stderr, "platform: instance deps (")
+	assert.NotContains(t, stderr, "cluster Platform not used")
+	assert.Less(t, elapsed, 10*time.Second, "--offline does not wait on the cluster lookup")
+}
+
+// TestE2E_InstanceVet_UnreachableClusterFallsBackToDeps covers "Unreachable
+// cluster degrades to the deps": the context's server never answers, and vet
+// warns within the bounded wait and passes against the deps.
+func TestE2E_InstanceVet_UnreachableClusterFallsBackToDeps(t *testing.T) {
+	_, instanceFile := podinfoExample(t)
+	home := seedRenderHome(t)
+	kubeconfig := writeBlackholeKubeconfig(t)
+
+	_, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
+		"instance", "vet", instanceFile, "--kubeconfig", kubeconfig)
+	require.NoError(t, err, "stderr: %s", stderr)
+
+	assert.Equal(t, 1, strings.Count(stderr, "cluster Platform not used"), "stderr: %s", stderr)
+	assert.Contains(t, stderr, "could not reach the cluster")
+	assert.Contains(t, stderr, "platform: instance deps (")
+	assert.Contains(t, stderr, "Instance valid")
 }

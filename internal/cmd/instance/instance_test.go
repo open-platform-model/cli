@@ -205,13 +205,13 @@ func TestInstanceVetCmd_RejectsMissingArg(t *testing.T) {
 
 func TestRunInstanceBuild_RejectsNonManifestOutput(t *testing.T) {
 	// cmdutil.InstanceFileFlags is renamed in the X4 slice.
-	err := runInstanceBuild("instance.cue", &config.GlobalConfig{}, &cmdutil.InstanceFileFlags{}, "", "wide", false, "")
+	err := runInstanceBuild("instance.cue", &config.GlobalConfig{}, &cmdutil.InstanceFileFlags{}, clusterLookup{offline: true}, "", "wide", false, "")
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "invalid output format"))
 }
 
 func TestRunInstanceBuild_MissingPath(t *testing.T) {
-	err := runInstanceBuild("/nonexistent/instance/path", &config.GlobalConfig{}, &cmdutil.InstanceFileFlags{}, "", "yaml", false, "")
+	err := runInstanceBuild("/nonexistent/instance/path", &config.GlobalConfig{}, &cmdutil.InstanceFileFlags{}, clusterLookup{offline: true}, "", "yaml", false, "")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }

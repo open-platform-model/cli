@@ -134,11 +134,11 @@ func RunPlatformPull(ctx context.Context, cfg *config.GlobalConfig, opts PullOpt
 	}
 
 	dir, res, err := platform.Resolve(ctx, platform.ResolveOptions{
-		ConfigPath:      cfg.ConfigPath,
-		Cluster:         capture,
-		NoLocalFallback: true,
-		Registry:        cfg.Registry,
-		ModFiles:        opts.ModFiles,
+		ConfigPath: cfg.ConfigPath,
+		Cluster:    capture,
+		NoFallback: true,
+		Registry:   cfg.Registry,
+		ModFiles:   opts.ModFiles,
 	})
 	if err != nil {
 		return pullResolveError(err)

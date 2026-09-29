@@ -27,7 +27,7 @@ const ModuleDepsPlatformModulePath = "opmodel.dev/platforms/module-deps@v0"
 const CatalogPathPrefix = "opmodel.dev/catalogs/"
 
 // The generated platform's metadata. The platform is never applied, so the
-// name reaches no cluster; the type matches the local default's.
+// name reaches no cluster; the type is the informational kubernetes one.
 const (
 	moduleDepsPlatformName = "module-deps"
 	moduleDepsPlatformType = "kubernetes"

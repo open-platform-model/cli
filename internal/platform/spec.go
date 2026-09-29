@@ -1,12 +1,13 @@
 // Package platform resolves the platform module every render consumes, by
-// precedence: --platform <dir> > cluster Platform CR > local default module
-// ~/.opm/platform/ (0006:D11/D12/D17/D21/D22; 0019:D5/D7).
+// precedence: --platform <dir> > cluster Platform CR > a platform generated
+// from the render's own dependency pins (0006:D21/D22; 0019:D5/D7).
 //
 // Every source resolves to a platform module directory the kernel acquires
-// with AcquirePlatformFromDir. The cluster CR is turned into such a module
-// first, through the library's generator (opm/helper/platformmodule): the
-// same helper and the same acquisition the operator's PlatformReconciler
-// runs, so the CLI's platform ingestion is structurally the operator's own.
+// with AcquirePlatformFromDir. The cluster CR and the deps are turned into
+// such a module first, through the library's generator
+// (opm/helper/platformmodule): the same helper and the same acquisition the
+// operator's PlatformReconciler runs, so the CLI's platform ingestion is
+// structurally the operator's own.
 package platform
 
 import (
