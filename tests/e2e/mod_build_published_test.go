@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -71,6 +72,31 @@ func TestE2E_ModBuild_PublishedModuleWithoutVersion(t *testing.T) {
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Contains(t, stderr, "Resolved "+path+" -> "+major)
 	assert.Contains(t, stderr, "highest major on core v2")
+	requireYAMLDocuments(t, stdout)
+}
+
+// TestE2E_ModBuild_PublishedModulePinnedWithValues covers "Published module
+// with a pinned version": the exact tag is rendered with the -f values in
+// place of the module's debugValues.
+func TestE2E_ModBuild_PublishedModulePinnedWithValues(t *testing.T) {
+	path, major := publishedPodinfo(t)
+	c, err := fixtures.Load("podinfo")
+	require.NoError(t, err)
+
+	workDir := t.TempDir()
+	values := filepath.Join(workDir, "values.cue")
+	require.NoError(t, os.WriteFile(values, []byte(`values: {
+	image: {repository: "ghcr.io/stefanprodan/podinfo", tag: "6.7.0", digest: ""}
+	replicas: 3
+}
+`), 0o600))
+
+	stdout, stderr, err := runOPMWithEnv(t, workDir, seedConfigOnlyHome(t), 180*time.Second,
+		"module", "build", path, "--version", c.Version, "-f", values)
+	require.NoError(t, err, "stderr: %s", stderr)
+	assert.Contains(t, stderr, "Resolved "+path+" -> "+major+" "+c.Version+" (pinned)")
+	assert.Contains(t, stdout, "ghcr.io/stefanprodan/podinfo:6.7.0", "the -f values reach the render")
+	assert.NotContains(t, stdout, "podinfo:6.7.1", "debugValues are not used with -f")
 	requireYAMLDocuments(t, stdout)
 }
 

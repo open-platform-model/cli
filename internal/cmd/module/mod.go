@@ -15,10 +15,13 @@ func NewModuleCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Short:   "Work with module source",
 		Long: `Work with OPM modules.
 
-		Use this command group when you are starting from module source: initialize a
-		module or validate it.
+Use this command group when you are starting from a module: initialize,
+tidy, validate, version and publish its source, or render and deploy it
+through a synthetic instance with 'opm module build' and 'opm module apply'.
+build and apply take a module directory or a published module path.
 
-		For rendering and deploying, use 'opm instance build' or 'opm instance apply'.`,
+For an instance package you own, use 'opm instance build' or
+'opm instance apply'.`,
 	}
 
 	c.AddCommand(NewModuleInitCmd(cfg))

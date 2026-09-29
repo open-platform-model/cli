@@ -2,45 +2,21 @@ package render
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	liberrors "github.com/open-platform-model/library/opm/errors"
 	"github.com/open-platform-model/library/opm/kernel"
+
+	"github.com/open-platform-model/cli/internal/cmdutil/cmdutiltest"
 )
-
-// minimalModule is a module package body that passes the kernel's module
-// shape gate without importing core, so no registry is needed.
-const minimalModule = `package demo
-
-kind: "Module"
-metadata: {
-	name:       "demo"
-	modulePath: "example.com/modules/demo@v0"
-	version:    "0.1.0"
-}
-`
-
-// writeMinimalModule writes a module package that needs no registry: a
-// cue.mod without dependencies and minimalModule.
-func writeMinimalModule(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, "cue.mod"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "cue.mod", "module.cue"),
-		[]byte("module: \"example.com/modules/demo@v0\"\nlanguage: version: \"v0.17.0\"\n"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "module.cue"), []byte(minimalModule), 0o644))
-	return dir
-}
 
 // Instance acquisition decides by package kind: a module package handed to
 // AcquireInstanceFromDir fails the shape gate with ErrWrongKind, which is
-// what `opm instance build` keys its module refusal on.
+// what the instance commands key their module refusal on.
 func TestAcquireInstanceFromDir_ModulePackageIsWrongKind(t *testing.T) {
 	k := kernel.New(kernel.WithRegistry("127.0.0.1:1+insecure"))
-	_, err := k.AcquireInstanceFromDir(context.Background(), writeMinimalModule(t))
+	_, err := k.AcquireInstanceFromDir(context.Background(), cmdutiltest.WriteMinimalModule(t))
 	require.ErrorIs(t, err, liberrors.ErrWrongKind)
 }

@@ -176,11 +176,14 @@ Read when entering `cli/`:
   `platformmodule.Closure`, core floored at the kernel's verified release)
   into the same cache, and the module's own `local-module.cue` replacements of
   paths it pins are carried into it. Skew cannot arise and is not checked.
-  Both commands also take a published module path (`internal/modref`): the
-  module is acquired with `AcquireModuleFromRegistry` and synthesized exactly
-  as a directory module, with no local module context (no replacements, no
-  local render provenance).
   `module apply` and every `instance` command keep the precedence above.
+  `opm module build` and `opm module apply` (not `vet`) also take a published
+  module path (`internal/modref`): the module is acquired with
+  `AcquireModuleFromRegistry` and synthesized exactly as a directory module,
+  with no local module context (no replacements, no local render provenance).
+  `opm instance` commands take only instance packages and decide by package
+  kind; a module package is refused naming the matching `opm module` command
+  (`cmdutil.ModulePackageError`).
 - Integration + CUE workflows need registry config. Follow the Registry Policy in the root `AGENTS.md` — both `opmodel.dev/*` and `testing.opmodel.dev/*` resolve from GHCR:
 
 ```bash

@@ -12,6 +12,9 @@
 //   - Dry-run: no inventory mutation, no resource creation.
 //   - Prune: re-applying with values_api_off.cue removes the api resources
 //     and bumps the inventory revision.
+//   - Published module: applying the podinfo fixture by its module path
+//     records the registry coordinate in spec.module and no local
+//     render-provenance annotation.
 //
 // Requires:
 //   - kind cluster at context "kind-opm-dev"
@@ -38,6 +41,7 @@ import (
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/tests/fixtures"
 )
 
 const (
@@ -47,6 +51,10 @@ const (
 	// Synthetic instance name: testdata module is "module-apply-itest" → "<module>-debug" by default.
 	// We pass --name explicitly to keep the name deterministic in the assertions.
 	instanceName = "module-apply-itest"
+
+	// publishedInstanceName is the instance Scenario 5 applies from the
+	// registry-published podinfo fixture.
+	publishedInstanceName = "module-apply-itest-published"
 
 	moduleFixture       = "tests/integration/module-apply/testdata"
 	valuesApiOffFixture = "tests/integration/module-apply/values_api_off.cue"
@@ -224,6 +232,46 @@ func main() {
 	apiDeploymentName := instanceName + "-api"
 	waitForResourceAbsent(ctx, client, deploymentGVR, testNamespace, apiDeploymentName)
 	fmt.Printf("   OK: Deployment/%s is deleted (404)\n", apiDeploymentName)
+
+	// ----------------------------------------------------------------
+	// Scenario 5: Apply a published module by module path
+	// ----------------------------------------------------------------
+	step(5, "Published module — spec.module names the registry coordinate, no local provenance")
+
+	podinfo, err := fixtures.Load("podinfo")
+	check("reading the podinfo fixture coordinate", err)
+	podinfoPath, podinfoMajor, _ := strings.Cut(podinfo.ModulePath, "@")
+
+	stdout, stderr, exitCode = runModuleApply([]string{
+		podinfoPath,
+		"--version", podinfoMajor,
+		"--context", clusterContext,
+		"--name", publishedInstanceName,
+		"-n", testNamespace,
+	})
+	if exitCode != 0 {
+		failf("published apply exited %d:\n%s\n%s", exitCode, stdout, stderr)
+	}
+	if !strings.Contains(stderr, "Resolved "+podinfoPath+" -> "+podinfoMajor) {
+		failf("expected the resolution report on stderr, got:\n%s", stderr)
+	}
+	if !strings.Contains(stderr, "debugValues") {
+		failf("expected the debugValues warning on stderr, got:\n%s", stderr)
+	}
+
+	waitForInstanceUUID(ctx, client, publishedInstanceName, testNamespace)
+	pub, err := inventory.GetRecord(ctx, client, publishedInstanceName, testNamespace)
+	check("reading ModuleInstance CR after published apply", err)
+	if pub.ModulePath != podinfo.ModulePath {
+		failf("expected spec.module.path %q, got %q", podinfo.ModulePath, pub.ModulePath)
+	}
+	if pub.ModuleVersion == "" {
+		failf("expected spec.module.version to carry the resolved version")
+	}
+	if pub.SourceLocal {
+		failf("a published module must not carry the local render-provenance annotation")
+	}
+	fmt.Printf("   OK: spec.module = %s %s, no local provenance\n", pub.ModulePath, pub.ModuleVersion)
 
 	// ----------------------------------------------------------------
 	// Cleanup

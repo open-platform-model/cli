@@ -154,7 +154,7 @@ A published module has no local module context, so `moduleRoot` is empty: replac
 | Ambiguous dotted argument | 2 | `"<arg>" is both a directory and a module path; use ./<arg> for the directory` |
 | Pin not published, no versions, nothing compatible | 2 | refusal naming path, registry and (for the walk) every skipped major with its reason |
 | Registry unreachable | 3 | `listing published versions of <path> (registry <registry>): <cause>` |
-| `instance build` on a module package | 2 | `<path> is a module, not an instance; build it with: opm module build <path>` |
+| `instance build` on a module package | 2 | `<path> is a module, not an instance; run: opm module build <path>` (`instance apply` names `opm module apply`, `instance vet` names `opm module vet`; `instance diff` and the cluster queries, with no module counterpart, name the `opm module` group) |
 
 ### Example output
 
@@ -220,6 +220,8 @@ Error: /home/me/src/my_app is a module, not an instance; build it with: opm modu
 - [Assumption: `ModuleVersions` on a major-free path lists every major against an in-memory `modregistrytest` registry as it does against GHCR] -> Proven in section 1; if not, the resolver lists per major by probing `@v0`..`@vN`, recorded here. Proven by `TestModuleVersions_MajorFreePathListsEveryMajor`.
 - [A bare dotted relative directory changes from "built" to "refused as ambiguous"] -> The refusal names the `./` spelling. The directory forms `opm mod init` scaffolds (`./my_app`, `.`) are unaffected.
 - [`opm instance build <module-dir>` breaks existing scripts] -> The refusal message names the exact replacement command.
+- [The `debugValues` warning of `opm module apply` names `opm instance init`, which the planned change `add-instance-init` delivers] -> Release-order constraint: `add-instance-init` ships in the same CLI release as this change, or the warning points at a command that does not exist yet. Recorded 2026-09-29 at verify.
+- [The module refusal in instance commands asks the kernel's module acquire] -> A package with `kind: "Module"` but no concrete `metadata.name`, `modulePath` or `version` fails that acquire too, so it gets the plain wrong-kind error rather than the `opm module` hint.
 
 ## Migration Plan
 

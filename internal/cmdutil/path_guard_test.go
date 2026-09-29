@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/open-platform-model/cli/internal/cmdutil/cmdutiltest"
 	"github.com/open-platform-model/cli/internal/config"
 )
 
@@ -22,60 +23,53 @@ func TestValidateModuleInputPath_RejectsInstancePackage(t *testing.T) {
 	assert.Contains(t, err.Error(), "opm instance")
 }
 
-// minimalModule is a module package body that passes the kernel's module
-// shape gate without importing core, so no registry is needed.
-const minimalModule = `package demo
-
-kind: "Module"
-metadata: {
-	name:       "demo"
-	modulePath: "example.com/modules/demo@v0"
-	version:    "0.1.0"
-}
-`
-
-// writeMinimalModule writes a module package that needs no registry: a
-// cue.mod without dependencies and minimalModule.
-func writeMinimalModule(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, "cue.mod"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "cue.mod", "module.cue"),
-		[]byte("module: \"example.com/modules/demo@v0\"\nlanguage: version: \"v0.17.0\"\n"), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "module.cue"), []byte(minimalModule), 0o600))
-	return dir
-}
-
-func TestModulePackageError_ModulePackageNamesModuleBuild(t *testing.T) {
-	dir := writeMinimalModule(t)
+func TestModulePackageError_NamesTheModuleCommand(t *testing.T) {
+	dir := cmdutiltest.WriteMinimalModule(t)
 	k := config.NewKernel("")
 	_, acquireErr := k.AcquireInstanceFromDir(context.Background(), dir)
 	require.Error(t, acquireErr)
 
-	err := ModulePackageError(context.Background(), k, dir, acquireErr)
+	for _, cmd := range []string{"opm module build", "opm module apply", "opm module vet"} {
+		err := ModulePackageError(context.Background(), k, dir, cmd, acquireErr)
+		require.Error(t, err, cmd)
+		assert.Contains(t, err.Error(), dir+" is a module, not an instance", cmd)
+		assert.Contains(t, err.Error(), "run: "+cmd+" "+dir, cmd)
+	}
+}
+
+// With no module counterpart (instance diff, the cluster queries) the
+// refusal points at the module command group, never at a wrong verb.
+func TestModulePackageError_NoCounterpartNamesTheGroup(t *testing.T) {
+	dir := cmdutiltest.WriteMinimalModule(t)
+	k := config.NewKernel("")
+	_, acquireErr := k.AcquireInstanceFromDir(context.Background(), dir)
+	require.Error(t, acquireErr)
+
+	err := ModulePackageError(context.Background(), k, dir, "", acquireErr)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), dir+" is a module, not an instance")
-	assert.Contains(t, err.Error(), "opm module build "+dir)
+	assert.Contains(t, err.Error(), "is a module, not an instance")
+	assert.Contains(t, err.Error(), "'opm module' commands")
+	assert.NotContains(t, err.Error(), "opm module build")
 }
 
 func TestModulePackageError_OtherKindIsNotAModule(t *testing.T) {
-	dir := writeMinimalModule(t)
+	dir := cmdutiltest.WriteMinimalModule(t)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "module.cue"),
 		[]byte("package demo\n\nkind: \"Platform\"\n"), 0o600))
 	k := config.NewKernel("")
 	_, acquireErr := k.AcquireInstanceFromDir(context.Background(), dir)
 	require.Error(t, acquireErr)
 
-	assert.NoError(t, ModulePackageError(context.Background(), k, dir, acquireErr))
+	assert.NoError(t, ModulePackageError(context.Background(), k, dir, "opm module build", acquireErr))
 }
 
 func TestModulePackageError_NonKindErrorIsIgnored(t *testing.T) {
 	k := config.NewKernel("")
-	assert.NoError(t, ModulePackageError(context.Background(), k, writeMinimalModule(t), assert.AnError))
+	assert.NoError(t, ModulePackageError(context.Background(), k, cmdutiltest.WriteMinimalModule(t), "opm module build", assert.AnError))
 }
 
 func TestResolveInstanceArg_RejectsModulePackagePath(t *testing.T) {
-	dir := writeMinimalModule(t)
+	dir := cmdutiltest.WriteMinimalModule(t)
 
 	_, err := ResolveInstanceArg(context.Background(), dir, &config.GlobalConfig{})
 	require.Error(t, err)

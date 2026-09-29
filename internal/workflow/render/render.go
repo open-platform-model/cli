@@ -26,8 +26,9 @@ import (
 
 // FromInstanceFile prepares and renders an instance from a declarative
 // #ModuleInstance CUE package through the library kernel (0006:D9). The
-// package directory containing the instance file is acquired as one CUE
-// package (instance.cue + values.cue + overlays) with any -f values files
+// instance package, the named directory or the directory holding the named
+// .cue file, is acquired as one CUE package (instance.cue + values.cue +
+// overlays) with any -f values files
 // passed as the acquire's trailing values sources, so the instance the render
 // imports already carries them; the kernel then renders it against the
 // resolved platform in one build.
@@ -62,7 +63,7 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	if err != nil {
 		// What the package is decides, not its file names: a module package
 		// is pointed at the module command that builds it.
-		if modErr := cmdutil.ModulePackageError(ctx, k, instanceDir, err); modErr != nil {
+		if modErr := cmdutil.ModulePackageError(ctx, k, instanceDir, opts.ModuleCommand, err); modErr != nil {
 			return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: modErr}
 		}
 		printValidationError(err)

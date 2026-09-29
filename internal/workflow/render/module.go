@@ -21,8 +21,10 @@ import (
 	"github.com/open-platform-model/cli/pkg/loader"
 )
 
-// FromModule synthesizes an instance from a module-package directory through
-// kernel SynthesizeInstance and renders it through the same render path as
+// FromModule synthesizes an instance from a module (a local module-package
+// directory, or a published module acquired from the registry when
+// opts.Published is set) through kernel SynthesizeInstance and renders it
+// through the same render path as
 // FromInstanceFile (0006:D9; retires the CLI's synthetic-wrapper module and
 // the last #ModuleRelease application — 0002 carryover). Values come from
 // `-f` files when supplied, else from the module's `debugValues`.
@@ -43,7 +45,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	}
 
 	namespace := opts.K8sConfig.Namespace.Value
-	output.Debug("rendering from module", "path", opts.ModulePath, "namespace", namespace)
+	output.Debug("rendering from module", "module", opts.moduleLabel(), "namespace", namespace)
 
 	k := config.NewKernel(opts.Config.Registry)
 
@@ -112,6 +114,15 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	return renderInstance(ctx, env, inst, opts.K8sConfig, src.moduleRoot, src.local)
 }
 
+// moduleLabel names the module for logs: the directory, or
+// "<path>@<version>" for a published module.
+func (o ModuleOpts) moduleLabel() string {
+	if p := o.Published; p != nil {
+		return p.Path + "@" + p.Version
+	}
+	return o.ModulePath
+}
+
 // acquiredModule is a module acquired for synthesis, with what the rest of
 // the pipeline needs to know about where it came from.
 type acquiredModule struct {
@@ -137,7 +148,7 @@ func acquireModule(ctx context.Context, k *kernel.Kernel, opts ModuleOpts) (*acq
 		if err != nil {
 			return nil, err
 		}
-		return &acquiredModule{module: mod, valuesOrigin: p.Path + "@" + p.Version}, nil
+		return &acquiredModule{module: mod, valuesOrigin: opts.moduleLabel()}, nil
 	}
 	mod, err := k.AcquireModuleFromDir(ctx, opts.ModulePath)
 	if err != nil {

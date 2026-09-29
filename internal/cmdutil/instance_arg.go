@@ -104,7 +104,7 @@ func resolveInstanceArgFromFile(ctx context.Context, arg string, cfg *config.Glo
 	k := config.NewKernel(cfg.Registry)
 	inst, err := k.AcquireInstanceFromDir(ctx, dir)
 	if err != nil {
-		if modErr := ModulePackageError(ctx, k, dir, err); modErr != nil {
+		if modErr := ModulePackageError(ctx, k, dir, "", err); modErr != nil {
 			return InstanceArg{}, modErr
 		}
 		return InstanceArg{}, fmt.Errorf("loading instance %q: %w", arg, err)

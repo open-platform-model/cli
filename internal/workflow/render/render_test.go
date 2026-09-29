@@ -18,6 +18,7 @@ import (
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
 
+	"github.com/open-platform-model/cli/internal/cmdutil/cmdutiltest"
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/platform"
 )
@@ -61,12 +62,13 @@ func TestRenderFromInstanceFile_NilK8sConfig(t *testing.T) {
 
 // A module package is refused by kind, before platform resolution, so no
 // registry or platform module is needed; the refusal names the module
-// command that builds it. A module file argument is judged by its package.
+// command the caller passed. A module file argument is judged by its package.
 func TestRenderFromInstanceFile_RefusesModulePackage(t *testing.T) {
-	dir := writeMinimalModule(t)
+	dir := cmdutiltest.WriteMinimalModule(t)
 	for _, arg := range []string{dir, filepath.Join(dir, "module.cue")} {
 		_, err := FromInstanceFile(context.Background(), InstanceFileOpts{
 			InstanceFilePath: arg,
+			ModuleCommand:    "opm module build",
 			Config:           &config.GlobalConfig{},
 			K8sConfig:        &config.ResolvedKubernetesConfig{},
 		})

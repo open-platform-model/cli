@@ -95,6 +95,7 @@ func runInstanceBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.In
 	result, err := render.FromInstanceFile(ctx, render.InstanceFileOpts{
 		PlatformFlag:     rff.Platform, // offline: no cluster read (0006:D21)
 		InstanceFilePath: buildArg,
+		ModuleCommand:    "opm module build",
 		ValuesFiles:      rff.Values,
 		K8sConfig:        k8sConfig,
 		Config:           cfg,

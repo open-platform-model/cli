@@ -41,11 +41,14 @@ func ValidateModuleInputPath(path string) error {
 
 // ModulePackageError reports, for a failed instance acquire of dir, whether
 // the package there is a module rather than an instance, and if so the
-// refusal naming `opm module build`. An instance command decides by what the
-// package is, not by its file names: only a shape-gate kind mismatch is
-// examined, and the kernel's module acquire is the judge. Nil when err is
-// anything else or the package is not a module either.
-func ModulePackageError(ctx context.Context, k *kernel.Kernel, dir string, err error) error {
+// refusal pointing at moduleCmd, the module command that does what the
+// instance command was asked to ("opm module build" for instance build).
+// With no counterpart (moduleCmd empty: diff, the cluster queries) the
+// refusal points at the module command group. An instance command decides
+// by what the package is, not by its file names: only a shape-gate kind
+// mismatch is examined, and the kernel's module acquire is the judge. Nil
+// when err is anything else or the package is not a module either.
+func ModulePackageError(ctx context.Context, k *kernel.Kernel, dir, moduleCmd string, err error) error {
 	if !errors.Is(err, liberrors.ErrWrongKind) {
 		return nil
 	}
@@ -56,7 +59,10 @@ func ModulePackageError(ctx context.Context, k *kernel.Kernel, dir string, err e
 	if absErr != nil {
 		abs = dir
 	}
-	return fmt.Errorf("%s is a module, not an instance; build it with: opm module build %s", abs, abs)
+	if moduleCmd == "" {
+		return fmt.Errorf("%s is a module, not an instance; the 'opm module' commands take a module directory", abs)
+	}
+	return fmt.Errorf("%s is a module, not an instance; run: %s %s", abs, moduleCmd, abs)
 }
 
 func hasFile(dir, name string) bool {

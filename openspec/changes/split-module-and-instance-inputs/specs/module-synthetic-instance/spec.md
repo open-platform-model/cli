@@ -19,7 +19,7 @@ The CLI SHALL synthesize a concrete instance from a published module without a l
 
 ### Requirement: Synthesize a `#ModuleInstance` from a module-package directory
 
-The CLI SHALL synthesize a concrete instance from a module CUE package directory without requiring an `instance.cue` file, via kernel `SynthesizeInstance`. The synthesis SHALL load the module as a whole CUE package (matching `cue eval`/`cue vet` semantics) and pass it, with resolved values and synthetic metadata, to the kernel; the kernel unifies against the resolved `#ModuleInstance` schema so uuid, components, auto-secrets, and standard labels derive in CUE. The produced instance SHALL have `kind: "ModuleInstance"`; the synthesis SHALL NOT apply `#ModuleRelease` and SHALL NOT import `opmodel.dev/core/v1alpha1/modulerelease@v1`. Only `opm module build` and `opm module apply` synthesize; `opm instance build` never does.
+The CLI SHALL synthesize a concrete instance from a module CUE package directory without requiring an `instance.cue` file, via kernel `SynthesizeInstance`. The synthesis SHALL load the module as a whole CUE package (matching `cue eval`/`cue vet` semantics) and pass it, with resolved values and synthetic metadata, to the kernel; the kernel unifies against the resolved `#ModuleInstance` schema so uuid, components, auto-secrets, and standard labels derive in CUE. The produced instance SHALL have `kind: "ModuleInstance"`; the synthesis SHALL NOT apply `#ModuleRelease` and SHALL NOT import `opmodel.dev/core/v1alpha1/modulerelease@v1`. Only the `opm module` commands (`build`, `apply` and `vet`) synthesize; `opm instance build` never does.
 
 #### Scenario: Module directory loads as a whole CUE package
 
