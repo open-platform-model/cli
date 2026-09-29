@@ -279,6 +279,34 @@ func TestFromModule_RendersAgainstModuleDeps(t *testing.T) {
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 
+// TestFromModule_AbsentClusterPlatformFallsBackToModuleDeps covers "module
+// apply on a cluster without a Platform" at the render: with the cluster
+// getter module apply passes and no Platform in the cluster, the render
+// warns naming the module's own deps and renders against them.
+func TestFromModule_AbsentClusterPlatformFallsBackToModuleDeps(t *testing.T) {
+	const registry = "opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"
+	dir, err := filepath.Abs(filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "module-with-debug-values"))
+	require.NoError(t, err)
+	if _, err := config.NewKernel(registry).SchemaCache().Get(); err != nil {
+		t.Skipf("core v2 schema unavailable (registry/cache): %v", err)
+	}
+	logBuf := captureRenderLog(t)
+
+	result, err := FromModule(context.Background(), ModuleOpts{
+		ModulePath:      dir,
+		ClusterPlatform: absentClusterPlatform(),
+		Config:          &config.GlobalConfig{ConfigPath: filepath.Join(t.TempDir(), "config.cue"), Registry: registry},
+		K8sConfig:       &config.ResolvedKubernetesConfig{},
+	})
+	require.NoError(t, err, "log: %s", logBuf.String())
+
+	assert.Equal(t, platform.SourceModuleDeps, result.Platform.Source)
+	assert.Equal(t, platform.DepsModule, result.Platform.DepsKind)
+	assert.NotEmpty(t, result.Platform.Warning)
+	assert.Contains(t, logBuf.String(), "cluster Platform not used (no Platform CR in the cluster) — rendering against the module's own deps")
+	assert.Contains(t, logBuf.String(), "platform: module deps (")
+}
+
 // TestModuleSource_CarriesCommittedModFile pins the input the module-deps
 // platform is generated from: a module acquired from a directory carries its
 // committed cue.mod/module.cue in Source.Overlay, keyed under Source.Root,

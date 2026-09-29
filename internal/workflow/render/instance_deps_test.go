@@ -1,6 +1,7 @@
 package render
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -10,11 +11,16 @@ import (
 	"cuelang.org/go/mod/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/instinit"
+	"github.com/open-platform-model/cli/internal/inventory"
+	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/platform"
 	"github.com/open-platform-model/cli/tests/fixtures"
 )
@@ -131,4 +137,53 @@ func TestInstanceDepsOf_CarriesThePackageReplacements(t *testing.T) {
 	assert.Equal(t, root, deps.ModuleRoot)
 	require.Len(t, deps.Replacements, 1)
 	assert.Equal(t, "opmodel.dev/catalogs/opm@v4", deps.Replacements[0].Path)
+}
+
+// absentClusterPlatform is the production cluster getter over a fake
+// dynamic client holding no Platform: every read is a real NotFound.
+func absentClusterPlatform() platform.ClusterPlatformGetter {
+	fake := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
+		map[schema.GroupVersionResource]string{inventory.PlatformGVR: "PlatformList"})
+	return platform.ClusterPlatformGetterFor(fake)
+}
+
+// captureRenderLog redirects the CLI's log sink for the test and returns it.
+func captureRenderLog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	output.SetLogWriter(&buf)
+	t.Cleanup(func() { output.SetLogWriter(os.Stderr) })
+	return &buf
+}
+
+// TestFromInstanceFile_AbsentClusterPlatformFallsBackToInstanceDeps covers
+// "Absent Platform falls back to the deps" for an instance render on the
+// apply path (a cluster getter, the cluster not optional): the cluster holds
+// no Platform, so the render warns naming the instance's own deps and
+// renders against a platform generated from the package's pins.
+func TestFromInstanceFile_AbsentClusterPlatformFallsBackToInstanceDeps(t *testing.T) {
+	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
+		t.Skip("skipping registry-backed tests")
+	}
+	k := config.NewKernel(instanceDepsRegistry)
+	if _, err := k.SchemaCache().Get(); err != nil {
+		t.Skipf("core v2 schema unavailable (registry/cache): %v", err)
+	}
+	dir := writeInitInstance(t, k)
+	logBuf := captureRenderLog(t)
+
+	result, err := FromInstanceFile(context.Background(), InstanceFileOpts{
+		InstanceFilePath: dir,
+		ClusterPlatform:  absentClusterPlatform(),
+		Config:           &config.GlobalConfig{ConfigPath: filepath.Join(t.TempDir(), "config.cue"), Registry: instanceDepsRegistry},
+		K8sConfig:        &config.ResolvedKubernetesConfig{},
+	})
+	require.NoError(t, err, "log: %s", logBuf.String())
+
+	assert.Equal(t, platform.SourceModuleDeps, result.Platform.Source)
+	assert.Equal(t, platform.DepsInstance, result.Platform.DepsKind)
+	assert.Equal(t, filepath.Join(dir, "cue.mod", "module.cue"), result.Platform.Location)
+	assert.NotEmpty(t, result.Resources)
+	assert.Contains(t, logBuf.String(), "cluster Platform not used (no Platform CR in the cluster) — rendering against the instance's own deps")
+	assert.Contains(t, logBuf.String(), "platform: instance deps (")
 }
