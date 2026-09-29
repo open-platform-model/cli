@@ -1,19 +1,14 @@
-// Local default platform for the kind dev cluster tooling (module form,
-// 0019:D5), the sibling platform/ of hack/opm-config.cue (config.PlatformDir).
-// This is the 0006:D21 precedence source 3 — used only by offline commands
-// (`opm instance build`/`vet`) which never read the cluster; cluster-facing
-// commands resolve the Platform CR (hack/kind-platform.yaml) instead and
-// generate a platform module from it under the OPM home cache.
+// Platform module for the kind dev cluster tooling and the offline tests
+// (module form, 0019:D5), passed explicitly with --platform. Nothing
+// resolves it implicitly: renders resolve --platform, else the cluster
+// Platform (hack/kind-platform.yaml), else their own dependency pins.
 //
 // Catalog builds are pinned in cue.mod/module.cue, never here. Those pins
-// MIRROR internal/config/templates.go's seeded module (DefaultCorePin,
-// DefaultCatalogPins) and hack/kind-platform.yaml on purpose, so an offline
-// build and an in-cluster render evaluate the same catalog builds; a drift
-// would show up as a render-digest difference with no obvious cause
-// (TestHackPlatformMirror_PinsMatchSeed guards it). cue.mod is kept in
+// MIRROR hack/kind-platform.yaml on purpose, so an offline build and an
+// in-cluster render evaluate the same catalog builds; a drift would show up
+// as a render-digest difference with no obvious cause. cue.mod is kept in
 // `cue mod tidy`'s canonical form (transitive pins included, no comments)
-// because the root `task deps:update` tidies it in the same pass as the
-// seed.
+// because the root `task deps:update` tidies it.
 package platform
 
 import (

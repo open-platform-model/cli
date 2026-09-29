@@ -23,41 +23,31 @@ const RuntimeName = "opm-cli"
 // file holds the render environment built on top of it.
 
 // renderEnv is the prepared per-invocation render environment: the kernel,
-// the acquired (source-carrying) platform with its provenance, the seed
-// document decoded from it and the skew policy the render runs under.
+// the acquired (source-carrying) platform with its provenance, and the skew
+// policy the render runs under.
 type renderEnv struct {
 	kernel     *kernel.Kernel
 	platform   *libplatform.Platform
 	resolution platform.Resolution
-	// spec is decoded from the built platform the render consumes
-	// (platform.SpecFromPlatform) — carried onto Result so the apply
-	// workflow can seed the cluster Platform without re-reading the module
-	// (no second I/O, no TOCTOU).
-	spec platform.Spec
-	skew kernel.SkewPolicy
+	skew       kernel.SkewPolicy
 }
 
-// resolvePlatformEnv resolves the platform by precedence (0006:D11/D21), acquires
-// the resolved module directory on the given kernel and reports provenance.
-// It runs AFTER the instance is loaded and its values validated, so cheap
-// validation failures surface before any platform/registry work.
-// clusterGetter is nil for offline commands (build/render — 0006:D17: they never
-// read the cluster). moduleDeps, set only by a render for a module's author,
-// replaces the cluster and local-default sources with a platform generated
-// from the module's own deps; an unparseable committed module file is the
-// module's validation failure, every other generation failure a general one.
+// resolvePlatformEnv resolves the platform by precedence (--platform, the
+// cluster Platform when sel.Cluster is set, then the render's own deps when
+// sel.Deps is set), acquires the resolved module directory on the given
+// kernel and reports provenance. It runs AFTER the instance is loaded and
+// its values validated, so cheap validation failures surface before any
+// platform/registry work. sel carries the command's sources; the config path
+// and registry come from cfg. An unparseable committed module file is the
+// render's validation failure, every other generation failure a general one.
 //
 // Acquisition is the build: a bad pin, a key-to-import mismatch or an
 // unpublished catalog fails here naming the entry or dependency, identically
 // for every source (0019:D5).
-func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.GlobalConfig, platformFlag string, clusterGetter platform.ClusterPlatformGetter, moduleDeps *platform.ModuleDeps) (*renderEnv, error) {
-	dir, res, err := platform.Resolve(ctx, platform.ResolveOptions{
-		PlatformFlag: platformFlag,
-		ConfigPath:   cfg.ConfigPath,
-		Cluster:      clusterGetter,
-		ModuleDeps:   moduleDeps,
-		Registry:     cfg.Registry,
-	})
+func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.GlobalConfig, sel platform.ResolveOptions) (*renderEnv, error) {
+	sel.ConfigPath = cfg.ConfigPath
+	sel.Registry = cfg.Registry
+	dir, res, err := platform.Resolve(ctx, sel)
 	if err != nil {
 		if errors.Is(err, platform.ErrModuleDepsFile) {
 			return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err}
@@ -71,12 +61,8 @@ func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.Globa
 	if err != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("building platform module %s (source %s): %w", dir, res.Source, err)}
 	}
-	spec, err := platform.SpecFromPlatform(p)
-	if err != nil {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("reading platform module %s (source %s): %w", dir, res.Source, err)}
-	}
 
-	return &renderEnv{kernel: k, platform: p, resolution: res, spec: spec, skew: skew}, nil
+	return &renderEnv{kernel: k, platform: p, resolution: res, skew: skew}, nil
 }
 
 // clusterSkewRefuse is the Platform CR's spec.skewPolicy value that refuses
@@ -90,8 +76,8 @@ const clusterSkewRefuse = "Refuse"
 // appended to the provenance line: it names a refuse policy and its source,
 // and names the CR as the policy's source when it overrode a config key
 // that would have refused. A platform generated from the module's own deps
-// pins every path at least at the module's version, so skew cannot arise:
-// the policy is not applied and not named.
+// pins every path at least at the render's own version, so skew cannot
+// arise: the policy is not applied and not named.
 func skewPolicyFor(res platform.Resolution, cfg *config.GlobalConfig) (policy kernel.SkewPolicy, note string) {
 	if res.Source == platform.SourceModuleDeps {
 		return kernel.SkewWarn, ""

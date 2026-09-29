@@ -18,13 +18,15 @@ import (
 
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/platform"
 	"github.com/open-platform-model/cli/tests/fixtures"
 )
 
 // seedRenderHome returns a hermetic HOME whose ~/.opm holds exactly what
-// `opm config init` writes (config.cue against the public registry mapping
-// and the local default platform module), so render-bearing e2e tests never
-// depend on the developer's real ~/.opm. Cleaned up with the test.
+// `opm config init` writes (config.cue against the public registry mapping),
+// so render-bearing e2e tests never depend on the developer's real ~/.opm.
+// The HOME has no ~/.kube, so a render there resolves no kubeconfig context.
+// Cleaned up with the test.
 //
 // The CUE module cache is not test state: the child process is pointed at
 // the invoking user's cache (CUE_CACHE_DIR) so a cold temp HOME does not
@@ -32,16 +34,6 @@ import (
 // the temp directory. Should anything still land there, the cleanup makes
 // the tree writable before t.TempDir removes it.
 func seedRenderHome(t *testing.T) string {
-	t.Helper()
-	home := seedConfigOnlyHome(t)
-	require.NoError(t, config.WritePlatformModule(config.PlatformDir(renderHomeConfigPath(home))))
-	return home
-}
-
-// seedConfigOnlyHome is seedRenderHome without the local default platform
-// module: ~/.opm holds config.cue and nothing else, the home of a machine
-// that never needed a platform (a module author's).
-func seedConfigOnlyHome(t *testing.T) string {
 	t.Helper()
 	home := t.TempDir()
 	t.Cleanup(func() { makeWritable(home) })
@@ -81,18 +73,60 @@ func makeWritable(dir string) {
 // v4.0.1 or newer), so a platform pinning it exhibits catalog version skew.
 const olderCatalogPin = "v4.0.0"
 
-// seedSkewPlatform writes a platform module identical to the seeded default
-// except that the abstraction catalog is pinned at olderCatalogPin, and
-// returns its directory.
+// hackPlatformPath is the repo's maintained platform module, the one the
+// kind dev flow mirrors into the cluster Platform.
+func hackPlatformPath(t *testing.T) string {
+	t.Helper()
+	dir, err := filepath.Abs(filepath.Join("..", "..", "hack", "platform"))
+	require.NoError(t, err)
+	return dir
+}
+
+// hackCatalogPin reads the version hack/platform/ pins path at.
+func hackCatalogPin(t *testing.T, path string) string {
+	t.Helper()
+	pins := modDeps(t, filepath.Join(hackPlatformPath(t), filepath.FromSlash(config.PlatformModuleFileName)))
+	require.Contains(t, pins, path, "hack/platform pins %s", path)
+	return pins[path]
+}
+
+// seedPlatform copies hack/platform/ into a fresh, writable directory and
+// returns it, so a test can edit its pins or its local-module.cue.
+func seedPlatform(t *testing.T) string {
+	t.Helper()
+	src := hackPlatformPath(t)
+	dst := t.TempDir()
+	require.NoError(t, filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		out := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(out, 0o755)
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(out, data, 0o644)
+	}))
+	return dst
+}
+
+// seedSkewPlatform writes a copy of hack/platform/ whose abstraction catalog
+// is pinned at olderCatalogPin, and returns its directory.
 func seedSkewPlatform(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
-	require.NoError(t, config.WritePlatformModule(dir))
+	dir := seedPlatform(t)
 	modFile := filepath.Join(dir, filepath.FromSlash(config.PlatformModuleFileName))
 	content, err := os.ReadFile(modFile)
 	require.NoError(t, err)
-	skewed := strings.Replace(string(content), config.DefaultCatalogPins[0], olderCatalogPin, 1)
-	require.NotEqual(t, string(content), skewed, "the seeded module must pin the abstraction catalog")
+	skewed := strings.Replace(string(content), hackCatalogPin(t, config.DefaultCatalogPaths[0]), olderCatalogPin, 1)
+	require.NotEqual(t, string(content), skewed, "hack/platform must pin the abstraction catalog")
 	require.NoError(t, os.WriteFile(modFile, []byte(skewed), 0o600))
 	return dir
 }
@@ -151,7 +185,8 @@ func TestE2E_InstanceBuild_LayersValuesFile(t *testing.T) {
 	assert.Contains(t, stdout, "ghcr.io/stefanprodan/podinfo:6.7.0", "the -f override must reach the rendered Deployment")
 	assert.NotContains(t, stdout, "podinfo:6.7.1", "the module default must be overridden")
 	assert.Contains(t, stdout, "replicas: 2", "the package's own values.cue still applies beside the override")
-	assert.Contains(t, stderr, "(local default)", "provenance names the local default platform module")
+	assert.Contains(t, stderr, "platform: instance deps (", "with no --platform and no kubeconfig context the render uses the instance package's own deps")
+	assert.NotContains(t, stderr, "cluster Platform not used", "no kubeconfig context is not a fallback: nothing is warned")
 }
 
 // TestE2E_InstanceBuild_SkewWarnsByDefault covers "Render warnings reach the
@@ -326,17 +361,8 @@ values: {
 	return filepath.Join(dir, "instance.cue")
 }
 
-// seedPlatform writes the seeded default platform module into a fresh
-// directory and returns it.
-func seedPlatform(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	require.NoError(t, config.WritePlatformModule(dir))
-	return dir
-}
-
-// catalogCopyWithLabel copies the abstraction catalog build the seeded
-// platform pins out of the CUE module cache into a writable directory and
+// catalogCopyWithLabel copies the abstraction catalog build hack/platform/
+// pins out of the CUE module cache into a writable directory and
 // stamps one extra label on its deployment transformer's output. The cache
 // is the invoking user's (seedRenderHome); a cold cache is warmed by one
 // plain render of the podinfo example against platformDir first.
@@ -344,7 +370,7 @@ func catalogCopyWithLabel(t *testing.T, home, platformDir, instanceFile string) 
 	t.Helper()
 	catalogPath, _, _ := strings.Cut(config.DefaultCatalogPaths[0], "@")
 	src := filepath.Join(os.Getenv("CUE_CACHE_DIR"), "mod", "extract",
-		filepath.FromSlash(catalogPath)+"@"+config.DefaultCatalogPins[0])
+		filepath.FromSlash(catalogPath)+"@"+hackCatalogPin(t, config.DefaultCatalogPaths[0]))
 	if _, err := os.Stat(src); err != nil {
 		_, stderr, runErr := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
 			"instance", "build", instanceFile, "--platform", platformDir)
@@ -435,6 +461,33 @@ func TestE2E_InstanceBuild_ReplacementOfPlatformPathIsInert(t *testing.T) {
 	assert.NotContains(t, stderr, "in effect")
 }
 
+// TestE2E_InstanceBuild_InstanceDepsHonorThePackageReplacement covers the
+// kernel-render scenario "Instance deps platform honors the instance
+// package's replacement" (the spec spells it the British way): with no
+// --platform and --offline, the platform is generated from the instance
+// package's own pins and carries its cue.mod/local-module.cue, so the
+// redirected catalog copy renders. The one warning names the path, the copy
+// and the module-context side of the render, "(instance)"; nothing says the
+// redirect belongs in the platform module.
+func TestE2E_InstanceBuild_InstanceDepsHonorThePackageReplacement(t *testing.T) {
+	repoRoot, example := podinfoExample(t)
+	home := seedRenderHome(t)
+	catDir := catalogCopyWithLabel(t, home, seedPlatform(t), example)
+	redirected := replacementInstance(t, repoRoot, false, map[string]string{config.DefaultCatalogPaths[0]: catDir})
+
+	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
+		"instance", "build", redirected, "--offline")
+	require.NoError(t, err, "stderr: %s", stderr)
+
+	assert.Contains(t, stderr, "platform: instance deps (")
+	assert.Contains(t, stdout, catalogLabel+": local", "the rendered Deployment carries the checkout's transformer output")
+	want := "local replacement in effect: " + config.DefaultCatalogPaths[0] + " served from " + catDir + " (instance)"
+	assert.Equal(t, 1, strings.Count(stderr, "local replacement in effect:"), "stderr: %s", stderr)
+	assert.Contains(t, stderr, want)
+	assert.NotContains(t, stderr, "redirect it in the platform module's cue.mod/local-module.cue")
+	assert.NotContains(t, stderr, "is ignored")
+}
+
 // TestE2E_InstanceBuild_PlatformReplacementIsHonored covers "Platform
 // replacement of its catalog is honored and warns": the --platform module
 // redirects its abstraction catalog to a patched copy; the rendered
@@ -500,4 +553,101 @@ func TestE2E_InstanceBuild_ModuleDirectoryRefused(t *testing.T) {
 	assert.Contains(t, stderr, "is a module, not an instance")
 	assert.Contains(t, stderr, "opm module build "+modDir)
 	assert.Empty(t, stdout)
+}
+
+// writeBlackholeKubeconfig writes a kubeconfig whose only context names an
+// API server that never answers (TEST-NET-1, RFC 5737).
+func writeBlackholeKubeconfig(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "kubeconfig")
+	writeE2EFile(t, path, `apiVersion: v1
+kind: Config
+clusters:
+- name: blackhole
+  cluster:
+    server: https://192.0.2.1:6443
+contexts:
+- name: blackhole
+  context:
+    cluster: blackhole
+    user: u
+current-context: blackhole
+users:
+- name: u
+  user:
+    token: t
+`)
+	return path
+}
+
+// TestE2E_InstanceBuild_OfflineNeverContactsTheCluster covers "offline never
+// contacts the cluster": with a kubeconfig context pointing at a server that
+// never answers, --offline renders against the instance's own deps with no
+// cluster warning and without waiting out the lookup bound.
+func TestE2E_InstanceBuild_OfflineNeverContactsTheCluster(t *testing.T) {
+	_, instanceFile := podinfoExample(t)
+	home := seedRenderHome(t)
+	kubeconfig := writeBlackholeKubeconfig(t)
+
+	start := time.Now()
+	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
+		"instance", "build", instanceFile, "--offline", "--kubeconfig", kubeconfig)
+	elapsed := time.Since(start)
+	require.NoError(t, err, "stderr: %s", stderr)
+
+	assert.NotEmpty(t, stdout)
+	assert.Contains(t, stderr, "platform: instance deps (")
+	assert.NotContains(t, stderr, "cluster Platform not used")
+	assert.Less(t, elapsed, 10*time.Second, "--offline does not wait on the cluster lookup")
+}
+
+// TestE2E_InstanceVet_UnreachableClusterFallsBackToDeps covers "Unreachable
+// cluster degrades to the deps": the context's server never answers, and vet
+// warns within the bounded wait and passes against the deps.
+func TestE2E_InstanceVet_UnreachableClusterFallsBackToDeps(t *testing.T) {
+	_, instanceFile := podinfoExample(t)
+	home := seedRenderHome(t)
+	kubeconfig := writeBlackholeKubeconfig(t)
+
+	_, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
+		"instance", "vet", instanceFile, "--kubeconfig", kubeconfig)
+	require.NoError(t, err, "stderr: %s", stderr)
+
+	assert.Equal(t, 1, strings.Count(stderr, "cluster Platform not used"), "stderr: %s", stderr)
+	assert.Contains(t, stderr, "could not reach the cluster")
+	assert.Contains(t, stderr, "platform: instance deps (")
+	assert.Contains(t, stderr, "Instance valid")
+}
+
+// TestE2E_InstanceBuild_ReadsTheNamedContextsClusterPlatform covers "build
+// reads the Platform from the named context", "Kubeconfig flags select the
+// cluster" and "Cluster CR used when no flag": with no --platform, instance
+// build reads the Platform of the context --kubeconfig and --context name
+// (always kind-opm-dev, never another context), renders against it and
+// generates no deps platform. Read-only against the cluster.
+func TestE2E_InstanceBuild_ReadsTheNamedContextsClusterPlatform(t *testing.T) {
+	_, instanceFile := podinfoExample(t)
+	kubeconfig := requireKindCluster(t)
+	home := seedRenderHome(t)
+
+	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
+		"instance", "build", instanceFile, "--kubeconfig", kubeconfig, "--context", kindContext)
+	require.NoError(t, err, "stderr: %s", stderr)
+
+	assert.NotEmpty(t, stdout)
+	assert.Contains(t, stderr, "platform: cluster Platform CR cluster (")
+	assert.NotContains(t, stderr, "cluster Platform not used")
+	assert.NotContains(t, stderr, " deps (")
+
+	// Every module generated under the temp home's cache is the cluster's:
+	// none carries the deps generator's module identity.
+	modFiles, err := filepath.Glob(filepath.Join(config.PlatformCacheDir(renderHomeConfigPath(home)), "*", "cue.mod", "module.cue"))
+	require.NoError(t, err)
+	require.NotEmpty(t, modFiles, "the cluster arm generates its platform module under the cache")
+	for _, f := range modFiles {
+		data, err := os.ReadFile(f)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), platform.ClusterPlatformModulePath, f)
+		assert.NotContains(t, string(data), platform.ModuleDepsPlatformModulePath, f)
+	}
 }

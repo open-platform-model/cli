@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/platform"
 	pkgcore "github.com/open-platform-model/cli/pkg/core"
 	"github.com/open-platform-model/cli/pkg/loader"
 )
@@ -54,6 +56,14 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	if err != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}
+	// A package under no module root cannot import its module: refuse it
+	// here, naming the directory, before the acquire reports it as an
+	// unresolved import.
+	if moduleRoot == "" {
+		err := errNoModuleRoot(instanceDir)
+		printValidationError(err)
+		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+	}
 	sources, err := loadValuesSources(k, opts.ValuesFiles)
 	if err != nil {
 		printValidationError(err)
@@ -76,9 +86,26 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	// context the render's replacement warnings are worded against.
 	sourceLocal := loader.HasLocalModuleReplacement(moduleRoot)
 
+	// Without --platform the render falls back to the instance package's own
+	// pins: its cue.mod/module.cue and local-module.cue at the module root.
+	var deps *platform.ModuleDeps
+	if opts.PlatformFlag == "" {
+		deps, err = instanceDepsOf(instanceDir, moduleRoot)
+		if err != nil {
+			printValidationError(err)
+			return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+		}
+	}
+
 	// Platform resolution + acquisition only after the instance itself
 	// validated: cheap failures never hit the cluster or registry.
-	env, err := resolvePlatformEnv(ctx, k, opts.Config, opts.PlatformFlag, opts.ClusterPlatform, nil)
+	env, err := resolvePlatformEnv(ctx, k, opts.Config, platform.ResolveOptions{
+		PlatformFlag:    opts.PlatformFlag,
+		Cluster:         opts.ClusterPlatform,
+		ClusterOptional: opts.ClusterOptional,
+		Deps:            deps,
+		DepsKind:        platform.DepsInstance,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +123,38 @@ func instanceContext(arg string) (dir, moduleRoot string, err error) {
 		return "", "", err
 	}
 	return dir, moduleContextRoot(dir), nil
+}
+
+// errNoModuleRoot is the validation error for an instance package under no
+// CUE module: without its own cue.mod it can import neither its module nor
+// core, and it has no dependency pins to render against.
+func errNoModuleRoot(instanceDir string) error {
+	return fmt.Errorf("instance package %s is under no CUE module (no cue.mod/module.cue at or above it): an instance package imports its module through its own cue.mod", instanceDir)
+}
+
+// instanceDepsOf reads what an instance-deps platform is generated from: the
+// instance package's committed cue.mod/module.cue at its module root and the
+// replacements of its cue.mod/local-module.cue. A package under no module
+// root cannot import its module, so it has no pins to read.
+func instanceDepsOf(instanceDir, moduleRoot string) (*platform.ModuleDeps, error) {
+	if moduleRoot == "" {
+		return nil, errNoModuleRoot(instanceDir)
+	}
+	name := filepath.Join(moduleRoot, "cue.mod", "module.cue")
+	data, err := os.ReadFile(name)
+	if err != nil {
+		return nil, fmt.Errorf("reading the instance package's dependency pins: %w", err)
+	}
+	replacements, err := loader.LocalReplacements(moduleRoot)
+	if err != nil {
+		return nil, err
+	}
+	return &platform.ModuleDeps{
+		ModFile:      data,
+		ModFileName:  name,
+		Replacements: replacements,
+		ModuleRoot:   moduleRoot,
+	}, nil
 }
 
 // moduleContextRoot is the effective module context of a render entry: the
@@ -219,10 +278,7 @@ func refuseDuplicateIdentities(out *kernel.RenderResult) error {
 }
 
 // newResult assembles the workflow Result from the render output and the
-// render environment. PlatformSpec is the seed document decoded from the
-// exact built platform the render consumed — the 0006:D12 write-if-absent seeding
-// writes it verbatim, with no re-read of the platform module at apply time.
-// Warnings are the render's advisory facts worded by the CLI from the
+// render environment. Warnings are the render's advisory facts worded by the CLI from the
 // diagnostics rows (unhandled optional traits, skew under the warn policy);
 // the 0010:D19 local-replacement warnings are emitted directly by renderInstance
 // from the replacement rows, after the render.
@@ -231,7 +287,6 @@ func newResult(env *renderEnv, out *kernel.RenderResult, renderDigest string, va
 		Pairs:        out.Diagnostics.Pairs,
 		Warnings:     formatAdvisories(out.Diagnostics),
 		Platform:     env.resolution,
-		PlatformSpec: env.spec,
 		RenderDigest: renderDigest,
 		Values:       values,
 		SourceLocal:  sourceLocal,

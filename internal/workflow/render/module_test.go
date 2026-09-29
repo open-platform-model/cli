@@ -248,11 +248,12 @@ func TestModuleDepsOf_MissingModFileIsAnError(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestFromModule_PlatformFromDepsNeedsNoLocalDefault renders the
-// module-with-debug-values fixture (no catalog, no components) with PlatformFromDeps and
-// an OPM home holding no platform/: the platform is generated from the
-// module's pins under the home's cache, and the render yields zero objects.
-func TestFromModule_PlatformFromDepsNeedsNoLocalDefault(t *testing.T) {
+// TestFromModule_RendersAgainstModuleDeps renders the
+// module-with-debug-values fixture (no catalog, no components) with no
+// --platform and no cluster, from an OPM home holding no platform/: the
+// platform is generated from the module's pins under the home's cache, and
+// the render yields zero objects.
+func TestFromModule_RendersAgainstModuleDeps(t *testing.T) {
 	const registry = "opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"
 	dir, err := filepath.Abs(filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "module-with-debug-values"))
 	require.NoError(t, err)
@@ -262,20 +263,48 @@ func TestFromModule_PlatformFromDepsNeedsNoLocalDefault(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.cue")
 
 	result, err := FromModule(context.Background(), ModuleOpts{
-		ModulePath:       dir,
-		PlatformFromDeps: true,
-		Config:           &config.GlobalConfig{ConfigPath: configPath, Registry: registry},
-		K8sConfig:        &config.ResolvedKubernetesConfig{},
+		ModulePath: dir,
+		Config:     &config.GlobalConfig{ConfigPath: configPath, Registry: registry},
+		K8sConfig:  &config.ResolvedKubernetesConfig{},
 	})
 	require.NoError(t, err)
 
 	assert.Equal(t, platform.SourceModuleDeps, result.Platform.Source)
+	assert.Equal(t, platform.DepsModule, result.Platform.DepsKind)
 	assert.Empty(t, result.Platform.Catalogs, "the fixture pins no catalog")
 	assert.Equal(t, config.PlatformCacheDir(configPath), filepath.Dir(result.Platform.Dir))
 	assert.Empty(t, result.Resources)
 	assert.Empty(t, result.Warnings, "no skew row against the module's own pins")
-	_, err = os.Stat(config.PlatformDir(configPath))
+	_, err = os.Stat(config.LegacyPlatformDirPath(configPath))
 	assert.ErrorIs(t, err, os.ErrNotExist)
+}
+
+// TestFromModule_AbsentClusterPlatformFallsBackToModuleDeps covers "module
+// apply on a cluster without a Platform" at the render: with the cluster
+// getter module apply passes and no Platform in the cluster, the render
+// warns naming the module's own deps and renders against them.
+func TestFromModule_AbsentClusterPlatformFallsBackToModuleDeps(t *testing.T) {
+	const registry = "opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"
+	dir, err := filepath.Abs(filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "module-with-debug-values"))
+	require.NoError(t, err)
+	if _, err := config.NewKernel(registry).SchemaCache().Get(); err != nil {
+		t.Skipf("core v2 schema unavailable (registry/cache): %v", err)
+	}
+	logBuf := captureRenderLog(t)
+
+	result, err := FromModule(context.Background(), ModuleOpts{
+		ModulePath:      dir,
+		ClusterPlatform: absentClusterPlatform(),
+		Config:          &config.GlobalConfig{ConfigPath: filepath.Join(t.TempDir(), "config.cue"), Registry: registry},
+		K8sConfig:       &config.ResolvedKubernetesConfig{},
+	})
+	require.NoError(t, err, "log: %s", logBuf.String())
+
+	assert.Equal(t, platform.SourceModuleDeps, result.Platform.Source)
+	assert.Equal(t, platform.DepsModule, result.Platform.DepsKind)
+	assert.NotEmpty(t, result.Platform.Warning)
+	assert.Contains(t, logBuf.String(), "cluster Platform not used (no Platform CR in the cluster) — rendering against the module's own deps")
+	assert.Contains(t, logBuf.String(), "platform: module deps (")
 }
 
 // TestModuleSource_CarriesCommittedModFile pins the input the module-deps

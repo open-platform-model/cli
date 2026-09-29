@@ -17,7 +17,9 @@ import (
 // NewInstanceVetCmd creates the instance vet command.
 func NewInstanceVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var rff cmdutil.InstanceFileFlags
+	var kf cmdutil.K8sFlags
 	var namespace string
+	var offline bool
 
 	c := &cobra.Command{
 		Use:   "vet <instance.cue>",
@@ -29,6 +31,12 @@ This command loads an instance file and renders it through the library kernel
 so it validates the instance can be rendered successfully.
 No manifests are output — purely a pass/fail validation tool.
 
+The platform is --platform <dir>, else the cluster's Platform when the
+kubeconfig context reaches one, else a platform generated from the instance
+package's own dependency pins. The cluster is never required: an absent
+Platform or an unreachable cluster warns and falls back to the deps, and
+--offline skips the cluster entirely.
+
 Arguments:
   instance.cue    Path to the instance .cue file (required)
 
@@ -37,21 +45,26 @@ Examples:
   opm instance vet ./jellyfin_instance.cue
 
   # Validate with a specific namespace
-  opm instance vet ./jellyfin_instance.cue -n production`,
+  opm instance vet ./jellyfin_instance.cue -n production
+
+  # Validate without contacting any cluster
+  opm instance vet ./jellyfin_instance.cue --offline`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runInstanceVet(args[0], cfg, &rff, namespace)
+			return runInstanceVet(args[0], cfg, &rff, clusterLookup{k8s: kf, offline: offline}, namespace)
 		},
 	}
 
 	rff.AddTo(c)
+	kf.AddTo(c)
 	c.Flags().StringVarP(&namespace, "namespace", "n", "", "Target namespace")
+	c.Flags().BoolVar(&offline, "offline", false, offlineFlagHelp)
 
 	return c
 }
 
 // runInstanceVet executes the instance vet command.
-func runInstanceVet(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.InstanceFileFlags, namespaceFlag string) error {
+func runInstanceVet(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.InstanceFileFlags, lookup clusterLookup, namespaceFlag string) error {
 	ctx := context.Background()
 
 	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
@@ -66,7 +79,9 @@ func runInstanceVet(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.
 		InstanceFilePath: instanceFile,
 		ModuleCommand:    "opm module vet",
 		ValuesFiles:      rff.Values,
-		PlatformFlag:     rff.Platform, // offline: no cluster read (0006:D21)
+		PlatformFlag:     rff.Platform,
+		ClusterPlatform:  optionalClusterGetter(cfg, lookup.k8s, rff.Platform, lookup.offline),
+		ClusterOptional:  true,
 		K8sConfig:        k8sConfig,
 		Config:           cfg,
 	})

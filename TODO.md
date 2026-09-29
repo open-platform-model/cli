@@ -10,7 +10,7 @@
 - [ ] Add "opm mod eval" to evaluate the module printing the raw CUE code of the module.
 
 - [x] ~~Ensure "opm config init" also run "cue mod tidy" or similar to discover and download all dependencies.~~
-  - **Resolved:** `opm config init` stays offline and writes pins without resolving them (auto-resolving was rejected to keep init explicit); `opm config vet` proves the pins resolve. The platform module under `~/.opm/platform/` is a plain CUE module, so `opm module tidy ~/.opm/platform` fills in or prunes its dependencies without the `cue` binary.
+  - **Resolved:** `opm config init` stays offline and writes only `~/.opm/config.cue`; it no longer writes a platform module, so there are no pins for it to resolve. A render without `--platform` or a cluster Platform generates its platform from the render's own dependency pins.
 - [ ] Rework all tests to use cue.AST() instead of strings for test data and comparison.
   - Use pure CUE files, packages and modules for testadata
   - Look into using pure CUE files for comparison data as well.

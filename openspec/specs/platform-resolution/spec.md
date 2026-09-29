@@ -2,95 +2,9 @@
 
 ## Purpose
 
-Platform-source resolution by precedence with visible provenance (enhancement 0006 D11/D12/D17/D21/D22/D39). Every source resolves to a platform module directory the kernel acquires with `AcquirePlatformFromDir`; the cluster CR is generated into one through the library's platform-module helper, the operator's own ingestion path (0019 D5/D6), from the effective registry the operator recorded on the CR's status (0015 D6).
+Platform-source resolution by precedence with visible provenance (enhancement 0006 D11/D17/D21/D39): `--platform <dir>`, the cluster `Platform` CR, then a platform generated from the render's own dependency pins; there is no local default platform. Every source resolves to a platform module directory the kernel acquires with `AcquirePlatformFromDir`; the cluster CR is generated into one through the library's platform-module helper, the operator's own ingestion path (0019 D5/D6), from the effective registry the operator recorded on the CR's status (0015 D6).
 
 ## Requirements
-
-### Requirement: Platform source precedence
-
-The CLI SHALL resolve the platform for every render by precedence. `opm module build` and `opm module vet` resolve `--platform <dir>` (highest) > the module-deps platform (see "Module commands render against the module's deps") and SHALL read neither the cluster nor the local default platform module. Every other render resolves `--platform <dir>` (highest, an explicit local platform module directory) > cluster `Platform` CR (cluster-facing commands only) > local default platform module `~/.opm/platform/`. Every source resolves to a platform module directory the kernel acquires; the CR source is generated into one first from the effective registry the operator recorded on the CR's status, or from the CR's spec when no operator has recorded one (see "Acquisition mirrors the operator" and "The cluster arm reads the effective registry"), and the module-deps source is generated into one from the module's committed dependency pins. Every command that renders SHALL report which platform source it resolved, the directory it acquired and, for the CR source, whether the effective registry or the spec was used and the package identity the operator recorded. A `--platform` argument that is a file, or a directory holding no platform module, SHALL fail naming the expected shape (a directory with `cue.mod/module.cue` and a `#Platform` package) and pointing at `opm config init`. The `--provider` flag SHALL NOT exist (superseded by `--platform`, 0006 D21).
-
-#### Scenario: Flag wins
-
-- **WHEN** `opm instance apply --platform ./my-platform/` runs against a cluster that has a `Platform` CR
-- **THEN** the render SHALL use the platform module at `./my-platform/`
-- **AND** the output SHALL report the platform source as the flag-provided directory
-
-#### Scenario: Cluster CR used when no flag
-
-- **WHEN** `opm instance apply` runs with no `--platform` against a cluster with a readable `Platform` CR
-- **THEN** the render SHALL use a platform module generated from the cluster CR's effective registry, or from its spec when the status carries none
-- **AND** the output SHALL report the platform source as the cluster CR and which of the two it generated from
-
-#### Scenario: Fallback to local default warns
-
-- **WHEN** `opm instance apply` runs with no `--platform` and the cluster `Platform` CR is absent or unreadable (RBAC denied)
-- **THEN** the render SHALL use the local default platform module `~/.opm/platform/`
-- **AND** a warning SHALL state that the cluster Platform was not used and why
-
-#### Scenario: Offline commands never read the cluster
-
-- **WHEN** `opm instance build`, `opm instance vet`, `opm module build` or `opm module vet` runs
-- **THEN** the CLI SHALL NOT attempt any cluster read for platform resolution
-- **AND** the platform of `opm instance build` and `opm instance vet` SHALL come from `--platform` or the local default only
-- **AND** the platform of `opm module build` and `opm module vet` SHALL come from `--platform` or the module-deps platform only
-
-#### Scenario: A platform file is refused
-
-- **WHEN** `--platform ./platform.cue` names a file
-- **THEN** resolution fails before any render, naming the expected module-directory shape and the `opm config init` migration
-
-### Requirement: Local default platform is a CUE module
-
-The local default platform SHALL be a CUE module directory (`~/.opm/platform/`, sibling of the resolved config file so `--config`/`OPM_CONFIG` overrides move both together): a `cue.mod/module.cue` under the reserved-unpublished module path `opmodel.dev/platforms/local@v0` pinning core and every subscribed catalog, and a `platform.cue` embedding `core.#Platform` with one `#registry` entry per catalog carrying the catalog by import (0019:D5). The build a catalog entry materializes SHALL be named exactly once, as the module's `cue.mod` dependency; `platform.cue` SHALL carry no version scalars. Maintenance is editing `cue.mod` (by hand or `cue mod get`), pinning whatever the new build needs with `opm module tidy` on the platform directory, and verifying with `opm config vet`; the CLI SHALL NOT require any other tool to keep the platform current.
-
-#### Scenario: The module is the resolution
-
-- **WHEN** the platform module's `cue.mod` pins `opmodel.dev/catalogs/opm@v4` at `4.0.1` and a newer catalog is published
-- **THEN** the platform still evaluates catalog `4.0.1` bytes until the pin is edited, with no lockfile and no re-resolution
-
-#### Scenario: Pin bump loop
-
-- **WHEN** a user edits the platform module's `cue.mod` to a newer published catalog build and runs `opm config vet`
-- **THEN** vet builds the module against the new pin and reports success, or fails naming the dependency when the pinned build does not exist
-
-#### Scenario: Key-to-import drift refuses
-
-- **WHEN** a `#registry` entry is keyed at one catalog path but embeds an import of a different catalog
-- **THEN** building the platform module fails with a conflict at a path naming that entry (the 0019:D5 binding), and vet surfaces it
-
-### Requirement: Solo-cluster Platform write-if-absent
-
-On a cluster-facing apply where no `Platform` CR exists and resolution fell back to the local default, the CLI SHALL create the singleton `cluster` Platform from the platform the render consumed using a plain create (field manager `opm-cli`), treating `AlreadyExists` as success-noop (0006 D22). The seeded document SHALL be decoded from the built platform value the render consumed, carried through the render result: `type` from the platform, and for each `#registry` entry its key, `enable` and the `version` core derived from the embedded catalog. The CLI MUST NOT re-read the platform module at apply time (no TOCTOU) and MUST NOT seed an empty or partial spec. The CLI MUST NOT use server-side apply or update for this write, and MUST NOT overwrite an existing Platform. Creation failure (e.g. RBAC) SHALL degrade to a warning — the apply itself proceeds against the local platform (0006 D17).
-
-The same write contract SHALL govern every caller that seeds the singleton, including `opm operator install`. Callers differ only in where the spec came from and in the provenance they report: an apply reports that it seeded from the local default platform, and an install reports the catalog coordinate and version it resolved from the registry. No caller SHALL report a provenance it did not use.
-
-#### Scenario: Absent Platform is seeded
-
-- **WHEN** an apply succeeds against a cluster with no `Platform` CR
-- **THEN** a `Platform` named `cluster` SHALL be created from the local platform the render consumed
-
-#### Scenario: Seeded document matches the render-consumed spec
-
-- **WHEN** the render resolved the local default platform module with `type` and at least one `#registry` entry, and the apply seeds the cluster Platform
-- **THEN** the created Platform's spec SHALL carry that same non-empty `type` and one subscription per entry (path, `enable`, the derived `version`)
-- **AND** the seeded document SHALL NOT be derived from a second read of the platform module
-
-#### Scenario: Concurrent create tolerated
-
-- **WHEN** the create returns `AlreadyExists`
-- **THEN** the CLI SHALL treat it as success and SHALL NOT modify the existing Platform
-
-#### Scenario: RBAC-denied create degrades
-
-- **WHEN** the create is forbidden
-- **THEN** the CLI SHALL warn and the apply SHALL still complete
-
-#### Scenario: Install reports its own provenance
-
-- **WHEN** `opm operator install` seeds the Platform from a registry-resolved catalog version
-- **THEN** the reported provenance SHALL name the catalog module path and the resolved version
-- **AND** it SHALL NOT claim the spec came from the local default platform file
 
 ### Requirement: Legacy Cluster CR Tolerance
 
@@ -213,7 +127,7 @@ When `opm module build` or `opm module vet` runs without `--platform`, the CLI S
 - A module with no `opmodel.dev/catalogs/*` dependency SHALL render against a generated platform with an empty registry: a module without components passes with zero objects, and a component is refused as unmatched with a hint naming `opm module tidy` and `--platform <dir>`.
 - A pin that is not published SHALL fail at generation naming the module path and version.
 - When a render against this source is refused for unresolved demands, the output SHALL add a hint that a provider-fulfilled contract comes from a platform, naming `--platform <dir>`.
-- `opm module apply` and every `opm instance` command SHALL NOT use this source.
+- The same generator serves the deps fallback of every other render (see "Renders fall back to their own deps").
 
 #### Scenario: Catalog pins come from the module
 
@@ -244,8 +158,9 @@ When `opm module build` or `opm module vet` runs without `--platform`, the CLI S
 
 #### Scenario: Deploying commands keep the platform
 
-- **WHEN** `opm module apply` or `opm instance build` runs with no `--platform`
-- **THEN** the render SHALL resolve its platform exactly as before this change and SHALL NOT generate one from the module's deps
+- **WHEN** `opm module apply` or `opm instance build` runs with no `--platform` against a cluster with a readable `Platform` CR
+- **THEN** the render SHALL use the platform generated from the cluster `Platform`
+- **AND** no platform SHALL be generated from the module's or the instance's deps
 
 #### Scenario: A local catalog checkout is rendered
 
@@ -282,3 +197,128 @@ When `opm module build` or `opm module vet` runs without `--platform`, the CLI S
 
 - **WHEN** `opm module build` runs twice on a module whose pins and replacements did not change
 - **THEN** both runs SHALL render against the same generated directory under `cache/platforms/`, and the second run SHALL NOT rewrite it
+
+### Requirement: Platform source precedence by command
+
+The CLI SHALL resolve the platform for every render by precedence, and no precedence SHALL include a platform module in the OPM home directory.
+
+- `opm module build` and `opm module vet` resolve `--platform <dir>` (highest) > the module-deps platform (see "Module commands render against the module's deps"), and SHALL NOT read the cluster.
+- `opm instance build`, `opm instance vet`, `opm instance diff`, `opm instance apply` and `opm module apply` resolve `--platform <dir>` (highest) > the cluster `Platform` CR named `cluster` > a platform generated from the render's own dependency pins (see "Renders fall back to their own deps").
+- `opm platform check` resolves its `[dir]` argument (highest) > `--platform <dir>` > the cluster `Platform` CR, and SHALL refuse when none is available, naming all three.
+
+Every source resolves to a platform module directory the kernel acquires; the CR source is generated into one first from the effective registry the operator recorded on the CR's status, or from the CR's spec when no operator has recorded one (see "Acquisition mirrors the operator" and "The cluster arm reads the effective registry"), and the deps sources are generated into one from committed dependency pins. Every command that renders SHALL report which platform source it resolved, the directory it acquired and, for the CR source, whether the effective registry or the spec was used and the package identity the operator recorded. A `--platform` argument that is a file, or a directory holding no platform module, SHALL fail naming the expected shape (a directory with `cue.mod/module.cue` and a `#Platform` package). The `--provider` flag SHALL NOT exist (superseded by `--platform`, 0006:D21).
+
+#### Scenario: Flag wins
+
+- **WHEN** `opm instance apply --platform ./my-platform/` runs against a cluster that has a `Platform` CR
+- **THEN** the render SHALL use the platform module at `./my-platform/`
+- **AND** the output SHALL report the platform source as the flag-provided directory
+
+#### Scenario: Cluster CR used when no flag
+
+- **WHEN** `opm instance apply` or `opm instance build` runs with no `--platform` and a kubeconfig context whose cluster has a readable `Platform` CR
+- **THEN** the render SHALL use a platform module generated from the cluster CR's effective registry, or from its spec when the status carries none
+- **AND** the output SHALL report the platform source as the cluster CR and which of the two it generated from
+
+#### Scenario: Absent Platform falls back to the deps
+
+- **WHEN** `opm instance apply` runs with no `--platform` and the cluster `Platform` CR is absent or unreadable (RBAC denied)
+- **THEN** the render SHALL use a platform generated from the instance package's own dependency pins
+- **AND** a warning SHALL state that the cluster Platform was not used and why
+- **AND** the apply SHALL NOT create a `Platform`
+
+#### Scenario: Module commands never read the cluster
+
+- **WHEN** `opm module build` or `opm module vet` runs
+- **THEN** the CLI SHALL NOT attempt any cluster read for platform resolution
+- **AND** the platform SHALL come from `--platform` or the module-deps platform only
+
+#### Scenario: A platform file is refused
+
+- **WHEN** `--platform ./platform.cue` names a file
+- **THEN** resolution fails before any render, naming the expected module-directory shape
+
+#### Scenario: platform check with no source refuses
+
+- **WHEN** `opm platform check` runs with no argument, no `--platform` and no readable cluster `Platform`
+- **THEN** the command SHALL fail naming the argument, the flag and the cluster as the sources it looked for
+- **AND** it SHALL NOT read any directory under the OPM home
+
+### Requirement: Only operator install seeds the cluster Platform
+
+`opm operator install` SHALL seed the singleton `cluster` Platform with a plain create (field manager `opm-cli`), treating `AlreadyExists` as success-noop (0006:D22), subscribing to the catalog build it resolved from the registry. The CLI MUST NOT use server-side apply or update for this write and MUST NOT overwrite an existing Platform. A forbidden create SHALL degrade to a warning. The reported provenance SHALL name the catalog coordinate and version the install resolved and SHALL NOT claim any other source.
+
+No render-bearing command SHALL create, update or seed a `Platform`: `opm instance apply` and `opm module apply` SHALL leave a cluster without a `Platform` without one.
+
+#### Scenario: Install seeds an absent Platform
+
+- **WHEN** `opm operator install` completes against a cluster with no `Platform` CR
+- **THEN** a `Platform` named `cluster` SHALL be created subscribing to the resolved catalog build
+
+#### Scenario: Concurrent create tolerated
+
+- **WHEN** the create returns `AlreadyExists`
+- **THEN** the CLI SHALL treat it as success and SHALL NOT modify the existing Platform
+
+#### Scenario: RBAC-denied create degrades
+
+- **WHEN** the create is forbidden
+- **THEN** the CLI SHALL warn and the install SHALL still complete
+
+#### Scenario: Install reports its own provenance
+
+- **WHEN** `opm operator install` seeds the Platform from a registry-resolved catalog version
+- **THEN** the reported provenance SHALL name the catalog module path and the resolved version
+
+#### Scenario: Apply never seeds a Platform
+
+- **WHEN** `opm instance apply` succeeds against a cluster with no `Platform` CR
+- **THEN** no `Platform` SHALL exist in the cluster afterwards
+- **AND** the output SHALL NOT mention seeding
+
+### Requirement: Renders fall back to their own deps
+
+When `opm instance build`, `opm instance vet`, `opm instance diff`, `opm instance apply` or `opm module apply` runs without `--platform` and resolution does not use a cluster `Platform`, the CLI SHALL generate a platform from the render's own committed dependency pins with the generator of "Module commands render against the module's deps", under the same rules for catalog entries, the core floor, the closure, carried replacements, the cache and the provenance line.
+
+- For an instance command, the pins SHALL be read from the instance package's own `cue.mod/module.cue`, and the replacements from the instance package's `cue.mod/local-module.cue`.
+- For `opm module apply`, the pins SHALL be read from the module's acquired source, exactly as `opm module build` reads them.
+- The skew policy SHALL NOT be applied to this source.
+- An instance package whose `cue.mod/module.cue` lists no `opmodel.dev/catalogs/*` dependency SHALL render against an empty registry, and a component SHALL be refused as unmatched with a hint naming `cue mod tidy` in the instance package and `--platform <dir>`.
+
+#### Scenario: Instance build with no cluster renders against its pins
+
+- **WHEN** `opm instance build ./hello` runs with no `--platform`, no kubeconfig context, and the package's `cue.mod/module.cue` pins `opmodel.dev/catalogs/opm@v4` at `v4.4.0`
+- **THEN** the render SHALL use a generated platform whose `#registry` has one enabled entry for `opmodel.dev/catalogs/opm@v4` at `4.4.0`
+- **AND** the provenance line SHALL name the instance package's deps as the source
+
+#### Scenario: module apply on a cluster without a Platform
+
+- **WHEN** `opm module apply ./mymodule` runs against a cluster with no `Platform` CR
+- **THEN** the render SHALL use the platform generated from the module's deps, as `opm module build` would
+- **AND** a warning SHALL state that the cluster Platform was not used and why
+
+### Requirement: Instance build and vet probe the cluster without depending on it
+
+`opm instance build` and `opm instance vet` SHALL try the cluster `Platform` before the deps, and SHALL NOT fail because of the cluster.
+
+- With `--offline`, the CLI SHALL NOT resolve a kubeconfig or contact any API server, and SHALL resolve `--platform`, else the deps.
+- With no resolvable kubeconfig context, the CLI SHALL resolve the deps and SHALL NOT warn.
+- When the `Platform` CR is absent (including a cluster without the `Platform` resource type) or the read is forbidden, the CLI SHALL warn that the cluster Platform was not used and why, and resolve the deps.
+- When the API server does not answer within a bounded wait (at most 10 seconds for the whole lookup), or the read fails for any other reason, the CLI SHALL warn naming the error and resolve the deps.
+- `opm instance diff`, `opm instance apply` and `opm module apply` keep failing on an unreachable cluster: they need the cluster to do their work.
+
+#### Scenario: offline never contacts the cluster
+
+- **WHEN** `opm instance build ./hello --offline` runs with a kubeconfig context pointing at an unreachable server
+- **THEN** the render SHALL complete against the deps with no delay and no cluster warning
+
+#### Scenario: Unreachable cluster degrades to the deps
+
+- **WHEN** `opm instance vet ./hello` runs and the kubeconfig context's server does not answer
+- **THEN** within the bounded wait the command SHALL warn that the cluster could not be reached and render against the deps
+- **AND** the exit code SHALL be that of the render, not a connection error
+
+#### Scenario: Kubeconfig flags select the cluster
+
+- **WHEN** `opm instance build ./hello --context staging` runs
+- **THEN** the cluster `Platform` SHALL be read from the `staging` context

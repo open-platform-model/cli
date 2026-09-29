@@ -1,13 +1,16 @@
 package cmdutil
 
 import (
+	"errors"
 	"fmt"
+	"os"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // NewK8sClient creates a Kubernetes client from pre-resolved Kubernetes configuration.
@@ -52,4 +55,42 @@ func ExitCodeFromK8sError(err error) int {
 	default:
 		return opmexit.ExitGeneralError
 	}
+}
+
+// IsNoKubeContext reports whether a client-building error means no kubeconfig
+// context resolves at all: the resolved kubeconfig file is empty (clientcmd's
+// empty-config error) or does not exist. The CLI always passes the resolved
+// path to client-go explicitly, so a missing file surfaces as a not-exist
+// error rather than as the empty-config one. Any other failure (a malformed
+// file, an unknown --context) is a broken kubeconfig, not an absent one.
+func IsNoKubeContext(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return true
+	}
+	return isEmptyKubeconfig(err)
+}
+
+// isEmptyKubeconfig walks err's chain for clientcmd's empty-config error,
+// which clientcmd.IsEmptyConfig only recognizes unwrapped.
+func isEmptyKubeconfig(err error) bool {
+	if err == nil {
+		return false
+	}
+	if clientcmd.IsEmptyConfig(err) {
+		return true
+	}
+	switch u := err.(type) { //nolint:errorlint // walking the chain by hand: IsEmptyConfig asserts types, not chains
+	case interface{ Unwrap() error }:
+		return isEmptyKubeconfig(u.Unwrap())
+	case interface{ Unwrap() []error }:
+		for _, e := range u.Unwrap() {
+			if isEmptyKubeconfig(e) {
+				return true
+			}
+		}
+	}
+	return false
 }

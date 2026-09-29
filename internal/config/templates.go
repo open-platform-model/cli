@@ -3,7 +3,6 @@ package config
 
 import (
 	"fmt"
-	"strings"
 )
 
 // DefaultRegistry is the default CUE_REGISTRY value used when initializing a
@@ -58,17 +57,17 @@ config: {
 	// build of core or a catalog than the platform pins.
 	// "warn"   - render against the platform's build and report the skew (default)
 	// "refuse" - fail the render before evaluation
-	// Applies to the local default platform and --platform directories; the
-	// cluster Platform's spec.skewPolicy wins when the cluster is the source.
+	// Applies to --platform directories; the cluster Platform's
+	// spec.skewPolicy wins when the cluster is the source, and a platform
+	// generated from the render's own deps cannot skew.
 	skewPolicy: "warn"
 }
 `, DefaultRegistry)
 
 // DefaultCatalogPaths are the major-suffixed CUE module paths of the two
 // first-party catalogs: the abstraction catalog and the raw Kubernetes
-// passthrough catalog extracted from it (0010:D47, catalog_opm's
-// k8s@v1 split). The generated default platform subscribes to both, so each
-// path is spelled exactly once here.
+// passthrough catalog extracted from it (0010:D47, catalog_opm's k8s@v1
+// split), each path spelled exactly once here.
 var DefaultCatalogPaths = []string{
 	"opmodel.dev/catalogs/opm@v4",
 	"opmodel.dev/catalogs/k8s@v1",
@@ -78,146 +77,16 @@ var DefaultCatalogPaths = []string{
 // version of when it seeds a single-catalog cluster Platform. Derived from
 // DefaultCatalogPaths rather than a second literal: install has no per-catalog
 // resolution (that is tracked separately against operator-install-platform),
-// so it keeps naming exactly one catalog — the abstraction catalog.
+// so it keeps naming exactly one catalog: the abstraction catalog.
 var DefaultCatalogPath = DefaultCatalogPaths[0]
 
-// DefaultPlatformModulePath is the module path of the seeded local default
-// platform: the reserved-unpublished platforms namespace (0019:D6). A main
-// module's own path is never fetched, and publishing platforms is disallowed,
-// so it can never collide with a published artifact.
-const DefaultPlatformModulePath = "opmodel.dev/platforms/local@v0"
-
-// DefaultCorePath is the major-qualified module path of the core schema the
-// seeded platform module embeds.
+// DefaultCorePath is the major-qualified module path of the core schema,
+// the import an instance package names core by.
 const DefaultCorePath = "opmodel.dev/core@v2"
 
-// DefaultCorePin is the core build the seeded platform module pins: the
-// first release carrying 0019:D5 (a #registry entry imports its catalog).
-// Hand-bumped alongside the library's verified release; the root
-// `task deps:update` (`.tasks/deps/platform-pins.sh`) rewrites it.
-const DefaultCorePin = "v2.0.0-alpha.10"
-
-// DefaultCatalogPins are the catalog builds the seeded platform module pins
-// in its cue.mod, index-aligned with DefaultCatalogPaths. These pins are
-// load-bearing and hand-bumped as catalog releases ship (`opm config init`
-// is normatively offline — it cannot resolve "latest"); the root
-// `task deps:update` (`.tasks/deps/platform-pins.sh`) rewrites each line by
-// its trailing key comment. They are mirrored in the same commit across
-// hack/platform/cue.mod/module.cue and hack/kind-platform.yaml (kind dev
-// flow). An immutable published tag never dangles, so the drift mode of a
-// stale pin is "old but resolvable".
-//
-// The seeded module is shipped content (every `opm config init` writes it),
-// so a pin bump here commits as `fix(deps)` and releases the CLI; the
-// mirrored fixture copies commit as `test(fixtures)`.
-var DefaultCatalogPins = []string{
-	"v4.4.0",         // opmodel.dev/catalogs/opm@v4
-	"v1.0.0-alpha.3", // opmodel.dev/catalogs/k8s@v1
-}
-
-// PlatformDirName is the name of the platform module directory beside the
-// config file.
-const PlatformDirName = "platform"
-
-// PlatformModuleFileName and PlatformCUEFileName are the two files the
-// seeded platform module consists of, relative to the module directory.
+// PlatformModuleFileName and PlatformCUEFileName are the two files a
+// platform module directory consists of, relative to the directory.
 const (
 	PlatformModuleFileName = "cue.mod/module.cue"
 	PlatformCUEFileName    = "platform.cue"
 )
-
-// catalogImportName returns the CUE package name a catalog is imported
-// under: the last path element before the major suffix. Both first-party
-// catalogs declare their root package by that convention (verified against
-// the published artifacts: "opm", "k8s"); a catalog that deviated would fail
-// the platform build naming the import.
-func catalogImportName(path string) string {
-	if i := strings.LastIndex(path, "@"); i >= 0 {
-		path = path[:i]
-	}
-	if i := strings.LastIndex(path, "/"); i >= 0 {
-		path = path[i+1:]
-	}
-	return path
-}
-
-// DefaultPlatformModuleFile is the embedded template for
-// ~/.opm/platform/cue.mod/module.cue — the seeded platform module's
-// dependency pins. The pins ARE the platform's catalog selection (0019:D5:
-// each #registry entry's version is derived from the imported bytes), so
-// this file is where a catalog bump happens.
-var DefaultPlatformModuleFile = fmt.Sprintf(`// OPM local default platform module
-// Generated by: opm config init
-// Documentation: https://opmodel.dev/docs/cli/config
-//
-// The dependency pins below select the catalog builds this platform offers:
-// each #registry entry in platform.cue imports its catalog, and the entry's
-// version is derived from the pinned build. To move to a newer catalog
-// release, edit the pin here (or run 'cue mod get <path>@<version>' in this
-// directory), run 'opm module tidy' here to pin whatever the new build needs,
-// then run 'opm config vet' to prove the module still builds.
-module: %q
-language: {
-	version: "v0.17.0"
-}
-deps: {
-	%q: {
-		v: %q
-	}
-	%q: {
-		v: %q
-	}
-	%q: {
-		v: %q
-	}
-}
-`, DefaultPlatformModulePath,
-	DefaultCatalogPaths[1], DefaultCatalogPins[1],
-	DefaultCatalogPaths[0], DefaultCatalogPins[0],
-	DefaultCorePath, DefaultCorePin)
-
-// DefaultPlatformCUE is the embedded template for ~/.opm/platform/platform.cue
-// — the local default platform (0006:D21 precedence source 3) in
-// module form (0019:D5): it embeds core.#Platform, imports both first-party
-// catalogs and declares one #registry entry per catalog carrying the catalog
-// by import. No version scalar appears here; the pins live in
-// cue.mod/module.cue.
-var DefaultPlatformCUE = fmt.Sprintf(`// OPM local default platform
-// Generated by: opm config init
-// Used when no --platform flag is given and no cluster Platform CR is
-// readable. Documentation: https://opmodel.dev/docs/cli/config
-//
-// Catalog builds are pinned in cue.mod/module.cue, never here: an entry's
-// version is derived from the imported catalog. To bump a catalog, edit the
-// pin there and run 'opm config vet'.
-package platform
-
-import (
-	core %q
-	%s %q
-	%s %q
-)
-
-core.#Platform
-
-// name matches the in-cluster singleton this module seeds on first apply
-// against an empty cluster.
-metadata: name: "cluster"
-
-// type is an informational discriminator; it does not affect matching.
-type: "kubernetes"
-
-// registry subscribes this platform to catalogs by major-suffixed CUE
-// module path: the abstraction catalog for portable contracts, and the raw
-// Kubernetes passthrough catalog as the escape hatch when an abstraction
-// doesn't fit. Each entry's key must equal its imported catalog's module
-// path; the build fails naming the entry otherwise.
-#registry: {
-	%q: #catalog: %s
-	%q: #catalog: %s
-}
-`, DefaultCorePath,
-	catalogImportName(DefaultCatalogPaths[0]), DefaultCatalogPaths[0],
-	catalogImportName(DefaultCatalogPaths[1]), DefaultCatalogPaths[1],
-	DefaultCatalogPaths[0], catalogImportName(DefaultCatalogPaths[0]),
-	DefaultCatalogPaths[1], catalogImportName(DefaultCatalogPaths[1]))

@@ -260,7 +260,7 @@ func validateConfigSchema(ctx *cue.Context, value cue.Value, configPath string) 
 func removedFieldHint(errMsg string) string {
 	switch {
 	case strings.Contains(errMsg, "providers"):
-		return "The 'providers' field was removed — catalog selection now lives in the platform module ~/.opm/platform/. Re-run 'opm config init' (or delete the providers block and any ~/.opm/cue.mod/)"
+		return "The 'providers' field was removed; catalog selection lives in the platform a render resolves (--platform, the cluster Platform, or the render's own deps). Re-run 'opm config init' (or delete the providers block and any ~/.opm/cue.mod/)"
 	case strings.Contains(errMsg, "cacheDir"):
 		return "The 'cacheDir' field was removed. Re-run 'opm config init' (or delete the field)"
 	case strings.Contains(errMsg, "skewPolicy"):

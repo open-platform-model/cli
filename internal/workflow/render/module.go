@@ -88,10 +88,11 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
-	// The author's platform is generated from the module's own deps unless
-	// --platform names one; the deps are read from the acquired source.
+	// Without --platform the render falls back to the module's own deps
+	// (after the cluster Platform, for module apply); the deps are read from
+	// the acquired source.
 	var deps *platform.ModuleDeps
-	if opts.PlatformFromDeps && opts.PlatformFlag == "" {
+	if opts.PlatformFlag == "" {
 		deps, err = moduleDepsOf(mod.Source, src.moduleRoot)
 		if err != nil {
 			printValidationError(err)
@@ -101,7 +102,12 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 
 	// Platform resolution + acquisition only after synthesis validated the
 	// values: cheap failures never hit the cluster or registry.
-	env, err := resolvePlatformEnv(ctx, k, opts.Config, opts.PlatformFlag, opts.ClusterPlatform, deps)
+	env, err := resolvePlatformEnv(ctx, k, opts.Config, platform.ResolveOptions{
+		PlatformFlag: opts.PlatformFlag,
+		Cluster:      opts.ClusterPlatform,
+		Deps:         deps,
+		DepsKind:     platform.DepsModule,
+	})
 	if err != nil {
 		return nil, err
 	}

@@ -17,7 +17,9 @@ import (
 // NewInstanceBuildCmd creates the instance build command.
 func NewInstanceBuildCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var rff cmdutil.InstanceFileFlags
+	var kf cmdutil.K8sFlags
 	var namespace string
+	var offline bool
 
 	var (
 		outputFlag string
@@ -37,6 +39,12 @@ such as an instance directory within a module tree. What the package is
 decides, not its file names: a module package is refused with the command
 that builds it, 'opm module build <dir>'.
 
+The platform is --platform <dir>, else the cluster's Platform when the
+kubeconfig context reaches one, else a platform generated from the instance
+package's own dependency pins. The cluster is never required: an absent
+Platform or an unreachable cluster warns and falls back to the deps, and
+--offline skips the cluster entirely.
+
 Arguments:
   instance.cue    Path to an instance .cue file
   instance-dir    Path to an instance package directory
@@ -52,15 +60,20 @@ Examples:
   opm instance build ./jellyfin_instance.cue --split --out-dir ./manifests
 
   # Build as JSON
-  opm instance build ./jellyfin_instance.cue -o json`,
+  opm instance build ./jellyfin_instance.cue -o json
+
+  # Build without contacting any cluster
+  opm instance build ./jellyfin_instance.cue --offline`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runInstanceBuild(args[0], cfg, &rff, namespace, outputFlag, splitFlag, outDirFlag)
+			return runInstanceBuild(args[0], cfg, &rff, clusterLookup{k8s: kf, offline: offline}, namespace, outputFlag, splitFlag, outDirFlag)
 		},
 	}
 
 	rff.AddTo(c)
+	kf.AddTo(c)
 	c.Flags().StringVarP(&namespace, "namespace", "n", "", "Target namespace")
+	c.Flags().BoolVar(&offline, "offline", false, offlineFlagHelp)
 	c.Flags().StringVarP(&outputFlag, "output", "o", "yaml", "Output format: yaml, json")
 	c.Flags().BoolVar(&splitFlag, "split", false, "Write separate files per resource")
 	c.Flags().StringVar(&outDirFlag, "out-dir", "./manifests", "Directory for split output")
@@ -69,7 +82,7 @@ Examples:
 }
 
 // runInstanceBuild executes the instance build command.
-func runInstanceBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.InstanceFileFlags, namespaceFlag, outputFmt string, split bool, outDir string) error {
+func runInstanceBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.InstanceFileFlags, lookup clusterLookup, namespaceFlag, outputFmt string, split bool, outDir string) error {
 	ctx := context.Background()
 
 	outputFormat, err := render.ParseManifestOutputFormat(outputFmt)
@@ -93,7 +106,9 @@ func runInstanceBuild(buildArg string, cfg *config.GlobalConfig, rff *cmdutil.In
 	}
 
 	result, err := render.FromInstanceFile(ctx, render.InstanceFileOpts{
-		PlatformFlag:     rff.Platform, // offline: no cluster read (0006:D21)
+		PlatformFlag:     rff.Platform,
+		ClusterPlatform:  optionalClusterGetter(cfg, lookup.k8s, rff.Platform, lookup.offline),
+		ClusterOptional:  true,
 		InstanceFilePath: buildArg,
 		ModuleCommand:    "opm module build",
 		ValuesFiles:      rff.Values,

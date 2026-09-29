@@ -22,8 +22,8 @@ const (
 	mirror     = "opmodel.dev/catalogs/velero/transformers/mirror@1.4.0"
 )
 
-func localRes() Resolution {
-	return Resolution{Source: SourceLocalDefault, Location: "/home/u/.opm/platform", Dir: "/home/u/.opm/platform"}
+func flagRes() Resolution {
+	return Resolution{Source: SourceFlagDir, Location: "/home/u/platforms/staging", Dir: "/home/u/platforms/staging"}
 }
 
 // cleanInv is one contract, defined and implemented exactly once.
@@ -48,7 +48,7 @@ func TestReportRender(t *testing.T) {
 			name: "clean",
 			inv:  cleanInv(),
 			present: []string{
-				"platform: /home/u/.opm/platform (local default)",
+				"platform: /home/u/platforms/staging (--platform)",
 				"defined contracts: 1",
 				"defined by      " + catOPM,
 				"implemented by  " + deployment,
@@ -199,7 +199,7 @@ func TestReportRender(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := NewReport(localRes(), tt.inv).Render()
+			got := NewReport(flagRes(), tt.inv).Render()
 			for _, want := range tt.present {
 				assert.Contains(t, got, want)
 			}
@@ -222,9 +222,9 @@ func TestReportRenderIsDeterministic(t *testing.T) {
 		Routable:      true,
 		Discriminated: true,
 	}
-	first := NewReport(localRes(), inv).Render()
+	first := NewReport(flagRes(), inv).Render()
 	for range 20 {
-		require.Equal(t, first, NewReport(localRes(), inv).Render())
+		require.Equal(t, first, NewReport(flagRes(), inv).Render())
 	}
 }
 
@@ -247,8 +247,8 @@ func TestComparableRowsRenderInAStableOrder(t *testing.T) {
 	b := libplatform.ComparablePredicates{Broader: deployment, Narrower: schedule, Contracts: []string{backup, container}}
 
 	require.Equal(t,
-		NewReport(localRes(), rows(a, b)).Render(),
-		NewReport(localRes(), rows(b, a)).Render(),
+		NewReport(flagRes(), rows(a, b)).Render(),
+		NewReport(flagRes(), rows(b, a)).Render(),
 		"rows sort by broader then narrower, and shared contracts sort within a row")
 }
 
@@ -267,7 +267,7 @@ func TestRenderDoesNotReorderTheInventory(t *testing.T) {
 		Routable:      true,
 		Discriminated: false,
 	}
-	_ = NewReport(localRes(), inv).Render()
+	_ = NewReport(flagRes(), inv).Render()
 
 	assert.Equal(t, mirror, inv.Comparable[0].Broader, "the row order the build produced is untouched")
 	assert.Equal(t, []string{container, backup}, inv.Comparable[0].Contracts, "a row's contract order is untouched")
@@ -281,7 +281,7 @@ func TestRenderDoesNotReorderTheInventory(t *testing.T) {
 // happily, and one that passed on over-subscription would bless a platform
 // platform-package generation refuses.
 func TestRoutableIsAGateAndFulfilledIsNot(t *testing.T) {
-	unfulfilled := NewReport(localRes(), &libplatform.ContractInventory{
+	unfulfilled := NewReport(flagRes(), &libplatform.ContractInventory{
 		DefinedBy:     map[string]string{backup: catOPM},
 		RequiredBy:    map[string][]string{backup: {}},
 		Unfulfilled:   []string{backup},
@@ -291,7 +291,7 @@ func TestRoutableIsAGateAndFulfilledIsNot(t *testing.T) {
 	})
 	assert.True(t, unfulfilled.Routable(), "an unfulfilled contract is reported, never a gate (0015:D18)")
 
-	overSubscribed := NewReport(localRes(), &libplatform.ContractInventory{
+	overSubscribed := NewReport(flagRes(), &libplatform.ContractInventory{
 		DefinedBy:      map[string]string{backup: catK8up},
 		RequiredBy:     map[string][]string{backup: {schedule, deployment}},
 		OverSubscribed: []string{backup},
@@ -301,7 +301,7 @@ func TestRoutableIsAGateAndFulfilledIsNot(t *testing.T) {
 	})
 	assert.False(t, overSubscribed.Routable(), "over-subscription is what platform-package generation refuses on")
 
-	assert.True(t, NewReport(localRes(), cleanInv()).Routable())
+	assert.True(t, NewReport(flagRes(), cleanInv()).Routable())
 }
 
 // TestDiscriminatedIsTheOtherGate pins that the report carries two independent
@@ -311,7 +311,7 @@ func TestRoutableIsAGateAndFulfilledIsNot(t *testing.T) {
 // can fail either gate while passing the other, so the command reads both
 // accessors rather than a single combined verdict that would hide which fired.
 func TestDiscriminatedIsTheOtherGate(t *testing.T) {
-	undiscriminated := NewReport(localRes(), &libplatform.ContractInventory{
+	undiscriminated := NewReport(flagRes(), &libplatform.ContractInventory{
 		DefinedBy:  map[string]string{container: catOPM},
 		RequiredBy: map[string][]string{container: {mirror, schedule}},
 		Comparable: []libplatform.ComparablePredicates{
@@ -324,7 +324,7 @@ func TestDiscriminatedIsTheOtherGate(t *testing.T) {
 	assert.True(t, undiscriminated.Routable(), "a comparable pair is not over-subscription")
 	assert.False(t, undiscriminated.Discriminated(), "0015:D5: generation refuses a comparable pair")
 
-	overSubscribed := NewReport(localRes(), &libplatform.ContractInventory{
+	overSubscribed := NewReport(flagRes(), &libplatform.ContractInventory{
 		DefinedBy:      map[string]string{backup: catK8up},
 		RequiredBy:     map[string][]string{backup: {schedule, deployment}},
 		OverSubscribed: []string{backup},
@@ -336,7 +336,7 @@ func TestDiscriminatedIsTheOtherGate(t *testing.T) {
 	assert.True(t, overSubscribed.Discriminated(), "over-subscription says nothing about predicates")
 
 	// `fulfilled` decides neither gate (0015:D18).
-	unfulfilled := NewReport(localRes(), &libplatform.ContractInventory{
+	unfulfilled := NewReport(flagRes(), &libplatform.ContractInventory{
 		DefinedBy:     map[string]string{backup: catOPM},
 		RequiredBy:    map[string][]string{backup: {}},
 		Unfulfilled:   []string{backup},
@@ -347,7 +347,7 @@ func TestDiscriminatedIsTheOtherGate(t *testing.T) {
 	assert.True(t, unfulfilled.Routable())
 	assert.True(t, unfulfilled.Discriminated())
 
-	clean := NewReport(localRes(), cleanInv())
+	clean := NewReport(flagRes(), cleanInv())
 	assert.True(t, clean.Routable())
 	assert.True(t, clean.Discriminated())
 }

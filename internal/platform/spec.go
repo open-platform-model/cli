@@ -1,12 +1,13 @@
 // Package platform resolves the platform module every render consumes, by
-// precedence: --platform <dir> > cluster Platform CR > local default module
-// ~/.opm/platform/ (0006:D11/D12/D17/D21/D22; 0019:D5/D7).
+// precedence: --platform <dir> > cluster Platform CR > a platform generated
+// from the render's own dependency pins (0006:D21/D22; 0019:D5/D7).
 //
 // Every source resolves to a platform module directory the kernel acquires
-// with AcquirePlatformFromDir. The cluster CR is turned into such a module
-// first, through the library's generator (opm/helper/platformmodule): the
-// same helper and the same acquisition the operator's PlatformReconciler
-// runs, so the CLI's platform ingestion is structurally the operator's own.
+// with AcquirePlatformFromDir. The cluster CR and the deps are turned into
+// such a module first, through the library's generator
+// (opm/helper/platformmodule): the same helper and the same acquisition the
+// operator's PlatformReconciler runs, so the CLI's platform ingestion is
+// structurally the operator's own.
 package platform
 
 import (
@@ -17,9 +18,9 @@ import (
 )
 
 // Spec is the CLI's typed platform document: what a cluster Platform CR's
-// spec carries and what the write-if-absent seed writes back. It is the one
-// shape CR decode (DecodeCRSpec) and the seed decoded from a built platform
-// (SpecFromPlatform) share.
+// spec carries and what the operator-install seed writes. It is the one
+// shape CR decode (DecodeCRSpec) and the seed (EnsureClusterPlatformForCatalog)
+// share.
 type Spec struct {
 	// Name is the platform name (metadata.name of the CR form).
 	Name string
@@ -76,9 +77,8 @@ func (w wireSpec) toSpec(name string) Spec {
 }
 
 // wireFromSpec converts a Spec into the wire shape the CR carries — the
-// document write-if-absent creates (0006:D12). Every entry's enable is written
-// explicitly: the Spec came from a built platform where it is concrete, so
-// the CR states exactly what the render consumed.
+// document the operator-install seed creates (0006:D22). Every entry's enable
+// is written explicitly, so the CR states exactly what was subscribed.
 func wireFromSpec(s Spec) wireSpec {
 	w := wireSpec{Type: s.Type, SkewPolicy: s.SkewPolicy}
 	if len(s.Entries) > 0 {

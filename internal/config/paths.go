@@ -11,11 +11,6 @@ type Paths struct {
 	// ConfigFile is the path to the config file (~/.opm/config.cue).
 	ConfigFile string
 
-	// PlatformDir is the local default platform module directory
-	// (~/.opm/platform/): a CUE module holding cue.mod/module.cue and
-	// platform.cue (0019:D5).
-	PlatformDir string
-
 	// HomeDir is the path to the OPM home directory (~/.opm).
 	HomeDir string
 }
@@ -29,9 +24,8 @@ func DefaultPaths() (*Paths, error) {
 
 	opmHome := filepath.Join(homeDir, ".opm")
 	return &Paths{
-		ConfigFile:  filepath.Join(opmHome, "config.cue"),
-		PlatformDir: filepath.Join(opmHome, PlatformDirName),
-		HomeDir:     opmHome,
+		ConfigFile: filepath.Join(opmHome, "config.cue"),
+		HomeDir:    opmHome,
 	}, nil
 }
 

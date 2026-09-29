@@ -44,9 +44,11 @@ func TestNewPlatformCheckCmd(t *testing.T) {
 	assert.Contains(t, cmd.Long, "unfulfilled       exits 0")
 
 	require.NotNil(t, cmd.Flags().Lookup("platform"))
-	// The check reads a platform module offline: no cluster connection flags
-	// and no render flags belong on it.
-	assert.Nil(t, cmd.Flags().Lookup("kubeconfig"))
+	// Without [dir] or --platform the check reads the cluster's Platform,
+	// so it carries the cluster connection flags; no render flags belong on
+	// it.
+	assert.NotNil(t, cmd.Flags().Lookup("kubeconfig"))
+	assert.NotNil(t, cmd.Flags().Lookup("context"))
 	assert.Nil(t, cmd.Flags().Lookup("values"))
 
 	// At most one positional directory.

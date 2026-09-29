@@ -11,18 +11,22 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/open-platform-model/library/opm/schema"
+
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 )
 
 // The fixture platforms below declare their catalogs inline rather than
 // importing published ones: the inventory is derived from the registry
 // entries' contract maps, so a platform depending on core alone exercises
-// every arm of the report without pinning a catalog release.
-const fixtureModule = `module: "testing.opmodel.dev/platforms/check-fixture@v0"
+// every arm of the report without pinning a catalog release. Core is pinned
+// at the release the kernel was verified against.
+var fixtureModule = `module: "testing.opmodel.dev/platforms/check-fixture@v0"
 language: version: "v0.17.0"
-deps: "opmodel.dev/core@v2": v: "` + config.DefaultCorePin + `"
+deps: "opmodel.dev/core@v2": v: "` + schema.DefaultSchemaVersion() + `"
 `
 
 // fixtureContracts is the shared prelude: one catalog-fulfilled resource, one
@@ -214,9 +218,9 @@ _harborCatalog: c.#Catalog & {
 #registry: (_harborCatalog.metadata.modulePath): #catalog: _harborCatalog
 `
 
-// writePlatformDir writes a platform module holding platformCUE and returns
+// writePlatformModuleDir writes a platform module holding platformCUE and returns
 // its directory.
-func writePlatformDir(t *testing.T, modFile, platformCUE string) string {
+func writePlatformModuleDir(t *testing.T, modFile, platformCUE string) string {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "cue.mod"), 0o755))
@@ -279,7 +283,7 @@ func skipIfRegistryUnavailable(t *testing.T, err error) {
 }
 
 func TestPlatformCheck_RoutablePlatformExitsZero(t *testing.T) {
-	dir := writePlatformDir(t, fixtureModule, routablePlatform)
+	dir := writePlatformModuleDir(t, fixtureModule, routablePlatform)
 
 	report, _, err := runCheck(t, dir)
 	skipIfRegistryUnavailable(t, err)
@@ -296,7 +300,7 @@ func TestPlatformCheck_RoutablePlatformExitsZero(t *testing.T) {
 }
 
 func TestPlatformCheck_OverSubscribedPlatformExitsValidation(t *testing.T) {
-	dir := writePlatformDir(t, fixtureModule, overSubscribedPlatform)
+	dir := writePlatformModuleDir(t, fixtureModule, overSubscribedPlatform)
 
 	report, _, err := runCheck(t, dir)
 	skipIfRegistryUnavailable(t, err)
@@ -319,7 +323,7 @@ func TestPlatformCheck_OverSubscribedPlatformExitsValidation(t *testing.T) {
 // names it and still exits zero, because the refusal for an unmet demand
 // belongs to the render that demands it.
 func TestPlatformCheck_UnfulfilledPlatformExitsZero(t *testing.T) {
-	dir := writePlatformDir(t, fixtureModule, baseOnlyPlatform)
+	dir := writePlatformModuleDir(t, fixtureModule, baseOnlyPlatform)
 
 	report, _, err := runCheck(t, dir)
 	skipIfRegistryUnavailable(t, err)
@@ -337,7 +341,7 @@ func TestPlatformCheck_UnfulfilledPlatformExitsZero(t *testing.T) {
 // catalogs may require a catalog-fulfilled one, and the report shows them as
 // implementations rather than as competitors.
 func TestPlatformCheck_CatalogFulfilledPluralityIsNotOverSubscription(t *testing.T) {
-	dir := writePlatformDir(t, fixtureModule, catalogFulfilledPluralityPlatform)
+	dir := writePlatformModuleDir(t, fixtureModule, catalogFulfilledPluralityPlatform)
 
 	report, _, err := runCheck(t, dir)
 	skipIfRegistryUnavailable(t, err)
@@ -358,7 +362,7 @@ func TestPlatformCheck_CatalogFulfilledPluralityIsNotOverSubscription(t *testing
 // (0015:D5), so the pre-flight refuses it too — even though every
 // contract here has exactly one supplier and the platform is routable.
 func TestPlatformCheck_UndiscriminatedPlatformExitsValidation(t *testing.T) {
-	dir := writePlatformDir(t, fixtureModule, undiscriminatedPlatform)
+	dir := writePlatformModuleDir(t, fixtureModule, undiscriminatedPlatform)
 
 	report, _, err := runCheck(t, dir)
 	skipIfRegistryUnavailable(t, err)
@@ -386,7 +390,7 @@ func TestPlatformCheck_UndiscriminatedPlatformExitsValidation(t *testing.T) {
 // The two refusals are independent: a platform failing both is reported under
 // both headings and exits once.
 func TestPlatformCheck_OverSubscribedAndUndiscriminatedExitsOnce(t *testing.T) {
-	dir := writePlatformDir(t, fixtureModule, overSubscribedAndUndiscriminatedPlatform)
+	dir := writePlatformModuleDir(t, fixtureModule, overSubscribedAndUndiscriminatedPlatform)
 
 	report, _, err := runCheck(t, dir)
 	skipIfRegistryUnavailable(t, err)
@@ -425,7 +429,7 @@ func TestPlatformCheck_NotAPlatformModuleFailsBeforeAnyBuild(t *testing.T) {
 func TestPlatformCheck_PlatformThatDoesNotBuildReportsItsDiagnostic(t *testing.T) {
 	// metadata.name is a string on #Platform; an int conflicts, and the
 	// conflict carries a source position, so it prints grouped.
-	dir := writePlatformDir(t, fixtureModule, `package platform
+	dir := writePlatformModuleDir(t, fixtureModule, `package platform
 
 import c "opmodel.dev/core@v2"
 
@@ -452,7 +456,7 @@ func TestPlatformCheck_CoreWithoutTheInventoryNamesTheRelease(t *testing.T) {
 	// A platform built against a core release predating the contract
 	// inventory derives no #contracts; the command says so and names the
 	// release that introduced it, rather than printing an empty report.
-	dir := writePlatformDir(t, `module: "testing.opmodel.dev/platforms/check-fixture@v0"
+	dir := writePlatformModuleDir(t, `module: "testing.opmodel.dev/platforms/check-fixture@v0"
 language: version: "v0.17.0"
 deps: "opmodel.dev/core@v2": v: "v2.0.0-alpha.6"
 `, `package platform
@@ -482,7 +486,7 @@ type: "kubernetes"
 // missing `discriminated` defaulted to true would read as a pass on exactly
 // the platforms this command now refuses.
 func TestPlatformCheck_CoreWithoutTheComparableReportNamesTheRelease(t *testing.T) {
-	dir := writePlatformDir(t, `module: "testing.opmodel.dev/platforms/check-fixture@v0"
+	dir := writePlatformModuleDir(t, `module: "testing.opmodel.dev/platforms/check-fixture@v0"
 language: version: "v0.17.0"
 deps: "opmodel.dev/core@v2": v: "v2.0.0-alpha.9"
 `, undiscriminatedPlatform)
@@ -498,4 +502,28 @@ deps: "opmodel.dev/core@v2": v: "v2.0.0-alpha.9"
 	assert.Contains(t, err.Error(), "2.0.0-alpha.10")
 	assert.Contains(t, err.Error(), dir)
 	assert.Empty(t, report, "no partial report is printed")
+}
+
+// TestPlatformCheck_NoSourceRefuses covers "platform check with no source
+// refuses": no argument, no --platform and a kubeconfig with no context
+// exit not-found naming all three sources, and nothing under the OPM home is
+// read.
+func TestPlatformCheck_NoSourceRefuses(t *testing.T) {
+	kubernetes.ResetClient()
+	t.Cleanup(kubernetes.ResetClient)
+	home := t.TempDir()
+	cmd := NewPlatformCheckCmd(&config.GlobalConfig{Registry: config.DefaultRegistry, ConfigPath: filepath.Join(home, "config.cue")})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--kubeconfig", filepath.Join(t.TempDir(), "missing")})
+
+	err := cmd.Execute()
+	require.Error(t, err)
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitNotFound, exitErr.Code)
+	assert.Contains(t, err.Error(), "pass [dir] or --platform <dir>, or point --context at a cluster with a Platform")
+	entries, rerr := os.ReadDir(home)
+	require.NoError(t, rerr)
+	assert.Empty(t, entries, "nothing is generated or read under the OPM home")
 }

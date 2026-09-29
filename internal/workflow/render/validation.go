@@ -60,29 +60,36 @@ func printValidationError(err error) {
 	cmdutil.PrintValidationError(renderFailedMsg, err)
 }
 
-// Hints for a render refused against a platform generated from the module's
+// Hints for a render refused against a platform generated from the render's
 // own deps, where the fix is a pin or a platform rather than the module.
 const (
-	moduleDepsProviderHint  = "the module's own catalogs do not implement this contract; a provider-fulfilled contract comes from a platform: pass --platform <dir>"
-	moduleDepsNoCatalogHint = "the module pins no catalog under " + platform.CatalogPathPrefix + ": pin the catalogs it imports with 'opm module tidy', or pass --platform <dir>"
+	moduleDepsProviderHint    = "the module's own catalogs do not implement this contract; a provider-fulfilled contract comes from a platform: pass --platform <dir>"
+	moduleDepsNoCatalogHint   = "the module pins no catalog under " + platform.CatalogPathPrefix + ": pin the catalogs it imports with 'opm module tidy', or pass --platform <dir>"
+	instanceDepsProviderHint  = "the instance package's own catalogs do not implement this contract; a provider-fulfilled contract comes from a platform: pass --platform <dir>"
+	instanceDepsNoCatalogHint = "the instance package pins no catalog under " + platform.CatalogPathPrefix + ": pin the catalogs its module imports with 'cue mod tidy' in the package directory, or pass --platform <dir>"
 )
 
 // refusalHint is the remediation a render refusal gets beside the kernel's
-// verdict, or "" when there is none: against a module-deps platform, an
-// unresolved demand names the provider-fulfilled route through --platform,
-// and an unmatched component under a platform with no catalog names the
-// missing pin.
+// verdict, or "" when there is none: against a platform generated from the
+// render's own deps (a module's or an instance package's), an unresolved
+// demand names the provider-fulfilled route through --platform, and an
+// unmatched component under a platform with no catalog names the missing pin
+// and the tidy command for the kind.
 func refusalHint(err error, res platform.Resolution) string {
 	if res.Source != platform.SourceModuleDeps {
 		return ""
 	}
+	providerHint, noCatalogHint := moduleDepsProviderHint, moduleDepsNoCatalogHint
+	if res.DepsKind == platform.DepsInstance {
+		providerHint, noCatalogHint = instanceDepsProviderHint, instanceDepsNoCatalogHint
+	}
 	var unresolved *liberrors.UnresolvedDemandsError
 	if errors.As(err, &unresolved) {
-		return moduleDepsProviderHint
+		return providerHint
 	}
 	var unmatched *liberrors.UnmatchedComponentsError
 	if len(res.Catalogs) == 0 && errors.As(err, &unmatched) {
-		return moduleDepsNoCatalogHint
+		return noCatalogHint
 	}
 	return ""
 }

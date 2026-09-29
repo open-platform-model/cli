@@ -48,19 +48,6 @@ func clusterPlatformObjWithStatus(spec, status map[string]any, generation int64)
 	return obj
 }
 
-// testSpec is the seed document as SpecFromPlatform decodes it from a built
-// local platform: every entry carries its derived version and a concrete
-// enable.
-func testSpec() Spec {
-	return Spec{
-		Name: "cluster",
-		Type: "kubernetes",
-		Entries: []Entry{
-			{Path: "opmodel.dev/catalogs/opm@v2", Version: "2.0.0-alpha.3", Enable: true},
-		},
-	}
-}
-
 func TestClusterPlatformGetterFor_ReadsSpecAndStatus(t *testing.T) {
 	dyn := newFakeDynamic(clusterPlatformObjWithStatus(
 		map[string]any{"type": "kubernetes"},
@@ -122,72 +109,6 @@ func TestClusterPlatformGetterFor_ForbiddenIsFallback(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, doc)
 	assert.Contains(t, unavailable, "RBAC")
-}
-
-func TestEnsureClusterPlatform_CreatesWhenAbsent(t *testing.T) {
-	dyn := newFakeDynamic()
-
-	require.NoError(t, EnsureClusterPlatform(context.Background(), dyn, testSpec()))
-
-	created, err := dyn.Resource(inventory.PlatformGVR).Get(context.Background(),
-		inventory.PlatformSingletonName, metav1.GetOptions{})
-	require.NoError(t, err)
-	spec, _, err := unstructured.NestedMap(created.Object, "spec")
-	require.NoError(t, err)
-	assert.Equal(t, "kubernetes", spec["type"])
-	// The wire spec keeps name in metadata only.
-	_, hasName := spec["name"]
-	assert.False(t, hasName, "spec must not carry a name field")
-
-	version, _, err := unstructured.NestedString(created.Object,
-		"spec", "registry", "opmodel.dev/catalogs/opm@v2", "version")
-	require.NoError(t, err)
-	assert.Equal(t, "2.0.0-alpha.3", version, "the seed carries the derived version")
-	enable, found, err := unstructured.NestedBool(created.Object,
-		"spec", "registry", "opmodel.dev/catalogs/opm@v2", "enable")
-	require.NoError(t, err)
-	assert.True(t, found, "the seed states enable explicitly")
-	assert.True(t, enable)
-	_, hasSkew := spec["skewPolicy"]
-	assert.False(t, hasSkew, "the seed writes no skew policy")
-}
-
-func TestEnsureClusterPlatform_AlreadyExistsIsNoop(t *testing.T) {
-	existing := clusterPlatformObj(map[string]any{
-		"type": "pre-existing",
-	})
-	dyn := newFakeDynamic(existing)
-
-	require.NoError(t, EnsureClusterPlatform(context.Background(), dyn, testSpec()))
-
-	// The existing Platform must be untouched — never overwritten (0006:D22).
-	after, err := dyn.Resource(inventory.PlatformGVR).Get(context.Background(),
-		inventory.PlatformSingletonName, metav1.GetOptions{})
-	require.NoError(t, err)
-	typ, _, err := unstructured.NestedString(after.Object, "spec", "type")
-	require.NoError(t, err)
-	assert.Equal(t, "pre-existing", typ)
-}
-
-func TestEnsureClusterPlatform_ForbiddenDegradesToWarning(t *testing.T) {
-	dyn := newFakeDynamic()
-	dyn.PrependReactor("create", "platforms", func(k8stesting.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewForbidden(
-			k8sschema.GroupResource{Group: inventory.GroupOpmodel, Resource: inventory.ResourcePlatforms},
-			inventory.PlatformSingletonName, nil)
-	})
-
-	// 0006:D17: forbidden create is a warning, not an error.
-	require.NoError(t, EnsureClusterPlatform(context.Background(), dyn, testSpec()))
-}
-
-func TestEnsureClusterPlatform_OtherErrorIsFatal(t *testing.T) {
-	dyn := newFakeDynamic()
-	dyn.PrependReactor("create", "platforms", func(k8stesting.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewInternalError(assert.AnError)
-	})
-
-	require.Error(t, EnsureClusterPlatform(context.Background(), dyn, testSpec()))
 }
 
 func TestEnsureClusterPlatformForCatalog_CreatesWhenAbsent(t *testing.T) {
