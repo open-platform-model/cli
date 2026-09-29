@@ -41,10 +41,6 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	if opts.InstanceFilePath == "" {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("instance file path is required")}
 	}
-	if pathErr := cmdutil.ValidateInstanceInputPath(opts.InstanceFilePath); pathErr != nil {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: pathErr}
-	}
-
 	output.Debug("rendering from instance file", "file", opts.InstanceFilePath, "namespace", opts.K8sConfig.Namespace.Value)
 
 	k := config.NewKernel(opts.Config.Registry)
@@ -53,7 +49,7 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	// file) with the -f files layered as values sources: the schema's own
 	// values unification performs the merge inside the build, nothing is
 	// filled from Go, and a conflict names the file it came from.
-	instanceDir, err := cmdutil.InstanceDir(opts.InstanceFilePath)
+	instanceDir, moduleRoot, err := instanceContext(opts.InstanceFilePath)
 	if err != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}
@@ -64,6 +60,11 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	}
 	inst, err := k.AcquireInstanceFromDir(ctx, instanceDir, sources...)
 	if err != nil {
+		// What the package is decides, not its file names: a module package
+		// is pointed at the module command that builds it.
+		if modErr := cmdutil.ModulePackageError(ctx, k, instanceDir, err); modErr != nil {
+			return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: modErr}
+		}
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
@@ -72,7 +73,6 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	// its module's cue.mod/local-module.cue replaces a dependency; otherwise it
 	// resolves from registries. The same module root is the 0010:D19 module
 	// context the render's replacement warnings are worded against.
-	moduleRoot := moduleContextRoot(filepath.Dir(opts.InstanceFilePath))
 	sourceLocal := loader.HasLocalModuleReplacement(moduleRoot)
 
 	// Platform resolution + acquisition only after the instance itself
@@ -83,6 +83,18 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	}
 
 	return renderInstance(ctx, env, inst, opts.K8sConfig, moduleRoot, sourceLocal)
+}
+
+// instanceContext resolves an instance argument (a .cue file or a package
+// directory) to the instance package directory and its module context. The
+// context is computed from the package directory, never from the argument's
+// parent, so a directory argument with its own cue.mod is its own context.
+func instanceContext(arg string) (dir, moduleRoot string, err error) {
+	dir, err = cmdutil.InstanceDir(arg)
+	if err != nil {
+		return "", "", err
+	}
+	return dir, moduleContextRoot(dir), nil
 }
 
 // moduleContextRoot is the effective module context of a render entry: the

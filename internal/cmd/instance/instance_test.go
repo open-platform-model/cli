@@ -1,6 +1,8 @@
 package instance
 
 import (
+	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -10,6 +12,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 )
 
 // The instance command surface is a published contract (README command table,
@@ -49,7 +52,7 @@ func TestNewInstanceVetCmd_Flags(t *testing.T) {
 
 func TestNewInstanceBuildCmd(t *testing.T) {
 	cmd := NewInstanceBuildCmd(&config.GlobalConfig{})
-	assert.Equal(t, "build <instance.cue|module-dir>", cmd.Use)
+	assert.Equal(t, "build <instance.cue | instance-dir>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 }
 
@@ -57,7 +60,32 @@ func TestNewInstanceBuildCmd_Flags(t *testing.T) {
 	cmd := NewInstanceBuildCmd(&config.GlobalConfig{})
 	assert.NotNil(t, cmd.Flags().Lookup("output"), "--output/-o flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("values"), "--values/-f flag should be registered")
-	assert.NotNil(t, cmd.Flags().Lookup("name"), "--name flag should be registered")
+	assert.Nil(t, cmd.Flags().Lookup("name"), "an instance names itself; --name belongs to module build")
+}
+
+// --name is an unknown flag: cobra's usage error, which is not an
+// *opmexit.ExitError, so main exits 1, and nothing renders.
+func TestInstanceBuildCmd_NameIsUnknownFlag(t *testing.T) {
+	cmd := NewInstanceBuildCmd(&config.GlobalConfig{})
+	cmd.SetArgs([]string{"./real-instance.cue", "--name", "foo"})
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown flag: --name")
+	var exitErr *opmexit.ExitError
+	assert.False(t, errors.As(err, &exitErr), "a usage error exits 1 through main's non-ExitError path")
+}
+
+func TestNewInstanceBuildCmd_HelpListsOnlyInstanceForms(t *testing.T) {
+	long := NewInstanceBuildCmd(&config.GlobalConfig{}).Long
+	assert.Contains(t, long, "instance.cue")
+	assert.Contains(t, long, "instance-dir")
+	assert.NotContains(t, long, "module-dir")
+	assert.NotContains(t, long, "synthesiz")
+	assert.NotContains(t, long, "--name")
+	assert.Contains(t, long, "opm module build", "a module package is pointed at module build")
 }
 
 func TestNewInstanceApplyCmd(t *testing.T) {
@@ -177,13 +205,13 @@ func TestInstanceVetCmd_RejectsMissingArg(t *testing.T) {
 
 func TestRunInstanceBuild_RejectsNonManifestOutput(t *testing.T) {
 	// cmdutil.InstanceFileFlags is renamed in the X4 slice.
-	err := runInstanceBuild("instance.cue", &config.GlobalConfig{}, &cmdutil.InstanceFileFlags{}, "", "", "wide", false, "")
+	err := runInstanceBuild("instance.cue", &config.GlobalConfig{}, &cmdutil.InstanceFileFlags{}, "", "wide", false, "")
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "invalid output format"))
 }
 
 func TestRunInstanceBuild_MissingPath(t *testing.T) {
-	err := runInstanceBuild("/nonexistent/instance/path", &config.GlobalConfig{}, &cmdutil.InstanceFileFlags{}, "", "", "yaml", false, "")
+	err := runInstanceBuild("/nonexistent/instance/path", &config.GlobalConfig{}, &cmdutil.InstanceFileFlags{}, "", "yaml", false, "")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }

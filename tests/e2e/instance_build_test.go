@@ -462,3 +462,42 @@ func TestE2E_InstanceBuild_PlatformReplacementIsHonored(t *testing.T) {
 	assert.Contains(t, stderr, "local replacement in effect: "+config.DefaultCatalogPaths[0]+" served from "+catDir+" (platform)")
 	assert.NotContains(t, stderr, "is ignored")
 }
+
+// TestE2E_InstanceBuild_DirectoryAndFileBuildIdentically covers "Argument is
+// an instance package directory": the directory form acquires the same
+// package as its instance.cue, including when the directory is a CUE module
+// of its own.
+func TestE2E_InstanceBuild_DirectoryAndFileBuildIdentically(t *testing.T) {
+	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
+		t.Skip("skipping registry-backed e2e tests")
+	}
+	dir, err := filepath.Abs(filepath.Join("testdata", "operator-owned"))
+	require.NoError(t, err)
+	home := seedRenderHome(t)
+
+	fromDir, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second, "instance", "build", dir)
+	require.NoError(t, err, "stderr: %s", stderr)
+	fromFile, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second, "instance", "build", filepath.Join(dir, "instance.cue"))
+	require.NoError(t, err, "stderr: %s", stderr)
+
+	assert.NotEmpty(t, fromDir)
+	assert.Equal(t, fromFile, fromDir, "the directory and its instance.cue name the same package")
+}
+
+// TestE2E_InstanceBuild_ModuleDirectoryRefused covers "Argument is a module
+// directory": instance build no longer synthesizes, and the refusal names
+// the module command that does.
+func TestE2E_InstanceBuild_ModuleDirectoryRefused(t *testing.T) {
+	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
+		t.Skip("skipping registry-backed e2e tests")
+	}
+	modDir, err := filepath.Abs(filepath.Join("..", "fixtures", "modules", "podinfo"))
+	require.NoError(t, err)
+
+	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), seedRenderHome(t), 180*time.Second, "instance", "build", modDir)
+	require.Error(t, err, "stdout: %s", stdout)
+	assert.Equal(t, 2, exitCode(t, err), "stderr: %s", stderr)
+	assert.Contains(t, stderr, "is a module, not an instance")
+	assert.Contains(t, stderr, "opm module build "+modDir)
+	assert.Empty(t, stdout)
+}

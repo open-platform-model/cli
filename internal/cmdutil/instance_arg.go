@@ -96,17 +96,17 @@ func isInstancePath(arg string) bool {
 // whose kind is not ModuleInstance, whose metadata.name or metadata.namespace
 // is not concrete, or that fails to build. Was: resolveReleaseArgFromFile.
 func resolveInstanceArgFromFile(ctx context.Context, arg string, cfg *config.GlobalConfig) (InstanceArg, error) {
-	if err := ValidateInstanceInputPath(arg); err != nil {
-		return InstanceArg{}, err
-	}
-
 	dir, err := InstanceDir(arg)
 	if err != nil {
 		return InstanceArg{}, err
 	}
 
-	inst, err := config.NewKernel(cfg.Registry).AcquireInstanceFromDir(ctx, dir)
+	k := config.NewKernel(cfg.Registry)
+	inst, err := k.AcquireInstanceFromDir(ctx, dir)
 	if err != nil {
+		if modErr := ModulePackageError(ctx, k, dir, err); modErr != nil {
+			return InstanceArg{}, modErr
+		}
 		return InstanceArg{}, fmt.Errorf("loading instance %q: %w", arg, err)
 	}
 

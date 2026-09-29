@@ -12,16 +12,27 @@ import (
 	"github.com/open-platform-model/library/opm/kernel"
 )
 
+// minimalModule is a module package body that passes the kernel's module
+// shape gate without importing core, so no registry is needed.
+const minimalModule = `package demo
+
+kind: "Module"
+metadata: {
+	name:       "demo"
+	modulePath: "example.com/modules/demo@v0"
+	version:    "0.1.0"
+}
+`
+
 // writeMinimalModule writes a module package that needs no registry: a
-// cue.mod without dependencies and a package declaring kind "Module".
+// cue.mod without dependencies and minimalModule.
 func writeMinimalModule(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "cue.mod"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "cue.mod", "module.cue"),
 		[]byte("module: \"example.com/modules/demo@v0\"\nlanguage: version: \"v0.17.0\"\n"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "module.cue"),
-		[]byte("package demo\n\nkind: \"Module\"\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "module.cue"), []byte(minimalModule), 0o644))
 	return dir
 }
 

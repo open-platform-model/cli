@@ -19,8 +19,8 @@
 
 ## 3. `opm instance build` decides by package kind (breaking)
 
-- [ ] 3.1 In `FromInstanceFile`, compute the module context from the instance directory rather than `filepath.Dir(arg)`, drop the file-name heuristics from `ValidateInstanceInputPath`, and map an `ErrWrongKind` on a module package to the exit-2 refusal naming `opm module build <path>`; verify unit tests cover a directory argument with its own `cue.mod`, a file argument, and a module directory refused with the hint
-- [ ] 3.2 Remove the directory branch and `--name` from `internal/cmd/instance/build.go` and rewrite its long help; verify a command test asserts `--name` is an unknown flag (exit 1) and the help lists only instance forms
-- [ ] 3.3 Update `tests/e2e/instance_build_test.go`: `tests/e2e/testdata/operator-owned` builds identically as a directory and as its `instance.cue`; a module directory exits 2 naming `opm module build`; remove or retarget any case that built a module directory through `instance build`; verify `task test:e2e` passes
-- [ ] 3.4 Update `README.md` instance examples and any help text or docs still showing `opm instance build <module-dir>` or `--name` on it (`rg -n "instance build" README.md docs internal`); verify the search finds no stale form
-- [ ] 3.5 `task lint` and `task test` green, then commit `feat(cmd)!: decide opm instance build by package kind`
+- [x] 3.1 In `FromInstanceFile`, compute the module context from the instance directory rather than `filepath.Dir(arg)`, drop the file-name heuristics from `ValidateInstanceInputPath`, and map an `ErrWrongKind` on a module package to the exit-2 refusal naming `opm module build <path>`; verify unit tests cover a directory argument with its own `cue.mod`, a file argument, and a module directory refused with the hint
+- [x] 3.2 Remove the directory branch and `--name` from `internal/cmd/instance/build.go` and rewrite its long help; verify a command test asserts `--name` is an unknown flag (exit 1) and the help lists only instance forms
+- [x] 3.3 Update `tests/e2e/instance_build_test.go`: `tests/e2e/testdata/operator-owned` builds identically as a directory and as its `instance.cue`; a module directory exits 2 naming `opm module build`; remove or retarget any case that built a module directory through `instance build`; verify `task test:e2e` passes
+- [x] 3.4 Update `README.md` instance examples and any help text or docs still showing `opm instance build <module-dir>` or `--name` on it (`rg -n "instance build" README.md docs internal`); verify the search finds no stale form
+- [x] 3.5 `task lint` and `task test` green, then commit `feat(cmd)!: decide opm instance build by package kind`

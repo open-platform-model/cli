@@ -73,7 +73,7 @@ Use `opm instance` when you are starting from an instance file or when you want 
 | Command | Description |
 |---------|-------------|
 | `instance vet` | Validate an instance file without generating manifests |
-| `instance build` | Render an instance file to manifests |
+| `instance build` | Render an instance file or instance package directory to manifests (a module directory is refused: use `module build`) |
 | `instance apply` | Deploy an instance file to a cluster |
 | `instance diff` | Compare an instance file with live cluster state |
 | `instance status` | Show resource status for a deployed instance |
