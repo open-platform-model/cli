@@ -23,7 +23,7 @@ The package's own module path SHALL default to `instance.local/<instance-name>@v
 #### Scenario: Builds with no step in between
 
 - **WHEN** init has written a package whose values satisfy the module's `#config`
-- **THEN** `opm instance build <dir>/instance.cue` loads it without any other command in between, and the package loads from CUE's module cache when the registry is unreachable. Source: 0016:D1:R2, 0016:D9:R2
+- **THEN** `opm instance build <dir>/instance.cue` and `opm instance vet <dir>/instance.cue` both succeed without any other command in between, and the package loads from CUE's module cache when the registry is unreachable. Source: 0016:D1:R2, 0016:D9:R2
 
 #### Scenario: Module path override
 
@@ -32,7 +32,7 @@ The package's own module path SHALL default to `instance.local/<instance-name>@v
 
 ### Requirement: Init arguments mirror module init
 
-The command SHALL take `[instance-name] [module-path]` positionals and the flags `--from <module-path>`, `--version <vN | X.Y.Z>`, `--namespace`/`-n <ns>`, `--dir <dir>` and `--module-path <path>`. With one positional, a value containing `/` or `.` is the module path, and anything else is the instance name. `--from` is another spelling of the module path; naming the module path twice SHALL be refused with exit 2 rather than ranked. The module path SHALL be major-free: a path carrying a major suffix is refused with exit 2 and a hint to select the major with `--version`. The instance name and the namespace SHALL each match the core name type (lowercase letters, digits and `-`, starting and ending with a letter or digit, at most 63 characters), checked before any registry access. `--dir` SHALL default to the instance name. When the instance name or namespace is missing and a terminal is attached, the command SHALL prompt for it; without a terminal the omission SHALL be refused with exit 2 naming the missing flag. Source: 0016:D5:R1/R4.
+The command SHALL take `[instance-name] [module-path]` positionals and the flags `--from <module-path>`, `--version <vN | X.Y.Z>`, `--namespace`/`-n <ns>`, `--dir <dir>` and `--module-path <path>`. With one positional, a value containing `/` or `.` is the module path, and anything else is the instance name. `--from` is another spelling of the module path; naming the module path twice SHALL be refused with exit 2 rather than ranked. The module path SHALL be major-free: a path carrying a major suffix is refused with exit 2 and a hint to select the major with `--version`. The instance name and the namespace SHALL each match the core name type (lowercase letters, digits and `-`, starting and ending with a letter or digit, at most 63 characters), checked before any registry access. `--dir` SHALL default to the instance name. When the instance name, the module path or the namespace is missing and a terminal is attached, the command SHALL prompt for it, in that order; without a terminal the omission SHALL be refused with exit 2 naming the missing input (the positional or `--from` for the module path, `--namespace` for the namespace). A prompted value passes the same checks as the flag or positional it replaces, before any registry access. Source: 0016:D5:R1/R4.
 
 #### Scenario: Positional module path
 
@@ -53,6 +53,16 @@ The command SHALL take `[instance-name] [module-path]` positionals and the flags
 
 - **WHEN** the command runs with standard input not a terminal and no `--namespace`
 - **THEN** it exits 2 naming `--namespace`, and writes nothing
+
+#### Scenario: Missing module path without a terminal
+
+- **WHEN** the user runs `opm instance init web -n demo` with standard input not a terminal
+- **THEN** it exits 2 naming the module path positional and `--from`, and writes nothing
+
+#### Scenario: Missing module path on a terminal
+
+- **WHEN** the user runs `opm instance init web -n demo` on a terminal and answers the prompt with `opmodel.dev/modules/web_app@v1`
+- **THEN** the command exits 2 without contacting the registry and suggests `--version v1`, as it would for the positional
 
 #### Scenario: Invalid instance name
 
@@ -78,10 +88,10 @@ The module version SHALL be resolved exactly as the `published-module-resolution
 `values.cue` SHALL be filled from the first applicable source in this order, and the report SHALL name the source used:
 
 1. The module's `initValues`, when the module declares it. Its content is rendered even when non-concrete: a defaulted field appears as its default, an undefaulted disjunction appears as the disjunction, and an optional field is omitted. No `debugValues` content SHALL reach the package. Source: 0016:D3:R2, 0016:D4:R3.
-2. Otherwise the module's `debugValues`, when it is concrete. The report SHALL warn the user to review the file before deploying. Source: 0016:D2:R1/R2/R3.
+2. Otherwise the module's `debugValues`, when the whole value is concrete once defaults are applied. A `debugValues` with any field left without a value (a bare type, an undefaulted disjunction, or `_`) is not concrete and falls to the next rung. The report SHALL warn the user to review the file before deploying. Source: 0016:D2:R1/R2/R3.
 3. Otherwise `values: {}`. The report SHALL warn that the values file is empty and point at `opm instance vet <dir>/instance.cue` for the contract the user must now satisfy. Source: 0016:D6:R1/R2.
 
-A concrete non-struct source SHALL be rendered verbatim. `values.cue` SHALL open with a comment naming the source it was filled from. Source: 0016:D6:R3.
+A concrete non-struct source SHALL be rendered verbatim. When the chosen source renders as an empty struct, the report SHALL still name that source and SHALL also carry the empty-file warning pointing at `opm instance vet <dir>/instance.cue`. `values.cue` SHALL open with a comment naming the source it was filled from. Source: 0016:D6:R3.
 
 #### Scenario: debugValues used and flagged
 
@@ -102,6 +112,16 @@ A concrete non-struct source SHALL be rendered verbatim. `values.cue` SHALL open
 
 - **WHEN** the module declares no `initValues` and its `debugValues` is not concrete
 - **THEN** all three files are written, `values.cue` holds `values: {}`, and the report warns that it is empty and names `opm instance vet`
+
+#### Scenario: Partly concrete debugValues
+
+- **WHEN** the module declares no `initValues` and its `debugValues` is `{image: "nginx:1.27", replicas: int}`
+- **THEN** `values.cue` holds `values: {}`, and the report names the source as empty and warns that the file is empty
+
+#### Scenario: Empty debugValues
+
+- **WHEN** the module declares no `initValues` and its `debugValues` is `{}`
+- **THEN** `values.cue` holds `values: {}`, and the report names `debugValues`, warns to review it, and also warns that the file is empty, naming `opm instance vet`
 
 ### Requirement: Init writes all or nothing, and only where a standalone package belongs
 

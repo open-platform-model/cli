@@ -73,8 +73,9 @@ type Files map[string][]byte
 func Render(in Input) (Files, error)
 
 // PickValues walks the ladder over an acquired module's package value
-// (initValues, else concrete debugValues, else empty) and serializes the
-// winner with Syntax(cue.Final(), cue.Concrete(false)).
+// (initValues, else debugValues when the whole value is concrete once
+// defaults apply, else empty) and serializes the winner with
+// Syntax(cue.Final(), cue.Concrete(false)).
 func PickValues(pkg cue.Value) ([]byte, ValuesSource, error)
 
 // Write stages files in a sibling temp directory, tidies the staged module
@@ -90,7 +91,7 @@ func Write(ctx context.Context, dir string, files Files, registry string) error
 ```text
 opm instance init [name] [module-path] [flags]
   1. classify positionals; merge --from          refuse(2) on duplicate
-  2. prompt for missing name / namespace         refuse(2) without a terminal
+  2. prompt for missing name / module path / namespace   refuse(2) without a terminal
   3. validate name, namespace (#NameType), --module-path, modref.ParsePath/ParseSelector   refuse(2), no I/O
   4. dir: refuse if it exists; refuse if ModuleRootFrom(parent(abs(dir))) != ""             refuse(2)
   5. modref.Resolve(src, path, sel, coreMajor)   ConnectivityError(3) | Refusal(2)
@@ -113,7 +114,7 @@ Step 9 writes the core pin explicitly at the module's own version, and tidy only
 | --- | --- | --- |
 | Package written | 0 | report ending `Validate it:  opm instance vet <dir>/instance.cue` |
 | Duplicate module path, major suffix, bad name, namespace or selector | 2 | refusal naming the input and the accepted form |
-| Name or namespace missing without a terminal | 2 | `standard input is not a terminal`; action: pass `--namespace` (or the name) |
+| Name, module path or namespace missing without a terminal | 2 | `standard input is not a terminal`; action: pass `--namespace`, the module path (positional or `--from`), or the name |
 | Target exists | 2 | `<dir> already exists`; action: choose another `--dir` |
 | Target inside a CUE module | 2 | `<dir> is inside the CUE module at <root>`; action: initialize outside it |
 | Pin not published, nothing compatible | 2 | refusal from `modref`, listing skipped majors |
@@ -174,6 +175,14 @@ Error: standard input is not a terminal, so the namespace cannot be asked
 **Decision**: Refuse (user decision 2026-09-28). The enhancement records it as 0016 D10, which amends D5.
 **Rationale**: Relaxing a refusal later is non-breaking; tightening one later is breaking. Colocated instances, which need no `cue.mod` of their own, stay out of scope.
 
+### What counts as a concrete `debugValues`
+
+**Context**: 0016 D6 sends a `debugValues` that is "not concrete" to `values: {}` without defining the word for a partly concrete struct such as `{image: "nginx:1.27", replicas: int}`. Separately, `module-renders-against-own-deps` gives fixtures `debugValues: {}`, which is concrete but renders an empty file.
+**Options considered**:
+1. Render a partial `debugValues` the way `initValues` renders, sending only `_` or an absent field to empty: keeps the author's values, but narrows D6 and would need an amending decision in 0016.
+2. The whole value must be concrete once defaults apply (chosen): D6 as written. `opm module build` already needs a concrete `debugValues`, so a published module rarely has a partial one.
+**Decision**: Option 2 (user decision 2026-09-29): `debugValues.Validate(cue.Final(), cue.Concrete(true))` decides the rung. A source that renders as an empty struct keeps its name in the report (0016 D2:R2) and also gets the empty-file warning.
+
 ### A registry failure during tidy exits 3
 
 **Context**: 0016 D5:R7 gives an unreachable registry exit 3, at any stage. `cuemod.Tidy` returns cmd/cue's error as it came, with no connectivity type, and `opm module tidy` maps every resolution or registry failure to exit 1.
@@ -192,6 +201,7 @@ Error: standard input is not a terminal, so the namespace cannot be asked
 - [Assumption: a registry failure inside `cuemod.Tidy` is recognisable as one (`errors.As` to `net.Error`, else cmd/cue's error text)] -> Section 1 proves it on an empty module cache with the registry mapped to an unreachable host; the error shape that matched is recorded here.
 - [Section 4 waits on a core release] -> Sections 1 to 3 are releasable on their own. If core lags, section 4 splits into its own change rather than holding the PR; that change then claims 0016 D3 and D4 in its `enhancement.yaml`, and they are removed from this one.
 - [Tidy mutates process state (working directory, `CUE_REGISTRY`)] -> Contained and restored inside `cuemod.Tidy`; init makes exactly one call.
+- [0016 D1:R2 names `opm instance apply` too, and `apply --dry-run` is server-side, so it needs a cluster] -> `apply`, `vet` and `diff` load a package through the same `render.FromInstanceFile` as `build`, so the e2e `build` and `vet` of the generated package cover what `apply` loads. Only the cluster write goes untested here, and that step is the same for every instance package.
 
 ## Migration Plan
 
