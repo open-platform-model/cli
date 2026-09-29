@@ -6,6 +6,7 @@
 ### ⚠ BREAKING CHANGES
 
 * **platform:** renders no longer fall back to ~/.opm/platform/. Pass it with --platform ~/.opm/platform to keep rendering against it.
+* **config:** config init no longer seeds a local default platform.
 
 ### Features
 
