@@ -6,7 +6,7 @@ Defines how the CLI synthesizes a concrete `#ModuleInstance` directly from a mod
 
 ### Requirement: Synthesize a `#ModuleInstance` from a module-package directory
 
-The CLI SHALL synthesize a concrete instance from a module CUE package directory without requiring an `instance.cue` file, via kernel `SynthesizeInstance`. The synthesis SHALL load the module as a whole CUE package (matching `cue eval`/`cue vet` semantics) and pass it, with resolved values and synthetic metadata, to the kernel; the kernel unifies against the resolved `#ModuleInstance` schema so uuid, components, auto-secrets, and standard labels derive in CUE. The produced instance SHALL have `kind: "ModuleInstance"` — the synthesis SHALL NOT apply `#ModuleRelease` and SHALL NOT import `opmodel.dev/core/v1alpha1/modulerelease@v1`.
+The CLI SHALL synthesize a concrete instance from a module CUE package directory without requiring an `instance.cue` file, via kernel `SynthesizeInstance`. The synthesis SHALL load the module as a whole CUE package (matching `cue eval`/`cue vet` semantics) and pass it, with resolved values and synthetic metadata, to the kernel; the kernel unifies against the resolved `#ModuleInstance` schema so uuid, components, auto-secrets, and standard labels derive in CUE. The produced instance SHALL have `kind: "ModuleInstance"`; the synthesis SHALL NOT apply `#ModuleRelease` and SHALL NOT import `opmodel.dev/core/v1alpha1/modulerelease@v1`. Only the `opm module` commands (`build`, `apply` and `vet`) synthesize; `opm instance build` never does.
 
 #### Scenario: Module directory loads as a whole CUE package
 
@@ -16,7 +16,7 @@ The CLI SHALL synthesize a concrete instance from a module CUE package directory
 
 #### Scenario: Emitted kind is ModuleInstance
 
-- **WHEN** `opm module build` or `opm instance build <dir>` synthesizes and renders
+- **WHEN** `opm module build` or `opm module apply` synthesizes and renders
 - **THEN** the built instance SHALL carry `kind: "ModuleInstance"`
 - **AND** no production code path SHALL reference `#ModuleRelease`
 
@@ -94,3 +94,18 @@ The synthesis SHALL only produce `#ModuleInstance` values. Bundle directories or
 
 - **WHEN** the synthesis input directory contains a `#Bundle`/`#BundleRelease`-shaped CUE package instead of a `#Module`
 - **THEN** the CLI SHALL return an error stating that bundle synthesis is not supported and pointing the user to `opm instance build <file>` for bundle instance files (when supported)
+
+### Requirement: Synthesize a `#ModuleInstance` from a published module
+
+The CLI SHALL synthesize a concrete instance from a published module without a local copy of its source: the module is acquired from the registry through the kernel (`AcquireModuleFromRegistry`) at the version the `published-module-resolution` capability selects, then passed to kernel `SynthesizeInstance` exactly as a module acquired from a directory is. Values selection, metadata defaults and the output banner SHALL be the same as for a module-package directory. The synthesis SHALL write nothing to disk other than CUE's own module cache.
+
+#### Scenario: Published module synthesizes
+
+- **WHEN** `opm module build opmodel.dev/modules/web_app --version 1.0.4` runs
+- **THEN** the built instance SHALL carry `kind: "ModuleInstance"` and embed version `1.0.4` of the module
+- **AND** no file SHALL be created in the working directory
+
+#### Scenario: debugValues of a published module
+
+- **WHEN** a published module is synthesized with no `-f` flag and the module defines `debugValues`
+- **THEN** `debugValues` SHALL be rendered as the single values source, attributed to the module's `debugValues`
