@@ -27,7 +27,7 @@ func TestNewInstanceCmd_Subcommands(t *testing.T) {
 		got = append(got, c.Name())
 	}
 	assert.ElementsMatch(t, []string{
-		"vet", "build", "apply", "diff",
+		"init", "vet", "build", "apply", "diff",
 		"status", "tree", "events", "delete", "list",
 	}, got)
 }

@@ -1,16 +1,13 @@
 package modulecmd
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
@@ -122,7 +119,7 @@ func runModuleInit(c *cobra.Command, cfg *config.GlobalConfig, args []string, fl
 
 	if moduleish(targetDir) {
 		if templateRef != "" {
-			return validationError(fmt.Sprintf("%s already holds a module; a template only seeds a new tree", targetDir),
+			return cmdutil.ValidationError(fmt.Sprintf("%s already holds a module; a template only seeds a new tree", targetDir),
 				"Rerun without the template to repair the existing tree, or scaffold\nelsewhere with --dir.")
 		}
 		return runRepair(c, cfg, targetDir, pathArg, flags.yes)
@@ -160,13 +157,13 @@ func classifyArgs(args []string) (pathArg, templateArg string, err error) {
 		return "", args[0], nil
 	case 2:
 		if !pathShaped(args[0]) {
-			return "", "", validationError(fmt.Sprintf("the first argument must be the new module path; %q is not one", args[0]),
+			return "", "", cmdutil.ValidationError(fmt.Sprintf("the first argument must be the new module path; %q is not one", args[0]),
 				"With two arguments the order is:  opm mod init <new-module-path> <template>")
 		}
 		return args[0], args[1], nil //nolint:gosec // G602: the enclosing case is len(args) == 2
 	default:
 		// Unreachable behind cobra.MaximumNArgs(2).
-		return "", "", validationError("too many arguments", "Usage:  opm mod init [new-module-path] [template]")
+		return "", "", cmdutil.ValidationError("too many arguments", "Usage:  opm mod init [new-module-path] [template]")
 	}
 }
 
@@ -195,7 +192,7 @@ func pickTemplateRef(templateArg string, flags initFlags) (string, error) {
 	case 1:
 		return set[0], nil
 	default:
-		return "", validationError(fmt.Sprintf("the template is named more than once: %s", strings.Join(set, ", ")),
+		return "", cmdutil.ValidationError(fmt.Sprintf("the template is named more than once: %s", strings.Join(set, ", ")),
 			"Name it once — positionally, or via --from / -t.")
 	}
 }
@@ -226,13 +223,13 @@ func moduleish(dir string) bool {
 func runScaffold(c *cobra.Command, cfg *config.GlobalConfig, newPath, templateRef, targetDir string) error {
 	ref, err := scaffold.ParseTemplateRef(templateRef)
 	if err != nil {
-		return validationError(err.Error(), "List the official templates:  opm module template list")
+		return cmdutil.ValidationError(err.Error(), "List the official templates:  opm module template list")
 	}
 	if err := scaffold.ValidateNewModulePath(newPath); err != nil {
-		return validationError(err.Error(), "Example:  opm mod init example.com/modules/my_app@v0")
+		return cmdutil.ValidationError(err.Error(), "Example:  opm mod init example.com/modules/my_app@v0")
 	}
 	if _, err := os.Stat(targetDir); err == nil {
-		return validationError(fmt.Sprintf("directory already exists: %s", targetDir),
+		return cmdutil.ValidationError(fmt.Sprintf("directory already exists: %s", targetDir),
 			"Choose another directory (--dir), or run inside a module tree to repair it.")
 	}
 
@@ -275,7 +272,7 @@ func runRepair(c *cobra.Command, cfg *config.GlobalConfig, dir, pathArg string, 
 			return err
 		}
 		if !ok {
-			return validationError("repair declined", "Rerun with --yes to skip this confirmation.")
+			return cmdutil.ValidationError("repair declined", "Rerun with --yes to skip this confirmation.")
 		}
 	}
 
@@ -291,22 +288,20 @@ func runRepair(c *cobra.Command, cfg *config.GlobalConfig, dir, pathArg string, 
 // terminal, from injected input under test, and refusing on a plain
 // non-interactive stdin.
 func promptModulePath(c *cobra.Command) (string, error) {
-	r, interactive := stdinReader(c)
+	r, interactive := cmdutil.StdinReader(c)
 	if !interactive {
-		return "", refusal(publish.Refusal{
+		return "", cmdutil.Refuse(publish.Refusal{
 			Headline:    "no module path given and standard input is not a terminal",
 			Consequence: "The template-only form prompts for the new module path; a pipe has nobody\nto ask.",
 			Action:      "Pass it:  opm mod init <new-module-path> <template>",
 		})
 	}
-	output.Prompt("New module path (e.g. example.com/modules/my_app@v0): ")
-	line, err := bufio.NewReader(r).ReadString('\n')
+	path, err := cmdutil.PromptLine(r, "New module path (e.g. example.com/modules/my_app@v0): ", "module path")
 	if err != nil {
-		return "", fmt.Errorf("reading module path: %w", err)
+		return "", err
 	}
-	path := strings.TrimSpace(line)
 	if path == "" {
-		return "", validationError("module path must not be empty", "Example:  example.com/modules/my_app@v0")
+		return "", cmdutil.ValidationError("module path must not be empty", "Example:  example.com/modules/my_app@v0")
 	}
 	return path, nil
 }
@@ -315,33 +310,20 @@ func promptModulePath(c *cobra.Command) (string, error) {
 // the second confirmation cannot be defaulted through a pipe (0011:D20); --yes is
 // the explicit bypass.
 func confirm(c *cobra.Command, prompt string) (bool, error) {
-	r, interactive := stdinReader(c)
+	r, interactive := cmdutil.StdinReader(c)
 	if !interactive {
-		return false, refusal(publish.Refusal{
+		return false, cmdutil.Refuse(publish.Refusal{
 			Headline:    "standard input is not a terminal, so the repair confirmation cannot be asked",
 			Consequence: "Repair writes into a tree you own; the second confirmation is the whole\nof the safety mechanism.",
 			Action:      "Rerun with --yes to consent up front.",
 		})
 	}
-	output.Prompt(prompt)
-	line, err := bufio.NewReader(r).ReadString('\n')
+	line, err := cmdutil.PromptLine(r, prompt, "confirmation")
 	if err != nil {
-		return false, fmt.Errorf("reading confirmation: %w", err)
+		return false, err
 	}
-	answer := strings.ToLower(strings.TrimSpace(line))
+	answer := strings.ToLower(line)
 	return answer == "y" || answer == "yes", nil
-}
-
-// stdinReader returns the command's input and whether it may be prompted:
-// an injected reader (tests) always may; the process stdin only when it is a
-// terminal.
-func stdinReader(c *cobra.Command) (io.Reader, bool) {
-	in := c.InOrStdin()
-	if f, ok := in.(*os.File); ok && f == os.Stdin {
-		//nolint:gosec // G115: stdin's fd is a small non-negative number on every supported platform
-		return in, term.IsTerminal(int(os.Stdin.Fd()))
-	}
-	return in, true
 }
 
 // initError maps scaffold errors onto the house funnels: refusals print and
@@ -349,29 +331,11 @@ func stdinReader(c *cobra.Command) (io.Reader, bool) {
 func initError(err error) error {
 	var refusalErr *scaffold.RefusalError
 	if errors.As(err, &refusalErr) {
-		return refusal(refusalErr.Refusal)
+		return cmdutil.Refuse(refusalErr.Refusal)
 	}
 	var connErr *publish.ConnectivityError
 	if errors.As(err, &connErr) {
 		return &opmexit.ExitError{Code: opmexit.ExitConnectivityError, Err: err}
 	}
 	return err
-}
-
-// refusal prints one refusal through the house funnel and exits 2.
-func refusal(r publish.Refusal) error {
-	cmdutil.PrintRefusals([]publish.Refusal{r})
-	return &opmexit.ExitError{
-		Code:    opmexit.ExitValidationError,
-		Err:     errors.New(r.Headline),
-		Printed: true,
-	}
-}
-
-// validationError is a plain exit-2 error with a hint.
-func validationError(msg, hint string) error {
-	return &opmexit.ExitError{
-		Code: opmexit.ExitValidationError,
-		Err:  fmt.Errorf("%s\n  %s", msg, hint),
-	}
 }
