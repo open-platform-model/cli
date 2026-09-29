@@ -3,6 +3,7 @@ package render
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	liberrors "github.com/open-platform-model/library/opm/errors"
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
 
@@ -158,4 +160,73 @@ func TestSkipUnprovided_NothingToSkipIsUnchanged(t *testing.T) {
 	for i := range off.Resources {
 		assert.Equal(t, off.Resources[i].Object, on.Resources[i].Object)
 	}
+}
+
+// strayFQN is the catalog-fulfilled trait the skip-unprovided fixture's db
+// component attaches while its stray value is true.
+const strayFQN = "example.com/elsewhere/traits/stray@v1"
+
+// captureRenderStderr runs fn with os.Stderr redirected to a pipe, drained
+// concurrently, and returns what fn wrote there: the refusal block and its
+// hint print to stderr directly, beside the log stream.
+func captureRenderStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	old := os.Stderr
+	os.Stderr = w
+	done := make(chan []byte)
+	go func() {
+		b, _ := io.ReadAll(r)
+		done <- b
+	}()
+	func() {
+		defer func() { os.Stderr = old }()
+		fn()
+	}()
+	require.NoError(t, w.Close())
+	return string(<-done)
+}
+
+// "A catalog-fulfilled gap still refuses": with the flag on, a component
+// demanding a catalog-fulfilled contract nothing on the platform implements
+// is refused, the refused row is not unprovided, and the refusal names no
+// --skip-unprovided way out. The same component's unprovided backup trait is
+// still reported as skipped on the refusal's diagnostics.
+func TestSkipUnprovided_CatalogFulfilledGapStillRefuses(t *testing.T) {
+	dir := skipFixture(t)
+	ctx := context.Background()
+	logs := captureRenderLog(t)
+	values := filepath.Join(t.TempDir(), "values.cue")
+	require.NoError(t, os.WriteFile(values, []byte("stray: true\n"), 0o600))
+
+	var err error
+	stderr := captureRenderStderr(t, func() {
+		_, err = FromModule(ctx, ModuleOpts{
+			ModulePath:     dir,
+			ValuesFiles:    []string{values},
+			SkipUnprovided: true,
+			Config:         skipFixtureConfig(t),
+			K8sConfig:      &config.ResolvedKubernetesConfig{},
+		})
+	})
+
+	require.Error(t, err)
+	var exitErr *opmexit.ExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
+	var unresolved *liberrors.UnresolvedDemandsError
+	require.True(t, errors.As(err, &unresolved), "refused for the unresolved demand")
+	var renderErr *kernel.RenderError
+	require.True(t, errors.As(err, &renderErr))
+	require.Len(t, renderErr.Diagnostics.Unresolved, 1)
+	row := renderErr.Diagnostics.Unresolved[0]
+	assert.Equal(t, strayFQN, row.FQN)
+	assert.False(t, row.Unprovided, "a catalog-fulfilled gap is not unprovided")
+
+	require.Len(t, renderErr.Diagnostics.Skipped, 1, "the unprovided backup trait is still skipped")
+	assert.Equal(t, backupFQN, renderErr.Diagnostics.Skipped[0].FQN)
+
+	assert.Contains(t, stderr, strayFQN, "the refusal names the catalog-fulfilled gap")
+	assert.NotContains(t, stderr+logs.String(), "--skip-unprovided", "no skip hint for a gap the flag cannot skip")
 }

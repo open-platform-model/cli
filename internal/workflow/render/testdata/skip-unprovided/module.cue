@@ -4,12 +4,15 @@
 // trait, so against the module's own deps (or any platform without a backup
 // provider) a default render refuses, and a render with --skip-unprovided
 // renders both components and reports the skipped trait. With backup false
-// the trait is not attached and nothing is skipped.
+// the trait is not attached and nothing is skipped. With stray true the db
+// component also attaches #StrayTrait, a catalog-fulfilled contract nothing
+// on any platform lists or implements: a gap --skip-unprovided never skips.
 package backup_demo
 
 import (
 	m "opmodel.dev/core@v2"
 	bp "opmodel.dev/catalogs/opm/blueprints/v1beta1"
+	res "opmodel.dev/catalogs/opm/resources/v1beta1"
 	tra "opmodel.dev/catalogs/opm/traits/v1alpha1"
 
 	id "example.com/modules/backup_demo/identity"
@@ -26,6 +29,25 @@ metadata: {
 #config: {
 	// Attach the backup trait to the db component.
 	backup: bool | *true
+	// Attach the catalog-fulfilled stray trait to the db component.
+	stray: bool | *false
+}
+
+// A load-bearing trait authored inline under a path outside every catalog,
+// with the default catalog fulfilment: no enabled catalog lists or
+// implements it, so a demand for it refuses whatever the switch.
+#StrayTrait: m.#Trait & {
+	metadata: {
+		name:           "stray"
+		modulePath:     "example.com/elsewhere/traits/v1"
+		apiVersion:     "v1"
+		catalogVersion: "0.0.1"
+		fqn:            "example.com/elsewhere/traits/stray@v1"
+		description:    "A catalog-fulfilled contract no catalog lists or implements"
+	}
+	optional: false
+	appliesTo: [res.#VolumesResource]
+	spec: stray: note!: string
 }
 
 debugValues: {}
@@ -59,6 +81,9 @@ debugValues: {}
 		if #config.backup {
 			tra.#Backup
 		}
+		if #config.stray {
+			#traits: (#StrayTrait.metadata.fqn): #StrayTrait
+		}
 
 		metadata: name: "db"
 
@@ -87,6 +112,9 @@ debugValues: {}
 				scaling: count: 1
 				restartPolicy: "Always"
 				updateStrategy: type: "RollingUpdate"
+			}
+			if #config.stray {
+				stray: note: "nobody lists me"
 			}
 			if #config.backup {
 				backup: {
