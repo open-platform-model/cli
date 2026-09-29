@@ -461,14 +461,15 @@ func TestE2E_InstanceBuild_ReplacementOfPlatformPathIsInert(t *testing.T) {
 	assert.NotContains(t, stderr, "in effect")
 }
 
-// TestE2E_InstanceBuild_InstanceDepsHonourThePackageReplacement covers
-// "Instance deps platform honours the instance package's replacement": with
-// no --platform and --offline, the platform is generated from the instance
+// TestE2E_InstanceBuild_InstanceDepsHonorThePackageReplacement covers the
+// kernel-render scenario "Instance deps platform honors the instance
+// package's replacement" (the spec spells it the British way): with no
+// --platform and --offline, the platform is generated from the instance
 // package's own pins and carries its cue.mod/local-module.cue, so the
 // redirected catalog copy renders. The one warning names the path, the copy
 // and the module-context side of the render, "(instance)"; nothing says the
 // redirect belongs in the platform module.
-func TestE2E_InstanceBuild_InstanceDepsHonourThePackageReplacement(t *testing.T) {
+func TestE2E_InstanceBuild_InstanceDepsHonorThePackageReplacement(t *testing.T) {
 	repoRoot, example := podinfoExample(t)
 	home := seedRenderHome(t)
 	catDir := catalogCopyWithLabel(t, home, seedPlatform(t), example)
