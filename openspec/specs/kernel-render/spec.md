@@ -110,7 +110,7 @@ The CLI SHALL inject its runtime identity (`opm-cli`) into the kernel render con
 
 ### Requirement: Local-replacement renders warn (0010 D19)
 
-Every render SHALL enable the kernel's local replacements, so a `cue.mod/local-module.cue` in the module context (the main module of an instance-file render, or the module directory of a module render) or in the platform module directory reaches the render build under the kernel's precedence: the platform's replacements whole, the module's only for paths the platform's dependency list does not name. When the platform is generated from the module's deps (`opm module build` and `opm module vet` without `--platform`), the module's replacements of paths that platform pins are carried into it (see the `platform-resolution` capability), so they are honoured rather than overridden. The CLI SHALL word the kernel's replacement rows as warnings, one per honoured replacement, naming the replaced path, the directory or module it was served from and whether the module or the platform supplied it, and stating that the rendered bytes may not correspond to any published build; a carried replacement SHALL be attributed to the module. For each `replaceWith` in the module context's own `cue.mod/local-module.cue` that no row honours with the same target, the CLI SHALL warn that the platform names that path and that the redirect belongs in the platform module's `cue.mod/local-module.cue`. The warnings SHALL NOT block the render or alter its output. A context without the file SHALL produce no such warning. Both render entry points SHALL perform this. The provenance signal (`SourceLocal`, the `module-instance.opmodel.dev/source: local` annotation) keeps its file-presence rule.
+Every render SHALL enable the kernel's local replacements, so a `cue.mod/local-module.cue` in the module context (the main module of an instance-file render, or the module directory of a module render) or in the platform module directory reaches the render build under the kernel's precedence: the platform's replacements whole, the module's only for paths the platform's dependency list does not name. When the platform is generated from the render's own deps (`opm module build` and `opm module vet` without `--platform`, and every other render that falls back to its deps), the module context's replacements of paths that platform pins are carried into it (see the `platform-resolution` capability), so they are honoured rather than overridden. The CLI SHALL word the kernel's replacement rows as warnings, one per honoured replacement, naming the replaced path, the directory or module it was served from and whether the module or the platform supplied it, and stating that the rendered bytes may not correspond to any published build; a carried replacement SHALL be attributed to the module. For each `replaceWith` in the module context's own `cue.mod/local-module.cue` that no row honours with the same target, the CLI SHALL warn that the platform names that path and that the redirect belongs in the platform module's `cue.mod/local-module.cue`. The warnings SHALL NOT block the render or alter its output. A context without the file SHALL produce no such warning. Both render entry points SHALL perform this. The provenance signal (`SourceLocal`, the `module-instance.opmodel.dev/source: local` annotation) keeps its file-presence rule.
 
 #### Scenario: Replaced dependency warns
 
@@ -121,13 +121,13 @@ Every render SHALL enable the kernel's local replacements, so a `cue.mod/local-m
 
 #### Scenario: Platform replacement of its catalog is honoured and warns
 
-- **WHEN** a render's platform module directory (`--platform <dir>` or the local default platform module) carries `cue.mod/local-module.cue` replacing its catalog path with a checkout
+- **WHEN** a render's platform module directory (`--platform <dir>`) carries `cue.mod/local-module.cue` replacing its catalog path with a checkout
 - **THEN** the rendered objects reflect the checkout's transformer bytes
 - **AND** a warning names the catalog path, the checkout directory and the platform as its source
 
 #### Scenario: Module-side replacement of a platform path is reported inert
 
-- **WHEN** a module render against a platform the module does not generate (`--platform <dir>`, the cluster Platform or the local default) runs from a module directory whose `cue.mod/local-module.cue` replaces a path that platform's dependency list names
+- **WHEN** a render against a platform the render does not generate (`--platform <dir>` or the cluster Platform) runs from a module context whose `cue.mod/local-module.cue` replaces a path that platform's dependency list names
 - **THEN** the rendered objects reflect the platform's pinned bytes
 - **AND** a warning names the path and says the redirect belongs in the platform module's `cue.mod/local-module.cue`
 
@@ -147,3 +147,9 @@ Every render SHALL enable the kernel's local replacements, so a `cue.mod/local-m
 - **THEN** the rendered objects reflect the checkout's transformer bytes
 - **AND** one warning names the catalog path, the checkout directory and the module as its source, with the published-bytes caveat
 - **AND** no warning says the redirect is ignored
+
+#### Scenario: Instance deps platform honours the instance package's replacement
+
+- **WHEN** `opm instance build --offline` runs on an instance package whose `cue.mod/local-module.cue` replaces `opmodel.dev/catalogs/opm@v4` with a checkout
+- **THEN** the rendered objects reflect the checkout's transformer bytes
+- **AND** one warning names the catalog path, the checkout directory and the module as its source
