@@ -128,7 +128,7 @@ Read when entering `cli/`:
 - `internal/dockercfg/` - single-entry read-modify-write of the standard OCI/docker credential file (`auths[host]` upsert; everything else passes through untouched; used by `registry login`).
 - `internal/kubernetes/` - cluster ops, status, apply, delete, events.
 - `internal/output/` - terminal formatting, log output, tables, manifests.
-- `internal/platform/` - platform-source resolution by precedence (`--platform` dir > cluster Platform CR > `~/.opm/platform/`; `module build`/`module vet`: `--platform` dir > the module-deps platform), cluster-CR and module-deps module generation into the OPM home cache, the write-if-absent Platform seed, catalog version resolution for `operator install`.
+- `internal/platform/` - platform-source resolution by precedence (`--platform` dir > cluster Platform CR > a platform generated from the render's own dependency pins; `module build`/`module vet` skip the cluster), cluster-CR and deps module generation into the OPM home cache, catalog version resolution and the write-if-absent Platform seed for `operator install`.
 - `internal/workflow/` - shared render/apply/query orchestration; `render` holds the kernel env and the single `Kernel.Render` call.
 - `pkg/loader/` - local-replacement provenance (module root lookup, `cue.mod/local-module.cue` replacements); instance packages load through the kernel.
 - `pkg/errors/` - shared structured errors; alias as `oerrors`.
@@ -143,41 +143,47 @@ Read when entering `cli/`:
   registry keys carry the catalog's major suffix), and module identity is read
   verbatim from core-v2 metadata (`metadata.modulePath` is the complete
   registry address). CUE fixtures pin `opmodel.dev/core` `v2.0.0-alpha.6` and
-  `opmodel.dev/catalogs/opm` `v4.0.1`. The local default platform is a CUE module (0019:D5): `opm config
-  init` writes `~/.opm/platform/` (`cue.mod/module.cue` pinning core and both
-  first-party catalogs, `platform.cue` with one `#registry` entry per catalog
-  carrying it by import; module path `opmodel.dev/platforms/local@v0`). The
-  pins live in `internal/config/templates.go` (`DefaultCorePin`,
-  `DefaultCatalogPins`, rendered into the embedded `cue.mod`) and are mirrored
-  in the same commit across `hack/platform/cue.mod/module.cue` (kind dev flow,
-  offline commands) and `hack/kind-platform.yaml` (the cluster Platform CR);
-  the operator's sample Platform lives in its own repo. A pin bump is `fix(deps)`
-  (shipped content); the root `task deps:update` rewrites all three. Catalog
-  maintenance for users is editing the module's `cue.mod` pin and running
-  `opm config vet`, which builds the module through the kernel loader.
+  `opmodel.dev/catalogs/opm` `v4.0.1`. There is no local default platform:
+  `opm config init` writes `~/.opm/config.cue` only, and no command reads a
+  platform from the OPM home (a platform directory an older release seeded
+  there is left on disk, and `opm config vet` warns about it). The repo's
+  maintained platform module is `hack/platform/` (`cue.mod/module.cue`
+  pinning core and both first-party catalogs, `platform.cue` with one
+  `#registry` entry per catalog carrying it by import), passed explicitly
+  with `--platform` by the offline tests; its pins are mirrored in the same
+  commit by `hack/kind-platform.yaml` (the kind cluster's Platform CR), and
+  the root `task deps:update` rewrites both. The operator's sample Platform
+  lives in its own repo.
 - **Render path (0019:D5/D7/D8).** Every render-bearing command resolves a
-  platform *module directory* by precedence (`--platform <dir>` > cluster
-  Platform CR > `~/.opm/platform/`; `internal/platform.Resolve`), acquires it
-  once with the kernel's `AcquirePlatformFromDir` and renders with the single
-  `Kernel.Render` call (`internal/workflow/render`). The CLI holds no built
-  platform value and carries no matching or transformer execution. The cluster
-  CR is turned into a module first through the library's
+  platform *module directory* by precedence (`internal/platform.Resolve`):
+  `--platform <dir>` > the cluster `Platform` CR named `cluster` > a platform
+  generated from the render's own committed dependency pins (the instance
+  package's `cue.mod/module.cue` for `instance` commands, the module's for
+  `module` commands). It acquires the directory once with the kernel's
+  `AcquirePlatformFromDir` and renders with the single `Kernel.Render` call
+  (`internal/workflow/render`). The CLI holds no built platform value and
+  carries no matching or transformer execution. The cluster CR and the deps
+  are turned into a module first through the library's
   `opm/helper/platformmodule` generator (byte-identical to the operator's),
   cached under `~/.opm/cache/platforms/<content-hash>/` (idempotent, derived
-  state, safe to delete; moves with `--config`). The write-if-absent Platform
-  seed is decoded from the built platform the render consumed
-  (`platform.SpecFromPlatform`). Catalog version skew follows the config
-  file's `skewPolicy` (`warn` default, `refuse`) for local and flag platforms;
-  the cluster CR's `spec.skewPolicy` wins when it is the source.
-  `opm module build` and `opm module vet` render for the module's author,
-  not for a deployment: without `--platform` they resolve the module-deps
-  source instead of the cluster and the local default. The platform is
-  generated from the module's committed `cue.mod/module.cue` (one registry
-  entry per `opmodel.dev/catalogs/*` pin, closed over with
-  `platformmodule.Closure`, core floored at the kernel's verified release)
-  into the same cache, and the module's own `local-module.cue` replacements of
-  paths it pins are carried into it. Skew cannot arise and is not checked.
-  `module apply` and every `instance` command keep the precedence above.
+  state, safe to delete; moves with `--config`). The deps platform carries
+  one registry entry per `opmodel.dev/catalogs/*` pin, closed over with
+  `platformmodule.Closure`, core floored at the kernel's verified release,
+  plus the context's own `local-module.cue` replacements of paths it pins;
+  skew cannot arise against it and is not checked. The provenance line names
+  the source (`module deps` or `instance deps` for the fallback). Catalog
+  version skew follows the config file's `skewPolicy` (`warn` default,
+  `refuse`) for `--platform` directories; the cluster CR's
+  `spec.skewPolicy` wins when it is the source. No render-bearing command
+  creates a Platform; only `opm operator install` seeds one.
+  `opm module build` and `opm module vet` render for the module's author and
+  never read the cluster. `instance build` and `instance vet` read the
+  cluster when a kubeconfig context resolves (`--kubeconfig`, `--context`,
+  bounded to 10 s) and never fail because of it: an absent Platform or an
+  unreachable cluster warns and falls back to the deps, and `--offline`
+  skips the cluster. `instance diff`, `instance apply` and `module apply`
+  fall back to the deps only when the cluster has no readable Platform; an
+  unreachable cluster fails them.
   `opm module build` and `opm module apply` (not `vet`) also take a published
   module path (`internal/modref`): the module is acquired with
   `AcquireModuleFromRegistry` and synthesized exactly as a directory module,
@@ -312,7 +318,7 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 - ASCII-safe output in docs, examples, terminal text.
 - Box-drawing: `[x]` / `[ ]` not Unicode checkmarks.
 - CLI docs: emphasize what happened + how to fix failures.
-- Follow SemVer + Conventional Commits for user-visible changes. The type decides the release: release-please hides `chore`, `test`, `ci` and `build`; `feat`, `fix`, `deps`, `perf`, `docs` and `refactor` release. Pins in `templates/*` and the seeded platform module pins (`DefaultCorePin`, `DefaultCatalogPins`) in `internal/config/templates.go` are shipped, so bumping them is `fix(deps)`; `examples/*` and `tests/fixtures/*` bumps are `test(fixtures)` (no release). See the workspace commit skill.
+- Follow SemVer + Conventional Commits for user-visible changes. The type decides the release: release-please hides `chore`, `test`, `ci` and `build`; `feat`, `fix`, `deps`, `perf`, `docs` and `refactor` release. Pins in `templates/*` are shipped, so bumping them is `fix(deps)`; `examples/*`, `tests/fixtures/*` and `hack/platform/` bumps are `test(fixtures)` (no release). See the workspace commit skill.
 
 ### Enhancement references in comments
 

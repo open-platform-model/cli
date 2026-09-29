@@ -80,7 +80,8 @@ var DefaultCatalogPaths = []string{
 // so it keeps naming exactly one catalog: the abstraction catalog.
 var DefaultCatalogPath = DefaultCatalogPaths[0]
 
-// DefaultCorePath is the major-qualified module path of the core schema.
+// DefaultCorePath is the major-qualified module path of the core schema,
+// the import an instance package names core by.
 const DefaultCorePath = "opmodel.dev/core@v2"
 
 // PlatformModuleFileName and PlatformCUEFileName are the two files a

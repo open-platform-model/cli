@@ -257,7 +257,7 @@ Flags:
   -f, --values strings      Additional values files (can be repeated)
   -n, --namespace string    Target namespace
       --name string         Instance name (default: module name)
-      --platform string     Platform module directory (overrides the cluster Platform and ~/.opm/platform/)
+      --platform string     Platform module directory (overrides the cluster Platform and the module's own deps)
       --dry-run             Server-side dry run
       --create-namespace    Create target namespace if it does not exist
       --no-prune            Skip stale resource pruning

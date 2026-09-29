@@ -24,7 +24,7 @@
 
 ## 4. Describe the new precedence
 
-- [ ] 4.1 `AGENTS.md`: rewrite the Environment Notes paragraphs on the local default platform and the render path, and the `internal/platform/` line of the package map, to the new precedence; verify every remaining `~/.opm` mention in `AGENTS.md` describes `config.cue` or the cache only
-- [ ] 4.2 `QUICKSTART.md` and `docs/site/`: remove the `~/.opm/platform/` steps and output lines; show the `instance deps` provenance line and `--offline`; verify no page tells the reader that `opm config init` writes a platform
-- [ ] 4.3 Edit in place the main-spec text that sits outside any requirement: the `--platform` help line in `openspec/specs/deploy/spec.md` Command Syntax, and the `## Purpose` of `openspec/specs/config-commands/spec.md` (init no longer seeds a platform module) and `openspec/specs/platform-resolution/spec.md` (no local default; drop 0006 D12/D22 from its list); verify `task openspec:check`
-- [ ] 4.4 `task lint`, `task test` and `task openspec:check` green, then commit `docs: describe the cluster-then-deps platform precedence`
+- [x] 4.1 `AGENTS.md`: rewrite the Environment Notes paragraphs on the local default platform and the render path, and the `internal/platform/` line of the package map, to the new precedence; verify every remaining `~/.opm` mention in `AGENTS.md` describes `config.cue` or the cache only
+- [x] 4.2 `QUICKSTART.md` and `docs/site/`: remove the `~/.opm/platform/` steps and output lines; show the `instance deps` provenance line and `--offline`; verify no page tells the reader that `opm config init` writes a platform
+- [x] 4.3 Edit in place the main-spec text that sits outside any requirement: the `--platform` help line in `openspec/specs/deploy/spec.md` Command Syntax, and the `## Purpose` of `openspec/specs/config-commands/spec.md` (init no longer seeds a platform module) and `openspec/specs/platform-resolution/spec.md` (no local default; drop 0006 D12/D22 from its list); verify `task openspec:check`
+- [x] 4.4 `task lint`, `task test` and `task openspec:check` green, then commit `docs: describe the cluster-then-deps platform precedence`

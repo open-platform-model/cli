@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The `opm config` command group: `init` seeds `~/.opm/` (the scalar config file and the local default platform module) offline, and `vet` proves the configuration loads and the platform module builds.
+The `opm config` command group: `init` writes the scalar config file `~/.opm/config.cue` offline and seeds no platform, and `vet` proves the configuration loads and warns about a leftover platform directory from an earlier release.
 
 ## Requirements
 

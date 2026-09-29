@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Platform-source resolution by precedence with visible provenance (enhancement 0006 D11/D12/D17/D21/D22/D39). Every source resolves to a platform module directory the kernel acquires with `AcquirePlatformFromDir`; the cluster CR is generated into one through the library's platform-module helper, the operator's own ingestion path (0019 D5/D6), from the effective registry the operator recorded on the CR's status (0015 D6).
+Platform-source resolution by precedence with visible provenance (enhancement 0006 D11/D17/D21/D39): `--platform <dir>`, the cluster `Platform` CR, then a platform generated from the render's own dependency pins; there is no local default platform. Every source resolves to a platform module directory the kernel acquires with `AcquirePlatformFromDir`; the cluster CR is generated into one through the library's platform-module helper, the operator's own ingestion path (0019 D5/D6), from the effective registry the operator recorded on the CR's status (0015 D6).
 
 ## Requirements
 

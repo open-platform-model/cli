@@ -32,8 +32,9 @@ package schema
 	// than the platform pins (0019:D18).
 	// - "warn" (default): render against the platform's build and report the skew
 	// - "refuse": fail the render before evaluation
-	// Applies to the local default platform and --platform directories; when
-	// the cluster Platform CR is the source its spec.skewPolicy wins. No flag.
+	// Applies to --platform directories; when the cluster Platform CR is the
+	// source its spec.skewPolicy wins, and a platform generated from the
+	// render's own deps cannot skew. No flag.
 	skewPolicy?: "warn" | "refuse"
 }
 

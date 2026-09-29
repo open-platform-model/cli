@@ -18,9 +18,9 @@ import (
 )
 
 // Spec is the CLI's typed platform document: what a cluster Platform CR's
-// spec carries and what the write-if-absent seed writes back. It is the one
-// shape CR decode (DecodeCRSpec) and the seed decoded from a built platform
-// (SpecFromPlatform) share.
+// spec carries and what the operator-install seed writes. It is the one
+// shape CR decode (DecodeCRSpec) and the seed (EnsureClusterPlatformForCatalog)
+// share.
 type Spec struct {
 	// Name is the platform name (metadata.name of the CR form).
 	Name string
@@ -77,9 +77,8 @@ func (w wireSpec) toSpec(name string) Spec {
 }
 
 // wireFromSpec converts a Spec into the wire shape the CR carries — the
-// document write-if-absent creates (0006:D12). Every entry's enable is written
-// explicitly: the Spec came from a built platform where it is concrete, so
-// the CR states exactly what the render consumed.
+// document the operator-install seed creates (0006:D22). Every entry's enable
+// is written explicitly, so the CR states exactly what was subscribed.
 func wireFromSpec(s Spec) wireSpec {
 	w := wireSpec{Type: s.Type, SkewPolicy: s.SkewPolicy}
 	if len(s.Entries) > 0 {

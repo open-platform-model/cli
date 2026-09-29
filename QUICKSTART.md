@@ -50,22 +50,22 @@ Add these exports to your shell profile if you plan to use OPM regularly.
 opm config init
 ```
 
-This writes, without fetching anything:
+This writes `~/.opm/config.cue`, the CLI settings (registry, kubernetes,
+log) as plain data, without fetching anything. It writes no platform.
 
-- `~/.opm/config.cue` — CLI settings (registry, kubernetes, log), plain data
-- `~/.opm/platform/` — the local default platform as a CUE module:
-  `cue.mod/module.cue` pins core and the official OPM catalogs, and
-  `platform.cue` subscribes to each catalog by import. The instance
-  commands (`opm instance build`, `vet`, `apply`, `diff`) and
-  `opm module apply` use it whenever no `--platform` flag is given and no
-  cluster `Platform` is readable. `opm module build` and `opm module vet`
-  never use it: they render against the module's own catalog pins (see
-  [Build](#build)). Building the module resolves the pinned catalogs from
-  the registry, so `opm config vet` and `build` need registry access (or a
-  warm CUE module cache).
+Every render resolves its platform from a real source, in this order:
 
-To move to a newer catalog release, edit the pin in
-`~/.opm/platform/cue.mod/module.cue` and run `opm config vet`.
+1. `--platform <dir>`, a platform module directory you pass explicitly (for
+   example one captured with `opm platform pull <dir>`).
+2. The cluster's `Platform`, when your kubeconfig context reaches a cluster
+   that has one. `opm module build` and `opm module vet` skip this step.
+3. A platform generated from the render's own dependency pins: the module's
+   `cue.mod/module.cue` for `opm module` commands, the instance package's for
+   `opm instance` commands.
+
+A `~/.opm/platform/` directory from an earlier release is no longer read;
+`opm config vet` warns about it. Pass it with `--platform ~/.opm/platform`
+to keep rendering against it, or delete it.
 
 ## Create Your First Module
 
@@ -129,8 +129,7 @@ to stdout by default.
 The build answers one question: does the module render with the catalogs it
 declares? It renders against a platform generated from the module's own
 `cue.mod/module.cue`, one catalog per `opmodel.dev/catalogs/*` pin at the
-pinned version, and reads neither the cluster nor `~/.opm/platform/`. The
-log names that source:
+pinned version, and never reads the cluster. The log names that source:
 
 ```text
 INFO platform: module deps (opmodel.dev/catalogs/opm@v4 v4.4.0; generated module ~/.opm/cache/platforms/3f2a...)
@@ -162,8 +161,9 @@ opm module build ./my-app --platform ./pulled-platform
 `opm module build` answers the author's question: does the module render
 with the catalogs it pins? For the deployer's question, does the module
 render on my platform, pass that platform with `--platform` (for example
-`opm module build ./my-app --platform ~/.opm/platform`), or write an instance
-package and build it with `opm instance build`. Both report version skew or
+one captured with `opm platform pull ./cluster-platform`), or write an
+instance package and build it with `opm instance build`, which reads the
+cluster's `Platform` when your kubeconfig context reaches one. Both report version skew or
 an unmatched component. `opm instance build` takes only instance packages; a
 module directory is refused with the `opm module build` command to run.
 
@@ -196,6 +196,23 @@ Available examples:
 
 ```bash
 opm instance build ./examples/instances/jellyfin/instance.cue
+```
+
+Without `--platform`, `opm instance build` uses the cluster's `Platform` when
+your kubeconfig context reaches one, and otherwise a platform generated from
+the instance package's own `cue.mod/module.cue`. The cluster is never
+required: an absent `Platform` or an unreachable cluster prints a warning and
+falls back to the package's pins. The log names the source:
+
+```text
+INFO platform: instance deps (opmodel.dev/catalogs/opm@v4 v4.4.0; generated module ~/.opm/cache/platforms/3f2a...)
+```
+
+Pass `--offline` to skip the cluster entirely, or `--context <name>` to read
+the `Platform` of another cluster:
+
+```bash
+opm instance build ./examples/instances/jellyfin/instance.cue --offline
 ```
 
 The instance directory contains a sibling `values.cue` which is loaded
