@@ -191,6 +191,20 @@ Read when entering `cli/`:
   `opm instance` commands take only instance packages and decide by package
   kind; a module package is refused naming the matching `opm module` command
   (`cmdutil.ModulePackageError`).
+  Every render-bearing command takes `--skip-unprovided` (default false),
+  passed straight to the kernel as `RenderInput.SkipUnprovided`: a demand for
+  a provider-fulfilled contract no enabled catalog provides is skipped instead
+  of refused (a skipped trait leaves its component rendering, a skipped
+  resource drops the whole component). Which demands are skippable is the
+  kernel's rule; the CLI only words the `Diagnostics.Skipped` rows
+  (`render.formatSkipped`, warnings on the log stream) and, on a refusal with
+  a row marked `Unprovided`, adds a hint naming the three ways out for every
+  platform source (`refusalHint`). `instance apply` and `module apply` record
+  the skips on the ModuleInstance as the
+  `module-instance.opmodel.dev/skipped-contracts` annotation (sorted
+  `<component>=<fqn>` pairs, omitted and so cleared by server-side apply when
+  nothing was skipped), and refuse the flag for an operator-managed instance,
+  since the operator renders it and never skips.
 - Integration + CUE workflows need registry config. Follow the Registry Policy in the root `AGENTS.md` — both `opmodel.dev/*` and `testing.opmodel.dev/*` resolve from GHCR:
 
 ```bash

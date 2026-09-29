@@ -23,10 +23,11 @@
 
 ## 4. Document the flag
 
-- [ ] 4.1 `AGENTS.md` (render-path note), `QUICKSTART.md` and `docs/site/`: describe `--skip-unprovided`, what a skip does to a trait and to a resource, and the annotation; verify every page that describes an unresolved-demand refusal mentions the flag
-- [ ] 4.2 `task lint`, `task test` and `task openspec:check` green, then commit `docs: describe --skip-unprovided`
+- [x] 4.1 `AGENTS.md` (render-path note), `QUICKSTART.md` and `docs/site/`: describe `--skip-unprovided`, what a skip does to a trait and to a resource, and the annotation; verify every page that describes an unresolved-demand refusal mentions the flag
+- [x] 4.2 `task lint`, `task test` and `task openspec:check` green, then commit `docs: describe --skip-unprovided`
 
 ## 5. Pin the released library
 
-- [ ] 5.1 Once the supervisor reports the library release carrying the interface, replace the pseudo-version with it (`go get github.com/open-platform-model/library@<version>`, `go mod tidy`); verify `go.mod` carries no pseudo-version for the library and the section 1-3 tests pass unchanged
-- [ ] 5.2 `task lint` and `task test` green, then commit `fix(deps): raise the library to <version> for SkipUnprovided`
+- [x] 5.1 Once the supervisor reports the library release carrying the interface, replace the pseudo-version with it (`go get github.com/open-platform-model/library@<version>`, `go mod tidy`); verify `go.mod` carries no pseudo-version for the library and the section 1-3 tests pass unchanged
+- [x] 5.2 `task lint` and `task test` green, then commit `fix(deps): raise the library to <version> for SkipUnprovided`
+  - Note: nothing to do here: the release was pinned in 1.1 (`v1.0.0-alpha.34`, no library pseudo-version in `go.mod`), so this section has no commit of its own.

@@ -167,6 +167,47 @@ cluster's `Platform` when your kubeconfig context reaches one. Both report versi
 an unmatched component. `opm instance build` takes only instance packages; a
 module directory is refused with the `opm module build` command to run.
 
+### When a contract has no provider
+
+Some traits and resources are provider-fulfilled: the catalog that defines
+them ships no transformer, and a platform supplies one (the `backup` trait of
+`opmodel.dev/catalogs/opm@v4` is one). A module that attaches one renders
+only on a platform that carries a provider. Against the module's own deps,
+or on a cluster without the OPM operator, the render is refused:
+
+```text
+ERRO render failed: 1 unresolved demand(s):
+  component "db": unresolved trait demand "opmodel.dev/catalogs/opm/traits/backup@v1alpha1": defined by "opmodel.dev/catalogs/opm@v4" and nothing on this platform implements it; provider-fulfilled, no provider on this platform
+...
+Hint: a provider-fulfilled contract has no provider on this platform: install one, pass --platform <dir> with a platform that carries one, or pass --skip-unprovided to render the rest
+```
+
+Pass `--skip-unprovided` to render everything else and see what was left
+out. It works on `opm module build`, `vet` and `apply`, and on
+`opm instance build`, `vet`, `diff` and `apply`:
+
+```bash
+opm module build ./my-app --skip-unprovided
+```
+
+```text
+WARN component "db": skipped provider-fulfilled trait "opmodel.dev/catalogs/opm/traits/backup@v1alpha1" (no provider on this platform)
+```
+
+A skipped trait produces nothing, and its component renders the rest. A
+skipped resource drops its whole component, reported once as
+`component "<name>" not rendered: ...`. Only contracts nothing on the
+platform provides are skipped: a catalog-fulfilled gap, or a provider that
+exists but did not match, still refuses. The warnings go to standard error,
+so the manifests on standard output stay clean.
+
+`opm instance apply` and `opm module apply` record what was skipped on the
+ModuleInstance, as the annotation
+`module-instance.opmodel.dev/skipped-contracts` (for example
+`db=opmodel.dev/catalogs/opm/traits/backup@v1alpha1`); the next apply that
+skips nothing removes it. An instance the OPM operator manages refuses the
+flag, because the operator renders it and never skips.
+
 `opm module build` also takes a published module by its module path, for
 example `opm module build opmodel.dev/modules/web_app --version v1`.
 
