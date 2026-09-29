@@ -18,6 +18,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/platform"
 	"github.com/open-platform-model/cli/tests/fixtures"
 )
 
@@ -460,6 +461,32 @@ func TestE2E_InstanceBuild_ReplacementOfPlatformPathIsInert(t *testing.T) {
 	assert.NotContains(t, stderr, "in effect")
 }
 
+// TestE2E_InstanceBuild_InstanceDepsHonourThePackageReplacement covers
+// "Instance deps platform honours the instance package's replacement": with
+// no --platform and --offline, the platform is generated from the instance
+// package's own pins and carries its cue.mod/local-module.cue, so the
+// redirected catalog copy renders. The one warning names the path, the copy
+// and the module-context side of the render, "(instance)"; nothing says the
+// redirect belongs in the platform module.
+func TestE2E_InstanceBuild_InstanceDepsHonourThePackageReplacement(t *testing.T) {
+	repoRoot, example := podinfoExample(t)
+	home := seedRenderHome(t)
+	catDir := catalogCopyWithLabel(t, home, seedPlatform(t), example)
+	redirected := replacementInstance(t, repoRoot, false, map[string]string{config.DefaultCatalogPaths[0]: catDir})
+
+	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
+		"instance", "build", redirected, "--offline")
+	require.NoError(t, err, "stderr: %s", stderr)
+
+	assert.Contains(t, stderr, "platform: instance deps (")
+	assert.Contains(t, stdout, catalogLabel+": local", "the rendered Deployment carries the checkout's transformer output")
+	want := "local replacement in effect: " + config.DefaultCatalogPaths[0] + " served from " + catDir + " (instance)"
+	assert.Equal(t, 1, strings.Count(stderr, "local replacement in effect:"), "stderr: %s", stderr)
+	assert.Contains(t, stderr, want)
+	assert.NotContains(t, stderr, "redirect it in the platform module's cue.mod/local-module.cue")
+	assert.NotContains(t, stderr, "is ignored")
+}
+
 // TestE2E_InstanceBuild_PlatformReplacementIsHonored covers "Platform
 // replacement of its catalog is honored and warns": the --platform module
 // redirects its abstraction catalog to a patched copy; the rendered
@@ -589,4 +616,37 @@ func TestE2E_InstanceVet_UnreachableClusterFallsBackToDeps(t *testing.T) {
 	assert.Contains(t, stderr, "could not reach the cluster")
 	assert.Contains(t, stderr, "platform: instance deps (")
 	assert.Contains(t, stderr, "Instance valid")
+}
+
+// TestE2E_InstanceBuild_ReadsTheNamedContextsClusterPlatform covers "build
+// reads the Platform from the named context", "Kubeconfig flags select the
+// cluster" and "Cluster CR used when no flag": with no --platform, instance
+// build reads the Platform of the context --kubeconfig and --context name
+// (always kind-opm-dev, never another context), renders against it and
+// generates no deps platform. Read-only against the cluster.
+func TestE2E_InstanceBuild_ReadsTheNamedContextsClusterPlatform(t *testing.T) {
+	_, instanceFile := podinfoExample(t)
+	kubeconfig := requireKindCluster(t)
+	home := seedRenderHome(t)
+
+	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
+		"instance", "build", instanceFile, "--kubeconfig", kubeconfig, "--context", kindContext)
+	require.NoError(t, err, "stderr: %s", stderr)
+
+	assert.NotEmpty(t, stdout)
+	assert.Contains(t, stderr, "platform: cluster Platform CR cluster (")
+	assert.NotContains(t, stderr, "cluster Platform not used")
+	assert.NotContains(t, stderr, " deps (")
+
+	// Every module generated under the temp home's cache is the cluster's:
+	// none carries the deps generator's module identity.
+	modFiles, err := filepath.Glob(filepath.Join(config.PlatformCacheDir(renderHomeConfigPath(home)), "*", "cue.mod", "module.cue"))
+	require.NoError(t, err)
+	require.NotEmpty(t, modFiles, "the cluster arm generates its platform module under the cache")
+	for _, f := range modFiles {
+		data, err := os.ReadFile(f)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), platform.ClusterPlatformModulePath, f)
+		assert.NotContains(t, string(data), platform.ModuleDepsPlatformModulePath, f)
+	}
 }
