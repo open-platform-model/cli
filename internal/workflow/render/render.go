@@ -56,6 +56,14 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	if err != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}
+	// A package under no module root cannot import its module: refuse it
+	// here, naming the directory, before the acquire reports it as an
+	// unresolved import.
+	if moduleRoot == "" {
+		err := errNoModuleRoot(instanceDir)
+		printValidationError(err)
+		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+	}
 	sources, err := loadValuesSources(k, opts.ValuesFiles)
 	if err != nil {
 		printValidationError(err)
@@ -117,13 +125,20 @@ func instanceContext(arg string) (dir, moduleRoot string, err error) {
 	return dir, moduleContextRoot(dir), nil
 }
 
+// errNoModuleRoot is the validation error for an instance package under no
+// CUE module: without its own cue.mod it can import neither its module nor
+// core, and it has no dependency pins to render against.
+func errNoModuleRoot(instanceDir string) error {
+	return fmt.Errorf("instance package %s is under no CUE module (no cue.mod/module.cue at or above it): an instance package imports its module through its own cue.mod", instanceDir)
+}
+
 // instanceDepsOf reads what an instance-deps platform is generated from: the
 // instance package's committed cue.mod/module.cue at its module root and the
 // replacements of its cue.mod/local-module.cue. A package under no module
 // root cannot import its module, so it has no pins to read.
 func instanceDepsOf(instanceDir, moduleRoot string) (*platform.ModuleDeps, error) {
 	if moduleRoot == "" {
-		return nil, fmt.Errorf("instance package %s is under no CUE module (no cue.mod/module.cue at or above it): an instance package imports its module through its own cue.mod", instanceDir)
+		return nil, errNoModuleRoot(instanceDir)
 	}
 	name := filepath.Join(moduleRoot, "cue.mod", "module.cue")
 	data, err := os.ReadFile(name)

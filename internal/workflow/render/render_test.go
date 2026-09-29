@@ -80,6 +80,28 @@ func TestRenderFromInstanceFile_RefusesModulePackage(t *testing.T) {
 	}
 }
 
+// An instance package under no CUE module is refused as a validation error
+// naming the directory, before the acquire: the refusal is the design's, not
+// the loader's unresolved-import error, with or without --platform.
+func TestRenderFromInstanceFile_RefusesPackageUnderNoModuleRoot(t *testing.T) {
+	dir := t.TempDir()
+	require.Empty(t, moduleContextRoot(dir), "the temp dir must sit under no cue.mod")
+	writeD19File(t, filepath.Join(dir, "instance.cue"),
+		"package hello\n\nimport m \"example.com/modules/hello@v0\"\n\nm\n")
+	for _, platformFlag := range []string{"", filepath.Join(t.TempDir(), "platform")} {
+		_, err := FromInstanceFile(context.Background(), InstanceFileOpts{
+			InstanceFilePath: dir,
+			PlatformFlag:     platformFlag,
+			Config:           &config.GlobalConfig{},
+			K8sConfig:        &config.ResolvedKubernetesConfig{},
+		})
+		var exitErr *opmexit.ExitError
+		require.True(t, errors.As(err, &exitErr), "platform %q", platformFlag)
+		assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
+		assert.Contains(t, err.Error(), "instance package "+dir+" is under no CUE module")
+	}
+}
+
 func TestInstanceContext_DirectoryWithItsOwnCueMod(t *testing.T) {
 	// An instance package directory inside a module tree that carries its
 	// own cue.mod: the directory is its own context, not the tree's root.
