@@ -105,14 +105,18 @@ The instance package's deps are read exactly as the module's are (`moduleDepsOf`
 `instance build` and `instance vet` gain `cmdutil.K8sFlags` (`--kubeconfig`, `--context`) and `--offline`. Building the getter never fails the command:
 
 ```go
-// optionalClusterGetter returns nil when --offline is set or no kubeconfig
-// context resolves (clientcmd's empty-config case: no warning). A client that
-// cannot be built warns and returns nil. The getter it returns bounds the
-// whole lookup with context.WithTimeout(ctx, clusterLookupTimeout).
-func optionalClusterGetter(ctx context.Context, cfg *config.GlobalConfig, kf cmdutil.K8sFlags, offline bool) platform.ClusterPlatformGetter
+// optionalClusterGetter returns nil when --offline or --platform is set
+// (neither loads a kubeconfig) or when no kubeconfig context resolves
+// (clientcmd's empty-config case or a missing kubeconfig: no warning). A
+// client that cannot be built otherwise warns and returns nil. The getter it
+// returns bounds the whole lookup with
+// context.WithTimeout(ctx, clusterLookupTimeout).
+func optionalClusterGetter(cfg *config.GlobalConfig, kf cmdutil.K8sFlags, platformFlag string, offline bool) platform.ClusterPlatformGetter
 
 const clusterLookupTimeout = 10 * time.Second
 ```
+
+The function takes no `ctx`: building the client makes no request, and the timeout lives inside the returned getter, which receives the render's context when the resolver calls it. It takes the `--platform` value because `--platform` wins over the cluster anyway: with it set, the command never loads a kubeconfig, so a broken kubeconfig cannot warn on a render that would not have used the cluster.
 
 Spike finding (section 1, `internal/cmdutil/kubeconfig_test.go`): the CLI always passes the resolved kubeconfig path (flag, `OPM_KUBECONFIG`, config, else the `~/.kube/config` default) to client-go as an explicit path. An empty kubeconfig file then yields clientcmd's empty-config error, but a path that does not exist yields a not-exist error, not the empty-config one. `optionalClusterGetter` therefore treats both the empty-config error and a not-exist error as "no kubeconfig context" (no warning); any other client-building failure warns.
 
