@@ -136,7 +136,7 @@ func RegistryCheck(ctx context.Context, opts CheckOptions) (*CheckReport, error)
 // a release-prerelease build counts its beta/GA members prerelease-exempt;
 // a stable build is compared against its dev-free predecessor window.
 func checkCompat(ctx context.Context, opts CheckOptions, lopts Options, repo, version string, report *CheckReport) error {
-	if isDevTag(version) {
+	if IsDevTag(version) {
 		report.Gates.CompatDevExempt = true
 		report.CompatRan = true
 		return nil
