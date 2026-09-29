@@ -265,6 +265,17 @@ The glyphs are whatever `output.FormatVetCheck`, `FormatCheckmark` and `FormatRe
 
 0006:D21 says offline `build`/`render` use `--platform` or the local default only. This change keeps its load-bearing half (build never reads the cluster) and replaces the local default with the module's deps for `module build` and `module vet`. No enhancement decision is implemented here, so the change carries no `enhancement.yaml`.
 
+### Spike findings
+
+Run 2026-09-28 against library `v1.0.0-alpha.33`, `modules/apprise` (pins `opmodel.dev/catalogs/opm@v4` `v4.4.0`, `opmodel.dev/core@v2` `v2.0.0-alpha.10`) and GHCR.
+
+- **Rendered objects are identical.** `Closure(Roots(entries) + the module's core pin)` then `Generate` produced a platform whose render of the synthesized `apprise` instance gave the same three objects (Deployment, Service, HTTPRoute), byte for byte after JSON normalisation, as `hack/platform`. Neither render reported a skew row or a replacement row.
+- **The catalog's own dependency is closed over.** The generated `cue.mod/module.cue` pins `cue.dev/x/k8s.io@v0` at `v0.11.0`, which `apprise` does not list and `opmodel.dev/catalogs/opm@v4` requires.
+- **The closure works offline with a warm cache.** With the cache warm, `Closure` returned the same three pins with `CUE_REGISTRY` pointing at an unresolvable host and again at a refused port. The module cache is keyed by module path and version, not by registry host, so the offline risk is closed.
+- **A platform `local-module.cue` with an absolute target is honoured.** Both shapes work: a minimal file listing only the replaced path, and one listing every pinned path with only the catalog replaced. The edited transformer's label appears on the Deployment, and the kernel returns one row, `{Path: opmodel.dev/catalogs/opm@v4, Target: <absolute checkout dir>, By: "platform"}`. The generator writes the minimal shape.
+- **The checkout must declare the pinned version.** `platformmodule.Generate` stamps each entry's pinned version as the entry's expected `version`, and the catalog reports its own `identity.Version`. A checkout at `4.4.1` behind a module pin of `v4.4.0` fails platform acquisition with `#registry."opmodel.dev/catalogs/opm@v4".version: conflicting values "4.4.1" and "4.4.0"`. That is the generator's existing tripwire, and a `--platform` directory replacing its catalog hits it the same way. So an author who redirects a catalog also pins the version the checkout declares. Today the same redirect is ignored with a warning; after this change it is honoured, so a mismatched pin now fails where it used to pass. The error names both versions.
+- **A directory-acquired module keys its overlay under the real directory.** `Kernel.AcquireModuleFromDir` returns `Source.Root` as the absolute module directory, not a synthetic root, and `Source.Overlay` carries `cue.mod/module.cue` under it. `TestModuleSource_CarriesCommittedModFile` pins this.
+
 ### Coordination with sibling changes
 
 - `split-module-and-instance-inputs` edits `render.FromModule`, `ModuleOpts` and `module build`. Neither change depends on the other: `PlatformFromDeps` reads the acquired `Source`, which the registry branch also produces. Whichever lands second rebases; the conflict is textual.
@@ -272,11 +283,14 @@ The glyphs are whatever `output.FormatVetCheck`, `FormatCheckmark` and `FormatRe
 
 ## Risks / Trade-offs
 
-- [Unverified: `Closure` through `modconfig.NewRegistry` serves module files from the CUE module cache with the registry unreachable, once a first build has run] -> Section 1 spike; if false, the generator fails the same way the cluster arm does today and the finding goes into this document before section 2.
-- [Unverified: a platform `local-module.cue` with an absolute directory target, in a module under the cache directory, is honoured by the render build, and its row comes back `By: "platform"` with that absolute target] -> Section 1 spike.
-- [Unverified: the dir-acquired module's `Source.Overlay` carries `cue.mod/module.cue` at `Root`] -> Section 1 spike, pinned by a unit test.
+- [Verified in the spike: `Closure` through `modconfig.NewRegistry` serves module files from the CUE module cache with the registry unreachable, once a first build has run] -> See Spike findings.
+- [Verified in the spike: a platform `local-module.cue` with an absolute directory target is honoured by the render build, and its row comes back `By: "platform"` with that absolute target] -> See Spike findings.
+- [Verified in the spike: the dir-acquired module's `Source.Overlay` carries `cue.mod/module.cue` at `Root`] -> Pinned by a unit test.
+- [A carried catalog checkout whose `identity.Version` differs from the module's pin fails platform acquisition on the entry's version tripwire, where the same redirect was ignored with a warning before this change] -> The error names both versions. The author pins the version the checkout declares, the same rule a `--platform` directory's own replacement already follows.
 - [`module build` can now pass where `instance build` of the same module fails, for example a platform missing a catalog] -> Intended: the two answer different questions. The provenance line names the source every time.
 - [`module vet` newly refuses modules whose components do not render against their own catalogs] -> `module build` already refused them. Release note states it.
+- [`module vet` newly refuses what synthesis already refused for `module build`: an open `debugValues: _` (the kernel does not fill `#config` defaults into an incomplete `values`, even with no values sources)] -> Found in section 4; decided to keep one verdict rather than special-case vet. The `simple-module` fixture declares `debugValues: {}`. Release note names the fix. Filling defaults at synthesis is a library question, not this change.
+- [The default synthetic instance name `<module name>-debug` failed the instance-name pattern for every module name with `_`, the only separator a CUE package name allows. `mod init example.com/modules/my_app@v0` followed by `module vet` exited 2 once vet rendered] -> Found in section 4 (`TestE2E_ModInit_ThenVet`). The default now hyphenates the module name (`my-app-debug`), which also fixes `module build` and `module apply` for such modules (`module-synthetic-instance` delta). An explicit `--name` is taken verbatim.
 - [Provider-fulfilled contracts: a module attaching one (today only `#Backup`, attached by no fleet module) is refused by `module build` without `--platform`] -> Hint names `--platform`; designed behaviour of the fail-closed gate.
 - [Cache growth: one directory per distinct pin and replacement set] -> Derived state, safe to delete, same policy as the cluster arm.
 

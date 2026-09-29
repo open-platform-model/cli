@@ -25,7 +25,7 @@ const ClusterPlatformModulePath = "opmodel.dev/platforms/cluster@v0"
 // before any registry I/O.
 var ErrEntryMissingVersion = errors.New("registry entry has no version")
 
-// GenerateOptions configures GenerateClusterModule.
+// GenerateOptions configures GenerateClusterModule and GenerateModuleDepsModule.
 type GenerateOptions struct {
 	// CacheDir is the directory generated modules live under
 	// (config.PlatformCacheDir): one content-hash-named subdirectory each.
@@ -69,16 +69,9 @@ func GenerateClusterModule(ctx context.Context, spec Spec, opts GenerateOptions)
 		return "", errors.New("platform cache directory is not set")
 	}
 
-	src := opts.ModFiles
-	if src == nil {
-		src, err = platformmodule.NewRegistry(platformmodule.RegistryConfig{
-			Registry:   opts.Registry,
-			ClientType: "opm-cli",
-			Env:        os.Environ(),
-		})
-		if err != nil {
-			return "", fmt.Errorf("configuring module registry: %w", err)
-		}
+	src, err := modFileSource(opts)
+	if err != nil {
+		return "", err
 	}
 	deps, err := platformmodule.Closure(ctx, src, platformmodule.Roots(entries))
 	if err != nil {
@@ -154,7 +147,7 @@ func writeCached(cacheDir string, files platformmodule.Files) (string, error) {
 	}
 	if err := files.WriteTo(staging); err != nil {
 		_ = os.RemoveAll(staging)
-		return "", fmt.Errorf("writing cluster platform module: %w", err)
+		return "", fmt.Errorf("writing platform module: %w", err)
 	}
 	if err := os.Rename(staging, dir); err != nil {
 		// The name is taken: a concurrent invocation converged on the same
@@ -169,7 +162,7 @@ func writeCached(cacheDir string, files platformmodule.Files) (string, error) {
 		}
 		if err := os.Rename(staging, dir); err != nil {
 			_ = os.RemoveAll(staging)
-			return "", fmt.Errorf("moving cluster platform module into place at %s: %w", dir, err)
+			return "", fmt.Errorf("moving platform module into place at %s: %w", dir, err)
 		}
 	}
 	return dir, nil

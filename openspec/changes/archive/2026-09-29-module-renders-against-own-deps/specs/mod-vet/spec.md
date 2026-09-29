@@ -31,7 +31,15 @@ When no `-f`/`--values` flag is provided, `opm mod vet` SHALL use the module's `
 - **THEN** the command SHALL return an error directing the user to add `debugValues` or provide values with `-f`
 - **AND** the exit code SHALL be 2
 
-A `debugValues` field left open (`_`) is a values source, not a missing one: the kernel merges it with `#config`, and the verdict is the `instance-building` spec's.
+A `debugValues` field left open (`_`) is a values source, not a missing one: the `#config` check merges it with `#config` and passes when every field has a default. The render that follows synthesizes an instance from it, and synthesis requires concrete values, so the command then refuses it exactly as `opm mod build` does. A module that relies on `#config` defaults declares `debugValues: {}`.
+
+#### Scenario: Open debugValues is refused at synthesis
+
+- **WHEN** `opm mod vet .` is run on a module whose `debugValues` is left open (`_`) and whose `#config` gives every field a default
+- **AND** no `-f` flag is provided
+- **THEN** the command SHALL print `FormatVetCheck("Values satisfy #config", "debugValues")` and `FormatCheckmark("Module config valid")`
+- **AND** it SHALL then refuse at synthesis, naming the incomplete `values`, the verdict `opm mod build` reaches for the same input
+- **AND** the exit code SHALL be 2
 
 #### Scenario: Values files against a module without #config
 

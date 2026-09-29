@@ -29,20 +29,20 @@ func localFileOf(root string) string {
 }
 
 func TestReplacementWarnings_CleanContextIsSilent(t *testing.T) {
-	got := replacementWarnings(nil, writeModuleContext(t, ""))
+	got := replacementWarnings(nil, writeModuleContext(t, ""), nil)
 
 	assert.Empty(t, got, "no rows and no file: nothing to warn about")
 	assert.NotNil(t, got, "never nil, so callers range without a nil check")
 }
 
 func TestReplacementWarnings_NoModuleContextReadsNoFile(t *testing.T) {
-	assert.Empty(t, replacementWarnings(nil, ""))
+	assert.Empty(t, replacementWarnings(nil, "", nil))
 }
 
 func TestReplacementWarnings_HonoredPlatformRow(t *testing.T) {
 	rows := []kernel.Replacement{{Path: "opmodel.dev/catalogs/opm@v4", Target: "/home/dev/catalog_opm", By: "platform"}}
 
-	got := replacementWarnings(rows, writeModuleContext(t, ""))
+	got := replacementWarnings(rows, writeModuleContext(t, ""), nil)
 
 	assert.Equal(t, []string{
 		"local replacement in effect: opmodel.dev/catalogs/opm@v4 served from /home/dev/catalog_opm (platform); rendered bytes may not correspond to any published build",
@@ -53,7 +53,7 @@ func TestReplacementWarnings_HonoredInstanceRow(t *testing.T) {
 	root := writeModuleContext(t, `deps: "test.example/lib@v0": replaceWith: "../lib"`)
 	rows := []kernel.Replacement{{Path: "test.example/lib@v0", Target: "/home/dev/lib", By: "instance"}}
 
-	got := replacementWarnings(rows, root)
+	got := replacementWarnings(rows, root, nil)
 
 	assert.Equal(t, []string{
 		"local replacement in effect: test.example/lib@v0 served from /home/dev/lib (instance); rendered bytes may not correspond to any published build",
@@ -63,7 +63,7 @@ func TestReplacementWarnings_HonoredInstanceRow(t *testing.T) {
 func TestReplacementWarnings_InertModuleEntry(t *testing.T) {
 	root := writeModuleContext(t, `deps: "opmodel.dev/catalogs/opm@v4": replaceWith: "../catalog_opm"`)
 
-	got := replacementWarnings(nil, root)
+	got := replacementWarnings(nil, root, nil)
 
 	assert.Equal(t, []string{
 		"local replacement of opmodel.dev/catalogs/opm@v4 in " + localFileOf(root) + " is ignored: the platform names that path; redirect it in the platform module's cue.mod/local-module.cue",
@@ -76,11 +76,40 @@ func TestReplacementWarnings_PlatformRowDoesNotHonourTheModuleEntry(t *testing.T
 	root := writeModuleContext(t, `deps: "opmodel.dev/catalogs/opm@v4": replaceWith: "../mine"`)
 	rows := []kernel.Replacement{{Path: "opmodel.dev/catalogs/opm@v4", Target: "/home/dev/theirs", By: "platform"}}
 
-	got := replacementWarnings(rows, root)
+	got := replacementWarnings(rows, root, nil)
 
 	require.Len(t, got, 2)
 	assert.Contains(t, got[0], "in effect: opmodel.dev/catalogs/opm@v4 served from /home/dev/theirs (platform)")
 	assert.Contains(t, got[1], "local replacement of opmodel.dev/catalogs/opm@v4 in "+localFileOf(root)+" is ignored")
+}
+
+func TestReplacementWarnings_CarriedCatalogIsTheModules(t *testing.T) {
+	// A module-deps platform carried the module's own redirect: the kernel
+	// reports the row as the platform's, but it is the module's, and the
+	// module file's entry is honored rather than ignored.
+	root := writeModuleContext(t, `deps: "opmodel.dev/catalogs/opm@v4": replaceWith: "../catalog_opm/opm"`)
+	rows := []kernel.Replacement{{Path: "opmodel.dev/catalogs/opm@v4", Target: "/home/dev/catalog_opm/opm", By: "platform"}}
+	carried := map[string]string{"opmodel.dev/catalogs/opm@v4": "/home/dev/catalog_opm/opm"}
+
+	got := replacementWarnings(rows, root, carried)
+
+	assert.Equal(t, []string{
+		"local replacement in effect: opmodel.dev/catalogs/opm@v4 served from /home/dev/catalog_opm/opm (instance); rendered bytes may not correspond to any published build",
+	}, got, "one in-effect line under the module side's label, no ignored line")
+}
+
+func TestReplacementWarnings_CarriedSetOnlyClaimsItsOwnTarget(t *testing.T) {
+	// A platform row for the same path with a different target is not the
+	// carried redirect: it keeps the platform label and the module entry is
+	// still reported ignored.
+	root := writeModuleContext(t, `deps: "opmodel.dev/catalogs/opm@v4": replaceWith: "../mine"`)
+	rows := []kernel.Replacement{{Path: "opmodel.dev/catalogs/opm@v4", Target: "/home/dev/theirs", By: "platform"}}
+
+	got := replacementWarnings(rows, root, map[string]string{"opmodel.dev/catalogs/opm@v4": "/home/dev/mine"})
+
+	require.Len(t, got, 2)
+	assert.Contains(t, got[0], "served from /home/dev/theirs (platform)")
+	assert.Contains(t, got[1], "is ignored")
 }
 
 func TestReplacementWarnings_MixedKeepsRowOrderThenInertByPath(t *testing.T) {
@@ -95,7 +124,7 @@ func TestReplacementWarnings_MixedKeepsRowOrderThenInertByPath(t *testing.T) {
 		{Path: "test.example/lib@v0", Target: "/home/dev/lib", By: "instance"},
 	}
 
-	got := replacementWarnings(rows, root)
+	got := replacementWarnings(rows, root, nil)
 
 	require.Len(t, got, 4)
 	assert.Contains(t, got[0], "in effect: example.com/shared@v1 served from /home/dev/shared (platform)")
@@ -117,9 +146,9 @@ func TestReplacementWarnings_StableAcrossCalls(t *testing.T) {
 }`)
 	rows := []kernel.Replacement{{Path: "c.example/three@v0", Target: "/three", By: "platform"}}
 
-	first := replacementWarnings(rows, root)
+	first := replacementWarnings(rows, root, nil)
 	for range 5 {
-		assert.Equal(t, first, replacementWarnings(rows, root))
+		assert.Equal(t, first, replacementWarnings(rows, root, nil))
 	}
 }
 
@@ -127,7 +156,7 @@ func TestReplacementWarnings_UnparseableFileYieldsRowsOnly(t *testing.T) {
 	root := writeModuleContext(t, `deps: {`)
 	rows := []kernel.Replacement{{Path: "test.example/lib@v0", Target: "/home/dev/lib", By: "instance"}}
 
-	got := replacementWarnings(rows, root)
+	got := replacementWarnings(rows, root, nil)
 
 	assert.Len(t, got, 1, "the kernel refuses a malformed file before any row exists; the builder stays defensive")
 	assert.Contains(t, got[0], "in effect: test.example/lib@v0")

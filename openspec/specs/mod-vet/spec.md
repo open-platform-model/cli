@@ -8,7 +8,7 @@ The `opm mod vet` command provides standalone module-config validation without g
 
 ### Requirement: mod vet command validates module without generating manifests
 
-The `opm mod vet` command SHALL load the module directly and validate values against `#config`. It SHALL NOT render resources or output manifests (YAML/JSON). Its purpose is pass/fail config validation with clear diagnostics for module authors.
+The `opm mod vet` command SHALL load the module directly, validate values against `#config`, and then render the synthesized instance against the module-deps platform, or against `--platform <dir>` when given (see the `platform-resolution` capability). It SHALL NOT output manifests (YAML/JSON). Its purpose is a pass/fail verdict with clear diagnostics for module authors: identity, values, and whether the module's components render with the catalogs it declares.
 
 The command SHALL accept a module path argument (default: current directory) and values flags for supplying one or more external values files.
 
@@ -20,7 +20,8 @@ When no `-f`/`--values` flag is provided, `opm mod vet` SHALL use the module's `
 - **AND** no `-f` flag is provided
 - **THEN** the command SHALL use `debugValues` as the values source
 - **AND** it SHALL print `FormatVetCheck("Values satisfy #config", "debugValues")`
-- **AND** a final summary line SHALL be printed: `FormatCheckmark("Module config valid")`
+- **AND** it SHALL print `FormatCheckmark("Module config valid")`
+- **AND** after the render it SHALL print one validation line per rendered object and a final summary line `FormatCheckmark("Module valid (<n> resources)")`
 - **AND** the command SHALL exit with code 0
 
 #### Scenario: -f flag overrides debugValues
@@ -36,7 +37,15 @@ When no `-f`/`--values` flag is provided, `opm mod vet` SHALL use the module's `
 - **THEN** the command SHALL return an error directing the user to add `debugValues` or provide values with `-f`
 - **AND** the exit code SHALL be 2
 
-A `debugValues` field left open (`_`) is a values source, not a missing one: the kernel merges it with `#config`, and the verdict is the `instance-building` spec's.
+A `debugValues` field left open (`_`) is a values source, not a missing one: the `#config` check merges it with `#config` and passes when every field has a default. The render that follows synthesizes an instance from it, and synthesis requires concrete values, so the command then refuses it exactly as `opm mod build` does. A module that relies on `#config` defaults declares `debugValues: {}`.
+
+#### Scenario: Open debugValues is refused at synthesis
+
+- **WHEN** `opm mod vet .` is run on a module whose `debugValues` is left open (`_`) and whose `#config` gives every field a default
+- **AND** no `-f` flag is provided
+- **THEN** the command SHALL print `FormatVetCheck("Values satisfy #config", "debugValues")` and `FormatCheckmark("Module config valid")`
+- **AND** it SHALL then refuse at synthesis, naming the incomplete `values`, the verdict `opm mod build` reaches for the same input
+- **AND** the exit code SHALL be 2
 
 #### Scenario: Values files against a module without #config
 
@@ -75,35 +84,27 @@ A `debugValues` field left open (`_`) is a values source, not a missing one: the
 - **AND** `base.cue` and `overrides.cue` also contain a conflicting assignment
 - **THEN** the command SHALL report both the schema violations and the merge conflict in one run
 
-### Requirement: mod vet does not use the render pipeline
+### Requirement: mod vet renders against the module's deps
 
-The `opm mod vet` command SHALL NOT call the release render pipeline used by `mod build`, `mod apply`, or `opm instance vet`.
+After the identity and coordinate checks and the `#config` validation pass, `opm mod vet` SHALL synthesize the module's instance from the same values and render it through the kernel against the resolved platform, exactly as `opm mod build` does, and SHALL report the rendered objects without printing them. A failure in the identity checks or the `#config` validation SHALL stop the command before any platform is generated or acquired, so a cheap failure never reaches the registry.
 
-It SHALL:
+#### Scenario: Config failure stops before the render
 
-1. Load the module package directly
-2. Resolve values as kernel values sources, the same way `mod build` does: each supplied `-f` file as a file-backed source attributed to that file, else the module's `debugValues` as one source attributed to the module's `debugValues`
-3. Validate the sources against the module's `#config` through the kernel's layered validation, which reports schema violations and merge conflicts at their source positions and refuses a merged value that is not concrete
-4. Print validation output and exit without rendering resources
-
-#### Scenario: mod vet loads module directly
-
-- **WHEN** `opm mod vet .` is run
-- **THEN** the command SHALL load the module package directly
-- **AND** it SHALL NOT resolve a provider
-- **AND** it SHALL NOT compute transformer matches
-- **AND** it SHALL NOT render resources
-
-#### Scenario: vet and build agree on a verdict
-
-- **WHEN** `opm mod vet . -f values.cue` and `opm mod build . -f values.cue` are run on the same module and values file
-- **THEN** both SHALL accept or both SHALL refuse the values, with the same `#config` violations reported
-
-#### Scenario: Non-concrete values are refused as a #config violation
-
-- **WHEN** `opm mod vet .` is run and the resolved values leave a required `#config` field incomplete
+- **WHEN** `opm mod vet .` runs and the resolved values leave a required `#config` field incomplete
 - **THEN** the command SHALL print the standard grouped validation block under "values do not satisfy #config", naming the incomplete field and the source position
+- **AND** no platform SHALL be generated or acquired
 - **AND** the exit code SHALL be 2
+
+#### Scenario: Build and vet reach one verdict
+
+- **WHEN** `opm mod vet . -f values.cue` and `opm mod build . -f values.cue` are run on the same module, values file and platform source
+- **THEN** both SHALL succeed, or both SHALL refuse with the same `#config` violations or the same render refusal
+
+#### Scenario: The platform flag switches vet to a platform
+
+- **WHEN** `opm mod vet . --platform ./pulled/` runs
+- **THEN** the render SHALL use the platform module at `./pulled/`
+- **AND** the output SHALL report that source
 
 ### Requirement: mod vet accepts values files for validation
 
@@ -117,7 +118,7 @@ The `opm mod vet` command SHALL support `--values` / `-f` flags for providing ex
 
 ### Requirement: mod vet command flags and syntax
 
-The `opm mod vet` command SHALL accept an optional module path argument that defaults to the current directory, and SHALL expose the shared render flags registered by `cmdutil.RenderFlags` (`-f`/`--values`, repeatable; `-n`/`--namespace`; `--instance-name`; `--platform`), of which only `-f`/`--values` affects the validation it performs.
+The `opm mod vet` command SHALL accept an optional module path argument that defaults to the current directory, and SHALL expose the shared render flags registered by `cmdutil.RenderFlags` (`-f`/`--values`, repeatable; `-n`/`--namespace`; `--instance-name`; `--platform`). All four affect the verdict: `-f` selects the values, `-n` and `--instance-name` set the synthesized instance's namespace and name for the render, and `--platform` renders against that platform module instead of the module-deps platform.
 
 ```text
 opm mod vet [path] [flags]
@@ -127,9 +128,9 @@ Arguments:
 
 Flags:
   -f, --values strings        Additional values files (can be repeated)
-  -n, --namespace string      Target namespace (shared render flag; unused by vet)
-      --instance-name string  Instance name (shared render flag; unused by vet)
-      --platform string       Platform module directory (shared render flag; unused by vet)
+  -n, --namespace string      Namespace of the synthesized instance
+      --instance-name string  Name of the synthesized instance (default: module name)
+      --platform string       Render against this platform module instead of the module's deps
   -h, --help                  Help for vet
 ```
 
@@ -137,16 +138,17 @@ Flags:
 
 - **WHEN** `opm mod vet` is run without any flags
 - **THEN** path SHALL default to `"."`
+- **AND** the render SHALL use the module-deps platform
 
 ### Requirement: mod vet exit codes
 
-The `opm mod vet` command SHALL signal its verdict through the process exit code: 0 when validation passes, 1 on a usage error, 2 on any validation failure, and 3 when the registry cannot be reached, as the table below details.
+The `opm mod vet` command SHALL signal its verdict through the process exit code: 0 when validation and the render pass, 1 on a usage error or when the platform cannot be generated or acquired, 2 on any validation failure or render refusal, and 3 when the registry cannot be reached for the core schema, as the table below details.
 
 | Code | Meaning |
 |------|---------|
-| 0 | Validation passed |
-| 1 | Usage error (invalid flags, missing arguments) |
-| 2 | Validation error (CUE errors, invalid values, missing `debugValues`, identity/coordinate check failures) |
+| 0 | Validation and render passed |
+| 1 | Usage error (invalid flags, missing arguments), or the platform could not be generated or acquired (an unpublished pin, a bad `--platform` directory) |
+| 2 | Validation error (CUE errors, invalid values, missing `debugValues`, identity/coordinate check failures) or render refusal (unmatched components, unresolved demands, a failed transformer) |
 | 3 | Registry unreachable (core-schema fetch) |
 
 #### Scenario: Exit code 0 on success
@@ -158,6 +160,12 @@ The `opm mod vet` command SHALL signal its verdict through the process exit code
 
 - **WHEN** `opm mod vet .` fails due to CUE errors
 - **THEN** the exit code SHALL be 2
+
+#### Scenario: Exit code 2 on render refusal
+
+- **WHEN** `opm mod vet .` passes the `#config` check but a component matches no transformer in the module's catalogs
+- **THEN** the command SHALL print the kernel's refusal with its diagnostics
+- **AND** the exit code SHALL be 2
 
 ### Requirement: Identity and coordinate checks before values validation
 

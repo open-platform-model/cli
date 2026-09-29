@@ -30,6 +30,14 @@ func TestNewModuleBuildCmd_Flags(t *testing.T) {
 	assert.NotNil(t, cmd.Flags().Lookup("out-dir"), "--out-dir flag should be registered")
 }
 
+func TestNewModuleBuildCmd_PlatformFlagNamesTheModuleDeps(t *testing.T) {
+	cmd := NewModuleBuildCmd(&config.GlobalConfig{})
+	assert.Equal(t, "Render against this platform module directory instead of the module's own deps",
+		cmd.Flags().Lookup("platform").Usage)
+	assert.Contains(t, cmd.Long, "module's own")
+	assert.Contains(t, cmd.Long, "--platform <dir>")
+}
+
 func TestRunModuleBuild_RejectsFileArgument(t *testing.T) {
 	dir := t.TempDir()
 	filePath := filepath.Join(dir, "module.cue")

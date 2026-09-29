@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/open-platform-model/cli/internal/config"
 )
 
 // runOPMWithEnv runs the opm binary with a custom HOME and configurable
@@ -56,15 +58,42 @@ func TestE2E_ModBuild_FromExampleModule(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	// A hermetic HOME seeded with what `opm config init` writes: the render
-	// resolves the local default platform module from it, never from the
-	// developer's real ~/.opm.
-	customHome := seedRenderHome(t)
+	// A hermetic HOME holding config.cue but no platform/: an author's build
+	// renders against a platform generated from the module's own deps, so it
+	// needs no local default and reads nothing from the developer's ~/.opm.
+	customHome := seedConfigOnlyHome(t)
 
 	stdout, stderr, err := runOPMWithEnv(t, tmpDir, customHome, 180*time.Second, "module", "build", modPath, "--name", "e2e-podinfo")
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Contains(t, stderr, "synthetic instance")
 	assert.Contains(t, stderr, "e2e-podinfo")
+	assert.Contains(t, stderr, "platform: module deps (opmodel.dev/catalogs/opm@v4 v4.0.1; generated module "+filepath.Join(customHome, ".opm", "cache", "platforms"))
+	assert.NotContains(t, stderr, "version skew", "the module's own pins cannot skew")
+	assert.NotEmpty(t, stdout, "expected manifest output on stdout")
+}
+
+// TestE2E_ModBuild_PlatformFlagOverridesDeps renders the same module against
+// an explicit platform module: the flag wins over the module's deps and the
+// provenance line names it.
+func TestE2E_ModBuild_PlatformFlagOverridesDeps(t *testing.T) {
+	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
+		t.Skip("skipping registry-backed e2e tests")
+	}
+
+	repoRoot, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	modPath := filepath.Join(repoRoot, "tests", "fixtures", "modules", "podinfo")
+	if _, statErr := os.Stat(modPath); statErr != nil {
+		t.Skipf("tests/fixtures/modules/podinfo not available: %v", statErr)
+	}
+
+	customHome := seedRenderHome(t)
+	platformDir := config.PlatformDir(renderHomeConfigPath(customHome))
+
+	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), customHome, 180*time.Second, "module", "build", modPath, "--name", "e2e-podinfo", "--platform", platformDir)
+	require.NoError(t, err, "stderr: %s", stderr)
+	assert.Contains(t, stderr, "platform: "+platformDir+" (--platform)")
+	assert.NotContains(t, stderr, "module deps")
 	assert.NotEmpty(t, stdout, "expected manifest output on stdout")
 }
 

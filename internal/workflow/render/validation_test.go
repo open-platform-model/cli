@@ -19,6 +19,7 @@ import (
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/platform"
 )
 
 // captureValidationOutput runs printValidationError and returns the log
@@ -182,4 +183,36 @@ func TestPrintValidationError_DuplicateIdentitiesSplitsHeaderAndRows(t *testing.
 	assert.Contains(t, details, "opmodel.dev/v1alpha1 TransformerRegistration backup-system/backup-system.k8up")
 	assert.Contains(t, details, `component "registration"`)
 	assert.Contains(t, details, `component "registration-copy"`)
+}
+
+func TestRefusalHint(t *testing.T) {
+	unresolved := &kernel.RenderError{Err: &liberrors.UnresolvedDemandsError{Demands: []liberrors.UnresolvedDemand{
+		{Component: "web", Kind: "trait", FQN: "opmodel.dev/core/contracts/backup@v1#Backup"},
+	}}}
+	unmatched := &kernel.RenderError{Err: &liberrors.UnmatchedComponentsError{}}
+	deps := platform.Resolution{Source: platform.SourceModuleDeps}
+	depsWithCatalog := platform.Resolution{Source: platform.SourceModuleDeps, Catalogs: []string{"opmodel.dev/catalogs/opm@v4 v4.4.0"}}
+	flag := platform.Resolution{Source: platform.SourceFlagDir}
+
+	tests := []struct {
+		name string
+		err  error
+		res  platform.Resolution
+		want string
+	}{
+		{"unresolved demand against the deps names the platform flag", fmt.Errorf("wrapped: %w", unresolved), depsWithCatalog, moduleDepsProviderHint},
+		{"unmatched with no catalog names tidy", unmatched, deps, moduleDepsNoCatalogHint},
+		{"unmatched with a catalog has no hint", unmatched, depsWithCatalog, ""},
+		{"a flag platform has no hint", unresolved, flag, ""},
+		{"a flag platform with no catalog has no hint", unmatched, flag, ""},
+		{"another refusal has no hint", errors.New("boom"), deps, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, refusalHint(tt.err, tt.res))
+		})
+	}
+	assert.Contains(t, moduleDepsProviderHint, "--platform <dir>")
+	assert.Contains(t, moduleDepsNoCatalogHint, "'opm module tidy'")
+	assert.Contains(t, moduleDepsNoCatalogHint, "--platform <dir>")
 }

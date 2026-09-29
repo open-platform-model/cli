@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
@@ -15,6 +16,8 @@ import (
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/platform"
+	"github.com/open-platform-model/cli/pkg/loader"
 )
 
 // FromModule synthesizes an instance from a module-package directory through
@@ -85,9 +88,21 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
+	// The author's platform is generated from the module's own deps unless
+	// --platform names one; the deps are read from the acquired source.
+	moduleRoot := moduleContextRoot(opts.ModulePath)
+	var deps *platform.ModuleDeps
+	if opts.PlatformFromDeps && opts.PlatformFlag == "" {
+		deps, err = moduleDepsOf(mod.Source, moduleRoot)
+		if err != nil {
+			printValidationError(err)
+			return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+		}
+	}
+
 	// Platform resolution + acquisition only after synthesis validated the
 	// values: cheap failures never hit the cluster or registry.
-	env, err := resolvePlatformEnv(ctx, k, opts.Config, opts.PlatformFlag, opts.ClusterPlatform)
+	env, err := resolvePlatformEnv(ctx, k, opts.Config, opts.PlatformFlag, opts.ClusterPlatform, deps)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +111,33 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	// local), so render provenance is local (0006:D7). The module
 	// directory is the 0010:D19 module context: a replaced dependency in its own
 	// cue.mod is worded from the kernel's rows after the render.
-	return renderInstance(ctx, env, inst, opts.K8sConfig, moduleContextRoot(opts.ModulePath), true)
+	return renderInstance(ctx, env, inst, opts.K8sConfig, moduleRoot, true)
+}
+
+// moduleDepsOf reads what a module-deps platform is generated from out of
+// the acquired module's source: the committed cue.mod/module.cue from the
+// overlay, and the replacements of the local module context at moduleRoot.
+// A module with no local context (moduleRoot "", a published module) carries
+// no replacements.
+func moduleDepsOf(src *module.Source, moduleRoot string) (*platform.ModuleDeps, error) {
+	if src == nil || src.Root == "" {
+		return nil, fmt.Errorf("module carries no source tree to read its dependency pins from")
+	}
+	name := filepath.Join(src.Root, "cue.mod", "module.cue")
+	data, ok := src.Overlay[name]
+	if !ok {
+		return nil, fmt.Errorf("module source carries no %s", name)
+	}
+	replacements, err := loader.LocalReplacements(moduleRoot)
+	if err != nil {
+		return nil, err
+	}
+	return &platform.ModuleDeps{
+		ModFile:      data,
+		ModFileName:  name,
+		Replacements: replacements,
+		ModuleRoot:   moduleRoot,
+	}, nil
 }
 
 // defaultNamespace is the synthetic-instance namespace when no
@@ -104,8 +145,9 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 const defaultNamespace = "default"
 
 // syntheticIdentity derives the synthetic instance identity: caller-supplied
-// name or "<module.metadata.name>-debug"; namespace from --namespace/env
-// override, else "default".
+// name or "<module.metadata.name>-debug" with every "_" hyphenated (a module
+// name is a CUE package name, "my_app"; an instance name is a DNS label);
+// namespace from --namespace/env override, else "default".
 func syntheticIdentity(mod *module.Module, opts ModuleOpts, namespace string) (modName, synthName, synthNamespace string) {
 	if mod.Metadata != nil {
 		modName = mod.Metadata.Name
@@ -115,7 +157,7 @@ func syntheticIdentity(mod *module.Module, opts ModuleOpts, namespace string) (m
 	}
 	synthName = opts.Name
 	if synthName == "" {
-		synthName = modName + "-debug"
+		synthName = strings.ReplaceAll(modName, "_", "-") + "-debug"
 	}
 	synthNamespace = defaultNamespace
 	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {

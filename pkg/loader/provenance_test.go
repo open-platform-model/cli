@@ -149,3 +149,44 @@ func TestHasLocalModuleReplacement_MalformedCountsAsLocal(t *testing.T) {
 func TestHasLocalModuleReplacement_EmptyRootIsFalse(t *testing.T) {
 	assert.False(t, HasLocalModuleReplacement(""))
 }
+
+func TestLocalReplacements_TargetVersion(t *testing.T) {
+	tests := []struct {
+		name  string
+		local string
+		want  []LocalReplacement
+	}{
+		{
+			name:  "directory target carries no version",
+			local: `deps: "example.com/lib@v0": replaceWith: "../lib"`,
+			want:  []LocalReplacement{{Path: "example.com/lib@v0", ReplaceWith: "../lib"}},
+		},
+		{
+			name: "major-only module target takes the file's pin",
+			local: `deps: {
+	"example.com/lib@v0": replaceWith: "example.com/fork@v0"
+	"example.com/fork@v0": v: "v0.3.0"
+}`,
+			want: []LocalReplacement{{Path: "example.com/lib@v0", ReplaceWith: "example.com/fork@v0", TargetVersion: "v0.3.0"}},
+		},
+		{
+			name:  "full-version module target carries its own",
+			local: `deps: "example.com/lib@v0": replaceWith: "example.com/fork@v0.2.0"`,
+			want:  []LocalReplacement{{Path: "example.com/lib@v0", ReplaceWith: "example.com/fork@v0.2.0", TargetVersion: "v0.2.0"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			entries, err := LocalReplacements(writeModuleRoot(t, tt.local))
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, entries)
+		})
+	}
+}
+
+func TestIsDirectoryTarget(t *testing.T) {
+	assert.True(t, IsDirectoryTarget("./lib"))
+	assert.True(t, IsDirectoryTarget("../lib"))
+	assert.True(t, IsDirectoryTarget("/abs/lib"))
+	assert.False(t, IsDirectoryTarget("example.com/fork@v0"))
+}
