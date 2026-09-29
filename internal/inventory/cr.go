@@ -59,6 +59,12 @@ const (
 	AnnotationSource = "module-instance.opmodel.dev/source"
 	// SourceLocal is the AnnotationSource value stamped for local renders.
 	SourceLocal = "local"
+	// AnnotationSkippedContracts records the provider-fulfilled contracts
+	// the last apply skipped under --skip-unprovided, as sorted,
+	// deduplicated "<component>=<fqn>" pairs joined with commas. Absent when
+	// the last apply skipped nothing. Information for whoever inspects the
+	// instance, never an authority any gate reads.
+	AnnotationSkippedContracts = "module-instance.opmodel.dev/skipped-contracts"
 )
 
 // LabelInstanceUUID is the label the render stamps on every resource carrying

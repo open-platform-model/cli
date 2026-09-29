@@ -20,6 +20,7 @@ import (
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
+	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
 )
 
@@ -125,4 +126,45 @@ func TestWriteInstanceRecord_StatusFailureRetainsLegacySecret(t *testing.T) {
 			t.Fatalf("a delete was issued against the legacy Secret before the status write succeeded: %#v", a)
 		}
 	}
+}
+
+// The spec write records the render's skipped demands as the
+// skipped-contracts annotation, "<component>=<fqn>" pairs; a render that
+// skipped nothing writes no annotation.
+func TestWriteInstanceRecord_RecordsSkippedContracts(t *testing.T) {
+	annotationsWritten := func(t *testing.T, skipped []kernel.SkippedDemand) map[string]string {
+		t.Helper()
+		var specPatch []byte
+		client := clientWithFailingStatusWrite(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "unrelated", Namespace: "default"}},
+			func(p []byte) { specPatch = p })
+		req := Request{
+			Result: &workflowrender.Result{
+				Instance: module.InstanceMetadata{Name: "hello", Namespace: "default", UUID: "uuid-1"},
+				Module:   module.ModuleMetadata{ModulePath: "example.com/modules/hello@v0", Name: "hello", Version: "0.1.0"},
+				Skipped:  skipped,
+			},
+			K8sClient: client,
+			Log:       output.InstanceLogger("skipped-test"),
+		}
+		// The status write fails by design of the fake; the spec write
+		// before it is what this test reads.
+		_ = WriteInstanceRecord(context.Background(), req, nil, nil, nil, "sha256:x", req.Log)
+		require.NotNil(t, specPatch, "the spec apply must have been issued")
+		var applied struct {
+			Metadata struct {
+				Annotations map[string]string `json:"annotations"`
+			} `json:"metadata"`
+		}
+		require.NoError(t, json.Unmarshal(specPatch, &applied))
+		return applied.Metadata.Annotations
+	}
+
+	got := annotationsWritten(t, []kernel.SkippedDemand{
+		{Component: "db", FQN: "opmodel.dev/catalogs/opm/traits/backup@v1alpha1", Kind: "trait"},
+	})
+	require.Equal(t, map[string]string{
+		inventory.AnnotationSkippedContracts: "db=opmodel.dev/catalogs/opm/traits/backup@v1alpha1",
+	}, got)
+
+	require.Empty(t, annotationsWritten(t, nil), "nothing skipped: no annotation, so SSA removes a prior one")
 }

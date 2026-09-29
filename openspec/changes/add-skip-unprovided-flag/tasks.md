@@ -16,10 +16,10 @@
 
 ## 3. Record skips on apply
 
-- [ ] 3.1 `internal/inventory/store.go`: add `AnnotationSkippedContracts` and `SpecInput.SkippedContracts`; `ApplySpec` sets one annotations map holding the source and skipped annotations; unit tests cover both annotations together, sorting and deduplication, and omission when empty
-- [ ] 3.2 `internal/workflow/apply`: fill `SkippedContracts` from `Result.Skipped` as `<component>=<fqn>`; refuse `--skip-unprovided` with exit 2 before `executeThinEditor` writes anything for an operator-managed instance; unit tests for both
-- [ ] 3.3 Integration on `kind-opm-dev`: `opm instance apply --skip-unprovided` of an instance of the section-2 test module stamps the annotation; a re-apply of the same instance with the `backup` value false clears it; verify `task test:integration`
-- [ ] 3.4 `task lint` and `task test` green, then commit `feat(apply): record skipped provider contracts on the ModuleInstance`
+- [x] 3.1 `internal/inventory/store.go`: add `AnnotationSkippedContracts` and `SpecInput.SkippedContracts`; `ApplySpec` sets one annotations map holding the source and skipped annotations; unit tests cover both annotations together, sorting and deduplication, and omission when empty
+- [x] 3.2 `internal/workflow/apply`: fill `SkippedContracts` from `Result.Skipped` as `<component>=<fqn>`; refuse `--skip-unprovided` with exit 2 before `executeThinEditor` writes anything for an operator-managed instance; unit tests for both
+- [x] 3.3 Integration on `kind-opm-dev`: `opm instance apply --skip-unprovided` of an instance of the section-2 test module stamps the annotation; a re-apply of the same instance with the `backup` value false clears it; verify `task test:integration`
+- [x] 3.4 `task lint` and `task test` green, then commit `feat(apply): record skipped provider contracts on the ModuleInstance`
 
 ## 4. Document the flag
 

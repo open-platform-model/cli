@@ -33,6 +33,11 @@ type Options struct {
 	// in CLI-executor mode, which does its own applying. Zero uses
 	// inventory.DefaultReconcileTimeout.
 	Timeout time.Duration
+
+	// SkipUnprovided is the command's --skip-unprovided. An operator-managed
+	// instance refuses it: the operator renders that instance and never
+	// skips.
+	SkipUnprovided bool
 }
 
 type Request struct {
@@ -259,13 +264,14 @@ func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory
 	modulePath, moduleVersion := workflowrender.CanonicalModuleRef(result.Module)
 
 	if _, err := inventory.ApplySpec(ctx, req.K8sClient, inventory.SpecInput{
-		Name:          name,
-		Namespace:     namespace,
-		Owner:         inventory.OwnerCLI,
-		ModulePath:    modulePath,
-		ModuleVersion: moduleVersion,
-		Values:        result.Values,
-		SourceLocal:   result.SourceLocal,
+		Name:             name,
+		Namespace:        namespace,
+		Owner:            inventory.OwnerCLI,
+		ModulePath:       modulePath,
+		ModuleVersion:    moduleVersion,
+		Values:           result.Values,
+		SourceLocal:      result.SourceLocal,
+		SkippedContracts: SkippedContracts(result),
 	}); err != nil {
 		instanceLog.Warn("failed to write ModuleInstance spec", "error", err)
 		return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
@@ -301,6 +307,20 @@ func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory
 	// write succeeds, so a failure leaves the Secret authoritative for a re-run.
 	cleanupLegacySecret(ctx, req.K8sClient, name, namespace, instanceID, legacy, instanceLog)
 	return nil
+}
+
+// SkippedContracts is the render's skipped demands as the
+// "<component>=<fqn>" pairs the skipped-contracts annotation records, in
+// build order; nil when the render skipped nothing.
+func SkippedContracts(result *workflowrender.Result) []string {
+	if len(result.Skipped) == 0 {
+		return nil
+	}
+	pairs := make([]string, 0, len(result.Skipped))
+	for _, s := range result.Skipped {
+		pairs = append(pairs, s.Component+"="+s.FQN)
+	}
+	return pairs
 }
 
 func cleanupLegacySecret(ctx context.Context, client *kubernetes.Client, name, namespace, instanceID string, legacy *inventory.LegacyInventory, instanceLog *log.Logger) {

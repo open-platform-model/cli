@@ -102,8 +102,15 @@ func previewThinEditor(req Request, rec *inventory.Record) error {
 // The operator fetches modules from the registry, so a render whose bytes came
 // from a local checkout or a local replacement describes something it cannot
 // obtain — writing that spec would strand the instance on a reference the
-// operator fails to resolve. Refused before any write.
+// operator fails to resolve. Refused before any write. So is
+// --skip-unprovided: the operator renders the instance and never skips a
+// provider-fulfilled contract, so the flag could not take effect.
 func resolveThinEditRef(req Request, name, namespace string) (path, version string, err error) {
+	if req.Options.SkipUnprovided {
+		return "", "", &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: fmt.Errorf(
+			"--skip-unprovided has no effect on instance %q: the opm-operator renders it and does not skip provider-fulfilled contracts. Install a provider for the contract instead",
+			name)}
+	}
 	if req.Result.SourceLocal {
 		return "", "", &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: fmt.Errorf(
 			"instance %q in namespace %q is operator-managed, but this apply resolves its module from local bytes — the operator can only fetch published modules; publish the module and re-apply",

@@ -168,3 +168,37 @@ func TestApplySpec_ProvenanceAnnotation(t *testing.T) {
 	metadata, _ = rec.body["metadata"].(map[string]any)
 	assert.NotContains(t, metadata, "annotations", "a registry render must clear the annotation")
 }
+
+// The skipped-contracts annotation rides in the same annotations map as the
+// provenance one; its pairs are sorted and deduplicated, and an apply that
+// skipped nothing omits it so SSA clears a prior record.
+func TestApplySpec_SkippedContractsAnnotation(t *testing.T) {
+	annotationsOf := func(t *testing.T, in SpecInput) map[string]any {
+		t.Helper()
+		client, rec := newApplyPatchClient(t, 1)
+		in.Name, in.Namespace, in.Owner, in.ModulePath, in.ModuleVersion = "demo", "demo", OwnerCLI, "p", "v"
+		_, err := ApplySpec(context.Background(), client, in)
+		require.NoError(t, err)
+		metadata, ok := rec.body["metadata"].(map[string]any)
+		require.True(t, ok)
+		annotations, _ := metadata["annotations"].(map[string]any)
+		return annotations
+	}
+
+	both := annotationsOf(t, SpecInput{SourceLocal: true, SkippedContracts: []string{
+		"db=opmodel.dev/catalogs/opm/traits/backup@v1alpha1",
+		"archive=example.dev/r/store@v1alpha1",
+		"db=opmodel.dev/catalogs/opm/traits/backup@v1alpha1",
+	}})
+	assert.Equal(t, map[string]any{
+		AnnotationSource:           SourceLocal,
+		AnnotationSkippedContracts: "archive=example.dev/r/store@v1alpha1,db=opmodel.dev/catalogs/opm/traits/backup@v1alpha1",
+	}, both)
+
+	skippedOnly := annotationsOf(t, SpecInput{SkippedContracts: []string{"db=x@v1"}})
+	assert.Equal(t, map[string]any{AnnotationSkippedContracts: "db=x@v1"}, skippedOnly)
+
+	assert.Nil(t, annotationsOf(t, SpecInput{}), "nothing skipped and a registry render: no annotations")
+	sourceOnly := annotationsOf(t, SpecInput{SourceLocal: true, SkippedContracts: []string{}})
+	assert.NotContains(t, sourceOnly, AnnotationSkippedContracts)
+}

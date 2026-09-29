@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
@@ -77,4 +78,34 @@ func TestPreviewThinEditor_RefusesLocalSourceModule(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "local bytes")
+}
+
+// The operator renders an operator-managed instance and never skips, so
+// --skip-unprovided is refused as a validation error before any spec write,
+// on the real edit and on the dry-run preview alike. The request carries no
+// client: reaching a write would panic.
+func TestThinEditor_RefusesSkipUnprovided(t *testing.T) {
+	result := &workflowrender.Result{
+		Instance: module.InstanceMetadata{Name: "hello", Namespace: "demo"},
+		Module: module.ModuleMetadata{
+			ModulePath: "testing.opmodel.dev/modules/cli/podinfo@v0", Name: "podinfo", Version: "0.1.4",
+		},
+	}
+	req := operatorOwnedRequest(result)
+	req.Options.SkipUnprovided = true
+	rec := &inventory.Record{Owner: inventory.OwnerOperator, Name: "hello", Namespace: "demo"}
+
+	for name, run := range map[string]func() error{
+		"apply":   func() error { return executeThinEditor(context.Background(), req, rec) },
+		"dry-run": func() error { return previewThinEditor(req, rec) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := run()
+			require.Error(t, err)
+			var exitErr *opmexit.ExitError
+			require.ErrorAs(t, err, &exitErr)
+			assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
+			assert.Equal(t, `--skip-unprovided has no effect on instance "hello": the opm-operator renders it and does not skip provider-fulfilled contracts. Install a provider for the contract instead`, err.Error())
+		})
+	}
 }

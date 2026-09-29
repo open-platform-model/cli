@@ -171,6 +171,7 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 			CreateNS:               opts.createNS,
 			NoPrune:                opts.noPrune,
 			Force:                  opts.force,
+			SkipUnprovided:         rf.SkipUnprovided,
 			SuccessUpToDateMessage: "Instance up to date",
 			SuccessAppliedMessage:  "Instance applied",
 		},
