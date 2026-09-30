@@ -111,7 +111,7 @@ follow-ups:  <work found outside this change's repo; "none">
 2. **Check each report.** Compare `deviations` and `surface` against `design.md` and the interface above. Send a worker back with a precise ask rather than fixing its branch yourself.
 3. **Finalize each change.** For each, in the worktree: `openspec archive <change> --yes`, commit the archive (`chore(openspec): archive <change>`), push, open the PR per the repo's `AGENTS.md`. Merge order: A, then B, then C and D; E whenever it is green. After A merges, merge the core release PR that release-please opens and note the released version; after B merges, do the same for the library release PR.
 4. **Wave 2.** Once A is released, launch B's worker with the core version. Do NOT run the workspace root `task deps:update` yet. Run it once B is released, and land its per-repo output (`fix(deps)` / `test(fixtures)` per the workspace commit skill). This departs from the previous set on purpose: a kernel older than B renders a colliding platform pinned to A's core (duplicate objects, measured), so no workspace platform moves to A's core before a refusing kernel exists.
-5. **Wave 3.** Once B's branch is pushed, launch C's and D's workers. Until B is released they develop against B's pushed head as a Go pseudo-version. Once B is released, tell each worker the version; it rebases on `origin/main`, pins the release, reruns its gates and pushes. Then finalize C and D as in step 3.
+5. **Wave 3.** Once B's branch is pushed, launch C's and D's workers. Until B is released they develop against B's pushed head as a Go pseudo-version. Once B is released, tell each worker the version; it merges `origin/main`, pins the release, reruns its gates and pushes. Then finalize C and D as in step 3.
 6. **Follow-ups.** Run the out-of-repo follow-ups each change's `orchestration.md` lists, after the merge they wait on.
 
 Every PR follows its repo's `AGENTS.md`: a body of at most 250 words, no bare `@name`, only the plain co-author trailer. Merging, releasing and pushing to `main` need the user's go-ahead.
@@ -122,7 +122,7 @@ Every PR follows its repo's `AGENTS.md`: a body of at most 250 words, no bare `@
 
 **Worktree setup (cli).**
 
-- Branch `fix/name-contract-collisions` from `origin/main`, worktree at `cli/.claude/worktrees/name-contract-collisions`. The planning commit (`chore(openspec): plan name-contract-collisions`) is already on this branch; rebase it onto fresh `origin/main` before section 1 and again before section 3 (the release pin).
+- Branch `fix/name-contract-collisions` from `origin/main`, worktree at `cli/.claude/worktrees/name-contract-collisions`. The planning commit (`chore(openspec): plan name-contract-collisions`) is already on this branch; merge it onto fresh `origin/main` before section 1 and again before section 3 (the release pin).
 - Export the workspace registry mapping in two lines (a one-line `export A=x B="$A"` leaves `OPM_REGISTRY` empty):
 
   ```bash
@@ -150,7 +150,7 @@ Every PR follows its repo's `AGENTS.md`: a body of at most 250 words, no bare `@
 
 - **A's release** (expected core `v2.0.0-alpha.13`) resolving from GHCR, and **B's pushed head** (`feat/refuse-colliding-contracts`) for sections 1 and 2. Task 1.1 stops if either is missing.
 - **B's release** for section 3 (use the version the supervisor reports). If B's report under `surface` renames any of `ContractInventory.Collisions`, `CollidingEntries`, `errors.ContractCollision` (fields `Key`, `Catalogs`), `errors.ContractCollisionsError`, `errors.NotRoutableError`, `RenderDiagnostics.Collisions` or `UnresolvedDemand.Colliding`, code against B's names and list the difference under `deviations`.
-- Rebase over C or E if either has merged (no file overlap: they are operator changes).
+- Merge origin/main if C or E has merged (no file overlap: they are operator changes).
 
 **Hands off:** nothing to another change. Under `surface`, report: the `opm platform check` report lines (the `colliding contracts: N` section, its `defined by  ` rows and omission note, the routable verdict wording), the exit message, the render collision row text, the unresolved `Colliding` wording, and the library version pinned.
 
