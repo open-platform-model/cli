@@ -70,7 +70,7 @@ colliding contracts: 2
     defined by  testing.opmodel.dev/catalogs/base@v1, testing.opmodel.dev/catalogs/base@v2
   testing.opmodel.dev/catalogs/base/traits/backup@v1alpha1
     defined by  testing.opmodel.dev/catalogs/base@v1, testing.opmodel.dev/catalogs/base@v2
-  (a colliding contract is left out of the defined, required and unfulfilled sections; enable one major of the catalog)
+  (a colliding contract is left out of the defined, required, unfulfilled and comparable sections; keep one of its defining entries enabled)
 ```
 
 Keys iterate `sortedCopy(r.Collisions)`; entries print `sortedCopy(r.CollidingEntries[key])` joined by `, `, like every other list in the report, never trusting the inventory's order. The header line is `colliding contracts: N` with `N = len(r.Collisions)`.
@@ -117,7 +117,7 @@ Development runs against B's pushed head as a Go pseudo-version (`go get github.
 ### 8. Section plan
 
 1. **Red first, then platform check names collisions** (`fix(platform)`): the colliding fixtures and command tests, red on library alpha.35 and red on B's head; the report, help and exit message; unit and command tests green.
-2. **The render words a collision** (`fix(render)`): the collision row first, the unresolved `Colliding` case, the hint guard; printer and formatter unit tests and an e2e `opm instance build --platform` on a copy of `hack/platform` re-pinned to A's core with a second entry (`testing.opmodel.dev/catalogs/opm-shadow@v1`) listing the opm catalog's resources and traits, with and without `--skip-unprovided`, all red first.
+2. **The render words a collision** (`fix(render)`): the collision row first, the unresolved `Colliding` case, the hint guard; printer and formatter unit tests and an e2e `opm instance build --platform` on a copy of `hack/platform` re-pinned to A's core with a second entry (`testing.opmodel.dev/catalogs/opm-shadow@v1`) listing a hand-authored member carrying the opm container resource's FQN (never the opm catalog's own stamped `#resources`/`#traits` values: `#Catalog` stamps `metadata.modulePath` and `catalogVersion`, so re-listing them conflicts, measured in review), with and without `--skip-unprovided`, all red first.
 3. **Pin B's release** (`fix(deps)`): the release replaces the pseudo-version; full gates.
 
 ## Command surface
@@ -136,7 +136,7 @@ colliding contracts: 2
     defined by  testing.opmodel.dev/catalogs/base@v1, testing.opmodel.dev/catalogs/base@v2
   testing.opmodel.dev/catalogs/base/traits/backup@v1alpha1
     defined by  testing.opmodel.dev/catalogs/base@v1, testing.opmodel.dev/catalogs/base@v2
-  (a colliding contract is left out of the defined, required and unfulfilled sections; enable one major of the catalog)
+  (a colliding contract is left out of the defined, required, unfulfilled and comparable sections; keep one of its defining entries enabled)
 
 fulfilled: yes
 routable:  no <separator> 2 contracts collide, 0 over-subscribed
