@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-alpha.26](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.25...v1.0.0-alpha.26) (2026-09-30)
+
+
+### Bug Fixes
+
+* **platform:** name colliding contracts in platform check and render refusals ([#244](https://github.com/open-platform-model/cli/issues/244)) ([721c715](https://github.com/open-platform-model/cli/commit/721c715182df5b578dd047a05b066113cee9af05))
+
 ## [1.0.0-alpha.25](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.24...v1.0.0-alpha.25) (2026-09-30)
 
 
