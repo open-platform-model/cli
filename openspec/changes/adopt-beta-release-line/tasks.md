@@ -74,12 +74,18 @@ Target versions below are expected values: if a gate lands on a different versio
 
 ## 6. Fixture pins on the beta line (hack/, examples/) [PR-C, own branch, gate G3]
 
-- [ ] 6.1 Create a second worktree: `git -C /var/home/emil/dev/open-platform-model/cli fetch origin && git -C /var/home/emil/dev/open-platform-model/cli worktree add /var/home/emil/dev/open-platform-model/cli/.claude/worktrees/beta-cli-fixture-pins -b beta/cli-fixture-pins origin/main`. Verify: it is clean and its `HEAD` equals `git -C /var/home/emil/dev/open-platform-model/cli rev-parse origin/main` taken after the fetch.
-- [ ] 6.2 **SUPERVISOR PATCH** (`task deps:update`, hack and examples hunks only): `git apply` it in that worktree. Verify: `hack/platform/cue.mod/module.cue` pins core `v2.0.0-beta.1`, catalogs/k8s `v1.0.0-beta.1`, catalogs/opm `v4.4.4`; `hack/kind-platform.yaml` mirrors both catalog versions (`"4.4.4"`, `"1.0.0-beta.1"`); `examples/cue.mod/module.cue` pins core `v2.0.0-beta.1` and opm `v4.4.4`; nothing under `templates/`, `tests/fixtures` or `go.mod` changed.
-- [ ] 6.3 Prove the dev platform and the collision seed on the new pins: `env -u OPM_CONFIG go test ./tests/e2e -run 'CollidingPlatform|InstanceBuild' -v` and `go test ./internal/cmd/platform/...` (the colliding fixtures pin `collisionCoreVersion` alpha.13 on purpose; `seedCollidingPlatform` keeps a newer hack pin). Verify: all pass; a failure caused by beta core semantics is reported, not patched around.
-- [ ] 6.4 `task fmt`, `task lint`, `task test` green in that worktree, then commit `test(fixtures): pin the dev platform and examples to the beta line`.
-- [ ] 6.5 Push (`git push -u origin beta/cli-fixture-pins`) and open PR-C titled exactly `test(fixtures): pin the dev platform and examples to the beta line`, body under 250 words, no footer. Verify: pr-title and mention-guard green. Tick this box on the change branch.
-- [ ] 6.6 **SUPERVISOR** merges PR-C after G3 (preferably before PR-B, so PR-B's final CI runs on the beta dev platform) with a supervisor-written squash body (not the default commit list) and no `Release-As` (grep the message for `release-as`, case-insensitive, abort on a hit; check with `check-merge-msg.js`). The FX run follows once PR-C and the opm-operator sample-platform PR have merged.
+- [x] 6.1 Create a second worktree: `git -C /var/home/emil/dev/open-platform-model/cli fetch origin && git -C /var/home/emil/dev/open-platform-model/cli worktree add /var/home/emil/dev/open-platform-model/cli/.claude/worktrees/beta-cli-fixture-pins -b beta/cli-fixture-pins origin/main`. Verify: it is clean and its `HEAD` equals `git -C /var/home/emil/dev/open-platform-model/cli rev-parse origin/main` taken after the fetch.
+  - Recorded: worktree `beta-cli-fixture-pins` created; HEAD equalled origin/main `776ae91` after the fetch.
+- [x] 6.2 **SUPERVISOR PATCH** (`task deps:update`, hack and examples hunks only): `git apply` it in that worktree. Verify: `hack/platform/cue.mod/module.cue` pins core `v2.0.0-beta.1`, catalogs/k8s `v1.0.0-beta.1`, catalogs/opm `v4.4.4`; `hack/kind-platform.yaml` mirrors both catalog versions (`"4.4.4"`, `"1.0.0-beta.1"`); `examples/cue.mod/module.cue` pins core `v2.0.0-beta.1` and opm `v4.4.4`; nothing under `templates/`, `tests/fixtures` or `go.mod` changed.
+  - Recorded: `run2-cli-fixtures.patch` applied unchanged; only `examples/cue.mod/module.cue`, `hack/platform/cue.mod/module.cue` and `hack/kind-platform.yaml` changed.
+- [x] 6.3 Prove the dev platform and the collision seed on the new pins: `env -u OPM_CONFIG go test ./tests/e2e -run 'CollidingPlatform|InstanceBuild' -v` and `go test ./internal/cmd/platform/...` (the colliding fixtures pin `collisionCoreVersion` alpha.13 on purpose; `seedCollidingPlatform` keeps a newer hack pin). Verify: all pass; a failure caused by beta core semantics is reported, not patched around.
+  - Recorded: the `CollidingPlatform|InstanceBuild` e2e subset and `go test ./internal/cmd/platform/...` passed; `cue mod tidy --check` and `cue vet` clean in `examples` and `hack/platform`. Reviewer run: `tests/integration/platform-build` passed on the beta pins (k8s 1.0.0-beta.1, opm 4.4.4).
+- [x] 6.4 `task fmt`, `task lint`, `task test` green in that worktree, then commit `test(fixtures): pin the dev platform and examples to the beta line`.
+  - Recorded: fmt unchanged, lint 0 issues, `task test:unit` passed, local e2e 49 pass / 4 skip / 0 fail (the four kind-backed cases skip without a kubeconfig, locally and in CI).
+- [x] 6.5 Push (`git push -u origin beta/cli-fixture-pins`) and open PR-C titled exactly `test(fixtures): pin the dev platform and examples to the beta line`, body under 250 words, no footer. Verify: pr-title and mention-guard green. Tick this box on the change branch.
+  - Recorded: PR-C is cli #253, head `fbac365`; all 12 PR checks green.
+- [x] 6.6 **SUPERVISOR** merges PR-C after G3 (preferably before PR-B, so PR-B's final CI runs on the beta dev platform) with a supervisor-written squash body (not the default commit list) and no `Release-As` (grep the message for `release-as`, case-insensitive, abort on a hit; check with `check-merge-msg.js`). The FX run follows once PR-C and the opm-operator sample-platform PR have merged.
+  - Recorded: PR-C merged as #253 (`c2644d3`) with a supervisor-written squash body, no footer.
 
 ## 7. Verify, archive and open the carrier PR [PR-B]
 
@@ -95,7 +101,9 @@ fix(deps): move the cli to the beta line on library v1.0.0-beta.1
 Links library v1.0.0-beta.1, so the default core is v2.0.0-beta.1.
 Ships templates 1.0.3 on core v2.0.0-beta.1 and catalogs/opm 4.4.4,
 embeds opm-operator v1.0.0-alpha.22, moves release-please to the beta
-prerelease line and flags prerelease tags as GitHub Pre-releases.
+prerelease line and flags prerelease tags as GitHub Pre-releases. The
+advanced template now sets an update strategy on its worker and cache,
+so it passes opm module vet before 1.0.3 publishes.
 
 Release-As: 1.0.0-beta.1
 Co-Authored-By: Claude <noreply@anthropic.com>
