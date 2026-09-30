@@ -173,3 +173,21 @@ func TestPrintValidationError_RoutesUnresolvedDemands(t *testing.T) {
 	require.True(t, errors.As(wrapped, &demandsErr))
 	assert.NotPanics(t, func() { PrintValidationError("validation failed", wrapped) })
 }
+
+// TestFormatUnresolvedDemands_CollidingNamesTheEntries covers a demand on a
+// contract key more than one enabled registry entry defines: the row carries
+// no defining catalog, and "nothing implements" would be false, so it names
+// the entries defining the key.
+func TestFormatUnresolvedDemands_CollidingNamesTheEntries(t *testing.T) {
+	got := FormatUnresolvedDemands([]liberrors.UnresolvedDemand{
+		{
+			Component: "web",
+			FQN:       "opmodel.dev/catalogs/opm/resources/container@v1beta1",
+			Kind:      "resource",
+			Colliding: []string{"opmodel.dev/catalogs/opm@v4", "testing.opmodel.dev/catalogs/opm-shadow@v1"},
+		},
+	})
+
+	assert.Contains(t, got, "  defined by more than one enabled registry entry: opmodel.dev/catalogs/opm@v4, testing.opmodel.dev/catalogs/opm-shadow@v1")
+	assert.NotContains(t, got, "nothing on this platform implements this contract")
+}

@@ -19,10 +19,12 @@ const renderFailedMsg = "render failed"
 
 // printValidationError prints a render failure in a user-friendly format.
 //
-// A *kernel.RenderError (the fail-closed gate after the build: unresolved
-// demands, unmatched components, an over-subscribed provider contract, a
-// failed pair) prints the kernel's message followed by the diagnostics rows
-// it carries. A skew refusal (*liberrors.SkewError, before evaluation)
+// A *kernel.RenderError (the fail-closed gate after the build: a contract
+// collision, unresolved demands, an over-subscribed provider contract,
+// unmatched components, a not-routable platform no row explains, a failed
+// pair) prints the kernel's message followed by the diagnostics rows it
+// carries; a not-routable refusal carries no row, so its message is the
+// whole output. A skew refusal (*liberrors.SkewError, before evaluation)
 // prints the kernel's message verbatim: it already names the path and both
 // versions. An older-core refusal (*liberrors.PlatformCoreTooOldError, before
 // staging) prints verbatim too: the library's message names the platform,
@@ -88,12 +90,20 @@ const (
 // command; a generated platform pins the verified core, so no other source
 // gets that hint. An unresolved demand the kernel marks unprovided names the
 // three ways out, whatever the platform source.
+// A contract collision gets no hint, checked first: the unresolved rows are
+// read against an inventory the collision distorts (a colliding key has no
+// defining catalog), so a provider hint would misdirect, and the collision
+// row already names the fix.
 // Otherwise, against a platform generated from the render's own deps (a
 // module's or an instance package's), an unresolved demand names the
 // provider-fulfilled route through --platform, and an unmatched component
 // under a platform with no catalog names the missing pin and the tidy
 // command for the kind.
 func refusalHint(err error, res platform.Resolution) string {
+	var collision *liberrors.ContractCollisionsError
+	if errors.As(err, &collision) {
+		return ""
+	}
 	var tooOld *liberrors.PlatformCoreTooOldError
 	if errors.As(err, &tooOld) {
 		if res.Source == platform.SourceFlagDir {
@@ -135,8 +145,10 @@ func anyUnprovided(demands []liberrors.UnresolvedDemand) bool {
 }
 
 // formatRenderDiagnostics renders the refusing rows of a render's
-// diagnostics as one block, in the existing validation-output style: each
-// unresolved demand with its same-base alternatives, each unmatched
+// diagnostics as one block, in the existing validation-output style: first
+// each colliding contract key with the registry entries defining it (its
+// fix comes before any other, and every other row is read against the
+// inventory it distorts), then each unresolved demand with its same-base alternatives, each unmatched
 // component, each over-subscribed contract key with the catalogs competing
 // for it, and each matched pair whose transformer output failed. Rows that
 // did not refuse (matched pairs, unhandled traits, version rows) are not
@@ -149,6 +161,9 @@ func anyUnprovided(demands []liberrors.UnresolvedDemand) bool {
 // default output keeps its one line per component.
 func formatRenderDiagnostics(d kernel.RenderDiagnostics, verbose bool) string {
 	var b strings.Builder
+	for _, c := range d.Collisions {
+		fmt.Fprintf(&b, "contract %q: defined by more than one enabled registry entry: %s\n", c.Key, strings.Join(c.Catalogs, ", "))
+	}
 	if len(d.Unresolved) > 0 {
 		b.WriteString(cmdutil.FormatUnresolvedDemands(d.Unresolved))
 		b.WriteString("\n")
