@@ -12,7 +12,7 @@ The release workflow SHALL trigger on `push` to `main` and on `workflow_dispatch
 - **THEN** release-please creates the tag and the GitHub Release and reports `releases_created == 'true'` with the new `tag_name`
 
 #### Scenario: Line change forced by a footer
-- **WHEN** the manifest holds `1.0.0-alpha.27` and a commit whose final footer is `Release-As: 1.0.0-beta.1` lands on main
+- **WHEN** the manifest holds `1.0.0-alpha.27` and a commit whose final footer paragraph carries `Release-As: 1.0.0-beta.1` lands on main
 - **THEN** release-please opens or retitles the release PR as `chore(main): release 1.0.0-beta.1`
 
 #### Scenario: Next release stays on the beta line
