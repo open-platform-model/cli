@@ -26,6 +26,10 @@ jobs:
         with:
           version: v2.11.3
           args: --timeout=5m
+          # A run restored whole from the action's cache has reported
+          # //nolint:staticcheck directives as unused (nolintlint) that a full
+          # analysis of the same commit uses, so lint runs uncached.
+          skip-cache: true
 
   unit:
     name: Unit Tests
