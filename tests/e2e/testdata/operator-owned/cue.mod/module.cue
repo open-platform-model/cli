@@ -7,10 +7,10 @@ source: {
 }
 deps: {
 	"opmodel.dev/catalogs/opm@v4": {
-		v: "v4.0.1"
+		v: "v4.4.4"
 	}
 	"opmodel.dev/core@v2": {
-		v: "v2.0.0-alpha.6"
+		v: "v2.0.0-beta.1"
 	}
 	"testing.opmodel.dev/modules/cli/podinfo@v0": {
 		v: "v0.1.11"
