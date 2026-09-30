@@ -6,7 +6,7 @@
 | **Created** | 2026-02-16                         |
 | **Authors** | OPM Contributors                   |
 
-> **Superseded in part (2026-09-24):** the site is built with Astro, Starlight and the Black theme in `opmodel.dev`, not Hugo and Docsy. Everything below about Hugo, Docsy, Hugo modules and content adapters no longer applies. The `docgen` extraction design still does.
+> **Superseded in part (2026-09-30):** the site is built in `opmodel.dev` with Hugo and the Hextra theme, vendored as files, not with Docsy through a Hugo module. Everything below about Docsy no longer applies. The `docgen` extraction design still does, and so does the idea of generating definition pages with a Hugo content adapter (`_content.gotmpl`), which is not built yet.
 
 ## Summary
 

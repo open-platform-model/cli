@@ -50,11 +50,11 @@ These replace the `task lint` and `task test` gates that `openspec instructions 
 
 ## 2. Say the site is built with Hugo and Hextra in RFC 0006
 
-- [ ] 2.1 Replace line 9 of `<wt>/docs/rfc/0006-documentation-generation.md`, the line that starts `> **Superseded in part (2026-09-24):**`. The new line is the exact text in design.md, "The RFC banner". Keep the blank lines 8 and 10. Verify:
+- [x] 2.1 Replace line 9 of `<wt>/docs/rfc/0006-documentation-generation.md`, the line that starts `> **Superseded in part (2026-09-24):**`. The new line is the exact text in design.md, "The RFC banner". Keep the blank lines 8 and 10. Verify:
   - `sed -n 9p <wt>/docs/rfc/0006-documentation-generation.md` prints the new line.
   - `grep -n -i -e astro -e starlight <wt>/docs/rfc/0006-documentation-generation.md` prints nothing.
   - `git -C <wt> diff --stat -- docs/rfc` shows one file, with 1 insertion and 1 deletion.
-- [ ] 2.2 Run the gates. Verify:
+- [x] 2.2 Run the gates. Verify:
   - The lint still prints `opm-dialect-lint: OK (...)`.
   - The order diff, run as in 1.4, still prints `order unchanged`.
   - `git -C <wt> diff --check` prints nothing.
