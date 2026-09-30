@@ -168,7 +168,13 @@ func TestResolveInstanceArg_RegistryBackedInstancePackage(t *testing.T) {
 		t.Skipf("fixture not found: %v", statErr)
 	}
 
-	cfg := &config.GlobalConfig{Registry: config.DefaultRegistry}
+	// OPM_REGISTRY when set: PR CI seeds the tree's fixtures into a job-local
+	// registry, and the fixture package pins the tree's fixture version.
+	registry := config.DefaultRegistry
+	if r := os.Getenv("OPM_REGISTRY"); r != "" {
+		registry = r
+	}
+	cfg := &config.GlobalConfig{Registry: registry}
 	for _, arg := range []string{dir, filepath.Join(dir, "instance.cue")} {
 		got, err := ResolveInstanceArg(context.Background(), arg, cfg)
 		skipIfRegistryUnavailable(t, err)
