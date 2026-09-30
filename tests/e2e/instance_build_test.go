@@ -15,6 +15,7 @@ import (
 	"cuelang.org/go/mod/modfile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/mod/semver"
 
 	"github.com/open-platform-model/library/opm/schema"
 
@@ -312,9 +313,10 @@ _shadowCatalog: core.#Catalog & {
 #registry: (_shadowCatalog.metadata.modulePath): #catalog: _shadowCatalog
 `
 
-// seedCollidingPlatform writes a copy of hack/platform/ re-pinned to
-// collisionCorePin with a second entry defining the opm container
-// resource's key, so the key has two enabled definers.
+// seedCollidingPlatform writes a copy of hack/platform/ with a second entry
+// defining the opm container resource's key, so the key has two enabled
+// definers. A hack/platform pin older than collisionCorePin is re-pinned to
+// it; a pin at or past it is kept, so a routine deps bump never breaks this.
 func seedCollidingPlatform(t *testing.T) string {
 	t.Helper()
 	dir := seedPlatform(t)
@@ -323,9 +325,11 @@ func seedCollidingPlatform(t *testing.T) string {
 	require.NoError(t, err)
 	corePin := modDeps(t, modFile)["opmodel.dev/core@v2"]
 	require.NotEmpty(t, corePin, "hack/platform must pin core")
-	repinned := strings.Replace(string(content), `v: "`+corePin+`"`, `v: "`+collisionCorePin+`"`, 1)
-	require.NotEqual(t, string(content), repinned)
-	require.NoError(t, os.WriteFile(modFile, []byte(repinned), 0o600))
+	if semver.Compare(corePin, collisionCorePin) < 0 {
+		repinned := strings.Replace(string(content), `v: "`+corePin+`"`, `v: "`+collisionCorePin+`"`, 1)
+		require.NotEqual(t, string(content), repinned)
+		require.NoError(t, os.WriteFile(modFile, []byte(repinned), 0o600))
+	}
 
 	platformFile := filepath.Join(dir, "platform.cue")
 	body, err := os.ReadFile(platformFile)
