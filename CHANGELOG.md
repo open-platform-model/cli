@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0-alpha.27](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.26...v1.0.0-alpha.27) (2026-09-30)
+
+
+### Bug Fixes
+
+* **deps:** bump the templates to catalogs/opm 4.4.3 ([d5b5c01](https://github.com/open-platform-model/cli/commit/d5b5c01ad913b43c74a6501539168f488ef78980))
+* **deps:** bump the templates to core v2.0.0-alpha.13 and catalogs/opm 4.4.2 ([5d372c0](https://github.com/open-platform-model/cli/commit/5d372c06cadb2261f9590c690b759e8299c48de4))
+
+
+### Documentation
+
+* **site:** adopt the hugo page dialect ([#246](https://github.com/open-platform-model/cli/issues/246)) ([7d8f44b](https://github.com/open-platform-model/cli/commit/7d8f44b68a86f86ae7a79dfd42a8236bba4e2cb8))
+
 ## [1.0.0-alpha.26](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.25...v1.0.0-alpha.26) (2026-09-30)
 
 
