@@ -159,8 +159,10 @@ func TestResolveInstanceArg_ImportFreeInstancePackage(t *testing.T) {
 
 // TestResolveInstanceArg_RegistryBackedInstancePackage acquires the
 // operator-owned e2e fixture, a renderable instance package that imports
-// core and the podinfo fixture module from GHCR, through the kernel with the
-// shipped default registry, and skips when the registry is unreachable.
+// core and the podinfo fixture module, through the kernel. It resolves them
+// from the registry OPM_REGISTRY names (in PR CI, the job-local registry
+// seeded from the tree), else from the shipped default registry, and skips
+// when the registry is unreachable.
 func TestResolveInstanceArg_RegistryBackedInstancePackage(t *testing.T) {
 	dir, err := filepath.Abs(filepath.Join("..", "..", "tests", "e2e", "testdata", "operator-owned"))
 	require.NoError(t, err)
