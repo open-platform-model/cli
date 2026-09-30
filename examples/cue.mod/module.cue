@@ -13,6 +13,6 @@ deps: {
 		v: "v2.0.0-beta.1"
 	}
 	"testing.opmodel.dev/modules/cli/podinfo@v0": {
-		v: "v0.1.10"
+		v: "v0.1.11"
 	}
 }
