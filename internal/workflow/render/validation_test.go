@@ -125,6 +125,39 @@ func TestPrintValidationError_CoreTooOldVerbatim(t *testing.T) {
 	assert.Contains(t, logs, tooOld.Error(), "the library's message names the platform, the field and the release")
 }
 
+// A collision refuses the render first, platform-wide, and its fix comes
+// before any other: its rows print ahead of every other refusing row,
+// naming the registry entries defining each key as the kernel carries them.
+func TestFormatRenderDiagnostics_CollisionsPrintFirst(t *testing.T) {
+	d := kernel.RenderDiagnostics{
+		Collisions: []liberrors.ContractCollision{
+			{Key: "opmodel.dev/catalogs/opm/resources/container@v1beta1", Catalogs: []string{"opmodel.dev/catalogs/opm@v4", "testing.opmodel.dev/catalogs/opm-shadow@v1"}},
+			{Key: "opmodel.dev/catalogs/opm/traits/expose@v1beta1", Catalogs: []string{"opmodel.dev/catalogs/opm@v4", "testing.opmodel.dev/catalogs/opm-shadow@v1"}},
+		},
+		Unresolved: []liberrors.UnresolvedDemand{
+			{Component: "web", Kind: "trait", FQN: "opmodel.dev/catalogs/opm/traits/backup@v1alpha1"},
+		},
+	}
+
+	got := formatRenderDiagnostics(d, false)
+	lines := strings.Split(got, "\n")
+	require.GreaterOrEqual(t, len(lines), 3, got)
+	assert.Equal(t, `contract "opmodel.dev/catalogs/opm/resources/container@v1beta1": defined by more than one enabled registry entry: opmodel.dev/catalogs/opm@v4, testing.opmodel.dev/catalogs/opm-shadow@v1`, lines[0])
+	assert.Equal(t, `contract "opmodel.dev/catalogs/opm/traits/expose@v1beta1": defined by more than one enabled registry entry: opmodel.dev/catalogs/opm@v4, testing.opmodel.dev/catalogs/opm-shadow@v1`, lines[1])
+	assert.Equal(t, `component "web": unresolved trait demand "opmodel.dev/catalogs/opm/traits/backup@v1alpha1"`, lines[2])
+}
+
+// A not-routable refusal carries no row: the kernel's message under the
+// render-failed header is the whole output.
+func TestPrintValidationError_NotRoutablePrintsTheKernelMessage(t *testing.T) {
+	notRoutable := &liberrors.NotRoutableError{}
+	logs, details := captureValidationOutput(t, &kernel.RenderError{Err: notRoutable})
+
+	assert.Contains(t, logs, "render failed")
+	assert.Contains(t, logs, notRoutable.Error())
+	assert.Empty(t, details)
+}
+
 func TestFormatRenderDiagnostics_EmptyIsEmpty(t *testing.T) {
 	assert.Empty(t, formatRenderDiagnostics(kernel.RenderDiagnostics{Pairs: []kernel.RenderPair{{Component: "web", Transformer: "x"}}}, true),
 		"matched pairs are not refusals and are not repeated")
@@ -211,6 +244,16 @@ func TestRefusalHint(t *testing.T) {
 	cluster := platform.Resolution{Source: platform.SourceClusterCR}
 	flag := platform.Resolution{Source: platform.SourceFlagDir}
 	flagDir := platform.Resolution{Source: platform.SourceFlagDir, Location: "/work/p", Dir: "/work/p"}
+	// Under a collision the unresolved rows are read against a distorted
+	// inventory, so no provider hint is added beside it.
+	colliding := &kernel.RenderError{Err: errors.Join(
+		&liberrors.ContractCollisionsError{Contracts: []liberrors.ContractCollision{
+			{Key: "opmodel.dev/catalogs/opm/resources/container@v1beta1", Catalogs: []string{"opmodel.dev/catalogs/opm@v4", "testing.opmodel.dev/catalogs/opm-shadow@v1"}},
+		}},
+		&liberrors.UnresolvedDemandsError{Demands: []liberrors.UnresolvedDemand{
+			{Component: "web", Kind: "resource", FQN: "opmodel.dev/catalogs/opm/resources/container@v1beta1", Colliding: []string{"opmodel.dev/catalogs/opm@v4", "testing.opmodel.dev/catalogs/opm-shadow@v1"}},
+		}},
+	)}
 	tooOld := fmt.Errorf("render refused before staging: %w",
 		&liberrors.PlatformCoreTooOldError{Platform: "p", Field: "providedBy", Since: "2.0.0-alpha.12"})
 
@@ -238,6 +281,7 @@ func TestRefusalHint(t *testing.T) {
 		{"an older-core --platform directory names the re-pin", tooOld, flagDir, platform.CoreRepinHint("/work/p")},
 		{"an older-core cluster platform has no hint", tooOld, cluster, ""},
 		{"an older-core deps platform has no hint", tooOld, depsWithCatalog, ""},
+		{"a collision against the deps has no hint", colliding, depsWithCatalog, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -70,11 +70,14 @@ func PrintValidationError(msg string, err error) {
 // (0015:D18): "defined by this catalog and implemented by
 // nothing" is a different situation from a contract no enabled catalog
 // defines at all, and the row has carried the distinction since library
-// v1.0.0-alpha.30. A row without a defining catalog keeps its wording
-// unchanged.
+// v1.0.0-alpha.30. A row whose contract key more than one enabled registry
+// entry defines (a collision, so no single defining catalog) names those
+// entries instead of saying nothing implements it. A row without a defining
+// catalog keeps its wording unchanged.
 func FormatUnresolvedDemands(demands []liberrors.UnresolvedDemand) string {
 	var b strings.Builder
-	for _, d := range demands {
+	for i := range demands {
+		d := &demands[i]
 		fmt.Fprintf(&b, "component %q: unresolved %s demand %q\n", d.Component, d.Kind, d.FQN)
 		switch {
 		case len(d.Alternatives) > 0 && d.DefinedBy != "":
@@ -84,6 +87,8 @@ func FormatUnresolvedDemands(demands []liberrors.UnresolvedDemand) string {
 			fmt.Fprintf(&b, "  implemented at: %s\n", strings.Join(d.Alternatives, ", "))
 		case d.DefinedBy != "":
 			fmt.Fprintf(&b, "  defined by %q, implemented by nothing on this platform\n", d.DefinedBy)
+		case len(d.Colliding) > 0:
+			fmt.Fprintf(&b, "  defined by more than one enabled registry entry: %s\n", strings.Join(d.Colliding, ", "))
 		default:
 			b.WriteString("  nothing on this platform implements this contract\n")
 		}

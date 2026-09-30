@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/open-platform-model/library/opm/schema"
+
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/platform"
@@ -273,9 +275,104 @@ type: "kubernetes"
 	assert.Empty(t, stdout, "nothing is rendered when the render is refused before staging")
 	assert.Contains(t, stderr, "render failed")
 	assert.Contains(t, stderr, "providedBy")
-	assert.Contains(t, stderr, "2.0.0-alpha.12")
+	assert.Contains(t, stderr, schema.ProvidedBySince)
 	assert.Contains(t, stderr, "the platform module at "+platformDir)
-	assert.Contains(t, stderr, "cue mod get opmodel.dev/core@v2.0.0-alpha.12")
+	// The re-pin names the core release the kernel was verified against.
+	assert.Contains(t, stderr, "cue mod get opmodel.dev/core@"+schema.DefaultSchemaVersion())
+}
+
+// collisionCorePin is the first core release that evaluates a platform whose
+// enabled entries share contract keys, reporting them as collisions.
+const collisionCorePin = "v2.0.0-alpha.13"
+
+// shadowCatalogEntry is a second registry entry listing a hand-authored
+// member under the opm catalog's container resource FQN. The member is
+// authored here rather than re-listed from the opm package: the opm members
+// carry opm's own modulePath and catalogVersion, which the shadow catalog's
+// stamp would conflict with.
+const shadowCatalogEntry = `
+
+_shadowContainer: core.#Resource & {
+	metadata: {
+		name:       "container"
+		apiVersion: "v1beta1"
+		fqn:        "opmodel.dev/catalogs/opm/resources/container@v1beta1"
+	}
+	spec: container: image: string
+}
+
+_shadowCatalog: core.#Catalog & {
+	metadata: {
+		modulePath: "testing.opmodel.dev/catalogs/opm-shadow@v1"
+		version:    "1.0.0"
+	}
+	#resources: (_shadowContainer.metadata.fqn): _shadowContainer
+}
+
+#registry: (_shadowCatalog.metadata.modulePath): #catalog: _shadowCatalog
+`
+
+// seedCollidingPlatform writes a copy of hack/platform/ re-pinned to
+// collisionCorePin with a second entry defining the opm container
+// resource's key, so the key has two enabled definers.
+func seedCollidingPlatform(t *testing.T) string {
+	t.Helper()
+	dir := seedPlatform(t)
+	modFile := filepath.Join(dir, filepath.FromSlash(config.PlatformModuleFileName))
+	content, err := os.ReadFile(modFile)
+	require.NoError(t, err)
+	corePin := modDeps(t, modFile)["opmodel.dev/core@v2"]
+	require.NotEmpty(t, corePin, "hack/platform must pin core")
+	repinned := strings.Replace(string(content), `v: "`+corePin+`"`, `v: "`+collisionCorePin+`"`, 1)
+	require.NotEqual(t, string(content), repinned)
+	require.NoError(t, os.WriteFile(modFile, []byte(repinned), 0o600))
+
+	platformFile := filepath.Join(dir, "platform.cue")
+	body, err := os.ReadFile(platformFile)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(platformFile, append(body, []byte(shadowCatalogEntry)...), 0o600))
+	return dir
+}
+
+// A platform whose enabled entries share a contract key is refused whatever
+// the instance, with or without --skip-unprovided, and the refusal prints a
+// row per colliding key naming the entries, ahead of every other row.
+func TestE2E_InstanceBuild_CollidingPlatformIsRefused(t *testing.T) {
+	_, instanceFile := podinfoExample(t)
+	home := seedRenderHome(t)
+	platformDir := seedCollidingPlatform(t)
+
+	for _, tc := range []struct {
+		name  string
+		extra []string
+	}{
+		{"default", nil},
+		{"skip unprovided", []string{"--skip-unprovided"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			args := append([]string{"instance", "build", instanceFile, "--platform", platformDir}, tc.extra...)
+			stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second, args...)
+			require.Error(t, err, "stdout: %s", stdout)
+
+			assert.Equal(t, opmexit.ExitValidationError, exitCode(t, err), "stderr: %s", stderr)
+			assert.Empty(t, stdout, "nothing is rendered for a colliding platform")
+			assert.Contains(t, stderr, "render failed")
+			row := `contract "opmodel.dev/catalogs/opm/resources/container@v1beta1": defined by more than one enabled registry entry: opmodel.dev/catalogs/opm@v4, testing.opmodel.dev/catalogs/opm-shadow@v1`
+			assert.Contains(t, stderr, row)
+			assert.NotContains(t, stderr, "Hint:")
+
+			// The details block follows the kernel's message; its first
+			// line is a collision row.
+			var first string
+			for _, line := range strings.Split(stderr, "\n") {
+				if strings.HasPrefix(line, "contract ") || strings.HasPrefix(line, "component ") {
+					first = line
+					break
+				}
+			}
+			assert.Equal(t, row, first, "stderr: %s", stderr)
+		})
+	}
 }
 
 // libModulePath is a module no registry serves: the never-published

@@ -208,6 +208,10 @@ Read when entering `cli/`:
   `<component>=<fqn>` pairs, omitted and so cleared by server-side apply when
   nothing was skipped), and refuse the flag for an operator-managed instance,
   since the operator renders it and never skips.
+  A platform whose enabled registry entries share a contract key is refused
+  by the kernel whatever the instance and whatever `--skip-unprovided` says;
+  the CLI prints the kernel's collision rows first
+  (`render.formatRenderDiagnostics`) and adds no hint.
 - Integration + CUE workflows need registry config. Follow the Registry Policy in the root `AGENTS.md` — both `opmodel.dev/*` and `testing.opmodel.dev/*` resolve from GHCR:
 
 ```bash

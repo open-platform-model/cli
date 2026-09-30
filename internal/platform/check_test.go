@@ -18,6 +18,11 @@ const (
 	container = "opmodel.dev/catalogs/opm/resources/container@v1beta1"
 	backup    = "opmodel.dev/catalogs/opm/traits/backup@v1alpha1"
 
+	catBaseV1 = "testing.opmodel.dev/catalogs/base@v1"
+	catBaseV2 = "testing.opmodel.dev/catalogs/base@v2"
+
+	collisionNote = "(a colliding contract is left out of the defined, required, unfulfilled and comparable sections; keep one of its defining entries enabled)"
+
 	deployment = "opmodel.dev/catalogs/opm/transformers/deployment@1.0.0"
 	schedule   = "opmodel.dev/catalogs/k8up/transformers/schedule@2.0.0"
 	mirror     = "opmodel.dev/catalogs/velero/transformers/mirror@1.4.0"
@@ -44,6 +49,8 @@ func TestReportRender(t *testing.T) {
 		inv     *libplatform.ContractInventory
 		present []string
 		absent  []string
+		// ordered, when set, are substrings that must appear in this order.
+		ordered []string
 	}{
 		{
 			name: "clean",
@@ -209,6 +216,66 @@ func TestReportRender(t *testing.T) {
 			},
 		},
 		{
+			// Two majors of one catalog list the same keys: nothing is
+			// defined or provided, and the platform is still not a
+			// vacuous one. fulfilled and discriminated read yes (core
+			// computes them without the colliding keys); routable does not.
+			name: "collision only",
+			inv: &libplatform.ContractInventory{
+				DefinedBy:  map[string]string{},
+				RequiredBy: map[string][]string{},
+				ProvidedBy: map[string][]string{},
+				Collisions: []string{container, backup},
+				CollidingEntries: map[string][]string{
+					container: {catBaseV1, catBaseV2},
+					backup:    {catBaseV1, catBaseV2},
+				},
+				Fulfilled:     true,
+				Routable:      false,
+				Discriminated: true,
+			},
+			present: []string{
+				"defined contracts: 0",
+				"colliding contracts: 2",
+				"  " + container + "\n    defined by  " + catBaseV1 + ", " + catBaseV2,
+				"  " + backup + "\n    defined by  " + catBaseV1 + ", " + catBaseV2,
+				collisionNote,
+				"fulfilled: yes",
+				"routable:  no — 2 contracts collide, 0 over-subscribed",
+				"discriminated: yes",
+			},
+			absent: []string{"vacuously", "define no contracts", "0 contracts are over-subscribed", "over-subscribed contracts:"},
+		},
+		{
+			// A collision on one key and an over-subscription on another,
+			// each under its own heading, the colliding one first.
+			name: "collision and over-subscription",
+			inv: &libplatform.ContractInventory{
+				DefinedBy:        map[string]string{backup: catBaseV1},
+				RequiredBy:       map[string][]string{backup: {schedule, mirror}},
+				ProvidedBy:       map[string][]string{backup: {catVel, catK8up}},
+				OverSubscribed:   []string{backup},
+				Collisions:       []string{container},
+				CollidingEntries: map[string][]string{container: {catBaseV1, catBaseV2}},
+				Fulfilled:        true,
+				Routable:         false,
+				Discriminated:    true,
+			},
+			present: []string{
+				"colliding contracts: 1",
+				"over-subscribed contracts: 1",
+				"routable:  no — 1 contract collides, 1 over-subscribed",
+			},
+			absent: []string{"1 contract is over-subscribed", "vacuously"},
+			ordered: []string{
+				"colliding contracts: 1",
+				container,
+				collisionNote,
+				"over-subscribed contracts: 1",
+				"provided by  " + catK8up + ", " + catVel,
+			},
+		},
+		{
 			name: "empty inventory",
 			inv: &libplatform.ContractInventory{
 				DefinedBy:     map[string]string{},
@@ -238,6 +305,14 @@ func TestReportRender(t *testing.T) {
 			for _, unwanted := range tt.absent {
 				assert.NotContains(t, got, unwanted)
 			}
+			rest := got
+			for _, want := range tt.ordered {
+				i := strings.Index(rest, want)
+				if !assert.NotEqual(t, -1, i, "%q out of order in:\n%s", want, got) {
+					break
+				}
+				rest = rest[i+len(want):]
+			}
 			assert.True(t, strings.HasPrefix(got, "platform: "), "the provenance line comes first")
 			assert.False(t, strings.HasSuffix(got, "\n"), "render is not newline-terminated")
 		})
@@ -256,6 +331,20 @@ func TestEmptyInventoryRenderIsUnchanged(t *testing.T) {
 		Routable:      true,
 		Discriminated: true,
 	}).Render()
+
+	// The library decodes an absent collision report as empty; an empty
+	// one reads exactly as none.
+	withEmptyCollisions := NewReport(flagRes(), &libplatform.ContractInventory{
+		DefinedBy:        map[string]string{},
+		RequiredBy:       map[string][]string{},
+		ProvidedBy:       map[string][]string{},
+		Collisions:       []string{},
+		CollidingEntries: map[string][]string{},
+		Fulfilled:        true,
+		Routable:         true,
+		Discriminated:    true,
+	}).Render()
+	assert.Equal(t, got, withEmptyCollisions)
 
 	want := "platform: /home/u/platforms/staging (--platform)\n" +
 		"\nthe enabled catalogs define no contracts — nothing was verified here.\n" +
@@ -299,6 +388,24 @@ func TestReportRenderIsDeterministic(t *testing.T) {
 	require.Equal(t,
 		NewReport(flagRes(), provided(catK8up, catVel)).Render(),
 		NewReport(flagRes(), provided(catVel, catK8up)).Render())
+
+	// The colliding keys, and the entries defining each, print sorted
+	// whatever order the inventory hands them over in.
+	colliding := func(keys, entries []string) *libplatform.ContractInventory {
+		return &libplatform.ContractInventory{
+			Collisions: keys,
+			CollidingEntries: map[string][]string{
+				container: entries,
+				backup:    {catBaseV1, catBaseV2},
+			},
+			Fulfilled:     true,
+			Routable:      false,
+			Discriminated: true,
+		}
+	}
+	require.Equal(t,
+		NewReport(flagRes(), colliding([]string{container, backup}, []string{catBaseV1, catBaseV2})).Render(),
+		NewReport(flagRes(), colliding([]string{backup, container}, []string{catBaseV2, catBaseV1})).Render())
 }
 
 // TestComparableRowsRenderInAStableOrder pins that the comparable section does
@@ -373,6 +480,19 @@ func TestRoutableIsAGateAndFulfilledIsNot(t *testing.T) {
 		Discriminated:  true,
 	})
 	assert.False(t, overSubscribed.Routable(), "over-subscription is what platform-package generation refuses on")
+
+	// A colliding key leaves the defined contracts, so the fulfilled
+	// verdict can read yes while the platform is not routable: routable is
+	// the gate the collision fails.
+	colliding := NewReport(flagRes(), &libplatform.ContractInventory{
+		Collisions:       []string{container},
+		CollidingEntries: map[string][]string{container: {catBaseV1, catBaseV2}},
+		Fulfilled:        true,
+		Routable:         false,
+		Discriminated:    true,
+	})
+	assert.False(t, colliding.Routable(), "a colliding contract key fails the routable gate")
+	assert.Contains(t, colliding.Render(), "fulfilled: yes", "the fulfilled verdict is printed as the inventory carries it")
 
 	assert.True(t, NewReport(flagRes(), cleanInv()).Routable())
 }
