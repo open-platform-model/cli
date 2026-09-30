@@ -28,8 +28,10 @@ Builds the resolved platform module and reports the contract inventory core
 derives from it: every contract the enabled catalogs define and the catalog
 that defines each, the transformers that implement it, the provider-fulfilled
 contracts nothing implements, the provider-fulfilled contracts required by
-transformers from more than one catalog, and every pair of transformers whose
-match predicates are comparable over a shared catalog-fulfilled contract.
+transformers of more than one enabled registry entry, with the registry keys
+providing each (two majors of one catalog are two entries), and every pair of
+transformers whose match predicates are comparable over a shared
+catalog-fulfilled contract.
 
 The command applies and renders nothing. It contacts a cluster only to read
 its Platform, when neither [dir] nor --platform is given. A cold module cache

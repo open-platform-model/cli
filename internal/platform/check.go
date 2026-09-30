@@ -36,8 +36,16 @@ type Report struct {
 	// transformer implements.
 	Unfulfilled []string
 
-	// OverSubscribed lists the provider-fulfilled contracts required by
-	// transformers from more than one catalog.
+	// ProvidedBy maps every provider-fulfilled contract FQN some enabled
+	// transformer requires, defined by an enabled catalog or not, to the
+	// registry keys (catalog path plus major) of the enabled entries whose
+	// transformers require it. It is the provider count the platform's core
+	// derives and the render enforces; the report prints it and never
+	// recounts it.
+	ProvidedBy map[string][]string
+
+	// OverSubscribed lists the keys of [Report.ProvidedBy] with two or more
+	// registry entries. Two majors of one catalog are two entries.
 	OverSubscribed []string
 
 	// Comparable lists every pair of enabled transformers whose match
@@ -63,6 +71,7 @@ func NewReport(res Resolution, inv *libplatform.ContractInventory) Report {
 		Resolution:     res,
 		Defined:        inv.DefinedBy,
 		RequiredBy:     inv.RequiredBy,
+		ProvidedBy:     inv.ProvidedBy,
 		Unfulfilled:    inv.Unfulfilled,
 		OverSubscribed: inv.OverSubscribed,
 		Comparable:     inv.Comparable,
@@ -91,7 +100,7 @@ func (r Report) Render() string {
 	var b strings.Builder
 	b.WriteString(r.Resolution.Describe() + "\n")
 
-	if len(r.Defined) == 0 {
+	if len(r.Defined) == 0 && len(r.ProvidedBy) == 0 {
 		b.WriteString("\nthe enabled catalogs define no contracts — nothing was verified here.\n" +
 			"A platform whose catalogs populate no contract maps produces an empty\n" +
 			"inventory, which is not the same answer as a platform whose contracts all\n" +
@@ -103,6 +112,10 @@ func (r Report) Render() string {
 	}
 
 	fmt.Fprintf(&b, "\ndefined contracts: %d\n", len(r.Defined))
+	if len(r.Defined) == 0 {
+		b.WriteString("  The enabled catalogs define no contracts. The provider counts below come\n" +
+			"  from the enabled transformers' own requirements.\n")
+	}
 	for _, fqn := range sortedKeys(r.Defined) {
 		fmt.Fprintf(&b, "  %s\n", fqn)
 		fmt.Fprintf(&b, "    defined by      %s\n", r.Defined[fqn])
@@ -122,12 +135,13 @@ func (r Report) Render() string {
 
 	if len(r.OverSubscribed) > 0 {
 		fmt.Fprintf(&b, "\nover-subscribed contracts: %d\n", len(r.OverSubscribed))
-		b.WriteString("  Provider-fulfilled contracts required by transformers from more than one\n" +
-			"  catalog. A platform package cannot be generated from this platform until\n" +
-			"  one of the competing catalogs is disabled.\n")
+		b.WriteString("  Provider-fulfilled contracts required by transformers of more than one\n" +
+			"  enabled registry entry. Two majors of one catalog are two entries. A\n" +
+			"  platform package cannot be generated from this platform until all but one\n" +
+			"  of the providing entries is disabled.\n")
 		for _, fqn := range sortedCopy(r.OverSubscribed) {
 			fmt.Fprintf(&b, "  %s%s\n", fqn, definedByClause(r.Defined[fqn]))
-			fmt.Fprintf(&b, "    required by  %s\n", joinOrNothing(r.RequiredBy[fqn]))
+			fmt.Fprintf(&b, "    provided by  %s\n", strings.Join(sortedCopy(r.ProvidedBy[fqn]), ", "))
 		}
 	}
 
@@ -182,10 +196,12 @@ func sortedRows(rows []libplatform.ComparablePredicates) []libplatform.Comparabl
 	return out
 }
 
-// definedByClause names the defining catalog when the contract carries one.
+// definedByClause names the defining catalog, or says no enabled catalog
+// defines the contract: a provider-fulfilled contract is counted, and can be
+// over-subscribed, whether or not its defining catalog is enabled.
 func definedByClause(catalog string) string {
 	if catalog == "" {
-		return ""
+		return " (defined by no enabled catalog)"
 	}
 	return " (defined by " + catalog + ")"
 }
