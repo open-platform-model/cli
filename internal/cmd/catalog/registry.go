@@ -58,10 +58,10 @@ The report lists the catalog's members per kind and apiVersion.
 
 	Examples:
 	  # Verify a published build's identity and see what it contains
-	  opm catalog registry check opmodel.dev/catalogs/opm@v2.0.0-alpha.3
+	  opm catalog registry check opmodel.dev/catalogs/opm@v4.4.4
 
 	  # Additionally check it kept its published contracts
-	  opm catalog registry check opmodel.dev/catalogs/opm@v2.0.0-alpha.3 --compat`,
+	  opm catalog registry check opmodel.dev/catalogs/opm@v4.4.4 --compat`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			report, err := publish.RegistryCheck(c.Context(), publish.CheckOptions{
