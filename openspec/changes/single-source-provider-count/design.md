@@ -115,8 +115,13 @@ Development runs against B's pushed head as a Go pseudo-version (`go get github.
 ### 5. Section plan
 
 1. **Red first, then the report names the providers** (`fix(platform)`): the three inline fixture platforms and their command tests run red on library alpha.34 (exit 0 on both bug shapes) and red on B's head (vacuous wording, no `provided by`); the pseudo-version pin; the report change; unit and command tests green.
-2. **An older core is a re-pin** (`fix(render)`): `CoreRepinHint`, the check's `DetailError`, the render printer and hint, the typed-error assertions on the existing alpha.6 and alpha.9 check tests, a new alpha.11 check test and an e2e older-core `--platform` render.
-3. **Pin B's release** (`fix(deps)!` with a `BREAKING CHANGE:` footer): the release replaces the pseudo-version; full gates on `kind-opm-dev`.
+2. **The deps platform keeps its generated pins** (`fix(platform)`): § 6, added during section 1.
+3. **An older core is a re-pin** (`fix(render)`): `CoreRepinHint`, the check's `DetailError`, the render printer and hint, the typed-error assertions on the existing alpha.6 and alpha.9 check tests, a new alpha.11 check test and an e2e older-core `--platform` render.
+4. **Pin B's release** (`fix(deps)!` with a `BREAKING CHANGE:` footer): the release replaces the pseudo-version; full gates on `kind-opm-dev`. As delivered, B's release was out before section 1 pinned the library, so section 1 pinned it and carries the `BREAKING CHANGE:` footer as `fix(platform)!`; section 4 needs no commit and runs only its gates.
+
+### 6. The deps platform's local module file carries every generated pin
+
+Found in section 1's e2e gate: `TestE2E_InstanceBuild_InstanceDepsHonorThePackageReplacement` failed with `platform "module-deps" carries no "providedBy"`. `carryReplacements` (`internal/platform/moduledeps.go`) wrote the generated module's `cue.mod/local-module.cue` with only the replaced paths. In main-module mode `cue/load` (cue v0.17.1, `modfile.ParseLocal`) takes the dependency list from the local file alone, restoring version and default mark from `module.cue` only for a path the local file names, so core resolved from the replaced catalog checkout's own pin (`v2.0.0-alpha.10`) rather than the generated floor (`v2.0.0-alpha.12`), and B's floor refused the render. The local file now lists every dependency of the generated module file, with `replaceWith` only on the replaced paths (`FormatLocal` omits the versions and default marks `module.cue` already states). The e2e fixture's catalog keeps its older core pin: that is the real-world case (a catalog checkout pinning an older core than the kernel floors to). Its own section, before the re-pin section, with a red unit test first.
 
 ## Command surface
 
@@ -142,7 +147,7 @@ Hint: the platform module at ./p pins a core release older than this opm reads: 
 
 ## Migration Plan
 
-Pre-GA. The `BREAKING CHANGE:` footer on the section 3 commit says: platform modules passed with `--platform` or to `opm platform check` must pin `opmodel.dev/core` at `v2.0.0-alpha.12` or later (`cue mod get opmodel.dev/core@v2.0.0-alpha.12` in the module); platforms enabling two majors of one provider catalog, or two providers of a contract whose defining catalog is disabled or absent, now fail `opm platform check` (every render on them already failed). Rollback is reverting the change; the library pin is the only coupling.
+Pre-GA. The `BREAKING CHANGE:` footer on the commit that pins B's release (section 1, as delivered) says: platform modules passed with `--platform` or to `opm platform check` must pin `opmodel.dev/core` at `v2.0.0-alpha.12` or later (`cue mod get opmodel.dev/core@v2.0.0-alpha.12` in the module); platforms enabling two majors of one provider catalog, or two providers of a contract whose defining catalog is disabled or absent, now fail `opm platform check` (every render on them already failed). Rollback is reverting the change; the library pin is the only coupling.
 
 ## Research & Decisions
 

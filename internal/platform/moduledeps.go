@@ -223,6 +223,14 @@ func majorPath(target, version string) string {
 // pins, and returns what it carried. Nothing is added when nothing is
 // carried. A module-path target is written major-qualified, with its version
 // as a dependency entry of its own, the form cue/load resolves it from.
+//
+// The local file lists every dependency of the generated module file, and
+// adds replaceWith only on the replaced paths. In main-module mode cue/load
+// takes the dependency list from the local file alone (version and default
+// mark fall back to the module file only for a path the local file names), so
+// a pin the local file omits would resolve from the replaced module's own
+// requirements: core at a catalog checkout's pin rather than the floored
+// release the platform was generated with.
 func carryReplacements(files platformmodule.Files, targets map[string]loader.LocalReplacement) (map[string]string, error) {
 	carried := map[string]string{}
 	if len(targets) == 0 {
@@ -232,7 +240,10 @@ func carryReplacements(files platformmodule.Files, targets map[string]loader.Loc
 	if err != nil {
 		return nil, fmt.Errorf("reading the generated module file: %w", err)
 	}
-	local := &modfile.File{Module: base.Module, Language: base.Language, Deps: map[string]*modfile.Dep{}}
+	local := &modfile.File{Module: base.Module, Language: base.Language, Deps: make(map[string]*modfile.Dep, len(base.Deps))}
+	for path, dep := range base.Deps {
+		local.Deps[path] = &modfile.Dep{Version: dep.Version, Default: dep.Default}
+	}
 	for path, rep := range targets {
 		dep, pinned := base.Deps[path]
 		if !pinned {
@@ -249,7 +260,7 @@ func carryReplacements(files platformmodule.Files, targets map[string]loader.Loc
 				local.Deps[target] = &modfile.Dep{Version: mv.Version()}
 			}
 		}
-		local.Deps[path] = &modfile.Dep{Version: dep.Version, ReplaceWith: target}
+		local.Deps[path] = &modfile.Dep{Version: dep.Version, Default: dep.Default, ReplaceWith: target}
 		carried[path] = target
 	}
 	if len(carried) == 0 {

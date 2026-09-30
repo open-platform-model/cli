@@ -98,7 +98,7 @@ Every PR follows its repo's `AGENTS.md`: a body of at most 250 words, no bare `@
 
 **Worktree setup (cli).**
 
-- Branch `fix/single-source-provider-count` from `origin/main`, worktree at `cli/.claude/worktrees/single-source-provider-count`. The planning commit (`chore(openspec): plan single-source-provider-count`) is already on this branch; rebase it onto fresh `origin/main` before section 1 and again before section 3.
+- Branch `fix/single-source-provider-count` from `origin/main`, worktree at `cli/.claude/worktrees/single-source-provider-count`. The planning commit (`chore(openspec): plan single-source-provider-count`) is already on this branch; rebase it onto fresh `origin/main` before section 1 and again before section 4 (the release pin).
 - Export the workspace registry mapping in two lines (a one-line `export A=x B="$A"` leaves `OPM_REGISTRY` empty):
 
   ```bash
@@ -116,7 +116,7 @@ Every PR follows its repo's `AGENTS.md`: a body of at most 250 words, no bare `@
 - **Bug-shape fixtures require ONLY the provider contract.** A provider transformer that also requires the catalog-fulfilled container forms comparable pairs and changes the readout (the same hazard change A recorded for its pins).
 - **No count in the CLI.** The report prints `ProvidedBy`, `OverSubscribed` and `Routable` as the inventory carries them. Do not derive provider keys from `RequiredBy`, transformer FQNs or registry iteration, and do not add a presence fallback for `ProvidedBy` (B refuses an inventory lacking it with `PlatformCoreTooOldError`).
 - **The merge gate.** `hack/platform/` and `examples/` pin core `v2.0.0-alpha.10` on `origin/main` as planned (e9a9e4e). B's floor refuses every `--platform hack/platform` render (`tests/e2e/instance_build_test.go`, `internal/config/platform_test.go`, `tests/integration/platform-build`, `tests/integration/render-parity`) until the supervisor's workspace `task deps:update` `fix(deps)` commit re-pins them on `main`. Task 1.1 stops if it is not there. This change never edits `hack/platform/`, `examples/` or `templates/`.
-- **The last section waits on B's release.** Task 3.1 stops after section 2, with nothing edited, when the release is not out. `go.mod` never reaches a PR on a pseudo-version.
+- **The last section waits on B's release.** Task 4.1 stops after section 3, with nothing edited, when the release is not out. `go.mod` never reaches a PR on a pseudo-version.
 - Commit messages are not Markdown: write every path major glued to its path (`opmodel.dev/core@v2`, `testing.opmodel.dev/catalogs/k8up@v3`), never a bare at-sign followed by a name, and no body line starting with a word followed by an opening parenthesis (the squash body reaches release-please).
 
 **Waits on:**
