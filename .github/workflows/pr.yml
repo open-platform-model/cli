@@ -177,11 +177,29 @@ jobs:
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
+    # Fixtures from a job-local registry seeded from the tree, as in the
+    # fixtures job: the published-fixture tests resolve the tree's fixture
+    # version, which GHCR holds only after publish-fixtures.yml runs on
+    # merge. Core and the catalogs still come from GHCR.
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    env:
+      CUE_REGISTRY: 'testing.opmodel.dev=localhost:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+      OPM_REGISTRY: 'testing.opmodel.dev=localhost:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+      CUE_CACHE_DIR: ${{ github.workspace }}/.cue-cache
+      OPM_BIN: ./bin/opm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.0'
+      - name: Build opm
+        run: go build -o bin/opm ./cmd/opm
+      - name: Seed the job-local registry from the tree
+        run: hack/fixtures.sh seed
       # -timeout matches task test:e2e; see that task's summary for why the
       # 10-minute default truncates a destructive test's cleanup.
       - name: Run E2E tests
