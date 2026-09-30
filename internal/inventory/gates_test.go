@@ -87,6 +87,42 @@ func TestGateOperatorVersionCeiling(t *testing.T) {
 		client := newDynamicClient(makePlatform("v1.2.0"))
 		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "v1.3.0"))
 	})
+
+	t.Run("newer prerelease counter on the same line passes", func(t *testing.T) {
+		client := newDynamicClient(makePlatform("1.0.0-beta.3"))
+		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "1.0.0-beta.2"))
+	})
+
+	t.Run("beta operator against an alpha cli of the same line passes", func(t *testing.T) {
+		client := newDynamicClient(makePlatform("1.0.0-beta.1"))
+		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "1.0.0-alpha.27"))
+	})
+
+	t.Run("newer operator patch passes", func(t *testing.T) {
+		client := newDynamicClient(makePlatform("1.0.4"))
+		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "1.0.1"))
+	})
+
+	t.Run("build metadata is ignored", func(t *testing.T) {
+		client := newDynamicClient(makePlatform("v1.0.0-beta.1+gabc123.dirty"))
+		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "1.0.0-beta.1"))
+	})
+
+	t.Run("newer operator minor refuses", func(t *testing.T) {
+		client := newDynamicClient(makePlatform("1.1.0"))
+		err := GateOperatorVersionCeiling(ctx, client, "1.0.0")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "older than the cluster operator")
+		assert.Contains(t, err.Error(), "1.1.0")
+		assert.Contains(t, err.Error(), "1.0.0")
+	})
+
+	t.Run("newer operator minor prerelease refuses", func(t *testing.T) {
+		client := newDynamicClient(makePlatform("1.1.0-beta.1"))
+		err := GateOperatorVersionCeiling(ctx, client, "1.0.0")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "older than the cluster operator")
+	})
 }
 
 func TestGateStatusRBAC(t *testing.T) {
