@@ -63,11 +63,14 @@ func GateCRDFieldFloor(ctx context.Context, client *kubernetes.Client) error {
 }
 
 // GateOperatorVersionCeiling reads the cluster-scoped Platform singleton and
-// refuses when the operator's advertised version is semver-newer than the
-// CLI's. Absent Platform or absent status.operatorVersion means a solo cluster
-// (or a pre-A6 operator) and the gate is skipped. A dev-build CLI or an
-// RBAC-denied Platform read degrades to skip-with-warning so a namespace-scoped
-// user can still apply.
+// refuses when the operator's advertised MAJOR.MINOR is newer than the CLI's.
+// Patch, prerelease and build metadata are ignored: the CLI and the operator
+// share a minor line and release patches and prerelease counters
+// independently, so only a minor or major step on the operator side signals a
+// skew the CLI may not be able to drive. Absent Platform or absent
+// status.operatorVersion means a solo cluster (or a pre-A6 operator) and the
+// gate is skipped. A dev-build CLI or an RBAC-denied Platform read degrades to
+// skip-with-warning so a namespace-scoped user can still apply.
 func GateOperatorVersionCeiling(ctx context.Context, client *kubernetes.Client, cliVersion string) error {
 	normalizedCLI := ensureVPrefix(cliVersion)
 	if cliVersion == "" || cliVersion == "dev" || !semver.IsValid(normalizedCLI) {
@@ -102,7 +105,7 @@ func GateOperatorVersionCeiling(ctx context.Context, client *kubernetes.Client, 
 		return nil
 	}
 
-	if semver.Compare(normalizedOp, normalizedCLI) > 0 {
+	if semver.Compare(semver.MajorMinor(normalizedOp), semver.MajorMinor(normalizedCLI)) > 0 {
 		return fmt.Errorf(
 			"your CLI (%s) is older than the cluster operator (%s) — upgrade the CLI before applying against this cluster",
 			cliVersion, opVersion,
