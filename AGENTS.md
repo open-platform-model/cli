@@ -174,7 +174,10 @@ Read when entering `cli/`:
   the source (`module deps` or `instance deps` for the fallback). Catalog
   version skew follows the config file's `skewPolicy` (`warn` default,
   `refuse`) for `--platform` directories; the cluster CR's
-  `spec.skewPolicy` wins when it is the source. No render-bearing command
+  `spec.skewPolicy` wins when it is the source. A `--platform` module pinning
+  a core older than a field the kernel reads is refused before the render
+  with the library's message, plus a hint naming the directory and the
+  `cue mod get` re-pin command (`refusalHint`). No render-bearing command
   creates a Platform; only `opm operator install` seeds one.
   `opm module build` and `opm module vet` render for the module's author and
   never read the cluster. `instance build` and `instance vet` read the

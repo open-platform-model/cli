@@ -116,6 +116,15 @@ func TestPrintValidationError_SkewErrorVerbatim(t *testing.T) {
 	assert.Contains(t, logs, skew.Error(), "the kernel's skew message names the path and both versions")
 }
 
+func TestPrintValidationError_CoreTooOldVerbatim(t *testing.T) {
+	tooOld := &liberrors.PlatformCoreTooOldError{Platform: "p", Field: "providedBy", Since: "2.0.0-alpha.12"}
+
+	logs, _ := captureValidationOutput(t, fmt.Errorf("render refused before staging: %w", tooOld))
+
+	assert.Contains(t, logs, "render failed")
+	assert.Contains(t, logs, tooOld.Error(), "the library's message names the platform, the field and the release")
+}
+
 func TestFormatRenderDiagnostics_EmptyIsEmpty(t *testing.T) {
 	assert.Empty(t, formatRenderDiagnostics(kernel.RenderDiagnostics{Pairs: []kernel.RenderPair{{Component: "web", Transformer: "x"}}}, true),
 		"matched pairs are not refusals and are not repeated")
@@ -201,6 +210,9 @@ func TestRefusalHint(t *testing.T) {
 	instDepsWithCatalog := platform.Resolution{Source: platform.SourceModuleDeps, DepsKind: platform.DepsInstance, Catalogs: []string{"opmodel.dev/catalogs/opm@v4 v4.4.0"}}
 	cluster := platform.Resolution{Source: platform.SourceClusterCR}
 	flag := platform.Resolution{Source: platform.SourceFlagDir}
+	flagDir := platform.Resolution{Source: platform.SourceFlagDir, Location: "/work/p", Dir: "/work/p"}
+	tooOld := fmt.Errorf("render refused before staging: %w",
+		&liberrors.PlatformCoreTooOldError{Platform: "p", Field: "providedBy", Since: "2.0.0-alpha.12"})
 
 	tests := []struct {
 		name string
@@ -223,6 +235,9 @@ func TestRefusalHint(t *testing.T) {
 		{"unprovided against the cluster names the three ways out", unprovided, cluster, unprovidedHint},
 		{"unprovided against --platform names the three ways out", unprovided, flag, unprovidedHint},
 		{"one unprovided row among others names the three ways out", mixed, flag, unprovidedHint},
+		{"an older-core --platform directory names the re-pin", tooOld, flagDir, platform.CoreRepinHint("/work/p")},
+		{"an older-core cluster platform has no hint", tooOld, cluster, ""},
+		{"an older-core deps platform has no hint", tooOld, depsWithCatalog, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

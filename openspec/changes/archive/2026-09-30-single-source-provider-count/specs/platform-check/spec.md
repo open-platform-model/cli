@@ -1,8 +1,4 @@
-## Purpose
-
-Define `opm platform check`: the offline pre-flight that answers whether a platform is usable before any module is deployed against it, reading the contract inventory core derives and library exposes. Covers what it reports, how it picks the platform, and why an unfulfilled contract ends in a different exit code from the two conditions platform-package generation refuses on — an over-subscribed contract and a comparable transformer pair (enhancement 0015 D1, D2, D5, D18).
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: opm platform check reports a platform's contract inventory
 
@@ -33,20 +29,6 @@ The CLI SHALL provide `opm platform check`, registered under a `platform` comman
 - **WHEN** the platform's enabled catalogs define no contract, and transformers of two enabled registry entries require one provider-fulfilled contract (its defining catalog disabled or absent from the registry)
 - **THEN** the report does not word any verdict as vacuous, lists the contract under the over-subscribed heading marked as defined by no enabled catalog with both registry keys named, and reads `routable: no`
 
-### Requirement: An unfulfilled contract is reported and does not fail the command
-
-A provider-fulfilled contract that no enabled transformer implements SHALL be listed in the report and SHALL NOT change the exit status. Enhancement 0015 D18 makes this a report and never a gate: a platform may legitimately define a contract ahead of the provider that implements it, and the refusal for an unmet demand belongs to the render that demands it.
-
-#### Scenario: Unfulfilled contracts exit zero
-
-- **WHEN** the platform defines a provider-fulfilled contract that nothing implements
-- **THEN** the report names the contract and its defining catalog, and the command exits 0
-
-#### Scenario: The report distinguishes the two lists
-
-- **WHEN** a platform is both unfulfilled on one contract and over-subscribed on another
-- **THEN** the two appear under separate headings, and only the over-subscription decides the exit status
-
 ### Requirement: An over-subscribed contract fails the command
 
 A provider-fulfilled contract required by transformers of more than one enabled registry entry SHALL be reported with every providing registry key named (catalog path plus major, sorted), and the command SHALL exit with the validation error code. Two majors of one catalog are two registry entries and so two providers; two transformers of one entry are one provider; the count does not depend on whether an enabled catalog defines the contract. The command reads the count the platform's core derives and the render build enforces, and SHALL NOT compute its own. This mirrors where the refusal lives in the system: `Routable: false` is the condition a platform-package generation step refuses on, so a pre-flight that exits 0 on it would contradict the tool that will reject the platform later.
@@ -70,44 +52,6 @@ A provider-fulfilled contract required by transformers of more than one enabled 
 
 - **WHEN** the catalog defining a provider-fulfilled contract is present in the registry with `enable: false`, and transformers of two other enabled entries require the contract
 - **THEN** the report lists the contract as over-subscribed, defined by no enabled catalog, with both registry keys named, and the command exits with the validation error code
-
-### Requirement: An undiscriminated platform fails the command
-
-A pair of enabled transformers whose match predicates are comparable over a shared catalog-fulfilled contract SHALL be reported with both transformers and the shared contracts named, and the command SHALL exit with the validation error code (enhancement 0015 D5). This mirrors where the refusal lives in the system: `Discriminated: false` is a condition platform-package generation refuses on, exactly as `Routable: false` is, so a pre-flight that exits 0 on it would bless a platform the operator rejects. No arbitration between the two transformers SHALL be applied or suggested. Transformers with incomparable predicates over a shared contract (a differing required label value, or a required trait the other lacks) SHALL be reported as implementations and SHALL NOT change the exit status.
-
-#### Scenario: A comparable pair exits non-zero
-
-- **WHEN** one enabled transformer requires a catalog-fulfilled resource alone and another enabled transformer requires the same resource plus a trait
-- **THEN** the report names the first as broader, the second as narrower and the resource as shared, states the platform is not discriminated, and the command exits with the validation error code
-
-#### Scenario: Discriminated plurality exits zero
-
-- **WHEN** several enabled transformers require the same catalog-fulfilled contract and each adds a required label value or trait the others lack
-- **THEN** the report shows them as implementations, states the platform is discriminated, and the command exits 0
-
-#### Scenario: Both refusals are reported together
-
-- **WHEN** a platform is over-subscribed on one contract and undiscriminated on another
-- **THEN** both appear under their own headings, both verdict lines say no, the error names both counts, and the command exits with the validation error code once
-
-### Requirement: The checked platform is resolved like every other command's
-
-`opm platform check` SHALL resolve which platform to check using the CLI's existing precedence and SHALL report the resolved location and how it was chosen, so a report can never be misread as describing a different platform. It MAY accept a platform directory as a positional argument, which takes precedence over the flag and the configured default.
-
-#### Scenario: The report states its provenance
-
-- **WHEN** the command runs with no argument and no flag, against the configured default platform
-- **THEN** the report's first line names the resolved directory and that it came from the configured default
-
-#### Scenario: A directory argument wins
-
-- **WHEN** the command is given a platform directory argument while a different platform is configured
-- **THEN** the argument's directory is checked and the report names it
-
-#### Scenario: A directory that is not a platform module is refused
-
-- **WHEN** the resolved location is a directory with no CUE module manifest
-- **THEN** the command fails with a not-found style error naming the directory, before any build is attempted
 
 ### Requirement: A platform that cannot build fails with its build diagnostic
 

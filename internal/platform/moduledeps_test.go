@@ -222,6 +222,7 @@ func TestGenerateModuleDepsModule(t *testing.T) {
 		entries, err := loader.LocalReplacements(dir)
 		require.NoError(t, err, "the carried file parses against the generated module file")
 		assert.Equal(t, []loader.LocalReplacement{{Path: "opmodel.dev/catalogs/opm@v4", ReplaceWith: checkout}}, entries)
+		assertLocalKeepsGeneratedPins(t, dir)
 	})
 
 	t.Run("carried module target is written with its version", func(t *testing.T) {
@@ -246,6 +247,7 @@ func TestGenerateModuleDepsModule(t *testing.T) {
 		entries, err := loader.LocalReplacements(dir)
 		require.NoError(t, err)
 		assert.Equal(t, []loader.LocalReplacement{{Path: "opmodel.dev/catalogs/opm@v4", ReplaceWith: "example.com/fork@v4", TargetVersion: "v4.0.1"}}, entries)
+		assertLocalKeepsGeneratedPins(t, dir)
 	})
 
 	t.Run("an unpublished pin served from a checkout generates", func(t *testing.T) {
@@ -295,4 +297,33 @@ func TestGenerateModuleDepsModule(t *testing.T) {
 		assert.ErrorIs(t, err, ErrModuleDepsFile)
 		assert.Contains(t, err.Error(), "/m/cue.mod/module.cue")
 	})
+}
+
+// assertLocalKeepsGeneratedPins asserts that the main-module view of the
+// generated module (its cue.mod/local-module.cue read against its
+// cue.mod/module.cue) pins every dependency the generated module file pins,
+// at the same version and default: a local file replaces the dependency list
+// in main-module mode, so a pin it omits resolves from the replaced module's
+// own requirements instead, core included.
+func assertLocalKeepsGeneratedPins(t *testing.T, dir string) {
+	t.Helper()
+	baseData, err := os.ReadFile(filepath.Join(dir, "cue.mod", "module.cue"))
+	require.NoError(t, err)
+	base, err := modfile.Parse(baseData, "module.cue")
+	require.NoError(t, err)
+	localData, err := os.ReadFile(filepath.Join(dir, "cue.mod", "local-module.cue"))
+	require.NoError(t, err)
+	eff, err := modfile.ParseLocal(localData, "local-module.cue", base)
+	require.NoError(t, err)
+
+	core := eff.Deps[platformmodule.CorePath]
+	require.NotNil(t, core, "the local view pins core")
+	assert.Equal(t, schema.DefaultSchemaVersion(), core.Version, "the local view keeps core at the generated pin")
+	for path, dep := range base.Deps {
+		got := eff.Deps[path]
+		if assert.NotNil(t, got, "the local view pins %s", path) {
+			assert.Equal(t, dep.Version, got.Version, "the local view keeps %s at the generated pin", path)
+			assert.Equal(t, dep.Default, got.Default, "the local view keeps the default mark of %s", path)
+		}
+	}
 }

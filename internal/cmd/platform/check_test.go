@@ -11,12 +11,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	liberrors "github.com/open-platform-model/library/opm/errors"
 	"github.com/open-platform-model/library/opm/schema"
 
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/platform"
+	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
 // The fixture platforms below declare their catalogs inline rather than
@@ -218,6 +221,133 @@ _harborCatalog: c.#Catalog & {
 #registry: (_harborCatalog.metadata.modulePath): #catalog: _harborCatalog
 `
 
+// backupProviders declares two provider transformers that each require ONLY
+// the provider-fulfilled backup trait, in the catalogs k8up@v2 and velero@v1.
+// Requiring nothing catalog-fulfilled keeps them out of every comparable pair,
+// so the provider count is the only thing the platforms below vary.
+const backupProviders = `
+_k8upPreBackup: c.#ComponentTransformer & {
+	metadata: {
+		name: "pre-backup-pod"
+		fqn:  "testing.opmodel.dev/catalogs/k8up/transformers/pre-backup-pod@2.0.0"
+	}
+	requiredTraits: (_backup.metadata.fqn): _backup
+}
+
+_k8upCatalog: c.#Catalog & {
+	metadata: {
+		modulePath: "testing.opmodel.dev/catalogs/k8up@v2"
+		version:    "2.0.0"
+	}
+	#transformers: (_k8upPreBackup.metadata.fqn): _k8upPreBackup
+}
+
+_veleroBackup: c.#ComponentTransformer & {
+	metadata: {
+		name: "backup"
+		fqn:  "testing.opmodel.dev/catalogs/velero/transformers/backup@1.4.0"
+	}
+	requiredTraits: (_backup.metadata.fqn): _backup
+}
+
+_veleroCatalog: c.#Catalog & {
+	metadata: {
+		modulePath: "testing.opmodel.dev/catalogs/velero@v1"
+		version:    "1.4.0"
+	}
+	#transformers: (_veleroBackup.metadata.fqn): _veleroBackup
+}
+`
+
+// twoMajorsPlatform: two majors of one provider catalog, k8up@v2 and
+// k8up@v3, each with a transformer requiring the provider-fulfilled backup
+// trait, and the base catalog defining it enabled. Two registry entries, so
+// two providers, although both entries are the same catalog.
+const twoMajorsPlatform = `package platform
+
+import c "opmodel.dev/core@v2"
+
+c.#Platform
+metadata: name: "two-majors"
+type: "kubernetes"
+` + fixtureContracts + `
+_k8upV2PreBackup: c.#ComponentTransformer & {
+	metadata: {
+		name: "pre-backup-pod"
+		fqn:  "testing.opmodel.dev/catalogs/k8up/transformers/pre-backup-pod@2.0.0"
+	}
+	requiredTraits: (_backup.metadata.fqn): _backup
+}
+
+_k8upV2Catalog: c.#Catalog & {
+	metadata: {
+		modulePath: "testing.opmodel.dev/catalogs/k8up@v2"
+		version:    "2.0.0"
+	}
+	#transformers: (_k8upV2PreBackup.metadata.fqn): _k8upV2PreBackup
+}
+
+_k8upV3PreBackup: c.#ComponentTransformer & {
+	metadata: {
+		name: "pre-backup-pod"
+		fqn:  "testing.opmodel.dev/catalogs/k8up/transformers/pre-backup-pod@3.0.0"
+	}
+	requiredTraits: (_backup.metadata.fqn): _backup
+}
+
+_k8upV3Catalog: c.#Catalog & {
+	metadata: {
+		modulePath: "testing.opmodel.dev/catalogs/k8up@v3"
+		version:    "3.0.0"
+	}
+	#transformers: (_k8upV3PreBackup.metadata.fqn): _k8upV3PreBackup
+}
+
+#registry: {
+	(_baseCatalog.metadata.modulePath): #catalog:   _baseCatalog
+	(_k8upV2Catalog.metadata.modulePath): #catalog: _k8upV2Catalog
+	(_k8upV3Catalog.metadata.modulePath): #catalog: _k8upV3Catalog
+}
+`
+
+// definerDisabledPlatform: the base catalog defining the backup trait is in
+// the registry with enable: false, and two other enabled entries, k8up@v2
+// and velero@v1, provide it. No enabled catalog defines the contract, and it
+// is still over-subscribed.
+const definerDisabledPlatform = `package platform
+
+import c "opmodel.dev/core@v2"
+
+c.#Platform
+metadata: name: "definer-disabled"
+type: "kubernetes"
+` + fixtureContracts + backupProviders + `
+#registry: {
+	(_baseCatalog.metadata.modulePath): {
+		enable:   false
+		#catalog: _baseCatalog
+	}
+	(_k8upCatalog.metadata.modulePath): #catalog:   _k8upCatalog
+	(_veleroCatalog.metadata.modulePath): #catalog: _veleroCatalog
+}
+`
+
+// definerAbsentPlatform: definerDisabledPlatform without the base entry at
+// all. The two providers require a contract no registry entry defines.
+const definerAbsentPlatform = `package platform
+
+import c "opmodel.dev/core@v2"
+
+c.#Platform
+metadata: name: "definer-absent"
+type: "kubernetes"
+` + fixtureContracts + backupProviders + `
+#registry: {
+	(_k8upCatalog.metadata.modulePath): #catalog:   _k8upCatalog
+	(_veleroCatalog.metadata.modulePath): #catalog: _veleroCatalog
+}
+`
+
 // writePlatformModuleDir writes a platform module holding platformCUE and returns
 // its directory.
 func writePlatformModuleDir(t *testing.T, modFile, platformCUE string) string {
@@ -313,10 +443,58 @@ func TestPlatformCheck_OverSubscribedPlatformExitsValidation(t *testing.T) {
 
 	assert.Contains(t, report, "over-subscribed contracts: 1")
 	assert.Contains(t, report, "testing.opmodel.dev/catalogs/base/traits/backup@v1alpha1 (defined by testing.opmodel.dev/catalogs/base@v1)")
-	// Both competing catalogs are named.
-	assert.Contains(t, report, "testing.opmodel.dev/catalogs/k8up/transformers/schedule@2.0.0")
-	assert.Contains(t, report, "testing.opmodel.dev/catalogs/velero/transformers/backup@1.4.0")
+	// Both competing registry entries are named.
+	assert.Contains(t, report, "provided by  testing.opmodel.dev/catalogs/k8up@v2, testing.opmodel.dev/catalogs/velero@v1")
 	assert.Contains(t, report, "routable:  no — 1 contract is over-subscribed")
+}
+
+// assertOverSubscribedBackup runs the check on a platform where two registry
+// entries provide the backup trait and asserts the refusal and the report
+// naming them. definerless says no enabled catalog defines the trait.
+func assertOverSubscribedBackup(t *testing.T, platformCUE, providers string, definerless bool) {
+	t.Helper()
+	dir := writePlatformModuleDir(t, fixtureModule, platformCUE)
+
+	report, _, err := runCheck(t, dir)
+	skipIfRegistryUnavailable(t, err)
+	require.Error(t, err, "an over-subscribed platform fails the check; report:\n%s", report)
+
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
+	assert.True(t, exitErr.Printed, "the report already carries the verdict")
+	assert.Contains(t, err.Error(), "1 over-subscribed contract(s), 0 comparable transformer pair(s)")
+
+	assert.Contains(t, report, "over-subscribed contracts: 1")
+	assert.Contains(t, report, "testing.opmodel.dev/catalogs/base/traits/backup@v1alpha1")
+	assert.Contains(t, report, "provided by  "+providers)
+	if definerless {
+		assert.Contains(t, report, "testing.opmodel.dev/catalogs/base/traits/backup@v1alpha1 (defined by no enabled catalog)")
+		assert.Contains(t, report, "defined contracts: 0")
+	}
+	assert.NotContains(t, report, "vacuously")
+	assert.Contains(t, report, "routable:  no")
+	assert.Contains(t, report, "discriminated: yes")
+}
+
+// Two majors of one provider catalog are two registry entries, so two
+// providers: the render refuses the platform, and so does the check.
+func TestPlatformCheck_TwoMajorsOfOneProviderAreOverSubscribed(t *testing.T) {
+	assertOverSubscribedBackup(t, twoMajorsPlatform,
+		"testing.opmodel.dev/catalogs/k8up@v2, testing.opmodel.dev/catalogs/k8up@v3", false)
+}
+
+// A disabled defining catalog does not hide the competition between the
+// enabled providers.
+func TestPlatformCheck_DefinerDisabledOverSubscriptionIsNotVacuous(t *testing.T) {
+	assertOverSubscribedBackup(t, definerDisabledPlatform,
+		"testing.opmodel.dev/catalogs/k8up@v2, testing.opmodel.dev/catalogs/velero@v1", true)
+}
+
+// Nor does a defining catalog missing from the registry altogether.
+func TestPlatformCheck_DefinerAbsentOverSubscriptionIsNotVacuous(t *testing.T) {
+	assertOverSubscribedBackup(t, definerAbsentPlatform,
+		"testing.opmodel.dev/catalogs/k8up@v2, testing.opmodel.dev/catalogs/velero@v1", true)
 }
 
 // An unfulfilled contract is a report and never a gate (0015:D18): the command
@@ -478,6 +656,7 @@ type: "kubernetes"
 	assert.Contains(t, err.Error(), "#contracts")
 	assert.Contains(t, err.Error(), "2.0.0-alpha.9")
 	assert.Contains(t, err.Error(), dir)
+	assertCoreTooOld(t, err, dir, "#contracts", "2.0.0-alpha.9")
 	assert.Empty(t, report)
 }
 
@@ -501,7 +680,47 @@ deps: "opmodel.dev/core@v2": v: "v2.0.0-alpha.9"
 	assert.Contains(t, err.Error(), `"comparable"`)
 	assert.Contains(t, err.Error(), "2.0.0-alpha.10")
 	assert.Contains(t, err.Error(), dir)
+	assertCoreTooOld(t, err, dir, "comparable", "2.0.0-alpha.10")
 	assert.Empty(t, report, "no partial report is printed")
+}
+
+// A platform pinning the core release before the provider count
+// (#contracts.providedBy) is refused naming the field and the release that
+// derives it, with the directory and the re-pin command, rather than
+// reporting a count of the CLI's own.
+func TestPlatformCheck_CoreWithoutTheProviderCountNamesTheRelease(t *testing.T) {
+	dir := writePlatformModuleDir(t, `module: "testing.opmodel.dev/platforms/check-fixture@v0"
+language: version: "v0.17.0"
+deps: "opmodel.dev/core@v2": v: "v2.0.0-alpha.11"
+`, undiscriminatedPlatform)
+
+	report, _, err := runCheck(t, dir)
+	skipIfRegistryUnavailable(t, err)
+	require.Error(t, err)
+
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
+	assert.Contains(t, err.Error(), `"providedBy"`)
+	assert.Contains(t, err.Error(), dir)
+	assertCoreTooOld(t, err, dir, "providedBy", schema.ProvidedBySince)
+	assert.Empty(t, report, "no partial report is printed")
+}
+
+// assertCoreTooOld asserts that err carries the library's older-core
+// refusal for field and since, and the re-pin hint naming dir and the core
+// release the kernel was verified against.
+func assertCoreTooOld(t *testing.T, err error, dir, field, since string) {
+	t.Helper()
+	var tooOld *liberrors.PlatformCoreTooOldError
+	require.ErrorAs(t, err, &tooOld)
+	assert.Equal(t, field, tooOld.Field)
+	assert.Equal(t, since, tooOld.Since)
+	var detail *oerrors.DetailError
+	require.ErrorAs(t, err, &detail)
+	assert.Equal(t, dir, detail.Location)
+	assert.Equal(t, platform.CoreRepinHint(dir), detail.Hint)
+	assert.Contains(t, err.Error(), "cue mod get opmodel.dev/core@"+schema.DefaultSchemaVersion())
 }
 
 // TestPlatformCheck_NoSourceRefuses covers "platform check with no source

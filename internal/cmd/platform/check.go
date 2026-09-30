@@ -7,11 +7,14 @@ import (
 
 	"github.com/spf13/cobra"
 
+	liberrors "github.com/open-platform-model/library/opm/errors"
+
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/platform"
+	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
 // NewPlatformCheckCmd creates the platform check command.
@@ -28,8 +31,10 @@ Builds the resolved platform module and reports the contract inventory core
 derives from it: every contract the enabled catalogs define and the catalog
 that defines each, the transformers that implement it, the provider-fulfilled
 contracts nothing implements, the provider-fulfilled contracts required by
-transformers from more than one catalog, and every pair of transformers whose
-match predicates are comparable over a shared catalog-fulfilled contract.
+transformers of more than one enabled registry entry, with the registry keys
+providing each (two majors of one catalog are two entries), and every pair of
+transformers whose match predicates are comparable over a shared
+catalog-fulfilled contract.
 
 The command applies and renders nothing. It contacts a cluster only to read
 its Platform, when neither [dir] nor --platform is given. A cold module cache
@@ -113,10 +118,7 @@ func runPlatformCheck(ctx context.Context, args []string, cfg *config.GlobalConf
 
 	inv, err := p.Contracts()
 	if err != nil {
-		return &opmexit.ExitError{
-			Code: opmexit.ExitValidationError,
-			Err:  fmt.Errorf("reading the contract inventory of the platform at %s: %w", dir, err),
-		}
+		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: contractsError(dir, res, err)}
 	}
 
 	report := platform.NewReport(res, inv)
@@ -176,4 +178,24 @@ func checkResolveError(err error) error {
 	default:
 		return &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: err}
 	}
+}
+
+// contractsError words a failure to read the contract inventory of the
+// platform at dir. A platform module the user named (the argument or
+// --platform) pinning a core older than a field the kernel reads gets the
+// directory and the re-pin command beside the library's message; every other
+// failure is the plain wrap.
+func contractsError(dir string, res platform.Resolution, err error) error {
+	wrapped := fmt.Errorf("reading the contract inventory of the platform at %s: %w", dir, err)
+	var tooOld *liberrors.PlatformCoreTooOldError
+	if errors.As(err, &tooOld) && (res.Source == platform.SourceArgumentDir || res.Source == platform.SourceFlagDir) {
+		return &oerrors.DetailError{
+			Type:     "platform module error",
+			Message:  wrapped.Error(),
+			Location: dir,
+			Hint:     platform.CoreRepinHint(dir),
+			Cause:    err,
+		}
+	}
+	return wrapped
 }

@@ -241,6 +241,43 @@ func TestE2E_InstanceBuild_SkewRefusedByConfig(t *testing.T) {
 	assert.Contains(t, stderr, "platform carries "+olderCatalogPin)
 }
 
+// TestE2E_InstanceBuild_OlderCorePlatformIsARepin covers "An older-core
+// --platform directory is refused with the re-pin command": a platform
+// module pinning a core release that derives no provider count is refused
+// before the render as a validation failure, with the library's message and
+// a hint naming the directory and the cue mod get command. The platform
+// carries no catalog, so a render that got past the floor would be refused
+// unmatched instead.
+func TestE2E_InstanceBuild_OlderCorePlatformIsARepin(t *testing.T) {
+	_, instanceFile := podinfoExample(t)
+	home := seedRenderHome(t)
+	platformDir := t.TempDir()
+	writeE2EFile(t, filepath.Join(platformDir, "cue.mod", "module.cue"), `module: "testing.opmodel.dev/platforms/older-core@v0"
+language: version: "v0.17.0"
+deps: "opmodel.dev/core@v2": v: "v2.0.0-alpha.11"
+`)
+	writeE2EFile(t, filepath.Join(platformDir, "platform.cue"), `package platform
+
+import c "opmodel.dev/core@v2"
+
+c.#Platform
+metadata: name: "older-core"
+type: "kubernetes"
+`)
+
+	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
+		"instance", "build", instanceFile, "--platform", platformDir)
+	require.Error(t, err, "stdout: %s", stdout)
+
+	assert.Equal(t, opmexit.ExitValidationError, exitCode(t, err), "stderr: %s", stderr)
+	assert.Empty(t, stdout, "nothing is rendered when the render is refused before staging")
+	assert.Contains(t, stderr, "render failed")
+	assert.Contains(t, stderr, "providedBy")
+	assert.Contains(t, stderr, "2.0.0-alpha.12")
+	assert.Contains(t, stderr, "the platform module at "+platformDir)
+	assert.Contains(t, stderr, "cue mod get opmodel.dev/core@v2.0.0-alpha.12")
+}
+
 // libModulePath is a module no registry serves: the never-published
 // dependency a developer redirects with cue.mod/local-module.cue.
 const libModulePath = "test.example/lib@v0"

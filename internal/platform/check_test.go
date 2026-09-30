@@ -13,6 +13,7 @@ import (
 const (
 	catOPM  = "opmodel.dev/catalogs/opm@v4"
 	catK8up = "opmodel.dev/catalogs/k8up@v2"
+	catVel  = "opmodel.dev/catalogs/velero@v1"
 
 	container = "opmodel.dev/catalogs/opm/resources/container@v1beta1"
 	backup    = "opmodel.dev/catalogs/opm/traits/backup@v1alpha1"
@@ -85,6 +86,7 @@ func TestReportRender(t *testing.T) {
 			inv: &libplatform.ContractInventory{
 				DefinedBy:      map[string]string{backup: catK8up},
 				RequiredBy:     map[string][]string{backup: {schedule, deployment}},
+				ProvidedBy:     map[string][]string{backup: {catVel, catK8up}},
 				OverSubscribed: []string{backup},
 				Fulfilled:      true,
 				Routable:       false,
@@ -93,14 +95,41 @@ func TestReportRender(t *testing.T) {
 			present: []string{
 				"over-subscribed contracts: 1",
 				backup + " (defined by " + catK8up + ")",
-				// Both competing catalogs are named, through the
-				// transformers that require the contract.
-				"required by  " + schedule + ", " + deployment,
+				"enabled registry entry. Two majors of one catalog are two entries.",
+				// Both competing registry entries are named, sorted.
+				"provided by  " + catK8up + ", " + catVel,
 				"fulfilled: yes",
 				"routable:  no — 1 contract is over-subscribed",
 				"discriminated: yes",
 			},
-			absent: []string{"unfulfilled contracts", "comparable transformer pairs"},
+			absent: []string{"unfulfilled contracts", "comparable transformer pairs", "    required by  ", "defined contracts: 0"},
+		},
+		{
+			// The defining catalog is disabled or absent: nothing is
+			// defined, and two registry entries still provide the
+			// contract. The inventory's verdict is read, never worded
+			// as vacuous.
+			name: "definer-less over-subscription",
+			inv: &libplatform.ContractInventory{
+				DefinedBy:      map[string]string{},
+				RequiredBy:     map[string][]string{},
+				ProvidedBy:     map[string][]string{backup: {catK8up, catVel}},
+				OverSubscribed: []string{backup},
+				Fulfilled:      true,
+				Routable:       false,
+				Discriminated:  true,
+			},
+			present: []string{
+				"defined contracts: 0",
+				"The enabled catalogs define no contracts. The provider counts below come",
+				"over-subscribed contracts: 1",
+				backup + " (defined by no enabled catalog)",
+				"provided by  " + catK8up + ", " + catVel,
+				"fulfilled: yes",
+				"routable:  no — 1 contract is over-subscribed",
+				"discriminated: yes",
+			},
+			absent: []string{"vacuously", "nothing was verified here", "unfulfilled contracts"},
 		},
 		{
 			// A comparable pair is a separate refusal from
@@ -137,6 +166,7 @@ func TestReportRender(t *testing.T) {
 			inv: &libplatform.ContractInventory{
 				DefinedBy:      map[string]string{container: catOPM, backup: catK8up},
 				RequiredBy:     map[string][]string{container: {mirror, schedule}, backup: {schedule, deployment}},
+				ProvidedBy:     map[string][]string{backup: {catK8up, catVel}},
 				OverSubscribed: []string{backup},
 				Comparable: []libplatform.ComparablePredicates{
 					{Broader: mirror, Narrower: schedule, Contracts: []string{backup, container}},
@@ -149,6 +179,7 @@ func TestReportRender(t *testing.T) {
 			present: []string{
 				"over-subscribed contracts: 1",
 				"comparable transformer pairs: 2",
+				"provided by  " + catK8up + ", " + catVel,
 				// Shared contracts sort within a row: the inventory
 				// listed backup first, and `resources/` sorts before
 				// `traits/`.
@@ -156,13 +187,14 @@ func TestReportRender(t *testing.T) {
 				"routable:  no — 1 contract is over-subscribed",
 				"discriminated: no — 2 pairs are comparable",
 			},
-			absent: []string{"unfulfilled contracts"},
+			absent: []string{"unfulfilled contracts", "    required by  "},
 		},
 		{
 			name: "both",
 			inv: &libplatform.ContractInventory{
 				DefinedBy:      map[string]string{container: catOPM, backup: catK8up},
 				RequiredBy:     map[string][]string{container: {schedule, deployment}, backup: {}},
+				ProvidedBy:     map[string][]string{container: {catK8up, catOPM}},
 				Unfulfilled:    []string{backup},
 				OverSubscribed: []string{container},
 				Fulfilled:      false,
@@ -212,6 +244,30 @@ func TestReportRender(t *testing.T) {
 	}
 }
 
+// TestEmptyInventoryRenderIsUnchanged pins the vacuous report byte for byte:
+// it is reserved for a platform where nothing is defined AND nothing is
+// provided, and its wording did not move when the provider count did.
+func TestEmptyInventoryRenderIsUnchanged(t *testing.T) {
+	got := NewReport(flagRes(), &libplatform.ContractInventory{
+		DefinedBy:     map[string]string{},
+		RequiredBy:    map[string][]string{},
+		ProvidedBy:    map[string][]string{},
+		Fulfilled:     true,
+		Routable:      true,
+		Discriminated: true,
+	}).Render()
+
+	want := "platform: /home/u/platforms/staging (--platform)\n" +
+		"\nthe enabled catalogs define no contracts — nothing was verified here.\n" +
+		"A platform whose catalogs populate no contract maps produces an empty\n" +
+		"inventory, which is not the same answer as a platform whose contracts all\n" +
+		"check out.\n" +
+		"\nfulfilled: yes (vacuously — no contract is defined)\n" +
+		"routable:  yes (vacuously — no contract is defined)\n" +
+		"discriminated: yes (vacuously — no contract is defined)"
+	assert.Equal(t, want, got)
+}
+
 // TestReportRenderIsDeterministic guards the map iteration order: the report
 // is read by people diffing two runs.
 func TestReportRenderIsDeterministic(t *testing.T) {
@@ -226,6 +282,23 @@ func TestReportRenderIsDeterministic(t *testing.T) {
 	for range 20 {
 		require.Equal(t, first, NewReport(flagRes(), inv).Render())
 	}
+
+	// The providing registry keys print sorted whatever order the
+	// inventory hands them over in.
+	provided := func(keys ...string) *libplatform.ContractInventory {
+		return &libplatform.ContractInventory{
+			DefinedBy:      map[string]string{backup: catOPM},
+			RequiredBy:     map[string][]string{backup: {schedule, mirror}},
+			ProvidedBy:     map[string][]string{backup: keys},
+			OverSubscribed: []string{backup},
+			Fulfilled:      true,
+			Routable:       false,
+			Discriminated:  true,
+		}
+	}
+	require.Equal(t,
+		NewReport(flagRes(), provided(catK8up, catVel)).Render(),
+		NewReport(flagRes(), provided(catVel, catK8up)).Render())
 }
 
 // TestComparableRowsRenderInAStableOrder pins that the comparable section does
