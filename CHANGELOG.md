@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0-beta.1](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.27...v1.0.0-beta.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* **deps:** move the cli to the beta line on library v1.0.0-beta.1 ([#255](https://github.com/open-platform-model/cli/issues/255)) ([2e90c24](https://github.com/open-platform-model/cli/commit/2e90c2474564afbd2ef162280976b480a08ded5f))
+* **inventory:** compare only MAJOR.MINOR in the operator ceiling ([#249](https://github.com/open-platform-model/cli/issues/249)) ([776ae91](https://github.com/open-platform-model/cli/commit/776ae91ffa55571f920d74256ef24b000df7e899))
+
 ## [1.0.0-alpha.27](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.26...v1.0.0-alpha.27) (2026-09-30)
 
 
