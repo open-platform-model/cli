@@ -159,8 +159,10 @@ func TestResolveInstanceArg_ImportFreeInstancePackage(t *testing.T) {
 
 // TestResolveInstanceArg_RegistryBackedInstancePackage acquires the
 // operator-owned e2e fixture, a renderable instance package that imports
-// core and the podinfo fixture module from GHCR, through the kernel with the
-// shipped default registry, and skips when the registry is unreachable.
+// core and the podinfo fixture module, through the kernel. It resolves them
+// from the registry OPM_REGISTRY names (in PR CI, the job-local registry
+// seeded from the tree), else from the shipped default registry, and skips
+// when the registry is unreachable.
 func TestResolveInstanceArg_RegistryBackedInstancePackage(t *testing.T) {
 	dir, err := filepath.Abs(filepath.Join("..", "..", "tests", "e2e", "testdata", "operator-owned"))
 	require.NoError(t, err)
@@ -168,7 +170,13 @@ func TestResolveInstanceArg_RegistryBackedInstancePackage(t *testing.T) {
 		t.Skipf("fixture not found: %v", statErr)
 	}
 
-	cfg := &config.GlobalConfig{Registry: config.DefaultRegistry}
+	// OPM_REGISTRY when set: PR CI seeds the tree's fixtures into a job-local
+	// registry, and the fixture package pins the tree's fixture version.
+	registry := config.DefaultRegistry
+	if r := os.Getenv("OPM_REGISTRY"); r != "" {
+		registry = r
+	}
+	cfg := &config.GlobalConfig{Registry: registry}
 	for _, arg := range []string{dir, filepath.Join(dir, "instance.cue")} {
 		got, err := ResolveInstanceArg(context.Background(), arg, cfg)
 		skipIfRegistryUnavailable(t, err)

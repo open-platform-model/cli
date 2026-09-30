@@ -99,7 +99,7 @@ func TestE2E_ModuleVet_RendersAgainstModuleDeps(t *testing.T) {
 	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), customHome, 180*time.Second, "module", "vet", modPath, "--instance-name", "e2e-podinfo")
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Contains(t, stderr, "Module config valid")
-	assert.Contains(t, stderr, "platform: module deps (opmodel.dev/catalogs/opm@v4 v4.0.1; generated module "+filepath.Join(customHome, ".opm", "cache", "platforms"))
+	assert.Contains(t, stderr, "platform: module deps ("+podinfoCatalogPin(t, modPath)+"; generated module "+filepath.Join(customHome, ".opm", "cache", "platforms"))
 	assert.Contains(t, stderr, "Deployment")
 	assert.Regexp(t, `Module valid \([1-9][0-9]* resources\)`, stderr)
 	assert.NotContains(t, stderr, "version skew")

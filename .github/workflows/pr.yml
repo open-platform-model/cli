@@ -13,11 +13,15 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # GHCR mapping: no registry service runs in CI, so anything the tests
-  # genuinely resolve must be published (public) on GHCR — same arrangement as
-  # the library repo's CI. testing.opmodel.dev carries this repo's fixture
-  # modules, published by publish-fixtures.yml; it is a GHCR-backed domain like
-  # any other, not a local-registry alias.
+  # GHCR mapping: the default for every job. Anything these jobs resolve must
+  # be published (public) on GHCR, the same arrangement as the library repo's
+  # CI. testing.opmodel.dev carries this repo's fixture modules, published by
+  # publish-fixtures.yml on merge; it is a GHCR-backed domain like any other.
+  # The exception is the fixture coordinate a PR changes: the fixtures, unit
+  # and E2E jobs (and the unit job in ci.yml) run a job-local registry,
+  # seed it from the tree (hack/fixtures.sh seed) and override this mapping
+  # so testing.opmodel.dev resolves from that seed while core and the
+  # catalogs still come from GHCR.
   OPM_REGISTRY: 'testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
   CUE_REGISTRY: 'testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
 
@@ -43,11 +47,31 @@ jobs:
   unit:
     name: Unit Tests
     runs-on: ubuntu-latest
+    # Fixtures from a job-local registry seeded from the tree, as in the
+    # fixtures and E2E jobs: the examples and e2e testdata pin the tree's
+    # fixture version, which GHCR holds only after publish-fixtures.yml runs
+    # on merge. Core and the catalogs still come from GHCR.
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    env:
+      CUE_REGISTRY: 'testing.opmodel.dev=localhost:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+      OPM_REGISTRY: 'testing.opmodel.dev=localhost:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+      CUE_CACHE_DIR: ${{ github.workspace }}/.cue-cache
+      OPM_BIN: ./bin/opm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.0'
+      - name: Build opm
+        run: go build -o bin/opm ./cmd/opm
+      - name: Install cue
+        run: go install cuelang.org/go/cmd/cue@v0.17.1
+      - name: Seed the job-local registry from the tree
+        run: hack/fixtures.sh seed
       - name: Run unit tests
         run: go test ./internal/...
 
@@ -98,7 +122,8 @@ jobs:
     #   seed   publish the tree's fixtures into a job-local registry.
     # Then the registry-backed render-parity program runs against that seed
     # (tree load == registry acquisition at the fixture's declared version),
-    # with core and the catalogs still from GHCR. publish-fixtures.yml
+    # with core and the catalogs still from GHCR. The unit and E2E jobs seed
+    # their own job-local registry the same way. publish-fixtures.yml
     # publishes the same coordinate to GHCR on merge.
     name: Fixtures (gates, seed, render parity)
     runs-on: ubuntu-latest
@@ -177,11 +202,32 @@ jobs:
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
+    # Fixtures from a job-local registry seeded from the tree, as in the
+    # fixtures job: the published-fixture tests and the examples resolve the
+    # tree's fixture version, which GHCR holds only after
+    # publish-fixtures.yml runs on merge. Core and the catalogs still come
+    # from GHCR.
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    env:
+      CUE_REGISTRY: 'testing.opmodel.dev=localhost:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+      OPM_REGISTRY: 'testing.opmodel.dev=localhost:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+      CUE_CACHE_DIR: ${{ github.workspace }}/.cue-cache
+      OPM_BIN: ./bin/opm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.0'
+      - name: Build opm
+        run: go build -o bin/opm ./cmd/opm
+      - name: Install cue
+        run: go install cuelang.org/go/cmd/cue@v0.17.1
+      - name: Seed the job-local registry from the tree
+        run: hack/fixtures.sh seed
       # -timeout matches task test:e2e; see that task's summary for why the
       # 10-minute default truncates a destructive test's cleanup.
       - name: Run E2E tests

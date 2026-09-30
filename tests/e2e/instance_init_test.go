@@ -20,6 +20,16 @@ import (
 	"github.com/open-platform-model/cli/tests/fixtures"
 )
 
+// e2eRegistry is the registry mapping the direct kernel and tidy calls use:
+// OPM_REGISTRY when set (PR CI seeds the tree's fixtures into a job-local
+// registry and maps testing.opmodel.dev to it), else the shipped default.
+func e2eRegistry() string {
+	if r := os.Getenv("OPM_REGISTRY"); r != "" {
+		return r
+	}
+	return config.DefaultRegistry
+}
+
 // podinfoInstancePackage hand-writes the three files `opm instance init`
 // generates for the podinfo fixture into a fresh directory and returns it:
 // a module file pinning the fixture and core at the fixture's own core pin,
@@ -111,7 +121,7 @@ func TestE2E_InstanceInit_GeneratedPackageTidiesAndLoads(t *testing.T) {
 
 	dir, written := podinfoInstancePackage(t)
 
-	res, err := cuemod.Tidy(ctx, dir, cuemod.TidyOptions{Registry: config.DefaultRegistry})
+	res, err := cuemod.Tidy(ctx, dir, cuemod.TidyOptions{Registry: e2eRegistry()})
 	require.NoError(t, err)
 	assert.True(t, res.ModuleUpdated, "tidy must add the rest of the closure")
 
@@ -125,10 +135,10 @@ func TestE2E_InstanceInit_GeneratedPackageTidiesAndLoads(t *testing.T) {
 	}
 	assert.Greater(t, len(tidied.Deps), len(written.Deps), "tidy must add the closure beyond the two written pins")
 
-	_, err = config.NewKernel(config.DefaultRegistry).AcquireInstanceFromDir(ctx, dir)
+	_, err = config.NewKernel(e2eRegistry()).AcquireInstanceFromDir(ctx, dir)
 	require.NoError(t, err, "the tidied package must load through the kernel")
 
-	_, err = cuemod.Tidy(ctx, dir, cuemod.TidyOptions{Registry: config.DefaultRegistry, Check: true})
+	_, err = cuemod.Tidy(ctx, dir, cuemod.TidyOptions{Registry: e2eRegistry(), Check: true})
 	require.NoError(t, err, "the tidied package must pass a tidy check")
 
 	_, err = config.NewKernel(cuemodtest.UnreachableRegistry).AcquireInstanceFromDir(ctx, dir)
@@ -195,7 +205,7 @@ func TestE2E_InstanceInit_PublishedFixture(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	_, err = cuemod.Tidy(ctx, pkgDir, cuemod.TidyOptions{Registry: config.DefaultRegistry, Check: true})
+	_, err = cuemod.Tidy(ctx, pkgDir, cuemod.TidyOptions{Registry: e2eRegistry(), Check: true})
 	require.NoError(t, err, "the generated package must be tidy")
 
 	_, stderr, err = runOPMWithEnv(t, workDir, home, timeout, "instance", "init", "podinfo", path, "-n", "demo")

@@ -7,9 +7,11 @@
 // spec.owner to "operator" (the thin-editor path refuses a locally-sourced
 // module, 0006:D38).
 //
-// Requires testing.opmodel.dev/modules/cli/podinfo@v0 v0.1.4 in the configured
-// registry. It is published to GHCR by .github/workflows/publish-fixtures.yml,
-// so the default registry mapping resolves it.
+// Requires testing.opmodel.dev/modules/cli/podinfo@v0 at the version
+// cue.mod/module.cue pins, in the configured registry. It is published to GHCR
+// by .github/workflows/publish-fixtures.yml on merge, so the default registry
+// mapping resolves it; PR CI resolves it from a job-local registry seeded from
+// the tree (hack/fixtures.sh seed).
 package operator_owned_instance
 
 import (

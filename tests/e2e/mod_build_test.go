@@ -9,9 +9,25 @@ import (
 	"testing"
 	"time"
 
+	"cuelang.org/go/mod/modfile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// podinfoCatalogPin returns the "<path> <version>" of the catalogs/opm pin in
+// the podinfo fixture's own cue.mod, the platform a module-deps render of the
+// fixture reports, so the assertion follows a fixture re-pin.
+func podinfoCatalogPin(t *testing.T, modPath string) string {
+	t.Helper()
+	const catalog = "opmodel.dev/catalogs/opm@v4"
+	data, err := os.ReadFile(filepath.Join(modPath, "cue.mod", "module.cue"))
+	require.NoError(t, err)
+	mf, err := modfile.Parse(data, "module.cue")
+	require.NoError(t, err)
+	dep := mf.Deps[catalog]
+	require.NotNil(t, dep, "the podinfo fixture must pin %s", catalog)
+	return catalog + " " + dep.Version
+}
 
 // runOPMWithEnv runs the opm binary with a custom HOME and configurable
 // timeout. Used for commands like `module build` that need a config.cue
@@ -65,7 +81,7 @@ func TestE2E_ModBuild_FromExampleModule(t *testing.T) {
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Contains(t, stderr, "synthetic instance")
 	assert.Contains(t, stderr, "e2e-podinfo")
-	assert.Contains(t, stderr, "platform: module deps (opmodel.dev/catalogs/opm@v4 v4.0.1; generated module "+filepath.Join(customHome, ".opm", "cache", "platforms"))
+	assert.Contains(t, stderr, "platform: module deps ("+podinfoCatalogPin(t, modPath)+"; generated module "+filepath.Join(customHome, ".opm", "cache", "platforms"))
 	assert.NotContains(t, stderr, "version skew", "the module's own pins cannot skew")
 	assert.NotEmpty(t, stdout, "expected manifest output on stdout")
 }

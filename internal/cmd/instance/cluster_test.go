@@ -103,7 +103,12 @@ func TestInstanceBuild_UnreachableClusterFallsBackToDeps(t *testing.T) {
 	}
 	instanceFile, err := filepath.Abs(filepath.Join("..", "..", "..", "examples", "instances", "podinfo", "instance.cue"))
 	require.NoError(t, err)
-	const registry = "opmodel.dev=ghcr.io/open-platform-model,testing.opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"
+	// OPM_REGISTRY when set: PR CI seeds the tree's fixtures into a job-local
+	// registry, and the examples pin the tree's fixture version.
+	registry := "opmodel.dev=ghcr.io/open-platform-model,testing.opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"
+	if r := os.Getenv("OPM_REGISTRY"); r != "" {
+		registry = r
+	}
 	if _, err := config.NewKernel(registry).SchemaCache().Get(); err != nil {
 		t.Skipf("core v2 schema unavailable (registry/cache): %v", err)
 	}
