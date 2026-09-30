@@ -44,3 +44,6 @@ Thumbs.db
 
 # Generated cluster platform modules (opm home cache beside hack/opm-config.cue)
 hack/cache/
+
+# Agent git worktrees are local checkouts, never content.
+.claude/worktrees/
