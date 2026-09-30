@@ -48,6 +48,16 @@ context: |
   - MINOR: New commands, new flags with defaults
   - PATCH: Bug fixes, performance improvements
   All commits MUST follow Conventional Commits: type(scope): description
+  Pre-GA note: from its first beta the cli (with opmodel.dev/core@v2,
+  opmodel.dev/catalogs/k8s@v1, library and opm-operator) is on the path to GA.
+  A breaking change is still allowed during beta, but only as a `feat!` commit
+  whose `BREAKING CHANGE:` footer is the migration note the CHANGELOG shows. It
+  advances the `-beta.N` counter and never moves the module path to a new
+  major. Stable lines (opmodel.dev/catalogs/opm@v4 and the module fleets) keep
+  the normal SemVer rule: a break is a new major. A core beta break that would
+  force a catalogs/opm major needs owner sign-off. GA drops the suffix:
+  `prerelease: false` plus a visible carrier commit per package, in dependency
+  order.
   Rationale: Enables predictable upgrades and changelog automation.
   
   ### VII. Simplicity & YAGNI
@@ -126,7 +136,7 @@ rules:
     - "Focus: WHY we're doing this, WHAT's in/out of scope"
     - "Updates when: Scope changes, intent clarifies, approach fundamentally shifts"
     - Identify affected command(s) and package(s)
-    - State whether this is MAJOR/MINOR/PATCH per SemVer
+    - "State whether this is MAJOR/MINOR/PATCH per SemVer. Before GA, state the class as it would be after GA and note that beta ships it as beta.N+1 (release-please never cuts a new MAJOR before GA)."
     - Scope MUST cut into at most about five tasks.md sections, each ending green and leaving
       `main` releasable on its own (Principle VIII).
     - "Delivery mode: one PR per change is the default and needs no statement. When a downstream

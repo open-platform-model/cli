@@ -101,6 +101,17 @@ Commits: `type(scope): description`.
 - PATCH: bug fixes, refinements, and performance improvements
 - Commit messages should be concise and scoped. AI attribution is limited to an optional plain `Co-Authored-By: Claude <noreply@anthropic.com>` trailer — never a `Claude-Session:` trailer, session URL, model-versioned co-author line, or "Generated with …" footer.
 
+Pre-GA note: from its first beta the cli (with opmodel.dev/core@v2,
+opmodel.dev/catalogs/k8s@v1, library and opm-operator) is on the path to GA.
+A breaking change is still allowed during beta, but only as a `feat!` commit
+whose `BREAKING CHANGE:` footer is the migration note the CHANGELOG shows. It
+advances the `-beta.N` counter and never moves the module path to a new
+major. Stable lines (opmodel.dev/catalogs/opm@v4 and the module fleets) keep
+the normal SemVer rule: a break is a new major. A core beta break that would
+force a catalogs/opm major needs owner sign-off. GA drops the suffix:
+`prerelease: false` plus a visible carrier commit per package, in dependency
+order.
+
 Versioning communicates compatibility and upgrade risk to users and maintainers.
 
 ---

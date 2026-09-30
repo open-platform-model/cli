@@ -122,6 +122,8 @@ func TestGateOperatorVersionCeiling(t *testing.T) {
 		err := GateOperatorVersionCeiling(ctx, client, "1.0.0")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "older than the cluster operator")
+		assert.Contains(t, err.Error(), "CLI (1.0.0)")
+		assert.Contains(t, err.Error(), "operator (1.1.0-beta.1)")
 	})
 }
 
