@@ -26,6 +26,7 @@ archives:
       - LICENSE
 
 release:
+  prerelease: auto
   extra_files:
     - glob: LICENSE
 

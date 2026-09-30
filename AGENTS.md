@@ -124,7 +124,7 @@ Read when entering `cli/`:
 - `internal/scaffold/` - fetch-based init engine (0011:D20/D25): template-ref grammar + shortcut expansion, the baked official-template table, stable-float version resolution (`compat.HighestStable`), staged-tree copy, wholesale re-identification, and repair-plan detection.
 - `internal/modref/` - published-module resolution (0016:D5): the major-free module path grammar, the `--version` selector (`vN` floats, `X.Y.Z` pins), the float rule (newest stable, else newest non-dev prerelease; the dev predicate is `publish.IsDevTag`), the highest-core-compatible major walk over each candidate's module file, and the stderr report. Shared by `module build`/`module apply` (via `cmdutil.ResolveModuleArg`, which also classifies the positional argument) and `instance init`. Distinct from `scaffold`, whose template grammar and selector differ on purpose.
 - `internal/instinit/` - the `opm instance init` package generator (0016:D1/D7/D9): a pure renderer from typed input to the three files (`cue.mod/module.cue` pinning the module and core, `instance.cue`, `values.cue`), the values ladder (`PickValues`: `initValues`, rendered even when non-concrete, else a fully concrete `debugValues`, else empty; `testdata/initvalues` is a module carrying both), and `Write`, which stages in a sibling directory, completes the closure with `cuemod.Tidy`, and renames into place all or nothing (a registry failure during tidy is a `publish.ConnectivityError`, recognized by `cuemod.IsConnectivityError`).
-- `templates/` - the official template module trees (`minimal`, `standard`, `advanced`) — real CUE modules at `opmodel.dev/templates/<name>` published by release CI through `opm module publish`; deps maintained by the workspace `deps:update:templates` task.
+- `templates/` - the official template module trees (`minimal`, `standard`, `advanced`) — real CUE modules at `opmodel.dev/templates/<name>` published by release CI through `opm module publish`; deps maintained by the workspace `deps:update:templates` task. Re-pinning a template needs `opm module version set` on each touched template in the same PR, or the new pins never publish (release CI skips a version GHCR already holds).
 - `internal/dockercfg/` - single-entry read-modify-write of the standard OCI/docker credential file (`auths[host]` upsert; everything else passes through untouched; used by `registry login`).
 - `internal/kubernetes/` - cluster ops, status, apply, delete, events.
 - `internal/output/` - terminal formatting, log output, tables, manifests.
@@ -138,12 +138,17 @@ Read when entering `cli/`:
 ## Environment Notes
 
 - Go version in `go.mod`: `1.26.0`.
+- **Release line: beta.** The cli releases on the `1.0.0-beta.N` line
+  (`prerelease-type: beta`); a line change travels as a one-shot `Release-As`
+  footer in the carrier's squash commit message, never as a `release-as` key in
+  `release-please-config.json`.
 - **Schema line: OPM v2.** The CLI embeds the library on the core v2 line; the
   cluster Platform CR surface is scalar subscriptions (`{enable?, version!}`,
   registry keys carry the catalog's major suffix), and module identity is read
   verbatim from core-v2 metadata (`metadata.modulePath` is the complete
-  registry address). CUE fixtures pin `opmodel.dev/core` `v2.0.0-alpha.6` and
-  `opmodel.dev/catalogs/opm` `v4.0.1`. There is no local default platform:
+  registry address). CUE fixtures lag the shipped pins until the workspace
+  `deps:pins:fixtures` run moves them, so read a fixture's own `cue.mod` for
+  its versions. There is no local default platform:
   `opm config init` writes `~/.opm/config.cue` only, and no command reads a
   platform from the OPM home (a platform directory an older release seeded
   there is left on disk, and `opm config vet` warns about it). The repo's
@@ -340,6 +345,9 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 - Box-drawing: `[x]` / `[ ]` not Unicode checkmarks.
 - CLI docs: emphasize what happened + how to fix failures.
 - Follow SemVer + Conventional Commits for user-visible changes. The type decides the release: release-please hides `chore`, `test`, `ci` and `build`; `feat`, `fix`, `deps`, `perf`, `docs` and `refactor` release. Pins in `templates/*` are shipped, so bumping them is `fix(deps)`; `examples/*`, `tests/fixtures/*` and `hack/platform/` bumps are `test(fixtures)` (no release). See the workspace commit skill.
+- Beta promise: from its first beta the cli (with `opmodel.dev/core@v2`, `opmodel.dev/catalogs/k8s@v1`, library and opm-operator) is on the path to GA. A breaking change is still allowed during beta, but only as a `feat!` commit whose `BREAKING CHANGE:` footer is the migration note the CHANGELOG shows; it advances the `-beta.N` counter and never moves the module path to a new major. Stable lines (`opmodel.dev/catalogs/opm@v4` and the module fleets) keep the normal SemVer rule: a break is a new major. A core beta break that would force a catalogs/opm major needs owner sign-off. GA drops the suffix: `prerelease: false` plus a visible carrier commit per package, in dependency order.
+- Beta skew rule: an opm-operator `feat!` that the released cli cannot drive merges only after the cli release that can drive it. No minor or major hop during beta (never a `Release-As` to `1.1.0-beta.1` or beyond), since the operator ceiling gate compares MAJOR.MINOR only and refuses nothing inside the `1.0` line.
+- Template rule: re-pinning `templates/*` needs `opm module version set` on each touched template in the same PR, or the new pins never publish.
 
 ### Enhancement references in comments
 

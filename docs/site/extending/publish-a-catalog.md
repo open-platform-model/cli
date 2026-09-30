@@ -9,7 +9,7 @@ weight: 22
 
 ## Before you begin
 
-<!-- The reader must already have: a catalog module whose members vet cleanly (see "Write a trait" and "Write a transformer"); the opm CLI installed (latest cli release is v1.0.0-alpha.21; Verify at writing); push access to the OCI registry their module path maps to. No cluster is needed. Check against: cli/.release-please-manifest.json, cli/internal/cmd/catalog/catalog.go -->
+<!-- The reader must already have: a catalog module whose members vet cleanly (see "Write a trait" and "Write a transformer"); the opm CLI installed (the cli releases on the 1.0.0-beta line; Verify at writing); push access to the OCI registry their module path maps to. No cluster is needed. Check against: cli/.release-please-manifest.json, cli/internal/cmd/catalog/catalog.go -->
 
 ## Steps
 

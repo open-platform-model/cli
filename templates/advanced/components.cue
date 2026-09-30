@@ -142,6 +142,7 @@ _versionLabels: "app.kubernetes.io/version": "\(id.Version)"
 				}
 				scaling: count: 1
 				restartPolicy: "Always"
+				updateStrategy: type: "RollingUpdate"
 			}
 
 			podMetadata: labels: _versionLabels
@@ -182,6 +183,7 @@ _versionLabels: "app.kubernetes.io/version": "\(id.Version)"
 				}
 				scaling: count: 1
 				restartPolicy: "Always"
+				updateStrategy: type: "RollingUpdate"
 			}
 
 			expose: {
