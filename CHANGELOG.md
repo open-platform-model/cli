@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0-alpha.25](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.24...v1.0.0-alpha.25) (2026-09-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **platform:** platform modules passed with --platform or to opm platform check must pin opmodel.dev/core at v2.0.0-alpha.12 or later (cue mod get opmodel.dev/core@v2.0.0-alpha.12 in the module). Platforms enabling two majors of one provider catalog, or two providers of a contract whose defining catalog is disabled or absent, now fail opm platform check.
+
+### Bug Fixes
+
+* **deps:** bump the templates to core v2.0.0-alpha.12 and catalogs/opm 4.4.1 ([e6d9f21](https://github.com/open-platform-model/cli/commit/e6d9f210b80326454270e4de33e3325bd496173b))
+* **platform:** name the registry entries providing an over-subscribed contract ([#241](https://github.com/open-platform-model/cli/issues/241)) ([4d3ace5](https://github.com/open-platform-model/cli/commit/4d3ace52a63635e38ef38215f7b200acb837bdab))
+
 ## [1.0.0-alpha.24](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.23...v1.0.0-alpha.24) (2026-09-29)
 
 
