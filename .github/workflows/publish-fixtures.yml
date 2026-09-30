@@ -3,9 +3,11 @@ name: Publish Fixtures
 # The repo's own test-fixture modules live on the testing domain
 # (testing.opmodel.dev/modules/cli/*) and are published to GHCR, so consumers —
 # examples, e2e testdata, the kind dev cluster, a fresh clone — resolve them
-# from a public registry with no local registry involved. PR CI is the one
-# exception: pr.yml seeds a job-local registry from the tree (hack/fixtures.sh
-# seed) so a fixture bump and its consumers land in one PR; this workflow then
+# from a public registry with no local registry involved. CI is the one
+# exception: the fixtures, unit and E2E jobs in pr.yml and the unit job in
+# ci.yml each seed a job-local registry from the tree (hack/fixtures.sh seed)
+# and resolve testing.opmodel.dev from it, so a fixture bump and its consumers
+# land in one PR and a push to main never races this workflow; this workflow
 # publishes the same coordinate to GHCR on merge.
 #
 # Independent of the cli's release train: a fixture is not release-please
