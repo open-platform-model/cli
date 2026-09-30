@@ -110,7 +110,7 @@ The version is `schema.DefaultSchemaVersion()`, not the error's `Since`: `Since`
 
 ### 4. Pins and sequencing
 
-Development runs against B's pushed head as a Go pseudo-version (`go get github.com/open-platform-model/library@<B head sha>`); the last section replaces it with B's release (expected `v1.0.0-alpha.35`; the supervisor supplies the actual version). `go.mod` never merges on a pseudo-version: the last section is the pin, and it stops and reports if B's release is not out.
+(As delivered, B's release was out before section 1 started, so section 1 pinned it directly; see § 5 item 4.) Development runs against B's pushed head as a Go pseudo-version (`go get github.com/open-platform-model/library@<B head sha>`); the last section replaces it with B's release (expected `v1.0.0-alpha.35`; the supervisor supplies the actual version). `go.mod` never merges on a pseudo-version: the last section is the pin, and it stops and reports if B's release is not out.
 
 ### 5. Section plan
 
