@@ -4,15 +4,15 @@ language: {
 }
 deps: {
 	"cue.dev/x/k8s.io@v0": {
-		v: "v0.11.0"
+		v: "v0.12.0"
 	}
 	"opmodel.dev/catalogs/k8s@v1": {
-		v: "v1.0.0-alpha.3"
+		v: "v1.0.0-alpha.4"
 	}
 	"opmodel.dev/catalogs/opm@v4": {
-		v: "v4.4.0"
+		v: "v4.4.1"
 	}
 	"opmodel.dev/core@v2": {
-		v: "v2.0.0-alpha.10"
+		v: "v2.0.0-alpha.12"
 	}
 }
