@@ -17,7 +17,7 @@ These replace the `task lint` and `task test` gates that `openspec instructions 
 
 ## 1. Adopt the page dialect in docs/site
 
-- [ ] 1.1 Set up the tools and the baseline.
+- [x] 1.1 Set up the tools and the baseline.
   - Write the lint and the page-order helper from `orchestration.md` 4.1, byte for byte, to `<scratch>/opm-dialect-lint.sh` and `<scratch>/opm-page-order.sh`.
   - Save the tree before the change: `mkdir -p <scratch>/before`, then `git -C <wt> archive origin/main docs/site | tar -x -C <scratch>/before`, then `sh <scratch>/opm-page-order.sh <scratch>/before/docs/site > <scratch>/order-before.txt`.
   - Run `sh <scratch>/opm-dialect-lint.sh <wt>/docs/site`.
@@ -27,7 +27,7 @@ These replace the `task lint` and `task test` gates that `openspec instructions 
   - If it prints anything else:
     - A `sidebar:` finding on another page gets the 1.2 edit: the `sidebar:` line the finding names and the `  order: N` line after it become `weight: N`. Name that page in the report. The checks in 1.2, 1.4, 1.5 and 2.2 then count it with the five.
     - Any other kind of finding: stop, and report it under `deviations`.
-- [ ] 1.2 Change the order key to `weight`. In each page below, replace the two front-matter lines `sidebar:` and `  order: N` (lines 5 and 6) with the one line `weight: N`. Keep N the same (design.md, "Weight values"). Leave `title`, `description`, `type` and the rest of the file byte-identical.
+- [x] 1.2 Change the order key to `weight`. In each page below, replace the two front-matter lines `sidebar:` and `  order: N` (lines 5 and 6) with the one line `weight: N`. Keep N the same (design.md, "Weight values"). Leave `title`, `description`, `type` and the rest of the file byte-identical.
 
   | Page under `<wt>/docs/site/` | New line |
   |---|---|
@@ -40,13 +40,13 @@ These replace the `task lint` and `task test` gates that `openspec instructions 
   Verify:
   - `grep -rn -e '^sidebar:' -e '^  order:' <wt>/docs/site` prints nothing.
   - `grep -rn '^weight:' <wt>/docs/site` prints the five lines above, plus one line for each page named under 1.1, and nothing else.
-- [ ] 1.3 Fix the stale path. In `<wt>/docs/site/authoring/publish-a-module.md`, find the planning comment under "Related". It is line 66 before 1.2 and line 65 after. Replace `opmodel.dev/site/content/docs/reference/cli/index.md` with `opmodel.dev/site/content/docs/reference/cli/_index.md`, and change nothing else on the line. Verify: `grep -rn 'index\.md' <wt>/docs/site | grep -v '_index\.md'` prints nothing.
-- [ ] 1.4 Run the dialect and order gates. Verify:
+- [x] 1.3 Fix the stale path. In `<wt>/docs/site/authoring/publish-a-module.md`, find the planning comment under "Related". It is line 66 before 1.2 and line 65 after. Replace `opmodel.dev/site/content/docs/reference/cli/index.md` with `opmodel.dev/site/content/docs/reference/cli/_index.md`, and change nothing else on the line. Verify: `grep -rn 'index\.md' <wt>/docs/site | grep -v '_index\.md'` prints nothing.
+- [x] 1.4 Run the dialect and order gates. Verify:
   - `sh <scratch>/opm-dialect-lint.sh <wt>/docs/site` prints `opm-dialect-lint: OK (...)`.
   - After `sh <scratch>/opm-page-order.sh <wt>/docs/site > <scratch>/order-after.txt`, the command `diff <scratch>/order-before.txt <scratch>/order-after.txt && echo "order unchanged"` prints `order unchanged`.
   - `git -C <wt> diff --stat` lists only the five pages, any page named under 1.1, and this `tasks.md`.
   - `git -C <wt> diff --check` prints nothing.
-- [ ] 1.5 Run `task -d <wt> openspec:check`, `task -d <wt> vet` and `task -d <wt> test:unit`, and get them green. Then stage the five pages, any page named under 1.1, and `openspec/changes/adopt-hugo-page-dialect/tasks.md` by explicit path, and commit `docs(site): adopt the hugo page dialect`.
+- [x] 1.5 Run `task -d <wt> openspec:check`, `task -d <wt> vet` and `task -d <wt> test:unit`, and get them green. Then stage the five pages, any page named under 1.1, and `openspec/changes/adopt-hugo-page-dialect/tasks.md` by explicit path, and commit `docs(site): adopt the hugo page dialect`.
 
 ## 2. Say the site is built with Hugo and Hextra in RFC 0006
 

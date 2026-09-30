@@ -2,8 +2,7 @@
 title: "Publish refusals"
 description: "Why publishing a module or catalog was refused, and how to fix it."
 type: how-to
-sidebar:
-  order: 26
+weight: 26
 ---
 
 <!-- Diagnostics entry for every refusal the publish gates raise in `opm module publish` and `opm catalog publish`. Each gate below is one cause; the headline the CLI prints after "refused: " is quoted in each section so a reader can search for it. Every gate that can run does run, so one publish attempt lists every refusal at once; only a missing cue.mod file and a tree that does not load stop the run early. Check against: cli/internal/publish/gates.go, cli/internal/cmdutil/publish.go -->

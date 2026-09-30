@@ -2,8 +2,7 @@
 title: "Contracts with no provider"
 description: "Why a render refused a provider-fulfilled trait or resource, and how --skip-unprovided renders the rest."
 type: how-to
-sidebar:
-  order: 27
+weight: 27
 ---
 
 <!-- Diagnostics entry for the render refusal a provider-fulfilled contract with no provider on the platform raises, in every render-bearing command (`opm module build`, `vet`, `apply`; `opm instance build`, `vet`, `diff`, `apply`), and for the `--skip-unprovided` flag that renders the rest. The rule is the kernel's (core SPEC §2.1 and §3.1); the CLI passes the switch and words the rows. Check against: cli/internal/workflow/render/validation.go, cli/internal/workflow/render/skipped.go, cli/internal/cmdutil/flags.go -->
