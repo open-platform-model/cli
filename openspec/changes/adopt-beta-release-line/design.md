@@ -50,9 +50,18 @@ Options considered:
 1. Keep the strict compare and have the supervisor enforce ordering (freeze operator main from G5 to G6, follow every operator release with a cli release). Fragile: operator `docs` commits cut releases, and counters restart at `beta.1` in both repos, so headroom is 0 to +1.
 2. Give the cli a higher first beta counter (for example `beta.6`) as headroom. Buys time, fixes nothing, and makes the counters meaningless.
 3. Compare MAJOR.MINOR.PATCH, ignoring only the prerelease. Still refuses operator patch releases the cli has not matched.
-4. **Compare MAJOR.MINOR (chosen).** Owner decision 3; matches the 0021 OQ14 position that cli and operator share MAJOR.MINOR and release patches independently. The gate exists to stop a CLI that predates a CRD or protocol change on a new minor, which it still does.
+4. **Compare MAJOR.MINOR (chosen).** Owner decision 3; matches the 0021 OQ14 position that cli and operator share MAJOR.MINOR and release patches independently.
 
 Exit code and message: unchanged (non-zero, "your CLI (X) is older than the cluster operator (Y) — upgrade the CLI ..."). The refusal now fires only across a minor boundary.
+
+**What this does during beta.** release-please's prerelease strategy on `1.0.0-beta.N` turns `fix`, `feat` and `feat!` alike into `1.0.0-beta.N+1` (the release-workflow delta's "Next release stays on the beta line" scenario). Neither repo reaches a new minor before GA unless a commit forces one. So from this change until GA every cli and every operator release is MAJOR.MINOR `1.0`, and the ceiling refuses nothing between them. That includes a cli `1.0.0-beta.2` against an operator `1.0.0-beta.9` that carries a `feat!` CRD change (the beta promise allows operator breaks as `feat!`, and the CRD API stays `v1alpha1`). The gate is inert through beta; it is not a safety net for beta skew.
+
+This revises enhancement 0006 D24, which the gate implements as a full-semver ceiling (the "CLI-at-least-cluster" invariant, cited by `internal/workflow/apply/thineditor.go` as the reason an old CLI writing spec for a newer operator is the unsafe direction). After this change the invariant holds only per MAJOR.MINOR. During beta, skew safety rests on:
+
+- the CRD field floor (`GateCRDFieldFloor`, `spec.owner` and `status.inventory`), which catches only a CRD missing those fields; and
+- a process rule for the supervisor and operator authors: an operator `feat!` that a released cli cannot drive ships only after the cli release that can, or the operator commit carries `Release-As: 1.1.0-beta.1` (and the cli moves to `1.1` with it), so the ceiling fires across the minor boundary.
+
+Whether the owner accepts an inert gate for the whole beta, and which of the two process-rule branches is canonical, is recorded as an open question for the supervisor. Final ceiling semantics are the canon GA-exit item "ceiling gate semantics final (OQ14)". The live spec Purpose line citing D24 is left as a pointer to the origin; the requirement text in the delta states the MAJOR.MINOR rule. Section 1 also rewrites the `thineditor.go` comment and the `gates.go` doc so neither claims full-version semantics.
 
 ### D2. The version line moves by a squash-message footer, never by config
 
@@ -83,7 +92,7 @@ release:
     - glob: LICENSE
 ```
 
-`auto` marks a tag with a SemVer prerelease suffix as Pre-release. goreleaser's default `release.mode` (`keep-existing`) leaves release-please's notes in place, as it does today. No PR workflow runs goreleaser and the recovery run checks out the tag, so a broken `.goreleaser.yml` would be unfixable for `v1.0.0-beta.1`: section 5 runs `goreleaser check` and a local `goreleaser release --snapshot --clean` (writes only `dist/`, never publishes) before the change can merge. If goreleaser cannot be installed locally, the task records that and the supervisor decides.
+`auto` marks a tag with a SemVer prerelease suffix as Pre-release. goreleaser's default `release.mode` (`keep-existing`) leaves release-please's notes in place, as it does today. Both are settled by the goreleaser release docs (goreleaser.com/customization/release: `prerelease: auto` marks the release as not ready for production when the tag carries a prerelease indicator; `mode` defaults to `keep-existing`, which keeps an existing release body), so no open question remains on the config semantics. The flag does not change what the repository's Latest release resolves to: Latest is `v0.6.0` today (every alpha already has the flag cleared yet is not Latest) and stays there until GA. A snapshot run proves the config parses and builds; only the real release run after the merge shows the flag (task 7.7). No PR workflow runs goreleaser and the recovery run checks out the tag, so a broken `.goreleaser.yml` would be unfixable for `v1.0.0-beta.1`: section 5 runs `goreleaser check` and a local `goreleaser release --snapshot --clean` (writes only `dist/`, never publishes) before the change can merge. If goreleaser cannot be installed locally, the task records that and the supervisor decides.
 
 ## Research & Decisions
 
@@ -111,8 +120,9 @@ release:
 - [goreleaser `auto` misread, or the snapshot differs from the real run] → `goreleaser check` plus a snapshot catches config errors; a failed real run burns `beta.1` (no hand tagging) and the target moves to `beta.2`.
 - [The operator `v1.0.0-alpha.22` embed changes CRDs or RBAC the cli's install plan filters] → Review the `install.yaml` diff and run `go test ./internal/operator/...`; the diff is one reviewable commit.
 - [Templates fail `opm module tidy --check` after the patch] → Run `opm module tidy` on the template and include the result in the same `fix(deps)` commit.
-- [MAJOR.MINOR ceiling lets an operator patch that needs a newer cli through] → Accepted: by the shared-minor rule, a patch never requires a newer cli; a change that does belongs on a new minor.
+- [MAJOR.MINOR ceiling lets an operator release that needs a newer cli through] → Not mitigated by the gate during beta: every release is `1.0.0-beta.N`, so the ceiling refuses nothing (D1). Mitigation is the D1 process rule (operator `feat!` after the enabling cli release, or a forced `1.1.0-beta.1` minor) plus the CRD field floor; owner confirmation is pending.
+- [A template pin change merges without an identity bump, so it never publishes] → `publish-templates.sh --dry-run` passes when the only refusal is "already holds", and the root `deps:update:templates` task re-pins without bumping identity (commit d5b5c01 is that case, and why GHCR `v1.0.2` still pins core alpha.10). This change bumps identity by hand (D5) and writes the rule into AGENTS.md. Enforcement is a follow-up outside this change: a PR check modelled on `hack/fixtures.sh check` that fails when a `templates/*/cue.mod` changed and the template's identity version is already on GHCR.
 
 ## Migration Plan
 
-Merge order (supervisor): PR-A any time; PR-C after G3; PR-B after G2 and G3, merged last with the footer. Then merge the retitled release PR, confirm G4 (Pre-release flag, five archives, `checksums.txt`, templates `1.0.3` on GHCR). Rollback is not a revert: a released tag is immutable, so a bad `beta.1` is fixed forward in `beta.2`.
+Merge order (supervisor): PR-A any time; PR-C after G3; PR-B after G2 and G3, merged last with the footer. Then merge the retitled release PR, confirm G4 (Pre-release flag, five archives, `checksums.txt`, templates `1.0.3` on GHCR). Tasks 7.6 (push, open PR-B) and 7.7 (supervisor merge and G4) happen after the archive commit, so they stay unchecked in the archived tasks.md by design; this paragraph and the G4/G6 gates are their record. The "Next release stays on the beta line" scenario is observed at the next releasable cli commit (the operator-beta embed, G6), whose release PR must read `1.0.0-beta.2`. Rollback is not a revert: a released tag is immutable, so a bad `beta.1` is fixed forward in `beta.2`.
