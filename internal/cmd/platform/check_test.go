@@ -348,6 +348,100 @@ type: "kubernetes"
 }
 `
 
+// collisionCoreVersion is the first core release that evaluates a platform
+// whose enabled entries share contract keys, reporting the shared keys as
+// collisions instead of failing the fold. The colliding fixtures pin it
+// explicitly rather than through schema.DefaultSchemaVersion(): a colliding
+// platform pinned to an older core does not build at all, so the report
+// would never be reached.
+const collisionCoreVersion = "v2.0.0-alpha.13"
+
+// collisionModule is the module file of the colliding fixtures.
+const collisionModule = `module: "testing.opmodel.dev/platforms/check-fixture@v0"
+language: version: "v0.17.0"
+deps: "opmodel.dev/core@v2": v: "` + collisionCoreVersion + `"
+`
+
+// secondMajorContracts declares a second major of the base catalog: one
+// listing the same resource and trait as the first, and one listing the
+// resource alone.
+const secondMajorContracts = `
+_baseCatalogV2: c.#Catalog & {
+	metadata: {
+		modulePath: "testing.opmodel.dev/catalogs/base@v2"
+		version:    "2.0.0"
+	}
+	#resources: (_container.metadata.fqn): _container
+	#traits: (_backup.metadata.fqn):       _backup
+}
+
+_baseCatalogV2ContainerOnly: c.#Catalog & {
+	metadata: {
+		modulePath: "testing.opmodel.dev/catalogs/base@v2"
+		version:    "2.0.0"
+	}
+	#resources: (_container.metadata.fqn): _container
+}
+`
+
+// collidingMajorsPlatform: two majors of one catalog, both enabled, listing
+// the same resource and trait, and nothing providing either. Both keys have
+// two enabled definers, so both collide and nothing is defined or provided.
+const collidingMajorsPlatform = `package platform
+
+import c "opmodel.dev/core@v2"
+
+c.#Platform
+metadata: name: "colliding-majors"
+type: "kubernetes"
+` + fixtureContracts + secondMajorContracts + `
+#registry: {
+	(_baseCatalog.metadata.modulePath): #catalog:   _baseCatalog
+	(_baseCatalogV2.metadata.modulePath): #catalog: _baseCatalogV2
+}
+`
+
+// collidingAndOverSubscribedPlatform: the second major lists the resource
+// alone, so the resource collides while the trait stays defined by the first
+// major, and two provider entries (k8up@v2 and velero@v1) require the trait.
+// The providers require nothing catalog-fulfilled, so no comparable pair
+// confounds the readout.
+const collidingAndOverSubscribedPlatform = `package platform
+
+import c "opmodel.dev/core@v2"
+
+c.#Platform
+metadata: name: "colliding-and-over-subscribed"
+type: "kubernetes"
+` + fixtureContracts + secondMajorContracts + backupProviders + `
+#registry: {
+	(_baseCatalog.metadata.modulePath): #catalog:                _baseCatalog
+	(_baseCatalogV2ContainerOnly.metadata.modulePath): #catalog: _baseCatalogV2ContainerOnly
+	(_k8upCatalog.metadata.modulePath): #catalog:                _k8upCatalog
+	(_veleroCatalog.metadata.modulePath): #catalog:              _veleroCatalog
+}
+`
+
+// disabledSecondMajorPlatform: the second major is in the registry with
+// enable: false. A disabled entry defines nothing, so the platform reads as
+// the first major alone.
+const disabledSecondMajorPlatform = `package platform
+
+import c "opmodel.dev/core@v2"
+
+c.#Platform
+metadata: name: "base-only"
+type: "kubernetes"
+` + fixtureContracts + secondMajorContracts + `
+#registry: {
+	(_baseCatalog.metadata.modulePath): #catalog: _baseCatalog
+	(_baseCatalogV2.metadata.modulePath): {
+		enable:   false
+		#catalog: _baseCatalogV2
+	}
+}
+`
+
 // writePlatformModuleDir writes a platform module holding platformCUE and returns
 // its directory.
 func writePlatformModuleDir(t *testing.T, modFile, platformCUE string) string {
@@ -745,4 +839,92 @@ func TestPlatformCheck_NoSourceRefuses(t *testing.T) {
 	entries, rerr := os.ReadDir(home)
 	require.NoError(t, rerr)
 	assert.Empty(t, entries, "nothing is generated or read under the OPM home")
+}
+
+// Two majors of one catalog listing the same contract keys: the platform
+// evaluates on a core carrying the collision report, and the check names
+// every colliding key with both entries instead of reading the empty
+// defined and provided maps as a vacuous platform.
+func TestPlatformCheck_CollidingMajorsExitValidation(t *testing.T) {
+	dir := writePlatformModuleDir(t, collisionModule, collidingMajorsPlatform)
+
+	report, _, err := runCheck(t, dir)
+	skipIfRegistryUnavailable(t, err)
+	require.Error(t, err, "a colliding platform fails the check; report:\n%s", report)
+
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
+	assert.True(t, exitErr.Printed, "the report already carries the verdict")
+	assert.Contains(t, err.Error(), "2 colliding contract(s), 0 over-subscribed contract(s), 0 comparable transformer pair(s)")
+
+	assert.Contains(t, report, "colliding contracts: 2")
+	assert.Contains(t, report, "testing.opmodel.dev/catalogs/base/resources/container@v1beta1")
+	assert.Contains(t, report, "testing.opmodel.dev/catalogs/base/traits/backup@v1alpha1")
+	assert.Equal(t, 2, strings.Count(report, "defined by  testing.opmodel.dev/catalogs/base@v1, testing.opmodel.dev/catalogs/base@v2"),
+		"each colliding key names both entries; report:\n%s", report)
+	assert.Contains(t, report, "(a colliding contract is left out of the defined, required, unfulfilled and comparable sections; keep one of its defining entries enabled)")
+	assert.Contains(t, report, "routable:  no")
+	assert.Contains(t, report, "2 contracts collide, 0 over-subscribed")
+
+	assert.NotContains(t, report, "vacuously")
+	assert.NotContains(t, report, "define no contracts")
+	assert.NotContains(t, report, "0 contracts are over-subscribed")
+}
+
+// A collision and an over-subscription on different keys are reported under
+// their own headings, colliding first, and the command exits once naming
+// both counts.
+func TestPlatformCheck_CollisionAndOverSubscriptionReportTogether(t *testing.T) {
+	dir := writePlatformModuleDir(t, collisionModule, collidingAndOverSubscribedPlatform)
+
+	report, _, err := runCheck(t, dir)
+	skipIfRegistryUnavailable(t, err)
+	require.Error(t, err, "report:\n%s", report)
+
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
+	assert.True(t, exitErr.Printed)
+	assert.Contains(t, err.Error(), "1 colliding contract(s), 1 over-subscribed contract(s)")
+
+	collidingAt := strings.Index(report, "colliding contracts: 1")
+	overAt := strings.Index(report, "over-subscribed contracts: 1")
+	require.NotEqual(t, -1, collidingAt, "report:\n%s", report)
+	require.NotEqual(t, -1, overAt, "report:\n%s", report)
+	assert.Less(t, collidingAt, overAt, "the colliding heading precedes the over-subscribed heading")
+
+	colliding := report[collidingAt:overAt]
+	assert.Contains(t, colliding, "testing.opmodel.dev/catalogs/base/resources/container@v1beta1")
+	assert.Contains(t, colliding, "defined by  testing.opmodel.dev/catalogs/base@v1, testing.opmodel.dev/catalogs/base@v2")
+	assert.NotContains(t, colliding, "backup@v1alpha1")
+
+	over := report[overAt:]
+	assert.Contains(t, over, "testing.opmodel.dev/catalogs/base/traits/backup@v1alpha1 (defined by testing.opmodel.dev/catalogs/base@v1)")
+	assert.Contains(t, over, "provided by  testing.opmodel.dev/catalogs/k8up@v2, testing.opmodel.dev/catalogs/velero@v1")
+	assert.Contains(t, report, "1 contract collides, 1 over-subscribed")
+	assert.NotContains(t, report, "1 contract is over-subscribed")
+}
+
+// A second major present with enable: false defines nothing: the report
+// reads exactly as the platform without it.
+func TestPlatformCheck_DisabledSecondMajorIsNotACollision(t *testing.T) {
+	withDisabled := writePlatformModuleDir(t, collisionModule, disabledSecondMajorPlatform)
+	baseOnly := writePlatformModuleDir(t, collisionModule, baseOnlyPlatform)
+
+	report, _, err := runCheck(t, withDisabled)
+	skipIfRegistryUnavailable(t, err)
+	require.NoError(t, err, "report:\n%s", report)
+	assert.NotContains(t, report, "colliding contracts")
+
+	want, _, err := runCheck(t, baseOnly)
+	skipIfRegistryUnavailable(t, err)
+	require.NoError(t, err)
+
+	// The first line is the provenance, naming each platform's own directory.
+	body := func(s string) string {
+		_, rest, _ := strings.Cut(s, "\n")
+		return rest
+	}
+	assert.Equal(t, body(want), body(report))
 }

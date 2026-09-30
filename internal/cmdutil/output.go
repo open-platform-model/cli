@@ -74,7 +74,8 @@ func PrintValidationError(msg string, err error) {
 // unchanged.
 func FormatUnresolvedDemands(demands []liberrors.UnresolvedDemand) string {
 	var b strings.Builder
-	for _, d := range demands {
+	for i := range demands {
+		d := &demands[i]
 		fmt.Fprintf(&b, "component %q: unresolved %s demand %q\n", d.Component, d.Kind, d.FQN)
 		switch {
 		case len(d.Alternatives) > 0 && d.DefinedBy != "":

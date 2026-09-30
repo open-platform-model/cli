@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/open-platform-model/library/opm/schema"
+
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/platform"
@@ -273,9 +275,10 @@ type: "kubernetes"
 	assert.Empty(t, stdout, "nothing is rendered when the render is refused before staging")
 	assert.Contains(t, stderr, "render failed")
 	assert.Contains(t, stderr, "providedBy")
-	assert.Contains(t, stderr, "2.0.0-alpha.12")
+	assert.Contains(t, stderr, schema.ProvidedBySince)
 	assert.Contains(t, stderr, "the platform module at "+platformDir)
-	assert.Contains(t, stderr, "cue mod get opmodel.dev/core@v2.0.0-alpha.12")
+	// The re-pin names the core release the kernel was verified against.
+	assert.Contains(t, stderr, "cue mod get opmodel.dev/core@"+schema.DefaultSchemaVersion())
 }
 
 // libModulePath is a module no registry serves: the never-published

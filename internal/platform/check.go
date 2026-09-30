@@ -55,6 +55,17 @@ type Report struct {
 	// only to be converted into.
 	Comparable []libplatform.ComparablePredicates
 
+	// Collisions lists the contract keys more than one enabled registry
+	// entry's catalog lists. A colliding key is in none of Defined,
+	// RequiredBy, Unfulfilled or Comparable, so the fulfilled and
+	// discriminated verdicts can read yes while Collisions is non-empty;
+	// routable reads no.
+	Collisions []string
+
+	// CollidingEntries maps each colliding key to the registry keys (catalog
+	// path plus major) of the enabled entries listing it.
+	CollidingEntries map[string][]string
+
 	// fulfilled, routable and discriminated are the inventory's own
 	// verdicts, kept unexported so the three lists and their verdicts
 	// cannot drift apart in a caller-built Report: NewReport is the only
@@ -68,20 +79,23 @@ type Report struct {
 // inventory read off its build.
 func NewReport(res Resolution, inv *libplatform.ContractInventory) Report {
 	return Report{
-		Resolution:     res,
-		Defined:        inv.DefinedBy,
-		RequiredBy:     inv.RequiredBy,
-		ProvidedBy:     inv.ProvidedBy,
-		Unfulfilled:    inv.Unfulfilled,
-		OverSubscribed: inv.OverSubscribed,
-		Comparable:     inv.Comparable,
-		fulfilled:      inv.Fulfilled,
-		routable:       inv.Routable,
-		discriminated:  inv.Discriminated,
+		Resolution:       res,
+		Defined:          inv.DefinedBy,
+		RequiredBy:       inv.RequiredBy,
+		ProvidedBy:       inv.ProvidedBy,
+		Unfulfilled:      inv.Unfulfilled,
+		OverSubscribed:   inv.OverSubscribed,
+		Comparable:       inv.Comparable,
+		Collisions:       inv.Collisions,
+		CollidingEntries: inv.CollidingEntries,
+		fulfilled:        inv.Fulfilled,
+		routable:         inv.Routable,
+		discriminated:    inv.Discriminated,
 	}
 }
 
-// Routable reports whether any provider-fulfilled contract is over-subscribed.
+// Routable reports whether no provider-fulfilled contract is over-subscribed
+// and no contract key collides.
 // It is one of the two values that decide `opm platform check`'s exit status,
 // [Report.Discriminated] being the other: 0015:D18 makes an
 // unfulfilled contract a report and never a gate, so a report that is not
@@ -100,7 +114,7 @@ func (r Report) Render() string {
 	var b strings.Builder
 	b.WriteString(r.Resolution.Describe() + "\n")
 
-	if len(r.Defined) == 0 && len(r.ProvidedBy) == 0 {
+	if len(r.Defined) == 0 && len(r.ProvidedBy) == 0 && len(r.Collisions) == 0 {
 		b.WriteString("\nthe enabled catalogs define no contracts — nothing was verified here.\n" +
 			"A platform whose catalogs populate no contract maps produces an empty\n" +
 			"inventory, which is not the same answer as a platform whose contracts all\n" +
@@ -112,7 +126,9 @@ func (r Report) Render() string {
 	}
 
 	fmt.Fprintf(&b, "\ndefined contracts: %d\n", len(r.Defined))
-	if len(r.Defined) == 0 {
+	// Under a collision the catalogs do define contracts, more than once;
+	// the colliding section's note explains why none is listed here.
+	if len(r.Defined) == 0 && len(r.Collisions) == 0 {
 		b.WriteString("  The enabled catalogs define no contracts. The provider counts below come\n" +
 			"  from the enabled transformers' own requirements.\n")
 	}
@@ -131,6 +147,16 @@ func (r Report) Render() string {
 		for _, fqn := range sortedCopy(r.Unfulfilled) {
 			fmt.Fprintf(&b, "  %s%s\n", fqn, definedByClause(r.Defined[fqn]))
 		}
+	}
+
+	if len(r.Collisions) > 0 {
+		fmt.Fprintf(&b, "\ncolliding contracts: %d\n", len(r.Collisions))
+		for _, fqn := range sortedCopy(r.Collisions) {
+			fmt.Fprintf(&b, "  %s\n", fqn)
+			fmt.Fprintf(&b, "    defined by  %s\n", strings.Join(sortedCopy(r.CollidingEntries[fqn]), ", "))
+		}
+		b.WriteString("  (a colliding contract is left out of the defined, required, unfulfilled " +
+			"and comparable sections; keep one of its defining entries enabled)\n")
 	}
 
 	if len(r.OverSubscribed) > 0 {
@@ -161,7 +187,7 @@ func (r Report) Render() string {
 	}
 
 	b.WriteString("\n" + verdictLine("fulfilled", r.fulfilled, len(r.Unfulfilled), "contract", "unfulfilled"))
-	b.WriteString(verdictLine("routable", r.routable, len(r.OverSubscribed), "contract", "over-subscribed"))
+	b.WriteString(r.routableLine())
 	b.WriteString(verdictLine("discriminated", r.discriminated, len(r.Comparable), "pair", "comparable"))
 	return strings.TrimRight(b.String(), "\n")
 }
@@ -180,6 +206,21 @@ func verdictLine(label string, ok bool, n int, noun, condition string) string {
 		verb, noun = "are", noun+"s"
 	}
 	return fmt.Sprintf("%-10s no — %d %s %s %s\n", label+":", n, noun, verb, condition)
+}
+
+// routableLine words the routable verdict. Without a collision it is
+// verdictLine's over-subscription wording; under one it names both counts,
+// so a collision-only platform never reads as refused for zero
+// over-subscribed contracts.
+func (r Report) routableLine() string {
+	if len(r.Collisions) == 0 {
+		return verdictLine("routable", r.routable, len(r.OverSubscribed), "contract", "over-subscribed")
+	}
+	noun, verb := "contract", "collides"
+	if len(r.Collisions) != 1 {
+		noun, verb = "contracts", "collide"
+	}
+	return fmt.Sprintf("%-10s no — %d %s %s, %d over-subscribed\n", "routable:", len(r.Collisions), noun, verb, len(r.OverSubscribed))
 }
 
 // sortedRows copies the comparable rows and orders them by broader then

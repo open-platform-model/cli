@@ -30,11 +30,12 @@ func NewPlatformCheckCmd(cfg *config.GlobalConfig) *cobra.Command {
 Builds the resolved platform module and reports the contract inventory core
 derives from it: every contract the enabled catalogs define and the catalog
 that defines each, the transformers that implement it, the provider-fulfilled
-contracts nothing implements, the provider-fulfilled contracts required by
-transformers of more than one enabled registry entry, with the registry keys
-providing each (two majors of one catalog are two entries), and every pair of
-transformers whose match predicates are comparable over a shared
-catalog-fulfilled contract.
+contracts nothing implements, the contract keys more than one enabled registry
+entry defines, with the entries defining each, the provider-fulfilled
+contracts required by transformers of more than one enabled registry entry,
+with the registry keys providing each (two majors of one catalog are two
+entries), and every pair of transformers whose match predicates are
+comparable over a shared catalog-fulfilled contract.
 
 The command applies and renders nothing. It contacts a cluster only to read
 its Platform, when neither [dir] nor --platform is given. A cold module cache
@@ -43,6 +44,9 @@ still fetches the platform's pinned core and catalogs.
 The exit code carries what platform-package generation refuses on, not the
 severity of the word:
 
+  colliding         exits with the validation error code, because a platform
+                    package cannot be generated until all but one of the
+                    registry entries defining a contract key is disabled
   over-subscribed   exits with the validation error code, because a platform
                     package cannot be generated from an over-subscribed
                     platform
@@ -80,7 +84,9 @@ Examples:
 // runPlatformCheck resolves the platform, builds it, and prints the contract
 // inventory report. Routability and discrimination decide the exit status —
 // the two conditions platform-package generation refuses on (0015:D5,
-// 0010:D37); an unfulfilled contract never does (0015:D18).
+// 0010:D37); an unfulfilled contract never does (0015:D18). A colliding
+// contract key makes the platform not routable, so it fails the command
+// through the same verdict.
 func runPlatformCheck(ctx context.Context, args []string, cfg *config.GlobalConfig, platformFlag string, kf cmdutil.K8sFlags) error {
 	argDir := ""
 	if len(args) > 0 {
@@ -123,15 +129,15 @@ func runPlatformCheck(ctx context.Context, args []string, cfg *config.GlobalConf
 
 	report := platform.NewReport(res, inv)
 	output.Println(report.Render())
-	// Both counts are named, whichever refusal fired: the two have
-	// different fixes (disable a competing catalog; discriminate the
-	// predicates), so a single combined verdict would hide which one is
-	// being reported.
+	// Every count is named, whichever refusal fired: they have different
+	// fixes (disable all but one entry defining a key; disable a competing
+	// provider; discriminate the predicates), so a single combined verdict
+	// would hide which one is being reported.
 	if !report.Routable() || !report.Discriminated() {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitValidationError,
-			Err: fmt.Errorf("platform %s cannot generate a platform package: %d over-subscribed contract(s), %d comparable transformer pair(s)",
-				dir, len(report.OverSubscribed), len(report.Comparable)),
+			Err: fmt.Errorf("platform %s cannot generate a platform package: %d colliding contract(s), %d over-subscribed contract(s), %d comparable transformer pair(s)",
+				dir, len(report.Collisions), len(report.OverSubscribed), len(report.Comparable)),
 			Printed: true,
 		}
 	}

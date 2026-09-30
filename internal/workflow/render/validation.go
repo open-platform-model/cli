@@ -126,8 +126,8 @@ func refusalHint(err error, res platform.Resolution) string {
 // anyUnprovided reports whether any demand is one --skip-unprovided would
 // have skipped.
 func anyUnprovided(demands []liberrors.UnresolvedDemand) bool {
-	for _, d := range demands {
-		if d.Unprovided {
+	for i := range demands {
+		if demands[i].Unprovided {
 			return true
 		}
 	}
