@@ -11,12 +11,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	liberrors "github.com/open-platform-model/library/opm/errors"
 	"github.com/open-platform-model/library/opm/schema"
 
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/internal/platform"
+	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
 // The fixture platforms below declare their catalogs inline rather than
@@ -653,6 +656,7 @@ type: "kubernetes"
 	assert.Contains(t, err.Error(), "#contracts")
 	assert.Contains(t, err.Error(), "2.0.0-alpha.9")
 	assert.Contains(t, err.Error(), dir)
+	assertCoreTooOld(t, err, dir, "#contracts", "2.0.0-alpha.9")
 	assert.Empty(t, report)
 }
 
@@ -676,7 +680,47 @@ deps: "opmodel.dev/core@v2": v: "v2.0.0-alpha.9"
 	assert.Contains(t, err.Error(), `"comparable"`)
 	assert.Contains(t, err.Error(), "2.0.0-alpha.10")
 	assert.Contains(t, err.Error(), dir)
+	assertCoreTooOld(t, err, dir, "comparable", "2.0.0-alpha.10")
 	assert.Empty(t, report, "no partial report is printed")
+}
+
+// A platform pinning the core release before the provider count
+// (#contracts.providedBy) is refused naming the field and the release that
+// derives it, with the directory and the re-pin command, rather than
+// reporting a count of the CLI's own.
+func TestPlatformCheck_CoreWithoutTheProviderCountNamesTheRelease(t *testing.T) {
+	dir := writePlatformModuleDir(t, `module: "testing.opmodel.dev/platforms/check-fixture@v0"
+language: version: "v0.17.0"
+deps: "opmodel.dev/core@v2": v: "v2.0.0-alpha.11"
+`, undiscriminatedPlatform)
+
+	report, _, err := runCheck(t, dir)
+	skipIfRegistryUnavailable(t, err)
+	require.Error(t, err)
+
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
+	assert.Contains(t, err.Error(), `"providedBy"`)
+	assert.Contains(t, err.Error(), dir)
+	assertCoreTooOld(t, err, dir, "providedBy", schema.ProvidedBySince)
+	assert.Empty(t, report, "no partial report is printed")
+}
+
+// assertCoreTooOld asserts that err carries the library's older-core
+// refusal for field and since, and the re-pin hint naming dir and the core
+// release the kernel was verified against.
+func assertCoreTooOld(t *testing.T, err error, dir, field, since string) {
+	t.Helper()
+	var tooOld *liberrors.PlatformCoreTooOldError
+	require.ErrorAs(t, err, &tooOld)
+	assert.Equal(t, field, tooOld.Field)
+	assert.Equal(t, since, tooOld.Since)
+	var detail *oerrors.DetailError
+	require.ErrorAs(t, err, &detail)
+	assert.Equal(t, dir, detail.Location)
+	assert.Equal(t, platform.CoreRepinHint(dir), detail.Hint)
+	assert.Contains(t, err.Error(), "cue mod get opmodel.dev/core@"+schema.DefaultSchemaVersion())
 }
 
 // TestPlatformCheck_NoSourceRefuses covers "platform check with no source

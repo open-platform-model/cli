@@ -24,7 +24,9 @@ const renderFailedMsg = "render failed"
 // failed pair) prints the kernel's message followed by the diagnostics rows
 // it carries. A skew refusal (*liberrors.SkewError, before evaluation)
 // prints the kernel's message verbatim: it already names the path and both
-// versions. A duplicate-identity refusal (*objectset.DuplicateIdentitiesError,
+// versions. An older-core refusal (*liberrors.PlatformCoreTooOldError, before
+// staging) prints verbatim too: the library's message names the platform,
+// the missing field and the core release required. A duplicate-identity refusal (*objectset.DuplicateIdentitiesError,
 // raised by the CLI from the library's helper after the render) is the
 // library's message split at its first newline: the header under the
 // render-failed header, the identity rows as details, so the CLI and the
@@ -45,6 +47,11 @@ func printValidationError(err error) {
 	}
 	var skewErr *liberrors.SkewError
 	if errors.As(err, &skewErr) {
+		output.Error(fmt.Sprintf("%s: %s", renderFailedMsg, err))
+		return
+	}
+	var tooOld *liberrors.PlatformCoreTooOldError
+	if errors.As(err, &tooOld) {
 		output.Error(fmt.Sprintf("%s: %s", renderFailedMsg, err))
 		return
 	}
@@ -76,14 +83,24 @@ const (
 )
 
 // refusalHint is the remediation a render refusal gets beside the kernel's
-// verdict, or "" when there is none. An unresolved demand the kernel marks
-// unprovided names the three ways out, whatever the platform source.
+// verdict, or "" when there is none. A --platform directory pinning a core
+// older than a field the kernel reads names the directory and the re-pin
+// command; a generated platform pins the verified core, so no other source
+// gets that hint. An unresolved demand the kernel marks unprovided names the
+// three ways out, whatever the platform source.
 // Otherwise, against a platform generated from the render's own deps (a
 // module's or an instance package's), an unresolved demand names the
 // provider-fulfilled route through --platform, and an unmatched component
 // under a platform with no catalog names the missing pin and the tidy
 // command for the kind.
 func refusalHint(err error, res platform.Resolution) string {
+	var tooOld *liberrors.PlatformCoreTooOldError
+	if errors.As(err, &tooOld) {
+		if res.Source == platform.SourceFlagDir {
+			return platform.CoreRepinHint(res.Dir)
+		}
+		return ""
+	}
 	var unresolved *liberrors.UnresolvedDemandsError
 	isUnresolved := errors.As(err, &unresolved)
 	if isUnresolved && anyUnprovided(unresolved.Demands) {
