@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-beta.2](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.1...v1.0.0-beta.2) (2026-09-30)
+
+
+### Bug Fixes
+
+* **deps:** embed opm-operator v1.0.0-beta.1 ([#256](https://github.com/open-platform-model/cli/issues/256)) ([1cb10ca](https://github.com/open-platform-model/cli/commit/1cb10ca08ce0e053c0963ad1d86e0b3b954a2c53))
+
 ## [1.0.0-beta.1](https://github.com/open-platform-model/cli/compare/v1.0.0-alpha.27...v1.0.0-beta.1) (2026-09-30)
 
 
