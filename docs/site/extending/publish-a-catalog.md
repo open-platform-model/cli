@@ -2,8 +2,7 @@
 title: "Publish a catalog"
 description: "Publish a catalog so platforms can subscribe to it."
 type: how-to
-sidebar:
-  order: 22
+weight: 22
 ---
 
 <!-- One sentence: opm catalog publish pushes a catalog to an OCI registry at the path and version the catalog itself declares, after running every publish gate, so that a platform can import it. The reader needs it once their catalog's resources, traits and transformers pass their own checks. Say that publish pushes the committed directory exactly, with no build step and no version rewriting, and that a published tag can never be replaced. Check against: cli/internal/cmd/catalog/publish.go, cli/internal/publish/publish.go, cli/internal/publish/registry.go -->

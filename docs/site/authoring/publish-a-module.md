@@ -2,8 +2,7 @@
 title: "Publish a module"
 description: "Publish a module to an OCI registry so others can install it."
 type: how-to
-sidebar:
-  order: 24
+weight: 24
 ---
 
 <!-- One sentence: `opm module publish` pushes a module to an OCI registry at the path and version the module itself declares, after a set of checks that refuse anything a consumer could not load. Use it when a module is ready for others to import or install.
@@ -63,4 +62,4 @@ Check against: cli/internal/publish/registry.go (gateAlreadyPublished, nextPatch
 ## Related
 
 <!-- By title: the reference entries "CLI reference" (`opm module publish`, `opm module version set`, `opm registry login`) and "Registry namespaces", the diagnostics entry "Publish refusals", and the concept page "Versions in OPM".
-Check against: opmodel.dev/site/content/docs/reference/cli/index.md, cli/docs/site/reference/registry-namespaces.md, cli/docs/site/diagnostics/publish-refusals.md, core/docs/site/concepts/versions.md -->
+Check against: opmodel.dev/site/content/docs/reference/cli/_index.md, cli/docs/site/reference/registry-namespaces.md, cli/docs/site/diagnostics/publish-refusals.md, core/docs/site/concepts/versions.md -->
