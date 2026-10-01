@@ -131,7 +131,7 @@ A local run zips whatever is on disk. Before running on this worktree, `git clea
 
 ## 2. Changed implies bumped, version order (publish-templates.sh, pr.yml, release.yml comments, AGENTS.md)
 
-- [ ] 2.1 `publish-templates.sh`, per design.md D3, D4 and D7:
+- [x] 2.1 `publish-templates.sh`, per design.md D3, D4 and D7:
   - Add `token` (anonymous pull token, never `GHCR_AUTH`), `published_zip` (exactly one `application/zip` layer; digest format checked; blob fetched with `-L` and verified by `sha256sum`) and `same_as_published`, which unzips the published zip and the tree zip from 1.1 and runs `diff -ru published tree`: 0 passes, 1 fails with the diff (header timestamps stripped, at most 60 lines) and the bump message, and anything else fails.
   - Add `stable_versions <repo> <major>`: the anonymous token request (200 reads the token, 403 means no versions, anything else fails), then `GET /v2/<repo>/tags/list?n=1000`, following `Link: <...>; rel="next"` (at most 20 pages). 200 appends the tags, 403 or 404 on the first page means no versions, anything else fails. It prints the bare `<major>.X.Y` stable versions, sorted with `sort -t. -k1,1n -k2,2n -k3,3n`.
   - In `gate`, right after the identity read: `Version` must be strict stable `X.Y.Z`.
@@ -143,14 +143,14 @@ A local run zips whatever is on disk. Before running on this worktree, `git clea
   - Do not edit `hack/fixtures.sh`.
 
   Verify: `shellcheck` is clean.
-- [ ] 2.2 Comments only. `pr.yml` `template-gates` and `release.yml` `publish-templates` say that a template whose tree differs from its published artifact, or whose version is not the one `opm module init` resolves, fails, in the release job before any publish. Neither checkout changes. Verify: actionlint is clean.
-- [ ] 2.3 `AGENTS.md`, both lines together:
+- [x] 2.2 Comments only. `pr.yml` `template-gates` and `release.yml` `publish-templates` say that a template whose tree differs from its published artifact, or whose version is not the one `opm module init` resolves, fails, in the release job before any publish. Neither checkout changes. Verify: actionlint is clean.
+- [x] 2.3 `AGENTS.md`, both lines together:
   - Line 128 (`templates/` entry): replace "Re-pinning a template needs ... (release CI skips a version GHCR already holds)." with: "Any change to a template's files, its `cue.mod` pins and comments included, needs `opm module version set` on that template, to a stable version above its highest published one, before the next release: published versions are immutable, and `.github/scripts/publish-templates.sh` fails the `template-gates` PR job and the release run (before any publish, so the release stays a draft) when a template's tree differs from the artifact GHCR holds at its declared version, holds a file its module zip omits (a symlink, for one), or declares a prerelease or an older version."
   - Line 351 (Template rule): replace it with: "Template rule: any change under `templates/<t>/` bumps that template with `opm module version set` in the same change, direct pushes included; see the `templates/` entry for where it is enforced."
 
   Verify: `grep -n "never publish" AGENTS.md` returns nothing.
-- [ ] 2.4 Harness, on this worktree, in both modes. Verify: exit 0, and each template prints `v1.0.3 already published and identical to the tree`. Publish mode prints three "already published; skipped" lines and no `WOULD PUBLISH`.
-- [ ] 2.5 In the scratch clone from 1.4, put each case on its own branch from the clone's HEAD and run `$S/run.sh $S/clone --dry-run` unless stated otherwise. Verify:
+- [x] 2.4 Harness, on this worktree, in both modes. Verify: exit 0, and each template prints `v1.0.3 already published and identical to the tree`. Publish mode prints three "already published; skipped" lines and no `WOULD PUBLISH`.
+- [x] 2.5 In the scratch clone from 1.4, put each case on its own branch from the clone's HEAD and run `$S/run.sh $S/clone --dry-run` unless stated otherwise. Verify:
   - (C) Only 1.6's pin change, without the bump: exit 1. The diff shows `-v: "v4.4.4"` and `+v: "v4.4.3"` in `cue.mod/module.cue`, and the message names minimal and `opm module version set`. Publish mode: exit 1, no `WOULD PUBLISH`.
   - (D) 1.6's branch: exit 0, and minimal reports `GO` at v1.0.4 and `passes every gate and is not published yet`.
   - (E) A comment-only edit in `templates/standard/module.cue`: exit 1, and the diff shows the comment line.
@@ -163,25 +163,25 @@ A local run zips whatever is on disk. Before running on this worktree, `git clea
   - (LOW) `FAULT=tags-high` on 1.6's branch, in both modes: exit 1, `v1.0.4 is not above the highest published v1.0.9` for minimal, and `v1.0.3 is published, but 'opm module init' fetches the highest published v1.0.9` for advanced and standard.
   - (V) The branch from 1.8: exit 1, `gates failed for: minimal standard`, standard's diff showing the added comment.
   - (R) C tagged `v1.0.0-beta.5` in the clone, publish mode: exit 1. An unrelated commit on top, dry-run: exit 1. That commit tagged `v1.0.0-beta.6`, publish mode: exit 1. Minimal differs each time, and nothing is published.
-- [ ] 2.6 History replays, publish mode. Copy this worktree's script to `$S/publish-templates.sh`, run with `SCRIPT=$S/publish-templates.sh`, and check each tag out in the clone. Verify:
+- [x] 2.6 History replays, publish mode. Copy this worktree's script to `$S/publish-templates.sh`, run with `SCRIPT=$S/publish-templates.sh`, and check each tag out in the clone. Verify:
   - `v1.0.0-alpha.22`: exit 1; advanced fails vet, and minimal and standard fail with `v1.0.2 is published, but 'opm module init' fetches the highest published v1.0.3`.
   - `v1.0.0-alpha.25`, `v1.0.0-alpha.26` and `v1.0.0-alpha.27`: exit 1 with the same three failures.
   - `v1.0.0-beta.1`: exit 0, all three identical and skipped.
   - Positive control, with `SCRIPT` pointing at a scratch copy whose published-version order check is removed: `v1.0.0-alpha.22` prints `v1.0.2 already published and identical to the tree` for minimal and standard (the content check reproduces a publish made by an older opm), and RB's dry-run exits 0 (RB is caught by the order rule alone).
   - No log has a `WOULD PUBLISH` line.
-- [ ] 2.7 No history needed. Verify:
+- [x] 2.7 No history needed. Verify:
   - A `git archive HEAD` export of this worktree (no `.git`): exit 0 in both modes, all three identical.
   - A `git clone --depth 1 file://<this worktree>` (origin removed): `git rev-parse --is-shallow-repository` prints `true`, and the dry-run exits 0 with all three identical.
-- [ ] 2.8 New template: in a clone branch, copy `templates/minimal` to `templates/zzprobe` and rename its module path, identity `ModulePath`, package clause and identity import. Verify: the dry-run exits 0 with `GO` for zzprobe (GHCR answers its token request with 403, read as no versions). Publish mode exits 0 with exactly one `WOULD PUBLISH ./templates/zzprobe/`.
-- [ ] 2.9 Faults, on this worktree. Verify:
+- [x] 2.8 New template: in a clone branch, copy `templates/minimal` to `templates/zzprobe` and rename its module path, identity `ModulePath`, package clause and identity import. Verify: the dry-run exits 0 with `GO` for zzprobe (GHCR answers its token request with 403, read as no versions). Publish mode exits 0 with exactly one `WOULD PUBLISH ./templates/zzprobe/`.
+- [x] 2.9 Faults, on this worktree. Verify:
   - With `FAULT=token` and `FAULT=tags`, each dry-run exits 1 and names every template with `cannot list the published versions on GHCR; a fetch error never counts as unpublished`.
   - With `FAULT=manifest` and `blob`, each dry-run exits 1 and names every template with `cannot fetch the published v1.0.3 from GHCR; a fetch error never counts as unpublished`.
   - With `FAULT=digest`, the dry-run also prints `downloaded blob does not match sha256:...`.
   - With `FAULT=cue-out`, the dry-run prints `cannot build the tree's module zip` for every template.
   - With `FAULT=blob` in publish mode: exit 1, no `WOULD PUBLISH`.
   - `env -i PATH=/nonexistent /bin/bash .github/scripts/publish-templates.sh --dry-run` prints `==> missing tool: cue` and exits 1. (`env -i PATH=/nonexistent bash ...` cannot find `bash` itself and exits 127 without running the script.)
-- [ ] 2.10 After every run of this section, `$S/docker` and `$S/xdg` are empty, `$S/home` holds only `.opm` (and `.cache`), and no log has `REFUSED CUE PUBLISH`.
-- [ ] 2.11 `task fmt`, `task lint`, `task test:unit` and `task openspec:check` are green. Then commit `ci(templates): fail a template whose tree differs from its published version`.
+- [x] 2.10 After every run of this section, `$S/docker` and `$S/xdg` are empty, `$S/home` holds only `.opm` (and `.cache`), and no log has `REFUSED CUE PUBLISH`.
+- [x] 2.11 `task fmt`, `task lint`, `task test:unit` and `task openspec:check` are green. Then commit `ci(templates): fail a template whose tree differs from its published version`.
 
 ## 3. Publish templates before goreleaser builds the release (release.yml)
 

@@ -100,8 +100,11 @@ jobs:
     # the same script the release publishes through, so a template that would
     # fail the release fails the PR first. The gates include `opm module vet`,
     # which renders each template's debugValues, and a check that the tree
-    # equals its module zip, so what vet read is what publishes. The release
-    # runs every gate on every template before it publishes any.
+    # equals its module zip, so what vet read is what publishes. A template
+    # whose tree differs from the artifact GHCR holds at its declared version,
+    # or whose version is not the one `opm module init` resolves (the highest
+    # published stable version, or an unpublished one above it), fails; the
+    # release job runs the same gates on every template before any publish.
     name: Template Publish Gates (dry-run)
     runs-on: ubuntu-latest
     steps:
