@@ -1,19 +1,41 @@
 name: Release
 
+# release-please (as the opm-release-please App) creates the release tag and a
+# draft GitHub Release; goreleaser uploads every asset into that draft and
+# publishes it last. Release tags are immutable: nothing here moves, deletes
+# or re-creates a tag, and a published release is never changed.
+#
+# The release-please step uses the App token with no GITHUB_TOKEN fallback.
+# Only the App may create a tag, and release-please swallows a refused tag
+# creation (any 422), so another token would leave a draft with no tag.
+#
+# Recovery runbook:
+#   - Draft with missing or partial assets: re-run the failed jobs, or run
+#     this workflow by hand with the tag.
+#   - Published release that is wrong or incomplete: cut the next patch;
+#     never re-tag, never delete.
+#   - Tag with no GitHub Release: re-run the release-please job of the run
+#     that merged the release PR; a manual run cannot fix it.
+#   - A second, empty draft for the same tag (a release-please re-run): the
+#     owner removes it in the browser; the workflow never deletes a release.
+#   - A draft whose tag does not exist (the goreleaser checkout fails on the
+#     tag): release-please ran with a token that may not create tags. Restore
+#     the App token, set the release PR back to autorelease: pending and
+#     re-run the release-please job; the owner removes the tagless draft in
+#     the browser.
+
 on:
   push:
     branches:
       - main
-  # Recovery for a release that exists without its artifacts. release-please
-  # can create the tag and the GitHub release and then fail on a later API
-  # call (v1.0.0-alpha.21, 2026-09-15); its outputs are then unset, both jobs
-  # below are skipped, and every later run sees the release as done. Run this
-  # workflow by hand with that tag to build the binaries and publish the
-  # templates the tag carries.
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag, for example v1.0.0-alpha.21
+        description: >-
+          Existing release tag, for example v1.0.0-beta.2. A draft is
+          finished and published; a published release is refused (cut the
+          next patch); a tag with no release is refused (re-run the
+          release-please job of the run that merged the release PR).
         required: true
         type: string
 
@@ -55,9 +77,51 @@ jobs:
     # would skip this job too.
     if: always() && (needs.release-please.outputs.releases_created == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    # One run per tag: two runs on one draft would delete each other's
+    # uploads and the later one would create a second release for the tag.
+    concurrency:
+      group: goreleaser-${{ needs.release-please.outputs.tag_name || inputs.tag }}
+      cancel-in-progress: false
     permissions:
+      # The draft check needs write: GitHub hides draft releases from
+      # read-only tokens, so with contents: read every draft reads as missing.
       contents: write
     steps:
+      - name: Check the release is still a draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          rc=0
+          out=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>&1) || rc=$?
+          if [ "$rc" -eq 0 ]; then
+            case "$out" in
+              true)
+                echo "release ${TAG} is a draft; building" ;;
+              false)
+                echo "::error::release ${TAG} is already published; its assets can no longer change and its tag never moves."
+                echo "release ${TAG} is already published; its assets can no longer change and its tag never moves."
+                echo "Cut the next patch release instead."
+                exit 1 ;;
+              *)
+                echo "::error::unexpected draft state for ${TAG}: ${out}"
+                exit 1 ;;
+            esac
+          else
+            case "$out" in
+              *"release not found"*)
+                echo "::error::no GitHub Release exists for ${TAG}; re-run the release-please job of the run that merged the release PR."
+                echo "no GitHub Release exists for ${TAG}; re-run the release-please job of the run that merged"
+                echo "the release PR (the release PR is still labelled autorelease: pending)."
+                exit 1 ;;
+              *)
+                echo "::error::gh release view ${TAG} failed (exit ${rc}): ${out}"
+                exit 1 ;;
+            esac
+          fi
+
       - name: Checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -71,6 +135,10 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
+          # Exact pin: the draft match by name and the publish step are
+          # version-specific; bump only with a sandbox or release run that
+          # proves the new version.
+          version: v2.18.2
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,19 @@
+# Enhancement declaration, read by `task enhancements:delivery:log` at archive time.
+# See enhancements/schema.cue #ChangeDeclaration.
+#
+# This change carries the cli's share of 0021 D10 ("Release tags are immutable"):
+#   - 0021:D10:R1  the cli release workflow never moves, deletes or re-creates a tag;
+#   - 0021:D10:R8  the cli's draft-first flow, the precondition for adding the cli
+#                  to immutable releases (the toggle itself is an owner action).
+# It does not claim D10 as a decision: D10 spans five repositories, platform
+# rulesets and Phase 2 release-branch tooling (R5, R9), so `decisions` stays
+# empty and D10 is claimed by whichever change completes it. The delivery log
+# line for this change names R1/R8 for the cli in its SUMMARY.
+#
+# D10 is on enhancements main (PR 74, merged as 0642f0f), with R1 and R8
+# numbered as cited above. Delivery logging runs at archive time (task 5.3),
+# after the first draft-first release.
+implements:
+  - enhancement: "0021"
+    decisions: []
+    resolves: []

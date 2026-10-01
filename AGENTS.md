@@ -101,6 +101,7 @@ For coding agents working in `cli/`.
 
 - Changes ship as mergeable sections, each ending green and closing with its own commit (`CONSTITUTION.md` § VIII).
 - Update existing packages over new abstractions unless duplication/coupling justifies it.
+- Release tags are immutable (workspace root `AGENTS.md`): no tag is ever moved, deleted or re-created, and a published GitHub Release is never deleted. A broken cli release is fixed by the next release (with a Go `retract` when the broken version must not be selected); a draft release is finished with the release workflow's manual run; a duplicate or tagless draft is deleted only by the owner (`.github/workflows/release.yml` runbook).
 
 ## Entrypoint
 
