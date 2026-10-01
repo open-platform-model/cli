@@ -1,9 +1,11 @@
 name: Release
 
 # release-please (as the opm-release-please App) creates the release tag and a
-# draft GitHub Release; goreleaser uploads every asset into that draft and
-# publishes it last. Release tags are immutable: nothing here moves, deletes
-# or re-creates a tag, and a published release is never changed.
+# draft GitHub Release. The official template modules are then gated and
+# published, and only after that does goreleaser upload every asset into the
+# draft and publish it last, so no release is published without its templates.
+# Release tags are immutable: nothing here moves, deletes or re-creates a tag,
+# and a published release is never changed.
 #
 # The release-please step uses the App token with no GITHUB_TOKEN fallback.
 # Only the App may create a tag, and release-please swallows a refused tag
@@ -23,6 +25,11 @@ name: Release
 #     the App token, set the release PR back to autorelease: pending and
 #     re-run the release-please job; the owner removes the tagless draft in
 #     the browser.
+#   - Template job failed: goreleaser refuses to build, so the release stays a
+#     draft. A transient failure: re-run the failed jobs, or run this workflow
+#     by hand with the tag. A gate failure: the tag never moves; bump the
+#     template on main and cut the next patch; the owner removes the abandoned
+#     draft in the browser.
 
 on:
   push:
@@ -72,7 +79,9 @@ jobs:
 
   goreleaser:
     name: Build and publish release binaries
-    needs: release-please
+    # publish-templates runs first: a template failure keeps the release a
+    # draft (the "Require the published templates" step below).
+    needs: [release-please, publish-templates]
     # always(): on a manual run release-please is skipped, and a skipped need
     # would skip this job too.
     if: always() && (needs.release-please.outputs.releases_created == 'true' || github.event_name == 'workflow_dispatch')
@@ -122,6 +131,20 @@ jobs:
             esac
           fi
 
+      # A step, not a job-level condition: a skipped goreleaser would lose the
+      # draft check's refusal of a published release.
+      - name: Require the published templates
+        env:
+          RESULT: ${{ needs.publish-templates.result }}
+          TAG: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
+        run: |
+          if [ "$RESULT" != success ]; then
+            echo "::error::publish-templates did not succeed (${RESULT}); release ${TAG} stays a draft."
+            echo "publish-templates did not succeed (${RESULT}); release ${TAG} stays a draft and no binary is built."
+            echo "A transient failure: re-run the failed jobs. A gate failure: bump the template on main and cut the next patch."
+            exit 1
+          fi
+
       - name: Checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -152,7 +175,9 @@ jobs:
     # or whose version is not the one `opm module init` resolves, fails here
     # before anything is pushed. The script publishes on the gate's verdict
     # (0011:D15): a release with no template version bumped publishes nothing
-    # and succeeds.
+    # and succeeds. It runs first and goreleaser waits for it. It has no draft
+    # check: it touches neither the tag nor the release, so a manual run can
+    # restore the templates of a published release.
     name: Publish template modules
     needs: release-please
     if: always() && (needs.release-please.outputs.releases_created == 'true' || github.event_name == 'workflow_dispatch')

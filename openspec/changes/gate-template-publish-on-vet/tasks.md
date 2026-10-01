@@ -185,7 +185,7 @@ A local run zips whatever is on disk. Before running on this worktree, `git clea
 
 ## 3. Publish templates before goreleaser builds the release (release.yml)
 
-- [ ] 3.1 `.github/workflows/release.yml`, per design.md D5:
+- [x] 3.1 `.github/workflows/release.yml`, per design.md D5:
   - `goreleaser` gets `needs: [release-please, publish-templates]`. Its `if:` and concurrency group stay unchanged.
   - Directly after "Check the release is still a draft", it gets a new step:
 
@@ -208,12 +208,12 @@ A local run zips whatever is on disk. Before running on this worktree, `git clea
   - The `publish-templates` comment says that it runs first and that goreleaser waits for it.
 
   Verify: actionlint is clean.
-- [ ] 3.2 Verify the graph:
+- [x] 3.2 Verify the graph:
   - `yq '.jobs.goreleaser.needs' .github/workflows/release.yml` prints `release-please` and `publish-templates`.
   - `yq '.jobs.goreleaser.steps[].name'` lists the draft check, then "Require the published templates", then the checkout.
   - `yq '.jobs.publish-templates.needs'` prints only `release-please`.
   - Run the new step's `run:` body under `bash -e` with `RESULT` set to `success` (exit 0) and to `failure`, `cancelled` and `skipped` (exit 1 each, with the tag in the message).
-- [ ] 3.3 `task fmt`, `task lint`, `task test:unit` and `task openspec:check` are green. Then commit `ci(release): publish templates before goreleaser builds the release`.
+- [x] 3.3 `task fmt`, `task lint`, `task test:unit` and `task openspec:check` are green. Then commit `ci(release): publish templates before goreleaser builds the release`.
 
 Archive-time note (not part of this PR): the `release-workflow` Purpose says goreleaser builds "while a second job publishes the bundled template modules". Deltas cannot change a Purpose, so reword it at archive to say that the template modules are gated and published before goreleaser publishes the release.
 
