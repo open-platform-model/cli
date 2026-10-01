@@ -2,9 +2,12 @@ package kubernetes
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -60,4 +63,60 @@ func TestBuildRestConfig_InvalidPath(t *testing.T) {
 		Context:    "nonexistent-context",
 	})
 	assert.Error(t, err, "expected error for nonexistent kubeconfig path")
+}
+
+// writeKubeconfig writes a one-context kubeconfig whose server is server.
+func writeKubeconfig(t *testing.T, server string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "kubeconfig")
+	require.NoError(t, os.WriteFile(path, []byte(`apiVersion: v1
+kind: Config
+clusters:
+- name: c
+  cluster:
+    server: `+server+`
+contexts:
+- name: ctx
+  context:
+    cluster: c
+    user: u
+current-context: ctx
+users:
+- name: u
+  user:
+    token: t
+`), 0o600))
+	return path
+}
+
+// An empty Kubeconfig defers to client-go's default discovery, which honors
+// the KUBECONFIG env var (and, failing that, ~/.kube/config, then in-cluster).
+func TestBuildRestConfig_EmptyPathHonoursKUBECONFIG(t *testing.T) {
+	t.Setenv("KUBECONFIG", writeKubeconfig(t, "https://from-env.example:6443"))
+
+	cfg, err := buildRestConfig(ClientOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, "https://from-env.example:6443", cfg.Host)
+}
+
+// An explicit path (flag, OPM_KUBECONFIG or config) wins over KUBECONFIG.
+func TestBuildRestConfig_ExplicitPathBeatsKUBECONFIG(t *testing.T) {
+	t.Setenv("KUBECONFIG", writeKubeconfig(t, "https://from-env.example:6443"))
+	explicit := writeKubeconfig(t, "https://explicit.example:6443")
+
+	cfg, err := buildRestConfig(ClientOptions{Kubeconfig: explicit})
+	require.NoError(t, err)
+	assert.Equal(t, "https://explicit.example:6443", cfg.Host)
+}
+
+// --context still selects among the contexts of the discovered kubeconfig.
+func TestBuildRestConfig_ContextWithDiscovery(t *testing.T) {
+	t.Setenv("KUBECONFIG", writeKubeconfig(t, "https://from-env.example:6443"))
+
+	_, err := buildRestConfig(ClientOptions{Context: "no-such-context"})
+	require.Error(t, err)
+
+	cfg, err := buildRestConfig(ClientOptions{Context: "ctx"})
+	require.NoError(t, err)
+	assert.Equal(t, "https://from-env.example:6443", cfg.Host)
 }

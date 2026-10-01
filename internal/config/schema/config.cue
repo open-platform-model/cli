@@ -41,7 +41,8 @@ package schema
 // #KubernetesConfig contains Kubernetes-specific settings.
 #KubernetesConfig: {
 	// kubeconfig is the path to the kubeconfig file.
-	// Env: OPM_KUBECONFIG, Default: ~/.kube/config
+	// Env: OPM_KUBECONFIG. Default: unset, so client-go discovery applies
+	// (the KUBECONFIG env var, ~/.kube/config, then in-cluster config).
 	kubeconfig?: string
 
 	// context is the Kubernetes context to use.

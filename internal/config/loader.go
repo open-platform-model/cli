@@ -14,9 +14,6 @@ import (
 	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
-// defaultKubeconfig is the built-in kubeconfig path default.
-const defaultKubeconfig = "~/.kube/config"
-
 // configErrType is the DetailError type used for config file parse/load
 // failures.
 const configErrType = "configuration error"
@@ -170,8 +167,7 @@ func loadConfigFile(cfg *GlobalConfig, configPath string) (string, error) {
 func extractConfigInto(cfg *GlobalConfig, value cue.Value) {
 	// Apply defaults first
 	cfg.Kubernetes = KubernetesConfig{
-		Kubeconfig: defaultKubeconfig,
-		Namespace:  "default",
+		Namespace: "default",
 	}
 
 	// Look for config struct or top-level fields
@@ -217,8 +213,7 @@ func setString(dst *string, parent cue.Value, path string) {
 // applyDefaults fills cfg with built-in defaults for the no-config-file case.
 func applyDefaults(cfg *GlobalConfig) {
 	cfg.Kubernetes = KubernetesConfig{
-		Kubeconfig: defaultKubeconfig,
-		Namespace:  "default",
+		Namespace: "default",
 	}
 	cfg.Log.Kubernetes.APIWarnings = APIWarningsWarn
 	cfg.SkewPolicy = SkewPolicyWarn

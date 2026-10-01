@@ -58,11 +58,13 @@ func ExitCodeFromK8sError(err error) int {
 }
 
 // IsNoKubeContext reports whether a client-building error means no kubeconfig
-// context resolves at all: the resolved kubeconfig file is empty (clientcmd's
-// empty-config error) or does not exist. The CLI always passes the resolved
-// path to client-go explicitly, so a missing file surfaces as a not-exist
-// error rather than as the empty-config one. Any other failure (a malformed
-// file, an unknown --context) is a broken kubeconfig, not an absent one.
+// context resolves at all: the kubeconfig file is empty or no file is found by
+// default discovery (clientcmd's empty-config error), or an explicitly named
+// file (--kubeconfig, OPM_KUBECONFIG, config) does not exist (a not-exist
+// error). Default discovery also falls back to the in-cluster service account,
+// so a pod with no kubeconfig file resolves a context and never reaches here.
+// Any other failure (a malformed file, an unknown --context) is a broken
+// kubeconfig, not an absent one.
 func IsNoKubeContext(err error) bool {
 	if err == nil {
 		return false

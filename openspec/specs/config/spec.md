@@ -14,7 +14,7 @@ The CLI SHALL resolve ALL configuration values using precedence: Flag > Environm
 |-------|------|---------|--------------|---------|
 | Registry | `--registry` | `OPM_REGISTRY` | `config.registry` | (none) |
 | Config Path | `--config` | `OPM_CONFIG` | (n/a) | `~/.opm/config.cue` |
-| Kubeconfig | `--kubeconfig` | `OPM_KUBECONFIG` | `kubernetes.kubeconfig` | `~/.kube/config` |
+| Kubeconfig | `--kubeconfig` | `OPM_KUBECONFIG` | `kubernetes.kubeconfig` | client-go discovery: `KUBECONFIG`, `~/.kube/config`, in-cluster |
 | Context | `--context` | `OPM_CONTEXT` | `kubernetes.context` | current-context |
 | Namespace | `--namespace` | `OPM_NAMESPACE` | `kubernetes.namespace` | `default` |
 | Timestamps | `--timestamps` | (n/a) | `log.timestamps` | `true` |

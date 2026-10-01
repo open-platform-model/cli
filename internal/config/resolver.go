@@ -163,6 +163,11 @@ type ResolveKubernetesOptions struct {
 }
 
 // ResolveKubernetes resolves Kubernetes configuration values using precedence: Flag > Env > Config > Default.
+//
+// The kubeconfig has no built-in path default: when no flag, OPM_KUBECONFIG or
+// config value names one, Kubeconfig.Value is empty with Source SourceDefault,
+// and client-go's default discovery applies (the KUBECONFIG environment
+// variable, then ~/.kube/config, then the in-cluster service account).
 func ResolveKubernetes(opts ResolveKubernetesOptions) (*ResolvedKubernetesConfig, error) {
 	result := &ResolvedKubernetesConfig{}
 
@@ -176,7 +181,7 @@ func ResolveKubernetes(opts ResolveKubernetesOptions) (*ResolvedKubernetesConfig
 			}
 			return ""
 		},
-		"~/.kube/config",
+		"", // no built-in path: empty defers to client-go's default discovery
 	)
 	// Expand tilde in kubeconfig path
 	result.Kubeconfig.Value = ExpandTilde(result.Kubeconfig.Value)
