@@ -239,6 +239,16 @@ task test
 task test:coverage
 ```
 
+## Container Image
+
+Each release publishes a multi-arch (linux/amd64, linux/arm64) distroless image to GHCR, usable as a CI job or Kubernetes `Job` image. It runs as a non-root user and carries a CA bundle for HTTPS registries; registry configuration and credentials come from the pipeline.
+
+```bash
+docker run --rm ghcr.io/open-platform-model/opm:1.0.0-beta.2 version
+```
+
+Every release is tagged with its version (no `v` prefix); stable releases also move `latest` and the major tag (`v1`).
+
 ## Requirements
 
 - Go 1.25+
