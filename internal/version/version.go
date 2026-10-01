@@ -4,7 +4,15 @@ package version
 import (
 	"fmt"
 	"runtime"
+	"runtime/debug"
 )
+
+// cueModulePath is the module path of the CUE SDK dependency.
+const cueModulePath = "cuelang.org/go"
+
+// unknownCUESDKVersion is reported when the binary carries no build info or
+// no record of the CUE SDK dependency.
+const unknownCUESDKVersion = "unknown"
 
 // These variables are set via ldflags at build time.
 var (
@@ -16,9 +24,6 @@ var (
 
 	// BuildDate is the build timestamp.
 	BuildDate = "unknown"
-
-	// CUESDKVersion is the CUE SDK version embedded at build time.
-	CUESDKVersion = "v0.17.1"
 )
 
 // Info contains version information.
@@ -35,7 +40,8 @@ type Info struct {
 	// GoVersion is the Go version used to build.
 	GoVersion string
 
-	// CUESDKVersion is the CUE SDK version (embedded at build time).
+	// CUESDKVersion is the CUE SDK version the binary is linked against,
+	// read from the embedded build info ("unknown" when unavailable).
 	CUESDKVersion string
 }
 
@@ -46,8 +52,45 @@ func Get() Info {
 		GitCommit:     GitCommit,
 		BuildDate:     BuildDate,
 		GoVersion:     runtime.Version(),
-		CUESDKVersion: CUESDKVersion,
+		CUESDKVersion: cueSDKVersion(),
 	}
+}
+
+// cueSDKVersion reports the CUE SDK version linked into the running binary.
+func cueSDKVersion() string {
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return unknownCUESDKVersion
+	}
+	return cueSDKVersionFrom(bi)
+}
+
+// cueSDKVersionFrom extracts the CUE SDK version from build info, honoring a
+// go.mod replace directive. A path replacement (local checkout) carries no
+// version, so the original version is reported with a "(replaced)" marker.
+func cueSDKVersionFrom(bi *debug.BuildInfo) string {
+	if bi == nil {
+		return unknownCUESDKVersion
+	}
+	for _, d := range bi.Deps {
+		if d == nil || d.Path != cueModulePath {
+			continue
+		}
+		if d.Replace != nil {
+			if d.Replace.Version != "" {
+				return d.Replace.Version
+			}
+			if d.Version != "" {
+				return d.Version + " (replaced)"
+			}
+			return unknownCUESDKVersion
+		}
+		if d.Version != "" {
+			return d.Version
+		}
+		return unknownCUESDKVersion
+	}
+	return unknownCUESDKVersion
 }
 
 // String returns a formatted version string.

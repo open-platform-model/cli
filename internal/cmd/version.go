@@ -19,7 +19,7 @@ func NewVersionCmd(_ *config.GlobalConfig) *cobra.Command {
 
 Displays:
   - OPM CLI version, commit, and build date
-  - CUE SDK version (embedded in CLI)`,
+  - CUE SDK version (the one the binary is linked against)`,
 		RunE: runVersion,
 		Annotations: map[string]string{
 			cmdutil.SkipConfigLoadAnnotation: "true",
