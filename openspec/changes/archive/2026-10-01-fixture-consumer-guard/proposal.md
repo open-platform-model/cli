@@ -1,10 +1,8 @@
 ## Why
 
-A fixture bump can leave a consumer on a stale core or catalog pin, and nothing fails. CUE v0.17.1 keeps a dependency the consumer's `module.cue` already lists at its listed version; it does not raise it to what the fixture requires. So a consumer that names podinfo `v0.1.11` (core `v2.0.0-beta.1`) next to core `v2.0.0-alpha.6` passes `cue mod tidy --check` and `cue export` really evaluates against alpha.6. That is exactly what happened in PR 254: the workspace `task deps:pins:fixtures` re-pinned only the fixture version in `tests/e2e/testdata/operator-owned` (commit `dd23e01`) and the core and catalog pins were fixed by hand (`a3d8b01`). `task deps:update` skips every `testdata` tree, so nothing else would ever have moved them.
+A fixture bump can leave a consumer on a stale core or catalog pin, and nothing fails. CUE v0.17.1 keeps a dependency the consumer's `module.cue` already lists at its listed version, so `cue mod tidy --check` passes and `cue export` evaluates against the stale core. That happened in PR 254: `task deps:pins:fixtures` re-pinned only the fixture version in `tests/e2e/testdata/operator-owned` and the core and catalog pins were fixed by hand; `task deps:update` skips every `testdata` tree.
 
-The workspace task is being fixed to copy the fixture's pins into every consumer (workspace PR, outside this repo). This change adds the check that catches the drift whatever produced it: the workspace task, a hand bump (`opm module version set` plus a hand re-pin, the path `AGENTS.md` documents), or a later edit.
-
-The check is the owner's own fix direction ("run cue mod get + cue mod tidy per consumer", workspace `tasks.md`, 2026-10-01), run in the one place the new fixture version resolves: PR CI, after `hack/fixtures.sh seed`. It lives in `hack/fixtures.sh` so opm-operator, whose modulepackages have the same exposure, runs the identical code (its own change, `fixture-consumer-guard` in opm-operator).
+The workspace task is being fixed separately. This change adds the check that catches the drift whatever produced it: run `cue mod get` plus `cue mod tidy` per consumer (the owner's fix direction) in PR CI after `hack/fixtures.sh seed`, the one place the new fixture version resolves. It lives in `hack/fixtures.sh` so opm-operator runs the identical code.
 
 ## What Changes
 
