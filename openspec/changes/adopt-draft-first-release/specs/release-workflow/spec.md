@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Release runs from pushes to main through release-please
-The release workflow SHALL trigger on `push` to `main` or to a `release/**` maintenance branch and on `workflow_dispatch` with one required `tag` input, and never on a tag push. On a push, the `release-please` job SHALL run first, authenticated as the opm-release-please App with no `GITHUB_TOKEN` fallback, with `target-branch` set to the pushed branch, driven by that branch's `release-please-config.json` and `.release-please-manifest.json`: on `main` a Go package named `opm` on a `v`-prefixed, `beta` prerelease version line with `CHANGELOG.md` as the changelog. The configuration SHALL set `draft: true` and `force-tag-creation: true`, so release-please creates the git tag at the release commit itself and leaves the GitHub Release as a draft for goreleaser to fill and publish. The job SHALL expose `releases_created` and `tag_name` as outputs for the downstream jobs. On a manual run the `release-please` job SHALL be skipped. The configuration SHALL NOT carry a `release-as` value: a move to a new version line (for example `1.0.0-alpha.27` to `1.0.0-beta.1`) SHALL travel as a one-shot `Release-As: <version>` footer in the final commit message of one commit on main, because a configured `release-as` is re-applied on every run.
+The release workflow SHALL trigger on `push` to `main` and on `workflow_dispatch` with one required `tag` input, and never on a tag push. On a push, the `release-please` job SHALL run first, authenticated as the opm-release-please App with no `GITHUB_TOKEN` fallback, driven by `release-please-config.json` and `.release-please-manifest.json`: a Go package named `opm` on a `v`-prefixed, `beta` prerelease version line with `CHANGELOG.md` as the changelog. The configuration SHALL set `draft: true` and `force-tag-creation: true`, so release-please creates the git tag at the release commit itself and leaves the GitHub Release as a draft for goreleaser to fill and publish. The job SHALL expose `releases_created` and `tag_name` as outputs for the downstream jobs. On a manual run the `release-please` job SHALL be skipped. The configuration SHALL NOT carry a `release-as` value: a move to a new version line (for example `1.0.0-alpha.27` to `1.0.0-beta.1`) SHALL travel as a one-shot `Release-As: <version>` footer in the final commit message of one commit on main, because a configured `release-as` is re-applied on every run.
 
 #### Scenario: Push without a merged release PR
 - **WHEN** a commit that is not a release PR merge lands on main
@@ -19,12 +19,8 @@ The release workflow SHALL trigger on `push` to `main` or to a `release/**` main
 - **WHEN** the manifest holds `1.0.0-beta.1` and a releasable commit without a `Release-As` footer lands on main
 - **THEN** release-please proposes `1.0.0-beta.2`
 
-#### Scenario: Backport lands on a release branch
-- **WHEN** `release/v1.0` holds a manifest at `1.0.0` with versioning `always-bump-patch` and a backported `feat` or `fix` merges into it by PR
-- **THEN** release-please opens its release PR into `release/v1.0` proposing `1.0.1`, and on its merge creates tag `v1.0.1` at that branch's release commit with a draft GitHub Release
-
 ### Requirement: Binaries publish only when a release was created
-The `goreleaser` job SHALL `need` release-please and run only when `releases_created == 'true'` or the run is a manual `workflow_dispatch`, with `contents: write` and the repository `GITHUB_TOKEN`; `contents: write` is also what lets it see a draft release, which GitHub hides from read-only tokens. Before building it SHALL fail when the GitHub Release for the tag is not a draft, with a message that the release is already published and the next patch release must be cut instead, and SHALL fail when the tag's commit is not an ancestor of the commit the run started from, naming the tag and the branch. It SHALL run in a concurrency group per tag that never cancels a running job. Otherwise it SHALL check out `tag_name`, or the `tag` input on a manual run, with `fetch-depth: 0`, set up Go 1.26.0, and run `goreleaser release --clean`. The manual run is the recovery for a draft release whose tag exists without all of its assets and SHALL run on the branch the tag was released from; it SHALL NOT change a published release.
+The `goreleaser` job SHALL `need` release-please and run only when `releases_created == 'true'` or the run is a manual `workflow_dispatch`, with `contents: write` and the repository `GITHUB_TOKEN`; `contents: write` is also what lets it see a draft release, which GitHub hides from read-only tokens. Before building it SHALL fail when the GitHub Release for the tag is not a draft, with a message that the release is already published and the next patch release must be cut instead. It SHALL run in a concurrency group per tag that never cancels a running job. Otherwise it SHALL check out `tag_name`, or the `tag` input on a manual run, with `fetch-depth: 0`, set up Go 1.26.0, and run `goreleaser release --clean`. The manual run is the recovery for a draft release whose tag exists without all of its assets; it SHALL NOT change a published release.
 
 #### Scenario: Skipped on a non-release push
 - **WHEN** release-please reports no release created
@@ -35,19 +31,15 @@ The `goreleaser` job SHALL `need` release-please and run only when `releases_cre
 - **THEN** goreleaser builds from the tagged commit with full git history available
 
 #### Scenario: Manual recovery builds an existing tag
-- **WHEN** the workflow is run by hand, on the branch the tag was released from, with `tag` set to an existing release tag whose GitHub Release is still a draft
+- **WHEN** the workflow is run by hand with `tag` set to an existing release tag whose GitHub Release is still a draft
 - **THEN** release-please is skipped and goreleaser builds that tag, attaches its assets to the existing draft, and publishes it
 
 #### Scenario: Manual recovery refuses a published release
 - **WHEN** the workflow is run by hand with `tag` set to a release that is already published
 - **THEN** the goreleaser job fails before building, names the tag, and says to cut the next patch release, and the published release and its tag are unchanged
 
-#### Scenario: Manual recovery on the wrong branch
-- **WHEN** the workflow is run by hand on `main` with `tag` set to a draft release tagged on `release/v1.0`
-- **THEN** the goreleaser job fails before building, naming the tag and the branch, and the draft is unchanged
-
 ### Requirement: Goreleaser produces per-platform archives, checksums and changelog
-Goreleaser SHALL build `opm` for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64 and windows/amd64 (windows/arm64 excluded), package each as an archive named `opm-<os>-<arch>` bundling `LICENSE`, and attach the archives, `checksums.txt` (SHA256 digests) and `LICENSE` to the GitHub Release. Its changelog SHALL group commits into Features, Bug Fixes, Performance, Refactoring and Other, excluding subjects starting with `docs:`, `test:`, `ci:` or `chore:`. Goreleaser SHALL attach to release-please's draft release (`release.use_existing_draft: true`, matched by a release name equal to the tag) instead of creating a release, SHALL upload every asset while the release is still a draft, replacing an asset a failed earlier run left on that draft, and SHALL publish the release as its last step. The configuration SHALL NOT set `release.draft`, a `release.name_template` that departs from the tag, or `release.replace_existing_draft`. Goreleaser SHALL set the GitHub Release's prerelease flag from the tag (`release.prerelease: auto`): a tag with a SemVer prerelease suffix SHALL be marked Pre-release and SHALL NOT become the repository's Latest release. A release published from a `release/**` branch SHALL NOT become the repository's Latest release (`release.make_latest` is `true` only for a run on `main`). It SHALL keep the release notes release-please already wrote on the existing GitHub Release (`release.mode: keep-existing`).
+Goreleaser SHALL build `opm` for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64 and windows/amd64 (windows/arm64 excluded), package each as an archive named `opm-<os>-<arch>` bundling `LICENSE`, and attach the archives, `checksums.txt` (SHA256 digests) and `LICENSE` to the GitHub Release. Its changelog SHALL group commits into Features, Bug Fixes, Performance, Refactoring and Other, excluding subjects starting with `docs:`, `test:`, `ci:` or `chore:`. Goreleaser SHALL attach to release-please's draft release (`release.use_existing_draft: true`, matched by a release name equal to the tag) instead of creating a release, SHALL upload every asset while the release is still a draft, replacing an asset a failed earlier run left on that draft, and SHALL publish the release as its last step. The configuration SHALL NOT set `release.draft`, a `release.name_template` that departs from the tag, or `release.replace_existing_draft`. Goreleaser SHALL set the GitHub Release's prerelease flag from the tag (`release.prerelease: auto`): a tag with a SemVer prerelease suffix SHALL be marked Pre-release and SHALL NOT become the repository's Latest release. It SHALL keep the release notes release-please already wrote on the existing GitHub Release (`release.mode: keep-existing`).
 
 #### Scenario: Five archives and checksums attached
 - **WHEN** goreleaser completes
@@ -65,18 +57,7 @@ Goreleaser SHALL build `opm` for linux/amd64, linux/arm64, darwin/amd64, darwin/
 - **WHEN** release-please has created a draft release and goreleaser runs for its tag
 - **THEN** exactly one GitHub Release exists for the tag, it stays a draft until every asset is attached, and goreleaser then publishes it
 
-#### Scenario: Backport release does not take Latest
-- **WHEN** `v1.1.0` is the Latest release and goreleaser publishes `v1.0.1` from `release/v1.0`
-- **THEN** `v1.0.1` is published as a full release and `v1.1.0` stays the Latest release
-
 ## ADDED Requirements
-
-### Requirement: Release branches are cut by the shared cut-release-branch workflow
-The repository SHALL carry `.github/workflows/cut-release-branch.yml`, triggered only by `workflow_dispatch` with one required `minor` input (`X.Y`), whose single job calls the reusable `open-platform-model/.github` workflow `cut-release-branch.yml`, pinned by commit SHA, with tag prefix `v`, the `minor` input and package path `.`. The caller SHALL hold no permission at the top level and grant the job only `contents: write` and `pull-requests: write`. The reusable workflow cuts `release/v<minor>` from the highest `v<minor>.*` tag and opens a PR into that branch that sets versioning `always-bump-patch` and `prerelease: false` for package `.`. A release branch SHALL be cut only through this workflow, SHALL change only by PR, and SHALL never be deleted.
-
-#### Scenario: Cutting a maintenance branch
-- **WHEN** the owner runs `cut-release-branch` with `minor` `1.0` while `v1.0.0` and `v1.0.1` are the released `v1.0.*` tags
-- **THEN** `release/v1.0` exists at the commit of `v1.0.1`, and a PR into `release/v1.0` sets `always-bump-patch` and `prerelease: false` for package `.`
 
 ### Requirement: The release workflow never mutates a tag
 No job, step or script of the release workflow SHALL move, delete or re-create a git tag, delete a GitHub Release, or change the tag or target of an existing GitHub Release. The only tag the workflow creates is the new release tag, created by release-please as the opm-release-please App. A wrong or broken published release SHALL be fixed by releasing the next version.
