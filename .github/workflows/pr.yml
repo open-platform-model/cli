@@ -120,6 +120,7 @@ jobs:
     #          bumped: a fixture edited in this PR must carry a version GHCR
     #          does not hold yet, because published versions are immutable.
     #   seed   publish the tree's fixtures into a job-local registry.
+    #   consumers  each consumer pins exactly what CUE resolves for its fixtures.
     # Then the registry-backed render-parity program runs against that seed
     # (tree load == registry acquisition at the fixture's declared version),
     # with core and the catalogs still from GHCR. The unit and E2E jobs seed
@@ -159,6 +160,11 @@ jobs:
           CUE_REGISTRY: ${{ env.MIXED_CUE_REGISTRY }}
           OPM_REGISTRY: ${{ env.MIXED_CUE_REGISTRY }}
         run: hack/fixtures.sh seed
+      - name: Fixture consumers follow their fixtures
+        env:
+          CUE_REGISTRY: ${{ env.MIXED_CUE_REGISTRY }}
+          OPM_REGISTRY: ${{ env.MIXED_CUE_REGISTRY }}
+        run: hack/fixtures.sh consumers examples tests/e2e/testdata/operator-owned
       - name: Render parity (tree vs seeded registry)
         env:
           CUE_REGISTRY: ${{ env.MIXED_CUE_REGISTRY }}
