@@ -106,6 +106,7 @@ func ApplyOne(ctx context.Context, client *Client, obj *unstructured.Unstructure
 	existing, err := client.ResourceClient(gvr, ns).Get(ctx, obj.GetName(), metav1.GetOptions{})
 	if err == nil {
 		existingVersion = existing.GetResourceVersion()
+		obj = guardPVCResize(ctx, client, obj, existing)
 	}
 	// If GET fails (NotFound or other), existingVersion stays empty -> "created"
 
