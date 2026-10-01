@@ -96,9 +96,12 @@ jobs:
         run: task openspec:check
 
   template-gates:
-    # The publish gates run over every template tree on each PR (dry-run, no
-    # push) — the same script the release publishes through, so a template
-    # that would fail the release fails the PR first.
+    # Every gate runs over every template tree on each PR (dry-run, no push):
+    # the same script the release publishes through, so a template that would
+    # fail the release fails the PR first. The gates include `opm module vet`,
+    # which renders each template's debugValues, and a check that the tree
+    # equals its module zip, so what vet read is what publishes. The release
+    # runs every gate on every template before it publishes any.
     name: Template Publish Gates (dry-run)
     runs-on: ubuntu-latest
     steps:
@@ -108,8 +111,8 @@ jobs:
           go-version: '1.26.0'
       - name: Build opm
         run: go build -o bin/opm ./cmd/opm
-      - name: Install cue
-        run: go install cuelang.org/go/cmd/cue@v0.17.1
+      - name: Install cue (the version go.mod requires)
+        run: go install "cuelang.org/go/cmd/cue@$(go list -m -f '{{.Version}}' cuelang.org/go)"
       - name: Dry-run the template publish gates
         run: .github/scripts/publish-templates.sh --dry-run
 

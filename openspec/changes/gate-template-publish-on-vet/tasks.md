@@ -81,7 +81,7 @@ A local run zips whatever is on disk. Before running on this worktree, `git clea
 
 ## 1. Vet gate, tree equals zip, gate every template before publishing any (publish-templates.sh, workflows)
 
-- [ ] 1.1 `.github/scripts/publish-templates.sh`: restructure it into the two phases of design.md D2, with the D6 checks.
+- [x] 1.1 `.github/scripts/publish-templates.sh`: restructure it into the two phases of design.md D2, with the D6 checks.
   - Preflight: fail with `==> missing tool: <name>` unless `cue` (checked first), `curl`, `jq`, `unzip`, `sha256sum`, `diff`, `find`, `sort`, `grep`, `sed`, `head`, `tail`, `cut`, `mktemp`, `cp`, `rm` and `basename` are on `PATH`. Export `LC_ALL=C`. A `work` temp directory is removed on `EXIT`.
   - A `gate <template> <dir>` function, called as an `if` condition, so every step checks its own status. In order:
     - Read `Version` and `ModulePath` with `cue eval ./identity --out text -e ...` inside `gate`; a failure prints the D4 line and fails only this template.
@@ -97,37 +97,37 @@ A local run zips whatever is on disk. Before running on this worktree, `git clea
   - Update the header comment: the gate list, the two phases, the verdict, and that vet renders `debugValues` against the template's own pins, and why the tree must equal its zip.
 
   Verify: `shellcheck .github/scripts/publish-templates.sh` is clean.
-- [ ] 1.2 Workflows.
+- [x] 1.2 Workflows.
   - Both cue install steps (`pr.yml` `template-gates`, `release.yml` `publish-templates`) become `go install "cuelang.org/go/cmd/cue@$(go list -m -f '{{.Version}}' cuelang.org/go)"`, named "Install cue (the version go.mod requires)". They already run after checkout and `setup-go`.
   - `release.yml`: the "Publish unpublished templates" step drops its `GHCR_AUTH` env (the script no longer reads it). `docker login` stays.
   - Comments only: `release.yml` `publish-templates` (lines 147-151) and `pr.yml` `template-gates` (lines 99-101) name the vet gate, the tree-equals-zip check and "every gate on every template before any publish".
 
   Verify: `go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/pr.yml .github/workflows/release.yml` is clean, and in this worktree `go list -m -f '{{.Version}}' cuelang.org/go` prints the `go.mod` version.
-- [ ] 1.3 Build the harness, then run `$S/run.sh <this worktree> --dry-run`. Verify: exit 0. For each of minimal, standard and advanced, the output shows `Module valid (<n> resources)` from vet (1, 2 and 8 at v1.0.3) and an accepted "already holds" dry-run.
-- [ ] 1.4 Make the scratch clone `$S/clone` (harness rules: `remote remove origin`, a local identity) and check that it carries the real tags. Branch `case-B` from the clone's HEAD:
+- [x] 1.3 Build the harness, then run `$S/run.sh <this worktree> --dry-run`. Verify: exit 0. For each of minimal, standard and advanced, the output shows `Module valid (<n> resources)` from vet (1, 2 and 8 at v1.0.3) and an accepted "already holds" dry-run.
+- [x] 1.4 Make the scratch clone `$S/clone` (harness rules: `remote remove origin`, a local identity) and check that it carries the real tags. Branch `case-B` from the clone's HEAD:
   - delete both `updateStrategy: type: "RollingUpdate"` lines from `templates/advanced/components.cue` (worker and cache);
   - run `$S/bin/opm-real module version set 1.0.4 templates/advanced`, then commit.
 
   Run `$S/run.sh $S/clone --dry-run` on it. Verify: exit 1. The output contains `unresolved disjunction "RollingUpdate" | "Recreate" | "OnDelete"`, the vet failure line for advanced, and `gates failed for: advanced; nothing published`. Minimal and standard still report their gates.
-- [ ] 1.5 Same branch, publish mode: `$S/run.sh $S/clone`. Verify: exit 1, the same failure line, no `publishing` and no `WOULD PUBLISH` line, and the isolation assertions held.
-- [ ] 1.6 Publish-mode success path. Branch `case-D` from the clone's HEAD:
+- [x] 1.5 Same branch, publish mode: `$S/run.sh $S/clone`. Verify: exit 1, the same failure line, no `publishing` and no `WOULD PUBLISH` line, and the isolation assertions held.
+- [x] 1.6 Publish-mode success path. Branch `case-D` from the clone's HEAD:
   - change `opmodel.dev/catalogs/opm@v4` `v: "v4.4.4"` to `"v4.4.3"` in `templates/minimal/cue.mod/module.cue`;
   - run `$S/bin/opm-real module version set 1.0.4 templates/minimal`, then commit.
 
   Run `$S/run.sh $S/clone`. Verify: exit 0. The log holds exactly one `WOULD PUBLISH` line, `WOULD PUBLISH ./templates/minimal/`, preceded by `==> minimal: publishing v1.0.4`. Advanced and standard print "already published; skipped".
-- [ ] 1.7 What vet reads is what publishes (D6). Each case is a branch from the clone's HEAD, run in both modes unless stated. Verify exit 1, no `WOULD PUBLISH`, and the named line:
+- [x] 1.7 What vet reads is what publishes (D6). Each case is a branch from the clone's HEAD, run in both modes unless stated. Verify exit 1, no `WOULD PUBLISH`, and the named line:
   - (S1) Add `hack/tplshared/extra.cue`, a second `package minimal` component, and commit `templates/minimal/extra.cue` as a symlink to it (`ln -s ../../hack/tplshared/extra.cue`), with no bump: `symbolic links never publish`, naming `extra.cue`. Vet alone passes it (2 resources); revision 3 called it identical to the published v1.0.3.
   - (S2) Move minimal's `debugValues` block out of `templates/minimal/module.cue` into `hack/tplshared/debug.cue`, commit `templates/minimal/debug.cue` as a symlink to it, and `version set 1.0.4`: the same line, naming `debug.cue`. Revision 3 said GO and published a zip without `debugValues`.
   - S1 and S2 again, dry-run, with `SCRIPT` pointing at a scratch copy of the script whose `layout` call is removed: exit 1 from the listing check alone, `only in the tree: extra.cue` and `only in the tree: debug.cue`.
   - (NM) `templates/minimal/sub/cue.mod/module.cue` (a nested module) and `sub/x.cue`, no bump, dry-run: `a nested cue.mod makes a nested module`, naming `sub/cue.mod`.
   - (HG) `templates/minimal/.hg_archival.txt`, no bump, dry-run: `the module zip does not hold exactly the tree's files`, `only in the tree: .hg_archival.txt`.
   - (FIFO) Uncommitted, on the clone's HEAD: `mkfifo templates/minimal/pipe`, dry-run: `special files never publish`, naming `pipe`. Remove it afterwards.
-- [ ] 1.8 Identity and verdict (D2). Verify:
+- [x] 1.8 Identity and verdict (D2). Verify:
   - (M) A branch renaming minimal's module path to `opmodel.dev/templates/minimalx@v1` in `cue.mod/module.cue`, the identity `ModulePath`, the package clause and the identity import, version kept, both modes: exit 1, `ModulePath is opmodel.dev/templates/minimalx@v1; the template in templates/minimal/ at v1.0.3 must be opmodel.dev/templates/minimal@v1`. Revision 3 exited 0 in publish mode, its second probe skipping the renamed template.
   - (V, identity part) A branch with a syntax error in `templates/minimal/identity/identity.cue` (`Version: 1.0.3 +`), dry-run: exit 1, cue's error, `cannot read Version and ModulePath from ./templates/minimal/identity`, and standard and advanced still run their gates. Revision 3 aborted at minimal.
   - (race) `FAULT=race` on `case-D`, publish mode: exit 1, `==> minimal: publishing v1.0.4`, then `publishing v1.0.4 failed`, and no `minimal: ... skipped` line.
   - `grep -n 'published()' .github/scripts/publish-templates.sh` returns nothing.
-- [ ] 1.9 `task fmt`, `task lint`, `task test:unit` and `task openspec:check` are green. Then commit `ci(templates): gate template publishing on opm module vet`.
+- [x] 1.9 `task fmt`, `task lint`, `task test:unit` and `task openspec:check` are green. Then commit `ci(templates): gate template publishing on opm module vet`.
 
 ## 2. Changed implies bumped, version order (publish-templates.sh, pr.yml, release.yml comments, AGENTS.md)
 
