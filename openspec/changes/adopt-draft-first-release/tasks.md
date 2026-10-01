@@ -53,8 +53,8 @@ Platform state at the G-platform tick (2026-10-01, re-read before relying on it)
 
 ## 4. Agent guidance (AGENTS.md)
 
-- [ ] 4.1 Precondition: the workspace rule from G-owner is on workspace `main`. Add one line to AGENTS.md "Repository Rules": release tags are immutable per the workspace root `AGENTS.md` rule; a broken cli release is fixed by the next release (a Go `retract` in it when the broken version must not be selected), a draft release is finished with the release workflow's manual run, and no tag or GitHub Release is ever moved, deleted or re-created. Verify: the line names no fixture or release version and adds no other prose.
-- [ ] 4.2 `task fmt`, `task lint`, `task test` (see the integration note) and `task openspec:check` green, then commit `chore(agents): point at the workspace release-tag rule`.
+- [x] 4.1 Precondition: the workspace rule from G-owner is on workspace `main`. Add one line to AGENTS.md "Repository Rules": release tags are immutable per the workspace root `AGENTS.md` rule; a broken cli release is fixed by the next release (a Go `retract` in it when the broken version must not be selected), a draft release is finished with the release workflow's manual run, and no tag or GitHub Release is ever moved, deleted or re-created. Verify: the line names no fixture or release version and adds no other prose.
+- [x] 4.2 `task fmt`, `task lint`, `task test` (see the integration note) and `task openspec:check` green, then commit `chore(agents): point at the workspace release-tag rule`.
 
 ## 5. First release verified, archive (after merge, gate G-first-release)
 
