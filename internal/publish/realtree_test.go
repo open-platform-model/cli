@@ -22,8 +22,9 @@ const realTreeRegistry = "opmodel.dev=ghcr.io/open-platform-model,registry.cue.w
 
 // TestRealTree_CatalogOpm is the registry-backed smoke over the real first
 // -party catalog: the workspace's catalog_opm/opm must pass the member and
-// posture gates AS-IS against the real core v2 schema, and the compat gate
-// must run clean against the live GHCR history.
+// posture gates AS-IS against the real core v2 schema, and the compat walk
+// over the live GHCR history must run on the prerelease line (the tree ships
+// breaking alphas, so a stable-line comparison cannot hold) without refusals.
 //
 // KNOWN BOUND (documented, deliberate): the predecessor scan probes by the
 // 0010:D49 filing convention (<kind>/<apiVersion> packages). The published history
@@ -91,18 +92,21 @@ func TestRealTree_CatalogOpm(t *testing.T) {
 	preds := predecessorVersions(versions, "v"+version, major)
 	require.NotEmpty(t, preds, "the live history should hold at least one predecessor build")
 
-	// lineIsPrerelease=false on purpose: the tree's own version is a
-	// release prerelease, which 0011:D26 clause 2 would exempt; forcing the stable
-	// line proves the walk itself is clean over the real members.
-	if err := compatScan(opts, repo, preds, false, members, &p.CatalogGates, p.refuse); err != nil {
+	// lineIsPrerelease=true: the tree ships breaking alphas on a release
+	// prerelease line, and 0011:D26 clause 2 exempts beta/GA members there, so
+	// a stable-line comparison cannot hold against the live history. The walk
+	// must still be exercised: at least one member is either compared or
+	// counted as prerelease-exempt.
+	if err := compatScan(opts, repo, preds, true, members, &p.CatalogGates, p.refuse); err != nil {
 		var connErr *ConnectivityError
 		if errors.As(err, &connErr) {
 			t.Skipf("GHCR unreachable mid-walk: %v", err)
 		}
 		t.Fatalf("compat walk failed: %v", err)
 	}
-	assert.Empty(t, p.Refusals, "the live history must compare clean:\n%s\n%s",
+	assert.Empty(t, p.Refusals, "the prerelease line must not refuse:\n%s\n%s",
 		refusalHeadlines(p), refusalDetails(p))
-	assert.Greater(t, p.CatalogGates.CompatCompared, 0)
+	assert.Positive(t, p.CatalogGates.CompatCompared+p.CatalogGates.CompatPrerelease,
+		"the compat gate must have evaluated at least one member")
 	t.Logf("real-tree outcome: %+v (predecessors: %v)", p.CatalogGates, preds)
 }
