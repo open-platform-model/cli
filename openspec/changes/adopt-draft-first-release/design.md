@@ -6,7 +6,7 @@ The workspace rule (owner, 2026-10-01, revised the same day): release tags are i
 
 - org ruleset `tags-immutable`: update, deletion, non-fast-forward on every tag, empty bypass list;
 - org ruleset `tags-create-app-only`: tag creation only by the opm-release-please App. A stale or hand-made tag therefore cannot exist, and the per-repo tag-commit assertion an earlier draft of this change carried is dropped;
-- GitHub immutable releases, for cli only after this change has shipped one real release (0021:D10:R8). On 2026-10-01 the setting is already ON for cli, ahead of that plan; gate G-platform requires the owner to turn it off first (see Risks).
+- GitHub immutable releases, for cli only after this change has shipped one real release (0021:D10:R8). The setting was briefly ON for cli on 2026-10-01, ahead of that plan; the owner turned it off and gate G-platform (b) records it OFF.
 
 Immutable releases forbid adding, replacing or deleting assets after publish, so the current publish-then-upload order cannot run under them. The policy is enhancement 0021 D10 (on enhancements PR 74); this change is the cli's share of it, 0021:D10:R1 and 0021:D10:R8, and opm-operator carries its own. It is Phase 1 of the owner's plan: the cli releases only from `main`. Release branches are Phase 2 (see "Phase 2" below) and nothing here prepares for them.
 
@@ -101,6 +101,7 @@ Recovery runbook, written as the dispatch input description and the workflow hea
 - Published release that is wrong or incomplete: cut the next patch; never re-tag, never delete.
 - Tag with no GitHub Release: re-run the release-please job of the run that merged the release PR; a dispatch cannot fix it.
 - A second, empty draft for the same tag (a release-please re-run, U6): the owner removes it in the browser; the workflow never deletes a release.
+- A draft whose tag does not exist (the `goreleaser` checkout fails on the tag): release-please ran with a token that may not create tags and swallowed the refusal. Restore the App token, set the release PR back to `autorelease: pending` and re-run the release-please job (the U6 procedure); the owner removes the tagless draft in the browser.
 
 ### D4. Consumers and the draft window
 
@@ -123,7 +124,7 @@ Between release-please and goreleaser's publish the git tag exists while the rel
 
 An earlier draft added a `verify-release` job comparing the tag's peeled commit with release-please's `sha`. It guarded against `createRef` swallowing a 422 for a pre-existing tag at another commit. Under `tags-create-app-only` no identity but the release App can create a tag, and in Phase 1 the App creates release tags only from `main`'s single version line, so a release tag cannot pre-exist. This holds only while one branch releases: Phase 2 re-opens it (two branches proposing the same version, see "Phase 2"). The job, its script and its permissions problem (it needed `contents: write` to see drafts) are gone; the draft check moved into the `goreleaser` job, which already holds that permission.
 
-### Unverified assumptions (gate G-sandbox, recorded in section 1)
+### Assumptions (gate G-sandbox; observed results under "Sandbox findings")
 
 A first sandbox pass (2026-10-01, `open-platform-model/release-flow-sandbox`, release-please-action v5.0.0, goreleaser v2.18.2) already observed parts of U1, U2, U3 and U5, but with `GITHUB_TOKEN` (the App was not available to the sandbox), with goreleaser in the operator shape (`draft: true` plus a separate publish job), and with no tag ruleset or immutable releases: run 36842600439 (U1: `releases_created`, `tag_name` and `sha` set for a draft, tag present at the release commit; U3: goreleaser attached to the one draft and kept its notes), release PR 4 of that sandbox (U2: the next release PR anchored on the forced tag while the previous release was a draft and after it was published), run 36843234784 (recovery into a draft failed with `422 already_exists` without `replace_existing_artifacts`, which is why D2 sets it), run 36844356743 (recovery with `replace_existing_artifacts` succeeded), run 36843387529 (U5: a dispatch on a published release was refused). G-sandbox still requires every assumption to be re-run on the cli's exact shape below.
 
@@ -136,12 +137,31 @@ A first sandbox pass (2026-10-01, `open-platform-model/release-flow-sandbox`, re
 
 If the sandbox contradicts any of these, section 1 stops the change and this design is revised before section 2.
 
+### Sandbox findings
+
+Second pass, 2026-10-01, `open-platform-model/release-flow-sandbox` PR 6 (merged as 09fd181): the cli shape exactly as task 3.2 and D2, release-please acting as the opm-release-please App with no fallback, under `tags-immutable` and `tags-create-app-only` with immutable releases ON. Versions: release-please-action v5.0.0 (release-please 17.6.0), goreleaser v2.18.2 through goreleaser-action v7.2.3, create-github-app-token v3.2.0. Every assumption held; nothing in D1 to D3 changes.
+
+- U1 holds. Run 36862828370: `releases_created=true`, `tag_name=v1.0.0-beta.3`, `sha=841701a`, `draft=true`; right after the job the tag `refs/tags/v1.0.0-beta.3` pointed at `sha` while the release was a draft. Same on runs 36863184964 and 36863653282.
+- U2 holds. Release PR 12 was opened while v1.0.0-beta.4 was a draft and PR 14 while v1.0.0-beta.5 was a draft; each proposed the next beta with only the new fix and a compare link from the previous tag, and PR 14 was unchanged after beta.5 was published.
+- U3 holds. Run 36862828370: the draft check printed `release v1.0.0-beta.3 is a draft; building`; goreleaser attached to release id 400952000 (no second release), uploaded the archive, `checksums.txt` and `LICENSE`, kept release-please's notes and published it with `isPrerelease: true`; `releases/latest` answered 404 before and after, so Latest did not move.
+- U4 holds. The whole flow ran green under both tag rulesets with immutable releases ON; uploads and replacements on the draft succeeded and every published release reports `isImmutable: true`. Tag creation as GITHUB_TOKEN was refused (`422 Reference update failed`, run 36862651882); every release tag was created by the App.
+- U5 holds. v1.0.0-beta.5 was held as a draft by an injected failure (run 36863653282); dispatch 36863859196 finished it and replaced a stale `checksums.txt` (`replace_existing_artifacts`). Dispatches 36862966138 and 36863863732 on published releases failed at the draft check with the D3 published message, later steps skipped. Dispatch 36863002685 on a tag with no release failed with the D3 no-release message. Two back-to-back dispatches ran one after the other in the per-tag concurrency group.
+- U6: a second draft IS created. Run 36863184964 attempt 2 (release PR relabelled `autorelease: pending`, release-please job re-run): release-please swallowed the 422 on `createRef` and created a second, empty draft with the same name. The D3 runbook line stays.
+
+Consequences adopted in this change:
+
+- GitHub's `::error::` annotation holds one line, so the draft check emits one `::error::` line and prints the full two-line D3 message as plain lines below it (the sandbox shape).
+- release-please 17.6.0 swallows every 422 from `createRef`, not only "already exists"; a ruleset refusal is also a 422. A non-App token would therefore produce a draft with no tag, and the `goreleaser` job would fail at the tag checkout with an unclear error. The release-please step keeps the App token with no GITHUB_TOKEN fallback as a hard rule, and the runbook gains the case.
+- goreleaser's `previous_tag` takes any tag (run 36862828370 picked the non-release tag `probe-orphan-1`). It is harmless with `mode: keep-existing`, which discards goreleaser's changelog; the cli keeps release-please's notes and does not switch to goreleaser's changelog.
+
+Considered and not adopted: failing the draft check when the tag has more than one release (as the opm-operator guard does). After U6 both drafts are empty when goreleaser runs, so whichever it matches by name ships a correct release and the leftover is the runbook's owner removal; the count would add an unproven step to the sandbox-proven job.
+
 ## Risks / Trade-offs
 
 - [release-please or goreleaser behavior differs from the traced source] → G-sandbox proves U1 to U6 on `open-platform-model/release-flow-sandbox`, running this change's exact config, before the cli changes.
 - [A draft is left behind when goreleaser fails] → it is mutable and invisible; the failed run's jobs are re-run, or the manual recovery finishes it. The next release PR does not wait on it (U2).
 - [The first real draft-first release fails in a way the sandbox missed] → immutable releases are off for cli (gate G-platform), so the release stays fixable in place; the owner enables the setting only after a clean release.
-- [Immutable releases are already on for cli (2026-10-01, org policy, ahead of the plan)] → while it stays on, the current publish-then-upload flow publishes the next cli release without assets and locks it, and the first draft-first release would lock at publish with no fix in place. G-platform requires the owner to turn it off before this PR merges; until then merging a cli release PR is unsafe.
+- [Immutable releases are turned back on for cli before task 5.1 is green] → the first draft-first release would lock at publish with no fix in place. G-platform (b) recorded the setting OFF on 2026-10-01 (it had been on briefly, ahead of the plan); re-read it before merging this PR.
 - [A future `name_template` breaks the draft match] → D2 forbids it; goreleaser would then create a second release for the tag, which task 5.1's "exactly one release" check and U3 catch.
 - [Phase 2 inherits this flow] → the draft-first pieces here are branch-agnostic except the main-only trigger and the unset `make_latest`; Phase 2 changes exactly those (see below).
 
