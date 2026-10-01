@@ -59,7 +59,7 @@ Goreleaser SHALL build `opm` for linux/amd64, linux/arm64, darwin/amd64, darwin/
 
 #### Scenario: Release published only with all assets
 - **WHEN** release-please has created a draft release and goreleaser runs for its tag
-- **THEN** exactly one GitHub Release exists for the tag, it stays a draft until every asset is attached, and goreleaser then publishes it
+- **THEN** goreleaser attaches to release-please's draft for the tag and creates no GitHub Release of its own, the release stays a draft until every asset is attached, and goreleaser then publishes it
 
 ## ADDED Requirements
 

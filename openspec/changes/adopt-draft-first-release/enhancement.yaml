@@ -10,9 +10,9 @@
 # empty and D10 is claimed by whichever change completes it. The delivery log
 # line for this change names R1/R8 for the cli in its SUMMARY.
 #
-# D10 is on enhancements PR 74 (branch docs/0021-immutable-tags), not yet on
-# enhancements main. Archive and delivery logging wait until it merges; re-check
-# the cited requirement numbers (R1, R8) against the merged text first.
+# D10 is on enhancements main (PR 74, merged as 0642f0f), with R1 and R8
+# numbered as cited above. Delivery logging runs at archive time (task 5.3),
+# after the first draft-first release.
 implements:
   - enhancement: "0021"
     decisions: []
