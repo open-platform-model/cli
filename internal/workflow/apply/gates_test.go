@@ -64,6 +64,15 @@ func TestRunClusterGates_ProbeOrder(t *testing.T) {
 		assert.Equal(t, []string{"customresourcedefinitions", "customresourcedefinitions"}, rec.gets,
 			"presence then field-floor read the CRD; the Platform ceiling probe never runs")
 	})
+
+	t.Run("field-floor failure on a CRD without status.inventory", func(t *testing.T) {
+		withReleasedCLIVersion(t)
+		client, _ := recordingDynamicClient(makeModuleInstanceCRD(true, false)) // CRD present, missing status.inventory
+
+		err := RunClusterGates(ctx, client)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "missing required fields")
+	})
 }
 
 // Dry-run writes nothing, so the write-protecting cluster gates are skipped

@@ -29,8 +29,15 @@ type Options struct {
 	SuccessUpToDateMessage string
 	SuccessAppliedMessage  string
 
-	// Timeout bounds the operator-reconcile wait in thin-editor mode. Unused
-	// in CLI-executor mode, which does its own applying. Zero uses
+	// Wait, in CLI-executor mode, blocks after a successful apply and
+	// inventory write until every applied resource is healthy (see
+	// operator.HealthyPredicate) or Timeout runs out. Ignored on dry-run. An
+	// operator-managed instance always waits for the operator, so the flag
+	// changes nothing there.
+	Wait bool
+
+	// Timeout bounds the operator-reconcile wait in thin-editor mode and the
+	// readiness wait (Wait) in CLI-executor mode. Zero uses
 	// inventory.DefaultReconcileTimeout.
 	Timeout time.Duration
 
@@ -189,6 +196,10 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 	if applyResult != nil && len(applyResult.Errors) > 0 {
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)), Printed: true}
+	}
+
+	if req.Options.Wait && !dryRun {
+		return waitForHealthy(ctx, req, instanceLog)
 	}
 
 	return nil

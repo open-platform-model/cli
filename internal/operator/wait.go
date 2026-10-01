@@ -64,11 +64,20 @@ func CRDEstablishedPredicate(obj *unstructured.Unstructured) bool {
 	return false
 }
 
+// HealthyPredicate reports whether a live object is healthy by the same rule
+// `opm instance status` applies: kubernetes.EvaluateHealth judged by
+// kubernetes.IsHealthy. Workloads must have finished their rollout, Jobs
+// completed and PVCs bound; kinds with no readiness concept are healthy once
+// they exist.
+func HealthyPredicate(obj *unstructured.Unstructured) bool {
+	return kubernetes.IsHealthy(kubernetes.EvaluateHealth(obj))
+}
+
 // WorkloadReadyPredicate reports whether a workload resource (e.g. a
 // Deployment) has completed its rollout, reusing the same health evaluation
 // the rest of the CLI uses for instance status.
 func WorkloadReadyPredicate(obj *unstructured.Unstructured) bool {
-	return kubernetes.IsHealthy(kubernetes.EvaluateHealth(obj))
+	return HealthyPredicate(obj)
 }
 
 // AbsentPredicate is the readiness predicate of absence mode: no live object
