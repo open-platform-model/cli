@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Commit types decide whether a release is cut
-`release-please-config.json` SHALL list `feat`, `fix`, `perf`, `revert`, `deps` and `refactor` as visible changelog sections, so a commit of one of those types on `main` opens or updates a release PR. It SHALL list `docs`, `test`, `ci`, `build` and `chore` as hidden sections, so a commit carrying only those types cuts no release. Source: workspace RELEASING.md, section "Bump rule".
+`release-please-config.json` SHALL list `feat`, `fix`, `perf`, `revert`, `deps` and `refactor` as visible changelog sections, so a commit of one of those types on `main` opens or updates a release PR. It SHALL list `docs`, `test`, `ci`, `build` and `chore` as hidden sections, so a commit carrying only those types cuts no release. Source: workspace RELEASING.md, section "Pin classes".
 
 #### Scenario: Docs-only commit cuts no release
 - **WHEN** only `docs(...)` commits land on `main` after the last release

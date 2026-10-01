@@ -7,7 +7,6 @@ Gates that run on the cli's release-please pull requests, so a release never shi
 ### Requirement: Release PRs refuse local, unpublished or mismatched pins
 A release-pin check (G1) SHALL fail, naming every offending pin and its file, when any of the following holds in the tree under test:
 - `go.mod` carries a `replace` directive;
-- a `go.work` file is tracked;
 - a `github.com/open-platform-model/*` requirement in `go.mod` is a Go pseudo-version, or names a version for which the module's repository has no tag;
 - a template `cue.mod/module.cue` under `templates/` pins a dependency at a `-0.dev.` version;
 - a `cue.mod/local-module.cue` file is tracked anywhere in the repository;
@@ -16,7 +15,7 @@ A release-pin check (G1) SHALL fail, naming every offending pin and its file, wh
 The check SHALL report all failures in one run, not only the first, and SHALL exit zero when none holds. It SHALL run as a step inside the existing `lint` job of both the pull-request workflow and the push workflow, and only when the branch name (`head_ref`, or `ref_name` when `head_ref` is empty) starts with `release-please--`; on every other branch the step SHALL be skipped while the job still runs. `task deps:release-check` SHALL run the same check locally on any branch. Source: workspace RELEASING.md, section "Gates".
 
 #### Scenario: Clean release PR passes
-- **WHEN** a release-please PR's tree has no replace, no tracked `go.work` or `local-module.cue`, library pinned at an existing tag, no dev template pin, and a matching operator pin and image tag
+- **WHEN** a release-please PR's tree has no replace, no tracked `local-module.cue`, library pinned at an existing tag, no dev template pin, and a matching operator pin and image tag
 - **THEN** the release-pin step exits zero and the `lint` job's result is decided by golangci-lint alone
 
 #### Scenario: Pseudo-version library pin fails the release PR
@@ -30,6 +29,14 @@ The check SHALL report all failures in one run, not only the first, and SHALL ex
 #### Scenario: Embedded operator out of step with its pin
 - **WHEN** `PinnedOperatorVersion` reads one release tag and the embedded `install.yaml` image carries another
 - **THEN** the release-pin step exits non-zero naming both tags and `task operator:sync VERSION=<tag>` as the fix
+
+#### Scenario: Missing or duplicated operator image line
+- **WHEN** the embedded `install.yaml` has no opm-operator image line, or has more than one
+- **THEN** the release-pin step exits non-zero naming `internal/operator/dist/install.yaml`
+
+#### Scenario: Tag lookup failure is not a pass
+- **WHEN** the tag lookup for an OPM Go pin fails for a reason other than a missing tag
+- **THEN** the release-pin step exits non-zero and reports a lookup failure for that pin
 
 #### Scenario: Ordinary PR is not gated
 - **WHEN** a pull request from any branch not starting with `release-please--` carries a pseudo-version library pin

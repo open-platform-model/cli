@@ -5,7 +5,7 @@ Repository automation files that other tools act on: the label sync, which must 
 ## ADDED Requirements
 
 ### Requirement: The label sync keeps bot-managed and cascade labels
-`.github/labels.yml` SHALL list every label that a tool applies to this repository's pull requests, because the label sync deletes any repository label the file does not list. It SHALL list the release-please labels `autorelease: pending` and `autorelease: tagged`, the Dependabot labels `dependencies`, `go` and `github_actions`, and the release-cascade labels `deps-cascade`, `deps-cascade:conflict`, `deps-cascade:hold`, `deps-cascade:breaking`, `need-human-review` and `e2e-verified`. Bot-managed labels SHALL keep the color and description they carry in the repository today, so a sync changes nothing about them. Source: workspace RELEASING.md, section "Cascade files".
+`.github/labels.yml` SHALL list every label that a tool applies to this repository's pull requests, because the label sync deletes any repository label the file does not list. It SHALL list the release-please labels `autorelease: pending` and `autorelease: tagged`, the Dependabot labels `dependencies`, `go` and `github_actions`, and the release-cascade labels `deps-cascade`, `deps-cascade:conflict`, `deps-cascade:hold`, `deps-cascade:breaking`, `need-human-review` and `e2e-verified`. Bot-managed labels SHALL keep the color and description they carry in the repository today, so a sync changes nothing about them. Source: workspace RELEASING.md, section "The cascade" (subsection Labels).
 
 #### Scenario: Sync after a labels.yml change deletes no bot label
 - **WHEN** a change to `.github/labels.yml` merges and the label sync runs with deletion enabled
@@ -20,7 +20,7 @@ Repository automation files that other tools act on: the label sync, which must 
 - **THEN** the label sync's dry run lists no deletion of a label any tool applies
 
 ### Requirement: Dependabot leaves OPM Go modules to the release cascade
-The Dependabot `gomod` update SHALL ignore every dependency named `github.com/open-platform-model/*`, so library pins move only through the release cascade or by hand as `fix(deps)`. Other Go modules and GitHub Actions SHALL keep their weekly updates. Source: workspace RELEASING.md, section "Cascade files".
+The Dependabot `gomod` update SHALL ignore every dependency named `github.com/open-platform-model/*`, so library pins move only through the release cascade or by hand as `fix(deps)`. Other Go modules and GitHub Actions SHALL keep their weekly updates. Source: workspace RELEASING.md, sections "The cascade" and "Rollout and changes" (Changes table).
 
 #### Scenario: New library release
 - **WHEN** a new `github.com/open-platform-model/library` version is tagged and Dependabot's weekly `gomod` run executes
