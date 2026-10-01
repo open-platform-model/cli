@@ -1,0 +1,43 @@
+# Tasks: prepare-release-cascade
+
+One PR, titled `ci(release): prepare the cli for the release cascade`. Workers never tag, never create, edit or delete a GitHub Release or label by hand, and never touch rulesets or repo settings. Items marked **OWNER** or **SUPERVISOR** are not worker tasks.
+
+Environment for every Go/CUE command, exported on two lines:
+
+```bash
+export CUE_REGISTRY='opmodel.dev=ghcr.io/open-platform-model,testing.opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+export OPM_REGISTRY="$CUE_REGISTRY"
+```
+
+`task test` includes `task test:integration`, which needs a live kind cluster; when none is available, run `task test:unit` and `task test:e2e` (with `env -u OPM_CONFIG`) and report integration as skipped instead of starting a cluster unasked.
+
+## Gates (SUPERVISOR ticks)
+
+- [ ] G-workspace workspace branch `docs/release-cascade` (RELEASING.md with the sections this change cites: "Release order", "Bump rule", "Gates", "Cascade files", "Runbook", "Owner settings", "Rollout and changes") is on workspace `main`. Check: `git -C <workspace> show origin/main:RELEASING.md | grep -n '^## '`. Required before the PR merges, not before any section.
+
+## 1. G1 release-pin gate (script, task, both lint jobs)
+
+- [ ] 1.1 Add `.github/scripts/release-pin-check.sh` (executable, `set -euo pipefail`) implementing design.md D1: every violation collected and printed as `release-pin: <file>: <what> (<fix>)`, exit 1 if any, exit 0 with one summary line otherwise; a `git ls-remote` that fails for any reason other than a missing ref is reported as a lookup failure. Verify on the clean tree: `.github/scripts/release-pin-check.sh` exits 0.
+- [ ] 1.2 Verify each failure path on throwaway edits, restoring the tree after each (`git stash` or `git checkout -- <file>`), and record the printed line for each in the PR description draft: (a) `go mod edit -replace github.com/open-platform-model/library=../library`; (b) `touch go.work && git add -N go.work`; (c) library version set to `v1.0.0-0.20260101000000-abcdefabcdef` with `go mod edit -require`; (d) library version set to `v1.0.0-beta.99` (no such tag); (e) one template's core pin edited to `v2.0.1-0.dev.1.gabc1234`; (f) `templates/minimal/cue.mod/local-module.cue` created and `git add -N`; (g) `PinnedOperatorVersion` edited to `v1.0.0-beta.3` without touching `install.yaml`; (h) (a) and (e) together print two lines. Each must exit 1.
+- [ ] 1.3 `Taskfile.yml`: add `deps:release-check` (desc "Check release pins (G1): no replace, published OPM pins, no dev template pins, operator embed matches its pin") running the script. Verify: `task deps:release-check` exits 0.
+- [ ] 1.4 `.github/workflows/pr.yml` and `.github/workflows/ci.yml`: add the D1 step to the `lint` job after `setup-go`, with `if: startsWith(github.head_ref || github.ref_name, 'release-please--')`, plus a two-line comment citing workspace RELEASING.md, section "Gates". Verify: `go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/pr.yml .github/workflows/ci.yml` is clean.
+- [ ] 1.5 `task fmt`, `task lint`, `task test` (see the integration note) and `task openspec:check` green, then commit `ci(release): refuse unpublished and local pins on release PRs`.
+
+## 2. G4 operator-embed evidence (interim)
+
+- [ ] 2.1 Add `.github/scripts/release-evidence.sh` implementing design.md D2, reading `HEAD_REF`, `REF_NAME`, `BASE_REF` and `LABELS` from the environment. Verify locally from the worktree root (`git fetch origin --tags` first): (a) `HEAD_REF=feat/x BASE_REF=main LABELS='[]'` exits 0 with the "release-please PRs only" line; (b) `HEAD_REF=release-please--branches--main--components--opm BASE_REF=main LABELS='[]'` exits 0 on the clean tree (operator unchanged since `v1.0.0-beta.4`); (c) the same after editing `PinnedOperatorVersion` to `v1.0.0-beta.3` exits 1 naming `v1.0.0-beta.2`, `v1.0.0-beta.3`, `v1.0.0-beta.4`, `task test:e2e`, `e2e-verified` and `add-embedded-operator-e2e-job`; (d) (c) with `LABELS='["e2e-verified"]'` exits 0; (e) with the manifest version faked to a tag that does not exist (a scratch copy of the script reading a scratch manifest) exits 1 naming the tag. Restore the tree.
+- [ ] 2.2 Add `.github/workflows/release-evidence.yml` per design.md D2: name `Release Evidence`; `pull_request` on `main` with types `[opened, synchronize, reopened, labeled, unlabeled]`; `permissions: contents: read`; `concurrency: { group: release-evidence-${{ github.event.pull_request.number }}, cancel-in-progress: true }`; one job `operator-e2e-evidence` named `G4 operator-embed evidence` with no job-level `if`, `runs-on: ubuntu-latest`, checkout at the pinned `actions/checkout` SHA used elsewhere with `fetch-depth: 0`, and one step running the script with every expression passed through `env:`. A header comment says the job is interim until `add-embedded-operator-e2e-job` lands and cites workspace RELEASING.md, section "Gates". Verify: actionlint clean on the file.
+- [ ] 2.3 `task fmt`, `task lint`, `task test` (see the integration note) and `task openspec:check` green, then commit `ci(release): require e2e evidence when the embedded operator moves`.
+
+## 3. Labels and Dependabot
+
+- [ ] 3.1 `.github/labels.yml`: add a `# Release cascade` group with the six labels and a `# Managed by bots (listed so the sync never deletes them)` group with the five bot labels, colors and descriptions exactly as design.md D4 and Context give them (re-read the live values with `gh label list -R open-platform-model/cli --json name,color,description` first; if they differ from design.md, use the live values and note it). Verify: `comm -23 <(gh label list -R open-platform-model/cli --limit 200 --json name --jq '.[].name' | sort) <(yq -r '.[].name' .github/labels.yml | sort)` prints nothing, and the file lists all six cascade labels.
+- [ ] 3.2 `.github/dependabot.yml`: add `ignore: [{dependency-name: "github.com/open-platform-model/*"}]` to the `gomod` entry with a one-line comment that the release cascade moves OPM pins (workspace RELEASING.md, section "Cascade files"); reword the prefix comment so it no longer says release-please drops `deps` (cli lists `deps` as a visible section in `release-please-config.json`; `pr-title.yml` rejects it, which is why `build` is used). Verify: `yq '.updates[] | select(.package-ecosystem=="gomod") | .ignore' .github/dependabot.yml` prints the entry; the github-actions entry is unchanged.
+- [ ] 3.3 `task fmt`, `task lint`, `task test` (see the integration note) and `task openspec:check` green, then commit `ci(github): declare cascade labels and leave OPM modules to the cascade`. After the PR opens, read the `labels` workflow's dry-run log and confirm it lists no deletion (SUPERVISOR, recorded on the PR).
+
+## 4. Release types and docs
+
+- [ ] 4.1 `release-please-config.json`: set the `docs` section to `"hidden": true` (owner decision D15); `refactor` stays `"hidden": false`; nothing else changes. Verify: `jq -c '.packages["."]["changelog-sections"][] | select(.type=="docs" or .type=="refactor")' release-please-config.json` prints docs hidden true and refactor hidden false.
+- [ ] 4.2 `AGENTS.md:348`: the release sentence reads that release-please hides `chore`, `test`, `ci`, `build` and `docs`, and that `feat`, `fix`, `deps`, `perf` and `refactor` release; add one sentence that release PRs must pass the release-pin gate (`task deps:release-check`) and, when the embedded operator moved, carry `e2e-verified` after a local `task test:e2e`, citing workspace RELEASING.md, section "Gates". Verify: `grep -n 'docs' AGENTS.md` shows no line still saying docs releases.
+- [ ] 4.3 `.github/workflows/pr-title.yml:3-10`: reword the header so it says release-please parses the squash commit title, which equals the PR title only once the repo's `squash_merge_commit_title` is `PR_TITLE` (owner setting, workspace RELEASING.md, section "Owner settings"); until then a one-commit PR squashes under its commit subject, so that subject must also be a Conventional Commit. Verify: actionlint clean; no other line of the file changes (`git diff --stat`).
+- [ ] 4.4 `task fmt`, `task lint`, `task test` (see the integration note) and `task openspec:check` green, then commit `ci(release): stop docs-only commits from cutting a release`.

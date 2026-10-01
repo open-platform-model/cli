@@ -1,0 +1,131 @@
+## Context
+
+The release cascade (workspace RELEASING.md) moves upstream pins into each repo through one rolling `deps/cascade` PR and leaves releases to humans. Before any of that runs, each repo needs its release-PR gates and its settings files ready. For the cli that means:
+
+- **CI layout today.** `pr.yml` runs seven independent jobs on `pull_request` (`lint` at `.github/workflows/pr.yml:29-45`); `ci.yml` runs `lint` and `unit` on every branch push (`.github/workflows/ci.yml:16-32`). Both `lint` jobs are named `Lint` and already set up Go 1.26.0. release-please runs as the opm-release-please App (`release.yml:68-81`), so its PRs and pushes to `release-please--branches--main--components--opm` trigger both workflows. No check is required today: the only branch rulesets are `mention-guard` (a workflow rule) and `Protected` (disabled), read with `gh api repos/open-platform-model/cli/rulesets` on 2026-10-01.
+- **Pins G1 inspects.** `go.mod:13` requires `github.com/open-platform-model/library v1.0.0-beta.1` (the only OPM Go module; no `replace`; no tracked `go.work`). The templates pin core `v2.0.0-beta.1` and the opm catalog `v4.4.4` (`templates/*/cue.mod/module.cue`). `PinnedOperatorVersion = "v1.0.0-beta.2"` (`internal/operator/manifest.go:19`) matches the digest-pinned image at `internal/operator/dist/install.yaml:1611`; `task operator:sync` writes both (`Taskfile.yml:390-407`). No `cue.mod/local-module.cue` is tracked. On `origin/main` (f3569b24) every G1 check passes, verified by hand on 2026-10-01 with the commands in D1.
+- **Last released version.** `.release-please-manifest.json` holds `1.0.0-beta.4`; tag `v1.0.0-beta.4` pins operator `v1.0.0-beta.2`, the same as `main`.
+- **Labels.** `.github/workflows/labels.yml:18-22` runs `crazy-max/ghaction-github-labeler` v6.0.0 with `skip-delete: false`, as a dry run on PRs and for real on `main`, triggered only when `.github/labels.yml` changes. The repo holds five labels the file does not list (`gh label list`, 2026-10-01): `autorelease: pending` and `autorelease: tagged` (color `ededed`, no description), `dependencies` (`0366d6`, "Pull requests that update a dependency file"), `go` (`16e2e2`, "Pull requests that update go code") and `github_actions` (`000000`, "Pull requests that update GitHub Actions code"). The plan named only the first three; `go` and `github_actions` are Dependabot's ecosystem labels and would be deleted just the same.
+- **Merge settings.** `squash_merge_commit_title` is `COMMIT_OR_PR_TITLE` and `squash_merge_commit_message` is `COMMIT_MESSAGES` (`gh api repos/open-platform-model/cli`, 2026-10-01). `pr-title.yml:3-10` describes the `PR_TITLE` behavior.
+
+## Goals / Non-Goals
+
+**Goals:**
+- G1 and G4 exist and run on release-please PRs, ready to be made required by the owner's ruleset.
+- The next label sync deletes nothing a tool relies on, and the cascade labels exist before the cascade runs.
+- Dependabot stops proposing library bumps.
+- Docs-only commits stop releasing (owner decision D15).
+- No comment in the repo describes the squash setting wrongly.
+
+**Non-Goals:**
+- The cascade task, the receiver and the notify job (`add-deps-cascade-task`, `join-release-cascade`).
+- G2 freshness and G3 settled statuses (set by the receiver in later phases).
+- The cluster-backed e2e CI job (`add-embedded-operator-e2e-job`), which retires G4.
+- Moving the embedded operator to beta.3 (a separate `fix(deps)` catch-up).
+- Rulesets, merge settings, the cascade App and Environments (owner actions, RELEASING.md "Owner settings").
+
+## Decisions
+
+### D1: G1 is one script, called from two `lint` jobs and one task
+
+`.github/scripts/release-pin-check.sh` (bash, `set -euo pipefail`, collects failures into an array and prints them all before exiting 1) performs, from the repo root:
+
+```bash
+go mod edit -json | jq -e '.Replace == null'                          # no replace
+git ls-files --error-unmatch go.work                                  # must fail: no tracked go.work
+go mod edit -json | jq -r '.Require[] | select(.Path | startswith("github.com/open-platform-model/")) | "\(.Path) \(.Version)"'
+  # each version: grep -E '([-.]0\.|-)[0-9]{14}-[0-9a-f]{12}$' must not match (all three pseudo-version shapes,
+  # checked on 2026-10-01 against v0.0.0-…, v1.2.4-0.…, v1.2.3-pre.0.…, and not matching v1.0.0-beta.1)
+  # repo = path with any /vN major suffix removed; git ls-remote --exit-code --tags "https://$repo.git" "refs/tags/$version"
+grep -HnE 'v: "[^"]*-0\.dev\.' templates/*/cue.mod/module.cue        # must not match
+git ls-files '*cue.mod/local-module.cue'                              # must be empty
+sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p' internal/operator/manifest.go
+grep -E '^\s*image: ghcr\.io/open-platform-model/opm-operator:' internal/operator/dist/install.yaml  # exactly one line; tag before '@'
+```
+
+The workflow step, added to the `lint` job of both `pr.yml` and `ci.yml` after `setup-go`:
+
+```yaml
+- name: Release-pin gate (G1)
+  if: startsWith(github.head_ref || github.ref_name, 'release-please--')
+  run: .github/scripts/release-pin-check.sh
+```
+
+`task deps:release-check` runs the same script with no branch condition. Failure lines name the file, the pin and the fix (for the operator: `task operator:sync VERSION=<tag>`); exit codes are 0 (pass) and 1 (any violation or any lookup failure; a failed `git ls-remote` that is not "no such ref" is reported as a lookup failure, never as a pass).
+
+### D2: G4 is its own workflow, because it must re-run on label events
+
+`.github/workflows/release-evidence.yml`, name `Release Evidence`, job `operator-e2e-evidence` (check name `G4 operator-embed evidence`), triggered by `pull_request` on `main` with types `[opened, synchronize, reopened, labeled, unlabeled]`, `permissions: contents: read`, a concurrency group per PR number. The job has no job-level `if`: it always runs and decides in its step, so a skipped job can never stand in for a pass. It checks out with `fetch-depth: 0` (tags and `origin/main`), then:
+
+```bash
+branch="${HEAD_REF:-$REF_NAME}"
+case "$branch" in release-please--*) ;; *) echo "G4 applies to release-please PRs only"; exit 0 ;; esac
+tag="v$(git show "origin/${BASE_REF}:.release-please-manifest.json" | jq -er '."."')"
+old=$(git show "${tag}:internal/operator/manifest.go" | sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p')
+new=$(sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p' internal/operator/manifest.go)
+[ -n "$old" ] && [ -n "$new" ] || fail "cannot read PinnedOperatorVersion at $tag or in the PR"
+[ "$old" = "$new" ] && exit 0
+jq -e 'index("e2e-verified")' <<<"$LABELS" >/dev/null || fail "operator moved $old -> $new since $tag; run task test:e2e and add e2e-verified (interim until add-embedded-operator-e2e-job)"
+```
+
+`HEAD_REF`, `REF_NAME`, `BASE_REF` and `LABELS` (`toJSON(github.event.pull_request.labels.*.name)`) reach the script through `env:`, never inline. The logic lives in `.github/scripts/release-evidence.sh` so it can be exercised locally with those variables set.
+
+### D3: G4's label is not bound to a commit
+
+The label proves a human ran the suite at some point on the release PR. If the cascade later moves the operator again and release-please refreshes the PR, the label stays and G4 passes. Accepted for an interim gate: a human removes `e2e-verified` whenever the operator pin moves after labeling (a line workspace RELEASING.md, section "Runbook", needs to carry; flagged to the workspace item), and the real fix is the CI job that replaces G4.
+
+### D4: Bot labels are listed with their live color and description
+
+The labeler rewrites color and description to match the file, so listing a bot label with a different color would edit it on every sync. The five bot labels go in a new `# Managed by bots` group with exactly the values in Context. The six cascade labels go in a new `# Release cascade` group: `deps-cascade` (`0366d6`, "Rolling upstream-pin PR opened by the release cascade"), `deps-cascade:conflict` (`b60205`, "Cascade PR could not be rebuilt on main; a human updates the branch"), `deps-cascade:hold` (`fbca04`, "A pin is held back by .cascade-hold"), `deps-cascade:breaking` (`d93f0b`, "An upstream changelog in this PR announces a breaking change"), `need-human-review` (`e99695`, "Cascade PR carries glue edits a human must review before merge"), `e2e-verified` (`0e8a16`, "A human ran task test:e2e against the embedded operator (G4)").
+
+### D5: Hiding docs delays cli, library and operator docs fixes on the site
+
+D15 hides `docs` in cli. opmodel.dev's line versions build cli docs from the newest cli tag and library, core and opm-operator docs from exactly what that tag pins (`opmodel.dev/site/versions.conf` header). A docs-only fix therefore reaches the published site only after the next releasing commit in the cli (and, for library or operator docs, after the cascade has carried their next release into a cli release). This change does not work around that; it records the trade-off for the owner (open question Q1).
+
+## Research & Decisions
+
+### Where G1 runs
+**Context**: G1 must not show as passing when it did not run.
+**Explored**: `pr.yml` and `ci.yml` job layout; GitHub's treatment of skipped jobs (a skipped required job counts as success).
+**Options considered**:
+1. A new job with `if: startsWith(...)` - skipped on ordinary PRs, which is fine, but a skipped job also reads as a pass on a release PR if the condition is ever wrong.
+2. A step in the `pr.yml` `lint` job only - simplest, but both workflows report a check named `Lint` on a release-please head commit, so a required `Lint` could be satisfied by the push workflow's run, which would lack the step.
+3. A step in both `lint` jobs - both `Lint` runs enforce it.
+**Decision**: option 3.
+**Rationale**: matches the plan's "step inside an existing required job" rule and removes the duplicate-name hole. The `ref_name` fallback covers the push workflow, where `head_ref` is empty.
+
+### PinnedOperatorVersion check: script or unit test
+**Context**: `task operator:sync` writes the pin and the manifest together, so a mismatch is only possible by hand-editing one of them.
+**Options considered**:
+1. A G1 script check on release PRs - as scoped.
+2. A unit test in `internal/operator` asserting the image tag equals the pin - runs on every PR, so a mismatch never reaches `main`.
+**Decision**: option 1 in this change.
+**Rationale**: keeps the change inside its scope and makes G1 self-contained across repos. Option 2 is cheap and stricter; it is open question Q2.
+
+### Last cli tag for G4
+**Context**: G4 compares against "the last cli tag".
+**Options considered**:
+1. Newest tag by semver from `git tag`.
+2. Newest published GitHub Release.
+3. The base branch's `.release-please-manifest.json` version.
+**Decision**: option 3.
+**Rationale**: it is the version release-please itself counts from, needs no API call, and on the release PR the manifest is already bumped, so reading it from the base branch gives exactly the previous release.
+
+### go.work and the two extra Dependabot labels
+**Context**: the plan listed neither.
+**Decision**: G1 also refuses a tracked `go.work` (Go's other local-override mechanism, the counterpart of `local-module.cue`); `labels.yml` also lists `go` and `github_actions`.
+**Rationale**: both are holes of the same kind the plan closes, found while grounding the change on the repo.
+
+## Risks / Trade-offs
+
+- [Gates are advisory until the ruleset requires them] → Owner action S0; RELEASING.md "Owner settings" names the checks `Lint` and `G4 operator-embed evidence`.
+- [G1's `git ls-remote` makes the `lint` job depend on github.com] → Only on release PRs; a network failure fails closed and a re-run clears it.
+- [G4 label not tied to a SHA] → D3.
+- [Docs-only fixes no longer release] → D5, Q1.
+- [The labels PR's dry run is the only pre-merge proof of D4] → Task 3.3 compares the file against `gh label list` before commit and reads the dry-run log on the PR.
+
+## Open Questions
+
+- **Q1 (owner)**: should opmodel.dev build cli (and library, operator) docs from the release-branch head like core and catalog_opm, so D15 does not delay docs fixes? Outside this repo.
+- **Q2 (owner)**: add the unit test of the Research section as well, so a mismatched embed fails every PR, not only release PRs?
+- **Q3 (owner)**: `amannn/action-semantic-pull-request` can also validate a single commit's subject (`validateSingleCommit`, `validateSingleCommitMatchesPrTitle`), which closes the `COMMIT_OR_PR_TITLE` gap without the owner setting. It would also reject a one-commit cascade PR whose commit subject is not conventional, so it needs `add-deps-cascade-task` to agree. Not in this change.
