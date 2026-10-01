@@ -6,15 +6,16 @@
 
 ### Requirement: The job applies to operator-facing pull requests, cascade pull requests and release pull requests
 
-The workflow SHALL run one job, named `E2E (kind, embedded operator)`, triggered by `pull_request` targeting `main` with the activity types `opened`, `synchronize`, `reopened` and `labeled`, and by `workflow_dispatch`. The job SHALL do the cluster-backed work (it *applies*) when at least one of these holds:
+The workflow SHALL run one job, named `E2E (kind, embedded operator)`, triggered by `pull_request` targeting `main` with the activity types `opened`, `synchronize`, `reopened`, `labeled` and `unlabeled`, and by `workflow_dispatch`. The job SHALL do the cluster-backed work (it *applies*) when at least one of these holds:
 
 - the run was started by `workflow_dispatch`;
 - the pull request's head branch starts with `release-please--`;
+- the pull request's head branch is the cascade branch `deps/cascade`;
 - the pull request currently carries the label `deps-cascade`;
 - the pull request changes a file under `internal/operator/`, `templates/` or `hack/platform/`;
-- the pull request changes one of the job's own inputs: the workflow file itself, its decision script `.github/scripts/e2e-cluster-applies.sh`, `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml`, `hack/opm-config.cue`, `tests/e2e/operator_test.go`, `tests/e2e/instance_operator_owned_test.go`, or anything under `tests/e2e/testdata/operator-owned/`.
+- the pull request changes one of the job's own inputs: the workflow file itself, its decision script `.github/scripts/e2e-cluster-applies.sh`, `Taskfile.yml` (which defines `cluster:create` and `cluster:operator`), `hack/fixtures.sh` (which seeds the registry), `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml`, `hack/opm-config.cue`, any Go file directly under `tests/e2e/` (the cluster-backed tests and the suite's shared helpers such as `TestMain` and `runOPMWithEnv`), or anything under `tests/e2e/testdata/operator-owned/`.
 
-The decision SHALL be computed from the pull request's state when the job runs (its head branch, its current labels and its full list of changed files), never from the triggering event alone, so two runs for the same head commit always reach the same decision.
+The decision SHALL be computed from the pull request's state when the job runs (its head branch, its current labels and its full list of changed files), never from the triggering event alone, so runs for the same head commit, head branch and labels always reach the same decision.
 
 #### Scenario: Operator pin bump applies
 
@@ -23,7 +24,7 @@ The decision SHALL be computed from the pull request's state when the job runs (
 
 #### Scenario: Release pull request applies
 
-- **WHEN** release-please opens or updates a pull request from a branch named `release-please--branches--main`
+- **WHEN** release-please opens or updates a pull request from the branch `release-please--branches--main--components--opm`
 - **THEN** the job runs the cluster-backed suite even if no listed path changed
 
 #### Scenario: Label added after opening
@@ -35,6 +36,16 @@ The decision SHALL be computed from the pull request's state when the job runs (
 
 - **WHEN** an unrelated label is added to a pull request
 - **THEN** the new run reaches the same decision as the previous run for that head commit
+
+#### Scenario: Cascade branch applies without its label
+
+- **WHEN** the `deps-cascade` label is removed from a pull request whose head branch is `deps/cascade`
+- **THEN** the `unlabeled` event starts a new run, which still applies and runs the suite
+
+#### Scenario: Change to the preparation task applies
+
+- **WHEN** a pull request changes only `Taskfile.yml`
+- **THEN** the job applies, so a change that breaks `task cluster:operator` fails on that pull request rather than on the next release pull request
 
 #### Scenario: Unrelated pull request
 
@@ -57,7 +68,7 @@ The workflow SHALL NOT use a workflow-level path or branch filter beyond the `ma
 
 ### Requirement: The cluster is prepared with the local loop's own tasks and the embedded operator
 
-When the job applies, it SHALL install kind at the version and checksum `pr.yml`'s `integration` job uses, create the `opm-dev` cluster with `task cluster:create` (the node image pinned in `Taskfile.yml`), and prepare it with `task cluster:operator`, which installs the operator from the manifest the CLI embeds (no `--version`), applies `hack/kind-platform.yaml` and `hack/kind-operator-rbac.yaml`, and waits for the cluster Platform to be Ready. The job SHALL NOT restate those steps in the workflow.
+When the job applies, it SHALL install kind at the version and checksum `pr.yml`'s `integration` job uses, create the `opm-dev` cluster with `task cluster:create` (the node image pinned in `Taskfile.yml`), and prepare it with `task cluster:operator`, which installs the operator from the manifest the CLI embeds (no `--version`), applies `hack/kind-platform.yaml` and `hack/kind-operator-rbac.yaml`, and waits for the cluster Platform to be Ready for its current generation. The job SHALL NOT restate those steps in the workflow.
 
 The job SHALL run a registry container seeded from the tree with `hack/fixtures.sh seed`, joined to kind's docker network. The CLI on the runner SHALL resolve `testing.opmodel.dev` from it on `localhost:5000`, and the operator SHALL resolve `testing.opmodel.dev` from it through `KIND_CUE_REGISTRY` on its in-cluster address. Core and the catalogs SHALL resolve from GHCR on both sides.
 

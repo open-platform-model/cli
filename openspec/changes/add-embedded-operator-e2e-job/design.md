@@ -9,7 +9,7 @@ See proposal.md, Why. Current state, read 2026-10-01 at `origin/main` `f3569b24`
   `opm-dev` with the pinned node image (`:197`), installs only the CRDs (`:201`) and runs six
   `tests/integration` programs. The `e2e` job (`:214-246`) seeds a `registry:2` service from the tree
   and runs `go test ./tests/e2e/... -v -timeout 25m` with no cluster.
-- **Five cluster-backed tests skip on a runner without a cluster.** `requireKindCluster`
+- **Four cluster-backed tests skip on a runner without a cluster.** `requireKindCluster`
   (`tests/e2e/operator_test.go:30-48`) skips when `~/.kube/config` is missing or `kind-opm-dev` does
   not answer. Its callers: `TestE2E_Operator_InstallUninstallLifecycle` (`operator_test.go:210`),
   `TestE2E_InstanceBuild_ReadsTheNamedContextsClusterPlatform` (`instance_build_test.go:766`), and,
@@ -35,17 +35,37 @@ See proposal.md, Why. Current state, read 2026-10-01 at `origin/main` `f3569b24`
 - **`status.operatorVersion` is not a health signal.** The archived change
   `2026-09-19-e2e-local-loop-self-sufficient` (design.md, Decision 3) measured `task
   cluster:operator` printing "operator v1.0.0-alpha.14 is reconciling" while `Platform/cluster` sat at
-  `Ready=False`/`Stalled=True`, reason `MaterializeFailed`. That is the H3 stall. It deferred waiting
-  for `Ready` until the operator pin moved; `PinnedOperatorVersion` is now `v1.0.0-beta.2`
-  (`internal/operator/manifest.go:19`). The operator owns `Ready`, `Reconciling` and `Stalled` on the
-  Platform (opm-operator `internal/controller/platform_controller.go:458,490-501`).
+  `Ready=False`/`Stalled=True`, reason `MaterializeFailed`. That is the alpha.14 stall (cli issue
+  214), the outage proposal.md describes. It deferred waiting for `Ready` until the operator pin
+  moved; `PinnedOperatorVersion` was `v1.0.0-beta.2` when this was written
+  (`internal/operator/manifest.go:19`), and workspace RELEASING.md, section "Rollout and changes"
+  (Phase 1), catches the embed up to the newest published operator (`v1.0.0-beta.3` exists) before
+  or alongside this change. The spike therefore records whatever `PinnedOperatorVersion` is embedded
+  when it runs. The operator owns `Ready`, `Reconciling` and `Stalled` on the Platform (opm-operator
+  `internal/controller/platform_controller.go:458,490-501`).
+- **`Ready=True` alone can describe an older spec.** `task cluster:operator` runs `opm operator
+  install` without `--skip-platform` (`Taskfile.yml:254`), which creates `Platform/cluster` subscribed
+  to the newest published catalog (`internal/cmd/operator/install.go:52-57,150-153,187-190`). The
+  task's `kubectl apply -f hack/kind-platform.yaml` (`:282`) then changes the spec to the pinned
+  catalogs, which bumps `metadata.generation`. The operator sets `status.observedGeneration` on both
+  its Ready and its Stalled paths (opm-operator `v1.0.0-beta.2`,
+  `platform_controller.go:212,302,456`), so a wait that reads only `Ready` can see generation 1's
+  `Ready=True` while generation 2 is stalling. Readiness means `Ready=True` *and*
+  `status.observedGeneration == metadata.generation`.
 - **The operator-owned fixture is a published module.** `tests/e2e/testdata/operator-owned/cue.mod/module.cue`
   pins `testing.opmodel.dev/modules/cli/podinfo@v0` `v0.1.11`. The operator resolves it inside the
   cluster. With the built-in registry default it reads GHCR, which holds a bumped fixture only after
   `publish-fixtures.yml` runs on merge.
 - **Release PRs run CI.** release-please runs as the `opm-release-please` App (`release.yml:66-79`),
-  so its pull requests fire `pull_request` workflows like any other, with a head branch starting
-  `release-please--`.
+  so its pull requests fire `pull_request` workflows like any other. The cli's release branch is
+  `release-please--branches--main--components--opm` (PRs 250, 257, 259, 261, 267); the rule keys on
+  the `release-please--` prefix.
+- **The developer's workspace registry is in use.** The workspace `opm-registry` container
+  (`.tasks/config.yml:14`, `registry:2` on `0.0.0.0:5000`, bind-mounted to `.registry-data`) runs on
+  the developer's Docker host and opm-kind-demo's Flux reads it. Local spike steps therefore use their
+  own container and port (`opm-spike-registry` on `5001`) and never start, seed or remove
+  `opm-registry`. `Taskfile.yml:11` already takes a `REGISTRY_CONTAINER` override. kind also switches
+  the current kube-context to a cluster it creates, so local steps record and restore it.
 - **Local timing.** The archived change's baseline (2026-09-19) ran the full suite in 616 s, of which
   about 562 s was three operator-owned tests waiting out 3-minute deadlines against the stalled
   alpha.14 operator. A healthy run is therefore expected to take a few minutes; it has not been
@@ -54,14 +74,14 @@ See proposal.md, Why. Current state, read 2026-10-01 at `origin/main` `f3569b24`
   lifecycle test deletes every ModuleInstance and the operator, so it was not run there. The tests
   hardcode `kind-opm-dev`, and kind cluster names are unique per Docker host, so the suite cannot be
   timed on a second cluster beside it. Section 1 therefore checks the preparation (the `Ready` wait)
-  on a throwaway cluster, `CLUSTER_NAME=opm-spike`, and the full suite is timed by this change's first
+  on a throwaway cluster, `CLUSTER_NAME=opm-spike`, with its own registry container, and the full suite is timed by this change's first
   PR run, which applies because the workflow file is one of its inputs (Migration Plan).
 
 ## Goals / Non-Goals
 
 **Goals**
 
-- An H3-class break (the embedded operator cannot serve the current core or catalogs) fails a cli
+- A break of the alpha.14-stall class (the embedded operator cannot serve the current core or catalogs) fails a cli
   pull request that touches the operator, a cascade PR, or the release PR, and says so in the
   preparation step rather than three minutes into a test.
 - CI and the local loop prepare the cluster with the same task, so neither can drift.
@@ -94,28 +114,43 @@ do so. A separate `e2e-cluster.yml` takes `labeled` for itself alone.
 
 ### 2. Decide inside the job from pull-request state; always report
 
-The workflow has no `paths:` filter, and the job has no `if:`. Its first step runs `.github/scripts/e2e-cluster-applies.sh`, which computes `applies` from inputs
-the step fetches and passes in (event name, head ref, a labels file, a changed-files file), so the
-rule can be exercised locally with hand-written inputs:
+The workflow triggers on `pull_request` to `main` with the types `opened`, `synchronize`,
+`reopened`, `labeled` and `unlabeled`, and on `workflow_dispatch`. It has no `paths:` filter, and
+the job has no `if:`. The job declares `permissions: { contents: read, pull-requests: read }`
+(job-level permissions replace the workflow-level set, so `contents: read`, which checkout needs, is
+restated). Its steps start:
+
+1. An ungated `actions/checkout` (the SHA `pr.yml` pins, shallow), so the decision script exists.
+2. `decide`: runs `.github/scripts/e2e-cluster-applies.sh` with `GH_REPO: ${{ github.repository }}`
+   in its `env:` (so `gh` needs no git remote) and every other expression passed through `env:`.
+
+The script computes `applies` from inputs the step fetches and passes in (event name, head ref, a
+labels file, a changed-files file), so the rule can be exercised locally with hand-written inputs:
 
 ```
 applies := event == workflow_dispatch
         || head_ref starts with "release-please--"
+        || head_ref == "deps/cascade"
         || "deps-cascade" in labels(PR, read live)
         || any(changed_files(PR, all pages) matches APPLY_PATHS)
 ```
 
-with `APPLY_PATHS` as listed in the `e2e-cluster-workflow` spec. Labels and files come from the API
-(`gh pr view <n> --json labels`, `gh api --paginate repos/{repo}/pulls/<n>/files`), with
-`permissions: pull-requests: read` on the job. Every later step carries
-`if: steps.decide.outputs.applies == 'true'`.
+with `APPLY_PATHS` as listed in the `e2e-cluster-workflow` spec. `deps/cascade` is the one rolling
+cascade branch (workspace RELEASING.md, section "The cascade", "One rolling PR per repo"), so a
+cascade PR applies even after someone removes its label. Labels and files come from the API
+(`gh pr view <n> --json labels`, `gh api --paginate repos/{repo}/pulls/<n>/files`). Every step after
+`decide` carries `if: steps.decide.outputs.applies == 'true'`.
 
 Why every condition reads live state: a required check is satisfied by the newest run for the head
-commit. If an unrelated `labeled` event could produce a run that skips, that run would overwrite a
-failing run with a pass. Making the decision a pure function of the pull request's state means a
-re-run can only repeat the earlier verdict. The cost is that an unrelated label on an applying PR
-re-runs the whole job; labels are rare enough that this is accepted. The concurrency group is the
-workflow and ref with `cancel-in-progress`, so the restart replaces, never duplicates.
+commit. If an unrelated label event could produce a run that skips, that run would overwrite a
+failing run with a pass. Making the decision a pure function of the pull request's head commit,
+branch and labels means that the same head commit, branch and labels give the same decision, so a
+re-run caused by an unrelated label can only repeat the earlier verdict. Removing `deps-cascade`
+from a PR that applied only through the label does change the decision; that is why `unlabeled` is
+a trigger (the change is reported at once, not at the next unrelated event) and why the cascade
+branch name is a condition of its own. The cost is that an unrelated label on an applying PR re-runs
+the whole job; labels are rare enough that this is accepted. The concurrency group is the workflow
+and ref with `cancel-in-progress`, so the restart replaces, never duplicates.
 
 Why not a job-level `if:`: a job skipped by its condition reports as skipped, which satisfies a
 required check, and a workflow that path filters out never reports at all, which leaves a required
@@ -173,7 +208,9 @@ KIND_CUE_REGISTRY           = testing.opmodel.dev=opm-registry:5000+insecure,opm
 `cluster:operator` then joins `opm-registry` to the `kind` network and adds `--registry` to the
 operator (`Taskfile.yml:258-280`); this is the opt-in path the `kind-cluster-tasks` spec already
 defines, so nothing in the task changes for it. The container name matches the task's
-`REGISTRY_CONTAINER` default (`Taskfile.yml:11`).
+`REGISTRY_CONTAINER` default (`Taskfile.yml:11`). That name and port are free on a fresh runner;
+on a developer machine they belong to the workspace registry (Context), so local reproductions of
+this setup use `REGISTRY_CONTAINER=opm-spike-registry` on port `5001` instead (tasks.md section 1).
 
 Verified 2026-10-01: Task reads an exported environment variable into a var declared as
 `'{{.KIND_CUE_REGISTRY | default ""}}'` (Task 3.52.0, scratch Taskfile: unset prints empty, exported
@@ -195,18 +232,30 @@ today's `e2e` job. The switch changes only the skip branches in `requireKindClus
 "could not check" branch of `requireOperatorApplierGrant`:
 
 ```go
-// skipOrFail skips, or fails when the run requires the cluster.
+// skipOrFail skips, or fails when the run requires the cluster. A failure
+// carries the variable as a prefix, so the log says why a skip became a failure.
 func skipOrFail(t *testing.T, format string, args ...any) {
 	t.Helper()
 	if os.Getenv("OPM_E2E_REQUIRE_CLUSTER") == "1" {
-		t.Fatalf(format, args...)
+		t.Fatalf("OPM_E2E_REQUIRE_CLUSTER=1: "+format, args...)
 	}
 	t.Skipf(format, args...)
 }
 ```
 
-Unset, the suite behaves exactly as now, so developer machines and `pr.yml`'s `e2e` job are
-unaffected.
+The messages change so they read correctly as either outcome: neither says "skipping", and both
+`requireKindCluster` branches name the cause, the `kind-opm-dev` context and `task cluster:create`
+(today the missing-kubeconfig branch at `operator_test.go:36-38` names neither):
+
+```
+no kubeconfig at "/home/runner/.kube/config", so context "kind-opm-dev" cannot be reached; run `task cluster:create`
+kind cluster "kind-opm-dev" not reachable; run `task cluster:create`: exit status 1
+```
+
+Under `OPM_E2E_REQUIRE_CLUSTER=1` the same lines appear behind the `OPM_E2E_REQUIRE_CLUSTER=1: `
+prefix as failures. The applier-grant message likewise drops its trailing "skipping operator e2e".
+Unset, every precondition skips exactly where it skips now, so developer machines and `pr.yml`'s
+`e2e` job are unaffected; only the skip text changes.
 
 **Alternatives considered**
 
@@ -217,11 +266,15 @@ unaffected.
    wants the same strictness locally.
 3. *An environment switch.* Chosen. It is opt-in and a developer can set it too.
 
-### 6. `cluster:operator` waits for `Ready=True`
+### 6. `cluster:operator` waits for `Ready=True` for the Platform's current generation
 
 The final wait in `cluster:operator` (`Taskfile.yml:287-300`) becomes a wait on the Platform's
-`Ready` condition. On timeout it prints the `Ready` and `Stalled` conditions and points at the
-operator log. Without this, an H3 stall reaches the suite and costs three 3-minute timeouts before
+`Ready` condition for the Platform's current generation: it passes only when
+`status.observedGeneration` equals `metadata.generation` and `Ready` is `True` (Context: the install
+creates generation 1, the task's apply makes generation 2, and a `Ready=True` left from generation 1
+proves nothing about the pinned catalogs). On timeout it prints both generations and the `Ready` and
+`Stalled` conditions, and points at the operator log. Without this, an alpha.14-class stall reaches
+the suite and costs three 3-minute timeouts before
 anything fails, and the failure names a test, not the Platform.
 
 The wait stays a shell loop rather than `kubectl wait --for=condition=Ready`, because the Platform
@@ -238,10 +291,12 @@ timeout stays 120 seconds unless section 1 measures a longer first reconcile on 
 
 ### 7. Recommend the check be required; G4 retires behind it
 
-The job is built to be required (Decision 2). Whether it is required is the owner's ruleset choice
-(workspace RELEASING.md, section "Owner settings"). G4 retires once the check is required and has
-passed on a cli release PR (proposal.md, Depends on / gates). Until then the check runs advisory, and
-G4 stays.
+The job is built to be required (Decision 2). Whether it is required is the owner's ruleset choice;
+workspace RELEASING.md, section "Owner settings", does not list this check yet, and the workspace item
+is asked to add it. G4 retires, in its own small cli change, once the check is required and has
+passed on a cli release PR (proposal.md, Depends on / gates). That refines the owner's rule
+that G4 retires "once the job lands" (workspace RELEASING.md, section "Gates") and is for the owner
+to confirm. Until then the check runs advisory, and G4 stays.
 
 ## Research & Decisions
 
@@ -260,7 +315,7 @@ G4 stays.
 
 ### Which tests does the job make real?
 
-**Context**: Only five tests use the cluster; the rest of the suite already runs in `pr.yml`'s `e2e` job.
+**Context**: Only four tests use the cluster; the rest of the suite already runs in `pr.yml`'s `e2e` job.
 **Explored**: The callers of `requireKindCluster` and `runOperatorOwnedOPM` listed under Context.
 **Options considered**:
 1. Run only the cluster-backed tests with `-run`: faster, but a new cluster test outside the regex
@@ -284,6 +339,16 @@ the kind of silent gap this change exists to close.
   Ready gets the stall reason at preparation time instead of three test timeouts.
 
 ## Migration Plan
+
+Local gates never touch a cluster the implementer does not own. `task test` runs `test:unit`, then
+`test:integration` (which needs `kind-opm-dev`, `Taskfile.yml:98-100`), then `test:e2e`, whose
+lifecycle test deletes every ModuleInstance, the CRDs and the operator namespace. The shared
+`kind-opm-dev` carries someone else's workload (Context), so each section's commit task replaces
+`task test` with its local half: `task fmt`, `task lint`, `task test:unit`, `go vet ./...`, and
+`go test ./tests/e2e/... -timeout 25m` with `OPM_E2E_REQUIRE_CLUSTER` unset and `HOME` pointed at an
+empty directory (so the cluster tests skip), with `GOMODCACHE`, `GOCACHE` and `CUE_CACHE_DIR`
+exported to their real values so the override does not force a cold rebuild. The cluster half of
+`task test` is this PR's own e2e-cluster run.
 
 Before merge, the PR's own run is the first real execution: the workflow file is one of its
 apply paths. Record its job duration and the time `cluster:operator` took to see `Ready=True` under
