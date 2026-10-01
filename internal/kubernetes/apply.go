@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -105,6 +106,7 @@ func ApplyOne(ctx context.Context, client *Client, obj *unstructured.Unstructure
 	existing, err := client.ResourceClient(gvr, ns).Get(ctx, obj.GetName(), metav1.GetOptions{})
 	if err == nil {
 		existingVersion = existing.GetResourceVersion()
+		obj = guardPVCResize(ctx, client, obj, existing)
 	}
 	// If GET fails (NotFound or other), existingVersion stays empty -> "created"
 
@@ -134,8 +136,37 @@ func ApplyOne(ctx context.Context, client *Client, obj *unstructured.Unstructure
 	if existingVersion == "" {
 		return output.StatusCreated, nil
 	}
+	if opts.DryRun {
+		// A dry-run persists nothing, so the response carries the live
+		// resourceVersion whether or not the apply would change the object.
+		// Compare the response body with the live object instead.
+		if result != nil && dryRunUnchanged(existing, result) {
+			return output.StatusUnchanged, nil
+		}
+		return output.StatusConfigured, nil
+	}
 	if result != nil && result.GetResourceVersion() == existingVersion {
 		return output.StatusUnchanged, nil
 	}
 	return output.StatusConfigured, nil
+}
+
+// dryRunUnchanged reports whether a server-side dry-run apply response equals
+// the live object once the fields the server rewrites on every read or write
+// are set aside.
+func dryRunUnchanged(live, dryRun *unstructured.Unstructured) bool {
+	return equality.Semantic.DeepEqual(normalizedContent(live), normalizedContent(dryRun))
+}
+
+// normalizedContent returns a copy of obj's content without the volatile fields that
+// differ between a live object and its dry-run projection regardless of
+// whether the apply changes anything: managedFields (timestamps and the
+// applied field sets), resourceVersion, generation and status.
+func normalizedContent(obj *unstructured.Unstructured) map[string]any {
+	content := obj.DeepCopy().Object
+	unstructured.RemoveNestedField(content, "metadata", "managedFields")
+	unstructured.RemoveNestedField(content, "metadata", "resourceVersion")
+	unstructured.RemoveNestedField(content, "metadata", "generation")
+	unstructured.RemoveNestedField(content, "status")
+	return content
 }

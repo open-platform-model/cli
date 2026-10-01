@@ -49,6 +49,7 @@ Use `opm module` when you are starting from module source. For rendering, deploy
 |---------|-------------|
 | `module init` | Create a new module from a template |
 | `module vet` | Validate a module without rendering manifests |
+| `module eval` | Print the evaluated module as formatted CUE; `-e <path>` prints one value (`#config`, `metadata.name`) |
 | `module build` | Render a module directory or a published module to manifests through a synthetic instance (`debugValues` or `-f` values) |
 | `module apply` | Deploy a module directory or a published module to a cluster through a synthetic instance |
 | `module tidy` | Resolve, pin and prune the module's CUE dependencies as `cue mod tidy` does, without the `cue` binary; `--check` fails without writing |
@@ -78,7 +79,7 @@ Use `opm instance` when you are starting from an instance file or when you want 
 | `instance init` | Create a standalone instance package (`cue.mod/module.cue`, `instance.cue`, `values.cue`) for a published module, pinned and ready to build |
 | `instance vet` | Validate an instance file without generating manifests |
 | `instance build` | Render an instance file or instance package directory to manifests (a module directory is refused: use `module build`) |
-| `instance apply` | Deploy an instance file to a cluster |
+| `instance apply` | Deploy an instance file to a cluster (`--wait` blocks until every resource is healthy) |
 | `instance diff` | Compare an instance file with live cluster state |
 | `instance status` | Show resource status for a deployed instance |
 | `instance tree` | Show instance resource hierarchy |
@@ -95,7 +96,11 @@ and resolves which one it is before doing anything.
 **CLI-managed** (`spec.owner: cli`): the CLI renders, applies, prunes, and
 records the inventory itself. Every instance the CLI creates is CLI-managed —
 `opm instance apply` writes `spec.owner: cli` on create and never rewrites an
-existing owner.
+existing owner. A CLI-managed apply returns once the cluster accepts the
+objects; pass `--wait` to block until every applied resource is healthy (a
+finished Deployment, StatefulSet or DaemonSet rollout, a completed Job, a bound
+claim), bounded by `--timeout` (default 5m). On timeout it exits non-zero and
+names the resources still pending.
 
 **Operator-managed** (`spec.owner: operator`): the operator reconciles the
 instance, and the CLI edits its spec rather than the cluster. An
@@ -233,6 +238,16 @@ task test
 # Run tests with coverage
 task test:coverage
 ```
+
+## Container Image
+
+Each release publishes a multi-arch (linux/amd64, linux/arm64) distroless image to GHCR, usable as a CI job or Kubernetes `Job` image. It runs as a non-root user and carries a CA bundle for HTTPS registries; registry configuration and credentials come from the pipeline.
+
+```bash
+docker run --rm ghcr.io/open-platform-model/opm:1.0.0-beta.2 version
+```
+
+Every release is tagged with its version (no `v` prefix); stable releases also move `latest` and the major tag (`v1`).
 
 ## Requirements
 

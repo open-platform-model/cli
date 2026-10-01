@@ -34,131 +34,295 @@ func makeResource(kind string, conditions []map[string]interface{}) *unstructure
 	return obj
 }
 
-// makeStatefulSet builds a StatefulSet resource with the given spec and ready replica counts.
-func makeStatefulSet(specReplicas *int64, readyReplicas int64) *unstructured.Unstructured {
+// makeWorkload builds an apps/v1 workload with the given metadata.generation,
+// spec and status maps. A nil spec or status is omitted.
+func makeWorkload(kind string, generation int64, spec, status map[string]interface{}) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "apps/v1",
-			"kind":       "StatefulSet",
-			"metadata":   map[string]interface{}{"name": "test-ss", "namespace": "default"},
-			"status":     map[string]interface{}{"readyReplicas": readyReplicas},
+			"kind":       kind,
+			"metadata": map[string]interface{}{
+				"name":       "test-workload",
+				"namespace":  "default",
+				"generation": generation,
+			},
 		},
 	}
-	if specReplicas != nil {
-		obj.Object["spec"] = map[string]interface{}{"replicas": *specReplicas}
+	if spec != nil {
+		obj.Object["spec"] = spec
+	}
+	if status != nil {
+		obj.Object["status"] = status
 	}
 	return obj
 }
 
-func ptr64(v int64) *int64 { return &v }
-
-func TestEvaluateHealth_StatefulSet(t *testing.T) {
+func TestEvaluateHealth_Deployment(t *testing.T) {
+	progressDeadline := []interface{}{
+		map[string]interface{}{"type": "Progressing", "status": "False", "reason": "ProgressDeadlineExceeded"},
+		map[string]interface{}{"type": "Available", "status": "True"},
+	}
 	tests := []struct {
-		name          string
-		specReplicas  *int64
-		readyReplicas int64
-		expected      HealthStatus
+		name       string
+		generation int64
+		spec       map[string]interface{}
+		status     map[string]interface{}
+		expected   HealthStatus
 	}{
 		{
-			name:          "1/1 ready",
-			specReplicas:  ptr64(1),
-			readyReplicas: 1,
-			expected:      HealthReady,
+			name:       "fully rolled out",
+			generation: 2,
+			spec:       map[string]interface{}{"replicas": int64(3)},
+			status: map[string]interface{}{
+				"observedGeneration": int64(2), "replicas": int64(3),
+				"updatedReplicas": int64(3), "availableReplicas": int64(3),
+			},
+			expected: HealthReady,
 		},
 		{
-			name:          "3/3 ready",
-			specReplicas:  ptr64(3),
-			readyReplicas: 3,
-			expected:      HealthReady,
+			name:       "stuck upgrade: old ReplicaSet serves, Available=True (issue 228)",
+			generation: 2,
+			spec:       map[string]interface{}{"replicas": int64(2)},
+			status: map[string]interface{}{
+				"observedGeneration": int64(2), "replicas": int64(2),
+				"updatedReplicas": int64(1), "availableReplicas": int64(1), "readyReplicas": int64(1),
+				"conditions": []interface{}{
+					map[string]interface{}{"type": "Available", "status": "True", "reason": "MinimumReplicasAvailable"},
+					map[string]interface{}{"type": "Progressing", "status": "True", "reason": "ReplicaSetUpdated"},
+				},
+			},
+			expected: HealthNotReady,
 		},
 		{
-			name:          "0/1 ready",
-			specReplicas:  ptr64(1),
-			readyReplicas: 0,
-			expected:      HealthNotReady,
+			name:       "controller has not observed the latest generation",
+			generation: 3,
+			spec:       map[string]interface{}{"replicas": int64(1)},
+			status: map[string]interface{}{
+				"observedGeneration": int64(2), "replicas": int64(1),
+				"updatedReplicas": int64(1), "availableReplicas": int64(1),
+			},
+			expected: HealthNotReady,
 		},
 		{
-			name:          "1/3 ready",
-			specReplicas:  ptr64(3),
-			readyReplicas: 1,
-			expected:      HealthNotReady,
+			name:       "all replicas updated but not all available",
+			generation: 1,
+			spec:       map[string]interface{}{"replicas": int64(2)},
+			status: map[string]interface{}{
+				"observedGeneration": int64(1), "replicas": int64(2),
+				"updatedReplicas": int64(2), "availableReplicas": int64(1),
+			},
+			expected: HealthNotReady,
 		},
 		{
-			name:          "spec.replicas omitted defaults to 1, pod ready",
-			specReplicas:  nil,
-			readyReplicas: 1,
-			expected:      HealthReady,
+			name:       "old replicas still terminating",
+			generation: 1,
+			spec:       map[string]interface{}{"replicas": int64(1)},
+			status: map[string]interface{}{
+				"observedGeneration": int64(1), "replicas": int64(2),
+				"updatedReplicas": int64(1), "availableReplicas": int64(1),
+			},
+			expected: HealthNotReady,
 		},
 		{
-			name:          "spec.replicas omitted defaults to 1, pod not ready",
-			specReplicas:  nil,
-			readyReplicas: 0,
-			expected:      HealthNotReady,
+			name:       "ProgressDeadlineExceeded is never healthy",
+			generation: 1,
+			spec:       map[string]interface{}{"replicas": int64(1)},
+			status: map[string]interface{}{
+				"observedGeneration": int64(1), "replicas": int64(1),
+				"updatedReplicas": int64(1), "availableReplicas": int64(1),
+				"conditions": progressDeadline,
+			},
+			expected: HealthNotReady,
 		},
 		{
-			name:          "scaled to zero is always ready",
-			specReplicas:  ptr64(0),
-			readyReplicas: 0,
-			expected:      HealthReady,
+			name:       "spec.replicas omitted defaults to 1, available",
+			generation: 1,
+			spec:       map[string]interface{}{},
+			status: map[string]interface{}{
+				"observedGeneration": int64(1), "replicas": int64(1),
+				"updatedReplicas": int64(1), "availableReplicas": int64(1),
+			},
+			expected: HealthReady,
+		},
+		{
+			name:       "spec.replicas omitted defaults to 1, none available",
+			generation: 1,
+			spec:       map[string]interface{}{},
+			status:     map[string]interface{}{"observedGeneration": int64(1)},
+			expected:   HealthNotReady,
+		},
+		{
+			name:       "scaled to zero",
+			generation: 1,
+			spec:       map[string]interface{}{"replicas": int64(0)},
+			status:     map[string]interface{}{"observedGeneration": int64(1)},
+			expected:   HealthReady,
+		},
+		{
+			name:       "no status yet",
+			generation: 1,
+			spec:       map[string]interface{}{"replicas": int64(1)},
+			status:     nil,
+			expected:   HealthNotReady,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			resource := makeStatefulSet(tc.specReplicas, tc.readyReplicas)
+			resource := makeWorkload("Deployment", tc.generation, tc.spec, tc.status)
 			assert.Equal(t, tc.expected, EvaluateHealth(resource))
 		})
 	}
 }
 
-func TestEvaluateHealth_Workloads(t *testing.T) {
+func TestEvaluateHealth_StatefulSet(t *testing.T) {
+	// ssStatus builds a StatefulSet status; revisions default to a settled "rev-1".
+	ssStatus := func(observed, ready, updated int64, current, update string) map[string]interface{} {
+		return map[string]interface{}{
+			"observedGeneration": observed, "readyReplicas": ready, "updatedReplicas": updated,
+			"currentRevision": current, "updateRevision": update,
+		}
+	}
 	tests := []struct {
 		name       string
-		kind       string
-		conditions []map[string]interface{}
+		generation int64
+		spec       map[string]interface{}
+		status     map[string]interface{}
 		expected   HealthStatus
 	}{
 		{
-			name: "Deployment with Available=True",
-			kind: "Deployment",
-			conditions: []map[string]interface{}{
-				{"type": "Available", "status": "True"},
-			},
-			expected: HealthReady,
-		},
-		{
-			name: "Deployment with Available=False",
-			kind: "Deployment",
-			conditions: []map[string]interface{}{
-				{"type": "Available", "status": "False"},
-			},
-			expected: HealthNotReady,
-		},
-		{
-			name:       "Deployment with no conditions",
-			kind:       "Deployment",
-			conditions: nil,
-			expected:   HealthNotReady,
-		},
-		{
-			name:       "DaemonSet is always passive (Ready on existence)",
-			kind:       "DaemonSet",
-			conditions: nil,
+			name:       "3/3 ready and settled",
+			generation: 1,
+			spec:       map[string]interface{}{"replicas": int64(3)},
+			status:     ssStatus(1, 3, 3, "rev-1", "rev-1"),
 			expected:   HealthReady,
 		},
 		{
-			name: "DaemonSet with Available=False is still passive (Ready)",
-			kind: "DaemonSet",
-			conditions: []map[string]interface{}{
-				{"type": "Available", "status": "False"},
+			name:       "0/1 ready",
+			generation: 1,
+			spec:       map[string]interface{}{"replicas": int64(1)},
+			status:     ssStatus(1, 0, 1, "rev-1", "rev-1"),
+			expected:   HealthNotReady,
+		},
+		{
+			name:       "1/3 ready",
+			generation: 1,
+			spec:       map[string]interface{}{"replicas": int64(3)},
+			status:     ssStatus(1, 1, 3, "rev-1", "rev-1"),
+			expected:   HealthNotReady,
+		},
+		{
+			name:       "rolling update in progress: updateRevision differs from currentRevision",
+			generation: 2,
+			spec:       map[string]interface{}{"replicas": int64(3), "updateStrategy": map[string]interface{}{"type": "RollingUpdate"}},
+			status:     ssStatus(2, 3, 3, "rev-1", "rev-2"),
+			expected:   HealthNotReady,
+		},
+		{
+			name:       "rolling update in progress: not all pods updated",
+			generation: 2,
+			spec:       map[string]interface{}{"replicas": int64(3)},
+			status:     ssStatus(2, 3, 1, "rev-2", "rev-2"),
+			expected:   HealthNotReady,
+		},
+		{
+			name:       "controller has not observed the latest generation",
+			generation: 3,
+			spec:       map[string]interface{}{"replicas": int64(1)},
+			status:     ssStatus(2, 1, 1, "rev-1", "rev-1"),
+			expected:   HealthNotReady,
+		},
+		{
+			name:       "partitioned rollout: revisions differ by design, updated >= replicas-partition",
+			generation: 2,
+			spec: map[string]interface{}{
+				"replicas": int64(3),
+				"updateStrategy": map[string]interface{}{
+					"type":          "RollingUpdate",
+					"rollingUpdate": map[string]interface{}{"partition": int64(2)},
+				},
 			},
+			status:   ssStatus(2, 3, 1, "rev-1", "rev-2"),
 			expected: HealthReady,
+		},
+		{
+			name:       "partitioned rollout: partitioned pods not yet updated",
+			generation: 2,
+			spec: map[string]interface{}{
+				"replicas": int64(3),
+				"updateStrategy": map[string]interface{}{
+					"type":          "RollingUpdate",
+					"rollingUpdate": map[string]interface{}{"partition": int64(2)},
+				},
+			},
+			status:   ssStatus(2, 3, 0, "rev-1", "rev-2"),
+			expected: HealthNotReady,
+		},
+		{
+			name:       "OnDelete: revisions differ until pods are deleted, still healthy",
+			generation: 2,
+			spec: map[string]interface{}{
+				"replicas":       int64(2),
+				"updateStrategy": map[string]interface{}{"type": "OnDelete"},
+			},
+			status:   ssStatus(2, 2, 0, "rev-1", "rev-2"),
+			expected: HealthReady,
+		},
+		{
+			name:       "spec.replicas omitted defaults to 1, pod ready",
+			generation: 1,
+			spec:       map[string]interface{}{},
+			status:     ssStatus(1, 1, 1, "rev-1", "rev-1"),
+			expected:   HealthReady,
+		},
+		{
+			name:       "spec.replicas omitted defaults to 1, pod not ready",
+			generation: 1,
+			spec:       map[string]interface{}{},
+			status:     ssStatus(1, 0, 1, "rev-1", "rev-1"),
+			expected:   HealthNotReady,
+		},
+		{
+			name:       "scaled to zero",
+			generation: 1,
+			spec:       map[string]interface{}{"replicas": int64(0)},
+			status:     ssStatus(1, 0, 0, "rev-1", "rev-1"),
+			expected:   HealthReady,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			resource := makeResource(tc.kind, tc.conditions)
+			resource := makeWorkload("StatefulSet", tc.generation, tc.spec, tc.status)
+			assert.Equal(t, tc.expected, EvaluateHealth(resource))
+		})
+	}
+}
+
+func TestEvaluateHealth_DaemonSet(t *testing.T) {
+	dsStatus := func(observed, desired, updated, available int64) map[string]interface{} {
+		return map[string]interface{}{
+			"observedGeneration": observed, "desiredNumberScheduled": desired,
+			"updatedNumberScheduled": updated, "numberAvailable": available,
+		}
+	}
+	tests := []struct {
+		name       string
+		generation int64
+		status     map[string]interface{}
+		expected   HealthStatus
+	}{
+		{name: "all nodes updated and available", generation: 1, status: dsStatus(1, 3, 3, 3), expected: HealthReady},
+		{name: "no node matches the selector", generation: 1, status: dsStatus(1, 0, 0, 0), expected: HealthReady},
+		{name: "rollout in progress: not all nodes updated", generation: 2, status: dsStatus(2, 3, 1, 3), expected: HealthNotReady},
+		{name: "updated pods not yet available", generation: 1, status: dsStatus(1, 3, 3, 2), expected: HealthNotReady},
+		{name: "controller has not observed the latest generation", generation: 2, status: dsStatus(1, 3, 3, 3), expected: HealthNotReady},
+		{name: "no status yet", generation: 1, status: nil, expected: HealthNotReady},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			resource := makeWorkload("DaemonSet", tc.generation, nil, tc.status)
 			assert.Equal(t, tc.expected, EvaluateHealth(resource))
 		})
 	}
@@ -201,21 +365,24 @@ func TestEvaluateHealth_Job(t *testing.T) {
 
 func TestEvaluateHealth_CronJob(t *testing.T) {
 	resource := makeResource("CronJob", nil)
-	assert.Equal(t, HealthReady, EvaluateHealth(resource))
+	assert.Equal(t, HealthApplied, EvaluateHealth(resource))
 }
 
 func TestEvaluateHealth_Passive(t *testing.T) {
+	// Kinds with no readiness concept report Applied, never Ready (issue 46).
 	// PersistentVolumeClaim is intentionally excluded — it has its own evaluatePVCHealth branch.
 	passiveResources := []string{
 		"ConfigMap", "Secret", "Service",
 		"ServiceAccount", "Namespace", "ClusterRole", "ClusterRoleBinding",
-		"Role", "RoleBinding",
+		"Role", "RoleBinding", "Ingress", "NetworkPolicy", "PodDisruptionBudget",
+		"ResourceQuota", "LimitRange", "StorageClass", "PriorityClass",
 	}
 
 	for _, kind := range passiveResources {
 		t.Run(kind, func(t *testing.T) {
 			resource := makeResource(kind, nil)
-			assert.Equal(t, HealthReady, EvaluateHealth(resource))
+			assert.Equal(t, HealthApplied, EvaluateHealth(resource))
+			assert.True(t, IsHealthy(EvaluateHealth(resource)))
 		})
 	}
 }
@@ -272,14 +439,14 @@ func TestEvaluateHealth_Custom(t *testing.T) {
 		{
 			name:       "Custom without Ready condition (passive fallback)",
 			conditions: nil,
-			expected:   HealthReady,
+			expected:   HealthApplied,
 		},
 		{
 			name: "Custom with other conditions but no Ready",
 			conditions: []map[string]interface{}{
 				{"type": "Synced", "status": "True"},
 			},
-			expected: HealthReady,
+			expected: HealthApplied,
 		},
 	}
 
@@ -289,4 +456,38 @@ func TestEvaluateHealth_Custom(t *testing.T) {
 			assert.Equal(t, tc.expected, EvaluateHealth(resource))
 		})
 	}
+}
+
+func TestIsHealthy(t *testing.T) {
+	tests := []struct {
+		status   HealthStatus
+		expected bool
+	}{
+		{HealthReady, true},
+		{HealthApplied, true},
+		{HealthComplete, true},
+		{HealthBound, true},
+		{HealthNotReady, false},
+		{HealthUnknown, false},
+		{HealthMissing, false},
+		{HealthStatus("Pending"), false},
+		{HealthStatus("Lost"), false},
+		{HealthStatus(""), false},
+	}
+	for _, tc := range tests {
+		t.Run(string(tc.status), func(t *testing.T) {
+			assert.Equal(t, tc.expected, IsHealthy(tc.status))
+		})
+	}
+}
+
+func TestQuickInstanceHealth_AppliedCountsAsHealthy(t *testing.T) {
+	resources := []*unstructured.Unstructured{
+		makeResource("ClusterRole", nil),
+		makeResource("ServiceAccount", nil),
+	}
+	status, ready, total := QuickInstanceHealth(resources, 0)
+	assert.Equal(t, HealthReady, status)
+	assert.Equal(t, 2, ready)
+	assert.Equal(t, 2, total)
 }

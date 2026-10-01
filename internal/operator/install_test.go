@@ -94,9 +94,12 @@ func stubApply(t *testing.T, client *kubernetes.Client) *int {
 				map[string]any{"type": "Established", "status": "True"},
 			}, "status", "conditions")
 		case kindDeployment:
-			_ = unstructured.SetNestedSlice(obj.Object, []any{
-				map[string]any{"type": "Available", "status": "True"},
-			}, "status", "conditions")
+			_ = unstructured.SetNestedMap(obj.Object, map[string]any{
+				"observedGeneration": int64(0),
+				"replicas":           int64(1),
+				"updatedReplicas":    int64(1),
+				"availableReplicas":  int64(1),
+			}, "status")
 		}
 		gvr := kubernetes.GVRFromUnstructured(obj)
 		if err := fake.Tracker().Add(obj); err != nil {

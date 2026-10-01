@@ -17,9 +17,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// explicitClientConfig loads a kubeconfig the way the CLI does: the resolved
-// kubeconfig path (flag, env, config or the ~/.kube/config default) is always
-// passed as the explicit path, never through client-go's KUBECONFIG discovery.
+// explicitClientConfig loads a kubeconfig the way the CLI does when a path was
+// configured (flag, OPM_KUBECONFIG or config): as the explicit path, never
+// through client-go's KUBECONFIG discovery. With no configured path the CLI
+// leaves the explicit path empty and discovery applies.
 func explicitClientConfig(path string) clientcmd.ClientConfig {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: path},
@@ -30,8 +31,8 @@ func explicitClientConfig(path string) clientcmd.ClientConfig {
 // TestKubeconfig_NoContextShapes pins what client-go returns for the two
 // "no kubeconfig context" cases the CLI meets: an empty kubeconfig file is
 // clientcmd's empty-config error, and a kubeconfig path that does not exist
-// is a not-exist error, not the empty-config one, because the CLI always
-// passes the resolved path explicitly.
+// is a not-exist error, not the empty-config one, because a configured path
+// is passed explicitly.
 func TestKubeconfig_NoContextShapes(t *testing.T) {
 	dir := t.TempDir()
 

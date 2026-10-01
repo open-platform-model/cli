@@ -39,7 +39,7 @@ func TestLoad_NoConfigFile(t *testing.T) {
 
 	// Should populate with defaults (empty registry when no config or env)
 	assert.Empty(t, cfg.Registry)
-	assert.Equal(t, "~/.kube/config", cfg.Kubernetes.Kubeconfig)
+	assert.Empty(t, cfg.Kubernetes.Kubeconfig, "no built-in kubeconfig path: client-go discovery applies")
 	assert.Equal(t, "default", cfg.Kubernetes.Namespace)
 	assert.Equal(t, APIWarningsWarn, cfg.Log.Kubernetes.APIWarnings)
 }
@@ -190,6 +190,7 @@ func TestLoadConfigFile_DefaultTemplateIsValid(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, DefaultRegistry, registry)
 	assert.Equal(t, "default", cfg.Kubernetes.Namespace)
+	assert.Empty(t, cfg.Kubernetes.Kubeconfig, "the template leaves the kubeconfig to client-go discovery")
 }
 
 func TestExtractConfig_LogKubernetesAPIWarnings(t *testing.T) {

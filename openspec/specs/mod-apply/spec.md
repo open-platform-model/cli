@@ -37,6 +37,8 @@ The `module apply` subcommand SHALL accept the following flags with the listed b
 | `--create-namespace` | bool | false | Create the target namespace if it does not exist |
 | `--no-prune` | bool | false | Skip pruning of stale resources |
 | `--force` | bool | false | Allow a 0-resource render to prune previously tracked resources |
+| `--wait` | bool | false | After a successful apply and inventory write, block until every applied resource is healthy; ignored on `--dry-run` |
+| `--timeout` | duration | 5m | Bound on the `--wait` readiness wait, and on the operator-reconcile wait for an operator-managed instance |
 
 #### Scenario: Values files override debugValues
 
@@ -65,6 +67,20 @@ The `module apply` subcommand SHALL accept the following flags with the listed b
 - **AND** SHALL NOT write or modify any inventory record
 - **AND** SHALL NOT prune any resources
 - **AND** SHALL log a summary of resources that would be applied
+
+#### Scenario: Wait blocks until the applied resources are healthy
+
+- **WHEN** the user runs `opm module apply ./my-module --wait` against a CLI-managed instance
+- **THEN** after the apply and inventory write the subcommand SHALL poll every applied resource until each is healthy per `kubernetes.IsHealthy(kubernetes.EvaluateHealth(...))`
+- **AND** SHALL print a success line and exit 0 once all are healthy
+- **WHEN** `--timeout` elapses first, or an applied resource has disappeared
+- **THEN** the subcommand SHALL exit non-zero with an error that lists the resources not yet healthy
+- **AND** the applied resources and the inventory SHALL be left in place
+
+#### Scenario: Wait is skipped on dry-run
+
+- **WHEN** the user runs `opm module apply ./my-module --wait --dry-run`
+- **THEN** the subcommand SHALL NOT poll the cluster for readiness
 
 #### Scenario: Create-namespace auto-creates the target namespace
 

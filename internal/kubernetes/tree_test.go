@@ -909,7 +909,7 @@ func TestFormatPlainTree_CrossDepthAlignment(t *testing.T) {
 							{Kind: "Pod", Name: "web-0", Status: "ContainerCreating"},
 						},
 					},
-					{Kind: "Service", Name: "svc", Status: HealthReady},
+					{Kind: "Service", Name: "svc", Status: HealthApplied},
 				},
 			},
 		},
@@ -925,7 +925,7 @@ func TestFormatPlainTree_CrossDepthAlignment(t *testing.T) {
 		case strings.Contains(line, "Pod/web-0"):
 			key, token = "Pod/web-0", "ContainerCreating"
 		case strings.Contains(line, "Service/svc"):
-			key, token = "Service/svc", "Ready"
+			key, token = "Service/svc", "Applied"
 		default:
 			continue
 		}

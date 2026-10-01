@@ -29,8 +29,15 @@ type Options struct {
 	SuccessUpToDateMessage string
 	SuccessAppliedMessage  string
 
-	// Timeout bounds the operator-reconcile wait in thin-editor mode. Unused
-	// in CLI-executor mode, which does its own applying. Zero uses
+	// Wait, in CLI-executor mode, blocks after a successful apply and
+	// inventory write until every applied resource is healthy (see
+	// operator.HealthyPredicate) or Timeout runs out. Ignored on dry-run. An
+	// operator-managed instance always waits for the operator, so the flag
+	// changes nothing there.
+	Wait bool
+
+	// Timeout bounds the operator-reconcile wait in thin-editor mode and the
+	// readiness wait (Wait) in CLI-executor mode. Zero uses
 	// inventory.DefaultReconcileTimeout.
 	Timeout time.Duration
 
@@ -74,9 +81,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		}
 	}
 
-	// Ownership has to be resolved on dry-run too. LoadPreviousInventory
-	// deliberately reads nothing here — its record feeds the prune and migration
-	// paths, which a dry-run never exercises — but with no record the resolver
+	// Ownership has to be resolved on dry-run too: with no record the resolver
 	// below would see an absent CR and preview the CLI-executor path, promising
 	// resource applies that an operator-owned instance would never receive.
 	// --dry-run is server-side, so the client is connected and this read is safe.
@@ -90,13 +95,15 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	}
 
 	// Load the previous inventory from the CR; when absent, look for a legacy
-	// Secret to migrate. Both are read-only.
+	// Secret to migrate. Both are read-only, so a dry-run loads them too and
+	// can report what a real apply would prune.
 	prevRecord, legacy := LoadPreviousInventory(ctx, req.K8sClient, name, namespace, instanceID, dryRun, instanceLog)
 
 	// Gate 4: ownership — the single branch point (0006:D18). An operator-owned
 	// instance takes the thin-editor path and returns; everything below this
-	// point is CLI-executor mode.
-	if inventory.ResolveOwnership(prevRecord) == inventory.ModeOperatorOwned {
+	// point is CLI-executor mode. A dry-run never takes this path: an
+	// operator-owned instance was already previewed above.
+	if !dryRun && inventory.ResolveOwnership(prevRecord) == inventory.ModeOperatorOwned {
 		return executeThinEditor(ctx, req, prevRecord)
 	}
 
@@ -156,6 +163,10 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		}
 	}
 
+	if dryRun && instanceID != "" && !req.Options.NoPrune {
+		previewPrune(staleSet, instanceLog)
+	}
+
 	if !dryRun && instanceID != "" {
 		applyHadErrors := applyResult != nil && len(applyResult.Errors) > 0
 		if applyHadErrors {
@@ -187,7 +198,31 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)), Printed: true}
 	}
 
+	if req.Options.Wait && !dryRun {
+		return waitForHealthy(ctx, req, instanceLog)
+	}
+
 	return nil
+}
+
+// previewPrune reports the resources a real apply would prune, without
+// deleting anything. It lists the same set PruneStaleResources acts on, which
+// never deletes a Namespace.
+func previewPrune(staleSet []inventory.InventoryEntry, instanceLog *log.Logger) {
+	var lines []string
+	for _, e := range staleSet {
+		if e.Kind == "Namespace" && e.Group == "" {
+			continue
+		}
+		lines = append(lines, output.FormatResourceLine(e.Kind, e.Namespace, e.Name, "would prune"))
+	}
+	if len(lines) == 0 {
+		return
+	}
+	instanceLog.Info(fmt.Sprintf("would prune %d stale resource(s)", len(lines)))
+	for _, l := range lines {
+		instanceLog.Info(l)
+	}
 }
 
 // RunClusterGates runs the read-only pre-apply cluster gates in order: CRD
@@ -224,10 +259,11 @@ func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Clien
 
 // LoadPreviousInventory reads the ModuleInstance CR for an instance. When no
 // CR exists, it looks for a legacy inventory Secret to migrate (0006:D6).
-// Returns (nil, nil) on dry-run, missing instance ID, or a first apply with no
-// legacy Secret.
+// Returns (nil, nil) on a missing instance ID or a first apply with no legacy
+// Secret. Both reads are read-only, so dryRun only changes the wording of the
+// migration message.
 func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, name, namespace, instanceID string, dryRun bool, instanceLog *log.Logger) (*inventory.Record, *inventory.LegacyInventory) {
-	if instanceID == "" || dryRun {
+	if instanceID == "" {
 		return nil, nil
 	}
 
@@ -248,7 +284,11 @@ func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, na
 	if legacy == nil {
 		return nil, nil
 	}
-	instanceLog.Info("migrating legacy inventory Secret to ModuleInstance CR")
+	if dryRun {
+		instanceLog.Info("legacy inventory Secret would be migrated to ModuleInstance CR")
+	} else {
+		instanceLog.Info("migrating legacy inventory Secret to ModuleInstance CR")
+	}
 	return nil, legacy
 }
 

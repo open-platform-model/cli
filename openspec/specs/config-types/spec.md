@@ -74,7 +74,7 @@ The loader SHALL NOT return a separate config struct, SHALL NOT construct a CUE 
 #### Scenario: Load with no config file uses defaults
 
 - **WHEN** no config file exists at the resolved path
-- **THEN** `cfg.Kubernetes.Kubeconfig` SHALL be `"~/.kube/config"`
+- **THEN** `cfg.Kubernetes.Kubeconfig` SHALL be empty, leaving kubeconfig discovery to client-go (`KUBECONFIG`, `~/.kube/config`, in-cluster)
 - **THEN** `cfg.Kubernetes.Namespace` SHALL be `"default"`
 - **THEN** `cfg.Log.Kubernetes.APIWarnings` SHALL be `"warn"`
 

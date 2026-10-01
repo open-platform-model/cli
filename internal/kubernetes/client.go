@@ -23,7 +23,7 @@ import (
 // No further precedence resolution is performed inside the client.
 type ClientOptions struct {
 	// Kubeconfig is the pre-resolved path to the kubeconfig file.
-	// Empty string means use the default kubeconfig discovery (KUBECONFIG env / ~/.kube/config).
+	// Empty string means use the default discovery (KUBECONFIG env / ~/.kube/config / in-cluster).
 	Kubeconfig string
 
 	// Context is the pre-resolved Kubernetes context name.
@@ -142,7 +142,8 @@ func ResetClient() {
 
 // buildRestConfig builds a REST config from pre-resolved options.
 // Kubeconfig and Context must already be resolved by the caller (via config.ResolveKubernetes).
-// When Kubeconfig is empty, client-go's default discovery applies (KUBECONFIG env / ~/.kube/config).
+// When Kubeconfig is empty, client-go's default discovery applies: the KUBECONFIG
+// env var, then ~/.kube/config, then the in-cluster service account.
 func buildRestConfig(opts ClientOptions) (*rest.Config, error) {
 	var loadingRules *clientcmd.ClientConfigLoadingRules
 	if opts.Kubeconfig != "" {
@@ -150,7 +151,8 @@ func buildRestConfig(opts ClientOptions) (*rest.Config, error) {
 			ExplicitPath: opts.Kubeconfig,
 		}
 	} else {
-		// Use default discovery: KUBECONFIG env var and ~/.kube/config
+		// Default discovery: KUBECONFIG env var or ~/.kube/config; the deferred
+		// client config below falls back to in-cluster config when neither yields one.
 		loadingRules = clientcmd.NewDefaultClientConfigLoadingRules()
 	}
 

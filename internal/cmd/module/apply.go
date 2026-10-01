@@ -3,12 +3,14 @@ package modulecmd
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/platform"
 	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
@@ -32,6 +34,8 @@ func NewModuleApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 		createNSFlag bool
 		noPruneFlag  bool
 		forceFlag    bool
+		waitFlag     bool
+		timeoutFlag  time.Duration
 	)
 
 	c := &cobra.Command{
@@ -74,6 +78,9 @@ Examples:
   # Apply with a custom synthetic instance name
   opm module apply ./my-module --name my-debug
 
+  # Apply and block until every resource is healthy (or --timeout runs out)
+  opm module apply ./my-module --wait --timeout 10m
+
   # Dry run against a specific namespace
   opm module apply ./my-module -n staging --dry-run
 
@@ -84,6 +91,7 @@ Examples:
 			return runModuleApply(args, cfg, &rf, &kf, applyOpts{
 				name: nameFlag, version: versionFlag,
 				dryRun: dryRunFlag, createNS: createNSFlag, noPrune: noPruneFlag, force: forceFlag,
+				wait: waitFlag, timeout: timeoutFlag,
 			})
 		},
 	}
@@ -96,6 +104,10 @@ Examples:
 	c.Flags().BoolVar(&createNSFlag, "create-namespace", false, "Create target namespace if it does not exist")
 	c.Flags().BoolVar(&noPruneFlag, "no-prune", false, "Skip stale resource pruning")
 	c.Flags().BoolVar(&forceFlag, "force", false, "Allow empty render to prune all previously tracked resources")
+	c.Flags().BoolVar(&waitFlag, "wait", false,
+		"Wait until every applied resource is healthy before returning (skipped on --dry-run; operator-managed instances always wait for the operator)")
+	c.Flags().DurationVar(&timeoutFlag, "timeout", inventory.DefaultReconcileTimeout,
+		"Bound on the --wait readiness wait and on the operator-reconcile wait (operator-managed instances)")
 
 	return c
 }
@@ -105,6 +117,8 @@ Examples:
 type applyOpts struct {
 	name, version                    string
 	dryRun, createNS, noPrune, force bool
+	wait                             bool
+	timeout                          time.Duration
 }
 
 // debugValuesWarning is printed whenever module apply deploys the module's
@@ -171,6 +185,8 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 			CreateNS:               opts.createNS,
 			NoPrune:                opts.noPrune,
 			Force:                  opts.force,
+			Wait:                   opts.wait,
+			Timeout:                opts.timeout,
 			SkipUnprovided:         rf.SkipUnprovided,
 			SuccessUpToDateMessage: "Instance up to date",
 			SuccessAppliedMessage:  "Instance applied",

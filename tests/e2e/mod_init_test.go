@@ -383,7 +383,7 @@ func TestE2E_Version(t *testing.T) {
 	require.NoError(t, err, "stderr: %s", stderr)
 
 	assert.Contains(t, stdout, "opm version")
-	assert.Contains(t, stdout, "CUE SDK")
+	assert.Regexp(t, `CUE SDK: v\d+\.\d+\.\d+`, stdout, "the SDK version comes from the binary's build info")
 }
 
 func TestE2E_Help(t *testing.T) {

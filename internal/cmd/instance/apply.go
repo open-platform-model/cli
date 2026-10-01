@@ -29,6 +29,7 @@ func NewInstanceApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 		createNSFlag bool
 		noPruneFlag  bool
 		forceFlag    bool
+		waitFlag     bool
 		timeoutFlag  time.Duration
 	)
 
@@ -48,6 +49,9 @@ Examples:
   # Apply an instance file
   opm instance apply ./jellyfin_instance.cue
 
+  # Apply and block until every resource is healthy (or --timeout runs out)
+  opm instance apply ./jellyfin_instance.cue --wait --timeout 10m
+
   # Dry run (skips the cluster gates; no CRD required)
   opm instance apply ./jellyfin_instance.cue --dry-run`,
 		Args: cobra.ExactArgs(1),
@@ -57,6 +61,7 @@ Examples:
 				CreateNS: createNSFlag,
 				NoPrune:  noPruneFlag,
 				Force:    forceFlag,
+				Wait:     waitFlag,
 				Timeout:  timeoutFlag,
 			})
 		},
@@ -69,8 +74,10 @@ Examples:
 	c.Flags().BoolVar(&createNSFlag, "create-namespace", false, "Create target namespace if it does not exist")
 	c.Flags().BoolVar(&noPruneFlag, "no-prune", false, "Skip stale resource pruning")
 	c.Flags().BoolVar(&forceFlag, "force", false, "Allow empty render to prune all previously tracked resources")
+	c.Flags().BoolVar(&waitFlag, "wait", false,
+		"Wait until every applied resource is healthy before returning (skipped on --dry-run; operator-managed instances always wait for the operator)")
 	c.Flags().DurationVar(&timeoutFlag, "timeout", inventory.DefaultReconcileTimeout,
-		"Bound on the operator-reconcile wait (operator-managed instances only)")
+		"Bound on the --wait readiness wait and on the operator-reconcile wait (operator-managed instances)")
 
 	return c
 }
@@ -81,6 +88,7 @@ type applyFlags struct {
 	CreateNS bool
 	NoPrune  bool
 	Force    bool
+	Wait     bool
 	Timeout  time.Duration
 }
 
@@ -134,6 +142,7 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 			CreateNS:               flags.CreateNS,
 			NoPrune:                flags.NoPrune,
 			Force:                  flags.Force,
+			Wait:                   flags.Wait,
 			Timeout:                flags.Timeout,
 			SkipUnprovided:         rff.SkipUnprovided,
 			SuccessUpToDateMessage: "Instance up to date",

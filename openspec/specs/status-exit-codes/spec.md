@@ -8,7 +8,7 @@
 
 ### Requirement: Status exits with code 0 when all resources are healthy
 
-The command SHALL exit with code 0 (`ExitSuccess`) when all discovered resources have a health status of `Ready` or `Complete`.
+The command SHALL exit with code 0 (`ExitSuccess`) when all discovered resources have a healthy status (`Ready`, `Applied`, `Complete` or `Bound`).
 
 #### Scenario: All resources healthy
 
@@ -18,7 +18,7 @@ The command SHALL exit with code 0 (`ExitSuccess`) when all discovered resources
 
 ### Requirement: Status exits with code 2 when resources are not ready
 
-The command SHALL exit with code 2 (`ExitValidationError`) when the command executes successfully but one or more resources have a health status of `NotReady` or `Unknown` (any aggregate status other than `Ready` or `Complete`). This enables CI/CD pipelines to distinguish between "command failed" (exit 1) and "resources unhealthy" (exit 2).
+The command SHALL exit with code 2 (`ExitValidationError`) when the command executes successfully but one or more resources have a health status of `NotReady` or `Unknown` (any aggregate status `IsHealthy` rejects). This enables CI/CD pipelines to distinguish between "command failed" (exit 1) and "resources unhealthy" (exit 2).
 
 #### Scenario: Some resources not ready
 

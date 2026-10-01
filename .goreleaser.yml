@@ -38,6 +38,39 @@ release:
   extra_files:
     - glob: LICENSE
 
+# Container image on GHCR (linux/amd64 + linux/arm64, one multi-arch tag).
+# dockers_v2 builds with buildx from the binaries the build above stages in
+# the Docker context, so the Dockerfile compiles nothing. Every release is
+# tagged with its version, prereleases included (the cli is on the beta line);
+# latest and the major tag go only to stable releases, because an empty
+# rendered tag is dropped.
+#
+# Images are pushed while the release is still a draft, and a pushed tag
+# cannot be unpublished. A draft that is abandoned leaves its version tag on
+# GHCR; the recovery for a bad release is the next patch, as for the binaries.
+dockers_v2:
+  - ids:
+      - opm
+    dockerfile: Dockerfile
+    images:
+      - ghcr.io/open-platform-model/opm
+    tags:
+      - "{{ .Version }}"
+      - "{{ if not .Prerelease }}v{{ .Major }}{{ end }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.title: opm
+      org.opencontainers.image.description: Open Platform Model CLI
+      org.opencontainers.image.source: https://github.com/open-platform-model/cli
+      org.opencontainers.image.url: https://github.com/open-platform-model/cli
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.created: "{{ .Date }}"
+      org.opencontainers.image.licenses: Apache-2.0
+
 checksum:
   name_template: checksums.txt
 

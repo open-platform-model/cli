@@ -98,6 +98,11 @@ func TestNewInstanceApplyCmd_Flags(t *testing.T) {
 	cmd := NewInstanceApplyCmd(&config.GlobalConfig{})
 	assert.NotNil(t, cmd.Flags().Lookup("dry-run"), "--dry-run flag should be registered")
 	assert.NotNil(t, cmd.Flags().Lookup("values"), "--values/-f flag should be registered")
+
+	wait := cmd.Flags().Lookup("wait")
+	require.NotNil(t, wait, "--wait flag should be registered")
+	assert.Equal(t, "false", wait.DefValue, "--wait is opt-in")
+	assert.NotNil(t, cmd.Flags().Lookup("timeout"), "--timeout bounds the --wait wait")
 }
 
 func TestNewInstanceDiffCmd(t *testing.T) {

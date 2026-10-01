@@ -194,7 +194,7 @@ func GetInstanceStatus(ctx context.Context, client *Client, opts StatusOptions) 
 	// Compute summary
 	for _, r := range result.Resources {
 		result.Summary.Total++
-		if r.Status == HealthReady || r.Status == HealthComplete || r.Status == HealthBound {
+		if IsHealthy(r.Status) {
 			result.Summary.Ready++
 		} else {
 			result.Summary.NotReady++
@@ -235,8 +235,7 @@ func buildResourceHealth(ctx context.Context, client *Client, res *unstructured.
 		}
 	}
 
-	healthy := health == HealthReady || health == HealthComplete || health == HealthBound
-	return rh, healthy
+	return rh, IsHealthy(health)
 }
 
 // FormatStatusTable renders the status result as a formatted table (default format).

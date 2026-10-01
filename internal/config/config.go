@@ -19,7 +19,8 @@ const (
 // KubernetesConfig contains Kubernetes-specific settings.
 type KubernetesConfig struct {
 	// Kubeconfig is the path to the kubeconfig file.
-	// Env: OPM_KUBECONFIG, Default: ~/.kube/config
+	// Env: OPM_KUBECONFIG. Default: unset, so client-go discovery applies
+	// (the KUBECONFIG env var, ~/.kube/config, then in-cluster config).
 	Kubeconfig string `json:"kubeconfig,omitempty"`
 
 	// Context is the Kubernetes context to use.

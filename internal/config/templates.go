@@ -25,7 +25,9 @@ config: {
 	kubernetes: {
 		// kubeconfig is the path to the kubeconfig file.
 		// Override with --kubeconfig flag or OPM_KUBECONFIG env var.
-		kubeconfig: "~/.kube/config"
+		// Default: unset, so the KUBECONFIG env var, ~/.kube/config and then
+		// the in-cluster service account are tried, as kubectl does.
+		kubeconfig?: string
 
 		// context is the Kubernetes context to use.
 		// Override with --context flag or OPM_CONTEXT env var.

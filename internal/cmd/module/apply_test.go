@@ -60,6 +60,8 @@ func TestNewModuleApplyCmd_Flags(t *testing.T) {
 		{"create-namespace", "", "bool", "false"},
 		{"no-prune", "", "bool", "false"},
 		{"force", "", "bool", "false"},
+		{"wait", "", "bool", "false"},
+		{"timeout", "", "duration", "5m0s"},
 	}
 
 	for _, c := range cases {

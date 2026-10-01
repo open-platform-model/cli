@@ -189,14 +189,11 @@ func TestResolveKubernetes_DefaultsUsedWhenNothingSet(t *testing.T) {
 	os.Unsetenv("OPM_CONTEXT")
 	os.Unsetenv("OPM_NAMESPACE")
 
-	homeDir, err := os.UserHomeDir()
-	require.NoError(t, err)
-	expectedKubeconfig := filepath.Join(homeDir, ".kube", "config")
-
 	result, err := ResolveKubernetes(ResolveKubernetesOptions{})
 	require.NoError(t, err)
 
-	assert.Equal(t, expectedKubeconfig, result.Kubeconfig.Value)
+	// No built-in path: empty defers to client-go's default discovery.
+	assert.Equal(t, "", result.Kubeconfig.Value)
 	assert.Equal(t, SourceDefault, result.Kubeconfig.Source)
 	assert.Equal(t, "", result.Context.Value)   // no default for context
 	assert.Equal(t, "", result.Namespace.Value) // no built-in default; must be explicit
@@ -240,16 +237,64 @@ func TestResolveKubernetes_Defaults(t *testing.T) {
 	os.Unsetenv("OPM_CONTEXT")
 	os.Unsetenv("OPM_NAMESPACE")
 
-	homeDir, err := os.UserHomeDir()
-	require.NoError(t, err)
-	expectedKubeconfig := filepath.Join(homeDir, ".kube", "config")
-
 	result, err := ResolveKubernetes(ResolveKubernetesOptions{})
 	require.NoError(t, err)
 
-	assert.Equal(t, expectedKubeconfig, result.Kubeconfig.Value)
+	// No built-in path: empty defers to client-go's default discovery.
+	assert.Equal(t, "", result.Kubeconfig.Value)
 	assert.Equal(t, SourceDefault, result.Kubeconfig.Source)
 	assert.Equal(t, "", result.Context.Value)
 	assert.Equal(t, "", result.Namespace.Value) // no built-in default; must be explicit
 	assert.Equal(t, SourceDefault, result.Namespace.Source)
+}
+
+// The kubeconfig default is empty so client-go's discovery (KUBECONFIG,
+// ~/.kube/config, in-cluster) applies; only a flag, OPM_KUBECONFIG or a config
+// value pins an explicit path.
+func TestResolveKubernetes_KubeconfigSources(t *testing.T) {
+	tests := []struct {
+		name       string
+		flag       string
+		opmEnv     string
+		kubeEnv    string
+		configPath string
+		wantValue  string
+		wantSource Source
+	}{
+		{name: "nothing set", wantValue: "", wantSource: SourceDefault},
+		{name: "KUBECONFIG alone is left to client-go", kubeEnv: "/kube/env", wantValue: "", wantSource: SourceDefault},
+		{name: "empty OPM_KUBECONFIG is unset", opmEnv: "", wantValue: "", wantSource: SourceDefault},
+		{name: "config value", configPath: "/config/kc", wantValue: "/config/kc", wantSource: SourceConfig},
+		{name: "OPM_KUBECONFIG beats config", opmEnv: "/opm/env", configPath: "/config/kc", wantValue: "/opm/env", wantSource: SourceEnv},
+		{name: "OPM_KUBECONFIG beats KUBECONFIG", opmEnv: "/opm/env", kubeEnv: "/kube/env", wantValue: "/opm/env", wantSource: SourceEnv},
+		{name: "flag beats everything", flag: "/flag/kc", opmEnv: "/opm/env", kubeEnv: "/kube/env", configPath: "/config/kc", wantValue: "/flag/kc", wantSource: SourceFlag},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("OPM_KUBECONFIG", tt.opmEnv)
+			t.Setenv("KUBECONFIG", tt.kubeEnv)
+
+			result, err := ResolveKubernetes(ResolveKubernetesOptions{
+				KubeconfigFlag: tt.flag,
+				Config:         &GlobalConfig{Kubernetes: KubernetesConfig{Kubeconfig: tt.configPath}},
+			})
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantValue, result.Kubeconfig.Value)
+			assert.Equal(t, tt.wantSource, result.Kubeconfig.Source)
+		})
+	}
+}
+
+func TestResolveKubernetes_KubeconfigTildeExpandedWhenExplicit(t *testing.T) {
+	t.Setenv("OPM_KUBECONFIG", "")
+
+	homeDir, err := os.UserHomeDir()
+	require.NoError(t, err)
+
+	result, err := ResolveKubernetes(ResolveKubernetesOptions{KubeconfigFlag: "~/custom/kc"})
+	require.NoError(t, err)
+
+	assert.Equal(t, filepath.Join(homeDir, "custom", "kc"), result.Kubeconfig.Value)
+	assert.Equal(t, SourceFlag, result.Kubeconfig.Source)
 }
