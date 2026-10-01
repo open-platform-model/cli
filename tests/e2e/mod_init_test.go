@@ -120,23 +120,34 @@ func repoTemplateDir(t *testing.T, name string) string {
 	return abs
 }
 
-// TestE2E_ModInit_ThenVet is the hermetic scaffold round-trip: publish the
-// repo's real standard template into an in-process registry, init from it
-// via the bare-word shortcut, and require the scaffold to pass vet and a
-// publish dry-run (GO) with the template's identity appearing nowhere in it.
+// TestE2E_ModInit_ThenVet is the hermetic scaffold round-trip, once per
+// official template: publish the repo's real template into an in-process
+// registry, init from it via the bare-word shortcut, and require the scaffold
+// to pass vet and a publish dry-run (GO) with the template's identity
+// appearing nowhere in it.
 func TestE2E_ModInit_ThenVet(t *testing.T) {
+	for _, name := range []string{"minimal", "standard", "advanced"} {
+		t.Run(name, func(t *testing.T) {
+			modInitThenVet(t, name)
+		})
+	}
+}
+
+// modInitThenVet runs the scaffold round-trip for one official template.
+func modInitThenVet(t *testing.T, name string) {
+	t.Helper()
 	env := []string{templatesRegistryEnv(t)}
 	tmpDir := t.TempDir()
 
 	// Publish the template through the real pipeline — the same act the
 	// release CI performs.
-	stdout, stderr, err := runOPMPublish(t, tmpDir, env, "module", "publish", repoTemplateDir(t, "standard"))
+	stdout, stderr, err := runOPMPublish(t, tmpDir, env, "module", "publish", repoTemplateDir(t, name))
 	skipWithoutCoreSchema(t, stderr)
 	require.NoError(t, err, "publishing the template failed\nstdout: %s\nstderr: %s", stdout, stderr)
 
 	// Scaffold from it by shortcut. The bare word expands into the reserved
 	// segment, which the env routes at the in-process registry.
-	stdout, stderr, err = runOPMPublish(t, tmpDir, env, "mod", "init", "example.com/modules/my_app@v0", "standard")
+	stdout, stderr, err = runOPMPublish(t, tmpDir, env, "mod", "init", "example.com/modules/my_app@v0", name)
 	require.NoError(t, err, "init failed\nstdout: %s\nstderr: %s", stdout, stderr)
 	assert.Contains(t, stdout, "opm module vet", "init points at vet")
 
@@ -162,9 +173,12 @@ func TestE2E_ModInit_ThenVet(t *testing.T) {
 	moduleCue, err := os.ReadFile(filepath.Join(moduleDir, "module.cue"))
 	require.NoError(t, err)
 	assert.Contains(t, string(moduleCue), "package my_app")
-	componentsCue, err := os.ReadFile(filepath.Join(moduleDir, "components.cue"))
-	require.NoError(t, err)
-	assert.Contains(t, string(componentsCue), "package my_app")
+	// minimal carries no components.cue; check the clause where the file exists.
+	if componentsCue, err := os.ReadFile(filepath.Join(moduleDir, "components.cue")); err == nil {
+		assert.Contains(t, string(componentsCue), "package my_app")
+	} else {
+		require.ErrorIs(t, err, os.ErrNotExist)
+	}
 
 	idCue, err := os.ReadFile(filepath.Join(moduleDir, "identity", "identity.cue"))
 	require.NoError(t, err)
