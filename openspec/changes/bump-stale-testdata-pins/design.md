@@ -1,15 +1,15 @@
 ## Context
 
-See proposal.md, Why. The current published releases are core `v2.0.0-beta.1`, opm catalog `v4.4.4` and k8s catalog `v1.0.0-beta.1`. The repo's maintained consumers already pin them (`examples/cue.mod/module.cue`, `tests/e2e/testdata/operator-owned/cue.mod/module.cue:10,13`, `hack/platform/cue.mod/module.cue:15-16`).
+See proposal.md, Why. The current published releases are core `v2.0.0-beta.1`, opm catalog `v4.4.4` and k8s catalog `v1.0.0-beta.1`. The repo's maintained consumers already pin them (`examples/cue.mod/module.cue`, `tests/e2e/testdata/operator-owned/cue.mod/module.cue:10,13`, `hack/platform/cue.mod/module.cue:12-16`).
 
 The five stale trees and their consumers:
 
 | Tree | Pins today | Consumed by | Runs in CI |
 | --- | --- | --- | --- |
-| `tests/fixtures/valid/simple-module` | core alpha.6 | `internal/cmd/module/vet_test.go:47`, `internal/workflow/render/module_test.go:316` | yes, `go test ./internal/...` (`pr.yml:76`) |
+| `tests/fixtures/valid/simple-module` | core alpha.6 | `internal/cmd/module/vet_test.go:47`, `internal/workflow/render/module_test.go:316`; e2e `tests/e2e/vet_output_test.go:155` (`TestE2E_ModuleVet_OpenDebugValuesRefusedAtSynthesis`, copies the tree) | unit yes, `go test ./internal/...` (`pr.yml:76`); e2e yes (`pr.yml:246`) |
 | `tests/fixtures/valid/module-with-debug-values` | core alpha.6 | `internal/cmd/module/eval_test.go:212`, `internal/workflow/render/module_test.go:258,288` | yes |
 | `internal/instinit/testdata/initvalues` | core alpha.11, opm 4.4.1 (`default: true`) | `internal/instinit/values_test.go:20` | yes |
-| `internal/workflow/render/testdata/skip-unprovided` | core alpha.10, opm 4.4.0 | `internal/workflow/render/skip_test.go:30-41`; `tests/integration/skip-unprovided/main.go:55` | unit yes; integration no |
+| `internal/workflow/render/testdata/skip-unprovided` | core alpha.10, opm 4.4.0 | `internal/workflow/render/skip_test.go:30-41`; e2e `tests/e2e/skip_unprovided_test.go:27` (`TestE2E_ModBuild_SkipUnprovided`); `tests/integration/skip-unprovided/main.go:55` | unit yes; e2e yes; integration no |
 | `tests/e2e/testdata/duplicate-identities` | core alpha.6, opm 4.0.1 | `tests/e2e/duplicate_identities_test.go:25` | yes, e2e job (`pr.yml:246`) |
 | `tests/integration/module-apply/testdata` | core alpha.6, opm 4.0.1 | `tests/integration/module-apply/main.go:59` | no: only local `task test:integration` (`Taskfile.yml:109`); CI integration job runs other programs (`pr.yml:202-209`) |
 
@@ -18,7 +18,7 @@ No tree pins `opmodel.dev/catalogs/k8s@v1` or any `testing.opmodel.dev` fixture,
 ## Goals / Non-Goals
 
 **Goals:**
-- `.cascade-frozen` exists and names every core pin that is old on purpose, so the future cascade task (B4) and a reviewer can tell frozen pins from stale ones.
+- `.cascade-frozen` exists and names every core and catalog pin that is old on purpose, so cli `add-deps-cascade-task` and a reviewer can tell frozen pins from stale ones.
 - The five trees are current, so the first cascade run starts from a clean baseline.
 
 **Non-Goals:**
@@ -30,11 +30,11 @@ No tree pins `opmodel.dev/catalogs/k8s@v1` or any `testing.opmodel.dev` fixture,
 
 ### D-a: Which literals go into `.cascade-frozen`
 
-**Context**: D7 names two deliberate pins in `tests/e2e/instance_build_test.go`. A repo-wide grep for alpha-line literals finds about 20 more in Go tests.
+**Context**: D7 names two deliberate pins in `tests/e2e/instance_build_test.go`. A repo-wide grep for alpha-line and old catalog literals finds about 20 more in Go tests.
 
 **Options considered**:
-1. List only the two named pins. This misses `internal/cmd/platform/check_test.go`, which holds the same two kinds of deliberate pin: too-old platforms at `:727`, `:761` and `:785`, and `collisionCoreVersion` at `:351-357`. A reader of `.cascade-frozen` would then wrongly conclude that file is safe to bump.
-2. List every alpha literal. Most are parser inputs or fake registry listings that are never resolved (`internal/modref/*_test.go`, `internal/platform/catalog_test.go`, `internal/platform/resolve_test.go:252-253`, `internal/cmd/platform/pull_test.go:57`, `internal/cueedit/cueedit_test.go`). Listing them turns the file into noise and dilutes "frozen" into "anything old".
+1. List only the two named pins. This misses `olderCatalogPin` in the same e2e file, and `internal/cmd/platform/check_test.go`, which holds the same two kinds of deliberate core pin: too-old platforms at `:727`, `:761` and `:785`, and `collisionCoreVersion` at `:351-357`. A reader of `.cascade-frozen` would then wrongly conclude those are safe to bump.
+2. List every old literal. Most are parser inputs or fake registry listings that are never resolved (`internal/modref/*_test.go`, `internal/platform/catalog_test.go`, `internal/platform/resolve_test.go:252-253`, `internal/cmd/platform/pull_test.go:57`, `internal/cueedit/cueedit_test.go`). Listing them turns the file into noise and dilutes "frozen" into "anything old".
 3. List every literal that a test resolves from a registry and that must stay old for the test to mean anything.
 
 **Decision**: Option 3. The file holds two entries, each with a single-sentence reason:
@@ -42,27 +42,28 @@ No tree pins `opmodel.dev/catalogs/k8s@v1` or any `testing.opmodel.dev` fixture,
 ```yaml
 frozen:
   - path: tests/e2e/instance_build_test.go
-    pins: ["opmodel.dev/core@v2"]
-    reason: "The older-core platform pins core v2.0.0-alpha.11 so the build is refused as too old for the provider count, and collisionCorePin v2.0.0-alpha.13 is the floor the colliding-platform seed re-pins up to, never down from."
+    pins: ["opmodel.dev/core@v2", "opmodel.dev/catalogs/opm@v4"]
+    reason: "The older-core platform pins core v2.0.0-alpha.11 so the build is refused as too old for the provider count, collisionCorePin v2.0.0-alpha.13 is the floor the colliding-platform seed re-pins up to, never down from, and olderCatalogPin v4.0.0 must stay older than the catalog examples requires so the platform shows catalog version skew."
   - path: internal/cmd/platform/check_test.go
     pins: ["opmodel.dev/core@v2"]
     reason: "Its too-old platforms pin core alpha.6, alpha.9 and alpha.11 to be refused naming the release that derives each missing field, and collisionCoreVersion v2.0.0-alpha.13 is the first core that reports contract collisions instead of failing the fold."
 ```
 
-**Rationale**: The reasons paraphrase the tests' own doc comments (`instance_build_test.go:247-253,285-286,316-319`; `check_test.go:351-356,757-760,780-783`). The golden literal `v2.0.0-alpha.10` in `internal/instinit/render_test.go:25,45` is out. The plan's pin inventory lists it, but the test never resolves it: it is a string in a golden file, and no cascade that edits `cue.mod` files would touch it. This exclusion is a deliberate departure from the plan, flagged for the owner.
+**Rationale**: The reasons paraphrase the tests' own doc comments (`instance_build_test.go:74-76,247-253,285-286,316-319`; `check_test.go:351-356,757-760,780-783`). `olderCatalogPin` is resolved from GHCR: `seedSkewPlatform` (`:123-135`) writes it into a platform `cue.mod`, and `:213` and `:244` assert the platform carries it. The golden literal `v2.0.0-alpha.10` in `internal/instinit/render_test.go:25,45` is out: the test never resolves it, it is a string in a golden file, and no cascade that edits `cue.mod` files would touch it. Workspace RELEASING.md, section "Pin classes", lists it today; this exclusion is a deliberate departure, flagged for the owner.
 
 ### D-b: How to bump
 
-**Decision**: In each tree run `cue mod get opmodel.dev/core@v2.0.0-beta.1`, plus `opmodel.dev/catalogs/opm@v4.4.4` where the tree pins the catalog, then `cue mod tidy`, with `CUE_REGISTRY='opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'`. `cue mod get` keeps the `default: true` marker in `initvalues` (verified during planning). Hand edits are banned because `cue mod tidy` is the check the cascade will run, and a hand edit can leave a tree that tidy would rewrite.
+**Decision**: In each tree run `cue mod get opmodel.dev/core@v2.0.0-beta.1`, plus `opmodel.dev/catalogs/opm@v4.4.4` where the tree pins the catalog, then `cue mod tidy`, with the canonical registry mapping `CUE_REGISTRY='testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'` (`.github/workflows/pr.yml:25-26`, `Taskfile.yml:18`, `internal/config/templates.go:11`). The mapping must include the `testing.opmodel.dev` domain: without it the module-apply program's version resolution (`tests/integration/module-apply/main.go:237-256`) is refused with "has no published versions", and `TestE2E_InstanceBuild_LayersValuesFile` fails on a cold cache. `pr.yml:60` is not the value to copy: it maps the testing domain to a job-local `localhost:5000` registry. `cue mod get` keeps the `default: true` marker in `initvalues` (verified during planning). Hand edits are banned because `cue mod tidy` is the check the cascade will run, and a hand edit can leave a tree that tidy would rewrite.
 
 ### D-c: Section cut
 
-**Decision**: Three sections, each a single commit that leaves `main` green:
+**Decision**: Four sections, each a single commit that leaves `main` green:
 1. `.cascade-frozen` alone. It changes no test, so it is green trivially.
-2. The four trees whose consumers are unit tests in CI: `fixtures/valid/*`, `initvalues` and `skip-unprovided`. `skip-unprovided` also has a cluster program, which runs here so the tree is proven whole in one section.
+2. The four trees whose consumers are unit tests: `fixtures/valid/*`, `initvalues` and `skip-unprovided`. Their e2e consumers and the `skip-unprovided` cluster program run here too, so each tree is proven whole in one section.
 3. The two trees consumed by the e2e suite and a cluster-only integration program: `duplicate-identities` and `module-apply`.
+4. Archive the change (owner decision D14: the archive commit rides the implementing PR).
 
-**Rationale**: Section 3 needs the kind cluster and section 2 mostly does not. Splitting along that line lets section 2 land on a machine without a cluster. Five one-tree sections would be valid but give five commits for six one-line diffs.
+**Rationale**: The cut follows consumer grouping. Section 2's trees are all read by unit tests in CI, section 3's trees are read only by the e2e suite and the cluster-only `module-apply` program. Every section's `task test` (`test:unit` + `test:integration` + `test:e2e`, `Taskfile.yml:75-80`) needs `kind-opm-dev` (`Taskfile.yml:98-100`), so no section can land without the cluster. Five one-tree sections would be valid but give five commits for six one-line diffs.
 
 ### D-d: Breakage rule
 
@@ -73,26 +74,31 @@ frozen:
 ### Are the old pins deliberate?
 
 **Context**: D7 asks whether any of the five trees is old on purpose.
-**Explored**: `git log` of each `cue.mod/module.cue`; grepping the trees for `alpha`, `pin`, `older`, `deliberate`; a reverted planning probe that bumped all six `cue.mod` files with `cue mod get` and `cue mod tidy` and ran the consumers.
-**Findings**: No tree comments on its pin. The probe kept everything green:
+**Explored**: `git log` of each `cue.mod/module.cue`; grepping the trees for `alpha`, `pin`, `older`, `deliberate`; a reverted planning probe that bumped all six `cue.mod` files with `cue mod get` and `cue mod tidy` and ran the consumers; a review probe that repeated the bump under the canonical mapping.
+**Findings**: No tree comments on its pin. The probes kept everything green:
 - `go test ./internal/instinit/ ./internal/workflow/render/ ./internal/cmd/module/`: ok.
-- `TestModVet_ValidModule` now runs instead of skipping.
+- `TestModVet_ValidModule` passes at both the old and the new pins under the GHCR mapping. Without any registry env it skips at both pins, because the kernel's own load of core `v2.0.0-beta.1` fails, not because of the fixture pin.
 - `go test ./tests/e2e/ -run 'DuplicateIdentities|OlderCorePlatform'`: both pass.
+- `TestE2E_ModBuild_SkipUnprovided` and `TestE2E_ModuleVet_OpenDebugValuesRefusedAtSynthesis` pass at the bumped pins.
 - `opm module build tests/integration/module-apply/testdata` renders the same three objects (Service and two Deployments) at both pins.
 
-The probe never ran the two cluster programs, `module-apply` and `skip-unprovided`.
+The probes never ran the two cluster programs, `module-apply` and `skip-unprovided`.
 **Decision**: Bump all five. Freeze only the Go-literal pins of D-a.
+
+### Why no spike section
+
+The one unverified assumption is that the two cluster programs still pass at the bumped pins. The repo's rule makes section 1 a spike when design.md carries an unverified assumption; here it does not, for two reasons. First, the evidence is strong: the programs' inputs render the same objects at both pins, and every other consumer of the same trees passes. Second, the outcome cannot change the plan: tasks 2.4 and 3.3 run each program against `kind-opm-dev` before their section commits, and D-d already decides what happens on failure (fix the fixture, or revert and freeze in that section's own commit). A spike would run the same commands one section earlier and decide nothing new.
 
 ### Silent skip without a registry
 
 **Context**: Without `CUE_REGISTRY`, `TestModVet_ValidModule` skips: the default registry cannot find `opmodel.dev/core@v2.0.0-beta.1`, and the test treats that as a connectivity error (`vet_test.go:69-74`). A local `go test` can therefore look green without exercising the fixture.
-**Decision**: Every task runs the tests with the CI registry mapping (`pr.yml:60`) and checks that the run reports no `SKIP`. Changing the skip itself is out of scope.
+**Decision**: Every task runs the tests with the canonical registry mapping of D-b and checks that the named fixture-consuming tests report PASS, not SKIP. A whole-run no-SKIP check cannot hold, because `TestModVet_CUEValidationError` skips unconditionally (`internal/cmd/module/vet_test.go:122`). Changing either skip is out of scope.
 
 ## Risks / Trade-offs
 
 - [The cluster programs are not in CI] A bumped `module-apply` or `skip-unprovided` tree could break `task test:integration` without CI noticing. → Sections 2 and 3 run those programs against the local `kind-opm-dev` cluster before committing.
-- [`.cascade-frozen` format drift] The workspace RELEASING.md that defines the format is still in review. → The file uses the fixed format verbatim. If the doc changes it, B4's change rewrites this file, and the content (paths, pins, reasons) carries over.
-- [The trees go stale again] Nothing enforces currency until the cascade task (B4) lands. → B4 runs `cue mod get` and `cue mod tidy` over these `cue.mod` files on every upstream release. Until then, the new test-fixture-lineage requirement is the written rule.
+- [`.cascade-frozen` format drift] The workspace RELEASING.md that defines the format is still in review. → The file uses the fixed format verbatim. If the doc changes it, cli `add-deps-cascade-task` rewrites this file, and the content (paths, pins, reasons) carries over.
+- [The trees go stale again] Nothing enforces currency until the cascade task lands. → Requirement on cli `add-deps-cascade-task` (proposal.md, "Depends on / gates"): its test-class set SHALL include the six `cue.mod` files bumped here, and workspace RELEASING.md SHALL list them. Until then, the new test-fixture-lineage requirement is the written rule.
 
 ## Migration Plan
 
