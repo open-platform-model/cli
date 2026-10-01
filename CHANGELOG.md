@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-beta.4](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.3...v1.0.0-beta.4) (2026-10-01)
+
+
+### Bug Fixes
+
+* **deps:** bump golang.org/x/term to v0.46.0 ([#221](https://github.com/open-platform-model/cli/issues/221)) ([a5cd82e](https://github.com/open-platform-model/cli/commit/a5cd82ef04e867cc217bf211146f008a02fc666e))
+
 ## [1.0.0-beta.3](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.2...v1.0.0-beta.3) (2026-09-30)
 
 
