@@ -1,12 +1,13 @@
 ## Revision
 
-Revision 3, 2026-10-01, after review 2:
+Revision 4, 2026-10-01, after review 3:
 
-- Changed-implies-bumped compares the tree with the **content GHCR holds** at the template's declared version, not with a git base. Revision 2's previous-release tag stopped seeing an unbumped change once a release landed on top of it.
-- `publish-templates` now runs **before** goreleaser builds, so a template failure leaves the release a draft.
-- No checkout needs full history any more.
+- **The tree must equal its module zip**, for every template. A symlinked file passed vet but was never published (review cases S1, S2).
+- **Version order.** A new version must be stable and above the highest published one, and a published version must be that highest one (cases P and rollback).
+- **Identity and verdict.** The module path must match the template's directory. The publish step acts on the gate's verdict instead of probing GHCR again (case M and a race). A broken identity no longer hides other failures (case V).
+- Both workflows install the cue version that `go.mod` requires.
 
-design.md Revisions has the details.
+Revision 3 moved the bump check to GHCR content and ran `publish-templates` before goreleaser. design.md Revisions has the details.
 
 ## Why
 
@@ -29,10 +30,14 @@ Both gaps break the same invariant: what `opm module init` fetches equals the te
 ## What Changes
 
 - **Vet gate.** `publish-templates.sh` runs `opm module vet` on every template tree, in both the PR dry-run and the release run. `opm module vet` validates `debugValues` against `#config` and then renders the module against a platform generated from the template's own pins, as `opm module build` does (`internal/cmd/module/vet.go:40-45`, spec `mod-vet`). It never reads a cluster.
-- **Gate everything before publishing anything.** The script gains a gate phase over every template (tidy, vet, publish dry-run). Only when every template passes does the release run push the templates whose versions GHCR lacks. Today the script publishes template by template, so a later template's failure can leave an earlier one published.
-- **Changed implies bumped, by content.** When GHCR already holds a template's declared version, the script fetches that published module zip anonymously and verifies its digest. It builds the tree's module zip with `cue mod publish --out`, which runs the same `modzip.CreateFromDir` that `opm module publish` zips with, and compares the two file by file (paths and bytes, comments included). A difference fails, in both modes, before any publish, and prints the diff and `opm module version set`. Equal content passes, and an unpublished version passes and is published. Any fetch or comparison error fails; it never counts as unpublished. The check reads no git history, so it holds however the change reached `main` and however many releases were cut on top of it.
+- **Gate everything before publishing anything.** The script gains a gate phase over every template, which reports every failing template. Only when every template passes does the release run act on the verdicts: it pushes the templates found unpublished and skips the ones found published and identical, without asking GHCR again. Today the script publishes template by template, so a later template's failure can leave an earlier one published.
+- **Identity.** The gate reads each template's identity itself, and requires the module path `opmodel.dev/templates/<dir>@v<major>`.
+- **What vet reads is what publishes.** The script builds each tree's module zip with `cue mod publish --out`, which runs the same `modzip.CreateFromDir` that `opm module publish` zips with. The zip must hold exactly the tree's files. Symlinks, special files and nested `cue.mod` directories are refused by name, because the zip silently omits them.
+- **Changed implies bumped, by content.** When GHCR already holds a template's declared version, the script fetches that published module zip anonymously, verifies its digest, and compares it with the tree's zip file by file (paths and bytes, comments included). A difference fails, in both modes, before any publish, and prints the diff and `opm module version set`. Any fetch or comparison error fails; it never counts as unpublished. The check reads no git history, so it holds however the change reached `main` and however many releases were cut on top of it.
+- **The tree is what `opm module init` resolves.** `init` floats to the highest published stable version. So a template's version must be stable. An unpublished version must be above the highest published one, and a published version must be that highest one.
 - **Release order.** In `release.yml`, `goreleaser` needs `publish-templates`. After its unchanged draft check, it fails unless the template job succeeded. With draft-first releases (PR 260), a template failure therefore leaves the release a draft: a transient failure is re-run, and a content failure is fixed by the next patch. Neither publishes binaries without templates.
 - **Scaffold test over every template.** `tests/e2e/mod_init_test.go` `TestE2E_ModInit_ThenVet` today publishes, scaffolds and vets only `standard`. It becomes a subtest per template, so the re-identified scaffold of each template must vet too.
+- **One cue.** Both template jobs install the cue that the cli's `go.mod` requires, instead of a hard-coded v0.17.1, so the tree zip and the push share one modzip.
 - `AGENTS.md` (the `templates/` entry, line 128, and the template rule, line 351) and the workflow comments state the bump rule and where it is enforced.
 
 SemVer class: none. Every commit is `ci` or `test`; no product Go code, command, flag, output or exit code changes, and no release is cut by this change (it would be none after GA too). PR title: `ci(templates): gate template publishing on opm module vet`.
@@ -45,15 +50,15 @@ SemVer class: none. Every commit is `ci` or `test`; no product Go code, command,
 
 ### Modified Capabilities
 
-- `pr-workflow`: the `template-gates` job vets every template and refuses a template whose tree differs from the artifact GHCR holds at its declared version.
+- `pr-workflow`: the `template-gates` job vets every template, and refuses a template whose tree differs from its module zip or from the artifact GHCR holds at its declared version, whose version is not the one `opm module init` resolves, or whose module path does not match its directory. It installs the cue that `go.mod` requires.
 - `release-workflow`:
-  - The `publish-templates` job vets every template, refuses a template whose tree differs from its published artifact, and runs every gate on every template before publishing any.
+  - The `publish-templates` job runs the same gates on every template before publishing any, and then publishes on the gate's verdict.
   - The `goreleaser` job waits for `publish-templates` and refuses to build when it failed.
-- `template-modules`: a template SHALL render its own `debugValues`, and its published content SHALL equal its tree at that version.
+- `template-modules`: a template SHALL render its own `debugValues`, its tree SHALL be exactly its module zip, its published content SHALL equal its tree at that version, and that version SHALL be the stable one `opm module init` resolves, or a higher unpublished one.
 
 ## Impact
 
-- Files: `.github/scripts/publish-templates.sh`, `.github/workflows/pr.yml` (`template-gates` comment), `.github/workflows/release.yml` (`goreleaser` needs and one step, header runbook, `publish-templates` comment), `tests/e2e/mod_init_test.go`, `AGENTS.md` (two lines), three spec deltas.
+- Files: `.github/scripts/publish-templates.sh`, `.github/workflows/pr.yml` (`template-gates` cue install step and comment), `.github/workflows/release.yml` (`goreleaser` needs and one step, header runbook, `publish-templates` cue install step, its `GHCR_AUTH` env dropped, and its comment), `tests/e2e/mod_init_test.go`, `AGENTS.md` (two lines), three spec deltas.
 - Commands and packages: none.
 - Workflow: any change to `templates/*`, by PR or by direct push, must bump each touched template with `opm module version set`, comment-only edits included. If it does not, every following PR's `template-gates` goes red, and every release fails before any publish and stays a draft, until a bump lands.
   - The workspace `task deps:update` re-pins templates without bumping them (root `Taskfile.yml` `deps:update:templates`), so its cli PR fails `template-gates` until the bump is added.
@@ -61,6 +66,6 @@ SemVer class: none. Every commit is `ci` or `test`; no product Go code, command,
 - Owner setting, not part of this change: `Template Publish Gates (dry-run)` is advisory today, because `main` requires no status check. Making it required stops a red release PR from merging. A release-time failure then no longer costs a tag (design.md Risks).
 - A cli PR that bumps the library can now fail `template-gates` if the new kernel no longer renders an unchanged, published template. That is intended: `opm module init` from that cli would scaffold a broken module.
 - Runtime (measured locally):
-  - Each script run adds three renders, about 1 to 2 s each, and three small anonymous GHCR downloads; the whole dry-run takes about 10 s.
+  - Each script run adds three renders, about 1 to 2 s each, three local module zips, and per template an anonymous token and tags request plus, when published, a small manifest and blob download; the whole dry-run takes about 10 s with a warm module cache (9 s measured).
   - The e2e test gains two subtests, about 4 s each.
   - Release binaries now wait one to two minutes for the template job.
