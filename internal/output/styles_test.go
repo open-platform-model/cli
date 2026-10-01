@@ -14,6 +14,7 @@ func TestFormatHealthStatus(t *testing.T) {
 	}{
 		{"Ready", "Ready"},
 		{"Complete", "Complete"},
+		{"Applied", "Applied"},
 		{"NotReady", "NotReady"},
 		{"Missing", "Missing"},
 		{"Unknown", "Unknown"},

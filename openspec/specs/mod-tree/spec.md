@@ -129,10 +129,10 @@ The command SHALL display health status for each resource using the same evaluat
 - **THEN** the tree output SHALL display `Pod/name  CrashLoop`
   (CrashLoopBackOff is shortened to CrashLoop per the project's display convention)
 
-#### Scenario: Passive resource shows Ready
+#### Scenario: Passive resource shows Applied
 
-- **WHEN** a ConfigMap, Secret, or Service is discovered
-- **THEN** the tree output SHALL display the resource with status `Ready`
+- **WHEN** a ConfigMap, Secret, Service, or RBAC resource is discovered
+- **THEN** the tree output SHALL display the resource with status `Applied`
 
 #### Scenario: PVC shows phase and storage capacity
 
@@ -187,7 +187,7 @@ The command SHALL render tree structure using Unicode box-drawing characters (â”
 
 - **WHEN** the command runs in a TTY environment
 - **THEN** the output SHALL use Unicode box-drawing characters for tree structure
-- **AND** SHALL apply colors: cyan for component names, green for Ready/Bound status, red for NotReady, yellow for Pending/Lost/Unknown, dim gray for tree chrome
+- **AND** SHALL apply colors: cyan for component names, green for Ready/Bound status, dim for Applied, red for NotReady, yellow for Pending/Lost/Unknown, dim gray for tree chrome
 
 #### Scenario: Status column alignment
 

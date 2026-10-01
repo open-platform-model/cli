@@ -293,7 +293,7 @@ func sortedComponentNames(groups map[string][]*unstructured.Unstructured) []stri
 
 // aggregateStatus returns the rollup health of a component.
 // When depth=0 no ResourceNodes are available, so resourceCount is used to
-// signal "unknown" vs "empty". At depth>=1 all resources must be Ready/Complete.
+// signal "unknown" vs "empty". At depth>=1 all resources must be healthy (see IsHealthy).
 func aggregateStatus(resources []ResourceNode, resourceCount int) HealthStatus {
 	if len(resources) == 0 {
 		if resourceCount > 0 {
@@ -302,7 +302,7 @@ func aggregateStatus(resources []ResourceNode, resourceCount int) HealthStatus {
 		return HealthUnknown
 	}
 	for _, r := range resources {
-		if r.Status != HealthReady && r.Status != HealthComplete && r.Status != HealthBound {
+		if !IsHealthy(r.Status) {
 			return HealthNotReady
 		}
 	}

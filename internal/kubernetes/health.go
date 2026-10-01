@@ -19,6 +19,11 @@ const (
 	// HealthMissing means the resource is tracked in the inventory but no longer
 	// exists on the cluster (deleted outside of OPM).
 	HealthMissing HealthStatus = "Missing"
+	// HealthApplied means the resource exists on the cluster and has no
+	// readiness concept (RBAC, identity, config, networking objects, custom
+	// resources that report no Ready condition). It says the object was
+	// applied, nothing more, and counts as healthy.
+	HealthApplied HealthStatus = "Applied"
 	// HealthBound means a PersistentVolumeClaim is bound to a PersistentVolume.
 	HealthBound HealthStatus = "Bound"
 )
@@ -37,7 +42,8 @@ var workloadKinds = map[string]bool{
 	kindDeployment: true,
 }
 
-// passiveKinds are resources that are healthy as soon as they exist.
+// passiveKinds are resources with no readiness concept: they are reported as
+// HealthApplied as soon as they exist.
 // Note: PersistentVolumeClaim is intentionally excluded — it has a lifecycle
 // phase (Pending → Bound → Lost) evaluated by evaluatePVCHealth.
 // Note: DaemonSet is intentionally excluded — it is a workload, evaluated by
@@ -86,9 +92,9 @@ func EvaluateHealth(resource *unstructured.Unstructured) HealthStatus {
 		return evaluateJobHealth(resource)
 	}
 
-	// CronJobs: always healthy (scheduled)
+	// CronJobs: scheduled, no readiness phase
 	if kind == "CronJob" {
-		return HealthReady
+		return HealthApplied
 	}
 
 	// PersistentVolumeClaim: has a lifecycle phase (Pending → Bound → Lost).
@@ -96,9 +102,9 @@ func EvaluateHealth(resource *unstructured.Unstructured) HealthStatus {
 		return evaluatePVCHealth(resource)
 	}
 
-	// Passive resources: healthy on creation
+	// Passive resources: applied on creation, no readiness phase
 	if passiveKinds[kind] {
-		return HealthReady
+		return HealthApplied
 	}
 
 	// Custom resources: check for Ready condition, fallback to passive
@@ -106,9 +112,11 @@ func EvaluateHealth(resource *unstructured.Unstructured) HealthStatus {
 }
 
 // IsHealthy returns true if the given health status represents a healthy state.
-// Healthy statuses are: HealthReady, HealthComplete, HealthBound.
+// Healthy statuses are: HealthReady, HealthApplied, HealthComplete, HealthBound.
+// Every caller that decides "is this resource fine" goes through here.
 func IsHealthy(status HealthStatus) bool {
-	return status == HealthReady || status == HealthComplete || status == HealthBound
+	return status == HealthReady || status == HealthApplied ||
+		status == HealthComplete || status == HealthBound
 }
 
 // QuickInstanceHealth evaluates aggregate health from pre-fetched resources.
@@ -272,7 +280,7 @@ func evaluateJobHealth(resource *unstructured.Unstructured) HealthStatus {
 }
 
 // evaluateCustomHealth checks for a Ready condition on custom resources.
-// If no Ready condition exists, treats the resource as passive (healthy).
+// If no Ready condition exists, treats the resource as passive (HealthApplied).
 func evaluateCustomHealth(resource *unstructured.Unstructured) HealthStatus {
 	conditions := getConditions(resource)
 	for _, c := range conditions {
@@ -284,7 +292,7 @@ func evaluateCustomHealth(resource *unstructured.Unstructured) HealthStatus {
 		}
 	}
 	// No Ready condition — treat as passive
-	return HealthReady
+	return HealthApplied
 }
 
 // condition represents a Kubernetes status condition.

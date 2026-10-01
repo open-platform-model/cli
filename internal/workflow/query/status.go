@@ -121,7 +121,7 @@ func PrintInstanceStatus(ctx context.Context, client *kubernetes.Client, opts ku
 	}
 	output.Println(formatted)
 
-	if result.AggregateStatus != "Ready" && result.AggregateStatus != "Complete" {
+	if !kubernetes.IsHealthy(result.AggregateStatus) {
 		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: fmt.Errorf("instance %q: %d resource(s) not ready", opts.InstanceName, result.Summary.NotReady), Printed: true}
 	}
 	return nil

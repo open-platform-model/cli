@@ -1,11 +1,13 @@
 package kubernetes
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // --- 7.6: Tests for output format selection ---
@@ -19,7 +21,7 @@ func TestFormatStatus_Table(t *testing.T) {
 		Summary:         statusSummary{Total: 2, Ready: 2},
 		Resources: []resourceHealth{
 			{Kind: "Deployment", Name: "web", Namespace: "default", Status: HealthReady, Age: "5m"},
-			{Kind: "ConfigMap", Name: "config", Namespace: "default", Status: HealthReady, Age: "5m"},
+			{Kind: "ConfigMap", Name: "config", Namespace: "default", Status: HealthApplied, Age: "5m"},
 		},
 	}
 
@@ -30,6 +32,46 @@ func TestFormatStatus_Table(t *testing.T) {
 	assert.Contains(t, formatted, "Deployment")
 	assert.Contains(t, formatted, "web")
 	assert.Contains(t, formatted, "ConfigMap")
+	assert.Contains(t, formatted, "Applied")
+}
+
+func TestGetInstanceStatus_PassiveKindsReportApplied(t *testing.T) {
+	deploy := makeWorkload("Deployment", 1, map[string]interface{}{"replicas": int64(1)}, map[string]interface{}{
+		"observedGeneration": int64(1), "replicas": int64(1), "updatedReplicas": int64(1), "availableReplicas": int64(1),
+	})
+	res, err := GetInstanceStatus(context.Background(), nil, StatusOptions{
+		InstanceName: "my-app",
+		InventoryLive: []*unstructured.Unstructured{
+			makeResource("ClusterRole", nil),
+			makeResource("ServiceAccount", nil),
+			deploy,
+		},
+	})
+	require.NoError(t, err)
+
+	statuses := map[string]HealthStatus{}
+	for _, r := range res.Resources {
+		statuses[r.Kind] = r.Status
+	}
+	assert.Equal(t, HealthApplied, statuses["ClusterRole"])
+	assert.Equal(t, HealthApplied, statuses["ServiceAccount"])
+	assert.Equal(t, HealthReady, statuses["Deployment"])
+
+	// Applied counts as healthy: the instance is Ready and nothing is NotReady.
+	assert.Equal(t, HealthReady, res.AggregateStatus)
+	assert.Equal(t, 3, res.Summary.Ready)
+	assert.Equal(t, 0, res.Summary.NotReady)
+}
+
+func TestAggregateStatus_AppliedIsHealthy(t *testing.T) {
+	assert.Equal(t, HealthReady, aggregateStatus([]ResourceNode{
+		{Kind: "ClusterRole", Status: HealthApplied},
+		{Kind: "Deployment", Status: HealthReady},
+	}, 2))
+	assert.Equal(t, HealthNotReady, aggregateStatus([]ResourceNode{
+		{Kind: "ClusterRole", Status: HealthApplied},
+		{Kind: "Deployment", Status: HealthNotReady},
+	}, 2))
 }
 
 func TestFormatStatus_JSON(t *testing.T) {

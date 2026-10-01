@@ -365,21 +365,24 @@ func TestEvaluateHealth_Job(t *testing.T) {
 
 func TestEvaluateHealth_CronJob(t *testing.T) {
 	resource := makeResource("CronJob", nil)
-	assert.Equal(t, HealthReady, EvaluateHealth(resource))
+	assert.Equal(t, HealthApplied, EvaluateHealth(resource))
 }
 
 func TestEvaluateHealth_Passive(t *testing.T) {
+	// Kinds with no readiness concept report Applied, never Ready (issue 46).
 	// PersistentVolumeClaim is intentionally excluded — it has its own evaluatePVCHealth branch.
 	passiveResources := []string{
 		"ConfigMap", "Secret", "Service",
 		"ServiceAccount", "Namespace", "ClusterRole", "ClusterRoleBinding",
-		"Role", "RoleBinding",
+		"Role", "RoleBinding", "Ingress", "NetworkPolicy", "PodDisruptionBudget",
+		"ResourceQuota", "LimitRange", "StorageClass", "PriorityClass",
 	}
 
 	for _, kind := range passiveResources {
 		t.Run(kind, func(t *testing.T) {
 			resource := makeResource(kind, nil)
-			assert.Equal(t, HealthReady, EvaluateHealth(resource))
+			assert.Equal(t, HealthApplied, EvaluateHealth(resource))
+			assert.True(t, IsHealthy(EvaluateHealth(resource)))
 		})
 	}
 }
@@ -436,14 +439,14 @@ func TestEvaluateHealth_Custom(t *testing.T) {
 		{
 			name:       "Custom without Ready condition (passive fallback)",
 			conditions: nil,
-			expected:   HealthReady,
+			expected:   HealthApplied,
 		},
 		{
 			name: "Custom with other conditions but no Ready",
 			conditions: []map[string]interface{}{
 				{"type": "Synced", "status": "True"},
 			},
-			expected: HealthReady,
+			expected: HealthApplied,
 		},
 	}
 
@@ -453,4 +456,38 @@ func TestEvaluateHealth_Custom(t *testing.T) {
 			assert.Equal(t, tc.expected, EvaluateHealth(resource))
 		})
 	}
+}
+
+func TestIsHealthy(t *testing.T) {
+	tests := []struct {
+		status   HealthStatus
+		expected bool
+	}{
+		{HealthReady, true},
+		{HealthApplied, true},
+		{HealthComplete, true},
+		{HealthBound, true},
+		{HealthNotReady, false},
+		{HealthUnknown, false},
+		{HealthMissing, false},
+		{HealthStatus("Pending"), false},
+		{HealthStatus("Lost"), false},
+		{HealthStatus(""), false},
+	}
+	for _, tc := range tests {
+		t.Run(string(tc.status), func(t *testing.T) {
+			assert.Equal(t, tc.expected, IsHealthy(tc.status))
+		})
+	}
+}
+
+func TestQuickInstanceHealth_AppliedCountsAsHealthy(t *testing.T) {
+	resources := []*unstructured.Unstructured{
+		makeResource("ClusterRole", nil),
+		makeResource("ServiceAccount", nil),
+	}
+	status, ready, total := QuickInstanceHealth(resources, 0)
+	assert.Equal(t, HealthReady, status)
+	assert.Equal(t, 2, ready)
+	assert.Equal(t, 2, total)
 }

@@ -224,11 +224,15 @@ func StyleNoun(s string) string {
 }
 
 // FormatHealthStatus renders a health status string with the appropriate color.
-// Ready/Complete/Bound → green, NotReady/Missing → red, Unknown/Pending/Lost → yellow, others → unstyled.
+// Ready/Complete/Bound → green, Applied → dim (healthy, but no readiness signal to celebrate),
+// NotReady/Missing → red, Unknown/Pending/Lost → yellow, others → unstyled.
+// The set of healthy statuses is kubernetes.IsHealthy; this package cannot import it.
 func FormatHealthStatus(status string) string {
 	switch status {
 	case "Ready", "Complete", "Bound":
 		return lipgloss.NewStyle().Foreground(colorGreen).Render(status)
+	case "Applied":
+		return styleDim.Render(status)
 	case "NotReady", "Missing":
 		return lipgloss.NewStyle().Foreground(colorRed).Render(status)
 	case "Unknown", "Pending", "Lost":

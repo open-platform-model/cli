@@ -8,7 +8,7 @@
 
 ### Requirement: Health status type is exported
 
-The kubernetes package SHALL export the `healthStatus` type as `HealthStatus` and its constants as `HealthReady`, `HealthNotReady`, `HealthComplete`, `HealthUnknown`, `HealthMissing`, `HealthBound`. All existing internal references SHALL be updated to use the exported names.
+The kubernetes package SHALL export the `healthStatus` type as `HealthStatus` and its constants as `HealthReady`, `HealthNotReady`, `HealthComplete`, `HealthUnknown`, `HealthMissing`, `HealthBound`, `HealthApplied`. All existing internal references SHALL be updated to use the exported names.
 
 #### Scenario: External package uses HealthStatus
 
@@ -37,11 +37,11 @@ The `evaluateHealth` function SHALL be exported as `EvaluateHealth` with the sig
 #### Scenario: EvaluateHealth on a passive ConfigMap
 
 - **WHEN** `EvaluateHealth` is called with an unstructured ConfigMap
-- **THEN** it SHALL return `HealthReady`
+- **THEN** it SHALL return `HealthApplied`, never `HealthReady`: a kind with no readiness concept (RBAC, identity, config, networking, CronJob, and custom resources without a `Ready` condition) is only applied, not ready
 
 ### Requirement: QuickInstanceHealth aggregates health from pre-fetched resources
 
-The kubernetes package SHALL provide a `QuickInstanceHealth` function that accepts a slice of live unstructured resources and a missing resource count, and returns the aggregate `HealthStatus`, a ready count, and a total count. A resource SHALL count as ready if its `EvaluateHealth` result is `HealthReady`, `HealthComplete`, or `HealthBound`. The aggregate SHALL be `HealthReady` when all resources are ready and missing count is zero, `HealthNotReady` when any resource is not ready or missing count is greater than zero, and `HealthUnknown` when the total is zero.
+The kubernetes package SHALL provide a `QuickInstanceHealth` function that accepts a slice of live unstructured resources and a missing resource count, and returns the aggregate `HealthStatus`, a ready count, and a total count. A resource SHALL count as ready if `IsHealthy` accepts its `EvaluateHealth` result. The aggregate SHALL be `HealthReady` when all resources are ready and missing count is zero, `HealthNotReady` when any resource is not ready or missing count is greater than zero, and `HealthUnknown` when the total is zero.
 
 #### Scenario: All resources healthy
 
@@ -65,7 +65,7 @@ The kubernetes package SHALL provide a `QuickInstanceHealth` function that accep
 
 ### Requirement: IsHealthy helper function
 
-The kubernetes package SHALL provide an `IsHealthy` function that accepts a `HealthStatus` and returns `true` if the status is `HealthReady`, `HealthComplete`, or `HealthBound`, and `false` otherwise. This centralizes the "what counts as healthy" logic.
+The kubernetes package SHALL provide an `IsHealthy` function that accepts a `HealthStatus` and returns `true` if the status is `HealthReady`, `HealthApplied`, `HealthComplete`, or `HealthBound`, and `false` otherwise. This centralizes the "what counts as healthy" logic: every command that decides whether a resource or instance is fine (status, tree, list, the exit code, the operator wait) SHALL go through it rather than comparing against individual statuses.
 
 #### Scenario: Ready is healthy
 
@@ -85,4 +85,9 @@ The kubernetes package SHALL provide an `IsHealthy` function that accepts a `Hea
 #### Scenario: Bound is healthy
 
 - **WHEN** `IsHealthy(HealthBound)` is called
+- **THEN** it SHALL return `true`
+
+#### Scenario: Applied is healthy
+
+- **WHEN** `IsHealthy(HealthApplied)` is called
 - **THEN** it SHALL return `true`

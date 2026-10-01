@@ -28,8 +28,8 @@ The command SHALL evaluate resource health using category-specific criteria:
   - StatefulSet: `readyReplicas` and `updatedReplicas` equal `spec.replicas` and `updateRevision` equals `currentRevision` (revision and `updatedReplicas` checks relax for a partitioned `RollingUpdate` and are skipped for `OnDelete`)
   - DaemonSet: `updatedNumberScheduled` and `numberAvailable` equal `desiredNumberScheduled`
 - **Jobs** (Job): healthy when `Complete` condition is True
-- **CronJobs**: always reported as healthy (scheduled)
-- **Passive** (ConfigMap, Secret, Service, PVC): healthy on creation
+- **CronJobs**: reported as `Applied` (scheduled, no readiness phase)
+- **Passive** (ConfigMap, Secret, Service, ServiceAccount, RBAC kinds, and similar kinds with no readiness concept): reported as `Applied` on creation, which counts as healthy but does not claim readiness
 - **Custom** (CRD instances): healthy if `Ready` condition is present and True, otherwise treated as passive
 
 #### Scenario: Deployment not yet ready
@@ -50,7 +50,8 @@ The command SHALL evaluate resource health using category-specific criteria:
 #### Scenario: ConfigMap always healthy
 
 - **WHEN** a ConfigMap exists in the cluster
-- **THEN** the status output SHALL show the ConfigMap as "Ready"
+- **THEN** the status output SHALL show the ConfigMap as "Applied"
+- **AND** the instance aggregate status SHALL still be "Ready" when every other resource is healthy
 
 #### Scenario: Custom resource with Ready condition
 
@@ -60,7 +61,7 @@ The command SHALL evaluate resource health using category-specific criteria:
 #### Scenario: Custom resource without Ready condition
 
 - **WHEN** a CRD instance has no `Ready` condition in its status
-- **THEN** the status output SHALL treat the resource as passive and show it as "Ready"
+- **THEN** the status output SHALL treat the resource as passive and show it as "Applied"
 
 ### Requirement: Status supports table output format
 
@@ -124,6 +125,7 @@ The status table and header SHALL use color-coded output when stdout is a TTY. C
 
 The color mapping SHALL be:
 - Health status `Ready` and `Complete`: green
+- Health status `Applied`: dim (healthy, but carries no readiness signal)
 - Health status `NotReady` and `Missing`: red
 - Health status `Unknown`: yellow
 - Component names: cyan
