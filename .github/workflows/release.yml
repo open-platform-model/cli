@@ -30,6 +30,9 @@ name: Release
 #     by hand with the tag. A gate failure: the tag never moves; bump the
 #     template on main and cut the next patch; the owner removes the abandoned
 #     draft in the browser.
+#   - A brand-new template: after its first publish the owner makes its GHCR
+#     package public in the browser. The gate lists versions anonymously, so
+#     until then every release fails for that template.
 
 on:
   push:
