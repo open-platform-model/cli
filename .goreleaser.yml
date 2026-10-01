@@ -27,6 +27,14 @@ archives:
 
 release:
   prerelease: auto
+  # release-please creates the tag and a draft release; goreleaser attaches
+  # to that draft (matched by name, which equals the tag), uploads every
+  # asset while it is a draft and publishes it last. Never set draft,
+  # name_template or replace_existing_draft here.
+  use_existing_draft: true
+  mode: keep-existing
+  # A re-run on the same draft replaces an asset a failed run left behind.
+  replace_existing_artifacts: true
   extra_files:
     - glob: LICENSE
 
