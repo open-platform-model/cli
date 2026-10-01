@@ -49,6 +49,7 @@ Use `opm module` when you are starting from module source. For rendering, deploy
 |---------|-------------|
 | `module init` | Create a new module from a template |
 | `module vet` | Validate a module without rendering manifests |
+| `module eval` | Print the evaluated module as formatted CUE; `-e <path>` prints one value (`#config`, `metadata.name`) |
 | `module build` | Render a module directory or a published module to manifests through a synthetic instance (`debugValues` or `-f` values) |
 | `module apply` | Deploy a module directory or a published module to a cluster through a synthetic instance |
 | `module tidy` | Resolve, pin and prune the module's CUE dependencies as `cue mod tidy` does, without the `cue` binary; `--check` fails without writing |
