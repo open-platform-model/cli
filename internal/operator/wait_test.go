@@ -44,9 +44,13 @@ func deploymentFixture(ready bool) *unstructured.Unstructured {
 		},
 	}}
 	if ready {
-		_ = unstructured.SetNestedSlice(obj.Object, []any{
-			map[string]any{"type": "Available", "status": "True"},
-		}, "status", "conditions")
+		// A finished rollout of the default single replica.
+		_ = unstructured.SetNestedMap(obj.Object, map[string]any{
+			"observedGeneration": int64(0),
+			"replicas":           int64(1),
+			"updatedReplicas":    int64(1),
+			"availableReplicas":  int64(1),
+		}, "status")
 	}
 	return obj
 }

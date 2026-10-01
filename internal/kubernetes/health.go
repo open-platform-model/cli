@@ -30,11 +30,9 @@ const conditionStatusTrue = "True"
 // Distinct from HealthStatus "Ready" — this is the .conditions[].type field value.
 const conditionTypeReady = "Ready"
 
-// workloadKinds are resources that use the Available/Ready condition for health.
-// Note: StatefulSet is intentionally excluded — it does not emit conditions
-// and must be evaluated via readyReplicas instead.
-// Note: DaemonSet is intentionally excluded — it does not reliably emit
-// Available/Ready conditions. Its health is conveyed via pod count in the tree.
+// workloadKinds are resources evaluated by rollout state (generation, replica
+// counts and, for Deployments, the Progressing condition) rather than by an
+// Available/Ready condition alone.
 var workloadKinds = map[string]bool{
 	kindDeployment: true,
 }
@@ -42,10 +40,9 @@ var workloadKinds = map[string]bool{
 // passiveKinds are resources that are healthy as soon as they exist.
 // Note: PersistentVolumeClaim is intentionally excluded — it has a lifecycle
 // phase (Pending → Bound → Lost) evaluated by evaluatePVCHealth.
-// Note: DaemonSet is included here — its health is conveyed via pod count in
-// the tree (like ReplicaSet), not a binary ready/not-ready label.
+// Note: DaemonSet is intentionally excluded — it is a workload, evaluated by
+// evaluateDaemonSetHealth.
 var passiveKinds = map[string]bool{
-	kindDaemonSet:         true,
 	"ConfigMap":           true,
 	"Secret":              true,
 	"Service":             true,
@@ -69,14 +66,19 @@ var passiveKinds = map[string]bool{
 func EvaluateHealth(resource *unstructured.Unstructured) HealthStatus {
 	kind := resource.GetKind()
 
-	// Workloads: Deployment, DaemonSet — check Available/Ready condition
+	// Deployment: rollout state, not just the Available condition
 	if workloadKinds[kind] {
 		return evaluateWorkloadHealth(resource)
 	}
 
-	// StatefulSet: does not emit status conditions; check readyReplicas instead
+	// StatefulSet: does not emit status conditions; check rollout counters
 	if kind == kindStatefulSet {
 		return evaluateStatefulSetHealth(resource)
+	}
+
+	// DaemonSet: does not reliably emit conditions; check rollout counters
+	if kind == kindDaemonSet {
+		return evaluateDaemonSetHealth(resource)
 	}
 
 	// Jobs: check Complete condition
@@ -143,36 +145,112 @@ func evaluatePVCHealth(resource *unstructured.Unstructured) HealthStatus {
 	return HealthReady // fallback: PVC created but not yet provisioned
 }
 
-// evaluateWorkloadHealth checks the Ready condition on workload resources.
+// conditionReasonProgressDeadline is the Progressing condition reason a
+// Deployment carries once its rollout has stalled past progressDeadlineSeconds.
+const conditionReasonProgressDeadline = "ProgressDeadlineExceeded"
+
+// evaluateWorkloadHealth reports whether a Deployment has finished rolling out.
+// The Available condition alone is not enough: it stays True while the old
+// ReplicaSet serves traffic during a stuck upgrade. A Deployment is healthy
+// only when the controller has observed the current generation, every replica
+// is on the new template and available, and no old replicas linger.
 func evaluateWorkloadHealth(resource *unstructured.Unstructured) HealthStatus {
-	conditions := getConditions(resource)
-	for _, c := range conditions {
-		if c.Type == "Available" || c.Type == conditionTypeReady {
-			if c.Status == conditionStatusTrue {
-				return HealthReady
-			}
+	if !generationObserved(resource) {
+		return HealthNotReady
+	}
+	for _, c := range getConditions(resource) {
+		if c.Type == "Progressing" && c.Reason == conditionReasonProgressDeadline {
 			return HealthNotReady
 		}
 	}
-	return HealthNotReady
+
+	desired := specReplicas(resource)
+	updated := statusInt(resource, "updatedReplicas")
+	available := statusInt(resource, "availableReplicas")
+	total := statusInt(resource, "replicas")
+
+	if updated != desired || available != desired || total > updated {
+		return HealthNotReady
+	}
+	return HealthReady
 }
 
-// evaluateStatefulSetHealth checks readyReplicas for StatefulSet resources.
-// StatefulSets do not emit Available/Ready status conditions; readiness is
-// signaled via readyReplicas reaching the desired replica count.
+// evaluateStatefulSetHealth reports whether a StatefulSet has finished
+// rolling out. StatefulSets do not emit Available/Ready status conditions;
+// readiness is signaled by the controller observing the current generation,
+// the update revision becoming the current revision, and the replica counters
+// reaching spec.replicas. With a RollingUpdate partition (or the OnDelete
+// strategy) the revisions legitimately differ, so only the counters the
+// strategy guarantees are required.
 func evaluateStatefulSetHealth(resource *unstructured.Unstructured) HealthStatus {
+	if !generationObserved(resource) {
+		return HealthNotReady
+	}
+
+	desired := specReplicas(resource)
+	if statusInt(resource, "readyReplicas") != desired {
+		return HealthNotReady
+	}
+
+	strategy, _, _ := unstructured.NestedString(resource.Object, "spec", "updateStrategy", "type") //nolint:errcheck // best-effort strategy read
+	switch strategy {
+	case "OnDelete":
+		return HealthReady
+	default: // RollingUpdate is the default strategy
+		partition, _, _ := unstructured.NestedInt64(resource.Object, "spec", "updateStrategy", "rollingUpdate", "partition") //nolint:errcheck // best-effort partition read
+		if partition > 0 {
+			if statusInt(resource, "updatedReplicas") < desired-partition {
+				return HealthNotReady
+			}
+			return HealthReady
+		}
+	}
+
+	if statusInt(resource, "updatedReplicas") != desired {
+		return HealthNotReady
+	}
+	updateRev, _, _ := unstructured.NestedString(resource.Object, "status", "updateRevision")   //nolint:errcheck // best-effort revision read
+	currentRev, _, _ := unstructured.NestedString(resource.Object, "status", "currentRevision") //nolint:errcheck // best-effort revision read
+	if updateRev != currentRev {
+		return HealthNotReady
+	}
+	return HealthReady
+}
+
+// evaluateDaemonSetHealth reports whether a DaemonSet has finished rolling
+// out: the current generation is observed and every node that should run a
+// pod runs an updated, available one.
+func evaluateDaemonSetHealth(resource *unstructured.Unstructured) HealthStatus {
+	if !generationObserved(resource) {
+		return HealthNotReady
+	}
+	desired := statusInt(resource, "desiredNumberScheduled")
+	if statusInt(resource, "updatedNumberScheduled") != desired || statusInt(resource, "numberAvailable") != desired {
+		return HealthNotReady
+	}
+	return HealthReady
+}
+
+// generationObserved reports whether status.observedGeneration has caught up
+// with metadata.generation, i.e. the controller has seen the latest spec.
+func generationObserved(resource *unstructured.Unstructured) bool {
+	observed, _, _ := unstructured.NestedInt64(resource.Object, "status", "observedGeneration") //nolint:errcheck // best-effort generation read
+	return observed >= resource.GetGeneration()
+}
+
+// specReplicas returns spec.replicas, which defaults to 1 when omitted.
+func specReplicas(resource *unstructured.Unstructured) int64 {
 	desired, found, _ := unstructured.NestedInt64(resource.Object, "spec", "replicas") //nolint:errcheck // best-effort replica count
 	if !found {
-		desired = 1 // spec.replicas defaults to 1 when omitted
+		return 1
 	}
-	if desired == 0 {
-		return HealthReady
-	}
-	ready, _, _ := unstructured.NestedInt64(resource.Object, "status", "readyReplicas") //nolint:errcheck // best-effort ready count
-	if ready >= desired {
-		return HealthReady
-	}
-	return HealthNotReady
+	return desired
+}
+
+// statusInt returns an integer status field, 0 when absent.
+func statusInt(resource *unstructured.Unstructured, field string) int64 {
+	v, _, _ := unstructured.NestedInt64(resource.Object, "status", field) //nolint:errcheck // best-effort status counter
+	return v
 }
 
 // evaluateJobHealth checks the Complete condition on Job resources.
@@ -213,6 +291,7 @@ func evaluateCustomHealth(resource *unstructured.Unstructured) HealthStatus {
 type condition struct {
 	Type   string
 	Status string
+	Reason string
 }
 
 // getConditions extracts status conditions from an unstructured resource.
@@ -237,10 +316,13 @@ func getConditions(resource *unstructured.Unstructured) []condition {
 		condType, _, _ := unstructured.NestedString(c, "type")     //nolint:errcheck // best-effort condition parsing
 		condStatus, _, _ := unstructured.NestedString(c, "status") //nolint:errcheck // best-effort condition parsing
 
+		condReason, _, _ := unstructured.NestedString(c, "reason") //nolint:errcheck // best-effort condition parsing
+
 		if condType != "" {
 			conditions = append(conditions, condition{
 				Type:   condType,
 				Status: condStatus,
+				Reason: condReason,
 			})
 		}
 	}

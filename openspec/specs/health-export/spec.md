@@ -26,8 +26,13 @@ The `evaluateHealth` function SHALL be exported as `EvaluateHealth` with the sig
 
 #### Scenario: EvaluateHealth on a ready Deployment
 
-- **WHEN** `EvaluateHealth` is called with an unstructured Deployment that has `Available` condition True
+- **WHEN** `EvaluateHealth` is called with an unstructured Deployment whose generation is observed and whose `updatedReplicas` and `availableReplicas` equal `spec.replicas`
 - **THEN** it SHALL return `HealthReady`
+
+#### Scenario: EvaluateHealth on a Deployment mid-rollout
+
+- **WHEN** `EvaluateHealth` is called with an unstructured Deployment that has `Available` condition True but `updatedReplicas` lower than `spec.replicas`
+- **THEN** it SHALL return `HealthNotReady`
 
 #### Scenario: EvaluateHealth on a passive ConfigMap
 

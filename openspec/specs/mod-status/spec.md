@@ -23,7 +23,10 @@ The `opm instance status` command SHALL read the persisted instance inventory re
 ### Requirement: Status evaluates health per resource category
 
 The command SHALL evaluate resource health using category-specific criteria:
-- **Workloads** (Deployment, StatefulSet, DaemonSet): healthy when `Ready` condition is True
+- **Workloads** (Deployment, StatefulSet, DaemonSet): healthy only when the rollout has finished, never on a condition alone. The controller SHALL have observed the current generation (`status.observedGeneration >= metadata.generation`) and the replica counters SHALL match `spec.replicas` (default 1):
+  - Deployment: `updatedReplicas` and `availableReplicas` equal `spec.replicas`, no old replicas remain, and the `Progressing` condition does not report `ProgressDeadlineExceeded`
+  - StatefulSet: `readyReplicas` and `updatedReplicas` equal `spec.replicas` and `updateRevision` equals `currentRevision` (revision and `updatedReplicas` checks relax for a partitioned `RollingUpdate` and are skipped for `OnDelete`)
+  - DaemonSet: `updatedNumberScheduled` and `numberAvailable` equal `desiredNumberScheduled`
 - **Jobs** (Job): healthy when `Complete` condition is True
 - **CronJobs**: always reported as healthy (scheduled)
 - **Passive** (ConfigMap, Secret, Service, PVC): healthy on creation
@@ -32,6 +35,11 @@ The command SHALL evaluate resource health using category-specific criteria:
 #### Scenario: Deployment not yet ready
 
 - **WHEN** a Deployment has `Ready` condition set to False
+- **THEN** the status output SHALL show the Deployment as "NotReady"
+
+#### Scenario: Deployment upgrade stuck behind an available old ReplicaSet
+
+- **WHEN** a Deployment has `Available` True but `updatedReplicas` is lower than `spec.replicas`
 - **THEN** the status output SHALL show the Deployment as "NotReady"
 
 #### Scenario: Job completed
