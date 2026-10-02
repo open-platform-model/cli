@@ -66,4 +66,4 @@ request body as merge gates and post-merge checks instead of commits on this cha
 
 ## 7. Archive
 
-- [ ] 7.1 Archive the change on this branch (openspec archive), so the archive rides the implementing PR; never push to main (owner decision 2026-10-01, RELEASING.md, "Owner settings"); verify `task openspec:check` passes, then commit `chore(openspec): archive add-embedded-operator-e2e-job`
+- [x] 7.1 Archive the change on this branch (openspec archive), so the archive rides the implementing PR; never push to main (owner decision 2026-10-01, RELEASING.md, "Owner settings"); verify `task openspec:check` passes, then commit `chore(openspec): archive add-embedded-operator-e2e-job`
