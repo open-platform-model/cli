@@ -21,7 +21,7 @@ import (
 const realTreeRegistry = "opmodel.dev=ghcr.io/open-platform-model,registry.cue.works"
 
 // TestRealTree_CatalogOpm is the registry-backed smoke over the real first
-// -party catalog: the workspace's catalog_opm/opm must pass the member and
+// -party catalog: the workspace's catalog_opm/src must pass the member and
 // posture gates AS-IS against the real core v2 schema, and the compat walk
 // over the live GHCR history must run on the prerelease line (the tree ships
 // breaking alphas, so a stable-line comparison cannot hold) without refusals.
@@ -33,10 +33,10 @@ const realTreeRegistry = "opmodel.dev=ghcr.io/open-platform-model,registry.cue.w
 // signal and the walk continues. Acceptable: that horizon is entirely
 // alpha-era, and alpha promises nothing (0010:D34).
 func TestRealTree_CatalogOpm(t *testing.T) {
-	src, err := filepath.Abs(filepath.Join("..", "..", "..", "catalog_opm", "opm"))
+	src, err := filepath.Abs(filepath.Join("..", "..", "..", "catalog_opm", "src"))
 	require.NoError(t, err)
 	if _, err := os.Stat(src); err != nil {
-		t.Skip("catalog_opm workspace checkout not present beside cli/")
+		t.Skipf("catalog_opm/src checkout not found at %s (expected beside cli/)", src)
 	}
 
 	k := kernel.New(kernel.WithRegistry(realTreeRegistry))
@@ -60,7 +60,7 @@ func TestRealTree_CatalogOpm(t *testing.T) {
 	require.True(t, opts.TraitOptionalGateSchema.Exists())
 
 	a, refusal := loadArtifact(opts)
-	require.Nil(t, refusal, "catalog_opm/opm must load")
+	require.Nil(t, refusal, "catalog_opm/src must load")
 
 	members, refusals := enumerateMembers(opts, src)
 	require.Empty(t, refusals)
@@ -68,7 +68,7 @@ func TestRealTree_CatalogOpm(t *testing.T) {
 	p := &Plan{Kind: KindCatalog, Dir: src}
 	gateMemberFQN(p, opts, a, members)
 	gateTraitOptional(p, opts, members)
-	require.Empty(t, p.Refusals, "catalog_opm/opm must pass the member and posture gates as-is:\n%s\n%s",
+	require.Empty(t, p.Refusals, "catalog_opm/src must pass the member and posture gates as-is:\n%s\n%s",
 		refusalHeadlines(p), refusalErrors(p))
 
 	// Order-of-magnitude sanity, not exact counts — the catalog grows.

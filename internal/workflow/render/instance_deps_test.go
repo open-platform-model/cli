@@ -129,7 +129,7 @@ func TestInstanceDepsOf_NoModuleRootIsAnError(t *testing.T) {
 // TestInstanceDepsOf_CarriesThePackageReplacements asserts the instance
 // package's own cue.mod/local-module.cue is read beside its module file.
 func TestInstanceDepsOf_CarriesThePackageReplacements(t *testing.T) {
-	root := writeModuleContext(t, `deps: "opmodel.dev/catalogs/opm@v4": replaceWith: "../catalog_opm/opm"`)
+	root := writeModuleContext(t, `deps: "opmodel.dev/catalogs/opm@v4": replaceWith: "../catalog_opm/src"`)
 
 	deps, err := instanceDepsOf(root, root)
 	require.NoError(t, err)

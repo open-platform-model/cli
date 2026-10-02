@@ -164,7 +164,7 @@ When `opm module build` or `opm module vet` runs without `--platform`, the CLI S
 
 #### Scenario: A local catalog checkout is rendered
 
-- **WHEN** the module's `cue.mod/local-module.cue` replaces `opmodel.dev/catalogs/opm@v4` with `../catalog_opm/opm` and `opm module build` runs with no `--platform`
+- **WHEN** the module's `cue.mod/local-module.cue` replaces `opmodel.dev/catalogs/opm@v4` with `../catalog_opm/src` and `opm module build` runs with no `--platform`
 - **THEN** the generated platform SHALL serve `opmodel.dev/catalogs/opm@v4` from the checkout's absolute directory
 - **AND** the rendered objects SHALL reflect the checkout's transformer bytes
 - **AND** the closure SHALL read the checkout's `cue.mod/module.cue`, so the render succeeds even when the pinned catalog version is not published

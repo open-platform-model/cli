@@ -227,7 +227,7 @@ func TestModuleDepsOf_OverlayOnlySourceCarriesNoReplacements(t *testing.T) {
 }
 
 func TestModuleDepsOf_DirectoryModuleCarriesItsReplacements(t *testing.T) {
-	root := writeModuleContext(t, `deps: "opmodel.dev/catalogs/opm@v4": replaceWith: "../catalog_opm/opm"`)
+	root := writeModuleContext(t, `deps: "opmodel.dev/catalogs/opm@v4": replaceWith: "../catalog_opm/src"`)
 	modFile, err := os.ReadFile(filepath.Join(root, "cue.mod", "module.cue"))
 	require.NoError(t, err)
 	src := &module.Source{Root: root, Overlay: map[string][]byte{filepath.Join(root, "cue.mod", "module.cue"): modFile}}
@@ -235,7 +235,7 @@ func TestModuleDepsOf_DirectoryModuleCarriesItsReplacements(t *testing.T) {
 	deps, err := moduleDepsOf(src, root)
 	require.NoError(t, err)
 	assert.Equal(t, root, deps.ModuleRoot)
-	assert.Equal(t, []loader.LocalReplacement{{Path: "opmodel.dev/catalogs/opm@v4", ReplaceWith: "../catalog_opm/opm"}}, deps.Replacements)
+	assert.Equal(t, []loader.LocalReplacement{{Path: "opmodel.dev/catalogs/opm@v4", ReplaceWith: "../catalog_opm/src"}}, deps.Replacements)
 }
 
 func TestModuleDepsOf_MissingModFileIsAnError(t *testing.T) {
