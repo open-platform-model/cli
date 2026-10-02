@@ -1,0 +1,40 @@
+# Operator-embed evidence (G4), workspace RELEASING.md, section "Gates".
+#
+# Interim: this whole workflow is retired once the cluster-backed e2e CI job
+# (cli change add-embedded-operator-e2e-job) has merged, has passed on a cli
+# release PR, and is a required check. Until then, a release-please PR whose
+# embedded opm-operator moved since the last cli release needs the label
+# e2e-verified, added by a human after `task test:e2e`.
+#
+# The job always runs and decides in its step (a skipped job would read as a
+# pass), and it re-runs on label events so adding the label clears it.
+name: Release Evidence
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-evidence-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  operator-e2e-evidence:
+    name: G4 operator-embed evidence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Tags and origin/<base>: G4 compares against the last cli tag.
+          fetch-depth: 0
+      - name: Check operator-embed evidence
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
+          BASE_REF: ${{ github.base_ref }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: .github/scripts/release-evidence.sh
