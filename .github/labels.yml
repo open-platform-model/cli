@@ -113,3 +113,56 @@
 - name: "wontfix"
   color: "ffffff"
   description: "Intentionally not addressing this"
+
+# ---------------------------------------------------------------------------
+# Release cascade (workspace RELEASING.md, section "The cascade", Labels).
+# Declared here, not created by the cascade receiver: this file owns the
+# repo's labels.
+# ---------------------------------------------------------------------------
+- name: "deps-cascade"
+  color: "0366d6"
+  description: "Rolling upstream-pin PR opened by the release cascade"
+
+- name: "deps-cascade:conflict"
+  color: "b60205"
+  description: "The bot could not merge main into this cascade PR; a human resolves it"
+
+- name: "deps-cascade:hold"
+  color: "fbca04"
+  description: "A human is working on this cascade PR; the bot does not push"
+
+- name: "deps-cascade:breaking"
+  color: "d93f0b"
+  description: "An upstream changelog in this PR announces a breaking change"
+
+- name: "need-human-review"
+  color: "e99695"
+  description: "Glue edits a human must review before merging"
+
+- name: "e2e-verified"
+  color: "0e8a16"
+  description: "A human ran task test:e2e against the embedded operator (G4)"
+
+# ---------------------------------------------------------------------------
+# Managed by bots (listed so the sync never deletes them). Colors and
+# descriptions are the ones the bots created, so a sync changes nothing.
+# ---------------------------------------------------------------------------
+- name: "autorelease: pending"
+  color: "ededed"
+  description: ""
+
+- name: "autorelease: tagged"
+  color: "ededed"
+  description: ""
+
+- name: "dependencies"
+  color: "0366d6"
+  description: "Pull requests that update a dependency file"
+
+- name: "go"
+  color: "16e2e2"
+  description: "Pull requests that update go code"
+
+- name: "github_actions"
+  color: "000000"
+  description: "Pull requests that update GitHub Actions code"

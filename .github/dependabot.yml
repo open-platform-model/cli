@@ -10,8 +10,13 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # OPM modules (library) move through the release cascade or by hand as
+    # fix(deps), never through Dependabot (workspace RELEASING.md, section
+    # "The cascade").
+    ignore:
+      - dependency-name: "github.com/open-platform-model/*"
     commit-message:
-      # "deps" is not a Conventional Commit type: pr-title.yml rejects it and
-      # release-please drops it from the changelog. Use "build(deps)".
+      # pr-title.yml does not accept "deps" as a type, so third-party Go bumps
+      # land as "build(deps)", a hidden type that cuts no release.
       prefix: "build"
       include: "scope"
