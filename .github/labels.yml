@@ -125,7 +125,7 @@
 
 - name: "deps-cascade:conflict"
   color: "b60205"
-  description: "Cascade PR could not be rebuilt on main; a human updates the branch"
+  description: "The bot could not merge main into this cascade PR; a human resolves it"
 
 - name: "deps-cascade:hold"
   color: "fbca04"
