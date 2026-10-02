@@ -21,7 +21,7 @@ This change is the cli's Phase 1 preparation (workspace RELEASING.md, section "R
 
 Not changed: the embedded operator pin (moved to `v1.0.0-beta.4` by cli PR 269 and released in `v1.0.0-beta.5` while this change was planned), the cascade receiver and notify jobs (`join-release-cascade`), the cascade task (`add-deps-cascade-task`), rulesets and repo settings (owner actions), and any tag or release.
 
-SemVer class: none. Every commit is `ci` or `chore`, and the PR title is `ci(release): prepare the cli for the release cascade`. No Go code changes; `opm` behaves the same.
+SemVer class: none. Every commit is `ci` or `chore`, except the artifact-only reconcile commit `docs(openspec)`. The squash takes the PR title `ci(release): prepare the cli for the release cascade`, and the squash body is blank. No Go code changes; `opm` behaves the same.
 
 ## Depends on / gates
 

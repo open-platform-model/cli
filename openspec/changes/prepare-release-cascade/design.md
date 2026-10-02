@@ -97,6 +97,10 @@ G4 is interim. It retires only when all of these hold: `add-embedded-operator-e2
 
 Steps 2 to 4 are one `ci(release)` commit riding that change's PR, archive included. G1, including its operator-embed check, stays.
 
+### D7: The local test gate skips the cluster half of `task test`
+
+`task test` runs `task test:integration` (needs the `kind-opm-dev` cluster) and `task test:e2e` (destructive on that shared cluster). This change adds no Go code, so the local gate is `task test:unit` plus `go test ./tests/e2e/...` with no kubeconfig, so the cluster tests skip (tasks.md, integration note), together with `task fmt`, `task lint` and `task openspec:check`. The supervisor accepted this explicit local gate in place of `task test` on 2026-10-02.
+
 ## Research & Decisions
 
 ### Where G1 runs
