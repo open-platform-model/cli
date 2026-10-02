@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0-beta.5](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.4...v1.0.0-beta.5) (2026-10-01)
+
+
+### Features
+
+* add apply --wait, module eval and a container image; fix health, apply and kubeconfig ([#266](https://github.com/open-platform-model/cli/issues/266)) ([f3569b2](https://github.com/open-platform-model/cli/commit/f3569b24168e7671122e23b966612301062e30b9))
+
+
+### Bug Fixes
+
+* **deps:** embed opm-operator v1.0.0-beta.4 ([#269](https://github.com/open-platform-model/cli/issues/269)) ([a43ffdb](https://github.com/open-platform-model/cli/commit/a43ffdbd50f288671e3e2decdca0e006f7479eac))
+
+
+### Documentation
+
+* **site:** add the Install the CLI page ([#268](https://github.com/open-platform-model/cli/issues/268)) ([af7b52c](https://github.com/open-platform-model/cli/commit/af7b52ca6c84febafe08e7dd5040adb61a942307))
+
 ## [1.0.0-beta.4](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.3...v1.0.0-beta.4) (2026-10-01)
 
 
