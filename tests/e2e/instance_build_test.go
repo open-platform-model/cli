@@ -128,7 +128,7 @@ func seedSkewPlatform(t *testing.T) string {
 	modFile := filepath.Join(dir, filepath.FromSlash(config.PlatformModuleFileName))
 	content, err := os.ReadFile(modFile)
 	require.NoError(t, err)
-	skewed := strings.Replace(string(content), hackCatalogPin(t, config.DefaultCatalogPaths[0]), olderCatalogPin, 1)
+	skewed := strings.Replace(string(content), hackCatalogPin(t, config.DefaultCatalogPath), olderCatalogPin, 1)
 	require.NotEqual(t, string(content), skewed, "hack/platform must pin the abstraction catalog")
 	require.NoError(t, os.WriteFile(modFile, []byte(skewed), 0o600))
 	return dir
@@ -141,8 +141,8 @@ func examplesCatalogPin(t *testing.T, repoRoot string) string {
 	t.Helper()
 	content, err := os.ReadFile(filepath.Join(repoRoot, "examples", "cue.mod", "module.cue"))
 	require.NoError(t, err)
-	m := regexp.MustCompile(`"` + regexp.QuoteMeta(config.DefaultCatalogPaths[0]) + `":\s*\{\s*v:\s*"([^"]+)"`).FindStringSubmatch(string(content))
-	require.Len(t, m, 2, "examples/cue.mod/module.cue must pin %s", config.DefaultCatalogPaths[0])
+	m := regexp.MustCompile(`"` + regexp.QuoteMeta(config.DefaultCatalogPath) + `":\s*\{\s*v:\s*"([^"]+)"`).FindStringSubmatch(string(content))
+	require.Len(t, m, 2, "examples/cue.mod/module.cue must pin %s", config.DefaultCatalogPath)
 	return m[1]
 }
 
@@ -208,7 +208,7 @@ func TestE2E_InstanceBuild_SkewWarnsByDefault(t *testing.T) {
 	require.NoError(t, err, "stderr: %s", stderr)
 
 	assert.NotEmpty(t, stdout, "the render proceeds under the warn policy")
-	assert.Contains(t, stderr, `version skew on "`+config.DefaultCatalogPaths[0]+`"`)
+	assert.Contains(t, stderr, `version skew on "`+config.DefaultCatalogPath+`"`)
 	assert.Contains(t, stderr, "module requires "+required)
 	assert.Contains(t, stderr, "platform carries "+olderCatalogPin)
 	assert.Contains(t, stderr, "rendering against the platform's build")
@@ -239,7 +239,7 @@ func TestE2E_InstanceBuild_SkewRefusedByConfig(t *testing.T) {
 	assert.Empty(t, stdout, "nothing is rendered when the render is refused before evaluation")
 	assert.Contains(t, stderr, "skew policy: refuse (config)", "provenance reports the refuse policy and its source")
 	assert.Contains(t, stderr, "render failed")
-	assert.Contains(t, stderr, `version skew on "`+config.DefaultCatalogPaths[0]+`"`)
+	assert.Contains(t, stderr, `version skew on "`+config.DefaultCatalogPath+`"`)
 	assert.Contains(t, stderr, "module requires "+required)
 	assert.Contains(t, stderr, "platform carries "+olderCatalogPin)
 }
@@ -506,9 +506,9 @@ values: {
 // plain render of the podinfo example against platformDir first.
 func catalogCopyWithLabel(t *testing.T, home, platformDir, instanceFile string) string {
 	t.Helper()
-	catalogPath, _, _ := strings.Cut(config.DefaultCatalogPaths[0], "@")
+	catalogPath, _, _ := strings.Cut(config.DefaultCatalogPath, "@")
 	src := filepath.Join(os.Getenv("CUE_CACHE_DIR"), "mod", "extract",
-		filepath.FromSlash(catalogPath)+"@"+hackCatalogPin(t, config.DefaultCatalogPaths[0]))
+		filepath.FromSlash(catalogPath)+"@"+hackCatalogPin(t, config.DefaultCatalogPath))
 	if _, err := os.Stat(src); err != nil {
 		_, stderr, runErr := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
 			"instance", "build", instanceFile, "--platform", platformDir)
@@ -580,7 +580,7 @@ func TestE2E_InstanceBuild_ReplacementOfPlatformPathIsInert(t *testing.T) {
 	platformDir := seedPlatform(t)
 	catDir := catalogCopyWithLabel(t, home, platformDir, example)
 	clean := replacementInstance(t, repoRoot, false, nil)
-	redirected := replacementInstance(t, repoRoot, false, map[string]string{config.DefaultCatalogPaths[0]: catDir})
+	redirected := replacementInstance(t, repoRoot, false, map[string]string{config.DefaultCatalogPath: catDir})
 
 	cleanOut, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
 		"instance", "build", clean, "--platform", platformDir)
@@ -594,7 +594,7 @@ func TestE2E_InstanceBuild_ReplacementOfPlatformPathIsInert(t *testing.T) {
 	assert.Equal(t, cleanOut, stdout, "the platform's pinned catalog rendered, not the instance's redirected copy")
 	assert.NotContains(t, stdout, catalogLabel)
 	localFile := filepath.Join(filepath.Dir(redirected), "cue.mod", "local-module.cue")
-	assert.Contains(t, stderr, "local replacement of "+config.DefaultCatalogPaths[0]+" in "+localFile+" is ignored: the platform names that path")
+	assert.Contains(t, stderr, "local replacement of "+config.DefaultCatalogPath+" in "+localFile+" is ignored: the platform names that path")
 	assert.Contains(t, stderr, "redirect it in the platform module's cue.mod/local-module.cue")
 	assert.NotContains(t, stderr, "in effect")
 }
@@ -611,7 +611,7 @@ func TestE2E_InstanceBuild_InstanceDepsHonorThePackageReplacement(t *testing.T) 
 	repoRoot, example := podinfoExample(t)
 	home := seedRenderHome(t)
 	catDir := catalogCopyWithLabel(t, home, seedPlatform(t), example)
-	redirected := replacementInstance(t, repoRoot, false, map[string]string{config.DefaultCatalogPaths[0]: catDir})
+	redirected := replacementInstance(t, repoRoot, false, map[string]string{config.DefaultCatalogPath: catDir})
 
 	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
 		"instance", "build", redirected, "--offline")
@@ -619,7 +619,7 @@ func TestE2E_InstanceBuild_InstanceDepsHonorThePackageReplacement(t *testing.T) 
 
 	assert.Contains(t, stderr, "platform: instance deps (")
 	assert.Contains(t, stdout, catalogLabel+": local", "the rendered Deployment carries the checkout's transformer output")
-	want := "local replacement in effect: " + config.DefaultCatalogPaths[0] + " served from " + catDir + " (instance)"
+	want := "local replacement in effect: " + config.DefaultCatalogPath + " served from " + catDir + " (instance)"
 	assert.Equal(t, 1, strings.Count(stderr, "local replacement in effect:"), "stderr: %s", stderr)
 	assert.Contains(t, stderr, want)
 	assert.NotContains(t, stderr, "redirect it in the platform module's cue.mod/local-module.cue")
@@ -643,14 +643,14 @@ func TestE2E_InstanceBuild_PlatformReplacementIsHonored(t *testing.T) {
 		paths = append(paths, p)
 	}
 	writeE2EFile(t, filepath.Join(platformDir, "cue.mod", "local-module.cue"),
-		localModuleFile(paths, map[string]string{config.DefaultCatalogPaths[0]: catDir}))
+		localModuleFile(paths, map[string]string{config.DefaultCatalogPath: catDir}))
 
 	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), home, 180*time.Second,
 		"instance", "build", example, "--platform", platformDir)
 	require.NoError(t, err, "stderr: %s", stderr)
 
 	assert.Contains(t, stdout, catalogLabel+": local", "the rendered Deployment carries the copy's transformer output")
-	assert.Contains(t, stderr, "local replacement in effect: "+config.DefaultCatalogPaths[0]+" served from "+catDir+" (platform)")
+	assert.Contains(t, stderr, "local replacement in effect: "+config.DefaultCatalogPath+" served from "+catDir+" (platform)")
 	assert.NotContains(t, stderr, "is ignored")
 }
 

@@ -20,5 +20,3 @@ spec:
     # entry, named by bare SemVer under the major-suffixed module path.
     opmodel.dev/catalogs/opm@v4:
       version: "4.4.4"
-    opmodel.dev/catalogs/k8s@v1:
-      version: "1.0.0-beta.1"

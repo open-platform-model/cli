@@ -49,7 +49,7 @@ context: |
   - PATCH: Bug fixes, performance improvements
   All commits MUST follow Conventional Commits: type(scope): description
   Pre-GA note: from its first beta the cli (with opmodel.dev/core@v2,
-  opmodel.dev/catalogs/k8s@v1, library and opm-operator) is on the path to GA.
+  library and opm-operator) is on the path to GA.
   A breaking change is still allowed during beta, but only as a `feat!` commit
   whose `BREAKING CHANGE:` footer is the migration note the CHANGELOG shows. It
   advances the `-beta.N` counter and never moves the module path to a new

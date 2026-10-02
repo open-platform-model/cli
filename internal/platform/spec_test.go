@@ -15,7 +15,7 @@ func TestDecodeCRSpec_DecodesWireShape(t *testing.T) {
 				"enable":  true,
 				"version": "4.0.1",
 			},
-			"opmodel.dev/catalogs/k8s@v1": map[string]any{
+			"example.com/catalogs/extra@v1": map[string]any{
 				"enable":  false,
 				"version": "1.0.0-alpha.2",
 			},
@@ -30,7 +30,7 @@ func TestDecodeCRSpec_DecodesWireShape(t *testing.T) {
 	assert.Equal(t, "kubernetes", s.Type)
 	assert.Equal(t, "Refuse", s.SkewPolicy)
 	require.Equal(t, []Entry{
-		{Path: "opmodel.dev/catalogs/k8s@v1", Version: "1.0.0-alpha.2", Enable: false},
+		{Path: "example.com/catalogs/extra@v1", Version: "1.0.0-alpha.2", Enable: false},
 		{Path: "opmodel.dev/catalogs/opm@v4", Version: "4.0.1", Enable: true},
 	}, s.Entries, "entries are sorted by path")
 }
@@ -81,7 +81,7 @@ func TestWireRoundTrip_SpecToWireToSpec(t *testing.T) {
 		Name: "cluster",
 		Type: "kubernetes",
 		Entries: []Entry{
-			{Path: "opmodel.dev/catalogs/k8s@v1", Version: "1.0.0-alpha.2", Enable: false},
+			{Path: "example.com/catalogs/extra@v1", Version: "1.0.0-alpha.2", Enable: false},
 			{Path: "opmodel.dev/catalogs/opm@v4", Version: "4.0.1", Enable: true},
 		},
 	}
@@ -89,8 +89,8 @@ func TestWireRoundTrip_SpecToWireToSpec(t *testing.T) {
 	w := wireFromSpec(in)
 	assert.Equal(t, in.Type, w.Type)
 	require.Len(t, w.Registry, 2)
-	require.NotNil(t, w.Registry["opmodel.dev/catalogs/k8s@v1"].Enable)
-	assert.False(t, *w.Registry["opmodel.dev/catalogs/k8s@v1"].Enable)
+	require.NotNil(t, w.Registry["example.com/catalogs/extra@v1"].Enable)
+	assert.False(t, *w.Registry["example.com/catalogs/extra@v1"].Enable)
 	assert.Equal(t, "4.0.1", w.Registry["opmodel.dev/catalogs/opm@v4"].Version)
 	assert.Empty(t, w.SkewPolicy, "a seed never writes a skew policy")
 
@@ -164,7 +164,7 @@ func TestDecodeCR_OmittedEnabledIsFalse(t *testing.T) {
 	_, eff, err := DecodeCR(crDoc(specWithOneSubscription(), map[string]any{
 		"registry": []any{
 			map[string]any{
-				"catalog": "opmodel.dev/catalogs/k8s@v1",
+				"catalog": "example.com/catalogs/extra@v1",
 				"version": "1.0.0-alpha.3",
 				"source":  EntrySourceSubscription,
 			},

@@ -150,6 +150,6 @@ func catalogRefusal(registry, modulePath, highest string, prerelease bool) publi
 }
 
 // DefaultCatalogPath is the catalog `opm operator install` seeds a
-// single-catalog Platform with, re-exported here so callers resolving a
+// Platform with, re-exported here so callers resolving a
 // version and callers building a subscription name the same value.
-var DefaultCatalogPath = config.DefaultCatalogPath
+const DefaultCatalogPath = config.DefaultCatalogPath

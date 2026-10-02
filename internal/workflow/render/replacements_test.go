@@ -130,7 +130,7 @@ func TestReplacementWarnings_MixedKeepsRowOrderThenInertByPath(t *testing.T) {
 	root := writeModuleContext(t, `deps: {
 	"opmodel.dev/catalogs/opm@v4": replaceWith: "../catalog_opm"
 	"test.example/lib@v0": replaceWith: "../lib"
-	"opmodel.dev/catalogs/k8s@v1": replaceWith: "../catalog_k8s"
+	"example.com/catalogs/extra@v1": replaceWith: "../catalog_extra"
 }`)
 	// Rows arrive in the kernel's path order; the builder does not reorder them.
 	rows := []kernel.Replacement{
@@ -143,7 +143,7 @@ func TestReplacementWarnings_MixedKeepsRowOrderThenInertByPath(t *testing.T) {
 	require.Len(t, got, 4)
 	assert.Contains(t, got[0], "in effect: example.com/shared@v1 served from /home/dev/shared (platform)")
 	assert.Contains(t, got[1], "in effect: test.example/lib@v0 served from /home/dev/lib (instance)")
-	assert.Contains(t, got[2], "local replacement of opmodel.dev/catalogs/k8s@v1 in ")
+	assert.Contains(t, got[2], "local replacement of example.com/catalogs/extra@v1 in ")
 	assert.Contains(t, got[3], "local replacement of opmodel.dev/catalogs/opm@v4 in ")
 	for _, w := range got[:2] {
 		assert.Contains(t, w, "rendered bytes may not correspond to any published build")

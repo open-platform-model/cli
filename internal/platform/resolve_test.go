@@ -230,9 +230,9 @@ func TestResolution_Describe(t *testing.T) {
 	assert.Equal(t, "platform: cluster Platform CR cluster (spec registry, no operator generation recorded, generated module /c/abc)",
 		Resolution{Source: SourceClusterCR, Location: "cluster", Dir: "/c/abc",
 			RegistryOrigin: RegistryOriginSpec}.Describe())
-	assert.Equal(t, "platform: module deps (opmodel.dev/catalogs/k8s@v1 v1.0.0, opmodel.dev/catalogs/opm@v4 v4.4.0; generated module /c/abc)",
+	assert.Equal(t, "platform: module deps (example.com/catalogs/extra@v1 v1.0.0, opmodel.dev/catalogs/opm@v4 v4.4.0; generated module /c/abc)",
 		Resolution{Source: SourceModuleDeps, DepsKind: DepsModule, Dir: "/c/abc",
-			Catalogs: []string{"opmodel.dev/catalogs/k8s@v1 v1.0.0", "opmodel.dev/catalogs/opm@v4 v4.4.0"}}.Describe())
+			Catalogs: []string{"example.com/catalogs/extra@v1 v1.0.0", "opmodel.dev/catalogs/opm@v4 v4.4.0"}}.Describe())
 	assert.Equal(t, "platform: module deps (no catalogs; generated module /c/abc)",
 		Resolution{Source: SourceModuleDeps, DepsKind: DepsModule, Dir: "/c/abc"}.Describe())
 	assert.Equal(t, "platform: instance deps (opmodel.dev/catalogs/opm@v4 v4.4.0; generated module /c/abc)",
@@ -322,7 +322,7 @@ func TestResolve_EffectiveRegistryWinsOverSpec(t *testing.T) {
 				"operatorVersion":    "v1.0.0-alpha.20",
 				"registry": []any{
 					statusRow("opmodel.dev/catalogs/opm@v4", "4.0.1", EntrySourceSubscription),
-					statusRow("opmodel.dev/catalogs/k8s@v1", "1.0.0-alpha.2", EntrySourceRegistration),
+					statusRow("example.com/catalogs/extra@v1", "1.0.0-alpha.2", EntrySourceRegistration),
 				},
 				"conditions": []any{
 					map[string]any{"type": "Ready", "status": "True", "reason": "Generated"},
@@ -340,7 +340,7 @@ func TestResolve_EffectiveRegistryWinsOverSpec(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(modFile), "opmodel.dev/catalogs/opm@v4",
 		"the subscribed catalog is pinned")
-	assert.Contains(t, string(modFile), "opmodel.dev/catalogs/k8s@v1",
+	assert.Contains(t, string(modFile), "example.com/catalogs/extra@v1",
 		"the registration-sourced catalog is pinned too")
 }
 

@@ -10,8 +10,8 @@
 // against the registry in OPM_REGISTRY, and that every #registry entry's
 // derived version is the catalog build the module's cue.mod pins.
 //
-// The module subscribes to the first-party catalogs at pinned versions. When
-// the registry does not serve them, the test SKIPS unless
+// The module subscribes to the first-party catalog at a pinned version. When
+// the registry does not serve it, the test SKIPS unless
 // OPM_ITEST_PLATFORM_BUILD=1 forces a hard failure: CI registries that only
 // publish example modules stay green while GHCR exercises the real path.
 //

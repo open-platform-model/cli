@@ -57,7 +57,7 @@ func pullGraph() *pullModFiles {
 		"opmodel.dev/catalogs/opm@v4.0.1": {
 			{Path: platformmodule.CorePath, Version: schema.DefaultSchemaVersion()},
 		},
-		"opmodel.dev/catalogs/k8s@v1.0.0-alpha.2": {
+		"example.com/catalogs/extra@v1.0.0-alpha.2": {
 			{Path: platformmodule.CorePath, Version: schema.DefaultSchemaVersion()},
 		},
 	}}
@@ -111,7 +111,7 @@ func reconciledPlatform() *unstructured.Unstructured {
 					"source":  platform.EntrySourceSubscription,
 				},
 				map[string]any{
-					"catalog": "opmodel.dev/catalogs/k8s@v1",
+					"catalog": "example.com/catalogs/extra@v1",
 					"version": "1.0.0-alpha.2",
 					"enabled": true,
 					"source":  platform.EntrySourceRegistration,
@@ -208,10 +208,10 @@ func TestRunPlatformPull_WritesTheCachedModule(t *testing.T) {
 	require.NotEmpty(t, modFile, "the written module carries its cue.mod")
 	assert.Contains(t, modFile, `"opmodel.dev/catalogs/opm@v4"`)
 	assert.Contains(t, modFile, `"v4.0.1"`)
-	assert.Contains(t, modFile, `"opmodel.dev/catalogs/k8s@v1"`,
+	assert.Contains(t, modFile, `"example.com/catalogs/extra@v1"`,
 		"the registration-sourced catalog is pinned too")
 	assert.Contains(t, modFile, `"v1.0.0-alpha.2"`)
-	assert.Contains(t, written["platform.cue"], `"opmodel.dev/catalogs/k8s@v1"`)
+	assert.Contains(t, written["platform.cue"], `"example.com/catalogs/extra@v1"`)
 
 	assert.Equal(t, readTree(t, cachedModuleDir(t, cfg)), written,
 		"the written module is the generated module, file for file")
@@ -307,7 +307,7 @@ func TestRunPlatformPull_ReportNamesWhatItReproduced(t *testing.T) {
 	assert.Contains(t, report, "registry: 2 entries")
 	assert.Contains(t, report, platform.EntrySourceSubscription)
 	assert.Contains(t, report, platform.EntrySourceRegistration)
-	assert.Contains(t, report, "opmodel.dev/catalogs/k8s@v1")
+	assert.Contains(t, report, "example.com/catalogs/extra@v1")
 	assert.Contains(t, report, "1.0.0-alpha.2")
 	assert.Contains(t, report, "enabled")
 	assert.Contains(t, report, "wrote "+dir)
