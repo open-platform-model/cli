@@ -310,8 +310,8 @@ tasks:
 
       On timeout it prints both generations, the Ready and Stalled conditions
       and where to look next, and fails. A Stalled=True with a reason such as
-      MaterializeFailed means the operator cannot serve the core or catalogs
-      the Platform pins.
+      BuildFailed (MaterializeFailed on operator alpha.14) means the operator
+      cannot serve the core or catalogs the Platform pins.
 
       PLATFORM_READY_TIMEOUT sets the wait in seconds (default 120).
     vars:
@@ -336,10 +336,18 @@ tasks:
         done
         echo "Platform/cluster is not Ready for its current generation after ${timeout}s." >&2
         echo "  generation: ${gen:-<none>}, observedGeneration: ${observed:-<none>}" >&2
+        # field <condition type> <key>: one key of one condition, empty when absent.
+        field() {
+          kubectl --context "$ctx" get platform cluster \
+            -o jsonpath="{.status.conditions[?(@.type==\"$1\")].$2}" 2>/dev/null || true
+        }
         for type in Ready Stalled; do
-          cond=$(kubectl --context "$ctx" get platform cluster \
-            -o jsonpath="{.status.conditions[?(@.type==\"$type\")].status} {.status.conditions[?(@.type==\"$type\")].reason}: {.status.conditions[?(@.type==\"$type\")].message}" 2>/dev/null || true)
-          echo "  $type: ${cond:-<not set>}" >&2
+          status=$(field "$type" status)
+          if [ -z "$status" ]; then
+            echo "  $type: <not set>" >&2
+          else
+            echo "  $type: $status $(field "$type" reason): $(field "$type" message)" >&2
+          fi
         done
         echo "Check: kubectl --context $ctx -n opm-operator-system logs deploy/opm-operator-controller-manager" >&2
         echo "A 'Failed to resolve OPM core schema' line means the pod cannot reach the registry" >&2
