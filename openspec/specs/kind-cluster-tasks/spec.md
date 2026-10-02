@@ -149,7 +149,7 @@ The task SHALL remain idempotent, SHALL apply the cluster `Platform` singleton a
 - **WHEN** `task cluster:operator` is run a second time
 - **THEN** it SHALL complete without error and without duplicating container arguments
 
-#### Scenario: Operator that cannot materialize the Platform
+#### Scenario: Operator that cannot build the Platform
 
 - **WHEN** the installed operator stamps `status.operatorVersion` on `Platform/cluster` but sets `Ready=False` with `Stalled=True`, for example reason `BuildFailed` (`MaterializeFailed` on operator alpha.14)
 - **THEN** the task SHALL fail once its wait expires, printing the `Stalled` reason and message

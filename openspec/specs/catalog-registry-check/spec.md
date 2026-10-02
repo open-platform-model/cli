@@ -8,7 +8,7 @@ Out-of-band verification of a published catalog (enhancement 0011, slice cli-cat
 
 ### Requirement: Out-of-band verification of a published catalog
 
-`opm catalog registry check <path@version>` SHALL pull the named published build and verify, out of band, what a consumer verifies at materialize: the declared identity is concrete and its `modulePath` and `version` agree with the coordinate the build was fetched by. It SHALL report the catalog's member inventory per kind and apiVersion. With `--compat`, it SHALL additionally run the predecessor comparison for the fetched build exactly as publish would have. The command's help text SHALL state that the check is an aid and not a guarantee — enforcement exists only at publish. Exit codes: 0 clean, 2 findings, 3 registry unreachable.
+`opm catalog registry check <path@version>` SHALL pull the named published build and verify, out of band, what a platform verifies when it imports the catalog (0019:D5): the declared identity is concrete and its `modulePath` and `version` agree with the coordinate the build was fetched by. It SHALL report the catalog's member inventory per kind and apiVersion. With `--compat`, it SHALL additionally run the predecessor comparison for the fetched build exactly as publish would have. The command's help text SHALL state that the check is an aid and not a guarantee — enforcement exists only at publish. Exit codes: 0 clean, 2 findings, 3 registry unreachable.
 
 #### Scenario: Identity mismatch found out of band
 

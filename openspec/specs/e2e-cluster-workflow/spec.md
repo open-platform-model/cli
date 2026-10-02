@@ -94,7 +94,7 @@ The job SHALL run a registry container seeded from the tree with `hack/fixtures.
 
 #### Scenario: Stalled Platform fails the preparation
 
-- **WHEN** the embedded operator cannot materialize the cluster Platform
+- **WHEN** the embedded operator cannot build the cluster Platform
 - **THEN** the job fails in the preparation step, before the suite starts, naming the Platform's stall reason
 
 ### Requirement: The suite runs with the cluster required and leaves evidence on failure
