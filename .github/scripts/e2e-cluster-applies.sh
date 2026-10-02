@@ -9,6 +9,13 @@
 #   files-file   one changed path per line, every page of the pull request's
 #                file list (a renamed file contributes both its old and new path)
 #
+# Environment:
+#   PR_STATE     the pull request's state, read live (OPEN, CLOSED or MERGED;
+#                empty without a pull request). A pull request that is no longer
+#                open never applies: release-please relabels a release pull
+#                request after it merges, and those label events must not start
+#                a full cluster run on a merged pull request.
+#
 # Prints a report of what it checked and why it decided, and writes
 # applies=true|false to $GITHUB_OUTPUT when that is set, else to stdout. The
 # decision depends only on these inputs, so runs for the same head commit,
@@ -61,7 +68,14 @@ if [ -n "$matched" ]; then
 fi
 
 joined_labels=$(printf '%s' "$labels" | paste -sd, - | sed 's/,/, /g')
-if [ ${#reasons[@]} -gt 0 ]; then
+pr_state=${PR_STATE:-}
+if [ -n "$pr_state" ] && [ "$pr_state" != OPEN ]; then
+  applies=false
+  echo "e2e-cluster: not applicable: pull request is closed (state $pr_state)"
+  echo "  head branch: ${head_ref:-<none>}"
+  echo "  labels: ${joined_labels:-<none>}"
+  echo "  nothing to do; passing"
+elif [ ${#reasons[@]} -gt 0 ]; then
   applies=true
   echo "e2e-cluster: applies"
   echo "  head branch: ${head_ref:-<none>}"

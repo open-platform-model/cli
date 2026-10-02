@@ -7,7 +7,7 @@ name: E2E Cluster
 # The workflow triggers on every pull request and decides inside the job
 # (.github/scripts/e2e-cluster-applies.sh) whether to do the work: on operator,
 # operator-command, template and Platform changes, on the job's own inputs, on
-# the cascade pull request and on release pull requests. Otherwise the job
+# the cascade pull request and on open release pull requests. Otherwise the job
 # passes in seconds and says why. A paths: filter or a job-level if: would leave
 # a required check pending or report a skip as a pass, so neither is used.
 on:
@@ -65,6 +65,10 @@ jobs:
           # Read live, never from the event payload: the decision must depend
           # only on the pull request's current state.
           if [ -n "$PR_NUMBER" ]; then
+            # A closed or merged pull request never applies (release-please
+            # relabels a release pull request after it merges).
+            PR_STATE=$(gh pr view "$PR_NUMBER" --json state --jq .state)
+            export PR_STATE
             gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' >"$labels"
             gh api --paginate "repos/$GH_REPO/pulls/$PR_NUMBER/files" \
               --jq '.[] | .filename, (.previous_filename // empty)' >"$files"
