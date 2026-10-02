@@ -149,12 +149,43 @@ func writeBlocks(b *strings.Builder, blocks []block) {
 		if i > 0 {
 			b.WriteString("\n")
 		}
+		if marker, items, ok := listItems(bl.lines); bl.pre && ok {
+			for _, item := range items {
+				b.WriteString(marker + " " + formatProse(item) + "\n")
+			}
+			continue
+		}
 		if bl.pre {
 			b.WriteString(fence(fenceLang(bl.lines), bl.lines))
 			continue
 		}
 		b.WriteString(formatProse(bl.lines[0]) + "\n")
 	}
+}
+
+var reListItem = regexp.MustCompile(`^(-|\d+\.) +(\S.*)$`)
+
+// listItems reads a preformatted block in which every line is one bullet
+// ("- item") or one numbered item ("1. item") as a Markdown list: marker is
+// "-" or "1.", the marker every item of an ordered list carries. A block with
+// a continuation line, a blank line or mixed markers is not a list.
+func listItems(lines []string) (marker string, items []string, ok bool) {
+	for _, l := range lines {
+		m := reListItem.FindStringSubmatch(l)
+		if m == nil {
+			return "", nil, false
+		}
+		mk := "-"
+		if m[1] != "-" {
+			mk = "1."
+		}
+		if marker != "" && mk != marker {
+			return "", nil, false
+		}
+		marker = mk
+		items = append(items, m[2])
+	}
+	return marker, items, len(items) > 0
 }
 
 // usageLines mirrors cobra's usage template: the use line of a runnable

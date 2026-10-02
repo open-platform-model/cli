@@ -99,7 +99,7 @@ Render an OPM instance to Kubernetes manifests.
 
 The argument names an instance package: a .cue file (the instance is the package in the file's directory) or a directory holding the package. The directory may be a CUE module of its own or a package inside another module, such as an instance directory within a module tree. What the package is decides, not its file names: a module package is refused with the command that builds it, `opm module build <dir>`.
 
-The platform is `--platform` `<dir>`, else the cluster's Platform when the kubeconfig context reaches one, else a platform generated from the instance package's own dependency pins. The cluster is never required: an absent Platform or an unreachable cluster warns and falls back to the deps, and `--offline` skips the cluster entirely.
+The platform is `--platform <dir>`, else the cluster's Platform when the kubeconfig context reaches one, else a platform generated from the instance package's own dependency pins. The cluster is never required: an absent Platform or an unreachable cluster warns and falls back to the deps, and `--offline` skips the cluster entirely.
 
 Arguments:
 
@@ -463,7 +463,7 @@ Validate an OPM instance file via the render pipeline.
 
 This command loads an instance file and renders it through the library kernel (component matching and transformer execution happen inside that one build), so it validates the instance can be rendered successfully. No manifests are output — purely a pass/fail validation tool.
 
-The platform is `--platform` `<dir>`, else the cluster's Platform when the kubeconfig context reaches one, else a platform generated from the instance package's own dependency pins. The cluster is never required: an absent Platform or an unreachable cluster warns and falls back to the deps, and `--offline` skips the cluster entirely.
+The platform is `--platform <dir>`, else the cluster's Platform when the kubeconfig context reaches one, else a platform generated from the instance package's own dependency pins. The cluster is never required: an absent Platform or an unreachable cluster warns and falls back to the deps, and `--offline` skips the cluster entirely.
 
 Arguments:
 

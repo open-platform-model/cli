@@ -208,3 +208,28 @@ func TestCompose_RefusesAPageWithoutAGeneratedBlock(t *testing.T) {
 	_, err := Compose([]byte("---\ntitle: \"x\"\n---\n\nAuthored only.\n"), Page{Name: "x.md"})
 	assert.ErrorContains(t, err, "begin marker missing")
 }
+
+func TestListItems(t *testing.T) {
+	marker, items, ok := listItems([]string{"- one", "- two"})
+	assert.True(t, ok)
+	assert.Equal(t, "-", marker)
+	assert.Equal(t, []string{"one", "two"}, items)
+
+	marker, items, ok = listItems([]string{"1. first", "2. second"})
+	assert.True(t, ok)
+	assert.Equal(t, "1.", marker)
+	assert.Equal(t, []string{"first", "second"}, items)
+
+	_, _, ok = listItems([]string{"- one", "  continued"})
+	assert.False(t, ok, "a continuation line keeps the block preformatted")
+	_, _, ok = listItems([]string{"- one", "1. two"})
+	assert.False(t, ok, "mixed markers keep the block preformatted")
+	_, _, ok = listItems([]string{"0   the module was written"})
+	assert.False(t, ok)
+}
+
+func TestWriteBlocks_ListBlockBecomesAMarkdownList(t *testing.T) {
+	var b strings.Builder
+	writeBlocks(&b, parseLong("Show version.\n\nDisplays:\n  - the CLI version\n  - the CUE SDK version").desc)
+	assert.Equal(t, "Show version.\n\nDisplays:\n\n- the CLI version\n- the CUE SDK version\n", b.String())
+}

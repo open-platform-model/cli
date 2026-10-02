@@ -230,14 +230,15 @@ func joinProse(lines []string) string {
 // formatProse turns one line of plain help text into Markdown. Words that
 // name code (flags, paths, placeholders, environment variables, CUE
 // definitions, file names) and single-quoted spans become code spans, so the
-// site never reads them as markup or links; every other Markdown character is
-// escaped. The words themselves are unchanged.
+// site never reads them as markup or links; neighbouring code words separated
+// by one space share one span (--platform <dir>). Every other Markdown
+// character is escaped. The words themselves are unchanged.
 func formatProse(s string) string {
-	var out []string
+	var pieces []piece
 	rest := strings.TrimSpace(s)
 	for rest != "" {
-		if span, after, ok := quotedSpan(rest); ok {
-			out = append(out, span)
+		if p, after, ok := quotedSpan(rest); ok {
+			pieces = appendPiece(pieces, p)
 			rest = strings.TrimLeft(after, " \t")
 			continue
 		}
@@ -247,7 +248,11 @@ func formatProse(s string) string {
 		} else {
 			rest = ""
 		}
-		out = append(out, formatWord(word))
+		pieces = appendPiece(pieces, formatWord(word))
+	}
+	out := make([]string, len(pieces))
+	for i, p := range pieces {
+		out[i] = p.String()
 	}
 	if len(out) > 0 {
 		out[0] = escapeLineStart(out[0])
@@ -255,29 +260,54 @@ func formatProse(s string) string {
 	return strings.Join(out, " ")
 }
 
+// piece is one formatted word: plain text, or a code span with the
+// punctuation around it.
+type piece struct {
+	text              string // plain text, unescaped
+	lead, code, trail string // a code span and its surrounding punctuation
+	isCode            bool
+}
+
+func (p piece) String() string {
+	if !p.isCode {
+		return escapeText(p.text)
+	}
+	return escapeText(p.lead) + codeSpan(p.code) + escapeText(p.trail)
+}
+
+// appendPiece appends p, joining it to the previous code span when nothing
+// but one space separates them.
+func appendPiece(pieces []piece, p piece) []piece {
+	if n := len(pieces); n > 0 && p.isCode && p.lead == "" && pieces[n-1].isCode && pieces[n-1].trail == "" {
+		pieces[n-1].code += " " + p.code
+		pieces[n-1].trail = p.trail
+		return pieces
+	}
+	return append(pieces, p)
+}
+
 // quotedSpan recognizes a single-quoted span at the start of s, such as
-// 'opm module vet', and renders it as a code span with any trailing
-// punctuation after it.
-func quotedSpan(s string) (span, after string, ok bool) {
+// 'opm module vet', as a code span with any trailing punctuation after it.
+func quotedSpan(s string) (p piece, after string, ok bool) {
 	if !strings.HasPrefix(s, "'") || len(s) < 3 || s[1] == ' ' {
-		return "", "", false
+		return piece{}, "", false
 	}
 	end := strings.Index(s[1:], "'")
 	if end <= 0 {
-		return "", "", false
+		return piece{}, "", false
 	}
 	end++
 	inner := s[1:end]
 	if strings.HasSuffix(inner, " ") {
-		return "", "", false
+		return piece{}, "", false
 	}
 	tail := s[end+1:]
 	punct := tail[:len(tail)-len(strings.TrimLeft(tail, ".,;:!?)"))]
 	next := tail[len(punct):]
 	if next != "" && next[0] != ' ' && next[0] != '\t' {
-		return "", "", false
+		return piece{}, "", false
 	}
-	return codeSpan(inner) + escapeText(punct), next, true
+	return piece{code: inner, trail: punct, isCode: true}, next, true
 }
 
 var (
@@ -288,21 +318,21 @@ var (
 	reOrdinal = regexp.MustCompile(`^\d+[.)]`)
 )
 
-// formatWord renders one whitespace-separated word, keeping surrounding
+// formatWord classifies one whitespace-separated word, keeping surrounding
 // punctuation outside a code span.
-func formatWord(w string) string {
+func formatWord(w string) piece {
 	core := strings.TrimLeft(w, `("`)
 	lead := w[:len(w)-len(core)]
 	trimmed := strings.TrimRight(core, `.,;:!?)"`)
 	trail := core[len(trimmed):]
 	if trimmed == "" || !isCode(trimmed) {
-		return escapeText(w)
+		return piece{text: w}
 	}
 	if strings.HasPrefix(lead, `"`) && strings.HasPrefix(trail, `"`) {
 		// A quoted code word: the code span replaces the quotes.
 		lead, trail = lead[:len(lead)-1], trail[1:]
 	}
-	return escapeText(lead) + codeSpan(trimmed) + escapeText(trail)
+	return piece{lead: lead, code: trimmed, trail: trail, isCode: true}
 }
 
 func isCode(w string) bool {

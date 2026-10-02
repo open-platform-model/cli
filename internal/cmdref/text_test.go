@@ -52,7 +52,7 @@ func TestFormatProse(t *testing.T) {
 		name, in, want string
 	}{
 		{"flags and env vars", "Use --registry, then OPM_REGISTRY.", "Use `--registry`, then `OPM_REGISTRY`."},
-		{"paths and placeholders", "Pass --platform <dir> or ~/.opm/platform/.", "Pass `--platform` `<dir>` or `~/.opm/platform/`."},
+		{"paths and placeholders", "Pass --platform <dir> or ~/.opm/platform/.", "Pass `--platform <dir>` or `~/.opm/platform/`."},
 		{"quoted command", "run 'opm module vet' first", "run `opm module vet` first"},
 		{"apostrophes stay prose", "the cluster's Platform", "the cluster's Platform"},
 		{"word pairs stay prose", "every beta/GA member", "every beta/GA member"},
@@ -85,4 +85,11 @@ func TestFenceLang(t *testing.T) {
 
 func TestEscapeShortcodes(t *testing.T) {
 	assert.Equal(t, "{{</* opm/x */>}} {{%/* y */%}}", escapeShortcodes("{{< opm/x >}} {{% y %}}"))
+}
+
+func TestFormatProse_JoinsNeighbouringCodeWords(t *testing.T) {
+	assert.Equal(t, "Pass `--platform <dir>` to render.", formatProse("Pass --platform <dir> to render."))
+	assert.Equal(t, "with `--platform ~/.opm/platform` to keep", formatProse("with --platform ~/.opm/platform to keep"))
+	assert.Equal(t, "(`--registry`, then `OPM_REGISTRY`)", formatProse("(--registry, then OPM_REGISTRY)"))
+	assert.Equal(t, "`--version` v1 takes", formatProse("--version v1 takes"))
 }

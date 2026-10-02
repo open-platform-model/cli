@@ -37,7 +37,7 @@ Initialize the OPM CLI configuration.
 
 Creates `~/.opm/config.cue`: the CLI configuration (registry, kubernetes, log), plain data. Init is offline; nothing is resolved.
 
-Init writes no platform. A render resolves its platform from `--platform` `<dir>`, else the cluster's Platform, else a platform generated from the render's own dependency pins. An existing `~/.opm/platform/` from an earlier release is left untouched and no longer read; pass it with `--platform` `~/.opm/platform` to keep rendering against it.
+Init writes no platform. A render resolves its platform from `--platform <dir>`, else the cluster's Platform, else a platform generated from the render's own dependency pins. An existing `~/.opm/platform/` from an earlier release is left untouched and no longer read; pass it with `--platform ~/.opm/platform` to keep rendering against it.
 
 A legacy data-only `~/.opm/platform.cue` from an earlier release is removed.
 
@@ -69,10 +69,8 @@ Validate the OPM CLI configuration files.
 
 Checks performed:
 
-```text
 1. Config file exists at resolved path
-2. Config file is valid CUE and matches the embedded schema
-```
+1. Config file is valid CUE and matches the embedded schema
 
 No platform is built or loaded. A `platform/` directory left next to the config file by an earlier release is no longer read by any command: vet warns about it and passes. Check a platform module directory with `opm platform check <dir>`. A legacy data-only `platform.cue` fails validation: re-run `opm config init --force` to remove it.
 

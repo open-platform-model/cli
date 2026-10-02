@@ -116,7 +116,7 @@ opm module build [path | module-path] [flags]
 
 Render an OPM module to Kubernetes manifests by synthesizing a `#ModuleInstance` around it. The module is a package directory on disk or a published module named by its module path. Values come from the module's debugValues (default) or from `-f/--values` files.
 
-The render answers whether the module renders with the catalogs it declares: by default it runs against a platform generated from the module's own `cue.mod/module.cue`, one registry entry per catalog the module pins, at the pinned version. The cluster is not read. Pass `--platform` `<dir>` to render against a platform module instead, for example one pulled with `opm platform pull`.
+The render answers whether the module renders with the catalogs it declares: by default it runs against a platform generated from the module's own `cue.mod/module.cue`, one registry entry per catalog the module pins, at the pinned version. The cluster is not read. Pass `--platform <dir>` to render against a platform module instead, for example one pulled with `opm platform pull`.
 
 A published module is fetched from the registry; nothing is written to disk except CUE's module cache. `--version` v1 takes the newest release of major 1, `--version` 1.0.4 pins that release, and no `--version` takes the newest release of the highest major built on this CLI's core. The chosen version is reported on standard error.
 
@@ -421,7 +421,7 @@ Validate an OPM module without generating manifests.
 
 This command first verifies the module's identity and coordinates — the identity package conforms to core's `#IdentityPackage`, metadata derives from it, and cue.mod agrees with the declared module path — then validates the module's `#config` contract using either the module's debugValues (default) or explicit values files passed with `-f/--values`.
 
-It then renders the module exactly as `opm module build` does and reports each rendered object without printing it, so vet and build reach the same verdict. By default the render runs against a platform generated from the module's own `cue.mod/module.cue`, one registry entry per catalog the module pins, at the pinned version; the cluster is not read. Pass `--platform` `<dir>` to render against a platform module instead.
+It then renders the module exactly as `opm module build` does and reports each rendered object without printing it, so vet and build reach the same verdict. By default the render runs against a platform generated from the module's own `cue.mod/module.cue`, one registry entry per catalog the module pins, at the pinned version; the cluster is not read. Pass `--platform <dir>` to render against a platform module instead.
 
 Arguments:
 

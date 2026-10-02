@@ -17,3 +17,8 @@ Local gate, named in every commit task below: `task fmt`, `task lint`, `go vet .
 ## 3. Archive
 
 - [x] 3.1 Archive the change on this branch (`openspec archive`), so the archive rides the implementing PR; give the new main spec a Purpose; verify `task openspec:check` passes, then commit `docs(openspec): archive generate-command-reference`
+
+## 4. Review fixes
+
+- [x] 4.1 Join code words separated by one space into one code span, and render a preformatted block whose every line is one bullet or one numbered item as a Markdown list (design.md Decision 2); unit tests for both; regenerate; local gate green, then commit `docs(reference): join adjacent code spans and render help-text lists as lists`
+- [x] 4.2 Drop the enhancement citations from the help text of `opm module template` (`0011:D25`, kept as a code comment at the symbol), `opm platform check` (`0015:D5`) and `opm module init` (the bare `D20`), and fix "a instance.cue file" in `opm module apply`; regenerate; local gate green, then commit `fix(cli): drop enhancement citations and a typo from command help`

@@ -20,9 +20,7 @@ Show OPM CLI version information.
 
 Displays:
 
-```text
 - OPM CLI version, commit, and build date
 - CUE SDK version (the one the binary is linked against)
-```
 
 <!-- end generated -->
