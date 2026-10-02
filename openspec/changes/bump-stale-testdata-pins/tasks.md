@@ -17,11 +17,11 @@ Every test command in this file runs with the canonical registry mapping exporte
 
 ## 3. Bump the e2e and integration trees
 
-- [ ] 3.1 In `tests/e2e/testdata/duplicate-identities` and `tests/integration/module-apply/testdata`, run `cue mod get opmodel.dev/core@v2.0.0-beta.1 opmodel.dev/catalogs/opm@v4.4.4` then `cue mod tidy`. Verify `cue mod tidy --check` passes in each tree.
-- [ ] 3.2 Run `go test -count=1 -v ./tests/e2e/ -run 'TestE2E_ModBuild_RefusesDuplicateIdentities' -timeout 10m` and verify PASS, not SKIP.
-- [ ] 3.3 With `kind-opm-dev` up, run `go run tests/integration/module-apply/main.go` and verify it exits 0. Fix any failure under design.md D-d.
-- [ ] 3.4 Run `git grep -nE '"v2\.0\.0-alpha|"v4\.([0-3]\.[0-9]+|4\.[0-3])"' -- 'tests/**/cue.mod/module.cue' 'internal/**/cue.mod/module.cue'` (or compare every core and catalog pin with `examples/cue.mod/module.cue`). Verify there is no match, which is the spec scenario "Every old core or catalog pin in a test module is accounted for": the frozen pins are Go literals, not `cue.mod` files.
-- [ ] 3.5 `task fmt`, `task lint`, `task test` (includes `test:e2e`) against `kind-opm-dev`, and `task openspec:check` green, then commit `test(fixtures): bump e2e and integration testdata to core v2.0.0-beta.1 and opm 4.4.4`
+- [x] 3.1 In `tests/e2e/testdata/duplicate-identities` and `tests/integration/module-apply/testdata`, run `cue mod get opmodel.dev/core@v2.0.0-beta.1 opmodel.dev/catalogs/opm@v4.4.4` then `cue mod tidy`. Verify `cue mod tidy --check` passes in each tree.
+- [x] 3.2 Run `go test -count=1 -v ./tests/e2e/ -run 'TestE2E_ModBuild_RefusesDuplicateIdentities' -timeout 10m` and verify PASS, not SKIP.
+- [x] 3.3 With `kind-opm-dev` up, run `go run tests/integration/module-apply/main.go` and verify it exits 0. Fix any failure under design.md D-d.
+- [x] 3.4 Run `git grep -nE '"v2\.0\.0-alpha|"v4\.([0-3]\.[0-9]+|4\.[0-3])"' -- 'tests/**/cue.mod/module.cue' 'internal/**/cue.mod/module.cue'` (or compare every core and catalog pin with `examples/cue.mod/module.cue`). Verify there is no match, which is the spec scenario "Every old core or catalog pin in a test module is accounted for": the frozen pins are Go literals, not `cue.mod` files.
+- [x] 3.5 `task fmt`, `task lint`, `task test` (includes `test:e2e`) against `kind-opm-dev`, and `task openspec:check` green, then commit `test(fixtures): bump e2e and integration testdata to core v2.0.0-beta.1 and opm 4.4.4`
 
 ## 4. Archive the change on this branch
 
