@@ -8,7 +8,8 @@ name: PR Title
 # commit subject, so that subject must be a Conventional Commit too. The squash
 # body is BLANK, so the PR title is all release-please reads: a breaking change
 # is a "!" in the title, and a forced version is a release-as key in
-# release-please-config.json, landed by a normal PR.
+# release-please-config.json, landed by a normal PR and removed by another
+# once that release is cut (release-please re-applies it on every run).
 # A non-conventional PR title (e.g. a branch name like "Feat/cli cr inventory
 # backend", PR #111) produces an unparseable merge commit, so release-please
 # silently skips it and cuts no release. This check fails the PR until its
