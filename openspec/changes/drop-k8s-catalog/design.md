@@ -28,6 +28,8 @@ const DefaultCatalogPath = "opmodel.dev/catalogs/opm@v4"
 
 `TestBuildPlatformModule_KeyImportDriftNamesTheEntry` proves that a `#registry` entry whose key disagrees with the embedded catalog's module path fails the 0019:D5 binding at a path naming the entry. With one catalog it re-keys the opm entry instead of swapping two bindings: the import stays `opm`, the key becomes another path the platform module also depends on. Section 1 measures which re-keying yields the binding refusal rather than an earlier resolution error; if none does without a second real dependency, the test is deleted and the scenario is left to core's own `#registry` tests, which section 1 names in this design.
 
+**Measured (section 1).** The test re-keys the opm entry to `opmodel.dev/core@v2`, a path the platform module already depends on, leaving `#catalog: opm`. The build fails at `#registry."opmodel.dev/core@v2".#catalog.metadata.modulePath: conflicting values "opmodel.dev/catalogs/opm@v4" and "opmodel.dev/core@v2"`, the 0019:D5 binding refusal, with the hint naming the entry and `platform.cue`; no earlier resolution error intervenes. The test is kept, not deleted.
+
 ### D3. The neutral sample is `example.com/catalogs/extra@v1`
 
 It sorts before `opmodel.dev/catalogs/opm@v4` exactly as `opmodel.dev/catalogs/k8s@v1` did, so `resolve_test.go` (the `Describe()` order), `spec_test.go` ("entries are sorted by path"), `replacements_test.go` (`got[2]`/`got[3]`) and the alias numbering they assert keep their order. `validation_test.go` used `k8s@v1#Expose` as an alternative implementer, which the k8s catalog never had (it shipped no traits); the sample fits it better. `replacements_test.go`'s `"../catalog_k8s"` becomes `"../catalog_extra"`.

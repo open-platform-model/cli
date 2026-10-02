@@ -66,21 +66,10 @@ config: {
 }
 `, DefaultRegistry)
 
-// DefaultCatalogPaths are the major-suffixed CUE module paths of the two
-// first-party catalogs: the abstraction catalog and the raw Kubernetes
-// passthrough catalog extracted from it (0010:D47, catalog_opm's k8s@v1
-// split), each path spelled exactly once here.
-var DefaultCatalogPaths = []string{
-	"opmodel.dev/catalogs/opm@v4",
-	"opmodel.dev/catalogs/k8s@v1",
-}
-
-// DefaultCatalogPath is the entry `opm operator install` resolves a published
-// version of when it seeds a single-catalog cluster Platform. Derived from
-// DefaultCatalogPaths rather than a second literal: install has no per-catalog
-// resolution (that is tracked separately against operator-install-platform),
-// so it keeps naming exactly one catalog: the abstraction catalog.
-var DefaultCatalogPath = DefaultCatalogPaths[0]
+// DefaultCatalogPath is the major-suffixed CUE module path of the
+// first-party catalog. `opm operator install` resolves a published
+// version of it when it seeds a cluster Platform.
+const DefaultCatalogPath = "opmodel.dev/catalogs/opm@v4"
 
 // DefaultCorePath is the major-qualified module path of the core schema,
 // the import an instance package names core by.

@@ -56,10 +56,8 @@ func hackCatalogPins(t *testing.T, dir string) map[string]string {
 	f, err := modfile.Parse(data, name)
 	require.NoError(t, err)
 	pins := map[string]string{}
-	for _, path := range DefaultCatalogPaths {
-		require.Contains(t, f.Deps, path)
-		pins[path] = f.Deps[path].Version
-	}
+	require.Contains(t, f.Deps, DefaultCatalogPath)
+	pins[DefaultCatalogPath] = f.Deps[DefaultCatalogPath].Version
 	return pins
 }
 
@@ -140,16 +138,14 @@ func TestBuildPlatformModule_HackPlatformBuilds(t *testing.T) {
 
 	registry := p.Package.LookupPath(cue.MakePath(cue.Def("registry")))
 	require.True(t, registry.Exists())
-	for _, path := range DefaultCatalogPaths {
-		entry := registry.LookupPath(cue.MakePath(cue.Str(path)))
-		require.True(t, entry.Exists(), path)
-		version, err := entry.LookupPath(cue.ParsePath("version")).String()
-		require.NoError(t, err, path)
-		assert.Equal(t, strings.TrimPrefix(pins[path], "v"), version, "%s version derived from the pinned catalog", path)
-		enable, err := entry.LookupPath(cue.ParsePath("enable")).Bool()
-		require.NoError(t, err, path)
-		assert.True(t, enable, "%s enabled by default", path)
-	}
+	entry := registry.LookupPath(cue.MakePath(cue.Str(DefaultCatalogPath)))
+	require.True(t, entry.Exists(), DefaultCatalogPath)
+	version, err := entry.LookupPath(cue.ParsePath("version")).String()
+	require.NoError(t, err)
+	assert.Equal(t, strings.TrimPrefix(pins[DefaultCatalogPath], "v"), version, "version derived from the pinned catalog")
+	enable, err := entry.LookupPath(cue.ParsePath("enable")).Bool()
+	require.NoError(t, err)
+	assert.True(t, enable, "enabled by default")
 }
 
 func TestBuildPlatformModule_UnpublishedPinNamesTheDependency(t *testing.T) {
@@ -160,7 +156,7 @@ func TestBuildPlatformModule_UnpublishedPinNamesTheDependency(t *testing.T) {
 	modPath := filepath.Join(dir, "cue.mod", "module.cue")
 	content, err := os.ReadFile(modPath)
 	require.NoError(t, err)
-	bumped := strings.Replace(string(content), pins[DefaultCatalogPaths[0]], "v4.9.9", 1)
+	bumped := strings.Replace(string(content), pins[DefaultCatalogPath], "v4.9.9", 1)
 	require.NotEqual(t, string(content), bumped)
 	require.NoError(t, os.WriteFile(modPath, []byte(bumped), 0o600))
 
@@ -168,35 +164,29 @@ func TestBuildPlatformModule_UnpublishedPinNamesTheDependency(t *testing.T) {
 	skipIfRegistryUnavailable(t, err)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, oerrors.ErrValidation)
-	assert.Contains(t, err.Error(), DefaultCatalogPaths[0]+".9.9")
+	assert.Contains(t, err.Error(), DefaultCatalogPath+".9.9")
 	assert.Contains(t, err.Error(), modPath)
 }
 
 func TestBuildPlatformModule_KeyImportDriftNamesTheEntry(t *testing.T) {
-	// Registry-backed: an entry keyed at one catalog but embedding the other
-	// fails the 0019:D5 binding at a path naming the entry.
+	// Registry-backed: an entry keyed at a path other than the embedded
+	// catalog's module path fails the 0019:D5 binding at a path naming the
+	// entry.
 	dir := copyHackPlatform(t)
 	cuePath := filepath.Join(dir, "platform.cue")
 	content, err := os.ReadFile(cuePath)
 	require.NoError(t, err)
-	opmName, k8sName := "opm", "k8s"
-	swapped := strings.NewReplacer(
-		"#catalog: "+opmName+"\n", "#catalog: "+k8sName+"\n",
-		"#catalog: "+k8sName+"\n", "#catalog: "+opmName+"\n",
-	).Replace(string(content))
-	require.NotEqual(t, string(content), swapped)
-	require.NoError(t, os.WriteFile(cuePath, []byte(swapped), 0o600))
+	const rekeyed = "opmodel.dev/core@v2"
+	drifted := strings.Replace(string(content), `"`+DefaultCatalogPath+`": #catalog: opm`, `"`+rekeyed+`": #catalog: opm`, 1)
+	require.NotEqual(t, string(content), drifted)
+	require.NoError(t, os.WriteFile(cuePath, []byte(drifted), 0o600))
 
 	_, err = BuildPlatformModule(buildCtx(t), dir, DefaultRegistry)
 	skipIfRegistryUnavailable(t, err)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, oerrors.ErrValidation)
-	// CUE reports the conflict at whichever swapped entry it evaluates
-	// first; either names a #registry entry by its key.
 	msg := err.Error()
-	named := strings.Contains(msg, `#registry."`+DefaultCatalogPaths[0]+`"`) ||
-		strings.Contains(msg, `#registry."`+DefaultCatalogPaths[1]+`"`)
-	assert.True(t, named, "conflict must be reported at a #registry entry path: %s", msg)
+	assert.Contains(t, msg, `#registry."`+rekeyed+`"`)
 	assert.Contains(t, msg, "conflicting values")
 	assert.Contains(t, msg, "must equal the module path")
 }

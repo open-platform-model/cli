@@ -14,7 +14,6 @@ package platform
 import (
 	core "opmodel.dev/core@v2"
 	opm "opmodel.dev/catalogs/opm@v4"
-	k8s "opmodel.dev/catalogs/k8s@v1"
 )
 
 core.#Platform
@@ -24,5 +23,4 @@ type: "kubernetes"
 
 #registry: {
 	"opmodel.dev/catalogs/opm@v4": #catalog: opm
-	"opmodel.dev/catalogs/k8s@v1": #catalog: k8s
 }
