@@ -12,10 +12,10 @@ The workflow SHALL run one job, named `E2E (kind, embedded operator)`, triggered
 - the pull request's head branch starts with `release-please--`;
 - the pull request's head branch is the cascade branch `deps/cascade`;
 - the pull request currently carries the label `deps-cascade`;
-- the pull request changes a file under `internal/operator/`, `templates/` or `hack/platform/`;
+- the pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`;
 - the pull request changes one of the job's own inputs: the workflow file itself, its decision script `.github/scripts/e2e-cluster-applies.sh`, `Taskfile.yml` (which defines `cluster:create` and `cluster:operator`), `hack/fixtures.sh` (which seeds the registry), `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml`, `hack/opm-config.cue`, any Go file directly under `tests/e2e/` (the cluster-backed tests and the suite's shared helpers such as `TestMain` and `runOPMWithEnv`), or anything under `tests/e2e/testdata/operator-owned/`.
 
-The decision SHALL be computed from the pull request's state when the job runs (its head branch, its current labels and its full list of changed files), never from the triggering event alone, so runs for the same head commit, head branch and labels always reach the same decision.
+The decision SHALL be computed from the pull request's state when the job runs (its head branch, its current labels and its full list of changed files), never from the triggering event alone, so runs for the same head commit, head branch and labels always reach the same decision. A pull request that is no longer open (read live: closed or merged) SHALL NOT apply, whatever else holds, so the label changes release-please makes after a release pull request merges start no cluster run.
 
 #### Scenario: Operator pin bump applies
 
@@ -46,6 +46,16 @@ The decision SHALL be computed from the pull request's state when the job runs (
 
 - **WHEN** a pull request changes only `Taskfile.yml`
 - **THEN** the job applies, so a change that breaks `task cluster:operator` fails on that pull request rather than on the next release pull request
+
+#### Scenario: Operator command change applies
+
+- **WHEN** a pull request changes only `internal/cmd/operator/install.go`
+- **THEN** the job applies, because `task cluster:operator` runs that command and the lifecycle test exercises it
+
+#### Scenario: Merged release pull request does not apply
+
+- **WHEN** release-please swaps the labels of a release pull request after it merged, and the `labeled` and `unlabeled` events start runs
+- **THEN** each run reports "not applicable: pull request is closed" and creates no cluster
 
 #### Scenario: Unrelated pull request
 
@@ -89,7 +99,7 @@ The job SHALL run a registry container seeded from the tree with `hack/fixtures.
 
 ### Requirement: The suite runs with the cluster required and leaves evidence on failure
 
-When the job applies, it SHALL run `go test ./tests/e2e/... -v` with the same `-timeout` as `task test:e2e`, with `OPM_E2E_REQUIRE_CLUSTER=1` set, and with the tools the cluster tests probe for present on the runner (`kubectl`, `task`, `crane`), so that every cluster-backed test runs and none takes a fallback path meant for a developer machine. On failure the job SHALL print the operator's logs, the cluster Platform and every ModuleInstance with their status, and recent cluster events.
+When the job applies, it SHALL run `go test ./tests/e2e/... -v` with the same `-timeout` as `task test:e2e`, with `OPM_E2E_REQUIRE_CLUSTER=1` set, and with the tools the cluster tests probe for present on the runner (`kubectl`, `task`, `crane`), so that every cluster-backed test runs and none takes a fallback path meant for a developer machine. When an operator-owned test fails, the test itself SHALL log, before its cleanup deletes the evidence, the test's ModuleInstance with its status, the cluster Platform with its status and the operator's logs, and a test that times out waiting for the operator to reconcile SHALL name the ModuleInstance's `Ready` condition in its failure message. Later tests (the operator lifecycle test tears the operator, CRDs and every ModuleInstance down and reinstalls) leave nothing of that state for a step after the suite. After any failed step, including a preparation step before the suite starts, the job SHALL also print the operator's logs, the cluster Platform and every ModuleInstance with their status, and recent cluster events.
 
 #### Scenario: A cluster test cannot skip
 
@@ -104,4 +114,9 @@ When the job applies, it SHALL run `go test ./tests/e2e/... -v` with the same `-
 #### Scenario: Failure leaves diagnostics
 
 - **WHEN** an operator-owned test fails because the operator did not reconcile
-- **THEN** the job log contains the operator's logs and the status of the Platform and of the test's ModuleInstance
+- **THEN** that test's output contains the operator's logs and the status of the Platform and of the test's ModuleInstance as they were when it failed, and its failure message names the ModuleInstance's `Ready` condition
+
+#### Scenario: Preparation failure leaves diagnostics
+
+- **WHEN** `task cluster:operator` fails before the suite starts
+- **THEN** the job's diagnostics step prints the operator's logs, the cluster Platform, every ModuleInstance and recent events

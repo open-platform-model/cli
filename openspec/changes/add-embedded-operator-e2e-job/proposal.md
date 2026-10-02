@@ -23,14 +23,22 @@ the "G4 replacement" bullet).
   with the same `task cluster:operator` the local loop uses (embedded operator, cluster Platform from
   `hack/kind-platform.yaml`, dev applier grant), and runs the whole `tests/e2e` suite with the cluster
   required.
-- **When it does real work.** On a pull request to `main` that changes `internal/operator/**`,
-  `templates/**`, `hack/platform/**`, or the job's own inputs (the workflow file and its decision
+- **When it does real work.** On an open pull request to `main` that changes `internal/operator/**`,
+  `internal/cmd/operator/**`, `templates/**`, `hack/platform/**`, or the job's own inputs (the workflow file and its decision
   script, `Taskfile.yml`, `hack/fixtures.sh`, `hack/kind-*.yaml`, `hack/opm-config.cue`, every Go
   file directly under `tests/e2e/`, and `tests/e2e/testdata/operator-owned/**`); on a pull request
   from the cascade branch `deps/cascade` or carrying the `deps-cascade` label; on every
   release-please PR (head branch starting `release-please--`); and on `workflow_dispatch`. This is
-  the trigger set of workspace RELEASING.md, section "Gates" ("G4 replacement"), plus the job's own
-  inputs.
+  the trigger set of workspace RELEASING.md, section "Gates" ("G4 replacement": `internal/operator/`
+  and `templates/`, cascade and release PRs), plus the job's own inputs, which include
+  `internal/cmd/operator/` (the `opm operator install` code `task cluster:operator` runs and the
+  lifecycle test exercises) and `hack/platform/` (the e2e tests read its pins, and
+  `hack/kind-platform.yaml` mirrors them). A closed or merged PR never applies, so release-please's
+  relabelling of a merged release PR starts no cluster run.
+- **Failure evidence is captured by the failing test.** Each operator-owned test logs its
+  ModuleInstance, the Platform and the operator's logs before its cleanup deletes them, and its
+  reconcile timeout names the `Ready` condition; the job's own diagnostics step covers failures
+  before the suite starts.
 - **It always reports.** The workflow triggers on every pull request and decides inside the job;
   when none of the conditions hold, the job passes in seconds and says why. A path-filtered workflow
   would leave a required check pending forever, so this is what lets the owner make it required.
@@ -63,14 +71,13 @@ the "G4 replacement" bullet).
   until that label exists, the label condition simply never matches (the `deps/cascade` branch
   condition still does).
 - **Owner setting it asks for.** Once the check has been green on real pull requests, the owner adds
-  "E2E (kind, embedded operator)" to the cli ruleset's required checks. Workspace RELEASING.md,
-  section "Owner settings", does not list it yet; flagged to the workspace item (`docs/release-cascade`)
-  to add that line.
+  "E2E (kind, embedded operator)" to the cli ruleset's required checks, as workspace RELEASING.md,
+  section "Owner settings" › "Rulesets on main", lists.
 - **Gates G4 retirement.** G4 retires only when all of these hold: this change has merged, the
   "E2E (kind, embedded operator)" check has passed on at least one cli release-please PR, and it is
   a required check (owner decision 2026-10-02, RELEASING.md, "Gates"). A merged but advisory job does
-  not block a release, so retiring G4 on merge alone would leave the operator embed ungated. The
-  RELEASING.md "Gates" G4 row is being reconciled to state the same conditions. Retirement is then
+  not block a release, so retiring G4 on merge alone would leave the operator embed ungated.
+  Retirement is then
   its own later cli OpenSpec change (working name `retire-g4-operator-embed-evidence`), in this
   order:
   1. The owner adds "E2E (kind, embedded operator)" to the cli ruleset's required checks and removes
@@ -111,9 +118,9 @@ the "G4 replacement" bullet).
 
 - **Affected files:** `.github/workflows/e2e-cluster.yml` and `.github/scripts/e2e-cluster-applies.sh`
   (new), `tests/e2e/operator_test.go` (`requireKindCluster`, new `skipOrFailf`),
-  `tests/e2e/instance_operator_owned_test.go` (`requireOperatorApplierGrant`), `Taskfile.yml`
+  `tests/e2e/instance_operator_owned_test.go` (`requireOperatorApplierGrant`, failure diagnostics), `Taskfile.yml`
   (`cluster:operator`), the cli dev guidance that names `task cluster:operator`, plus this change's
-  design.md for the spike record.
+  design.md.
 - **Affected commands:** none. No `opm` behaviour changes.
 - **CI cost:** one extra ubuntu-latest job, roughly 10 to 15 minutes when it applies (estimate;
   the first PR run measures it), and about 15 seconds when it does not. Counting every Go file under

@@ -11,7 +11,7 @@ test` (design.md, Migration Plan, "Accepted").
 
 No step in sections 1 to 4 creates, deletes or applies to a cluster: the implementing session may
 not (design.md, Migration Plan, "No local cluster"). The cluster checks the plan first put in a
-local spike run on the PR's own e2e-cluster job instead, and section 5 records them. Any later
+local spike run on the PR's own e2e-cluster job instead, and section 6 moves them to the pull request. Any later
 local cluster step never touches the developer's workspace `opm-registry` container (port 5000) or
 `kind-opm-dev`: it uses `opm-spike-registry` on port 5001 and `CLUSTER_NAME=opm-spike`, records the
 current kube-context first and restores it afterwards, because `kind create` switches it.
@@ -46,16 +46,24 @@ current kube-context first and restores it afterwards, because `kind create` swi
 - [x] 4.5 Add the new workflow to the cli dev guidance where `pr.yml`'s jobs and the e2e loop are described (AGENTS.md or the doc that names `task cluster:operator`), stating when the job applies and that `OPM_E2E_REQUIRE_CLUSTER=1` reproduces it locally against a `kind-opm-dev` the developer owns and has prepared; verify with `grep -rn e2e-cluster.yml` that it is referenced
 - [x] 4.6 Local gate green (above) and actionlint clean, then commit `ci(e2e): run the cluster-backed e2e suite against the embedded operator`
 
-## 5. The first PR run proves the job (after the branch is pushed)
+## 5. Fixes from the implementation review
+
+- [x] 5.1 Capture failure evidence while it exists: in `tests/e2e/instance_operator_owned_test.go`, register `logOperatorOwnedDiagnostics` as a `t.Cleanup` right after each `resetOperatorOwnedInstance` cleanup (per subtest in `TestE2E_Delete_OperatorOwnedDelegates`, whose subtests reset the instance in turn), logging on `t.Failed()` the test's ModuleInstance, `Platform/cluster` and the operator's last 300 log lines; name the `Ready` condition in `makeOperatorOwned`'s timeout message; keep the workflow's diagnostics step for preparation failures (design.md Decision 5); verify `go vet ./tests/e2e/...` and lint pass, then commit `test(e2e): log operator-owned failure evidence before cleanup`
+- [x] 5.2 Add `^internal/cmd/operator/` to the decision script's apply paths and the dev guidance; verify a change to only `internal/cmd/operator/install.go` applies, then commit `ci(e2e): apply the cluster job to operator command changes`
+- [x] 5.3 Make a pull request that is no longer open never apply: the decide step reads the state live and passes `PR_STATE`; verify a merged release-please PR reports "not applicable: pull request is closed" and an open one still applies, then commit `ci(e2e): skip the cluster job on closed pull requests`
+- [x] 5.4 In `cluster:operator:wait-ready`, read each condition's status, reason and message separately so an absent condition prints `<not set>`, and name `BuildFailed` (`MaterializeFailed` on alpha.14) as the example stall reason; verify against a stub `kubectl`, then commit `chore(taskfile): print absent platform conditions as not set`
+- [x] 5.5 Update the specs, proposal and design for 5.1 to 5.4, cite RELEASING.md "Owner settings" › "Rulesets on main", drop the stale "being reconciled" and spike wording, and class `hack/platform/` as an own input with its reason; verify `openspec validate add-embedded-operator-e2e-job --strict`, then commit `chore(openspec): revise add-embedded-operator-e2e-job after implementation review`
+
+## 6. The first PR run proves the job (moved to the pull request)
 
 The PR's own e2e-cluster run is the first execution on a real cluster (design.md, Migration Plan).
-These tasks are done on the PR branch once that run has finished.
+The archive rides the PR and is committed before that run, so these checks moved to the pull
+request body as merge gates and post-merge checks instead of commits on this change.
 
-- [ ] 5.1 From the PR's first applying run, record under design.md Context ("First PR run"): the embedded `PinnedOperatorVersion`, the job duration, the seconds `task cluster:operator` took to see `Ready=True`, the Platform's `generation` and `observedGeneration` (generation above 1, both equal), and the suite's pass/skip/fail counts (no cluster-backed test skipped); if the run stalled, stop: that is an alpha.14-class stall and needs a `fix(deps)` change first
-- [ ] 5.2 If the runner needed more than 120 seconds to reach `Ready`, raise the wait in `Taskfile.yml` and note the new value in design.md Decision 6
-- [ ] 5.3 On a cluster the developer owns (never the shared `kind-opm-dev` while it carries other workloads), simulate a stall by applying a Platform that subscribes to an unpublished catalog version, and verify `task cluster:operator`'s wait fails printing both generations, `Stalled` and its reason; record the result in design.md
-- [ ] 5.4 Local gate green (above), then commit `chore(openspec): record the first e2e-cluster run`
+- [x] 6.1 Moved to the PR body (merge gate): the PR's own "E2E (kind, embedded operator)" run must be green before merge, with no cluster-backed test skipped; its embedded operator version, job duration and seconds to `Ready=True` are noted on the PR. If the run stalls, that is an alpha.14-class stall and needs a `fix(deps)` change first
+- [x] 6.2 Moved to the PR body (merge gate): if the runner needed more than 120 seconds to reach `Ready`, raise `PLATFORM_READY_TIMEOUT`'s default in `Taskfile.yml` in a commit on the PR branch before merge
+- [x] 6.3 Moved to the PR body (post-merge human check): on a cluster the developer owns (never the shared `kind-opm-dev` while it carries other workloads), simulate a stall by applying a Platform that subscribes to an unpublished catalog version, and verify `task cluster:operator`'s wait fails printing both generations, `Stalled` and its reason
 
-## 6. Archive
+## 7. Archive
 
-- [ ] 6.1 Archive the change on this branch (openspec archive), so the archive rides the implementing PR; never push to main (owner decision 2026-10-01, RELEASING.md, "Owner settings"); verify `task openspec:check` passes, then commit `chore(openspec): archive add-embedded-operator-e2e-job`
+- [ ] 7.1 Archive the change on this branch (openspec archive), so the archive rides the implementing PR; never push to main (owner decision 2026-10-01, RELEASING.md, "Owner settings"); verify `task openspec:check` passes, then commit `chore(openspec): archive add-embedded-operator-e2e-job`

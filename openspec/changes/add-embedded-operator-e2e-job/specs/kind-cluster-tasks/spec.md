@@ -18,7 +18,7 @@ The task SHALL remain idempotent, SHALL apply the cluster `Platform` singleton a
 
 #### Scenario: Operator that cannot materialize the Platform
 
-- **WHEN** the installed operator stamps `status.operatorVersion` on `Platform/cluster` but sets `Ready=False` with `Stalled=True`, for example reason `MaterializeFailed`
+- **WHEN** the installed operator stamps `status.operatorVersion` on `Platform/cluster` but sets `Ready=False` with `Stalled=True`, for example reason `BuildFailed` (`MaterializeFailed` on operator alpha.14)
 - **THEN** the task SHALL fail once its wait expires, printing the `Stalled` reason and message
 - **AND** it SHALL NOT report the operator as reconciling
 

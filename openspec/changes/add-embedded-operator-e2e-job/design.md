@@ -40,8 +40,8 @@ See proposal.md, Why. Current state, read 2026-10-01 at `origin/main` `f3569b24`
   moved; `PinnedOperatorVersion` was `v1.0.0-beta.2` when this was written
   (`internal/operator/manifest.go:19`), and workspace RELEASING.md, section "Rollout and changes"
   (Phase 1), catches the embed up to the newest published operator (`v1.0.0-beta.3` exists) before
-  or alongside this change. The spike therefore records whatever `PinnedOperatorVersion` is embedded
-  when it runs. The operator owns `Ready`, `Reconciling` and `Stalled` on the Platform (opm-operator
+  or alongside this change. The first PR run (tasks.md 6.1) therefore exercises whatever
+  `PinnedOperatorVersion` is embedded when it runs. The operator owns `Ready`, `Reconciling` and `Stalled` on the Platform (opm-operator
   `internal/controller/platform_controller.go:458,490-501`).
 - **`Ready=True` alone can describe an older spec.** `task cluster:operator` runs `opm operator
   install` without `--skip-platform` (`Taskfile.yml:254`), which creates `Platform/cluster` subscribed
@@ -62,7 +62,7 @@ See proposal.md, Why. Current state, read 2026-10-01 at `origin/main` `f3569b24`
   the `release-please--` prefix.
 - **The developer's workspace registry is in use.** The workspace `opm-registry` container
   (`.tasks/config.yml:14`, `registry:2` on `0.0.0.0:5000`, bind-mounted to `.registry-data`) runs on
-  the developer's Docker host and opm-kind-demo's Flux reads it. Local spike steps therefore use their
+  the developer's Docker host and opm-kind-demo's Flux reads it. Local cluster steps therefore use their
   own container and port (`opm-spike-registry` on `5001`) and never start, seed or remove
   `opm-registry`. `Taskfile.yml:11` already takes a `REGISTRY_CONTAINER` override. kind also switches
   the current kube-context to a cluster it creates, so local steps record and restore it.
@@ -130,11 +130,12 @@ The script computes `applies` from inputs the step fetches and passes in (event 
 labels file, a changed-files file), so the rule can be exercised locally with hand-written inputs:
 
 ```
-applies := event == workflow_dispatch
+applies := pr_state(PR, read live) in {"", OPEN} && (
+           event == workflow_dispatch
         || head_ref starts with "release-please--"
         || head_ref == "deps/cascade"
         || "deps-cascade" in labels(PR, read live)
-        || any(changed_files(PR, all pages) matches APPLY_PATHS)
+        || any(changed_files(PR, all pages) matches APPLY_PATHS) )
 ```
 
 with `APPLY_PATHS` as listed in the `e2e-cluster-workflow` spec. `deps/cascade` is the one rolling
@@ -144,6 +145,20 @@ cascade PR applies even after someone removes its label. Labels and files come f
 file contributes both its `filename` and its `previous_filename`, so moving a file out of an apply
 path still applies. Every step after
 `decide` carries `if: steps.decide.outputs.applies == 'true'`.
+
+A pull request that is no longer open never applies. After a release PR merges, release-please swaps
+its labels (`autorelease: pending` to `autorelease: tagged`) as the App, and those `labeled` and
+`unlabeled` events start runs whose head branch still starts with `release-please--`; without the
+state check each release would pay a full kind run on a merged PR, and a cancelled one would leave a
+red mark on it. The step reads the state live (`gh pr view <n> --json state`) and passes it as
+`PR_STATE`; the script reports "not applicable: pull request is closed".
+
+`APPLY_PATHS` also holds `internal/cmd/operator/`: the `opm operator install` and `uninstall` code
+that `task cluster:operator` runs and the lifecycle test exercises, and that creates the
+generation-1 Platform Decision 6 waits past. `hack/platform/` is an own input too: the e2e tests read
+its pins (`tests/e2e/instance_build_test.go`, `hackCatalogPin`) and `hack/kind-platform.yaml` mirrors
+them. Neither is in RELEASING.md's "G4 replacement" set, which names only `internal/operator/` and
+`templates/`.
 
 Why every condition reads live state: a required check is satisfied by the newest run for the head
 commit. If an unrelated label event could produce a run that skips, that run would overwrite a
@@ -166,7 +181,7 @@ Example output when the job does not apply:
 e2e-cluster: not applicable
   head branch: feat/mod-list-wide
   labels: enhancement
-  changed files: 7, none under internal/operator/, templates/, hack/platform/ or the job's own inputs
+  changed files: 7, none under internal/operator/, internal/cmd/operator/, templates/, hack/platform/ or the job's own inputs
   nothing to do; passing
 ```
 
@@ -270,6 +285,19 @@ Unset, every precondition skips exactly where it skips now, so developer machine
    wants the same strictness locally.
 3. *An environment switch.* Chosen. It is opt-in and a developer can set it too.
 
+**Evidence on failure is captured by the failing test.** A diagnostics step after `go test` sees
+none of an operator-owned test's state: the test's cleanup deletes its ModuleInstance (on failure
+too), and the lifecycle test, which runs later in the same `go test`, deletes the operator
+namespace, the CRDs and every ModuleInstance and reinstalls the operator, so the step would show the
+new pod's logs and no instances. Each operator-owned test (each subtest, where subtests reset the
+instance in turn) therefore registers `logOperatorOwnedDiagnostics` as a `t.Cleanup` right after the
+reset cleanup; cleanups run last-in-first-out, so on `t.Failed()` it logs `kubectl get moduleinstance
+-o yaml`, `kubectl get platform cluster -o yaml` and the operator's last 300 log lines before the
+reset runs. Its kubectl errors are logged, never fatal. `makeOperatorOwned`'s timeout message names
+the instance's `Ready` condition (status, reason, observed generation, message). The workflow keeps
+its `if: failure()` diagnostics step for failures before the suite starts (a stalled
+`task cluster:operator`), where the cluster state is still intact.
+
 ### 6. `cluster:operator` waits for `Ready=True` for the Platform's current generation
 
 The final wait in `cluster:operator` (`Taskfile.yml:287-300`) becomes a wait on the Platform's
@@ -301,8 +329,8 @@ timeout stays 120 seconds unless the first PR run measures a longer first reconc
 ### 7. Recommend the check be required; G4 retires behind it
 
 The job is built to be required (Decision 2). Whether it is required is the owner's ruleset choice;
-workspace RELEASING.md, section "Owner settings", does not list this check yet, and the workspace item
-is asked to add it. G4 retires only when all hold: this change has merged, the check has passed on
+workspace RELEASING.md, section "Owner settings" › "Rulesets on main", lists it as the check to
+make required once it is green. G4 retires only when all hold: this change has merged, the check has passed on
 at least one cli release PR, and it is required (owner decision 2026-10-02, RELEASING.md, "Gates").
 Retiring it is its own later cli change, working name `retire-g4-operator-embed-evidence`
 (proposal.md, Depends on / gates). Until then the check runs advisory, and G4 stays.
@@ -366,20 +394,21 @@ from `openspec/config.yaml`'s "task test" gate on purpose and only for this chan
 **No local cluster.** The implementing session was not allowed to create, delete or apply to any
 cluster, so the planned section-1 spike (the embedded operator reaching `Ready` on a throwaway
 cluster) and the throwaway-cluster check of the new `Ready` wait (including the simulated stall)
-did not run locally. Both move to the PR's own run: tasks.md section 5 records what that run shows,
-and the stall-simulation check is done there or by a developer on a cluster they own. If the first
-run shows the embedded operator stalling, that is an alpha.14-class stall and needs a `fix(deps)`
-change before this one merges; the job has then done its job.
+did not run locally. Both move to the pull request (tasks.md section 6): the PR's own run must be
+green before merge, and the stall simulation is a post-merge check by a developer on a cluster they
+own. If the first run shows the embedded operator stalling, that is an alpha.14-class stall and
+needs a `fix(deps)` change before this one merges; the job has then done its job.
 
 Before merge, the PR's own run is the first real execution: the workflow file is one of its
-apply paths. Record its job duration and the time `cluster:operator` took to see `Ready=True` under
-Context in this file, in a commit on the PR branch, and raise the `Ready` timeout if the runner
-needed more than 120 seconds. After merge, watch the check on the next operator-touching PR and the next release PR. Rollback is
+apply paths. The archive rides the PR and is committed before that run, so its job duration and the
+time `cluster:operator` took to see `Ready=True` are noted on the PR, not in this file; if the
+runner needed more than 120 seconds, the `Ready` timeout is raised in a commit on the PR branch.
+After merge, watch the check on the next operator-touching PR and the next release PR. Rollback is
 deleting `e2e-cluster.yml`; the test switch is inert when unset, and the `Ready` wait can be reverted
 on its own if it misfires on a healthy operator.
 
 ## Open Questions
 
 - How long the job takes on ubuntu-latest, and whether 120 seconds covers the first Platform
-  reconcile there. Both numbers come from the first PR run (Migration Plan, tasks.md section 5).
+  reconcile there. Both numbers come from the first PR run (Migration Plan, tasks.md section 6).
   Neither changes the approach.
