@@ -70,5 +70,5 @@ Depends on: opmodel.dev change `build-docs-from-branch-head` merged before this 
 
 Archive the change on this branch (openspec archive), so the archive rides the implementing PR; never push to main (owner decision 2026-10-01 (RELEASING.md, Owner settings)).
 
-- [ ] 5.1 `openspec archive prepare-release-cascade --yes`. This creates `openspec/specs/release-gates/spec.md` and `openspec/specs/repo-automation/spec.md` with their Purpose text and adds the commit-type requirement to `openspec/specs/release-workflow/spec.md`. Verify: `task openspec:check` green; both new main specs carry their Purpose; the release-workflow main spec keeps every existing requirement and scenario heading.
-- [ ] 5.2 `task fmt` and `task openspec:check` green, then commit `chore(openspec): archive prepare-release-cascade`. The commit touches only `openspec/`.
+- [x] 5.1 `openspec archive prepare-release-cascade --yes`. This creates `openspec/specs/release-gates/spec.md` and `openspec/specs/repo-automation/spec.md` with their Purpose text and adds the commit-type requirement to `openspec/specs/release-workflow/spec.md`. Verify: `task openspec:check` green; both new main specs carry their Purpose; the release-workflow main spec keeps every existing requirement and scenario heading.
+- [x] 5.2 `task fmt` and `task openspec:check` green, then commit `chore(openspec): archive prepare-release-cascade`. The commit touches only `openspec/`.
