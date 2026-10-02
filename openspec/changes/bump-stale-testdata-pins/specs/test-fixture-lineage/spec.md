@@ -17,6 +17,7 @@ A pin is frozen only when the test depends on that exact old version. Examples a
 - **THEN** every entry has a non-empty `path` that exists in the repo, a non-empty `pins` list, and a non-empty `reason`
 - **AND** it lists `tests/e2e/instance_build_test.go` with `opmodel.dev/core@v2` and `opmodel.dev/catalogs/opm@v4`, whose tests need an older core to be refused, the collision floor, and an older catalog to show version skew
 - **AND** it lists `internal/cmd/platform/check_test.go` with `opmodel.dev/core@v2`, whose tests need older cores to be refused and the collision floor
+- **AND** it lists `internal/instinit/render_test.go` with `opmodel.dev/core@v2`, whose golden asserts rendered text that carries the old core version
 
 #### Scenario: Bumped test trees still pass
 

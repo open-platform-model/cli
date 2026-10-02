@@ -3,8 +3,8 @@ Every test command in this file runs with the canonical registry mapping exporte
 
 ## 1. Record the deliberately old pins
 
-- [ ] 1.1 Create the repo-root `.cascade-frozen` with the two entries of design.md D-a: `tests/e2e/instance_build_test.go` pinning `opmodel.dev/core@v2` and `opmodel.dev/catalogs/opm@v4`, and `internal/cmd/platform/check_test.go` pinning `opmodel.dev/core@v2`, each with its one-sentence reason. Use the format in workspace RELEASING.md, section "Cascade files", exactly. Verify by parsing it, e.g. `yq '.frozen[] | [.path, .pins, .reason]' .cascade-frozen`: both paths exist, both pin lists are non-empty and both reasons are non-empty.
-- [ ] 1.2 Re-read the doc comments the reasons paraphrase (`tests/e2e/instance_build_test.go:74-76,247-253,285-286,316-319`; `internal/cmd/platform/check_test.go:351-356` and the comments above `:761` and `:785`) and confirm each reason states what the test needs the old pin for.
+- [ ] 1.1 Create the repo-root `.cascade-frozen` with the three entries of design.md D-a: `tests/e2e/instance_build_test.go` pinning `opmodel.dev/core@v2` and `opmodel.dev/catalogs/opm@v4`, `internal/cmd/platform/check_test.go` pinning `opmodel.dev/core@v2`, and `internal/instinit/render_test.go` pinning `opmodel.dev/core@v2`, each with its one-sentence reason. Use the format in workspace RELEASING.md, section "Cascade files", exactly. Verify by parsing it, e.g. `yq '.frozen[] | [.path, .pins, .reason]' .cascade-frozen`: every path exists, every pin list is non-empty and every reason is non-empty.
+- [ ] 1.2 Re-read the doc comments the reasons paraphrase (`tests/e2e/instance_build_test.go:74-76,247-253,285-286,316-319`; `internal/cmd/platform/check_test.go:351-356` and the comments above `:761` and `:785`; `internal/instinit/render_test.go:18-50`) and confirm each reason states what the test needs the old pin for.
 - [ ] 1.3 `task fmt`, `task lint`, `task test` (against `kind-opm-dev`) and `task openspec:check` green, then commit `test(fixtures): list the deliberately old core and catalog pins in .cascade-frozen`
 
 ## 2. Bump the unit-test trees
@@ -23,8 +23,8 @@ Every test command in this file runs with the canonical registry mapping exporte
 - [ ] 3.4 Run `git grep -nE '"v2\.0\.0-alpha|"v4\.([0-3]\.[0-9]+|4\.[0-3])"' -- 'tests/**/cue.mod/module.cue' 'internal/**/cue.mod/module.cue'` (or compare every core and catalog pin with `examples/cue.mod/module.cue`). Verify there is no match, which is the spec scenario "Every old core or catalog pin in a test module is accounted for": the frozen pins are Go literals, not `cue.mod` files.
 - [ ] 3.5 `task fmt`, `task lint`, `task test` (includes `test:e2e`) against `kind-opm-dev`, and `task openspec:check` green, then commit `test(fixtures): bump e2e and integration testdata to core v2.0.0-beta.1 and opm 4.4.4`
 
-## 4. Archive the change
+## 4. Archive the change on this branch
 
-- [ ] 4.1 Run `openspec archive bump-stale-testdata-pins --yes`.
+- [ ] 4.1 Archive the change on this branch (openspec archive), so the archive rides the implementing PR; never push to main. Run `openspec archive bump-stale-testdata-pins --yes`.
 - [ ] 4.2 Verify `task openspec:check` is green, `openspec/specs/test-fixture-lineage/spec.md` carries the requirement "Old test pins are current or frozen with a reason", and its requirement "Maintained fixtures track the current schema line" names `opmodel.dev/catalogs/opm@v4` with all four scenarios still present.
-- [ ] 4.3 Commit `chore(openspec): archive bump-stale-testdata-pins`. The archive rides the implementing PR (owner decision D14); nothing is pushed to `main` directly.
+- [ ] 4.3 Commit `chore(openspec): archive bump-stale-testdata-pins` on this branch. Nothing is pushed to `main` directly (owner decision 2026-10-01 (RELEASING.md, "Owner settings")).

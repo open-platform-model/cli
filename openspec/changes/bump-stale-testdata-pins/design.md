@@ -30,14 +30,14 @@ No tree pins `opmodel.dev/catalogs/k8s@v1` or any `testing.opmodel.dev` fixture,
 
 ### D-a: Which literals go into `.cascade-frozen`
 
-**Context**: D7 names two deliberate pins in `tests/e2e/instance_build_test.go`. A repo-wide grep for alpha-line and old catalog literals finds about 20 more in Go tests.
+**Context**: The owner decision 2026-10-01 (RELEASING.md, "Pin classes") names two deliberate pins in `tests/e2e/instance_build_test.go`. A repo-wide grep for alpha-line and old catalog literals finds about 20 more in Go tests.
 
 **Options considered**:
 1. List only the two named pins. This misses `olderCatalogPin` in the same e2e file, and `internal/cmd/platform/check_test.go`, which holds the same two kinds of deliberate core pin: too-old platforms at `:727`, `:761` and `:785`, and `collisionCoreVersion` at `:351-357`. A reader of `.cascade-frozen` would then wrongly conclude those are safe to bump.
 2. List every old literal. Most are parser inputs or fake registry listings that are never resolved (`internal/modref/*_test.go`, `internal/platform/catalog_test.go`, `internal/platform/resolve_test.go:252-253`, `internal/cmd/platform/pull_test.go:57`, `internal/cueedit/cueedit_test.go`). Listing them turns the file into noise and dilutes "frozen" into "anything old".
 3. List every literal that a test resolves from a registry and that must stay old for the test to mean anything.
 
-**Decision**: Option 3. The file holds two entries, each with a single-sentence reason:
+**Decision**: Option 3, plus the one golden literal below. The file holds three entries, each with a single-sentence reason:
 
 ```yaml
 frozen:
@@ -47,9 +47,12 @@ frozen:
   - path: internal/cmd/platform/check_test.go
     pins: ["opmodel.dev/core@v2"]
     reason: "Its too-old platforms pin core alpha.6, alpha.9 and alpha.11 to be refused naming the release that derives each missing field, and collisionCoreVersion v2.0.0-alpha.13 is the first core that reports contract collisions instead of failing the fold."
+  - path: internal/instinit/render_test.go
+    pins: ["opmodel.dev/core@v2"]
+    reason: "TestRender_Golden feeds core v2.0.0-alpha.10 into Render and asserts the exact rendered module.cue text carrying it, so the literal is expected output that is never resolved and moving it would prove nothing new."
 ```
 
-**Rationale**: The reasons paraphrase the tests' own doc comments (`instance_build_test.go:74-76,247-253,285-286,316-319`; `check_test.go:351-356,757-760,780-783`). `olderCatalogPin` is resolved from GHCR: `seedSkewPlatform` (`:123-135`) writes it into a platform `cue.mod`, and `:213` and `:244` assert the platform carries it. The golden literal `v2.0.0-alpha.10` in `internal/instinit/render_test.go:25,45` is out: the test never resolves it, it is a string in a golden file, and no cascade that edits `cue.mod` files would touch it. Workspace RELEASING.md, section "Pin classes", lists it today; this exclusion is a deliberate departure, flagged for the owner.
+**Rationale**: The reasons paraphrase the tests' own doc comments (`instance_build_test.go:74-76,247-253,285-286,316-319`; `check_test.go:351-356,757-760,780-783`). `olderCatalogPin` is resolved from GHCR: `seedSkewPlatform` (`:123-135`) writes it into a platform `cue.mod`, and `:213` and `:244` assert the platform carries it. The golden literal `v2.0.0-alpha.10` in `internal/instinit/render_test.go:25,45` is not registry-resolved, so Option 3 alone would leave it out. It is listed anyway, by the cascade supervisor's ruling of 2026-10-02: it is an expected-output golden that asserts rendered text, not a pin, so it is frozen with that reason rather than bumped. Listing it tells the cascade and a reviewer that the old literal is intended, where silence would make it look stale.
 
 ### D-b: How to bump
 
@@ -61,7 +64,7 @@ frozen:
 1. `.cascade-frozen` alone. It changes no test, so it is green trivially.
 2. The four trees whose consumers are unit tests: `fixtures/valid/*`, `initvalues` and `skip-unprovided`. Their e2e consumers and the `skip-unprovided` cluster program run here too, so each tree is proven whole in one section.
 3. The two trees consumed by the e2e suite and a cluster-only integration program: `duplicate-identities` and `module-apply`.
-4. Archive the change (owner decision D14: the archive commit rides the implementing PR).
+4. Archive the change on this branch, so the archive rides the implementing PR and nothing is pushed to `main` (owner decision 2026-10-01 (RELEASING.md, "Owner settings")).
 
 **Rationale**: The cut follows consumer grouping. Section 2's trees are all read by unit tests in CI, section 3's trees are read only by the e2e suite and the cluster-only `module-apply` program. Every section's `task test` (`test:unit` + `test:integration` + `test:e2e`, `Taskfile.yml:75-80`) needs `kind-opm-dev` (`Taskfile.yml:98-100`), so no section can land without the cluster. Five one-tree sections would be valid but give five commits for six one-line diffs.
 
@@ -73,7 +76,7 @@ frozen:
 
 ### Are the old pins deliberate?
 
-**Context**: D7 asks whether any of the five trees is old on purpose.
+**Context**: The owner decision 2026-10-01 (RELEASING.md, "Pin classes") asks whether any of the five trees is old on purpose.
 **Explored**: `git log` of each `cue.mod/module.cue`; grepping the trees for `alpha`, `pin`, `older`, `deliberate`; a reverted planning probe that bumped all six `cue.mod` files with `cue mod get` and `cue mod tidy` and ran the consumers; a review probe that repeated the bump under the canonical mapping.
 **Findings**: No tree comments on its pin. The probes kept everything green:
 - `go test ./internal/instinit/ ./internal/workflow/render/ ./internal/cmd/module/`: ok.
