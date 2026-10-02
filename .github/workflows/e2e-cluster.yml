@@ -6,10 +6,10 @@ name: E2E Cluster
 #
 # The workflow triggers on every pull request and decides inside the job
 # (.github/scripts/e2e-cluster-applies.sh) whether to do the work: on operator,
-# template and Platform changes, on the job's own inputs, on the cascade pull
-# request and on release pull requests. Otherwise the job passes in seconds and
-# says why. A paths: filter or a job-level if: would leave a required check
-# pending or report a skip as a pass, so neither is used.
+# operator-command, template and Platform changes, on the job's own inputs, on
+# the cascade pull request and on release pull requests. Otherwise the job
+# passes in seconds and says why. A paths: filter or a job-level if: would leave
+# a required check pending or report a skip as a pass, so neither is used.
 on:
   pull_request:
     branches:

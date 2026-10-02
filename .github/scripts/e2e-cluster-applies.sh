@@ -31,6 +31,7 @@ release_prefix=release-please--
 # matched against the whole repo-relative path.
 apply_paths=(
   '^internal/operator/'
+  '^internal/cmd/operator/'
   '^templates/'
   '^hack/platform/'
   '^\.github/workflows/e2e-cluster\.yml$'
@@ -71,7 +72,7 @@ else
   echo "e2e-cluster: not applicable"
   echo "  head branch: ${head_ref:-<none>}"
   echo "  labels: ${joined_labels:-<none>}"
-  echo "  changed files: $file_count, none under internal/operator/, templates/, hack/platform/ or the job's own inputs"
+  echo "  changed files: $file_count, none under internal/operator/, internal/cmd/operator/, templates/, hack/platform/ or the job's own inputs"
   echo "  nothing to do; passing"
 fi
 
