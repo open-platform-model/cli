@@ -9,11 +9,11 @@ Every test command in this file runs with the canonical registry mapping exporte
 
 ## 2. Bump the unit-test trees
 
-- [ ] 2.1 In `tests/fixtures/valid/simple-module` and `tests/fixtures/valid/module-with-debug-values`, run `cue mod get opmodel.dev/core@v2.0.0-beta.1` then `cue mod tidy`. Verify `cue mod tidy --check` passes in each tree and the diff touches only the core `v:` line.
-- [ ] 2.2 In `internal/instinit/testdata/initvalues` and `internal/workflow/render/testdata/skip-unprovided`, run `cue mod get opmodel.dev/core@v2.0.0-beta.1 opmodel.dev/catalogs/opm@v4.4.4` then `cue mod tidy`. Verify `cue mod tidy --check` passes in each tree and `initvalues` keeps `default: true` on the opm dependency.
-- [ ] 2.3 Run `go test -count=1 -v ./internal/cmd/module/ ./internal/workflow/render/ ./internal/instinit/` and verify there is no FAIL and that `TestModVet_ValidModule`, `TestModEval_FixtureModule`, `TestPickValues_AcquiredModule` and the `TestSkipUnprovided_*` tests report PASS, not SKIP. Then run `go test -count=1 -v ./tests/e2e/ -run 'TestE2E_ModBuild_SkipUnprovided|TestE2E_ModuleVet_OpenDebugValuesRefusedAtSynthesis' -timeout 10m` and verify both report PASS, not SKIP. Fix any failure under design.md D-d. If a tree has to be reverted, record it in `.cascade-frozen` in this commit.
-- [ ] 2.4 With `kind-opm-dev` up (`task cluster:status`), run `go run tests/integration/skip-unprovided/main.go` and verify it exits 0. This program is not in CI (`.github/workflows/pr.yml:202-209`).
-- [ ] 2.5 `task fmt`, `task lint`, `task test` (against `kind-opm-dev`) and `task openspec:check` green, then commit `test(fixtures): bump unit-test trees to core v2.0.0-beta.1 and opm 4.4.4`
+- [x] 2.1 In `tests/fixtures/valid/simple-module` and `tests/fixtures/valid/module-with-debug-values`, run `cue mod get opmodel.dev/core@v2.0.0-beta.1` then `cue mod tidy`. Verify `cue mod tidy --check` passes in each tree and the diff touches only the core `v:` line.
+- [x] 2.2 In `internal/instinit/testdata/initvalues` and `internal/workflow/render/testdata/skip-unprovided`, run `cue mod get opmodel.dev/core@v2.0.0-beta.1 opmodel.dev/catalogs/opm@v4.4.4` then `cue mod tidy`. Verify `cue mod tidy --check` passes in each tree and `initvalues` keeps `default: true` on the opm dependency.
+- [x] 2.3 Run `go test -count=1 -v ./internal/cmd/module/ ./internal/workflow/render/ ./internal/instinit/` and verify there is no FAIL and that `TestModVet_ValidModule`, `TestModEval_FixtureModule`, `TestPickValues_AcquiredModule` and the `TestSkipUnprovided_*` tests report PASS, not SKIP. Then run `go test -count=1 -v ./tests/e2e/ -run 'TestE2E_ModBuild_SkipUnprovided|TestE2E_ModuleVet_OpenDebugValuesRefusedAtSynthesis' -timeout 10m` and verify both report PASS, not SKIP. Fix any failure under design.md D-d. If a tree has to be reverted, record it in `.cascade-frozen` in this commit.
+- [x] 2.4 With `kind-opm-dev` up (`task cluster:status`), run `go run tests/integration/skip-unprovided/main.go` and verify it exits 0. This program is not in CI (`.github/workflows/pr.yml:202-209`).
+- [x] 2.5 `task fmt`, `task lint`, `task test` (against `kind-opm-dev`) and `task openspec:check` green, then commit `test(fixtures): bump unit-test trees to core v2.0.0-beta.1 and opm 4.4.4`
 
 ## 3. Bump the e2e and integration trees
 
