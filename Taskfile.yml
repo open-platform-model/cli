@@ -239,6 +239,11 @@ tasks:
       the operator overwrites CUE_REGISTRY in its own process env. Setting
       either as a pod env var does nothing.
 
+      It finishes by waiting for Platform/cluster to be Ready for its current
+      generation (cluster:operator:wait-ready), not merely stamped with
+      status.operatorVersion, so an operator that cannot serve the pinned
+      core or catalogs fails here, naming the Platform's stall reason.
+
       Idempotent: safe to re-run.
     preconditions:
       - sh: kubectl cluster-info --context kind-{{.CLUSTER_NAME}} &>/dev/null
@@ -284,17 +289,59 @@ tasks:
       # impersonate a per-instance ServiceAccount the CLI cannot write. Dev-only
       # grant; see the file header.
       - kubectl --context kind-{{.CLUSTER_NAME}} apply -f hack/kind-operator-rbac.yaml
-      # status.operatorVersion is stamped by the PlatformReconciler, so it is
-      # proof the operator is genuinely reconciling and not merely Running.
+      # status.operatorVersion is stamped on every reconcile whatever its
+      # outcome, so it proves only that the operator runs. The wait below asks
+      # for Ready=True on the Platform's current generation instead.
+      - task: cluster:operator:wait-ready
+        vars:
+          CLUSTER_NAME: "{{.CLUSTER_NAME}}"
+
+  cluster:operator:wait-ready:
+    desc: Wait until Platform/cluster is Ready for its current generation
+    summary: |
+      Passes only when Platform/cluster reports Ready=True AND
+      status.observedGeneration equals metadata.generation.
+
+      The generation check matters: `opm operator install` creates the
+      Platform (generation 1) subscribed to the newest catalogs, and
+      cluster:operator then applies hack/kind-platform.yaml, which changes the
+      spec (generation 2). A Ready=True left over from generation 1 says
+      nothing about the pinned catalogs, so it does not count.
+
+      On timeout it prints both generations, the Ready and Stalled conditions
+      and where to look next, and fails. A Stalled=True with a reason such as
+      MaterializeFailed means the operator cannot serve the core or catalogs
+      the Platform pins.
+
+      PLATFORM_READY_TIMEOUT sets the wait in seconds (default 120).
+    vars:
+      PLATFORM_READY_TIMEOUT: '{{.PLATFORM_READY_TIMEOUT | default "120"}}'
+    cmds:
       - |
-        echo "waiting for the operator to reconcile the Platform..."
-        for i in $(seq 1 60); do
-          v=$(kubectl --context kind-{{.CLUSTER_NAME}} get platform cluster -o jsonpath='{.status.operatorVersion}' 2>/dev/null || true)
-          if [ -n "$v" ]; then echo "operator $v is reconciling"; exit 0; fi
+        ctx=kind-{{.CLUSTER_NAME}}
+        timeout={{.PLATFORM_READY_TIMEOUT}}
+        echo "waiting up to ${timeout}s for Platform/cluster to be Ready for its current generation..."
+        deadline=$(( $(date +%s) + timeout ))
+        while :; do
+          gen=$(kubectl --context "$ctx" get platform cluster -o jsonpath='{.metadata.generation}' 2>/dev/null || true)
+          observed=$(kubectl --context "$ctx" get platform cluster -o jsonpath='{.status.observedGeneration}' 2>/dev/null || true)
+          ready=$(kubectl --context "$ctx" get platform cluster -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
+          if [ -n "$gen" ] && [ "$gen" = "$observed" ] && [ "$ready" = "True" ]; then
+            version=$(kubectl --context "$ctx" get platform cluster -o jsonpath='{.status.operatorVersion}' 2>/dev/null || true)
+            echo "operator ${version:-<unknown>} is reconciling; Platform/cluster is Ready for generation $gen"
+            exit 0
+          fi
+          if [ "$(date +%s)" -ge "$deadline" ]; then break; fi
           sleep 2
         done
-        echo "Platform/cluster has no status.operatorVersion after 120s." >&2
-        echo "Check: kubectl -n opm-operator-system logs deploy/opm-operator-controller-manager" >&2
+        echo "Platform/cluster is not Ready for its current generation after ${timeout}s." >&2
+        echo "  generation: ${gen:-<none>}, observedGeneration: ${observed:-<none>}" >&2
+        for type in Ready Stalled; do
+          cond=$(kubectl --context "$ctx" get platform cluster \
+            -o jsonpath="{.status.conditions[?(@.type==\"$type\")].status} {.status.conditions[?(@.type==\"$type\")].reason}: {.status.conditions[?(@.type==\"$type\")].message}" 2>/dev/null || true)
+          echo "  $type: ${cond:-<not set>}" >&2
+        done
+        echo "Check: kubectl --context $ctx -n opm-operator-system logs deploy/opm-operator-controller-manager" >&2
         echo "A 'Failed to resolve OPM core schema' line means the pod cannot reach the registry" >&2
         echo "its --registry flag (or built-in default) points at." >&2
         exit 1

@@ -281,6 +281,11 @@ anything fails, and the failure names a test, not the Platform.
 
 The wait stays a shell loop rather than `kubectl wait --for=condition=Ready`, because the Platform
 may not exist yet when the wait starts and `kubectl wait` fails at once on a missing object. The
+loop lives in its own task, `cluster:operator:wait-ready`, which `cluster:operator` calls last: a
+developer can re-run just the wait, and the loop can be exercised without a cluster by putting a
+stub `kubectl` first on `PATH` (tasks.md 3.3). Its wait is `PLATFORM_READY_TIMEOUT` seconds, default
+120; the knob exists so that check can run in seconds and so the first PR run's measurement can
+raise the default in one place. The
 timeout stays 120 seconds unless the first PR run measures a longer first reconcile on the runner.
 
 **Alternatives considered**
