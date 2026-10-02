@@ -101,14 +101,14 @@ func TestReplacementWarnings_CarriedCatalogIsTheModules(t *testing.T) {
 	// A module-deps platform carried the module's own redirect: the kernel
 	// reports the row as the platform's, but it is the module's, and the
 	// module file's entry is honored rather than ignored.
-	root := writeModuleContext(t, `deps: "opmodel.dev/catalogs/opm@v4": replaceWith: "../catalog_opm/opm"`)
-	rows := []kernel.Replacement{{Path: "opmodel.dev/catalogs/opm@v4", Target: "/home/dev/catalog_opm/opm", By: "platform"}}
-	carried := map[string]string{"opmodel.dev/catalogs/opm@v4": "/home/dev/catalog_opm/opm"}
+	root := writeModuleContext(t, `deps: "opmodel.dev/catalogs/opm@v4": replaceWith: "../catalog_opm/src"`)
+	rows := []kernel.Replacement{{Path: "opmodel.dev/catalogs/opm@v4", Target: "/home/dev/catalog_opm/src", By: "platform"}}
+	carried := map[string]string{"opmodel.dev/catalogs/opm@v4": "/home/dev/catalog_opm/src"}
 
 	got := replacementWarnings(rows, root, carried)
 
 	assert.Equal(t, []string{
-		"local replacement in effect: opmodel.dev/catalogs/opm@v4 served from /home/dev/catalog_opm/opm (instance); rendered bytes may not correspond to any published build",
+		"local replacement in effect: opmodel.dev/catalogs/opm@v4 served from /home/dev/catalog_opm/src (instance); rendered bytes may not correspond to any published build",
 	}, got, "one in-effect line under the module side's label, no ignored line")
 }
 
