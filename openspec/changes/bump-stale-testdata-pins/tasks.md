@@ -3,9 +3,9 @@ Every test command in this file runs with the canonical registry mapping exporte
 
 ## 1. Record the deliberately old pins
 
-- [ ] 1.1 Create the repo-root `.cascade-frozen` with the three entries of design.md D-a: `tests/e2e/instance_build_test.go` pinning `opmodel.dev/core@v2` and `opmodel.dev/catalogs/opm@v4`, `internal/cmd/platform/check_test.go` pinning `opmodel.dev/core@v2`, and `internal/instinit/render_test.go` pinning `opmodel.dev/core@v2`, each with its one-sentence reason. Use the format in workspace RELEASING.md, section "Cascade files", exactly. Verify by parsing it, e.g. `yq '.frozen[] | [.path, .pins, .reason]' .cascade-frozen`: every path exists, every pin list is non-empty and every reason is non-empty.
-- [ ] 1.2 Re-read the doc comments the reasons paraphrase (`tests/e2e/instance_build_test.go:74-76,247-253,285-286,316-319`; `internal/cmd/platform/check_test.go:351-356` and the comments above `:761` and `:785`; `internal/instinit/render_test.go:18-50`) and confirm each reason states what the test needs the old pin for.
-- [ ] 1.3 `task fmt`, `task lint`, `task test` (against `kind-opm-dev`) and `task openspec:check` green, then commit `test(fixtures): list the deliberately old core and catalog pins in .cascade-frozen`
+- [x] 1.1 Create the repo-root `.cascade-frozen` with the three entries of design.md D-a: `tests/e2e/instance_build_test.go` pinning `opmodel.dev/core@v2` and `opmodel.dev/catalogs/opm@v4`, `internal/cmd/platform/check_test.go` pinning `opmodel.dev/core@v2`, and `internal/instinit/render_test.go` pinning `opmodel.dev/core@v2`, each with its one-sentence reason. Use the format in workspace RELEASING.md, section "Cascade files", exactly. Verify by parsing it, e.g. `yq '.frozen[] | [.path, .pins, .reason]' .cascade-frozen`: every path exists, every pin list is non-empty and every reason is non-empty.
+- [x] 1.2 Re-read the doc comments the reasons paraphrase (`tests/e2e/instance_build_test.go:74-76,247-253,285-286,316-319`; `internal/cmd/platform/check_test.go:351-356` and the comments above `:761` and `:785`; `internal/instinit/render_test.go:18-50`) and confirm each reason states what the test needs the old pin for.
+- [x] 1.3 `task fmt`, `task lint`, `task test` (against `kind-opm-dev`) and `task openspec:check` green, then commit `test(fixtures): list the deliberately old core and catalog pins in .cascade-frozen`
 
 ## 2. Bump the unit-test trees
 

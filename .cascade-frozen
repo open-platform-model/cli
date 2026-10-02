@@ -1,0 +1,12 @@
+# Pins that a test keeps old on purpose. The release cascade never moves
+# them. Format: workspace RELEASING.md, section "Cascade files".
+frozen:
+  - path: tests/e2e/instance_build_test.go
+    pins: ["opmodel.dev/core@v2", "opmodel.dev/catalogs/opm@v4"]
+    reason: "The older-core platform pins core v2.0.0-alpha.11 so the build is refused as too old for the provider count, collisionCorePin v2.0.0-alpha.13 is the floor the colliding-platform seed re-pins up to, never down from, and olderCatalogPin v4.0.0 must stay older than the catalog examples requires so the platform shows catalog version skew."
+  - path: internal/cmd/platform/check_test.go
+    pins: ["opmodel.dev/core@v2"]
+    reason: "Its too-old platforms pin core alpha.6, alpha.9 and alpha.11 to be refused naming the release that derives each missing field, and collisionCoreVersion v2.0.0-alpha.13 is the first core that reports contract collisions instead of failing the fold."
+  - path: internal/instinit/render_test.go
+    pins: ["opmodel.dev/core@v2"]
+    reason: "TestRender_Golden feeds core v2.0.0-alpha.10 into Render and asserts the exact rendered module.cue text carrying it, so the literal is expected output that is never resolved and moving it would prove nothing new."
