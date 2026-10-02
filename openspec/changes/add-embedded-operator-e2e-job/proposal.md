@@ -66,13 +66,12 @@ the "G4 replacement" bullet).
   "E2E (kind, embedded operator)" to the cli ruleset's required checks. Workspace RELEASING.md,
   section "Owner settings", does not list it yet; flagged to the workspace item (`docs/release-cascade`)
   to add that line.
-- **Gates G4 retirement.** The owner's release-cascade decision retires G4 "once the job lands"
-  (workspace RELEASING.md, section "Gates", G4 row). This change refines that, for the owner to
-  confirm, to: this change has merged, the "E2E (kind, embedded operator)" check has passed
-  on at least one cli release-please PR, and it is a required check. A merged but advisory job does
-  not block a release, so retiring G4 on merge alone would leave the operator embed ungated. Flagged
-  to the workspace item so the RELEASING.md "Gates" G4 row states the same conditions. Retirement is
-  then its own small cli OpenSpec change (working name `retire-g4-operator-embed-evidence`), in this
+- **Gates G4 retirement.** G4 retires only when all of these hold: this change has merged, the
+  "E2E (kind, embedded operator)" check has passed on at least one cli release-please PR, and it is
+  a required check (owner decision 2026-10-02, RELEASING.md, "Gates"). A merged but advisory job does
+  not block a release, so retiring G4 on merge alone would leave the operator embed ungated. The
+  RELEASING.md "Gates" G4 row is being reconciled to state the same conditions. Retirement is then
+  its own later cli OpenSpec change (working name `retire-g4-operator-embed-evidence`), in this
   order:
   1. The owner adds "E2E (kind, embedded operator)" to the cli ruleset's required checks and removes
      `G4 operator-embed evidence` from them (so deleting its workflow cannot leave pull requests
@@ -121,8 +120,10 @@ the "G4 replacement" bullet).
   `tests/e2e/` as an input means any e2e test edit pays the full job; accepted, because the shared
   helpers (`runOPMWithEnv` in `mod_build_test.go`, `TestMain` in `mod_init_test.go`) live in files
   whose names do not say so, and a narrower list would let a helper change land untested.
-- **SemVer:** none. Tests, CI and dev tooling only. Section commits are `chore(openspec)`,
-  `test(e2e)`, `chore(taskfile)` and `ci(e2e)`, none of which releases.
+- **SemVer:** none. Tests, CI and dev tooling only. Section commits are `docs(openspec)`,
+  `test(e2e)`, `chore(taskfile)`, `ci(e2e)` and `chore(openspec)`; the pull request squashes under
+  one non-releasing title, and the archive rides it (owner decision 2026-10-01, RELEASING.md,
+  "Owner settings").
 - **Complexity (Principle VII):** one workflow file, one decision script and one environment switch.
   The job reuses the local loop's tasks rather than restating them, and a change to those tasks
   re-runs the job, so CI and a developer's `task cluster:operator` cannot drift apart unnoticed.

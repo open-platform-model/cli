@@ -6,23 +6,22 @@ with `OPM_E2E_REQUIRE_CLUSTER` unset, so the cluster tests skip. This replaces `
 operator. The cluster half of `task test` is this PR's own e2e-cluster run, and never runs on a
 cluster the implementer does not own.
 
-Local cluster steps never touch the developer's workspace `opm-registry` container (port 5000) or
-`kind-opm-dev`: they use `opm-spike-registry` on port 5001 and `CLUSTER_NAME=opm-spike`, and they
-record the current kube-context first (`kubectl config current-context`) and restore it with
-`kubectl config use-context` afterwards, because `kind create` switches it.
+The local gate above was accepted by the release-cascade supervisor on 2026-10-02 in place of `task
+test` (design.md, Migration Plan, "Accepted").
 
-## 1. Spike: the embedded operator reaches Ready on a fresh cluster
+No step in sections 1 to 4 creates, deletes or applies to a cluster: the implementing session may
+not (design.md, Migration Plan, "No local cluster"). The cluster checks the plan first put in a
+local spike run on the PR's own e2e-cluster job instead, and section 5 records them. Any later
+local cluster step never touches the developer's workspace `opm-registry` container (port 5000) or
+`kind-opm-dev`: it uses `opm-spike-registry` on port 5001 and `CLUSTER_NAME=opm-spike`, records the
+current kube-context first and restores it afterwards, because `kind create` switches it.
 
-design.md carries two unverified assumptions: that the operator embedded at spike time (record its
-`PinnedOperatorVersion`) brings `Platform/cluster`, as `hack/kind-platform.yaml` pins it, to
-`Ready=True` for its current generation, and how long that takes. Section 3 depends on the first; if
-it fails, stop: that is an alpha.14-class stall and needs a `fix(deps)` change before this one can
-continue.
+## 1. Reconcile with workspace RELEASING.md
 
-- [ ] 1.1 Record the current kube-context. On a throwaway cluster that leaves `kind-opm-dev` alone, run `task cluster:create CLUSTER_NAME=opm-spike` then `time task cluster:operator CLUSTER_NAME=opm-spike`; verify with `kubectl --context kind-opm-spike get platform cluster -o jsonpath='{.metadata.generation} {.status.observedGeneration} {.status.conditions}'` that `observedGeneration` equals `generation`, that `generation` is above 1 (the task's apply changed the spec the install created), and that `Ready` is `True`; note the seconds from apply to `Ready`
-- [ ] 1.2 Repeat 1.1's `cluster:operator` with a spike registry container: `docker run -d --name opm-spike-registry -p 5001:5000 registry:2`, seed it with `CUE_REGISTRY='testing.opmodel.dev=localhost:5001+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works' hack/fixtures.sh seed`, then `task cluster:operator CLUSTER_NAME=opm-spike REGISTRY_CONTAINER=opm-spike-registry KIND_CUE_REGISTRY='testing.opmodel.dev=opm-spike-registry:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'`; verify the operator Deployment's args carry that `--registry`, and that the Platform is `Ready=True` with `observedGeneration` equal to `generation`
-- [ ] 1.3 Tear down with `task cluster:delete CLUSTER_NAME=opm-spike` and `docker rm -f opm-spike-registry` (only that container), restore the recorded kube-context with `kubectl config use-context`, and verify `docker ps` still shows the workspace `opm-registry` untouched; write the embedded operator version, both measurements and the observed conditions and generations under design.md Context ("Spike, section 1"), and verify `openspec validate add-embedded-operator-e2e-job --strict` passes
-- [ ] 1.4 Local gate green (above), then commit `chore(openspec): record the embedded-operator e2e spike`
+- [x] 1.1 Cite workspace RELEASING.md sections instead of bare decision numbers; state the G4 retirement conditions as the owner decision of 2026-10-02 (RELEASING.md, "Gates"): this change merged, its check passed on at least one cli release PR, and the check required; retirement is the later change `retire-g4-operator-embed-evidence`
+- [x] 1.2 Record in design.md that the explicit local gate is accepted in place of `task test`, and that the local spike is dropped because the implementing session may not touch a cluster; move its checks to section 5 (the PR's own run)
+- [x] 1.3 Add the archive section (section 6), so the archive rides the implementing PR; verify `openspec validate add-embedded-operator-e2e-job --strict` passes
+- [x] 1.4 Local gate green (above), then commit `docs(openspec): reconcile add-embedded-operator-e2e-job with RELEASING.md`
 
 ## 2. The suite can be told the cluster is required
 
@@ -33,9 +32,9 @@ continue.
 
 ## 3. cluster:operator waits for a Ready Platform
 
-- [ ] 3.1 Replace the `status.operatorVersion` loop at the end of `cluster:operator` in `Taskfile.yml` with a loop that passes only when `Platform/cluster` has `status.observedGeneration` equal to `metadata.generation` and its `Ready` condition is `True` (design.md Decision 6); on success print the operator version as today, on timeout print both generations, the `Ready` and `Stalled` conditions with reason and message, and the existing log hint; keep the timeout at 120 seconds unless section 1 measured more
+- [ ] 3.1 Replace the `status.operatorVersion` loop at the end of `cluster:operator` in `Taskfile.yml` with a loop that passes only when `Platform/cluster` has `status.observedGeneration` equal to `metadata.generation` and its `Ready` condition is `True` (design.md Decision 6); on success print the operator version as today, on timeout print both generations, the `Ready` and `Stalled` conditions with reason and message, and the existing log hint; keep the timeout at 120 seconds (section 5 raises it if the first PR run needs more)
 - [ ] 3.2 Update the comment above the loop and the `cluster:operator` summary so neither claims `status.operatorVersion` proves reconciliation; verify with `task --summary cluster:operator`
-- [ ] 3.3 Verify on a throwaway cluster (`CLUSTER_NAME=opm-spike`, recording and restoring the kube-context as in section 1) that the task succeeds with `observedGeneration` equal to `generation`, and that a second run is a no-op; then simulate a stall by applying a Platform that subscribes to an unpublished catalog version (which bumps the generation over a `Ready=True` one) and verify the task's wait fails printing both generations, `Stalled` and its reason, rather than passing on the older generation's `Ready=True`; tear the cluster down and restore the kube-context
+- [ ] 3.3 Without a cluster, exercise the new wait against a stub `kubectl` placed first on `PATH` (a scratch script answering the loop's `get platform cluster` queries from fixed JSON), driving the loop as `task cluster:operator` runs it: (a) `generation` 2, `observedGeneration` 2, `Ready=True` passes and prints the operator version; (b) `generation` 2, `observedGeneration` 1, `Ready=True` (left from generation 1) keeps waiting and fails printing both generations, `Stalled` and its reason; (c) `Ready=False`, `Stalled=True` reason `MaterializeFailed` for the current generation fails naming that reason; (d) no Platform yet keeps waiting rather than failing at once. Use a short timeout override for the runs if the loop takes one, else run the loop body extracted to a scratch script
 - [ ] 3.4 Local gate green (above), then commit `chore(taskfile): wait for a ready platform in cluster:operator`
 
 ## 4. The e2e-cluster workflow
@@ -46,3 +45,17 @@ continue.
 - [ ] 4.4 Add an `if: failure() && steps.decide.outputs.applies == 'true'` diagnostics step printing the operator logs, `kubectl get platform cluster -o yaml`, `kubectl get moduleinstances -A -o yaml` and recent events; verify the workflow parses with `actionlint` (run it with `go run github.com/rhysd/actionlint/cmd/actionlint@latest` if it is not installed) and that every action is pinned by commit SHA
 - [ ] 4.5 Add the new workflow to the cli dev guidance where `pr.yml`'s jobs and the e2e loop are described (AGENTS.md or the doc that names `task cluster:operator`), stating when the job applies and that `OPM_E2E_REQUIRE_CLUSTER=1` reproduces it locally against a `kind-opm-dev` the developer owns and has prepared; verify with `grep -rn e2e-cluster.yml` that it is referenced
 - [ ] 4.6 Local gate green (above) and actionlint clean, then commit `ci(e2e): run the cluster-backed e2e suite against the embedded operator`
+
+## 5. The first PR run proves the job (after the branch is pushed)
+
+The PR's own e2e-cluster run is the first execution on a real cluster (design.md, Migration Plan).
+These tasks are done on the PR branch once that run has finished.
+
+- [ ] 5.1 From the PR's first applying run, record under design.md Context ("First PR run"): the embedded `PinnedOperatorVersion`, the job duration, the seconds `task cluster:operator` took to see `Ready=True`, the Platform's `generation` and `observedGeneration` (generation above 1, both equal), and the suite's pass/skip/fail counts (no cluster-backed test skipped); if the run stalled, stop: that is an alpha.14-class stall and needs a `fix(deps)` change first
+- [ ] 5.2 If the runner needed more than 120 seconds to reach `Ready`, raise the wait in `Taskfile.yml` and note the new value in design.md Decision 6
+- [ ] 5.3 On a cluster the developer owns (never the shared `kind-opm-dev` while it carries other workloads), simulate a stall by applying a Platform that subscribes to an unpublished catalog version, and verify `task cluster:operator`'s wait fails printing both generations, `Stalled` and its reason; record the result in design.md
+- [ ] 5.4 Local gate green (above), then commit `chore(openspec): record the first e2e-cluster run`
+
+## 6. Archive
+
+- [ ] 6.1 Archive the change on this branch (openspec archive), so the archive rides the implementing PR; never push to main (owner decision 2026-10-01, RELEASING.md, "Owner settings"); verify `task openspec:check` passes, then commit `chore(openspec): archive add-embedded-operator-e2e-job`

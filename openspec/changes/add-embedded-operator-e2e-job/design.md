@@ -73,9 +73,11 @@ See proposal.md, Why. Current state, read 2026-10-01 at `origin/main` `f3569b24`
   someone's unrelated workload (`default/backup-demo-web`) and no `Platform/cluster`; the suite's
   lifecycle test deletes every ModuleInstance and the operator, so it was not run there. The tests
   hardcode `kind-opm-dev`, and kind cluster names are unique per Docker host, so the suite cannot be
-  timed on a second cluster beside it. Section 1 therefore checks the preparation (the `Ready` wait)
-  on a throwaway cluster, `CLUSTER_NAME=opm-spike`, with its own registry container, and the full suite is timed by this change's first
-  PR run, which applies because the workflow file is one of its inputs (Migration Plan).
+  timed on a second cluster beside it. The planned spike on a throwaway cluster
+  (`CLUSTER_NAME=opm-spike`, with its own registry container) was dropped at implementation time:
+  the implementing session may not create or apply to any cluster (Migration Plan, "No local
+  cluster"). The preparation (the `Ready` wait) and the full suite are therefore both first proven
+  by this change's own PR run, which applies because the workflow file is one of its inputs.
 
 ## Goals / Non-Goals
 
@@ -210,7 +212,7 @@ operator (`Taskfile.yml:258-280`); this is the opt-in path the `kind-cluster-tas
 defines, so nothing in the task changes for it. The container name matches the task's
 `REGISTRY_CONTAINER` default (`Taskfile.yml:11`). That name and port are free on a fresh runner;
 on a developer machine they belong to the workspace registry (Context), so local reproductions of
-this setup use `REGISTRY_CONTAINER=opm-spike-registry` on port `5001` instead (tasks.md section 1).
+this setup use `REGISTRY_CONTAINER=opm-spike-registry` on port `5001` instead.
 
 Verified 2026-10-01: Task reads an exported environment variable into a var declared as
 `'{{.KIND_CUE_REGISTRY | default ""}}'` (Task 3.52.0, scratch Taskfile: unset prints empty, exported
@@ -279,7 +281,7 @@ anything fails, and the failure names a test, not the Platform.
 
 The wait stays a shell loop rather than `kubectl wait --for=condition=Ready`, because the Platform
 may not exist yet when the wait starts and `kubectl wait` fails at once on a missing object. The
-timeout stays 120 seconds unless section 1 measures a longer first reconcile on the runner.
+timeout stays 120 seconds unless the first PR run measures a longer first reconcile on the runner.
 
 **Alternatives considered**
 
@@ -293,10 +295,10 @@ timeout stays 120 seconds unless section 1 measures a longer first reconcile on 
 
 The job is built to be required (Decision 2). Whether it is required is the owner's ruleset choice;
 workspace RELEASING.md, section "Owner settings", does not list this check yet, and the workspace item
-is asked to add it. G4 retires, in its own small cli change, once the check is required and has
-passed on a cli release PR (proposal.md, Depends on / gates). That refines the owner's rule
-that G4 retires "once the job lands" (workspace RELEASING.md, section "Gates") and is for the owner
-to confirm. Until then the check runs advisory, and G4 stays.
+is asked to add it. G4 retires only when all hold: this change has merged, the check has passed on
+at least one cli release PR, and it is required (owner decision 2026-10-02, RELEASING.md, "Gates").
+Retiring it is its own later cli change, working name `retire-g4-operator-embed-evidence`
+(proposal.md, Depends on / gates). Until then the check runs advisory, and G4 stays.
 
 ## Research & Decisions
 
@@ -347,8 +349,20 @@ lifecycle test deletes every ModuleInstance, the CRDs and the operator namespace
 `task test` with its local half: `task fmt`, `task lint`, `task test:unit`, `go vet ./...`, and
 `go test ./tests/e2e/... -timeout 25m` with `OPM_E2E_REQUIRE_CLUSTER` unset and `HOME` pointed at an
 empty directory (so the cluster tests skip), with `GOMODCACHE`, `GOCACHE` and `CUE_CACHE_DIR`
-exported to their real values so the override does not force a cold rebuild. The cluster half of
-`task test` is this PR's own e2e-cluster run.
+exported to their real values so the override does not force a cold rebuild, plus
+`task openspec:check`. The cluster half of `task test` is this PR's own e2e-cluster run.
+
+**Accepted.** The release-cascade supervisor accepted this explicit local gate in place of `task
+test` on 2026-10-02, when it scheduled this change's implementation; it departs
+from `openspec/config.yaml`'s "task test" gate on purpose and only for this change.
+
+**No local cluster.** The implementing session was not allowed to create, delete or apply to any
+cluster, so the planned section-1 spike (the embedded operator reaching `Ready` on a throwaway
+cluster) and the throwaway-cluster check of the new `Ready` wait (including the simulated stall)
+did not run locally. Both move to the PR's own run: tasks.md section 5 records what that run shows,
+and the stall-simulation check is done there or by a developer on a cluster they own. If the first
+run shows the embedded operator stalling, that is an alpha.14-class stall and needs a `fix(deps)`
+change before this one merges; the job has then done its job.
 
 Before merge, the PR's own run is the first real execution: the workflow file is one of its
 apply paths. Record its job duration and the time `cluster:operator` took to see `Ready=True` under
@@ -360,5 +374,5 @@ on its own if it misfires on a healthy operator.
 ## Open Questions
 
 - How long the job takes on ubuntu-latest, and whether 120 seconds covers the first Platform
-  reconcile there. Section 1 measures the preparation locally; the CI numbers come from the
-  first PR run (Migration Plan). Neither changes the approach.
+  reconcile there. Both numbers come from the first PR run (Migration Plan, tasks.md section 5).
+  Neither changes the approach.
