@@ -1608,7 +1608,7 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: ghcr.io/open-platform-model/opm-operator:v1.0.0-beta.2@sha256:a130b542a0aafe6afc982e32ab969f81e366b7ff6a84ee8ef33a7ac5fc461c3e
+        image: ghcr.io/open-platform-model/opm-operator:v1.0.0-beta.4@sha256:e32db6a0b53c94a8272289b15225520d6d96393ecc391c01db98b9c8d56796bc
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
