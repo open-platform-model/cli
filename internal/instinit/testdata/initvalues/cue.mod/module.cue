@@ -7,10 +7,10 @@ source: {
 }
 deps: {
 	"opmodel.dev/catalogs/opm@v4": {
-		v:       "v4.4.1"
+		v:       "v4.4.4"
 		default: true
 	}
 	"opmodel.dev/core@v2": {
-		v: "v2.0.0-alpha.11"
+		v: "v2.0.0-beta.1"
 	}
 }
