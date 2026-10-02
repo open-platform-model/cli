@@ -426,18 +426,36 @@ tasks:
       - go install -ldflags "{{.LDFLAGS}}" ./cmd/opm
 
   check:
-    desc: Run all checks (fmt, vet, lint, openspec, test)
+    desc: Run all checks (fmt, vet, lint, openspec, command reference, test)
     cmds:
       - task: fmt
       - task: vet
       - task: lint
       - task: openspec:check
+      - task: docs:reference:check
       - task: test
 
   generate:
     desc: Run go generate
     cmds:
       - go generate ./...
+
+  #########################
+  ## Docs tasks
+  #########################
+  # The command reference is generated from the cobra commands (hack/cmdref,
+  # internal/cmdref) and committed, because opmodel.dev builds its pages from
+  # this repo's docs/site/. Regenerate after changing any command's Use,
+  # Short, Long, Example, Aliases or flags; the check fails CI otherwise.
+  docs:reference:
+    desc: Regenerate the opm command reference in docs/site/reference/cli/ from the cobra commands
+    cmds:
+      - go run ./hack/cmdref
+
+  docs:reference:check:
+    desc: Fail when the committed command reference in docs/site/reference/cli/ is stale (writes nothing)
+    cmds:
+      - go run ./hack/cmdref -check
 
   #########################
   ## Operator lifecycle tasks
