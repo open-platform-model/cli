@@ -25,6 +25,6 @@ Every test command in this file runs with the canonical registry mapping exporte
 
 ## 4. Archive the change on this branch
 
-- [ ] 4.1 Archive the change on this branch (openspec archive), so the archive rides the implementing PR; never push to main. Run `openspec archive bump-stale-testdata-pins --yes`.
-- [ ] 4.2 Verify `task openspec:check` is green, `openspec/specs/test-fixture-lineage/spec.md` carries the requirement "Old test pins are current or frozen with a reason", and its requirement "Maintained fixtures track the current schema line" names `opmodel.dev/catalogs/opm@v4` with all four scenarios still present.
-- [ ] 4.3 Commit `chore(openspec): archive bump-stale-testdata-pins` on this branch. Nothing is pushed to `main` directly (owner decision 2026-10-01 (RELEASING.md, "Owner settings")).
+- [x] 4.1 Archive the change on this branch (openspec archive), so the archive rides the implementing PR; never push to main. Run `openspec archive bump-stale-testdata-pins --yes`.
+- [x] 4.2 Verify `task openspec:check` is green, `openspec/specs/test-fixture-lineage/spec.md` carries the requirement "Old test pins are current or frozen with a reason", and its requirement "Maintained fixtures track the current schema line" names `opmodel.dev/catalogs/opm@v4` with all four scenarios still present.
+- [x] 4.3 Commit `chore(openspec): archive bump-stale-testdata-pins` on this branch. Nothing is pushed to `main` directly (owner decision 2026-10-01 (RELEASING.md, "Owner settings")).
