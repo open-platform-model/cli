@@ -5,7 +5,7 @@
 - [x] 1.3 `hack/kind-platform.yaml`: drop the `opmodel.dev/catalogs/k8s@v1` entry
 - [x] 1.4 `internal/config/platform_test.go`: lines 59 and 143 check `DefaultCatalogPath`; rewrite `TestBuildPlatformModule_KeyImportDriftNamesTheEntry` per design D2 and record the measured re-keying (or the deletion and core's covering test) in design.md
 - [ ] 1.5 `task test:e2e` against the kind cluster with the edited platform
-- [ ] 1.6 `task lint` and `task test` green, then commit `refactor(config): drop the k8s catalog from the first-party defaults`
+- [x] 1.6 `task lint` and `task test` green, then commit `refactor(config): drop the k8s catalog from the first-party defaults`
 
 ## 2. Test samples: a neutral second catalog
 
@@ -16,6 +16,6 @@
 
 ## 3. Rule files
 
-- [ ] 3.1 `AGENTS.md` (Beta promise bullet), `CONSTITUTION.md` and `openspec/config.yaml`: the beta-line list drops `opmodel.dev/catalogs/k8s@v1`
-- [ ] 3.2 `grep -rn -E 'catalogs/k8s|k8s catalog|raw (kubernetes )?catalog' --exclude-dir=archive --exclude-dir=.git --exclude=CHANGELOG.md .` returns only this change's own files
-- [ ] 3.3 `task lint`, `task test` and `task openspec:check` green, then commit `docs: drop the k8s catalog from the beta lines`
+- [x] 3.1 `AGENTS.md` (Beta promise bullet), `CONSTITUTION.md` and `openspec/config.yaml`: the beta-line list drops `opmodel.dev/catalogs/k8s@v1`
+- [x] 3.2 `grep -rn -E 'catalogs/k8s|k8s catalog|raw (kubernetes )?catalog' --exclude-dir=archive --exclude-dir=.git --exclude=CHANGELOG.md .` returns only this change's own files
+- [x] 3.3 `task lint`, `task test` and `task openspec:check` green, then commit `docs: drop the k8s catalog from the beta lines`
