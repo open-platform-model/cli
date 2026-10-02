@@ -9,10 +9,10 @@
 
 ## 2. Test samples: a neutral second catalog
 
-- [ ] 2.1 Swap `opmodel.dev/catalogs/k8s@v1` for `example.com/catalogs/extra@v1` (design D3) in `internal/cmd/platform/pull_test.go`, `internal/platform/generate_test.go`, `internal/platform/resolve_test.go`, `internal/platform/moduledeps_test.go`, `internal/platform/spec_test.go`, `internal/workflow/render/validation_test.go`
-- [ ] 2.2 `internal/workflow/render/replacements_test.go`: the k8s entry becomes `example.com/catalogs/extra@v1` with `replaceWith: "../catalog_extra"`
-- [ ] 2.3 `grep -rn 'catalogs/k8s' --include=*.go .` returns nothing
-- [ ] 2.4 `task lint` and `task test` green, then commit `test: use a neutral second catalog in samples`
+- [x] 2.1 Swap `opmodel.dev/catalogs/k8s@v1` for `example.com/catalogs/extra@v1` (design D3) in `internal/cmd/platform/pull_test.go`, `internal/platform/generate_test.go`, `internal/platform/resolve_test.go`, `internal/platform/moduledeps_test.go`, `internal/platform/spec_test.go`, `internal/workflow/render/validation_test.go`
+- [x] 2.2 `internal/workflow/render/replacements_test.go`: the k8s entry becomes `example.com/catalogs/extra@v1` with `replaceWith: "../catalog_extra"`
+- [x] 2.3 `grep -rn 'catalogs/k8s' --include=*.go .` returns nothing
+- [x] 2.4 `task lint` and `task test` green, then commit `test: use a neutral second catalog in samples`
 
 ## 3. Rule files
 

@@ -133,7 +133,7 @@ func TestReplacedModFiles(t *testing.T) {
 		ModuleRoot: moduleRoot,
 		Replacements: []loader.LocalReplacement{
 			{Path: "opmodel.dev/catalogs/opm@v4", ReplaceWith: "../" + filepath.Base(checkout)},
-			{Path: "opmodel.dev/catalogs/k8s@v1", ReplaceWith: "example.com/fork@v1", TargetVersion: "v1.0.0-alpha.2"},
+			{Path: "example.com/catalogs/extra@v1", ReplaceWith: "example.com/fork@v1", TargetVersion: "v1.0.0-alpha.2"},
 		},
 	})
 	base.graph["example.com/fork@v1.0.0-alpha.2"] = []platformmodule.Dep{{Path: "example.com/lib@v0", Version: "v0.1.0"}}
@@ -147,7 +147,7 @@ func TestReplacedModFiles(t *testing.T) {
 	})
 
 	t.Run("module target delegates at the target version", func(t *testing.T) {
-		mf, err := src.ModFile(ctx, module.MustNewVersion("opmodel.dev/catalogs/k8s@v1", "v1.0.0-alpha.2"))
+		mf, err := src.ModFile(ctx, module.MustNewVersion("example.com/catalogs/extra@v1", "v1.0.0-alpha.2"))
 		require.NoError(t, err)
 		assert.Contains(t, mf.Deps, "example.com/lib@v0")
 		assert.Equal(t, []string{"example.com/fork@v1.0.0-alpha.2"}, base.calls)

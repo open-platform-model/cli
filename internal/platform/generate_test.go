@@ -53,7 +53,7 @@ func fixtureGraph() *fakeModFiles {
 			{Path: "cue.dev/x/k8s.io@v0", Version: "v0.10.0"},
 			{Path: platformmodule.CorePath, Version: "v2.0.0-alpha.6"},
 		},
-		"opmodel.dev/catalogs/k8s@v1.0.0-alpha.2": {
+		"example.com/catalogs/extra@v1.0.0-alpha.2": {
 			{Path: platformmodule.CorePath, Version: "v2.0.0-alpha.6"},
 		},
 		"cue.dev/x/k8s.io@v0.10.0": nil,

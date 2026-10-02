@@ -47,11 +47,11 @@ func captureValidationOutput(t *testing.T, err error) (logs, details string) {
 func TestPrintValidationError_RenderErrorPrintsDiagnostics(t *testing.T) {
 	renderErr := &kernel.RenderError{
 		Err: &liberrors.UnresolvedDemandsError{Demands: []liberrors.UnresolvedDemand{
-			{Component: "web", Kind: "trait", FQN: "opmodel.dev/catalogs/opm@v4#Expose", Alternatives: []string{"opmodel.dev/catalogs/k8s@v1#Expose"}},
+			{Component: "web", Kind: "trait", FQN: "opmodel.dev/catalogs/opm@v4#Expose", Alternatives: []string{"example.com/catalogs/extra@v1#Expose"}},
 		}},
 		Diagnostics: kernel.RenderDiagnostics{
 			Unresolved: []liberrors.UnresolvedDemand{
-				{Component: "web", Kind: "trait", FQN: "opmodel.dev/catalogs/opm@v4#Expose", Alternatives: []string{"opmodel.dev/catalogs/k8s@v1#Expose"}},
+				{Component: "web", Kind: "trait", FQN: "opmodel.dev/catalogs/opm@v4#Expose", Alternatives: []string{"example.com/catalogs/extra@v1#Expose"}},
 			},
 			Unmatched: []liberrors.UnmatchedComponent{{
 				Component: "worker",
@@ -71,7 +71,7 @@ func TestPrintValidationError_RenderErrorPrintsDiagnostics(t *testing.T) {
 	assert.Contains(t, logs, "render failed")
 	assert.Contains(t, logs, renderErr.Err.Error(), "the kernel's message is printed verbatim")
 	assert.Contains(t, details, `component "web": unresolved trait demand "opmodel.dev/catalogs/opm@v4#Expose"`)
-	assert.Contains(t, details, "implemented at: opmodel.dev/catalogs/k8s@v1#Expose")
+	assert.Contains(t, details, "implemented at: example.com/catalogs/extra@v1#Expose")
 	assert.Contains(t, details, `component "worker": no transformer matched`)
 	assert.NotContains(t, details, "candidate", "the default output stays one line per unmatched component")
 	assert.Contains(t, details, `contract "opmodel.dev/contracts/ingress@v1"`)
