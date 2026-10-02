@@ -4,7 +4,7 @@ The release cascade (workspace RELEASING.md) moves upstream pins into each repo 
 
 - **CI layout today.** `pr.yml` runs seven independent jobs on `pull_request` (`lint` at `.github/workflows/pr.yml:29-45`); `ci.yml` runs `lint` and `unit` on every branch push (`.github/workflows/ci.yml:16-32`). Both `lint` jobs are named `Lint` and already set up Go 1.26.0. release-please runs as the opm-release-please App (`release.yml:68-81`), so its PRs and pushes to `release-please--branches--main--components--opm` trigger both workflows. No status check is required on `main`; active branch rulesets are `mention-guard` (required workflow on `main`) and `release-branches` (`release/*` only); `Protected` is disabled (read with `gh api repos/open-platform-model/cli/rulesets` on 2026-10-01; the tag rulesets `tags-create-app-only` and `tags-immutable` do not gate PRs).
 - **Pins G1 inspects.** `go.mod:13` requires `github.com/open-platform-model/library v1.0.0-beta.1` (the only OPM Go module; no `replace`). The templates pin core `v2.0.0-beta.1` and the opm catalog `v4.4.4` (`templates/*/cue.mod/module.cue`). `PinnedOperatorVersion = "v1.0.0-beta.2"` (`internal/operator/manifest.go:19`) matches the digest-pinned image at `internal/operator/dist/install.yaml:1611`; `task operator:sync` writes both (`Taskfile.yml:390-408`). No `cue.mod/local-module.cue` is tracked. On `origin/main` (f3569b24) every G1 check passes, verified by hand on 2026-10-01 with the commands in D1.
-- **Last released version.** `.release-please-manifest.json` holds `1.0.0-beta.4`; tag `v1.0.0-beta.4` pins operator `v1.0.0-beta.2`, the same as `main`.
+- **Last released version.** At this branch's base (`f3569b24`) `.release-please-manifest.json` holds `1.0.0-beta.4` and tag `v1.0.0-beta.4` pins operator `v1.0.0-beta.2`. Since then `main` gained cli PR 269 (`PinnedOperatorVersion = "v1.0.0-beta.4"`) and released `v1.0.0-beta.5` (PR 267), which embeds `v1.0.0-beta.4`. This change touches neither operator file, so the merged tree carries `main`'s pin.
 - **Labels.** `.github/workflows/labels.yml:18-22` runs `crazy-max/ghaction-github-labeler` v6.0.0 with `skip-delete: false`, as a dry run on PRs and for real on `main`, triggered only when `.github/labels.yml` changes. The repo holds five labels the file does not list (`gh label list`, 2026-10-01): `autorelease: pending` and `autorelease: tagged` (color `ededed`, no description), `dependencies` (`0366d6`, "Pull requests that update a dependency file"), `go` (`16e2e2`, "Pull requests that update go code") and `github_actions` (`000000`, "Pull requests that update GitHub Actions code"). The plan named only the first three; `go` and `github_actions` are Dependabot's ecosystem labels and would be deleted just the same.
 - **Merge settings.** `squash_merge_commit_title` is `COMMIT_OR_PR_TITLE` and `squash_merge_commit_message` is `COMMIT_MESSAGES` (`gh api repos/open-platform-model/cli`, 2026-10-01). `pr-title.yml:3-10` describes the `PR_TITLE` behavior.
 
@@ -14,14 +14,14 @@ The release cascade (workspace RELEASING.md) moves upstream pins into each repo 
 - G1 and G4 exist and run on release-please PRs, ready to be made required by the owner's ruleset.
 - The next label sync deletes nothing a tool relies on, and the cascade labels exist before the cascade runs.
 - Dependabot stops proposing library bumps.
-- Docs-only commits stop releasing (the owner's decision to hide `docs`, workspace RELEASING.md, section "Pin classes").
+- Docs-only commits stop releasing (owner decision 2026-10-01 (RELEASING.md, Pin classes)).
 - No comment in the repo describes the squash setting wrongly.
 
 **Non-Goals:**
 - The cascade task, the receiver and the notify job (`add-deps-cascade-task`, `join-release-cascade`).
 - G2 freshness and G3 settled statuses (set by the receiver in later phases).
 - The cluster-backed e2e CI job (`add-embedded-operator-e2e-job`), which retires G4.
-- Moving the embedded operator to beta.3 (a separate `fix(deps)` catch-up).
+- Moving the embedded operator (cli PR 269 already moved it to `v1.0.0-beta.4` on `main`).
 - Rulesets, merge settings, the cascade App and Environments (owner actions, RELEASING.md "Owner settings").
 
 ## Decisions
@@ -81,9 +81,21 @@ The labeler rewrites color and description to match the file, so listing a bot l
 
 ### D5: Hiding docs delays cli, library and operator docs fixes on the site
 
-The owner's decision to hide `docs` (workspace RELEASING.md, section "Pin classes") applies to cli. opmodel.dev's line versions build cli docs from the newest cli tag and library and opm-operator docs from exactly what that tag pins (`opmodel.dev/site/versions.conf` header; core and catalog_opm docs come from their `release/<prefix>vX.Y` branch or `main`, so they are unaffected). A docs-only fix therefore reaches the published site only after the next releasing commit in the cli (and, for library or operator docs, after the cascade has carried their next release into a cli release). This change does not work around that; it records the trade-off for the owner (open question Q1).
+Owner decision 2026-10-01 (RELEASING.md, Pin classes) hides `docs` in cli. opmodel.dev's line versions build cli docs from the newest cli tag and library and opm-operator docs from exactly what that tag pins (`opmodel.dev/site/versions.conf` header; core and catalog_opm docs come from their `release/<prefix>vX.Y` branch or `main`, so they are unaffected). A docs-only fix therefore reaches the published site only after the next releasing commit in the cli (and, for library or operator docs, after the cascade has carried their next release into a cli release). The owner resolved this on 2026-10-02 (RELEASING.md, Rollout and changes): a new opmodel.dev change, `build-docs-from-branch-head`, builds library, opm-operator and cli docs from their branch head like core and catalog_opm. Section 4 (the docs-hiding commit) MUST NOT merge before that change merges; if it does, a docs-only fix in this repo reaches opmodel.dev only with the next release.
 
 A second effect concerns templates. The AGENTS.md Template rule forces a template version bump for any change under `templates/<t>/`, and templates publish only from the release workflow. A `docs`-typed edit there would bump the template version yet publish nothing until the next releasing commit (PR #161, `docs(config): propose seeding both catalogs…`, touched `templates/`). AGENTS.md therefore states that edits under `templates/` are never typed `docs` (task 4.2).
+
+### D6: What `retire-g4-operator-embed-evidence` removes
+
+G4 is interim. It retires only when all of these hold: `add-embedded-operator-e2e-job` has merged, its e2e check ("E2E (kind, embedded operator)") has passed on at least one cli release PR, and the owner has made that check required (owner-approved 2026-10-02; RELEASING.md, Gates). Retiring it is its own later cli OpenSpec change, working name `retire-g4-operator-embed-evidence`. G4 is a whole workflow, not a step inside one, so that change removes, in this order:
+
+1. **Owner first:** the owner adds "E2E (kind, embedded operator)" to the cli ruleset's required checks and removes `G4 operator-embed evidence` from them. Deleting the workflow while its check is still required would leave every PR pending.
+2. A REMOVED delta for the `release-gates` requirement "A moved embedded operator on a release PR needs e2e evidence".
+3. `.github/workflows/release-evidence.yml` (the `G4 operator-embed evidence` check) and `.github/scripts/release-evidence.sh`, deleted.
+4. The `e2e-verified` entry in `.github/labels.yml` (the label sync then deletes the label from the repo) and the G4 sentence in `AGENTS.md`.
+5. A workspace PR updates RELEASING.md: the G4 row in "Gates", the `e2e-verified` row in "The cascade" › Labels, the G4 step in "Runbook" › "Merging release PRs", and the cli line in "Owner settings" › "Rulesets on main".
+
+Steps 2 to 4 are one `ci(release)` commit riding that change's PR, archive included. G1, including its operator-embed check, stays.
 
 ## Research & Decisions
 
@@ -122,15 +134,15 @@ A second effect concerns templates. The AGENTS.md Template rule forces a templat
 
 ## Risks / Trade-offs
 
-- [Gates are advisory until the ruleset requires them] → Owner action S0; RELEASING.md "Owner settings" must name the checks `Lint` and `G4 operator-embed evidence` (flagged to the workspace item; gate G-workspace checks it).
+- [Gates are advisory until the ruleset requires them] → Owner action S0; RELEASING.md "Owner settings" › "Rulesets on main" names the cli checks `Lint` and `G4 operator-embed evidence` (gate G-workspace checks it on workspace `main`).
 - [G1's `git ls-remote` makes the `lint` job depend on github.com] → Only on release PRs; a network failure fails closed and a re-run clears it.
 - [G4 label not tied to a SHA] → D3.
 - [A typo in the G1 step's `if:` would skip G1 forever while every local check passes] → gate G-release-pr-run reads the step on real release-please runs.
-- [Docs-only fixes no longer release] → D5, Q1.
+- [Docs-only fixes no longer release, so they reach opmodel.dev late] → D5; gated on opmodel.dev `build-docs-from-branch-head` merging before section 4 merges. Until it merges, a docs-only fix in this repo reaches opmodel.dev only with the next release.
 - [The labels PR's dry run is the only pre-merge proof of D4] → Task 3.1 compares the file against `gh label list` before commit; gate G-labels-dry-run reads the dry-run log on the PR.
 
 ## Open Questions
 
-- **Q1 (owner)**: should opmodel.dev build cli (and library, operator) docs from the release-branch head like core and catalog_opm, so hiding `docs` does not delay docs fixes? Outside this repo.
+- **Q1 (owner, resolved 2026-10-02)**: opmodel.dev builds library, opm-operator and cli docs from the branch head like core and catalog_opm (change `build-docs-from-branch-head`); see D5.
 - **Q2 (owner)**: add the unit test of the Research section as well, so a mismatched embed fails every PR, not only release PRs?
 - **Q3 (owner)**: `amannn/action-semantic-pull-request` can also validate a single commit's subject (`validateSingleCommit`, `validateSingleCommitMatchesPrTitle`), which closes the `COMMIT_OR_PR_TITLE` gap without the owner setting. It would also reject a one-commit cascade PR whose commit subject is not conventional, so it needs `add-deps-cascade-task` to agree. Not in this change.
