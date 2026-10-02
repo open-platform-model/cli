@@ -406,3 +406,11 @@ tasks:
       - perl -pi -e 's/^const PinnedOperatorVersion = ".*"/const PinnedOperatorVersion = "{{.VERSION}}"/' internal/operator/manifest.go
       - gofmt -w internal/operator/manifest.go
       - echo "Synced embedded operator manifest to {{.VERSION}}"
+
+  #########################
+  ## Release tasks
+  #########################
+  deps:release-check:
+    desc: "Check release pins (G1): no replace, published OPM pins, no dev template pins, operator embed matches its pin"
+    cmds:
+      - .github/scripts/release-pin-check.sh
