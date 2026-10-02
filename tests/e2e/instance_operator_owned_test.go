@@ -186,6 +186,35 @@ func resetOperatorOwnedInstance(t *testing.T, kubeconfig string) {
 	waitForNoInstancePods(t, kubeconfig)
 }
 
+// logOperatorOwnedDiagnostics, registered as a t.Cleanup right after
+// resetOperatorOwnedInstance's (cleanups run last-in-first-out, so it runs
+// first), logs the evidence of a failure while it still exists: the test's
+// ModuleInstance, the cluster Platform and the operator's logs. Once the reset
+// cleanup and the later lifecycle test have run, all three are gone or replaced.
+// Best effort: a kubectl error is logged, never fails the test.
+func logOperatorOwnedDiagnostics(t *testing.T, kubeconfig string) {
+	t.Helper()
+	if !t.Failed() {
+		return
+	}
+
+	for _, args := range [][]string{
+		{"get", "moduleinstance", operatorOwnedInstance, "-n", operatorOwnedNamespace, "-o", "yaml"},
+		{"get", "platform", "cluster", "-o", "yaml"},
+		{"-n", operatorNamespace, "logs", "deploy/" + operatorDeployment, "--tail=300"},
+	} {
+		fullArgs := append([]string{"--kubeconfig", kubeconfig, "--context", kindContext}, args...)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		out, err := exec.CommandContext(ctx, "kubectl", fullArgs...).CombinedOutput()
+		cancel()
+		if err != nil {
+			t.Logf("diagnostics: kubectl %s: %v\n%s", strings.Join(args, " "), err, out)
+			continue
+		}
+		t.Logf("diagnostics: kubectl %s\n%s", strings.Join(args, " "), out)
+	}
+}
+
 // applyCLIOwned deploys the fixture as a CLI-owned instance and waits for its
 // Deployment to roll out.
 func applyCLIOwned(t *testing.T, kubeconfig string) {
@@ -238,8 +267,11 @@ func makeOperatorOwned(t *testing.T, kubeconfig string) {
 		}
 		time.Sleep(2 * time.Second)
 	}
-	t.Fatalf("operator did not reconcile generation %d of %s/%s within 3m",
-		generation, operatorOwnedNamespace, operatorOwnedInstance)
+	t.Fatalf("operator did not reconcile generation %d of %s/%s within 3m; Ready condition: %s",
+		generation, operatorOwnedNamespace, operatorOwnedInstance,
+		instanceField(t, kubeconfig,
+			`{range .status.conditions[?(@.type=="Ready")]}status={.status} reason={.reason} `+
+				`observedGeneration={.observedGeneration} message={.message}{end}`))
 }
 
 // swapFixtureReplicas rewrites one line of the fixture and returns a function
@@ -269,6 +301,7 @@ func TestE2E_ThinEditor_ValuesRoundTrip(t *testing.T) {
 	requireReconcilingOperator(t, kubeconfig)
 
 	t.Cleanup(func() { resetOperatorOwnedInstance(t, kubeconfig) })
+	t.Cleanup(func() { logOperatorOwnedDiagnostics(t, kubeconfig) })
 	resetOperatorOwnedInstance(t, kubeconfig)
 	makeOperatorOwned(t, kubeconfig)
 	require.Equal(t, "1", instanceField(t, kubeconfig, "{.spec.values.replicas}"))
@@ -310,7 +343,10 @@ func TestE2E_Delete_OperatorOwnedDelegates(t *testing.T) {
 	requireReconcilingOperator(t, kubeconfig)
 	t.Cleanup(func() { resetOperatorOwnedInstance(t, kubeconfig) })
 
+	// Each subtest resets the instance first, which would wipe the previous
+	// subtest's evidence, so the diagnostics cleanup is registered per subtest.
 	t.Run("without spec.prune the operator orphans the workloads, and the CLI says so", func(t *testing.T) {
+		t.Cleanup(func() { logOperatorOwnedDiagnostics(t, kubeconfig) })
 		resetOperatorOwnedInstance(t, kubeconfig)
 		makeOperatorOwned(t, kubeconfig)
 
@@ -331,6 +367,7 @@ func TestE2E_Delete_OperatorOwnedDelegates(t *testing.T) {
 	})
 
 	t.Run("with spec.prune the operator removes the workloads", func(t *testing.T) {
+		t.Cleanup(func() { logOperatorOwnedDiagnostics(t, kubeconfig) })
 		resetOperatorOwnedInstance(t, kubeconfig)
 		makeOperatorOwned(t, kubeconfig)
 
