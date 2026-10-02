@@ -5,7 +5,10 @@ name: PR Title
 # That title equals the PR title only once the repo's
 # squash_merge_commit_title is PR_TITLE (owner setting, workspace RELEASING.md,
 # section "Owner settings"); until then a one-commit PR squashes under its
-# commit subject, so that subject must be a Conventional Commit too.
+# commit subject, so that subject must be a Conventional Commit too. The squash
+# body is BLANK, so the PR title is all release-please reads: a breaking change
+# is a "!" in the title, and a forced version is a release-as key in
+# release-please-config.json, landed by a normal PR.
 # A non-conventional PR title (e.g. a branch name like "Feat/cli cr inventory
 # backend", PR #111) produces an unparseable merge commit, so release-please
 # silently skips it and cuts no release. This check fails the PR until its
