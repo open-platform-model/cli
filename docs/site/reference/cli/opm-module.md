@@ -50,7 +50,7 @@ Deploy an OPM module to a Kubernetes cluster by synthesizing a `#ModuleInstance`
 
 A published module is fetched from the registry at the version `--version` selects (v1: newest in major 1; 1.0.4: that release; none: newest release of the highest major built on this CLI's core), resolved before the cluster is contacted.
 
-The synthetic instance defaults to `<module>-debug`. `--name` and `--namespace` participate in instance identity (different values produce different instances, each with its own ModuleInstance CR). The ModuleInstance CRD must be installed first (run `opm operator install --crds-only`). For persistent deploys, author a `instance.cue` file and use `opm instance apply` instead.
+The synthetic instance defaults to `<module>-debug`. `--name` and `--namespace` participate in instance identity (different values produce different instances, each with its own ModuleInstance CR). The ModuleInstance CRD must be installed first (run `opm operator install --crds-only`). For persistent deploys, author an `instance.cue` file and use `opm instance apply` instead.
 
 When switching from `opm module apply` to `opm instance apply` (or vice versa) with a different instance name, delete the previous instance first to avoid orphan inventory:
 
@@ -219,7 +219,7 @@ A bare-word template (letters, digits, underscores) is a shortcut into the offic
 
 Scaffolding requires the registry once for an uncached template; after any successful fetch, CUE's module cache serves repeats offline. No template is embedded in the binary.
 
-Run against a directory that already holds a module, init detects a missing or disagreeing cue.mod module line or identity package, shows exactly what it would create or edit, and asks before writing (D20). It never invents identity: the module path and version always come from the tree or from your arguments.
+Run against a directory that already holds a module, init detects a missing or disagreeing cue.mod module line or identity package, shows exactly what it would create or edit, and asks before writing. It never invents identity: the module path and version always come from the tree or from your arguments.
 
 Exit codes: 0 scaffolded or repaired, 2 refused, 3 registry unreachable.
 
@@ -300,7 +300,7 @@ Work with the official module templates.
 opm module template [command]
 ```
 
-Work with the official module templates — the curated set published to the reserved `opmodel.dev/templates` segment by the cli's own release pipeline (0011:D25).
+Work with the official module templates — the curated set published to the reserved `opmodel.dev/templates` segment by the cli's own release pipeline.
 
 **Subcommands**
 

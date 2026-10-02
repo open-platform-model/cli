@@ -43,7 +43,7 @@ re-identifying it to your module path, or repair an existing module tree.
 
 	Run against a directory that already holds a module, init detects a missing
 	or disagreeing cue.mod module line or identity package, shows exactly what
-	it would create or edit, and asks before writing (D20). It never invents
+	it would create or edit, and asks before writing. It never invents
 	identity: the module path and version always come from the tree or from
 	your arguments.
 

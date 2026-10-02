@@ -55,7 +55,7 @@ over-subscribed   exits with the validation error code, because a platform
 comparable        exits with the validation error code — every component
                   the narrower transformer matches is also matched by the
                   broader one, so both would render and nothing tells them
-                  apart (0015:D5)
+                  apart
 unfulfilled       exits 0 — a platform may define a contract ahead of the
                   provider that implements it, and an unmet demand is
                   refused by the render that demands it

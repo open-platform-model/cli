@@ -9,14 +9,16 @@ import (
 	"github.com/open-platform-model/cli/internal/scaffold"
 )
 
-// NewModuleTemplateCmd creates the module template command group.
+// NewModuleTemplateCmd creates the module template command group. The
+// official templates live in the reserved opmodel.dev/templates segment
+// (0011:D25).
 func NewModuleTemplateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "template",
 		Short: "Work with the official module templates",
 		Long: `Work with the official module templates — the curated set published to
 the reserved opmodel.dev/templates segment by the cli's own release
-pipeline (0011:D25).`,
+pipeline.`,
 	}
 	c.AddCommand(newModuleTemplateListCmd())
 	return c
