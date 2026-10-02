@@ -1,12 +1,11 @@
 ## Context
 
-`internal/config/templates.go` declares `DefaultCatalogPaths = []string{"opmodel.dev/catalogs/opm@v4", "opmodel.dev/catalogs/k8s@v1"}` and derives `DefaultCatalogPath = DefaultCatalogPaths[0]`; `internal/platform/catalog.go` re-exports the latter for `opm operator install`. Everything else that reads the slice is a test (`internal/config/platform_test.go`, which also checks it against `hack/platform`). The k8s path appears as a sample "second catalog" in seven test files, all over fake graphs or decoded data, none resolving it. Four tests and one site page name the catalog checkout `../catalog_opm/opm`.
+`internal/config/templates.go` declares `DefaultCatalogPaths = []string{"opmodel.dev/catalogs/opm@v4", "opmodel.dev/catalogs/k8s@v1"}` and derives `DefaultCatalogPath = DefaultCatalogPaths[0]`; `internal/platform/catalog.go` re-exports the latter for `opm operator install`. Everything else that reads the slice is a test (`internal/config/platform_test.go`, which also checks it against `hack/platform`). The k8s path appears as a sample "second catalog" in seven test files, all over fake graphs or decoded data, none resolving it.
 
 ## Goals / Non-Goals
 
 **Goals:**
 - No first-party reference to `opmodel.dev/catalogs/k8s@v1` in code, fixtures, rule files or docs.
-- Every test that reads the catalog checkout reads `catalog_opm/src` and fails or skips by name, never silently.
 
 **Non-Goals:**
 - Refusing or warning about a user platform that still subscribes to `k8s@v1`; it keeps resolving.
@@ -33,10 +32,6 @@ const DefaultCatalogPath = "opmodel.dev/catalogs/opm@v4"
 
 It sorts before `opmodel.dev/catalogs/opm@v4` exactly as `opmodel.dev/catalogs/k8s@v1` did, so `resolve_test.go` (the `Describe()` order), `spec_test.go` ("entries are sorted by path"), `replacements_test.go` (`got[2]`/`got[3]`) and the alias numbering they assert keep their order. `validation_test.go` used `k8s@v1#Expose` as an alternative implementer, which the k8s catalog never had (it shipped no traits); the sample fits it better. `replacements_test.go`'s `"../catalog_k8s"` becomes `"../catalog_extra"`.
 
-### D4. `TestRealTree_CatalogOpm` names what it skipped
-
-It reads `../../../catalog_opm/src`. Its skip message names that path, so a missing checkout reads as a skip of a named directory in `go test -v`, not as a pass.
-
 ## Research & Decisions
 
 ### Which references are real
@@ -51,5 +46,4 @@ It reads `../../../catalog_opm/src`. Its skip message names that path, so a miss
 ## Risks / Trade-offs
 
 - [`platform-pins.sh` fails on the missing key] → The workspace change lands first or with this PR (proposal, Impact).
-- [Section 3 lands before catalog_opm moves] → The local-checkout tests skip by name until it does; the proposal orders section 3 after `retire-k8s-catalog`.
 - [The e2e kind platform loses a catalog an e2e test relied on] → Section 1 runs `task test:e2e` against the kind cluster with the edited `hack/kind-platform.yaml`; no e2e test renders a k8s member (none imports it).

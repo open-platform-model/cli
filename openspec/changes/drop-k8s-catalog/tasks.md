@@ -14,16 +14,8 @@
 - [ ] 2.3 `grep -rn 'catalogs/k8s' --include=*.go .` returns nothing
 - [ ] 2.4 `task lint` and `task test` green, then commit `test: use a neutral second catalog in samples`
 
-## 3. The catalog checkout lives at catalog_opm/src (after catalog_opm retire-k8s-catalog merges)
+## 3. Rule files
 
-- [ ] 3.1 `internal/publish/realtree_test.go`: read `../../../catalog_opm/src`; the skip message names the path (design D4)
-- [ ] 3.2 `internal/workflow/render/replacements_test.go`, `module_test.go`, `instance_deps_test.go`: `../catalog_opm/opm` becomes `../catalog_opm/src` (and `/home/dev/catalog_opm/src`)
-- [ ] 3.3 `docs/site/extending/publish-a-catalog.md`: the "Check against" paths name `catalog_opm/src/`
-- [ ] 3.4 `go test -v -run TestRealTree_CatalogOpm ./internal/publish/` runs (not skips) with the workspace checkout beside `cli/`
-- [ ] 3.5 `task lint`, `task test` and `task openspec:check` green, then commit `test: read the opm catalog checkout from catalog_opm/src`
-
-## 4. Rule files
-
-- [ ] 4.1 `AGENTS.md` (Beta promise bullet), `CONSTITUTION.md` and `openspec/config.yaml`: the beta-line list drops `opmodel.dev/catalogs/k8s@v1`
-- [ ] 4.2 `grep -rn -E 'catalogs/k8s|k8s catalog|raw (kubernetes )?catalog|catalog_opm/opm' --exclude-dir=archive --exclude-dir=.git --exclude=CHANGELOG.md .` returns only this change's own files
-- [ ] 4.3 `task lint` and `task test` green, then commit `docs: drop the k8s catalog from the beta lines`
+- [ ] 3.1 `AGENTS.md` (Beta promise bullet), `CONSTITUTION.md` and `openspec/config.yaml`: the beta-line list drops `opmodel.dev/catalogs/k8s@v1`
+- [ ] 3.2 `grep -rn -E 'catalogs/k8s|k8s catalog|raw (kubernetes )?catalog' --exclude-dir=archive --exclude-dir=.git --exclude=CHANGELOG.md .` returns only this change's own files
+- [ ] 3.3 `task lint`, `task test` and `task openspec:check` green, then commit `docs: drop the k8s catalog from the beta lines`
