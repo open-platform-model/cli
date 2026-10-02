@@ -4,7 +4,7 @@
 - [x] 1.2 `hack/platform/platform.cue` and `hack/platform/cue.mod/module.cue`: drop the k8s import, `#registry` entry and dep; `cue mod tidy` in `hack/platform`
 - [x] 1.3 `hack/kind-platform.yaml`: drop the `opmodel.dev/catalogs/k8s@v1` entry
 - [x] 1.4 `internal/config/platform_test.go`: lines 59 and 143 check `DefaultCatalogPath`; rewrite `TestBuildPlatformModule_KeyImportDriftNamesTheEntry` per design D2 and record the measured re-keying (or the deletion and core's covering test) in design.md
-- [ ] 1.5 `task test:e2e` against the kind cluster with the edited platform
+- [x] 1.5 `task test:e2e` against the kind cluster with the edited platform
 - [x] 1.6 `task lint` and `task test` green, then commit `refactor(config): drop the k8s catalog from the first-party defaults`
 
 ## 2. Test samples: a neutral second catalog
