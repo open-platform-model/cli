@@ -140,7 +140,9 @@ applies := event == workflow_dispatch
 with `APPLY_PATHS` as listed in the `e2e-cluster-workflow` spec. `deps/cascade` is the one rolling
 cascade branch (workspace RELEASING.md, section "The cascade", "One rolling PR per repo"), so a
 cascade PR applies even after someone removes its label. Labels and files come from the API
-(`gh pr view <n> --json labels`, `gh api --paginate repos/{repo}/pulls/<n>/files`). Every step after
+(`gh pr view <n> --json labels`, `gh api --paginate repos/{repo}/pulls/<n>/files`). A renamed
+file contributes both its `filename` and its `previous_filename`, so moving a file out of an apply
+path still applies. Every step after
 `decide` carries `if: steps.decide.outputs.applies == 'true'`.
 
 Why every condition reads live state: a required check is satisfied by the newest run for the head

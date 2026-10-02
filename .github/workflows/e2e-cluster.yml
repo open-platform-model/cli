@@ -1,0 +1,149 @@
+name: E2E Cluster
+# The cluster-backed e2e suite against the operator the CLI embeds: a kind
+# cluster prepared with the local loop's own tasks (task cluster:create, task
+# cluster:operator), a registry seeded from the tree, and the whole tests/e2e
+# suite with OPM_E2E_REQUIRE_CLUSTER=1, so no cluster test can pass by skipping.
+#
+# The workflow triggers on every pull request and decides inside the job
+# (.github/scripts/e2e-cluster-applies.sh) whether to do the work: on operator,
+# template and Platform changes, on the job's own inputs, on the cascade pull
+# request and on release pull requests. Otherwise the job passes in seconds and
+# says why. A paths: filter or a job-level if: would leave a required check
+# pending or report a skip as a pass, so neither is used.
+on:
+  pull_request:
+    branches:
+      - main
+    # labeled/unlabeled: the deps-cascade label is a condition, and a label
+    # added after opening must start a run that sees it.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-cluster:
+    name: E2E (kind, embedded operator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Job-level permissions replace the workflow's, so contents: read (for
+    # checkout) is restated next to pull-requests: read (labels and files).
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      # The CLI on the runner reads the tree's fixtures from the seeded
+      # registry on localhost:5000; the operator reads the same container by its
+      # name on kind's network (KIND_CUE_REGISTRY, applied by cluster:operator
+      # as the operator's --registry). Core and the catalogs come from GHCR on
+      # both sides, so a PR that bumps a fixture is tested before GHCR holds it.
+      CUE_REGISTRY: 'testing.opmodel.dev=localhost:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+      OPM_REGISTRY: 'testing.opmodel.dev=localhost:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+      KIND_CUE_REGISTRY: 'testing.opmodel.dev=opm-registry:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
+      CUE_CACHE_DIR: ${{ github.workspace }}/.cue-cache
+      OPM_BIN: ./bin/opm
+      OPM_E2E_REQUIRE_CLUSTER: '1'
+    steps:
+      # Ungated: the decision script lives in the tree.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Decide whether the cluster suite applies
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          labels=$(mktemp) files=$(mktemp)
+          # Read live, never from the event payload: the decision must depend
+          # only on the pull request's current state.
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' >"$labels"
+            gh api --paginate "repos/$GH_REPO/pulls/$PR_NUMBER/files" \
+              --jq '.[] | .filename, (.previous_filename // empty)' >"$files"
+          fi
+          .github/scripts/e2e-cluster-applies.sh "$EVENT_NAME" "$HEAD_REF" "$labels" "$files"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: steps.decide.outputs.applies == 'true'
+        with:
+          go-version: '1.26.0'
+
+      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
+        if: steps.decide.outputs.applies == 'true'
+        with:
+          version: 3.x
+
+      - name: Install kind
+        if: steps.decide.outputs.applies == 'true'
+        # Same version and checksum as pr.yml's integration job.
+        run: |
+          KIND_VERSION="v0.31.0"
+          curl -Lo ./kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          echo "eb244cbafcc157dff60cf68693c14c9a75c4e6e6fedaf9cd71c58117cb93e3fa  ./kind" | sha256sum -c -
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+      - name: Install cue and crane
+        if: steps.decide.outputs.applies == 'true'
+        # crane must be present: without it the operator lifecycle test takes
+        # its developer-machine fallback and asserts a rollout failure.
+        run: |
+          go install cuelang.org/go/cmd/cue@v0.17.1
+          go install github.com/google/go-containerregistry/cmd/crane@v0.22.1
+
+      - name: Build opm
+        if: steps.decide.outputs.applies == 'true'
+        run: task build
+
+      - name: Start and seed the registry
+        if: steps.decide.outputs.applies == 'true'
+        # A named container, not a services: registry: kind's node must reach
+        # it by name once cluster:operator joins it to the kind network.
+        run: |
+          docker run -d --name opm-registry -p 5000:5000 registry:2
+          for _ in $(seq 1 30); do curl -fsS http://localhost:5000/v2/ >/dev/null && break; sleep 1; done
+          hack/fixtures.sh seed
+
+      - name: Create the kind cluster
+        if: steps.decide.outputs.applies == 'true'
+        run: task cluster:create
+
+      - name: Install the embedded operator and wait for a Ready Platform
+        if: steps.decide.outputs.applies == 'true'
+        run: task cluster:operator
+
+      # -timeout matches task test:e2e; see that task's summary.
+      - name: Run E2E tests (cluster required)
+        if: steps.decide.outputs.applies == 'true'
+        run: go test ./tests/e2e/... -v -timeout 25m
+
+      - name: Cluster diagnostics
+        if: failure() && steps.decide.outputs.applies == 'true'
+        run: |
+          set +e
+          ctx=kind-opm-dev
+          echo "::group::operator logs"
+          kubectl --context "$ctx" -n opm-operator-system logs deploy/opm-operator-controller-manager --tail=500 --all-containers
+          echo "::endgroup::"
+          echo "::group::operator deployment"
+          kubectl --context "$ctx" -n opm-operator-system get deploy,pods -o wide
+          kubectl --context "$ctx" -n opm-operator-system get deploy/opm-operator-controller-manager -o jsonpath='{.spec.template.spec.containers[0].args}'; echo
+          echo "::endgroup::"
+          echo "::group::Platform/cluster"
+          kubectl --context "$ctx" get platform cluster -o yaml
+          echo "::endgroup::"
+          echo "::group::ModuleInstances"
+          kubectl --context "$ctx" get moduleinstances -A -o yaml
+          echo "::endgroup::"
+          echo "::group::recent events"
+          kubectl --context "$ctx" get events -A --sort-by=.lastTimestamp | tail -100
+          echo "::endgroup::"
+          exit 0
