@@ -25,8 +25,24 @@ const pinnedInstallYAMLRelPath = "../../internal/operator/dist/install.yaml"
 
 var pinnedImageRe = regexp.MustCompile(`image:\s*(\S+)`)
 
-// requireKindCluster skips the test if the kind-opm-dev cluster is not
-// reachable, and returns the real (non-HOME-overridden) kubeconfig path.
+// requireClusterEnv opts a run into treating a missing or unusable cluster as
+// a failure. CI's cluster job sets it, so a cluster-backed test cannot pass by
+// skipping; unset, the suite skips cluster tests as a developer machine needs.
+const requireClusterEnv = "OPM_E2E_REQUIRE_CLUSTER"
+
+// skipOrFailf skips, or fails when the run requires the cluster. A failure
+// carries the variable as a prefix, so the log says why a skip became a failure.
+func skipOrFailf(t *testing.T, format string, args ...any) {
+	t.Helper()
+	if os.Getenv(requireClusterEnv) == "1" {
+		t.Fatalf(requireClusterEnv+"=1: "+format, args...)
+	}
+	t.Skipf(format, args...)
+}
+
+// requireKindCluster skips the test (or fails it, see skipOrFailf) if the
+// kind-opm-dev cluster is not reachable, and returns the real
+// (non-HOME-overridden) kubeconfig path.
 func requireKindCluster(t *testing.T) string {
 	t.Helper()
 
@@ -34,14 +50,15 @@ func requireKindCluster(t *testing.T) string {
 	require.NoError(t, err)
 	kubeconfig := filepath.Join(realHome, ".kube", "config")
 	if _, statErr := os.Stat(kubeconfig); statErr != nil {
-		t.Skipf("no kubeconfig at %q; skipping operator e2e", kubeconfig)
+		skipOrFailf(t, "no kubeconfig at %q, so context %q cannot be reached; run `task cluster:create`",
+			kubeconfig, kindContext)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := exec.CommandContext(ctx, "kubectl", "--kubeconfig", kubeconfig, "--context", kindContext,
 		"cluster-info").Run(); err != nil {
-		t.Skipf("kind cluster %q not reachable; run `task cluster:create`: %v", kindContext, err)
+		skipOrFailf(t, "kind cluster %q not reachable; run `task cluster:create`: %v", kindContext, err)
 	}
 
 	return kubeconfig

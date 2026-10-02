@@ -234,9 +234,9 @@ today's `e2e` job. The switch changes only the skip branches in `requireKindClus
 "could not check" branch of `requireOperatorApplierGrant`:
 
 ```go
-// skipOrFail skips, or fails when the run requires the cluster. A failure
+// skipOrFailf skips, or fails when the run requires the cluster. A failure
 // carries the variable as a prefix, so the log says why a skip became a failure.
-func skipOrFail(t *testing.T, format string, args ...any) {
+func skipOrFailf(t *testing.T, format string, args ...any) {
 	t.Helper()
 	if os.Getenv("OPM_E2E_REQUIRE_CLUSTER") == "1" {
 		t.Fatalf("OPM_E2E_REQUIRE_CLUSTER=1: "+format, args...)

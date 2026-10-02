@@ -110,7 +110,7 @@ the "G4 replacement" bullet).
 ## Impact
 
 - **Affected files:** `.github/workflows/e2e-cluster.yml` and `.github/scripts/e2e-cluster-applies.sh`
-  (new), `tests/e2e/operator_test.go` (`requireKindCluster`, new `skipOrFail`),
+  (new), `tests/e2e/operator_test.go` (`requireKindCluster`, new `skipOrFailf`),
   `tests/e2e/instance_operator_owned_test.go` (`requireOperatorApplierGrant`), `Taskfile.yml`
   (`cluster:operator`), the cli dev guidance that names `task cluster:operator`, plus this change's
   design.md for the spike record.

@@ -122,7 +122,8 @@ func operatorApplierIdentity(t *testing.T, kubeconfig string) string {
 // patch the two representative kinds every fixture renders. An explicit "no"
 // is a preparation mistake on a reachable cluster and FAILS; anything other
 // than "yes"/"no" (kubectl error, test user lacking `impersonate`) means the
-// check could not be performed and follows the reachability rule: skip.
+// check could not be performed and follows the reachability rule: skip, or
+// fail when the run requires the cluster (skipOrFailf).
 func requireOperatorApplierGrant(t *testing.T, kubeconfig string) {
 	t.Helper()
 
@@ -146,8 +147,8 @@ func requireOperatorApplierGrant(t *testing.T, kubeconfig string) {
 				"(hack/kind-operator-rbac.yaml) is missing; `opm operator install` does not apply it. "+
 				"Run `task cluster:operator`.", identity, resource, operatorOwnedNamespace)
 		default:
-			t.Skipf("could not check whether %s may patch %s in namespace %q (kubectl auth can-i: %v: %s); "+
-				"skipping operator e2e", identity, resource, operatorOwnedNamespace, err, answer)
+			skipOrFailf(t, "could not check whether %s may patch %s in namespace %q (kubectl auth can-i: %v: %s)",
+				identity, resource, operatorOwnedNamespace, err, answer)
 		}
 	}
 }
