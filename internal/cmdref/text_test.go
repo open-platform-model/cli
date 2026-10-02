@@ -87,7 +87,7 @@ func TestEscapeShortcodes(t *testing.T) {
 	assert.Equal(t, "{{</* opm/x */>}} {{%/* y */%}}", escapeShortcodes("{{< opm/x >}} {{% y %}}"))
 }
 
-func TestFormatProse_JoinsNeighbouringCodeWords(t *testing.T) {
+func TestFormatProse_JoinsNeighboringCodeWords(t *testing.T) {
 	assert.Equal(t, "Pass `--platform <dir>` to render.", formatProse("Pass --platform <dir> to render."))
 	assert.Equal(t, "with `--platform ~/.opm/platform` to keep", formatProse("with --platform ~/.opm/platform to keep"))
 	assert.Equal(t, "(`--registry`, then `OPM_REGISTRY`)", formatProse("(--registry, then OPM_REGISTRY)"))

@@ -230,7 +230,7 @@ func joinProse(lines []string) string {
 // formatProse turns one line of plain help text into Markdown. Words that
 // name code (flags, paths, placeholders, environment variables, CUE
 // definitions, file names) and single-quoted spans become code spans, so the
-// site never reads them as markup or links; neighbouring code words separated
+// site never reads them as markup or links; neighboring code words separated
 // by one space share one span (--platform <dir>). Every other Markdown
 // character is escaped. The words themselves are unchanged.
 func formatProse(s string) string {
