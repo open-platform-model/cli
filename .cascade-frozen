@@ -9,4 +9,4 @@ frozen:
     reason: "Its too-old platforms pin core alpha.6, alpha.9 and alpha.11 to be refused naming the release that derives each missing field, and collisionCoreVersion v2.0.0-alpha.13 is the first core that reports contract collisions instead of failing the fold."
   - path: internal/instinit/render_test.go
     pins: ["opmodel.dev/core@v2"]
-    reason: "TestRender_Golden feeds core v2.0.0-alpha.10 into Render and asserts the exact rendered module.cue text carrying it, so the literal is expected output that is never resolved and moving it would prove nothing new."
+    reason: "TestRender_Golden feeds core v2.0.0-alpha.10 into Render and asserts the exact rendered module.cue text carrying it; the literal is expected output that is never resolved, so it stays as written and is not a stale pin."
