@@ -17,11 +17,14 @@ cd "$(git rev-parse --show-toplevel)"
 failures=()
 fail() { failures+=("release-pin: $1"); }
 
+# Read go.mod once; a failed read stops the gate instead of reading as "no pins".
+gomod=$(go mod edit -json) || { echo "release-pin: go.mod: go mod edit -json failed; cannot check Go pins" >&2; exit 1; }
+
 # 1. No replace directive in go.mod.
-if ! go mod edit -json | jq -e '.Replace == null' >/dev/null; then
+if ! jq -e '.Replace == null' >/dev/null <<<"$gomod"; then
   while IFS= read -r line; do
     fail "go.mod: replace directive ${line} (remove it; release against published modules)"
-  done < <(go mod edit -json | jq -r '.Replace[] | "\(.Old.Path) => \(.New.Path)\(if .New.Version then "@" + .New.Version else "" end)"')
+  done < <(jq -r '.Replace[] | "\(.Old.Path) => \(.New.Path)\(if .New.Version then "@" + .New.Version else "" end)"' <<<"$gomod")
 fi
 
 # 2. Every OPM Go pin is a tagged release, never a pseudo-version.
@@ -34,15 +37,16 @@ while read -r path version; do
   fi
   repo=$(sed -E 's#/v[0-9]+$##' <<<"$path")
   rc=0
-  git ls-remote --exit-code --tags "https://${repo}.git" "refs/tags/${version}" </dev/null >/dev/null 2>&1 || rc=$?
+  GIT_TERMINAL_PROMPT=0 git ls-remote --exit-code --tags "https://${repo}.git" "refs/tags/${version}" </dev/null >/dev/null 2>&1 || rc=$?
   case "$rc" in
     0) ;;
     2) fail "go.mod: ${path} ${version} has no tag ${version} in ${repo} (pin a published release)" ;;
     *) fail "go.mod: ${path} ${version}: lookup failure, git ls-remote exited ${rc} for https://${repo}.git (re-run when github.com is reachable)" ;;
   esac
-done < <(go mod edit -json | jq -r '.Require[]? | select(.Path | startswith("github.com/open-platform-model/")) | "\(.Path) \(.Version)"')
+done < <(jq -r '.Require[]? | select(.Path | startswith("github.com/open-platform-model/")) | "\(.Path) \(.Version)"' <<<"$gomod")
 
 # 3. No development CUE pin in a shipped template.
+compgen -G 'templates/*/cue.mod/module.cue' >/dev/null || fail "templates/*/cue.mod/module.cue: no template module found"
 while IFS= read -r hit; do
   [ -n "$hit" ] || continue
   fail "${hit%%:*}: dev pin at line $(cut -d: -f2 <<<"$hit"): $(cut -d: -f3- <<<"$hit" | sed 's/^[[:space:]]*//') (pin a published release with cue mod get)"
