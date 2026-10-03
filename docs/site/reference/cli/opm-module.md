@@ -81,7 +81,7 @@ module-path   Published module path without a major, e.g.
 | `--no-prune` |  | bool |  | Skip stale resource pruning. |
 | `--platform` |  | string |  | Platform module directory (overrides the cluster Platform and the module's own deps). |
 | `--skip-unprovided` |  | bool |  | Render what the platform can: skip provider-fulfilled contracts nothing on the platform provides, and report each one. |
-| `--timeout` |  | duration | `5m0s` | Bound on the `--wait` readiness wait and on the operator-reconcile wait (operator-managed instances). |
+| `--timeout` |  | duration | `5m0s` | Bound on the CustomResourceDefinition establish wait (counted from the start of the apply), on the `--wait` readiness wait, and on the operator-reconcile wait (operator-managed instances). |
 | `--values` | `-f` | stringArray |  | Additional values files (can be repeated). |
 | `--version` |  | string |  | Version of a published module: vN takes the newest in major N, X.Y.Z pins (default: highest major on this CLI's core). |
 | `--wait` |  | bool |  | Wait until every applied resource is healthy before returning (skipped on `--dry-run`; operator-managed instances always wait for the operator). |

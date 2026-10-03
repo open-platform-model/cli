@@ -49,7 +49,7 @@ var knownKindResources = map[string]string{
 	"PodDisruptionBudget":              "poddisruptionbudgets",
 	"ValidatingWebhookConfiguration":   "validatingwebhookconfigurations",
 	"MutatingWebhookConfiguration":     "mutatingwebhookconfigurations",
-	"CustomResourceDefinition":         "customresourcedefinitions",
+	kindCustomResourceDefinition:       "customresourcedefinitions",
 	"ResourceQuota":                    "resourcequotas",
 	"LimitRange":                       "limitranges",
 	"Pod":                              "pods",

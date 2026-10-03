@@ -53,7 +53,7 @@ func CheckReady(ctx context.Context, client *kubernetes.Client) error {
 	if len(pending) == 0 {
 		return nil
 	}
-	return &NotReadyError{Pending: describeObjectList(pending)}
+	return &NotReadyError{Pending: kubernetes.DescribeObjectList(pending)}
 }
 
 // readinessTargets selects the manifest objects whose liveness defines "the
@@ -69,16 +69,4 @@ func readinessTargets(manifest []*unstructured.Unstructured) []*unstructured.Uns
 		}
 	}
 	return targets
-}
-
-func describeObjectList(objs []*unstructured.Unstructured) []string {
-	names := make([]string, len(objs))
-	for i, obj := range objs {
-		if ns := obj.GetNamespace(); ns != "" {
-			names[i] = fmt.Sprintf("%s/%s in %s", obj.GetKind(), obj.GetName(), ns)
-		} else {
-			names[i] = fmt.Sprintf("%s/%s", obj.GetKind(), obj.GetName())
-		}
-	}
-	return names
 }

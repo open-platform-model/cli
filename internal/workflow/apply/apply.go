@@ -31,14 +31,15 @@ type Options struct {
 
 	// Wait, in CLI-executor mode, blocks after a successful apply and
 	// inventory write until every applied resource is healthy (see
-	// operator.HealthyPredicate) or Timeout runs out. Ignored on dry-run. An
+	// kubernetes.HealthyPredicate) or Timeout runs out. Ignored on dry-run. An
 	// operator-managed instance always waits for the operator, so the flag
 	// changes nothing there.
 	Wait bool
 
-	// Timeout bounds the operator-reconcile wait in thin-editor mode and the
-	// readiness wait (Wait) in CLI-executor mode. Zero uses
-	// inventory.DefaultReconcileTimeout.
+	// Timeout bounds the operator-reconcile wait in thin-editor mode. In
+	// CLI-executor mode it bounds the CustomResourceDefinition establish wait,
+	// counted from the start of the apply, and, separately and in full, the
+	// readiness wait (Wait). Zero uses inventory.DefaultReconcileTimeout.
 	Timeout time.Duration
 
 	// SkipUnprovided is the command's --skip-unprovided. An operator-managed
@@ -140,10 +141,20 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		instanceLog.Info(fmt.Sprintf("applying %d resources", len(result.Resources)))
 	}
 
+	// The CustomResourceDefinition establish wait inside the apply is charged
+	// to a --timeout budget that starts with the apply; the --wait readiness
+	// wait after it gets a fresh --timeout of its own.
+	timeout := inventory.ResolveTimeout(req.Options.Timeout)
+	budgetStart := time.Now()
+
 	var applyResult *kubernetes.ApplyResult
 	if len(result.Resources) > 0 {
 		var err error
-		applyResult, err = kubernetes.Apply(ctx, req.K8sClient, result.Resources, name, kubernetes.ApplyOptions{DryRun: dryRun})
+		applyResult, err = kubernetes.Apply(ctx, req.K8sClient, result.Resources, name, kubernetes.ApplyOptions{
+			DryRun:            dryRun,
+			EstablishDeadline: budgetStart.Add(timeout),
+			BudgetStart:       budgetStart,
+		})
 		if err != nil {
 			instanceLog.Error("apply failed", "error", err)
 			return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
@@ -157,7 +168,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		}
 
 		if dryRun {
-			instanceLog.Info(fmt.Sprintf("dry run complete: %d resources would be applied", applyResult.Applied))
+			instanceLog.Info(FormatDryRunSummary(applyResult))
 		} else {
 			instanceLog.Info(FormatApplySummary(applyResult))
 		}
@@ -209,7 +220,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	}
 
 	if req.Options.Wait && !dryRun {
-		return waitForHealthy(ctx, req, instanceLog)
+		return waitForHealthy(ctx, req, timeout, instanceLog)
 	}
 
 	return nil
@@ -448,6 +459,16 @@ func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client
 		return fmt.Errorf("pre-apply existence check failed: %w", err)
 	}
 	return nil
+}
+
+// FormatDryRunSummary is the closing line of a dry run: how many resources
+// would be applied and, when any were skipped, how many and why.
+func FormatDryRunSummary(r *kubernetes.ApplyResult) string {
+	summary := fmt.Sprintf("dry run complete: %d resources would be applied", r.Applied)
+	if r.Skipped > 0 {
+		summary += fmt.Sprintf(", %d skipped (CustomResourceDefinition created by this apply)", r.Skipped)
+	}
+	return summary
 }
 
 func FormatApplySummary(r *kubernetes.ApplyResult) string {

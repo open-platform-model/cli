@@ -2,10 +2,14 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/json"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
@@ -149,4 +153,199 @@ func TestNormalizedContent_DoesNotMutateInput(t *testing.T) {
 	assert.NotContains(t, got, "status")
 	assert.Equal(t, "100", obj.GetResourceVersion(), "input keeps its volatile fields")
 	assert.Contains(t, obj.Object, "status")
+}
+
+// stagingCluster is a fake API server for the staging tests. It answers every
+// server-side apply by echoing the patch body and recording "Kind/name" in
+// patch order, and every GET with NotFound except for the CustomResourceDefinition,
+// which exists once applied (or from the start, with crdExists) and reports
+// Established=True only when established is set.
+type stagingCluster struct {
+	mu          sync.Mutex
+	patched     []string
+	crdExists   bool
+	established bool
+	// crdForbidden makes every read of the CustomResourceDefinition fail
+	// with Forbidden, as for a user who may patch it but not get it.
+	crdForbidden bool
+}
+
+func (c *stagingCluster) client(t *testing.T) *Client {
+	t.Helper()
+	fake := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+	fake.PrependReactor("get", "*", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		get := action.(k8stesting.GetAction)
+		if c.crdForbidden && action.GetResource().Resource == "customresourcedefinitions" {
+			return true, nil, apierrors.NewForbidden(action.GetResource().GroupResource(), get.GetName(), nil)
+		}
+		if action.GetResource().Resource != "customresourcedefinitions" || !c.crdExists {
+			return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), get.GetName())
+		}
+		crd := stagingCRD()
+		crd.SetResourceVersion("1")
+		if c.established {
+			_ = unstructured.SetNestedSlice(crd.Object, []any{
+				map[string]any{"type": "Established", "status": "True"},
+			}, "status", "conditions")
+		}
+		return true, crd, nil
+	})
+	fake.PrependReactor("patch", "*", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		patch := action.(k8stesting.PatchActionImpl)
+		obj := &unstructured.Unstructured{}
+		require.NoError(t, json.Unmarshal(patch.GetPatch(), &obj.Object))
+		c.patched = append(c.patched, obj.GetKind()+"/"+obj.GetName())
+		if obj.GetKind() == "CustomResourceDefinition" && len(patch.PatchOptions.DryRun) == 0 {
+			c.crdExists = true
+		}
+		obj.SetResourceVersion("2")
+		return true, obj, nil
+	})
+	return &Client{Dynamic: fake}
+}
+
+func (c *stagingCluster) patchOrder() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]string(nil), c.patched...)
+}
+
+func stagingObject(apiVersion, kind, name, namespace string) *unstructured.Unstructured {
+	u := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": apiVersion,
+		"kind":       kind,
+		"metadata":   map[string]any{"name": name},
+	}}
+	if namespace != "" {
+		u.SetNamespace(namespace)
+	}
+	return u
+}
+
+func stagingCRD() *unstructured.Unstructured {
+	crd := stagingObject("apiextensions.k8s.io/v1", "CustomResourceDefinition", "foos.example.com", "")
+	_ = unstructured.SetNestedField(crd.Object, "example.com", "spec", "group")
+	_ = unstructured.SetNestedField(crd.Object, "Foo", "spec", "names", "kind")
+	return crd
+}
+
+// stagingInput is a module's resources in the worst build order: everything
+// before the definitions it depends on.
+func stagingInput() []*unstructured.Unstructured {
+	return []*unstructured.Unstructured{
+		stagingObject("apps/v1", "Deployment", "web", "demo"),
+		stagingObject("v1", "Service", "web", "demo"),
+		stagingObject("example.com/v1", "Foo", "my-foo", "demo"),
+		stagingObject("v1", "ConfigMap", "cfg", "demo"),
+		stagingObject("v1", "Namespace", "demo", ""),
+		stagingCRD(),
+	}
+}
+
+func kindsAndNames(objs []*unstructured.Unstructured) []string {
+	out := make([]string, len(objs))
+	for i, o := range objs {
+		out[i] = o.GetKind() + "/" + o.GetName()
+	}
+	return out
+}
+
+func shortWaitPoll(t *testing.T) {
+	t.Helper()
+	prev := WaitPollInterval
+	WaitPollInterval = 5 * time.Millisecond
+	t.Cleanup(func() { WaitPollInterval = prev })
+}
+
+func TestApply_StagesDefinitionsThenWeight(t *testing.T) {
+	shortWaitPoll(t)
+	cluster := &stagingCluster{established: true}
+	input := stagingInput()
+	before := kindsAndNames(input)
+
+	result, err := Apply(context.Background(), cluster.client(t), input, "test", ApplyOptions{})
+	require.NoError(t, err)
+	assert.Empty(t, result.Errors)
+	assert.Equal(t, 6, result.Applied)
+	assert.Equal(t, []string{
+		"CustomResourceDefinition/foos.example.com",
+		"Namespace/demo",
+		"ConfigMap/cfg",
+		"Service/web",
+		"Deployment/web",
+		"Foo/my-foo",
+	}, cluster.patchOrder())
+	assert.Equal(t, before, kindsAndNames(input), "the caller's slice must not be reordered")
+}
+
+func TestApply_CRDNotEstablishedStopsBeforeSecondStage(t *testing.T) {
+	shortWaitPoll(t)
+	cluster := &stagingCluster{established: false}
+
+	_, err := Apply(context.Background(), cluster.client(t), stagingInput(), "test", ApplyOptions{
+		EstablishDeadline: time.Now().Add(200 * time.Millisecond),
+	})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "CustomResourceDefinition/foos.example.com")
+	assert.ErrorContains(t, err, "established")
+	assert.Equal(t, []string{
+		"CustomResourceDefinition/foos.example.com",
+		"Namespace/demo",
+	}, cluster.patchOrder(), "nothing of the second stage may be applied")
+}
+
+func TestApply_CRDTimeoutReportsTimeSinceBudgetStart(t *testing.T) {
+	shortWaitPoll(t)
+	cluster := &stagingCluster{established: false}
+
+	// The budget started an hour before the wait: the apply spent it. The
+	// timeout must report the hour, not the wait's own few milliseconds.
+	_, err := Apply(context.Background(), cluster.client(t), stagingInput(), "test", ApplyOptions{
+		EstablishDeadline: time.Now().Add(100 * time.Millisecond),
+		BudgetStart:       time.Now().Add(-time.Hour),
+	})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "timed out after 1h0m0s")
+}
+
+func TestApply_DryRunSkipsCustomResourceOfNewCRD(t *testing.T) {
+	// A wait would time out: the CRD never exists and never reports
+	// Established. The short deadline makes an accidental wait fail fast.
+	shortWaitPoll(t)
+	cluster := &stagingCluster{}
+
+	result, err := Apply(context.Background(), cluster.client(t), stagingInput(), "test", ApplyOptions{
+		DryRun:            true,
+		EstablishDeadline: time.Now().Add(100 * time.Millisecond),
+	})
+	require.NoError(t, err)
+	assert.Empty(t, result.Errors)
+	assert.Equal(t, 1, result.Skipped)
+	assert.Equal(t, 5, result.Applied)
+	assert.NotContains(t, cluster.patchOrder(), "Foo/my-foo")
+}
+
+func TestApply_DryRunSendsCustomResourceOfExistingCRD(t *testing.T) {
+	cluster := &stagingCluster{crdExists: true, established: true}
+
+	result, err := Apply(context.Background(), cluster.client(t), stagingInput(), "test", ApplyOptions{DryRun: true})
+	require.NoError(t, err)
+	assert.Empty(t, result.Errors)
+	assert.Equal(t, 0, result.Skipped)
+	assert.Contains(t, cluster.patchOrder(), "Foo/my-foo")
+}
+
+func TestApply_DryRunSendsCustomResourceWhenCRDReadIsForbidden(t *testing.T) {
+	// A refused read is not proof the CRD is new, so the custom resource is
+	// sent, not skipped.
+	cluster := &stagingCluster{crdForbidden: true}
+
+	result, err := Apply(context.Background(), cluster.client(t), stagingInput(), "test", ApplyOptions{DryRun: true})
+	require.NoError(t, err)
+	assert.Equal(t, 0, result.Skipped)
+	assert.Contains(t, cluster.patchOrder(), "Foo/my-foo")
 }
