@@ -518,6 +518,6 @@ tasks:
   ## Release tasks
   #########################
   deps:release-check:
-    desc: "Check release pins (G1): no replace, published OPM pins, no dev template pins, operator embed matches its pin"
+    desc: "Check release pins (G1): no replace, published OPM pins (nested modules by their subdir tag), no dev template pins, operator embed matches its pin, a docs bundle for every docs pin (G2-pins)"
     cmds:
       - .github/scripts/release-pin-check.sh
