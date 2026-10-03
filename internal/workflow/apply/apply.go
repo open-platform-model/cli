@@ -37,9 +37,9 @@ type Options struct {
 	Wait bool
 
 	// Timeout bounds the operator-reconcile wait in thin-editor mode. In
-	// CLI-executor mode it is one budget, starting when the apply starts,
-	// shared by the CustomResourceDefinition establish wait and the readiness
-	// wait (Wait). Zero uses inventory.DefaultReconcileTimeout.
+	// CLI-executor mode it bounds the CustomResourceDefinition establish wait,
+	// counted from the start of the apply, and, separately and in full, the
+	// readiness wait (Wait). Zero uses inventory.DefaultReconcileTimeout.
 	Timeout time.Duration
 
 	// SkipUnprovided is the command's --skip-unprovided. An operator-managed
@@ -141,14 +141,20 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		instanceLog.Info(fmt.Sprintf("applying %d resources", len(result.Resources)))
 	}
 
-	// One --timeout budget for the command's waits: the CustomResourceDefinition
-	// establish wait inside the apply and the --wait readiness wait after it.
-	deadline := time.Now().Add(inventory.ResolveTimeout(req.Options.Timeout))
+	// The CustomResourceDefinition establish wait inside the apply is charged
+	// to a --timeout budget that starts with the apply; the --wait readiness
+	// wait after it gets a fresh --timeout of its own.
+	timeout := inventory.ResolveTimeout(req.Options.Timeout)
+	budgetStart := time.Now()
 
 	var applyResult *kubernetes.ApplyResult
 	if len(result.Resources) > 0 {
 		var err error
-		applyResult, err = kubernetes.Apply(ctx, req.K8sClient, result.Resources, name, kubernetes.ApplyOptions{DryRun: dryRun, EstablishDeadline: deadline})
+		applyResult, err = kubernetes.Apply(ctx, req.K8sClient, result.Resources, name, kubernetes.ApplyOptions{
+			DryRun:            dryRun,
+			EstablishDeadline: budgetStart.Add(timeout),
+			BudgetStart:       budgetStart,
+		})
 		if err != nil {
 			instanceLog.Error("apply failed", "error", err)
 			return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
@@ -214,7 +220,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	}
 
 	if req.Options.Wait && !dryRun {
-		return waitForHealthy(ctx, req, deadline, instanceLog)
+		return waitForHealthy(ctx, req, timeout, instanceLog)
 	}
 
 	return nil

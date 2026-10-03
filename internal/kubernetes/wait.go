@@ -13,7 +13,7 @@ import (
 )
 
 // WaitPollInterval is how often the wait loops re-check the cluster. A
-// variable so tests can poll faster.
+// variable so tests can poll faster; only tests may change it.
 var WaitPollInterval = 2 * time.Second
 
 // conditionEstablished is the CustomResourceDefinition condition type that

@@ -70,7 +70,7 @@ instance.cue    Path to the instance .cue file (required)
 | `--no-prune` |  | bool |  | Skip stale resource pruning. |
 | `--platform` |  | string |  | Platform module directory (overrides the cluster Platform and the instance's own deps). |
 | `--skip-unprovided` |  | bool |  | Render what the platform can: skip provider-fulfilled contracts nothing on the platform provides, and report each one. |
-| `--timeout` |  | duration | `5m0s` | Bound on the CustomResourceDefinition establish wait and the `--wait` readiness wait (one budget, starting when the apply starts), and on the operator-reconcile wait (operator-managed instances). |
+| `--timeout` |  | duration | `5m0s` | Bound on the CustomResourceDefinition establish wait (counted from the start of the apply), on the `--wait` readiness wait, and on the operator-reconcile wait (operator-managed instances). |
 | `--values` | `-f` | stringArray |  | Additional values files (can be repeated; default: `values.cue` next to the instance file). |
 | `--wait` |  | bool |  | Wait until every applied resource is healthy before returning (skipped on `--dry-run`; operator-managed instances always wait for the operator). |
 

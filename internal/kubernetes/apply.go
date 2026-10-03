@@ -27,6 +27,12 @@ type ApplyOptions struct {
 	// CustomResourceDefinitions to report Established=True. Zero means
 	// defaultEstablishTimeout from the start of the wait. ApplyOne ignores it.
 	EstablishDeadline time.Time
+
+	// BudgetStart is when the budget behind EstablishDeadline started (the
+	// start of the apply), so a timeout reports the time spent against that
+	// budget rather than only the wait's share. Zero means the start of the
+	// wait. ApplyOne ignores it.
+	BudgetStart time.Time
 }
 
 // defaultEstablishTimeout bounds the CustomResourceDefinition wait when the
@@ -106,7 +112,7 @@ func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstru
 	var newKinds map[schema.GroupKind]string
 	if opts.DryRun {
 		newKinds = kindsOfNewCRDs(applied)
-	} else if err := waitEstablished(ctx, client, applied, opts.EstablishDeadline, instanceLog); err != nil {
+	} else if err := waitEstablished(ctx, client, applied, opts.EstablishDeadline, opts.BudgetStart, instanceLog); err != nil {
 		return result, err
 	}
 
@@ -119,18 +125,15 @@ func isCRD(gvk schema.GroupVersionKind) bool {
 	return gvk.Group == "apiextensions.k8s.io" && gvk.Kind == "CustomResourceDefinition"
 }
 
-// isClusterDefinition reports whether gvk is a kind other objects cannot be
-// applied without: a CustomResourceDefinition (its custom resources) or a
-// Namespace (the objects in it).
-func isClusterDefinition(gvk schema.GroupVersionKind) bool {
-	return isCRD(gvk) || (gvk.Group == "" && gvk.Kind == "Namespace")
-}
-
 // splitClusterDefinitions partitions objs, keeping their order, into the
-// cluster definitions and everything else.
+// cluster definitions and everything else. The cluster definitions are the
+// protected kinds (IsProtectedKind): a CustomResourceDefinition, which its
+// custom resources cannot be applied without, and a Namespace, which the
+// objects in it cannot.
 func splitClusterDefinitions(objs []*unstructured.Unstructured) (definitions, rest []*unstructured.Unstructured) {
 	for _, obj := range objs {
-		if isClusterDefinition(obj.GroupVersionKind()) {
+		gvk := obj.GroupVersionKind()
+		if IsProtectedKind(gvk.Group, gvk.Kind) {
 			definitions = append(definitions, obj)
 		} else {
 			rest = append(rest, obj)
@@ -187,8 +190,9 @@ func applyStage(ctx context.Context, client *Client, objs []*unstructured.Unstru
 
 // waitEstablished waits until every CustomResourceDefinition among applied
 // reports Established=True, or deadline passes (zero: defaultEstablishTimeout
-// from now).
-func waitEstablished(ctx context.Context, client *Client, applied []stageOutcome, deadline time.Time, instanceLog *log.Logger) error {
+// from now). since is when the budget behind deadline started (zero: now); a
+// timeout reports the time elapsed from it.
+func waitEstablished(ctx context.Context, client *Client, applied []stageOutcome, deadline, since time.Time, instanceLog *log.Logger) error {
 	var crds []*unstructured.Unstructured
 	for _, o := range applied {
 		if isCRD(o.obj.GroupVersionKind()) {
@@ -203,11 +207,14 @@ func waitEstablished(ctx context.Context, client *Client, applied []stageOutcome
 	if deadline.IsZero() {
 		deadline = start.Add(defaultEstablishTimeout)
 	}
+	if since.IsZero() {
+		since = start
+	}
 	instanceLog.Info(fmt.Sprintf("waiting for %d CustomResourceDefinition(s) to be established", len(crds)))
 
 	waitCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
-	if err := Wait(waitCtx, client, crds, CRDEstablishedPredicate, start); err != nil {
+	if err := Wait(waitCtx, client, crds, CRDEstablishedPredicate, since); err != nil {
 		return fmt.Errorf("waiting for CustomResourceDefinitions to be established: %w", err)
 	}
 	return nil

@@ -67,7 +67,7 @@ type ApplyResult struct {
 Algorithm:
 
 1. Copy the input and sort the copy with `SortObjects(objs, resourceorder.Ascending)` (decision 5). The caller's slice is not reordered (the inventory entries were computed from it already, and the digest is order-independent anyway).
-2. Partition, keeping order: stage 1 holds every object whose `isClusterDefinition` is true (kind `CustomResourceDefinition` in group `apiextensions.k8s.io`, or kind `Namespace` in the core group); stage 2 holds the rest. Because CRDs weigh -100 and Namespaces 0, stage 1 is CRDs then Namespaces. After the rebase on `protect-crds-and-namespaces-in-prune-and-delete`, `isClusterDefinition` calls `IsProtectedKind(gvk.Group, gvk.Kind)` (same kind set) rather than repeating it.
+2. Partition, keeping order: stage 1 holds every object whose kind is protected (kind `CustomResourceDefinition` in group `apiextensions.k8s.io`, or kind `Namespace` in the core group); stage 2 holds the rest. Because CRDs weigh -100 and Namespaces 0, stage 1 is CRDs then Namespaces. The partition uses `IsProtectedKind(gvk.Group, gvk.Kind)` from the sibling change `protect-crds-and-namespaces-in-prune-and-delete` (same kind set) rather than repeating it.
 3. Apply stage 1 with the existing per-resource loop (`applyStage`, factored out of today's body): log each line, collect errors, continue.
 4. Not a dry run: collect the stage-1 CRDs that applied without error. If any, log `waiting for N CustomResourceDefinition(s) to be established` and call `Wait(ctx', client, crds, CRDEstablishedPredicate, start)` under `context.WithDeadline(ctx, deadline)`. A wait error returns `(result, fmt.Errorf("waiting for CustomResourceDefinitions to be established: %w", err))` before stage 2.
 5. Dry run: record the group/kind pairs served by every stage-1 CRD whose pre-apply GET returned NotFound (`spec.group`, `spec.names.kind`; a CRD missing either is ignored). A GET refused for any other reason (RBAC, say) does not mark the CRD new, so its custom resources are sent and fail or pass on their own. No wait.
@@ -101,7 +101,7 @@ The doc comment of `Apply` states this staging and drops the "already ordered by
 Limits, recorded and not fixed here:
 
 - Only a CRD that does not yet exist on the cluster triggers the skip. A CRD that exists and is reconfigured (a new served version, say) is not detected; a custom resource of a version the live CRD does not serve yet fails the dry run as it does today. Detecting that needs a CRD diff.
-- A namespaced object in a Namespace that the same apply creates fails the dry run with `namespaces "<ns>" not found`: the dry run of the Namespace persists nothing, and the object's own dry run goes through namespace admission. Extending the skip to these objects is outside the owner's decision; `--create-namespace` covers the instance namespace itself.
+- A namespaced object in a Namespace that the same apply creates fails the dry run with `namespaces "<ns>" not found`: the dry run of the Namespace persists nothing, and the object's own dry run goes through namespace admission. Extending the skip to these objects is outside the owner's decision; `--create-namespace` covers the instance namespace on a real apply; a dry run, which creates nothing, hits the same NotFound for it.
 
 ### 4. The wait moves to `internal/kubernetes/wait.go`
 
@@ -159,17 +159,18 @@ Callers: `kubernetes.Apply` (ascending), `kubernetes.Delete` (`delete.go`, desce
 **Decision**: option 2.
 **Rationale**: stays inside the owner's decision. The gap against the `mod-tree` spec is recorded in Non-Goals and in the supervisor report for the owner to schedule.
 
-### 7. One `--timeout` budget covers the CRD wait and `--wait`
+### 7. The CRD wait shares the apply's `--timeout` budget; `--wait` keeps a fresh one
 
 **Context**: `instance apply` and `module apply` resolve `--timeout` (`inventory.ResolveTimeout`, default 5m) for the `--wait` readiness wait. The CRD establish wait now needs a bound too.
-**Explored**: `internal/operator/install.go:66-70` ("One budget ... the user reasons about a single --timeout per command") and the `operator-lifecycle` spec, which charges every wait to one budget.
+**Explored**: `internal/operator/install.go:66-70` ("One budget ... the user reasons about a single --timeout per command") and the `operator-lifecycle` spec, which charges every wait to one budget; `kubernetes.Wait`, whose `since` argument is the start of the budget in force, so a timeout reports the time spent against it.
 **Options considered**:
-1. A full `--timeout` for each wait - simple, but one command can then run for twice `--timeout`, against the CLI's convention.
-2. One budget per command - `Execute` computes `deadline := time.Now().Add(timeout)` before the apply, passes it as `ApplyOptions.EstablishDeadline`, and `waitForHealthy` waits under `context.WithDeadline(ctx, deadline)`.
-**Decision**: option 2.
-**Rationale**: matches `opm operator install`. The applies, prune and inventory write are not cancelled by the budget (they run on the command's own context); only the two waits are bounded by it. The timeout error reports the time that wait actually ran.
+1. A full `--timeout` for each wait - one command can run for twice `--timeout`.
+2. One budget per command for both waits - `--wait` then gets only what the apply left over, a user-visible change to `--wait` that no decision asked for.
+3. The CRD wait is charged to a budget that starts with the apply; `--wait` keeps a fresh full `--timeout`, as before this change.
+**Decision**: option 3 (supervisor triage of the review, 2026-10-03).
+**Rationale**: the CRD wait is part of the apply, so it is bounded from the apply's start; `--wait` behaves exactly as it did. `Execute` records `budgetStart` before the apply and passes `EstablishDeadline: budgetStart + timeout` and `BudgetStart: budgetStart`; `waitEstablished` passes `BudgetStart` to `Wait` as `since`, so its timeout reports the time since the apply started. `waitForHealthy` takes the resolved `--timeout` and waits under a deadline of its own start plus that timeout, reporting from its own start. The applies, prune and inventory write are not cancelled by either bound.
 
-The flag help on both commands becomes `Bound on the CustomResourceDefinition establish wait and the --wait readiness wait (one budget, starting when the apply starts), and on the operator-reconcile wait (operator-managed instances)`, and `task docs:reference` regenerates the reference pages. The `mod-apply` flag table follows.
+The flag help on both commands becomes `Bound on the CustomResourceDefinition establish wait (counted from the start of the apply), on the --wait readiness wait, and on the operator-reconcile wait (operator-managed instances)`, and `task docs:reference` regenerates the reference pages. The `mod-apply` flag table follows.
 
 ## Errors
 
