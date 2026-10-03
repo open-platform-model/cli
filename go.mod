@@ -11,7 +11,7 @@ require (
 	github.com/gonvenience/ytbx v1.5.0
 	github.com/homeport/dyff v1.12.0
 	github.com/open-platform-model/docs-kit/cobradump v0.1.0
-	github.com/open-platform-model/library v1.0.0-beta.1
+	github.com/open-platform-model/library v1.0.0-beta.3
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
