@@ -17,7 +17,7 @@
 
 How every move behaves:
 
-- No pin SHALL move backwards. No pin SHALL move past an in-date `.cascade-hold` `max`.
+- No pin SHALL move backwards. No pin SHALL move past an in-date `.cascade-hold` `max`. When a hold on core is below the core a newer catalog pins, the catalog SHALL stay too, with a warning.
 - No pin SHALL move to a version that is tagged but not yet published.
 - No pin listed for a file in `.cascade-frozen` SHALL change in that file. If `cue mod tidy` raises such a pin, the task SHALL fail, naming the file and the key.
 - `cue mod get` SHALL name only the moved `opmodel.dev` keys, at exact versions. It and `cue mod tidy` SHALL run only in a module where a pin moved.
@@ -36,6 +36,11 @@ How every move behaves:
 
 - **WHEN** a file pins a core newer than the core its catalog pins
 - **THEN** that file's core is unchanged, and a warning names both versions
+
+#### Scenario: A hold on core holds the catalog
+
+- **WHEN** `.cascade-hold` holds `opmodel.dev/core@v2` in date at the tree's core, and the newest catalog pins a newer core
+- **THEN** no catalog or core pin changes, the task exits 3, and a warning says the catalog is held too
 
 #### Scenario: An unpublished newest tag leaves the pin
 
@@ -59,7 +64,8 @@ How every move behaves:
 Order of work:
 
 - Every resolver call that decides a target SHALL run before the first file edit.
-- A failing resolver call, or any answer other than "move" or "stay", SHALL end the task with a code other than 0 and 3, and the tree SHALL be unchanged.
+- A failing target-deciding call, or any answer other than "move" or "stay", SHALL end the task with a code other than 0 and 3, and the tree SHALL be unchanged.
+- A failure after the first edit (a tool, or a resolver call that decides no target, such as the docs-bundle check) SHALL end the task with a code other than 0 and 3. The tree may then be partly edited; callers discard it.
 
 Exit codes:
 
@@ -94,7 +100,9 @@ The three templates (`opmodel.dev/templates/<name>@v1`) and the podinfo fixture 
 - It SHALL be the merge base's version when that version is not yet published.
 - A second run in the same pull request SHALL NOT advance any version again.
 
-The podinfo pin in `examples/cue.mod/module.cue` and `tests/e2e/testdata/operator-owned/cue.mod/module.cue` SHALL follow the fixture's new version in the same run, as a text rewrite made after their catalog and core moved. No `cue mod get` or `cue mod tidy` SHALL follow that rewrite.
+- The task SHALL write a version only when it is greater than the file's. A file version above the target SHALL stay, with a warning.
+
+The podinfo pin in `examples/cue.mod/module.cue` and `tests/e2e/testdata/operator-owned/cue.mod/module.cue` SHALL follow the fixture's new version in the same run, as a text rewrite made after their catalog and core moved. No `cue mod get` or `cue mod tidy` SHALL follow that rewrite. When a consumer's catalog or core moves while it pins a podinfo version that is not published, the task SHALL point it at the merge base's published podinfo for `cue mod get` and `tidy`, then rewrite it to the fixture's new version.
 
 Source: workspace RELEASING.md, section "The cascade", "The receiver" ("Version advances happen once per PR").
 
@@ -108,6 +116,11 @@ Source: workspace RELEASING.md, section "The cascade", "The receiver" ("Version 
 
 - **WHEN** the result of the first run is committed on the same branch and `task -x deps:cascade` runs again against the same base
 - **THEN** it exits 3 and no identity file changes
+
+#### Scenario: A consumer pinning the unpublished fixture still moves
+
+- **WHEN** a first run advanced the podinfo fixture and its consumers, the result is committed, and a second run against the same base moves the consumers' catalog
+- **THEN** the second run exits 0, the consumers carry the new catalog and core, and their podinfo pin is the fixture's new version
 
 ### Requirement: The cascade task leaves non-cascade files alone and reports risks as warnings
 
@@ -188,11 +201,14 @@ Source: workspace RELEASING.md, section "The cascade", "Title from diff class".
   - the frozen-file scenario;
   - the title and body scenario, when `CASCADE_RESOLVER_REAL` names the real resolver.
 
-The offline set SHALL run as a step of the required `Unit Tests` job in `.github/workflows/pr.yml`. The full set SHALL run in `.github/workflows/cascade-task.yml`, job `Cascade task (network)`, which is not a required check.
+- The offline set SHALL also check that a core ahead of its catalog's pin stays with a warning, and that a hold on core holds the catalog.
+- The full set SHALL also check a second catalog move on a branch whose consumers already pin the unpublished fixture.
+
+The offline set SHALL run as a step of the `Lint` job in `.github/workflows/pr.yml`, the job workspace RELEASING.md "Rulesets on main" names as the cli's required check. The full set SHALL run in `.github/workflows/cascade-task.yml`, job `Cascade task (network)`, which is not a required check.
 
 #### Scenario: Offline set runs on every pull request
 
-- **WHEN** a pull request runs the `Unit Tests` job
+- **WHEN** a pull request runs the `Lint` job
 - **THEN** the job runs `task -x deps:cascade:test` with `CASCADE_TEST_SET=offline` and fails when any offline scenario fails
 
 #### Scenario: The checkout is never modified by the test

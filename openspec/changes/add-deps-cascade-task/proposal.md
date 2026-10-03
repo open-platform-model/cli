@@ -41,10 +41,10 @@ Phase 2 of the rollout gives each repo a `task deps:cascade` that the Phase 3 re
     - `tests/e2e/testdata/operator-owned`;
     - the six testdata `cue.mod` files.
   - **version advances**, once per PR, for the three templates and the podinfo fixture.
-  - **podinfo consumers:** the podinfo pin in `examples` and `operator-owned` follows the fixture in the same PR.
+  - **podinfo consumers:** the podinfo pin in `examples` and `operator-owned` follows the fixture in the same PR. When a later run on the same branch moves a consumer's catalog or core while it pins the not-yet-published fixture, the task points it back at the merge base's published fixture for `cue mod get` and `tidy`, then rewrites it to the fixture's new version again.
   - **warnings:** for an unpublished docs bundle and for a `language.version` newer than the cli's pinned CUE.
 - **CI:**
-  - The offline test set runs as one step in `pr.yml`'s required `Unit Tests` job (`.github/workflows/pr.yml:57-89`). That job gains a SHA-pinned `go-task/setup-task` step.
+  - The offline test set runs as one step in `pr.yml`'s `Lint` job (`.github/workflows/pr.yml:29-54`), the job workspace RELEASING.md "Rulesets on main" names as the cli's required check (it already carries G1). That job gains a SHA-pinned `go-task/setup-task` step. The `Unit Tests` job is not on that list, so the step does not go there.
   - A new, non-required workflow `.github/workflows/cascade-task.yml` (job `Cascade task (network)`) runs the full set against GHCR, the Go proxy and GitHub releases.
 - **`AGENTS.md`** names `task deps:cascade` where it now names the workspace root tasks for templates and fixtures.
 - **Main spec `test-fixture-lineage`:** its "Old test pins are current or frozen with a reason" requirement says core moves to "the newest published release". That contradicts the consistent-set rule (workspace RELEASING.md, "The cascade" › "The receiver"): core follows the version the catalog pins. The requirement is restated to match. Its three scenarios are kept.
@@ -86,8 +86,9 @@ Release class: none. This is CI and repo tooling, titled `ci(cascade): add the d
 - **Packages:** none. No Go code changes.
 - **Files:**
   - new: `.tasks/cascade/{cascade.sh,pins.sh,classes,test.sh}`, `.tasks/cascade/testdata/{stub-resolve.sh,older.tsv,s1-calls.txt}` and `.github/workflows/cascade-task.yml`;
-  - edited: `Taskfile.yml`, `.github/workflows/pr.yml` (`Unit Tests` job) and `AGENTS.md`.
+  - edited: `Taskfile.yml`, `.github/workflows/pr.yml` (`Lint` job) and `AGENTS.md`.
 - **Network:** `deps:cascade` reads GHCR, `proxy.golang.org` and GitHub release downloads anonymously, through the resolver. It never publishes, pushes or commits.
 - **Risks:**
   - The first real run (the catch-up PR) moves the catalog from `v4.4.4` to `v4.5.1` in shipped templates. If `v4.5.x` breaks a template or fixture, that PR needs hand fixes. This change does not.
-  - The docs pins the cli reports (`hack/docskit-dump pins`) take core from library's `DefaultSchemaModule` (`v2.0.0-beta.2` at library `v1.0.0-beta.3`). The templates take core from the catalog's pin: `v4.5.1` pins `v2.0.0-beta.1`, checked live 2026-10-04. The two can differ. That is expected under the consistent-set rule and fails no gate.
+  - The docs pins the cli reports (`hack/docskit-dump pins`) take core from library's `DefaultSchemaModule` (`v2.0.0-beta.2` at library `v1.0.0-beta.3`). The templates take core from the catalog's pin: `v4.5.1` pins `v2.0.0-beta.1`, checked live 2026-10-04. The two can differ. That is expected under the consistent-set rule. G1 then requires the docs bundle `docs/core:2.0.0-beta.2` while every cue.mod in the tree ships core `beta.1`; no gate compares the two.
+  - The workspace root tasks (`deps:update`, `deps:update:templates`, `deps:pins:*`) still edit cli pins until Phase 5 rewires them. They move core to its bare-major newest (`v2.0.0-beta.2`), above what the catalog pins. The cascade never moves a pin backwards, so it would then keep that core and warn "core ahead" on every run. `AGENTS.md` says not to run them against the cli, and the supervisor is asked to make them skip `cli/` (outside this repo).

@@ -20,8 +20,8 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 
 ## Gates (SUPERVISOR ticks)
 
-- [ ] G-resolver: before merge, `.github` `add-cascade-resolver` is merged on `open-platform-model/.github` `main`. Check: `git -C <workspace>/.github show origin/main:.github/scripts/cascade/cascade-resolve.sh | head -3` succeeds, and `sha256sum` of `.github/scripts/cascade/stub-resolve.sh` there equals contract §7's `970130f7d55c07f5b86d4f5b6f392330427ff923eb34f93553656bcd4b893d9c`.
-- [ ] G-network-run: before merge, on this change's PR, `Cascade task (network)` is green, and its log shows S5 ran against the real resolver (not skipped). Also, `Unit Tests` shows the offline cascade step passing.
+- [ ] G-resolver: before merge, `.github` `add-cascade-resolver` is merged on `open-platform-model/.github` `main`. Check: `git -C <ws>/.github fetch && git -C <ws>/.github cat-file -e origin/main:.github/scripts/cascade/cascade-resolve.sh && git -C <ws>/.github show origin/main:.github/scripts/cascade/stub-resolve.sh | sha256sum` succeeds and prints contract §7's `970130f7d55c07f5b86d4f5b6f392330427ff923eb34f93553656bcd4b893d9c`.
+- [ ] G-network-run: before merge, on this change's PR, `Cascade task (network)` is green, and its log shows S5 ran against the real resolver (not skipped). Also, `Lint` shows the offline cascade step passing.
 - [ ] G-catch-up: after merge, not a merge precondition. The cli catch-up PR (contract §8: `task -x deps:cascade` on `main`, titled by `task -x deps:cascade:title`) is a separate PR. It waits until the operator's catch-up release is published. After it merges, `task -x deps:cascade` on `main` exits 3. That is the Phase 2 gate (workspace RELEASING.md, "Rollout and changes" › "Phases").
 
 ## 1. Spike: confirm the assumptions in design.md
@@ -31,7 +31,7 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
 - [ ] 1.1 `task --version`. In a scratch Taskfile with one task running `exit 3`, confirm that `task -x` exits 3 and plain `task` exits 201 (contract §3).
 - [ ] 1.2 Copy `templates/minimal` to scratch and run `cue mod get opmodel.dev/catalogs/opm@v4.5.1 opmodel.dev/core@v2.0.0-beta.1 && cue mod tidy`. Record the diff. Confirm it names no third-party key and leaves `language.version` alone.
 - [ ] 1.3 In that scratch copy, run `go build -o <scratch>/opm ./cmd/opm`, then `<scratch>/opm module version set 1.0.4 <scratch copy>`. Confirm it rewrites only the `Version:` line of `identity/identity.cue` and needs no registry.
-- [ ] 1.4 The D10 S2 assumption. Copy `examples` and `hack/platform` to scratch. Text-edit their catalog and core `v:` to `v4.4.3` and `v2.0.0-alpha.13`, then run `cue mod get opmodel.dev/catalogs/opm@v4.4.4 opmodel.dev/core@v2.0.0-beta.1 && cue mod tidy`. Each `module.cue` must come back byte-identical to the committed file. If it does not, record the difference: it decides the S2 golden list.
+- [ ] 1.4 The D10 S2 assumption, for every D3 file. Copy each of the twelve D3 directories to scratch. Text-edit their catalog and core `v:` to `v4.4.3` and `v2.0.0-alpha.13` (core only in the two core-only files), then run `cue mod get` of the keys each file has at `v4.4.4` and `v2.0.0-beta.1`, and `cue mod tidy`. Each `module.cue` must come back byte-identical to the committed file (`internal/instinit/testdata/initvalues` carries `default: true` with an aligned `v:`). Also, in a scratch copy of the repo: `go get github.com/open-platform-model/library@v1.0.0-beta.2 && go mod tidy`, `go build ./cmd/opm`, then `go get ...@v1.0.0-beta.3 && go mod tidy`; `go.mod` and `go.sum` must come back byte-identical. Record any difference: it decides the S2 golden list.
 - [ ] 1.5 Confirm `testdata/older.tsv`'s versions are published. Use these anonymous checks, the same ones the contract §2.4 kinds make:
   - library `v1.0.0-beta.2`: `proxy.golang.org/.../@v/v1.0.0-beta.2.info` answers 200;
   - opm-operator `v1.0.0-beta.4`: the `install.yaml` download `HEAD -L` answers 200;
@@ -85,33 +85,37 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
   - the exit 0 or 3 result (contract §5.2 rule 13).
 - [ ] 3.4 `Taskfile.yml`: add `deps:cascade` running `.tasks/cascade/cascade.sh`, with the same anchor, env and precondition as section 2. Its `desc` names the exit codes and `task -x`.
 - [ ] 3.5 Create `.tasks/cascade/testdata/s1-calls.txt`: the normalized S1 call list from design.md D10 (`check-files`, `newest go`, `newest release`, `newest cue` for the catalog, `hold`, one `pin-of`).
-- [ ] 3.6 Add the offline scenarios to `test.sh`: S1 no-op, S3 error and S6 dirty tree, exactly as contract §8 and design.md D10 describe.
+- [ ] 3.6 Add the offline scenarios to `test.sh`: S1 no-op, S3 error and S6 dirty tree, exactly as contract §8 and design.md D10 describe, plus S7 and S8.
   - Build the stub table from `pins.sh WORKTREE` at test time; nothing current is committed.
   - Assert that every `newest` line in the log carries `--current` and `--repo-root`.
   - Assert that the real checkout's `git status --porcelain` is unchanged after the run.
+  - S3 also asserts that the normalized stub log ends at the `newest go` call and that `$STATE/bin/opm` does not exist.
+  - Add S7 (core ahead) and S8 (a hold on core holds the catalog) from design.md D10 to the offline set.
 - [ ] 3.7 Verify on the tree:
-  - `CASCADE_TEST_SET=offline task -x deps:cascade:test` exits 0 with `PASS` for the pre-checks and S1, S3 and S6;
+  - `CASCADE_TEST_SET=offline task -x deps:cascade:test` exits 0 with `PASS` for the pre-checks and S1, S3, S6, S7 and S8;
   - a throwaway `|| true` added after the library `newest` call in `cascade.sh` makes S3 fail (restore it).
 - [ ] 3.8 `task fmt`, `task lint`, `task test:unit`, `task openspec:check`, shellcheck, and the offline test set green, then commit `ci(cascade): add task deps:cascade`.
 
 ## 4. Network scenarios, CI and docs
 
-- [ ] 4.1 Create `.tasks/cascade/testdata/older.tsv` with the four keys and the `pin-of` row from design.md D10, as confirmed in 1.5. `test.sh` asserts each is strictly older than the tree's value with the stub's `semver-cmp`, failing with the contract §8 message otherwise.
+- [ ] 4.1 Create `.tasks/cascade/testdata/older.tsv` with the `older` and `oldest` rows and the two `pin-of` rows from design.md D10, as confirmed in 1.5. `test.sh` asserts each is strictly older than the tree's value with the stub's `semver-cmp`, failing with the contract §8 message otherwise.
 - [ ] 4.2 Add S2 (older pins) to `test.sh`.
   - Setup:
     - `go get github.com/open-platform-model/library@<older>` and `go mod tidy`;
     - `task operator:sync VERSION=<older>`;
     - a text edit of the catalog and core `v:` in every D3 file and of `hack/kind-platform.yaml`.
   - First run: exit 0. The diff against the original tree equals the golden list from design.md D10, as adjusted by 1.4. Its versions are derived from the tree's identity files.
+  - The warnings file holds the docs-bundle warning.
   - Second run: `git add -A && git commit`, keep `CASCADE_BASE`, run again. Exit 3, and every identity file is unchanged.
-- [ ] 4.3 Add S4 (frozen) to `test.sh`. Run the S2 setup, then append an entry to the real `.cascade-frozen` for `tests/integration/module-apply/testdata/cue.mod/module.cue` with both `opmodel.dev` keys and a reason. Assert that file is byte-unchanged and the exit is 0.
-- [ ] 4.4 Add S5 (title and body) to `test.sh`. It is skipped with a `SKIP` line unless `CASCADE_RESOLVER_REAL` is set. It asserts:
+- [ ] 4.3 Add S4 (frozen) to `test.sh`. Run the S2 setup, then append an entry to the sandbox copy's `.cascade-frozen`, keeping its real entries, for `tests/integration/module-apply/testdata/cue.mod/module.cue` with both `opmodel.dev` keys and a reason. Assert that file is byte-unchanged, `tests/e2e/testdata/duplicate-identities/cue.mod/module.cue` moved, and the exit is 0.
+- [ ] 4.3a Add S9 (a second move on the branch) to `test.sh` per design.md D10, and the D7 second-run rule it backs, if section 3 did not already implement it.
+- [ ] 4.4 Add S5 (title and body) to `test.sh`. `CASCADE_RESOLVER_REAL` holds the absolute path of the real `cascade-resolve.sh`; S5 runs only when it is set, and is skipped with a `SKIP` line otherwise. It asserts:
   - the title `fix(deps): bump 4 upstream pins`;
   - both markers, four table rows, `## Notes` last, and no `need-human-review`.
-- [ ] 4.5 Verify `task -x deps:cascade:test` (the full set, with network) exits 0 locally. S5 runs if the resolver is checked out beside the repo, and is reported as skipped otherwise.
-- [ ] 4.6 `.github/workflows/pr.yml`, job `unit`: after `setup-go`, add `go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0` (`version: 3.x`) and a step `Cascade task (offline)`.
+- [ ] 4.5 Verify `task -x deps:cascade:test` (the full set, with network) exits 0 locally, with `CASCADE_RESOLVER_REAL` set to the real resolver's absolute path (beside the repo, or the `add-cascade-resolver` worktree until it merges), so S5 runs.
+- [ ] 4.6 `.github/workflows/pr.yml`, job `lint` (`Lint`): after `setup-go`, before `golangci-lint`, add `go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0` (`version: 3.x`) and a step `Cascade task (offline)`.
   - The step runs `task -x deps:cascade:test` with `CASCADE_TEST_SET: offline` and `CASCADE_RESOLVER: ${{ github.workspace }}/.tasks/cascade/testdata/stub-resolve.sh` (design.md D11).
-  - Add a two-line comment citing workspace RELEASING.md "Rollout and changes".
+  - Add a short comment citing workspace RELEASING.md "Rollout and changes" and "Rulesets on main".
 - [ ] 4.7 Create `.github/workflows/cascade-task.yml` per design.md D11:
   - job `Cascade task (network)`, `timeout-minutes: 20`, `permissions: contents: read`;
   - the path-filtered `pull_request`, `workflow_dispatch` and weekly `schedule` triggers;
@@ -120,10 +124,11 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
   - Go 1.26.0, `cue` v0.17.1 and setup-task, all SHA-pinned as in `pr.yml`;
   - `task -x deps:cascade:test`.
 
-  Verify both workflows with `go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/pr.yml .github/workflows/cascade-task.yml`.
+  Verify both workflows with `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/pr.yml .github/workflows/cascade-task.yml`.
 - [ ] 4.8 `AGENTS.md`:
   - at `AGENTS.md:128` (templates) and `AGENTS.md:231` (fixtures), say that `task deps:cascade` moves the template and fixture pins and advances their versions once per PR, replacing the workspace root task names there;
-  - add one bullet next to the release-pin bullet (`AGENTS.md:356`) naming the four cascade tasks, `task -x`, and workspace RELEASING.md "The cascade".
+  - add one bullet next to the release-pin bullet (`AGENTS.md:356`) naming the four cascade tasks, `task -x`, and workspace RELEASING.md "The cascade";
+  - say: do not run the workspace root `deps:update`, `deps:update:templates` or `deps:pins:*` against the cli; Phase 5 rewires them (design.md Risks).
 - [ ] 4.9 `task fmt`, `task lint`, `task test:unit`, `task openspec:check`, shellcheck, the offline test set, and the full set from 4.5 green, then commit `ci(cascade): test the cascade task in CI`.
 
 ## 5. Archive (rides this PR)

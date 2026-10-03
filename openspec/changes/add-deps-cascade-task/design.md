@@ -18,7 +18,7 @@
 | opm-operator | `internal/operator/manifest.go:19` `PinnedOperatorVersion`, plus the image line `internal/operator/dist/install.yaml:1643` | `v1.0.0-beta.5` | shipped |
 | opm catalog, core | `templates/{minimal,standard,advanced}/cue.mod/module.cue:9-13` | `v4.4.4`, `v2.0.0-beta.1` | shipped |
 | template versions | `templates/*/identity/identity.cue:14` | `1.0.3` | shipped, own version |
-| opm catalog, core (plus third-party `cue.dev/x/k8s.io@v0` `v0.12.0`, never moved) | `hack/platform/cue.mod/module.cue:6-13` | `v4.4.4`, `v2.0.0-beta.1` | test |
+| opm catalog, core (plus third-party `cue.dev/x/k8s.io@v0` `v0.12.0`, never moved) | `hack/platform/cue.mod/module.cue:6-14` | `v4.4.4`, `v2.0.0-beta.1` | test |
 | opm catalog (bare) | `hack/kind-platform.yaml:21-22` | `4.4.4` | test |
 | catalog, core, podinfo `v0.1.11` | `examples/cue.mod/module.cue:9-16` | `v4.4.4`, `v2.0.0-beta.1` | test |
 | catalog, core | `tests/fixtures/modules/podinfo/cue.mod/module.cue:9-13` | `v4.4.4`, `v2.0.0-beta.1` | test |
@@ -79,7 +79,7 @@ deps:cascade:test:       # .tasks/cascade/test.sh
 
 **Invocation is always `task -x <name>`** (contract §3 and §9.9). Without `-x`, go-task maps `exit 3` to 201.
 
-**Example, a run with nothing to do:**
+**Example, the first run on today's `main`:**
 
 ```text
 $ task -x deps:cascade; echo $?
@@ -152,6 +152,7 @@ Each entry is a directory whose `cue.mod/module.cue` the task reads. The list is
 - **Hold on core.**
   - `hold opmodel.dev/core@v2` is read once.
   - If an in-date `max` is below `pin-of T`, the file's catalog stays at its current value, and so does its core. The warning is "catalog `<t>` needs core `<c>`, above the hold `<max>`; catalog held too" (contract §9.11).
+  - If the file's catalog does not move and `max` is below `pin-of C`, core stays too, with the warning "core `<c>` that catalog `<C>` pins is above the hold `<max>`; core held". Core is never written to a value MVS would raise again.
 - **`hack/kind-platform.yaml`.** The bare `version:` under `opmodel.dev/catalogs/opm@v4:` is rewritten as text to `hack/platform`'s catalog after the move, with no `v`. The file header says it mirrors `hack/platform` (`hack/kind-platform.yaml:4-9`).
 - **Writing.**
   - In a file where some key moved, the task runs one `cue mod get` naming only the moved `opmodel.dev/*` keys at their exact versions, then one `cue mod tidy`.
@@ -162,7 +163,7 @@ Each entry is a directory whose `cue.mod/module.cue` the task reads. The list is
 
 The phases follow contract §5.2 rule 5.
 
-**Phase A, resolve.** No edits. Calls, in this order:
+**Phase A, resolve.** No edits. Calls, in this order (the call groups 6 to 10 follow from the earlier answers, so most runs make only some of them):
 
 1. `check-files --repo-root .`
 2. `newest go github.com/open-platform-model/library --current <go.mod> --repo-root .`
@@ -170,9 +171,10 @@ The phases follow contract §5.2 rule 5.
 4. `newest cue opmodel.dev/catalogs/opm@v4 --current <representative> --repo-root .`
 5. `hold opmodel.dev/core@v2 --repo-root .`
 6. `pin-of opmodel.dev/catalogs/opm@v4 <C> opmodel.dev/core@v2`, once per distinct `C` (D3).
-7. `is-frozen <file> <key>` for every (file, key) pair whose target differs from the file's value, and for `hack/kind-platform.yaml`. A frozen pair drops out.
+7. `is-frozen <file> <key>` for every (file, key) pair whose target differs from the file's value, and for `hack/kind-platform.yaml` when its version differs from the target. A frozen pair drops out.
 8. For each version-advance module that will differ from the merge base (D6): `published cue <module>@vN v<B>`.
-9. `language-of <module> <target>`, for the catalog and for core when either moves (D8).
+9. For each podinfo consumer whose catalog or core moves: `published cue testing.opmodel.dev/modules/cli/podinfo@v0 <its podinfo pin>`, and, when that answers 3, `published` of the merge base's podinfo `v<B>` (D7).
+10. `language-of <module> <target>`, for the catalog and for core when either moves (D8).
 
 `newest` gets `--expect <v>` when `CASCADE_EXPECT` names its key (contract §5.4). Each exit code is handled by a `case`:
 
@@ -196,7 +198,7 @@ This builds from the unmodified tree, so a library move that breaks compilation 
    - **library:** `go get github.com/open-platform-model/library@<v>` and `go mod tidy`. Any other `go.mod` require line that changed is warned under the library key.
    - **operator:** `task operator:sync VERSION=<v>` (`Taskfile.yml:497-518`). Its `curl -sfL ... -o` writes nothing on a 404, so a draft that appears between phases A and C fails the task loudly.
    - **the three templates** (D3).
-2. Test pins (D3), then `hack/kind-platform.yaml`.
+2. Test pins (D3), then `hack/kind-platform.yaml`. A consumer that pins an unpublished podinfo is first pointed at the merge base's podinfo (D7).
 3. Version advances (D6).
 4. Podinfo consumers (D7).
 5. Docs-bundle warnings (D9).
@@ -211,7 +213,7 @@ The contract lists `operator:sync` among the regenerators that rule 12 places la
 
 - **Clean start.** A dirty tree without `CASCADE_ALLOW_DIRTY=1` is exit 1.
 - **State.** `STATE=$(git rev-parse --git-dir)/cascade`, with `$STATE/warnings` truncated. `CASCADE_WARNINGS` is exported.
-- **Registries.** `CUE_REGISTRY` and `OPM_REGISTRY` are exported as `testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works`. The task never inherits the `Unit Tests` job's `localhost:5000` mapping (`.github/workflows/pr.yml:66-67`).
+- **Registries.** `CUE_REGISTRY` and `OPM_REGISTRY` are exported as `testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works`. The task never inherits the `Unit Tests` job's `localhost:5000` mapping (`.github/workflows/pr.yml:69-70`).
 
 ### D5: Never touched
 
@@ -245,7 +247,10 @@ Per contract §5.2 rule 11:
   - `B` when the module is unchanged;
   - `next-patch(v<B>)` when it changed and `published cue <coord> v<B>` answers 0;
   - `B` when it changed and `B` is not yet published.
-- It is written bare with `"$STATE/bin/opm" module version set <ver> <dir>` (`internal/cmd/module/version.go:31`, `set <version> [path]`), only when it differs from the file.
+- It is written bare with `"$STATE/bin/opm" module version set <ver> <dir>` (`internal/cmd/module/version.go:31`, `set <version> [path]`), only when the target is greater than the file's version.
+- A file version above the target (a human set it on the cascade branch) stays, with the warning "`<file>` declares `<v>`, above the cascade target `<t>`; left as is". The task never lowers a version a human set.
+
+**A refinement of RELEASING.md.** RELEASING.md "The receiver" says an advance goes to "`main`'s declared version plus one". This design (contract §5.2 rule 11) keeps `B` when `B` is not yet published. That is right for the templates, which publish only at a cli release: a template already advanced on `main` but not yet released must not be advanced again. It is reported to the supervisor as a refinement, not a conflict.
 
 In phase A the task predicts "will differ from `M`" as `f_changed` now, or any pin in that module moving. So `published` is called only when needed, and a no-op run (S1) makes no `published` call.
 
@@ -253,13 +258,20 @@ The publish gate (`.github/scripts/publish-templates.sh`; `AGENTS.md:128`) refus
 
 ### D7: The podinfo consumers follow in the same PR
 
-**Trap T3 is closed.** `TestResolveInstanceArg_RegistryBackedInstancePackage` now resolves through `OPM_REGISTRY` when it is set (`internal/cmdutil/instance_arg_test.go:160-177`). PR CI sets it to the job-local registry seeded from the tree (`.github/workflows/pr.yml:57-89`). The memory note that says the test uses `config.DefaultRegistry` predates that fix.
+**Trap T3 is closed.** `TestResolveInstanceArg_RegistryBackedInstancePackage` now resolves through `OPM_REGISTRY` when it is set (the lookup is at `internal/cmdutil/instance_arg_test.go:172-176`). PR CI sets it to the job-local registry seeded from the tree (`.github/workflows/pr.yml:56-85`). The memory note that says the test uses `config.DefaultRegistry` predates that fix.
 
 So `examples/cue.mod/module.cue:15-16` and `tests/e2e/testdata/operator-owned/cue.mod/module.cue:15-16` follow the podinfo target in the same PR (contract §6.4 step 5 and §9.6):
 
 1. Their catalog and core move through D3 (`cue mod get` and `tidy`) while podinfo is still at its published version.
 2. Then the `v:` inside their `"testing.opmodel.dev/modules/cli/podinfo@v0": {` block is rewritten as text to the D6 target, only if it differs.
 3. No `cue mod get` or `tidy` runs in a consumer after that rewrite, because the new podinfo is not published until merge.
+
+**A second run on the same branch.** On the Phase 3 "Open PR with a human commit" path (RELEASING.md "One rolling PR per repo"), the branch keeps the previous run's edits, so a consumer may already pin the unpublished podinfo (`v0.1.12`) when the next catalog move arrives. `cue mod get` and `tidy` would then fail to resolve it. So:
+
+- Phase A asks `published` for each moving consumer's podinfo pin (D4 step 9). When it answers 3, it also asks `published` for the merge base's podinfo `v<B>`; if that answers 3 too, the task exits 1 naming the consumer.
+- Phase C rewrites that consumer's podinfo `v:` as text to `v<B>` before step 1, runs `cue mod get` and `tidy`, and then step 2 rewrites it to the D6 target as usual.
+
+This closes a gap in contract §6.4 step 5, which assumes the consumer still pins the published podinfo. It is reported to the supervisor.
 
 PR CI's `hack/fixtures.sh consumers examples tests/e2e/testdata/operator-owned` (`Taskfile.yml:144`, fixtures job) checks the result against the seeded registry.
 
@@ -281,6 +293,7 @@ This follows contract §6.4 step 6 and §9.5. When library or the operator moved
 
 - The task runs `go run ./hack/docskit-dump pins` on the edited tree. It prints JSON whose `.pins` maps `library`, `core` and `opm-operator` to bare versions (`hack/docskit-dump/main.go:54-78`).
 - For each entry it calls `published oci open-platform-model/docs/<project> <pin>`.
+- Any exit other than 0 or 3 ends the task with that code (phase C, so the tree may be partly edited; contract §5.2 rule 5).
 - On exit 3 it warns: "docs bundle for `<project>` `<pin>` is not published; G1 will fail the next release PR until it is".
 - If `docskit-dump` fails to build, it warns with key `-` and continues.
 
@@ -297,20 +310,25 @@ These calls decide no target, so they run in phase C.
 - **Stub tables.** These are built at test time from `pins.sh WORKTREE`, plus:
   - one `pin-of` row for the tree catalog;
   - one `published` row per advance module at its tree version.
-- **`testdata/older.tsv`**, checked live 2026-10-04:
+- **`testdata/older.tsv`**, checked live 2026-10-04. Rows are `older<TAB><key><TAB><v>`, `oldest<TAB><key><TAB><v>` (S9 only) and stub `pin-of` rows copied into the scenario tables:
 
-  | Key | Older version |
-  | --- | --- |
-  | library | `v1.0.0-beta.2` |
-  | opm-operator | `v1.0.0-beta.4` (its `install.yaml` downloads) |
-  | `catalogs/opm@v4` | `v4.4.3` |
-  | `core@v2` | `v2.0.0-alpha.13` |
+  | Row | Key | Version |
+  | --- | --- | --- |
+  | `older` | library | `v1.0.0-beta.2` |
+  | `older` | opm-operator | `v1.0.0-beta.4` (its `install.yaml` downloads) |
+  | `older` | `catalogs/opm@v4` | `v4.4.3` |
+  | `older` | `core@v2` | `v2.0.0-alpha.13` |
+  | `oldest` | `catalogs/opm@v4` | `v4.4.2` |
+  | `oldest` | `core@v2` | `v2.0.0-alpha.12` |
+  | `oldest` | podinfo | `v0.1.10` (pins catalog `v4.0.1` and core `v2.0.0-alpha.6`) |
+  | `pin-of` | `v4.4.3` | core `v2.0.0-alpha.13` |
+  | `pin-of` | `v4.4.2` | core `v2.0.0-alpha.12` |
 
-  Plus the row `pin-of opmodel.dev/catalogs/opm@v4 v4.4.3 opmodel.dev/core@v2 v2.0.0-alpha.13`. The test asserts each is older than the tree's value.
+  The test asserts with the stub's `semver-cmp` that each `older` row is older than the tree's value, and each `oldest` row older than its `older` row (podinfo: older than the tree's fixture).
 - **S1, no-op.**
   - Exit 3 and a clean tree.
   - The normalized stub log equals `testdata/s1-calls.txt`: `check-files`, `newest go`, `newest release`, `newest cue` (catalog), `hold`, and one `pin-of`.
-- **S3, error.** The library `newest` row is `ERROR`. The exit is neither 0 nor 3, and the tree stays clean.
+- **S3, error.** The library `newest` row is `ERROR`. The exit is neither 0 nor 3, and the tree stays clean. The normalized stub log ends at the `newest go` call, and `$STATE/bin/opm` does not exist (phase B never ran). These two asserts make S3 fail if the error is swallowed.
 - **S6, dirty tree.** With an untracked file, the exit is 1.
 - **S2, older pins.**
   - **Setup:**
@@ -322,25 +340,34 @@ These calls decide no target, so they run in phase C.
     - `templates/{minimal,standard,advanced}/identity/identity.cue` at `1.0.4`;
     - `tests/fixtures/modules/podinfo/identity/identity.cue` at `0.1.12`;
     - `examples/cue.mod/module.cue` and `tests/e2e/testdata/operator-owned/cue.mod/module.cue`, with podinfo at `v0.1.12`.
+  - The warnings file holds the docs-bundle warning for each `hack/docskit-dump pins` entry (the stub table has no `published oci` rows, so every bundle reads as unpublished).
   - **Second run:** commit, keep `CASCADE_BASE`, run again. Exit 3, and no identity file changes.
   - The version numbers are derived from the tree at test time, not hard-coded.
 - **S4, frozen.**
   - The S2 setup, plus an appended `.cascade-frozen` entry for `tests/integration/module-apply/testdata/cue.mod/module.cue` with both OPM keys.
   - That file has catalog and core, no consumers and no version advance, so the freeze isolates one file.
-  - That file stays byte-unchanged, and the exit is 0.
-- **S5, title and body.** Runs only with `CASCADE_RESOLVER_REAL` set, after S2.
+  - That file stays byte-unchanged, `tests/e2e/testdata/duplicate-identities/cue.mod/module.cue` (a sibling) did move, and the exit is 0.
+- **S5, title and body.** Runs only when `CASCADE_RESOLVER_REAL` is set; it holds the absolute path of the real `cascade-resolve.sh`. It reuses S2's first-run sandbox.
   - The title is `fix(deps): bump 4 upstream pins`.
   - The body has both markers, four table rows and `## Notes` last.
   - It has no `need-human-review` label.
-- **Sets.** `CASCADE_TEST_SET=offline` runs the pre-checks plus S1, S3 and S6. `all` (the default) runs everything.
+- **S7, core ahead** (offline). Setup: `tests/integration/module-apply/testdata/cue.mod/module.cue`'s core set as text to `v2.0.0-beta.99`. Exit 3, the tree clean, and `.git/cascade/warnings` holds the "core `v2.0.0-beta.99` is ahead of the core" line. Backs the spec scenario "Core already ahead of the catalog's pin stays" (contract §9.10).
+- **S8, a hold on core holds the catalog** (offline). The table's catalog `newest` row is `v4.99.0`, with `pin-of v4.99.0 -> v2.0.0-beta.99`. Setup: a `.cascade-hold` holding `opmodel.dev/core@v2` at the tree's core, in date for `CASCADE_TODAY`. Exit 3, the tree clean, and the "catalog held too" warning (contract §9.11).
+- **S9, a second move on the branch** (network). It backs the D7 second-run rule.
+  - Setup: the S2 setup with the `oldest` catalog and core, and both consumers' podinfo pin set to the `oldest` podinfo (`v0.1.10`), which pins a catalog below every catalog here, so MVS raises nothing.
+  - First run: the table's catalog `newest` row is the `older` catalog (`v4.4.3`), plus a `published` row for podinfo `v0.1.10`. Exit 0; the consumers pin the next podinfo (`v0.1.12`).
+  - Commit, keep `CASCADE_BASE`. Second run, against the current rows (catalog at the tree's version): the consumers' catalog moves while they pin the unpublished podinfo. Exit 0, and the diff against the original tree is S2's golden list.
+  - A third run exits 3.
+  - The stub table never lists the next podinfo as published.
+- **Sets.** `CASCADE_TEST_SET=offline` runs the pre-checks plus S1, S3, S6, S7 and S8. `all` (the default) adds S2, S4, S5 and S9.
 
 ### D11: CI placement
 
-- **Required, offline.** In `pr.yml` job `unit` (name `Unit Tests`), add these steps after `setup-go`:
+- **Required, offline.** In `pr.yml` job `lint` (name `Lint`), add these steps after `setup-go`, before `golangci-lint`:
   - `go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0`, the pin `pr.yml:99` already uses;
   - `task -x deps:cascade:test`, with `CASCADE_TEST_SET=offline` and `CASCADE_RESOLVER=${{ github.workspace }}/.tasks/cascade/testdata/stub-resolve.sh`.
 
-  The offline set needs no resolver checkout. Setting `CASCADE_RESOLVER` to the stub satisfies the contract §3 precondition, which every cascade task carries. `ubuntu-latest` ships mikefarah `yq` for the stub's `is-frozen`.
+  `Lint` is the job workspace RELEASING.md "Rulesets on main" lists as the cli's required check, and it already carries G1 the same way ("G1 placement"). Contract §8 names `Unit Tests` as "an existing required job"; RELEASING.md does not list it, so RELEASING.md wins and the conflict is reported to the supervisor. The offline set never builds `opm` and never resolves a module, so `Lint` needs no registry or `cue`. The offline set needs no resolver checkout. Setting `CASCADE_RESOLVER` to the stub satisfies the contract §3 precondition, which every cascade task carries. `ubuntu-latest` ships mikefarah `yq` for the stub's `is-frozen`.
 - **Not required, network.** New `.github/workflows/cascade-task.yml`:
   - job `Cascade task (network)`, `timeout-minutes: 20`, `permissions: contents: read`;
   - triggers: `pull_request` on `.tasks/cascade/**`, `Taskfile.yml`, `.tasks/*.yaml` and the workflow itself, plus `workflow_dispatch` and a weekly `schedule`;
@@ -404,6 +431,13 @@ These calls decide no target, so they run in phase C.
 
 **Rationale**: the prediction is exact. The task edits nothing in a module where no pin moves, and S1 stays the minimal call list the contract describes.
 
+### Plan review (2026-10-04)
+
+All fourteen findings and the nits were applied. None was rejected. Two were applied differently from the suggestion:
+
+- **Finding 1 (required job).** The offline step moved to `Lint`, the job RELEASING.md lists, rather than asking for `Unit Tests` to be added to that list. That needs no edit outside this repo.
+- **Finding 2 (second run).** The suggested test (catalog `v4.4.2`, then `v4.4.3`, then the tree's) does not reach the bug: podinfo `v0.1.11` pins catalog `v4.4.4` (checked live), so `tidy` in a consumer lifts its catalog to `v4.4.4` on the first run, and the second run has nothing to move there. S9 instead sets the consumers' podinfo to `v0.1.10`, which pins catalog `v4.0.1` and core `v2.0.0-alpha.6`, so the first run's catalog stays where the task put it.
+
 ## Risks / Trade-offs
 
 - **[Catalog `v4.5.x` breaks a template]** The first real run (the catch-up PR) is the first time templates render against `v4.5.1`. → The PR's CI shows it, and `.cascade-hold` or a human commit handles it (RELEASING.md "Runbook"). This change's tests use the stub and real older versions, never `v4.5.x`.
@@ -411,8 +445,10 @@ These calls decide no target, so they run in phase C.
 - **[The network job is not required]** A regression only the network set catches can merge. → The job runs on every PR that touches the cascade files and weekly. The supervisor checks it before merging cascade-touching PRs (contract §9.12).
 - **[Proxy or GHCR lag]** This belongs to the resolver (`--expect`, contract §2.9). The task only forwards `CASCADE_EXPECT`.
 - **[`go mod tidy` raises a third-party module]** It is warned, not reverted (contract §5.2 rule 6).
+- **[The workspace root tasks still edit cli pins]** Workspace `Taskfile.yml` `deps:update` and `.tasks/deps/templates.sh` run `cue mod get <bare dep>` across `cli/templates/*`, `hack/platform` and `examples`, which moves core to `v2.0.0-beta.2` while catalog `v4.5.1` pins `beta.1`. The cascade then keeps `beta.2` (never backwards) with a "core ahead" warning on every run. The owner still runs the root task for the leaf repos (owner decision 15). → `AGENTS.md` says not to run the root `deps:update`, `deps:update:templates` or `deps:pins:*` against the cli until Phase 5 rewires them, and the supervisor is asked to make them skip `cli/` before this merges (outside this repo, contract §10).
+- **[Overlap with `publish-cli-bundle`]** Its section 3 deletes the `command-reference` job in `pr.yml` and edits `AGENTS.md`. Whichever merges second updates with `git merge origin/main`; the two touch different lines.
 
 ## Open Questions
 
 - **Core versus catalog ranking.** Contract §9.10 has the owner choose whether core may be lowered to a catalog's pin. This design keeps never-backwards, as the contract does. If the owner reverses it, only D3's "core is greater" branch changes.
-- **Docs-pin mismatch.** The cli's docs pins report core `2.0.0-beta.2` (library's `DefaultSchemaModule`), while the templates ship `v2.0.0-beta.1` (catalog `v4.5.1`'s pin). No gate compares the two. Should the body warn about it? The contract does not ask for it, so this change does not add it.
+- **Docs-pin mismatch.** The cli's docs pins report core `2.0.0-beta.2` (library's `DefaultSchemaModule`), while the templates ship `v2.0.0-beta.1` (catalog `v4.5.1`'s pin). G1 will therefore require the docs bundle `docs/core:2.0.0-beta.2` while every cue.mod in the tree ships core `beta.1`. No gate compares the two. Should the body warn about it? The contract does not ask for it, so this change does not add it. The root-task risk above widens the same gap.
