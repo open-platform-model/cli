@@ -50,9 +50,12 @@ context: |
   All commits MUST follow Conventional Commits: type(scope): description
   Pre-GA note: from its first beta the cli (with opmodel.dev/core@v2,
   library and opm-operator) is on the path to GA.
-  A breaking change is still allowed during beta, but only as a `feat!` commit
-  whose `BREAKING CHANGE:` footer is the migration note the CHANGELOG shows. It
-  advances the `-beta.N` counter and never moves the module path to a new
+  A breaking change is still allowed during beta, but only as a `!` in the PR
+  title (`feat!:`), which is the squash commit title and the CHANGELOG entry;
+  until the owner merge settings land, merge by squash only and give a
+  one-commit PR's commit subject the same `!`. The migration note goes in the PR
+  body, and in the user docs when users need it to upgrade.
+  It advances the `-beta.N` counter and never moves the module path to a new
   major. Stable lines (opmodel.dev/catalogs/opm@v4 and the module fleets) keep
   the normal SemVer rule: a break is a new major. A core beta break that would
   force a catalogs/opm major needs owner sign-off. GA drops the suffix:
@@ -222,7 +225,7 @@ operations:
         checking that box, run the section's gates (`task lint`, `task test`) on the whole tree and make
         exactly the named Conventional Commit (types and scopes per § Commit Standards; optional plain Co-Authored-By: Claude
         <noreply@anthropic.com> trailer only, never a session link, never a bare @name, and
-        no body line starting with word( because the squash body reaches release-please). Do not start the next section with uncommitted work in the tree."
+        no body line starting with word( because a squash message other than BLANK copies commit bodies into main, where release-please parses such a line as a commit). Do not start the next section with uncommitted work in the tree."
       - "The commit task is the only delivery operation apply performs: no push, no PR, no tag,
         no release. Commit on the working branch the run started on. If the run started on
         main, create the working branch before the first commit task; never commit to main."
