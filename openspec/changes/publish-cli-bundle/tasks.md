@@ -26,11 +26,12 @@ Gate G2-pins, checked before the release PR merges: core `v2.0.0-beta.1`, librar
 
 ## 3. Retire cmdref
 
-Gate G2-switch: opmodel.dev's v1.0 reads core, cli, library and opm-operator from bundles (docs-kit `docs/orchestration.md`).
+Gates (docs-kit `docs/orchestration.md` step 8): G2-switch, opmodel.dev's v1.0 reads core, cli, library and opm-operator from bundles (holds since opmodel.dev#38, 2026-10-04); and G2-edge, opmodel.dev `add-edge-build` section 2 merged, so the site's `sources-main` job reads the cli's `main` from its `edge` docs bundle (design.md D6).
 
 - [ ] 3.1 Delete `internal/cmdref/`, `hack/cmdref/` and `docs/site/reference/cli/`.
-- [ ] 3.2 `Taskfile.yml`: delete `docs:reference`, `docs:reference:check`, their comment and the line in `task check`. `.github/workflows/ci.yml` and `pr.yml`: delete the `command-reference` jobs. Owner: drop "Command Reference (current)" from the required checks if the ruleset lists it.
-- [ ] 3.3 `docs-kit.cue`: the `markdown` source becomes `{kind: "markdown", dir: "docs/site"}`. Verify: `task docs:bundle:check` passes and `out/cli/content/reference/cli/` still holds the section page and one page per top-level command.
-- [ ] 3.4 `AGENTS.md`: replace the `internal/cmdref/` layout entry and the `docs:reference:check` mention in "Core commands" (design.md D6). Verify: `grep -rn "cmdref\|docs:reference" --exclude-dir=archive .` finds nothing outside `openspec/changes/`.
-- [ ] 3.5 `openspec archive publish-cli-bundle --yes`; then set `openspec/specs/command-reference/spec.md`'s Purpose to the bundle-built reference. Verify: `task openspec:check` passes.
-- [ ] 3.6 `task lint` and `task test` green (and `task check`), then commit `ci(docs): retire cmdref and the committed command reference`.
+- [ ] 3.2 `Taskfile.yml`: delete `docs:reference`, `docs:reference:check`, their comment and the line in `task check`. `.github/workflows/ci.yml` and `pr.yml`: delete the `command-reference` jobs. Owner, before merge: confirm no organization ruleset requires "Command Reference (current)" (no repository ruleset does, design.md D6), or drop it there.
+- [ ] 3.3 `docs-kit.cue`: the `markdown` source becomes `{kind: "markdown", dir: "docs/site"}`, and its comment drops the exclude. Verify: `task docs:bundle:check` passes and `out/cli/content/reference/cli/` still holds the section page and one page per top-level command.
+- [ ] 3.4 `AGENTS.md` per design.md D6: the `internal/cmdref/` layout entry, the `docs:reference` line of "Core commands" and the "Docs bundles" sentence about the excluded pages. `docs/site/authoring/publish-a-module.md`: its "Check against" comment names `opmodel.dev/site/content/docs/reference/cli/_index.md`, which opmodel.dev deleted (opmodel.dev#38); name `hack/docskit-dump` (the command reference's source) instead. Verify: `grep -rn "cmdref\|docs:reference" --exclude-dir=archive .` finds nothing outside `openspec/changes/`.
+- [ ] 3.5 Check `main` together with this tree: `task docs:bundle`, then in an opmodel.dev checkout `OPM_BUNDLES_LOCAL="cli@v1.0=<this worktree>/out/cli" task build:edge`. Verify: it builds green, so every other repository's `main` still resolves its links into `/docs/reference/cli/`.
+- [ ] 3.6 `openspec archive publish-cli-bundle --yes`; then set `openspec/specs/command-reference/spec.md`'s Purpose to the bundle-built reference. Verify: `task openspec:check` passes.
+- [ ] 3.7 `task lint` and `task test` green (and `task check`), then commit `ci(docs): retire cmdref and the committed command reference`.
