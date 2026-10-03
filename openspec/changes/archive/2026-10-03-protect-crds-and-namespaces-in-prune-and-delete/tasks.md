@@ -33,4 +33,4 @@ Coordination: the wave-1 sibling `order-instance-apply-by-weight` rewrites the s
 
 ## 4. Hand-off to the PR stage (not done in this worktree)
 
-- [ ] 4.1 Open the PR with the title `fix: never delete CRDs or Namespaces on prune or instance delete; list them as left behind` (the changelog carrier, since the squash keeps only the PR title), and put proposal.md § Behaviour change for users into the draft GitHub release notes.
+- [x] 4.1 Open the PR with the title `fix: never delete CRDs or Namespaces on prune or instance delete; list them as left behind` (the changelog carrier, since the squash keeps only the PR title), and put proposal.md § Behaviour change for users into the draft GitHub release notes.
