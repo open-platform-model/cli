@@ -4,6 +4,12 @@ package kubernetes
 // that prune or delete leaves behind.
 const ProtectedKindReason = "CRDs and Namespaces are never deleted"
 
+// The API group and kind of a CustomResourceDefinition.
+const (
+	groupAPIExtensions           = "apiextensions.k8s.io"
+	kindCustomResourceDefinition = "CustomResourceDefinition"
+)
+
 // IsProtectedKind reports whether the CLI never deletes objects of this kind:
 // a Namespace takes everything inside it, and a CustomResourceDefinition takes
 // every custom resource of its kind cluster-wide. Prune, the prune preview and
@@ -15,7 +21,7 @@ func IsProtectedKind(group, kind string) bool {
 	switch {
 	case group == "" && kind == "Namespace":
 		return true
-	case group == "apiextensions.k8s.io" && kind == "CustomResourceDefinition":
+	case group == groupAPIExtensions && kind == kindCustomResourceDefinition:
 		return true
 	}
 	return false

@@ -122,7 +122,7 @@ func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstru
 
 // isCRD reports whether gvk is a CustomResourceDefinition.
 func isCRD(gvk schema.GroupVersionKind) bool {
-	return gvk.Group == "apiextensions.k8s.io" && gvk.Kind == "CustomResourceDefinition"
+	return gvk.Group == groupAPIExtensions && gvk.Kind == kindCustomResourceDefinition
 }
 
 // splitClusterDefinitions partitions objs, keeping their order, into the
