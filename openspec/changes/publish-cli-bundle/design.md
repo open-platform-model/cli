@@ -150,7 +150,7 @@ The title, description and weight are what `command-reference` requires of `_ind
       setup-go: true
 ```
 
-A manual re-run for a tag whose bundle already exists rebuilds the same digest, which `push` treats as a no-op (C4 rule 2). Tasks, `.tasks/opm-docs.sh` and `.gitignore` (`/out/`, `/.bin/`) as catalog_opm; `task check` runs `docs:bundle:check` after `docs:reference:check`.
+A re-run of the failed run (the same `main` commit) for a tag whose bundle already exists rebuilds the same digest, which `push` treats as a no-op (C4 rule 2). A fresh `release` dispatch after `main` renamed or deleted an authored page builds a different `edit`, so a different digest, and `push` refuses it; a fix to a published bundle is a docs revision. `publish-docs` also requires `github.ref == 'refs/heads/main'`, the one ref `publish.yml` accepts, so a manual release run from another branch skips it. The Lint jobs of `pr.yml` and `ci.yml` run `.tasks/opm-docs.sh pin-check` (`task docs:pins:check`), and `.github/dependabot.yml` ignores `open-platform-model/docs-kit*` among the actions, since `publish.yml@` moves only with `.opm-docs-version`. The `cobradump` require moves by hand: Dependabot ignores `github.com/open-platform-model/*`. Tasks, `.tasks/opm-docs.sh` and `.gitignore` (`/out/`, `/.bin/`) as catalog_opm; `task check` runs `docs:bundle:check` after `docs:reference:check`.
 
 ### D5. Gate G2-pins and the release order
 
@@ -182,7 +182,11 @@ task docs:bundle
 .bin/opm-docs pull --config <scratch>/bundles.cue --out <scratch>/pull --local cli@v1.0=out/cli
 ```
 
-It passes when it exits 0 and `<scratch>/pull/lock.json` has `docs` entries for `library` `1.0.0-beta.1`, `core` `2.0.0-beta.1` and `opm-operator` `1.0.0-beta.4` (or whatever the head's `manifest.json` `pins` names). After the release, drop `--local` for G2-pins. Dry run on 2026-10-03 with `opm-docs` 0.4.0 (which carries `pull-docs-placement`) and the network blocked by a refusing proxy, so nothing reached GHCR: the config validated, the local anchor loaded with its pins, and the pull stopped at the first pin's registry request (`v1.0 library 1.0.0-beta.1: resolving ghcr.io/open-platform-model/docs/library:1.0.0-beta.1`), as expected.
+It passes when it exits 0 and `<scratch>/pull/lock.json` has `docs` entries for `library` `1.0.0-beta.1`, `core` `2.0.0-beta.1` and `opm-operator` `1.0.0-beta.4` (or whatever the head's `manifest.json` `pins` names). After the release, drop `--local` for G2-pins.
+
+**Automatic in the release gate (review of cli#290).** `.github/scripts/release-pin-check.sh` (`task deps:release-check`, the `Release-pin gate (G1)` step of the Lint jobs on release-please branches) also runs `go run ./hack/docskit-dump pins` and, for each pin, an anonymous manifest HEAD of `ghcr.io/open-platform-model/docs/<project>:<pin>` (an anonymous token first, as the site pulls); a 401, 403 or 404 counts as missing (C16) and fails the gate naming the project, the version and the dispatch that publishes it. So cli#276's Lint job is the G2-pins gate: it fails until the three backfills exist, and passes only when every pin has a bundle. The manual `--local` pull above stays the fuller pre-merge check (signatures, lint, cross-bundle checks), and its anonymous form without `--local` the post-release confirmation. The same review found the gate looked up the nested module `github.com/open-platform-model/docs-kit/cobradump` as a repository; it now takes the repository from the first three path segments and the tag as `<subdir>/<version>` (any `/vN` suffix dropped).
+
+Dry run on 2026-10-03 with `opm-docs` 0.4.0 (which carries `pull-docs-placement`) and the network blocked by a refusing proxy, so nothing reached GHCR: the config validated, the local anchor loaded with its pins, and the pull stopped at the first pin's registry request (`v1.0 library 1.0.0-beta.1: resolving ghcr.io/open-platform-model/docs/library:1.0.0-beta.1`), as expected.
 
 `v1.0.0-beta.5` (today's newest release) pins library `1.0.0-beta.1`, core `2.0.0-beta.1` and the operator `1.0.0-beta.4`, but it has no hook and can never have a bundle; nothing is lost, because the site keeps reading the cli from git until G2-switch.
 
