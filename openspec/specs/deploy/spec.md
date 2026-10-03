@@ -42,7 +42,7 @@ A developer wants to delete a deployed module after deleting the source files.
 
 **Acceptance Scenarios**:
 
-1. **Given** a deployed module, **When** source is deleted and `opm instance delete <name> -n <ns>` runs, **Then** resources are removed.
+1. **Given** a deployed module, **When** source is deleted and `opm instance delete <name> -n <ns>` runs, **Then** its tracked resources are removed, and any CRD or Namespace it rendered is left behind and listed.
 2. **Given** delete request, **When** running `opm instance delete --dry-run`, **Then** resources to delete are listed but not removed.
 
 ---

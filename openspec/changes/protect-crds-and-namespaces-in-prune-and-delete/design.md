@@ -19,7 +19,7 @@ The operator's `Prune` (`opm-operator/internal/apply/prune.go`) is the reference
 - A live ownership re-check in prune, and shared `CanApply`/`CanDelete` verdicts or an adopt annotation. Those belong to the later ownership change that serves both frontends.
 - Keeping left-behind prune entries in the recorded inventory. A stale Namespace already drops out today; CRDs follow the same rule.
 - Changing the operator.
-- Discovery-time read errors on instance delete. `inventory.DiscoverResourcesFromInventory` drops an entry whose GET fails with anything but NotFound (debug log only), so that entry never reaches the in-loop re-read and the `ModuleInstance` is still deleted. That gap predates this change and belongs to the later delete protocol that serves both frontends; the re-read error rule below covers only errors raised inside `Delete`.
+- Discovery-time read errors on instance delete. `inventory.DiscoverResourcesFromInventory` drops an entry whose GET fails with anything but NotFound (debug log only), so that entry never reaches the in-loop re-read and the `ModuleInstance` is still deleted. That gap predates this change and belongs to the later delete protocol that serves both frontends (tracked in cli issue #283); the re-read error rule below covers only errors raised inside `Delete`.
 
 ## Decisions
 
@@ -69,7 +69,7 @@ Per object, in the existing reverse-weight order, on both the dry run and the re
 
 Step 4 copies the operator's tolerances: an object with no UUID label predates UUID stamping and passes on the managed-by check alone, and an instance with no recorded UUID falls back to the managed-by check. This is the reading of the owner's "like the operator" for the UUID match. A stricter rule (refuse when either side is empty) would leave legacy objects behind on every delete, which the operator does not do.
 
-The re-read is done inside the loop rather than relying on the objects `ResolveInventory` fetched, because earlier foreground deletes in the same loop (and, without `--force`, the time the user takes at the prompt before discovery returns) sit between that read and the delete. The delete itself is unchanged (foreground propagation, by name).
+The re-read is done inside the loop rather than relying on the objects `ResolveInventory` fetched, because earlier foreground deletes in the same loop sit between that read and the delete. The delete itself is unchanged (foreground propagation, by name).
 
 `executeInstanceDelete` prints each left-behind object as `output.FormatResourceLine(kind, ns, name, StatusLeftBehind)` with its reason as a key-value field. Left-behind objects are not errors: the exit code is 0 and the `ModuleInstance` is deleted last as today. The progress line `all resources have been deleted` is printed only when nothing was left behind and nothing failed, and a real run with a per-resource failure prints no closing checkmark at all, since the `ModuleInstance` is kept for a re-run. The closing line becomes `Instance deleted — N resource(s) left behind` when N > 0, followed by `output.Details` naming `kubectl delete` as the way to remove them once nothing needs them. The dry run closes with `dry run complete: N resources would be deleted, M left behind`.
 

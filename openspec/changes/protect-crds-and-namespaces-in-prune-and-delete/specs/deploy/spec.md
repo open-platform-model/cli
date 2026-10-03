@@ -70,3 +70,26 @@ Before deleting each tracked resource, `opm instance delete` SHALL read the live
 - **THEN** the resource SHALL be reported as failed
 - **AND** the `ModuleInstance` record SHALL NOT be deleted
 - **AND** the command SHALL exit non-zero
+
+## MODIFIED Requirements
+
+### Requirement: mod delete uses ownership inventory for resource enumeration
+
+`opm instance delete` SHALL use the ownership inventory stored in the persisted instance inventory record to enumerate resources for deletion when it exists. If an inventory exists, only resources tracked in that ownership inventory SHALL be deleted (no label-scan), and the `ModuleInstance` record itself SHALL be deleted last. If no record exists, the command SHALL exit 5 (not found).
+
+#### Scenario: Delete with ownership inventory
+
+- **WHEN** running `opm instance delete` and a persisted instance inventory record exists
+- **THEN** only resources listed in that record's ownership inventory SHALL be deleted
+- **AND** the `ModuleInstance` record SHALL be deleted after all tracked resources it deletes; resources left behind SHALL NOT block it
+
+#### Scenario: Delete without inventory
+
+- **WHEN** running `opm instance delete` and no `ModuleInstance` record exists for the instance
+- **THEN** the command SHALL exit with code 5 and report the instance as not found
+
+#### Scenario: Delete does not remove derived resources
+
+- **WHEN** running `opm instance delete` with ownership inventory
+- **AND** derived resources (e.g., Endpoints) exist with OPM labels but are not in the inventory
+- **THEN** the derived resources SHALL NOT be deleted
