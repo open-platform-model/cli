@@ -72,18 +72,19 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
 
 ## 3. `task deps:cascade` and the offline scenarios
 
-- [ ] 3.1 Create `.tasks/cascade/cascade.sh` (executable, `set -euo pipefail`). It covers:
+- [x] 3.1 Create `.tasks/cascade/cascade.sh` (executable, `set -euo pipefail`). It covers:
   - the setup: clean-tree check with `CASCADE_ALLOW_DIRTY` and `snapshot`, `$STATE`, `CASCADE_WARNINGS`, the registry exports, and `check-files` (design.md D4; contract §5.2 rules 1 to 4);
   - `f_changed`, copied verbatim from contract §5.2 rule 11;
   - `CASCADE_EXPECT` parsing (contract §5.4).
 
   No `|| true`, no `2>/dev/null ||` and no `set +e` around resolver or tool calls.
-- [ ] 3.2 Phase A in `cascade.sh` (design.md D4): the nine call groups in order, each exit handled by a `case` on 0, 3 or other. Implement the consistent set across the D3 file list (an explicit list, never a glob), including:
+- [x] 3.2 Phase A in `cascade.sh` (design.md D4): the nine call groups in order, each exit handled by a `case` on 0, 3 or other. Implement the consistent set across the D3 file list (an explicit list, never a glob), including:
   - the core-only files;
   - the hold rule;
   - the "core ahead" warning;
   - the phase A prediction for the version advance (D6).
-- [ ] 3.3 Phases B and C in `cascade.sh`:
+  Done: also caught in S1 during the build: a core-only file must never get a catalog move.
+- [x] 3.3 Phases B and C in `cascade.sh`:
   - `go build -o "$STATE/bin/opm" ./cmd/opm`, only if something moves;
   - library `go get` and `go mod tidy`, with the third-party require warning;
   - `task operator:sync VERSION=<v>`;
@@ -95,18 +96,20 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
   - `language-of` warnings against `.github/workflows/pr.yml`'s `cue@v...` (D8);
   - docs-bundle warnings (D9);
   - the exit 0 or 3 result (contract §5.2 rule 13).
-- [ ] 3.4 `Taskfile.yml`: add `deps:cascade` running `.tasks/cascade/cascade.sh`, with the same anchor, env and precondition as section 2. Its `desc` names the exit codes and `task -x`.
-- [ ] 3.5 Create `.tasks/cascade/testdata/s1-calls.txt`: the normalized S1 call list from design.md D10 (`check-files`, `newest go`, `newest release`, `newest cue` for the catalog, `hold`, one `pin-of`).
-- [ ] 3.6 Add the offline scenarios to `test.sh`: S1 no-op, S3 error and S6 dirty tree, exactly as contract §8 and design.md D10 describe, plus S7 and S8.
+- [x] 3.4 `Taskfile.yml`: add `deps:cascade` running `.tasks/cascade/cascade.sh`, with the same anchor, env and precondition as section 2. Its `desc` names the exit codes and `task -x`.
+- [x] 3.5 Create `.tasks/cascade/testdata/s1-calls.txt`: the normalized S1 call list from design.md D10 (`check-files`, `newest go`, `newest release`, `newest cue` for the catalog, `hold`, one `pin-of`).
+- [x] 3.6 Add the offline scenarios to `test.sh`: S1 no-op, S3 error and S6 dirty tree, exactly as contract §8 and design.md D10 describe, plus S7 and S8.
   - Build the stub table from `pins.sh WORKTREE` at test time; nothing current is committed.
   - Assert that every `newest` line in the log carries `--current` and `--repo-root`.
   - Assert that the real checkout's `git status --porcelain` is unchanged after the run.
   - S3 also asserts that the normalized stub log ends at the `newest go` call and that `$STATE/bin/opm` does not exist.
   - Add S7 (core ahead) and S8 (a hold on core holds the catalog) from design.md D10 to the offline set.
-- [ ] 3.7 Verify on the tree:
+- [x] 3.7 Verify on the tree:
   - `CASCADE_TEST_SET=offline task -x deps:cascade:test` exits 0 with `PASS` for the pre-checks and S1, S3, S6, S7 and S8;
   - a throwaway `|| true` added after the library `newest` call in `cascade.sh` makes S3 fail (restore it).
-- [ ] 3.8 `task fmt`, `task lint`, `task test:unit`, `task openspec:check`, shellcheck, and the offline test set green, then commit `ci(cascade): add task deps:cascade`.
+  Done: offline set all PASS. Every resolver call goes through the helper `r`, which exits on any code but 0 or 3, so a literal `|| true` after the library call cannot swallow the error (S3 still passes, correctly). The equivalent swallow, the helper's error branch turned into "stay", makes S3 fail (`exit 3, want neither 0 nor 3`). Both restored.
+- [x] 3.8 `task fmt`, `task lint`, `task test:unit`, `task openspec:check`, shellcheck, and the offline test set green, then commit `ci(cascade): add task deps:cascade`.
+  Done: all green.
 
 ## 4. Network scenarios, CI and docs
 

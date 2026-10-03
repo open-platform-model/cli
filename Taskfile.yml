@@ -526,8 +526,8 @@ tasks:
   # contract §3 and §5). Run every cascade task with `task -x`, or go-task turns
   # exit 3 into 201. The resolver lives in open-platform-model/.github; each
   # task finds it itself (never a global var, which would run for every task).
-  deps:cascade:title:
-    desc: "Release cascade: print the cascade PR title for the diff against CASCADE_BASE (default origin/main); see workspace RELEASING.md \"The cascade\""
+  deps:cascade:
+    desc: "Release cascade: move the cli's upstream pins to the newest published versions in the working tree; exit 0 changed, 3 nothing to do, other on error, so run it as task -x; see workspace RELEASING.md \"The cascade\""
     vars: &cascade_vars
       CASCADE_RESOLVER_PATH:
         sh: |
@@ -542,6 +542,14 @@ tasks:
     preconditions: &cascade_pre
       - sh: test -x '{{.CASCADE_RESOLVER_PATH}}'
         msg: "cascade resolver not found: check out open-platform-model/.github beside this repo, or set CASCADE_RESOLVER"
+    cmds:
+      - .tasks/cascade/cascade.sh
+
+  deps:cascade:title:
+    desc: "Release cascade: print the cascade PR title for the diff against CASCADE_BASE (default origin/main); see workspace RELEASING.md \"The cascade\""
+    vars: *cascade_vars
+    env: *cascade_env
+    preconditions: *cascade_pre
     cmds:
       - '"$CASCADE_RESOLVER" title --classes .tasks/cascade/classes --pins .tasks/cascade/pins.sh'
 

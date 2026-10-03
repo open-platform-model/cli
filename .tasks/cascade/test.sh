@@ -58,6 +58,77 @@ sandbox() {
   printf '%s\n' "$d"
 }
 
+# commit_setup DIR: commit the scenario's setup edits and point CASCADE_BASE
+# at that commit, by SHA, for every run in the scenario (contract §8 step 4).
+commit_setup() {
+  g "$1" add -A
+  g "$1" commit -q --allow-empty -m setup
+  CASCADE_BASE=$(g "$1" rev-parse HEAD)
+  export CASCADE_BASE
+}
+
+LIB=github.com/open-platform-model/library
+OP=github.com/open-platform-model/opm-operator
+CAT=opmodel.dev/catalogs/opm@v4
+CORE=opmodel.dev/core@v2
+POD=testing.opmodel.dev/modules/cli/podinfo@v0
+PODDIR=tests/fixtures/modules/podinfo
+ADV_DIRS=(templates/minimal templates/standard templates/advanced "$PODDIR")
+declare -A ADV_COORD=(
+  [templates/minimal]=opmodel.dev/templates/minimal@v1
+  [templates/standard]=opmodel.dev/templates/standard@v1
+  [templates/advanced]=opmodel.dev/templates/advanced@v1
+  [$PODDIR]=$POD
+)
+
+# id_version FILE: the bare Version of an identity file.
+id_version() { sed -n 's/^Version: "\(.*\)"$/\1/p' "$1"; }
+# cue_dep_v FILE KEY: the v: of KEY in a module.cue's deps.
+cue_dep_v() {
+  awk -v k="\"$2\": {" '
+    index($0, k) { f = 1; next }
+    f && /^[[:space:]]*v:/ { match($0, /"[^"]*"/); print substr($0, RSTART + 1, RLENGTH - 2); exit }
+    f && /^[[:space:]]*}/ { exit }' "$1"
+}
+
+# current_rows DIR: the stub rows for the tree in DIR as it is (contract §8):
+# a newest row per pin, the pin-of row for its catalog, and a published row
+# per version-advance module at its declared version. Read before any setup.
+current_rows() {
+  local d="$1" key v cat="" core="" a
+  while IFS=$'\t' read -r key _ _ v _; do
+    case "$key" in
+      "$LIB") printf 'newest\tgo\t%s\t%s\n' "$key" "$v" ;;
+      "$OP") printf 'newest\trelease\topm-operator\t%s\n' "$v" ;;
+      *) printf 'newest\tcue\t%s\t%s\n' "$key" "$v" ;;
+    esac
+    case "$key" in "$CAT") cat=$v ;; "$CORE") core=$v ;; esac
+  done < <(cd "$d" && .tasks/cascade/pins.sh WORKTREE)
+  printf 'pin-of\t%s\t%s\t%s\t%s\n' "$CAT" "$cat" "$CORE" "$core"
+  for a in "${ADV_DIRS[@]}"; do
+    printf 'published\tcue\t%s\tv%s\n' "${ADV_COORD[$a]}" "$(id_version "$d/$a/identity/identity.cue")"
+  done
+}
+
+# run DIR TABLE LOG: task -x deps:cascade in DIR against the stub; sets RUN_RC.
+# Its output goes to DIR/../out.N; the last run's file is in RUN_OUT.
+RUNS=0
+run() {
+  RUNS=$((RUNS + 1))
+  RUN_OUT="$1/../out.$RUNS"
+  RUN_RC=0
+  (cd "$1" && CASCADE_RESOLVER="$STUB" CASCADE_STUB_TABLE="$2" CASCADE_STUB_LOG="$3" \
+    task -x deps:cascade) >"$RUN_OUT" 2>&1 || RUN_RC=$?
+}
+# normalized LOG: the stub log with every version replaced by V, sorted.
+normalized() { sed -E 's/v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?/V/g' "$1" | LC_ALL=C sort; }
+# clean DIR: the sandbox has no change against its last commit.
+clean() { [ -z "$(g "$1" status --porcelain --untracked-files=all)" ]; }
+# warned DIR TEXT: the sandbox's warnings file has a line containing TEXT.
+warned() { grep -qF -- "$2" "$1/.git/cascade/warnings" 2>/dev/null; }
+# why: the tail of the last run's output, for a FAIL line.
+why() { tail -n 3 "$RUN_OUT" | tr '\n' ' '; }
+
 # ---------------------------------------------------------------------------
 # Pre-checks (both sets).
 
@@ -76,6 +147,99 @@ if (cd "$pre" && diff <(.tasks/cascade/pins.sh WORKTREE) <(.tasks/cascade/pins.s
   fi
 else
   fail "pins.sh WORKTREE equals HEAD" "the two reads differ on a clean copy"
+fi
+
+# ---------------------------------------------------------------------------
+# Offline scenarios (both sets): no GHCR, Go proxy or GitHub access.
+
+# S1 no-op: the tree as it is, current rows only.
+d=$(sandbox s1)
+current_rows "$d" >"$TMP/s1/table"
+commit_setup "$d"
+run "$d" "$TMP/s1/table" "$TMP/s1/log"
+if [ "$RUN_RC" != 3 ]; then
+  fail "S1 no-op" "exit $RUN_RC, want 3: $(why)"
+elif ! clean "$d"; then
+  fail "S1 no-op" "the tree changed"
+elif ! diff <(normalized "$TMP/s1/log") "$HERE/testdata/s1-calls.txt" >"$TMP/s1/diff"; then
+  fail "S1 no-op" "the resolver calls differ from testdata/s1-calls.txt: $(tr '\n' ' ' <"$TMP/s1/diff")"
+elif grep '^newest ' "$TMP/s1/log" | grep -v -e '--current ' >/dev/null ||
+  grep '^newest ' "$TMP/s1/log" | grep -v -e '--repo-root ' >/dev/null; then
+  fail "S1 no-op" "a newest call lacks --current or --repo-root"
+else
+  pass "S1 no-op"
+fi
+
+# S3 error: the first pin the task resolves (library) answers with an error.
+d=$(sandbox s3)
+{ printf 'newest\tgo\t%s\tERROR\n' "$LIB"; current_rows "$d"; } >"$TMP/s3/table"
+commit_setup "$d"
+run "$d" "$TMP/s3/table" "$TMP/s3/log"
+if [ "$RUN_RC" = 0 ] || [ "$RUN_RC" = 3 ]; then
+  fail "S3 error" "exit $RUN_RC, want neither 0 nor 3"
+elif ! clean "$d"; then
+  fail "S3 error" "the tree changed"
+elif [ "$(tail -n 1 "$TMP/s3/log" | cut -d' ' -f1-3)" != "newest go $LIB" ]; then
+  fail "S3 error" "the task went on after the failing call: $(tail -n 1 "$TMP/s3/log")"
+elif [ -e "$d/.git/cascade/bin/opm" ]; then
+  fail "S3 error" "phase B ran after a phase A error"
+else
+  pass "S3 error"
+fi
+
+# S6 dirty tree: an untracked file, CASCADE_ALLOW_DIRTY unset.
+d=$(sandbox s6)
+current_rows "$d" >"$TMP/s6/table"
+commit_setup "$d"
+printf 'x\n' >"$d/untracked-file"
+run "$d" "$TMP/s6/table" "$TMP/s6/log"
+if [ "$RUN_RC" != 1 ]; then
+  fail "S6 dirty tree" "exit $RUN_RC, want 1"
+elif [ "$(g "$d" status --porcelain --untracked-files=all)" != "?? untracked-file" ]; then
+  fail "S6 dirty tree" "the tree changed beyond the untracked file"
+else
+  pass "S6 dirty tree"
+fi
+
+# S7 core ahead: one file's core above the core its catalog pins stays, with a
+# warning (contract §9.10).
+d=$(sandbox s7)
+current_rows "$d" >"$TMP/s7/table"
+f="$d/tests/integration/module-apply/testdata/cue.mod/module.cue"
+perl -0pi -e 's/("opmodel\.dev\/core\@v2": \{\n\s*v:\s*)"[^"]+"/$1"v2.0.0-beta.99"/' "$f"
+commit_setup "$d"
+run "$d" "$TMP/s7/table" "$TMP/s7/log"
+if [ "$(cue_dep_v "$f" "$CORE")" != v2.0.0-beta.99 ]; then
+  fail "S7 core ahead" "the setup edit did not apply"
+elif [ "$RUN_RC" != 3 ]; then
+  fail "S7 core ahead" "exit $RUN_RC, want 3: $(why)"
+elif ! clean "$d"; then
+  fail "S7 core ahead" "the tree changed"
+elif ! warned "$d" "core \`v2.0.0-beta.99\` is ahead of the core"; then
+  fail "S7 core ahead" "no core-ahead warning"
+else
+  pass "S7 core ahead"
+fi
+
+# S8 a hold on core holds the catalog: the newest catalog pins a core above an
+# in-date hold at the tree's core (contract §9.11).
+d=$(sandbox s8)
+tree_core=$(cue_dep_v "$d/templates/minimal/cue.mod/module.cue" "$CORE")
+{ printf 'newest\tcue\t%s\tv4.99.0\n' "$CAT"
+  printf 'pin-of\t%s\tv4.99.0\t%s\tv2.0.0-beta.99\n' "$CAT" "$CORE"
+  current_rows "$d"; } >"$TMP/s8/table"
+printf 'holds:\n  - pin: "%s"\n    max: "%s"\n    reason: "test hold"\n    expires: "2026-12-31"\n' \
+  "$CORE" "$tree_core" >"$d/.cascade-hold"
+commit_setup "$d"
+run "$d" "$TMP/s8/table" "$TMP/s8/log"
+if [ "$RUN_RC" != 3 ]; then
+  fail "S8 core hold" "exit $RUN_RC, want 3: $(why)"
+elif ! clean "$d"; then
+  fail "S8 core hold" "the tree changed"
+elif ! warned "$d" "catalog \`v4.99.0\` needs core \`v2.0.0-beta.99\`, above the hold"; then
+  fail "S8 core hold" "no catalog-held warning"
+else
+  pass "S8 core hold"
 fi
 
 # ---------------------------------------------------------------------------

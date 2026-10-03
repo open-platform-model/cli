@@ -171,12 +171,12 @@ The phases follow contract §5.2 rule 5.
 4. `newest cue opmodel.dev/catalogs/opm@v4 --current <representative> --repo-root .`
 5. `hold opmodel.dev/core@v2 --repo-root .`
 6. `pin-of opmodel.dev/catalogs/opm@v4 <C> opmodel.dev/core@v2`, once per distinct `C` (D3).
-7. `is-frozen <file> <key>` for every (file, key) pair whose target differs from the file's value, and for `hack/kind-platform.yaml` when its version differs from the target. A frozen pair drops out.
+7. `is-frozen <file> <key>` for every (file, key) pair whose target differs from the file's value, and for `hack/kind-platform.yaml` when its version differs from the target. A frozen pair drops out. For a file that will be touched, it also asks for every other `opmodel.dev` and `testing.opmodel.dev` key the file pins, so the check after `tidy` (contract §5.2 rule 8) knows every frozen key. A consumer's podinfo key is asked only when the task would edit it (D7).
 8. For each version-advance module that will differ from the merge base (D6): `published cue <module>@vN v<B>`.
 9. For each podinfo consumer whose catalog or core moves: `published cue testing.opmodel.dev/modules/cli/podinfo@v0 <its podinfo pin>`, and, when that answers 3, `published` of the merge base's podinfo `v<B>` (D7).
 10. `language-of <module> <target>`, for the catalog and for core when either moves (D8).
 
-`newest` gets `--expect <v>` when `CASCADE_EXPECT` names its key (contract §5.4). Each exit code is handled by a `case`:
+`newest` gets `--expect <v>` when `CASCADE_EXPECT` names its key (contract §5.4). Every call goes through one helper, `r`, whose `case` handles the exit code:
 
 - 0 means move;
 - 3 means stay;
