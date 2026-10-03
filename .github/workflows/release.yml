@@ -233,8 +233,10 @@ jobs:
     # last, so the bundle follows a published release only: a release left a
     # draft has none until the manual run that finishes it.
     needs: [release-please, goreleaser]
-    # always(): on a manual run release-please is skipped.
-    if: always() && needs.goreleaser.result == 'success'
+    # always(): on a manual run release-please is skipped. publish.yml
+    # refuses every ref but main (docs-kit C5), so a manual run from another
+    # branch skips this job instead of failing it.
+    if: always() && needs.goreleaser.result == 'success' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
       packages: write
