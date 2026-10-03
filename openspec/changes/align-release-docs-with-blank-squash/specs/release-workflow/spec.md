@@ -24,16 +24,31 @@ The release workflow SHALL trigger on `push` to `main` and on `workflow_dispatch
 - **THEN** release-please proposes `1.0.0-beta.2`
 
 ### Requirement: A version line moves only through a release-as key
-A forced version, such as a move to a new version line (for example `1.0.0-alpha.27` to `1.0.0-beta.1`), SHALL be a `release-as` value on the `.` package in `release-please-config.json`, set by a normal pull request. Because release-please re-applies a configured `release-as` on every run, the next pull request after that release is cut SHALL remove the key. The configuration SHALL carry no `release-as` value at any other time. A breaking change SHALL be marked by `!` in the pull request title, which is the squash commit title. A `Release-As:` or `BREAKING CHANGE:` footer in a pull request body or a branch commit message SHALL NOT be relied on, because the `BLANK` squash message keeps it off `main`. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+A forced version, such as a move to a new version line (for example `1.0.0-alpha.27` to `1.0.0-beta.1`), SHALL be a `release-as` value on the `.` package in `release-please-config.json`, set by a normal pull request. The key SHALL take effect only together with a releasable commit (a visible type: `feat`, `fix`, `perf`, `revert`, `deps` or `refactor`) on `main` since the last release, because release-please opens no release PR for hidden-type commits alone, whatever the key says; so the key pull request SHALL itself carry a releasable type, or land with or after a releasable commit in the same release. Because release-please re-applies a configured `release-as` on every run, the key SHALL be removed before any later release PR merges. The configuration SHALL carry no `release-as` value at any other time. A `Release-As:` footer in a pull request body or a branch commit message SHALL NOT be relied on, because the `BLANK` squash message keeps it off `main`. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
 
 #### Scenario: A release-as key forces the line change
-- **WHEN** the manifest holds `1.0.0-alpha.27` and a pull request that sets `release-as` to `1.0.0-beta.1` in `release-please-config.json` merges to main
+- **WHEN** the manifest holds `1.0.0-alpha.27`, a pull request that sets `release-as` to `1.0.0-beta.1` in `release-please-config.json` merges to main, and it or another commit since the last release has a releasable type
 - **THEN** release-please opens or retitles the release PR as `chore(main): release 1.0.0-beta.1`
+
+#### Scenario: A key pull request of a hidden type alone opens no release PR
+- **WHEN** the only commit on main since the last release is a `chore(...)`, `build(...)` or `ci(...)` pull request that sets `release-as`
+- **THEN** release-please opens no release PR, and the forced version waits for the next releasable commit
 
 #### Scenario: The key is removed once its release is cut
 - **WHEN** the release PR for the `release-as` version has merged and that version is tagged
-- **THEN** the next pull request removes the `release-as` key, and later releasable commits advance the line normally
+- **THEN** a pull request removes the `release-as` key before any later release PR merges, and later releasable commits advance the line normally
 
 #### Scenario: A footer forces nothing
 - **WHEN** a pull request whose body or branch commit message carries `Release-As: 1.1.0-beta.1` merges to main under the `BLANK` squash message
 - **THEN** the squash commit on main carries only the pull request title, and release-please proposes the next version from that title alone
+
+### Requirement: A breaking change is marked by a bang in the pull request title
+A breaking change SHALL be marked by `!` in the pull request title (`feat!:`, `fix(deps)!:`), which is the squash commit title once `squash_merge_commit_title` is `PR_TITLE`. Until that owner setting lands, a one-commit pull request squashes under its commit subject, so that subject SHALL carry the same `!`. A `BREAKING CHANGE:` footer in a pull request body or a branch commit message SHALL NOT be relied on, because the `BLANK` squash message keeps it off `main`; the migration note goes in the pull request body, and in the user docs when users need it to upgrade. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+
+#### Scenario: Breaking change marked in the title
+- **WHEN** a pull request titled `feat!: ...` squash-merges to main while the manifest holds `1.0.0-beta.3`
+- **THEN** release-please lists it under breaking changes and proposes `1.0.0-beta.4`, advancing the `-beta.N` counter
+
+#### Scenario: A breaking footer alone marks nothing
+- **WHEN** a pull request titled `feat: ...` whose body carries a `BREAKING CHANGE:` footer squash-merges to main under the `BLANK` squash message
+- **THEN** the squash commit carries only the title, and release-please files it as an ordinary feature
