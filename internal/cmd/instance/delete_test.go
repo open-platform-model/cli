@@ -2,6 +2,7 @@ package instance
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
+	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
@@ -162,4 +164,43 @@ func TestExecuteInstanceDelete_LeavesNamespaceBehind(t *testing.T) {
 			assert.True(t, apierrors.IsNotFound(miErr), "the ModuleInstance is deleted")
 		})
 	}
+}
+
+// A re-read that fails with anything but NotFound fails that resource: the
+// ModuleInstance is kept for a re-run, the command exits non-zero and claims
+// no completion.
+func TestExecuteInstanceDelete_ReadErrorKeepsModuleInstance(t *testing.T) {
+	ctx := context.Background()
+	labels := map[string]any{pkgcore.LabelManagedBy: pkgcore.LabelManagedByValue}
+	cm := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1", "kind": "ConfigMap",
+		"metadata": map[string]any{"name": "web", "namespace": "apps", "labels": labels},
+	}}
+	mi := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": inventory.APIVersionModuleInstance, "kind": inventory.KindModuleInstance,
+		"metadata": map[string]any{"name": "demo", "namespace": "apps"},
+	}}
+	dyn := fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
+		map[schema.GroupVersionResource]string{inventory.ModuleInstanceGVR: "ModuleInstanceList"},
+		cm.DeepCopy(), mi.DeepCopy())
+	dyn.PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "web", errors.New("denied"))
+	})
+	client := &kubernetes.Client{Dynamic: dyn}
+	inv := &inventory.Record{Name: "demo", Namespace: "apps", Owner: inventory.OwnerCLI}
+
+	var runErr error
+	out := captureOutput(t, func() {
+		runErr = executeInstanceDelete(ctx, client, &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}, "apps", inv,
+			[]*unstructured.Unstructured{cm.DeepCopy()}, false, output.InstanceLogger("demo"))
+	})
+	require.Error(t, runErr)
+	assert.Contains(t, runErr.Error(), "1 resource(s) failed to delete")
+	assert.NotContains(t, out, "Instance deleted")
+	assert.NotContains(t, out, "all resources have been deleted")
+
+	_, miErr := dyn.Tracker().Get(inventory.ModuleInstanceGVR, "apps", "demo")
+	assert.NoError(t, miErr, "the ModuleInstance is kept for a re-run")
+	_, cmErr := dyn.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, "apps", "web")
+	assert.NoError(t, cmErr, "the ConfigMap is not deleted")
 }
