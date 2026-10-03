@@ -359,7 +359,10 @@ These calls decide no target, so they run in phase C.
   - Commit, keep `CASCADE_BASE`. Second run, against the current rows (catalog at the tree's version): the consumers' catalog moves while they pin the unpublished podinfo. Exit 0, and the diff against the original tree is S2's golden list.
   - A third run exits 3.
   - The stub table never lists the next podinfo as published.
-- **Sets.** `CASCADE_TEST_SET=offline` runs the pre-checks plus S1, S3, S6, S7 and S8. `all` (the default) adds S2, S4, S5 and S9.
+- **S10, allowed dirty tree and expect hint** (offline, added at verify). An untracked file with `CASCADE_ALLOW_DIRTY=1`: exit 3 by snapshot, and the file stays. `CASCADE_EXPECT` naming library and an unrelated key: only the library `newest` call carries `--expect`.
+- **S11, never lower** (offline, added at verify). A commit after the base sets `templates/minimal` to `1.99.0`: exit 3, the version stays, and the "above the cascade target" warning (D6).
+- **S5 also checks the path-class map** through the real resolver's `classify`: the test-class paths of every pattern in `classes`, and three shipped paths.
+- **Sets.** `CASCADE_TEST_SET=offline` runs the pre-checks plus S1, S3, S6, S7, S8, S10 and S11. `all` (the default) adds S2, S4, S5 and S9.
 
 ### D11: CI placement
 

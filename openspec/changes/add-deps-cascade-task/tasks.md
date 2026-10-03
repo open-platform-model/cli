@@ -152,6 +152,9 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
 - [x] 4.9 `task fmt`, `task lint`, `task test:unit`, `task openspec:check`, shellcheck, the offline test set, and the full set from 4.5 green, then commit `ci(cascade): test the cascade task in CI`.
   Done: all green; the offline set also passes with no `cue` on PATH, as in the `Lint` job.
 
+- [x] 4.10 Close the coverage gaps the verify pass found: S10 (`CASCADE_ALLOW_DIRTY` snapshot and the `CASCADE_EXPECT` hint) and S11 (never lower a human-set version) in the offline set, and a `classify` check of `classes` beside S5 (design.md D10). Gates as in 4.9, then commit `ci(cascade): test the dirty-tree snapshot, the expect hint and the never-lower rule`.
+  Done: all PASS; turning the never-lower rule back into "write when it differs" makes S11 fail.
+
 ## 5. Archive (rides this PR)
 
 The archive rides the implementing PR, never a push to main (owner decision 4). This section runs only after the supervisor's review of sections 1 to 4, and never in the planning run.

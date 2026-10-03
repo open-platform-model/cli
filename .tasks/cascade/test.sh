@@ -243,6 +243,46 @@ else
   pass "S8 core hold"
 fi
 
+# S10 allowed dirty tree and expect hint: with CASCADE_ALLOW_DIRTY=1 an
+# untracked file is kept and judged by snapshot, so nothing to move is exit 3;
+# CASCADE_EXPECT reaches the library's newest call as --expect.
+d=$(sandbox s10)
+current_rows "$d" >"$TMP/s10/table"
+commit_setup "$d"
+printf 'x\n' >"$d/untracked-file"
+export CASCADE_ALLOW_DIRTY=1 CASCADE_EXPECT="$LIB=v9.9.9 unrelated.example/x=v1.0.0"
+run "$d" "$TMP/s10/table" "$TMP/s10/log"
+unset CASCADE_ALLOW_DIRTY CASCADE_EXPECT
+if [ "$RUN_RC" != 3 ]; then
+  fail "S10 allowed dirty tree" "exit $RUN_RC, want 3: $(why)"
+elif [ "$(g "$d" status --porcelain --untracked-files=all)" != "?? untracked-file" ]; then
+  fail "S10 allowed dirty tree" "the tree changed beyond the untracked file"
+elif ! grep -q "^newest go $LIB .*--expect v9.9.9" "$TMP/s10/log"; then
+  fail "S10 allowed dirty tree" "the library newest call lacks --expect v9.9.9"
+elif [ "$(grep -c -e '--expect' "$TMP/s10/log")" != 1 ]; then
+  fail "S10 allowed dirty tree" "--expect reached a pin CASCADE_EXPECT does not name"
+else
+  pass "S10 allowed dirty tree"
+fi
+
+# S11 never lower: a template version a human set above the cascade target
+# stays, with a warning (design.md D6).
+d=$(sandbox s11)
+current_rows "$d" >"$TMP/s11/table"
+commit_setup "$d"
+sed -i 's/^Version: ".*"$/Version: "1.99.0"/' "$d/templates/minimal/identity/identity.cue"
+g "$d" commit -q -am "a human sets the version"
+run "$d" "$TMP/s11/table" "$TMP/s11/log"
+if [ "$RUN_RC" != 3 ]; then
+  fail "S11 never lower" "exit $RUN_RC, want 3: $(why)"
+elif ! clean "$d" || [ "$(id_version "$d/templates/minimal/identity/identity.cue")" != 1.99.0 ]; then
+  fail "S11 never lower" "the human version was changed"
+elif ! warned "$d" "declares \`1.99.0\`, above the cascade target"; then
+  fail "S11 never lower" "no warning"
+else
+  pass "S11 never lower"
+fi
+
 # ---------------------------------------------------------------------------
 # Network scenarios (CASCADE_TEST_SET=all): the older versions are real, so
 # go get, operator:sync and cue mod get resolve them from the Go proxy, GitHub
@@ -375,6 +415,21 @@ if [ "$SET" = all ]; then
           fail "S5 title and body" "the body carries need-human-review"
         else
           pass "S5 title and body"
+        fi
+      fi
+      # The path-class map, through the real resolver's classify.
+      if [ -n "${CASCADE_RESOLVER_REAL:-}" ]; then
+        want=$(printf '%s\n' \
+          "test	hack/platform/cue.mod/module.cue" "test	hack/kind-platform.yaml" \
+          "test	examples/cue.mod/module.cue" "test	tests/fixtures/modules/podinfo/identity/identity.cue" \
+          "test	internal/instinit/testdata/initvalues/cue.mod/module.cue" \
+          "test	internal/cmd/platform/check_test.go" "shipped	templates/minimal/cue.mod/module.cue" \
+          "shipped	internal/operator/dist/install.yaml" "shipped	go.mod")
+        got=$(cut -f2 <<<"$want" | (cd "$d" && "$CASCADE_RESOLVER_REAL" classify --classes .tasks/cascade/classes)) || got="classify failed"
+        if [ "$got" = "$want" ]; then
+          pass "S5 classes"
+        else
+          fail "S5 classes" "classify printed: $(tr '\n\t' '; ' <<<"$got")"
         fi
       fi
       commit_run "$d"
