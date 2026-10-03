@@ -117,3 +117,10 @@ func TestFormatEventResource(t *testing.T) {
 	styled := FormatEventResource("Pod", "api-0")
 	assert.Contains(t, styled, "Pod/api-0")
 }
+
+func TestFormatResourceLine_LeftBehind(t *testing.T) {
+	line := FormatResourceLine("Namespace", "", "apps", StatusLeftBehind)
+	assert.Contains(t, line, "Namespace/apps")
+	assert.Contains(t, line, "! left behind")
+	assert.Equal(t, "!", statusIcon(StatusLeftBehind))
+}

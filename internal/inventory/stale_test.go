@@ -9,7 +9,7 @@ import (
 )
 
 // helper to build an InventoryEntry quickly
-func entry(group, kind, ns, name, component string) InventoryEntry { //nolint:unparam // ns param kept for test flexibility
+func entry(group, kind, ns, name, component string) InventoryEntry {
 	return InventoryEntry{
 		Group:     group,
 		Kind:      kind,

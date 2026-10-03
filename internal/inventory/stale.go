@@ -95,9 +95,25 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 	return nil
 }
 
+// SplitProtected partitions a stale set into the entries prune may delete and
+// the entries it always leaves behind (kubernetes.IsProtectedKind: core
+// Namespaces and CRDs), keeping the input order in both halves.
+func SplitProtected(stale []InventoryEntry) (prunable, protected []InventoryEntry) {
+	for _, e := range stale {
+		if kubernetes.IsProtectedKind(e.Group, e.Kind) {
+			protected = append(protected, e)
+			continue
+		}
+		prunable = append(prunable, e)
+	}
+	return prunable, protected
+}
+
 // PruneStaleResources deletes the stale resources from the cluster.
 // Resources are deleted in reverse weight order (highest weight first).
-// Namespace resources are excluded unless explicitly included.
+// A core Namespace or a CRD (kubernetes.IsProtectedKind) is never deleted,
+// even when the caller passes one; callers that report what was left behind
+// split the set first with SplitProtected.
 // 404 (not found) errors are treated as success (idempotent).
 func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale []InventoryEntry) error {
 	if len(stale) == 0 {
@@ -115,9 +131,8 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 
 	var errs []error
 	for _, entry := range sorted {
-		// Exclude Namespace resources from pruning by default
-		if entry.Kind == "Namespace" && entry.Group == "" {
-			output.Debug("skipping Namespace pruning", "name", entry.Name)
+		if kubernetes.IsProtectedKind(entry.Group, entry.Kind) {
+			output.Debug("leaving protected resource behind", "kind", entry.Kind, "name", entry.Name)
 			continue
 		}
 
