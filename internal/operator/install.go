@@ -86,7 +86,7 @@ func Install(ctx context.Context, client *kubernetes.Client, opts InstallOptions
 		output.Info(output.FormatResourceLine(obj.GetKind(), obj.GetNamespace(), obj.GetName(), status))
 	}
 
-	if err := Wait(ctx, client, plan, DefaultPredicate, budgetStart); err != nil {
+	if err := kubernetes.Wait(ctx, client, plan, DefaultPredicate, budgetStart); err != nil {
 		return result, err
 	}
 
@@ -111,7 +111,7 @@ func waitForTerminating(ctx context.Context, client *kubernetes.Client, plan []*
 	for _, obj := range terminating {
 		output.Info(output.FormatResourceLine(obj.GetKind(), obj.GetNamespace(), obj.GetName(), "waiting to finish terminating"))
 	}
-	return WaitAbsent(ctx, client, terminating, since)
+	return kubernetes.WaitAbsent(ctx, client, terminating, since)
 }
 
 // terminatingObjects returns the planned objects that exist on the cluster
