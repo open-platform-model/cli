@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.0.0-beta.6](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.5...v1.0.0-beta.6) (2026-10-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* **render:** opm instance apply, build, diff and vet now exit 2 when --namespace (-n) or OPM_NAMESPACE differs from the instance file's metadata.namespace; an exported OPM_NAMESPACE makes build --offline and vet refuse every instance file in another namespace. Drop the override, or edit metadata.namespace in the instance file.
+
+### Features
+
+* **render:** refuse a namespace override that disagrees with the instance file ([#284](https://github.com/open-platform-model/cli/issues/284)) ([1d9f475](https://github.com/open-platform-model/cli/commit/1d9f475b2147e068faede50d0aa33c66a0c1fd74))
+
+
+### Bug Fixes
+
+* **cli:** generate the command reference and drop citations from help ([#275](https://github.com/open-platform-model/cli/issues/275)) ([8e3c15e](https://github.com/open-platform-model/cli/commit/8e3c15e4e5f9e8325dbe5eb42bfc8e78cd04e95d))
+* **kubernetes:** apply instance resources by kind and weight ([#289](https://github.com/open-platform-model/cli/issues/289)) ([75e5f26](https://github.com/open-platform-model/cli/commit/75e5f2681cd619802d45716c167811c94422a416))
+* never delete CRDs or Namespaces on prune or instance delete; list them as left behind ([#285](https://github.com/open-platform-model/cli/issues/285)) ([cd00874](https://github.com/open-platform-model/cli/commit/cd0087460453a798eeec309ccffaa03160dac809))
+
+
+### Code Refactoring
+
+* **config:** drop the retired k8s catalog ([#277](https://github.com/open-platform-model/cli/issues/277)) ([db4f9fd](https://github.com/open-platform-model/cli/commit/db4f9fd93be486ccfe90ffd8c415e8d1761ab3a2))
+
 ## [1.0.0-beta.5](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.4...v1.0.0-beta.5) (2026-10-01)
 
 
