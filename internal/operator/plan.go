@@ -1,10 +1,9 @@
 package operator
 
 import (
-	"sort"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/pkg/resourceorder"
 )
 
@@ -17,7 +16,7 @@ const (
 // weight (CRDs first, workloads last) — the order the objects must be applied in.
 func InstallPlan(objs []*unstructured.Unstructured) []*unstructured.Unstructured {
 	plan := append([]*unstructured.Unstructured(nil), objs...)
-	sortByWeightAscending(plan)
+	kubernetes.SortObjects(plan, resourceorder.Ascending)
 	return plan
 }
 
@@ -30,7 +29,7 @@ func CRDsOnlyPlan(objs []*unstructured.Unstructured) []*unstructured.Unstructure
 			plan = append(plan, obj)
 		}
 	}
-	sortByWeightAscending(plan)
+	kubernetes.SortObjects(plan, resourceorder.Ascending)
 	return plan
 }
 
@@ -46,18 +45,6 @@ func UninstallPlan(objs []*unstructured.Unstructured) []*unstructured.Unstructur
 		}
 		plan = append(plan, obj)
 	}
-	sortByWeightDescending(plan)
+	kubernetes.SortObjects(plan, resourceorder.Descending)
 	return plan
-}
-
-func sortByWeightAscending(objs []*unstructured.Unstructured) {
-	sort.SliceStable(objs, func(i, j int) bool {
-		return resourceorder.GetWeight(objs[i].GroupVersionKind()) < resourceorder.GetWeight(objs[j].GroupVersionKind())
-	})
-}
-
-func sortByWeightDescending(objs []*unstructured.Unstructured) {
-	sort.SliceStable(objs, func(i, j int) bool {
-		return resourceorder.GetWeight(objs[i].GroupVersionKind()) > resourceorder.GetWeight(objs[j].GroupVersionKind())
-	})
 }

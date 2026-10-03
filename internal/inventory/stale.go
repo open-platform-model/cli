@@ -3,7 +3,6 @@ package inventory
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -107,11 +106,9 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 	// Sort in reverse weight order (highest weight deleted first)
 	sorted := make([]InventoryEntry, len(stale))
 	copy(sorted, stale)
-	sort.SliceStable(sorted, func(i, j int) bool {
-		wi := resourceorder.GetWeight(schema.GroupVersionKind{Group: sorted[i].Group, Version: sorted[i].Version, Kind: sorted[i].Kind})
-		wj := resourceorder.GetWeight(schema.GroupVersionKind{Group: sorted[j].Group, Version: sorted[j].Version, Kind: sorted[j].Kind})
-		return wi > wj // descending
-	})
+	resourceorder.Sort(sorted, func(e InventoryEntry) schema.GroupVersionKind {
+		return schema.GroupVersionKind{Group: e.Group, Version: e.Version, Kind: e.Kind}
+	}, resourceorder.Descending)
 
 	var errs []error
 	for _, entry := range sorted {

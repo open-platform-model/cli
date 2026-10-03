@@ -11,6 +11,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/pkg/resourceorder"
 )
 
 // InstallOptions configures an install run.
@@ -62,7 +63,7 @@ func Install(ctx context.Context, client *kubernetes.Client, opts InstallOptions
 	}
 	if rbacObjs := opts.RBAC.Objects(); len(rbacObjs) > 0 {
 		plan = append(plan, rbacObjs...)
-		sortByWeightAscending(plan)
+		kubernetes.SortObjects(plan, resourceorder.Ascending)
 	}
 
 	result := &InstallResult{Version: version, Source: source}
