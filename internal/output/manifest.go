@@ -43,8 +43,8 @@ type ManifestOptions struct {
 
 // sortResources sorts resources by weight, then by namespace, then by name.
 // Intentional 3-key sort for display purposes (weight → namespace → name).
-// Does not need to match the 5-key apply order (weight → group → kind → namespace → name)
-// since this function only controls output file and table ordering.
+// It need not match the apply order (weight, then build order), since this
+// function only controls output file and table ordering.
 func sortResources(resources []*unstructured.Unstructured) {
 	sort.Slice(resources, func(i, j int) bool {
 		// Primary: sort by weight

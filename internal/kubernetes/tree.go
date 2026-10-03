@@ -254,12 +254,8 @@ func buildResourceNode(ctx context.Context, client *Client, res *unstructured.Un
 
 // groupByComponent groups resources by their entry in componentMap.
 // Resources absent from the map (or with an empty value) land in noComponentLabel.
-// The input slice order is preserved within each group.
-//
-// NOTE: The inventory Secret stores resources in the order they were written by
-// `opm mod apply`, which is weight-ascending order (same as the transformer apply
-// order). Preserving input slice order here therefore implicitly preserves weight
-// order within each component — no explicit weight sort is needed.
+// Each group keeps the input slice order, which is the inventory's order: the
+// render order of the last apply, not weight order.
 func groupByComponent(resources []*unstructured.Unstructured, componentMap map[string]string) map[string][]*unstructured.Unstructured {
 	groups := make(map[string][]*unstructured.Unstructured)
 	for _, res := range resources {

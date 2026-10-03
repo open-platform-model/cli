@@ -70,9 +70,9 @@ func terminatingFixture(obj *unstructured.Unstructured) *unstructured.Unstructur
 
 func fastPolling(t *testing.T) {
 	t.Helper()
-	prev := waitPollInterval
-	waitPollInterval = 5 * time.Millisecond
-	t.Cleanup(func() { waitPollInterval = prev })
+	prev := kubernetes.WaitPollInterval
+	kubernetes.WaitPollInterval = 5 * time.Millisecond
+	t.Cleanup(func() { kubernetes.WaitPollInterval = prev })
 }
 
 // stubApply makes the fake dynamic client accept server-side-apply patches

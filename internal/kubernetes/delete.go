@@ -3,7 +3,6 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/open-platform-model/cli/pkg/resourceorder"
 
@@ -128,7 +127,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 	instanceLog.Debug("resources to delete", "count", len(resources))
 
 	// Sort in reverse weight order (highest weight first = delete webhooks before deployments)
-	sortByWeightDescending(resources)
+	SortObjects(resources, resourceorder.Descending)
 
 	// Delete each workload resource
 	for _, res := range resources {
@@ -221,13 +220,4 @@ func deleteResource(ctx context.Context, client *Client, obj *unstructured.Unstr
 	}
 
 	return client.ResourceClient(gvr, ns).Delete(ctx, obj.GetName(), deleteOpts)
-}
-
-// sortByWeightDescending sorts resources by weight in descending order (for deletion).
-func sortByWeightDescending(resources []*unstructured.Unstructured) {
-	sort.SliceStable(resources, func(i, j int) bool {
-		wi := resourceorder.GetWeight(resources[i].GroupVersionKind())
-		wj := resourceorder.GetWeight(resources[j].GroupVersionKind())
-		return wi > wj
-	})
 }

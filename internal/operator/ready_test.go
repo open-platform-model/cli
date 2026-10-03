@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestReadinessTargets_SelectsCRDsAndTheControllerDeployment(t *testing.T) {
@@ -55,14 +54,4 @@ func TestNotReadyError_IncludesTheCallerHint(t *testing.T) {
 	assert.Contains(t, err.Error(), "opm-operator-controller-manager")
 	assert.Contains(t, err.Error(), "deleting now would wedge the instance")
 	assert.Contains(t, err.Error(), "opm operator install")
-}
-
-func TestDescribeObjectList_NamespacedAndClusterScoped(t *testing.T) {
-	objs := []*unstructured.Unstructured{
-		{Object: map[string]any{"kind": "Deployment", "metadata": map[string]any{"name": "mgr", "namespace": "sys"}}},
-		{Object: map[string]any{"kind": "CustomResourceDefinition", "metadata": map[string]any{"name": "moduleinstances.opmodel.dev"}}},
-	}
-
-	described := describeObjectList(objs)
-	assert.Equal(t, []string{"Deployment/mgr in sys", "CustomResourceDefinition/moduleinstances.opmodel.dev"}, described)
 }
