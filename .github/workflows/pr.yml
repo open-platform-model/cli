@@ -78,7 +78,7 @@ jobs:
       - name: Seed the job-local registry from the tree
         run: hack/fixtures.sh seed
       - name: Run unit tests
-        run: go test ./internal/...
+        run: go test ./internal/... ./hack/...
 
   openspec:
     # The main specs are the CLI's behavioral record. A spec the validator no
