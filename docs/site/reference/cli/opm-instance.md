@@ -150,7 +150,9 @@ Delete instance resources from cluster.
 opm instance delete <file|name|uuid> [flags]
 ```
 
-Delete all resources belonging to an OPM instance from a Kubernetes cluster.
+Delete the resources belonging to an OPM instance from a Kubernetes cluster (CRDs and Namespaces are left behind).
+
+CustomResourceDefinitions and Namespaces are never deleted, since deleting one takes every custom resource of its kind, or everything inside it, with it. Each tracked resource is also read again just before its delete, and a resource that is no longer managed by OPM or now belongs to another instance is left behind. Every resource left behind is listed with its reason; remove it with `kubectl delete` once nothing else needs it.
 
 Arguments:
 
