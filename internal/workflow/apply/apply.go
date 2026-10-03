@@ -163,8 +163,12 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		}
 	}
 
+	// CRDs and Namespaces are never pruned (kubernetes.IsProtectedKind); they
+	// are listed as left behind instead, in the preview and the real run.
+	prunable, protected := inventory.SplitProtected(staleSet)
+
 	if dryRun && instanceID != "" && !req.Options.NoPrune {
-		previewPrune(staleSet, instanceLog)
+		previewPrune(prunable, protected, instanceLog)
 	}
 
 	if !dryRun && instanceID != "" {
@@ -174,10 +178,16 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)), Printed: true}
 		}
 
-		if len(staleSet) > 0 && !req.Options.NoPrune {
-			instanceLog.Info(fmt.Sprintf("pruning %d stale resource(s)", len(staleSet)))
-			if err := inventory.PruneStaleResources(ctx, req.K8sClient, staleSet); err != nil {
-				instanceLog.Warn("pruning stale resources failed", "error", err)
+		if !req.Options.NoPrune {
+			if len(prunable) > 0 {
+				instanceLog.Info(fmt.Sprintf("pruning %d stale resource(s)", len(prunable)))
+				if err := inventory.PruneStaleResources(ctx, req.K8sClient, prunable); err != nil {
+					instanceLog.Warn("pruning stale resources failed", "error", err)
+				}
+			}
+			if len(protected) > 0 {
+				instanceLog.Warn(fmt.Sprintf("leaving %d resource(s) behind", len(protected)))
+				logLeftBehind(protected, instanceLog)
 			}
 		}
 
@@ -205,23 +215,27 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	return nil
 }
 
-// previewPrune reports the resources a real apply would prune, without
-// deleting anything. It lists the same set PruneStaleResources acts on, which
-// never deletes a Namespace.
-func previewPrune(staleSet []inventory.InventoryEntry, instanceLog *log.Logger) {
-	var lines []string
-	for _, e := range staleSet {
-		if e.Kind == "Namespace" && e.Group == "" {
-			continue
+// previewPrune reports what a real apply would do with the stale set, without
+// deleting anything: the prunable half under "would prune", then the protected
+// half (inventory.SplitProtected) as left behind.
+func previewPrune(prunable, protected []inventory.InventoryEntry, instanceLog *log.Logger) {
+	if len(prunable) > 0 {
+		instanceLog.Info(fmt.Sprintf("would prune %d stale resource(s)", len(prunable)))
+		for _, e := range prunable {
+			instanceLog.Info(output.FormatResourceLine(e.Kind, e.Namespace, e.Name, "would prune"))
 		}
-		lines = append(lines, output.FormatResourceLine(e.Kind, e.Namespace, e.Name, "would prune"))
 	}
-	if len(lines) == 0 {
-		return
+	if len(protected) > 0 {
+		instanceLog.Info(fmt.Sprintf("would leave %d resource(s) behind", len(protected)))
+		logLeftBehind(protected, instanceLog)
 	}
-	instanceLog.Info(fmt.Sprintf("would prune %d stale resource(s)", len(lines)))
-	for _, l := range lines {
-		instanceLog.Info(l)
+}
+
+// logLeftBehind prints one left-behind line per protected stale entry.
+func logLeftBehind(protected []inventory.InventoryEntry, instanceLog *log.Logger) {
+	for _, e := range protected {
+		instanceLog.Warn(output.FormatResourceLine(e.Kind, e.Namespace, e.Name, output.StatusLeftBehind),
+			"reason", kubernetes.ProtectedKindReason)
 	}
 }
 

@@ -188,7 +188,9 @@ func main() {
 		os.Exit(1)
 	}
 	var dryLive []*unstructured.Unstructured
+	var dryUUID string
 	if dryInv != nil {
+		dryUUID = dryInv.InstanceUUID
 		dryLive, _, err = inventory.DiscoverResourcesFromInventory(ctx, client, dryInv)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: discovering from inventory for dry-run delete: %v\n", err)
@@ -198,6 +200,7 @@ func main() {
 	dryDeleteResult, err := kubernetes.Delete(ctx, client, kubernetes.DeleteOptions{
 		InstanceName:  instanceName,
 		Namespace:     namespace,
+		InstanceUUID:  dryUUID,
 		DryRun:        true,
 		InventoryLive: dryLive,
 	})
@@ -218,7 +221,9 @@ func main() {
 		os.Exit(1)
 	}
 	var delLive []*unstructured.Unstructured
+	var delUUID string
 	if delInv != nil {
+		delUUID = delInv.InstanceUUID
 		delLive, _, err = inventory.DiscoverResourcesFromInventory(ctx, client, delInv)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: discovering from inventory for delete: %v\n", err)
@@ -228,6 +233,7 @@ func main() {
 	deleteResult, err := kubernetes.Delete(ctx, client, kubernetes.DeleteOptions{
 		InstanceName:          instanceName,
 		Namespace:             namespace,
+		InstanceUUID:          delUUID,
 		InventoryLive:         delLive,
 		InventoryRecordExists: delInv != nil,
 	})

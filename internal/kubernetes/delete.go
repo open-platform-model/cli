@@ -7,10 +7,12 @@ import (
 
 	"github.com/open-platform-model/cli/pkg/resourceorder"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/cli/internal/output"
+	pkgcore "github.com/open-platform-model/cli/pkg/core"
 )
 
 // DeleteOptions configures a delete operation.
@@ -26,7 +28,15 @@ type DeleteOptions struct {
 	// Mutually exclusive with InstanceName.
 	InstanceID string
 
-	// DryRun previews resources to delete without removing them.
+	// InstanceUUID is the instance's recorded UUID (the ModuleInstance's
+	// status.instanceUUID). A live object whose UUID label differs is left
+	// behind. Empty disables the UUID comparison, as in the operator's prune:
+	// every object is then judged on its managed-by label alone.
+	InstanceUUID string
+
+	// DryRun previews resources to delete without removing them. The
+	// protected-kind and ownership checks run in a dry run too, so the
+	// preview lists the same left-behind set a real run would.
 	DryRun bool
 
 	// InventoryLive is the list of live resources pre-fetched from the
@@ -50,14 +60,42 @@ type DeleteResult struct {
 	// Resources lists all discovered resources (for dry-run display).
 	Resources []*unstructured.Unstructured
 
+	// LeftBehind lists the resources Delete declined to remove: a protected
+	// kind (IsProtectedKind), or an object whose live labels show it is no
+	// longer OPM-managed or belongs to another instance. They are not errors.
+	LeftBehind []LeftBehindResource
+
 	// Errors contains per-resource errors (non-fatal).
 	Errors []resourceError
 }
 
-// Delete removes all resources belonging to an instance deployment.
+// LeftBehindResource is a tracked resource Delete did not remove, with the
+// reason shown to the user.
+type LeftBehindResource struct {
+	Kind      string
+	Namespace string
+	Name      string
+	Reason    string
+}
+
+// Reasons a tracked resource is left behind by Delete, besides
+// ProtectedKindReason.
+const (
+	reasonNotManaged    = "no longer managed by OPM"
+	reasonOtherInstance = "owned by another instance"
+)
+
+// Delete removes the resources belonging to an instance deployment.
 // opts.InventoryLive must be pre-fetched from the ModuleInstance CR inventory by
 // the caller. Resources are deleted in reverse weight order. The ModuleInstance
 // CR itself is deleted last by the caller, after Delete returns.
+//
+// A CRD or Namespace is never deleted. Every other object is read again just
+// before its delete and deleted only while it is still OPM-managed and, when
+// both sides carry one, still has this instance's UUID; otherwise it is left
+// behind (DeleteResult.LeftBehind). An object that is already gone counts
+// neither as deleted nor as an error; any other read error is a per-resource
+// error, so the caller keeps the ModuleInstance and a re-run retries.
 func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteResult, error) {
 	result := &DeleteResult{}
 
@@ -98,6 +136,20 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 		name := res.GetName()
 		ns := res.GetNamespace()
 
+		reason, gone, err := checkDeletable(ctx, client, res, opts.InstanceUUID)
+		switch {
+		case err != nil:
+			instanceLog.Warn(fmt.Sprintf("reading %s/%s: %v", kind, name, err))
+			result.Errors = append(result.Errors, resourceError{Kind: kind, Name: name, Namespace: ns, Err: err})
+			continue
+		case gone:
+			instanceLog.Debug("resource already gone", "kind", kind, "namespace", ns, "name", name)
+			continue
+		case reason != "":
+			result.LeftBehind = append(result.LeftBehind, LeftBehindResource{Kind: kind, Namespace: ns, Name: name, Reason: reason})
+			continue
+		}
+
 		if opts.DryRun {
 			instanceLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
 			result.Deleted++
@@ -105,6 +157,11 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 		}
 
 		if err := deleteResource(ctx, client, res); err != nil {
+			if apierrors.IsNotFound(err) {
+				// Gone between the re-read and the delete: already done.
+				instanceLog.Debug("resource already gone", "kind", kind, "namespace", ns, "name", name)
+				continue
+			}
 			instanceLog.Warn(fmt.Sprintf("deleting %s/%s: %v", kind, name, err))
 			result.Errors = append(result.Errors, resourceError{
 				Kind:      kind,
@@ -122,6 +179,35 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 	// The ModuleInstance CR is deleted last by the caller (after this returns),
 	// so the inventory record is only removed once the instance is fully torn down.
 	return result, nil
+}
+
+// checkDeletable decides whether Delete may remove obj. It returns a non-empty
+// reason when the object is left behind, gone when the live object no longer
+// exists, and an error when the live read fails for any other reason.
+func checkDeletable(ctx context.Context, client *Client, obj *unstructured.Unstructured, instanceUUID string) (reason string, gone bool, err error) {
+	gvk := obj.GroupVersionKind()
+	if IsProtectedKind(gvk.Group, gvk.Kind) {
+		return ProtectedKindReason, false, nil
+	}
+
+	live, err := client.ResourceClient(GVRFromUnstructured(obj), obj.GetNamespace()).Get(ctx, obj.GetName(), metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", true, nil
+		}
+		return "", false, err
+	}
+
+	labels := live.GetLabels()
+	if !pkgcore.IsOPMManagedBy(labels[pkgcore.LabelManagedBy]) {
+		return reasonNotManaged, false, nil
+	}
+	// The operator's tolerance: an object without a UUID label predates UUID
+	// stamping, and an instance without a recorded UUID has nothing to compare.
+	if liveUUID := labels[pkgcore.LabelModuleInstanceUUID]; instanceUUID != "" && liveUUID != "" && liveUUID != instanceUUID {
+		return reasonOtherInstance, false, nil
+	}
+	return "", false, nil
 }
 
 // deleteResource deletes a single resource with foreground propagation.

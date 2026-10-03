@@ -54,6 +54,9 @@ const (
 	StatusConfigured = "configured"
 	StatusUnchanged  = "unchanged"
 	StatusDeleted    = "deleted"
+	// StatusLeftBehind marks an object prune or delete declined to remove:
+	// a protected kind, or one that no longer belongs to the instance.
+	StatusLeftBehind = "left behind"
 	StatusValid      = "valid"
 	statusFailed     = "failed"
 )
@@ -72,6 +75,8 @@ func statusStyle(status string) lipgloss.Style {
 		return lipgloss.NewStyle().Faint(true)
 	case StatusDeleted:
 		return lipgloss.NewStyle().Foreground(colorRed)
+	case StatusLeftBehind:
+		return lipgloss.NewStyle().Foreground(ColorYellow)
 	case statusFailed:
 		return lipgloss.NewStyle().Bold(true).Foreground(colorBoldRed)
 	default:
@@ -82,7 +87,8 @@ func statusStyle(status string) lipgloss.Style {
 // statusIcon returns the icon prefix for a resource status.
 // Validation and apply statuses use distinct icon vocabularies:
 //   - Validation: ✓ (checkmark — "validation passed")
-//   - Apply: diff-style symbols (+, ~, =, -, !)
+//   - Apply: diff-style symbols (+, ~, =, -, !); left behind shares the
+//     failed icon but is yellow, since it needs attention, not a retry
 func statusIcon(status string) string {
 	switch status {
 	case StatusValid:
@@ -95,6 +101,8 @@ func statusIcon(status string) string {
 		return "="
 	case StatusDeleted:
 		return "-"
+	case StatusLeftBehind:
+		return "!"
 	case statusFailed:
 		return "!"
 	default:
