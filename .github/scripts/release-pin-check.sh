@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Release-pin gate (G1): a release must never ship a local, unpublished or
 # mismatched upstream pin. The rule is shared by every repo in the release
-# cascade (workspace RELEASING.md, section "Gates"); the cli adds the check that
-# the embedded opm-operator manifest matches PinnedOperatorVersion.
+# cascade (workspace RELEASING.md, section "Gates"); the cli adds the checks that
+# the embedded opm-operator manifest matches PinnedOperatorVersion and that
+# every version its docs bundle pins has a docs bundle (docs-kit gate G2-pins).
 #
 # CI runs this in the lint job of pr.yml and ci.yml on release-please branches
 # only; `task deps:release-check` runs it locally on any branch.
@@ -35,12 +36,19 @@ while read -r path version; do
     fail "go.mod: ${path} ${version} is a pseudo-version (pin a released tag: go get ${path}@<tag>)"
     continue
   fi
-  repo=$(sed -E 's#/v[0-9]+$##' <<<"$path")
+  # The repository is the first three path segments; a nested module
+  # (github.com/open-platform-model/docs-kit/cobradump) is tagged
+  # <subdir>/<version> in it, the form the Go module proxy reads. A major
+  # suffix (/v2) is no directory and no part of the tag.
+  repo=$(cut -d/ -f1-3 <<<"$path")
+  sub=$(sed -E 's#(^|/)v[0-9]+$##' <<<"${path#"$repo"}")
+  sub=${sub#/}
+  tag=${sub:+${sub}/}${version}
   rc=0
-  GIT_TERMINAL_PROMPT=0 git ls-remote --exit-code --tags "https://${repo}.git" "refs/tags/${version}" </dev/null >/dev/null 2>&1 || rc=$?
+  GIT_TERMINAL_PROMPT=0 git ls-remote --exit-code --tags "https://${repo}.git" "refs/tags/${tag}" </dev/null >/dev/null 2>&1 || rc=$?
   case "$rc" in
     0) ;;
-    2) fail "go.mod: ${path} ${version} has no tag ${version} in ${repo} (pin a published release)" ;;
+    2) fail "go.mod: ${path} ${version} has no tag ${tag} in ${repo} (pin a published release)" ;;
     *) fail "go.mod: ${path} ${version}: lookup failure, git ls-remote exited ${rc} for https://${repo}.git (re-run when github.com is reachable)" ;;
   esac
 done < <(jq -r '.Require[]? | select(.Path | startswith("github.com/open-platform-model/")) | "\(.Path) \(.Version)"' <<<"$gomod")
@@ -75,9 +83,51 @@ else
   fi
 fi
 
+# 6. Every version the cli's docs bundle pins has a docs bundle (docs-kit gate
+# G2-pins). opmodel.dev anchors a site version on the cli's bundle and pulls
+# the library, core and opm-operator bundles of exactly the versions its
+# manifest pins, refusing a pin with none (docs-kit C16), so a release whose
+# pins lack bundles would break every site build. The pins come from the
+# program docs-kit runs (hack/docskit-dump pins); each is looked up
+# anonymously, as the site pulls it, at its release tag. A 401, 403 or 404
+# counts as missing: GHCR answers 403 for a package that does not exist yet
+# or is private.
+docs_registry=ghcr.io
+docs_repo=open-platform-model/docs
+# docs_bundle_status PROJECT TAG: the HTTP status of an anonymous manifest
+# HEAD of PROJECT's docs bundle at TAG (the token request's status when GHCR
+# refuses an anonymous token), 000 when ghcr.io is unreachable.
+docs_bundle_status() {
+  local body code token
+  body=$(curl -sS --retry 3 --retry-all-errors -w '\n%{http_code}' \
+    "https://${docs_registry}/token?scope=repository:${docs_repo}/$1:pull" 2>/dev/null) || { echo 000; return; }
+  code=${body##*$'\n'}
+  if [ "$code" != 200 ]; then echo "$code"; return; fi
+  token=$(jq -r '.token // empty' <<<"${body%$'\n'*}")
+  curl -sS -o /dev/null -w '%{http_code}' -I --retry 3 --retry-all-errors \
+    -H "Authorization: Bearer ${token}" \
+    -H 'Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json' \
+    "https://${docs_registry}/v2/${docs_repo}/$1/manifests/$2" 2>/dev/null || true
+}
+if ! docs_pins=$(go run ./hack/docskit-dump pins 2>&1); then
+  fail "hack/docskit-dump pins failed: ${docs_pins}"
+else
+  while read -r project pin; do
+    [ -n "${project:-}" ] || continue
+    ref="${docs_registry}/${docs_repo}/${project}:${pin}"
+    code=$(docs_bundle_status "$project" "$pin")
+    code=${code:-000}
+    case "$code" in
+      200) ;;
+      401|403|404) fail "docs bundle: the cli pins ${project} ${pin}, and ${ref} does not exist or is not public (publish it: run ${project}'s Docs workflow in release mode for its v${pin} release)" ;;
+      *) fail "docs bundle: ${ref}: lookup failure, HTTP ${code} (re-run when ghcr.io is reachable)" ;;
+    esac
+  done < <(jq -r '.pins | to_entries[] | "\(.key) \(.value)"' <<<"$docs_pins")
+fi
+
 if [ "${#failures[@]}" -gt 0 ]; then
   printf '%s\n' "${failures[@]}" >&2
   echo "release-pin: ${#failures[@]} violation(s); see workspace RELEASING.md, section \"Gates\" (G1)" >&2
   exit 1
 fi
-echo "release-pin: ok (no replace, published OPM pins, no dev template pins, operator embed matches ${pinned})"
+echo "release-pin: ok (no replace, published OPM pins, no dev template pins, operator embed matches ${pinned}, docs bundles exist for every docs pin)"

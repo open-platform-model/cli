@@ -1,0 +1,98 @@
+name: Docs
+
+# The cli docs bundle (docs-kit.cue): the command reference docs-kit
+# generates from hack/docskit-dump's dump of the cobra commands, the authored
+# pages under docs/site/, and the library, core and opm-operator versions the
+# cli pins, built, signed and published by docs-kit's reusable publish.yml
+# (docs-kit docs/contracts.md C5). opmodel.dev pulls it from
+# ghcr.io/open-platform-model/docs/cli as the anchor of a site version.
+#
+#   pull_request       check: build and lint, publish nothing
+#   push to main       edge: publish the commit as the edge build
+#   workflow_dispatch  release: the recovery when release.yml's publish-docs
+#                      job did not run for a cli release. Only for releases
+#                      whose tree has hack/docskit-dump: the dump and the
+#                      pins run from the tag's tree, so v1.0.0-beta.5 and
+#                      earlier can never get a bundle (docs-kit C19).
+#                      revision: a docs revision of a published release. It
+#                      applies fix, a single-parent commit on main that changes
+#                      only Markdown or only comments, to the release tree and
+#                      publishes <version>.<next> (docs-kit README, "Fixing a
+#                      release's docs"; docs/contracts.md, "Docs revisions").
+#                      Help text is Go strings, so a help-text fix reaches
+#                      the reference only through a release.
+#                      Dispatch either on main; publish.yml refuses any other ref:
+#                      gh workflow run docs.yml --ref main -f mode=release -f tag=vX.Y.Z
+#                      gh workflow run docs.yml --ref main -f mode=revision -f tag=vX.Y.Z -f fix=<40-hex sha>
+#
+# publish.yml is pinned by docs-kit release tag, never a SHA: the signing
+# certificate names it at that ref, and the site trusts only docs-kit's v*
+# tags (C5, C9). It runs the opm-docs release named in .opm-docs-version; the
+# two pins move together in one PR (task docs:bundle:check refuses a
+# mismatch). publish.yml declares no permissions, so each job grants exactly
+# what its mode needs. setup-go installs Go for hack/docskit-dump, which the
+# build runs with go run (C14).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: release (recover a release with no bundle) or revision (fix a published release's docs)
+        type: choice
+        options: [release, revision]
+        default: release
+        required: true
+      tag:
+        description: The cli release tag (vX.Y.Z)
+        type: string
+        required: true
+      # Required by publish.yml in revision mode, which refuses anything but
+      # a full 40-hex hash; release mode ignores it, so it cannot be a
+      # required input of the dispatch.
+      fix:
+        description: "revision only: the full 40-hex commit on main to apply"
+        type: string
+        default: ""
+
+permissions: {}
+
+jobs:
+  check:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      packages: read
+    uses: open-platform-model/docs-kit/.github/workflows/publish.yml@v0.4.0
+    with:
+      project: cli
+      mode: check
+      setup-go: true
+
+  edge:
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: open-platform-model/docs-kit/.github/workflows/publish.yml@v0.4.0
+    with:
+      project: cli
+      mode: edge
+      setup-go: true
+
+  dispatch:
+    if: github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: open-platform-model/docs-kit/.github/workflows/publish.yml@v0.4.0
+    with:
+      project: cli
+      mode: ${{ inputs.mode }}
+      tag: ${{ inputs.tag }}
+      fix: ${{ inputs.fix }}
+      setup-go: true
