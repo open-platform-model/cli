@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -21,6 +22,7 @@ import (
 	"github.com/open-platform-model/cli/internal/cmdutil/cmdutiltest"
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/platform"
+	pkgerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
 func TestShowRenderOutput_NoErrors_DefaultMode(t *testing.T) {
@@ -352,4 +354,49 @@ func TestRefuseDuplicateIdentities_NamelessValueIsSkipped(t *testing.T) {
 // A render with no compiled objects carries no duplicate.
 func TestRefuseDuplicateIdentities_EmptyRender(t *testing.T) {
 	assert.NoError(t, refuseDuplicateIdentities(&kernel.RenderResult{}))
+}
+
+// The guard compares only an override (flag or env) with the file's
+// namespace; a namespace from config or the default, and an env value the
+// flag shadows, are never compared.
+func TestRefuseNamespaceOverride(t *testing.T) {
+	const declared = "media"
+	tests := []struct {
+		name    string
+		ns      config.ResolvedField
+		wantErr []string
+	}{
+		{name: "flag matches", ns: config.ResolvedField{Value: "media", Source: config.SourceFlag}},
+		{name: "flag differs", ns: config.ResolvedField{Value: "staging", Source: config.SourceFlag}, wantErr: []string{"--namespace", `"staging"`, `"media"`, "./jellyfin"}},
+		{name: "env differs", ns: config.ResolvedField{Value: "staging", Source: config.SourceEnv}, wantErr: []string{"OPM_NAMESPACE", `"staging"`, `"media"`, "./jellyfin"}},
+		{name: "config is no override", ns: config.ResolvedField{Value: "staging", Source: config.SourceConfig}},
+		{name: "default is no override", ns: config.ResolvedField{Value: "default", Source: config.SourceDefault}},
+		{name: "flag matches while env differs", ns: config.ResolvedField{Value: "media", Source: config.SourceFlag, Shadowed: map[config.Source]string{config.SourceEnv: "staging"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := refuseNamespaceOverride("./jellyfin", declared, tt.ns)
+			if tt.wantErr == nil {
+				assert.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			var valErr *pkgerrors.ValidationError
+			require.True(t, errors.As(err, &valErr))
+			for _, want := range tt.wantErr {
+				assert.Contains(t, valErr.Message, want)
+			}
+			assert.Contains(t, valErr.Message, "metadata.namespace")
+			assert.Contains(t, valErr.Details, "metadata.namespace")
+		})
+	}
+
+	t.Run("printed form", func(t *testing.T) {
+		err := refuseNamespaceOverride("./jellyfin", declared, config.ResolvedField{Value: "staging", Source: config.SourceFlag})
+		logs, details := captureValidationOutput(t, err)
+		assert.Contains(t, logs, `render failed: --namespace "staging" disagrees with metadata.namespace "media" in ./jellyfin`)
+		assert.NotContains(t, logs, "error=", "the refusal prints as a message, not an escaped field")
+		assert.Contains(t, details, `set metadata.namespace: "staging" in the instance file`)
+		assert.False(t, strings.Contains(details, "0011:"), "no enhancement reference in CLI output")
+	})
 }
