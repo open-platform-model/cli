@@ -112,7 +112,7 @@ bundles: cli: {
 	}, {
 		// The authored pages ship in the same bundle (docs-kit DESIGN decision
 		// 20). The exclude keeps cmdref's committed pages out while the site
-		// still reads the cli from git; section 3 deletes both.
+		// still reads the cli from git; both go at G2-switch.
 		kind: "markdown", dir: "docs/site", exclude: ["reference/cli/"]
 	}]
 }
@@ -152,11 +152,11 @@ A manual re-run for a tag whose bundle already exists rebuilds the same digest, 
 
 ### D5. Gate G2-pins and the release order
 
-The cli's bundle is an anchor: `opm-docs pull` refuses a site version whose anchor pins a version without a bundle (C16 D2), and that would break every site build. So section 2 runs only after the release cascade has moved the cli's pins to bundled versions: `go.mod` to the library release of `publish-go-api-bundle` section 3 (whose `DefaultSchemaModule` names core's bundled release) and `PinnedOperatorVersion` to a release of `publish-crd-bundle` section 2. Before the release PR merges, a local check proves it: build the release PR head's bundle (`task docs:bundle`), then `opm-docs pull --local cli@v1.0=out/cli` with a scratch `bundles.cue` holding opmodel.dev's planned `docs` and `versions."v1.0"` (C16 D1, D6). After the release, the same pull without `--local`, anonymously, is G2-pins.
+The cli's bundle is an anchor: `opm-docs pull` refuses a site version whose anchor pins a version without a bundle (C16 D2), and that would break every site build. The owner decided (2026-10-03) how G2-pins is met: release-mode backfills of exactly the versions the cli's `main` pins today, core `v2.0.0-beta.1`, library `v1.0.0-beta.1` and opm-operator `v1.0.0-beta.4` (each sibling's own change dispatches its backfill), then cli `v1.0.0-beta.6`, the first release with `hack/docskit-dump`. No pin moves and no cascade bump is needed. The open release PR cli#276 (beta.6) is held until adoption is merged and the three backfills verify; if the library (library#155) or operator (opm-operator#178) releases merge first and the release cascade bumps the cli's pins, those versions need bundles before cli#276 merges. Before the release PR merges, a local check proves it: build the release PR head's bundle (`task docs:bundle`), then `opm-docs pull --local cli@v1.0=out/cli` with a scratch `bundles.cue` holding opmodel.dev's planned `docs` and `versions."v1.0"` (C16 D1, D6); this needs docs-kit's `pull-docs-placement` released (gate G2-site) in the local `opm-docs`. After the release, the same pull without `--local`, anonymously, is G2-pins.
 
 `v1.0.0-beta.5` (today's newest release) pins library `1.0.0-beta.1`, core `2.0.0-beta.1` and the operator `1.0.0-beta.4`, but it has no hook and can never have a bundle; nothing is lost, because the site keeps reading the cli from git until G2-switch.
 
-### D6. Section 3 at G2-switch
+### D6. Retiring cmdref at G2-switch
 
 Delete `internal/cmdref/`, `hack/cmdref/`, `docs/site/reference/cli/`, the `docs:reference` and `docs:reference:check` tasks and their comment, their line in `task check`, and the `command-reference` jobs of `ci.yml` and `pr.yml`; the `markdown` source loses its `exclude`. `AGENTS.md`'s `internal/cmdref/` entry becomes a `hack/docskit-dump/` entry ("help text and flags are the reference; check with `task docs:bundle:check`").
 
@@ -185,6 +185,6 @@ Delete `internal/cmdref/`, `hack/cmdref/`, `docs/site/reference/cli/`, the `docs
 ## Risks / Trade-offs
 
 - G2-pins is a cross-repository ordering gate: a cli release cut before its pins have bundles breaks every site pull until a later cli release fixes it (release tags are immutable). Section 2's pre-merge check is the guard; the owner merges the release PR.
-- After G2-switch, a help-text fix reaches the site only through a cli release: a docs revision applies only Markdown or comment changes (C3), and help text is Go strings (C19 risks).
+- After G2-switch, a help-text fix reaches the site only through a cli release: a docs revision applies only Markdown or comment changes (C3), and help text is Go strings (C19 risks). Revisions of authored pages are dispatched by hand for now (cli#282, tracked in docs-kit#16).
 - `go run` in the docs build downloads the cli's modules in docs-kit's build job; a slow proxy lengthens it, within C14's 10-minute limit.
-- "Command Reference (current)" may be a required check in the ruleset; deleting the job in section 3 would block every PR until the owner removes it from the list.
+- "Command Reference (current)" may be a required check in the ruleset; deleting the job at G2-switch would block every PR until the owner removes it from the list.

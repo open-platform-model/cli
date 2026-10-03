@@ -13,7 +13,7 @@ Delivery: one PR per section (opmodel.dev needs the docs/cli release bundle afte
 ## What Changes
 
 - **Section 1, adopt (gate G2-cli).** `hack/docskit-dump/main.go` prints the cobra dump (`cobradump.Write(cmd.NewRootCmd(), ...)`) or, with the argument `pins`, the pins of `library`, `core` and `opm-operator`, read where the site reads them today; a test that those pins equal their sources. `go.mod` requires `github.com/open-platform-model/docs-kit/cobradump` and nothing else new. `docs-kit.cue` declares the project `cli` (owning `reference/cli/`, `pins`, a `cobra` source, a `markdown` source excluding `reference/cli/`). `.opm-docs-version`, `.tasks/opm-docs.sh`, the docs tasks (`docs:bundle:check` in `task check`), `.github/workflows/docs.yml` with `setup-go: true`, and `publish-docs` in `release.yml` after `goreleaser` succeeds. `AGENTS.md` gains a "Docs bundles" paragraph. cmdref and its check stay.
-- **Section 2, the first anchor bundle (gate G2-pins, owner).** Before the next cli release PR merges, its pins must all have bundles; check with a local pull, then release and confirm anonymously.
+- **Section 2, the first anchor bundle (gate G2-pins, owner).** The owner's path (2026-10-03): the siblings backfill exactly the versions the cli pins today (core `v2.0.0-beta.1`, library `v1.0.0-beta.1`, opm-operator `v1.0.0-beta.4`); then release PR cli#276 (`v1.0.0-beta.6`), held until then, merges after a local pull on its head resolves all three pins; confirm anonymously.
 - **Section 3, retire cmdref (gate G2-switch).** Delete `internal/cmdref/`, `hack/cmdref/`, `docs/site/reference/cli/`, the `docs:reference` tasks, the "Command Reference (current)" jobs in `ci.yml` and `pr.yml`, and the `exclude`; archive.
 
 ## Capabilities
@@ -36,7 +36,7 @@ Delivery: one PR per section (opmodel.dev needs the docs/cli release bundle afte
 
 | Consumer | What it has to do |
 | --- | --- |
-| opmodel.dev | `pull-reference-bundles` section 2 makes the cli bundle the v1.0 anchor once section 2 here holds G2-pins; section 3 waits for that merge. |
-| library, core, opm-operator | Their bundles must exist for the versions the cli pins before the cli's release (their own sibling changes, section 2 each). |
+| opmodel.dev | `pull-reference-bundles` makes the cli bundle the v1.0 anchor once G2-pins holds; its merge is gate G2-switch, which cmdref's retirement waits for. |
+| library, core, opm-operator | Each backfills the version the cli pins (their own sibling changes) before the cli's release; no pin moves. |
 
-**Owner items:** merging docs-kit's release PRs and the `cobradump/v0.1.0` release (gate G2-cli); the release cascade that bumps the cli's library and operator pins to bundled versions; the cli release of section 2; checking `ghcr.io/open-platform-model/docs/cli` is public on first push; removing "Command Reference (current)" from required status checks, if it is one, when section 3 merges.
+**Owner items:** merging docs-kit's release PRs and the `cobradump/v0.1.0` release (gate G2-cli); holding release PR cli#276 until adoption merges and G2-pins holds; the three sibling backfills; the cli release; checking `ghcr.io/open-platform-model/docs/cli` is public on first push; removing "Command Reference (current)" from required status checks, if it is one, when cmdref is retired at G2-switch.
