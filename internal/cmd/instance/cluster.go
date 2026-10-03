@@ -25,6 +25,11 @@ type clusterLookup struct {
 // offlineFlagHelp is the --offline help shared by instance build and vet.
 const offlineFlagHelp = "Never contact a cluster; render against --platform or the instance's own deps"
 
+// renderNamespaceFlagHelp is the -n help shared by instance apply, build, diff
+// and vet: the instance file owns its namespace, so a differing value is
+// refused rather than applied.
+const renderNamespaceFlagHelp = "Namespace; must equal the instance file's metadata.namespace"
+
 // optionalClusterGetter returns the cluster Platform getter instance build
 // and vet resolve through, or nil when the cluster step is skipped. Building
 // it never fails the command:

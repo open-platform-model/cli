@@ -14,10 +14,10 @@ Before each section, merge fresh `origin/main` if it moved. After merging a sibl
 
 ## 2. Say so in the -n help text
 
-- [ ] 2.1 In `internal/cmd/instance/apply.go`, `build.go`, `diff.go` and `vet.go`, change the `-n` help from "Target namespace" to "Namespace; must equal the instance file's metadata.namespace" (one shared constant in the package, e.g. beside `offlineFlagHelp`). Drop the `-n production` example from `vet`'s `Long`.
-- [ ] 2.2 Add a test in `internal/cmd/instance/instance_test.go` that each of the four commands' `namespace` flag has that usage string.
-- [ ] 2.3 Run `task docs:reference` and verify the diff in `docs/site/reference/cli/opm-instance.md` touches only the four `--namespace` rows and the dropped `vet` example.
-- [ ] 2.4 `task fmt`, `task lint`, `task test`, `task docs:reference:check` and `task openspec:check` green, then commit `docs(cmd): state that instance -n must match metadata.namespace`
+- [x] 2.1 In `internal/cmd/instance/apply.go`, `build.go`, `diff.go` and `vet.go`, change the `-n` help from "Target namespace" to "Namespace; must equal the instance file's metadata.namespace" (one shared constant in the package, e.g. beside `offlineFlagHelp`). Drop the `-n production` example from `vet`'s `Long`.
+- [x] 2.2 Add a test in `internal/cmd/instance/instance_test.go` that each of the four commands' `namespace` flag has that usage string.
+- [x] 2.3 Run `task docs:reference` and verify the diff in `docs/site/reference/cli/opm-instance.md` touches only the four `--namespace` rows and the dropped `vet` example.
+- [x] 2.4 `task fmt`, `task lint`, `task test`, `task docs:reference:check` and `task openspec:check` green, then commit `docs(cmd): state that instance -n must match metadata.namespace`
 
 ## 3. Archive the change on this branch
 

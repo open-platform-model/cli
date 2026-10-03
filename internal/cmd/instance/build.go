@@ -72,7 +72,7 @@ Examples:
 
 	rff.AddTo(c)
 	kf.AddTo(c)
-	c.Flags().StringVarP(&namespace, "namespace", "n", "", "Target namespace")
+	c.Flags().StringVarP(&namespace, "namespace", "n", "", renderNamespaceFlagHelp)
 	c.Flags().BoolVar(&offline, "offline", false, offlineFlagHelp)
 	c.Flags().StringVarP(&outputFlag, "output", "o", "yaml", "Output format: yaml, json")
 	c.Flags().BoolVar(&splitFlag, "split", false, "Write separate files per resource")

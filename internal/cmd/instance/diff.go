@@ -42,7 +42,7 @@ Examples:
 
 	rff.AddTo(c)
 	kf.AddTo(c)
-	c.Flags().StringVarP(&namespace, "namespace", "n", "", "Target namespace")
+	c.Flags().StringVarP(&namespace, "namespace", "n", "", renderNamespaceFlagHelp)
 
 	return c
 }
