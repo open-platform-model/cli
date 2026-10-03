@@ -28,17 +28,24 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 
 Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spike/`, never in the tree. Record each result as an indented "Done:" note, then write a short "Spike findings" subsection at the end of design.md's "Research & Decisions".
 
-- [ ] 1.1 `task --version`. In a scratch Taskfile with one task running `exit 3`, confirm that `task -x` exits 3 and plain `task` exits 201 (contract §3).
-- [ ] 1.2 Copy `templates/minimal` to scratch and run `cue mod get opmodel.dev/catalogs/opm@v4.5.1 opmodel.dev/core@v2.0.0-beta.1 && cue mod tidy`. Record the diff. Confirm it names no third-party key and leaves `language.version` alone.
-- [ ] 1.3 In that scratch copy, run `go build -o <scratch>/opm ./cmd/opm`, then `<scratch>/opm module version set 1.0.4 <scratch copy>`. Confirm it rewrites only the `Version:` line of `identity/identity.cue` and needs no registry.
-- [ ] 1.4 The D10 S2 assumption, for every D3 file. Copy each of the twelve D3 directories to scratch. Text-edit their catalog and core `v:` to `v4.4.3` and `v2.0.0-alpha.13` (core only in the two core-only files), then run `cue mod get` of the keys each file has at `v4.4.4` and `v2.0.0-beta.1`, and `cue mod tidy`. Each `module.cue` must come back byte-identical to the committed file (`internal/instinit/testdata/initvalues` carries `default: true` with an aligned `v:`). Also, in a scratch copy of the repo: `go get github.com/open-platform-model/library@v1.0.0-beta.2 && go mod tidy`, `go build ./cmd/opm`, then `go get ...@v1.0.0-beta.3 && go mod tidy`; `go.mod` and `go.sum` must come back byte-identical. Record any difference: it decides the S2 golden list.
-- [ ] 1.5 Confirm `testdata/older.tsv`'s versions are published. Use these anonymous checks, the same ones the contract §2.4 kinds make:
+- [x] 1.1 `task --version`. In a scratch Taskfile with one task running `exit 3`, confirm that `task -x` exits 3 and plain `task` exits 201 (contract §3).
+  Done: task 3.52.0; `task -x` exits 3, plain `task` exits 201.
+- [x] 1.2 Copy `templates/minimal` to scratch and run `cue mod get opmodel.dev/catalogs/opm@v4.5.1 opmodel.dev/core@v2.0.0-beta.1 && cue mod tidy`. Record the diff. Confirm it names no third-party key and leaves `language.version` alone.
+  Done: the only diff is the catalog `v:` (`v4.4.4` -> `v4.5.1`); no third-party key, `language.version` unchanged.
+- [x] 1.3 In that scratch copy, run `go build -o <scratch>/opm ./cmd/opm`, then `<scratch>/opm module version set 1.0.4 <scratch copy>`. Confirm it rewrites only the `Version:` line of `identity/identity.cue` and needs no registry.
+  Done: only `Version:` in `identity/identity.cue` changes (1.0.3 -> 1.0.4), with the registry env pointed at an unreachable host; the log line goes to stderr.
+- [x] 1.4 The D10 S2 assumption, for every D3 file. Copy each of the thirteen D3 directories to scratch. Text-edit their catalog and core `v:` to `v4.4.3` and `v2.0.0-alpha.13` (core only in the two core-only files), then run `cue mod get` of the keys each file has at `v4.4.4` and `v2.0.0-beta.1`, and `cue mod tidy`. Each `module.cue` must come back byte-identical to the committed file (`internal/instinit/testdata/initvalues` carries `default: true` with an aligned `v:`). Also, in a scratch copy of the repo: `go get github.com/open-platform-model/library@v1.0.0-beta.2 && go mod tidy`, `go build ./cmd/opm`, then `go get ...@v1.0.0-beta.3 && go mod tidy`; `go.mod` and `go.sum` must come back byte-identical. Record any difference: it decides the S2 golden list.
+  Done: all thirteen D3 `module.cue` files come back byte-identical, `initvalues`' `default: true` included; the Go round trip gives byte-identical `go.mod` and `go.sum`, and `./cmd/opm` builds at library `v1.0.0-beta.2`. The S2 golden list stands as written.
+- [x] 1.5 Confirm `testdata/older.tsv`'s versions are published. Use these anonymous checks, the same ones the contract §2.4 kinds make:
   - library `v1.0.0-beta.2`: `proxy.golang.org/.../@v/v1.0.0-beta.2.info` answers 200;
   - opm-operator `v1.0.0-beta.4`: the `install.yaml` download `HEAD -L` answers 200;
   - catalog `v4.4.3`: the GHCR manifest `HEAD` answers 200;
   - the catalog `v4.4.3` modulefile pins core `v2.0.0-alpha.13`.
-- [ ] 1.6 Run `go run ./hack/docskit-dump pins` and record its JSON shape (`.pins` keys and bare values) for D9.
-- [ ] 1.7 `task openspec:check` green, then commit `docs(openspec): record the add-deps-cascade-task spike findings`. The commit touches only `openspec/changes/add-deps-cascade-task/`.
+  Done: library `v1.0.0-beta.2` `.info` 200; opm-operator `v1.0.0-beta.4` `install.yaml` 200; catalog `v4.4.3` and `v4.4.2` published; `v4.4.3` pins core `v2.0.0-alpha.13`, `v4.4.2` pins `v2.0.0-alpha.12`; podinfo `v0.1.10` is published and pins catalog `v4.0.1` and core `v2.0.0-alpha.6`; podinfo `v0.1.12` is not published.
+- [x] 1.6 Run `go run ./hack/docskit-dump pins` and record its JSON shape (`.pins` keys and bare values) for D9.
+  Done: `{"schema": "docs.opmodel.dev/pins/v1", "pins": {"core": "2.0.0-beta.2", "library": "1.0.0-beta.3", "opm-operator": "1.0.0-beta.5"}}`; values bare.
+- [x] 1.7 `task openspec:check` green, then commit `docs(openspec): record the add-deps-cascade-task spike findings`. The commit touches only `openspec/changes/add-deps-cascade-task/`.
+  Done: `task openspec:check` green.
 
 ## 2. Pins, classes, stub, and the title and body tasks
 

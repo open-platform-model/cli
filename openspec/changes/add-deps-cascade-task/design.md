@@ -431,6 +431,15 @@ These calls decide no target, so they run in phase C.
 
 **Rationale**: the prediction is exact. The task edits nothing in a module where no pin moves, and S1 stays the minimal call list the contract describes.
 
+### Spike findings (2026-10-04)
+
+- `task -x` keeps exit 3; plain `task` turns it into 201 (task 3.52.0).
+- `cue mod get` of the two `opmodel.dev` keys plus `cue mod tidy` changes only their `v:` lines, never `language.version` or a third-party key.
+- `opm module version set` rewrites only the `Version:` line, needs no registry, and logs to stderr.
+- Every D3 `module.cue`, text-edited to catalog `v4.4.3` and core `v2.0.0-alpha.13` and then moved back with `get` and `tidy`, is byte-identical to the committed file, `initvalues`' `default: true` included. The library round trip `beta.3 -> beta.2 -> beta.3` gives byte-identical `go.mod` and `go.sum`, and the cli builds at `beta.2`. So the S2 golden list is the four identity files and the two consumers' podinfo lines.
+- `hack/docskit-dump pins` prints `.pins` with the keys `core`, `library` and `opm-operator`, values bare.
+- Catalog `v4.4.2` pins core `v2.0.0-alpha.12`; podinfo `v0.1.10` pins catalog `v4.0.1` and core `v2.0.0-alpha.6` (S9's data).
+
 ### Plan review (2026-10-04)
 
 All fourteen findings and the nits were applied. None was rejected. Two were applied differently from the suggestion:
