@@ -79,6 +79,11 @@ func TestExecute_CRDNotEstablishedSkipsPruneAndInventoryWrite(t *testing.T) {
 	var mu sync.Mutex
 	var mutations, patched []string
 	fake.PrependReactor("patch", "*", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		if action.GetResource().Resource == "customresourcedefinitions" {
+			// The apply itself spends most of the budget, so a timeout
+			// measured from the start of the establish wait would read 0s.
+			time.Sleep(time.Second)
+		}
 		mu.Lock()
 		defer mu.Unlock()
 		res := action.GetResource().Resource
@@ -121,12 +126,14 @@ func TestExecute_CRDNotEstablishedSkipsPruneAndInventoryWrite(t *testing.T) {
 		},
 		K8sClient: &kubernetes.Client{Dynamic: fake, Clientset: cs},
 		Log:       output.InstanceLogger("demo"),
-		Options:   Options{Timeout: 100 * time.Millisecond, SuccessAppliedMessage: "applied", SuccessUpToDateMessage: "up to date"},
+		Options:   Options{Timeout: 1200 * time.Millisecond, SuccessAppliedMessage: "applied", SuccessUpToDateMessage: "up to date"},
 	}
 
 	err := Execute(ctx, req)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "CustomResourceDefinition/foos.example.com")
+	assert.Contains(t, err.Error(), "timed out after")
+	assert.NotContains(t, err.Error(), "timed out after 0s", "the elapsed time counts from the start of the apply, not of the establish wait")
 	var exitErr *opmexit.ExitError
 	require.ErrorAs(t, err, &exitErr)
 	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
