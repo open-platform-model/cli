@@ -35,7 +35,7 @@ opm config init [flags]
 
 Initialize the OPM CLI configuration.
 
-Creates `~/.opm/config.cue`: the CLI configuration (registry, kubernetes, log), plain data. Init is offline; nothing is resolved.
+Creates `~/.opm/config.cue`: the CLI configuration (registry, kubernetes, log, skewPolicy), plain data. Init is offline; nothing is resolved.
 
 Init writes no platform. A render resolves its platform from `--platform <dir>`, else the cluster's Platform, else a platform generated from the render's own dependency pins. An existing `~/.opm/platform/` from an earlier release is left untouched and no longer read; pass it with `--platform ~/.opm/platform` to keep rendering against it.
 

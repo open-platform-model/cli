@@ -75,9 +75,8 @@ module-path   Published module path without a major, e.g.
 | `--create-namespace` |  | bool |  | Create target namespace if it does not exist. |
 | `--dry-run` |  | bool |  | Server-side dry run (no changes made). |
 | `--force` |  | bool |  | Allow empty render to prune all previously tracked resources. |
-| `--instance-name` |  | string |  | Instance name (default: module name). |
 | `--kubeconfig` |  | string |  | Path to kubeconfig file. |
-| `--name` |  | string |  | Override synthetic instance name. |
+| `--name` |  | string |  | Synthetic instance name (default: `<module name>-debug`). |
 | `--namespace` | `-n` | string |  | Target namespace. |
 | `--no-prune` |  | bool |  | Skip stale resource pruning. |
 | `--platform` |  | string |  | Platform module directory (overrides the cluster Platform and the module's own deps). |
@@ -133,8 +132,7 @@ module-path   Published module path without a major, e.g.
 
 | Flag | Shorthand | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `--instance-name` |  | string |  | Instance name (default: module name). |
-| `--name` |  | string |  | Override synthetic instance name. |
+| `--name` |  | string |  | Synthetic instance name (default: `<module name>-debug`). |
 | `--namespace` | `-n` | string |  | Target namespace. |
 | `--out-dir` |  | string | `./manifests` | Directory for split output. |
 | `--output` | `-o` | string | `yaml` | Output format: yaml, json. |
@@ -261,7 +259,9 @@ opm module publish [path] [flags]
 
 Publish an OPM module to its registry, at the coordinates the module itself declares.
 
-The pipeline reads `identity/identity.cue`, validates it against core's `#IdentityPackage`, derives repository/major/tag from the declared module path, runs the publish gates, prints the resolved plan, and pushes. What is published is exactly the committed tree.
+The pipeline reads `identity/identity.cue`, validates it against core's `#IdentityPackage`, derives repository/major/tag from the declared module path, runs the publish gates, prints the resolved plan, and pushes. What is published is the module directory as it is on disk, zipped by CUE's module machinery: the command checks no git state, so commit first.
+
+`--version` fills an open identity Version by writing it into `identity/identity.cue` just before the push (never on `--dry-run`), and the zip carries that written file. It asserts a declared Version and never overwrites one.
 
 Exit codes: 0 published (or dry-run GO), 2 refused, 3 registry unreachable.
 
@@ -288,7 +288,7 @@ opm module publish
 # See the plan and every gate verdict without pushing
 opm module publish ./my-module --dry-run
 
-# Fill an open identity Version (writes identity/identity.cue), then publish
+# Write 1.3.0 into an open identity Version, then publish
 opm module publish --version 1.3.0
 ```
 
@@ -433,7 +433,7 @@ path    Path to module directory (default: current directory)
 
 | Flag | Shorthand | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `--instance-name` |  | string |  | Instance name (default: module name). |
+| `--instance-name` |  | string |  | Instance name (default: `<module name>-debug`). |
 | `--namespace` | `-n` | string |  | Target namespace. |
 | `--platform` |  | string |  | Render against this platform module directory instead of the module's own deps. |
 | `--skip-unprovided` |  | bool |  | Render what the platform can: skip provider-fulfilled contracts nothing on the platform provides, and report each one. |
