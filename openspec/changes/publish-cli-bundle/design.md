@@ -79,7 +79,7 @@ func pins() (map[string]string, error) {
 }
 ```
 
-`linkedVersion` reads `debug.ReadBuildInfo()` and returns the `Version` of the dependency with that path (following `Replace` when set). A `replace` to a directory yields `(devel)`, which `WritePins` would print and docs-kit refuses as not SemVer (C15 D7: exit 2 naming the value), so a dev tree cannot publish pins by accident. `cobradump.Write` adds cobra's completion command and replaces the home directory with `~` in flag defaults, as `hack/cmdref` does today.
+`linkedVersion` reads `debug.ReadBuildInfo()` and returns the `Version` of the dependency with that path (following `Replace` when set). A `replace` to a directory yields `(devel)`, which `WritePins` refuses as not an exact version (and docs-kit would too, C15), so a dev tree cannot publish pins by accident. `cobradump.Write` adds cobra's completion command and replaces the home directory with `~` in flag defaults, as `hack/cmdref` does today.
 
 Errors and exits: `0` with one JSON document on stdout; `1` with `docskit-dump: <message>` on stderr for a wrong argument (`usage: docskit-dump [pins]`), a missing build info ("no build info: run it with go run or go build"), a library dependency absent from the build, or a `DefaultSchemaModule` that names only a major.
 
@@ -90,6 +90,8 @@ Example output, `go run ./hack/docskit-dump pins`:
 ```
 
 The test, `hack/docskit-dump/main_test.go`, checks `pins()` against the sources `resolve-versions.sh` reads: the library `require` in `go.mod` (parsed with `golang.org/x/mod/modfile`, already a dependency), the `DefaultSchemaModule` line in the library's `opm/schema/loader.go` at that version (read from the module cache with `go list -m -json` for its directory), and `PinnedOperatorVersion`. A second test runs the dump twice in process and compares the bytes (C14's determinism, caught here before docs-kit's `check` catches it).
+
+**As built (section 1).** `linkedVersion(info, path)` takes the build info as a parameter, so its replace handling is table-tested, and `coreRelease` refuses a `DefaultSchemaModule` without the `opmodel.dev/core@v` prefix or naming only a major. `debug.ReadBuildInfo` reports the library dependency in the test binary exactly as under `go run` (`TestPins_TestBinaryLinksTheLibrary` asserts it equals `go.mod`'s require). A directory `replace` of the library was tried with a scratch `-modfile`: `go run ./hack/docskit-dump pins` exits 1 with `docskit-dump: cobradump: pin library is "(devel)", not an exact version such as 1.0.0-beta.1 (no v)`; the program refuses it before docs-kit would. The test's file reading matches `resolve-versions.sh`'s: a `replace` of the library in `go.mod` fails it, and each constant is matched by its text, exactly once. `go test ./hack/...` was added to `task test:unit` and to the `unit` jobs of `pr.yml` and `ci.yml` (`go test ./internal/... ./hack/...`), which ran only `./internal/...`, so the test runs in CI and inside `task test`.
 
 ### D2. `go.mod`
 
@@ -154,7 +156,39 @@ A manual re-run for a tag whose bundle already exists rebuilds the same digest, 
 
 The cli's bundle is an anchor: `opm-docs pull` refuses a site version whose anchor pins a version without a bundle (C16 D2), and that would break every site build. The owner decided (2026-10-03) how G2-pins is met: release-mode backfills of exactly the versions the cli's `main` pins today, core `v2.0.0-beta.1`, library `v1.0.0-beta.1` and opm-operator `v1.0.0-beta.4` (each sibling's own change dispatches its backfill), then cli `v1.0.0-beta.6`, the first release with `hack/docskit-dump`. No pin moves and no cascade bump is needed. The open release PR cli#276 (beta.6) is held until adoption is merged and the three backfills verify; if the library (library#155) or operator (opm-operator#178) releases merge first and the release cascade bumps the cli's pins, those versions need bundles before cli#276 merges. Before the release PR merges, a local check proves it: build the release PR head's bundle (`task docs:bundle`), then `opm-docs pull --local cli@v1.0=out/cli` with a scratch `bundles.cue` holding opmodel.dev's planned `docs` and `versions."v1.0"` (C16 D1, D6); this needs docs-kit's `pull-docs-placement` released (gate G2-site) in the local `opm-docs`. After the release, the same pull without `--local`, anonymously, is G2-pins.
 
+**The pre-merge check, prepared in section 1** (run it on the release PR's head; it cannot pass until the three backfills exist). The scratch `bundles.cue`, outside the repository:
+
+```cue
+registry: "ghcr.io/open-platform-model/docs"
+signer: {
+	issuer:   "https://token.actions.githubusercontent.com"
+	workflow: "https://github.com/open-platform-model/docs-kit/.github/workflows/publish.yml"
+	refs: ["refs/tags/v[0-9]*"]
+}
+docs: {
+	cli:            {repo: "open-platform-model/cli"}
+	core:           {repo: "open-platform-model/core"}
+	library:        {repo: "open-platform-model/library"}
+	"opm-operator": {repo: "open-platform-model/opm-operator"}
+}
+versions: "v1.0": {
+	anchor: {project: "cli", tag: "1.0"}
+	pinned: ["library", "core", "opm-operator"]
+}
+```
+
+```sh
+task docs:bundle
+.bin/opm-docs pull --config <scratch>/bundles.cue --out <scratch>/pull --local cli@v1.0=out/cli
+```
+
+It passes when it exits 0 and `<scratch>/pull/lock.json` has `docs` entries for `library` `1.0.0-beta.1`, `core` `2.0.0-beta.1` and `opm-operator` `1.0.0-beta.4` (or whatever the head's `manifest.json` `pins` names). After the release, drop `--local` for G2-pins. Dry run on 2026-10-03 with `opm-docs` 0.4.0 (which carries `pull-docs-placement`) and the network blocked by a refusing proxy, so nothing reached GHCR: the config validated, the local anchor loaded with its pins, and the pull stopped at the first pin's registry request (`v1.0 library 1.0.0-beta.1: resolving ghcr.io/open-platform-model/docs/library:1.0.0-beta.1`), as expected.
+
 `v1.0.0-beta.5` (today's newest release) pins library `1.0.0-beta.1`, core `2.0.0-beta.1` and the operator `1.0.0-beta.4`, but it has no hook and can never have a bundle; nothing is lost, because the site keeps reading the cli from git until G2-switch.
+
+### Parity record (section 1)
+
+At cli commit `f954083a` (main `1d9f475b` plus the dump program and `docs-kit.cue`), `task docs:bundle` with `opm-docs` 0.4.0 wrote 16 pages, linted green: the six authored pages of `docs/site/` and the ten generated pages under `reference/cli/`. Each of the ten equals the committed `docs/site/reference/cli/` page of the same name once cmdref's two marker comments are removed (the begin comment with its following blank line, and the end comment with its preceding newline, as docs-kit's `compareWithCmdref` strips them), and the page sets are equal: no difference at all, so nothing beyond C19's parity record. docs-kit's `TestCLICommandParityLive` with `OPM_CLI_CHECKOUT` naming this tree passes too. The manifest's `pins` are `core 2.0.0-beta.1`, `library 1.0.0-beta.1`, `opm-operator 1.0.0-beta.4`.
 
 ### D6. Retiring cmdref at G2-switch
 
