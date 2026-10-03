@@ -76,14 +76,24 @@ Examples:
 	}
 
 	rf.AddTo(c)
+	hideIgnoredInstanceName(c)
 	useModuleDepsPlatformHelp(c)
-	c.Flags().StringVar(&nameFlag, "name", "", "Override synthetic instance name")
+	c.Flags().StringVar(&nameFlag, "name", "", "Synthetic instance name (default: <module name>-debug)")
 	c.Flags().StringVar(&versionFlag, "version", "", versionFlagHelp)
 	c.Flags().StringVarP(&outputFlag, "output", "o", "yaml", "Output format: yaml, json")
 	c.Flags().BoolVar(&splitFlag, "split", false, "Write separate files per resource")
 	c.Flags().StringVar(&outDirFlag, "out-dir", "./manifests", "Directory for split output")
 
 	return c
+}
+
+// hideIgnoredInstanceName hides the shared --instance-name flag on the module
+// commands that name the synthetic instance with --name instead: they register
+// it through cmdutil.RenderFlags but never read it (only module vet does).
+func hideIgnoredInstanceName(c *cobra.Command) {
+	f := c.Flags().Lookup("instance-name")
+	f.Usage = "Ignored by this command; use --name"
+	f.Hidden = true
 }
 
 // moduleDepsPlatformHelp is the --platform help text of the commands that

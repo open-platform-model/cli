@@ -25,8 +25,9 @@ declares.
 	The pipeline reads identity/identity.cue, validates it against core's
 	#IdentityPackage, derives repository/major/tag from the declared module path,
 	runs the publish gates, prints the resolved plan, and pushes. What is
-	published is exactly the committed tree — no copied build directory, no
-	generated version override.
+	published is the catalog directory as it is on disk, zipped by CUE's module
+	machinery: no copied build directory, no generated version override, and no
+	git state is checked, so commit first.
 
 	Exit codes: 0 published (or dry-run GO), 2 refused, 3 registry unreachable.
 

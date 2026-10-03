@@ -71,7 +71,7 @@ instance.cue    Path to the instance .cue file (required)
 | `--platform` |  | string |  | Platform module directory (overrides the cluster Platform and the instance's own deps). |
 | `--skip-unprovided` |  | bool |  | Render what the platform can: skip provider-fulfilled contracts nothing on the platform provides, and report each one. |
 | `--timeout` |  | duration | `5m0s` | Bound on the `--wait` readiness wait and on the operator-reconcile wait (operator-managed instances). |
-| `--values` | `-f` | stringArray |  | Additional values files (can be repeated; default: `values.cue` next to the instance file). |
+| `--values` | `-f` | stringArray |  | Values files added on top of the instance package, which already includes its `values.cue` (can be repeated). |
 | `--wait` |  | bool |  | Wait until every applied resource is healthy before returning (skipped on `--dry-run`; operator-managed instances always wait for the operator). |
 
 **Examples**
@@ -121,7 +121,7 @@ instance-dir    Path to an instance package directory
 | `--platform` |  | string |  | Platform module directory (overrides the cluster Platform and the instance's own deps). |
 | `--skip-unprovided` |  | bool |  | Render what the platform can: skip provider-fulfilled contracts nothing on the platform provides, and report each one. |
 | `--split` |  | bool |  | Write separate files per resource. |
-| `--values` | `-f` | stringArray |  | Additional values files (can be repeated; default: `values.cue` next to the instance file). |
+| `--values` | `-f` | stringArray |  | Values files added on top of the instance package, which already includes its `values.cue` (can be repeated). |
 
 **Examples**
 
@@ -217,7 +217,7 @@ instance.cue    Path to the instance .cue file (required)
 | `--namespace` | `-n` | string |  | Target namespace. |
 | `--platform` |  | string |  | Platform module directory (overrides the cluster Platform and the instance's own deps). |
 | `--skip-unprovided` |  | bool |  | Render what the platform can: skip provider-fulfilled contracts nothing on the platform provides, and report each one. |
-| `--values` | `-f` | stringArray |  | Additional values files (can be repeated; default: `values.cue` next to the instance file). |
+| `--values` | `-f` | stringArray |  | Values files added on top of the instance package, which already includes its `values.cue` (can be repeated). |
 
 **Examples**
 
@@ -481,7 +481,7 @@ instance.cue    Path to the instance .cue file (required)
 | `--offline` |  | bool |  | Never contact a cluster; render against `--platform` or the instance's own deps. |
 | `--platform` |  | string |  | Platform module directory (overrides the cluster Platform and the instance's own deps). |
 | `--skip-unprovided` |  | bool |  | Render what the platform can: skip provider-fulfilled contracts nothing on the platform provides, and report each one. |
-| `--values` | `-f` | stringArray |  | Additional values files (can be repeated; default: `values.cue` next to the instance file). |
+| `--values` | `-f` | stringArray |  | Values files added on top of the instance package, which already includes its `values.cue` (can be repeated). |
 
 **Examples**
 

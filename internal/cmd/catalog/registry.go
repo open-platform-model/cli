@@ -42,10 +42,9 @@ func NewCatalogRegistryCheckCmd(cfg *config.GlobalConfig) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "check <path@version>",
 		Short: "Verify a published catalog out of band",
-		Long: `Pull a published catalog by path@version and run the same verification a
-consumer performs when a platform acquires it: the declared identity is
-concrete, and its modulePath and version agree with the coordinate the build
-was fetched by.
+		Long: `Pull a published catalog by path@version and check its declared identity: it
+is concrete, and its modulePath and version agree with the coordinate the
+build was fetched by.
 The report lists the catalog's members per kind and apiVersion.
 
 	With --compat, additionally compare every beta/GA member against the last

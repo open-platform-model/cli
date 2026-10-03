@@ -15,8 +15,9 @@ func NewPlatformCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Short: "Inspect platform modules",
 		Long: `Inspect the platform a render would run against.
 
-opm platform check reads a platform module offline: it applies nothing,
-renders nothing and contacts no cluster.
+opm platform check reports a platform module's contract inventory: it applies
+nothing and renders nothing. It reads the cluster's Platform only when neither
+[dir] nor --platform names one.
 
 opm platform pull reads the cluster Platform CR and writes the platform
 module the cluster renders against to a directory. It reads the cluster; it

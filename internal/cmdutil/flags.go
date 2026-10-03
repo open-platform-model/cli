@@ -32,7 +32,7 @@ func (f *RenderFlags) AddTo(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&f.Namespace, "namespace", "n", "",
 		"Target namespace")
 	cmd.Flags().StringVar(&f.InstanceName, "instance-name", "",
-		"Instance name (default: module name)")
+		"Instance name (default: <module name>-debug)")
 	cmd.Flags().StringVar(&f.Platform, "platform", "",
 		modulePlatformFlagHelp)
 	cmd.Flags().BoolVar(&f.SkipUnprovided, "skip-unprovided", false,
@@ -121,7 +121,8 @@ func ResolveModulePath(args []string) string {
 // InstanceFileFlags holds flags specific to instance-file-based rendering.
 type InstanceFileFlags struct {
 	// Values are additional values CUE files (-f/--values flag).
-	// When empty, values.cue next to the instance file is used if it exists.
+	// The instance package already carries its own values.cue; these files
+	// are added on top of it as trailing values sources.
 	Values []string
 	// Platform is the --platform platform module directory (0006:D21;
 	// highest platform-source precedence). Supersedes the retired --provider
@@ -135,7 +136,7 @@ type InstanceFileFlags struct {
 // AddTo registers the instance file flags on the given cobra command.
 func (f *InstanceFileFlags) AddTo(cmd *cobra.Command) {
 	cmd.Flags().StringArrayVarP(&f.Values, "values", "f", nil,
-		"Additional values files (can be repeated; default: values.cue next to the instance file)")
+		"Values files added on top of the instance package, which already includes its values.cue (can be repeated)")
 	cmd.Flags().StringVar(&f.Platform, "platform", "",
 		instancePlatformFlagHelp)
 	cmd.Flags().BoolVar(&f.SkipUnprovided, "skip-unprovided", false,
