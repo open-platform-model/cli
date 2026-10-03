@@ -107,7 +107,7 @@ Examples:
 	c.Flags().BoolVar(&waitFlag, "wait", false,
 		"Wait until every applied resource is healthy before returning (skipped on --dry-run; operator-managed instances always wait for the operator)")
 	c.Flags().DurationVar(&timeoutFlag, "timeout", inventory.DefaultReconcileTimeout,
-		"Bound on the --wait readiness wait and on the operator-reconcile wait (operator-managed instances)")
+		"Bound on the CustomResourceDefinition establish wait and the --wait readiness wait (one budget, starting when the apply starts), and on the operator-reconcile wait (operator-managed instances)")
 
 	return c
 }

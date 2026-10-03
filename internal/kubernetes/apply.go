@@ -4,20 +4,34 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/charmbracelet/log"
 	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/pkg/resourceorder"
 )
 
 // ApplyOptions configures an apply operation.
 type ApplyOptions struct {
 	// DryRun performs a server-side dry run without persisting changes.
 	DryRun bool
+
+	// EstablishDeadline bounds Apply's wait for the first stage's
+	// CustomResourceDefinitions to report Established=True. Zero means
+	// defaultEstablishTimeout from the start of the wait. ApplyOne ignores it.
+	EstablishDeadline time.Time
 }
+
+// defaultEstablishTimeout bounds the CustomResourceDefinition wait when the
+// caller sets no deadline; it matches the apply commands' --timeout default.
+const defaultEstablishTimeout = 5 * time.Minute
 
 // ApplyResult contains the outcome of an apply operation.
 type ApplyResult struct {
@@ -32,6 +46,10 @@ type ApplyResult struct {
 
 	// Unchanged is the number of resources that had no changes.
 	Unchanged int
+
+	// Skipped counts the custom resources a dry run did not send because the
+	// same apply would create their CustomResourceDefinition.
+	Skipped int
 
 	// Errors contains per-resource errors (non-fatal).
 	Errors []resourceError
@@ -55,20 +73,92 @@ func (e *resourceError) Error() string {
 	return fmt.Sprintf("%s/%s: %v", e.Kind, e.Name, e.Err)
 }
 
-// Apply performs server-side apply for a set of rendered resources.
-// Resources are assumed to be already ordered by weight (from RenderResult).
+// stageOutcome is one object a stage applied without error. absentBefore
+// records that the pre-apply read returned NotFound: the apply creates it.
+type stageOutcome struct {
+	obj          *unstructured.Unstructured
+	absentBefore bool
+}
+
+// Apply performs server-side apply for a set of rendered resources, in two
+// stages. It sorts a copy of resources ascending by resource weight (stable,
+// so the input order breaks ties; the caller's slice is not reordered). The
+// first stage applies the CustomResourceDefinitions and Namespaces; outside a
+// dry run, Apply then waits until every CustomResourceDefinition of that stage
+// that applied reports Established=True, bounded by opts.EstablishDeadline,
+// and returns an error without applying the second stage if the wait fails.
+// The second stage applies everything else. A dry run waits for nothing, and
+// does not send a custom resource whose CustomResourceDefinition the same
+// apply creates: the server cannot validate it yet, so it is logged as
+// skipped and counted in Skipped. A resource that fails to apply is logged and
+// recorded in Errors, and the remaining resources are still applied.
 // instanceName is used for logging only.
 func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstructured, instanceName string, opts ApplyOptions) (*ApplyResult, error) {
 	result := &ApplyResult{}
 	instanceLog := output.InstanceLogger(instanceName)
 
-	for _, res := range resources {
+	sorted := append([]*unstructured.Unstructured(nil), resources...)
+	SortObjects(sorted, resourceorder.Ascending)
+	definitions, rest := splitClusterDefinitions(sorted)
+
+	applied := applyStage(ctx, client, definitions, opts, nil, result, instanceLog)
+
+	var newKinds map[schema.GroupKind]string
+	if opts.DryRun {
+		newKinds = kindsOfNewCRDs(applied)
+	} else if err := waitEstablished(ctx, client, applied, opts.EstablishDeadline, instanceLog); err != nil {
+		return result, err
+	}
+
+	applyStage(ctx, client, rest, opts, newKinds, result, instanceLog)
+	return result, nil
+}
+
+// isCRD reports whether gvk is a CustomResourceDefinition.
+func isCRD(gvk schema.GroupVersionKind) bool {
+	return gvk.Group == "apiextensions.k8s.io" && gvk.Kind == "CustomResourceDefinition"
+}
+
+// isClusterDefinition reports whether gvk is a kind other objects cannot be
+// applied without: a CustomResourceDefinition (its custom resources) or a
+// Namespace (the objects in it).
+func isClusterDefinition(gvk schema.GroupVersionKind) bool {
+	return isCRD(gvk) || (gvk.Group == "" && gvk.Kind == "Namespace")
+}
+
+// splitClusterDefinitions partitions objs, keeping their order, into the
+// cluster definitions and everything else.
+func splitClusterDefinitions(objs []*unstructured.Unstructured) (definitions, rest []*unstructured.Unstructured) {
+	for _, obj := range objs {
+		if isClusterDefinition(obj.GroupVersionKind()) {
+			definitions = append(definitions, obj)
+		} else {
+			rest = append(rest, obj)
+		}
+	}
+	return definitions, rest
+}
+
+// applyStage applies objs in order, logging one line per object and
+// recording counts and per-resource errors in result. An object whose group
+// and kind is in skip is not sent: skip maps each such kind to the name of the
+// CustomResourceDefinition this apply creates for it. It returns the objects
+// applied without error.
+func applyStage(ctx context.Context, client *Client, objs []*unstructured.Unstructured, opts ApplyOptions, skip map[schema.GroupKind]string, result *ApplyResult, instanceLog *log.Logger) []stageOutcome {
+	var applied []stageOutcome
+	for _, res := range objs {
 		kind := res.GetKind()
 		name := res.GetName()
 		ns := res.GetNamespace()
 
-		// Apply the resource
-		status, err := ApplyOne(ctx, client, res, opts)
+		if crdName, ok := skip[res.GroupVersionKind().GroupKind()]; ok {
+			instanceLog.Warn(fmt.Sprintf("skipping %s: its CustomResourceDefinition %s is created by this apply, so a dry run cannot validate it",
+				describeObjects([]*unstructured.Unstructured{res}), crdName))
+			result.Skipped++
+			continue
+		}
+
+		status, absentBefore, err := applyOne(ctx, client, res, opts)
 		if err != nil {
 			instanceLog.Warn(fmt.Sprintf("applying %s/%s: %v", kind, name, err))
 			result.Errors = append(result.Errors, resourceError{
@@ -90,29 +180,84 @@ func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstru
 			result.Unchanged++
 		}
 		instanceLog.Info(output.FormatResourceLine(kind, ns, name, status))
+		applied = append(applied, stageOutcome{obj: res, absentBefore: absentBefore})
+	}
+	return applied
+}
+
+// waitEstablished waits until every CustomResourceDefinition among applied
+// reports Established=True, or deadline passes (zero: defaultEstablishTimeout
+// from now).
+func waitEstablished(ctx context.Context, client *Client, applied []stageOutcome, deadline time.Time, instanceLog *log.Logger) error {
+	var crds []*unstructured.Unstructured
+	for _, o := range applied {
+		if isCRD(o.obj.GroupVersionKind()) {
+			crds = append(crds, o.obj)
+		}
+	}
+	if len(crds) == 0 {
+		return nil
 	}
 
-	return result, nil
+	start := time.Now()
+	if deadline.IsZero() {
+		deadline = start.Add(defaultEstablishTimeout)
+	}
+	instanceLog.Info(fmt.Sprintf("waiting for %d CustomResourceDefinition(s) to be established", len(crds)))
+
+	waitCtx, cancel := context.WithDeadline(ctx, deadline)
+	defer cancel()
+	if err := Wait(waitCtx, client, crds, CRDEstablishedPredicate, start); err != nil {
+		return fmt.Errorf("waiting for CustomResourceDefinitions to be established: %w", err)
+	}
+	return nil
+}
+
+// kindsOfNewCRDs maps the group and kind served by each CustomResourceDefinition
+// among applied that did not exist before the apply to that definition's name.
+// A definition without spec.group or spec.names.kind is ignored.
+func kindsOfNewCRDs(applied []stageOutcome) map[schema.GroupKind]string {
+	kinds := make(map[schema.GroupKind]string)
+	for _, o := range applied {
+		if !o.absentBefore || !isCRD(o.obj.GroupVersionKind()) {
+			continue
+		}
+		group, _, _ := unstructured.NestedString(o.obj.Object, "spec", "group")        //nolint:errcheck // a malformed CRD is ignored
+		kind, _, _ := unstructured.NestedString(o.obj.Object, "spec", "names", "kind") //nolint:errcheck // a malformed CRD is ignored
+		if group == "" || kind == "" {
+			continue
+		}
+		kinds[schema.GroupKind{Group: group, Kind: kind}] = o.obj.GetName()
+	}
+	return kinds
 }
 
 // ApplyOne performs server-side apply for a single resource.
 // Returns the status of the operation (created, configured, or unchanged).
 func ApplyOne(ctx context.Context, client *Client, obj *unstructured.Unstructured, opts ApplyOptions) (string, error) {
+	status, _, err := applyOne(ctx, client, obj, opts)
+	return status, err
+}
+
+// applyOne is ApplyOne that also reports whether the pre-apply read returned
+// NotFound, which, unlike the "created" status, no other read error implies.
+func applyOne(ctx context.Context, client *Client, obj *unstructured.Unstructured, opts ApplyOptions) (status string, absentBefore bool, err error) {
 	gvr := GVRFromUnstructured(obj)
 	ns := obj.GetNamespace()
 
 	// Check if resource already exists to determine status after apply.
 	var existingVersion string
-	existing, err := client.ResourceClient(gvr, ns).Get(ctx, obj.GetName(), metav1.GetOptions{})
-	if err == nil {
+	existing, getErr := client.ResourceClient(gvr, ns).Get(ctx, obj.GetName(), metav1.GetOptions{})
+	if getErr == nil {
 		existingVersion = existing.GetResourceVersion()
 		obj = guardPVCResize(ctx, client, obj, existing)
 	}
 	// If GET fails (NotFound or other), existingVersion stays empty -> "created"
+	absentBefore = apierrors.IsNotFound(getErr)
 
 	data, err := json.Marshal(obj)
 	if err != nil {
-		return "", fmt.Errorf("marshaling resource: %w", err)
+		return "", absentBefore, fmt.Errorf("marshaling resource: %w", err)
 	}
 
 	patchOpts := metav1.PatchOptions{
@@ -129,26 +274,26 @@ func ApplyOne(ctx context.Context, client *Client, obj *unstructured.Unstructure
 	)
 
 	if patchErr != nil {
-		return "", patchErr
+		return "", absentBefore, patchErr
 	}
 
 	// Determine status from before/after comparison.
 	if existingVersion == "" {
-		return output.StatusCreated, nil
+		return output.StatusCreated, absentBefore, nil
 	}
 	if opts.DryRun {
 		// A dry-run persists nothing, so the response carries the live
 		// resourceVersion whether or not the apply would change the object.
 		// Compare the response body with the live object instead.
 		if result != nil && dryRunUnchanged(existing, result) {
-			return output.StatusUnchanged, nil
+			return output.StatusUnchanged, absentBefore, nil
 		}
-		return output.StatusConfigured, nil
+		return output.StatusConfigured, absentBefore, nil
 	}
 	if result != nil && result.GetResourceVersion() == existingVersion {
-		return output.StatusUnchanged, nil
+		return output.StatusUnchanged, absentBefore, nil
 	}
-	return output.StatusConfigured, nil
+	return output.StatusConfigured, absentBefore, nil
 }
 
 // dryRunUnchanged reports whether a server-side dry-run apply response equals

@@ -102,6 +102,7 @@ tasks:
       OPM_REGISTRY: "{{.OPM_REGISTRY}}"
     cmds:
       - go run tests/integration/deploy/main.go
+      - go run tests/integration/apply-staging/main.go
       - go run tests/integration/inventory-apply/main.go
       - go run tests/integration/inventory-ops/main.go
       - go run tests/integration/inst-list/main.go

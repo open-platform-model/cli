@@ -93,7 +93,7 @@ func TestWaitForHealthy(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			req := waitRequest(t, tc.rendered, tc.live, 100*time.Millisecond)
-			err := waitForHealthy(context.Background(), req, req.Log)
+			err := waitForHealthy(context.Background(), req, time.Now().Add(req.Options.Timeout), req.Log)
 			if tc.wantErr == nil {
 				require.NoError(t, err)
 				return
