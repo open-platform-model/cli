@@ -58,7 +58,7 @@ Exit code 2 (`ExitValidationError`), printed through `printValidationError` like
 ```
 $ opm instance apply ./jellyfin -n staging
 ERROR render failed: --namespace "staging" disagrees with metadata.namespace "media" in ./jellyfin
-  the namespace is part of the instance's identity: to deploy this instance to "staging", set metadata.namespace: "staging" in the instance file; otherwise drop the override
+  the namespace is part of the instance's identity: to deploy to "staging", set metadata.namespace: "staging" in the instance file (that makes a new instance; delete the one in "media" if it is deployed); otherwise drop the override
 exit 2
 
 $ OPM_NAMESPACE=staging opm instance build ./jellyfin

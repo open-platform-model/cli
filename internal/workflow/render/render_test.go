@@ -397,6 +397,7 @@ func TestRefuseNamespaceOverride(t *testing.T) {
 		assert.Contains(t, logs, `render failed: --namespace "staging" disagrees with metadata.namespace "media" in ./jellyfin`)
 		assert.NotContains(t, logs, "error=", "the refusal prints as a message, not an escaped field")
 		assert.Contains(t, details, `set metadata.namespace: "staging" in the instance file`)
+		assert.Contains(t, details, `delete the one in "media"`, "a changed namespace is a new instance, not a move")
 		assert.False(t, strings.Contains(details, "0011:"), "no enhancement reference in CLI output")
 	})
 }

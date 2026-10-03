@@ -146,7 +146,7 @@ func refuseNamespaceOverride(instancePath, declared string, ns config.ResolvedFi
 	}
 	return &pkgerrors.ValidationError{
 		Message: fmt.Sprintf("%s %q disagrees with metadata.namespace %q in %s", source, ns.Value, declared, instancePath),
-		Details: fmt.Sprintf("the namespace is part of the instance's identity: to deploy this instance to %q, set metadata.namespace: %q in the instance file; otherwise drop the override", ns.Value, ns.Value),
+		Details: fmt.Sprintf("the namespace is part of the instance's identity: to deploy to %q, set metadata.namespace: %q in the instance file (that makes a new instance; delete the one in %q if it is deployed); otherwise drop the override", ns.Value, ns.Value, declared),
 	}
 }
 

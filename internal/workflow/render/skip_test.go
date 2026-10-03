@@ -17,6 +17,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/platform"
 )
 
 // skipFixtureRegistry routes core and the catalogs to GHCR; the
@@ -249,6 +250,16 @@ func TestNamespaceOverride_InstanceRefusedModuleAllowed(t *testing.T) {
 	instanceOpts := func(cfg *config.ResolvedKubernetesConfig) InstanceFileOpts {
 		return InstanceFileOpts{InstanceFilePath: filepath.Join(dir, "instance"), SkipUnprovided: true, Config: skipFixtureConfig(t), K8sConfig: cfg}
 	}
+	// refusedOpts reads the cluster platform through a getter that fails the
+	// test, so a guard moved below platform resolution is caught.
+	refusedOpts := func(t *testing.T, cfg *config.ResolvedKubernetesConfig) InstanceFileOpts {
+		opts := instanceOpts(cfg)
+		opts.ClusterPlatform = func(context.Context) (*platform.ClusterPlatform, string, error) {
+			t.Fatal("platform resolved before the namespace refusal")
+			return nil, "", nil
+		}
+		return opts
+	}
 	requireRefused := func(t *testing.T, err error, source string) {
 		t.Helper()
 		require.Error(t, err)
@@ -262,17 +273,22 @@ func TestNamespaceOverride_InstanceRefusedModuleAllowed(t *testing.T) {
 	}
 
 	t.Run("instance flag differs", func(t *testing.T) {
-		_, err := FromInstanceFile(ctx, instanceOpts(k8s("staging", config.SourceFlag)))
+		_, err := FromInstanceFile(ctx, refusedOpts(t, k8s("staging", config.SourceFlag)))
 		requireRefused(t, err, "--namespace")
 	})
 	t.Run("instance env differs", func(t *testing.T) {
-		_, err := FromInstanceFile(ctx, instanceOpts(k8s("staging", config.SourceEnv)))
+		_, err := FromInstanceFile(ctx, refusedOpts(t, k8s("staging", config.SourceEnv)))
 		requireRefused(t, err, "OPM_NAMESPACE")
 	})
 	t.Run("instance flag matches", func(t *testing.T) {
 		result, err := FromInstanceFile(ctx, instanceOpts(k8s(skipFixtureNamespace, config.SourceFlag)))
 		require.NoError(t, err)
-		assert.Equal(t, skipFixtureNamespace, result.Instance.Namespace)
+		require.NotEmpty(t, result.Resources)
+		for _, res := range result.Resources {
+			if ns := res.GetNamespace(); ns != "" {
+				assert.Equal(t, skipFixtureNamespace, ns, "%s/%s renders in the file's namespace", res.GetKind(), res.GetName())
+			}
+		}
 	})
 	t.Run("module flag differs is allowed", func(t *testing.T) {
 		result, err := FromModule(ctx, ModuleOpts{ModulePath: dir, SkipUnprovided: true, Config: skipFixtureConfig(t), K8sConfig: k8s("staging", config.SourceFlag)})
