@@ -5,7 +5,7 @@ type: how-to
 weight: 15
 ---
 
-The `opm` CLI ships as a prebuilt binary on each [GitHub release](https://github.com/open-platform-model/cli/releases) of `open-platform-model/cli`. This page installs [v1.0.0-beta.4](https://github.com/open-platform-model/cli/releases/tag/v1.0.0-beta.4) on Linux or macOS, then covers Windows, building from source and shell completion.
+The `opm` CLI ships as a prebuilt binary on each [GitHub release](https://github.com/open-platform-model/cli/releases) of `open-platform-model/cli`. This page installs [v1.0.0-beta.5](https://github.com/open-platform-model/cli/releases/tag/v1.0.0-beta.5) on Linux or macOS, then covers Windows, building from source and shell completion.
 
 > [!WARNING]
 > **GitHub's Latest release is not the current CLI**
@@ -35,7 +35,7 @@ The CLI is not published to Homebrew or any other package manager.
 Set the version and your system, then download the archive and the release's checksum file:
 
 ```sh
-OPM_VERSION=v1.0.0-beta.4
+OPM_VERSION=v1.0.0-beta.5
 OS=linux      # linux or darwin
 ARCH=amd64    # amd64 or arm64
 curl -fsSLO "https://github.com/open-platform-model/cli/releases/download/${OPM_VERSION}/opm-${OS}-${ARCH}.tar.gz"
@@ -74,11 +74,11 @@ Any other result means the download is damaged or is not the released file. Dele
 > ```
 >
 > ```text
-> Calculated digest for opm-linux-amd64.tar.gz: sha256:3e754c49de0ea80e092347679f6d9d9f42e4be05b136c626b0dd3e3da97d2749
-> Resolved tag v1.0.0-beta.4 to sha1:0e66ec08a7d262695994761dd39f1c526c09c86a
+> Calculated digest for opm-linux-amd64.tar.gz: sha256:1debc482cf1a432f7183993dda637b5c0a6af123e1089644574b4b9efee11ec1
+> Resolved tag v1.0.0-beta.5 to sha1:7c10dfb7d4c01cce3029f92596888c0474da77d4
 > Loaded attestation from GitHub API
 >
-> ✓ Verification succeeded! opm-linux-amd64.tar.gz is present in release v1.0.0-beta.4
+> ✓ Verification succeeded! opm-linux-amd64.tar.gz is present in release v1.0.0-beta.5
 > ```
 >
 > The releases carry no other signature or build provenance.
@@ -112,7 +112,7 @@ opm version
 The output should look similar to this:
 
 ```text
-opm version 1.0.0-beta.4 (0e66ec08a7d262695994761dd39f1c526c09c86a) built 2026-10-01T15:04:10Z with go1.26.0
+opm version 1.0.0-beta.5 (7c10dfb7d4c01cce3029f92596888c0474da77d4) built 2026-10-01T20:02:54Z with go1.26.0
 CUE SDK: v0.17.1
 ```
 
@@ -123,7 +123,7 @@ The first line names the release, the commit it was built from, the build time a
 The Windows archive holds `opm.exe`. In PowerShell, download it and the checksum file, and compare the sums:
 
 ```powershell
-$Version = "v1.0.0-beta.4"
+$Version = "v1.0.0-beta.5"
 $Base = "https://github.com/open-platform-model/cli/releases/download/$Version"
 Invoke-WebRequest "$Base/opm-windows-amd64.tar.gz" -OutFile opm-windows-amd64.tar.gz
 Invoke-WebRequest "$Base/checksums.txt" -OutFile checksums.txt
@@ -143,7 +143,7 @@ tar -xzf opm-windows-amd64.tar.gz
 With Go 1.26 or newer, `go install` builds the same release from its tag:
 
 ```sh
-go install github.com/open-platform-model/cli/cmd/opm@v1.0.0-beta.4
+go install github.com/open-platform-model/cli/cmd/opm@v1.0.0-beta.5
 ```
 
 The binary lands in `$(go env GOPATH)/bin`, or in `$GOBIN` when it is set. Put that directory on your `PATH`. A binary built this way reports `opm version dev (unknown) built unknown`, because only the release build stamps the version in.
@@ -177,4 +177,4 @@ To load completion in every new shell, `opm completion <shell> --help` prints wh
 - [Quickstart](/docs/start/quickstart/), which starts with `opm config init` to configure the CLI
 - [Install the operator](/docs/start/install-the-operator/)
 
-<!-- Tested on 2026-10-01 against the v1.0.0-beta.4 release (Pre-release, immutable; GitHub's Latest resolves to v0.6.0, which has no assets, so releases/latest/download/opm-linux-amd64.tar.gz returns 404). Linux amd64: steps 1 to 4 run as written on Fedora (install into a scratch directory instead of /usr/local/bin), the checksum and `gh release verify-asset` outputs are from that run; the checksum line for darwin-arm64 and windows-amd64 also verified with sha256sum. The linux-amd64 binary is dynamically linked against glibc and fails to start on alpine:3 (missing dynamic library); linux-arm64 is statically linked. The PowerShell block ran in the mcr.microsoft.com/powershell container on Linux (prints OK; tar extracts opm.exe), not on Windows. macOS steps, the shasum line and the Gatekeeper note were not run on a Mac; .goreleaser.yml has no signing or notarization. `go install ...@v1.0.0-beta.4` built with go1.26.5 and printed `opm version dev (unknown) built unknown with go1.26.5`; the same install in golang:1.26-alpine builds and runs. bash, zsh (with compinit) and fish completion load (bash `complete -p opm` shows `__start_opm`, zsh `_comps[opm]` is `_opm`). Re-run every step and update the outputs when the named release changes. -->
+<!-- Tested on 2026-10-03 against the v1.0.0-beta.5 release (Pre-release, immutable; GitHub's Latest resolves to v0.6.0, which has no assets, so releases/latest/download/opm-linux-amd64.tar.gz returns 404). Linux amd64: steps 1 to 4 run as written on Fedora (install into a scratch directory instead of /usr/local/bin), the checksum and `gh release verify-asset` outputs are from that run; the checksum line for darwin-arm64 and windows-amd64 also verified with sha256sum. The linux-amd64 binary is dynamically linked against glibc and fails to start on alpine:3 (missing dynamic library); linux-arm64 is statically linked. The PowerShell block ran in the mcr.microsoft.com/powershell container on Linux (prints OK; tar extracts opm.exe), not on Windows. macOS steps, the shasum line and the Gatekeeper note were not run on a Mac; .goreleaser.yml has no signing or notarization. `go install ...@v1.0.0-beta.5` built with go1.26.5 and printed `opm version dev (unknown) built unknown with go1.26.5`; the same install in golang:1.26-alpine builds and runs. bash, zsh (with compinit) and fish completion load (bash `complete -p opm` shows `__start_opm`, zsh `_comps[opm]` is `_opm`). Re-verified on 2026-10-03 at v1.0.0-beta.5: Linux amd64 steps 1 to 4 (checksum, `gh release verify-asset`, `opm version`) and `go install` ran and the outputs above come from that run; the windows archive holds `opm.exe`. The Alpine, PowerShell, macOS and completion checks are from the beta.4 run and were not repeated. Re-run every step and update the outputs when the named release changes. -->

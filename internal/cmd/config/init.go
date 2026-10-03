@@ -23,7 +23,7 @@ func NewConfigInitCmd(_ *config.GlobalConfig) *cobra.Command {
 		Short: "Initialize default configuration",
 		Long: `Initialize the OPM CLI configuration.
 
-Creates ~/.opm/config.cue: the CLI configuration (registry, kubernetes, log),
+Creates ~/.opm/config.cue: the CLI configuration (registry, kubernetes, log, skewPolicy),
 plain data. Init is offline; nothing is resolved.
 
 Init writes no platform. A render resolves its platform from --platform
