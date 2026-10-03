@@ -232,6 +232,7 @@ func stagingCRD() *unstructured.Unstructured {
 func stagingInput() []*unstructured.Unstructured {
 	return []*unstructured.Unstructured{
 		stagingObject("apps/v1", "Deployment", "web", "demo"),
+		stagingObject("v1", "Service", "web", "demo"),
 		stagingObject("example.com/v1", "Foo", "my-foo", "demo"),
 		stagingObject("v1", "ConfigMap", "cfg", "demo"),
 		stagingObject("v1", "Namespace", "demo", ""),
@@ -263,11 +264,12 @@ func TestApply_StagesDefinitionsThenWeight(t *testing.T) {
 	result, err := Apply(context.Background(), cluster.client(t), input, "test", ApplyOptions{})
 	require.NoError(t, err)
 	assert.Empty(t, result.Errors)
-	assert.Equal(t, 5, result.Applied)
+	assert.Equal(t, 6, result.Applied)
 	assert.Equal(t, []string{
 		"CustomResourceDefinition/foos.example.com",
 		"Namespace/demo",
 		"ConfigMap/cfg",
+		"Service/web",
 		"Deployment/web",
 		"Foo/my-foo",
 	}, cluster.patchOrder())
@@ -299,7 +301,7 @@ func TestApply_DryRunSkipsCustomResourceOfNewCRD(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, result.Errors)
 	assert.Equal(t, 1, result.Skipped)
-	assert.Equal(t, 4, result.Applied)
+	assert.Equal(t, 5, result.Applied)
 	assert.NotContains(t, cluster.patchOrder(), "Foo/my-foo")
 }
 
