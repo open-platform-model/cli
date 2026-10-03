@@ -33,6 +33,10 @@ name: Release
 #   - A brand-new template: after its first publish the owner makes its GHCR
 #     package public in the browser. The gate lists versions anonymously, so
 #     until then every release fails for that template.
+#   - Published release with no docs bundle (publish-docs failed or did not
+#     run): re-run the failed job, or dispatch docs.yml on main in release
+#     mode with the tag (see docs.yml). Only a release whose tree has
+#     hack/docskit-dump can have a bundle.
 
 on:
   push:
@@ -219,3 +223,30 @@ jobs:
 
       - name: Publish unpublished templates
         run: .github/scripts/publish-templates.sh
+
+  publish-docs:
+    name: Publish the cli docs bundle
+    # The docs bundle of this release (docs-kit.cue): the command reference,
+    # the authored pages under docs/site/ and the library, core and
+    # opm-operator versions this tree pins, which opmodel.dev follows to
+    # their bundles (docs-kit C15, C16). goreleaser publishes the release
+    # last, so the bundle follows a published release only: a release left a
+    # draft has none until the manual run that finishes it.
+    needs: [release-please, goreleaser]
+    # always(): on a manual run release-please is skipped.
+    if: always() && needs.goreleaser.result == 'success'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    # Pinned by docs-kit release tag, not a SHA: the signing certificate names
+    # publish.yml at this ref, and the site trusts only docs-kit's v* tags
+    # (docs-kit C5, C9). Moves with .opm-docs-version in one PR
+    # (task docs:pins:check).
+    uses: open-platform-model/docs-kit/.github/workflows/publish.yml@v0.4.0
+    with:
+      project: cli
+      mode: release
+      tag: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
+      # hack/docskit-dump runs with go run (docs-kit C14).
+      setup-go: true
