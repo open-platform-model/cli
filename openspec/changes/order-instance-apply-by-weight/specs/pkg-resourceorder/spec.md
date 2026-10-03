@@ -2,7 +2,7 @@
 
 ### Requirement: One stable weight sort
 
-The `pkg/resourceorder` package SHALL export a sort that orders a slice in place by `GetWeight` of each element's GVK, ascending or descending, and SHALL keep elements of equal weight in their input order. It SHALL work over unstructured objects and over any element type through a caller-supplied GVK accessor. Every CLI path that orders resources for apply, delete, prune or the operator install and uninstall plans SHALL use it rather than a sort of its own.
+The `pkg/resourceorder` package SHALL export a generic sort that orders a slice in place by `GetWeight` of each element's GVK, read through a caller-supplied accessor, ascending or descending, and SHALL keep elements of equal weight in their input order. Every CLI path that orders resources for apply, delete, prune or the operator install and uninstall plans SHALL use it rather than a sort of its own. Adding the sort SHALL NOT widen the package's dependency tree beyond the standard library and `k8s.io/apimachinery/pkg/runtime/schema`.
 
 #### Scenario: Ascending order for apply
 

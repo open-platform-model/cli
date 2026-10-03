@@ -2,7 +2,7 @@
 
 ### Requirement: Apply stages CustomResourceDefinitions and Namespaces before the rest
 
-`opm instance apply` and `opm module apply` SHALL apply the rendered resources in two stages, each in ascending `pkg/resourceorder` weight order with build order breaking ties. The first stage SHALL hold every `CustomResourceDefinition` (group `apiextensions.k8s.io`) and every `Namespace` (core group); the second stage SHALL hold everything else. Outside a dry run, after the first stage the command SHALL wait until every CustomResourceDefinition the first stage applied without error reports the condition `Established=True`, bounded by `--timeout` (default 5m), and only then apply the second stage. When the wait does not complete, the command SHALL fail naming the CustomResourceDefinitions still pending, SHALL NOT apply the second stage, and SHALL NOT prune or write the inventory. A resource that fails to apply SHALL be reported and SHALL NOT stop the remaining resources of its stage or the next stage.
+`opm instance apply` and `opm module apply` SHALL apply the rendered resources in two stages, each in ascending `pkg/resourceorder` weight order with build order breaking ties. The first stage SHALL hold every `CustomResourceDefinition` (group `apiextensions.k8s.io`) and every `Namespace` (core group); the second stage SHALL hold everything else. Outside a dry run, after the first stage the command SHALL wait until every CustomResourceDefinition the first stage applied without error reports the condition `Established=True`, charged to the command's single `--timeout` budget (default 5m, shared with the `--wait` readiness wait and starting when the apply starts), and only then apply the second stage. When the wait does not complete, the command SHALL fail naming the CustomResourceDefinitions still pending, SHALL NOT apply the second stage, and SHALL NOT prune or write the inventory. A resource that fails to apply SHALL be reported and SHALL NOT stop the remaining resources of its stage or the next stage.
 
 #### Scenario: A CRD and its custom resource apply in one run
 
@@ -26,7 +26,7 @@
 
 ### Requirement: A dry run skips a custom resource whose CRD the same apply creates
 
-On `--dry-run`, `opm instance apply` and `opm module apply` SHALL NOT send a custom resource whose group and kind are defined by a CustomResourceDefinition of the same apply that does not yet exist on the cluster. The command SHALL log a warning naming the skipped resource and its CustomResourceDefinition, SHALL count it as skipped in the dry-run summary, and SHALL NOT treat it as an error. A dry run SHALL NOT wait for any CustomResourceDefinition. A custom resource whose CustomResourceDefinition already exists on the cluster SHALL be sent as usual.
+On `--dry-run`, `opm instance apply` and `opm module apply` SHALL NOT send a custom resource whose group and kind are defined by a CustomResourceDefinition of the same apply that does not yet exist on the cluster. The command SHALL log a warning naming the skipped resource and its CustomResourceDefinition, SHALL count it as skipped in the dry-run summary, and SHALL NOT treat it as an error. A dry run SHALL NOT wait for any CustomResourceDefinition. A custom resource whose CustomResourceDefinition already exists on the cluster SHALL be sent as usual. A namespaced object in a Namespace that the same apply creates is not skipped: its dry run is sent and fails namespace admission as before.
 
 #### Scenario: A dry run with a new CRD skips its custom resource
 
