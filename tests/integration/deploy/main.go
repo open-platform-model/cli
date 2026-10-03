@@ -198,6 +198,7 @@ func main() {
 	dryDeleteResult, err := kubernetes.Delete(ctx, client, kubernetes.DeleteOptions{
 		InstanceName:  instanceName,
 		Namespace:     namespace,
+		InstanceUUID:  dryInv.InstanceUUID,
 		DryRun:        true,
 		InventoryLive: dryLive,
 	})
@@ -228,6 +229,7 @@ func main() {
 	deleteResult, err := kubernetes.Delete(ctx, client, kubernetes.DeleteOptions{
 		InstanceName:          instanceName,
 		Namespace:             namespace,
+		InstanceUUID:          delInv.InstanceUUID,
 		InventoryLive:         delLive,
 		InventoryRecordExists: delInv != nil,
 	})

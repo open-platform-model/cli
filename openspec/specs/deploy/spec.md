@@ -29,7 +29,7 @@ A developer wants to deploy their rendered module to a Kubernetes cluster.
 **Acceptance Scenarios**:
 
 1. **Given** a valid module, **When** running `opm mod apply`, **Then** resources are deployed.
-2. **Given** a deployed module, **When** running `opm instance delete`, **Then** all resources are removed.
+2. **Given** a deployed module, **When** running `opm instance delete`, **Then** its tracked resources are removed, and any CRD or Namespace it rendered is left behind and listed.
 3. **Given** a module with CRDs and CRs, **When** running `opm mod apply`, **Then** CRDs are created first.
 4. **Given** pending changes, **When** running `opm mod apply`, **Then** changes are applied.
 5. **Given** dry-run request, **When** running `opm mod apply --dry-run`, **Then** no changes are made.

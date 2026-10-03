@@ -2,19 +2,26 @@ package instance
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 
+	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
+	pkgcore "github.com/open-platform-model/cli/pkg/core"
 )
 
 func emptyClusterClient() *kubernetes.Client {
@@ -70,4 +77,89 @@ func TestDeleteForceFlagIsConfirmationOnly(t *testing.T) {
 	forceFlag := cmd.Flags().Lookup("force")
 	require.NotNil(t, forceFlag)
 	assert.Contains(t, forceFlag.Usage, "confirmation")
+}
+
+// captureOutput runs fn with standard output, standard error and the logger
+// redirected, and returns everything they wrote.
+func captureOutput(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	origStdout, origStderr := os.Stdout, os.Stderr
+	os.Stdout, os.Stderr = w, w
+	output.SetLogWriter(w)
+
+	done := make(chan []byte)
+	go func() {
+		b, _ := io.ReadAll(r)
+		done <- b
+	}()
+	defer func() {
+		os.Stdout, os.Stderr = origStdout, origStderr
+		output.SetLogWriter(origStderr)
+	}()
+
+	fn()
+	require.NoError(t, w.Close())
+	return string(<-done)
+}
+
+// A CLI-owned instance whose inventory tracks a ConfigMap and its Namespace:
+// delete removes the ConfigMap and the ModuleInstance, keeps the Namespace,
+// lists it as left behind and exits 0.
+func TestExecuteInstanceDelete_LeavesNamespaceBehind(t *testing.T) {
+	const uuid = "uuid-demo"
+	labels := map[string]any{pkgcore.LabelManagedBy: pkgcore.LabelManagedByValue, pkgcore.LabelModuleInstanceUUID: uuid}
+	cm := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1", "kind": "ConfigMap",
+		"metadata": map[string]any{"name": "web", "namespace": "apps", "labels": labels},
+	}}
+	ns := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1", "kind": "Namespace",
+		"metadata": map[string]any{"name": "apps", "labels": labels},
+	}}
+	mi := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": inventory.APIVersionModuleInstance, "kind": inventory.KindModuleInstance,
+		"metadata": map[string]any{"name": "demo", "namespace": "apps"},
+	}}
+	inv := &inventory.Record{Name: "demo", Namespace: "apps", Owner: inventory.OwnerCLI, InstanceUUID: uuid}
+	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}
+
+	for _, dryRun := range []bool{false, true} {
+		t.Run(fmt.Sprintf("dryRun=%v", dryRun), func(t *testing.T) {
+			ctx := context.Background()
+			fake := fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
+				map[schema.GroupVersionResource]string{inventory.ModuleInstanceGVR: "ModuleInstanceList"},
+				cm.DeepCopy(), ns.DeepCopy(), mi.DeepCopy())
+			client := &kubernetes.Client{Dynamic: fake}
+
+			var runErr error
+			out := captureOutput(t, func() {
+				runErr = executeInstanceDelete(ctx, client, rsf, "apps", inv,
+					[]*unstructured.Unstructured{cm.DeepCopy(), ns.DeepCopy()}, dryRun, output.InstanceLogger("demo"))
+			})
+			require.NoError(t, runErr, out)
+
+			assert.Contains(t, out, "Namespace/apps")
+			assert.Contains(t, out, output.StatusLeftBehind)
+			assert.Contains(t, out, kubernetes.ProtectedKindReason)
+			assert.NotContains(t, out, "all resources have been deleted")
+
+			_, nsErr := fake.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}, "", "apps")
+			assert.NoError(t, nsErr, "the Namespace stays")
+			_, cmErr := fake.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, "apps", "web")
+			_, miErr := fake.Tracker().Get(inventory.ModuleInstanceGVR, "apps", "demo")
+
+			if dryRun {
+				assert.Contains(t, out, "dry run complete: 1 resources would be deleted, 1 left behind")
+				assert.NoError(t, cmErr, "a dry run deletes nothing")
+				assert.NoError(t, miErr, "a dry run keeps the ModuleInstance")
+				return
+			}
+			assert.Contains(t, out, "Instance deleted — 1 resource(s) left behind")
+			assert.Contains(t, out, "kubectl delete")
+			assert.True(t, apierrors.IsNotFound(cmErr), "the ConfigMap is deleted")
+			assert.True(t, apierrors.IsNotFound(miErr), "the ModuleInstance is deleted")
+		})
+	}
 }

@@ -38,7 +38,15 @@ func NewInstanceDeleteCmd(cfg *config.GlobalConfig) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "delete <file|name|uuid>",
 		Short: "Delete instance resources from cluster",
-		Long: `Delete all resources belonging to an OPM instance from a Kubernetes cluster.
+		Long: `Delete the resources belonging to an OPM instance from a Kubernetes cluster
+(CRDs and Namespaces are left behind).
+
+CustomResourceDefinitions and Namespaces are never deleted, since deleting one
+takes every custom resource of its kind, or everything inside it, with it.
+Each tracked resource is also read again just before its delete, and a
+resource that is no longer managed by OPM or now belongs to another instance
+is left behind. Every resource left behind is listed with its reason; remove
+it with 'kubectl delete' once nothing else needs it.
 
 Arguments:
   file         Path to an instance.cue file or directory containing one.
@@ -203,6 +211,7 @@ func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rs
 		InstanceName:          rsf.InstanceName,
 		Namespace:             namespace,
 		InstanceID:            rsf.InstanceID,
+		InstanceUUID:          recordedUUID(inv),
 		DryRun:                dryRun,
 		InventoryLive:         liveResources,
 		InventoryRecordExists: inv != nil,
@@ -210,6 +219,10 @@ func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rs
 	if err != nil {
 		instanceLog.Error("delete failed", "error", err)
 		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
+	}
+
+	for _, lb := range deleteResult.LeftBehind {
+		instanceLog.Warn(output.FormatResourceLine(lb.Kind, lb.Namespace, lb.Name, output.StatusLeftBehind), "reason", lb.Reason)
 	}
 
 	if len(deleteResult.Errors) > 0 {
@@ -228,9 +241,18 @@ func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rs
 		}
 	}
 
-	if dryRun {
+	leftBehind := len(deleteResult.LeftBehind)
+	switch {
+	case dryRun && leftBehind > 0:
+		instanceLog.Info(fmt.Sprintf("dry run complete: %d resources would be deleted, %d left behind", deleteResult.Deleted, leftBehind))
+	case dryRun:
 		instanceLog.Info(fmt.Sprintf("dry run complete: %d resources would be deleted", deleteResult.Deleted))
-	} else {
+	case len(deleteResult.Errors) > 0:
+		// The ModuleInstance was kept for a re-run; claim no completion.
+	case leftBehind > 0:
+		output.Println(output.FormatCheckmark(fmt.Sprintf("Instance deleted — %d resource(s) left behind", leftBehind)))
+		output.Details("Remove them with 'kubectl delete' once nothing else needs them.")
+	default:
 		instanceLog.Info("all resources have been deleted")
 		output.Println(output.FormatCheckmark("Instance deleted"))
 	}
@@ -245,12 +267,21 @@ func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rs
 	return nil
 }
 
+// recordedUUID is the instance UUID the ModuleInstance recorded, or empty
+// when there is no record.
+func recordedUUID(inv *inventory.Record) string {
+	if inv == nil {
+		return ""
+	}
+	return inv.InstanceUUID
+}
+
 func confirmInstanceDelete(instanceName, instanceID, namespace string) bool {
 	var prompt string
 	if instanceName != "" {
-		prompt = fmt.Sprintf("Delete all resources for instance %q in namespace %q? [y/N]: ", instanceName, namespace)
+		prompt = fmt.Sprintf("Delete the resources for instance %q in namespace %q (CRDs and Namespaces are left behind)? [y/N]: ", instanceName, namespace)
 	} else {
-		prompt = fmt.Sprintf("Delete all resources for instance-id %q in namespace %q? [y/N]: ", instanceID, namespace)
+		prompt = fmt.Sprintf("Delete the resources for instance-id %q in namespace %q (CRDs and Namespaces are left behind)? [y/N]: ", instanceID, namespace)
 	}
 	output.Prompt(prompt)
 	scanner := bufio.NewScanner(os.Stdin)

@@ -138,6 +138,7 @@ func main() {
 	deleteResult67, err := kubernetes.Delete(ctx, client, kubernetes.DeleteOptions{
 		InstanceName:          instanceName,
 		Namespace:             namespace,
+		InstanceUUID:          readInv67.InstanceUUID,
 		InventoryLive:         liveResources67,
 		InventoryRecordExists: readInv67 != nil,
 	})
