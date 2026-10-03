@@ -34,6 +34,18 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.0'
+      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
+        with:
+          version: 3.x
+      - name: Cascade task (offline)
+        # task deps:cascade's offline scenarios against the stub resolver; no
+        # registry or proxy access. Lint is the cli's required check (workspace
+        # RELEASING.md, "Rulesets on main"); the full set runs in
+        # cascade-task.yml ("Rollout and changes"). Local: task -x deps:cascade:test.
+        env:
+          CASCADE_TEST_SET: offline
+          CASCADE_RESOLVER: ${{ github.workspace }}/.tasks/cascade/testdata/stub-resolve.sh
+        run: task -x deps:cascade:test
       - name: Release-pin gate (G1)
         # Release PRs only: no local, unpublished or mismatched pin ships
         # (workspace RELEASING.md, section "Gates"). Local: task deps:release-check.

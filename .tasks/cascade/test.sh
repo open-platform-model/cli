@@ -26,6 +26,7 @@ esac
 FAILED=0
 pass() { printf 'PASS %s\n' "$1"; }
 fail() { printf 'FAIL %s: %s\n' "$1" "$2"; FAILED=1; }
+skip() { printf 'SKIP %s: %s\n' "$1" "$2"; }
 
 TMP=$(mktemp -d)
 trap 'chmod -R u+w "$TMP" 2>/dev/null || true; rm -rf "$TMP"' EXIT
@@ -240,6 +241,218 @@ elif ! warned "$d" "catalog \`v4.99.0\` needs core \`v2.0.0-beta.99\`, above the
   fail "S8 core hold" "no catalog-held warning"
 else
   pass "S8 core hold"
+fi
+
+# ---------------------------------------------------------------------------
+# Network scenarios (CASCADE_TEST_SET=all): the older versions are real, so
+# go get, operator:sync and cue mod get resolve them from the Go proxy, GitHub
+# releases and GHCR, or from a warm cache.
+
+OLDER="$HERE/testdata/older.tsv"
+CUE_DIRS=(
+  templates/minimal templates/standard templates/advanced hack/platform "$PODDIR"
+  examples tests/e2e/testdata/operator-owned
+  internal/instinit/testdata/initvalues internal/workflow/render/testdata/skip-unprovided
+  tests/e2e/testdata/duplicate-identities tests/integration/module-apply/testdata
+  tests/fixtures/valid/simple-module tests/fixtures/valid/module-with-debug-values
+)
+CONSUMERS=(examples tests/e2e/testdata/operator-owned)
+# GOLDEN: what the first run leaves changed against the original tree once every
+# pin is back at the tree's value (design.md D10; spike 1.4).
+GOLDEN=$(printf '%s\n' templates/minimal/identity/identity.cue templates/standard/identity/identity.cue \
+  templates/advanced/identity/identity.cue "$PODDIR/identity/identity.cue" \
+  examples/cue.mod/module.cue tests/e2e/testdata/operator-owned/cue.mod/module.cue | LC_ALL=C sort)
+
+older() { awk -F'\t' -v r="$1" -v k="$2" '$1 == r && $2 == k { print $3; exit }' "$OLDER"; }
+next_patch() { awk -F. -v OFS=. '{ $NF = $NF + 1; print }' <<<"$1"; }
+# older_than A B: true when A ranks below B (the stub's semver-cmp).
+older_than() { [ "$(CASCADE_STUB_TABLE=/dev/null "$STUB" semver-cmp "$1" "$2")" = -1 ]; }
+# set_v FILE KEY VERSION: rewrite KEY's v: in a module.cue as text, untidy on purpose.
+set_v() {
+  K="$2" V="$3" perl -0pi -e 's/("\Q$ENV{K}\E": \{\n\s*v:\s*)"[^"]+"/$1"$ENV{V}"/' "$1"
+  [ "$(cue_dep_v "$1" "$2")" = "$3" ]
+}
+# setup_older DIR CATALOG CORE [PODINFO]: move every pin the task moves back to
+# the given versions (library and operator to their older rows).
+setup_older() {
+  local d="$1" c m
+  (cd "$d" && GOWORK=off go get "$LIB@$(older older "$LIB")" && GOWORK=off go mod tidy) >/dev/null 2>&1 &&
+    (cd "$d" && task -x operator:sync VERSION="$(older older "$OP")") >/dev/null 2>&1 || return 1
+  for c in "${CUE_DIRS[@]}"; do
+    m="$d/$c/cue.mod/module.cue"
+    if [ -n "$(cue_dep_v "$m" "$CAT")" ]; then set_v "$m" "$CAT" "$2" || return 1; fi
+    set_v "$m" "$CORE" "$3" || return 1
+  done
+  perl -pi -e 's/^(\s*version:\s*)"[^"]+"/$1"'"${2#v}"'"/ if $seen; $seen = 1 if /opmodel\.dev\/catalogs\/opm\@v4:/' \
+    "$d/hack/kind-platform.yaml"
+  if [ -n "${4:-}" ]; then
+    for c in "${CONSUMERS[@]}"; do set_v "$d/$c/cue.mod/module.cue" "$POD" "$4" || return 1; done
+  fi
+}
+# golden DIR: the tree differs from the original (the root commit "base") in
+# exactly the GOLDEN paths: each identity one patch up, and the consumers'
+# podinfo pin at the fixture's new version. Prints the reason on failure.
+golden() {
+  local d="$1" base a want pod c
+  base=$(g "$d" rev-list --max-parents=0 HEAD)
+  if [ -n "$(g "$d" ls-files --others --exclude-standard)" ]; then echo "untracked files"; return 1; fi
+  if [ "$(g "$d" diff --name-only "$base" | LC_ALL=C sort)" != "$GOLDEN" ]; then
+    echo "changed paths: $(g "$d" diff --name-only "$base" | tr '\n' ' ')"; return 1
+  fi
+  for a in "${ADV_DIRS[@]}"; do
+    want=$(next_patch "$(g "$d" show "$base:$a/identity/identity.cue" | sed -n 's/^Version: "\(.*\)"$/\1/p')")
+    if [ "$(id_version "$d/$a/identity/identity.cue")" != "$want" ]; then
+      echo "$a declares $(id_version "$d/$a/identity/identity.cue"), want $want"; return 1
+    fi
+  done
+  pod=v$(id_version "$d/$PODDIR/identity/identity.cue")
+  for c in "${CONSUMERS[@]}"; do
+    if ! diff <(g "$d" show "$base:$c/cue.mod/module.cue" |
+      K="$POD" V="$pod" perl -0pe 's/("\Q$ENV{K}\E": \{\n\s*v:\s*)"[^"]+"/$1"$ENV{V}"/') \
+      "$d/$c/cue.mod/module.cue" >/dev/null; then
+      echo "$c differs from the original beyond its podinfo pin $pod"; return 1
+    fi
+  done
+}
+commit_run() { g "$1" add -A; g "$1" commit -q -m "run"; }
+
+if [ "$SET" = all ]; then
+  # The older rows must stay older than the tree (contract §8).
+  d=$(sandbox older)
+  ok=1
+  while IFS=$'\t' read -r key _ _ v _; do
+    o=$(older older "$key")
+    if [ -z "$o" ] || ! older_than "$o" "$v"; then
+      fail "older.tsv" "\`older.tsv\` \`$key\` \`${o:-missing}\` is not older than the tree's \`$v\`; pick an older published version"
+      ok=0
+    fi
+  done < <(cd "$d" && .tasks/cascade/pins.sh WORKTREE)
+  for key in "$CAT" "$CORE"; do
+    if ! older_than "$(older oldest "$key")" "$(older older "$key")"; then
+      fail "older.tsv" "the oldest \`$key\` is not older than its older row"; ok=0
+    fi
+  done
+  if ! older_than "$(older oldest "$POD")" "v$(id_version "$d/$PODDIR/identity/identity.cue")"; then
+    fail "older.tsv" "the oldest podinfo is not older than the tree's fixture"; ok=0
+  fi
+  if [ "$ok" = 1 ]; then pass "older.tsv"; fi
+
+  OLD_CAT=$(older older "$CAT")
+  OLD_CORE=$(older older "$CORE")
+
+  # S2 older pins: every pin older; the first run moves them back and advances
+  # each version once; a second run against the same base changes nothing.
+  d=$(sandbox s2)
+  { current_rows "$d"; grep '^pin-of' "$OLDER"; } >"$TMP/s2/table"
+  if ! setup_older "$d" "$OLD_CAT" "$OLD_CORE"; then
+    fail "S2 older pins" "the setup did not apply"
+  else
+    commit_setup "$d"
+    run "$d" "$TMP/s2/table" "$TMP/s2/log"
+    if [ "$RUN_RC" != 0 ]; then
+      fail "S2 older pins" "first run exit $RUN_RC, want 0: $(why)"
+    elif ! reason=$(golden "$d"); then
+      fail "S2 older pins" "first run: $reason"
+    elif ! warned "$d" "docs bundle for \`library\`"; then
+      fail "S2 older pins" "no docs-bundle warning"
+    else
+      # S5 title and body, on the first run's tree, against the real resolver.
+      if [ -z "${CASCADE_RESOLVER_REAL:-}" ]; then
+        skip "S5 title and body" "CASCADE_RESOLVER_REAL is not set"
+      else
+        title=$(cd "$d" && CASCADE_RESOLVER="$CASCADE_RESOLVER_REAL" task -x deps:cascade:title 2>"$TMP/s5.err") || true
+        body=$(cd "$d" && CASCADE_RESOLVER="$CASCADE_RESOLVER_REAL" task -x deps:cascade:body 2>>"$TMP/s5.err") || true
+        rows=$(grep -c '^| .* (`' <<<"$body" || true)
+        if [ "$title" != "fix(deps): bump 4 upstream pins" ]; then
+          fail "S5 title and body" "title '$title': $(tail -n 2 "$TMP/s5.err" | tr '\n' ' ')"
+        elif ! grep -q '^<!-- cascade-title: ' <<<"$body" || ! grep -q '^<!-- cascade-labels: ' <<<"$body"; then
+          fail "S5 title and body" "the body lacks a marker"
+        elif [ "$rows" != 4 ]; then
+          fail "S5 title and body" "$rows moved-pin rows, want 4"
+        elif [ "$(grep '^## ' <<<"$body" | tail -n 1)" != "## Notes" ]; then
+          fail "S5 title and body" "## Notes is not the last section"
+        elif grep -q need-human-review <<<"$body"; then
+          fail "S5 title and body" "the body carries need-human-review"
+        else
+          pass "S5 title and body"
+        fi
+      fi
+      commit_run "$d"
+      run "$d" "$TMP/s2/table" "$TMP/s2/log2"
+      if [ "$RUN_RC" != 3 ]; then
+        fail "S2 older pins" "second run exit $RUN_RC, want 3: $(why)"
+      elif ! clean "$d"; then
+        fail "S2 older pins" "the second run changed the tree"
+      else
+        pass "S2 older pins"
+      fi
+    fi
+  fi
+
+  # S4 frozen: the S2 setup, plus a freeze on one moved test tree for both keys.
+  d=$(sandbox s4)
+  { current_rows "$d"; grep '^pin-of' "$OLDER"; } >"$TMP/s4/table"
+  frozen_file=tests/integration/module-apply/testdata/cue.mod/module.cue
+  sibling=tests/e2e/testdata/duplicate-identities/cue.mod/module.cue
+  if ! setup_older "$d" "$OLD_CAT" "$OLD_CORE"; then
+    fail "S4 frozen" "the setup did not apply"
+  else
+    [ -f "$d/.cascade-frozen" ] || printf 'frozen:\n' >"$d/.cascade-frozen"
+    printf '  - path: %s\n    pins: ["%s", "%s"]\n    reason: "test freeze"\n' \
+      "$frozen_file" "$CAT" "$CORE" >>"$d/.cascade-frozen"
+    commit_setup "$d"
+    run "$d" "$TMP/s4/table" "$TMP/s4/log"
+    if [ "$RUN_RC" != 0 ]; then
+      fail "S4 frozen" "exit $RUN_RC, want 0: $(why)"
+    elif ! g "$d" diff --quiet HEAD -- "$frozen_file"; then
+      fail "S4 frozen" "$frozen_file changed"
+    elif g "$d" diff --quiet HEAD -- "$sibling"; then
+      fail "S4 frozen" "$sibling did not move"
+    else
+      pass "S4 frozen"
+    fi
+  fi
+
+  # S9 a second move on the branch: after a first run advanced podinfo and its
+  # consumers, a second catalog move must still get and tidy the consumers,
+  # whose podinfo pin is not published yet (design.md D7).
+  d=$(sandbox s9)
+  current_rows "$d" >"$TMP/s9/current"
+  { printf 'newest\tcue\t%s\t%s\n' "$CAT" "$OLD_CAT"
+    printf 'published\tcue\t%s\t%s\n' "$POD" "$(older oldest "$POD")"
+    grep '^pin-of' "$OLDER"; cat "$TMP/s9/current"; } >"$TMP/s9/table1"
+  { grep '^pin-of' "$OLDER"; cat "$TMP/s9/current"; } >"$TMP/s9/table2"
+  next_pod=v$(next_patch "$(id_version "$d/$PODDIR/identity/identity.cue")")
+  if ! setup_older "$d" "$(older oldest "$CAT")" "$(older oldest "$CORE")" "$(older oldest "$POD")"; then
+    fail "S9 second move" "the setup did not apply"
+  else
+    commit_setup "$d"
+    run "$d" "$TMP/s9/table1" "$TMP/s9/log1"
+    if [ "$RUN_RC" != 0 ]; then
+      fail "S9 second move" "first run exit $RUN_RC, want 0: $(why)"
+    elif [ "$(cue_dep_v "$d/examples/cue.mod/module.cue" "$CAT")" != "$OLD_CAT" ] ||
+      [ "$(cue_dep_v "$d/examples/cue.mod/module.cue" "$POD")" != "$next_pod" ]; then
+      fail "S9 second move" "after the first run, examples does not pin catalog $OLD_CAT and podinfo $next_pod"
+    else
+      commit_run "$d"
+      run "$d" "$TMP/s9/table2" "$TMP/s9/log2"
+      if [ "$RUN_RC" != 0 ]; then
+        fail "S9 second move" "second run exit $RUN_RC, want 0: $(why)"
+      elif ! reason=$(golden "$d"); then
+        fail "S9 second move" "second run: $reason"
+      else
+        commit_run "$d"
+        run "$d" "$TMP/s9/table2" "$TMP/s9/log3"
+        if [ "$RUN_RC" != 3 ] || ! clean "$d"; then
+          fail "S9 second move" "third run exit $RUN_RC, want 3 and no change"
+        else
+          pass "S9 second move"
+        fi
+      fi
+    fi
+  fi
+else
+  skip "network scenarios" "CASCADE_TEST_SET=offline"
 fi
 
 # ---------------------------------------------------------------------------

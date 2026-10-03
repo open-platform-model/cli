@@ -113,8 +113,9 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
 
 ## 4. Network scenarios, CI and docs
 
-- [ ] 4.1 Create `.tasks/cascade/testdata/older.tsv` with the `older` and `oldest` rows and the two `pin-of` rows from design.md D10, as confirmed in 1.5. `test.sh` asserts each is strictly older than the tree's value with the stub's `semver-cmp`, failing with the contract §8 message otherwise.
-- [ ] 4.2 Add S2 (older pins) to `test.sh`.
+- [x] 4.1 Create `.tasks/cascade/testdata/older.tsv` with the `older` and `oldest` rows and the two `pin-of` rows from design.md D10, as confirmed in 1.5. `test.sh` asserts each is strictly older than the tree's value with the stub's `semver-cmp`, failing with the contract §8 message otherwise.
+  Done: `older.tsv` holds the four `older` rows, three `oldest` rows and two `pin-of` rows; the `older.tsv` check runs in the full set.
+- [x] 4.2 Add S2 (older pins) to `test.sh`.
   - Setup:
     - `go get github.com/open-platform-model/library@<older>` and `go mod tidy`;
     - `task operator:sync VERSION=<older>`;
@@ -122,16 +123,18 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
   - First run: exit 0. The diff against the original tree equals the golden list from design.md D10, as adjusted by 1.4. Its versions are derived from the tree's identity files.
   - The warnings file holds the docs-bundle warning.
   - Second run: `git add -A && git commit`, keep `CASCADE_BASE`, run again. Exit 3, and every identity file is unchanged.
-- [ ] 4.3 Add S4 (frozen) to `test.sh`. Run the S2 setup, then append an entry to the sandbox copy's `.cascade-frozen`, keeping its real entries, for `tests/integration/module-apply/testdata/cue.mod/module.cue` with both `opmodel.dev` keys and a reason. Assert that file is byte-unchanged, `tests/e2e/testdata/duplicate-identities/cue.mod/module.cue` moved, and the exit is 0.
-- [ ] 4.3a Add S9 (a second move on the branch) to `test.sh` per design.md D10, and the D7 second-run rule it backs, if section 3 did not already implement it.
-- [ ] 4.4 Add S5 (title and body) to `test.sh`. `CASCADE_RESOLVER_REAL` holds the absolute path of the real `cascade-resolve.sh`; S5 runs only when it is set, and is skipped with a `SKIP` line otherwise. It asserts:
+- [x] 4.3 Add S4 (frozen) to `test.sh`. Run the S2 setup, then append an entry to the sandbox copy's `.cascade-frozen`, keeping its real entries, for `tests/integration/module-apply/testdata/cue.mod/module.cue` with both `opmodel.dev` keys and a reason. Assert that file is byte-unchanged, `tests/e2e/testdata/duplicate-identities/cue.mod/module.cue` moved, and the exit is 0.
+- [x] 4.3a Add S9 (a second move on the branch) to `test.sh` per design.md D10, and the D7 second-run rule it backs, if section 3 did not already implement it.
+  Done: S9 passes; with the D7 swap disabled it fails with `podinfo@v0.1.12: module not found` on the second run, the failure plan-review finding 2 predicted.
+- [x] 4.4 Add S5 (title and body) to `test.sh`. `CASCADE_RESOLVER_REAL` holds the absolute path of the real `cascade-resolve.sh`; S5 runs only when it is set, and is skipped with a `SKIP` line otherwise. It asserts:
   - the title `fix(deps): bump 4 upstream pins`;
   - both markers, four table rows, `## Notes` last, and no `need-human-review`.
-- [ ] 4.5 Verify `task -x deps:cascade:test` (the full set, with network) exits 0 locally, with `CASCADE_RESOLVER_REAL` set to the real resolver's absolute path (beside the repo, or the `add-cascade-resolver` worktree until it merges), so S5 runs.
-- [ ] 4.6 `.github/workflows/pr.yml`, job `lint` (`Lint`): after `setup-go`, before `golangci-lint`, add `go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0` (`version: 3.x`) and a step `Cascade task (offline)`.
+- [x] 4.5 Verify `task -x deps:cascade:test` (the full set, with network) exits 0 locally, with `CASCADE_RESOLVER_REAL` set to the real resolver's absolute path (beside the repo, or the `add-cascade-resolver` worktree until it merges), so S5 runs.
+  Done: full set all PASS with `CASCADE_RESOLVER_REAL` set to the `add-cascade-resolver` worktree's resolver. A real run with that resolver on a scratch copy of the tree moved the catalog `v4.4.4 -> v4.5.1` in all eleven catalog files and `hack/kind-platform.yaml`, kept core at `v2.0.0-beta.1`, advanced the templates to 1.0.4 and podinfo to 0.1.12, titled `fix(deps): bump opm catalog to v4.5.1`; after a commit, a second run exited 3.
+- [x] 4.6 `.github/workflows/pr.yml`, job `lint` (`Lint`): after `setup-go`, before `golangci-lint`, add `go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0` (`version: 3.x`) and a step `Cascade task (offline)`.
   - The step runs `task -x deps:cascade:test` with `CASCADE_TEST_SET: offline` and `CASCADE_RESOLVER: ${{ github.workspace }}/.tasks/cascade/testdata/stub-resolve.sh` (design.md D11).
   - Add a short comment citing workspace RELEASING.md "Rollout and changes" and "Rulesets on main".
-- [ ] 4.7 Create `.github/workflows/cascade-task.yml` per design.md D11:
+- [x] 4.7 Create `.github/workflows/cascade-task.yml` per design.md D11:
   - job `Cascade task (network)`, `timeout-minutes: 20`, `permissions: contents: read`;
   - the path-filtered `pull_request`, `workflow_dispatch` and weekly `schedule` triggers;
   - checkout of `open-platform-model/.github` at `main` into `org-github` with `persist-credentials: false`;
@@ -140,11 +143,14 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
   - `task -x deps:cascade:test`.
 
   Verify both workflows with `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/pr.yml .github/workflows/cascade-task.yml`.
-- [ ] 4.8 `AGENTS.md`:
+  Done: actionlint v1.7.12 clean on both workflows.
+- [x] 4.8 `AGENTS.md`:
   - at `AGENTS.md:128` (templates) and `AGENTS.md:231` (fixtures), say that `task deps:cascade` moves the template and fixture pins and advances their versions once per PR, replacing the workspace root task names there;
   - add one bullet next to the release-pin bullet (`AGENTS.md:356`) naming the four cascade tasks, `task -x`, and workspace RELEASING.md "The cascade";
   - say: do not run the workspace root `deps:update`, `deps:update:templates` or `deps:pins:*` against the cli; Phase 5 rewires them (design.md Risks).
-- [ ] 4.9 `task fmt`, `task lint`, `task test:unit`, `task openspec:check`, shellcheck, the offline test set, and the full set from 4.5 green, then commit `ci(cascade): test the cascade task in CI`.
+  Done: also repointed the two "Schema line" mentions of the root `deps:pins:fixtures` and `deps:update` at `task deps:cascade`.
+- [x] 4.9 `task fmt`, `task lint`, `task test:unit`, `task openspec:check`, shellcheck, the offline test set, and the full set from 4.5 green, then commit `ci(cascade): test the cascade task in CI`.
+  Done: all green; the offline set also passes with no `cue` on PATH, as in the `Lint` job.
 
 ## 5. Archive (rides this PR)
 
