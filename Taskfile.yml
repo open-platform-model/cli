@@ -84,6 +84,7 @@ tasks:
     cmds:
       - go test ./internal/...
       - go test ./pkg/...
+      - go test ./hack/...
 
   test:integration:
     desc: Run integration tests (requires cluster)
@@ -427,13 +428,14 @@ tasks:
       - go install -ldflags "{{.LDFLAGS}}" ./cmd/opm
 
   check:
-    desc: Run all checks (fmt, vet, lint, openspec, command reference, test)
+    desc: Run all checks (fmt, vet, lint, openspec, command reference, docs bundle, test)
     cmds:
       - task: fmt
       - task: vet
       - task: lint
       - task: openspec:check
       - task: docs:reference:check
+      - task: docs:bundle:check
       - task: test
 
   generate:
@@ -457,6 +459,37 @@ tasks:
     desc: Fail when the committed command reference in docs/site/reference/cli/ is stale (writes nothing)
     cmds:
       - go run ./hack/cmdref -check
+
+  # docs-kit.cue declares one docs bundle, cli: the command reference
+  # opm-docs generates from hack/docskit-dump's dump of the cobra commands,
+  # the authored pages under docs/site/, and the library, core and
+  # opm-operator versions the cli pins. CI builds, signs and publishes it
+  # through docs-kit's publish.yml (docs.yml, release.yml). These tasks run
+  # the same opm-docs release locally. The release is pinned in
+  # .opm-docs-version and in every publish.yml ref, and docs:bundle:check
+  # refuses the two disagreeing.
+  tools:opm-docs:
+    desc: Install or reuse .bin/opm-docs, the checksum-verified docs-kit release named by .opm-docs-version
+    cmds:
+      - bash .tasks/opm-docs.sh install
+
+  docs:bundle:
+    desc: Build the cli docs bundle of the work tree into out/cli/ (a local preview of edge)
+    deps: [tools:opm-docs]
+    cmds:
+      - .bin/opm-docs build --project cli --out out
+
+  docs:pins:check:
+    desc: Refuse a docs-kit publish.yml ref under .github/workflows/ that names another release than .opm-docs-version (offline)
+    cmds:
+      - bash .tasks/opm-docs.sh pin-check
+
+  docs:bundle:check:
+    desc: Check the docs-kit pins agree, then build and lint the cli docs bundle into a temporary directory
+    deps: [tools:opm-docs]
+    cmds:
+      - task: docs:pins:check
+      - .bin/opm-docs check --project cli
 
   #########################
   ## Operator lifecycle tasks
@@ -485,6 +518,6 @@ tasks:
   ## Release tasks
   #########################
   deps:release-check:
-    desc: "Check release pins (G1): no replace, published OPM pins, no dev template pins, operator embed matches its pin"
+    desc: "Check release pins (G1): no replace, published OPM pins (nested modules by their subdir tag), no dev template pins, operator embed matches its pin, a docs bundle for every docs pin (G2-pins)"
     cmds:
       - .github/scripts/release-pin-check.sh

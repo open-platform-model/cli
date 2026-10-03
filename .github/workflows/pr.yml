@@ -39,6 +39,10 @@ jobs:
         # (workspace RELEASING.md, section "Gates"). Local: task deps:release-check.
         if: startsWith(github.head_ref || github.ref_name, 'release-please--')
         run: .github/scripts/release-pin-check.sh
+      - name: Verify the docs-kit pins agree
+        # .opm-docs-version and every docs-kit publish.yml ref name the same
+        # release (docs-kit C5, C12); offline. Local: task docs:pins:check.
+        run: bash .tasks/opm-docs.sh pin-check
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
@@ -78,7 +82,7 @@ jobs:
       - name: Seed the job-local registry from the tree
         run: hack/fixtures.sh seed
       - name: Run unit tests
-        run: go test ./internal/...
+        run: go test ./internal/... ./hack/...
 
   openspec:
     # The main specs are the CLI's behavioral record. A spec the validator no
