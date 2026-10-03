@@ -41,7 +41,15 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ModuleInstance is the Schema for the moduleinstances API
+        description: |-
+          ModuleInstance asks the operator to render one CUE module at a pinned
+          version with the given values and apply the result.
+
+          The module is resolved from an OCI registry by spec.module.path and
+          spec.module.version. When spec.owner is "cli", the OPM CLI manages the
+          instance and the operator leaves it alone: it renders, applies and prunes
+          nothing, adds no finalizer, and records only a ManagedExternally
+          acknowledgement.
         properties:
           apiVersion:
             description: |-
@@ -85,9 +93,10 @@ spec:
                 type: object
               owner:
                 description: |-
-                  Owner identifies which actor manages this instance. An absent, empty, or
+                  Owner identifies which actor manages this instance. An absent or
                   "operator" value means operator-managed: the controller reconciles
-                  normally. Only an explicit "cli" makes the operator skip the instance
+                  normally. The API server rejects any other value, including an explicit
+                  empty string. Only an explicit "cli" makes the operator skip the instance
                   (no render/apply/prune, no finalizer) and record a single
                   ManagedExternally acknowledgement. There is no CRD default; the
                   reconciler carries the operator-managed default semantics.
@@ -96,6 +105,13 @@ spec:
                 - operator
                 type: string
               prune:
+                description: |-
+                  Prune controls whether the operator deletes what an instance no longer
+                  renders. When true, the operator deletes stale resources on reconcile
+                  and every applied object when the ModuleInstance is deleted. When false
+                  or absent, it leaves them in place: deleting the ModuleInstance leaves
+                  its applied objects running. Namespaces and CustomResourceDefinitions
+                  are never deleted.
                 type: boolean
               rollout:
                 description: RolloutSpec configures apply behavior for a release.
@@ -124,16 +140,8 @@ spec:
             description: status defines the observed state of ModuleInstance
             properties:
               conditions:
-                description: |-
-                  conditions represent the current state of the ModuleInstance resource.
-                  Each condition has a unique type and reflects the status of a specific aspect of the resource.
-
-                  Standard condition types include:
-                  - "Available": the resource is fully functional
-                  - "Progressing": the resource is being created or updated
-                  - "Degraded": the resource failed to reach or maintain its desired state
-
-                  The status of each condition is one of True, False, or Unknown.
+                description: conditions represent the current state of the ModuleInstance
+                  resource.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -318,7 +326,7 @@ spec:
                   RequiredContracts lists every contract FQN this instance's components
                   declare, sorted and deduplicated, as the last successful render
                   reported them. It is the instance side of the removal guard
-                  (0015:D3, D16): a TransformerRegistration counts its
+                  (0015:D3/D16): a TransformerRegistration counts its
                   dependents by intersecting this with its own spec.provides, so a
                   provider cannot be deleted, or shrink its provides, out from under
                   the instances still demanding what it serves.
@@ -381,7 +389,13 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ModulePackage is the Schema for the modulepackages API.
+        description: |-
+          ModulePackage renders the ModuleInstance package that a Flux source
+          artifact carries.
+
+          The operator fetches the artifact spec.sourceRef names, loads instance.cue
+          from the directory at spec.path, and renders and applies it when it
+          evaluates to #ModuleInstance; any other kind is rejected as unsupported.
         properties:
           apiVersion:
             description: |-
@@ -406,7 +420,10 @@ spec:
               dependsOn:
                 description: |-
                   DependsOn references other ModulePackage CRs that must be Ready=True before
-                  this ModulePackage is reconciled. References are same-namespace only.
+                  this ModulePackage is reconciled. References are same-namespace only: an
+                  entry whose namespace is set to anything other than this ModulePackage's
+                  own is refused: the ModulePackage reports Ready=False with reason
+                  DependenciesNotReady and does not reconcile.
                 items:
                   description: |-
                     NamespacedObjectReference contains enough information to locate the referenced Kubernetes resource object in any
@@ -425,8 +442,13 @@ spec:
                 type: array
               interval:
                 description: |-
-                  Interval at which the reconciler re-evaluates the package to detect drift
-                  and re-apply. Also the requeue interval after transient failures.
+                  Interval at which the reconciler runs again: it re-fetches the source
+                  artifact, re-renders the package and compares the source, render and
+                  inventory digests with the last applied ones, and skips the apply when
+                  they all match. It does not compare the live objects, so a change made
+                  directly to an applied object is not detected or reverted until the
+                  rendered output changes. Also the requeue interval after transient
+                  failures. Defaults to 5 minutes.
                 type: string
               path:
                 description: |-
@@ -744,9 +766,12 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          Platform is the Schema for the platforms API. It is a cluster-scoped
-          singleton (the only permitted name is "cluster") whose spec projects the
-          core #Platform author surface.
+          Platform declares the catalogs the operator renders against: the operator
+          generates a platform CUE module from it, and renders ModuleInstances and
+          ModulePackages against that module.
+
+          It is a cluster-scoped singleton (the only permitted name is "cluster")
+          whose spec projects the core #Platform author surface.
         properties:
           apiVersion:
             description: |-
@@ -826,8 +851,9 @@ spec:
               type:
                 description: |-
                   Type is the informational discriminator for the platform (core
-                  #Platform.type). It does not affect matching; it labels the platform
-                  flavor for operators and downstream tooling.
+                  #Platform.type). It is required and shown in the Type column of
+                  kubectl get. The operator passes it on to the generated platform
+                  module, and nothing in OPM acts on its value.
                 minLength: 1
                 type: string
             required:
@@ -1057,7 +1083,9 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          TransformerRegistration is the Schema for the transformerregistrations API.
+          TransformerRegistration is a provider module's claim that its catalog
+          implements platform contracts.
+
           It is the cluster-scoped claim a provider module ships among its rendered
           resources, the second path by which transformers reach a platform
           (0015:D3); the first is a subscription in Platform.spec.registry.
@@ -1158,7 +1186,8 @@ spec:
               active:
                 description: |-
                   active reports whether an accepted claim's provider is serving. An
-                  accepted claim stays inactive until its ModulePackage is Ready.
+                  accepted claim stays inactive until its provider ModuleInstance (named by
+                  spec.providerRef) reports Ready, and once active it stays active.
                 type: boolean
               conditions:
                 description: |-
@@ -1608,7 +1637,10 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: ghcr.io/open-platform-model/opm-operator:v1.0.0-beta.4@sha256:e32db6a0b53c94a8272289b15225520d6d96393ecc391c01db98b9c8d56796bc
+        env:
+        - name: GOMEMLIMIT
+          value: 3276MiB
+        image: ghcr.io/open-platform-model/opm-operator:v1.0.0-beta.5@sha256:cd48321b1ffb17481fc6818c0afa324ce0312bea4af11f36d44f8b91e63b34b1
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
