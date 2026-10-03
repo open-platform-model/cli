@@ -16,7 +16,8 @@ func NewOperatorCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Long: `Install, upgrade, and remove the opm-operator on a Kubernetes cluster.
 
 opm operator prepares a cluster for OPM workflows that depend on the operator:
-its CRDs (ModuleInstance, ModulePackage, Platform) and, for full deployments,
+its CRDs (ModuleInstance, ModulePackage, Platform,
+TransformerRegistration) and, for full deployments,
 the running controller itself.`,
 	}
 

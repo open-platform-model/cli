@@ -18,7 +18,7 @@ opm catalog [command]
 
 Work with OPM catalogs.
 
-Use this command group when you are starting from catalog source: publish a catalog release from its committed tree.
+Use this command group when you are starting from catalog source: publish a catalog release from its source tree.
 
 **Subcommands**
 
@@ -39,7 +39,7 @@ opm catalog publish [path] [flags]
 
 Publish an OPM catalog to its registry, at the coordinates the catalog itself declares.
 
-The pipeline reads `identity/identity.cue`, validates it against core's `#IdentityPackage`, derives repository/major/tag from the declared module path, runs the publish gates, prints the resolved plan, and pushes. What is published is exactly the committed tree — no copied build directory, no generated version override.
+The pipeline reads `identity/identity.cue`, validates it against core's `#IdentityPackage`, derives repository/major/tag from the declared module path, runs the publish gates, prints the resolved plan, and pushes. What is published is the catalog directory as it is on disk, zipped by CUE's module machinery: no copied build directory, no generated version override, and no git state is checked, so commit first.
 
 Exit codes: 0 published (or dry-run GO), 2 refused, 3 registry unreachable.
 
@@ -95,7 +95,7 @@ Verify a published catalog out of band.
 opm catalog registry check <path@version> [flags]
 ```
 
-Pull a published catalog by `path@version` and run the same verification a consumer performs when a platform acquires it: the declared identity is concrete, and its modulePath and version agree with the coordinate the build was fetched by. The report lists the catalog's members per kind and apiVersion.
+Pull a published catalog by `path@version` and check its declared identity: it is concrete, and its modulePath and version agree with the coordinate the build was fetched by. The report lists the catalog's members per kind and apiVersion.
 
 With `--compat`, additionally compare every beta/GA member against the last published build that shipped it, under the additive-only rule — exactly the comparison publish enforces.
 

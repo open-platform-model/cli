@@ -16,7 +16,7 @@ func NewCatalogCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Long: `Work with OPM catalogs.
 
 		Use this command group when you are starting from catalog source: publish a
-		catalog release from its committed tree.`,
+		catalog release from its source tree.`,
 	}
 
 	c.AddCommand(NewCatalogPublishCmd(cfg))

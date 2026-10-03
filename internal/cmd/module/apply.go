@@ -97,8 +97,9 @@ Examples:
 	}
 
 	rf.AddTo(c)
+	hideIgnoredInstanceName(c)
 	kf.AddTo(c)
-	c.Flags().StringVar(&nameFlag, "name", "", "Override synthetic instance name")
+	c.Flags().StringVar(&nameFlag, "name", "", "Synthetic instance name (default: <module name>-debug)")
 	c.Flags().StringVar(&versionFlag, "version", "", versionFlagHelp)
 	c.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Server-side dry run (no changes made)")
 	c.Flags().BoolVar(&createNSFlag, "create-namespace", false, "Create target namespace if it does not exist")
