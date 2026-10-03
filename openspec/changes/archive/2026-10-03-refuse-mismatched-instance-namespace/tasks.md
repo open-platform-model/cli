@@ -21,6 +21,6 @@ Before each section, merge fresh `origin/main` if it moved. After merging a sibl
 
 ## 3. Archive the change on this branch
 
-- [ ] 3.1 Run `openspec archive refuse-mismatched-instance-namespace --yes`, so the archive and the synced main spec ride the implementing PR; nothing is pushed to `main`.
-- [ ] 3.2 Verify `task openspec:check` is green and `openspec/specs/inst-commands/spec.md` carries the requirement "instance render commands refuse a namespace override that disagrees with the instance file" with all seven scenarios.
-- [ ] 3.3 Commit `chore(openspec): archive refuse-mismatched-instance-namespace`
+- [x] 3.1 Run `openspec archive refuse-mismatched-instance-namespace --yes`, so the archive and the synced main spec ride the implementing PR; nothing is pushed to `main`.
+- [x] 3.2 Verify `task openspec:check` is green and `openspec/specs/inst-commands/spec.md` carries the requirement "instance render commands refuse a namespace override that disagrees with the instance file" with all seven scenarios.
+- [x] 3.3 Commit `chore(openspec): archive refuse-mismatched-instance-namespace`
