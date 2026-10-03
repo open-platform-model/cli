@@ -16,7 +16,7 @@ The CLI can delete objects whose loss cascades far past the instance that owns t
 - **The first-install refusal drops the `--force` text.** The message says what to do instead (remove or rename the existing object, or render a different name).
 - `opm instance delete --help` states that CRDs and Namespaces are never deleted and that objects no longer owned by the instance are left behind. The generated command reference is regenerated.
 
-**Behaviour change for users.** `opm instance delete` no longer deletes a Namespace or a CRD that the instance rendered, and `opm instance apply` / `opm module apply` no longer prune a CRD that a module stopped rendering. Both are listed as left behind; remove them with `kubectl delete` when nothing else needs them. Instance delete also skips an object whose labels show it no longer belongs to the instance. The changelog entry comes from the section 1 and section 2 commit bodies.
+**Behaviour change for users.** `opm instance delete` no longer deletes a Namespace or a CRD that the instance rendered, and `opm instance apply` / `opm module apply` no longer prune a CRD that a module stopped rendering. Both are listed as left behind; remove them with `kubectl delete` when nothing else needs them. Instance delete also skips an object whose labels show it no longer belongs to the instance. The section 1 and section 2 commit bodies carry this wording, but under the repo's squash settings (title from the PR title, blank body) only the PR title reaches `main` and CHANGELOG.md. The PR title is therefore the changelog carrier: `fix: never delete CRDs or Namespaces on prune or instance delete; list them as left behind`, and this paragraph goes into the draft GitHub release notes.
 
 ## Capabilities
 
@@ -31,7 +31,7 @@ None.
 
 ## Impact
 
-- **Release class: `fix`, PATCH (after GA as well), shipped as the next beta.N.** No flag, command or exit code is added or removed. The change is a safety fix that makes the CLI match the operator, which already never deletes these kinds. It is deliberately not a `feat!`: no input that worked stops working, but the delete outcome changes, so the commit bodies carry the changelog wording above.
+- **Release class: `fix`, PATCH (after GA as well), shipped as the next beta.N.** No flag, command or exit code is added or removed. The change is a safety fix that makes the CLI match the operator, which already never deletes these kinds. It is deliberately not a `feat!`: no input that worked stops working, but the delete outcome changes, so the PR title and the draft release notes carry the changelog wording above (the commit bodies repeat it for `git log` readers).
 - Commands: `opm instance apply`, `opm module apply` (prune and dry-run preview), `opm instance delete` (CLI-owned path; the operator-owned path is unchanged), and every first-install apply for the refusal wording.
 - Packages: `internal/kubernetes` (`IsProtectedKind`, `delete.go`), `internal/inventory` (`stale.go`), `internal/workflow/apply` (`apply.go`), `internal/cmd/instance` (`delete.go`), `internal/output` (a `left behind` status), `docs/site/reference/cli/` (regenerated).
 - Tests: `internal/kubernetes/delete_test.go` (the existing tracked-object fixture gains OPM labels), `internal/inventory/stale_test.go`, `internal/workflow/apply/dryrunprune_test.go`, `internal/cmd/instance/delete_test.go`; the integration programs under `tests/integration/` that call `kubernetes.Delete` and `inventory.PruneStaleResources`.

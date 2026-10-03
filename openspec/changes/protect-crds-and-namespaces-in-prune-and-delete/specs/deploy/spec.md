@@ -27,7 +27,7 @@
 
 ### Requirement: Instance delete re-checks live ownership before each delete
 
-Before deleting each tracked resource, `opm instance delete` SHALL read the live object again and SHALL delete it only when its `app.kubernetes.io/managed-by` label carries an OPM value and its `module-instance.opmodel.dev/uuid` label matches the instance's recorded UUID. As in the operator's prune, an object with no UUID label SHALL be judged on the managed-by label alone, and so SHALL every object when the instance has no recorded UUID. A resource that fails the check SHALL be left behind and listed with the reason, and SHALL NOT count as a failure. A resource that is already gone SHALL count neither as deleted nor as a failure. Any other read error SHALL count as a failure for that resource, so the `ModuleInstance` record is kept and a re-run retries.
+Before deleting each tracked resource, `opm instance delete` SHALL read the live object again and SHALL delete it only when its `app.kubernetes.io/managed-by` label carries an OPM value and its `module-instance.opmodel.dev/uuid` label matches the instance's recorded UUID. As in the operator's prune, an object with no UUID label SHALL be judged on the managed-by label alone, and so SHALL every object when the instance has no recorded UUID. A resource that fails the check SHALL be left behind and listed with the reason, and SHALL NOT count as a failure. A resource that is already gone, whether its re-read or its delete call returns NotFound, SHALL count neither as deleted nor as a failure. Any other read error SHALL count as a failure for that resource, so the `ModuleInstance` record is kept and a re-run retries.
 
 #### Scenario: Resource no longer managed by OPM is left behind
 
@@ -51,3 +51,22 @@ Before deleting each tracked resource, `opm instance delete` SHALL read the live
 - **WHEN** a tracked resource no longer exists when it is read again
 - **THEN** the command SHALL NOT report an error for it
 - **AND** it SHALL NOT be counted as deleted
+
+#### Scenario: Resource gone between its re-read and its delete
+
+- **WHEN** a tracked resource passes the ownership check and its delete call returns NotFound
+- **THEN** the command SHALL NOT report an error for it
+- **AND** it SHALL NOT be counted as deleted
+
+#### Scenario: Instance without a recorded UUID deletes on managed-by alone
+
+- **WHEN** the instance has no recorded UUID
+- **AND** a tracked resource carries an OPM managed-by value and any `module-instance.opmodel.dev/uuid` label
+- **THEN** the resource SHALL be deleted
+
+#### Scenario: Read error keeps the ModuleInstance
+
+- **WHEN** re-reading a tracked resource fails with an error other than NotFound, such as Forbidden
+- **THEN** the resource SHALL be reported as failed
+- **AND** the `ModuleInstance` record SHALL NOT be deleted
+- **AND** the command SHALL exit non-zero

@@ -19,6 +19,7 @@ The operator's `Prune` (`opm-operator/internal/apply/prune.go`) is the reference
 - A live ownership re-check in prune, and shared `CanApply`/`CanDelete` verdicts or an adopt annotation. Those belong to the later ownership change that serves both frontends.
 - Keeping left-behind prune entries in the recorded inventory. A stale Namespace already drops out today; CRDs follow the same rule.
 - Changing the operator.
+- Discovery-time read errors on instance delete. `inventory.DiscoverResourcesFromInventory` drops an entry whose GET fails with anything but NotFound (debug log only), so that entry never reaches the in-loop re-read and the `ModuleInstance` is still deleted. That gap predates this change and belongs to the later delete protocol that serves both frontends; the re-read error rule below covers only errors raised inside `Delete`.
 
 ## Decisions
 
@@ -51,7 +52,7 @@ It lives in `internal/kubernetes` because `internal/inventory` imports `internal
 
 `PruneStaleResources` keeps its signature (the integration programs call it) and keeps skipping protected kinds itself, through the same predicate, so a caller that does not split cannot delete one.
 
-`output.StatusLeftBehind = "left behind"` is added beside `StatusDeleted`, with a warn-tone style in the status colour map.
+`output.StatusLeftBehind = "left behind"` is added beside `StatusDeleted`, with a warn-tone (yellow) style in the status colour map and the `!` icon in `statusIcon`, so a left-behind line is never rendered with a blank icon.
 
 ### 3. Instance delete re-reads, checks ownership, and lists what it leaves
 
@@ -64,12 +65,13 @@ Per object, in the existing reverse-weight order, on both the dry run and the re
 3. `pkgcore.IsOPMManagedBy(labels[LabelManagedBy])` false: left behind, reason `no longer managed by OPM`.
 4. `opts.InstanceUUID != "" && liveUUID != "" && liveUUID != opts.InstanceUUID`: left behind, reason `owned by another instance`.
 5. Otherwise delete (real run) or print the existing dry-run line, and count it.
+   a. A NotFound from the delete call itself (the object vanished between the GET and the DELETE) is "already gone", as in the operator's prune: neither deleted nor an error.
 
 Step 4 copies the operator's tolerances: an object with no UUID label predates UUID stamping and passes on the managed-by check alone, and an instance with no recorded UUID falls back to the managed-by check. This is the reading of the owner's "like the operator" for the UUID match. A stricter rule (refuse when either side is empty) would leave legacy objects behind on every delete, which the operator does not do.
 
-The re-read is done inside the loop rather than relying on the objects `ResolveInventory` fetched, because the confirmation prompt and earlier deletes sit between that read and the delete. The delete itself is unchanged (foreground propagation, by name).
+The re-read is done inside the loop rather than relying on the objects `ResolveInventory` fetched, because earlier foreground deletes in the same loop (and, without `--force`, the time the user takes at the prompt before discovery returns) sit between that read and the delete. The delete itself is unchanged (foreground propagation, by name).
 
-`executeInstanceDelete` prints each left-behind object as `output.FormatResourceLine(kind, ns, name, StatusLeftBehind)` with its reason as a key-value field. Left-behind objects are not errors: the exit code is 0 and the `ModuleInstance` is deleted last as today. The closing line becomes `Instance deleted — N resource(s) left behind` when N > 0, followed by `output.Details` naming `kubectl delete` as the way to remove them once nothing needs them. The dry run closes with `dry run complete: N resources would be deleted, M left behind`.
+`executeInstanceDelete` prints each left-behind object as `output.FormatResourceLine(kind, ns, name, StatusLeftBehind)` with its reason as a key-value field. Left-behind objects are not errors: the exit code is 0 and the `ModuleInstance` is deleted last as today. The progress line `all resources have been deleted` is printed only when nothing was left behind and nothing failed. The closing line becomes `Instance deleted — N resource(s) left behind` when N > 0, followed by `output.Details` naming `kubectl delete` as the way to remove them once nothing needs them. The dry run closes with `dry run complete: N resources would be deleted, M left behind`.
 
 ### 4. First-install refusal wording
 
@@ -105,18 +107,20 @@ No flag is named. The guard's scope (first apply only, non-NotFound GET errors i
 
 ## Example output
 
+The resource lines come from `output.FormatResourceLine` (`r:Kind/namespace/name`, padded to 48 columns, then icon and status); the closing line from `output.FormatCheckmark`.
+
 ```text
 $ opm instance delete demo -n apps --force
 demo  deleting resources in namespace "apps"
-demo  Deployment apps/web                         deleted
-demo  CustomResourceDefinition widgets.example.io left behind  reason="CRDs and Namespaces are never deleted"
-demo  Namespace apps                              left behind  reason="CRDs and Namespaces are never deleted"
-[x] Instance deleted — 2 resource(s) left behind
-    Remove them with 'kubectl delete' once nothing else needs them.
+demo  r:Deployment/apps/web                           - deleted
+demo  r:CustomResourceDefinition/widgets.example.io   ! left behind  reason="CRDs and Namespaces are never deleted"
+demo  r:Namespace/apps                                ! left behind  reason="CRDs and Namespaces are never deleted"
+✔ Instance deleted — 2 resource(s) left behind
+  Remove them with 'kubectl delete' once nothing else needs them.
 ```
 
 ## Risks / Trade-offs
 
-- [A user relied on `instance delete` removing the instance's Namespace] → it now stays, listed with a `kubectl delete` hint; the proposal and the commit bodies carry the changelog note.
+- [A user relied on `instance delete` removing the instance's Namespace] → it now stays, listed with a `kubectl delete` hint; the PR title and the draft release notes carry the changelog note (proposal.md § Behaviour change for users).
 - [An extra GET per object on delete] → one request per tracked object, the same order as the existing discovery reads; acceptable for an interactive command.
 - [A left-behind CRD or Namespace drops out of the inventory after prune] → unchanged rule (Namespaces already do this); the warn lines are the record.
