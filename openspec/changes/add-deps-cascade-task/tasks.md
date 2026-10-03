@@ -49,21 +49,26 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
 
 ## 2. Pins, classes, stub, and the title and body tasks
 
-- [ ] 2.1 Create `.tasks/cascade/testdata/stub-resolve.sh` (mode 0755). Extract the fenced block of contract §7 byte for byte. Verify with `sha256sum`: it must equal `970130f7d55c07f5b86d4f5b6f392330427ff923eb34f93553656bcd4b893d9c`. Never edit it.
-- [ ] 2.2 Create `.tasks/cascade/classes` with exactly the cli block of contract §5.3, plus a one-line `#` header citing workspace RELEASING.md "Title from diff class".
-- [ ] 2.3 Create `.tasks/cascade/pins.sh <ref>` (executable, `set -euo pipefail`, following design.md D2).
+- [x] 2.1 Create `.tasks/cascade/testdata/stub-resolve.sh` (mode 0755). Extract the fenced block of contract §7 byte for byte. Verify with `sha256sum`: it must equal `970130f7d55c07f5b86d4f5b6f392330427ff923eb34f93553656bcd4b893d9c`. Never edit it.
+  Done: sha256 matches.
+- [x] 2.2 Create `.tasks/cascade/classes` with exactly the cli block of contract §5.3, plus a one-line `#` header citing workspace RELEASING.md "Title from diff class".
+- [x] 2.3 Create `.tasks/cascade/pins.sh <ref>` (executable, `set -euo pipefail`, following design.md D2).
   - Read with `cat` for `WORKTREE`, and with `git show <ref>:<path>` otherwise.
   - Print `key<TAB>display<TAB>shipped<TAB>v...<TAB>` rows in the D2 order. Omit a pin missing at the ref.
   - Exit 1 on a bad argument.
   - Verify: `.tasks/cascade/pins.sh WORKTREE` prints four rows matching `go.mod:14`, `internal/operator/manifest.go:19` and `templates/minimal/cue.mod/module.cue:10,13`. `pins.sh HEAD` prints the same.
-- [ ] 2.4 `Taskfile.yml`, after `deps:release-check`: add `deps:cascade:title`, `deps:cascade:body` and `deps:cascade:test`.
+  Done: four rows; `WORKTREE` and `HEAD` agree; a bad ref or no argument exits 1.
+- [x] 2.4 `Taskfile.yml`, after `deps:release-check`: add `deps:cascade:title`, `deps:cascade:body` and `deps:cascade:test`.
   - Each carries the task-level `CASCADE_RESOLVER_PATH` var through one YAML anchor (contract §3, design.md D1), `env: CASCADE_RESOLVER` and the `test -x` precondition with the contract §3 message.
   - `desc` lines say each task is part of the release cascade and cite workspace RELEASING.md "The cascade".
   - Do not add `deps:cascade` yet; section 3 adds it.
-- [ ] 2.5 Create `.tasks/cascade/test.sh` with the shared sandbox helper, the `CASCADE_TEST_SET` switch and the two pre-checks from design.md D10: the stub checksum, and `pins.sh WORKTREE` equal to `pins.sh HEAD` in a sandbox. It prints `PASS`/`FAIL` lines and exits 0 or 1. Scenarios come in sections 3 and 4.
+- [x] 2.5 Create `.tasks/cascade/test.sh` with the shared sandbox helper, the `CASCADE_TEST_SET` switch and the two pre-checks from design.md D10: the stub checksum, and `pins.sh WORKTREE` equal to `pins.sh HEAD` in a sandbox. It prints `PASS`/`FAIL` lines and exits 0 or 1. Scenarios come in sections 3 and 4.
   - Verify `CASCADE_TEST_SET=offline task -x deps:cascade:test` exits 0, and exits 1 after a throwaway one-byte edit of the stub (restore it).
-- [ ] 2.6 Verify the precondition. With `CASCADE_RESOLVER=relative/path`, `task -x deps:cascade:title` fails with "must be absolute". With an absolute non-existent path, it fails with the contract §3 message.
-- [ ] 2.7 `task fmt`, `task lint`, `task test:unit`, `task openspec:check`, shellcheck, and the offline test set green, then commit `ci(cascade): add the cascade pins, classes and title and body tasks`.
+  Done: offline set exits 0; a one-byte stub edit makes it exit 1. Sandbox git runs with auto gc off, after one cleanup race on the sandbox's `.git/objects`.
+- [x] 2.6 Verify the precondition. With `CASCADE_RESOLVER=relative/path`, `task -x deps:cascade:title` fails with "must be absolute". With an absolute non-existent path, it fails with the contract §3 message.
+  Done: a relative path stops the var with "must be absolute"; an absolute missing path fails the precondition with the contract §3 message.
+- [x] 2.7 `task fmt`, `task lint`, `task test:unit`, `task openspec:check`, shellcheck, and the offline test set green, then commit `ci(cascade): add the cascade pins, classes and title and body tasks`.
+  Done: all green.
 
 ## 3. `task deps:cascade` and the offline scenarios
 

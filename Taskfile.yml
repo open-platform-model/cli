@@ -521,3 +521,42 @@ tasks:
     desc: "Check release pins (G1): no replace, published OPM pins (nested modules by their subdir tag), no dev template pins, operator embed matches its pin, a docs bundle for every docs pin (G2-pins)"
     cmds:
       - .github/scripts/release-pin-check.sh
+
+  # Release cascade (workspace RELEASING.md, "The cascade"; Phase 2 cascade
+  # contract §3 and §5). Run every cascade task with `task -x`, or go-task turns
+  # exit 3 into 201. The resolver lives in open-platform-model/.github; each
+  # task finds it itself (never a global var, which would run for every task).
+  deps:cascade:title:
+    desc: "Release cascade: print the cascade PR title for the diff against CASCADE_BASE (default origin/main); see workspace RELEASING.md \"The cascade\""
+    vars: &cascade_vars
+      CASCADE_RESOLVER_PATH:
+        sh: |
+          if [ -n "${CASCADE_RESOLVER:-}" ]; then
+            case "$CASCADE_RESOLVER" in /*) ;; *) echo "CASCADE_RESOLVER must be absolute" >&2; exit 1 ;; esac
+            printf '%s\n' "$CASCADE_RESOLVER"; exit 0
+          fi
+          common=$(git rev-parse --path-format=absolute --git-common-dir) || exit 1
+          printf '%s\n' "$(dirname "$common")/../.github/.github/scripts/cascade/cascade-resolve.sh"
+    env: &cascade_env
+      CASCADE_RESOLVER: '{{.CASCADE_RESOLVER_PATH}}'
+    preconditions: &cascade_pre
+      - sh: test -x '{{.CASCADE_RESOLVER_PATH}}'
+        msg: "cascade resolver not found: check out open-platform-model/.github beside this repo, or set CASCADE_RESOLVER"
+    cmds:
+      - '"$CASCADE_RESOLVER" title --classes .tasks/cascade/classes --pins .tasks/cascade/pins.sh'
+
+  deps:cascade:body:
+    desc: "Release cascade: print the cascade PR body for the diff against CASCADE_BASE (default origin/main); see workspace RELEASING.md \"The cascade\""
+    vars: *cascade_vars
+    env: *cascade_env
+    preconditions: *cascade_pre
+    cmds:
+      - '"$CASCADE_RESOLVER" body --classes .tasks/cascade/classes --pins .tasks/cascade/pins.sh'
+
+  deps:cascade:test:
+    desc: "Release cascade: test deps:cascade in sandbox copies against the stub resolver (CASCADE_TEST_SET=offline|all); see workspace RELEASING.md \"The cascade\""
+    vars: *cascade_vars
+    env: *cascade_env
+    preconditions: *cascade_pre
+    cmds:
+      - .tasks/cascade/test.sh
