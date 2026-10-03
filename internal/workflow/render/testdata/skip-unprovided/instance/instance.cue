@@ -12,7 +12,7 @@ core.#ModuleInstance
 
 metadata: {
 	name:      "backup-demo"
-	namespace: "default"
+	namespace: "opm-skip-unprovided-itest"
 }
 
 #module: demo

@@ -66,7 +66,7 @@ instance.cue    Path to the instance .cue file (required)
 | `--dry-run` |  | bool |  | Server-side dry run (no changes made). |
 | `--force` |  | bool |  | Allow empty render to prune all previously tracked resources. |
 | `--kubeconfig` |  | string |  | Path to kubeconfig file. |
-| `--namespace` | `-n` | string |  | Target namespace. |
+| `--namespace` | `-n` | string |  | Namespace; must equal the instance file's metadata.namespace. |
 | `--no-prune` |  | bool |  | Skip stale resource pruning. |
 | `--platform` |  | string |  | Platform module directory (overrides the cluster Platform and the instance's own deps). |
 | `--skip-unprovided` |  | bool |  | Render what the platform can: skip provider-fulfilled contracts nothing on the platform provides, and report each one. |
@@ -114,7 +114,7 @@ instance-dir    Path to an instance package directory
 | --- | --- | --- | --- | --- |
 | `--context` |  | string |  | Kubernetes context to use. |
 | `--kubeconfig` |  | string |  | Path to kubeconfig file. |
-| `--namespace` | `-n` | string |  | Target namespace. |
+| `--namespace` | `-n` | string |  | Namespace; must equal the instance file's metadata.namespace. |
 | `--offline` |  | bool |  | Never contact a cluster; render against `--platform` or the instance's own deps. |
 | `--out-dir` |  | string | `./manifests` | Directory for split output. |
 | `--output` | `-o` | string | `yaml` | Output format: yaml, json. |
@@ -216,7 +216,7 @@ instance.cue    Path to the instance .cue file (required)
 | --- | --- | --- | --- | --- |
 | `--context` |  | string |  | Kubernetes context to use. |
 | `--kubeconfig` |  | string |  | Path to kubeconfig file. |
-| `--namespace` | `-n` | string |  | Target namespace. |
+| `--namespace` | `-n` | string |  | Namespace; must equal the instance file's metadata.namespace. |
 | `--platform` |  | string |  | Platform module directory (overrides the cluster Platform and the instance's own deps). |
 | `--skip-unprovided` |  | bool |  | Render what the platform can: skip provider-fulfilled contracts nothing on the platform provides, and report each one. |
 | `--values` | `-f` | stringArray |  | Values files added on top of the instance package, which already includes its `values.cue` (can be repeated). |
@@ -479,7 +479,7 @@ instance.cue    Path to the instance .cue file (required)
 | --- | --- | --- | --- | --- |
 | `--context` |  | string |  | Kubernetes context to use. |
 | `--kubeconfig` |  | string |  | Path to kubeconfig file. |
-| `--namespace` | `-n` | string |  | Target namespace. |
+| `--namespace` | `-n` | string |  | Namespace; must equal the instance file's metadata.namespace. |
 | `--offline` |  | bool |  | Never contact a cluster; render against `--platform` or the instance's own deps. |
 | `--platform` |  | string |  | Platform module directory (overrides the cluster Platform and the instance's own deps). |
 | `--skip-unprovided` |  | bool |  | Render what the platform can: skip provider-fulfilled contracts nothing on the platform provides, and report each one. |
@@ -490,9 +490,6 @@ instance.cue    Path to the instance .cue file (required)
 ```sh
 # Validate an instance file
 opm instance vet ./jellyfin_instance.cue
-
-# Validate with a specific namespace
-opm instance vet ./jellyfin_instance.cue -n production
 
 # Validate without contacting any cluster
 opm instance vet ./jellyfin_instance.cue --offline

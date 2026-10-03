@@ -23,6 +23,7 @@ import (
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/platform"
 	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	pkgerrors "github.com/open-platform-model/cli/pkg/errors"
 	"github.com/open-platform-model/cli/pkg/loader"
 )
 
@@ -80,6 +81,15 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
 	}
 
+	// The instance file owns its namespace: a --namespace or OPM_NAMESPACE
+	// that disagrees with it is refused before the platform is resolved.
+	if inst.Metadata != nil {
+		if err := refuseNamespaceOverride(opts.InstanceFilePath, inst.Metadata.Namespace, opts.K8sConfig.Namespace); err != nil {
+			printValidationError(err)
+			return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+		}
+	}
+
 	// Render provenance (0006:D7): an instance apply is local when
 	// its module's cue.mod/local-module.cue replaces a dependency; otherwise it
 	// resolves from registries. The same module root is the 0010:D19 module
@@ -112,6 +122,32 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 	env.skipUnprovided = opts.SkipUnprovided
 
 	return renderInstance(ctx, env, inst, opts.K8sConfig, moduleRoot, sourceLocal)
+}
+
+// refuseNamespaceOverride returns a validation error when the namespace was
+// set by --namespace or OPM_NAMESPACE and differs from the namespace the
+// instance file declares. The file owns the namespace: it is part of the
+// instance's identity (fqn and uuid), so an override would put the record
+// in one namespace and the resources in another. A namespace from the
+// config file or the default is not an override and is never compared, nor
+// is an OPM_NAMESPACE the flag shadows.
+func refuseNamespaceOverride(instancePath, declared string, ns config.ResolvedField) error {
+	var source string
+	switch ns.Source {
+	case config.SourceFlag:
+		source = "--namespace"
+	case config.SourceEnv:
+		source = "OPM_NAMESPACE"
+	case config.SourceConfig, config.SourceDefault:
+		// Not an override: the instance renders in its file's namespace.
+	}
+	if source == "" || ns.Value == declared {
+		return nil
+	}
+	return &pkgerrors.ValidationError{
+		Message: fmt.Sprintf("%s %q disagrees with metadata.namespace %q in %s", source, ns.Value, declared, instancePath),
+		Details: fmt.Sprintf("the namespace is part of the instance's identity: to deploy to %q, set metadata.namespace: %q in the instance file (that makes a new instance; delete the one in %q if it is deployed); otherwise drop the override", ns.Value, ns.Value, declared),
+	}
 }
 
 // instanceContext resolves an instance argument (a .cue file or a package
