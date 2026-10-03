@@ -106,15 +106,23 @@ func captureOutput(t *testing.T, fn func()) string {
 	return string(<-done)
 }
 
-// A CLI-owned instance whose inventory tracks a ConfigMap and its Namespace:
-// delete removes the ConfigMap and the ModuleInstance, keeps the Namespace,
-// lists it as left behind and exits 0.
+// A CLI-owned instance whose inventory tracks a ConfigMap, its Namespace and a
+// ConfigMap another instance has since claimed: delete removes the first
+// ConfigMap and the ModuleInstance, keeps the Namespace and the foreign
+// ConfigMap, lists both as left behind and exits 0. The foreign ConfigMap pins
+// that the command passes the recorded instance UUID to Delete.
 func TestExecuteInstanceDelete_LeavesNamespaceBehind(t *testing.T) {
 	const uuid = "uuid-demo"
 	labels := map[string]any{pkgcore.LabelManagedBy: pkgcore.LabelManagedByValue, pkgcore.LabelModuleInstanceUUID: uuid}
 	cm := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1", "kind": "ConfigMap",
 		"metadata": map[string]any{"name": "web", "namespace": "apps", "labels": labels},
+	}}
+	foreign := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1", "kind": "ConfigMap",
+		"metadata": map[string]any{"name": "shared", "namespace": "apps", "labels": map[string]any{
+			pkgcore.LabelManagedBy: pkgcore.LabelManagedByValue, pkgcore.LabelModuleInstanceUUID: "uuid-other",
+		}},
 	}}
 	ns := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1", "kind": "Namespace",
@@ -132,33 +140,37 @@ func TestExecuteInstanceDelete_LeavesNamespaceBehind(t *testing.T) {
 			ctx := context.Background()
 			fake := fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
 				map[schema.GroupVersionResource]string{inventory.ModuleInstanceGVR: "ModuleInstanceList"},
-				cm.DeepCopy(), ns.DeepCopy(), mi.DeepCopy())
+				cm.DeepCopy(), foreign.DeepCopy(), ns.DeepCopy(), mi.DeepCopy())
 			client := &kubernetes.Client{Dynamic: fake}
 
 			var runErr error
 			out := captureOutput(t, func() {
 				runErr = executeInstanceDelete(ctx, client, rsf, "apps", inv,
-					[]*unstructured.Unstructured{cm.DeepCopy(), ns.DeepCopy()}, dryRun, output.InstanceLogger("demo"))
+					[]*unstructured.Unstructured{cm.DeepCopy(), foreign.DeepCopy(), ns.DeepCopy()}, dryRun, output.InstanceLogger("demo"))
 			})
 			require.NoError(t, runErr, out)
 
 			assert.Contains(t, out, "Namespace/apps")
 			assert.Contains(t, out, output.StatusLeftBehind)
 			assert.Contains(t, out, kubernetes.ProtectedKindReason)
+			assert.Contains(t, out, "ConfigMap/apps/shared")
+			assert.Contains(t, out, "owned by another instance")
 			assert.NotContains(t, out, "all resources have been deleted")
 
 			_, nsErr := fake.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}, "", "apps")
 			assert.NoError(t, nsErr, "the Namespace stays")
+			_, foreignErr := fake.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, "apps", "shared")
+			assert.NoError(t, foreignErr, "the ConfigMap owned by another instance stays")
 			_, cmErr := fake.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, "apps", "web")
 			_, miErr := fake.Tracker().Get(inventory.ModuleInstanceGVR, "apps", "demo")
 
 			if dryRun {
-				assert.Contains(t, out, "dry run complete: 1 resources would be deleted, 1 left behind")
+				assert.Contains(t, out, "dry run complete: 1 resources would be deleted, 2 left behind")
 				assert.NoError(t, cmErr, "a dry run deletes nothing")
 				assert.NoError(t, miErr, "a dry run keeps the ModuleInstance")
 				return
 			}
-			assert.Contains(t, out, "Instance deleted — 1 resource(s) left behind")
+			assert.Contains(t, out, "Instance deleted — 2 resource(s) left behind")
 			assert.Contains(t, out, "kubectl delete")
 			assert.True(t, apierrors.IsNotFound(cmErr), "the ConfigMap is deleted")
 			assert.True(t, apierrors.IsNotFound(miErr), "the ModuleInstance is deleted")
@@ -168,9 +180,9 @@ func TestExecuteInstanceDelete_LeavesNamespaceBehind(t *testing.T) {
 
 // A re-read that fails with anything but NotFound fails that resource: the
 // ModuleInstance is kept for a re-run, the command exits non-zero and claims
-// no completion.
+// no completion. A dry run reports the failure as a check it could not make
+// and prints no "dry run complete" line.
 func TestExecuteInstanceDelete_ReadErrorKeepsModuleInstance(t *testing.T) {
-	ctx := context.Background()
 	labels := map[string]any{pkgcore.LabelManagedBy: pkgcore.LabelManagedByValue}
 	cm := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1", "kind": "ConfigMap",
@@ -180,27 +192,38 @@ func TestExecuteInstanceDelete_ReadErrorKeepsModuleInstance(t *testing.T) {
 		"apiVersion": inventory.APIVersionModuleInstance, "kind": inventory.KindModuleInstance,
 		"metadata": map[string]any{"name": "demo", "namespace": "apps"},
 	}}
-	dyn := fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
-		map[schema.GroupVersionResource]string{inventory.ModuleInstanceGVR: "ModuleInstanceList"},
-		cm.DeepCopy(), mi.DeepCopy())
-	dyn.PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "web", errors.New("denied"))
-	})
-	client := &kubernetes.Client{Dynamic: dyn}
 	inv := &inventory.Record{Name: "demo", Namespace: "apps", Owner: inventory.OwnerCLI}
 
-	var runErr error
-	out := captureOutput(t, func() {
-		runErr = executeInstanceDelete(ctx, client, &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}, "apps", inv,
-			[]*unstructured.Unstructured{cm.DeepCopy()}, false, output.InstanceLogger("demo"))
-	})
-	require.Error(t, runErr)
-	assert.Contains(t, runErr.Error(), "1 resource(s) failed to delete")
-	assert.NotContains(t, out, "Instance deleted")
-	assert.NotContains(t, out, "all resources have been deleted")
+	for _, dryRun := range []bool{false, true} {
+		t.Run(fmt.Sprintf("dryRun=%v", dryRun), func(t *testing.T) {
+			ctx := context.Background()
+			dyn := fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
+				map[schema.GroupVersionResource]string{inventory.ModuleInstanceGVR: "ModuleInstanceList"},
+				cm.DeepCopy(), mi.DeepCopy())
+			dyn.PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+				return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "web", errors.New("denied"))
+			})
+			client := &kubernetes.Client{Dynamic: dyn}
 
-	_, miErr := dyn.Tracker().Get(inventory.ModuleInstanceGVR, "apps", "demo")
-	assert.NoError(t, miErr, "the ModuleInstance is kept for a re-run")
-	_, cmErr := dyn.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, "apps", "web")
-	assert.NoError(t, cmErr, "the ConfigMap is not deleted")
+			var runErr error
+			out := captureOutput(t, func() {
+				runErr = executeInstanceDelete(ctx, client, &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}, "apps", inv,
+					[]*unstructured.Unstructured{cm.DeepCopy()}, dryRun, output.InstanceLogger("demo"))
+			})
+			require.Error(t, runErr)
+			assert.NotContains(t, out, "Instance deleted")
+			assert.NotContains(t, out, "all resources have been deleted")
+			assert.NotContains(t, out, "dry run complete")
+			if dryRun {
+				assert.Contains(t, runErr.Error(), "1 resource(s) could not be checked")
+			} else {
+				assert.Contains(t, runErr.Error(), "1 resource(s) failed to delete")
+			}
+
+			_, miErr := dyn.Tracker().Get(inventory.ModuleInstanceGVR, "apps", "demo")
+			assert.NoError(t, miErr, "the ModuleInstance is kept")
+			_, cmErr := dyn.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, "apps", "web")
+			assert.NoError(t, cmErr, "the ConfigMap is not deleted")
+		})
+	}
 }

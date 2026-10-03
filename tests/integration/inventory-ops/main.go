@@ -130,6 +130,9 @@ func main() {
 	// Discover live resources.
 	readInv67, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	check("reading inventory for 6.7", err)
+	if readInv67 == nil {
+		failf("6.7: no ModuleInstance record for %s/%s after writing it", namespace, instanceName)
+	}
 	liveResources67, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv67)
 	check("discovering resources from inventory for 6.7", err)
 

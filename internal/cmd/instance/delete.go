@@ -241,28 +241,34 @@ func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rs
 		}
 	}
 
+	return reportInstanceDelete(deleteResult, dryRun, instanceLog)
+}
+
+// reportInstanceDelete prints the closing summary of a CLI-owned delete and
+// turns per-resource errors into the command's exit error. Errors claim no
+// completion: a real run kept the ModuleInstance for a re-run, and a dry run,
+// which attempts no delete, could not check every resource.
+func reportInstanceDelete(deleteResult *kubernetes.DeleteResult, dryRun bool, instanceLog *log.Logger) error {
+	if n := len(deleteResult.Errors); n > 0 {
+		format := "%d resource(s) failed to delete"
+		if dryRun {
+			format = "%d resource(s) could not be checked"
+		}
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf(format, n), Printed: true}
+	}
+
 	leftBehind := len(deleteResult.LeftBehind)
 	switch {
 	case dryRun && leftBehind > 0:
 		instanceLog.Info(fmt.Sprintf("dry run complete: %d resources would be deleted, %d left behind", deleteResult.Deleted, leftBehind))
 	case dryRun:
 		instanceLog.Info(fmt.Sprintf("dry run complete: %d resources would be deleted", deleteResult.Deleted))
-	case len(deleteResult.Errors) > 0:
-		// The ModuleInstance was kept for a re-run; claim no completion.
 	case leftBehind > 0:
 		output.Println(output.FormatCheckmark(fmt.Sprintf("Instance deleted — %d resource(s) left behind", leftBehind)))
 		output.Details("Remove them with 'kubectl delete' once nothing else needs them.")
 	default:
 		instanceLog.Info("all resources have been deleted")
 		output.Println(output.FormatCheckmark("Instance deleted"))
-	}
-
-	if len(deleteResult.Errors) > 0 {
-		return &opmexit.ExitError{
-			Code:    opmexit.ExitGeneralError,
-			Err:     fmt.Errorf("%d resource(s) failed to delete", len(deleteResult.Errors)),
-			Printed: true,
-		}
 	}
 	return nil
 }
