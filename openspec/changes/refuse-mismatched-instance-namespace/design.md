@@ -53,17 +53,16 @@ if inst.Metadata != nil {
 
 Exit code 2 (`ExitValidationError`), printed through `printValidationError` like the other input refusals in `FromInstanceFile`. The input is well-formed but inconsistent, which is a validation failure, not a usage error.
 
-The message names the override's source, both namespaces, the instance argument as given, and the fix. It carries no enhancement or ADR reference (CLI output reaches people without the enhancements repo).
+`refuseNamespaceOverride` returns a `*pkgerrors.ValidationError` whose `Message` is the one-line disagreement (the override's source, both namespaces, the instance argument as given) and whose `Details` is the guidance to edit `metadata.namespace`. `printValidationError` falls through to `cmdutil.PrintValidationError`, which prints a `ValidationError` with details as `render failed: <message>` followed by a details block, the same header every other `FromInstanceFile` refusal uses. A plain error would instead print as an escaped `error=` field under the header. The message carries no enhancement or ADR reference (CLI output reaches people without the enhancements repo).
 
 ```
 $ opm instance apply ./jellyfin -n staging
-Error: --namespace "staging" disagrees with metadata.namespace "media" in ./jellyfin
-  The namespace is part of the instance's identity. To deploy this instance to "staging",
-  set metadata.namespace: "staging" in the instance file; otherwise drop the override.
+ERROR render failed: --namespace "staging" disagrees with metadata.namespace "media" in ./jellyfin
+  the namespace is part of the instance's identity: to deploy this instance to "staging", set metadata.namespace: "staging" in the instance file; otherwise drop the override
 exit 2
 
 $ OPM_NAMESPACE=staging opm instance build ./jellyfin
-Error: OPM_NAMESPACE "staging" disagrees with metadata.namespace "media" in ./jellyfin
+ERROR render failed: OPM_NAMESPACE "staging" disagrees with metadata.namespace "media" in ./jellyfin
   ...same guidance...
 exit 2
 ```
@@ -91,7 +90,7 @@ Namespace; must equal the instance file's metadata.namespace
 **Context**: The override and the file disagree; one must win consistently.
 **Explored**: `research.json` task i5 (2026-10-02), verified against `render.go`, `module.go`, `instance_arg.go`, `instance_target.go` and core `module_instance.cue`.
 **Options considered**:
-1. Refuse - the file stays the single owner of the namespace (library ADR-001: `#ModuleInstance` owns the authoritative deployed namespace); one guard and a message; by-file query commands keep finding what apply wrote.
+1. Refuse - the file stays the single owner of the namespace (library ADR-001: `#ModuleInstance`, named `#ModuleRelease` in the ADR, owns the authoritative deployed namespace); one guard and a message; by-file query commands keep finding what apply wrote.
 2. Honour - re-synthesize the instance in the override namespace so resources, fqn, uuid and record move together. The same file would then name different instances depending on the shell environment, and `instance status f` would still look in the file's namespace.
 **Decision**: Refuse (owner, 2026-10-03, i5).
 **Rationale**: Namespace is identity. A file that means one instance regardless of environment is the simpler contract.

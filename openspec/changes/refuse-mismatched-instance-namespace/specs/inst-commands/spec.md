@@ -23,6 +23,11 @@ The module commands (`opm module build`, `apply`, `vet`) are unaffected: they sy
 - **THEN** the command SHALL exit with code 2 and print no manifests
 - **AND** the error SHALL name `OPM_NAMESPACE`, `staging` and `media`
 
+#### Scenario: Flag matches while OPM_NAMESPACE differs
+
+- **WHEN** `OPM_NAMESPACE=staging opm instance apply ./jellyfin -n media` is run and the instance declares `metadata.namespace: "media"`
+- **THEN** the flag SHALL win and the command SHALL NOT refuse: the shadowed `OPM_NAMESPACE` value is not compared
+
 #### Scenario: No override
 
 - **WHEN** `opm instance diff ./jellyfin` is run with neither `-n` nor `OPM_NAMESPACE`, and `~/.opm/config.cue` sets `kubernetes.namespace: "staging"`

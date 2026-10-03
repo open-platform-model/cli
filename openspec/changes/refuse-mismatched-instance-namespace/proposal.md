@@ -4,7 +4,7 @@
 
 `OPM_NAMESPACE` is worse than the flag, because the by-file query commands never honour it: `OPM_NAMESPACE=other opm instance apply f` writes the record to `other`, while `OPM_NAMESPACE=other opm instance status f` looks in the file's namespace.
 
-The instance file owns its namespace. `#ModuleInstance` carries the authoritative deployed namespace (library `adr/001-module-default-namespace-as-annotation.md`, ADR-001), and the namespace is part of the instance's identity. Owner decision 2026-10-03 (i5): refuse when `-n`/`OPM_NAMESPACE` disagrees with the instance file's `metadata.namespace`; the module path is unaffected.
+The instance file owns its namespace. `#ModuleInstance` (named `#ModuleRelease` in the ADR) carries the authoritative deployed namespace (library `adr/001-module-default-namespace-as-annotation.md`, ADR-001), and the namespace is part of the instance's identity. Owner decision 2026-10-03 (i5): refuse when `-n`/`OPM_NAMESPACE` disagrees with the instance file's `metadata.namespace`; the module path is unaffected.
 
 ## What Changes
 
@@ -12,7 +12,7 @@ The instance file owns its namespace. `#ModuleInstance` carries the authoritativ
 - A namespace from `~/.opm/config.cue` or the built-in default is not an override and is never compared: those commands keep using the file's namespace.
 - An override equal to the file's namespace is accepted as today.
 - The module path (`opm module build`, `apply`, `vet` with a directory or a published module) is unchanged: it synthesizes the instance in the override namespace, so the record, resources and fqn already agree.
-- The `-n` help text of `opm instance apply`, `diff` and `build` says the value must equal the instance file's `metadata.namespace`. `opm instance vet` shares the render path and therefore the refusal, so its help text and its `-n production` example change with it. The generated command reference is regenerated.
+- The `-n` help text of `opm instance apply`, `diff` and `build` says the value must equal the instance file's `metadata.namespace`. `opm instance vet` shares the render path and therefore the refusal, so its help text and its `-n production` example change with it. The decision names apply, diff and build only; including vet is the supervisor's reading of i5 (vet shares the guard, so leaving its help as "Target namespace" beside an example that now exits 2 would ship a self-contradictory CLI). If the owner wants vet exempt, an opt-out field on `InstanceFileOpts` would drop it from the requirement and the help-text scenario. The generated command reference is regenerated.
 - The skip-unprovided integration program applies its fixture with `-n opm-skip-unprovided-itest` while the fixture declares `namespace: "default"`, which is exactly the split this change refuses. The fixture's `metadata.namespace` moves to `opm-skip-unprovided-itest`.
 
 Release class: PATCH (a fix), and the PR title carries `fix`. During beta it ships as the next `1.0.0-beta.N`. An invocation that used to succeed now refuses, but what it produced was a broken split instance, so no working workflow is removed and no flag is renamed or dropped.
