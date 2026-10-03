@@ -38,7 +38,7 @@ The `module apply` subcommand SHALL accept the following flags with the listed b
 | `--no-prune` | bool | false | Skip pruning of stale resources |
 | `--force` | bool | false | Allow a 0-resource render to prune previously tracked resources |
 | `--wait` | bool | false | After a successful apply and inventory write, block until every applied resource is healthy; ignored on `--dry-run` |
-| `--timeout` | duration | 5m | Bound on the `--wait` readiness wait, and on the operator-reconcile wait for an operator-managed instance |
+| `--timeout` | duration | 5m | Bound on the CustomResourceDefinition establish wait, counted from the start of the apply; on the `--wait` readiness wait, which gets a full `--timeout` of its own; and on the operator-reconcile wait for an operator-managed instance |
 
 #### Scenario: Values files override debugValues
 
