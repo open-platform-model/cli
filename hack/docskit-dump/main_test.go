@@ -48,6 +48,26 @@ func TestPins_TestBinaryLinksTheLibrary(t *testing.T) {
 	assert.Equal(t, goModLibrary(t, "../../go.mod"), v)
 }
 
+// TestPins_GoRunPrintsTheSame runs the program as docs-kit.cue does and
+// compares what it prints with pins(), so the build info go run embeds is
+// the one the tests above read.
+func TestPins_GoRunPrintsTheSame(t *testing.T) {
+	if testing.Short() {
+		t.Skip("compiles the program")
+	}
+	out, err := exec.CommandContext(t.Context(), "go", "run", ".", "pins").Output()
+	require.NoError(t, err)
+	var doc struct {
+		Schema string            `json:"schema"`
+		Pins   map[string]string `json:"pins"`
+	}
+	require.NoError(t, json.Unmarshal(out, &doc))
+	assert.Equal(t, "docs.opmodel.dev/pins/v1", doc.Schema)
+	want, err := pins()
+	require.NoError(t, err)
+	assert.Equal(t, want, doc.Pins)
+}
+
 func TestLinkedVersion(t *testing.T) {
 	tests := []struct {
 		name    string
