@@ -88,7 +88,7 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 		// legacy open-platform-model) for backward compatibility.
 		labels := unstrObj.GetLabels()
 		if !pkgcore.IsOPMManagedBy(labels[pkgcore.LabelManagedBy]) {
-			return fmt.Errorf("resource %s/%s in namespace %q already exists and is not managed by OPM — use --force to proceed",
+			return fmt.Errorf("resource %s/%s in namespace %q already exists and is not managed by OPM — remove or rename it, or change the module to render a different name",
 				entry.Kind, entry.Name, entry.Namespace)
 		}
 	}

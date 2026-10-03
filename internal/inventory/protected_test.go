@@ -69,3 +69,17 @@ func TestPruneStaleResources_SkipsProtectedKinds(t *testing.T) {
 	_, err = client.ResourceClient(schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}, "").Get(ctx, "widgets.example.io", metav1.GetOptions{})
 	assert.NoError(t, err, "the CRD stays")
 }
+
+// The first-install refusal names no bypass flag, since none bypasses it.
+func TestPreApplyExistenceCheck_UntrackedNamesNoFlag(t *testing.T) {
+	cm := liveObject("v1", "ConfigMap", "default", "taken")
+	client := &kubernetes.Client{Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), cm)}
+
+	err := PreApplyExistenceCheck(context.Background(), client, []InventoryEntry{
+		{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "taken"},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "already exists and is not managed by OPM")
+	assert.Contains(t, err.Error(), "remove or rename it")
+	assert.NotContains(t, err.Error(), "--force")
+}

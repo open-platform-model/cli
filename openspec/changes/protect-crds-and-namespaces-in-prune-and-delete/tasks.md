@@ -26,10 +26,10 @@ Coordination: the wave-1 sibling `order-instance-apply-by-weight` rewrites the s
 
 ## 3. First-install refusal stops naming --force (internal/inventory)
 
-- [ ] 3.1 Red first. In `internal/inventory/stale_test.go`, `TestPreApplyExistenceCheck_UntrackedNamesNoFlag`: a fake dynamic client holding an unlabelled ConfigMap; the error contains `already exists and is not managed by OPM` and `remove or rename it`, and does not contain `--force`. Verify: it fails on today's code.
-- [ ] 3.2 `internal/inventory/stale.go`: the untracked-resource message per design.md § 4. Grep the tree (`internal/`, `tests/`, `docs/`) for the old `use --force to proceed` text tied to this check and update any test or doc that asserts it; the empty-render message in `internal/workflow/apply/apply.go`, where `--force` does work, stays. Verify: `go test ./internal/inventory/... ./internal/workflow/apply/...` passes.
-- [ ] 3.3 Cross-cutting: `task check` in full (fmt, vet, lint, `openspec:check`, `docs:reference:check`, unit, integration and e2e on `kind-opm-dev` with a reconciling operator). Verify: green.
-- [ ] 3.4 `task fmt`, `task lint` and `task test` green, then commit `fix(apply): drop the --force hint from the first-install refusal`.
+- [x] 3.1 Red first. In `internal/inventory/stale_test.go`, `TestPreApplyExistenceCheck_UntrackedNamesNoFlag`: a fake dynamic client holding an unlabelled ConfigMap; the error contains `already exists and is not managed by OPM` and `remove or rename it`, and does not contain `--force`. Verify: it fails on today's code.
+- [x] 3.2 `internal/inventory/stale.go`: the untracked-resource message per design.md § 4. Grep the tree (`internal/`, `tests/`, `docs/`) for the old `use --force to proceed` text tied to this check and update any test or doc that asserts it; the empty-render message in `internal/workflow/apply/apply.go`, where `--force` does work, stays. Verify: `go test ./internal/inventory/... ./internal/workflow/apply/...` passes.
+- [ ] 3.3 Cross-cutting: `task check` in full (fmt, vet, lint, `openspec:check`, `docs:reference:check`, unit, integration and e2e on `kind-opm-dev` with a reconciling operator). Verify: green. Status 2026-10-03: everything but e2e is green (fmt, vet, lint, `openspec:check`, `docs:reference:check`, unit, integration on `kind-opm-dev`); e2e was not run because another wave-1 change was running it on the same cluster and the lifecycle test tears the operator down. The e2e suite exercises only the operator-owned delete path, which this change does not touch; run `OPM_E2E_REQUIRE_CLUSTER=1 task test:e2e` on a free cluster before the PR.
+- [x] 3.4 `task fmt`, `task lint` and `task test` green, then commit `fix(apply): drop the --force hint from the first-install refusal`.
 
 ## 4. Hand-off to the PR stage (not done in this worktree)
 
