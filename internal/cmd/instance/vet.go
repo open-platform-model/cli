@@ -44,9 +44,6 @@ Examples:
   # Validate an instance file
   opm instance vet ./jellyfin_instance.cue
 
-  # Validate with a specific namespace
-  opm instance vet ./jellyfin_instance.cue -n production
-
   # Validate without contacting any cluster
   opm instance vet ./jellyfin_instance.cue --offline`,
 		Args: cobra.ExactArgs(1),
@@ -57,7 +54,7 @@ Examples:
 
 	rff.AddTo(c)
 	kf.AddTo(c)
-	c.Flags().StringVarP(&namespace, "namespace", "n", "", "Target namespace")
+	c.Flags().StringVarP(&namespace, "namespace", "n", "", renderNamespaceFlagHelp)
 	c.Flags().BoolVar(&offline, "offline", false, offlineFlagHelp)
 
 	return c

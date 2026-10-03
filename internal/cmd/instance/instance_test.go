@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/open-platform-model/cli/internal/inventory"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -30,6 +31,23 @@ func TestNewInstanceCmd_Subcommands(t *testing.T) {
 		"init", "vet", "build", "apply", "diff",
 		"status", "tree", "events", "delete", "list",
 	}, got)
+}
+
+// The instance render commands refuse a namespace that disagrees with the
+// instance file, and their -n help says so.
+func TestInstanceRenderCmds_NamespaceHelp(t *testing.T) {
+	cfg := &config.GlobalConfig{}
+	for name, cmd := range map[string]*cobra.Command{
+		"apply": NewInstanceApplyCmd(cfg),
+		"build": NewInstanceBuildCmd(cfg),
+		"diff":  NewInstanceDiffCmd(cfg),
+		"vet":   NewInstanceVetCmd(cfg),
+	} {
+		f := cmd.Flags().Lookup("namespace")
+		require.NotNil(t, f, name)
+		assert.Equal(t, "Namespace; must equal the instance file's metadata.namespace", f.Usage, name)
+		assert.Equal(t, "n", f.Shorthand, name)
+	}
 }
 
 // --- 8.1 Unit tests for instance render commands ---

@@ -69,7 +69,7 @@ Examples:
 
 	rff.AddTo(c)
 	kf.AddTo(c)
-	c.Flags().StringVarP(&namespace, "namespace", "n", "", "Target namespace")
+	c.Flags().StringVarP(&namespace, "namespace", "n", "", renderNamespaceFlagHelp)
 	c.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Server-side dry run (no changes made)")
 	c.Flags().BoolVar(&createNSFlag, "create-namespace", false, "Create target namespace if it does not exist")
 	c.Flags().BoolVar(&noPruneFlag, "no-prune", false, "Skip stale resource pruning")

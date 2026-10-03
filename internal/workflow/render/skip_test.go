@@ -17,6 +17,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/platform"
 )
 
 // skipFixtureRegistry routes core and the catalogs to GHCR; the
@@ -229,4 +230,69 @@ func TestSkipUnprovided_CatalogFulfilledGapStillRefuses(t *testing.T) {
 
 	assert.Contains(t, stderr, strayFQN, "the refusal names the catalog-fulfilled gap")
 	assert.NotContains(t, stderr+logs.String(), "--skip-unprovided", "no skip hint for a gap the flag cannot skip")
+}
+
+// skipFixtureNamespace is the metadata.namespace the skip-unprovided
+// instance declares.
+const skipFixtureNamespace = "opm-skip-unprovided-itest"
+
+// The instance path refuses a flag or env namespace that disagrees with the
+// instance file and accepts one that matches; the module path synthesizes
+// its instance in the override namespace and is never refused.
+func TestNamespaceOverride_InstanceRefusedModuleAllowed(t *testing.T) {
+	dir := skipFixture(t)
+	ctx := context.Background()
+	captureRenderLog(t)
+
+	k8s := func(value string, source config.Source) *config.ResolvedKubernetesConfig {
+		return &config.ResolvedKubernetesConfig{Namespace: config.ResolvedField{Value: value, Source: source}}
+	}
+	instanceOpts := func(cfg *config.ResolvedKubernetesConfig) InstanceFileOpts {
+		return InstanceFileOpts{InstanceFilePath: filepath.Join(dir, "instance"), SkipUnprovided: true, Config: skipFixtureConfig(t), K8sConfig: cfg}
+	}
+	// refusedOpts reads the cluster platform through a getter that fails the
+	// test, so a guard moved below platform resolution is caught.
+	refusedOpts := func(t *testing.T, cfg *config.ResolvedKubernetesConfig) InstanceFileOpts {
+		opts := instanceOpts(cfg)
+		opts.ClusterPlatform = func(context.Context) (*platform.ClusterPlatform, string, error) {
+			t.Fatal("platform resolved before the namespace refusal")
+			return nil, "", nil
+		}
+		return opts
+	}
+	requireRefused := func(t *testing.T, err error, source string) {
+		t.Helper()
+		require.Error(t, err)
+		var exitErr *opmexit.ExitError
+		require.True(t, errors.As(err, &exitErr))
+		assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
+		assert.True(t, exitErr.Printed)
+		for _, want := range []string{source, `"staging"`, `"` + skipFixtureNamespace + `"`} {
+			assert.Contains(t, err.Error(), want)
+		}
+	}
+
+	t.Run("instance flag differs", func(t *testing.T) {
+		_, err := FromInstanceFile(ctx, refusedOpts(t, k8s("staging", config.SourceFlag)))
+		requireRefused(t, err, "--namespace")
+	})
+	t.Run("instance env differs", func(t *testing.T) {
+		_, err := FromInstanceFile(ctx, refusedOpts(t, k8s("staging", config.SourceEnv)))
+		requireRefused(t, err, "OPM_NAMESPACE")
+	})
+	t.Run("instance flag matches", func(t *testing.T) {
+		result, err := FromInstanceFile(ctx, instanceOpts(k8s(skipFixtureNamespace, config.SourceFlag)))
+		require.NoError(t, err)
+		require.NotEmpty(t, result.Resources)
+		for _, res := range result.Resources {
+			if ns := res.GetNamespace(); ns != "" {
+				assert.Equal(t, skipFixtureNamespace, ns, "%s/%s renders in the file's namespace", res.GetKind(), res.GetName())
+			}
+		}
+	})
+	t.Run("module flag differs is allowed", func(t *testing.T) {
+		result, err := FromModule(ctx, ModuleOpts{ModulePath: dir, SkipUnprovided: true, Config: skipFixtureConfig(t), K8sConfig: k8s("staging", config.SourceFlag)})
+		require.NoError(t, err)
+		assert.Equal(t, "staging", result.Instance.Namespace)
+	})
 }
