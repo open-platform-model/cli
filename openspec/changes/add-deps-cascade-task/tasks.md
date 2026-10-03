@@ -154,6 +154,8 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
 
 - [x] 4.10 Close the coverage gaps the verify pass found: S10 (`CASCADE_ALLOW_DIRTY` snapshot and the `CASCADE_EXPECT` hint) and S11 (never lower a human-set version) in the offline set, and a `classify` check of `classes` beside S5 (design.md D10). Gates as in 4.9, then commit `ci(cascade): test the dirty-tree snapshot, the expect hint and the never-lower rule`.
   Done: all PASS; turning the never-lower rule back into "write when it differs" makes S11 fail.
+- [x] 4.11 S2 also checks the `language.version` warning (D8) and that a resolver warning reaches the warnings file. Then commit `ci(cascade): name the language version in the cascade warning`.
+  Done: the new check found a bug: the warning named the `semver-cmp` answer (`1`) instead of the language version, because the comparison overwrote the resolver output. Fixed; full set all PASS.
 
 ## 5. Archive (rides this PR)
 

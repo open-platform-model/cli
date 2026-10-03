@@ -341,6 +341,7 @@ These calls decide no target, so they run in phase C.
     - `tests/fixtures/modules/podinfo/identity/identity.cue` at `0.1.12`;
     - `examples/cue.mod/module.cue` and `tests/e2e/testdata/operator-owned/cue.mod/module.cue`, with podinfo at `v0.1.12`.
   - The warnings file holds the docs-bundle warning for each `hack/docskit-dump pins` entry (the stub table has no `published oci` rows, so every bundle reads as unpublished).
+  - Added at verify: the table also has a `language-of` row for the tree's catalog at `v0.99.0` and a stub `warn` row on the library lookup; the warnings file must hold the `language.version` warning (D8) and the resolver's new-major line.
   - **Second run:** commit, keep `CASCADE_BASE`, run again. Exit 3, and no identity file changes.
   - The version numbers are derived from the tree at test time, not hard-coded.
 - **S4, frozen.**

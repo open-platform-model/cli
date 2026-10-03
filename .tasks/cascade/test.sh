@@ -383,7 +383,11 @@ if [ "$SET" = all ]; then
   # S2 older pins: every pin older; the first run moves them back and advances
   # each version once; a second run against the same base changes nothing.
   d=$(sandbox s2)
-  { current_rows "$d"; grep '^pin-of' "$OLDER"; } >"$TMP/s2/table"
+  # Plus a language-of row newer than the cue PR CI installs, and a resolver
+  # warning on the library lookup, both of which must reach the warnings file.
+  { printf 'language-of\t%s\t%s\tv0.99.0\n' "$CAT" "$(cue_dep_v "$d/templates/minimal/cue.mod/module.cue" "$CAT")"
+    printf 'warn\tgo\t%s\tnew major available: %sv2.0.0%s\n' "$LIB" '`' '`'
+    current_rows "$d"; grep '^pin-of' "$OLDER"; } >"$TMP/s2/table"
   if ! setup_older "$d" "$OLD_CAT" "$OLD_CORE"; then
     fail "S2 older pins" "the setup did not apply"
   else
@@ -395,6 +399,10 @@ if [ "$SET" = all ]; then
       fail "S2 older pins" "first run: $reason"
     elif ! warned "$d" "docs bundle for \`library\`"; then
       fail "S2 older pins" "no docs-bundle warning"
+    elif ! warned "$d" "declares \`language.version\` \`v0.99.0\`, newer than the cue"; then
+      fail "S2 older pins" "no language.version warning"
+    elif ! grep -qF "$LIB	new major available" "$d/.git/cascade/warnings"; then
+      fail "S2 older pins" "the resolver's warning did not reach the warnings file"
     else
       # S5 title and body, on the first run's tree, against the real resolver.
       if [ -z "${CASCADE_RESOLVER_REAL:-}" ]; then

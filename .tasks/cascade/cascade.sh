@@ -392,11 +392,13 @@ lang_check() { # lang_check MODULE VERSION
     warn - "no \`cuelang.org/go/cmd/cue\` version in \`$CUE_PIN_SOURCE\`; \`language.version\` not checked"
     return 0
   fi
+  local lang
   r language-of "$1" "$2"
   [ "$RC" = 0 ] || return 0
-  vcmp "$OUT" "$CUE_PIN"
+  lang=$OUT
+  vcmp "$lang" "$CUE_PIN"
   if [ "$CMP" = 1 ]; then
-    warn "$1" "\`$1\` \`$2\` declares \`language.version\` \`$OUT\`, newer than the cue \`$CUE_PIN\` that \`$CUE_PIN_SOURCE\` installs"
+    warn "$1" "\`$1\` \`$2\` declares \`language.version\` \`$lang\`, newer than the cue \`$CUE_PIN\` that \`$CUE_PIN_SOURCE\` installs"
   fi
 }
 for d in "${CUE_DIRS[@]}"; do
