@@ -16,7 +16,7 @@ The registry model asserts things **only about domains OPM owns** (`0011 D13`). 
 | Prefix | What it is | Published by | Enforcement |
 | --- | --- | --- | --- |
 | `opmodel.dev/core` | The OPM core schema module (current line: major v2) | `core` repo release CI | Release automation; the module path is the address (`0010 D1`) |
-| `opmodel.dev/catalogs/<name>` | First-party catalogs, currently the single consolidated `opm` catalog (`0010 D47`) | `catalog_opm` repo release CI via `opm catalog publish` | The full catalog gate set on every publish ([The Catalog Contract](/docs/reference/catalog-contract/)) |
+| `opmodel.dev/catalogs/<name>` | First-party catalogs, currently the single consolidated `opm` catalog (`0010 D47`) | `catalog_opm` repo release CI via `opm catalog publish` | The full catalog gate set on every publish ([The Catalog Contract](/catalogs/opm/)) |
 | `opmodel.dev/modules/<name>` | First-party modules. **Flat**: one snake-case leaf, no nesting | Module release pipelines via `opm module publish` | The publish namespace gate refuses nested paths and non-snake leaves (`0011 D13`) |
 | `opmodel.dev/templates/<name>` | Official module templates, the modules `opm mod init` clones | The `cli` repo's release CI, exclusively | Reserved segment (`0011 D25`); the name `index` is reserved within it; publish gates admit the segment as module-kind |
 | `opmodel.dev/platforms/…` | **Reserved, unpublished.** No platform is published or fetched from a registry today | Nobody | A namespace claim, not a publisher (`0011 D14`) |
@@ -35,4 +35,4 @@ The registry model asserts things **only about domains OPM owns** (`0011 D13`). 
 
 ## See also
 
-- [The Catalog Contract](/docs/reference/catalog-contract/): what a catalog publish promises and where it is enforced.
+- [The Catalog Contract](/catalogs/opm/): what a catalog publish promises and where it is enforced.
