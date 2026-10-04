@@ -85,10 +85,14 @@ All checks are read-only. Each result is an indented "Done:" note; design.md "Sp
 
 ## 5. Documentation and final cross-check (wiring §10.1 items 8, 9, 10, 11)
 
-- [ ] 5.1 In `AGENTS.md`, rewrite the "Release cascade" bullet as design D8 says. Cite no wiring section.
-- [ ] 5.2 Run the wiring §10.1 item 11 re-grep over the files this branch changed plus `cascade-task.yml`, and fix every hit that is not an allowed one (`labels-managed` on or about the `cascade-publish` step; `@main` or `ref: main` about something else; "no secret" about `compute` or `gates` only; historical text that says it is superseded).
-- [ ] 5.3 `openspec validate join-release-cascade --strict` and `task openspec:check`; re-read the spec deltas against the final files.
-- [ ] 5.4 The local gate is green, then commit `docs(agents): describe the pinned cascade callers and the wiring check`.
+- [x] 5.1 In `AGENTS.md`, rewrite the "Release cascade" bullet as design D8 says. Cite no wiring section.
+  Done: the bullet names the receiver's reusable `cascade` job and own `publish` job, the fail-closed `CASCADE_DRY_RUN` read by the `if:` and the action, `Notify downstream` and `CASCADE_NOTIFY=off`, the gate caller on PRs into `main` with the two mode variables, the key rule, the one `.github` `main` SHA moved only by a `ci(deps)` pin PR and ignored by Dependabot, and `task cascade:wiring:check`; it points to RELEASING.md "The cascade", "Pinning the cascade code", "Moving the cascade pin" and "Stop switches".
+- [x] 5.2 Run the wiring §10.1 item 11 re-grep over the files this branch changed plus `cascade-task.yml`, and fix every hit that is not an allowed one (`labels-managed` on or about the `cascade-publish` step; `@main` or `ref: main` about something else; "no secret" about `compute` or `gates` only; historical text that says it is superseded).
+  Done: every hit is an allowed one: `labels-managed` on or about the `cascade-publish` step (`deps-cascade.yml`, `wiring-check.sh`, the change docs); `@main` and `ref: main` only in text about the version 2 build or `main`'s state before this change, and in the spec scenario that the check refuses `ref: main`; "no secret" only about `compute` and `gates`; `AGENTS.md:177` "holds no built platform value" is unrelated.
+- [x] 5.3 `openspec validate join-release-cascade --strict` and `task openspec:check`; re-read the spec deltas against the final files.
+  Done: `openspec validate join-release-cascade --strict` valid, `task openspec:check` 68/0; each scenario matches the YAML as written.
+- [x] 5.4 The local gate is green, then commit `docs(agents): describe the pinned cascade callers and the wiring check`.
+  Done: `task lint` (0 issues), `task test:unit`, `task openspec:check`, actionlint on all workflows, `task cascade:wiring:check`: green.
 
 ## 6. Verify and archive
 
