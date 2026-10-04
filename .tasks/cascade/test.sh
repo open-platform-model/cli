@@ -22,6 +22,14 @@ case "$SET" in
   offline | all) ;;
   *) printf 'test.sh: CASCADE_TEST_SET must be offline or all, not %s\n' "$SET" >&2; exit 1 ;;
 esac
+# The test needs no resolver beyond its stub. A CASCADE_RESOLVER_REAL that is
+# set must name an executable by absolute path, so a missing checkout fails
+# here instead of turning S5 into a quiet failure.
+if [ -n "${CASCADE_RESOLVER_REAL:-}" ]; then
+  case "$CASCADE_RESOLVER_REAL" in /*) ;; *) printf 'test.sh: CASCADE_RESOLVER_REAL must be absolute\n' >&2; exit 1 ;; esac
+  [ -x "$CASCADE_RESOLVER_REAL" ] ||
+    { printf 'test.sh: CASCADE_RESOLVER_REAL is not executable: %s\n' "$CASCADE_RESOLVER_REAL" >&2; exit 1; }
+fi
 
 FAILED=0
 pass() { printf 'PASS %s\n' "$1"; }

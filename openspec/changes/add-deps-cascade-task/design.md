@@ -68,7 +68,7 @@ What the catalog modulefiles pin for core:
 
 The cli Taskfile has no `includes:`. Its only `.tasks/` file is `opm-docs.sh`. The four tasks therefore go into `Taskfile.yml` after `deps:release-check` (`Taskfile.yml:520-523`), under the existing "Release tasks" banner.
 
-Each task declares `CASCADE_RESOLVER_PATH` at task level through one YAML anchor, never as a global `vars:` entry (contract §3). Each also exports `CASCADE_RESOLVER: '{{.CASCADE_RESOLVER_PATH}}'` and has the precondition `test -x '{{.CASCADE_RESOLVER_PATH}}'`, with the contract §3 message.
+`deps:cascade`, `deps:cascade:title` and `deps:cascade:body` each declare `CASCADE_RESOLVER_PATH` at task level through one YAML anchor, never as a global `vars:` entry (contract §3). Each also exports `CASCADE_RESOLVER: '{{.CASCADE_RESOLVER_PATH}}'` and has the precondition `test -x '{{.CASCADE_RESOLVER_PATH}}'`, with the contract §3 message. `deps:cascade:test` declares none of these (v1.1 clarification C7).
 
 ```yaml
 deps:cascade:            # .tasks/cascade/cascade.sh
@@ -369,13 +369,13 @@ These calls decide no target, so they run in phase C.
 
 - **Required, offline.** In `pr.yml` job `lint` (name `Lint`), add these steps after `setup-go`, before `golangci-lint`:
   - `go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0`, the pin `pr.yml:99` already uses;
-  - `task -x deps:cascade:test`, with `CASCADE_TEST_SET=offline` and `CASCADE_RESOLVER=${{ github.workspace }}/.tasks/cascade/testdata/stub-resolve.sh`.
+  - `task -x deps:cascade:test`, with `CASCADE_TEST_SET=offline`.
 
-  `Lint` is the job workspace RELEASING.md "Rulesets on main" lists as the cli's required check, and it already carries G1 the same way ("G1 placement"). Contract §8 names `Unit Tests` as "an existing required job"; RELEASING.md does not list it, so RELEASING.md wins and the conflict is reported to the supervisor. The offline set never builds `opm` and never resolves a module, so `Lint` needs no registry or `cue`. The offline set needs no resolver checkout. Setting `CASCADE_RESOLVER` to the stub satisfies the contract §3 precondition, which every cascade task carries. `ubuntu-latest` ships mikefarah `yq` for the stub's `is-frozen`.
+  `Lint` is the job workspace RELEASING.md "Rulesets on main" lists as the cli's required check, and it already carries G1 the same way ("G1 placement"). Contract §8 named `Unit Tests` as "an existing required job"; RELEASING.md does not list it, so RELEASING.md wins, and the contract's v1.1 clarification C6 corrects the §8 row to `Lint`. The offline set never builds `opm` and never resolves a module, so `Lint` needs no registry or `cue`. The offline set needs no resolver checkout, and `deps:cascade:test` carries no resolver precondition (v1.1 clarification C7): `test.sh` runs every scenario against its stub, and only S5 also uses `CASCADE_RESOLVER_REAL`, which `test.sh` refuses at once when it is set but not an absolute executable path. `ubuntu-latest` ships mikefarah `yq` for the stub's `is-frozen`.
 - **Not required, network.** New `.github/workflows/cascade-task.yml`:
   - job `Cascade task (network)`, `timeout-minutes: 20`, `permissions: contents: read`;
   - triggers: `pull_request` on `.tasks/cascade/**`, `Taskfile.yml`, `.tasks/*.yaml` and the workflow itself, plus `workflow_dispatch` and a weekly `schedule`;
-  - it checks out `open-platform-model/.github` at `main` into `org-github` with `persist-credentials: false`;
+  - it checks the cli out at `repo` and `open-platform-model/.github` at `main` beside it at `org-github` with `persist-credentials: false`, and runs the step with `working-directory: repo`, so the resolver checkout never sits inside the tree `test.sh` copies (contract §3; v1.1 clarification C4);
   - it sets `CASCADE_RESOLVER_REAL`, so S5 runs, and installs Go 1.26.0 and `cue` v0.17.1, as `pr.yml` does;
   - every `uses:` is SHA-pinned to the pins `pr.yml` already uses.
 

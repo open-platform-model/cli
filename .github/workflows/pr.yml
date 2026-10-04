@@ -44,7 +44,6 @@ jobs:
         # cascade-task.yml ("Rollout and changes"). Local: task -x deps:cascade:test.
         env:
           CASCADE_TEST_SET: offline
-          CASCADE_RESOLVER: ${{ github.workspace }}/.tasks/cascade/testdata/stub-resolve.sh
         run: task -x deps:cascade:test
       - name: Release-pin gate (G1)
         # Release PRs only: no local, unpublished or mismatched pin ships

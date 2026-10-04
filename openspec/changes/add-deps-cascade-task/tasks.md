@@ -11,7 +11,7 @@ export CUE_REGISTRY='testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev
 export OPM_REGISTRY="$CUE_REGISTRY"
 ```
 
-**The resolver.** Until `.github` `add-cascade-resolver` is merged and checked out beside this repo, export `CASCADE_RESOLVER` as the absolute path of this worktree's `.tasks/cascade/testdata/stub-resolve.sh` (contract §3). This satisfies the precondition every cascade task carries.
+**The resolver.** Until `.github` `add-cascade-resolver` is merged and checked out beside this repo, export `CASCADE_RESOLVER` as the absolute path of this worktree's `.tasks/cascade/testdata/stub-resolve.sh` (contract §3). This satisfies the precondition `deps:cascade`, `deps:cascade:title` and `deps:cascade:body` carry; `deps:cascade:test` needs none.
 
 **The local test gate** is `task test:unit`, `task openspec:check`, `shellcheck .tasks/cascade/*.sh .tasks/cascade/testdata/stub-resolve.sh` and, from section 2 on, `CASCADE_TEST_SET=offline task -x deps:cascade:test`.
 
@@ -132,13 +132,13 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
 - [x] 4.5 Verify `task -x deps:cascade:test` (the full set, with network) exits 0 locally, with `CASCADE_RESOLVER_REAL` set to the real resolver's absolute path (beside the repo, or the `add-cascade-resolver` worktree until it merges), so S5 runs.
   Done: full set all PASS with `CASCADE_RESOLVER_REAL` set to the `add-cascade-resolver` worktree's resolver. A real run with that resolver on a scratch copy of the tree moved the catalog `v4.4.4 -> v4.5.1` in all eleven catalog files and `hack/kind-platform.yaml`, kept core at `v2.0.0-beta.1`, advanced the templates to 1.0.4 and podinfo to 0.1.12, titled `fix(deps): bump opm catalog to v4.5.1`; after a commit, a second run exited 3.
 - [x] 4.6 `.github/workflows/pr.yml`, job `lint` (`Lint`): after `setup-go`, before `golangci-lint`, add `go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0` (`version: 3.x`) and a step `Cascade task (offline)`.
-  - The step runs `task -x deps:cascade:test` with `CASCADE_TEST_SET: offline` and `CASCADE_RESOLVER: ${{ github.workspace }}/.tasks/cascade/testdata/stub-resolve.sh` (design.md D11).
+  - The step runs `task -x deps:cascade:test` with `CASCADE_TEST_SET: offline` (design.md D11). It needs no `CASCADE_RESOLVER`: the test task has no resolver precondition (v1.1 clarification C7).
   - Add a short comment citing workspace RELEASING.md "Rollout and changes" and "Rulesets on main".
 - [x] 4.7 Create `.github/workflows/cascade-task.yml` per design.md D11:
   - job `Cascade task (network)`, `timeout-minutes: 20`, `permissions: contents: read`;
   - the path-filtered `pull_request`, `workflow_dispatch` and weekly `schedule` triggers;
-  - checkout of `open-platform-model/.github` at `main` into `org-github` with `persist-credentials: false`;
-  - `CASCADE_RESOLVER_REAL` and `CASCADE_RESOLVER` set to `$GITHUB_WORKSPACE/org-github/.github/scripts/cascade/cascade-resolve.sh`;
+  - the cli checked out at `repo`, and `open-platform-model/.github` at `main` beside it at `org-github` with `persist-credentials: false`; the test step runs with `working-directory: repo` (v1.1 clarification C4);
+  - `CASCADE_RESOLVER_REAL` set to `$GITHUB_WORKSPACE/org-github/.github/scripts/cascade/cascade-resolve.sh`;
   - Go 1.26.0, `cue` v0.17.1 and setup-task, all SHA-pinned as in `pr.yml`;
   - `task -x deps:cascade:test`.
 

@@ -561,10 +561,9 @@ tasks:
     cmds:
       - '"$CASCADE_RESOLVER" body --classes .tasks/cascade/classes --pins .tasks/cascade/pins.sh'
 
+  # The test needs no resolver checkout: every scenario runs against the stub in
+  # testdata/, and only S5 also uses CASCADE_RESOLVER_REAL when it is set.
   deps:cascade:test:
-    desc: "Release cascade: test deps:cascade in sandbox copies against the stub resolver (CASCADE_TEST_SET=offline|all); see workspace RELEASING.md \"The cascade\""
-    vars: *cascade_vars
-    env: *cascade_env
-    preconditions: *cascade_pre
+    desc: "Release cascade: test deps:cascade in sandbox copies against the stub resolver (CASCADE_TEST_SET=offline|all; S5 needs CASCADE_RESOLVER_REAL); see workspace RELEASING.md \"The cascade\""
     cmds:
       - .tasks/cascade/test.sh

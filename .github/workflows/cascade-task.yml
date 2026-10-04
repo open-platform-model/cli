@@ -31,7 +31,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # The repo and the resolver are checked out side by side, so the resolver
+      # never sits inside the tree test.sh copies into its sandboxes (contract
+      # §3; v1.1 clarification C4).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: repo
       - name: Check out the shared cascade resolver
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,6 +47,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.0'
+          cache-dependency-path: repo/go.sum
       - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         with:
           version: 3.x
@@ -49,11 +55,10 @@ jobs:
         run: go install cuelang.org/go/cmd/cue@v0.17.1
       - name: Run the cascade scenarios
         # test.sh runs every scenario against its stub; the title and body
-        # scenario also runs against the real resolver (CASCADE_RESOLVER_REAL).
-        # CASCADE_RESOLVER names it too, so the task's precondition fails at
-        # once if the checkout above did not provide it.
+        # scenario also runs against the real resolver (CASCADE_RESOLVER_REAL),
+        # and test.sh fails at once if that path is not an executable file.
+        working-directory: repo
         env:
           CASCADE_TEST_SET: all
-          CASCADE_RESOLVER: ${{ github.workspace }}/org-github/.github/scripts/cascade/cascade-resolve.sh
           CASCADE_RESOLVER_REAL: ${{ github.workspace }}/org-github/.github/scripts/cascade/cascade-resolve.sh
         run: task -x deps:cascade:test
