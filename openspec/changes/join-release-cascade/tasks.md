@@ -99,15 +99,19 @@ All checks are read-only. Record each result as an indented "Done:" note. Then w
 
 ## 4. Documentation and final cross-check
 
-- [ ] 4.1 In `AGENTS.md`, extend the "Release cascade" bullet (`:360`) as design D5 says:
+- [x] 4.1 In `AGENTS.md`, extend the "Release cascade" bullet (`:360`) as design D5 says:
   - `deps-cascade.yml` (dispatch, daily sweep, manual `dry_run`) runs the shared receiver, a dry run unless `CASCADE_DRY_RUN` is exactly `false`;
   - `release.yml`'s `Notify downstream` dispatches to catalog_opm and opm-operator after a release publishes, and `CASCADE_NOTIFY=off` stops it;
   - `cascade-gates.yml` posts `cascade/freshness` and `cascade/settled` on every PR, as warnings set by `CASCADE_G2_MODE` and `CASCADE_G3_MODE`.
 
   Point to RELEASING.md "The cascade" and "Stop switches". Cite no wiring section.
-- [ ] 4.2 Repeat the 1.1 comparison against A's newest state, input by input. Fix any drift in the callers in its own `ci(cascade)` commit, never inside the 4.4 `docs(agents)` commit, or report it to the supervisor when A and the wiring contract disagree.
-- [ ] 4.3 Run `openspec validate join-release-cascade --strict` and `task openspec:check`. Re-read the three spec deltas against the final files, so every scenario matches the YAML as written.
-- [ ] 4.4 The local gate is green, then commit `docs(agents): describe the cascade receiver, notify job and switches`.
+  Done: The bullet now names `deps-cascade.yml` (dispatch, 06:17 UTC sweep, `dry_run`), the fail-closed `CASCADE_DRY_RUN`, `Notify downstream` and `CASCADE_NOTIFY=off`, `cascade-gates.yml` and the two mode variables, and points to RELEASING.md "The cascade" and "Stop switches". No wiring section is cited.
+- [x] 4.2 Repeat the 1.1 comparison against A's newest state, input by input. Fix any drift in the callers in its own `ci(cascade)` commit, never inside the 4.4 `docs(agents)` commit, or report it to the supervisor when A and the wiring contract disagree.
+  Done: A unchanged since 1.1 (`04bc25d`, still not on `origin`); every caller input matches and the actionlint input check against A's copies is clean. No drift fix needed. The open G-shared item is still A's `publish.if` lacking `inputs.gates-only` (reported).
+- [x] 4.3 Run `openspec validate join-release-cascade --strict` and `task openspec:check`. Re-read the three spec deltas against the final files, so every scenario matches the YAML as written.
+  Done: `openspec validate join-release-cascade --strict` valid, `task openspec:check` 68/0. Each delta scenario matches the YAML as written; the scenario "A release head's code cannot unlock publishing" depends on A reading `inputs.gates-only` in `publish.if`, which G-shared checks.
+- [x] 4.4 The local gate is green, then commit `docs(agents): describe the cascade receiver, notify job and switches`.
+  Done: `task lint` (0 issues), `task test:unit`, `task openspec:check` green; no `environment: cascade`, `CASCADE_APP_PRIVATE_KEY` or `secrets: inherit` anywhere under `.github/`.
 
 ## 5. Verify and archive
 
