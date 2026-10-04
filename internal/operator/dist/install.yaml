@@ -100,6 +100,15 @@ spec:
                   (no render/apply/prune, no finalizer) and record a single
                   ManagedExternally acknowledgement. There is no CRD default; the
                   reconciler carries the operator-managed default semantics.
+
+                  The operator never reconciles the instance that deploys the operator
+                  itself, whatever this field says: an instance named opm-operator in
+                  opm-operator-system, an instance of the opmodel.dev/modules/opm_operator
+                  module, or one whose inventory records the operator's own
+                  CustomResourceDefinitions. With an absent or "operator" value such an
+                  instance is refused (Ready=False, Stalled=True, reason
+                  SelfManagementRefused) and never gets the cleanup finalizer, so
+                  re-running the install can always repair the operator. Keep it "cli".
                 enum:
                 - cli
                 - operator
@@ -1640,7 +1649,7 @@ spec:
         env:
         - name: GOMEMLIMIT
           value: 3276MiB
-        image: ghcr.io/open-platform-model/opm-operator:v1.0.0-beta.5@sha256:cd48321b1ffb17481fc6818c0afa324ce0312bea4af11f36d44f8b91e63b34b1
+        image: ghcr.io/open-platform-model/opm-operator:v1.0.0-beta.7@sha256:c10178d190deb16ede0cc3092a5cfb17dd0278d159b817b4ce4bdba8f1b68455
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
