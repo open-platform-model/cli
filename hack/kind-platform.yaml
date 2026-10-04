@@ -19,4 +19,4 @@ spec:
     # Scalar subscription (0010): exactly one published catalog build per
     # entry, named by bare SemVer under the major-suffixed module path.
     opmodel.dev/catalogs/opm@v4:
-      version: "4.4.4"
+      version: "4.6.0"

@@ -19,6 +19,43 @@ func compileX(t *testing.T, ctx *cue.Context, src string) cue.Value {
 	return v
 }
 
+// catalogRoleSchema is catalog_opm's #RoleSchema shape (role rules and
+// subjects, the subject an embedded disjunction of two structs), with the
+// subjects field spelled by subjectsField ("subjects!" or "subjects?").
+func catalogRoleSchema(subjectsField string) string {
+	return `
+#PolicyRuleSchema: #ResourcePolicyRuleSchema | #NonResourcePolicyRuleSchema
+#ResourcePolicyRuleSchema: {
+	apiGroups!: [...string]
+	resources!: [...string]
+	verbs!: [...string]
+	resourceNames?: [...string]
+	nonResourceURLs?: _|_
+}
+#NonResourcePolicyRuleSchema: {
+	nonResourceURLs!: [_, ...] & [...string]
+	verbs!: [...string]
+	apiGroups?:     _|_
+	resources?:     _|_
+	resourceNames?: _|_
+}
+#ServiceAccountSchema: {
+	name!:           string
+	automountToken?: bool
+}
+#WorkloadIdentitySchema: {
+	name!:           string
+	automountToken?: bool
+}
+#RoleSubjectSchema: {#WorkloadIdentitySchema | #ServiceAccountSchema}
+#X: {
+	name!: string
+	scope: "namespace" | "cluster"
+	rules!: [...#PolicyRuleSchema] & [_, ...]
+	` + subjectsField + `: [...#RoleSubjectSchema] & [_, ...]
+}`
+}
+
 type wantViolation struct {
 	path, kind string
 }
@@ -153,6 +190,49 @@ func TestCheck(t *testing.T) {
 			[]wantViolation{{"t", KindDefaultChanged}, {"t", KindDomainNarrowed}}},
 		{"concrete-to-non-concrete default", `#X: {t: *"a" | string}`, `#X: {t: *string | "a"}`,
 			[]wantViolation{{"t", KindDefaultChanged}}},
+
+		// CUE gives every open list an implicit default (the list closed at
+		// its fixed elements); no author wrote it, so it is never compared.
+		// The catalog_opm incident: role subjects made optional was refused
+		// as "default changed" with the same rendering on both sides.
+		{"catalog role subjects made optional",
+			catalogRoleSchema("subjects!"), catalogRoleSchema("subjects?"), nil},
+		{"catalog role subjects made required",
+			catalogRoleSchema("subjects?"), catalogRoleSchema("subjects!"),
+			[]wantViolation{{"subjects", KindFieldMadeRequired}}},
+		{"non-empty open list made optional", `#X: {xs!: [...string] & [_, ...]}`, `#X: {xs?: [...string] & [_, ...]}`, nil},
+		{"regular non-empty open list made optional", `#X: {xs: [...string] & [_, ...]}`, `#X: {xs?: [...string] & [_, ...]}`, nil},
+		{"open list made optional", `#X: {xs: [...string]}`, `#X: {xs?: [...string]}`, nil},
+		{"open list narrowed to non-empty", `#X: {xs: [...string]}`, `#X: {xs: [...string] & [_, ...]}`,
+			[]wantViolation{{"xs", KindDomainNarrowed}}},
+
+		// An authored list default is still a default.
+		{"authored list default changed", `#X: {xs: *["a"] | [...string]}`, `#X: {xs: *["b"] | [...string]}`,
+			[]wantViolation{{"xs", KindDefaultChanged}, {"xs", KindDomainNarrowed}}},
+		// The raw-mode leaf subsume is default-sensitive, as in "change
+		// default" above, so a removed list default also reports narrowing.
+		{"authored list default removed", `#X: {xs: *["a"] | [...string]}`, `#X: {xs: [...string]}`,
+			[]wantViolation{{"xs", KindDefaultRemoved}, {"xs", KindDomainNarrowed}}},
+		{"authored empty list default changed", `#X: {xs: *[] | [...string]}`, `#X: {xs: *["a"] | [...string]}`,
+			[]wantViolation{{"xs", KindDefaultChanged}, {"xs", KindDomainNarrowed}}},
+		{"authored list default behind a reference changed",
+			`#D: *["a"] | [...string], #X: {xs: #D}`,
+			`#D: *["b"] | [...string], #X: {xs: #D}`,
+			[]wantViolation{{"xs", KindDefaultChanged}, {"xs", KindDomainNarrowed}}},
+		// Adding a default is additive; the implicit [] used to be compared
+		// against it and reported "default changed".
+		{"authored list default added", `#X: {xs: [...string]}`, `#X: {xs: *["a"] | [...string]}`, nil},
+
+		// Defaults written inside an open list's fixed elements are folded
+		// into its implicit default, so they are compared element-wise.
+		{"open list fixed element default removed", `#X: {xs: [*"a" | string, ...string]}`, `#X: {xs: [string, ...string]}`,
+			[]wantViolation{{"xs[0]", KindDefaultRemoved}}},
+		{"open list fixed element nested default removed", `#X: {xs: [{a: *1 | int}, ...]}`, `#X: {xs: [{a: int}, ...]}`,
+			[]wantViolation{{"xs[0].a", KindDefaultRemoved}}},
+		{"open list fixed element nested default changed", `#X: {xs: [{a: *1 | int}, ...]}`, `#X: {xs: [{a: *2 | int}, ...]}`,
+			[]wantViolation{{"xs[0].a", KindDefaultChanged}, {"xs", KindDomainNarrowed}}},
+		{"open list fixed element default unchanged made optional", `#X: {xs!: [{a: *1 | int}, ...]}`, `#X: {xs?: [{a: *1 | int}, ...]}`, nil},
+		{"open list fixed element default added", `#X: {xs: [string, ...string]}`, `#X: {xs: [*"a" | string, ...string]}`, nil},
 	}
 
 	ctx := cuecontext.New()

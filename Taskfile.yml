@@ -428,7 +428,7 @@ tasks:
       - go install -ldflags "{{.LDFLAGS}}" ./cmd/opm
 
   check:
-    desc: Run all checks (fmt, vet, lint, openspec, docs bundle, test)
+    desc: Run all checks (fmt, vet, lint, openspec, docs bundle, test, cascade wiring)
     cmds:
       - task: fmt
       - task: vet
@@ -436,6 +436,7 @@ tasks:
       - task: openspec:check
       - task: docs:bundle:check
       - task: test
+      - task: cascade:wiring:check
 
   generate:
     desc: Run go generate
@@ -468,6 +469,11 @@ tasks:
     desc: Refuse a docs-kit publish.yml ref under .github/workflows/ that names another release than .opm-docs-version (offline)
     cmds:
       - bash .tasks/opm-docs.sh pin-check
+
+  cascade:wiring:check:
+    desc: Check the release-cascade caller workflows (Phase 3 wiring contract 10.1)
+    cmds:
+      - bash .tasks/cascade/wiring-check.sh
 
   docs:bundle:check:
     desc: Check the docs-kit pins agree, then build and lint the cli docs bundle into a temporary directory

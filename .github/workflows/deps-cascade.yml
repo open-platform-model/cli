@@ -1,0 +1,94 @@
+name: Deps cascade
+
+# The release-cascade receiver (workspace RELEASING.md, "The receiver" and
+# "Two-job split"). An upstream release (library, opm-operator or
+# catalog_opm) dispatches upstream-released here; the daily sweep and a
+# manual run cover a dispatch that never arrived.
+#
+# Two jobs. cascade calls the reusable cascade-receive.yml at this repo's
+# pinned .github commit: compute runs this repo's task -x deps:cascade and
+# plans the rolling deps/cascade pull request, and gates posts the release-PR
+# gates; neither holds a secret. publish is this repo's own job and the only
+# one here that reads the App key: it declares environment: cascade (main
+# only) and passes secrets.CASCADE_APP_PRIVATE_KEY only as the private-key
+# input of the SHA-pinned cascade-publish action, its one step, with no
+# checkout, run:, env:, container: or services: of its own (the action
+# checks the repo out but never runs it). No reusable call passes secrets:
+# or secrets: inherit. task cascade:wiring:check, run in the required Lint
+# job, holds this shape.
+#
+# The receiver fails closed: every run is a dry run (compute and summarize,
+# push nothing) unless the repository variable CASCADE_DRY_RUN is exactly
+# false, and a manual run with dry_run set is a dry run either way. The
+# publish job's if: and the action's dry-run input both read the switch. A
+# run from any ref but main is always a dry run. Real runs on main share the
+# concurrency group deps-cascade (one active, one pending, none cancelled
+# mid-run); gates-only runs and branch runs get their own groups, so they
+# never replace a pending real run (RELEASING.md, "Concurrency").
+
+on:
+  repository_dispatch:
+    types: [upstream-released]
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Compute and show the diff in the job summary; push nothing
+        type: boolean
+        default: false
+      gates_only:
+        description: Evaluate and post the release-PR gates only (sent by Cascade gates)
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.ref != 'refs/heads/main' && format('deps-cascade-{0}', github.ref) || (inputs.gates_only && 'deps-cascade-gates' || 'deps-cascade') }}
+  cancel-in-progress: false
+
+jobs:
+  cascade:
+    name: Deps cascade
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    uses: open-platform-model/.github/.github/workflows/cascade-receive.yml@2376ffae4bfc665f327d51581350dea694c01504 # .github main
+    with:
+      dry-run: ${{ inputs.dry_run == true || vars.CASCADE_DRY_RUN != 'false' }}
+      gates-only: ${{ inputs.gates_only == true }}
+      g2-mode: ${{ vars.CASCADE_G2_MODE || 'warn' }}
+      g3-mode: ${{ vars.CASCADE_G3_MODE || 'warn' }}
+      # The cascade task builds opm and runs go get, go mod tidy and
+      # go run ./hack/docskit-dump.
+      setup-go: true
+
+  publish:
+    name: Publish
+    needs: cascade
+    if: >-
+      !cancelled()
+      && needs.cascade.outputs.compute-ok == 'true'
+      && needs.cascade.outputs.dry-run == 'false'
+      && inputs.dry_run != true
+      && vars.CASCADE_DRY_RUN == 'false'
+      && github.ref == 'refs/heads/main'
+      && contains(fromJSON('["push","recreate","close","conflict","too_long"]'), needs.cascade.outputs.action)
+    runs-on: ubuntu-latest
+    environment: cascade
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Publish
+        uses: open-platform-model/.github/.github/actions/cascade-publish@2376ffae4bfc665f327d51581350dea694c01504 # .github main
+        with:
+          dry-run: ${{ inputs.dry_run == true || vars.CASCADE_DRY_RUN != 'false' }}
+          # .github/labels.yml owns this repo's labels, so publish only
+          # checks that the cascade labels exist and never creates one.
+          labels-managed: true
+          client-id: ${{ vars.CASCADE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CASCADE_APP_PRIVATE_KEY }}
