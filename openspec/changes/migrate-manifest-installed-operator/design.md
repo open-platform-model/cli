@@ -4,14 +4,14 @@ proposal.md, Why, describes the problem. The code this change touches, as read o
 
 - **The apply guard.** `inventory.PreApplyExistenceCheck` (`internal/inventory/stale.go`) GETs every rendered entry on a first apply. It refuses at the first object without an OPM `app.kubernetes.io/managed-by` value (`pkgcore.IsOPMManagedBy`). It logs a read error other than NotFound at debug level and skips the object. `apply.RunPreApplyExistenceCheck` (`internal/workflow/apply/apply.go`) skips the guard entirely when a previous inventory exists or on a dry run. The guard admits any OPM-managed object, whichever instance it belongs to.
 - **The writes.** `kubernetes.ApplyOne` server-side-applies with field manager `opm-cli` and `Force: true` (`internal/kubernetes/apply.go`, `internal/kubernetes/labels.go`). `inventory.PruneStaleResources` deletes with foreground propagation and never deletes a CRD or a Namespace (`kubernetes.IsProtectedKind`). `kubernetes.WaitAbsent` waits for objects to disappear; `operator.waitForTerminating` in `internal/operator/install.go` uses it.
-- **The install being replaced.** Today `operator.Install` server-side-applies the embedded `dist/install.yaml` (`internal/operator/manifest.go`, `PinnedOperatorVersion = "v1.0.0-beta.5"`). Change `install-operator-from-module` replaces it with a two-step module install: a check phase with no writes, the CRD step, then the instance apply. That change leaves a slot for this one in the check phase and in the write order. Its check phase runs `inventory.PreApplyExistenceCheck` over every rendered object inside `PlanInstall` when no record exists, and its instance apply runs the same guard again through `apply.RunPreApplyExistenceCheck`. Its planning sketch places the proof slot after that guard; this change needs it before the guard (see "Flow"). Its instance apply applies the four CRDs again with the same field manager after the CRD step: `splitClusterDefinitions` (`internal/kubernetes/apply.go`) applies protected kinds first, and the install experiment reported `15 created, 4 unchanged` for those CRDs. The exact function names come from that change once it is merged (task 1.2).
+- **The install being replaced.** Today `operator.Install` server-side-applies the embedded `dist/install.yaml` (`internal/operator/manifest.go`, `PinnedOperatorVersion = "v1.0.0-beta.5"`). Change `install-operator-from-module` replaces it with a two-step module install: a check phase with no writes, the CRD step, then the instance apply. That change leaves a slot for this one in the check phase and in the write order. Its check phase runs `inventory.PreApplyExistenceCheck` over every rendered object inside `PlanInstall` when no record exists, as its last check, and leaves the proof slot immediately before it, as this change needs (see "Flow"); its instance apply runs the same guard again through `apply.RunPreApplyExistenceCheck`. Its instance apply applies the four CRDs again with the same field manager after the CRD step: `splitClusterDefinitions` (`internal/kubernetes/apply.go`) applies protected kinds first, and the install experiment reported `15 created, 4 unchanged` for those CRDs. The exact function names come from that change once it is merged (task 1.2).
 - **Identity labels.** `pkg/core/labels.go` defines `module-instance.opmodel.dev/{name,namespace,uuid}`. The operator module's render stamps them, and `app.kubernetes.io/managed-by: opm-cli`, on every object.
 
 ### What the earlier manifests contain (measured 2026-10-04)
 
 These figures come from `dist/install.yaml` at every one of the 47 opm-operator tags and from the GitHub release assets:
 
-- Releases v0.5.0 to v1.0.0-beta.5 publish an `install.yaml` asset; v0.2.0 to v0.4.0 publish none. From v0.2.0 to v0.4.4 every name is `poc-controller-*` in `poc-controller-system`. From v0.5.0 every name carries the `opm-operator` prefix.
+- Only operator releases (tags `v<semver>`) were read; the operator module's releases (tags `opm_operator-vX.Y.Z`, from opm-operator's `release-operator-module`) also attach an `install.yaml`, but it is a render of the module and is never a source for this list. Releases v0.5.0 to v1.0.0-beta.5 publish an `install.yaml` asset; v0.2.0 to v0.4.0 publish none. From v0.2.0 to v0.4.4 every name is `poc-controller-*` in `poc-controller-system`. From v0.5.0 every name carries the `opm-operator` prefix.
 - The union over v0.5.0 to v1.0.0-beta.5 is 29 objects. 19 belong to the current manifest. The other 10 shipped only in older releases:
   - the ClusterRoles `opm-operator-bundlerelease-{admin,editor,viewer}-role` (v0.5.0 to v0.6.4);
   - the ClusterRoles `opm-operator-modulerelease-{admin,editor,viewer}-role` (v0.5.0 to v0.7.5);
@@ -48,7 +48,7 @@ In the same experiment, an upgrade that rolled the operator pod produced a 28 s 
 
 **Non-Goals:**
 
-- Writing the 0012:D8 adopt annotation. The amended 0012:D8 lets `opm operator install` set it on exactly the objects this change proves, but no frontend's guard reads it yet. This change admits the same objects through an admission set instead. When the guard reads the annotation, a later change can switch install to writing it; the spec names which objects pass, not how, so it does not change.
+- Writing the 0012:D8 adopt annotation. 0012:D8:R6, as amended in enhancements PR #94, says no frontend sets it on the user's behalf and that installing the operator admits the proven objects as if adopted. This change does exactly that, through an admission set, and writes nothing to mark the objects.
 - Closing the guard's general gap: it admits another instance's OPM-managed object. The migration refuses such an object when it is on the proof list; for other objects the guard is unchanged here.
 - Migrating `poc-controller-*` installs (v0.2.0 to v0.4.4). No release with those names published a manifest, so they are not on the list.
 - Ownership transfer of the operator's instance, version and downgrade checks, and locating the operator. Other changes own these.
@@ -68,7 +68,7 @@ opm operator install
        -> or *migration.RefusalError naming every object that blocks it
     apply guard over the rendered objects, admitting Plan.Admit()
                                                      (install-operator-from-module guard,
-                                                      moved after the proof by this change)
+                                                      its last check, after the proof slot)
   write phase:
     CRD step, wait until served                      (install-operator-from-module)
     migration.MoveOwnership(ctx, client, plan)       (this change)
@@ -101,9 +101,9 @@ type LegacyObject struct {
 var LegacyObjects = []LegacyObject{ /* 29 entries */ }
 ```
 
-`hack/operator-legacy/` is a `go run` program that is not linked into `opm`. It downloads `install.yaml` from every release that has that asset and writes `internal/operator/testdata/legacy-manifests.json`, with the kind, namespace, name, labels and selector per release and no specs. It needs the network and runs by hand, only when an earlier release is found to be missing. A unit test checks `LegacyObjects` against that file offline.
+`hack/operator-legacy/` is a `go run` program that is not linked into `opm`. It downloads `install.yaml` from every operator release, a tag matching `v<semver>`, that has that asset. It skips every other tag, the operator module's `opm_operator-vX.Y.Z` releases included: their `install.yaml` is the module's render, whose objects carry the operator instance's identity and so are never foreign. The tag filter is a function with its own offline test and writes `internal/operator/testdata/legacy-manifests.json`, with the kind, namespace, name, labels and selector per release and no specs. It needs the network and runs by hand, only when an earlier release is found to be missing. A unit test checks `LegacyObjects` against that file offline.
 
-The list is closed. The operator now ships as a module, and any manifest a later release publishes is a render of that module (0021:D4). Such a manifest carries the instance identity and the module's selector, so its objects are this instance's own, not foreign.
+The list closes once operator releases stop attaching `install.yaml` (opm-operator's `stop-operator-install-manifest`, gated on this cli). Until then an operator release after v1.0.0-beta.5 still attaches a manifest built from `config/default`; task 2.1 runs the program at implementation time, so the list covers every operator release published by then, and a release cut after that is added by re-running it. The module's own manifests never need an entry: they carry the instance identity and the module's selector, so their objects are this instance's own, not foreign (0021:D4 as amended).
 
 **Options considered:**
 
@@ -143,12 +143,12 @@ type AdmitSet map[K8sIdentity]struct{}
 
 `K8sIdentity` is new (`pkg/inventory/entry.go` has only `K8sIdentityEqual`, which compares two entries); task 4.1 adds it beside that function. An entry in `admit` passes the managed-by test, and only that test: a terminating admitted object is still refused. Every other caller passes `nil`, which keeps today's behaviour. `apply.Request` gains the set, so the instance apply admits the same objects as the check-phase guard. `Plan.Admit()` is `Adopt` plus the rendered objects whose identity is this instance's (`Ours`); the latter already pass today, and listing them keeps a resumed run's set complete.
 
-The amended 0012:D8 lets install set the adopt annotation on exactly these proven objects instead. Both mechanisms admit the same objects; the set needs no write, nothing of it outlives the run, and a resumed run recomputes it.
+This is the admission 0012:D8:R6 describes: the proven objects pass as if adopted, and no adopt annotation is written on the user's behalf. The set needs no write, nothing of it outlives the run, and a resumed run recomputes it.
 
 **Options considered:**
 
 1. **Relabel the proven objects `managed-by=opm-cli` before the apply**, as the install experiment did by hand. That is one more write per object. The label is also the guard's signal for every instance, so a relabel outlives the install.
-2. **Write the 0012:D8 adopt annotation and teach the guard to read it.** That is 0012's design. Doing it here would implement half of 0012:D8 in one frontend, and the migration would then wait on that decision's implementation.
+2. **Write the 0012:D8 adopt annotation and teach the guard to read it.** Ruled out by 0012:D8:R6: no frontend sets the annotation on the user's behalf.
 3. **An explicit admission set computed from the proof.** It needs no write, nothing outlives the run, and a resumed run recomputes it. Chosen.
 
 ### Field ownership of client-side installs
@@ -167,11 +167,11 @@ The scope is deliberately narrow. Only the `kubectl-client-side-apply` manager m
 
 ### Deployment recreate
 
-The Deployment is deleted only when it is `Proven` and its live `spec.selector.matchLabels` equals the listed selector. The delete uses foreground propagation, then `WaitAbsent` under the install's `--timeout` budget. A Deployment that is `Ours`, or that carries any other selector, is never deleted. An `Unproven` Deployment on the list refuses the install. Its names come from `locate-operator-and-guard-its-instance`'s `internal/operator/names.go` (`OperatorNamespace`, `ControllerDeploymentName`), not from new literals.
+The Deployment is deleted only when it is `Proven` and its live `spec.selector.matchLabels` equals the listed selector (0012:D8:R7). The delete uses foreground propagation, then `WaitAbsent` under the install's `--timeout` budget. A Deployment that is `Ours`, or that carries any other selector, is never deleted. An `Unproven` Deployment on the list refuses the install. Its names come from `locate-operator-and-guard-its-instance`'s `internal/operator/names.go` (`OperatorNamespace`, `ControllerDeploymentName`), not from new literals.
 
 ### Binding delete
 
-A superseded binding is deleted only when it is `Proven` and the render holds a binding of the same kind and namespace whose `roleRef` (API group, kind, name) equals the live binding's `roleRef`. The proof list does not hardcode the replacement names: the catalog's role abstraction decides them, and the render is the only source that cannot drift from it. A proven superseded binding with no replacement in the render refuses the install, naming the binding and its `roleRef`; deleting it would leave the operator without the rights it grants. The report names the replacement it found.
+A superseded binding is deleted only when it is `Proven` (0012:D8:R7) and the render holds a binding of the same kind and namespace whose `roleRef` (API group, kind, name) equals the live binding's `roleRef`. The proof list does not hardcode the replacement names: the catalog's role abstraction decides them, and the render is the only source that cannot drift from it. A proven superseded binding with no replacement in the render refuses the install, naming the binding and its `roleRef`; deleting it would leave the operator without the rights it grants. The report names the replacement it found.
 
 The controller is down from the delete until the new pod holds the leader lease. The owner accepted this one-time outage when choosing the catalog-shaped module. The managed workloads keep running throughout. Only reconciliation pauses.
 
@@ -227,7 +227,7 @@ The cli `README.md` operator section gains a short note (task 4.6): the first in
 
 - [The operator is down from the Deployment delete until the new pod holds the leader lease; about 28 s were measured on a pod roll] → Accepted by the owner. The report says so, and the managed workloads keep running.
 - [csaupgrade does not move the kustomize labels or the annotation] → Section 1 measures it first. If it fails, this design takes the JSON-patch option for exactly the fields the proof list names plus the annotation, and the spec is unchanged.
-- [A release manifest is missing from the table] → The table is closed (see the proof-list decision), and the test against the downloaded set catches a gap among past releases.
+- [An operator release manifest is missing from the table] → The program reads every operator release (`v<semver>`) at implementation time and the test against the downloaded set catches a gap among past releases; an operator release that still attaches a manifest after that is added by re-running the program, until `stop-operator-install-manifest` closes the list (see the proof-list decision). Module releases are never a source.
 - [Controller arguments a user patched onto the earlier Deployment, such as `--registry`, vanish with the recreate] → They become instance values under `install-operator-from-module`. The report's recreate line says the patches are not carried over, and the README migration note says to pass them as values on this install.
 - [An object on the list belongs to another instance and gets touched] → It reads `Unproven` and refuses the install before any write.
 - [The delivery run needs a cluster that can pull the operator image] → At proposal time, kind nodes on the development host have no egress. `kind load docker-image` failed for the multi-arch operator image in the install experiment (`ctr: content digest … not found`). The run therefore uses a single-platform pull, a host-network pull-through mirror, or another cluster, and its result is recorded before archive.
