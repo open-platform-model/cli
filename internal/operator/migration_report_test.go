@@ -93,5 +93,5 @@ func TestMigrationRefusal_NamesEveryObject(t *testing.T) {
 	assert.Equal(t, `operator migration refused: 2 object(s) of an earlier operator manifest cannot be proven:
   ClusterRoleBinding/opm-operator-manager-rolebinding: carries the identity of instance team-a/web
   ServiceAccount/opm-operator-system/opm-operator-controller-manager: label app.kubernetes.io/name is "x", earlier manifests set "opm-operator"
-nothing was changed; remove or rename these objects, then re-run 'opm operator install'`, err.Error())
+nothing was changed; remove or rename these objects, or stop the tool that applies them, then re-run 'opm operator install'`, err.Error())
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -187,6 +188,60 @@ func TestPlanMigration_Refusals(t *testing.T) {
 				"Deployment/opm-operator-system/opm-operator-controller-manager: carries the identity",
 				"RoleBinding/opm-operator-system/opm-operator-leader-election-rolebinding: carries the identity"},
 		},
+		{
+			// Flux would re-apply the old-selector Deployment and the
+			// bindings install deletes.
+			name: "a manifest install Flux applies",
+			cluster: func() []*unstructured.Unstructured {
+				objs := manifestObjects(t, beta8, originOPMCLI)
+				for _, o := range objs {
+					l := o.GetLabels()
+					if l == nil {
+						l = map[string]string{}
+					}
+					l["kustomize.toolkit.fluxcd.io/name"] = "opm-operator"
+					o.SetLabels(l)
+				}
+				return objs
+			}(),
+			render: migrationModuleObjects(""),
+			want: []string{
+				"Deployment/opm-operator-system/opm-operator-controller-manager: is applied by Flux (label kustomize.toolkit.fluxcd.io/name); suspend",
+				"ClusterRoleBinding/opm-operator-manager-rolebinding: is applied by Flux",
+				"or stop the tool that applies them"},
+		},
+		{
+			name: "a binding Argo CD tracks by annotation",
+			cluster: mutated("ClusterRoleBinding", "opm-operator-metrics-auth-rolebinding", func(o *unstructured.Unstructured) {
+				o.SetAnnotations(map[string]string{"argocd.argoproj.io/tracking-id": "opm:rbac.authorization.k8s.io/ClusterRoleBinding:/opm-operator-metrics-auth-rolebinding"})
+			}),
+			render: migrationModuleObjects(""),
+			want:   []string{"1 object(s)", "ClusterRoleBinding/opm-operator-metrics-auth-rolebinding: is applied by Argo CD (annotation argocd.argoproj.io/tracking-id)"},
+		},
+		{
+			name: "a Deployment Argo CD applies client-side",
+			cluster: mutated("Deployment", ControllerDeploymentName, func(o *unstructured.Unstructured) {
+				o.SetManagedFields(append(o.GetManagedFields(), metav1.ManagedFieldsEntry{Manager: "argocd-controller", Operation: metav1.ManagedFieldsOperationUpdate}))
+			}),
+			render: migrationModuleObjects(""),
+			want:   []string{"1 object(s)", "Deployment/opm-operator-system/opm-operator-controller-manager: is applied by Argo CD (field manager argocd-controller)"},
+		},
+		{
+			name: "a rendered object another tool server-side applies",
+			cluster: mutated("ServiceAccount", "opm-operator-controller-manager", func(o *unstructured.Unstructured) {
+				o.SetManagedFields(append(o.GetManagedFields(), metav1.ManagedFieldsEntry{Manager: "pulumi-kubernetes", Operation: metav1.ManagedFieldsOperationApply}))
+			}),
+			render: migrationModuleObjects(""),
+			want:   []string{"1 object(s)", "ServiceAccount/opm-operator-system/opm-operator-controller-manager: is server-side applied by field manager pulumi-kubernetes, not by opm-cli or kubectl"},
+		},
+		{
+			// The earlier controller would run beside the module's and
+			// compete for the leader lease.
+			name:    "a proven Deployment the module does not render",
+			cluster: manifestObjects(t, beta8, originOPMCLI),
+			render:  withoutKey(migrationModuleObjects(""), kindDeployment, ControllerDeploymentName),
+			want:    []string{"1 object(s)", "Deployment/opm-operator-system/opm-operator-controller-manager: the module renders no Deployment of this name"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -264,9 +319,8 @@ func TestPlanMigration_CRDsOnly(t *testing.T) {
 	require.ErrorAs(t, err, &refusal)
 }
 
-// Until the plan is admitted (the guard still runs without it), a proven
-// manifest install is refused by the guard and an unproven one by the
-// proof; neither writes.
+// An unproven manifest install is refused by the proof, before the guard
+// runs, and nothing is written.
 func TestPlanInstall_ProofRunsBeforeTheGuard(t *testing.T) {
 	cluster := manifestObjects(t, beta8, originOPMCLI)
 	findObj(cluster, "ClusterRoleBinding", "opm-operator-manager-rolebinding").SetLabels(map[string]string{"module-instance.opmodel.dev/uuid": "other"})

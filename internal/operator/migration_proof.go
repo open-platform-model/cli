@@ -5,8 +5,10 @@ import (
 	"maps"
 	"sort"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/open-platform-model/cli/internal/kubernetes"
 	pkgcore "github.com/open-platform-model/cli/pkg/core"
 )
 
@@ -36,9 +38,10 @@ var identityLabels = []string{
 
 // ProveLegacy proves a live object against its proof-list entry (0012:D8:R6):
 // it is proven when it carries every label the entry lists (added labels do
-// not disprove it), the Deployment also the listed selector, and none of
-// the instance identity labels. An object carrying instanceUUID is the
-// instance's own. The reason says why an object is unproven.
+// not disprove it), the Deployment also the listed selector, none of the
+// instance identity labels, and no mark of another tool that keeps applying
+// it (see gitOpsOwner). An object carrying instanceUUID is the instance's
+// own. The reason says why an object is unproven.
 func ProveLegacy(live *unstructured.Unstructured, want LegacyObject, instanceUUID string) (verdict Verdict, reason string) {
 	if live == nil {
 		return VerdictAbsent, ""
@@ -73,8 +76,62 @@ func ProveLegacy(live *unstructured.Unstructured, want LegacyObject, instanceUUI
 			return VerdictUnproven, fmt.Sprintf("selector is %v, earlier manifests set %v", sel, want.Selector)
 		}
 	}
+	if owner := gitOpsOwner(live); owner != "" {
+		return VerdictUnproven, owner + "; suspend that tool's reconciliation of the operator first, or it re-applies what install changes"
+	}
 	return VerdictProven, ""
 }
+
+// gitOpsLabels and gitOpsAnnotations are the tracking marks Flux and Argo CD
+// set on the objects they apply; gitOpsManagers are their field managers.
+var (
+	gitOpsLabels = map[string]string{
+		"kustomize.toolkit.fluxcd.io/name": "Flux",
+		"helm.toolkit.fluxcd.io/name":      "Flux",
+		"argocd.argoproj.io/instance":      "Argo CD",
+	}
+	gitOpsAnnotations = map[string]string{
+		"argocd.argoproj.io/tracking-id": "Argo CD",
+	}
+	gitOpsManagers = map[string]string{
+		"kustomize-controller":          "Flux",
+		"helm-controller":               "Flux",
+		"argocd-controller":             "Argo CD",
+		"argocd-application-controller": "Argo CD",
+	}
+)
+
+// gitOpsOwner names the tool that keeps applying a live object, or "": a
+// Flux or Argo CD tracking label or annotation, a Flux or Argo CD field
+// manager, or a server-side apply by any manager other than opm-cli or
+// kubectl. Install would fight such a tool over the objects it adopts,
+// recreates or deletes.
+func gitOpsOwner(live *unstructured.Unstructured) string {
+	labels, annotations := live.GetLabels(), live.GetAnnotations()
+	for _, key := range sortedKeys(gitOpsLabels) {
+		if _, ok := labels[key]; ok {
+			return fmt.Sprintf("is applied by %s (label %s)", gitOpsLabels[key], key)
+		}
+	}
+	for _, key := range sortedKeys(gitOpsAnnotations) {
+		if _, ok := annotations[key]; ok {
+			return fmt.Sprintf("is applied by %s (annotation %s)", gitOpsAnnotations[key], key)
+		}
+	}
+	for _, mf := range live.GetManagedFields() {
+		if tool, ok := gitOpsManagers[mf.Manager]; ok {
+			return fmt.Sprintf("is applied by %s (field manager %s)", tool, mf.Manager)
+		}
+		if mf.Operation == metav1.ManagedFieldsOperationApply && mf.Manager != kubernetes.FieldManager && mf.Manager != kubectlApplyManager {
+			return fmt.Sprintf("is server-side applied by field manager %s, not by opm-cli or kubectl", mf.Manager)
+		}
+	}
+	return ""
+}
+
+// kubectlApplyManager is the field manager of a `kubectl apply
+// --server-side` without --field-manager.
+const kubectlApplyManager = "kubectl"
 
 // instanceRef names the instance an object's identity labels point at.
 func instanceRef(labels map[string]string) string {

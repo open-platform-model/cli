@@ -108,7 +108,7 @@ func (e *MigrationRefusalError) Error() string {
 	for _, blk := range e.Blocks {
 		fmt.Fprintf(&b, "\n  %s: %s", objPath(blk.Kind, blk.Namespace, blk.Name), blk.Reason)
 	}
-	b.WriteString("\nnothing was changed; remove or rename these objects, then re-run 'opm operator install'")
+	b.WriteString("\nnothing was changed; remove or rename these objects, or stop the tool that applies them, then re-run 'opm operator install'")
 	return b.String()
 }
 
@@ -192,7 +192,8 @@ func PlanMigration(ctx context.Context, client *kubernetes.Client, rendered []*u
 
 // classify sorts one proof-list entry into the plan, or returns the block
 // it raises: an unproven entry the migration would adopt, recreate or
-// delete, or a proven superseded binding the render does not replace.
+// delete, a proven superseded binding the render does not replace, or a
+// proven earlier Deployment the render does not hold.
 func (p *MigrationPlan) classify(want LegacyObject, live *unstructured.Unstructured, verdict Verdict, reason string, isRendered bool, rendered []*unstructured.Unstructured) (MigrationBlock, bool) {
 	block := func(r string) (MigrationBlock, bool) {
 		return MigrationBlock{Kind: want.Kind, Namespace: want.Namespace, Name: want.Name, Reason: r}, true
@@ -219,6 +220,8 @@ func (p *MigrationPlan) classify(want LegacyObject, live *unstructured.Unstructu
 			return block(fmt.Sprintf("the module renders no %s to %s", want.Kind, ref))
 		}
 		p.DeleteBindings = append(p.DeleteBindings, SupersededBinding{Live: live, Replacement: repl})
+	case verdict == VerdictProven && legacyKey(want) == legacyKey(legacyDeployment):
+		return block("the module renders no Deployment of this name, so the earlier controller would keep running beside the module's")
 	case verdict == VerdictProven:
 		p.LeftInPlace = append(p.LeftInPlace, want)
 	}
