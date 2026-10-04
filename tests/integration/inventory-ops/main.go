@@ -250,7 +250,7 @@ func main() {
 	fmt.Printf("   OK: AggregateStatus = %q (not Ready)\n", statusResult.AggregateStatus)
 
 	readInv68.Owner = inventory.OwnerOperator
-	statusOpts := workflowquery.BuildStatusOptions(namespace, &cmdutil.InstanceSelectorFlags{InstanceName: instanceName, InstanceID: instanceID}, "table", false, readInv68, liveResources68, missingResources68)
+	statusOpts := workflowquery.BuildStatusOptions(namespace, &cmdutil.InstanceSelectorFlags{InstanceName: instanceName, InstanceID: instanceID}, "table", false, readInv68, liveResources68, missingResources68, nil)
 	statusResult.Owner = statusOpts.Owner
 	formatted, err := kubernetes.FormatStatus(statusResult, "table")
 	check("formatting operator-managed status", err)

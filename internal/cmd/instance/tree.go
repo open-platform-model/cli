@@ -6,10 +6,13 @@ import (
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
+	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/workflow/query"
@@ -91,10 +94,20 @@ func runInstanceTree(ctx context.Context, identifier string, cfg *config.GlobalC
 		return err
 	}
 
-	inv, liveResources, _, _, err := query.ResolveInventory(ctx, k8sClient, target.Selector, namespace, instanceLog)
+	inv, liveResources, _, unreadable, err := query.ResolveInventory(ctx, k8sClient, target.Selector, namespace, instanceLog)
 	if err != nil {
 		return err
 	}
+
+	return showInstanceTree(ctx, k8sClient, inv, liveResources, unreadable, depth, outputFormat, instanceLog)
+}
+
+// showInstanceTree prints the tree of a resolved instance. It first warns about
+// each tracked resource it could not read; the tree shows what it could read,
+// and with nothing readable it exits 5 (no resources found) as before.
+func showInstanceTree(ctx context.Context, k8sClient *kubernetes.Client, inv *inventory.Record, liveResources []*unstructured.Unstructured,
+	unreadable []inventory.UnreadableEntry, depth int, outputFormat output.Format, instanceLog *log.Logger) error {
+	query.WarnUnreadable(instanceLog, unreadable)
 
 	componentMap := make(map[string]string)
 	for _, entry := range inv.Inventory.Entries {
@@ -120,7 +133,7 @@ func runInstanceTree(ctx context.Context, identifier string, cfg *config.GlobalC
 	result, err := kubernetes.GetModuleTree(ctx, k8sClient, treeOpts)
 	if err != nil {
 		if kubernetes.IsNoResourcesFound(err) {
-			instanceLog.Error("no resources found", "instance", logName, "namespace", namespace)
+			instanceLog.Error("no resources found", "instance", inv.Name, "namespace", inv.Namespace)
 			return &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: err, Printed: true}
 		}
 		instanceLog.Error("getting tree", "error", err)

@@ -54,7 +54,7 @@ func EvaluateInstanceHealth(ctx context.Context, client *kubernetes.Client, inve
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			live, missing, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, inv)
+			live, missing, unreadable, err := inventory.DiscoverResourcesFromInventory(ctx, client, inv)
 			if err != nil {
 				if logDiscoveryFailures {
 					output.Debug("failed to discover resources for instance", "instance", inv.Name, "error", err)
@@ -63,7 +63,14 @@ func EvaluateInstanceHealth(ctx context.Context, client *kubernetes.Client, inve
 				return
 			}
 
-			status, ready, total := kubernetes.QuickInstanceHealth(live, len(missing))
+			// An unreadable resource is never silent: it counts as not ready and
+			// gets one warning per instance (status names each resource).
+			if n := len(unreadable); n > 0 {
+				output.Warn(fmt.Sprintf("instance %q in %q: could not read %d tracked resource(s); run 'opm instance status' for details",
+					inv.Name, inv.Namespace, n))
+			}
+
+			status, ready, total := kubernetes.QuickInstanceHealth(live, len(missing)+len(unreadable))
 			results[idx] = instanceHealthResult{index: idx, status: status, ready: ready, total: total}
 		}(i, inv)
 	}

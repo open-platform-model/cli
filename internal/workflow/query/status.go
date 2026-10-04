@@ -76,7 +76,19 @@ func ResolveInventory(
 	return inv, live, missing, unreadable, nil
 }
 
-func BuildStatusOptions(namespace string, rsf *cmdutil.InstanceSelectorFlags, outputFormat output.Format, verbose bool, inv *inventory.Record, liveResources []*unstructured.Unstructured, missingEntries []inventory.InventoryEntry) kubernetes.StatusOptions {
+// WarnUnreadable logs one warning per tracked resource that could not be read,
+// naming it and the read error. The read-only instance commands call it so a
+// failed read is never silent.
+func WarnUnreadable(logger *log.Logger, unreadable []inventory.UnreadableEntry) {
+	for _, u := range unreadable {
+		logger.Warn("could not read tracked resource",
+			"kind", u.Entry.Kind, "namespace", u.Entry.Namespace, "name", u.Entry.Name, "error", u.Err)
+	}
+}
+
+// BuildStatusOptions assembles the status options from a resolved inventory.
+// Missing entries become "Missing" rows and unreadable entries "Unknown" rows.
+func BuildStatusOptions(namespace string, rsf *cmdutil.InstanceSelectorFlags, outputFormat output.Format, verbose bool, inv *inventory.Record, liveResources []*unstructured.Unstructured, missingEntries []inventory.InventoryEntry, unreadable []inventory.UnreadableEntry) kubernetes.StatusOptions {
 	componentMap := make(map[string]string)
 	for _, entry := range inv.Inventory.Entries {
 		key := entry.Kind + "/" + entry.Namespace + "/" + entry.Name
@@ -84,16 +96,17 @@ func BuildStatusOptions(namespace string, rsf *cmdutil.InstanceSelectorFlags, ou
 	}
 
 	statusOpts := kubernetes.StatusOptions{
-		Namespace:     namespace,
-		InstanceName:  rsf.InstanceName,
-		InstanceID:    rsf.InstanceID,
-		Version:       inv.ModuleVersion,
-		Owner:         inventory.DisplayOwner(inv.Owner),
-		ComponentMap:  componentMap,
-		OutputFormat:  outputFormat,
-		InventoryLive: liveResources,
-		Wide:          outputFormat == output.FormatWide,
-		Verbose:       verbose,
+		Namespace:           namespace,
+		InstanceName:        rsf.InstanceName,
+		InstanceID:          rsf.InstanceID,
+		Version:             inv.ModuleVersion,
+		Owner:               inventory.DisplayOwner(inv.Owner),
+		ComponentMap:        componentMap,
+		OutputFormat:        outputFormat,
+		InventoryLive:       liveResources,
+		Wide:                outputFormat == output.FormatWide,
+		Verbose:             verbose,
+		UnreadableResources: inventory.UnreadableResources(unreadable),
 	}
 	for _, m := range missingEntries {
 		statusOpts.MissingResources = append(statusOpts.MissingResources, kubernetes.MissingResource{

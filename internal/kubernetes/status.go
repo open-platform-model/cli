@@ -49,13 +49,19 @@ type StatusOptions struct {
 	OutputFormat output.Format
 
 	// InventoryLive is the list of live resources pre-fetched from the inventory
-	// Secret by the caller. When empty or nil, GetInstanceStatus returns
-	// noResourcesFoundError (unless MissingResources is also non-empty).
+	// by the caller. When empty or nil, GetInstanceStatus returns
+	// noResourcesFoundError (unless MissingResources or UnreadableResources is
+	// non-empty).
 	InventoryLive []*unstructured.Unstructured
 
 	// MissingResources is the list of resources tracked in the inventory that
 	// no longer exist on the cluster. These are shown with "Missing" status.
 	MissingResources []MissingResource
+
+	// UnreadableResources is the list of tracked resources whose read failed
+	// with an error other than NotFound. They are shown with "Unknown" status,
+	// which is not healthy, so the instance is not ready.
+	UnreadableResources []UnreadableResource
 
 	// Wide enables extraction of workload-specific wide info (replicas, image).
 	Wide bool
@@ -130,11 +136,13 @@ type StatusResult struct {
 }
 
 // GetInstanceStatus evaluates health for all resources tracked in opts.InventoryLive.
-// Returns noResourcesFoundError when no resources are present and no missing entries exist.
+// Returns noResourcesFoundError when no resources are present and no missing or
+// unreadable entries exist.
 //
-// opts.InventoryLive contains the live resources fetched from the inventory Secret by the
+// opts.InventoryLive contains the live resources fetched from the inventory by the
 // caller. opts.MissingResources contains entries tracked in inventory that no longer exist
-// on the cluster; these are appended with "Missing" status.
+// on the cluster; these are appended with "Missing" status. opts.UnreadableResources
+// contains entries whose read failed; these are appended with "Unknown" status.
 func GetInstanceStatus(ctx context.Context, client *Client, opts StatusOptions) (*StatusResult, error) {
 	resources := opts.InventoryLive
 
@@ -142,10 +150,11 @@ func GetInstanceStatus(ctx context.Context, client *Client, opts StatusOptions) 
 		"instance", opts.InstanceName,
 		"liveCount", len(resources),
 		"missingCount", len(opts.MissingResources),
+		"unreadableCount", len(opts.UnreadableResources),
 	)
 
-	// Return error when no resources found (and no missing resources to show)
-	if len(resources) == 0 && len(opts.MissingResources) == 0 {
+	// Return error when no resources found (and no missing or unreadable resources to show)
+	if len(resources) == 0 && len(opts.MissingResources) == 0 && len(opts.UnreadableResources) == 0 {
 		return nil, &noResourcesFoundError{
 			InstanceName: opts.InstanceName,
 			InstanceID:   opts.InstanceID,
@@ -176,6 +185,20 @@ func GetInstanceStatus(ctx context.Context, client *Client, opts StatusOptions) 
 			Name:      m.Name,
 			Namespace: m.Namespace,
 			Status:    HealthMissing,
+			Age:       "<unknown>",
+		})
+		allReady = false
+	}
+
+	// Append unreadable resources (tracked in inventory, read failed): their
+	// health could not be determined, which is not healthy.
+	for _, u := range opts.UnreadableResources {
+		result.Resources = append(result.Resources, resourceHealth{
+			Kind:      u.Kind,
+			Name:      u.Name,
+			Namespace: u.Namespace,
+			Component: opts.ComponentMap[u.Kind+"/"+u.Namespace+"/"+u.Name],
+			Status:    HealthUnknown,
 			Age:       "<unknown>",
 		})
 		allReady = false

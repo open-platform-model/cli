@@ -491,3 +491,17 @@ func TestQuickInstanceHealth_AppliedCountsAsHealthy(t *testing.T) {
 	assert.Equal(t, 2, ready)
 	assert.Equal(t, 2, total)
 }
+
+// The second argument counts every tracked resource that is missing or could
+// not be read; each counts toward the total and not toward ready.
+func TestQuickInstanceHealth_UnhealthyCountIncludesUnreadable(t *testing.T) {
+	resources := []*unstructured.Unstructured{
+		makeResource("ConfigMap", nil),
+		makeResource("ServiceAccount", nil),
+	}
+	missing, unreadable := 1, 2
+	status, ready, total := QuickInstanceHealth(resources, missing+unreadable)
+	assert.Equal(t, HealthNotReady, status)
+	assert.Equal(t, 2, ready)
+	assert.Equal(t, 5, total)
+}

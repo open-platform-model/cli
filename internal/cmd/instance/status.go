@@ -81,11 +81,12 @@ func runInstanceStatus(ctx context.Context, identifier string, cfg *config.Globa
 		return err
 	}
 
-	inv, liveResources, missingEntries, _, err := query.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, instanceLog)
+	inv, liveResources, missingEntries, unreadable, err := query.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, instanceLog)
 	if err != nil {
 		return err
 	}
+	query.WarnUnreadable(instanceLog, unreadable)
 
-	statusOpts := query.BuildStatusOptions(target.Namespace, target.Selector, outputFormat, verbose, inv, liveResources, missingEntries)
+	statusOpts := query.BuildStatusOptions(target.Namespace, target.Selector, outputFormat, verbose, inv, liveResources, missingEntries, unreadable)
 	return query.PrintInstanceStatus(ctx, k8sClient, statusOpts, logName)
 }

@@ -87,7 +87,7 @@ func runInstanceEvents(ctx context.Context, identifier string, cfg *config.Globa
 	if err != nil {
 		return err
 	}
-	_ = unreadable // reported by the read-only warning helper (refuse-delete-on-unreadable-inventory section 3)
+	query.WarnUnreadable(instanceLog, unreadable)
 
 	eventsOpts.Namespace = target.Namespace
 	eventsOpts.InstanceName = target.Selector.InstanceName
