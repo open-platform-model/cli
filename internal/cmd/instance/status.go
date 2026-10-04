@@ -4,9 +4,12 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/inventory"
+	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/workflow/query"
 )
@@ -85,8 +88,18 @@ func runInstanceStatus(ctx context.Context, identifier string, cfg *config.Globa
 	if err != nil {
 		return err
 	}
-	query.WarnUnreadable(instanceLog, unreadable)
 
-	statusOpts := query.BuildStatusOptions(target.Namespace, target.Selector, outputFormat, verbose, inv, liveResources, missingEntries, unreadable)
+	return showInstanceStatus(ctx, k8sClient, target.Namespace, target.Selector, outputFormat, verbose,
+		inv, liveResources, missingEntries, unreadable, logName)
+}
+
+// showInstanceStatus warns about each tracked resource discovery could not
+// read, then prints the status table. The unreadable resources become Unknown
+// rows, so the instance is not ready and the command exits 2.
+func showInstanceStatus(ctx context.Context, k8sClient *kubernetes.Client, namespace string, rsf *cmdutil.InstanceSelectorFlags,
+	outputFormat output.Format, verbose bool, inv *inventory.Record, liveResources []*unstructured.Unstructured,
+	missingEntries []inventory.InventoryEntry, unreadable []inventory.UnreadableEntry, logName string) error {
+	query.WarnUnreadable(output.InstanceLogger(logName), unreadable)
+	statusOpts := query.BuildStatusOptions(namespace, rsf, outputFormat, verbose, inv, liveResources, missingEntries, unreadable)
 	return query.PrintInstanceStatus(ctx, k8sClient, statusOpts, logName)
 }

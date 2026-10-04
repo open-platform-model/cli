@@ -184,6 +184,7 @@ func GetInstanceStatus(ctx context.Context, client *Client, opts StatusOptions) 
 			Kind:      m.Kind,
 			Name:      m.Name,
 			Namespace: m.Namespace,
+			Component: opts.ComponentMap[m.Kind+"/"+m.Namespace+"/"+m.Name],
 			Status:    HealthMissing,
 			Age:       "<unknown>",
 		})

@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stesting "k8s.io/client-go/testing"
 
+	"github.com/open-platform-model/cli/internal/cmdutil"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
@@ -88,4 +89,28 @@ func TestDiscoverOrphanCandidates_WarnsAboutUnreadable(t *testing.T) {
 	assert.Contains(t, out, "could not read tracked resource")
 	assert.Contains(t, out, "name=settings")
 	assert.Contains(t, out, "orphan detection could not check 1 tracked resource(s)")
+}
+
+// Status warns about each tracked resource it could not read, lists it as an
+// Unknown row, and exits 2 because the instance is not ready.
+func TestShowInstanceStatus_UnreadableIsUnknownAndExitsNotReady(t *testing.T) {
+	web := trackedConfigMap("web")
+	client, _ := fakeClusterClient(web.DeepCopy())
+	inv := &inventory.Record{Name: "demo", Namespace: "apps", Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{
+		{Kind: "ConfigMap", Namespace: "apps", Name: "web", Version: "v1"},
+		{Kind: "ConfigMap", Namespace: "apps", Name: "settings", Version: "v1"},
+	}}}
+	unreadable := []inventory.UnreadableEntry{{Entry: inv.Inventory.Entries[1], Err: forbiddenRead("configmaps", "settings")}}
+	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}
+
+	var runErr error
+	out := captureOutput(t, func() {
+		runErr = showInstanceStatus(context.Background(), client, "apps", rsf, output.FormatTable, false,
+			inv, []*unstructured.Unstructured{web}, nil, unreadable, "demo")
+	})
+	requireExitCode(t, runErr, opmexit.ExitValidationError)
+	assert.Contains(t, out, "could not read tracked resource")
+	assert.Contains(t, out, "name=settings")
+	assert.Contains(t, out, "forbidden")
+	assert.Regexp(t, `settings\s.*Unknown|Unknown.*\ssettings`, out, "the unreadable resource is an Unknown row")
 }
