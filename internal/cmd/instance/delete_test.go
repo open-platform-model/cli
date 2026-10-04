@@ -77,7 +77,7 @@ func TestDeleteOperatorOwned_DryRunStillRequiresAReadyOperator(t *testing.T) {
 // out, at the operator's fixed names, with no ModuleInstance recording it.
 func runningOperatorObjects() []runtime.Object {
 	var objs []runtime.Object
-	for _, name := range operator.CRDNames {
+	for _, name := range operator.CRDNames() {
 		objs = append(objs, &unstructured.Unstructured{Object: map[string]any{
 			"apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition",
 			"metadata": map[string]any{"name": name},

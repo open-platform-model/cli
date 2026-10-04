@@ -23,19 +23,25 @@ const (
 	ControllerDeploymentName = "opm-operator-controller-manager"
 
 	// OperatorAPIGroup is the API group the operator's CRDs serve.
-	OperatorAPIGroup = "opmodel.dev"
+	OperatorAPIGroup = inventory.GroupOpmodel
 
 	// OperatorModulePath is the operator module's path without its @<major>
 	// suffix.
 	OperatorModulePath = "opmodel.dev/modules/opm_operator"
 )
 
-// CRDNames are the CRDs every operator release since v1.0.0-alpha.18 serves.
-var CRDNames = []string{
-	"moduleinstances.opmodel.dev",
-	"modulepackages.opmodel.dev",
-	"platforms.opmodel.dev",
-	"transformerregistrations.opmodel.dev",
+// crdNames are the CRDs every operator release since v1.0.0-alpha.18 serves.
+var crdNames = [...]string{
+	inventory.CRDNameModuleInstances,
+	"modulepackages." + OperatorAPIGroup,
+	"platforms." + OperatorAPIGroup,
+	"transformerregistrations." + OperatorAPIGroup,
+}
+
+// CRDNames returns the CRDs every operator release since v1.0.0-alpha.18
+// serves, as a fresh slice the caller may keep or change.
+func CRDNames() []string {
+	return append([]string(nil), crdNames[:]...)
 }
 
 // The signals DeploysOperator reports, naming which part of the record matched.

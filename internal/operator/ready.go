@@ -50,12 +50,12 @@ func CheckReady(ctx context.Context, client *kubernetes.Client) error {
 }
 
 // fixedTargets are the objects whose liveness defines "the operator is
-// serving": the CRDs in CRDNames and the controller Deployment. Supporting
+// serving": the CRDs in crdNames and the controller Deployment. Supporting
 // objects (RBAC, Service, Namespace) are left out: a rolled-out Deployment
 // implies them, and they add noise to the refusal message.
 func fixedTargets() []*unstructured.Unstructured {
-	targets := make([]*unstructured.Unstructured, 0, len(CRDNames)+1)
-	for _, name := range CRDNames {
+	targets := make([]*unstructured.Unstructured, 0, len(crdNames)+1)
+	for _, name := range crdNames {
 		crd := &unstructured.Unstructured{}
 		crd.SetAPIVersion("apiextensions.k8s.io/v1")
 		crd.SetKind(kindCustomResourceDefinition)

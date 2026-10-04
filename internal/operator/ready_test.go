@@ -9,6 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stesting "k8s.io/client-go/testing"
+
+	"github.com/open-platform-model/cli/internal/kubernetes"
 )
 
 // namedCRDFixture is an Established CRD of the given name.
@@ -26,7 +28,7 @@ func readyOperatorObjects(skip ...string) []*unstructured.Unstructured {
 		skipped[s] = true
 	}
 	var objs []*unstructured.Unstructured
-	for _, name := range CRDNames {
+	for _, name := range CRDNames() {
 		if !skipped[name] {
 			objs = append(objs, namedCRDFixture(name))
 		}
@@ -67,33 +69,57 @@ func TestCheckReady_MissingFourthCRDIsNotReady(t *testing.T) {
 	assert.Contains(t, err.Error(), "opm operator install")
 }
 
-// The check reads exactly the four CRDs and the controller Deployment: no
-// instance record, no Namespace.
-func TestCheckReady_DoesNotReadTheManifest(t *testing.T) {
-	client := fakeClientWith(readyOperatorObjects()...)
+// recordReads records every call CheckReady makes against client, as
+// "<verb> <resource> <namespace>/<name>" for gets.
+func recordReads(t *testing.T, client *kubernetes.Client) *[]string {
+	t.Helper()
 	fake, ok := client.Dynamic.(interface {
 		PrependReactor(verb, resource string, reaction k8stesting.ReactionFunc)
 	})
 	require.True(t, ok)
 
-	var reads []string
+	reads := &[]string{}
 	fake.PrependReactor("*", "*", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		target := action.GetVerb() + " " + action.GetResource().Resource
 		if get, isGet := action.(k8stesting.GetAction); isGet {
 			target += " " + get.GetNamespace() + "/" + get.GetName()
 		}
-		reads = append(reads, target)
+		*reads = append(*reads, target)
 		return false, nil, nil
 	})
+	return reads
+}
 
-	require.NoError(t, CheckReady(context.Background(), client))
-
-	want := make([]string, 0, len(CRDNames)+1)
-	for _, name := range CRDNames {
+// fixedNameReads is what CheckReady reads: the four CRDs and the controller
+// Deployment, nothing else.
+func fixedNameReads() []string {
+	want := make([]string, 0, len(CRDNames())+1)
+	for _, name := range CRDNames() {
 		want = append(want, "get customresourcedefinitions /"+name)
 	}
-	want = append(want, "get deployments "+OperatorNamespace+"/"+ControllerDeploymentName)
-	assert.ElementsMatch(t, want, reads)
+	return append(want, "get deployments "+OperatorNamespace+"/"+ControllerDeploymentName)
+}
+
+// The check reads exactly the four CRDs and the controller Deployment: no
+// instance record, no Namespace.
+func TestCheckReady_ReadsOnlyTheFixedNames(t *testing.T) {
+	client := fakeClientWith(readyOperatorObjects()...)
+	reads := recordReads(t, client)
+
+	require.NoError(t, CheckReady(context.Background(), client))
+	assert.ElementsMatch(t, fixedNameReads(), *reads)
+}
+
+// An operator installed as the opm-operator module instance keeps the same
+// fixed names, so the check finds it the same way and never reads the
+// ModuleInstance that deployed it.
+func TestCheckReady_ModuleInstalledOperatorFoundByTheSameNames(t *testing.T) {
+	objs := append(readyOperatorObjects(), moduleInstanceFixture(OperatorNamespace, OperatorInstanceName))
+	client := fakeClientWith(objs...)
+	reads := recordReads(t, client)
+
+	require.NoError(t, CheckReady(context.Background(), client))
+	assert.ElementsMatch(t, fixedNameReads(), *reads)
 }
 
 func TestCheckReady_AbsentOperatorIsNotReady(t *testing.T) {
@@ -105,7 +131,7 @@ func TestCheckReady_AbsentOperatorIsNotReady(t *testing.T) {
 
 	var notReady *NotReadyError
 	require.ErrorAs(t, err, &notReady)
-	assert.Len(t, notReady.Pending, len(CRDNames)+1)
+	assert.Len(t, notReady.Pending, len(CRDNames())+1)
 	assert.Contains(t, err.Error(), "opm operator install")
 }
 

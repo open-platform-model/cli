@@ -44,13 +44,14 @@ const (
     OperatorInstanceName     = "opm-operator"
     OperatorNamespace        = "opm-operator-system"
     ControllerDeploymentName = "opm-operator-controller-manager"
-    OperatorAPIGroup         = "opmodel.dev"
+    OperatorAPIGroup         = inventory.GroupOpmodel // "opmodel.dev"
     OperatorModulePath       = "opmodel.dev/modules/opm_operator" // without @<major>
 )
 
-// CRDNames are the CRDs every operator release since v1.0.0-alpha.18 serves.
-var CRDNames = []string{
-    "moduleinstances.opmodel.dev", "modulepackages.opmodel.dev",
+// crdNames are the CRDs every operator release since v1.0.0-alpha.18 serves;
+// CRDNames() returns a copy, so no caller can change the contract.
+var crdNames = [...]string{
+    inventory.CRDNameModuleInstances, "modulepackages.opmodel.dev",
     "platforms.opmodel.dev", "transformerregistrations.opmodel.dev",
 }
 
@@ -61,7 +62,7 @@ func CheckReady(ctx context.Context, client *kubernetes.Client) error {
 }
 ```
 
-`fixedTargets` builds unstructured stubs from the constants: `apiextensions.k8s.io/v1` `CustomResourceDefinition` for each of `CRDNames` (cluster-scoped), and `apps/v1` `Deployment` `ControllerDeploymentName` in `OperatorNamespace`. `readinessTargets` and `CheckReady`'s call to `EmbeddedManifest()` go; `readinessTargets` has no other user. The `Namespace` is not a target: it is only the Deployment's namespace, as it is today. Error surfaces do not change: a not-ready operator keeps `*NotReadyError` and its wording (`the opm operator is not ready (...) — <hint>; install or repair it with 'opm operator install', then retry`), and any Get error still counts as pending.
+`fixedTargets` builds unstructured stubs from the constants: `apiextensions.k8s.io/v1` `CustomResourceDefinition` for each of `crdNames` (cluster-scoped), and `apps/v1` `Deployment` `ControllerDeploymentName` in `OperatorNamespace`. `readinessTargets` and `CheckReady`'s call to `EmbeddedManifest()` go; `readinessTargets` has no other user. The `Namespace` is not a target: it is only the Deployment's namespace, as it is today. Error surfaces do not change: a not-ready operator keeps `*NotReadyError` and its wording (`the opm operator is not ready (...) — <hint>; install or repair it with 'opm operator install', then retry`), and any Get error still counts as pending.
 
 **Options considered:**
 

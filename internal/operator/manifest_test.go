@@ -68,7 +68,7 @@ func TestEmbeddedManifest_UsesTheFixedNames(t *testing.T) {
 		}
 	}
 
-	assert.ElementsMatch(t, CRDNames, crdNames)
+	assert.ElementsMatch(t, CRDNames(), crdNames)
 	require.Len(t, deployments, 1)
 	assert.Equal(t, ControllerDeploymentName, deployments[0].GetName())
 	assert.Equal(t, OperatorNamespace, deployments[0].GetNamespace())
