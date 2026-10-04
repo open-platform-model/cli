@@ -13,16 +13,18 @@ Three sections, each one commit. Section 1 checks the gate and names the operato
 
 ## 2. The running-operator check locates the operator by its fixed names (internal/operator, internal/cmd/instance)
 
-- [ ] 2.1 Red first, in `internal/operator/ready_test.go` on `fakeClientWith` (`wait_test.go:72-86`) with `crdFixture`/`deploymentFixture`-style objects:
+- [x] 2.1 Red first, in `internal/operator/ready_test.go` on `fakeClientWith` (`wait_test.go:72-86`) with `crdFixture`/`deploymentFixture`-style objects:
   - `TestCheckReady_FixedNamesReadyOperatorPasses`: four Established CRDs and a rolled-out `opm-operator-controller-manager` in `opm-operator-system`: nil.
   - `TestCheckReady_MissingDeploymentIsNotReady`: same without the Deployment: `*NotReadyError` naming `opm-operator-controller-manager`.
   - `TestCheckReady_MissingFourthCRDIsNotReady`: three CRDs (no `transformerregistrations.opmodel.dev`), Deployment ready: `*NotReadyError` naming that CRD.
   - `TestCheckReady_DoesNotReadTheManifest`: a reactor records every Get; the recorded targets are exactly the four CRDs and the one Deployment (no ModuleInstance, no Namespace read).
   - Delete `TestReadinessTargets_SelectsCRDsAndTheControllerDeployment` with `readinessTargets`; keep `TestCheckReady_AbsentOperatorIsNotReady` and `TestNotReadyError_IncludesTheCallerHint`.
   Verify: `TestCheckReady_DoesNotReadTheManifest` fails or does not compile on today's code; the others pin today's behaviour.
-- [ ] 2.2 `internal/operator/ready.go` per design.md § 1: `fixedTargets`; `CheckReady` stops calling `EmbeddedManifest()`; remove `readinessTargets`; rewrite `CheckReady`'s doc comment (fixed names, any read error counts as pending) in its own words. Verify: `go test ./internal/operator/...` passes and `grep -n EmbeddedManifest internal/operator/ready.go` finds nothing.
-- [ ] 2.3 `internal/cmd/instance/delete_test.go`: add `TestDeleteOperatorOwned_KubectlInstalledOperatorIsFound` (fixed-name objects ready, no operator instance record: the CR is deleted). Verify: `go test ./internal/cmd/instance/...` passes, including the two existing readiness tests.
-- [ ] 2.4 `task fmt`, `task lint` and `task test` green, then commit `feat(operator): locate the running operator by its fixed names`.
+  - Result: all five pass on today's code, `TestCheckReady_DoesNotReadTheManifest` included. Reading the embedded manifest is no cluster call, and the manifest names the same five objects, so no fake-client test can tell the two locators apart; the test pins the read set, and 2.2's grep pins that the manifest is gone.
+- [x] 2.2 `internal/operator/ready.go` per design.md § 1: `fixedTargets`; `CheckReady` stops calling `EmbeddedManifest()`; remove `readinessTargets`; rewrite `CheckReady`'s doc comment (fixed names, any read error counts as pending) in its own words. Verify: `go test ./internal/operator/...` passes and `grep -n EmbeddedManifest internal/operator/ready.go` finds nothing.
+- [x] 2.3 `internal/cmd/instance/delete_test.go`: add `TestDeleteOperatorOwned_KubectlInstalledOperatorIsFound` (fixed-name objects ready, no operator instance record: the CR is deleted). Verify: `go test ./internal/cmd/instance/...` passes, including the two existing readiness tests.
+- [x] 2.4 `task fmt`, `task lint` and `task test` green, then commit `feat(operator): locate the running operator by its fixed names`.
+  - `task fmt`, `task lint`, `task test:unit` green; `task test:integration` not run (no cluster egress).
 
 ## 3. Instance delete of an instance that deploys the operator is guarded (internal/operator, internal/cmd/instance)
 

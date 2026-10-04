@@ -31,42 +31,41 @@ func (e *NotReadyError) Error() string {
 
 // CheckReady reports whether the operator is installed and serving: its CRDs
 // Established and its controller Deployment rolled out. It is the single-shot
-// form of the readiness machinery Install waits on (0006:D35 built
-// it for this reuse) — a gate, not a wait, so a down operator fails fast
-// instead of burning a timeout.
+// form of the readiness machinery Install waits on (0006:D35 built it for this
+// reuse): a gate, not a wait, so a down operator fails fast instead of burning
+// a timeout.
 //
-// Readiness targets come from the embedded, pinned manifest: the CRD names and
-// the controller Deployment's name/namespace are stable across operator
-// versions, so an older or newer installed operator is still located correctly.
+// It locates the operator by its fixed names (names.go) and reads nothing
+// else: no embedded manifest, no instance record, no Namespace. Those names
+// hold for every operator release since v1.0.0-alpha.18 and for the operator
+// module, so a manifest install and a module install are found alike. Any read
+// that fails counts that object as not ready, so a caller proceeds only on a
+// positive finding.
 func CheckReady(ctx context.Context, client *kubernetes.Client) error {
-	manifest, err := EmbeddedManifest()
-	if err != nil {
-		return fmt.Errorf("reading embedded operator manifest: %w", err)
-	}
-
-	targets := readinessTargets(manifest)
-	if len(targets) == 0 {
-		return fmt.Errorf("embedded operator manifest declares no CRDs or controller Deployment")
-	}
-
-	pending := pendingObjects(ctx, client, targets, DefaultPredicate)
+	pending := pendingObjects(ctx, client, fixedTargets(), DefaultPredicate)
 	if len(pending) == 0 {
 		return nil
 	}
 	return &NotReadyError{Pending: kubernetes.DescribeObjectList(pending)}
 }
 
-// readinessTargets selects the manifest objects whose liveness defines "the
-// operator is serving": the CRDs and the controller Deployment. Supporting
-// objects (RBAC, Service, Namespace) are excluded — their existence is implied
-// by a rolled-out Deployment and adds noise to the refusal message.
-func readinessTargets(manifest []*unstructured.Unstructured) []*unstructured.Unstructured {
-	var targets []*unstructured.Unstructured
-	for _, obj := range manifest {
-		switch obj.GetKind() {
-		case kindCustomResourceDefinition, kindDeployment:
-			targets = append(targets, obj)
-		}
+// fixedTargets are the objects whose liveness defines "the operator is
+// serving": the CRDs in CRDNames and the controller Deployment. Supporting
+// objects (RBAC, Service, Namespace) are left out: a rolled-out Deployment
+// implies them, and they add noise to the refusal message.
+func fixedTargets() []*unstructured.Unstructured {
+	targets := make([]*unstructured.Unstructured, 0, len(CRDNames)+1)
+	for _, name := range CRDNames {
+		crd := &unstructured.Unstructured{}
+		crd.SetAPIVersion("apiextensions.k8s.io/v1")
+		crd.SetKind(kindCustomResourceDefinition)
+		crd.SetName(name)
+		targets = append(targets, crd)
 	}
-	return targets
+	deploy := &unstructured.Unstructured{}
+	deploy.SetAPIVersion("apps/v1")
+	deploy.SetKind(kindDeployment)
+	deploy.SetName(ControllerDeploymentName)
+	deploy.SetNamespace(OperatorNamespace)
+	return append(targets, deploy)
 }

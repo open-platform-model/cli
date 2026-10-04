@@ -22,6 +22,7 @@ import (
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/operator"
 	"github.com/open-platform-model/cli/internal/output"
 	pkgcore "github.com/open-platform-model/cli/pkg/core"
 )
@@ -68,6 +69,56 @@ func TestDeleteOperatorOwned_DryRunStillRequiresAReadyOperator(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not ready")
+}
+
+// runningOperatorObjects is an operator applied with kubectl from a release
+// manifest: its four CRDs Established and its controller Deployment rolled
+// out, at the operator's fixed names, with no ModuleInstance recording it.
+func runningOperatorObjects() []runtime.Object {
+	var objs []runtime.Object
+	for _, name := range operator.CRDNames {
+		objs = append(objs, &unstructured.Unstructured{Object: map[string]any{
+			"apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition",
+			"metadata": map[string]any{"name": name},
+			"status":   map[string]any{"conditions": []any{map[string]any{"type": "Established", "status": "True"}}},
+		}})
+	}
+	return append(objs, &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "apps/v1", "kind": "Deployment",
+		"metadata": map[string]any{"name": operator.ControllerDeploymentName, "namespace": operator.OperatorNamespace},
+		"status": map[string]any{
+			"observedGeneration": int64(0), "replicas": int64(1),
+			"updatedReplicas": int64(1), "availableReplicas": int64(1),
+		},
+	}})
+}
+
+// fakeClusterClient is a fake cluster holding objs, with the ModuleInstance
+// list kind registered so a cluster-wide list works on an empty fixture.
+func fakeClusterClient(objs ...runtime.Object) (*kubernetes.Client, *fakedynamic.FakeDynamicClient) {
+	fake := fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
+		map[schema.GroupVersionResource]string{inventory.ModuleInstanceGVR: "ModuleInstanceList"}, objs...)
+	return &kubernetes.Client{Dynamic: fake}, fake
+}
+
+// An operator applied with kubectl has no instance record; the readiness check
+// finds it by its fixed names, so an operator-owned delete goes ahead.
+func TestDeleteOperatorOwned_KubectlInstalledOperatorIsFound(t *testing.T) {
+	rec := operatorOwnedRecord()
+	mi := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": inventory.APIVersionModuleInstance, "kind": inventory.KindModuleInstance,
+		"metadata": map[string]any{"name": rec.Name, "namespace": rec.Namespace},
+	}}
+	client, fake := fakeClusterClient(append(runningOperatorObjects(), mi)...)
+
+	var runErr error
+	captureOutput(t, func() {
+		runErr = deleteOperatorOwned(context.Background(), client, rec, 5*time.Second, false, output.InstanceLogger("test"))
+	})
+	require.NoError(t, runErr)
+
+	_, err := fake.Tracker().Get(inventory.ModuleInstanceGVR, rec.Namespace, rec.Name)
+	assert.True(t, apierrors.IsNotFound(err), "the ModuleInstance is deleted")
 }
 
 // --force skips the confirmation prompt; it must not reach the readiness
