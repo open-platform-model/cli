@@ -18,11 +18,11 @@ Gate G2-cli: docs-kit's `add-cobra-extractor`, `add-authored-docs` and `generali
 
 Gate G2-pins, checked before the release PR merges: core `v2.0.0-beta.1`, library `v1.0.0-beta.1` and opm-operator `v1.0.0-beta.4` have verified backfilled bundles (owner decision 2026-10-03; the siblings `publish-definitions-bundle`, `publish-go-api-bundle` and `publish-crd-bundle` dispatch them), the cli's `main` still pins exactly those (or every version it pins has a bundle), and the local `opm-docs` carries `pull-docs-placement` (gate G2-site). Owner: hold release PR cli#276 (`v1.0.0-beta.6`) until then. This section's deliverable is a publishing operation (the owner's), so its steps are the implementation.
 
-- [ ] 2.1 On the open release PR's head: `task docs:bundle`, then `opm-docs pull --local cli@v1.0=out/cli` with a scratch `bundles.cue` holding opmodel.dev's planned `docs` (cli, core, library, opm-operator) and `versions."v1.0": {anchor: {project: "cli", tag: "1.0"}, pinned: ["library", "core", "opm-operator"]}` (design.md D5). Verify: the pull succeeds anonymously, resolving the three pinned bundles.
-- [ ] 2.2 Owner: merge the cli release PR; `publish-docs` publishes `docs/cli` after `goreleaser`. Check `ghcr.io/open-platform-model/docs/cli` is public and linked to `open-platform-model/cli` (change it in the package settings if not).
-- [ ] 2.3 Verify: the full, release, minor and major tags with `cosign verify` and docs-kit C9's identity flags; the scratch pull of 2.1 without `--local`, anonymously (gate G2-pins holds).
-- [ ] 2.4 Record in design.md D5 the run URL, version, digest, pins and the verification; tell opmodel.dev that G2-pins holds, so its v1.0 switch may merge.
-- [ ] 2.5 `task openspec:check` passes; `task lint` and `task test` green, then commit `docs(openspec): record the first cli docs bundle`.
+- [x] 2.1 On the open release PR's head: `task docs:bundle`, then `opm-docs pull --local cli@v1.0=out/cli` with a scratch `bundles.cue` holding opmodel.dev's planned `docs` (cli, core, library, opm-operator) and `versions."v1.0": {anchor: {project: "cli", tag: "1.0"}, pinned: ["library", "core", "opm-operator"]}` (design.md D5). Verify: the pull succeeds anonymously, resolving the three pinned bundles. Done as the owner's anonymous G2-pins pull with the beta.6 anchor and the release gate's anonymous lookups (design.md D5 "Published").
+- [x] 2.2 Owner: merge the cli release PR; `publish-docs` publishes `docs/cli` after `goreleaser`. Check `ghcr.io/open-platform-model/docs/cli` is public and linked to `open-platform-model/cli` (change it in the package settings if not).
+- [x] 2.3 Verify: the full, release, minor and major tags with `cosign verify` and docs-kit C9's identity flags; the scratch pull of 2.1 without `--local`, anonymously (gate G2-pins holds).
+- [x] 2.4 Record in design.md D5 the run URL, version, digest, pins and the verification; tell opmodel.dev that G2-pins holds, so its v1.0 switch may merge.
+- [x] 2.5 `task openspec:check` passes; `task lint` and `task test` green, then commit `docs(openspec): record the first cli docs bundle`.
 
 ## 3. Retire cmdref
 

@@ -190,6 +190,15 @@ Dry run on 2026-10-03 with `opm-docs` 0.4.0 (which carries `pull-docs-placement`
 
 `v1.0.0-beta.5` (today's newest release) pins library `1.0.0-beta.1`, core `2.0.0-beta.1` and the operator `1.0.0-beta.4`, but it has no hook and can never have a bundle; nothing is lost, because the site keeps reading the cli from git until G2-switch.
 
+**Published (section 2 record, owner steps).** G2-pins held before cli#276 merged: the release gate's anonymous lookups found all three backfilled bundles, and the owner's anonymous pull resolved them (core `2.0.0-beta.1`, library `1.0.0-beta.1`, opm-operator `1.0.0-beta.4`), with the cli `1.0.0-beta.6` bundle as anchor.
+
+| Release | Run | Digest | Pins |
+| --- | --- | --- | --- |
+| `v1.0.0-beta.6` | `https://github.com/open-platform-model/cli/actions/runs/37135949909` | `sha256:a1ee7187d68b5a09a56c74b2a4aa3b6534c62ad6abeb3deb05e105e5aeded775` | core `2.0.0-beta.1`, library `1.0.0-beta.1`, opm-operator `1.0.0-beta.4` |
+| `v1.0.0-beta.7` | `https://github.com/open-platform-model/cli/actions/runs/37153556651` | `sha256:a15c7aa08d53142609a06ea23d25b0ab4c2f6840b7b00d962d3da6ec5268cb9d` | core `2.0.0-beta.2`, library `1.0.0-beta.3`, opm-operator `1.0.0-beta.5` |
+
+`v1.0.0-beta.7` (the cascade bump of cli#291) is the release the site's v1.0 anchors on (opmodel.dev#38); the owner added `e2e-verified` to it after `task test:e2e` passed 65/0. Verified 2026-10-04: `ghcr.io/open-platform-model/docs/cli` is public and linked to `open-platform-model/cli`; the full tags (`1.0.0-beta.6.0`, `1.0.0-beta.7.0`) resolve to the release tags' digests, and `1.0` and `1` to beta.7's; `cosign verify` with C9's flags (`--certificate-identity-regexp '^https://github\.com/open-platform-model/docs-kit/\.github/workflows/publish\.yml@refs/tags/v[0-9]'`, `--certificate-github-workflow-repository open-platform-model/cli`, `--certificate-github-workflow-ref refs/heads/main`) passes for both digests; each bundle's `manifest.json` `pins` are the ones in the table.
+
 ### Parity record (section 1)
 
 At cli commit `f954083a` (main `1d9f475b` plus the dump program and `docs-kit.cue`), `task docs:bundle` with `opm-docs` 0.4.0 wrote 16 pages, linted green: the six authored pages of `docs/site/` and the ten generated pages under `reference/cli/`. Each of the ten equals the committed `docs/site/reference/cli/` page of the same name once cmdref's two marker comments are removed (the begin comment with its following blank line, and the end comment with its preceding newline, as docs-kit's `compareWithCmdref` strips them), and the page sets are equal: no difference at all, so nothing beyond C19's parity record. docs-kit's `TestCLICommandParityLive` with `OPM_CLI_CHECKOUT` naming this tree passes too. The manifest's `pins` are `core 2.0.0-beta.1`, `library 1.0.0-beta.1`, `opm-operator 1.0.0-beta.4`.
