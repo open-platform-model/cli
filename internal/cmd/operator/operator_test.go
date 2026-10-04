@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/open-platform-model/library/opm/kernel"
+
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -249,4 +251,27 @@ func TestInstallErrorMapping(t *testing.T) {
 		require.ErrorAs(t, installError(c.err), &exitErr, c.err.Error())
 		assert.Equal(t, c.code, exitErr.Code, c.err.Error())
 	}
+}
+
+// The operator's instance renders under its fixed name and namespace,
+// from the merged values only, against the module's own pins.
+func TestModuleRenderOpts(t *testing.T) {
+	cfg := &config.GlobalConfig{}
+	k8s := &config.ResolvedKubernetesConfig{}
+	res := &modref.Resolution{Path: oplib.OperatorModulePath, Version: "v0.1.0"}
+	values := kernel.Source{Origin: "merged values"}
+
+	opts := moduleRenderOpts(cfg, k8s, res, values)
+
+	assert.Same(t, res, opts.Published)
+	assert.Equal(t, oplib.OperatorInstanceName, opts.Name)
+	assert.Equal(t, oplib.OperatorNamespace, opts.Namespace)
+	assert.True(t, opts.DepsOnly, "the render never reads a Platform")
+	require.Len(t, opts.Values, 1)
+	assert.Equal(t, "merged values", opts.Values[0].Origin)
+	assert.Empty(t, opts.ValuesFiles)
+	assert.Empty(t, opts.PlatformFlag)
+	assert.Nil(t, opts.ClusterPlatform)
+	assert.Same(t, cfg, opts.Config)
+	assert.Same(t, k8s, opts.K8sConfig)
 }

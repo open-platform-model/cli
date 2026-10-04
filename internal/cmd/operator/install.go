@@ -293,15 +293,22 @@ func selectionLabel(t oplib.Target, versionFlag string) string {
 // against the module's own dependency pins only.
 func moduleRenderer(cfg *config.GlobalConfig, k8sConfig *config.ResolvedKubernetesConfig) oplib.RenderFunc {
 	return func(ctx context.Context, res *modref.Resolution, values kernel.Source) (*workflowrender.Result, error) {
-		return workflowrender.FromModule(ctx, workflowrender.ModuleOpts{
-			Published: res,
-			Values:    []kernel.Source{values},
-			Name:      oplib.OperatorInstanceName,
-			Namespace: oplib.OperatorNamespace,
-			DepsOnly:  true,
-			K8sConfig: k8sConfig,
-			Config:    cfg,
-		})
+		return workflowrender.FromModule(ctx, moduleRenderOpts(cfg, k8sConfig, res, values))
+	}
+}
+
+// moduleRenderOpts are the render options of the operator's instance: the
+// resolved module, the one merged values source, the fixed instance name
+// and namespace, and the module's own dependency pins (never a Platform).
+func moduleRenderOpts(cfg *config.GlobalConfig, k8sConfig *config.ResolvedKubernetesConfig, res *modref.Resolution, values kernel.Source) workflowrender.ModuleOpts {
+	return workflowrender.ModuleOpts{
+		Published: res,
+		Values:    []kernel.Source{values},
+		Name:      oplib.OperatorInstanceName,
+		Namespace: oplib.OperatorNamespace,
+		DepsOnly:  true,
+		K8sConfig: k8sConfig,
+		Config:    cfg,
 	}
 }
 
