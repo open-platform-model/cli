@@ -1,0 +1,6 @@
+## 1. Compare only authored defaults
+
+- [ ] 1.1 Add the failing cases to `TestCheck` in `internal/compat/compat_test.go`: the catalog role case (`subjects!: [...#S] & [_, ...]` to `subjects?:` with `#S` a disjunction of structs), the `[...string] & [_, ...]` probe under `!` to `?`, a plain `[...string]` made optional, and `[...string]` narrowed to `[...string] & [_, ...]` (want `domain narrowed` only); verify they fail on the current `checkDefaults` with `default changed`
+- [ ] 1.2 Add the negative cases that must keep reporting: `*["a"] | [...string]` to `*["b"] | [...string]` (`default changed`), to `[...string]` (`default removed`), `*[] | [...string]` to `*["a"] | [...string]` (`default changed`), and a default reached through a definition reference; verify they pass before and after the fix
+- [ ] 1.3 Add `authoredDefault` and `implicitListDefault` in `internal/compat/compat.go`, call `authoredDefault` from `checkDefaults` on both sides, and update the `checkDefaults` doc comment; verify `go test ./internal/compat/...` passes with every pre-existing case unchanged
+- [ ] 1.4 `task fmt`, `task lint`, `task test` and `task openspec:check` green, then commit `fix(compat): compare only authored defaults`
