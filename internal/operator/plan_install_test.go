@@ -95,6 +95,14 @@ func operatorRecord(owner string, values map[string]any) *unstructured.Unstructu
 	return obj
 }
 
+// ownerlessRecord is the operator instance's record with no spec.owner,
+// which resolves as operator-owned.
+func ownerlessRecord() *unstructured.Unstructured {
+	obj := operatorRecord("", nil)
+	unstructured.RemoveNestedField(obj.Object, "spec", "owner")
+	return obj
+}
+
 func newEnv(fc *fakeCluster, r *fakeRender) InstallEnv {
 	return InstallEnv{Client: fc.client, Render: r.render, CLIVersion: "v1.0.0-beta.9"}
 }
@@ -208,7 +216,13 @@ func TestPlanInstall_RefusalsWriteNothing(t *testing.T) {
 			name:    "operator-owned record",
 			cluster: []*unstructured.Unstructured{operatorRecord("operator", nil)},
 			render:  &fakeRender{objs: moduleObjects(renderOpts{})},
-			want:    []string{"spec.owner operator", "set spec.owner to cli"},
+			want:    []string{"is not spec.owner: cli", "set spec.owner to cli"},
+		},
+		{
+			name:    "record without an owner",
+			cluster: []*unstructured.Unstructured{ownerlessRecord()},
+			render:  &fakeRender{objs: moduleObjects(renderOpts{})},
+			want:    []string{"is not spec.owner: cli", "set spec.owner to cli"},
 		},
 	}
 	for _, c := range cases {

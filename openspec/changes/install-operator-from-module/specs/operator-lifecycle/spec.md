@@ -45,6 +45,20 @@ Install SHALL run, before it writes any object, every check that can refuse it: 
 - **WHEN** an object of the render stays terminating for longer than `--timeout`
 - **THEN** the command exits non-zero naming that object and the elapsed timeout, and nothing has been applied
 
+### Requirement: Install refuses an operator instance record that is not CLI-owned
+
+Before any object changes, install SHALL refuse when the operator's instance record `opm-operator` in `opm-operator-system` exists and its `spec.owner` is not `cli`, an absent owner included, since the CLI treats a record without an owner as operator-owned. The refusal SHALL exit 2, name the record, state that its `spec.owner` is not `cli`, and give the command that sets `spec.owner: cli`. Install SHALL NOT change the owner itself: the instance apply would otherwise only edit the record's spec, and the operator never reconciles the instance that deploys it, so nothing would install.
+
+#### Scenario: Operator-owned record
+
+- **WHEN** install runs on a cluster whose record `opm-operator` in `opm-operator-system` has `spec.owner: operator`
+- **THEN** install exits 2 naming the record, saying its `spec.owner` is not `cli` and how to set it, and nothing changed
+
+#### Scenario: Record without an owner
+
+- **WHEN** install runs on a cluster whose record `opm-operator` in `opm-operator-system` has no `spec.owner`
+- **THEN** install refuses in the same way, and nothing changed
+
 ### Requirement: The CLI pins a default operator module version and the operator it deploys
 
 Each CLI release SHALL name one default operator module version and SHALL record the operator version that module deploys, both readable from the CLI's source without a registry. The recorded operator version SHALL be the version the module's own source states it deploys. Install without `--version` SHALL install exactly that module version. The pin SHALL be produced by `task operator:pin VERSION=<v>` from the module's own statement of the operator it deploys, without a render, and no other task SHALL write it. The module is trusted as the configured registry serves it, as every other module the CLI installs is. Source: 0021:D11:R6.

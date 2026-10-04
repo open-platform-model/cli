@@ -134,14 +134,15 @@ func ResolveTarget(ctx context.Context, src ModuleRegistry, registry, version st
 	return res, Target{ModuleVersion: res.Version, OperatorVersion: opVersion, Default: version == ""}, nil
 }
 
-// OwnedRecordError refuses an install over an operator instance
-// record that says the operator owns it: the operator's own instance is
-// CLI-owned, and the instance apply would otherwise only edit its spec.
+// OwnedRecordError refuses an install over an operator instance record
+// whose spec.owner is not cli (an absent owner resolves as operator-owned):
+// the operator's own instance is CLI-owned, and the instance apply would
+// otherwise only edit its spec.
 type OwnedRecordError struct{}
 
 func (e *OwnedRecordError) Error() string {
 	return fmt.Sprintf(
-		"refusing to install: ModuleInstance %s/%s records spec.owner operator, but the operator never reconciles the instance that deploys it; "+
+		"refusing to install: ModuleInstance %s/%s is not spec.owner: cli, and the operator never reconciles the instance that deploys it; "+
 			"set spec.owner to cli (kubectl patch moduleinstance %s -n %s --type=merge -p '{\"spec\":{\"owner\":\"cli\"}}'), then retry",
 		OperatorNamespace, OperatorInstanceName, OperatorInstanceName, OperatorNamespace)
 }
