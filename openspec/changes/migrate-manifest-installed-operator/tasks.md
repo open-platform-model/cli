@@ -72,16 +72,11 @@ One PR, titled with the highest class among the section commits. The release cou
 
 ## 5. Measure the migration on a cluster
 
-- [ ] 5.1 Add `tests/integration/operator-migration/main.go` (`//go:build ignore`, context `kind-opm-dev`) and add it to `task test:integration`. It drives `migration.Plan`, the two write functions and the instance apply against objects applied from a copy of the v1.0.0-beta.5 manifest in its testdata, in three runs:
-  - an `opm-cli` server-side origin;
-  - a client-side `kubectl apply` origin;
-  - an interrupted run: the Deployment delete and one binding delete executed from a partial plan, then a full re-run.
+- [x] 5.1 Add the cluster proof as the e2e test `TestE2E_Operator_MigratesManifestInstall` (`tests/e2e/operator_migration_test.go`), run by CI's kind job ("E2E (kind, embedded operator)") with the pinned operator module, instead of a `tests/integration` program: an integration program in `task test:integration` would tear down the dev cluster's operator with nothing to restore it, while the e2e suite already resets and restores it (`resetOperatorCluster`, `restoreDevOperator`). It applies a copy of the v1.0.0-beta.8 manifest (the last operator release that attaches one; `tests/e2e/testdata/legacy-operator/`) and runs `opm operator install` over it in three runs:
+  - a client-side `kubectl apply` origin, through `--crds-only` first (the Deployment and bindings untouched), then a full install and a re-run;
+  - an `opm-cli` server-side origin with one object another instance's identity: the install refuses and the CRDs keep their `resourceVersion`;
+  - an `opm-cli` server-side origin left as an interrupted migration leaves it (Deployment and one binding already deleted), completed by one install.
 
-  It asserts that:
-  - every rendered object is recorded;
-  - every uid is kept except the Deployment's;
-  - the three bindings are gone;
-  - the earlier labels and `last-applied-configuration` are gone;
-  - the CRDs' spec, and a seeded ModuleInstance and its workload, are unchanged (`uid`, `resourceVersion`)
-- [ ] 5.2 Run 5.1 on `kind-opm-dev`. Then measure with the real binary: `opm operator install` of the pinned operator module over a v1.0.0-beta.5 operator installed by the last manifest-installing CLI release, again over a client-side `kubectl apply` install, and an interrupted run completed by re-running install. Afterwards every CRD, custom resource and managed workload must be unchanged and the operator must be reconciling. The cluster needs the operator image; when the cluster has no egress, use a single-platform image with `kind load docker-image` or a host-network pull-through mirror. Record the timings, the controller gap and the object outcomes in design.md under a new "Measured" heading
-- [ ] 5.3 `task fmt`, `task lint`, `task test` and `task openspec:check` green, then commit `test(operator): measure the operator migration over both install origins and an interrupted run`
+  It asserts that the CRDs, the Namespace, the ServiceAccount, a ClusterRole and a CLI-owned ModuleInstance keep their uid (the instance its generation), the Deployment is recreated with the module's selector, the three bindings are gone and their replacements exist, the client-side labels, `last-applied-configuration` and manager are gone, the record lists the CRDs and every rendered kind, and a re-run prints no migration lines and keeps the Deployment's uid
+- [x] 5.2 Measure with the real binary on a throwaway kind cluster (`kind-migrate-spike`, not `kind-opm-dev`): a client-side `kubectl apply` install, through `--crds-only` and directly; an `opm-cli` server-side install (`kubectl apply --server-side --field-manager=opm-cli`, the apply an earlier `opm operator install` made) refused for two unproven objects; and the same install left interrupted, completed by re-running install. Record the timings, the controller gap and the object outcomes in design.md under a new "Measured" heading
+- [x] 5.3 `task fmt`, `task lint`, `task test` and `task openspec:check` green, then commit `test(operator): measure the operator migration over both install origins and an interrupted run`
