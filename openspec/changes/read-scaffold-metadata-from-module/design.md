@@ -63,8 +63,8 @@ The `cueedit.CheckVersion` gate after it is unchanged.
 
 **Findings**:
 - A non-concrete or non-string `metadata.version` or `metadata.modulePath` fails `Decode`, so the acquire fails first. Both sites already handle acquire failure ("tree does not load"), before and after this change.
-- An absent field decodes to `""`. In `statedVersion` an empty version already refused as "not stated", and an absent one errored into the same refusal, so nothing changes.
-- In `assertDerives` an absent field used to produce the "does not evaluate" internal error. Now it is `""` and fails the comparison, so it produces the donor-defect refusal with an empty `metadata.<field>` evidence row. That is the more accurate message for a clone source whose metadata does not state the field. Official templates cannot reach this path (publish gates enforce the derivation).
+- An absent field decodes to `""`, but only in a donor that does not embed core `#Module`. Core declares `modulePath!` and `version!` required, so in a `#Module` donor an absent field is non-concrete, `Decode` fails, and the acquire fails ("tree does not load"), unchanged. In `statedVersion` an empty version already refused as "not stated", and an absent one errored into the same refusal, so nothing changes.
+- In `assertDerives`, for a non-`#Module` donor (such as the e2e `litdonor` fixture shape), an absent field used to produce the "does not evaluate" internal error. Now it is `""` and fails the comparison, so it produces the donor-defect refusal with an empty `metadata.<field>` evidence row. That is the more accurate message for a clone source whose metadata does not state the field. Official templates cannot reach this path (publish gates enforce the derivation).
 
 **Options considered**:
 1. Read `Metadata`, nil-guard only (the plan entry's reading).
@@ -72,7 +72,7 @@ The `cueedit.CheckVersion` gate after it is unchanged.
 
 **Decision**: Option 1.
 
-**Rationale**: It matches the owner's decision and the plan entry. The only input that behaves differently is a donor with no `metadata.modulePath` or `metadata.version`, and it now gets the donor-defect refusal, which is the accurate one.
+**Rationale**: It matches the owner's decision and the plan entry. The only inputs that behave differently are a non-`#Module` donor with no `metadata.modulePath` or `metadata.version`, which now gets the donor-defect refusal (the accurate one), and a donor failing both checks, which is now reported on `modulePath` every time.
 
 ## Risks / Trade-offs
 
@@ -80,4 +80,4 @@ The `cueedit.CheckVersion` gate after it is unchanged.
 
 ## Error handling
 
-Unchanged: an acquire failure is an internal error in `assertDerives` and a "tree does not load" refusal in `statedVersion`, a mismatch is the existing `RefusalError` (exit 2), and the new nil-`Metadata` branch is an internal error (exit 1). No command syntax, flags or output change.
+Unchanged: an acquire failure is an internal error in `assertDerives` and a "tree does not load" refusal in `statedVersion`, a mismatch is the existing `RefusalError` (exit 2), and the new nil-`Metadata` branch is an internal error (exit 1). No command syntax or flags change; output changes only for the two donor cases in the Findings above.
