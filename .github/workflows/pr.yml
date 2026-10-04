@@ -65,6 +65,8 @@ jobs:
         # library's code. Local: .github/scripts/docs-pins-check.sh --warn
         # --moved-from origin/main.
         if: github.event_name == 'pull_request'
+        timeout-minutes: 10
+        continue-on-error: true # a timeout stays a warning too
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |

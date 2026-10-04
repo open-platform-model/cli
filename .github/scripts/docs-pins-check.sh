@@ -70,8 +70,14 @@ if [ -n "$moved_from" ]; then
   op_base=$(op_of <<<"$base_manifest")
   lib_tree=$(lib_of <go.mod)
   op_tree=$(op_of <"$MANIFEST")
+  # An empty read means go.mod or the manifest changed shape; two empty reads
+  # would compare equal and skip the check without a word.
+  if [ -z "$lib_base" ] || [ -z "$lib_tree" ] || [ -z "$op_base" ] || [ -z "$op_tree" ]; then
+    problem "docs bundles not checked: cannot read the $LIB version in go.mod or PinnedOperatorVersion in $MANIFEST (base ${lib_base:-?}/${op_base:-?}, tree ${lib_tree:-?}/${op_tree:-?})"
+    finish
+  fi
   if [ "$lib_tree" = "$lib_base" ] && [ "$op_tree" = "$op_base" ]; then
-    echo "docs-pins: library ${lib_tree:-?} and opm-operator ${op_tree:-?} unchanged against ${moved_from}; nothing to check" >&2
+    echo "docs-pins: library ${lib_tree} and opm-operator ${op_tree} unchanged against ${moved_from}; nothing to check" >&2
     finish
   fi
 fi
@@ -83,12 +89,12 @@ docs_repo=open-platform-model/docs
 # refuses an anonymous token), 000 when ghcr.io is unreachable.
 docs_bundle_status() {
   local body code token
-  body=$(curl -sS --retry 3 --retry-all-errors -w '\n%{http_code}' \
+  body=$(curl -sS --connect-timeout 10 --max-time 30 --retry 3 --retry-all-errors -w '\n%{http_code}' \
     "https://${docs_registry}/token?scope=repository:${docs_repo}/$1:pull" 2>/dev/null) || { echo 000; return; }
   code=${body##*$'\n'}
   if [ "$code" != 200 ]; then echo "$code"; return; fi
   token=$(jq -r '.token // empty' <<<"${body%$'\n'*}")
-  curl -sS -o /dev/null -w '%{http_code}' -I --retry 3 --retry-all-errors \
+  curl -sS -o /dev/null -w '%{http_code}' -I --connect-timeout 10 --max-time 30 --retry 3 --retry-all-errors \
     -H "Authorization: Bearer ${token}" \
     -H 'Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json' \
     "https://${docs_registry}/v2/${docs_repo}/$1/manifests/$2" 2>/dev/null || true
