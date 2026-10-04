@@ -136,6 +136,27 @@ func TestGroupByComponent_EqualWeightAndNameOrderedByKindThenNamespace(t *testin
 	assert.Equal(t, []string{"ConfigMap/a", "ConfigMap/b", "Secret/b"}, got)
 }
 
+func TestGroupByComponent_EqualKindAndNameOrderedByAPIGroup(t *testing.T) {
+	// Two CRDs can both define a Certificate; with one weight, kind, name and
+	// namespace, the API group decides, whatever the inventory order.
+	certificate := func(apiVersion string) *unstructured.Unstructured {
+		res := makeRes("Certificate", "a", "web")
+		res.SetAPIVersion(apiVersion)
+		return res
+	}
+	resources := []*unstructured.Unstructured{
+		certificate("z.example.com/v1"),
+		certificate("cert-manager.io/v1"),
+	}
+	groups := groupByComponent(resources, map[string]string{})
+
+	got := make([]string, 0, len(resources))
+	for _, res := range groups[noComponentLabel] {
+		got = append(got, res.GroupVersionKind().Group)
+	}
+	assert.Equal(t, []string{"cert-manager.io", "z.example.com"}, got)
+}
+
 func TestSortedComponentNames_AlphabeticalWithNoComponentLast(t *testing.T) {
 	groups := map[string][]*unstructured.Unstructured{
 		"zebra":          {},

@@ -275,8 +275,8 @@ func groupByComponent(resources []*unstructured.Unstructured, componentMap map[s
 }
 
 // sortByWeightThenName orders objs in place ascending by resource weight, then
-// name. Kind and then namespace break the remaining ties, so the same set of
-// objects always comes out in the same order.
+// name. Kind, API group and then namespace break the remaining ties, so the
+// same set of objects always comes out in the same order.
 func sortByWeightThenName(objs []*unstructured.Unstructured) {
 	sort.SliceStable(objs, func(i, j int) bool {
 		a, b := objs[i], objs[j]
@@ -285,6 +285,9 @@ func sortByWeightThenName(objs []*unstructured.Unstructured) {
 		}
 		if a.GetKind() != b.GetKind() {
 			return a.GetKind() < b.GetKind()
+		}
+		if ga, gb := a.GroupVersionKind().Group, b.GroupVersionKind().Group; ga != gb {
+			return ga < gb
 		}
 		return a.GetNamespace() < b.GetNamespace()
 	})

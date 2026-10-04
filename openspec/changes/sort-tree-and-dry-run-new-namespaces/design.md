@@ -27,13 +27,13 @@ Verified against `origin/main` 5180cad1:
 
 ## Research & Decisions
 
-### 1. Tree order: weight, then name, then kind, then namespace
+### 1. Tree order: weight, then name, then kind, API group and namespace
 
 **Context**: the spec names weight then name. Two resources of equal weight can share a name (a ConfigMap and a Secret named `config`, or one name in two namespaces under the no-component group).
 **Options considered**:
 1. Sort the inventory when it is written - changes the stored record and the operator-shared format, and does nothing for records already written.
 2. Sort in `groupByComponent` - local to the tree, works for every record.
-**Decision**: option 2. Each group is first sorted by name, kind and namespace (`sort.SliceStable`), then by weight with the stable `SortObjects(group, resourceorder.Ascending)`.
+**Decision**: option 2. Each group is first sorted by name, kind, API group and namespace (`sort.SliceStable`), then by weight with the stable `SortObjects(group, resourceorder.Ascending)`.
 **Rationale**: the stable weight sort keeps the name order within a weight, and the extra keys make the order total, so two runs over the same inventory print the same tree.
 
 ```go
@@ -46,7 +46,7 @@ func groupByComponent(resources []*unstructured.Unstructured, componentMap map[s
 }
 
 // sortByWeightThenName orders objs ascending by resource weight, then name,
-// kind and namespace.
+// kind, API group and namespace.
 func sortByWeightThenName(objs []*unstructured.Unstructured)
 ```
 
