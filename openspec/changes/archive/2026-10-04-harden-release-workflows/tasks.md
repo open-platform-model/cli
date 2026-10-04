@@ -33,3 +33,12 @@ One PR, titled `ci: harden the release workflows`. Workers never touch tags, rel
 - [x] 4.1 `AGENTS.md`: the release cascade and docs bundle notes.
 - [x] 4.2 Run the gates: `task lint`, `task test:unit`, `task openspec:check`, `task -x deps:cascade:test` (all set), `actionlint`, `shellcheck`, `task cascade:wiring:check`.
 - [x] 4.3 Commit `docs(agents): describe the release Environment, job permissions and docs-pin check`.
+
+## 5. Review fixes (PR 306)
+
+- [x] 5.1 `cascade.sh`: build `opm` from an export of the merge base, not the work tree (design D6); spec and `AGENTS.md` say so.
+- [x] 5.2 `test.sh` S2: a `go` shim fails the scenario on any `go` call but `get`, `mod tidy` and the `opm` build from the export.
+- [x] 5.3 `docs-pins-check.sh`: bounded GHCR requests, an empty pin read is a warning; the `pr.yml` step gets `timeout-minutes` and `continue-on-error`.
+- [x] 5.4 `deps-cascade.yml`: the setup-go comment no longer names `hack/docskit-dump`.
+- [x] 5.5 publish-templates and `publish-fixtures.yml` run from `main` only; the release jobs check out `refs/tags/<tag>`.
+- [x] 5.6 Re-run the gates.
