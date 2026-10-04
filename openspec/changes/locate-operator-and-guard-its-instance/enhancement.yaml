@@ -1,0 +1,18 @@
+# Enhancement declaration, read by `task enhancements:delivery:log` at archive time.
+# See enhancements/schema.cue #ChangeDeclaration.
+#
+# This change carries three requirements of 0028 ahead of the module install:
+#   - 0028:D3:R13  after a module install, the running-operator check finds the
+#                  operator through its instance record;
+#   - 0028:D3:R15  with no record, it finds the operator by the fixed names of
+#                  its Deployment, Namespace and CRDs;
+#   - 0028:D9:R5   no CLI command deletes the operator's instance while any
+#                  ModuleInstance carries the operator's cleanup finalizer,
+#                  unless the user makes uninstall's explicit choice.
+# It claims neither D3 nor D9: both carry many more requirements (the two-step
+# install, the version rules, uninstall over the inventory), so `decisions`
+# stays empty and the delivery log line names R13/R15 and R5 in its SUMMARY.
+implements:
+  - enhancement: "0028"
+    decisions: []
+    resolves: []
