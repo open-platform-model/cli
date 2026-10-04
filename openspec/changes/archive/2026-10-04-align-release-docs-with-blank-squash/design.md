@@ -64,7 +64,7 @@ Workspace RELEASING.md and `.github/workflows/pr-title.yml:12` say the key is re
 
 ### D5: Where a migration note goes
 
-The old text made the `BREAKING CHANGE:` footer "the migration note the CHANGELOG shows". Under `BLANK` the CHANGELOG entry is the PR title alone. The new text says the migration note goes in the PR body, and in the user docs (`docs/site/`) when users need it to upgrade. The CHANGELOG still carries the note: whoever merges the release PR first edits its `CHANGELOG.md` by hand to add it (supervisor decision 2026-10-04, Phase 2 triage). The text in `AGENTS.md`, `CONSTITUTION.md`, `openspec/config.yaml` and the new requirement says so.
+The old text made the `BREAKING CHANGE:` footer "the migration note the CHANGELOG shows". Under `BLANK` the CHANGELOG entry is the PR title alone. The new text says the migration note goes in the PR body, and in the user docs (`docs/site/`) when users need it to upgrade. The CHANGELOG still carries the note: whoever merges the release PR edits its `CHANGELOG.md` by hand to add it, as the last step before merging, and redoes the edit if anything landed on `main` since, because release-please rebuilds the release PR on every push to `main` (`manifest.js` `updatePullRequest` with `force: true`) and drops the edit (supervisor decision 2026-10-04, Phase 2 triage; timing from the implementation re-review). A `BEGIN_COMMIT_OVERRIDE` block in the PR body would carry the note without a hand edit, but it also re-enables `Release-As:` and `BREAKING CHANGE:` footers, so the specs forbid it; adopting it instead is a supervisor or owner call. The text in `AGENTS.md`, `CONSTITUTION.md`, `openspec/config.yaml` and the new requirement says so.
 
 ### D6: A release-as key needs a releasable commit beside it
 

@@ -108,7 +108,9 @@ title (`feat!:`), which is the squash commit title and the CHANGELOG entry;
 until the owner merge settings land, merge by squash only and give a
 one-commit PR's commit subject the same `!`. The migration note goes in the PR
 body, and in the user docs when users need it to upgrade; whoever merges the
-release PR first edits its `CHANGELOG.md` by hand to carry the note.
+release PR edits its `CHANGELOG.md` by hand to carry the note as the
+last step before merging, and redoes the edit if anything landed on `main`
+since (release-please rebuilds the release PR and drops it).
 A breaking change advances the `-beta.N` counter and never moves the module
 path to a new major. Stable lines (opmodel.dev/catalogs/opm@v4 and the module
 fleets) keep the normal SemVer rule: a break is a new major. A core beta break
