@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0-beta.8](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.7...v1.0.0-beta.8) (2026-10-04)
+
+
+### Features
+
+* **instance:** locate the operator by fixed names and guard deleting its instance ([#299](https://github.com/open-platform-model/cli/issues/299)) ([9d28ebd](https://github.com/open-platform-model/cli/commit/9d28ebdc8ed86fb2c03c4d1a4d87965f6fc39fda))
+
+
+### Bug Fixes
+
+* **compat:** compare only authored defaults ([#300](https://github.com/open-platform-model/cli/issues/300)) ([5396688](https://github.com/open-platform-model/cli/commit/5396688904670a0ad5ddf965a61e2fa5d9cdc773))
+
 ## [1.0.0-beta.7](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.6...v1.0.0-beta.7) (2026-10-03)
 
 
