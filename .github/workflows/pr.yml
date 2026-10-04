@@ -40,7 +40,9 @@ jobs:
       - name: Verify the cascade wiring
         # The canonical .github check with this repo's values
         # (.tasks/cascade/wiring-check.yaml); --pin-on-main also confirms the
-        # pinned SHA is on .github main. Local, offline: task cascade:wiring:check.
+        # pinned SHA is on .github main and this copy is the file at that SHA.
+        # Only SHA-pinned actions may come before it. Local, offline:
+        # task cascade:wiring:check.
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash .tasks/cascade/wiring-check.sh --pin-on-main
