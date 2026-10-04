@@ -8,14 +8,14 @@ At origin/main (`5180cad1`) `.github/dependabot.yml` ignores only `github.com/op
 
 ## What Changes
 
-- `.github/dependabot.yml`: the `gomod` update also ignores `cuelang.org/go`, with a comment in the same style as the existing `github.com/open-platform-model/*` ignore. The comment says that CUE moves only through a library release and reaches the cli through the cascade's library bump, whose `go get` of the library raises `cuelang.org/go` by minimal version selection (kept by `go mod tidy`). The same entry list also ignores `cuelabs.dev/go/oci/ociregistry` (a direct require at `go.mod:6`), the CUE team's OCI module whose version `cuelang.org/go` pins; a standalone bump of it would skip the library's CUE check the same way (supervisor triage of the plan, extending j4).
+- `.github/dependabot.yml`: the `gomod` update also ignores `cuelang.org/go`, with a comment in the same style as the existing `github.com/open-platform-model/*` ignore. The comment says that CUE moves only through a library release and reaches the cli through the cascade's library bump, whose `go get` of the library raises `cuelang.org/go` by minimal version selection (kept by `go mod tidy`). The same entry list also ignores `cuelabs.dev/go/oci/ociregistry` (a direct require at `go.mod:6`), the CUE team's OCI module, whose version the library's `go.mod` sets (`cuelang.org/go` sets only a floor), so it reaches the cli through the library bump; a standalone bump of it would skip the library's CUE check the same way (the supervisor's round-1 triage, extending j4).
 - Main spec `repo-automation`: one ADDED requirement, "Dependabot leaves cuelang.org/go to library releases", and one MODIFIED requirement, "Dependabot leaves OPM Go modules to the release cascade", whose sentence about other Go modules now excepts `cuelang.org/go` (both scenarios kept). The archive commit also updates the spec's Purpose line to name `cuelang.org/go`.
 
 Not in this change:
 
 - the opm-operator ignore (its own change, after opm-operator#225);
 - the workspace RELEASING.md rule (its own change in the workspace repo);
-- the CUE CLI version pins, the literal `go install cuelang.org/go/cmd/cue@v0.17.1` installs in `cascade-task.yml`, `ci.yml`, `e2e-cluster.yml`, `pr.yml` (three times) and `publish-fixtures.yml`, which are not Go module requires and which Dependabot does not manage (`pr.yml:159` and `release.yml:246` already derive the version from `go.mod`);
+- the CUE CLI version pins, the literal `go install cuelang.org/go/cmd/cue@v0.17.1` installs in `cascade-task.yml`, `ci.yml`, `e2e-cluster.yml`, `pr.yml` (three times) and `publish-fixtures.yml`, which are not Go module requires and which Dependabot does not manage (the steps "Install cue (the version go.mod requires)" in `pr.yml` and `release.yml` already derive the version from `go.mod`);
 - any change to how `task deps:cascade` moves the library.
 
 ## Capabilities
