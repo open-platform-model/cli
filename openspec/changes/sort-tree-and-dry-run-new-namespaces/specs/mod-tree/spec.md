@@ -2,7 +2,7 @@
 
 ### Requirement: Tree sorts resources within components by weight
 
-Within each component group, resources SHALL be sorted by OPM weight (ascending) and then alphabetically by name, with kind and then namespace breaking any remaining tie, so the same inventory always prints in the same order. This ensures tree output matches apply order. The tree SHALL sort when it builds the groups; it SHALL NOT rely on the order of the inventory entries, which follow the render order of the last apply.
+Within each component group, resources SHALL be sorted by OPM weight (ascending) and then alphabetically by name, with kind and then namespace breaking any remaining tie, so the same inventory always prints in the same order. This ensures tree output matches apply order at weight granularity. The tree SHALL sort when it builds the groups; it SHALL NOT rely on the order of the inventory entries, which follow the render order of the last apply.
 
 #### Scenario: Resources sorted by weight
 

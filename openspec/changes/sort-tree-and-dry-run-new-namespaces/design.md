@@ -100,7 +100,7 @@ A Namespace whose own dry-run apply failed is not in `applied`, so its objects a
 1. Keep the sleep and assert a parsed duration `>= 1s` - still slow and still wall-clock dependent.
 2. A package clock in `internal/workflow/apply`: `var now = time.Now`, and `budgetStart := now()`. The test sets `now` to return the real time minus one hour and `Options.Timeout` to one hour plus a few hundred milliseconds, so the deadline is a few hundred milliseconds away and the error must read `timed out after 1h0m`.
 **Decision**: option 2.
-**Rationale**: without `BudgetStart` the wait would count from its own start and report `0s`, so the line the reviewer deleted is now guarded, and the test takes well under a second. `EstablishDeadline` stays guarded: without it the default five-minute deadline would make the test fail on the Go test timeout instead of passing.
+**Rationale**: without `BudgetStart` the wait would count from its own start and report `0s`, so the line the reviewer deleted is now guarded, and the test takes well under a second. `EstablishDeadline` stays guarded: without it the 5m default deadline applies and the reported `1h5m` fails the `1h0m` assertion (slowly).
 
 ### 5. The `OPM_NAMESPACE` command test
 
