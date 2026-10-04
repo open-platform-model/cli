@@ -20,4 +20,4 @@ One PR, titled `ci(deps): pin the cascade to .github 7b9ad1b`. Workers never tou
 - [x] 2.1 `AGENTS.md` release cascade note and the `cascade:wiring:check` task description: the canonical copy, its config, `--pin-on-main`, the gates-only switch and the release key rule.
 - [x] 2.2 Negative checks: the wiring check fails on a moved single reference, a missing `gates-only` input, a dropped `cache: false` in a publishing workflow, and with `--pin-on-main` on a SHA not on `.github` `main`.
 - [x] 2.3 Run the gates: `task lint`, `task openspec:check`, `task -x deps:cascade:test` (offline set), `actionlint`, `bash .tasks/cascade/wiring-check.sh --pin-on-main`.
-- [ ] 2.4 Commit `docs(agents): describe the canonical cascade wiring check`.
+- [x] 2.4 Commit `docs(agents): describe the canonical cascade wiring check`.
