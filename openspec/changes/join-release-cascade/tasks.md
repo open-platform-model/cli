@@ -82,16 +82,20 @@ All checks are read-only. Record each result as an indented "Done:" note. Then w
 
 ## 3. Receiver and gate callers
 
-- [ ] 3.1 Create `.github/workflows/deps-cascade.yml` exactly as design D2 shows: cron `17 6 * * *`, `setup-go: true`, `labels-managed: true`, `permissions: {}` at the top, and the job permissions `contents: read`, `pull-requests: read` and `statuses: write`. Put a header comment above `on:` that names:
+- [x] 3.1 Create `.github/workflows/deps-cascade.yml` exactly as design D2 shows: cron `17 6 * * *`, `setup-go: true`, `labels-managed: true`, `permissions: {}` at the top, and the job permissions `contents: read`, `pull-requests: read` and `statuses: write`. Put a header comment above `on:` that names:
   - RELEASING.md "The receiver";
   - the fail-closed `CASCADE_DRY_RUN` (live only at exactly `false`);
   - that the shared workflow at `main` does the work.
-- [ ] 3.2 Create `.github/workflows/cascade-gates.yml` exactly as design D3 shows. Its header comment says:
+  Done: Created as D2 with the wiring §5 template and the cli §5.1 values; header comment names RELEASING.md "The receiver", the fail-closed `CASCADE_DRY_RUN` and the shared workflow at `main`.
+- [x] 3.2 Create `.github/workflows/cascade-gates.yml` exactly as design D3 shows. Its header comment says:
   - that it posts `cascade/freshness` and `cascade/settled` on every PR;
   - that it checks out no PR code;
   - that neither status is required until Phase 5.
-- [ ] 3.3 Grep check: `grep -n -E 'secrets:|environment:' .github/workflows/deps-cascade.yml .github/workflows/cascade-gates.yml` prints nothing, and `grep -c 'open-platform-model/.github/.github/workflows/cascade-.*\.yml@main' .github/workflows/{release,deps-cascade,cascade-gates}.yml` prints 1 for each file.
-- [ ] 3.4 The local gate (with `actionlint` on both new files) is green, then commit `ci(cascade): add the cascade receiver and gate callers`.
+  Done: Created as the wiring §8.3 template; header comment covers both statuses on every PR, no PR checkout, and not required until Phase 5.
+- [x] 3.3 Grep check: `grep -n -E 'secrets:|environment:' .github/workflows/deps-cascade.yml .github/workflows/cascade-gates.yml` prints nothing, and `grep -c 'open-platform-model/.github/.github/workflows/cascade-.*\.yml@main' .github/workflows/{release,deps-cascade,cascade-gates}.yml` prints 1 for each file.
+  Done: No `secrets:` or `environment:` in either new file; each of the three files has exactly one `cascade-*.yml@main` reference.
+- [x] 3.4 The local gate (with `actionlint` on both new files) is green, then commit `ci(cascade): add the cascade receiver and gate callers`.
+  Done: `task lint` (0 issues), `task test:unit`, `task openspec:check` (68/0) green; actionlint with shellcheck on all three callers, with `@main` resolved to A's branch copies: clean.
 
 ## 4. Documentation and final cross-check
 
