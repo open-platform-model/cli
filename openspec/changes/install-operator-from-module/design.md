@@ -91,7 +91,7 @@ flags --> catalog version (if seeding) --> module ref (pin | --version)
       --> Platform seed (write-if-absent, unless --skip-platform)
 ```
 
-`--crds-only` stops after write 1 (checks V1, the image agreement, V5 and the guard over the CRDs only), then applies `--rbac` objects as today.
+`--crds-only` stops after write 1 (checks V1, the image agreement, V5, the migration proof slot immediately before the guard, and the guard over the CRDs only), then applies `--rbac` objects as today. As in the full flow, the guard is that path's last check and nothing but the proof slot sits between it and the checks before it, so `migrate-manifest-installed-operator` can prove and admit the earlier manifest's CRDs there.
 
 Signatures (new or changed, `internal/operator`):
 
