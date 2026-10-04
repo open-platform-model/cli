@@ -55,7 +55,7 @@ jobs:
       contents: read
       pull-requests: read
       statuses: write
-    uses: open-platform-model/.github/.github/workflows/cascade-receive.yml@2376ffae4bfc665f327d51581350dea694c01504 # .github main
+    uses: open-platform-model/.github/.github/workflows/cascade-receive.yml@7b9ad1bea132f7a3f053a5db61ac3933b59ee226 # .github main
     with:
       dry-run: ${{ inputs.dry_run == true || vars.CASCADE_DRY_RUN != 'false' }}
       gates-only: ${{ inputs.gates_only == true }}
@@ -73,6 +73,7 @@ jobs:
       && needs.cascade.outputs.compute-ok == 'true'
       && needs.cascade.outputs.dry-run == 'false'
       && inputs.dry_run != true
+      && inputs.gates_only != true
       && vars.CASCADE_DRY_RUN == 'false'
       && github.ref == 'refs/heads/main'
       && contains(fromJSON('["push","recreate","close","conflict","too_long"]'), needs.cascade.outputs.action)
@@ -84,9 +85,12 @@ jobs:
       pull-requests: read
     steps:
       - name: Publish
-        uses: open-platform-model/.github/.github/actions/cascade-publish@2376ffae4bfc665f327d51581350dea694c01504 # .github main
+        uses: open-platform-model/.github/.github/actions/cascade-publish@7b9ad1bea132f7a3f053a5db61ac3933b59ee226 # .github main
         with:
           dry-run: ${{ inputs.dry_run == true || vars.CASCADE_DRY_RUN != 'false' }}
+          # A gates-only run never publishes: the action fails before the
+          # mint unless this is exactly false.
+          gates-only: ${{ inputs.gates_only == true }}
           # .github/labels.yml owns this repo's labels, so publish only
           # checks that the cascade labels exist and never creates one.
           labels-managed: true
