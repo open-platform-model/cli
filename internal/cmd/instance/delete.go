@@ -122,12 +122,12 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 		}
 	}
 
-	inv, liveResources, _, _, err := query.ResolveInventory(ctx, k8sClient, rsf, namespace, instanceLog)
+	inv, liveResources, _, unreadable, err := query.ResolveInventory(ctx, k8sClient, rsf, namespace, instanceLog)
 	if err != nil {
 		return err
 	}
 
-	return deleteResolvedInstance(ctx, k8sClient, rsf, namespace, inv, liveResources, timeout, dryRun, instanceLog)
+	return deleteResolvedInstance(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, timeout, dryRun, instanceLog)
 }
 
 // deleteResolvedInstance deletes an instance whose record has been read. It
@@ -135,8 +135,13 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 // a dry run alike. Ownership is then the single branch point (0006:D18): an
 // operator-owned instance is deleted by deleting its CR and letting the
 // operator's finalizer prune the workloads.
+//
+// unreadable lists the tracked resources discovery could not read. The
+// CLI-owned branch treats each as a per-resource failure and keeps the
+// ModuleInstance; the operator-owned branch ignores them, since it deletes only
+// the ModuleInstance and the operator prunes with its own credentials.
 func deleteResolvedInstance(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string,
-	inv *inventory.Record, liveResources []*unstructured.Unstructured, timeout time.Duration, dryRun bool, instanceLog *log.Logger) error {
+	inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, timeout time.Duration, dryRun bool, instanceLog *log.Logger) error {
 	if err := guardOperatorInstanceDelete(ctx, k8sClient, inv); err != nil {
 		return err
 	}
@@ -145,7 +150,7 @@ func deleteResolvedInstance(ctx context.Context, k8sClient *kubernetes.Client, r
 		return deleteOperatorOwned(ctx, k8sClient, inv, timeout, dryRun, instanceLog)
 	}
 
-	return executeInstanceDelete(ctx, k8sClient, rsf, namespace, inv, liveResources, dryRun, instanceLog)
+	return executeInstanceDelete(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, dryRun, instanceLog)
 }
 
 // guardOperatorInstanceDelete refuses to delete an instance that deploys the
@@ -267,7 +272,9 @@ func deleteOperatorOwned(ctx context.Context, k8sClient *kubernetes.Client, inv 
 
 // executeInstanceDelete deletes the instance's tracked workloads, then the
 // ModuleInstance CR last (after all workloads are gone; skipped on dry-run).
-func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, inv *inventory.Record, liveResources []*unstructured.Unstructured, dryRun bool, instanceLog *log.Logger) error {
+// A tracked resource discovery could not read (unreadable) is a per-resource
+// failure, so the ModuleInstance is kept and still tracks it.
+func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, dryRun bool, instanceLog *log.Logger) error {
 	instanceLog.Info(fmt.Sprintf("deleting resources in namespace %q", namespace))
 
 	deleteResult, err := kubernetes.Delete(ctx, k8sClient, kubernetes.DeleteOptions{
@@ -278,6 +285,7 @@ func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rs
 		DryRun:                dryRun,
 		InventoryLive:         liveResources,
 		InventoryRecordExists: inv != nil,
+		Unreadable:            inventory.UnreadableResources(unreadable),
 	})
 	if err != nil {
 		instanceLog.Error("delete failed", "error", err)
@@ -309,13 +317,16 @@ func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rs
 
 // reportInstanceDelete prints the closing summary of a CLI-owned delete and
 // turns per-resource errors into the command's exit error. Errors claim no
-// completion: a real run kept the ModuleInstance for a re-run, and a dry run,
-// which attempts no delete, could not check every resource.
+// completion: a real run kept the ModuleInstance for a re-run, and says so,
+// and a dry run, which attempts no delete, could not check every resource.
 func reportInstanceDelete(deleteResult *kubernetes.DeleteResult, dryRun bool, instanceLog *log.Logger) error {
 	if n := len(deleteResult.Errors); n > 0 {
 		format := "%d resource(s) failed to delete"
 		if dryRun {
 			format = "%d resource(s) could not be checked"
+		} else {
+			output.Details("The ModuleInstance was kept, so it still tracks these resources.\n" +
+				"Fix the cause (for example missing RBAC) and re-run; re-running is safe.")
 		}
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf(format, n), Printed: true}
 	}
