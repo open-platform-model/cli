@@ -25,13 +25,15 @@ on:
       - reopened
       - synchronize
 
-permissions:
-  pull-requests: read
+permissions: {}
 
 jobs:
   validate:
     name: Validate Conventional Commit title
     runs-on: ubuntu-latest
+    # pull_request_target with no checkout: the action only reads the title.
+    permissions:
+      pull-requests: read
     steps:
       - name: Check PR title
         uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1

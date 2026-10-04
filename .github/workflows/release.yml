@@ -60,15 +60,21 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: write
-  pull-requests: write
+# Every job grants exactly what it uses, so the repository's default token
+# can be read-only.
+permissions: {}
 
 jobs:
   release-please:
     name: Release Please
-    if: github.event_name == 'push'
+    # The only job that reads RELEASE_APP_PRIVATE_KEY. The release Environment
+    # deploys from main only; the ref check keeps the key off any other ref
+    # even if a trigger is added later.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: release
+    # No GITHUB_TOKEN scope: the job acts only through the App token.
+    permissions: {}
     outputs:
       releases_created: ${{ steps.release.outputs.releases_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -170,6 +176,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.0'
+          # No Actions cache in a publishing job: main's cache scope is
+          # written by runs of other code (the cascade's compute and gates).
+          cache: false
 
       # dockers_v2 builds the multi-arch image with buildx. The Dockerfile has
       # no RUN step (it only copies the cross-compiled binary), so no QEMU.
@@ -218,6 +227,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.0'
+          # No Actions cache in a publishing job: main's cache scope is
+          # written by runs of other code (the cascade's compute and gates).
+          cache: false
 
       - name: Build opm
         run: go build -o bin/opm ./cmd/opm
