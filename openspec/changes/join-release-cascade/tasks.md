@@ -115,5 +115,6 @@ All checks are read-only. Record each result as an indented "Done:" note. Then w
 
 ## 5. Verify and archive
 
-- [ ] 5.1 Run the OpenSpec verify skill (`opsx:verify`) on `join-release-cascade` and resolve or report every CRITICAL and WARNING.
+- [x] 5.1 Run the OpenSpec verify skill (`opsx:verify`) on `join-release-cascade` and resolve or report every CRITICAL and WARNING.
+  Done: verify ran on 2026-10-04: no CRITICAL beyond the open archive task 5.2; two WARNINGs, both outside the cli: the shared receiver's `publish.if` does not yet read `inputs.gates-only` (G-shared), and A's sandbox cycle has not run, so the runtime scenarios are unproven until it does. Both are reported to the supervisor.
 - [ ] 5.2 Archive with `openspec archive join-release-cascade` and commit it in this PR (`docs(openspec): archive join-release-cascade`). The archive rides the implementing PR. Under the supervised swarm protocol, the supervisor decides when this runs, after review.
