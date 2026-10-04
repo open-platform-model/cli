@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -284,4 +285,44 @@ func TestMoveOwnership_LeavesOtherManagers(t *testing.T) {
 		managers = append(managers, mf.Manager+":"+string(mf.Operation))
 	}
 	assert.ElementsMatch(t, []string{"opm-cli:Apply", "kubectl-label:Update"}, managers)
+}
+
+// A run whose instance apply stamped the identity on some rendered objects
+// (the Namespace, the ServiceAccount and the new Deployment) and then
+// stopped before writing the record resumes: the stamped objects are the
+// instance's own, the rest are still adopted, the remaining bindings are
+// deleted, and the record names every rendered object.
+func TestInstall_ResumesAfterAPartialInstanceApply(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	render := &fakeRender{objs: migrationModuleObjects("")}
+	cluster := withoutKey(manifestObjects(t, beta8, originOPMCLI), kindDeployment, ControllerDeploymentName)
+	cluster = withoutKey(cluster, "ClusterRoleBinding", "opm-operator-manager-rolebinding")
+	for _, o := range cluster {
+		if o.GetKind() == "Namespace" || o.GetKind() == "ServiceAccount" {
+			labeled(o, "controller-manager", "0.1.0")
+		}
+	}
+	deploy := findObj(render.objs, kindDeployment, ControllerDeploymentName).DeepCopy()
+	deploy.SetUID("partial-deployment")
+	require.NoError(t, unstructured.SetNestedMap(deploy.Object, map[string]any{
+		"observedGeneration": int64(0), "replicas": int64(1), "updatedReplicas": int64(1), "availableReplicas": int64(1),
+	}, "status"))
+	cluster = append(cluster, deploy)
+	fc := newFakeCluster(t, cluster...)
+	require.Nil(t, fc.record(), "the stopped run wrote no record")
+
+	plan, err := PlanInstall(context.Background(), newEnv(fc, render), testResolution("v0.1.0"), defaultTarget, PlanOptions{Timeout: 2 * time.Second})
+	require.NoError(t, err, "the guard admits a mix of the instance's own and adopted objects")
+	assert.Nil(t, plan.Migration.RecreateDeployment, "the Deployment is already the instance's")
+	assert.NotEmpty(t, plan.Migration.Ours)
+	assert.NotEmpty(t, plan.Migration.Adopt)
+
+	result, err := Install(context.Background(), newEnv(fc, render), plan)
+	require.NoError(t, err)
+	assert.True(t, result.Recorded)
+	assert.Len(t, entryNames(fc.record()), len(render.objs))
+	assert.Equal(t, "partial-deployment", string(fc.mustGet(deploymentGVR, OperatorNamespace, ControllerDeploymentName).GetUID()))
+	assert.False(t, fc.exists(crbGVR, "", "opm-operator-metrics-auth-rolebinding"))
+	assert.False(t, fc.exists(rbGVR, OperatorNamespace, "opm-operator-leader-election-rolebinding"))
 }
