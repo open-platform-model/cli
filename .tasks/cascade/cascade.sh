@@ -429,6 +429,39 @@ if [ -n "$LIB_T" ] || [ -n "$OP_T" ] || [ -n "$KIND_T" ]; then work=1; fi
 for d in "${CUE_DIRS[@]}"; do if [ -n "${MOVES[$d]}" ]; then work=1; fi; done
 if [ "${#ADV_T[@]}" -gt 0 ] || [ "${#REPIN[@]}" -gt 0 ]; then work=1; fi
 
+# docs_check: docs bundles, a warning, never a hold (design.md D9; contract
+# §9.5). It runs when library or the operator differs from the merge base,
+# not only when this run moved it, and on both the exit-0 and the exit-3 path
+# (the working tree is the final tree on either), so a later run on the
+# branch keeps the warning.
+docs_check() {
+  local pins entries project pin key lib_base op_base
+  lib_base=$(git show "$M:go.mod" | awk -v m="$LIB" '$1 == m { print $2; exit }')
+  op_base=$(git show "$M:internal/operator/manifest.go" | sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p')
+  if [ "${LIB_T:-$LIB_CUR}" != "$lib_base" ] || [ "${OP_T:-$OP_CUR}" != "$op_base" ]; then
+    if pins=$(go run ./hack/docskit-dump pins 2>"$STATE/docskit.err"); then
+      # Outside a process substitution, so a changed output shape stops the task.
+      entries=$(jq -er '.pins | to_entries[] | "\(.key)\t\(.value)"' <<<"$pins") ||
+        die "\`hack/docskit-dump pins\` printed no \`.pins\` entries"
+      while IFS=$'\t' read -r project pin; do
+        [ -n "$project" ] || continue
+        r published oci "open-platform-model/docs/$project" "$pin"
+        if [ "$RC" = 3 ]; then
+          case "$project" in
+            library) key=$LIB ;;
+            opm-operator) key=$OP ;;
+            core) key=$CORE ;;
+            *) key=- ;;
+          esac
+          warn "$key" "docs bundle for \`$project\` \`$pin\` is not published; G1 will fail the next release PR until it is"
+        fi
+      done <<<"$entries"
+    else
+      warn - "\`hack/docskit-dump pins\` did not build on the final tree; docs bundles not checked"
+    fi
+  fi
+}
+
 finish() {
   if [ -n "$START" ]; then
     if [ "$(snapshot)" != "$START" ]; then exit 0; fi
@@ -439,6 +472,7 @@ finish() {
 }
 if [ "$work" = 0 ]; then
   say "nothing to move"
+  docs_check
   finish
 fi
 
@@ -521,32 +555,7 @@ for c in "${CONSUMERS[@]}"; do
   set_cue_dep_v "$c/cue.mod/module.cue" "$POD" "${REPIN[$c]}"
 done
 
-# 5. Docs bundles: a warning, never a hold (design.md D9; contract §9.5). It
-# runs when library or the operator differs from the merge base, not only when
-# this run moved it, so a later run on the branch keeps the warning.
-LIB_BASE=$(git show "$M:go.mod" | awk -v m="$LIB" '$1 == m { print $2; exit }')
-OP_BASE=$(git show "$M:internal/operator/manifest.go" | sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p')
-if [ "${LIB_T:-$LIB_CUR}" != "$LIB_BASE" ] || [ "${OP_T:-$OP_CUR}" != "$OP_BASE" ]; then
-  if pins=$(go run ./hack/docskit-dump pins 2>"$STATE/docskit.err"); then
-    # Outside a process substitution, so a changed output shape stops the task.
-    entries=$(jq -er '.pins | to_entries[] | "\(.key)\t\(.value)"' <<<"$pins") ||
-      die "\`hack/docskit-dump pins\` printed no \`.pins\` entries"
-    while IFS=$'\t' read -r project pin; do
-      [ -n "$project" ] || continue
-      r published oci "open-platform-model/docs/$project" "$pin"
-      if [ "$RC" = 3 ]; then
-        case "$project" in
-          library) key=$LIB ;;
-          opm-operator) key=$OP ;;
-          core) key=$CORE ;;
-          *) key=- ;;
-        esac
-        warn "$key" "docs bundle for \`$project\` \`$pin\` is not published; G1 will fail the next release PR until it is"
-      fi
-    done <<<"$entries"
-  else
-    warn - "\`hack/docskit-dump pins\` did not build on the edited tree; docs bundles not checked"
-  fi
-fi
+# 5. Docs bundles.
+docs_check
 
 finish
