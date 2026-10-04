@@ -485,6 +485,25 @@ tasks:
   #########################
   ## Operator lifecycle tasks
   #########################
+  operator:pin:
+    desc: Pin the default operator module version and the operator it deploys
+    summary: |
+      Resolves the operator module version through the registry
+      (OPM_REGISTRY, else CUE_REGISTRY, else the cli default), reads the
+      operator release it deploys from the module's operator package (no
+      render), and rewrites internal/operator/pin.go. The only writer of
+      that file.
+
+      Usage:
+        task operator:pin VERSION=0.1.0
+    vars:
+      VERSION: '{{.VERSION | default ""}}'
+    preconditions:
+      - sh: '[ -n "{{.VERSION}}" ]'
+        msg: "VERSION variable is required. Usage: task operator:pin VERSION=<module version>"
+    cmds:
+      - go run ./hack/operator-pin "{{.VERSION}}"
+
   operator:sync:
     desc: Refresh the embedded opm-operator manifest and version pin
     summary: |
