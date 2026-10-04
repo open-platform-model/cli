@@ -5,7 +5,7 @@
 1. Its base value is a disjunction with marked defaults (`*"a" | string`). The author wrote this.
 2. Its base value is an open list. `Default()` returns the list closed at its fixed elements: `[]` for `[...string]`, `[string]` for `[...string] & [_, ...]`. Nobody wrote this; it is how CUE exports an open list.
 
-`checkDefaults` treats both the same. For the catalog's `subjects` the case-2 "default" is `[#RoleSubjectSchema]`, which is not concrete, so the comparison falls to mutual subsumption under `cue.Schema(), cue.Raw()`, and that fails in one direction when the field's constraint marker changes from `!` to `?` ("value not an instance"), although both renderings are identical.
+`checkDefaults` treats both the same. For the catalog's `subjects` the case-2 "default" is `[#RoleSubjectSchema]`, which is not concrete, so the comparison falls to mutual subsumption under `cue.Schema(), cue.Raw()`, and that fails in one direction when the field's constraint marker changes from `!` to `?` ("value not an instance"), although both renderings are identical. The tests written for this change measured the bug as wider than the catalog case: a plain `xs: [...string]` made `xs?: [...string]` was refused the same way, adding an authored default to an open list (`[...string]` to `*["a"] | [...string]`) was refused as `default changed` against the implicit `[]`, and narrowing `[...string]` to `[...string] & [_, ...]` reported a spurious `default changed` beside its correct `domain narrowed`.
 
 ## Goals / Non-Goals
 

@@ -153,6 +153,36 @@ func TestCheck(t *testing.T) {
 			[]wantViolation{{"t", KindDefaultChanged}, {"t", KindDomainNarrowed}}},
 		{"concrete-to-non-concrete default", `#X: {t: *"a" | string}`, `#X: {t: *string | "a"}`,
 			[]wantViolation{{"t", KindDefaultChanged}}},
+
+		// CUE gives every open list an implicit default (the list closed at
+		// its fixed elements); no author wrote it, so it is never compared.
+		// The catalog_opm incident: role subjects made optional was refused
+		// as "default changed" with the same rendering on both sides.
+		{"catalog role subjects made optional",
+			`#S: {name!: string} | {sa!: string}, #X: {subjects!: [...#S] & [_, ...]}`,
+			`#S: {name!: string} | {sa!: string}, #X: {subjects?: [...#S] & [_, ...]}`, nil},
+		{"non-empty open list made optional", `#X: {xs!: [...string] & [_, ...]}`, `#X: {xs?: [...string] & [_, ...]}`, nil},
+		{"regular non-empty open list made optional", `#X: {xs: [...string] & [_, ...]}`, `#X: {xs?: [...string] & [_, ...]}`, nil},
+		{"open list made optional", `#X: {xs: [...string]}`, `#X: {xs?: [...string]}`, nil},
+		{"open list narrowed to non-empty", `#X: {xs: [...string]}`, `#X: {xs: [...string] & [_, ...]}`,
+			[]wantViolation{{"xs", KindDomainNarrowed}}},
+
+		// An authored list default is still a default.
+		{"authored list default changed", `#X: {xs: *["a"] | [...string]}`, `#X: {xs: *["b"] | [...string]}`,
+			[]wantViolation{{"xs", KindDefaultChanged}, {"xs", KindDomainNarrowed}}},
+		// The raw-mode leaf subsume is default-sensitive, as in "change
+		// default" above, so a removed list default also reports narrowing.
+		{"authored list default removed", `#X: {xs: *["a"] | [...string]}`, `#X: {xs: [...string]}`,
+			[]wantViolation{{"xs", KindDefaultRemoved}, {"xs", KindDomainNarrowed}}},
+		{"authored empty list default changed", `#X: {xs: *[] | [...string]}`, `#X: {xs: *["a"] | [...string]}`,
+			[]wantViolation{{"xs", KindDefaultChanged}, {"xs", KindDomainNarrowed}}},
+		{"authored list default behind a reference changed",
+			`#D: *["a"] | [...string], #X: {xs: #D}`,
+			`#D: *["b"] | [...string], #X: {xs: #D}`,
+			[]wantViolation{{"xs", KindDefaultChanged}, {"xs", KindDomainNarrowed}}},
+		// Adding a default is additive; the implicit [] used to be compared
+		// against it and reported "default changed".
+		{"authored list default added", `#X: {xs: [...string]}`, `#X: {xs: *["a"] | [...string]}`, nil},
 	}
 
 	ctx := cuecontext.New()

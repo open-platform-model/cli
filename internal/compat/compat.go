@@ -280,16 +280,17 @@ func leafIdentical(prev, next cue.Value) bool {
 	return bytes.Equal(pb, nb)
 }
 
-// checkDefaults enforces default immutability (0010:D27). Defaults are compared
-// only when the prior build has one — adding a default where none existed is
-// additive. When either side's default is non-concrete, equality is judged by
-// mutual subsumption so a merely-reordered disjunction does not report.
+// checkDefaults enforces default immutability (0010:D27). Only authored
+// defaults are compared (see [authoredDefault]), and only when the prior build
+// has one — adding a default where none existed is additive. When either
+// side's default is non-concrete, equality is judged by mutual subsumption so
+// a merely-reordered disjunction does not report.
 func checkDefaults(path string, prev, next cue.Value, acc []Violation) []Violation {
-	pd, phas := prev.Default()
+	pd, phas := authoredDefault(prev)
 	if !phas {
 		return acc
 	}
-	nd, nhas := next.Default()
+	nd, nhas := authoredDefault(next)
 	if !nhas {
 		return append(acc, Violation{Path: path, Kind: KindDefaultRemoved, Old: render(pd)})
 	}
@@ -303,6 +304,34 @@ func checkDefaults(path string, prev, next cue.Value, acc []Violation) []Violati
 		return append(acc, Violation{Path: path, Kind: KindDefaultChanged, Old: render(pd), New: render(nd)})
 	}
 	return acc
+}
+
+// authoredDefault is v's default when an author marked one with `*`. CUE
+// also reports a default for every plain open list — the list closed at its
+// fixed elements: [] for [...T], [T] for [...T] & [_, ...] — which nobody
+// wrote and which is not contract surface. Compared, it reports "default
+// changed" with the same rendering on both sides whenever the field's
+// constraint marker changes (measured on catalog_opm's role subjects, cue
+// v0.17.1).
+func authoredDefault(v cue.Value) (cue.Value, bool) {
+	d, ok := v.Default()
+	if !ok || implicitListDefault(v) {
+		return d, false
+	}
+	return d, true
+}
+
+// implicitListDefault reports whether v is a plain open list, whose only
+// default is CUE's implicit one. Len is the discriminator: it evaluates on a
+// list value only (any disjunction, the sole carrier of an authored default,
+// has no length) and is non-concrete exactly when the list is open. The
+// authored-list-default test cases pin this behaviour of Len.
+func implicitListDefault(v cue.Value) bool {
+	if v.IncompleteKind() != cue.ListKind {
+		return false
+	}
+	n := v.Len()
+	return n.Err() == nil && !n.IsConcrete()
 }
 
 // fieldName is the clean field name for paths and dedup — no ?/! markers, no

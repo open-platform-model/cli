@@ -47,6 +47,7 @@ The walk SHALL apply 0010 D30's provenance denylist at every depth: the direct c
 - **THEN** `Check` reports `default changed` at `xs`
 - **AND** declaring it `xs: [...string]` instead reports `default removed` at `xs`
 - **AND** declaring `xs: *[] | [...string]` as `xs: *["a"] | [...string]` reports `default changed` at `xs`
+- **AND** adding a default, `xs: [...string]` to `xs: *["a"] | [...string]`, reports nothing
 
 #### Scenario: Default change reported with both values
 
