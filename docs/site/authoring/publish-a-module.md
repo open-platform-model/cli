@@ -62,4 +62,4 @@ Check against: cli/internal/publish/registry.go (gateAlreadyPublished, nextPatch
 ## Related
 
 <!-- By title: the reference entries "CLI reference" (`opm module publish`, `opm module version set`, `opm registry login`) and "Registry namespaces", the diagnostics entry "Publish refusals", and the concept page "Versions in OPM".
-Check against: opmodel.dev/site/content/docs/reference/cli/_index.md, cli/docs/site/reference/registry-namespaces.md, cli/docs/site/diagnostics/publish-refusals.md, core/docs/site/concepts/versions.md -->
+Check against: cli/hack/docskit-dump (the command reference's source), cli/docs/site/reference/registry-namespaces.md, cli/docs/site/diagnostics/publish-refusals.md, core/docs/site/concepts/versions.md -->
