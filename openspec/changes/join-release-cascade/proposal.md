@@ -1,72 +1,60 @@
 ## Why
 
-Phase 2 gave the cli `task -x deps:cascade` and its title and body tasks (`Taskfile.yml:514-547`, archived change `2026-10-04-add-deps-cascade-task`). Nothing runs them yet, and nothing tells the cli's downstreams that a cli release exists. Phase 3 of the rollout wires each repo into the release cascade (workspace RELEASING.md, "Rollout and changes" › "Phases", row 3, and the Changes row `join-release-cascade`). The binding interface is the Phase 3 wiring contract, committed by the `.github` change `add-release-cascade-workflows` as `openspec/changes/add-release-cascade-workflows/contract.md` (archived with that change on merge; cited below as "wiring §N"), together with RELEASING.md, sections "The cascade", "Gates", "Stop switches" and "Owner settings".
+Phase 2 gave the cli `task -x deps:cascade` and its title and body tasks (`Taskfile.yml`, archived change `2026-10-04-add-deps-cascade-task`). Nothing runs them yet, and nothing tells the cli's downstreams that a cli release exists. Phase 3 of the rollout wires each repo into the release cascade (workspace RELEASING.md, "Rollout and changes" › "Phases", row 3, and the Changes row `join-release-cascade`).
+
+The binding interface is the **Phase 3 wiring contract (version 3.1)**, merged with the `.github` change `add-release-cascade-workflows` (`open-platform-model/.github#9`, squash `2376ffae4bfc665f327d51581350dea694c01504`) and archived at `openspec/changes/archive/2026-10-04-add-release-cascade-workflows/contract.md` in `open-platform-model/.github`, including its changelogs 3.1.1 and 3.1.2 (cited below as "wiring §N"). §10.1 is this change's checklist. The other sources are workspace RELEASING.md on `main` (sections "The cascade", "Pinning the cascade code", "Two-job split", "Gates", "Stop switches", "Moving the cascade pin" and "Owner settings") and the `.github` README ("Cascade workflows", "Pinning and bumps").
+
+This change was first built to contract version 2 (reusable notify and publish workflows called at `@main`). Version 3 moved the App key into caller-owned jobs that run SHA-pinned composite actions, because a reusable-workflow job cannot read the caller's Environment secret without `secrets: inherit` (sandbox E1). Owner decision 24 pins the cascade actions by SHA in all five repos, and the supervisor extended the pin to the two reusable workflows and the resolver checkout (wiring top item 2, §2.4). This change is rebuilt to version 3.1.
 
 The cli has both roles:
 
 - **Receiver.** It pins library, the opm-operator release and the opm catalog with core (RELEASING.md "What each repo's task moves", cli row). It accepts dispatches from catalog_opm, library and opm-operator (wiring §3.2).
-- **Notifier.** It is the release tool that catalog_opm and opm-operator pin in `.opm-cli-version` (RELEASING.md "Notify after publish", cli row: "`goreleaser` and `publish-templates`, also on the manual recovery path"; wiring §3.1).
-
-Today a cli release reaches catalog_opm and opm-operator only when someone runs `task deps:pins:opm-cli` at the workspace root. An upstream release reaches the cli only when someone bumps it by hand. This change joins the cli to the shared workflows that the `.github` change `add-release-cascade-workflows` adds, with the receiver in dry run (`CASCADE_DRY_RUN=true`, owner decision 22, wiring §1 and §9.1).
+- **Notifier.** It is the release tool that catalog_opm and opm-operator pin in `.opm-cli-version` (RELEASING.md "Notify after publish", cli row; wiring §3.1).
 
 ## What Changes
 
-- **Notify** (`.github/workflows/release.yml`): a new last job, `notify-downstream`, calls `open-platform-model/.github/.github/workflows/cascade-notify.yml@main` with the release tag (wiring §4.3, §4.5 cli row).
-  - It needs `release-please` and `goreleaser`. `goreleaser` already needs `publish-templates` (`release.yml:91`), so notify runs only after the templates and every binary are published and the draft is public.
-  - It runs `if: ${{ !cancelled() && needs.goreleaser.result == 'success' && github.ref == 'refs/heads/main' && vars.CASCADE_NOTIFY != 'off' }}`.
-  - Its tag is `${{ needs.release-please.outputs.tag_name || inputs.tag }}`, the same expression `goreleaser` and `publish-docs` use (`release.yml:99`, `:252`). It therefore also fires on the manual `workflow_dispatch` recovery path (`release.yml:45-54`) when that run finishes a draft. A manual run on a published release fails the draft check (`release.yml:108-141`), so a release never notifies twice.
-  - It grants only `contents: read`. The App token minted inside the reusable workflow, in the `cascade` Environment, does the dispatch. That workflow sends to catalog_opm and opm-operator as release-tool edges (wiring §3.1). The cli neither names nor chooses the targets.
-  - The runbook comment at the top of `release.yml` (`:14-39`) gains the notify recovery line.
-- **Receiver** (new `.github/workflows/deps-cascade.yml`): the per-repo caller of wiring §5. It runs on `repository_dispatch` (`upstream-released`), a daily sweep at `17 6 * * *` (cli tier, wiring §5.1) and `workflow_dispatch` with `dry_run` and `gates_only` inputs. It has `permissions: {}` at the top and the wiring §5 concurrency groups. It calls `cascade-receive.yml@main` with:
-  - `dry-run: ${{ inputs.dry_run == true || vars.CASCADE_DRY_RUN != 'false' }}`, so the receiver fails closed: it is live only when the variable is exactly `false`;
-  - `setup-go: true` (the task builds `opm`, runs `go get`, `go mod tidy` and `go run ./hack/docskit-dump`; `.tasks/cascade/cascade.sh:442`, `:490`, `:500-501`);
-  - `labels-managed: true` (`.github/labels.yml:117-144` declares all six cascade labels, and the label sync deletes undeclared ones; RELEASING.md "Labels"), so the receiver only checks that the labels exist and never creates one;
-  - `g2-mode` and `g3-mode` from `vars.CASCADE_G2_MODE` and `vars.CASCADE_G3_MODE`, default `warn`.
-- **Gate caller** (new `.github/workflows/cascade-gates.yml`): on `pull_request_target` (`opened`, `reopened`, `synchronize`) it calls `cascade-gates.yml@main` (wiring §8.3). Every PR opened or synchronized after this change then carries `cascade/freshness` and `cascade/settled`: `n/a` on an ordinary PR, and a gates-only receiver run on a release PR. The exception is a release PR whose gates-only evaluation fails before it writes its result in `warn` mode, which gets neither status. Both stay warnings (owner decisions 11 and 12). Neither becomes a required check in this change.
-- **`AGENTS.md`** (`:360`): the "Release cascade" bullet names the receiver, the gate caller, the notify job and the repo variables `CASCADE_DRY_RUN`, `CASCADE_NOTIFY`, `CASCADE_G2_MODE` and `CASCADE_G3_MODE`.
-- **Already in place, unchanged:**
-  - The E2E job applies to cascade PRs. `.github/scripts/e2e-cluster-applies.sh:31-32` and `:61-63` match the branch `deps/cascade` and the label `deps-cascade`, and `e2e-cluster.yml:17-19` re-runs on label changes. The App's push triggers `pull_request` workflows, because it is not `GITHUB_TOKEN` (wiring §11.4 E2 proves this in the sandbox).
-  - `pr-title.yml` accepts the bot's `fix(deps)`, `test(fixtures)` and `ci(deps)` titles: the types are listed and the scope is optional.
-  - `labels.yml` already declares every label (wiring §10: "unchanged").
+- **Notify** (`.github/workflows/release.yml`): a new last job, `notify-downstream`, exactly the cli block of wiring §4.6.
+  - It is a caller-owned job: `runs-on: ubuntu-latest`, `environment: cascade`, `timeout-minutes: 20`, `permissions: {contents: read}`, and one step that runs `open-platform-model/.github/.github/actions/cascade-notify@<SHA> # .github main` with `tag`, `client-id: ${{ vars.CASCADE_APP_CLIENT_ID }}` and `private-key: ${{ secrets.CASCADE_APP_PRIVATE_KEY }}`. The action mints the token and dispatches to catalog_opm and opm-operator (release-tool edges, wiring §3.1).
+  - It needs `release-please` and `goreleaser` and runs `if: ${{ !cancelled() && needs.goreleaser.result == 'success' && github.ref == 'refs/heads/main' && vars.CASCADE_NOTIFY != 'off' }}`, so it runs once per published release, also on the manual recovery path, and never for a branch run (wiring §4.5).
+  - The runbook comment at the top of `release.yml` gains the notify recovery line, including the skipped case after a manual run from a branch other than `main`.
+- **Receiver** (new `.github/workflows/deps-cascade.yml`): exactly wiring §5 with the cli `jobs:` map of §5.2.
+  - Job `cascade` calls `cascade-receive.yml@<SHA> # .github main` (compute and gates, no secret) with the fail-closed `dry-run` expression, `gates-only`, `g2-mode`, `g3-mode` and `setup-go: true`.
+  - Job `publish` is caller-owned: `environment: cascade`, the byte-for-byte §5 `if:`, and one step running `cascade-publish@<SHA> # .github main` with the same `dry-run` expression, `labels-managed: true` (`.github/labels.yml` owns the cli's labels), `client-id` and `private-key`.
+- **Gate caller** (new `.github/workflows/cascade-gates.yml`): exactly wiring §8.3, calling `cascade-gates.yml@<SHA> # .github main`. Pull requests into `main` then carry `cascade/freshness` and `cascade/settled`, as warnings.
+- **Resolver pin** (`.github/workflows/cascade-task.yml`): the `open-platform-model/.github` checkout moves from `ref: main` to `ref: <SHA> # .github main`, so CI tests the resolver the receiver runs (wiring §10.1 item 3).
+- **Wiring check** (new `.tasks/cascade/wiring-check.sh`, task `cascade:wiring:check`): the wiring §10.1 item 6 script with the 3.1.2 additions (an allow-list of `release.yml` workflow `env` keys, empty for the cli, and `runs-on: ubuntu-latest` on every key-holding job). It runs as the step "Verify the cascade wiring" in `pr.yml`'s required `Lint` job and in the aggregate `task check`.
+- **Dependabot** (`.github/dependabot.yml`): the `github-actions` entry ignores `open-platform-model/.github*`, so a cascade reference moves only through a `ci(deps): pin the cascade to .github <sha7>` PR (wiring §10.1 item 7).
+- **`AGENTS.md`**: the "Release cascade" bullet describes the caller-owned notify and publish jobs, the receiver, the gate caller, the pin and the wiring check, and the switches `CASCADE_DRY_RUN`, `CASCADE_NOTIFY`, `CASCADE_G2_MODE` and `CASCADE_G3_MODE`.
+- **Already in place, unchanged:** the E2E job applies to cascade PRs (`.github/scripts/e2e-cluster-applies.sh` matches `deps/cascade` and the `deps-cascade` label); `pr-title.yml` accepts the bot's `fix(deps)`, `test(fixtures)` and `ci(deps)` titles; `labels.yml` declares every cascade label (wiring §10).
 
-Release class: none. This is CI wiring, titled `ci: join the release cascade` (wiring §1). No command, flag, output or shipped file changes. After GA it would still cut no release.
+`<SHA>` is `2376ffae4bfc665f327d51581350dea694c01504`, the `.github` `main` squash of PR #9, in all five cascade references.
+
+Release class: none. This is CI wiring, titled `ci: join the release cascade` (wiring §1). No command, flag, output or shipped file changes.
 
 ## Depends on / gates
 
-- **`.github` `add-release-cascade-workflows` merged first.** The callers reference `cascade-notify.yml`, `cascade-receive.yml` and `cascade-gates.yml` at `@main`. GitHub resolves a called workflow and checks its inputs when the run is created. Until they exist on `.github` `main`, every run of a caller fails before any job starts. For `release.yml` that includes `release-please` and `goreleaser`, so no cli release could be cut. This PR merges only after A has merged (wiring §1: "B1 to B5 ... merge only after A has merged"). A in turn merges only after the sandbox cycle is green (wiring §11).
-- **The workspace RELEASING.md amendments of wiring §14** land before or with A. This change relies on them for `CASCADE_NOTIFY`, the fail-closed dry run and the concurrency groups. It does not edit RELEASING.md.
-- **Supervisor, before merge:** set the cli repo variable `CASCADE_DRY_RUN=true` (wiring §1, §10; owner decision 22). The receiver would also dry-run with the variable unset, but the explicit value makes the state visible. The schedule must never fire a live run.
-- **Phase 0 settings** (verified 2026-10-04 in `owner-selections-verbatim.md`): the cli has the `cascade` Environment (main only) with `CASCADE_APP_PRIVATE_KEY` and `CASCADE_APP_CLIENT_ID`, and the `opm-cascade` App is installed.
+- **`.github` `add-release-cascade-workflows`**: merged (`2376ffa`). The pin must stay on `.github` `main`: `gh api repos/open-platform-model/.github/compare/2376ffae4bfc665f327d51581350dea694c01504...main --jq .status` prints `identical` or `ahead` (wiring §10.1 pre-merge check).
+- **Workspace RELEASING.md amendments** (wiring §14): merged on workspace `main` (`501594c`, workspace PR #26).
+- **`CASCADE_DRY_RUN=true`** in the cli: set by the supervisor before this change (wiring "Supervisor records"). The receiver merges dry.
+- **Phase 0 settings** (read back by the supervisor 2026-10-04, recorded in wiring "Facts"): the cli has the `cascade` Environment (deployments from `main` only) with the secret `CASCADE_APP_PRIVATE_KEY` and the variable `CASCADE_APP_CLIENT_ID`, and the `opm-cascade` App is installed. The cli's own read-back is task 1.2.
 - **Already merged:** cli `prepare-release-cascade` (labels, G1, G4), `add-deps-cascade-task` (the task), `add-embedded-operator-e2e-job` (the E2E job on cascade PRs).
-- **Not part of this change:**
-  - going live (`CASCADE_DRY_RUN=false`), which is Phase 4;
-  - making G2 or G3 required, which is Phase 5 (`require-pin-freshness-gate`);
-  - any change to the shared workflows or the resolver.
+- **Not part of this change:** going live (`CASCADE_DRY_RUN=false`, Phase 4); making G2 or G3 required (Phase 5); any change to the `.github` workflows, actions or resolver.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `release-cascade-wiring`: how the cli joins the release cascade. It covers:
-  - the receiver caller's triggers, inputs, permissions and concurrency;
-  - the fail-closed dry run;
-  - the per-PR gate caller;
-  - the shared workflows being called at `main` with no secret passed.
+- `release-cascade-wiring`: how the cli joins the release cascade: the receiver caller and its caller-owned publish job, the fail-closed dry run, the concurrency groups, the per-PR gate caller, the key rule, and the one `.github` `main` SHA every cascade reference carries, checked by `task cascade:wiring:check` in the required CI job.
 
 ### Modified Capabilities
 
-- `release-workflow`: a new requirement for the `notify-downstream` job (when it runs, the tag it sends, the recovery path, the `CASCADE_NOTIFY` switch). Existing requirements are unchanged.
+- `release-workflow`: a new requirement for the caller-owned `notify-downstream` job (when it runs, the tag it sends, the recovery path, the `CASCADE_NOTIFY` switch, the pinned action and the key inputs). Existing requirements are unchanged.
 
 ## Impact
 
 - **Commands and packages:** none. No Go code changes.
 - **Files:**
-  - new: `.github/workflows/deps-cascade.yml` and `.github/workflows/cascade-gates.yml`;
-  - edited: `.github/workflows/release.yml` and `AGENTS.md`.
-- **Secrets:** none passed. The App key is an Environment secret, read only inside the shared reusable workflows' `cascade` jobs (wiring §2.2).
-- **Risks:**
-  - **Shared key reach.** Any job that runs in the cli's `cascade` Environment can mint a token for all seven App repos (wiring Facts, §11.5). The main-only Environment policy and the cli `main` ruleset are the controls. This change adds no job that declares the Environment itself.
-  - **Workflows guard.** Every workflow change on cli `main` (this PR included, and Dependabot `github_actions` bumps) turns a bot-only cascade PR into `recreate`, and one with a human commit into `conflict`, under `WF_GUARD_RULE=strict` (wiring §7.6). A decides the rule from the E4c sandbox result.
-  - **Gates on Dependabot PRs.** If a Dependabot `pull_request_target` run cannot post statuses (wiring §11.4 E7), those PRs lack the two contexts. That is harmless while the contexts are warnings, and is a Phase 5 item (wiring §15 item 3).
-  - **`release.yml` depends on `cascade-notify.yml@main` at load time.** If that file is removed or renamed, or a required input is added or renamed, every cli `release.yml` run fails before any job starts, and `CASCADE_NOTIFY=off` does not help, because the `if:` is never evaluated. The shared interface must stay append-only with optional inputs. Recovery: revert the `.github` change, or merge a cli PR that removes the `notify-downstream` job.
-  - **Duplicate CI on bot pushes.** `ci.yml` runs on a push to any branch (`ci.yml` `push: branches: ['**']`), so each App push to `deps/cascade` runs `ci.yml` as well as `pr.yml`. This happens already for human branches and is not a new cost class.
+  - new: `.github/workflows/deps-cascade.yml`, `.github/workflows/cascade-gates.yml`, `.tasks/cascade/wiring-check.sh`;
+  - edited: `.github/workflows/release.yml`, `.github/workflows/cascade-task.yml`, `.github/workflows/pr.yml`, `.github/dependabot.yml`, `Taskfile.yml`, `AGENTS.md`.
+- **Secrets:** the key is read only in the caller-owned `notify-downstream` and `publish` jobs, which declare `environment: cascade` and pass `secrets.CASCADE_APP_PRIVATE_KEY` only as the `private-key` input of the SHA-pinned cascade action; those jobs have no checkout or `run:` of their own, and no `env:`, `container:` or `services:` (the publish action checks out the repo but never runs it); no reusable call passes `secrets:` or `secrets: inherit` (wiring §2.2, §10.1 item 9).
+- **Risks:** see design.md "Risks / Trade-offs". The main ones: the shared App key reaches every product repo from any `cascade` Environment job; repo code in `compute` (on a release PR's gates-only run, the release head's) can forge compute's outputs and, once the receiver is live, shape the plan; every later `.github` cascade change needs a pin PR here.
