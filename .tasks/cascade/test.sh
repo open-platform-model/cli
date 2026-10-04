@@ -313,6 +313,33 @@ else
   pass "S12 kind ahead"
 fi
 
+# S13 warning against the merge base: a human commit on the branch already
+# moved one file's core, and this run moves nothing; the language.version
+# warning for that core still reaches the warnings file (contract §6.4 step 6).
+d=$(sandbox s13)
+f="$d/tests/integration/module-apply/testdata/cue.mod/module.cue"
+tree_core=$(cue_dep_v "$f" "$CORE")
+{ printf 'language-of\t%s\t%s\tv0.99.0\n' "$CORE" "$tree_core"; current_rows "$d"; } >"$TMP/s13/table"
+cp "$f" "$TMP/s13/module.cue"
+perl -0pi -e 's/("opmodel\.dev\/core\@v2": \{\n\s*v:\s*)"[^"]+"/$1"v2.0.0-alpha.1"/' "$f"
+setup_ok=0
+if [ "$(cue_dep_v "$f" "$CORE")" = v2.0.0-alpha.1 ]; then setup_ok=1; fi
+commit_setup "$d"
+cp "$TMP/s13/module.cue" "$f"
+g "$d" commit -q -am "a human moves core"
+run "$d" "$TMP/s13/table" "$TMP/s13/log"
+if [ "$setup_ok" != 1 ]; then
+  fail "S13 warning against the base" "the setup edit did not apply"
+elif [ "$RUN_RC" != 3 ]; then
+  fail "S13 warning against the base" "exit $RUN_RC, want 3: $(why)"
+elif ! clean "$d"; then
+  fail "S13 warning against the base" "the tree changed"
+elif ! warned "$d" "\`$CORE\` \`$tree_core\` declares \`language.version\` \`v0.99.0\`"; then
+  fail "S13 warning against the base" "no language.version warning"
+else
+  pass "S13 warning against the base"
+fi
+
 # ---------------------------------------------------------------------------
 # Network scenarios (CASCADE_TEST_SET=all): the older versions are real, so
 # go get, operator:sync and cue mod get resolve them from the Go proxy, GitHub

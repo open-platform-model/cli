@@ -142,8 +142,8 @@ It SHALL NOT publish, seed a real registry or push.
 
 It SHALL append a warning to the cascade warnings file, without failing, in each of these cases:
 
-- a moved CUE upstream declares a `language.version` newer than the `cue` version `.github/workflows/pr.yml` installs;
-- a docs bundle that `hack/docskit-dump pins` reports for the edited tree is not published under `ghcr.io/open-platform-model/docs`;
+- a CUE upstream that differs from the merge base declares a `language.version` newer than the `cue` version `.github/workflows/pr.yml` installs;
+- when library or the operator differs from the merge base, a docs bundle that `hack/docskit-dump pins` reports for the edited tree is not published under `ghcr.io/open-platform-model/docs`;
 - a new major of a pinned upstream is available.
 
 #### Scenario: An unpublished docs bundle is a warning

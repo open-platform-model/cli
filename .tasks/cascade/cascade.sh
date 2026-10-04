@@ -265,7 +265,7 @@ HOLD=""
 if [ "$RC" = 0 ]; then HOLD=$OUT; fi
 
 # The consistent set, per file (design.md D3; contract §5.2 rules 7 and 8).
-declare -A CAT_CUR=() CORE_CUR=() CAT_T=() CORE_T=() MOVES=() FROZEN_KEYS=()
+declare -A CAT_CUR=() CAT_T=() CORE_T=() MOVES=() FROZEN_KEYS=()
 plan_file() {
   local d="$1" m="$1/cue.mod/module.cue" cc kc cand kt held=0 k
   [ -f "$m" ] || die "\`$m\` does not exist"
@@ -273,7 +273,6 @@ plan_file() {
   kc=$(cue_dep_v "$m" "$CORE")
   [ -n "$kc" ] || die "\`$m\` pins no \`$CORE\`"
   CAT_CUR[$d]=$cc
-  CORE_CUR[$d]=$kc
 
   # Catalog: up to T, never lowered, never past a freeze. A file without a
   # catalog takes the representative's catalog after its move.
@@ -406,9 +405,16 @@ lang_check() { # lang_check MODULE VERSION
     warn "$1" "\`$1\` \`$2\` declares \`language.version\` \`$lang\`, newer than the cue \`$CUE_PIN\` that \`$CUE_PIN_SOURCE\` installs"
   fi
 }
+# Every pin that differs from the merge base once this run is done, not only
+# this run's moves: the warnings file starts empty on every run, and the PR
+# body lists every pin moved against the base (contract §6.4 step 6).
+base_dep_v() { # base_dep_v FILE KEY: the v: of KEY in FILE at the merge base
+  git show "$M:$1" 2>/dev/null | cue_dep_v /dev/stdin "$2" || true
+}
 for d in "${CUE_DIRS[@]}"; do
-  if [ -n "${CAT_CUR[$d]}" ] && [ "${CAT_T[$d]}" != "${CAT_CUR[$d]}" ]; then lang_check "$CAT" "${CAT_T[$d]}"; fi
-  if [ "${CORE_T[$d]}" != "${CORE_CUR[$d]}" ]; then lang_check "$CORE" "${CORE_T[$d]}"; fi
+  m="$d/cue.mod/module.cue"
+  if [ -n "${CAT_CUR[$d]}" ] && [ "${CAT_T[$d]}" != "$(base_dep_v "$m" "$CAT")" ]; then lang_check "$CAT" "${CAT_T[$d]}"; fi
+  if [ "${CORE_T[$d]}" != "$(base_dep_v "$m" "$CORE")" ]; then lang_check "$CORE" "${CORE_T[$d]}"; fi
 done
 
 # Anything to do?
@@ -503,8 +509,12 @@ for c in "${CONSUMERS[@]}"; do
   set_cue_dep_v "$c/cue.mod/module.cue" "$POD" "${REPIN[$c]}"
 done
 
-# 5. Docs bundles: a warning, never a hold (design.md D9; contract §9.5).
-if [ -n "$LIB_T" ] || [ -n "$OP_T" ]; then
+# 5. Docs bundles: a warning, never a hold (design.md D9; contract §9.5). It
+# runs when library or the operator differs from the merge base, not only when
+# this run moved it, so a later run on the branch keeps the warning.
+LIB_BASE=$(git show "$M:go.mod" | awk -v m="$LIB" '$1 == m { print $2; exit }')
+OP_BASE=$(git show "$M:internal/operator/manifest.go" | sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p')
+if [ "${LIB_T:-$LIB_CUR}" != "$LIB_BASE" ] || [ "${OP_T:-$OP_CUR}" != "$OP_BASE" ]; then
   if pins=$(go run ./hack/docskit-dump pins 2>"$STATE/docskit.err"); then
     # Outside a process substitution, so a changed output shape stops the task.
     entries=$(jq -er '.pins | to_entries[] | "\(.key)\t\(.value)"' <<<"$pins") ||

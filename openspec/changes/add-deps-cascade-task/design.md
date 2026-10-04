@@ -282,20 +282,20 @@ A local `go test` without a seeded `OPM_REGISTRY` resolves podinfo from GHCR and
 The cli sets no `CUE_VERSION` env. Its required PR CI installs `cuelang.org/go/cmd/cue@v0.17.1` in the `Unit Tests` job (`.github/workflows/pr.yml:81`), and the same literal appears at `:187` and `:268`.
 
 - The task reads the first `cuelang.org/go/cmd/cue@v[0-9.]+` in `.github/workflows/pr.yml`.
-- For each moved CUE upstream (catalog `T`, core targets) it compares `language-of` with that version through `semver-cmp`, never with the `cue` on `PATH` (contract §5.2 rule 10).
+- For each CUE upstream whose target differs from the merge base's pin in that file (catalog `T`, core targets), not only this run's moves, it compares `language-of` with that version through `semver-cmp`, never with the `cue` on `PATH` (contract §5.2 rule 10).
 - Newer upstream: warn.
 - Exit 3 from `language-of`: no warning.
 - Unreadable pin: warn with key `-`.
 
 ### D9: Docs bundles are a warning
 
-This follows contract §6.4 step 6 and §9.5. When library or the operator moved:
+This follows contract §6.4 step 6 and §9.5. When library or the operator differs from the merge base after this run (not only when this run moved it, since the warnings file starts empty on every run and the PR body lists every pin moved against the base):
 
 - The task runs `go run ./hack/docskit-dump pins` on the edited tree. It prints JSON whose `.pins` maps `library`, `core` and `opm-operator` to bare versions (`hack/docskit-dump/main.go:54-78`).
 - For each entry it calls `published oci open-platform-model/docs/<project> <pin>`.
 - Any exit other than 0 or 3 ends the task with that code (phase C, so the tree may be partly edited; contract §5.2 rule 5).
 - On exit 3 it warns: "docs bundle for `<project>` `<pin>` is not published; G1 will fail the next release PR until it is".
-- If `docskit-dump` fails to build, it warns with key `-` and continues.
+- If `docskit-dump` fails to build, it warns with key `-` and continues. If its output has no `.pins` entries, the task stops (`jq -e`, outside a process substitution).
 
 These calls decide no target, so they run in phase C.
 
@@ -363,7 +363,7 @@ These calls decide no target, so they run in phase C.
 - **S10, allowed dirty tree and expect hint** (offline, added at verify). An untracked file with `CASCADE_ALLOW_DIRTY=1`: exit 3 by snapshot, and the file stays. `CASCADE_EXPECT` naming library and an unrelated key: only the library `newest` call carries `--expect`.
 - **S11, never lower** (offline, added at verify). A commit after the base sets `templates/minimal` to `1.99.0`: exit 3, the version stays, and the "above the cascade target" warning (D6).
 - **S5 also checks the path-class map** through the real resolver's `classify`: the test-class paths of every pattern in `classes`, and three shipped paths.
-- **Sets.** `CASCADE_TEST_SET=offline` runs the pre-checks plus S1, S3, S6, S7, S8, S10, S11 and S12 (a kind catalog ahead of `hack/platform` stays). `all` (the default) adds S2, S4, S5 and S9.
+- **Sets.** `CASCADE_TEST_SET=offline` runs the pre-checks plus S1, S3, S6, S7, S8, S10, S11, S12 (a kind catalog ahead of `hack/platform` stays) and S13 (a `language.version` warning for a pin a human commit moved, on a run that moves nothing). `all` (the default) adds S2, S4, S5 and S9.
 
 ### D11: CI placement
 
