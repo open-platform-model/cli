@@ -33,7 +33,10 @@ jobs:
     steps:
       # The repo and the resolver are checked out side by side, so the resolver
       # never sits inside the tree test.sh copies into its sandboxes (contract
-      # §3; v1.1 clarification C4).
+      # §3; v1.1 clarification C4). The resolver comes from this repo's pinned
+      # .github commit, the one SHA every cascade reference here carries, so
+      # CI tests the resolver the receiver runs; it moves only through a
+      # ci(deps) pin PR (RELEASING.md, "Pinning the cascade code").
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: repo
@@ -41,7 +44,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: open-platform-model/.github
-          ref: main
+          ref: 2376ffae4bfc665f327d51581350dea694c01504 # .github main
           path: org-github
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0

@@ -1,35 +1,30 @@
 name: Cascade gates
-
 # Posts the release-cascade gate statuses cascade/freshness (G2) and
-# cascade/settled (G3) on every pull request (workspace RELEASING.md,
+# cascade/settled (G3) on pull requests into main (workspace RELEASING.md,
 # "Gates"). An ordinary or fork pull request gets n/a on both; for a release
-# pull request the shared workflow starts a gates-only Deps cascade run on
-# main, which evaluates and posts them on the new head.
+# pull request the reusable workflow, at this repo's pinned .github commit,
+# starts a gates-only Deps cascade run on main, which evaluates and posts
+# them on the new head. actions: write lets it send that dispatch.
 #
-# pull_request_target runs this file as it is on main, and the shared job
-# checks out nothing, so no pull-request code runs with these permissions.
-# Both statuses are warnings (CASCADE_G2_MODE and CASCADE_G3_MODE, default
-# warn); neither is a required check until Phase 5 of the rollout
-# (RELEASING.md, "Rollout and changes").
-
+# pull_request_target runs this file as it is on the pull request's base
+# branch (main), and the reusable job checks out nothing, so no
+# pull-request code runs with these permissions. Both statuses are warnings
+# (CASCADE_G2_MODE and CASCADE_G3_MODE, default warn); neither is a required
+# check until Phase 5 of the rollout (RELEASING.md, "Rollout and changes").
 on:
   pull_request_target:
     types: [opened, reopened, synchronize]
-
 permissions: {}
-
 concurrency:
   group: cascade-gates-${{ github.event.pull_request.number }}
   cancel-in-progress: true
-
 jobs:
   gates:
     name: Cascade gates
     permissions:
       statuses: write
-      # Lets the shared job dispatch the gates-only Deps cascade run.
       actions: write
-    uses: open-platform-model/.github/.github/workflows/cascade-gates.yml@main
+    uses: open-platform-model/.github/.github/workflows/cascade-gates.yml@2376ffae4bfc665f327d51581350dea694c01504 # .github main
     with:
       g2-mode: ${{ vars.CASCADE_G2_MODE || 'warn' }}
       g3-mode: ${{ vars.CASCADE_G3_MODE || 'warn' }}

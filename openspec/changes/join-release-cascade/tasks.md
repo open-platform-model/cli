@@ -59,12 +59,18 @@ All checks are read-only. Each result is an indented "Done:" note; design.md "Sp
 
 ## 3. Receiver, gate caller, resolver pin and Dependabot (wiring §10.1 items 2, 3, 4, 5, 7, 9)
 
-- [ ] 3.1 Make `.github/workflows/deps-cascade.yml` wiring §5 with the cli `jobs:` map of §5.2: `cascade-receive.yml@<SHA> # .github main`, `labels-managed` removed from the `cascade` job, the whole `publish` job added with `labels-managed: true` and the `.github/labels.yml` comment on the `cascade-publish` step. Only a header comment between `name:` and `on:` and short comments above a `with:` value are allowed; move the concurrency comment into the header. Rewrite the header's "no secret" text to the wiring §10.1 item 9 wording.
-- [ ] 3.2 In `.github/workflows/cascade-gates.yml`, change the `uses:` line to `cascade-gates.yml@<SHA> # .github main`; make every other line wiring §8.3 byte for byte, with the comment above `actions: write` moved into the header. The header says the statuses are posted on pull requests into `main` and that `pull_request_target` runs the file as it is on the PR's base branch (main).
-- [ ] 3.3 In `.github/workflows/cascade-task.yml`, change the resolver checkout's `ref: main` to `ref: <SHA> # .github main`, and say in its comment that the resolver comes from the pinned commit. Keep its `actions/checkout` pin.
-- [ ] 3.4 In `.github/dependabot.yml`, add the wiring §10.1 item 7 entry and comment for `open-platform-model/.github*` after the docs-kit entry of the `github-actions` ignore list.
-- [ ] 3.5 actionlint again with the `.github` references rewritten to local copies of the pinned files (`git show <SHA>:…`), so every input the callers pass is checked; a renamed input must be reported.
-- [ ] 3.6 The local gate is green, then commit `ci(cascade): run the receiver's publish job and pin the cascade callers to .github main`.
+- [x] 3.1 Make `.github/workflows/deps-cascade.yml` wiring §5 with the cli `jobs:` map of §5.2: `cascade-receive.yml@<SHA> # .github main`, `labels-managed` removed from the `cascade` job, the whole `publish` job added with `labels-managed: true` and the `.github/labels.yml` comment on the `cascade-publish` step. Only a header comment between `name:` and `on:` and short comments above a `with:` value are allowed; move the concurrency comment into the header. Rewrite the header's "no secret" text to the wiring §10.1 item 9 wording.
+  Done: the file is wiring §5 with the cli §5.2 `jobs:` map (cron `17 6 * * *`, `setup-go: true`, `labels-managed: true` on `cascade-publish`); the only comments are the header and two above `with:` values. The header says compute and gates hold no secret and gives the item 9 key rule for `publish`.
+- [x] 3.2 In `.github/workflows/cascade-gates.yml`, change the `uses:` line to `cascade-gates.yml@<SHA> # .github main`; make every other line wiring §8.3 byte for byte, with the comment above `actions: write` moved into the header. The header says the statuses are posted on pull requests into `main` and that `pull_request_target` runs the file as it is on the PR's base branch (main).
+  Done: §8.3 byte for byte apart from the header and the pin; no blank lines, as in the template.
+- [x] 3.3 In `.github/workflows/cascade-task.yml`, change the resolver checkout's `ref: main` to `ref: <SHA> # .github main`, and say in its comment that the resolver comes from the pinned commit. Keep its `actions/checkout` pin.
+  Done: `ref: 2376ffae4bfc665f327d51581350dea694c01504 # .github main`; the `actions/checkout` pin stays `3d3c42e5` (v7.0.1). `CASCADE_RESOLVER_REAL` was already unconditional.
+- [x] 3.4 In `.github/dependabot.yml`, add the wiring §10.1 item 7 entry and comment for `open-platform-model/.github*` after the docs-kit entry of the `github-actions` ignore list.
+  Done: the entry sits after `open-platform-model/docs-kit*` at the same six-space indentation.
+- [x] 3.5 actionlint again with the `.github` references rewritten to local copies of the pinned files (`git show <SHA>:…`), so every input the callers pass is checked; a renamed input must be reported.
+  Done: with the four `uses:` rewritten to local copies of the files at `<SHA>`, actionlint v1.7.12 reports nothing on `release.yml`, `deps-cascade.yml` and `cascade-gates.yml`; a renamed `labels-managed` input on the publish step is reported (`input "labels-managedx" is not defined in action "Cascade publish"`), so the input check bites.
+- [x] 3.6 The local gate is green, then commit `ci(cascade): run the receiver's publish job and pin the cascade callers to .github main`.
+  Done: `task lint` (0 issues), `task test:unit`, `task openspec:check` (68/0), actionlint on all workflows: clean.
 
 ## 4. The wiring check in the required CI job (wiring §10.1 item 6)
 
