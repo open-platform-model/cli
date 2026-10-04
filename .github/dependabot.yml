@@ -24,6 +24,11 @@ updates:
     # "The cascade").
     ignore:
       - dependency-name: "github.com/open-platform-model/*"
+      # CUE moves only through a library release, whose own pull request runs
+      # the CUE check; it reaches the cli through the cascade's library bump,
+      # whose go get raises cuelang.org/go by minimal version selection (owner
+      # decision j4, 2026-10-03; workspace RELEASING.md, section "Pin classes").
+      - dependency-name: "cuelang.org/go"
     commit-message:
       # pr-title.yml does not accept "deps" as a type, so third-party Go bumps
       # land as "build(deps)", a hidden type that cuts no release.
