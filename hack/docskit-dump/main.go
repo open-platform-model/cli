@@ -54,9 +54,9 @@ func run(args []string, w io.Writer) error {
 // pins returns the versions this build compiles in, each bare SemVer without
 // "v": the library module the program links, the core release that
 // library's schema loader pins, and the operator release the cli installs.
-// These are the values opmodel.dev's resolve-versions.sh read from the cli's
-// go.mod, the library's opm/schema/loader.go and internal/operator/manifest.go;
-// main_test.go keeps the two readings equal.
+// They come from the cli's go.mod, the library's opm/schema/loader.go and
+// internal/operator/manifest.go; main_test.go keeps the compiled values equal
+// to those source pins.
 func pins() (map[string]string, error) {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
