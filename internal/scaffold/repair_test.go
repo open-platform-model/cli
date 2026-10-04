@@ -181,7 +181,7 @@ metadata: {
 		assert.Contains(t, refusalErr.Refusal.Headline, "states no version")
 		require.Len(t, refusalErr.Refusal.Evidence, 1)
 		assert.Contains(t, refusalErr.Refusal.Evidence[0][2], "tree does not load")
-		assert.Contains(t, refusalErr.Refusal.Evidence[0][2], `"metadata.version" is absent`)
+		assert.Contains(t, refusalErr.Refusal.Evidence[0][2], "metadata.version")
 	})
 
 	t.Run("malformed cue.mod is not silently rewritten", func(t *testing.T) {

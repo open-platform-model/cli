@@ -293,16 +293,15 @@ func assertDerives(ctx context.Context, k *kernel.Kernel, dir, newPath string) e
 		{"modulePath", mod.Metadata.ModulePath, newPath},
 		{"version", mod.Metadata.Version, InitialVersion},
 	} {
-		field, got, want := c.field, c.got, c.want
-		if got != want {
+		if c.got != c.want {
 			return &RefusalError{publish.Refusal{
-				Headline: fmt.Sprintf("the clone source does not derive metadata.%s from its identity package", field),
+				Headline: fmt.Sprintf("the clone source does not derive metadata.%s from its identity package", c.field),
 				Evidence: [][]string{
-					{"metadata." + field, got},
-					{"expected", want, "derived from identity/identity.cue after re-identification"},
+					{"metadata." + c.field, c.got},
+					{"expected", c.want, "derived from identity/identity.cue after re-identification"},
 				},
 				Consequence: "Re-identification rewrites the identity package and everything that\nderives from it; metadata carrying literals stays stamped with the\nsource's old identity.",
-				Action:      fmt.Sprintf("Clone a module whose metadata derives (%s: id.%s), or start\nfrom an official template:  opm module template list", field, deriveField(field)),
+				Action:      fmt.Sprintf("Clone a module whose metadata derives (%s: id.%s), or start\nfrom an official template:  opm module template list", c.field, deriveField(c.field)),
 			}}
 		}
 	}

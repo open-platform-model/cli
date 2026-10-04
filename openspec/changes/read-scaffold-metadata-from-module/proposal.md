@@ -33,5 +33,5 @@ None.
 
 - Code: `internal/scaffold/scaffold.go` (`assertDerives`), `internal/scaffold/repair.go` (`statedVersion`).
 - Commands: `opm module init` (scaffold and `--from` clone, the post-rewrite assertion) and `opm module init` in repair mode (identity creation). Same refusals and headlines; only the field a doubly-failing donor is reported on becomes fixed.
-- Tests: two new `TestDetectRepair` subtests run `statedVersion` through a real `kernel.New()` (a stated version is adopted; an unstated one refuses, through the acquire's shape gate). The existing `DetectRepair` unit tests and the `TestE2E_ModInit_*` e2e tests (including `TestE2E_ModInit_NonDerivingDonorRefuses`) cover `assertDerives`.
+- Tests: two new `TestDetectRepair` subtests run `statedVersion` through a real `kernel.New()` (a stated version is adopted; an unstated one refuses, through the acquire's shape gate). A new hermetic `TestAssertDerives` runs `assertDerives` through `kernel.New()` on literal-metadata trees: matching metadata passes, a wrong modulePath or a wrong version each refuses on that field, and a donor wrong on both is reported on modulePath. The `TestE2E_ModInit_*` e2e tests (including `TestE2E_ModInit_NonDerivingDonorRefuses`) cover the clone path end to end.
 - Dependencies: none. Library pin unchanged (`v1.0.0-beta.4` already exposes `Module.Metadata`).

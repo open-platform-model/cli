@@ -26,5 +26,5 @@ There SHALL be no `pkg/bundle/` package — bundle support is not implemented (e
 
 #### Scenario: Scaffold reads module identity from decoded metadata
 - **WHEN** `opm module init` checks that a scaffolded or cloned tree derives its new identity, or reads the version a tree states to create its identity package
-- **THEN** it reads the identity fields (`name`, `modulePath`, `version`) it needs from the acquired module's `Metadata`, not from its `Package` value
+- **THEN** it reads the identity fields (`modulePath`, `version`) from the acquired module's `Metadata`, not from its `Package` value
 - **AND** a clone source whose metadata does not derive the new identity still refuses with the existing "does not derive metadata" refusal
