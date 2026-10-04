@@ -10,7 +10,7 @@
 
 **Reason**: Its scenario "RBAC denied" said an RBAC denial on resources exits 4. A denied read of a tracked resource is now an `Unknown` row and exits 2. The requirement is re-added below as "Status exits with code 3 when no cluster client can be built", scoped to client setup.
 
-**Migration**: None for client setup failures. A denied read of a tracked resource exits 2 with a warning naming the resource and the Forbidden error.
+**Migration**: None for client setup failures. A denied read of a tracked resource exits 2 with a warning naming the resource and the Forbidden error. An unreachable cluster, or a denied read of the `ModuleInstance` record, exits 1: the old spec promised 3 or 4, which the code never did. Mapping that read through `cmdutil.ExitCodeFromK8sError` is tracked in cli issue #310.
 
 ## ADDED Requirements
 
