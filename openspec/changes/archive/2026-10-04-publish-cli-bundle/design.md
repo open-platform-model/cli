@@ -213,6 +213,8 @@ Delete `internal/cmdref/`, `hack/cmdref/`, `docs/site/reference/cli/`, the `docs
 
 **The required check.** "Command Reference (current)" is required nowhere. `gh api repos/open-platform-model/cli/rules/branches/main` (2026-10-04) lists every rule that applies to `main` from any ruleset, organization ones included: a single `workflows` rule (the organization `mention-guard` ruleset, requiring `mention-guard.yml`) and no `required_status_checks`; `main` has no classic branch protection; the owner confirmed the same day that no organization ruleset requires it. Deleting the job blocks nothing. If the planned PR-only ruleset ever lists required checks, it must not list this one.
 
+**Pre-merge check (2026-10-04).** At cli commit `9a78c275` (the retire commit on `origin/main` `2d939fb8`), `task docs:bundle` with `opm-docs` 0.4.0 in a worktree whose `origin` is `git@github.com:open-platform-model/cli.git` wrote 16 pages (the six authored pages and the ten generated `reference/cli/` pages), pins core `2.0.0-beta.2`, library `1.0.0-beta.3`, opm-operator `1.0.0-beta.5`. Then, in detached worktrees at `origin/main` of opmodel.dev (`2b72a7c`), opm (`01b8ca5`) and catalog_opm (`6bb1e10`), `OPM_SRC_OPM=<opm> OPM_SRC_CATALOG_OPM=<catalog_opm> OPM_SRC_CLI=<this tree> OPM_BUNDLES_LOCAL="cli@v1.0=<this tree>/out/cli" task build:edge` built green: the pull took the cli anchor from the local tree and core, library and opm-operator from their `edge` bundles; v1.0 84 of 84 pages, 996 distinct URLs all resolve.
+
 ## Research & Decisions
 
 ### Where pins come from
