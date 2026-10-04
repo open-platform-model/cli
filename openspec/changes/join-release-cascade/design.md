@@ -221,6 +221,14 @@ It names no section or decision number of the wiring contract, which lives in a 
 
 **Rationale**: It matches wiring §10 ("runs actionlint from the scratchpad binary on the new files") and adds no CI surface.
 
+### Spike findings
+
+- A's three reusable workflows exist on its branch and match D1 to D3 input by input, with the same job permissions the callers grant (task 1.1).
+- A's receiver `publish.if` does not yet read `inputs.gates-only`. On a release PR's gates-only run, the compute job runs the release head's task, so G-shared blocks this PR until A adds it (reported to the supervisor).
+- The cli's `cascade` Environment, App variables and five cascade labels are in place; `CASCADE_DRY_RUN` is not set yet (task 1.2).
+- The first post-merge dry run is not a `noop`: it should show the opm catalog moving from v4.4.4 to v4.5.2 in 16 files, titled `fix(deps): bump opm catalog to v4.5.2` (task 1.3).
+- actionlint has no baseline findings on the current workflows (task 1.4).
+
 ## Error handling
 
 | Failure | Where it shows | Effect |

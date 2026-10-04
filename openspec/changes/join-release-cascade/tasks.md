@@ -40,23 +40,27 @@ The binding interface is the Phase 3 wiring contract, `openspec/changes/add-rele
 
 All checks are read-only. Record each result as an indented "Done:" note. Then write a short "Spike findings" subsection at the end of design.md's "Research & Decisions".
 
-- [ ] 1.1 Read A's three reusable workflows:
+- [x] 1.1 Read A's three reusable workflows:
   - from `.github` `origin/main` if A has merged;
   - otherwise from `origin/feat/add-release-cascade-workflows`, or from the local worktree `<ws>/.github/.claude/worktrees/add-release-cascade-workflows`.
 
   List each `workflow_call` input with its type, default and required flag. Compare them with design D1 to D3 and wiring §4.1, §6.1 and §8.3. If A is not written yet, record that and use the wiring sections as the interface. A mismatch between A and the wiring contract is reported to the supervisor, not resolved here.
-- [ ] 1.2 Confirm the Phase 0 state the callers rely on, read-only:
+  Done: A is written but not merged (local worktree, branch not on `origin`; `.github` `main` is `6a18e7d`). Inputs: `cascade-notify.yml`: `tag` (string, required), `org-github-ref` (string, default `main`). `cascade-receive.yml`: `dry-run` (boolean, required), `gates-only` (boolean, false), `g2-mode` and `g3-mode` (string, `warn`), `setup-go` (boolean, false), `setup-cue` (boolean, true), `cue-version` (string, `v0.17.1`), `labels-managed` (boolean, false), `org-github-ref`. `cascade-gates.yml`: `g2-mode`, `g3-mode` (string, `warn`), `org-github-ref`. Every input D1 to D3 passes exists with that name and type, the only required ones (`tag`, `dry-run`) are passed, and the job permissions A requests (notify `contents: read`; receive up to `contents: read`, `pull-requests: read`, `statuses: write`; gates `statuses: write`, `actions: write`) equal what the callers grant. The gates job dispatches `deps-cascade.yml --ref main -f gates_only=true`, matching D2's input name. Reported to the supervisor: `publish.if` reads `inputs.dry-run` and `github.ref` but not `inputs.gates-only` (contract §6.2 step 5 relies on compute's `action=gates-only` output), so G-shared does not hold yet; `setup-go` has no `cache-dependency-path` and `setup-task` is v2.0.0 (advisory).
+- [x] 1.2 Confirm the Phase 0 state the callers rely on, read-only:
   - `gh api repos/open-platform-model/cli/environments/cascade --jq '.name, .deployment_branch_policy'`: the Environment exists with custom branch policies;
   - `gh api repos/open-platform-model/cli/environments/cascade/deployment-branch-policies --jq '.branch_policies[].name'`: lists only `main`;
   - `gh api repos/open-platform-model/cli/environments/cascade/variables --jq '.variables[].name'`: lists `CASCADE_APP_CLIENT_ID`;
   - `gh label list -R open-platform-model/cli --search deps-cascade` and `--search need-human-review`: all five bot-relevant labels exist with the RELEASING.md "Labels" colours.
 
   Report a missing item to the supervisor. Never create it.
-- [ ] 1.3 Predict the Phase 3 gate. Add a detached scratch worktree at a literal path in the supervisor's scratchpad, `git worktree add --detach <scratchpad>/p3-cli-join-spike origin/main`, never inside this tree or under `.git/` (the worktree guard refuses computed paths). In it, run `CASCADE_RESOLVER=<ws>/.github/.github/scripts/cascade/cascade-resolve.sh task -x deps:cascade` (refresh the `.github` checkout with a plain `git fetch` run from inside `<ws>/.github`, and read the resolver from `origin/main` if the local checkout is behind).
+  Done: Environment `cascade` exists with custom branch policies and only `main`; it holds the secret `CASCADE_APP_PRIVATE_KEY` and the variable `CASCADE_APP_CLIENT_ID`. All five bot-relevant labels exist with the RELEASING.md colours (`deps-cascade` 0366d6, `:conflict` b60205, `:hold` fbca04, `:breaking` d93f0b, `need-human-review` e99695). No repository variable is set, so `CASCADE_DRY_RUN` is still the supervisor's G-dry-run-var step (the receiver dry-runs with it unset too).
+- [x] 1.3 Predict the Phase 3 gate. Add a detached scratch worktree at a literal path in the supervisor's scratchpad, `git worktree add --detach <scratchpad>/p3-cli-join-spike origin/main`, never inside this tree or under `.git/` (the worktree guard refuses computed paths). In it, run `CASCADE_RESOLVER=<ws>/.github/.github/scripts/cascade/cascade-resolve.sh task -x deps:cascade` (refresh the `.github` checkout with a plain `git fetch` run from inside `<ws>/.github`, and read the resolver from `origin/main` if the local checkout is behind).
   - Record the exit code: 3 means the post-merge dry run must show `noop`; 0 means record `git diff --stat`.
   - Remove the scratch worktree with `git worktree remove --force`.
-- [ ] 1.4 Run `actionlint` on the current `.github/workflows/*.yml` and record the baseline findings (expected: none, or only pre-existing shellcheck notes).
-- [ ] 1.5 `task openspec:check` green, then commit `docs(openspec): record the join-release-cascade spike findings`. The commit touches only `openspec/changes/join-release-cascade/`.
+  Done: exit 0 against cli `origin/main` `19f19cd2` with the real resolver from `.github` `main` `6a18e7d`: library v1.0.0-beta.3 and opm-operator v1.0.0-beta.5 current, opm catalog v4.4.4 -> v4.5.2. `git diff --stat`: 16 files, 18 insertions, 18 deletions (twelve `cue.mod/module.cue`, `hack/kind-platform.yaml`, four template and fixture `identity.cue` version bumps). Title `fix(deps): bump opm catalog to v4.5.2`. The post-merge dry run should show this diff unless the cli bumps the catalog first. Scratch worktree removed.
+- [x] 1.4 Run `actionlint` on the current `.github/workflows/*.yml` and record the baseline findings (expected: none, or only pre-existing shellcheck notes).
+  Done: actionlint v1.7.12 with shellcheck 0.11.0 (pyflakes off) on all current workflows: no findings. The baseline is empty.
+- [x] 1.5 `task openspec:check` green, then commit `docs(openspec): record the join-release-cascade spike findings`. The commit touches only `openspec/changes/join-release-cascade/`.
 
 ## 2. Notify downstream after a release publishes
 
