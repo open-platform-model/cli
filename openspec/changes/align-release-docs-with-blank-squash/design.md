@@ -58,15 +58,17 @@ A `release-as` key that stays after its release pins every later release to that
 - the mechanism has not been used under the new rule yet, and a stale key shows itself on the next release PR, which proposes the version already released; every release PR is merged by a human (owner selection 7), who sees it. What release-please and the release workflow do if such a PR merged anyway is not verified here;
 - adding a gate changes `release-gates` and a script, which this docs change does not otherwise touch.
 
-The requirement makes the removal PR an explicit step. A gate can follow as its own change if the owner wants one (Open Questions).
+The requirement makes the removal PR an explicit step. A gate is a follow-up change (supervisor decision 2026-10-04, Phase 2 triage), not part of this one.
+
+Workspace RELEASING.md and `.github/workflows/pr-title.yml:12` say the key is removed "by the next PR once that release is cut". This change keeps "before any later release PR merges", which is what release-please needs, and the SUPERVISOR follow-up asks RELEASING.md to take the same wording.
 
 ### D5: Where a migration note goes
 
-The old text made the `BREAKING CHANGE:` footer "the migration note the CHANGELOG shows". Under `BLANK` the CHANGELOG entry is the PR title alone. The new text says the migration note goes in the PR body, and in the user docs (`docs/site/`) when users need it to upgrade. This is a statement of fact under the owner's setting, not a new policy; whether the CHANGELOG should still carry migration notes (for example by a human editing the release PR's `CHANGELOG.md`) is an owner question (Open Questions).
+The old text made the `BREAKING CHANGE:` footer "the migration note the CHANGELOG shows". Under `BLANK` the CHANGELOG entry is the PR title alone. The new text says the migration note goes in the PR body, and in the user docs (`docs/site/`) when users need it to upgrade. The CHANGELOG still carries the note: whoever merges the release PR first edits its `CHANGELOG.md` by hand to add it (supervisor decision 2026-10-04, Phase 2 triage). The text in `AGENTS.md`, `CONSTITUTION.md`, `openspec/config.yaml` and the new requirement says so.
 
 ### D6: A release-as key needs a releasable commit beside it
 
-release-please 17.11.2 (`strategies/base`, the `changelogEmpty` check after `buildNewVersion`) skips a release with "No user facing commits found" when every commit since the last release is of a hidden type, even when `releaseAs` is set. The old `Release-As:` footer escaped this only because the conventionalcommits preset un-hides a commit that carries the footer (`conventional-changelog-conventionalcommits/writer-opts.js`); the config key gets no such exemption. A PR that only edits `release-please-config.json` would naturally be typed `chore`, `build` or `ci`, which are hidden (`release-please-config.json:23-28`), so it would open nothing. The text therefore says the key takes effect only with a releasable commit since the last release: the key PR carries a releasable type itself, or lands with or after a `fix:`/`feat:` commit in the same release. Workspace RELEASING.md "Merge settings" (lines 460-467) has the same gap; that is a SUPERVISOR follow-up, not a cli edit.
+release-please 17.11.2 (`strategies/base`, the `changelogEmpty` check after `buildNewVersion`) skips a release with "No user facing commits found" when every commit since the last release is of a hidden type, even when `releaseAs` is set. The old `Release-As:` footer escaped this only because the conventionalcommits preset un-hides a commit that carries the footer (`conventional-changelog-conventionalcommits/writer-opts.js`); the config key gets no such exemption. A PR that only edits `release-please-config.json` would naturally be typed `chore`, `build` or `ci`, which are hidden (`release-please-config.json:23-28`), so it would open nothing. The text therefore says the key takes effect only with a releasable commit since the last release: the key PR carries a releasable type itself, or lands after a releasable (`feat`, `fix`, `perf`, `revert`, `deps`, `refactor`) commit since the last release. Workspace RELEASING.md "Merge settings" (lines 460-467) has the same gap; that is a SUPERVISOR follow-up, not a cli edit.
 
 ## Research & Decisions
 
@@ -94,12 +96,10 @@ release-please 17.11.2 (`strategies/base`, the `changelogEmpty` check after `bui
 
 - [A stale `release-as` key pins later releases] → the new requirement names the removal PR as a step; D4 defers a gate.
 - [Enhancement 0021 policy text still says the opposite] → SUPERVISOR follow-up in tasks.md; the cli text cites RELEASING.md, which carries the owner decision.
-- [Migration notes leave the CHANGELOG] → D5; owner question below.
+- [Migration notes leave the CHANGELOG] → D5; a hand edit of the release PR's `CHANGELOG.md` carries them.
 - [A hidden-type key PR forces nothing] → D6; the text names the releasable-commit condition.
 - [The interim clause outlives Phase 0] → harmless (it describes a superset of the final rule); drop it in a later docs PR.
 
 ## Open Questions
 
 - Enhancement 0021 (`enhancements/0021/policy/01-core-schema.md:8,22,70,74,165,167,169,173-183`) still requires a `BREAKING CHANGE:` footer and a `Release-As:` footer and forbids a `release-as` key (167), including for a prerelease-type flip and a post-GA major crossing. Reconciling it with `BLANK` is a SUPERVISOR follow-up in tasks.md; whether the crossing procedure becomes "the `module:` line edit and a `release-as` key in one releasable PR" is the owner's call there.
-- Should a breaking change's migration note still reach the CHANGELOG, for example by editing the release PR's `CHANGELOG.md` before merging it? (owner; D5)
-- Should a gate refuse a release PR while a `release-as` key names an already-tagged version? (owner; D4)

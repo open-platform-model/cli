@@ -54,11 +54,12 @@ context: |
   title (`feat!:`), which is the squash commit title and the CHANGELOG entry;
   until the owner merge settings land, merge by squash only and give a
   one-commit PR's commit subject the same `!`. The migration note goes in the PR
-  body, and in the user docs when users need it to upgrade.
-  It advances the `-beta.N` counter and never moves the module path to a new
-  major. Stable lines (opmodel.dev/catalogs/opm@v4 and the module fleets) keep
-  the normal SemVer rule: a break is a new major. A core beta break that would
-  force a catalogs/opm major needs owner sign-off. GA drops the suffix:
+  body, and in the user docs when users need it to upgrade; whoever merges the
+  release PR first edits its `CHANGELOG.md` by hand to carry the note.
+  A breaking change advances the `-beta.N` counter and never moves the module
+  path to a new major. Stable lines (opmodel.dev/catalogs/opm@v4 and the module
+  fleets) keep the normal SemVer rule: a break is a new major. A core beta break
+  that would force a catalogs/opm major needs owner sign-off. GA drops the suffix:
   `prerelease: false` plus a visible carrier commit per package, in dependency
   order.
   Rationale: Enables predictable upgrades and changelog automation.
@@ -235,7 +236,8 @@ operations:
         again: the checked boxes plus a clean tree are the resume state."
       - "Delivery mode: unless proposal.md carries `Delivery: one PR per section`, all section
         commits ship in one PR after the last section and the PR title carries the change's
-        release class. In per-section mode each section commit is the PR title and therefore a
+        release class, the highest of its sections (a `!` if any section breaks), because only
+        the title reaches main under the BLANK squash message. In per-section mode each section commit is the PR title and therefore a
         release trigger; the change stays active on main between PRs, and spec sync and enhancement
         delivery logging wait for archive after the last PR."
   archive:
