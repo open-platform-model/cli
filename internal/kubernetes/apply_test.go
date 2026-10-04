@@ -159,12 +159,16 @@ func TestNormalizedContent_DoesNotMutateInput(t *testing.T) {
 // server-side apply by echoing the patch body and recording "Kind/name" in
 // patch order, and every GET with NotFound except for the CustomResourceDefinition,
 // which exists once applied (or from the start, with crdExists) and reports
-// Established=True only when established is set.
+// Established=True only when established is set, and the objects named in
+// existing.
 type stagingCluster struct {
 	mu          sync.Mutex
 	patched     []string
 	crdExists   bool
 	established bool
+	// existing names objects, as "<resource>/<name>" (namespaces/demo), that
+	// every read finds.
+	existing map[string]bool
 	// crdForbidden makes every read of the CustomResourceDefinition fail
 	// with Forbidden, as for a user who may patch it but not get it.
 	crdForbidden bool
@@ -179,6 +183,12 @@ func (c *stagingCluster) client(t *testing.T) *Client {
 		get := action.(k8stesting.GetAction)
 		if c.crdForbidden && action.GetResource().Resource == "customresourcedefinitions" {
 			return true, nil, apierrors.NewForbidden(action.GetResource().GroupResource(), get.GetName(), nil)
+		}
+		if c.existing[action.GetResource().Resource+"/"+get.GetName()] {
+			found := &unstructured.Unstructured{Object: map[string]any{}}
+			found.SetName(get.GetName())
+			found.SetResourceVersion("1")
+			return true, found, nil
 		}
 		if action.GetResource().Resource != "customresourcedefinitions" || !c.crdExists {
 			return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), get.GetName())
@@ -316,7 +326,7 @@ func TestApply_DryRunSkipsCustomResourceOfNewCRD(t *testing.T) {
 	// A wait would time out: the CRD never exists and never reports
 	// Established. The short deadline makes an accidental wait fail fast.
 	shortWaitPoll(t)
-	cluster := &stagingCluster{}
+	cluster := &stagingCluster{existing: demoNamespaceExists()}
 
 	result, err := Apply(context.Background(), cluster.client(t), stagingInput(), "test", ApplyOptions{
 		DryRun:            true,
@@ -330,7 +340,7 @@ func TestApply_DryRunSkipsCustomResourceOfNewCRD(t *testing.T) {
 }
 
 func TestApply_DryRunSendsCustomResourceOfExistingCRD(t *testing.T) {
-	cluster := &stagingCluster{crdExists: true, established: true}
+	cluster := &stagingCluster{crdExists: true, established: true, existing: demoNamespaceExists()}
 
 	result, err := Apply(context.Background(), cluster.client(t), stagingInput(), "test", ApplyOptions{DryRun: true})
 	require.NoError(t, err)
@@ -342,10 +352,96 @@ func TestApply_DryRunSendsCustomResourceOfExistingCRD(t *testing.T) {
 func TestApply_DryRunSendsCustomResourceWhenCRDReadIsForbidden(t *testing.T) {
 	// A refused read is not proof the CRD is new, so the custom resource is
 	// sent, not skipped.
-	cluster := &stagingCluster{crdForbidden: true}
+	cluster := &stagingCluster{crdForbidden: true, existing: demoNamespaceExists()}
 
 	result, err := Apply(context.Background(), cluster.client(t), stagingInput(), "test", ApplyOptions{DryRun: true})
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.Skipped)
 	assert.Contains(t, cluster.patchOrder(), "Foo/my-foo")
+}
+
+// demoNamespaceExists marks the staging namespace as existing, so a dry-run
+// test of the CustomResourceDefinition skip checks that reason alone.
+func demoNamespaceExists() map[string]bool {
+	return map[string]bool{"namespaces/demo": true}
+}
+
+// namespacedInput is stagingInput without the CustomResourceDefinition and
+// its custom resource, plus a cluster-scoped ClusterRole: a Namespace and
+// three objects in it.
+func namespacedInput() []*unstructured.Unstructured {
+	return []*unstructured.Unstructured{
+		stagingObject("apps/v1", "Deployment", "web", "demo"),
+		stagingObject("v1", "Service", "web", "demo"),
+		stagingObject("rbac.authorization.k8s.io/v1", "ClusterRole", "reader", ""),
+		stagingObject("v1", "ConfigMap", "cfg", "demo"),
+		stagingObject("v1", "Namespace", "demo", ""),
+	}
+}
+
+var objectsInDemo = []string{"Deployment/web", "Service/web", "ConfigMap/cfg"}
+
+func TestApply_DryRunSkipsObjectsOfNewNamespace(t *testing.T) {
+	cluster := &stagingCluster{}
+
+	result, err := Apply(context.Background(), cluster.client(t), namespacedInput(), "test", ApplyOptions{DryRun: true})
+	require.NoError(t, err)
+	assert.Empty(t, result.Errors)
+	assert.Equal(t, 3, result.Skipped)
+	assert.Equal(t, 2, result.Applied)
+	assert.Equal(t, []string{"Namespace/demo", "ClusterRole/reader"}, cluster.patchOrder(),
+		"the Namespace and the cluster-scoped object are sent, the objects in demo are not")
+}
+
+func TestApply_DryRunSkipsObjectsOfNewNamespacesOption(t *testing.T) {
+	cluster := &stagingCluster{}
+	input := namespacedInput()[:4] // no Namespace object
+
+	result, err := Apply(context.Background(), cluster.client(t), input, "test", ApplyOptions{
+		DryRun:        true,
+		NewNamespaces: []string{"demo"},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, result.Errors)
+	assert.Equal(t, 3, result.Skipped)
+	assert.Equal(t, []string{"ClusterRole/reader"}, cluster.patchOrder())
+}
+
+func TestApply_DryRunSendsObjectsOfExistingNamespace(t *testing.T) {
+	cluster := &stagingCluster{existing: demoNamespaceExists()}
+
+	result, err := Apply(context.Background(), cluster.client(t), namespacedInput(), "test", ApplyOptions{DryRun: true})
+	require.NoError(t, err)
+	assert.Empty(t, result.Errors)
+	assert.Equal(t, 0, result.Skipped)
+	assert.Subset(t, cluster.patchOrder(), objectsInDemo)
+}
+
+func TestApply_RealApplyIgnoresNewNamespaces(t *testing.T) {
+	cluster := &stagingCluster{}
+
+	result, err := Apply(context.Background(), cluster.client(t), namespacedInput(), "test", ApplyOptions{
+		NewNamespaces: []string{"demo"},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, result.Errors)
+	assert.Equal(t, 0, result.Skipped)
+	assert.Equal(t, 5, result.Applied)
+	assert.Subset(t, cluster.patchOrder(), objectsInDemo)
+}
+
+func TestApply_DryRunCustomResourceOfNewCRDInNewNamespaceSkippedOnce(t *testing.T) {
+	// The Foo has both reasons to be skipped; it counts once.
+	shortWaitPoll(t)
+	cluster := &stagingCluster{}
+
+	result, err := Apply(context.Background(), cluster.client(t), stagingInput(), "test", ApplyOptions{
+		DryRun:            true,
+		EstablishDeadline: time.Now().Add(100 * time.Millisecond),
+	})
+	require.NoError(t, err)
+	assert.Empty(t, result.Errors)
+	assert.Equal(t, 4, result.Skipped)
+	assert.Equal(t, 2, result.Applied)
+	assert.NotContains(t, cluster.patchOrder(), "Foo/my-foo")
 }

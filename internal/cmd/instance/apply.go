@@ -70,7 +70,7 @@ Examples:
 	rff.AddTo(c)
 	kf.AddTo(c)
 	c.Flags().StringVarP(&namespace, "namespace", "n", "", renderNamespaceFlagHelp)
-	c.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Server-side dry run (no changes made)")
+	c.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Server-side dry run (no changes made); skips objects whose CustomResourceDefinition or namespace the apply creates, which the server cannot validate yet")
 	c.Flags().BoolVar(&createNSFlag, "create-namespace", false, "Create target namespace if it does not exist")
 	c.Flags().BoolVar(&noPruneFlag, "no-prune", false, "Skip stale resource pruning")
 	c.Flags().BoolVar(&forceFlag, "force", false, "Allow empty render to prune all previously tracked resources")

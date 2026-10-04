@@ -4,8 +4,9 @@
 // Namespace, a custom resource of that definition and a ConfigMap in that
 // Namespace, handed to kubernetes.Apply in reverse weight order, apply in one
 // call on a cluster that has none of them. A dry run of the same set skips the
-// custom resource and reports the ConfigMap's namespace as missing (the dry
-// run of the Namespace persists nothing).
+// custom resource (its CustomResourceDefinition is new) and the ConfigMap (its
+// Namespace is new: the dry run of the Namespace persists nothing), and
+// reports no error.
 package main
 
 import (
@@ -58,16 +59,16 @@ func main() {
 	if err != nil {
 		fail("dry run returned an error: %v", err)
 	}
-	if dry.Skipped != 1 {
-		fail("dry run skipped %d resources, want 1 (the custom resource)", dry.Skipped)
+	if dry.Skipped != 2 {
+		fail("dry run skipped %d resources, want 2 (the custom resource and the ConfigMap)", dry.Skipped)
 	}
-	if len(dry.Errors) != 1 || dry.Errors[0].Kind != "ConfigMap" || !apierrors.IsNotFound(dry.Errors[0].Err) {
-		fail("dry run errors = %v, want exactly the ConfigMap's namespace NotFound", dry.Errors)
+	if len(dry.Errors) != 0 {
+		fail("dry run errors = %v, want none", dry.Errors)
 	}
 	if dry.Applied != 2 {
 		fail("dry run applied %d resources, want 2 (the CRD and the Namespace)", dry.Applied)
 	}
-	fmt.Println("   OK: custom resource skipped, ConfigMap refused for its missing namespace (documented limit)")
+	fmt.Println("   OK: custom resource and ConfigMap skipped (new CustomResourceDefinition, new Namespace), no error")
 
 	fmt.Println()
 	fmt.Println("4. Real apply in reverse weight order...")

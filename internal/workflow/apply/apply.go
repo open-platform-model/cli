@@ -63,8 +63,13 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	instanceID := result.Instance.UUID
 	dryRun := req.Options.DryRun
 
-	if err := EnsureNamespaceIfRequested(ctx, req.K8sClient, namespace, req.Options.CreateNS, dryRun, instanceLog); err != nil {
+	wouldCreateNS, err := EnsureNamespaceIfRequested(ctx, req.K8sClient, namespace, req.Options.CreateNS, dryRun, instanceLog)
+	if err != nil {
 		return err
+	}
+	var newNamespaces []string
+	if wouldCreateNS {
+		newNamespaces = []string{namespace}
 	}
 
 	// Operator-parity render digest, computed by the render workflow over the
@@ -154,6 +159,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			DryRun:            dryRun,
 			EstablishDeadline: budgetStart.Add(timeout),
 			BudgetStart:       budgetStart,
+			NewNamespaces:     newNamespaces,
 		})
 		if err != nil {
 			instanceLog.Error("apply failed", "error", err)
@@ -262,15 +268,19 @@ func RunClusterGates(ctx context.Context, client *kubernetes.Client) error {
 	return inventory.GateOperatorVersionCeiling(ctx, client, version.Version)
 }
 
-func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Client, namespace string, createNS, dryRun bool, instanceLog *log.Logger) error {
+// EnsureNamespaceIfRequested creates the instance namespace when createNS is
+// set and it is missing. On a dry run it creates nothing and reports
+// wouldCreate: the namespace is missing, so the objects in it cannot be
+// validated by the server.
+func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Client, namespace string, createNS, dryRun bool, instanceLog *log.Logger) (wouldCreate bool, err error) {
 	if !createNS || namespace == "" {
-		return nil
+		return false, nil
 	}
 
 	created, err := k8sClient.EnsureNamespace(ctx, namespace, dryRun)
 	if err != nil {
 		instanceLog.Error("ensuring namespace", "error", err)
-		return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
+		return false, &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 	if created {
 		if dryRun {
@@ -279,7 +289,7 @@ func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Clien
 			instanceLog.Info(fmt.Sprintf("namespace %q created", namespace))
 		}
 	}
-	return nil
+	return created && dryRun, nil
 }
 
 // LoadPreviousInventory reads the ModuleInstance CR for an instance. When no
@@ -466,7 +476,7 @@ func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client
 func FormatDryRunSummary(r *kubernetes.ApplyResult) string {
 	summary := fmt.Sprintf("dry run complete: %d resources would be applied", r.Applied)
 	if r.Skipped > 0 {
-		summary += fmt.Sprintf(", %d skipped (CustomResourceDefinition created by this apply)", r.Skipped)
+		summary += fmt.Sprintf(", %d skipped (their CustomResourceDefinition or Namespace is created by this apply)", r.Skipped)
 	}
 	return summary
 }

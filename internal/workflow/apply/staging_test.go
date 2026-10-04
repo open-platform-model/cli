@@ -32,7 +32,7 @@ func TestFormatDryRunSummary(t *testing.T) {
 		want   string
 	}{
 		{"nothing skipped", kubernetes.ApplyResult{Applied: 3}, "dry run complete: 3 resources would be applied"},
-		{"skipped custom resources", kubernetes.ApplyResult{Applied: 2, Skipped: 1}, "dry run complete: 2 resources would be applied, 1 skipped (CustomResourceDefinition created by this apply)"},
+		{"skipped objects", kubernetes.ApplyResult{Applied: 2, Skipped: 1}, "dry run complete: 2 resources would be applied, 1 skipped (their CustomResourceDefinition or Namespace is created by this apply)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
