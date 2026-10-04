@@ -2,15 +2,13 @@
 
 ### Requirement: The running-operator check locates the operator through its instance record, else by its fixed names
 
-Every CLI command that checks for a running operator before it acts SHALL locate the operator without reading the CLI's embedded operator manifest. Source: 0028:D3:R13, 0028:D3:R15.
+Every CLI command that checks for a running operator before it acts SHALL locate the operator without reading the CLI's embedded operator manifest. The CLI is moving to install the operator as an OPM module and will stop carrying that manifest, so the check must not depend on it.
 
-The check SHALL first read the operator's instance record, the `ModuleInstance` named `opm-operator` in the namespace `opm-operator-system` (0028:D3:R18). When that record exists, the operator's objects SHALL be the `CustomResourceDefinition` entries (group `apiextensions.k8s.io`) and the `Deployment` entries (group `apps`) its recorded inventory lists. A record whose inventory lists no `CustomResourceDefinition` or no `Deployment` SHALL make the check report the operator as not ready, naming the record.
+The check SHALL first read the operator's instance record, the `ModuleInstance` named `opm-operator` in the namespace `opm-operator-system`, the coordinates at which the CLI installs the operator. When that record exists, the operator's objects SHALL be the `CustomResourceDefinition` entries (group `apiextensions.k8s.io`) and the `Deployment` entries (group `apps`) its recorded inventory lists. A record whose inventory lists no `CustomResourceDefinition` or no `Deployment` SHALL make the check report the operator as not ready, naming the record.
 
-When the record does not exist, including when the `ModuleInstance` CRD itself is absent, the operator's objects SHALL be its fixed names, which every released operator manifest uses and every module install keeps (0028:D2:R10): the `Deployment` `opm-operator-controller-manager` in the `Namespace` `opm-operator-system`, and the `CustomResourceDefinition`s `moduleinstances.opmodel.dev`, `modulepackages.opmodel.dev`, `platforms.opmodel.dev` and `transformerregistrations.opmodel.dev`.
+When the record does not exist, including when the `ModuleInstance` CRD itself is absent, the operator's objects SHALL be its fixed names, which every operator release since `v1.0.0-alpha.18` uses and every install of the operator module keeps: the `Deployment` `opm-operator-controller-manager` in the namespace `opm-operator-system`, and the `CustomResourceDefinition`s `moduleinstances.opmodel.dev`, `modulepackages.opmodel.dev`, `platforms.opmodel.dev` and `transformerregistrations.opmodel.dev`. The `Namespace` is checked only as the `Deployment`'s namespace; the check reads no `Namespace` object. An operator from an earlier release, which lacks one of these CRDs or serves its CRDs in another group, SHALL be reported as not ready.
 
 The operator SHALL count as running only when every located `CustomResourceDefinition` reports `Established=True` and every located `Deployment` has completed its rollout. Otherwise the check SHALL report the operator as not ready, name each object that failed, and point at `opm operator install`. A read of the instance record that fails for any reason other than NotFound SHALL fail the check closed, naming the read that failed, so the command proceeds only on a positive finding.
-
-While the CLI still embeds an operator manifest, that manifest's `CustomResourceDefinition` names and its controller `Deployment` name and namespace SHALL equal the fixed names above.
 
 #### Scenario: Manifest-installed operator is found by its fixed names
 
@@ -43,6 +41,10 @@ While the CLI still embeds an operator manifest, that manifest's `CustomResource
 
 - **WHEN** the cluster holds no operator instance record, none of the four CRDs and no `opm-operator-controller-manager` Deployment
 - **THEN** the running-operator check SHALL report the operator as not ready, naming the missing objects, and point at `opm operator install`
+
+### Requirement: The embedded operator manifest matches the fixed names
+
+While the CLI still embeds an operator manifest, that manifest's `CustomResourceDefinition` names, its controller `Deployment` name and that `Deployment`'s namespace SHALL equal the fixed names of the running-operator check, so the check finds an operator `opm operator install` applied.
 
 #### Scenario: Embedded manifest keeps the fixed names
 
