@@ -1,6 +1,6 @@
 ## Purpose
 
-Install's one-time migration of an opm-operator installed from an earlier release's manifest into the CLI-owned operator ModuleInstance. It defines which objects install may adopt or delete, the Deployment recreate, the field ownership of adopted objects, the order of checks and writes, how a stopped migration resumes, and what install reports.
+Install's one-time migration of an opm-operator installed from an earlier release's manifest into the CLI-owned operator ModuleInstance. It defines which objects install may adopt or delete, the Deployment recreate, the field ownership of rendered objects, the order of checks and writes, how a stopped migration resumes, and what install reports.
 
 ## ADDED Requirements
 
@@ -55,7 +55,7 @@ An object that already carries the operator instance's own identity, as after an
 
 ### Requirement: Install adopts the proven objects the module renders and no others
 
-On the first module install over an operator installed from an earlier manifest, install SHALL admit through the apply guard exactly the proven objects that the module renders. It SHALL record every object the module renders in the operator instance's inventory. The guard SHALL refuse every other existing object the render names that is neither proven nor already this instance's, as it does for any instance. Install SHALL offer no flag or prompt that overrides that refusal. Install SHALL write no annotation and no label in order to admit an object.
+On the first module install over an operator installed from an earlier manifest, install SHALL admit through the apply guard exactly the proven objects that the module renders. It SHALL record every object the module renders in the operator instance's inventory. The guard SHALL refuse every other existing object the render names that is neither proven nor already this instance's, as it does for any instance. Install SHALL offer no flag or prompt that overrides that refusal. The proven objects SHALL pass both the guard in install's check phase and the guard of the instance apply, so a manifest-installed cluster is not refused at either.
 
 #### Scenario: Migration over an opm-cli server-side install
 
@@ -68,14 +68,19 @@ On the first module install over an operator installed from an earlier manifest,
 - **WHEN** `opm operator install` runs on a cluster whose operator was installed with client-side `kubectl apply -f install.yaml` of an earlier release
 - **THEN** the run succeeds, every object the module renders is recorded, and every adopted object other than the Deployment keeps its `metadata.uid`
 
+#### Scenario: The check-phase guard admits proven objects
+
+- **WHEN** install's check phase runs on a cluster whose `Namespace opm-operator-system` and the other objects of the v1.0.0-beta.5 manifest carry `app.kubernetes.io/managed-by=kustomize` and no instance identity
+- **THEN** the check phase passes, and the guard refuses none of them
+
 #### Scenario: Unproven foreign object is refused
 
 - **WHEN** the render names an object that exists on the cluster, is not on the proof list, and carries no OPM `managed-by` label
 - **THEN** install refuses before any object changes, naming the object, and offers no override
 
-### Requirement: Adopted objects end under the CLI's field ownership whatever installed them
+### Requirement: Labels and annotations of an earlier client-side or opm-cli apply do not survive install
 
-After a migration, every adopted object SHALL hold only the fields the module renders, whichever tool installed it earlier. A label or annotation that the earlier manifest or its installer set and the module does not render SHALL be gone; this includes `kubectl.kubernetes.io/last-applied-configuration`. The field manager `opm-cli` SHALL own the fields the module renders.
+After a full install, a label or annotation on a rendered object that an earlier client-side `kubectl apply` (field manager `kubectl-client-side-apply`) or an earlier `opm-cli` apply set, and that the module does not render, SHALL be gone; this includes `kubectl.kubernetes.io/last-applied-configuration`. This SHALL hold for adopted objects and for objects that already carry the operator instance's identity alike. The field manager `opm-cli` SHALL own the fields the module renders. Install SHALL NOT move or remove fields owned by any other field manager.
 
 #### Scenario: Earlier labels are dropped after a client-side install
 
@@ -86,7 +91,12 @@ After a migration, every adopted object SHALL hold only the fields the module re
 #### Scenario: Earlier labels are dropped from a CRD after a client-side install
 
 - **WHEN** the migration adopts `CustomResourceDefinition moduleinstances.opmodel.dev`, which client-side `kubectl apply` created
-- **THEN** after install it carries no `kubectl.kubernetes.io/last-applied-configuration` annotation, and no field manager other than `opm-cli` and the API server owns a field of it
+- **THEN** after install it carries no `kubectl.kubernetes.io/last-applied-configuration` annotation, and the field manager `kubectl-client-side-apply` owns no field of it
+
+#### Scenario: Fields of another manager are left alone
+
+- **WHEN** an adopted object holds a label owned by a field manager other than `kubectl-client-side-apply` and `opm-cli`
+- **THEN** after install that label and its manager's ownership are unchanged
 
 #### Scenario: Earlier labels are dropped after an opm-cli install
 
@@ -109,16 +119,21 @@ When the operator's Deployment exists, is proven, and carries the selector of an
 
 ### Requirement: Install deletes the superseded role bindings
 
-Install SHALL delete the earlier manifest's role bindings that the module's bindings replace: `ClusterRoleBinding opm-operator-manager-rolebinding`, `ClusterRoleBinding opm-operator-metrics-auth-rolebinding` and `RoleBinding opm-operator-system/opm-operator-leader-election-rolebinding`. It SHALL delete each one only when it is proven. After a completed migration, no role binding of an earlier manifest SHALL remain in the cluster.
+Install SHALL delete the earlier manifest's role bindings that the module's bindings replace: `ClusterRoleBinding opm-operator-manager-rolebinding`, `ClusterRoleBinding opm-operator-metrics-auth-rolebinding` and `RoleBinding opm-operator-system/opm-operator-leader-election-rolebinding`. It SHALL delete each one only when it is proven and the render holds a binding of the same kind and namespace whose `roleRef` equals the live binding's `roleRef`. When a proven superseded binding has no such replacement in the render, install SHALL refuse before any object changes, naming the binding and its `roleRef`. After a completed migration, no role binding of an earlier manifest SHALL remain in the cluster.
 
 #### Scenario: Three bindings are deleted
 
 - **WHEN** install migrates an operator installed from any manifest release
-- **THEN** none of the three bindings exists afterwards, the module's bindings exist, and install reports each deleted binding
+- **THEN** none of the three bindings exists afterwards, the module's bindings exist, and install reports each deleted binding with the rendered binding that replaces it
+
+#### Scenario: Binding without a replacement refuses the install
+
+- **WHEN** the render holds no `ClusterRoleBinding` whose `roleRef` names `ClusterRole opm-operator-manager-role`, and the proven `ClusterRoleBinding opm-operator-manager-rolebinding` exists
+- **THEN** install refuses before any object changes, naming the binding and its `roleRef`
 
 ### Requirement: The migration deletes only proven objects, and refuses otherwise
 
-The migration SHALL delete an object only when that object meets the proof. When the earlier Deployment or a superseded binding exists and is not proven, install SHALL refuse before any object changes, naming the object and the label or identity that failed the proof. The migration SHALL NOT delete or change any of the following:
+The migration SHALL delete an object only when that object meets the proof. When an object the migration would adopt, recreate or delete (a rendered object on the proof list, the earlier Deployment, or a superseded binding) exists and is not proven, install SHALL refuse before any object changes, naming the object and the label or identity that failed the proof. An unproven object on the proof list that the module does not render and the migration does not delete SHALL NOT refuse the install; install SHALL leave it unchanged. The migration SHALL NOT delete or change any of the following:
 
 - any CustomResourceDefinition, other than the CRD step's own apply;
 - any custom resource stored under the operator's CRDs;
@@ -130,6 +145,11 @@ The migration SHALL delete an object only when that object meets the proof. When
 - **WHEN** `ClusterRoleBinding opm-operator-manager-rolebinding` exists but carries the `module-instance.opmodel.dev/uuid` of another instance
 - **THEN** install refuses before any object changes and names the binding
 
+#### Scenario: Unproven leftover does not block the install
+
+- **WHEN** `ClusterRole opm-operator-modulerelease-viewer-role` exists without the labels its manifests set, and every object the migration adopts, recreates or deletes is proven
+- **THEN** install migrates, and that ClusterRole keeps its `metadata.resourceVersion`
+
 #### Scenario: Custom resources and managed workloads are untouched
 
 - **WHEN** install migrates an operator that manages ModuleInstances with deployed workloads
@@ -138,11 +158,11 @@ The migration SHALL delete an object only when that object meets the proof. When
 
 ### Requirement: Every refusing check runs before the migration's first write
 
-Install SHALL compute and check the whole migration, including the proof of every object it will adopt or delete, together with its other refusing checks and before its first write to the cluster. Only after all of them pass SHALL install write, in this order:
+Install SHALL compute and check the whole migration, including the proof of every object it will adopt or delete, together with its other refusing checks, before the apply guard of its check phase and before its first write to the cluster. Only after all of them pass SHALL install write, in this order:
 
-1. the field-ownership moves of adopted objects;
-2. the CRD step;
-3. the migration's deletes;
+1. the CRD step;
+2. the field-ownership moves;
+3. the delete of the earlier Deployment, then the deletes of the superseded bindings;
 4. the instance apply.
 
 A migration install that refuses SHALL leave the earlier operator running and every object of the earlier manifest unchanged.
@@ -155,7 +175,7 @@ A migration install that refuses SHALL leave the earlier operator running and ev
 #### Scenario: Deletes follow the CRD step
 
 - **WHEN** a migration install passes every check
-- **THEN** the CRDs are applied and served before the earlier Deployment or any binding is deleted, and both deletes happen before the operator instance is applied
+- **THEN** the CRDs are applied and served before the earlier Deployment or any binding is deleted, the Deployment is deleted before the bindings, and every delete happens before the operator instance is applied
 
 ### Requirement: Re-running install completes a migration that stopped partway
 
@@ -187,23 +207,34 @@ When an operator was installed with `kubectl apply` of a manifest rendered from 
 
 ### Requirement: Install reports what the migration did and left
 
-Beside its ordinary per-object lines, a migration install SHALL report each adopted object, the recreated Deployment and each deleted binding. It SHALL also report each object of an earlier manifest that is present on the cluster, that the module does not render and that the migration does not delete; install SHALL leave such an object in place. A refused migration SHALL name every object that failed the proof, not only the first. An install with nothing to migrate SHALL print no migration lines.
+Beside its ordinary per-object lines, an install that adopts, recreates or deletes an object SHALL report each adopted object, the recreated Deployment and each deleted binding. That install SHALL also report each proven object of an earlier manifest that is present on the cluster, that the module does not render and that the migration does not delete; install SHALL leave such an object in place. A refused migration SHALL name every object that blocks it, not only the first. An install that adopts, recreates and deletes nothing SHALL print no migration lines, even when objects of an earlier manifest remain in place.
 
 #### Scenario: Leftover object of an older release is named and kept
 
 - **WHEN** install migrates a cluster that still holds `ClusterRole opm-operator-modulerelease-viewer-role` from a v0.7 install
 - **THEN** install names it as left in place, and afterwards it still exists with the same `metadata.resourceVersion`
 
+#### Scenario: Install after a completed migration prints no migration lines
+
+- **WHEN** install runs again after a completed migration on a cluster that still holds `ClusterRole opm-operator-modulerelease-viewer-role`
+- **THEN** install prints no migration lines
+
 #### Scenario: Refusal names every unproven object
 
 - **WHEN** two objects on the proof list fail the proof
 - **THEN** install's refusal names both of them
 
-### Requirement: The CRDs-only form performs no migration
+### Requirement: The CRDs-only form admits proven CRDs and makes no other migration write
 
-`opm operator install --crds-only` SHALL NOT delete or recreate any object of an earlier manifest, and SHALL NOT move the field ownership of any such object other than the CRDs it applies.
+`opm operator install --crds-only` SHALL prove the CRDs it applies against the proof list and SHALL admit the proven ones through its guard, so it does not refuse on a cluster whose operator was installed from an earlier manifest. It SHALL refuse an unproven existing CRD as the full install does. It SHALL NOT delete or recreate any object, SHALL NOT move the field ownership of any object, and SHALL print no migration lines.
 
 #### Scenario: CRDs-only over a manifest install
 
 - **WHEN** `opm operator install --crds-only` runs on a cluster whose operator was installed from an earlier manifest
-- **THEN** the earlier Deployment and the three bindings keep their `metadata.uid` and `metadata.resourceVersion`
+- **THEN** it applies the four CRDs and succeeds
+- **AND** the earlier Deployment and the three bindings keep their `metadata.uid` and `metadata.resourceVersion`
+
+#### Scenario: Full install after CRDs-only completes the migration
+
+- **WHEN** `opm operator install --crds-only` ran on a manifest-installed cluster, and a full `opm operator install` of the same version runs next
+- **THEN** the full install migrates the remaining objects and records every object the module renders, the four CRDs included
