@@ -84,6 +84,7 @@ func TestExecute_DryRunSkipsObjectsOfNamespaceCreateNamespaceWouldCreate(t *test
 	assert.Empty(t, run.patched, "the ConfigMap in the new namespace is never sent")
 	assert.False(t, run.nsCreated, "a dry run creates no namespace")
 	assert.Contains(t, run.log.String(), `namespace "default" would be created`)
+	assert.Contains(t, run.log.String(), "skipping ConfigMap/cfg in default: namespace default is created by this apply, so a dry run cannot validate it")
 	assert.Contains(t, run.log.String(), "0 resources would be applied, 1 skipped")
 }
 
