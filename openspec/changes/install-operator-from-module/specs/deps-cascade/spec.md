@@ -5,7 +5,7 @@
 `task -x deps:cascade` SHALL move the following pins in the working tree only. It SHALL NOT commit, branch or push.
 
 - **library.** `github.com/open-platform-model/library` in `go.mod` SHALL move to the newest version the Go proxy serves in its major, through `go get <module>@<exact version>` followed by `go mod tidy`.
-- **opm-operator module.** The operator module pin in `internal/operator/pin.go` (module version, content digests and `PinnedOperatorVersion`) SHALL move only through `task operator:pin VERSION=<v>`. The target is the newest published release of `opmodel.dev/modules/opm_operator` in the pinned major whose deployed operator `MAJOR.MINOR` is not above the cli's own, the same rule install applies to a target module version.
+- **opm-operator module.** The operator module pin in `internal/operator/pin.go` (`PinnedModuleVersion` and `PinnedOperatorVersion`) SHALL move only through `task operator:pin VERSION=<v>`. The target is the newest published release of `opmodel.dev/modules/opm_operator` in the pinned major whose stated operator version, read from the module's source without a render, has a `MAJOR.MINOR` not above the cli's own, the same rule install applies to a target module version.
 - **Catalog and core as a consistent set.** This covers the `cue.mod/module.cue` files of the three templates, `hack/platform`, `examples`, `tests/fixtures/modules/podinfo`, `tests/e2e/testdata/operator-owned`, `internal/instinit/testdata/initvalues`, `internal/workflow/render/testdata/skip-unprovided`, `tests/e2e/testdata/duplicate-identities`, `tests/integration/module-apply/testdata`, `tests/fixtures/valid/simple-module` and `tests/fixtures/valid/module-with-debug-values`.
   - `opmodel.dev/catalogs/opm@v4` SHALL move to the newest published catalog in its major, resolved against `templates/minimal`'s catalog.
   - `opmodel.dev/core@v2` SHALL move to the core version that the file's resulting catalog pins. A file without a catalog SHALL use `templates/minimal`'s resulting catalog.
@@ -58,3 +58,45 @@ How every move behaves:
 - **WHEN** the catalog moves in `hack/platform`
 - **THEN** `cue mod get` names only the `opmodel.dev` keys, and `cue.dev/x/k8s.io@v0` changes only if `cue mod tidy` raised it, in which case a warning names it
 
+### Requirement: Title and body tasks describe the cascade diff
+
+`task -x deps:cascade:title` SHALL print the shared resolver's one-line title for the diff against `CASCADE_BASE` (default `origin/main`). It SHALL use the path-class map `.tasks/cascade/classes`, which classes these paths as `test` and everything else as `shipped`:
+
+- `hack/platform/`;
+- `hack/kind-platform.yaml`;
+- `examples/`;
+- `tests/`;
+- any `testdata/` directory;
+- `*_test.go`.
+
+`task -x deps:cascade:body` SHALL print the resolver's body for the same diff. `.tasks/cascade/pins.sh <ref>` SHALL report five pins, each `v`-prefixed:
+
+- `github.com/open-platform-model/library` from `go.mod`;
+- `github.com/open-platform-model/opm-operator` from `PinnedOperatorVersion` in `internal/operator/pin.go`;
+- `opmodel.dev/modules/opm_operator@v0` from `PinnedModuleVersion` in `internal/operator/pin.go`, so a module release that deploys the same operator still shows as a moved pin;
+- `opmodel.dev/catalogs/opm@v4` from `templates/minimal/cue.mod/module.cue`;
+- `opmodel.dev/core@v2` from `templates/minimal/cue.mod/module.cue`.
+
+Each pin SHALL be of class `shipped`, with no label.
+
+Source: workspace RELEASING.md, section "The cascade", "Title from diff class".
+
+#### Scenario: A shipped move titles as fix(deps)
+
+- **WHEN** a run moved library, the operator module to a version deploying a newer operator, the catalog and core
+- **THEN** `task -x deps:cascade:title` prints `fix(deps): bump 5 upstream pins`
+
+#### Scenario: Test-only paths title as test(fixtures)
+
+- **WHEN** the only changed paths are under `hack/platform/`, `examples/` and `tests/`
+- **THEN** the title's type is `test(fixtures)`
+
+#### Scenario: The body lists each moved pin
+
+- **WHEN** a run moved four pins
+- **THEN** `task -x deps:cascade:body` prints the title and labels markers, one table row per moved pin, and `## Notes` as the last section
+
+#### Scenario: A module-only pin move is reported
+
+- **WHEN** a run moved only the operator module pin, to a module version that deploys the same operator version
+- **THEN** `task -x deps:cascade:title` prints a `fix(deps)` title counting one moved pin, and `task -x deps:cascade:body` prints one table row for `opmodel.dev/modules/opm_operator@v0` and none for `github.com/open-platform-model/opm-operator`

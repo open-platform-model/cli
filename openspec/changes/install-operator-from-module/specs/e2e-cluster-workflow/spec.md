@@ -2,7 +2,7 @@
 
 ### Requirement: The job applies to operator-facing pull requests, cascade pull requests and release pull requests
 
-The workflow SHALL run one job, named `E2E (kind, embedded operator)`, triggered by `pull_request` targeting `main` with the activity types `opened`, `synchronize`, `reopened`, `labeled` and `unlabeled`, and by `workflow_dispatch`. The job SHALL do the cluster-backed work (it *applies*) when at least one of these holds:
+The workflow SHALL run one job, named `E2E (kind, embedded operator)` (a name the `main` ruleset requires as a status check, kept although no operator is embedded), triggered by `pull_request` targeting `main` with the activity types `opened`, `synchronize`, `reopened`, `labeled` and `unlabeled`, and by `workflow_dispatch`. The job SHALL do the cluster-backed work (it *applies*) when at least one of these holds:
 
 - the run was started by `workflow_dispatch`;
 - the pull request's head branch starts with `release-please--`;
