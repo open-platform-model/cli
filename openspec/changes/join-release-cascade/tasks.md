@@ -2,7 +2,7 @@
 
 The change ships as one PR, titled `ci: join the release cascade` (Phase 3 wiring contract §1). Workers never tag. They never create, edit or delete a GitHub Release, label, repository variable, Environment, ruleset or repo setting. They never touch a Kubernetes cluster. Items marked **SUPERVISOR** are not worker tasks.
 
-The binding interface is the Phase 3 wiring contract (`p3-wiring-contract.md` in the supervisor's scratchpad, cited as "wiring §N"), together with workspace RELEASING.md, sections "The cascade", "Gates", "Stop switches" and "Owner settings". Where the two disagree, stop and report the conflict to the supervisor. Do not pick one.
+The binding interface is the Phase 3 wiring contract, `openspec/changes/add-release-cascade-workflows/contract.md` in `open-platform-model/.github` (archived with that change on merge; cited as "wiring §N"), together with workspace RELEASING.md, sections "The cascade", "Gates", "Stop switches" and "Owner settings". Where the two disagree, stop and report the conflict to the supervisor. Do not pick one.
 
 **Paths.**
 
@@ -15,7 +15,7 @@ The binding interface is the Phase 3 wiring contract (`p3-wiring-contract.md` in
 - `task lint`
 - `task test:unit`
 - `task openspec:check`
-- `actionlint` on every workflow file the section touched. It runs with `-shellcheck=` and `-pyflakes=` empty when those tools are absent. A finding the section introduced fails the gate. A finding listed in the 1.5 baseline does not.
+- `actionlint` on every workflow file the section touched. It runs with `-shellcheck=` and `-pyflakes=` empty when those tools are absent. A finding the section introduced fails the gate. A finding listed in the 1.4 baseline does not.
 
 `task test` also runs `test:integration` and `test:e2e`, which need a cluster. This change adds no Go code, so report them as not run.
 
@@ -24,13 +24,16 @@ The binding interface is the Phase 3 wiring contract (`p3-wiring-contract.md` in
 - **G-shared.** Before merge, A is merged on `open-platform-model/.github` `main`, and `cascade-notify.yml`, `cascade-receive.yml` and `cascade-gates.yml` exist there.
   - Each input this change passes exists there with the same name and type: `tag`; `dry-run`, `gates-only`, `g2-mode`, `g3-mode`, `setup-go` and `labels-managed`; `g2-mode` and `g3-mode`.
   - No required input is left unpassed.
+  - `cascade-receive.yml`'s `publish.if` reads `inputs.dry-run`, `inputs.gates-only` and `github.ref` directly, not only the compute job's outputs. The compute job runs repository code (on a release PR's gates-only run, the release head's), so its outputs cannot hold the stop switch.
+  - Advisory, not blocking: the receiver's `setup-go` step passes `cache-dependency-path: repo/go.sum`, and its `setup-task` pin is v2.2.0, the version the workspace uses most.
   - Check: `git -C <ws>/.github fetch && git -C <ws>/.github show origin/main:.github/workflows/<name>.yml`.
+  - Merge order: sections 2 and 3 add `@main` callers. GitHub resolves those when a run is created, so before A merges, every run of `release.yml` (release-please and goreleaser included) would fail at load. The per-section invariant (constitution VIII) therefore holds only once G-shared holds. This PR merges only after it.
 - **G-releasing.** The workspace RELEASING.md amendments of wiring §14 are merged, or are merged in the same review round as A.
 - **G-dry-run-var (SUPERVISOR).** Before merge, the cli repository variable `CASCADE_DRY_RUN` is `true` (owner decision 22). Check: `gh variable get CASCADE_DRY_RUN -R open-platform-model/cli` prints `true`.
-- **G-ci.** On this PR, `Lint`, `Unit Tests`, `E2E (kind, embedded operator)` (not applicable: passes quickly), `Validate Conventional Commit title` and mention-guard are green.
+- **G-ci.** On this PR, `Lint`, `Unit Tests`, `G4 operator-embed evidence`, `E2E (kind, embedded operator)` (not applicable: passes quickly), `Validate Conventional Commit title` and mention-guard are green. `Lint`, `G4 operator-embed evidence` and `E2E (kind, embedded operator)` are the `main` ruleset's required checks.
   - The new `Cascade gates` run is green too. It cannot run before A merges: `pull_request_target` runs `main`'s copy, which does not contain the file yet. Its first run is on the next PR after merge.
 - **G-post-merge (SUPERVISOR, not a merge precondition)** (wiring §1 "Phase 3 gate", §10):
-  - `gh workflow run deps-cascade.yml -R open-platform-model/cli -f dry_run=true`. The summary shows "DRY RUN", mode `fresh` and action `noop`, or the diff task 1.4 recorded.
+  - `gh workflow run deps-cascade.yml -R open-platform-model/cli -f dry_run=true`. The summary shows "DRY RUN", mode `fresh` and action `noop`, or the diff task 1.3 recorded.
   - On the next PR, `cascade/freshness` and `cascade/settled` appear as `n/a`.
 
 ## 1. Spike: confirm the assumptions in design.md
@@ -45,15 +48,15 @@ All checks are read-only. Record each result as an indented "Done:" note. Then w
 - [ ] 1.2 Confirm the Phase 0 state the callers rely on, read-only:
   - `gh api repos/open-platform-model/cli/environments/cascade --jq '.name, .deployment_branch_policy'`: the Environment exists with custom branch policies;
   - `gh api repos/open-platform-model/cli/environments/cascade/deployment-branch-policies --jq '.branch_policies[].name'`: lists only `main`;
+  - `gh api repos/open-platform-model/cli/environments/cascade/variables --jq '.variables[].name'`: lists `CASCADE_APP_CLIENT_ID`;
   - `gh label list -R open-platform-model/cli --search deps-cascade` and `--search need-human-review`: all five bot-relevant labels exist with the RELEASING.md "Labels" colours.
 
   Report a missing item to the supervisor. Never create it.
-- [ ] 1.3 Find out from the GitHub docs (Dependabot options reference, `github-actions` ecosystem) whether Dependabot ever proposes a change to a `uses: owner/repo/path@<branch>` reference. Record the answer and its source URL for design D4. The ignore entry stays either way.
-- [ ] 1.4 Predict the Phase 3 gate. Add a detached scratch worktree with `git worktree add --detach "$(git rev-parse --git-common-dir)/cascade-spike" origin/main`, never inside this tree. In it, run `CASCADE_RESOLVER=<ws>/.github/.github/scripts/cascade/cascade-resolve.sh task -x deps:cascade` (refresh the `.github` checkout with `git -C <ws>/.github fetch` and read the resolver from `origin/main` if the local checkout is behind).
+- [ ] 1.3 Predict the Phase 3 gate. Add a detached scratch worktree at a literal path in the supervisor's scratchpad, `git worktree add --detach <scratchpad>/p3-cli-join-spike origin/main`, never inside this tree or under `.git/` (the worktree guard refuses computed paths). In it, run `CASCADE_RESOLVER=<ws>/.github/.github/scripts/cascade/cascade-resolve.sh task -x deps:cascade` (refresh the `.github` checkout with a plain `git fetch` run from inside `<ws>/.github`, and read the resolver from `origin/main` if the local checkout is behind).
   - Record the exit code: 3 means the post-merge dry run must show `noop`; 0 means record `git diff --stat`.
   - Remove the scratch worktree with `git worktree remove --force`.
-- [ ] 1.5 Run `actionlint` on the current `.github/workflows/*.yml` and record the baseline findings (expected: none, or only pre-existing shellcheck notes).
-- [ ] 1.6 `task openspec:check` green, then commit `docs(openspec): record the join-release-cascade spike findings`. The commit touches only `openspec/changes/join-release-cascade/`.
+- [ ] 1.4 Run `actionlint` on the current `.github/workflows/*.yml` and record the baseline findings (expected: none, or only pre-existing shellcheck notes).
+- [ ] 1.5 `task openspec:check` green, then commit `docs(openspec): record the join-release-cascade spike findings`. The commit touches only `openspec/changes/join-release-cascade/`.
 
 ## 2. Notify downstream after a release publishes
 
@@ -79,9 +82,8 @@ All checks are read-only. Record each result as an indented "Done:" note. Then w
   - that it posts `cascade/freshness` and `cascade/settled` on every PR;
   - that it checks out no PR code;
   - that neither status is required until Phase 5.
-- [ ] 3.3 In `.github/dependabot.yml`, add `- dependency-name: "open-platform-model/.github*"` to the `github-actions` `ignore` list, with a two-line comment (design D4).
-- [ ] 3.4 Grep check: `grep -n -E 'secrets:|environment:' .github/workflows/deps-cascade.yml .github/workflows/cascade-gates.yml` prints nothing, and `grep -c 'open-platform-model/.github/.github/workflows/cascade-.*\.yml@main' .github/workflows/{release,deps-cascade,cascade-gates}.yml` prints 1 for each file.
-- [ ] 3.5 The local gate (with `actionlint` on both new files) is green, then commit `ci(cascade): add the cascade receiver and gate callers`.
+- [ ] 3.3 Grep check: `grep -n -E 'secrets:|environment:' .github/workflows/deps-cascade.yml .github/workflows/cascade-gates.yml` prints nothing, and `grep -c 'open-platform-model/.github/.github/workflows/cascade-.*\.yml@main' .github/workflows/{release,deps-cascade,cascade-gates}.yml` prints 1 for each file.
+- [ ] 3.4 The local gate (with `actionlint` on both new files) is green, then commit `ci(cascade): add the cascade receiver and gate callers`.
 
 ## 4. Documentation and final cross-check
 
@@ -91,6 +93,11 @@ All checks are read-only. Record each result as an indented "Done:" note. Then w
   - `cascade-gates.yml` posts `cascade/freshness` and `cascade/settled` on every PR, as warnings set by `CASCADE_G2_MODE` and `CASCADE_G3_MODE`.
 
   Point to RELEASING.md "The cascade" and "Stop switches". Cite no wiring section.
-- [ ] 4.2 Repeat the 1.1 comparison against A's newest state, input by input. Fix any drift in the callers, or report it to the supervisor when A and the wiring contract disagree.
+- [ ] 4.2 Repeat the 1.1 comparison against A's newest state, input by input. Fix any drift in the callers in its own `ci(cascade)` commit, never inside the 4.4 `docs(agents)` commit, or report it to the supervisor when A and the wiring contract disagree.
 - [ ] 4.3 Run `openspec validate join-release-cascade --strict` and `task openspec:check`. Re-read the three spec deltas against the final files, so every scenario matches the YAML as written.
 - [ ] 4.4 The local gate is green, then commit `docs(agents): describe the cascade receiver, notify job and switches`.
+
+## 5. Verify and archive
+
+- [ ] 5.1 Run the OpenSpec verify skill (`opsx:verify`) on `join-release-cascade` and resolve or report every CRITICAL and WARNING.
+- [ ] 5.2 Archive with `openspec archive join-release-cascade` and commit it in this PR (`docs(openspec): archive join-release-cascade`). The archive rides the implementing PR. Under the supervised swarm protocol, the supervisor decides when this runs, after review.

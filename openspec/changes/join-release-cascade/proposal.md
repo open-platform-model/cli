@@ -1,6 +1,6 @@
 ## Why
 
-Phase 2 gave the cli `task -x deps:cascade` and its title and body tasks (`Taskfile.yml:514-547`, archived change `2026-10-04-add-deps-cascade-task`). Nothing runs them yet, and nothing tells the cli's downstreams that a cli release exists. Phase 3 of the rollout wires each repo into the release cascade (workspace RELEASING.md, "Rollout and changes" › "Phases", row 3, and the Changes row `join-release-cascade`). The binding interface is the Phase 3 wiring contract (`p3-wiring-contract.md` in the supervisor's scratchpad, cited below as "wiring §N"), together with RELEASING.md, sections "The cascade", "Gates", "Stop switches" and "Owner settings".
+Phase 2 gave the cli `task -x deps:cascade` and its title and body tasks (`Taskfile.yml:514-547`, archived change `2026-10-04-add-deps-cascade-task`). Nothing runs them yet, and nothing tells the cli's downstreams that a cli release exists. Phase 3 of the rollout wires each repo into the release cascade (workspace RELEASING.md, "Rollout and changes" › "Phases", row 3, and the Changes row `join-release-cascade`). The binding interface is the Phase 3 wiring contract, committed by the `.github` change `add-release-cascade-workflows` as `openspec/changes/add-release-cascade-workflows/contract.md` (archived with that change on merge; cited below as "wiring §N"), together with RELEASING.md, sections "The cascade", "Gates", "Stop switches" and "Owner settings".
 
 The cli has both roles:
 
@@ -22,8 +22,7 @@ Today a cli release reaches catalog_opm and opm-operator only when someone runs 
   - `setup-go: true` (the task builds `opm`, runs `go get`, `go mod tidy` and `go run ./hack/docskit-dump`; `.tasks/cascade/cascade.sh:442`, `:490`, `:500-501`);
   - `labels-managed: true` (`.github/labels.yml:117-144` declares all six cascade labels, and the label sync deletes undeclared ones; RELEASING.md "Labels"), so the receiver only checks that the labels exist and never creates one;
   - `g2-mode` and `g3-mode` from `vars.CASCADE_G2_MODE` and `vars.CASCADE_G3_MODE`, default `warn`.
-- **Gate caller** (new `.github/workflows/cascade-gates.yml`): on `pull_request_target` (`opened`, `reopened`, `synchronize`) it calls `cascade-gates.yml@main` (wiring §8.3). Every PR then carries `cascade/freshness` and `cascade/settled`: `n/a` on an ordinary PR, and a gates-only receiver run on a release PR. Both stay warnings (owner decisions 11 and 12). Neither becomes a required check in this change.
-- **Dependabot** (`.github/dependabot.yml:3-12`): the `github-actions` update ignores `open-platform-model/.github*`, the same way it already ignores docs-kit. The shared cascade workflows stay at `@main` (owner decision 13) and are never proposed for a SHA or tag pin.
+- **Gate caller** (new `.github/workflows/cascade-gates.yml`): on `pull_request_target` (`opened`, `reopened`, `synchronize`) it calls `cascade-gates.yml@main` (wiring §8.3). Every PR opened or synchronized after this change then carries `cascade/freshness` and `cascade/settled`: `n/a` on an ordinary PR, and a gates-only receiver run on a release PR. The exception is a release PR whose gates-only evaluation fails before it writes its result in `warn` mode, which gets neither status. Both stay warnings (owner decisions 11 and 12). Neither becomes a required check in this change.
 - **`AGENTS.md`** (`:360`): the "Release cascade" bullet names the receiver, the gate caller, the notify job and the repo variables `CASCADE_DRY_RUN`, `CASCADE_NOTIFY`, `CASCADE_G2_MODE` and `CASCADE_G3_MODE`.
 - **Already in place, unchanged:**
   - The E2E job applies to cascade PRs. `.github/scripts/e2e-cluster-applies.sh:31-32` and `:61-63` match the branch `deps/cascade` and the label `deps-cascade`, and `e2e-cluster.yml:17-19` re-runs on label changes. The App's push triggers `pull_request` workflows, because it is not `GITHUB_TOKEN` (wiring §11.4 E2 proves this in the sandbox).
@@ -34,7 +33,7 @@ Release class: none. This is CI wiring, titled `ci: join the release cascade` (w
 
 ## Depends on / gates
 
-- **`.github` `add-release-cascade-workflows` merged first.** The callers reference `cascade-notify.yml`, `cascade-receive.yml` and `cascade-gates.yml` at `@main`. Until they exist on `.github` `main`, every caller run fails at workflow load. This PR merges only after A has merged (wiring §1: "B1 to B5 ... merge only after A has merged"). A in turn merges only after the sandbox cycle is green (wiring §11).
+- **`.github` `add-release-cascade-workflows` merged first.** The callers reference `cascade-notify.yml`, `cascade-receive.yml` and `cascade-gates.yml` at `@main`. GitHub resolves a called workflow and checks its inputs when the run is created. Until they exist on `.github` `main`, every run of a caller fails before any job starts. For `release.yml` that includes `release-please` and `goreleaser`, so no cli release could be cut. This PR merges only after A has merged (wiring §1: "B1 to B5 ... merge only after A has merged"). A in turn merges only after the sandbox cycle is green (wiring §11).
 - **The workspace RELEASING.md amendments of wiring §14** land before or with A. This change relies on them for `CASCADE_NOTIFY`, the fail-closed dry run and the concurrency groups. It does not edit RELEASING.md.
 - **Supervisor, before merge:** set the cli repo variable `CASCADE_DRY_RUN=true` (wiring §1, §10; owner decision 22). The receiver would also dry-run with the variable unset, but the explicit value makes the state visible. The schedule must never fire a live run.
 - **Phase 0 settings** (verified 2026-10-04 in `owner-selections-verbatim.md`): the cli has the `cascade` Environment (main only) with `CASCADE_APP_PRIVATE_KEY` and `CASCADE_APP_CLIENT_ID`, and the `opm-cascade` App is installed.
@@ -57,17 +56,17 @@ Release class: none. This is CI wiring, titled `ci: join the release cascade` (w
 ### Modified Capabilities
 
 - `release-workflow`: a new requirement for the `notify-downstream` job (when it runs, the tag it sends, the recovery path, the `CASCADE_NOTIFY` switch). Existing requirements are unchanged.
-- `repo-automation`: a new requirement that Dependabot leaves the shared `.github` workflows at `main`. Existing requirements are unchanged.
 
 ## Impact
 
 - **Commands and packages:** none. No Go code changes.
 - **Files:**
   - new: `.github/workflows/deps-cascade.yml` and `.github/workflows/cascade-gates.yml`;
-  - edited: `.github/workflows/release.yml`, `.github/dependabot.yml` and `AGENTS.md`.
+  - edited: `.github/workflows/release.yml` and `AGENTS.md`.
 - **Secrets:** none passed. The App key is an Environment secret, read only inside the shared reusable workflows' `cascade` jobs (wiring §2.2).
 - **Risks:**
   - **Shared key reach.** Any job that runs in the cli's `cascade` Environment can mint a token for all seven App repos (wiring Facts, §11.5). The main-only Environment policy and the cli `main` ruleset are the controls. This change adds no job that declares the Environment itself.
   - **Workflows guard.** Every workflow change on cli `main` (this PR included, and Dependabot `github_actions` bumps) turns a bot-only cascade PR into `recreate`, and one with a human commit into `conflict`, under `WF_GUARD_RULE=strict` (wiring §7.6). A decides the rule from the E4c sandbox result.
   - **Gates on Dependabot PRs.** If a Dependabot `pull_request_target` run cannot post statuses (wiring §11.4 E7), those PRs lack the two contexts. That is harmless while the contexts are warnings, and is a Phase 5 item (wiring §15 item 3).
+  - **`release.yml` depends on `cascade-notify.yml@main` at load time.** If that file is removed or renamed, or a required input is added or renamed, every cli `release.yml` run fails before any job starts, and `CASCADE_NOTIFY=off` does not help, because the `if:` is never evaluated. The shared interface must stay append-only with optional inputs. Recovery: revert the `.github` change, or merge a cli PR that removes the `notify-downstream` job.
   - **Duplicate CI on bot pushes.** `ci.yml` runs on a push to any branch (`ci.yml` `push: branches: ['**']`), so each App push to `deps/cascade` runs `ci.yml` as well as `pr.yml`. This happens already for human branches and is not a new cost class.

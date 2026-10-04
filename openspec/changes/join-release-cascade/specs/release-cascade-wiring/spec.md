@@ -46,7 +46,7 @@ Receiver runs on `main` that are not gates-only SHALL share the concurrency grou
 - **THEN** the gates-only run starts in `deps-cascade-gates` and the pending real run is not replaced
 
 ### Requirement: Every pull request carries the cascade gate statuses
-`.github/workflows/cascade-gates.yml` SHALL run on `pull_request_target` for `opened`, `reopened` and `synchronize`. It SHALL declare `permissions: {}` at the workflow level. It SHALL have one job that calls the shared `open-platform-model/.github` gates workflow at `main` with only `statuses: write` and `actions: write`, passes `g2-mode` and `g3-mode` from `CASCADE_G2_MODE` and `CASCADE_G3_MODE` (default `warn`), passes no secrets, and checks out no pull-request code. The commit statuses `cascade/freshness` (G2) and `cascade/settled` (G3) SHALL then be present on every pull request head: `n/a` success on an ordinary or fork pull request; on a same-repository release pull request, a gates-only receiver run evaluates them. In `warn` mode a problem is posted as a success whose description starts `WARN:`. This change does not make either status a required check. Source: workspace RELEASING.md, section "Gates"; owner decisions 11 and 12 (warn first).
+`.github/workflows/cascade-gates.yml` SHALL run on `pull_request_target` for `opened`, `reopened` and `synchronize`. It SHALL declare `permissions: {}` at the workflow level. It SHALL have one job that calls the shared `open-platform-model/.github` gates workflow at `main` with only `statuses: write` and `actions: write`, passes `g2-mode` and `g3-mode` from `CASCADE_G2_MODE` and `CASCADE_G3_MODE` (default `warn`), passes no secrets, and checks out no pull-request code. The commit statuses `cascade/freshness` (G2) and `cascade/settled` (G3) SHALL then be posted on every pull request opened or synchronized after this change, except a release pull request whose gates-only evaluation fails in `warn` mode before it writes its result: `n/a` success on an ordinary or fork pull request; on a same-repository release pull request, a gates-only receiver run evaluates them. In `warn` mode a problem is posted as a success whose description starts `WARN:`. This change does not make either status a required check. Source: workspace RELEASING.md, section "Gates"; owner decisions 11 and 12 (warn first).
 
 #### Scenario: Ordinary pull request
 - **WHEN** a pull request whose head branch does not start with `release-please--` is opened
@@ -56,9 +56,13 @@ Receiver runs on `main` that are not gates-only SHALL share the concurrency grou
 - **WHEN** the release pull request's head moves while a newer library release is published and not yet pinned
 - **THEN** a gates-only `Deps cascade` run posts `cascade/freshness` on the new head as success with a `WARN:` description naming the pin
 
-#### Scenario: Pull request code never runs
+#### Scenario: The gate job checks out no pull request code
 - **WHEN** a pull request from a fork changes `Taskfile.yml`
 - **THEN** the gate job runs the workflow from `main`, checks out nothing from the pull request, and posts `n/a` statuses
+
+#### Scenario: A release head's code cannot unlock publishing
+- **WHEN** a same-repository release pull request's head carries a modified `Taskfile.yml`, and its gates-only receiver run executes that head's `task -x deps:cascade` in the read-only compute job
+- **THEN** nothing is pushed and no pull request is opened, because the shared receiver's publish job reads the `dry-run` and `gates-only` inputs and the ref directly and never trusts the compute job's outputs to unlock it
 
 ### Requirement: The shared cascade workflows are called at main with no secret passed
 Every caller of the shared cascade workflows in this repository SHALL reference `open-platform-model/.github/.github/workflows/<name>.yml@main` and SHALL NOT pass `secrets:` or `secrets: inherit`. No job in this repository SHALL declare `environment: cascade` or read `CASCADE_APP_PRIVATE_KEY`. The App key is read only by the shared workflows' own jobs that declare the `cascade` Environment, which deploys from `main` only. Source: workspace RELEASING.md, sections "Notify after publish" and "Two-job split"; owner decisions 5 and 13.
