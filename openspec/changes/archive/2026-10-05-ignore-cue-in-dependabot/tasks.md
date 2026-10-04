@@ -10,5 +10,5 @@
 
 The archive rides the implementing PR, never a push to main. This section runs only after the supervisor's review of section 1, and never in the planning or implementation run.
 
-- [ ] 2.1 `openspec archive ignore-cue-in-dependabot --yes`. This adds "Dependabot leaves cuelang.org/go to library releases" to `openspec/specs/repo-automation/spec.md` and applies the MODIFIED "Dependabot leaves OPM Go modules to the release cascade". In the same commit, update the spec's Purpose line so Dependabot leaves OPM-owned Go modules to the release cascade and `cuelang.org/go` to library releases. Verify: `task openspec:check` is green.
-- [ ] 2.2 `task openspec:check` green, then commit `chore(openspec): archive ignore-cue-in-dependabot`. The commit touches only `openspec/`.
+- [x] 2.1 `openspec archive ignore-cue-in-dependabot --yes`. This adds "Dependabot leaves cuelang.org/go to library releases" to `openspec/specs/repo-automation/spec.md` and applies the MODIFIED "Dependabot leaves OPM Go modules to the release cascade". In the same commit, update the spec's Purpose line so Dependabot leaves OPM-owned Go modules to the release cascade and `cuelang.org/go` to library releases. Verify: `task openspec:check` is green.
+- [x] 2.2 `task openspec:check` green, then commit `chore(openspec): archive ignore-cue-in-dependabot`. The commit touches only `openspec/`.
