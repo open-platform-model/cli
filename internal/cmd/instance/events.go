@@ -83,10 +83,11 @@ func runInstanceEvents(ctx context.Context, identifier string, cfg *config.Globa
 		return err
 	}
 
-	_, liveResources, _, err := query.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, instanceLog)
+	_, liveResources, _, unreadable, err := query.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, instanceLog)
 	if err != nil {
 		return err
 	}
+	_ = unreadable // reported by the read-only warning helper (refuse-delete-on-unreadable-inventory section 3)
 
 	eventsOpts.Namespace = target.Namespace
 	eventsOpts.InstanceName = target.Selector.InstanceName

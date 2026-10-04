@@ -13,10 +13,12 @@ import (
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 func makeCRClient(objs ...*unstructured.Unstructured) *kubernetes.Client {
@@ -68,7 +70,7 @@ func TestResolveInventory_ByInstanceName_Success(t *testing.T) {
 	client := makeCRClient(cr)
 	ctx := context.Background()
 	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "myapp", Namespace: "default"}
-	inv, live, missing, err := ResolveInventory(ctx, client, rsf, "default", silentLogger())
+	inv, live, missing, _, err := ResolveInventory(ctx, client, rsf, "default", silentLogger())
 	require.NoError(t, err)
 	require.NotNil(t, inv)
 	assert.Equal(t, "myapp", inv.Name)
@@ -82,7 +84,7 @@ func TestResolveInventory_ByInstanceID_Success(t *testing.T) {
 	client := makeCRClient(cr)
 	ctx := context.Background()
 	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "myapp", InstanceID: "uuid-xyz-789", Namespace: "production"}
-	inv, live, missing, err := ResolveInventory(ctx, client, rsf, "production", silentLogger())
+	inv, live, missing, _, err := ResolveInventory(ctx, client, rsf, "production", silentLogger())
 	require.NoError(t, err)
 	require.NotNil(t, inv)
 	assert.Equal(t, "uuid-xyz-789", inv.InstanceUUID)
@@ -95,9 +97,10 @@ func TestResolveInventory_ByInstanceID_NoInstanceName(t *testing.T) {
 	client := makeCRClient(cr)
 	ctx := context.Background()
 	rsf := &cmdutil.InstanceSelectorFlags{InstanceID: "uuid-nnn-000", Namespace: "default"}
-	inv, _, _, err := ResolveInventory(ctx, client, rsf, "default", silentLogger())
+	inv, live, _, _, err := ResolveInventory(ctx, client, rsf, "default", silentLogger())
 	require.NoError(t, err)
 	require.NotNil(t, inv)
+	assert.Empty(t, live)
 	assert.Equal(t, "uuid-nnn-000", inv.InstanceUUID)
 }
 
@@ -105,7 +108,7 @@ func TestResolveInventory_NotFound(t *testing.T) {
 	client := makeCRClient()
 	ctx := context.Background()
 	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "nonexistent", Namespace: "default"}
-	inv, live, missing, err := ResolveInventory(ctx, client, rsf, "default", silentLogger())
+	inv, live, missing, _, err := ResolveInventory(ctx, client, rsf, "default", silentLogger())
 	require.Error(t, err)
 	assert.Nil(t, inv)
 	assert.Nil(t, live)
@@ -113,4 +116,43 @@ func TestResolveInventory_NotFound(t *testing.T) {
 	var exitErr *opmexit.ExitError
 	require.True(t, errors.As(err, &exitErr))
 	assert.Equal(t, opmexit.ExitNotFound, exitErr.Code)
+}
+
+// forbidConfigMapGets makes every ConfigMap GET on client fail with Forbidden.
+func forbidConfigMapGets(t *testing.T, client *kubernetes.Client) {
+	t.Helper()
+	fake, ok := client.Dynamic.(*dynamicfake.FakeDynamicClient)
+	require.True(t, ok)
+	fake.PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "settings", nil)
+	})
+}
+
+// withEntries sets the CR's status.inventory entries.
+func withEntries(cr *unstructured.Unstructured, entries ...map[string]any) *unstructured.Unstructured {
+	list := make([]any, len(entries))
+	for i, e := range entries {
+		list[i] = e
+	}
+	inv := cr.Object["status"].(map[string]any)["inventory"].(map[string]any)
+	inv["entries"] = list
+	inv["count"] = int64(len(entries))
+	return cr
+}
+
+func TestResolveInventory_ReturnsUnreadable(t *testing.T) {
+	cr := withEntries(makeModuleInstanceCR("guarded", "default", "uuid-abc-123"),
+		map[string]any{"kind": "ConfigMap", "namespace": "default", "name": "settings", "v": "v1"})
+	client := makeCRClient(cr)
+	forbidConfigMapGets(t, client)
+	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "guarded", Namespace: "default"}
+
+	inv, live, missing, unreadable, err := ResolveInventory(context.Background(), client, rsf, "default", silentLogger())
+	require.NoError(t, err)
+	require.NotNil(t, inv)
+	assert.Empty(t, live)
+	assert.Empty(t, missing)
+	require.Len(t, unreadable, 1)
+	assert.Equal(t, "settings", unreadable[0].Entry.Name)
+	assert.True(t, apierrors.IsForbidden(unreadable[0].Err))
 }

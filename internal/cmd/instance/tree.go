@@ -91,7 +91,7 @@ func runInstanceTree(ctx context.Context, identifier string, cfg *config.GlobalC
 		return err
 	}
 
-	inv, liveResources, _, err := query.ResolveInventory(ctx, k8sClient, target.Selector, namespace, instanceLog)
+	inv, liveResources, _, _, err := query.ResolveInventory(ctx, k8sClient, target.Selector, namespace, instanceLog)
 	if err != nil {
 		return err
 	}

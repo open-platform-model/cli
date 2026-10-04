@@ -84,7 +84,7 @@ func main() {
 	// Read back and discover live resources from inventory.
 	readInv65, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	check("reading inventory for 6.5", err)
-	liveResources65, missing65, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv65)
+	liveResources65, missing65, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv65)
 	check("discovering resources from inventory for 6.5", err)
 	if len(missing65) != 0 {
 		failf("6.5: expected 0 missing resources, got %d", len(missing65))
@@ -133,7 +133,7 @@ func main() {
 	if readInv67 == nil {
 		failf("6.7: no ModuleInstance record for %s/%s after writing it", namespace, instanceName)
 	}
-	liveResources67, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv67)
+	liveResources67, _, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv67)
 	check("discovering resources from inventory for 6.7", err)
 
 	// Delete with inventory-first path. The ModuleInstance CR is deleted last
@@ -190,7 +190,7 @@ func main() {
 	// Discover resources from inventory — svc-a should be in missing list.
 	readInv68, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	check("reading inventory for 6.8", err)
-	liveResources68, missingResources68, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv68)
+	liveResources68, missingResources68, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv68)
 	check("discovering resources from inventory for 6.8", err)
 
 	if len(liveResources68) != 1 {

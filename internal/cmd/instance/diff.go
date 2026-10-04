@@ -105,7 +105,7 @@ func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil
 		if invErr != nil {
 			instanceLog.Debug("could not read inventory for diff", "error", invErr)
 		} else if inv != nil {
-			liveResources, _, invDiscoverErr := inventory.DiscoverResourcesFromInventory(ctx, k8sClient, inv)
+			liveResources, _, _, invDiscoverErr := inventory.DiscoverResourcesFromInventory(ctx, k8sClient, inv)
 			if invDiscoverErr != nil {
 				instanceLog.Debug("inventory discovery failed", "error", invDiscoverErr)
 			} else {

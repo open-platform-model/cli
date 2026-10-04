@@ -54,7 +54,7 @@ func EvaluateInstanceHealth(ctx context.Context, client *kubernetes.Client, inve
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			live, missing, err := inventory.DiscoverResourcesFromInventory(ctx, client, inv)
+			live, missing, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, inv)
 			if err != nil {
 				if logDiscoveryFailures {
 					output.Debug("failed to discover resources for instance", "instance", inv.Name, "error", err)

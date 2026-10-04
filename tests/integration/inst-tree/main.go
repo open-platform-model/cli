@@ -105,7 +105,7 @@ func main() {
 	// Read back inventory and discover live resources.
 	readInv, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 	check("reading back inventory", err)
-	liveResources, missingEntries, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv)
+	liveResources, missingEntries, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv)
 	check("discovering resources from inventory", err)
 	if len(missingEntries) != 0 {
 		failf("expected 0 missing resources, got %d", len(missingEntries))
@@ -454,7 +454,7 @@ func main() {
 
 	nameRSF := nameArg.ToSelectorFlags("")
 	nameRSF.Namespace = namespace
-	nameInv, nameLive, _, err := query.ResolveInventory(ctx, client, nameRSF, namespace, silentLog)
+	nameInv, nameLive, _, _, err := query.ResolveInventory(ctx, client, nameRSF, namespace, silentLog)
 	check("ResolveInventory(name)", err)
 	if nameInv == nil {
 		failf("15.1: ResolveInventory returned nil inventory")
@@ -476,7 +476,7 @@ func main() {
 
 	uuidRSF := uuidArg.ToSelectorFlags("")
 	uuidRSF.Namespace = namespace
-	uuidInv, uuidLive, _, err := query.ResolveInventory(ctx, client, uuidRSF, namespace, silentLog)
+	uuidInv, uuidLive, _, _, err := query.ResolveInventory(ctx, client, uuidRSF, namespace, silentLog)
 	check("ResolveInventory(uuid)", err)
 	if uuidInv == nil {
 		failf("15.2: ResolveInventory returned nil inventory")
@@ -504,7 +504,7 @@ func main() {
 	fmt.Printf("   OK: ResolveInstanceArg extracted Name=%q Namespace=%q from file\n", pathArg.Name, pathArg.Namespace)
 
 	pathRSF := pathArg.ToSelectorFlags("")
-	pathInv, pathLive, _, err := query.ResolveInventory(ctx, client, pathRSF, namespace, silentLog)
+	pathInv, pathLive, _, _, err := query.ResolveInventory(ctx, client, pathRSF, namespace, silentLog)
 	check("ResolveInventory(path)", err)
 	if pathInv == nil {
 		failf("15.3: ResolveInventory returned nil inventory")

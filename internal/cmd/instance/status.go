@@ -81,7 +81,7 @@ func runInstanceStatus(ctx context.Context, identifier string, cfg *config.Globa
 		return err
 	}
 
-	inv, liveResources, missingEntries, err := query.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, instanceLog)
+	inv, liveResources, missingEntries, _, err := query.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, instanceLog)
 	if err != nil {
 		return err
 	}

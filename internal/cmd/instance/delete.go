@@ -122,7 +122,7 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 		}
 	}
 
-	inv, liveResources, _, err := query.ResolveInventory(ctx, k8sClient, rsf, namespace, instanceLog)
+	inv, liveResources, _, _, err := query.ResolveInventory(ctx, k8sClient, rsf, namespace, instanceLog)
 	if err != nil {
 		return err
 	}

@@ -51,6 +51,16 @@ type DeleteOptions struct {
 	InventoryRecordExists bool
 }
 
+// UnreadableResource is a tracked resource whose discovery read failed with an
+// error other than NotFound.
+type UnreadableResource struct {
+	Group     string
+	Kind      string
+	Namespace string
+	Name      string
+	Err       error
+}
+
 // DeleteResult contains the outcome of a delete operation.
 type DeleteResult struct {
 	// Deleted is the number of resources successfully deleted.

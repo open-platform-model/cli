@@ -25,13 +25,19 @@ func ParseStatusOutputFormat(outputFmt string) (output.Format, error) {
 	return outputFormat, nil
 }
 
+// ResolveInventory reads the instance's ModuleInstance record and discovers
+// the live state of every resource it tracks. A failed record read exits 1 and
+// a missing record exits 5. Each tracked resource is returned as live, missing
+// (NotFound) or unreadable (any other read error); ResolveInventory prints
+// nothing about unreadable entries, since delete and the read-only commands
+// report them differently.
 func ResolveInventory(
 	ctx context.Context,
 	client *kubernetes.Client,
 	rsf *cmdutil.InstanceSelectorFlags,
 	namespace string,
 	instanceLog *log.Logger,
-) (inv *inventory.Record, live []*unstructured.Unstructured, missing []inventory.InventoryEntry, err error) {
+) (inv *inventory.Record, live []*unstructured.Unstructured, missing []inventory.InventoryEntry, unreadable []inventory.UnreadableEntry, err error) {
 	var invErr error
 	switch {
 	case rsf.InstanceID != "":
@@ -46,7 +52,7 @@ func ResolveInventory(
 	if invErr != nil {
 		instanceLog.Error("reading inventory", "error", invErr)
 		err = &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("reading inventory: %w", invErr)}
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	if inv == nil {
@@ -57,19 +63,17 @@ func ResolveInventory(
 		notFound := &kubernetes.InstanceNotFoundError{Name: name, Namespace: namespace}
 		instanceLog.Error("instance not found", "name", name, "namespace", namespace)
 		err = &opmexit.ExitError{Code: opmexit.ExitNotFound, Err: notFound, Printed: true}
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	liveResources, missingEntries, discoverErr := inventory.DiscoverResourcesFromInventory(ctx, client, inv)
+	live, missing, unreadable, discoverErr := inventory.DiscoverResourcesFromInventory(ctx, client, inv)
 	if discoverErr != nil {
 		instanceLog.Error("discovering resources from inventory", "error", discoverErr)
 		err = &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("discovering resources: %w", discoverErr)}
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	live = liveResources
-	missing = missingEntries
-	return inv, live, missing, nil
+	return inv, live, missing, unreadable, nil
 }
 
 func BuildStatusOptions(namespace string, rsf *cmdutil.InstanceSelectorFlags, outputFormat output.Format, verbose bool, inv *inventory.Record, liveResources []*unstructured.Unstructured, missingEntries []inventory.InventoryEntry) kubernetes.StatusOptions {

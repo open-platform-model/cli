@@ -184,7 +184,7 @@ func main() {
 	step(5, "Health status accuracy — delete a resource, verify NotReady")
 
 	// All resources are ConfigMaps (passive) so they should all be Ready initially
-	live, missing, err := inventory.DiscoverResourcesFromInventory(ctx, client, listA[0])
+	live, missing, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, listA[0])
 	check("discovering resources for app-one", err)
 	if len(missing) != 0 {
 		failf("expected 0 missing resources initially, got %d", len(missing))
@@ -206,7 +206,7 @@ func main() {
 	// Re-read inventory and check health
 	invOneRefresh, err := inventory.GetRecord(ctx, client, instanceOne, nsA)
 	check("refreshing app-one inventory", err)
-	live2, missing2, err := inventory.DiscoverResourcesFromInventory(ctx, client, invOneRefresh)
+	live2, missing2, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, invOneRefresh)
 	check("re-discovering resources for app-one", err)
 
 	if len(missing2) != 1 {
