@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -263,4 +264,24 @@ func TestInstall_CRDsOnlyThenFullInstallMigrates(t *testing.T) {
 		assert.Contains(t, names, "CustomResourceDefinition/"+crd)
 	}
 	assert.False(t, fc.exists(crbGVR, "", "opm-operator-manager-rolebinding"))
+}
+
+// "Fields of another manager are left alone": only the client-side apply's
+// entry moves to opm-cli.
+func TestMoveOwnership_LeavesOtherManagers(t *testing.T) {
+	cluster := manifestObjects(t, beta8, originClientSide)
+	ns := findObj(cluster, "Namespace", OperatorNamespace)
+	ns.SetManagedFields(append(ns.GetManagedFields(), metav1.ManagedFieldsEntry{
+		Manager: "flux", Operation: metav1.ManagedFieldsOperationApply, APIVersion: "v1", FieldsType: "FieldsV1",
+		FieldsV1: &metav1.FieldsV1{Raw: []byte(`{"f:metadata":{"f:labels":{"f:team":{}}}}`)},
+	}))
+	fc := newFakeCluster(t, cluster...)
+	require.NoError(t, MoveOwnership(context.Background(), fc.client, planFor(t, fc)))
+
+	fields := fc.mustGet(namespaceGVR, "", OperatorNamespace).GetManagedFields()
+	managers := make([]string, 0, len(fields))
+	for _, mf := range fields {
+		managers = append(managers, mf.Manager+":"+string(mf.Operation))
+	}
+	assert.ElementsMatch(t, []string{"opm-cli:Apply", "flux:Apply"}, managers)
 }
