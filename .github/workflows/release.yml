@@ -37,6 +37,13 @@ name: Release
 #     run): re-run the failed job, or dispatch docs.yml on main in release
 #     mode with the tag (see docs.yml). Only a release whose tree has
 #     hack/docskit-dump can have a bundle.
+#   - Published release whose downstreams were not notified: if Notify
+#     downstream failed, re-run the failed jobs; if it was skipped (a manual
+#     run from a branch other than main published the draft), nothing re-sends
+#     it and the downstream receivers' daily sweep picks the release up. The
+#     job runs only after goreleaser published the release, never for a
+#     published tag (goreleaser's draft check fails first), and does not wait
+#     for publish-docs. CASCADE_NOTIFY=off stops the notify.
 
 on:
   push:
@@ -252,3 +259,23 @@ jobs:
       tag: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
       # hack/docskit-dump runs with go run (docs-kit C14).
       setup-go: true
+
+  # Caller-owned: it declares environment: cascade and passes
+  # secrets.CASCADE_APP_PRIVATE_KEY to the SHA-pinned cascade-notify action
+  # as its private-key input.
+  notify-downstream:
+    name: Notify downstream
+    needs: [release-please, goreleaser]
+    if: ${{ !cancelled() && needs.goreleaser.result == 'success' && github.ref == 'refs/heads/main' && vars.CASCADE_NOTIFY != 'off' }}
+    runs-on: ubuntu-latest
+    environment: cascade
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Notify downstream
+        uses: open-platform-model/.github/.github/actions/cascade-notify@2376ffae4bfc665f327d51581350dea694c01504 # .github main
+        with:
+          tag: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
+          client-id: ${{ vars.CASCADE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CASCADE_APP_PRIVATE_KEY }}

@@ -11,4 +11,4 @@ ModulePath: "opmodel.dev/templates/minimal@v1"
 // Version is the module's bare SemVer; its major must agree with ModulePath's.
 // A plain literal: the kernel's loader gate requires a concrete value, and a
 // defaulted disjunction is not one. Written by opm module version set.
-Version: "1.0.3"
+Version: "1.0.4"

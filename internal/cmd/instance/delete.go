@@ -21,6 +21,7 @@ import (
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/operator"
 	"github.com/open-platform-model/cli/internal/output"
+	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
 	"github.com/open-platform-model/cli/internal/workflow/query"
 )
 
@@ -47,6 +48,16 @@ Each tracked resource is also read again just before its delete, and a
 resource that is no longer managed by OPM or now belongs to another instance
 is left behind. Every resource left behind is listed with its reason; remove
 it with 'kubectl delete' once nothing else needs it.
+
+Deleting an instance that deploys the operator (the instance opm-operator in
+opm-operator-system, any instance of the operator module, or one whose
+inventory holds the operator's CRDs) is refused in two cases, dry runs
+included. While it is operator-owned: the operator never reconciles or prunes
+the instance that deploys it, so set spec.owner to cli first. And while any
+instance still carries the operator's opmodel.dev/cleanup finalizer: removing
+the operator would leave them unable to finish deletion. Run
+'opm operator uninstall --remove-finalizers' to remove that finalizer first,
+which orphans those instances' workloads. --force does not bypass either.
 
 Arguments:
   file         Path to an instance.cue file or directory containing one.
@@ -117,14 +128,67 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 		return err
 	}
 
-	// Ownership is the single branch point (0006:D18): an operator-owned
-	// instance is deleted by deleting its CR and letting the operator's
-	// finalizer prune the workloads.
+	return deleteResolvedInstance(ctx, k8sClient, rsf, namespace, inv, liveResources, timeout, dryRun, instanceLog)
+}
+
+// deleteResolvedInstance deletes an instance whose record has been read. It
+// first guards an instance that deploys the operator, on both branches and on
+// a dry run alike. Ownership is then the single branch point (0006:D18): an
+// operator-owned instance is deleted by deleting its CR and letting the
+// operator's finalizer prune the workloads.
+func deleteResolvedInstance(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string,
+	inv *inventory.Record, liveResources []*unstructured.Unstructured, timeout time.Duration, dryRun bool, instanceLog *log.Logger) error {
+	if err := guardOperatorInstanceDelete(ctx, k8sClient, inv); err != nil {
+		return err
+	}
+
 	if inventory.ResolveOwnership(inv) == inventory.ModeOperatorOwned {
 		return deleteOperatorOwned(ctx, k8sClient, inv, timeout, dryRun, instanceLog)
 	}
 
 	return executeInstanceDelete(ctx, k8sClient, rsf, namespace, inv, liveResources, dryRun, instanceLog)
+}
+
+// guardOperatorInstanceDelete refuses to delete an instance that deploys the
+// operator (operator.DeploysOperator) in two cases; every other instance
+// passes untouched.
+//
+// An operator-owned record is refused before any read: the operator never
+// reconciles, finalizes or prunes the instance that deploys it, so the
+// operator-owned branch would wait on, and report, a cleanup that does not
+// happen. The remedy is to set spec.owner to cli; the CLI does not write it.
+//
+// Otherwise the delete is refused while any ModuleInstance carries the
+// operator's cleanup finalizer: removing the operator then leaves each one
+// unable to finish deletion until an operator runs again. Orphaning them is
+// the explicit choice 'opm operator uninstall --remove-finalizers' already
+// owns, so the refusal points there and this command offers no such flag. A
+// failed list fails closed.
+func guardOperatorInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, inv *inventory.Record) error {
+	signal, ok := operator.DeploysOperator(inv)
+	if !ok {
+		return nil
+	}
+
+	if inventory.ResolveOwnership(inv) == inventory.ModeOperatorOwned {
+		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: &operator.OwnInstanceOwnerError{
+			Namespace: inv.Namespace, Name: inv.Name, Signal: signal,
+		}}
+	}
+
+	armed, err := operator.CheckFinalizerGuard(ctx, k8sClient)
+	if err != nil {
+		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err}
+	}
+	if len(armed) == 0 {
+		return nil
+	}
+	return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: &operator.FinalizerGuardError{
+		Armed:  armed,
+		Action: fmt.Sprintf("delete %s/%s, which deploys the operator", inv.Namespace, inv.Name),
+		Target: operator.ArmedInstance{Namespace: inv.Namespace, Name: inv.Name},
+		Remedy: "run 'opm operator uninstall --remove-finalizers' to remove that finalizer, orphaning their workloads, then retry",
+	}}
 }
 
 // deleteOperatorOwned deletes an operator-managed instance by removing its
@@ -205,42 +269,19 @@ func deleteOperatorOwned(ctx context.Context, k8sClient *kubernetes.Client, inv 
 // executeInstanceDelete deletes the instance's tracked workloads, then the
 // ModuleInstance CR last (after all workloads are gone; skipped on dry-run).
 func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, inv *inventory.Record, liveResources []*unstructured.Unstructured, dryRun bool, instanceLog *log.Logger) error {
-	instanceLog.Info(fmt.Sprintf("deleting resources in namespace %q", namespace))
-
-	deleteResult, err := kubernetes.Delete(ctx, k8sClient, kubernetes.DeleteOptions{
-		InstanceName:          rsf.InstanceName,
-		Namespace:             namespace,
-		InstanceID:            rsf.InstanceID,
-		InstanceUUID:          recordedUUID(inv),
-		DryRun:                dryRun,
-		InventoryLive:         liveResources,
-		InventoryRecordExists: inv != nil,
+	deleteResult, err := workflowapply.DeleteRecorded(ctx, workflowapply.DeleteRequest{
+		Client:       k8sClient,
+		InstanceName: rsf.InstanceName,
+		InstanceID:   rsf.InstanceID,
+		Namespace:    namespace,
+		Record:       inv,
+		Live:         liveResources,
+		DryRun:       dryRun,
+		Log:          instanceLog,
 	})
 	if err != nil {
-		instanceLog.Error("delete failed", "error", err)
 		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
-
-	for _, lb := range deleteResult.LeftBehind {
-		instanceLog.Warn(output.FormatResourceLine(lb.Kind, lb.Namespace, lb.Name, output.StatusLeftBehind), "reason", lb.Reason)
-	}
-
-	if len(deleteResult.Errors) > 0 {
-		instanceLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(deleteResult.Errors)))
-		for _, e := range deleteResult.Errors {
-			instanceLog.Error(e.Error())
-		}
-	}
-
-	// Delete the ModuleInstance CR last — only after every tracked workload
-	// resource is gone (0006:D1). Skipped on dry-run and on partial
-	// failure (so a re-run can retry the remaining workloads).
-	if !dryRun && inv != nil && len(deleteResult.Errors) == 0 {
-		if err := inventory.DeleteCR(ctx, k8sClient, inv.Name, inv.Namespace); err != nil {
-			instanceLog.Warn("could not delete ModuleInstance CR", "error", err)
-		}
-	}
-
 	return reportInstanceDelete(deleteResult, dryRun, instanceLog)
 }
 
@@ -271,15 +312,6 @@ func reportInstanceDelete(deleteResult *kubernetes.DeleteResult, dryRun bool, in
 		output.Println(output.FormatCheckmark("Instance deleted"))
 	}
 	return nil
-}
-
-// recordedUUID is the instance UUID the ModuleInstance recorded, or empty
-// when there is no record.
-func recordedUUID(inv *inventory.Record) string {
-	if inv == nil {
-		return ""
-	}
-	return inv.InstanceUUID
 }
 
 func confirmInstanceDelete(instanceName, instanceID, namespace string) bool {

@@ -22,9 +22,14 @@ func NewOperatorUninstallCmd(cfg *config.GlobalConfig) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "uninstall",
 		Short: "Remove the opm-operator from a cluster",
-		Long: `Delete everything 'opm operator install' applied, except the CRDs and the
-operator's Namespace — those remain for a deliberate, separate 'kubectl delete
-crd' once you're sure no ModuleInstance data is still needed.
+		Long: `Delete every object the operator's instance record (ModuleInstance
+opm-operator in opm-operator-system) lists, then the record, except the CRDs
+and the operator's Namespace — those remain for a deliberate, separate
+'kubectl delete crd' once you're sure no ModuleInstance data is still needed.
+An object that no longer carries the instance's identity is left behind.
+
+With no record, uninstall deletes nothing: run 'opm operator install' first,
+so the running operator is recorded.
 
 Refuses to proceed while any ModuleInstance still carries the operator's
 cleanup finalizer: deleting the operator out from under it would orphan its
@@ -75,7 +80,8 @@ func runOperatorUninstall(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, remove
 	result, err := oplib.Uninstall(ctx, k8sClient, oplib.UninstallOptions{RemoveFinalizers: removeFinalizers})
 	if err != nil {
 		var guardErr *oplib.FinalizerGuardError
-		if errors.As(err, &guardErr) {
+		var noRecord *oplib.NoRecordError
+		if errors.As(err, &guardErr) || errors.As(err, &noRecord) {
 			return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err}
 		}
 		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err}
@@ -93,6 +99,6 @@ func runOperatorUninstall(cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, remove
 		}
 	}
 
-	output.Println(output.FormatCheckmark(fmt.Sprintf("opm-operator uninstalled (%d resource(s) deleted)", result.Deleted)))
+	output.Println(output.FormatCheckmark(fmt.Sprintf("opm-operator uninstalled (%d resource(s) deleted, %d left behind)", result.Deleted, result.LeftBehind)))
 	return nil
 }

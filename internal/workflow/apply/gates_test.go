@@ -35,7 +35,7 @@ func TestRunClusterGates_ProbeOrder(t *testing.T) {
 		withReleasedCLIVersion(t) // newer than the operator below, so the ceiling passes
 		client, rec := recordingDynamicClient(makeModuleInstanceCRD(true, true), makePlatform("1.0.0"))
 
-		require.NoError(t, RunClusterGates(ctx, client))
+		require.NoError(t, RunClusterGates(ctx, client, false))
 		assert.Equal(t,
 			[]string{"customresourcedefinitions", "customresourcedefinitions", "platforms"},
 			rec.gets,
@@ -47,7 +47,7 @@ func TestRunClusterGates_ProbeOrder(t *testing.T) {
 		withReleasedCLIVersion(t)
 		client, rec := recordingDynamicClient() // no CRD, no Platform
 
-		err := RunClusterGates(ctx, client)
+		err := RunClusterGates(ctx, client, false)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "ModuleInstance CRD not found")
 		assert.Equal(t, []string{"customresourcedefinitions"}, rec.gets,
@@ -58,7 +58,7 @@ func TestRunClusterGates_ProbeOrder(t *testing.T) {
 		withReleasedCLIVersion(t)
 		client, rec := recordingDynamicClient(makeModuleInstanceCRD(false, true)) // CRD present, missing spec.owner
 
-		err := RunClusterGates(ctx, client)
+		err := RunClusterGates(ctx, client, false)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "missing required fields")
 		assert.Equal(t, []string{"customresourcedefinitions", "customresourcedefinitions"}, rec.gets,
@@ -69,7 +69,7 @@ func TestRunClusterGates_ProbeOrder(t *testing.T) {
 		withReleasedCLIVersion(t)
 		client, _ := recordingDynamicClient(makeModuleInstanceCRD(true, false)) // CRD present, missing status.inventory
 
-		err := RunClusterGates(ctx, client)
+		err := RunClusterGates(ctx, client, false)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "missing required fields")
 	})
@@ -111,4 +111,26 @@ func TestExecute_DryRunSkipsClusterGates(t *testing.T) {
 		assert.Equal(t, []string{"customresourcedefinitions"}, rec.gets,
 			"a real apply probes the CRD — proving the dry-run zero-probe result is the exemption, not an empty flow")
 	})
+}
+
+// "Older CLI repairs a newer operator" and "Ordinary apply against the same
+// cluster still refused": only the operator's own install skips the
+// ceiling, and the CRD gates still run for it.
+func TestRunClusterGates_OnlyOperatorInstallSkipsTheCeiling(t *testing.T) {
+	ctx := context.Background()
+	orig := version.Version
+	version.Version = "v1.0.0"
+	t.Cleanup(func() { version.Version = orig })
+
+	client, rec := recordingDynamicClient(makeModuleInstanceCRD(true, true), makePlatform("1.1.0"))
+	require.NoError(t, RunClusterGates(ctx, client, true))
+	assert.Equal(t, []string{"customresourcedefinitions", "customresourcedefinitions"}, rec.gets,
+		"the CRD gates run; the Platform is never read")
+
+	err := RunClusterGates(ctx, client, false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "upgrade the CLI")
+
+	floorless, _ := recordingDynamicClient(makeModuleInstanceCRD(false, true), makePlatform("1.1.0"))
+	require.Error(t, RunClusterGates(ctx, floorless, true), "the field floor still refuses")
 }

@@ -1,12 +1,12 @@
 ## Purpose
 
-`.github/workflows/e2e-cluster.yml` runs the cluster-backed e2e suite in CI against the operator the CLI embeds, so a change that breaks the CLI-to-operator path, or an upstream publish that breaks the embedded operator, fails a pull request instead of reaching a release.
+`.github/workflows/e2e-cluster.yml` runs the cluster-backed e2e suite in CI against the operator module the CLI pins, so a change that breaks the CLI-to-operator path, or an upstream publish that breaks the pinned operator module, fails a pull request instead of reaching a release.
 
 ## Requirements
 
 ### Requirement: The job applies to operator-facing pull requests, cascade pull requests and release pull requests
 
-The workflow SHALL run one job, named `E2E (kind, embedded operator)`, triggered by `pull_request` targeting `main` with the activity types `opened`, `synchronize`, `reopened`, `labeled` and `unlabeled`, and by `workflow_dispatch`. The job SHALL do the cluster-backed work (it *applies*) when at least one of these holds:
+The workflow SHALL run one job, named `E2E (kind, embedded operator)` (a name the `main` ruleset requires as a status check, kept although no operator is embedded), triggered by `pull_request` targeting `main` with the activity types `opened`, `synchronize`, `reopened`, `labeled` and `unlabeled`, and by `workflow_dispatch`. The job SHALL do the cluster-backed work (it *applies*) when at least one of these holds:
 
 - the run was started by `workflow_dispatch`;
 - the pull request's head branch starts with `release-please--`;
@@ -19,8 +19,8 @@ The decision SHALL be computed from the pull request's state when the job runs (
 
 #### Scenario: Operator pin bump applies
 
-- **WHEN** a pull request changes `internal/operator/dist/install.yaml` and `internal/operator/manifest.go`
-- **THEN** the job boots a cluster, installs the embedded operator and runs the e2e suite
+- **WHEN** a pull request changes `internal/operator/pin.go`
+- **THEN** the job boots a cluster, installs the pinned operator module and runs the e2e suite
 
 #### Scenario: Release pull request applies
 
@@ -76,27 +76,6 @@ The workflow SHALL NOT use a workflow-level path or branch filter beyond the `ma
 - **WHEN** the check is required by a ruleset and a pull request touches none of the listed paths
 - **THEN** the check reports success for that pull request's head commit
 
-### Requirement: The cluster is prepared with the local loop's own tasks and the embedded operator
-
-When the job applies, it SHALL install kind at the version and checksum `pr.yml`'s `integration` job uses, create the `opm-dev` cluster with `task cluster:create` (the node image pinned in `Taskfile.yml`), and prepare it with `task cluster:operator`, which installs the operator from the manifest the CLI embeds (no `--version`), applies `hack/kind-platform.yaml` and `hack/kind-operator-rbac.yaml`, and waits for the cluster Platform to be Ready for its current generation. The job SHALL NOT restate those steps in the workflow.
-
-The job SHALL run a registry container seeded from the tree with `hack/fixtures.sh seed`, joined to kind's docker network. The CLI on the runner SHALL resolve `testing.opmodel.dev` from it on `localhost:5000`, and the operator SHALL resolve `testing.opmodel.dev` from it through `KIND_CUE_REGISTRY` on its in-cluster address. Core and the catalogs SHALL resolve from GHCR on both sides.
-
-#### Scenario: Embedded operator is what runs
-
-- **WHEN** the job has prepared the cluster
-- **THEN** the controller Deployment's image is the image reference in `internal/operator/dist/install.yaml` of the pull request's head commit
-
-#### Scenario: Bumped fixture before it is published
-
-- **WHEN** a pull request bumps the fixture `tests/e2e/testdata/operator-owned` pins to a version GHCR does not hold yet
-- **THEN** the operator resolves that fixture from the job's registry and the operator-owned tests run against it
-
-#### Scenario: Stalled Platform fails the preparation
-
-- **WHEN** the embedded operator cannot build the cluster Platform
-- **THEN** the job fails in the preparation step, before the suite starts, naming the Platform's stall reason
-
 ### Requirement: The suite runs with the cluster required and leaves evidence on failure
 
 When the job applies, it SHALL run `go test ./tests/e2e/... -v` with the same `-timeout` as `task test:e2e`, with `OPM_E2E_REQUIRE_CLUSTER=1` set, and with the tools the cluster tests probe for present on the runner (`kubectl`, `task`, `crane`), so that every cluster-backed test runs and none takes a fallback path meant for a developer machine. When an operator-owned test fails, the test itself SHALL log, before its cleanup deletes the evidence, the test's ModuleInstance with its status, the cluster Platform with its status and the operator's logs, and a test that times out waiting for the operator to reconcile SHALL name the ModuleInstance's `Ready` condition in its failure message. Later tests (the operator lifecycle test tears the operator, CRDs and every ModuleInstance down and reinstalls) leave nothing of that state for a step after the suite. After any failed step, including a preparation step before the suite starts, the job SHALL also print the operator's logs, the cluster Platform and every ModuleInstance with their status, and recent cluster events.
@@ -120,3 +99,24 @@ When the job applies, it SHALL run `go test ./tests/e2e/... -v` with the same `-
 
 - **WHEN** `task cluster:operator` fails before the suite starts
 - **THEN** the job's diagnostics step prints the operator's logs, the cluster Platform, every ModuleInstance and recent events
+
+### Requirement: The cluster is prepared with the local loop's own tasks and the pinned operator module
+
+When the job applies, it SHALL install kind at the version and checksum `pr.yml`'s `integration` job uses, create the `opm-dev` cluster with `task cluster:create` (the node image pinned in `Taskfile.yml`), and prepare it with `task cluster:operator`, which installs the operator module version the CLI pins (no `--version`), applies `hack/kind-platform.yaml` and `hack/kind-operator-rbac.yaml`, and waits for the cluster Platform to be Ready for its current generation. The job SHALL NOT restate those steps in the workflow.
+
+The job SHALL run a registry container seeded from the tree with `hack/fixtures.sh seed`, joined to kind's docker network. The CLI on the runner SHALL resolve `testing.opmodel.dev` from it on `localhost:5000`, and the operator SHALL resolve `testing.opmodel.dev` from it through `KIND_CUE_REGISTRY` on its in-cluster address, set as a value of the operator's instance. Core, the catalogs and the operator module SHALL resolve from GHCR on both sides.
+
+#### Scenario: The pinned operator module is what runs
+
+- **WHEN** the job has prepared the cluster
+- **THEN** the ModuleInstance `opm-operator` in `opm-operator-system` records the `PinnedModuleVersion` of the pull request's head commit, and the controller Deployment runs the operator release `PinnedOperatorVersion` names
+
+#### Scenario: Bumped fixture before it is published
+
+- **WHEN** a pull request bumps the fixture `tests/e2e/testdata/operator-owned` pins to a version GHCR does not hold yet
+- **THEN** the operator resolves that fixture from the job's registry and the operator-owned tests run against it
+
+#### Scenario: Stalled Platform fails the preparation
+
+- **WHEN** the pinned operator cannot build the cluster Platform
+- **THEN** the job fails in the preparation step, before the suite starts, naming the Platform's stall reason

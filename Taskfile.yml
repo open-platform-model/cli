@@ -235,11 +235,16 @@ tasks:
       KIND_CUE_REGISTRY (see the var's comment for the in-cluster spelling).
       That path additionally requires the registry container from
       `task registry:start` at the workspace root, joins it to kind's docker
-      network, and patches --registry onto the operator Deployment. The
-      operator's registry is a COMMAND-LINE FLAG, not an env var: --registry
-      wins over OPM_REGISTRY (which is only read when the flag is empty), and
-      the operator overwrites CUE_REGISTRY in its own process env. Setting
-      either as a pod env var does nothing.
+      network, and passes the mapping to `opm operator install` as the
+      operator module's `registry` value in a values file, so it is recorded
+      on the operator's instance and survives later installs. The module
+      renders it as the operator's --registry flag. The operator's registry is
+      a COMMAND-LINE FLAG, not an env var: --registry wins over OPM_REGISTRY
+      (which is only read when the flag is empty), and the operator overwrites
+      CUE_REGISTRY in its own process env. Setting either as a pod env var
+      does nothing. Without KIND_CUE_REGISTRY no registry value is passed, so
+      a mapping an earlier opt-in run recorded stays until
+      `opm operator install --reset-values`.
 
       It finishes by waiting for Platform/cluster to be Ready for its current
       generation (cluster:operator:wait-ready), not merely stamped with
@@ -258,34 +263,29 @@ tasks:
     cmds:
       # --config keeps this hermetic: the dev-cluster tooling must not depend on
       # a developer's personal ~/.opm being present or in the 0006:D39 format.
-      - ./{{.BUILD_DIR}}/{{.BINARY_NAME}} operator install --config hack/opm-config.cue --context kind-{{.CLUSTER_NAME}} --timeout 180s
-      # Local-registry opt-in. No-op unless KIND_CUE_REGISTRY is set; append
-      # --registry only if it is not already there, so re-runs do not stack
-      # duplicate flags on the container args.
+      # --skip-platform: hack/kind-platform.yaml below is the Platform. The
+      # local-registry opt-in is an instance value, never a Deployment patch.
       - |
         registry='{{.KIND_CUE_REGISTRY}}'
-        if [ -z "$registry" ]; then
-          echo "using the operator's built-in registry default (GHCR); set KIND_CUE_REGISTRY to override"
-          exit 0
-        fi
-        if ! docker ps -f name={{.REGISTRY_CONTAINER}} --format '{{`{{.Names}}`}}' | grep -qx {{.REGISTRY_CONTAINER}}; then
-          echo "KIND_CUE_REGISTRY is set but registry container '{{.REGISTRY_CONTAINER}}' is not running." >&2
-          echo "Run 'task registry:start' at the workspace root, or unset KIND_CUE_REGISTRY to use GHCR." >&2
-          exit 1
-        fi
-        # The kind network only exists once a cluster has been created, so this
-        # cannot move into cluster:create. Errors when already connected.
-        docker network connect kind {{.REGISTRY_CONTAINER}} 2>/dev/null || true
-        current=$(kubectl --context kind-{{.CLUSTER_NAME}} -n opm-operator-system get deployment opm-operator-controller-manager \
-          -o jsonpath='{.spec.template.spec.containers[0].args}')
-        if echo "$current" | grep -q -- "--registry="; then
-          echo "operator already carries a --registry flag; leaving it alone"
+        set --
+        if [ -n "$registry" ]; then
+          if ! docker ps -f name={{.REGISTRY_CONTAINER}} --format '{{`{{.Names}}`}}' | grep -qx {{.REGISTRY_CONTAINER}}; then
+            echo "KIND_CUE_REGISTRY is set but registry container '{{.REGISTRY_CONTAINER}}' is not running." >&2
+            echo "Run 'task registry:start' at the workspace root, or unset KIND_CUE_REGISTRY to use GHCR." >&2
+            exit 1
+          fi
+          # The kind network only exists once a cluster has been created, so this
+          # cannot move into cluster:create. Errors when already connected.
+          docker network connect kind {{.REGISTRY_CONTAINER}} 2>/dev/null || true
+          values=$(mktemp "${TMPDIR:-/tmp}/opm-operator-values.XXXXXX.cue")
+          trap 'rm -f "$values"' EXIT
+          printf 'values: registry: "%s"\n' "$registry" > "$values"
+          echo "recording the operator registry value: $registry"
+          set -- -f "$values"
         else
-          kubectl --context kind-{{.CLUSTER_NAME}} -n opm-operator-system patch deployment opm-operator-controller-manager \
-            --type=json \
-            -p "[{\"op\":\"add\",\"path\":\"/spec/template/spec/containers/0/args/-\",\"value\":\"--registry=${registry}\"}]"
+          echo "setting no operator registry value: the operator uses its built-in GHCR default unless an earlier run recorded a mapping (clear it with 'opm operator install --reset-values')"
         fi
-      - kubectl --context kind-{{.CLUSTER_NAME}} -n opm-operator-system rollout status deployment/opm-operator-controller-manager --timeout=180s
+        ./{{.BUILD_DIR}}/{{.BINARY_NAME}} operator install --config hack/opm-config.cue --context kind-{{.CLUSTER_NAME}} --timeout 180s --skip-platform "$@"
       - kubectl --context kind-{{.CLUSTER_NAME}} apply -f hack/kind-platform.yaml
       # The operator ships with no workload permissions — it expects to
       # impersonate a per-instance ServiceAccount the CLI cannot write. Dev-only
@@ -428,7 +428,7 @@ tasks:
       - go install -ldflags "{{.LDFLAGS}}" ./cmd/opm
 
   check:
-    desc: Run all checks (fmt, vet, lint, openspec, docs bundle, test)
+    desc: Run all checks (fmt, vet, lint, openspec, docs bundle, test, cascade wiring)
     cmds:
       - task: fmt
       - task: vet
@@ -436,6 +436,7 @@ tasks:
       - task: openspec:check
       - task: docs:bundle:check
       - task: test
+      - task: cascade:wiring:check
 
   generate:
     desc: Run go generate
@@ -469,6 +470,11 @@ tasks:
     cmds:
       - bash .tasks/opm-docs.sh pin-check
 
+  cascade:wiring:check:
+    desc: Check the release-cascade caller workflows (Phase 3 wiring contract 10.1)
+    cmds:
+      - bash .tasks/cascade/wiring-check.sh
+
   docs:bundle:check:
     desc: Check the docs-kit pins agree, then build and lint the cli docs bundle into a temporary directory
     deps: [tools:opm-docs]
@@ -479,31 +485,30 @@ tasks:
   #########################
   ## Operator lifecycle tasks
   #########################
-  operator:sync:
-    desc: Refresh the embedded opm-operator manifest and version pin
+  operator:pin:
+    desc: Pin the default operator module version and the operator it deploys
     summary: |
-      Downloads dist/install.yaml from the given opm-operator GitHub release tag,
-      replaces the embedded copy, and rewrites PinnedOperatorVersion to match.
-      The whole upgrade is one reviewable diff.
+      Resolves the operator module version through the registry
+      (OPM_REGISTRY, else CUE_REGISTRY, else the cli default), reads the
+      operator release it deploys from the module's operator package (no
+      render), and rewrites internal/operator/pin.go. The only writer of
+      that file.
 
       Usage:
-        task operator:sync VERSION=v1.0.0-beta.1
+        task operator:pin VERSION=0.1.0
     vars:
       VERSION: '{{.VERSION | default ""}}'
     preconditions:
       - sh: '[ -n "{{.VERSION}}" ]'
-        msg: "VERSION variable is required. Usage: task operator:sync VERSION=<tag>"
+        msg: "VERSION variable is required. Usage: task operator:pin VERSION=<module version>"
     cmds:
-      - curl -sfL "https://github.com/open-platform-model/opm-operator/releases/download/{{.VERSION}}/install.yaml" -o internal/operator/dist/install.yaml
-      - perl -pi -e 's/^const PinnedOperatorVersion = ".*"/const PinnedOperatorVersion = "{{.VERSION}}"/' internal/operator/manifest.go
-      - gofmt -w internal/operator/manifest.go
-      - echo "Synced embedded operator manifest to {{.VERSION}}"
+      - go run ./hack/operator-pin "{{.VERSION}}"
 
   #########################
   ## Release tasks
   #########################
   deps:release-check:
-    desc: "Check release pins (G1): no replace, published OPM pins (nested modules by their subdir tag), no dev template pins, operator embed matches its pin, a docs bundle for every docs pin (G2-pins)"
+    desc: "Check release pins (G1): no replace, published OPM pins (nested modules by their subdir tag), no dev template pins, the operator module pin is served and records the operator it deploys, a docs bundle for every docs pin (G2-pins)"
     cmds:
       - .github/scripts/release-pin-check.sh
 

@@ -3,7 +3,6 @@
 # 2026-10-04). "older" rows feed S2 and S4, "oldest" rows S9; pin-of rows are
 # copied into the stub tables as they are. test.sh fails when a row is not older.
 older	github.com/open-platform-model/library	v1.0.0-beta.2
-older	github.com/open-platform-model/opm-operator	v1.0.0-beta.4
 older	opmodel.dev/catalogs/opm@v4	v4.4.3
 older	opmodel.dev/core@v2	v2.0.0-alpha.13
 oldest	opmodel.dev/catalogs/opm@v4	v4.4.2

@@ -7,14 +7,13 @@ import (
 	"fmt"
 	"strings"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
+	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
 )
 
 // The ModuleInstance CRD coordinates are defined once in internal/inventory
@@ -44,20 +43,65 @@ func (a ArmedInstance) String() string {
 	return fmt.Sprintf("%s/%s", a.Namespace, a.Name)
 }
 
-// FinalizerGuardError reports that uninstall was refused because one or more
-// ModuleInstances still carry the operator's cleanup finalizer.
+// FinalizerGuardError reports that an action was refused because one or more
+// ModuleInstances still carry the operator's cleanup finalizer. Uninstall sets
+// only Armed; the other fields let another command that removes the operator
+// name its own action and remedy.
 type FinalizerGuardError struct {
 	Armed []ArmedInstance
+
+	// Action is what was refused, completing "refusing to <Action>". Empty
+	// means "uninstall".
+	Action string
+
+	// Target, when set, is the instance the refused action would delete; it is
+	// marked in the list when it is armed itself.
+	Target ArmedInstance
+
+	// Remedy is the closing parenthetical. Empty means uninstall's own flag.
+	Remedy string
 }
 
 func (e *FinalizerGuardError) Error() string {
+	action := e.Action
+	if action == "" {
+		action = "uninstall"
+	}
+	remedy := e.Remedy
+	if remedy == "" {
+		remedy = "use --remove-finalizers to proceed; this orphans their workloads"
+	}
 	names := make([]string, len(e.Armed))
 	for i, a := range e.Armed {
 		names[i] = a.String()
+		if e.Target != (ArmedInstance{}) && a == e.Target {
+			names[i] += " (the instance being deleted)"
+		}
 	}
 	return fmt.Sprintf(
-		"refusing to uninstall: %d instance(s) still carry the %s finalizer: %s (use --remove-finalizers to proceed; this orphans their workloads)",
-		len(e.Armed), cleanupFinalizer, strings.Join(names, ", "),
+		"refusing to %s: %d instance(s) still carry the %s finalizer: %s (%s)",
+		action, len(e.Armed), cleanupFinalizer, strings.Join(names, ", "), remedy,
+	)
+}
+
+// OwnInstanceOwnerError reports that a delete was refused because the target
+// deploys the operator and is operator-owned. The operator never reconciles,
+// finalizes or prunes the instance that deploys it, so the operator-owned
+// delete would wait on, and report, a cleanup that does not happen. The remedy
+// is the one the operator itself names for such an instance.
+type OwnInstanceOwnerError struct {
+	Namespace string
+	Name      string
+	// Signal is the DeploysOperator signal that matched.
+	Signal string
+}
+
+func (e *OwnInstanceOwnerError) Error() string {
+	return fmt.Sprintf(
+		"refusing to delete %s/%s: it deploys the operator (matched by %s) and is operator-owned, "+
+			"but the operator never reconciles or prunes the instance that deploys it; "+
+			"set spec.owner to cli (kubectl patch moduleinstance %s -n %s --type=merge -p '{\"spec\":{\"owner\":\"cli\"}}'), then retry",
+		e.Namespace, e.Name, e.Signal, e.Name, e.Namespace,
 	)
 }
 
@@ -153,21 +197,44 @@ type UninstallResult struct {
 	// Deleted is the number of resources deleted.
 	Deleted int
 
+	// LeftBehind is the number of recorded objects left in place: the CRDs,
+	// the Namespace and any object that no longer carries the instance's
+	// identity.
+	LeftBehind int
+
 	// Errors contains per-resource delete errors. Uninstall is fire-and-report:
-	// one resource failing to delete does not stop the rest.
+	// one resource failing to delete does not stop the rest, and the record is
+	// then kept so a re-run retries.
 	Errors []error
 }
 
-// Uninstall deletes everything the embedded manifest installed except its
-// CRDs and Namespace, in descending resource-weight order (matching
-// delete.go's teardown convention). Before deleting anything it checks for
-// ModuleInstances still carrying the operator's cleanup finalizer and refuses
-// (or, with opts.RemoveFinalizers, strips the finalizer and proceeds).
-// Deletion does not wait for objects to fully disappear (fire-and-report):
-// nothing downstream depends on "fully gone", and waiting only adds failure
-// modes (stuck pod termination) to a command whose job is done at
-// delete-issuance.
+// NoRecordError refuses an uninstall on a cluster whose operator has no
+// instance record: the CLI cannot prove what it would delete.
+type NoRecordError struct{}
+
+func (e *NoRecordError) Error() string {
+	return fmt.Sprintf("no operator instance record %s/%s; run 'opm operator install' to record the running operator, then uninstall",
+		OperatorNamespace, OperatorInstanceName)
+}
+
+// Uninstall deletes what the operator instance's record lists, except CRDs
+// and the Namespace, then the record (0021:D11:R11). With no record it
+// deletes nothing and returns a *NoRecordError. Before deleting anything it
+// checks for ModuleInstances still carrying the operator's cleanup
+// finalizer and refuses (or, with opts.RemoveFinalizers, strips the
+// finalizer and proceeds). Objects are deleted in descending resource-weight
+// order, an object that no longer carries the instance's identity is left
+// behind, an already absent object counts as deleted, and deletion is not
+// waited for (fire-and-report).
 func Uninstall(ctx context.Context, client *kubernetes.Client, opts UninstallOptions) (*UninstallResult, error) {
+	rec, err := inventory.GetRecord(ctx, client, OperatorInstanceName, OperatorNamespace)
+	if err != nil {
+		return nil, fmt.Errorf("reading the operator's instance record: %w", err)
+	}
+	if rec == nil {
+		return nil, &NoRecordError{}
+	}
+
 	armed, err := CheckFinalizerGuard(ctx, client)
 	if err != nil {
 		return nil, err
@@ -181,36 +248,24 @@ func Uninstall(ctx context.Context, client *kubernetes.Client, opts UninstallOpt
 		}
 	}
 
-	manifest, err := EmbeddedManifest()
+	live, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, rec)
+	if err != nil {
+		return nil, fmt.Errorf("reading the recorded objects: %w", err)
+	}
+	deleted, err := workflowapply.DeleteRecorded(ctx, workflowapply.DeleteRequest{
+		Client:       client,
+		InstanceName: OperatorInstanceName,
+		Namespace:    OperatorNamespace,
+		Record:       rec,
+		Live:         live,
+		Log:          output.InstanceLogger(OperatorInstanceName),
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	result := &UninstallResult{}
-	for _, obj := range UninstallPlan(manifest) {
-		if err := deleteOne(ctx, client, obj); err != nil {
-			output.Warn(fmt.Sprintf("deleting %s/%s: %v", obj.GetKind(), obj.GetName(), err))
-			result.Errors = append(result.Errors, fmt.Errorf("%s/%s: %w", obj.GetKind(), obj.GetName(), err))
-			continue
-		}
-		result.Deleted++
-		output.Info(output.FormatResourceLine(obj.GetKind(), obj.GetNamespace(), obj.GetName(), output.StatusDeleted))
+	result := &UninstallResult{Deleted: deleted.Deleted, LeftBehind: len(deleted.LeftBehind)}
+	for i := range deleted.Errors {
+		result.Errors = append(result.Errors, &deleted.Errors[i])
 	}
-
 	return result, nil
-}
-
-// deleteOne deletes a single resource with foreground propagation, matching
-// kubernetes.Delete's per-resource behavior. A NotFound response counts as
-// success: uninstall is idempotent, and re-running it after a prior
-// successful (or partial) run is a natural user action.
-func deleteOne(ctx context.Context, client *kubernetes.Client, obj *unstructured.Unstructured) error {
-	propagation := metav1.DeletePropagationForeground
-	err := client.ResourceClient(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace()).Delete(ctx, obj.GetName(), metav1.DeleteOptions{
-		PropagationPolicy: &propagation,
-	})
-	if apierrors.IsNotFound(err) {
-		return nil
-	}
-	return err
 }
