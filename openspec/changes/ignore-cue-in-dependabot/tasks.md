@@ -3,7 +3,7 @@
 - [x] 1.1 In `.github/dependabot.yml`, add `- dependency-name: "cuelang.org/go"` to the `ignore:` list of the `gomod` update, preceded by a comment in the style of the `github.com/open-platform-model/*` comment above it: CUE moves only through a library release (the library's pull request runs the CUE check), and reaches the cli through the cascade's library bump, whose `go get` of the library raises it by minimal version selection (kept by `go mod tidy`); cite owner decision j4 (2026-10-03) and workspace RELEASING.md, section "Pin classes". Leave the `github-actions` block and every other key unchanged.
 - [x] 1.2 Check the file: it parses as YAML (`yq` or `python3 -c 'import yaml,sys; yaml.safe_load(open(sys.argv[1]))' .github/dependabot.yml`), and `git diff` shows only the added comment and ignore entry.
 - [x] 1.3 `task lint` and `task openspec:check` green (no Go code changes, so the unit tests are not affected), then commit `ci(dependabot): leave cuelang.org/go to library releases`.
-- [ ] 1.4 Run the opsx:verify skill for ignore-cue-in-dependabot and report the result to the supervisor.
+- [x] 1.4 Run the opsx:verify skill for ignore-cue-in-dependabot and report the result to the supervisor.
 
 ## 2. Archive (rides this PR)
 
