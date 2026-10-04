@@ -260,10 +260,9 @@ jobs:
       # hack/docskit-dump runs with go run (docs-kit C14).
       setup-go: true
 
-  # Caller-owned: the only job here that reads the App key. It declares
-  # environment: cascade and passes secrets.CASCADE_APP_PRIVATE_KEY only as
-  # the private-key input of the SHA-pinned cascade-notify action, its one
-  # step, with no checkout, run:, env:, container: or services: of its own.
+  # Caller-owned: it declares environment: cascade and passes
+  # secrets.CASCADE_APP_PRIVATE_KEY to the SHA-pinned cascade-notify action
+  # as its private-key input.
   notify-downstream:
     name: Notify downstream
     needs: [release-please, goreleaser]
