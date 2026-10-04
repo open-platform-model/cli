@@ -470,3 +470,27 @@ func TestDeleteResolvedInstance_OtherInstancesAreNotGuarded(t *testing.T) {
 	require.NoError(t, err, out)
 	g.assertDeleted(t)
 }
+
+// The operator-owned refusal comes before the cluster-wide list, so a user who
+// may not list ModuleInstances still gets exit 2 and the spec.owner remedy, in
+// a dry run too, and no list is attempted.
+func TestDeleteResolvedInstance_OperatorOwnedRefusedBeforeList(t *testing.T) {
+	for _, dryRun := range []bool{false, true} {
+		t.Run(fmt.Sprintf("dryRun=%v", dryRun), func(t *testing.T) {
+			g := newGuardScenario(operator.OperatorNamespace, operator.OperatorInstanceName, "", false, nil)
+			g.rec.Owner = inventory.OwnerOperator
+			g.fake.PrependReactor("list", "moduleinstances", func(k8stesting.Action) (bool, runtime.Object, error) {
+				return true, nil, apierrors.NewForbidden(schema.GroupResource{Group: "opmodel.dev", Resource: "moduleinstances"}, "", errors.New("denied"))
+			})
+
+			_, err := g.run(t, dryRun)
+			requireExitCode(t, err, opmexit.ExitValidationError)
+			assert.Contains(t, err.Error(), "spec.owner")
+			for _, a := range g.fake.Actions() {
+				assert.False(t, a.GetVerb() == "list" && a.GetResource().Resource == "moduleinstances",
+					"no ModuleInstance list before the operator-owned refusal")
+			}
+			g.assertUntouched(t)
+		})
+	}
+}
