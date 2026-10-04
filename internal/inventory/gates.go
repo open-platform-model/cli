@@ -50,7 +50,17 @@ func GateCRDFieldFloor(ctx context.Context, client *kubernetes.Client) error {
 	if err != nil {
 		return fmt.Errorf("reading ModuleInstance CRD: %w", err)
 	}
+	return CheckCRDFieldFloor(crd)
+}
 
+// CRDFieldFloor names the fields the CLI requires of the ModuleInstance
+// CRD's storage version before it applies an instance.
+const CRDFieldFloor = "spec.owner and status.inventory"
+
+// CheckCRDFieldFloor checks a ModuleInstance CRD object, live or rendered,
+// against the field floor: its storage version's schema must carry
+// spec.owner and status.inventory.
+func CheckCRDFieldFloor(crd *unstructured.Unstructured) error {
 	root, err := servedStorageSchema(crd)
 	if err != nil {
 		return err

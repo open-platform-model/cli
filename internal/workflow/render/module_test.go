@@ -330,3 +330,50 @@ func TestModuleSource_CarriesCommittedModFile(t *testing.T) {
 	require.True(t, ok, "overlay carries cue.mod/module.cue at Source.Root")
 	assert.Equal(t, string(want), string(got))
 }
+
+// DepsOnly: the platform is the module's deps whatever --platform and the
+// cluster getter hold, and the getter is never called, so a Stalled or
+// unreadable cluster Platform cannot change or refuse the render ("Seeded
+// Platform on another catalog release", "Stalled Platform does not block
+// repair").
+func TestModuleOpts_DepsOnlyNeverReadsThePlatform(t *testing.T) {
+	called := false
+	getter := platform.ClusterPlatformGetter(func(context.Context) (*platform.ClusterPlatform, string, error) {
+		called = true
+		return nil, "", errors.New("stalled Platform; must not be read")
+	})
+	deps := &platform.ModuleDeps{ModFileName: "cue.mod/module.cue"}
+	opts := ModuleOpts{PlatformFlag: "/some/platform", ClusterPlatform: getter, DepsOnly: true}
+
+	sel := opts.platformOptions(deps)
+	assert.Empty(t, sel.PlatformFlag)
+	assert.Nil(t, sel.Cluster)
+	assert.Same(t, deps, sel.Deps)
+	assert.Equal(t, platform.DepsModule, sel.DepsKind)
+
+	// Resolution with no deps then has nothing to fall back to, and still
+	// never calls the getter.
+	sel.Deps = nil
+	_, _, err := platform.Resolve(context.Background(), sel)
+	require.ErrorIs(t, err, platform.ErrNoPlatformSource)
+	assert.False(t, called, "the cluster Platform getter was called")
+
+	// Without DepsOnly the usual precedence holds.
+	sel = ModuleOpts{PlatformFlag: "/some/platform", ClusterPlatform: getter}.platformOptions(deps)
+	assert.Equal(t, "/some/platform", sel.PlatformFlag)
+	assert.NotNil(t, sel.Cluster)
+}
+
+// An explicit Namespace outranks the --namespace flag and the environment.
+func TestSyntheticIdentity_ExplicitNamespace(t *testing.T) {
+	mod := &module.Module{Metadata: &module.ModuleMetadata{Name: "opm_operator"}}
+	k8s := &config.ResolvedKubernetesConfig{}
+	k8s.Namespace.Value = "from-flag"
+	k8s.Namespace.Source = config.SourceFlag
+
+	_, _, ns := syntheticIdentity(mod, ModuleOpts{K8sConfig: k8s, Namespace: "opm-operator-system"}, "from-flag")
+	assert.Equal(t, "opm-operator-system", ns)
+
+	_, _, ns = syntheticIdentity(mod, ModuleOpts{K8sConfig: k8s}, "from-flag")
+	assert.Equal(t, "from-flag", ns)
+}
