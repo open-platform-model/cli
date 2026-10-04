@@ -105,14 +105,28 @@ The rule is mechanical, not stylistic: CUE resolves modules by longest-prefix ma
 
 ### Requirement: Old test pins are current or frozen with a reason
 
-Each `opmodel.dev/core@v2` or `opmodel.dev/catalogs/*` pin in a test input that tests resolve from a registry SHALL be moved to the newest published release (a `cue.mod` file by `cue mod get` then `cue mod tidy`, a Go literal by editing the literal) unless `.cascade-frozen` lists it with a reason. Test inputs include a test module's `cue.mod/module.cue` and a module file a test writes from a Go literal. A `cue.mod` file SHALL NOT be bumped by a hand edit. Each `.cascade-frozen` entry names the repo-relative file or directory, the module paths frozen there, and a one-sentence reason saying why the pin must stay old. The file uses the format in workspace RELEASING.md, section "Cascade files".
+Each `opmodel.dev/core@v2` or `opmodel.dev/catalogs/*` pin in a test input that tests resolve from a registry SHALL be moved to the release cascade's target, unless `.cascade-frozen` lists it with a reason.
 
-A pin is frozen only when the test depends on that exact old version. Examples are a platform that must be refused as too old, a platform that must show catalog version skew, or a floor that the test re-pins up to. A pin that is old only because a tree was copied from an older tree, or because an upstream release moved on, is not frozen. Between an upstream release and the release cascade that follows it, a pin is behind but not in breach. A literal that a test only compares as expected output and never resolves from a registry (a golden) MAY also be listed, with a reason saying so, so that it is not mistaken for a stale pin.
+- **The target.** A catalog pin's target is the newest published release in its major. A core pin's target is the core version that the input's catalog pins, or, for an input that pins no catalog, the core that `templates/minimal`'s catalog pins. The source is workspace RELEASING.md, section "The cascade", "Consistent set".
+- **No backwards moves.** A core pin already newer than that target stays.
+- **How a pin moves.** A `cue.mod` file moves by `cue mod get` then `cue mod tidy`, which `task deps:cascade` runs for the inputs it lists. A Go literal moves by editing the literal. A `cue.mod` file SHALL NOT be bumped by a hand edit.
+- **Test inputs** include a test module's `cue.mod/module.cue` and a module file a test writes from a Go literal.
+- **`.cascade-frozen` entries.** Each entry names the repo-relative file or directory, the module paths frozen there, and a one-sentence reason saying why the pin must stay old. The file uses the format in workspace RELEASING.md, section "Cascade files".
+
+A pin is frozen only when the test depends on that exact old version. Examples:
+
+- a platform that must be refused as too old;
+- a platform that must show catalog version skew;
+- a floor that the test re-pins up to.
+
+A pin that is old only because a tree was copied from an older tree, or because an upstream release moved on, is not frozen. Between an upstream release and the release cascade that follows it, a pin is behind but not in breach.
+
+A literal that a test only compares as expected output and never resolves from a registry (a golden) MAY also be listed, with a reason saying so, so that it is not mistaken for a stale pin.
 
 #### Scenario: Every old core or catalog pin in a test module is accounted for
 
-- **WHEN** the tracked `cue.mod/module.cue` files under `tests/` and `internal/` are read and their `opmodel.dev/core@v2` and `opmodel.dev/catalogs/*` pins compared with the newest published release of each module
-- **THEN** each one that is older is at or under a path listed in `.cascade-frozen` with that module path among its pins
+- **WHEN** the tracked `cue.mod/module.cue` files under `tests/` and `internal/` are read, and their `opmodel.dev/core@v2` and `opmodel.dev/catalogs/*` pins are compared with the cascade target (the newest published catalog, and the core that catalog pins)
+- **THEN** each one that is older than its target is at or under a path listed in `.cascade-frozen`, with that module path among its pins
 
 #### Scenario: A deliberately old pin carries its reason
 

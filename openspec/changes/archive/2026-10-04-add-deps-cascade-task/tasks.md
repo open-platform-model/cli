@@ -18,11 +18,11 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 - `task test` also runs `test:integration` and `test:e2e`, which need a cluster. This change adds no Go code, so they are reported as not run.
 - Always run tasks with `task -x` when the exit code matters (contract §3).
 
-## Gates (SUPERVISOR ticks)
+## Gates (merge-time checks; carried in the PR body, not ticked here)
 
-- [ ] G-resolver: before merge, `.github` `add-cascade-resolver` is merged on `open-platform-model/.github` `main`. Check: `git -C <ws>/.github fetch && git -C <ws>/.github cat-file -e origin/main:.github/scripts/cascade/cascade-resolve.sh && git -C <ws>/.github show origin/main:.github/scripts/cascade/stub-resolve.sh | sha256sum` succeeds and prints contract §7's `970130f7d55c07f5b86d4f5b6f392330427ff923eb34f93553656bcd4b893d9c`.
-- [ ] G-network-run: before merge, on this change's PR, `Cascade task (network)` is green, and its log shows S5 ran against the real resolver (not skipped). Also, `Lint` shows the offline cascade step passing.
-- [ ] G-catch-up: after merge, not a merge precondition. The cli catch-up PR (contract §8: `task -x deps:cascade` on `main`, titled by `task -x deps:cascade:title`) is a separate PR. It waits until the operator's catch-up release is published. After it merges, `task -x deps:cascade` on `main` exits 3. That is the Phase 2 gate (workspace RELEASING.md, "Rollout and changes" › "Phases").
+- G-resolver: before merge, `.github` `add-cascade-resolver` is merged on `open-platform-model/.github` `main`. Check: `git -C <ws>/.github fetch && git -C <ws>/.github cat-file -e origin/main:.github/scripts/cascade/cascade-resolve.sh && git -C <ws>/.github show origin/main:.github/scripts/cascade/stub-resolve.sh | sha256sum` succeeds and prints contract §7's `970130f7d55c07f5b86d4f5b6f392330427ff923eb34f93553656bcd4b893d9c`.
+- G-network-run: before merge, on this change's PR, `Cascade task (network)` is green, and its log shows S5 ran against the real resolver (not skipped). Also, `Lint` shows the offline cascade step passing.
+- G-catch-up: after merge, not a merge precondition. The cli catch-up PR (contract §8: `task -x deps:cascade` on `main`, titled by `task -x deps:cascade:title`) is a separate PR. It waits until the operator's catch-up release is published. After it merges, `task -x deps:cascade` on `main` exits 3. That is the Phase 2 gate (workspace RELEASING.md, "Rollout and changes" › "Phases").
 
 ## 1. Spike: confirm the assumptions in design.md
 
@@ -173,6 +173,7 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
 
 The archive rides the implementing PR, never a push to main (owner decision 4). This section runs only after the supervisor's review of sections 1 to 4, and never in the planning run.
 
-- [ ] 5.1 `openspec verify` for this change; record its result.
-- [ ] 5.2 `openspec archive add-deps-cascade-task --yes`. This creates `openspec/specs/deps-cascade/spec.md` with its Purpose, and restates "Old test pins are current or frozen with a reason" in `openspec/specs/test-fixture-lineage/spec.md`, keeping its three scenarios. Verify: `task openspec:check` is green.
-- [ ] 5.3 `task openspec:check` green, then commit `chore(openspec): archive add-deps-cascade-task`. The commit touches only `openspec/`.
+- [x] 5.1 `openspec verify` for this change; record its result.
+  Done: every task 1.x to 4.13 ticked; `openspec validate add-deps-cascade-task --strict` valid; the Phase 2 re-review at `ff2290f8` found no blocker or major, and both of its minors are fixed in 4.13; offline and full test sets all PASS at the archive head.
+- [x] 5.2 `openspec archive add-deps-cascade-task --yes`. This creates `openspec/specs/deps-cascade/spec.md` with its Purpose, and restates "Old test pins are current or frozen with a reason" in `openspec/specs/test-fixture-lineage/spec.md`, keeping its three scenarios. Verify: `task openspec:check` is green.
+- [x] 5.3 `task openspec:check` green, then commit `chore(openspec): archive add-deps-cascade-task`. The commit touches only `openspec/`.
