@@ -1,0 +1,7 @@
+# Path classes for the cascade PR title (workspace RELEASING.md, "Title from diff class").
+test hack/platform/
+test hack/kind-platform.yaml
+test examples/
+test tests/
+test **/testdata/
+test *_test.go
