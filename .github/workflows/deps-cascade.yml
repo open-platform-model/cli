@@ -61,8 +61,8 @@ jobs:
       gates-only: ${{ inputs.gates_only == true }}
       g2-mode: ${{ vars.CASCADE_G2_MODE || 'warn' }}
       g3-mode: ${{ vars.CASCADE_G3_MODE || 'warn' }}
-      # The cascade task builds opm and runs go get, go mod tidy and
-      # go run ./hack/docskit-dump.
+      # The cascade task builds opm from the merge base and runs go get
+      # and go mod tidy; it runs no code from a moved dependency.
       setup-go: true
 
   publish:

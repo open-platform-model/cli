@@ -84,45 +84,18 @@ else
 fi
 
 # 6. Every version the cli's docs bundle pins has a docs bundle (docs-kit gate
-# G2-pins). opmodel.dev anchors a site version on the cli's bundle and pulls
-# the library, core and opm-operator bundles of exactly the versions its
-# manifest pins, refusing a pin with none (docs-kit C16), so a release whose
-# pins lack bundles would break every site build. The pins come from the
-# program docs-kit runs (hack/docskit-dump pins); each is looked up
-# anonymously, as the site pulls it, at its release tag. A 401, 403 or 404
-# counts as missing: GHCR answers 403 for a package that does not exist yet
-# or is private.
-docs_registry=ghcr.io
-docs_repo=open-platform-model/docs
-# docs_bundle_status PROJECT TAG: the HTTP status of an anonymous manifest
-# HEAD of PROJECT's docs bundle at TAG (the token request's status when GHCR
-# refuses an anonymous token), 000 when ghcr.io is unreachable.
-docs_bundle_status() {
-  local body code token
-  body=$(curl -sS --retry 3 --retry-all-errors -w '\n%{http_code}' \
-    "https://${docs_registry}/token?scope=repository:${docs_repo}/$1:pull" 2>/dev/null) || { echo 000; return; }
-  code=${body##*$'\n'}
-  if [ "$code" != 200 ]; then echo "$code"; return; fi
-  token=$(jq -r '.token // empty' <<<"${body%$'\n'*}")
-  curl -sS -o /dev/null -w '%{http_code}' -I --retry 3 --retry-all-errors \
-    -H "Authorization: Bearer ${token}" \
-    -H 'Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json' \
-    "https://${docs_registry}/v2/${docs_repo}/$1/manifests/$2" 2>/dev/null || true
-}
-if ! docs_pins=$(go run ./hack/docskit-dump pins 2>&1); then
-  fail "hack/docskit-dump pins failed: ${docs_pins}"
-else
-  while read -r project pin; do
-    [ -n "${project:-}" ] || continue
-    ref="${docs_registry}/${docs_repo}/${project}:${pin}"
-    code=$(docs_bundle_status "$project" "$pin")
-    code=${code:-000}
-    case "$code" in
-      200) ;;
-      401|403|404) fail "docs bundle: the cli pins ${project} ${pin}, and ${ref} does not exist or is not public (publish it: run ${project}'s Docs workflow in release mode for its v${pin} release)" ;;
-      *) fail "docs bundle: ${ref}: lookup failure, HTTP ${code} (re-run when ghcr.io is reachable)" ;;
-    esac
-  done < <(jq -r '.pins | to_entries[] | "\(.key) \(.value)"' <<<"$docs_pins")
+# G2-pins); the lookup lives in docs-pins-check.sh, which pr.yml also runs as
+# a warning on every pull request that moves library or the operator. Each
+# line it prints is a violation, and a failing exit with no line is one too,
+# so a crash never reads as a pass.
+docs_rc=0
+docs_out=$(.github/scripts/docs-pins-check.sh) || docs_rc=$?
+while IFS= read -r line; do
+  [ -n "$line" ] || continue
+  fail "$line"
+done <<<"$docs_out"
+if [ "$docs_rc" -ne 0 ] && [ -z "$docs_out" ]; then
+  fail "docs bundle: .github/scripts/docs-pins-check.sh exited ${docs_rc} without naming a problem"
 fi
 
 if [ "${#failures[@]}" -gt 0 ]; then

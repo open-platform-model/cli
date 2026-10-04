@@ -1,0 +1,12 @@
+# Changes here need a code owner's review (main ruleset).
+/.github/                       @emil-jacero @orvis98
+/.tasks/                        @emil-jacero @orvis98
+/Taskfile*.yml                  @emil-jacero @orvis98
+/release-please-config.json     @emil-jacero @orvis98
+/.release-please-manifest.json  @emil-jacero @orvis98
+/.cascade-frozen                @emil-jacero @orvis98
+# Run by jobs that hold a write token: hack/fixtures.sh in
+# publish-fixtures.yml, hack/docskit-dump in the docs publish, and the
+# goreleaser config in release.yml.
+/hack/                          @emil-jacero @orvis98
+/.goreleaser.yml                @emil-jacero @orvis98
