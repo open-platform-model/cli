@@ -12,6 +12,8 @@ The CLI SHALL provide a pure comparison (`internal/compat.Check`) that, given a 
 
 A field is "required" for this rule when it carries the required constraint (`!`) or is a regular field with no default. A field that carried the optional constraint (`?`) in the prior definition and is required in the new one SHALL report kind `field made required` at its path, independently of whether its value domain also changed. A defaulted field that loses its default is the default rule's finding (`default removed`), not this one's. The reverse transition (required to optional, or an optional field gaining a default) SHALL NOT report this kind.
 
+A default is compared only where an author wrote one: a value whose disjunction marks a default with `*`. The implicit default CUE gives a plain open list (the list closed at its fixed elements: `[]` for `[...T]`, `[T]` for `[...T] & [_, ...]`) SHALL NOT count as a default on either side: it SHALL NOT be compared, its absence SHALL NOT report `default removed`, and a constraint-marker change on such a list (required to optional) SHALL report nothing. An open list's value domain is still judged at the leaf, so narrowing it keeps reporting `domain narrowed`.
+
 The walk SHALL apply 0010 D30's provenance denylist at every depth: the direct children `catalogVersion` and `description` of any field named `metadata` reached by the walk SHALL be neither compared nor reported, so a member reference embedded in another member (`appliesTo`, `composedResources`, `composedTraits`) does not report the referenced member's per-release provenance. Lists whose two sides have equal length SHALL be walked element-wise so their elements reach that rule; lists of unequal length SHALL be judged as a leaf. A leaf whose emitted syntax is identical on both sides SHALL report nothing.
 
 #### Scenario: Field removal reported
@@ -32,6 +34,26 @@ The walk SHALL apply 0010 D30's provenance denylist at every depth: the direct c
 - **AND** declaring it `y: string` (regular, no default) reports the same kind
 - **AND** declaring it `y!: =~"^[a-z]"` reports both `field made required` and `domain narrowed` at `y`
 - **AND** the reverse (`y!: string` → `y?: string`, or `y: string` → `y: string | *"z"`) reports no `field made required`
+
+#### Scenario: Implicit open-list default is not compared
+
+- **WHEN** a field declared `subjects!: [...#Subject] & [_, ...]` in the prior definition, where `#Subject` is a disjunction of structs, is declared `subjects?: [...#Subject] & [_, ...]` in the new one
+- **THEN** `Check` reports no violations
+- **AND** the same holds for `xs!: [...string] & [_, ...]` to `xs?: [...string] & [_, ...]`, and for a plain `xs: [...string]` made `xs?: [...string]`
+
+#### Scenario: Open list narrowed reports only the narrowing
+
+- **WHEN** a field declared `xs: [...string]` is declared `xs: [...string] & [_, ...]` in the new definition
+- **THEN** `Check` reports `domain narrowed` at `xs`
+- **AND** no `default changed` at `xs`
+
+#### Scenario: Authored list default is still compared
+
+- **WHEN** a field declared `xs: *["a"] | [...string]` is declared `xs: *["b"] | [...string]` in the new definition
+- **THEN** `Check` reports `default changed` at `xs`
+- **AND** declaring it `xs: [...string]` instead reports `default removed` at `xs`
+- **AND** declaring `xs: *[] | [...string]` as `xs: *["a"] | [...string]` reports `default changed` at `xs`
+- **AND** adding a default, `xs: [...string]` to `xs: *["a"] | [...string]`, reports nothing
 
 #### Scenario: Default change reported with both values
 
