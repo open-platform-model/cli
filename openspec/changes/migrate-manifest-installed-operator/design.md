@@ -11,8 +11,8 @@ proposal.md, Why, describes the problem. The code this change touches, as read o
 
 These figures come from `dist/install.yaml` at every one of the 47 opm-operator tags and from the GitHub release assets:
 
-- Only operator releases (tags `v<semver>`) were read; the operator module's releases (tags `opm_operator-vX.Y.Z`, from opm-operator's `release-operator-module`) also attach an `install.yaml`, but it is a render of the module and is never a source for this list. Releases v0.5.0 to v1.0.0-beta.5 publish an `install.yaml` asset; v0.2.0 to v0.4.0 publish none. From v0.2.0 to v0.4.4 every name is `poc-controller-*` in `poc-controller-system`. From v0.5.0 every name carries the `opm-operator` prefix.
-- The union over v0.5.0 to v1.0.0-beta.5 is 29 objects. 19 belong to the current manifest. The other 10 shipped only in older releases:
+- Only operator releases (tags `v<semver>`) were read; the operator module's releases (tags `opm_operator-vX.Y.Z`, from opm-operator's `release-operator-module`) also attach an `install.yaml`, but it is a render of the module and is never a source for this list. `hack/operator-legacy` found 46 operator releases with an `install.yaml` asset: v0.4.2 to v1.0.0-beta.8 (v0.2.0 to v0.4.1 publish none). From v0.2.0 to v0.4.4 every name is `poc-controller-*` in `poc-controller-system`; from v0.5.0 every name carries the `opm-operator` prefix. The list starts at v0.5.0 (`FirstLegacyRelease`): v0.4.2 to v0.4.4 install another operator, in another namespace, under names the module never renders, and taking them over is a non-goal.
+- The union over v0.5.0 to v1.0.0-beta.8 is 32 objects. 22 belong to the beta.8 manifest, which adds the ClusterRoles `opm-operator-{modulepackage,platform,transformerregistration}-viewer-role` to beta.5's 19. The other 10 shipped only in older releases:
   - the ClusterRoles `opm-operator-bundlerelease-{admin,editor,viewer}-role` (v0.5.0 to v0.6.4);
   - the ClusterRoles `opm-operator-modulerelease-{admin,editor,viewer}-role` (v0.5.0 to v0.7.5);
   - the CRDs `bundlereleases`, `modulereleases`, `releases` and `platforms` in group `releases.opmodel.dev`.
@@ -50,7 +50,7 @@ In the same experiment, an upgrade that rolled the operator pod produced a 28 s 
 
 - Writing the 0012:D8 adopt annotation. 0012:D8:R6, as amended in enhancements PR #94, says no frontend sets it on the user's behalf and that installing the operator admits the proven objects as if adopted. This change does exactly that, through an admission set, and writes nothing to mark the objects.
 - Closing the guard's general gap: it admits another instance's OPM-managed object. The migration refuses such an object when it is on the proof list; for other objects the guard is unchanged here.
-- Migrating `poc-controller-*` installs (v0.2.0 to v0.4.4). No release with those names published a manifest, so they are not on the list.
+- Migrating `poc-controller-*` installs (v0.2.0 to v0.4.4). Releases v0.4.2 to v0.4.4 published a manifest with those names, but they install another operator in another namespace, so they are not on the list.
 - Ownership transfer of the operator's instance, version and downgrade checks, and locating the operator. Other changes own these.
 
 ## Decisions
@@ -97,17 +97,17 @@ type LegacyObject struct {
 	Group, Kind, Namespace, Name string
 	Labels   map[string]string // the labels every manifest that shipped it set; may be empty
 	Selector map[string]string // Deployment only
-	Releases string            // "v0.5.0..v1.0.0-beta.5", for the report and the test
+	Releases string            // "v0.5.0..v1.0.0-beta.8", for the report and the test
 }
 
 // LegacyObjects is the union of the objects of every opm-operator release
 // that published an install manifest.
-var LegacyObjects = []LegacyObject{ /* 29 entries */ }
+var LegacyObjects = []LegacyObject{ /* 32 entries */ }
 ```
 
 `hack/operator-legacy/` is a `go run` program that is not linked into `opm`. It downloads `install.yaml` from every operator release, a tag matching `v<semver>`, that has that asset. It skips every other tag, the operator module's `opm_operator-vX.Y.Z` releases included: their `install.yaml` is the module's render, whose objects carry the operator instance's identity and so are never foreign. The tag filter is a function with its own offline test and writes `internal/operator/testdata/legacy-manifests.json`, with the kind, namespace, name, labels and selector per release and no specs. It needs the network and runs by hand, only when an earlier release is found to be missing. A unit test checks `LegacyObjects` against that file offline.
 
-The list closes once operator releases stop attaching `install.yaml` (opm-operator's `stop-operator-install-manifest`, gated on this cli). Until then an operator release after v1.0.0-beta.5 still attaches a manifest built from `config/default`; task 2.1 runs the program at implementation time, so the list covers every operator release published by then, and a release cut after that is added by re-running it. The module's own manifests never need an entry: they carry the instance identity and the module's selector, so their objects are this instance's own, not foreign (0021:D4 as amended).
+The list closes once operator releases stop attaching `install.yaml` (opm-operator's `stop-operator-install-manifest`, gated on this cli). Until then an operator release after v1.0.0-beta.8 still attaches a manifest built from `config/default`; task 2.1 runs the program at implementation time, so the list covers every operator release published by then, and a release cut after that is added by re-running it. The module's own manifests never need an entry: they carry the instance identity and the module's selector, so their objects are this instance's own, not foreign (0021:D4 as amended).
 
 **Options considered:**
 
@@ -248,7 +248,7 @@ The CLI migrates no data of its own. Rollback is a CLI downgrade. An older CLI's
 **Explored**: `dist/install.yaml` at all 47 opm-operator tags, the assets of the GitHub releases, and the 10 manifests the CLI has embedded.
 **Options considered**:
 1. Only the current manifest's 19 objects. This misses the 10 objects of v0.5.0 to v0.7.5 that a cluster upgraded through kubectl still holds.
-2. The union over every release with a manifest asset (29 objects). Install can then name the older leftovers in its report.
+2. The union over every release with a manifest asset from v0.5.0 on (32 objects). Install can then name the older leftovers in its report.
 **Decision**: Option 2.
 **Rationale**: The extra 10 are never adopted or deleted, because the module does not render them, none is a binding, and four are CRDs. They are only reported, and only on the run that migrates. Naming them once tells the user what is left over from an earlier install. An unproven one never blocks the install.
 
