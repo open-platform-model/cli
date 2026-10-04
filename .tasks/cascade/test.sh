@@ -340,6 +340,33 @@ else
   pass "S13 warning against the base"
 fi
 
+# S14 frozen unpublished podinfo: a consumer whose catalog must move freezes
+# its podinfo at an unpublished version; the task stops in phase A with a clear
+# message instead of failing inside cue mod get.
+d=$(sandbox s14)
+tree_core=$(cue_dep_v "$d/templates/minimal/cue.mod/module.cue" "$CORE")
+{ printf 'newest\tcue\t%s\tv4.99.0\n' "$CAT"
+  printf 'pin-of\t%s\tv4.99.0\t%s\t%s\n' "$CAT" "$CORE" "$tree_core"
+  current_rows "$d"; } >"$TMP/s14/table"
+f="$d/examples/cue.mod/module.cue"
+K="$POD" perl -0pi -e 's/("\Q$ENV{K}\E": \{\n\s*v:\s*)"[^"]+"/$1"v0.1.99"/' "$f"
+setup_ok=0
+if [ "$(cue_dep_v "$f" "$POD")" = v0.1.99 ]; then setup_ok=1; fi
+printf '  - path: examples/cue.mod/module.cue\n    pins: ["%s"]\n    reason: "test freeze"\n' "$POD" >>"$d/.cascade-frozen"
+commit_setup "$d"
+run "$d" "$TMP/s14/table" "$TMP/s14/log"
+if [ "$setup_ok" != 1 ]; then
+  fail "S14 frozen unpublished podinfo" "the setup edit did not apply"
+elif [ "$RUN_RC" = 0 ] || [ "$RUN_RC" = 3 ]; then
+  fail "S14 frozen unpublished podinfo" "exit $RUN_RC, want neither 0 nor 3"
+elif ! clean "$d"; then
+  fail "S14 frozen unpublished podinfo" "the tree changed"
+elif ! grep -qF "freezes \`$POD\` at the unpublished \`v0.1.99\`" "$RUN_OUT"; then
+  fail "S14 frozen unpublished podinfo" "no clear message: $(why)"
+else
+  pass "S14 frozen unpublished podinfo"
+fi
+
 # ---------------------------------------------------------------------------
 # Network scenarios (CASCADE_TEST_SET=all): the older versions are real, so
 # go get, operator:sync and cue mod get resolve them from the Go proxy, GitHub

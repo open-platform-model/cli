@@ -184,7 +184,7 @@ The phases follow contract §5.2 rule 5.
 
 No `|| true`, no `2>/dev/null ||` and no `set +e` around a resolver call.
 
-**Phase B, tools.** Only when something moves:
+**Phase B, tools.** Only when something moves. It requires `cue` on `PATH` only when some `cue.mod` file runs `get` and `tidy`, and builds `opm` only when a version advances, so a library- or operator-only run needs neither (Phase 2 implementation review, nit 5):
 
 ```bash
 go build -o "$STATE/bin/opm" ./cmd/opm
@@ -270,8 +270,9 @@ So `examples/cue.mod/module.cue:15-16` and `tests/e2e/testdata/operator-owned/cu
 
 - Phase A asks `published` for each moving consumer's podinfo pin (D4 step 9). When it answers 3, it also asks `published` for the merge base's podinfo `v<B>`; if that answers 3 too, the task exits 1 naming the consumer.
 - Phase C rewrites that consumer's podinfo `v:` as text to `v<B>` before step 1, runs `cue mod get` and `tidy`, and then step 2 rewrites it to the D6 target as usual.
+- A consumer that freezes its podinfo is never swapped. When the swap would be needed, Phase A stops with a message naming the freeze, instead of letting `cue mod get` fail later (test S14).
 
-This closes a gap in contract §6.4 step 5, which assumes the consumer still pins the published podinfo. It is reported to the supervisor.
+This closes a gap in contract §6.4 step 5, which assumes the consumer still pins the published podinfo; contract v1.1 clarification C8 records the rule.
 
 PR CI's `hack/fixtures.sh consumers examples tests/e2e/testdata/operator-owned` (`Taskfile.yml:144`, fixtures job) checks the result against the seeded registry.
 
@@ -363,7 +364,7 @@ These calls decide no target, so they run in phase C.
 - **S10, allowed dirty tree and expect hint** (offline, added at verify). An untracked file with `CASCADE_ALLOW_DIRTY=1`: exit 3 by snapshot, and the file stays. `CASCADE_EXPECT` naming library and an unrelated key: only the library `newest` call carries `--expect`.
 - **S11, never lower** (offline, added at verify). A commit after the base sets `templates/minimal` to `1.99.0`: exit 3, the version stays, and the "above the cascade target" warning (D6).
 - **S5 also checks the path-class map** through the real resolver's `classify`: the test-class paths of every pattern in `classes`, and three shipped paths.
-- **Sets.** `CASCADE_TEST_SET=offline` runs the pre-checks plus S1, S3, S6, S7, S8, S10, S11, S12 (a kind catalog ahead of `hack/platform` stays) and S13 (a `language.version` warning for a pin a human commit moved, on a run that moves nothing). `all` (the default) adds S2, S4, S5 and S9.
+- **Sets.** `CASCADE_TEST_SET=offline` runs the pre-checks plus S1, S3, S6, S7, S8, S10, S11, S12 (a kind catalog ahead of `hack/platform` stays), S13 (a `language.version` warning for a pin a human commit moved, on a run that moves nothing) and S14 (a frozen unpublished podinfo in a moving consumer stops the task in phase A). `all` (the default) adds S2, S4, S5 and S9.
 
 ### D11: CI placement
 

@@ -375,7 +375,13 @@ for c in "${CONSUMERS[@]}"; do
   # the merge base's published podinfo for that step.
   if [ -n "${MOVES[$c]}" ] && ! published "$POD" "$pc"; then swap=v${ADV_B[$PODDIR]}; fi
   if [ -z "$swap" ] && [ "$pc" = "$POD_FINAL" ]; then continue; fi
-  if frozen "$m" "$POD"; then continue; fi # a frozen pin is never edited, not even for a moment
+  # A frozen pin is never edited, not even for a moment, so a frozen
+  # unpublished podinfo leaves get and tidy nothing to resolve.
+  if frozen "$m" "$POD"; then
+    [ -z "$swap" ] ||
+      die "\`$m\` freezes \`$POD\` at the unpublished \`$pc\`, so its catalog and core cannot move; freeze those too, or lift the podinfo freeze"
+    continue
+  fi
   if [ -n "$swap" ]; then
     published "$POD" "$swap" ||
       die "\`$m\` pins the unpublished \`$POD\` \`$pc\`, and the merge base's \`$swap\` is not published either"
@@ -440,9 +446,15 @@ fi
 # Phase B: tools, from the unmodified tree, so a library move that breaks
 # compilation cannot stop the task from producing its diff (contract rule 11).
 
-command -v cue >/dev/null || die "cue is not on PATH"
-mkdir -p "$STATE/bin"
-go build -o "$STATE/bin/opm" ./cmd/opm
+# cue only when a cue.mod runs get and tidy, opm only for a version advance,
+# so a library- or operator-only run needs neither.
+for d in "${CUE_DIRS[@]}"; do
+  if [ -n "${MOVES[$d]}" ]; then command -v cue >/dev/null || die "cue is not on PATH"; break; fi
+done
+if [ "${#ADV_T[@]}" -gt 0 ]; then
+  mkdir -p "$STATE/bin"
+  go build -o "$STATE/bin/opm" ./cmd/opm
+fi
 
 # ---------------------------------------------------------------------------
 # Phase C: edit (contract §5.2 rule 12 and §6.4). A failure here exits
