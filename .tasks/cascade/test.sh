@@ -476,11 +476,27 @@ if [ "$SET" = all ]; then
     fail "S2 older pins" "the setup did not apply"
   else
     commit_setup "$d"
-    run "$d" "$TMP/s2/table" "$TMP/s2/log"
+    # A go shim logs every go subcommand of the first run: get, mod tidy and
+    # the opm build from the merge base's export are the only ones allowed.
+    mkdir -p "$TMP/s2/bin"
+    printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>%q\nexec %q "$@"\n' \
+      "$TMP/s2/go.log" "$(command -v go)" >"$TMP/s2/bin/go"
+    chmod +x "$TMP/s2/bin/go"
+    : >"$TMP/s2/go.log"
+    PATH="$TMP/s2/bin:$PATH" run "$d" "$TMP/s2/table" "$TMP/s2/log"
+    # By pattern, not by path: the task names its state dir by the resolved git dir.
+    opm_build='^build -C /.*/\.git/cascade/opm-src -buildvcs=false -o /.*/\.git/cascade/bin/opm \./cmd/opm$'
     if [ "$RUN_RC" != 0 ]; then
       fail "S2 older pins" "first run exit $RUN_RC, want 0: $(why)"
     elif ! reason=$(golden "$d"); then
       fail "S2 older pins" "first run: $reason"
+    elif ! grep -qE -- "$opm_build" "$TMP/s2/go.log"; then
+      fail "S2 older pins" "opm was not built from the merge base's export: $(tr '\n' ';' <"$TMP/s2/go.log")"
+    elif other=$(grep -vE -e "$opm_build" -e '^mod tidy$' -e '^get ' "$TMP/s2/go.log") ; then
+      # Anything else (run, test, another build) would run code the move pulled in.
+      fail "S2 older pins" "the task ran go $(tr '\n' ';' <<<"$other")"
+    elif [ -e "$d/.git/cascade/opm-src" ]; then
+      fail "S2 older pins" "the task left the opm source export behind"
     elif grep -q '^published oci open-platform-model/docs/' "$TMP/s2/log"; then
       # The docs-bundle check runs hack/docskit-dump, which links the moved
       # library; it belongs to the pull request's CI, not to the task.
