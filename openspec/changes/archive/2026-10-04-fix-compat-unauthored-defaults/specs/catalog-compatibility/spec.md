@@ -1,10 +1,4 @@
-# Capability: catalog-compatibility
-
-## Purpose
-
-Publish-side catalog compatibility, owned by the CLI: enhancement 0010 D27's additive-only comparison walk, D34 contract-level classification, the D30 provenance strip, and the float selector template resolution uses to pick a version. Consumed by the 0011 publish gate (`opm module publish`, `opm catalog publish`), by `opm catalog registry check --compat`, and by template scaffolding. Pure logic — no I/O, no registry access, no schema-cache dependency; callers compose enumeration, fetching and gate policy around it.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Compatibility Comparison
 
@@ -99,60 +93,3 @@ The walk SHALL apply 0010 D30's provenance denylist at every depth: the direct c
 - **THEN** `Check` reports `domain narrowed` at the list's path
 
 Known limitation (measured 2026-08-16, cue v0.17.1; narrowed 2026-08-26): a leaf that both changed and carries a `matchN` validator or a pending comprehension is judged by the forward subsume alone, which cannot evaluate those constructs: narrowing `matchN`'s alternatives is not detected and widening them reports `domain narrowed` spuriously. Unchanged leaves no longer report. A comparator-level fix for the changed-leaf residue is unowned.
-
-### Requirement: Level Classification
-
-The CLI SHALL classify a primitive's `apiVersion` on the `vNalphaM | vNbetaM | vN` ladder (`internal/compat.ParseLevel`) using the exact grammar of core's `#APIVersionType`, and SHALL expose whether a level is enforced (`Enforced`: beta and GA yes, alpha no). The level-aware entry point (`CheckAtLevel`) SHALL return no violations and no error for an alpha `apiVersion` without evaluating the operands, and SHALL return an error — not a violation — for an `apiVersion` the grammar rejects. The CLI SHALL provide a total, transitive ordering over valid `apiVersion` strings (`CompareAPIVersions`).
-
-The grammar SHALL be pinned against core's own declaration by a parity test, so a core change that widens or narrows `#APIVersionType` fails here rather than silently diverging.
-
-#### Scenario: Alpha is not gated
-
-- **WHEN** `CheckAtLevel` is called with `apiVersion: "v1alpha1"` and operands that differ incompatibly
-- **THEN** it returns no violations and no error
-
-#### Scenario: Beta and GA are gated
-
-- **WHEN** `CheckAtLevel` is called with `"v1beta1"`, `"v1"`, or `"v2"` and incompatible operands
-- **THEN** it returns the same violations `Check` reports
-
-#### Scenario: Unparseable apiVersion is an error
-
-- **WHEN** `CheckAtLevel` is called with an `apiVersion` core's `#APIVersionType` rejects (e.g. `"v1alpha"`, `"1.2.0"`)
-- **THEN** it returns a non-nil error and no violations
-
-#### Scenario: Ordering is transitive
-
-- **WHEN** `CompareAPIVersions` orders `v1alpha1`, `v2`, and `v10`
-- **THEN** the resulting order is the same regardless of input order
-
-#### Scenario: Grammar parity with core is pinned
-
-- **WHEN** the apiVersion pattern this package accepts is compared with core's `#APIVersionType` declaration
-- **THEN** a test fails if the two have diverged
-
-### Requirement: Template Version Selection
-
-The CLI SHALL provide a stable-preferring version selector over a published-version list, in the package that resolves template versions: given the registry's `v`-prefixed SemVer-ascending list, it SHALL return the highest stable (non-prerelease) version, skipping unparseable entries, and SHALL fall back to the highest version overall when no stable version exists. Selection SHALL be pure — enumeration and fetching are the caller's. The selector SHALL NOT be exported: template resolution is its only caller.
-
-This selector is NOT the compatibility gate's predecessor selection, and SHALL NOT ship in the compatibility package. 0011 D23 (amending D9) settled that the publish gate's predecessor is found by the literal rule — scan published versions strictly below the effective version, same major, prereleases included, newest first, each member resolving against the newest build carrying its `name` at its `apiVersion` — implemented in `internal/publish` over the registry's version enumeration; a stable-preferring selector coincides with that rule only on a prerelease-only history and would miss breaks that prerelease pinners (0010 D14-blessed) can see. The documentation of the selector SHALL state this distinction, because the two were confused once already.
-
-#### Scenario: Stable preferred over higher prerelease
-
-- **WHEN** the list contains `v1.2.0` and `v1.3.0-alpha.1`
-- **THEN** the selector returns `v1.2.0`
-
-#### Scenario: Prerelease-only fallback
-
-- **WHEN** every entry is a prerelease
-- **THEN** the selector returns the highest entry
-
-#### Scenario: Unparseable entry is skipped
-
-- **WHEN** the list ends with an entry SemVer cannot parse
-- **THEN** the selector returns the highest parseable stable entry instead
-
-#### Scenario: The gate does not use it
-
-- **WHEN** the publish gate selects the predecessor build to compare against
-- **THEN** it applies D9's literal backward scan, not this selector
