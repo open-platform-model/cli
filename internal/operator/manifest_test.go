@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestEmbeddedManifest_ParsesAllDocuments(t *testing.T) {
@@ -45,6 +46,34 @@ func TestEmbeddedManifest_CRDNamesAreExpected(t *testing.T) {
 		"platforms.opmodel.dev",
 		"transformerregistrations.opmodel.dev",
 	}, crdNames)
+}
+
+// The running-operator check reads fixed names, not the manifest. While the CLI
+// still embeds a manifest, this keeps the two from drifting apart. It goes
+// with the manifest.
+func TestEmbeddedManifest_UsesTheFixedNames(t *testing.T) {
+	objs, err := EmbeddedManifest()
+	require.NoError(t, err)
+
+	var crdNames []string
+	var deployments, namespaces []*unstructured.Unstructured
+	for _, obj := range objs {
+		switch obj.GetKind() {
+		case kindCustomResourceDefinition:
+			crdNames = append(crdNames, obj.GetName())
+		case kindDeployment:
+			deployments = append(deployments, obj)
+		case kindNamespace:
+			namespaces = append(namespaces, obj)
+		}
+	}
+
+	assert.ElementsMatch(t, CRDNames(), crdNames)
+	require.Len(t, deployments, 1)
+	assert.Equal(t, ControllerDeploymentName, deployments[0].GetName())
+	assert.Equal(t, OperatorNamespace, deployments[0].GetNamespace())
+	require.Len(t, namespaces, 1)
+	assert.Equal(t, OperatorNamespace, namespaces[0].GetName())
 }
 
 func TestParseManifest_EmptyDocumentsAreSkipped(t *testing.T) {

@@ -76,6 +76,38 @@ func TestFinalizerGuardError_NamesArmedInstances(t *testing.T) {
 	assert.ErrorContains(t, err, cleanupFinalizer)
 }
 
+// Uninstall builds the error with no Action or Remedy; its message stays as it
+// always was.
+func TestFinalizerGuardError_DefaultsToUninstall(t *testing.T) {
+	err := &FinalizerGuardError{Armed: []ArmedInstance{{Namespace: "default", Name: "jellyfin"}, {Namespace: "media", Name: "sonarr"}}}
+	assert.EqualError(t, err,
+		"refusing to uninstall: 2 instance(s) still carry the opmodel.dev/cleanup finalizer: default/jellyfin, media/sonarr (use --remove-finalizers to proceed; this orphans their workloads)")
+}
+
+func TestFinalizerGuardError_NamesActionTargetAndRemedy(t *testing.T) {
+	target := ArmedInstance{Namespace: "opm-operator-system", Name: "opm-operator"}
+	err := &FinalizerGuardError{
+		Armed:  []ArmedInstance{{Namespace: "default", Name: "hello"}, target},
+		Action: "delete opm-operator-system/opm-operator, which deploys the operator",
+		Target: target,
+		Remedy: "run 'opm operator uninstall --remove-finalizers' to remove that finalizer, orphaning their workloads, then retry",
+	}
+	assert.EqualError(t, err,
+		"refusing to delete opm-operator-system/opm-operator, which deploys the operator: 2 instance(s) still carry the opmodel.dev/cleanup finalizer: "+
+			"default/hello, opm-operator-system/opm-operator (the instance being deleted) "+
+			"(run 'opm operator uninstall --remove-finalizers' to remove that finalizer, orphaning their workloads, then retry)")
+}
+
+func TestOwnInstanceOwnerError_NamesSignalAndRemedy(t *testing.T) {
+	err := &OwnInstanceOwnerError{Namespace: "opm-operator-system", Name: "opm-operator", Signal: SignalCoordinates}
+	msg := err.Error()
+	assert.Contains(t, msg, "refusing to delete opm-operator-system/opm-operator")
+	assert.Contains(t, msg, "matched by coordinates")
+	assert.Contains(t, msg, "operator-owned")
+	assert.Contains(t, msg, "set spec.owner to cli")
+	assert.Contains(t, msg, `kubectl patch moduleinstance opm-operator -n opm-operator-system --type=merge -p '{"spec":{"owner":"cli"}}'`)
+}
+
 func TestRemoveCleanupFinalizer_RemovesOnlyTheCleanupFinalizer(t *testing.T) {
 	inst := moduleInstanceFixture("default", "jellyfin", cleanupFinalizer, "example.com/foreign")
 	client := fakeClientWith(inst)

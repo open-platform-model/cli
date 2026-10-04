@@ -44,20 +44,65 @@ func (a ArmedInstance) String() string {
 	return fmt.Sprintf("%s/%s", a.Namespace, a.Name)
 }
 
-// FinalizerGuardError reports that uninstall was refused because one or more
-// ModuleInstances still carry the operator's cleanup finalizer.
+// FinalizerGuardError reports that an action was refused because one or more
+// ModuleInstances still carry the operator's cleanup finalizer. Uninstall sets
+// only Armed; the other fields let another command that removes the operator
+// name its own action and remedy.
 type FinalizerGuardError struct {
 	Armed []ArmedInstance
+
+	// Action is what was refused, completing "refusing to <Action>". Empty
+	// means "uninstall".
+	Action string
+
+	// Target, when set, is the instance the refused action would delete; it is
+	// marked in the list when it is armed itself.
+	Target ArmedInstance
+
+	// Remedy is the closing parenthetical. Empty means uninstall's own flag.
+	Remedy string
 }
 
 func (e *FinalizerGuardError) Error() string {
+	action := e.Action
+	if action == "" {
+		action = "uninstall"
+	}
+	remedy := e.Remedy
+	if remedy == "" {
+		remedy = "use --remove-finalizers to proceed; this orphans their workloads"
+	}
 	names := make([]string, len(e.Armed))
 	for i, a := range e.Armed {
 		names[i] = a.String()
+		if e.Target != (ArmedInstance{}) && a == e.Target {
+			names[i] += " (the instance being deleted)"
+		}
 	}
 	return fmt.Sprintf(
-		"refusing to uninstall: %d instance(s) still carry the %s finalizer: %s (use --remove-finalizers to proceed; this orphans their workloads)",
-		len(e.Armed), cleanupFinalizer, strings.Join(names, ", "),
+		"refusing to %s: %d instance(s) still carry the %s finalizer: %s (%s)",
+		action, len(e.Armed), cleanupFinalizer, strings.Join(names, ", "), remedy,
+	)
+}
+
+// OwnInstanceOwnerError reports that a delete was refused because the target
+// deploys the operator and is operator-owned. The operator never reconciles,
+// finalizes or prunes the instance that deploys it, so the operator-owned
+// delete would wait on, and report, a cleanup that does not happen. The remedy
+// is the one the operator itself names for such an instance.
+type OwnInstanceOwnerError struct {
+	Namespace string
+	Name      string
+	// Signal is the DeploysOperator signal that matched.
+	Signal string
+}
+
+func (e *OwnInstanceOwnerError) Error() string {
+	return fmt.Sprintf(
+		"refusing to delete %s/%s: it deploys the operator (matched by %s) and is operator-owned, "+
+			"but the operator never reconciles or prunes the instance that deploys it; "+
+			"set spec.owner to cli (kubectl patch moduleinstance %s -n %s --type=merge -p '{\"spec\":{\"owner\":\"cli\"}}'), then retry",
+		e.Namespace, e.Name, e.Signal, e.Name, e.Namespace,
 	)
 }
 

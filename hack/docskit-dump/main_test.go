@@ -16,12 +16,11 @@ import (
 	"golang.org/x/mod/modfile"
 )
 
-// TestPins_EqualTheSourcesTheSiteRead binds pins() to the files
-// opmodel.dev's resolve-versions.sh read the same three versions from: the
-// library require in the cli's go.mod, the DefaultSchemaModule line of that
-// library's opm/schema/loader.go, and the PinnedOperatorVersion line of
-// internal/operator/manifest.go.
-func TestPins_EqualTheSourcesTheSiteRead(t *testing.T) {
+// TestPins_EqualTheSourcePins checks that the compiled pins equal the source
+// pins: the library require in the cli's go.mod, the DefaultSchemaModule line
+// of that library's opm/schema/loader.go, and the PinnedOperatorVersion line
+// of internal/operator/manifest.go.
+func TestPins_EqualTheSourcePins(t *testing.T) {
 	got, err := pins()
 	require.NoError(t, err)
 
@@ -129,7 +128,7 @@ func TestRun_DumpIsDeterministic(t *testing.T) {
 }
 
 // goModLibrary returns the library version path's go.mod requires; a replace
-// of the library is a failure, as it is for the site's reading.
+// of the library is a failure.
 func goModLibrary(t *testing.T, path string) string {
 	t.Helper()
 	data, err := os.ReadFile(path)
@@ -160,7 +159,7 @@ func moduleDir(t *testing.T, path string) string {
 }
 
 // constValue returns the version in `name = "<prefix>v..."` in file, matched
-// by its text as resolve-versions.sh matches it, with the prefix removed.
+// by its text, with the prefix removed.
 func constValue(t *testing.T, file, name, prefix string) string {
 	t.Helper()
 	data, err := os.ReadFile(file)
