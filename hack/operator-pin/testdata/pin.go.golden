@@ -7,6 +7,6 @@ package operator
 // only with 'task operator:pin VERSION=<version>'.
 const PinnedModuleVersion = "0.2.0"
 
-// pinnedModuleOperatorVersion is the operator release PinnedModuleVersion deploys, as the
+// PinnedOperatorVersion is the operator release PinnedModuleVersion deploys, as the
 // module's operator package states it, "v"-prefixed.
-const pinnedModuleOperatorVersion = "v1.0.0-beta.6"
+const PinnedOperatorVersion = "v1.0.0-beta.6"

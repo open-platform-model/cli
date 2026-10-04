@@ -120,7 +120,7 @@ jobs:
         if: steps.decide.outputs.applies == 'true'
         run: task cluster:create
 
-      - name: Install the embedded operator and wait for a Ready Platform
+      - name: Install the pinned operator module and wait for a Ready Platform
         if: steps.decide.outputs.applies == 'true'
         run: task cluster:operator
 

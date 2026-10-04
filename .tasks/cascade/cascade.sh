@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # cascade.sh: task deps:cascade. Moves the cli's upstream pins (library, the
-# embedded opm-operator, and the opm catalog and core in the templates and test
-# trees) to the newest published versions the release cascade allows, in the
-# working tree only: no commit, no branch, no push.
+# operator module pin in internal/operator/pin.go, and the opm catalog and core
+# in the templates and test trees) to the newest published versions the release
+# cascade allows, in the working tree only: no commit, no branch, no push.
 #
 # Design: workspace RELEASING.md, "The cascade" and "What each repo's task
 # moves"; Phase 2 cascade contract §5.2 and §6.4; openspec change
@@ -25,6 +25,8 @@ cd "$(git rev-parse --show-toplevel)"
 
 LIB=github.com/open-platform-model/library
 OP=github.com/open-platform-model/opm-operator
+MOD=opmodel.dev/modules/opm_operator@v0
+PIN=internal/operator/pin.go
 CAT=opmodel.dev/catalogs/opm@v4
 CORE=opmodel.dev/core@v2
 POD=testing.opmodel.dev/modules/cli/podinfo@v0
@@ -248,11 +250,27 @@ newest "$LIB" go "$LIB" --current "$LIB_CUR" --repo-root .
 LIB_T=$NEW
 report library "$LIB_CUR" "$LIB_T"
 
-OP_CUR=$(sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p' internal/operator/manifest.go)
-[ -n "$OP_CUR" ] || die "internal/operator/manifest.go has no PinnedOperatorVersion"
-newest "$OP" release opm-operator --asset install.yaml --current "$OP_CUR" --repo-root .
-OP_T=$NEW
-report opm-operator "$OP_CUR" "$OP_T"
+# The operator module: the newest published release in the pinned major whose
+# operator MAJOR.MINOR is not above the cli's, the rule install applies to a
+# target (0021:D9:R4). The resolver answers the newest release; operator-pin
+# walks down from it, reading each candidate's operator package (no render).
+MOD_CUR=$(sed -n 's/^const PinnedModuleVersion = "\(.*\)"$/\1/p' "$PIN")
+[ -n "$MOD_CUR" ] || die "\`$PIN\` has no PinnedModuleVersion"
+MOD_CUR=v$MOD_CUR
+newest "$MOD" cue "$MOD" --current "$MOD_CUR" --repo-root .
+MOD_T=""
+if [ -n "$NEW" ]; then
+  CLI_V=$(jq -er '."."' .release-please-manifest.json) || die "cannot read the cli version from .release-please-manifest.json"
+  SEL_RC=0
+  SEL=$(go run ./hack/operator-pin select "$NEW" "$CLI_V") || SEL_RC=$?
+  case "$SEL_RC" in
+    0) if [ "v$SEL" != "$MOD_CUR" ]; then MOD_T=v$SEL; fi ;;
+    3) warn "$MOD" "no \`$MOD\` release up to \`$NEW\` deploys an operator the cli \`$CLI_V\` can drive; the pin stays" ;;
+    *) die "\`hack/operator-pin select $NEW $CLI_V\` failed (exit $SEL_RC)" "$SEL_RC" ;;
+  esac
+  if [ -n "$MOD_T" ]; then vcmp "$MOD_T" "$MOD_CUR"; if [ "$CMP" != 1 ]; then MOD_T=""; fi; fi
+fi
+report "opm-operator module" "$MOD_CUR" "$MOD_T"
 
 CAT_REP=$(cue_dep_v "$REP/cue.mod/module.cue" "$CAT")
 [ -n "$CAT_REP" ] || die "\`$REP/cue.mod/module.cue\` pins no \`$CAT\`"
@@ -425,20 +443,24 @@ done
 
 # Anything to do?
 work=0
-if [ -n "$LIB_T" ] || [ -n "$OP_T" ] || [ -n "$KIND_T" ]; then work=1; fi
+if [ -n "$LIB_T" ] || [ -n "$MOD_T" ] || [ -n "$KIND_T" ]; then work=1; fi
 for d in "${CUE_DIRS[@]}"; do if [ -n "${MOVES[$d]}" ]; then work=1; fi; done
 if [ "${#ADV_T[@]}" -gt 0 ] || [ "${#REPIN[@]}" -gt 0 ]; then work=1; fi
 
 # docs_check: docs bundles, a warning, never a hold (design.md D9; contract
-# §9.5). It runs when library or the operator differs from the merge base,
+# §9.5). It runs when library or the operator release differs from the merge base,
 # not only when this run moved it, and on both the exit-0 and the exit-3 path
 # (the working tree is the final tree on either), so a later run on the
 # branch keeps the warning.
 docs_check() {
   local pins entries project pin key lib_base op_base
   lib_base=$(git show "$M:go.mod" | awk -v m="$LIB" '$1 == m { print $2; exit }')
-  op_base=$(git show "$M:internal/operator/manifest.go" | sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p')
-  if [ "${LIB_T:-$LIB_CUR}" != "$lib_base" ] || [ "${OP_T:-$OP_CUR}" != "$op_base" ]; then
+  # The operator release the pinned module deploys, at the merge base (from
+  # pin.go, or from manifest.go before the module pin existed) and now.
+  op_base=$({ git show "$M:$PIN" 2>/dev/null || git show "$M:internal/operator/manifest.go" 2>/dev/null; } |
+    sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p')
+  op_now=$(sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p' "$PIN")
+  if [ "${LIB_T:-$LIB_CUR}" != "$lib_base" ] || [ "$op_now" != "$op_base" ]; then
     if pins=$(go run ./hack/docskit-dump pins 2>"$STATE/docskit.err"); then
       # Outside a process substitution, so a changed output shape stops the task.
       entries=$(jq -er '.pins | to_entries[] | "\(.key)\t\(.value)"' <<<"$pins") ||
@@ -481,7 +503,7 @@ fi
 # compilation cannot stop the task from producing its diff (contract rule 11).
 
 # cue only when a cue.mod runs get and tidy, opm only for a version advance,
-# so a library- or operator-only run needs neither.
+# so a library- or operator-module-only run needs neither.
 for d in "${CUE_DIRS[@]}"; do
   if [ -n "${MOVES[$d]}" ]; then command -v cue >/dev/null || die "cue is not on PATH"; break; fi
 done
@@ -494,7 +516,7 @@ fi
 # Phase C: edit (contract §5.2 rule 12 and §6.4). A failure here exits
 # non-zero and may leave a partly edited tree; callers discard it.
 
-# 1. Shipped: library, then the operator embed.
+# 1. Shipped: library, then the operator module pin.
 if [ -n "$LIB_T" ]; then
   before=$(go_requires)
   go get "$LIB@$LIB_T"
@@ -508,8 +530,8 @@ if [ -n "$LIB_T" ]; then
     fi
   done <<<"$after"
 fi
-if [ -n "$OP_T" ]; then
-  task -x operator:sync VERSION="$OP_T" >&2
+if [ -n "$MOD_T" ]; then
+  task -x operator:pin VERSION="${MOD_T#v}" >&2
 fi
 
 # 2. Catalog and core: templates first, then the test trees (CUE_DIRS order).

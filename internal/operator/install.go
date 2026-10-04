@@ -14,6 +14,11 @@ import (
 	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
 )
 
+const (
+	kindCustomResourceDefinition = "CustomResourceDefinition"
+	kindNamespace                = "Namespace"
+)
+
 // InstallResult reports what an install wrote.
 type InstallResult struct {
 	Target Target

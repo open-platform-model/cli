@@ -41,7 +41,7 @@ import (
 const pinFile = "internal/operator/pin.go"
 
 // operatorConst is the constant the pin records the operator version in.
-const operatorConst = "pinnedModuleOperatorVersion"
+const operatorConst = "PinnedOperatorVersion"
 
 // exitNone is select's "no version qualifies", the cascade's stay code.
 const exitNone = 3

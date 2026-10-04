@@ -18,7 +18,7 @@ import (
 
 func TestResolveTarget(t *testing.T) {
 	reg := operatortest.Registry(t,
-		operatortest.Version{Module: PinnedModuleVersion, Operator: pinnedModuleOperatorVersion[1:]},
+		operatortest.Version{Module: PinnedModuleVersion, Operator: PinnedOperatorVersion[1:]},
 		operatortest.Version{Module: "0.2.0", Operator: "1.0.0-beta.8"},
 		operatortest.Version{Module: "0.3.0", OperatorPackage: "-"},
 	)
@@ -29,7 +29,7 @@ func TestResolveTarget(t *testing.T) {
 	res, target, err := ResolveTarget(ctx, src, reg, "")
 	require.NoError(t, err)
 	assert.Equal(t, "v"+PinnedModuleVersion, res.Version)
-	assert.Equal(t, Target{ModuleVersion: "v" + PinnedModuleVersion, OperatorVersion: pinnedModuleOperatorVersion, Default: true}, target)
+	assert.Equal(t, Target{ModuleVersion: "v" + PinnedModuleVersion, OperatorVersion: PinnedOperatorVersion, Default: true}, target)
 
 	// "Selecting another version", pinned and floating.
 	_, target, err = ResolveTarget(ctx, src, reg, "0.2.0")

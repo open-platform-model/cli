@@ -78,6 +78,7 @@ commit_setup() {
 
 LIB=github.com/open-platform-model/library
 OP=github.com/open-platform-model/opm-operator
+MOD=opmodel.dev/modules/opm_operator@v0
 CAT=opmodel.dev/catalogs/opm@v4
 CORE=opmodel.dev/core@v2
 POD=testing.opmodel.dev/modules/cli/podinfo@v0
@@ -149,10 +150,10 @@ fi
 
 pre=$(sandbox pins)
 if (cd "$pre" && diff <(.tasks/cascade/pins.sh WORKTREE) <(.tasks/cascade/pins.sh HEAD) >/dev/null); then
-  if [ "$(cd "$pre" && .tasks/cascade/pins.sh WORKTREE | wc -l)" -eq 4 ]; then
+  if [ "$(cd "$pre" && .tasks/cascade/pins.sh WORKTREE | wc -l)" -eq 5 ]; then
     pass "pins.sh WORKTREE equals HEAD"
   else
-    fail "pins.sh WORKTREE equals HEAD" "pins.sh does not print four pins"
+    fail "pins.sh WORKTREE equals HEAD" "pins.sh does not print five pins"
   fi
 else
   fail "pins.sh WORKTREE equals HEAD" "the two reads differ on a clean copy"
@@ -367,10 +368,36 @@ else
   pass "S14 frozen unpublished podinfo"
 fi
 
+# S16 module-only move: only PinnedModuleVersion moves, to a module release
+# that deploys the same operator (0021:D11:R3); the title counts one moved pin
+# and the body has a row for the module and none for the operator release.
+# Needs the real resolver for title and body, which read no registry.
+if [ -z "${CASCADE_RESOLVER_REAL:-}" ]; then
+  skip "S16 module-only move" "CASCADE_RESOLVER_REAL is not set"
+else
+  d=$(sandbox s16)
+  commit_setup "$d"
+  perl -pi -e 's/^const PinnedModuleVersion = "[^"]+"$/const PinnedModuleVersion = "0.99.0"/' "$d/internal/operator/pin.go"
+  title=$(cd "$d" && CASCADE_RESOLVER="$CASCADE_RESOLVER_REAL" task -x deps:cascade:title 2>"$TMP/s16.err") || true
+  body=$(cd "$d" && CASCADE_RESOLVER="$CASCADE_RESOLVER_REAL" task -x deps:cascade:body 2>>"$TMP/s16.err") || true
+  if [ "$title" != "fix(deps): bump opm-operator module to v0.99.0" ]; then
+    fail "S16 module-only move" "title '$title': $(tail -n 2 "$TMP/s16.err" | tr '\n' ' ')"
+  elif [ "$(grep -c '^| .* (`' <<<"$body" || true)" != 1 ] || ! grep -qF "$MOD" <<<"$body"; then
+    fail "S16 module-only move" "the body does not have exactly one row, for $MOD"
+  elif grep -q "^| .*\`$OP\`" <<<"$body"; then
+    fail "S16 module-only move" "the body has a row for $OP"
+  else
+    pass "S16 module-only move"
+  fi
+fi
+
 # ---------------------------------------------------------------------------
 # Network scenarios (CASCADE_TEST_SET=all): the older versions are real, so
-# go get, operator:sync and cue mod get resolve them from the Go proxy, GitHub
-# releases and GHCR, or from a warm cache.
+# go get and cue mod get resolve them from the Go proxy and GHCR, or from a
+# warm cache. The operator module pin stays at the tree's version: no older
+# module release exists yet (0.1.0 is the first). Once one does, add an
+# "older" row for it, move it in setup_older with task operator:pin, and
+# count it in S5.
 
 OLDER="$HERE/testdata/older.tsv"
 CUE_DIRS=(
@@ -397,11 +424,10 @@ set_v() {
   [ "$(cue_dep_v "$1" "$2")" = "$3" ]
 }
 # setup_older DIR CATALOG CORE [PODINFO]: move every pin the task moves back to
-# the given versions (library and operator to their older rows).
+# the given versions (library to its older row; the operator module pin stays).
 setup_older() {
   local d="$1" c m
-  (cd "$d" && GOWORK=off go get "$LIB@$(older older "$LIB")" && GOWORK=off go mod tidy) >/dev/null 2>&1 &&
-    (cd "$d" && task -x operator:sync VERSION="$(older older "$OP")") >/dev/null 2>&1 || return 1
+  (cd "$d" && GOWORK=off go get "$LIB@$(older older "$LIB")" && GOWORK=off go mod tidy) >/dev/null 2>&1 || return 1
   for c in "${CUE_DIRS[@]}"; do
     m="$d/$c/cue.mod/module.cue"
     if [ -n "$(cue_dep_v "$m" "$CAT")" ]; then set_v "$m" "$CAT" "$2" || return 1; fi
@@ -445,6 +471,8 @@ if [ "$SET" = all ]; then
   d=$(sandbox older)
   ok=1
   while IFS=$'\t' read -r key _ _ v _; do
+    # The operator module pin and the operator release it records stay put.
+    case "$key" in "$OP" | "$MOD") continue ;; esac
     o=$(older older "$key")
     if [ -z "$o" ] || ! older_than "$o" "$v"; then
       fail "older.tsv" "\`older.tsv\` \`$key\` \`${o:-missing}\` is not older than the tree's \`$v\`; pick an older published version"
@@ -495,12 +523,12 @@ if [ "$SET" = all ]; then
         title=$(cd "$d" && CASCADE_RESOLVER="$CASCADE_RESOLVER_REAL" task -x deps:cascade:title 2>"$TMP/s5.err") || true
         body=$(cd "$d" && CASCADE_RESOLVER="$CASCADE_RESOLVER_REAL" task -x deps:cascade:body 2>>"$TMP/s5.err") || true
         rows=$(grep -c '^| .* (`' <<<"$body" || true)
-        if [ "$title" != "fix(deps): bump 4 upstream pins" ]; then
+        if [[ "$title" != "fix(deps): bump library to "*", opm catalog to "*" and core to "* ]]; then
           fail "S5 title and body" "title '$title': $(tail -n 2 "$TMP/s5.err" | tr '\n' ' ')"
         elif ! grep -q '^<!-- cascade-title: ' <<<"$body" || ! grep -q '^<!-- cascade-labels: ' <<<"$body"; then
           fail "S5 title and body" "the body lacks a marker"
-        elif [ "$rows" != 4 ]; then
-          fail "S5 title and body" "$rows moved-pin rows, want 4"
+        elif [ "$rows" != 3 ]; then
+          fail "S5 title and body" "$rows moved-pin rows, want 3"
         elif [ "$(grep '^## ' <<<"$body" | tail -n 1)" != "## Notes" ]; then
           fail "S5 title and body" "## Notes is not the last section"
         elif grep -q need-human-review <<<"$body"; then
@@ -516,7 +544,7 @@ if [ "$SET" = all ]; then
           "test	examples/cue.mod/module.cue" "test	tests/fixtures/modules/podinfo/identity/identity.cue" \
           "test	internal/instinit/testdata/initvalues/cue.mod/module.cue" \
           "test	internal/cmd/platform/check_test.go" "shipped	templates/minimal/cue.mod/module.cue" \
-          "shipped	internal/operator/dist/install.yaml" "shipped	go.mod")
+          "shipped	internal/operator/pin.go" "shipped	go.mod")
         got=$(cut -f2 <<<"$want" | (cd "$d" && "$CASCADE_RESOLVER_REAL" classify --classes .tasks/cascade/classes)) || got="classify failed"
         if [ "$got" = "$want" ]; then
           pass "S5 classes"
