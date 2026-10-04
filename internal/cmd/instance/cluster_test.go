@@ -101,6 +101,8 @@ func TestInstanceBuild_UnreachableClusterFallsBackToDeps(t *testing.T) {
 	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
 		t.Skip("skipping registry-backed tests")
 	}
+	// A developer's own OPM_NAMESPACE would be refused as an override.
+	t.Setenv("OPM_NAMESPACE", "")
 	instanceFile, err := filepath.Abs(filepath.Join("..", "..", "..", "examples", "instances", "podinfo", "instance.cue"))
 	require.NoError(t, err)
 	// OPM_REGISTRY when set: PR CI seeds the tree's fixtures into a job-local

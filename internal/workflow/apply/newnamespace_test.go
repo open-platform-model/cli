@@ -24,9 +24,8 @@ import (
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
 )
 
-// namespaceDryRun is a dry run of one ConfigMap in the instance namespace
-// "default", with --create-namespace set to createNS and the namespace present
-// on the cluster when nsExists.
+// namespaceDryRun records one run: the resources patched, whether a
+// Namespace was created, and the log.
 type namespaceDryRun struct {
 	mu        sync.Mutex
 	patched   []string
@@ -34,6 +33,9 @@ type namespaceDryRun struct {
 	log       bytes.Buffer
 }
 
+// runNamespaceDryRun dry-runs one ConfigMap in the instance namespace
+// "default", with --create-namespace set to createNS and the namespace present
+// on the cluster when nsExists.
 func runNamespaceDryRun(t *testing.T, createNS, nsExists bool) (*namespaceDryRun, error) {
 	t.Helper()
 	run := &namespaceDryRun{}
