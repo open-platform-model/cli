@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 )
 
@@ -19,7 +20,7 @@ import (
 const clientSideApplyManager = "kubectl-client-side-apply"
 
 // objKey identifies a Kubernetes object by group, kind, namespace and name.
-type objKey struct{ Group, Kind, Namespace, Name string }
+type objKey = inventory.K8sIdentity
 
 func keyOf(obj *unstructured.Unstructured) objKey {
 	return objKey{Group: obj.GroupVersionKind().Group, Kind: obj.GetKind(), Namespace: obj.GetNamespace(), Name: obj.GetName()}
@@ -70,6 +71,25 @@ type MigrationPlan struct {
 // which is when install prints its migration lines.
 func (p *MigrationPlan) Migrates() bool {
 	return p != nil && (len(p.Adopt) > 0 || p.RecreateDeployment != nil || len(p.DeleteBindings) > 0)
+}
+
+// Admit is the set the apply guard admits: the adopted objects, the
+// Deployment the migration recreates, and the rendered objects that already
+// carry the instance's identity, so a resumed run's set is complete. Nil
+// for a nil plan.
+func (p *MigrationPlan) Admit() inventory.AdmitSet {
+	if p == nil {
+		return nil
+	}
+	set := inventory.AdmitSet{}
+	objs := append(append([]*unstructured.Unstructured(nil), p.Adopt...), p.Ours...)
+	if p.RecreateDeployment != nil {
+		objs = append(objs, p.RecreateDeployment)
+	}
+	for _, obj := range objs {
+		set[keyOf(obj)] = struct{}{}
+	}
+	return set
 }
 
 // Writes reports whether the plan makes any migration write.

@@ -229,10 +229,11 @@ func PlanInstall(ctx context.Context, env InstallEnv, res *modref.Resolution, ta
 	}
 
 	// The apply guard, the last check: on a cluster with no record every
-	// object the plan applies must be absent or already OPM's.
+	// object the plan applies must be absent, already OPM's, or admitted by
+	// the migration's proof.
 	if rec == nil {
 		entries := workflowapply.CurrentInventoryEntries(plan.Objects())
-		if err := inventory.PreApplyExistenceCheck(ctx, env.Client, entries); err != nil {
+		if err := inventory.PreApplyExistenceCheck(ctx, env.Client, entries, plan.Migration.Admit()); err != nil {
 			return nil, &GuardError{Err: err}
 		}
 	}

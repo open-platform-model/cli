@@ -77,9 +77,46 @@ func TestPreApplyExistenceCheck_UntrackedNamesNoFlag(t *testing.T) {
 
 	err := PreApplyExistenceCheck(context.Background(), client, []InventoryEntry{
 		{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "taken"},
-	})
+	}, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "already exists and is not managed by OPM")
 	assert.Contains(t, err.Error(), "remove or rename it")
 	assert.NotContains(t, err.Error(), "--force")
+}
+
+// The admission set passes an admitted object's untracked test only: an
+// unadmitted untracked object and an admitted terminating one still fail,
+// and a nil set keeps the check as it is for every other apply.
+func TestPreApplyExistenceCheck_AdmitSet(t *testing.T) {
+	kustomized := liveObject("v1", "Namespace", "", "opm-operator-system")
+	kustomized.SetLabels(map[string]string{"app.kubernetes.io/managed-by": "kustomize"})
+	foreign := liveObject("v1", "ConfigMap", "default", "taken")
+	doomed := liveObject("v1", "ServiceAccount", "default", "doomed")
+	now := metav1.Now()
+	doomed.SetDeletionTimestamp(&now)
+	doomed.SetFinalizers([]string{"foregroundDeletion"})
+	client := &kubernetes.Client{Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), kustomized, foreign, doomed)}
+
+	nsEntry := InventoryEntry{Version: "v1", Kind: "Namespace", Name: "opm-operator-system"}
+	cmEntry := InventoryEntry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "taken"}
+	saEntry := InventoryEntry{Version: "v1", Kind: "ServiceAccount", Namespace: "default", Name: "doomed"}
+	admit := AdmitSet{
+		{Kind: "Namespace", Name: "opm-operator-system"}:               {},
+		{Kind: "ServiceAccount", Namespace: "default", Name: "doomed"}: {},
+	}
+	ctx := context.Background()
+
+	require.NoError(t, PreApplyExistenceCheck(ctx, client, []InventoryEntry{nsEntry}, admit), "an admitted kustomize-labeled object passes")
+
+	err := PreApplyExistenceCheck(ctx, client, []InventoryEntry{nsEntry, cmEntry}, admit)
+	require.Error(t, err, "an unadmitted untracked object is refused")
+	assert.Contains(t, err.Error(), "ConfigMap/taken")
+
+	err = PreApplyExistenceCheck(ctx, client, []InventoryEntry{saEntry}, admit)
+	require.Error(t, err, "an admitted terminating object is refused")
+	assert.Contains(t, err.Error(), "is terminating")
+
+	err = PreApplyExistenceCheck(ctx, client, []InventoryEntry{nsEntry}, nil)
+	require.Error(t, err, "a nil set admits nothing")
+	assert.Contains(t, err.Error(), "Namespace/opm-operator-system")
 }

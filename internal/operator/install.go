@@ -44,7 +44,7 @@ func (e *RolloutError) Unwrap() error { return e.Err }
 // Install performs a plan's writes, in order, within the plan's --timeout
 // budget: the CRD step (server-side apply of the rendered CRDs as opm-cli,
 // then wait for Established), then, unless the plan is CRDs-only, the
-// CLI-owned instance apply of the whole render (no namespace creation, the
+// migration's writes and the CLI-owned instance apply of the whole render (no namespace creation, the
 // running-operator ceiling skipped, pruning on), then the --rbac objects,
 // then the controller Deployment's rollout. A step that fails stops the
 // install; nothing is rolled back, and re-running install completes it.
@@ -66,9 +66,21 @@ func Install(ctx context.Context, env InstallEnv, plan *Plan) (*InstallResult, e
 		return result, err
 	}
 
-	// The migration writes slot: migrate-manifest-installed-operator deletes
-	// the proven earlier Deployment and superseded role bindings here, after
-	// the CRDs are served and before the instance apply (0012:D8:R7).
+	// The migration's writes, after the CRDs are served and before the
+	// instance apply (0012:D8:R7): the field-ownership moves, then the
+	// earlier Deployment, then the superseded role bindings. A cluster with
+	// nothing to migrate writes nothing here.
+	if !plan.CRDsOnly {
+		if err := MoveOwnership(ctx, env.Client, plan.Migration); err != nil {
+			return result, err
+		}
+		if err := DeleteSuperseded(ctx, env.Client, plan.Migration, plan.BudgetStart); err != nil {
+			return result, err
+		}
+		for _, line := range MigrationReport(plan.Migration) {
+			output.Info(line)
+		}
+	}
 
 	// Write 2: the instance apply records every rendered object, the CRDs
 	// and the Namespace included.
@@ -77,6 +89,7 @@ func Install(ctx context.Context, env InstallEnv, plan *Plan) (*InstallResult, e
 			Result:    plan.Render,
 			K8sClient: env.Client,
 			Log:       output.InstanceLogger(OperatorInstanceName),
+			Admit:     plan.Migration.Admit(),
 			Options: workflowapply.Options{
 				CreateNS:               false,
 				SkipOperatorCeiling:    true,

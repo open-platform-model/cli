@@ -83,7 +83,7 @@ opm operator install                                  (internal/cmd/operator/ins
 
 Everything lives in package `internal/operator` (files `legacy.go`, `migration_proof.go`, `migration_plan.go`, `migration_execute.go`, `migration_report.go`), not in a `migration` subpackage: the proof list is built from the names in `names.go`, and `PlanInstall` calls the planner, so a subpackage would import its own importer. The plan travels on `operator.Plan` as the field `Migration`.
 
-The proof runs before the check-phase guard, and both guard calls (the one in the check phase and the one inside the instance apply) admit `Plan.Admit()`. A proof placed after the guard would never run on a manifest-installed cluster: the guard refuses at `Namespace/opm-operator-system` first, exactly as the install experiment measured.
+The proof runs before the check-phase guard, and both guard calls (the one in the check phase and the one inside the instance apply) admit `MigrationPlan.Admit()`. A proof placed after the guard would never run on a manifest-installed cluster: the guard refuses at `Namespace/opm-operator-system` first, exactly as the install experiment measured.
 
 All migration writes sit in one slot after the CRD step. A CRD step that fails therefore leaves the earlier operator untouched. The ownership move can wait until after the CRD step because the instance apply applies the CRDs again as `opm-cli` with force (see Context): that second apply drops whatever the move handed to `opm-cli` and the module does not render. The move rewrites `managedFields` only, so a run that stops right after it leaves the earlier operator running unchanged.
 
@@ -145,7 +145,7 @@ type K8sIdentity struct{ Group, Kind, Namespace, Name string }
 type AdmitSet map[K8sIdentity]struct{}
 ```
 
-`K8sIdentity` is new (`pkg/inventory/entry.go` has only `K8sIdentityEqual`, which compares two entries); task 4.1 adds it beside that function. An entry in `admit` passes the managed-by test, and only that test: a terminating admitted object is still refused. Every other caller passes `nil`, which keeps today's behaviour. `apply.Request` gains the set, so the instance apply admits the same objects as the check-phase guard. `Plan.Admit()` is `Adopt` plus the rendered objects whose identity is this instance's (`Ours`); the latter already pass today, and listing them keeps a resumed run's set complete.
+`K8sIdentity` is new (`pkg/inventory/entry.go` has only `K8sIdentityEqual`, which compares two entries); task 4.1 adds it beside that function. An entry in `admit` passes the managed-by test, and only that test: a terminating admitted object is still refused. Every other caller passes `nil`, which keeps today's behaviour. `apply.Request` gains the set, so the instance apply admits the same objects as the check-phase guard. `MigrationPlan.Admit()` is `Adopt`, the Deployment the migration recreates (it still exists when the check-phase guard reads it), and the rendered objects whose identity is this instance's (`Ours`); the latter already pass today, and listing them keeps a resumed run's set complete.
 
 This is the admission 0012:D8:R6 describes, and the one exception 0012:D8:R3 names to the ownership refusals of 0012:D1:R7 and 0012:D4:R2: the proven objects pass as if adopted, and no adopt annotation is written on the user's behalf. The set needs no write, nothing of it outlives the run, and a resumed run recomputes it.
 
@@ -158,6 +158,8 @@ This is the admission 0012:D8:R6 describes, and the one exception 0012:D8:R3 nam
 ### Field ownership of client-side installs
 
 For each existing rendered object, adopted or `Ours`, whose `managedFields` hold an `Update` entry by `kubectl-client-side-apply`, install sends the patch `csaupgrade.UpgradeManagedFieldsPatch(obj, sets.New("kubectl-client-side-apply"), "opm-cli")` (`k8s.io/client-go/util/csaupgrade`, client-go v0.36.4). `Ours` objects are included because a client-side `kubectl apply` of a manifest rendered from the module leaves the same manager behind. The instance apply's forced apply then drops what the module does not render and the moved manager set, `last-applied-configuration` included, as it already does over an earlier `opm-cli` install (install experiment, step 3). This is what `kubectl apply --server-side` does when it takes over a client-side object. Argo CD's `ClientSideApplyMigration` sync option does the same at each sync.
+
+`MoveOwnership` reads each object again before building its patch: the CRD step has changed the CRDs since the check phase read them, and the patch replaces `resourceVersion`, so a patch built from the planned copy would conflict. Every delete is preconditioned on the uid the proof read, so an object replaced since then is never deleted.
 
 The scope is deliberately narrow. Only the `kubectl-client-side-apply` manager moves. Fields owned by server-side `kubectl`, Flux, Argo CD or another tool's manager, by controllers, or set by API defaults stay where they are; the spec promises nothing about them. The move is cheap and is a no-op once no client-side manager is left, so it runs on every full install, not only on a migration run.
 
@@ -211,15 +213,18 @@ Exit codes follow `internal/exit`: 1 general error, 2 validation error (a refusa
 
 ```text
 migrating the operator installed from an earlier release manifest
+  adopted   CustomResourceDefinition/moduleinstances.opmodel.dev
   adopted   Namespace/opm-operator-system
-  adopted   ServiceAccount/opm-operator-controller-manager (opm-operator-system)
+  adopted   ServiceAccount/opm-operator-system/opm-operator-controller-manager
   ...
-  recreated Deployment/opm-operator-controller-manager (opm-operator-system): selector changed; patches made to the earlier Deployment are not carried over
+  recreated Deployment/opm-operator-system/opm-operator-controller-manager: selector changed; patches made to the earlier Deployment are not carried over
+  deleted   RoleBinding/opm-operator-system/opm-operator-leader-election-rolebinding: superseded by opm-operator-leader-election-role
   deleted   ClusterRoleBinding/opm-operator-manager-rolebinding: superseded by opm-operator-manager-role
   deleted   ClusterRoleBinding/opm-operator-metrics-auth-rolebinding: superseded by opm-operator-metrics-auth-role
-  deleted   RoleBinding/opm-operator-system/opm-operator-leader-election-rolebinding: superseded by opm-operator-leader-election-role
   left      ClusterRole/opm-operator-modulerelease-viewer-role: not part of the operator module
 ```
+
+Objects are named as the apply lines name them (`Kind/namespace/name`), in proof-list order. `MigrationReport` builds the lines; install prints them after the migration's deletes, immediately before the instance apply's own lines.
 
 Install prints migration lines only on a run that adopts, recreates or deletes something. The `left` lines name proven list entries the module does not render. Those objects are never removed, so printing them on every later install would repeat the same lines forever; after a completed migration nothing is adopted, recreated or deleted, and install prints no migration lines. The replacement names come from the render (see "Binding delete").
 
