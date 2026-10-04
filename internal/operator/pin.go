@@ -9,4 +9,4 @@ const PinnedModuleVersion = "0.1.0"
 
 // PinnedOperatorVersion is the operator release PinnedModuleVersion deploys, as the
 // module's operator package states it, "v"-prefixed.
-const PinnedOperatorVersion = "v1.0.0-beta.7"
+const PinnedOperatorVersion = "v1.0.0-beta.8"
