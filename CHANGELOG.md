@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-beta.9](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.8...v1.0.0-beta.9) (2026-10-04)
+
+
+### Bug Fixes
+
+* **deps:** bump library to v1.0.0-beta.4, opm-operator to v1.0.0-beta.7 and opm catalog to v4.6.0 ([#304](https://github.com/open-platform-model/cli/issues/304)) ([e6d49d6](https://github.com/open-platform-model/cli/commit/e6d49d626e311502e08df2030bbb03fefe6d5841))
+
 ## [1.0.0-beta.8](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.7...v1.0.0-beta.8) (2026-10-04)
 
 
