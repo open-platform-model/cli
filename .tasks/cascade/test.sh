@@ -291,6 +291,28 @@ else
   pass "S11 never lower"
 fi
 
+# S12 kind ahead: hack/kind-platform.yaml above hack/platform's catalog stays,
+# with a warning; it is never moved down (contract v1.1 clarification C8).
+d=$(sandbox s12)
+current_rows "$d" >"$TMP/s12/table"
+perl -pi -e 's/^(\s*version:\s*)"[^"]+"/$1"4.99.0"/ if $seen; $seen = 1 if /opmodel\.dev\/catalogs\/opm\@v4:/' \
+  "$d/hack/kind-platform.yaml"
+setup_ok=0
+if grep -q '"4.99.0"' "$d/hack/kind-platform.yaml"; then setup_ok=1; fi
+commit_setup "$d"
+run "$d" "$TMP/s12/table" "$TMP/s12/log"
+if [ "$setup_ok" != 1 ]; then
+  fail "S12 kind ahead" "the setup edit did not apply"
+elif [ "$RUN_RC" != 3 ]; then
+  fail "S12 kind ahead" "exit $RUN_RC, want 3: $(why)"
+elif ! clean "$d"; then
+  fail "S12 kind ahead" "the tree changed"
+elif ! warned "$d" "\`hack/kind-platform.yaml\` \`4.99.0\` is ahead of"; then
+  fail "S12 kind ahead" "no kind-ahead warning"
+else
+  pass "S12 kind ahead"
+fi
+
 # ---------------------------------------------------------------------------
 # Network scenarios (CASCADE_TEST_SET=all): the older versions are real, so
 # go get, operator:sync and cue mod get resolve them from the Go proxy, GitHub

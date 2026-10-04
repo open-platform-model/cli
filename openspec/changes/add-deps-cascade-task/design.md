@@ -153,7 +153,7 @@ Each entry is a directory whose `cue.mod/module.cue` the task reads. The list is
   - `hold opmodel.dev/core@v2` is read once.
   - If an in-date `max` is below `pin-of T`, the file's catalog stays at its current value, and so does its core. The warning is "catalog `<t>` needs core `<c>`, above the hold `<max>`; catalog held too" (contract §9.11).
   - If the file's catalog does not move and `max` is below `pin-of C`, core stays too, with the warning "core `<c>` that catalog `<C>` pins is above the hold `<max>`; core held". Core is never written to a value MVS would raise again.
-- **`hack/kind-platform.yaml`.** The bare `version:` under `opmodel.dev/catalogs/opm@v4:` is rewritten as text to `hack/platform`'s catalog after the move, with no `v`. The file header says it mirrors `hack/platform` (`hack/kind-platform.yaml:4-9`).
+- **`hack/kind-platform.yaml`.** The bare `version:` under `opmodel.dev/catalogs/opm@v4:` is rewritten as text to `hack/platform`'s catalog after the move, with no `v`, when it is lower. The file header says it mirrors `hack/platform` (`hack/kind-platform.yaml:4-9`), but no pin moves backwards (contract v1.1 clarification C8), so a kind version above `hack/platform`'s stays, with a warning (Phase 2 implementation review, finding 1; test S12).
 - **Writing.**
   - In a file where some key moved, the task runs one `cue mod get` naming only the moved `opmodel.dev/*` keys at their exact versions, then one `cue mod tidy`.
   - A file where nothing moved is never touched.
@@ -363,7 +363,7 @@ These calls decide no target, so they run in phase C.
 - **S10, allowed dirty tree and expect hint** (offline, added at verify). An untracked file with `CASCADE_ALLOW_DIRTY=1`: exit 3 by snapshot, and the file stays. `CASCADE_EXPECT` naming library and an unrelated key: only the library `newest` call carries `--expect`.
 - **S11, never lower** (offline, added at verify). A commit after the base sets `templates/minimal` to `1.99.0`: exit 3, the version stays, and the "above the cascade target" warning (D6).
 - **S5 also checks the path-class map** through the real resolver's `classify`: the test-class paths of every pattern in `classes`, and three shipped paths.
-- **Sets.** `CASCADE_TEST_SET=offline` runs the pre-checks plus S1, S3, S6, S7, S8, S10 and S11. `all` (the default) adds S2, S4, S5 and S9.
+- **Sets.** `CASCADE_TEST_SET=offline` runs the pre-checks plus S1, S3, S6, S7, S8, S10, S11 and S12 (a kind catalog ahead of `hack/platform` stays). `all` (the default) adds S2, S4, S5 and S9.
 
 ### D11: CI placement
 

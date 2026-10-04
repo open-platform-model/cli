@@ -13,7 +13,7 @@
 - **Catalog and core as a consistent set.** This covers the `cue.mod/module.cue` files of the three templates, `hack/platform`, `examples`, `tests/fixtures/modules/podinfo`, `tests/e2e/testdata/operator-owned`, `internal/instinit/testdata/initvalues`, `internal/workflow/render/testdata/skip-unprovided`, `tests/e2e/testdata/duplicate-identities`, `tests/integration/module-apply/testdata`, `tests/fixtures/valid/simple-module` and `tests/fixtures/valid/module-with-debug-values`.
   - `opmodel.dev/catalogs/opm@v4` SHALL move to the newest published catalog in its major, resolved against `templates/minimal`'s catalog.
   - `opmodel.dev/core@v2` SHALL move to the core version that the file's resulting catalog pins. A file without a catalog SHALL use `templates/minimal`'s resulting catalog.
-- **Kind Platform.** The bare `version:` under `opmodel.dev/catalogs/opm@v4:` in `hack/kind-platform.yaml` SHALL equal `hack/platform`'s catalog after the move.
+- **Kind Platform.** The bare `version:` under `opmodel.dev/catalogs/opm@v4:` in `hack/kind-platform.yaml` SHALL be raised to `hack/platform`'s catalog after the move when it is lower. A version above it SHALL stay, with a warning, since no pin moves backwards.
 
 How every move behaves:
 
@@ -36,6 +36,11 @@ How every move behaves:
 
 - **WHEN** a file pins a core newer than the core its catalog pins
 - **THEN** that file's core is unchanged, and a warning names both versions
+
+#### Scenario: A kind catalog ahead of hack/platform stays
+
+- **WHEN** `hack/kind-platform.yaml` pins a catalog newer than `hack/platform`'s, and nothing else moves
+- **THEN** the file is unchanged, the task exits 3, and a warning names both versions
 
 #### Scenario: A hold on core holds the catalog
 

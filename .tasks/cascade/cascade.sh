@@ -326,9 +326,14 @@ for d in "${CUE_DIRS[@]}"; do plan_file "$d"; done
 
 KIND_CUR=$(kind_version)
 [ -n "$KIND_CUR" ] || die "\`$KIND\` has no version under \`$CAT\`"
+# The kind file follows hack/platform's catalog up, never down (contract v1.1
+# clarification C8): a kind version above it stays, with a warning.
 KIND_T=""
-if [ "$KIND_CUR" != "${CAT_T[hack/platform]#v}" ] && ! frozen "$KIND" "$CAT"; then
+vcmp "v$KIND_CUR" "${CAT_T[hack/platform]}"
+if [ "$CMP" = -1 ] && ! frozen "$KIND" "$CAT"; then
   KIND_T=${CAT_T[hack/platform]#v}
+elif [ "$CMP" = 1 ]; then
+  warn "$CAT" "\`$KIND\` \`$KIND_CUR\` is ahead of \`hack/platform\` \`${CAT_T[hack/platform]}\`; left as is"
 fi
 
 # Version advances, once per PR (design.md D6; contract §5.2 rule 11).
