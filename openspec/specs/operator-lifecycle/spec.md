@@ -96,7 +96,7 @@ Resolution failures SHALL map to the CLI's standard exit codes: a catalog major 
 
 ### Requirement: The running-operator check locates the operator by its fixed names
 
-Every CLI command that checks for a running operator before it acts SHALL locate the operator without reading the CLI's embedded operator manifest. The CLI is moving to install the operator as an OPM module and will stop carrying that manifest, so the check must not depend on it.
+Every CLI command that checks for a running operator before it acts SHALL locate the operator by its fixed names, reading no operator manifest and no instance record, so it finds the operator however it was installed: from a release manifest, with kubectl or by an earlier CLI, or from the operator module.
 
 The operator's objects SHALL be its fixed names, which every operator release since `v1.0.0-alpha.18` uses and every install of the operator module keeps: the `Deployment` `opm-operator-controller-manager` in the namespace `opm-operator-system`, and the `CustomResourceDefinition`s `moduleinstances.opmodel.dev`, `modulepackages.opmodel.dev`, `platforms.opmodel.dev` and `transformerregistrations.opmodel.dev`. The `Namespace` is checked only as the `Deployment`'s namespace; the check reads no `Namespace` object and no instance record. An operator from an earlier release, which lacks one of these CRDs or serves its CRDs in another group, SHALL be reported as not ready.
 
@@ -104,7 +104,7 @@ The operator SHALL count as running only when every one of these `CustomResource
 
 #### Scenario: Manifest-installed operator is found by its fixed names
 
-- **WHEN** the cluster runs an operator applied from a release manifest, with kubectl or by `opm operator install`
+- **WHEN** the cluster runs an operator applied from a release manifest, with kubectl or by an earlier `opm operator install`
 - **AND** its four CRDs are `Established` and `opm-operator-controller-manager` has rolled out
 - **THEN** the running-operator check SHALL report the operator as running
 
