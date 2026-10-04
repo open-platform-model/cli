@@ -15,7 +15,8 @@ name: Publish Fixtures
 # release. An already-published version is treated as success, so pushing an
 # unrelated change under tests/fixtures/modules/ publishes nothing.
 #
-# workflow_dispatch is the repair path: re-publish without waiting for a merge.
+# workflow_dispatch is the repair path: re-publish without waiting for a
+# merge. It runs from main only.
 on:
   push:
     branches:
@@ -33,7 +34,9 @@ jobs:
   publish:
     name: Publish fixture modules
     # Forks have no access to GITHUB_TOKEN with packages:write — skip cleanly.
-    if: github.event.repository.fork == false
+    # Main only: a dispatch from another ref would publish that ref's fixtures
+    # and scripts with packages: write.
+    if: github.event.repository.fork == false && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -44,6 +47,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.0'
+          # No Actions cache in a publishing job: main's cache scope is
+          # written by runs of other code (the cascade's compute and gates).
+          cache: false
 
       - name: Build opm
         run: go build -o bin/opm ./cmd/opm

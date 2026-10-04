@@ -5,7 +5,7 @@
 `task -x deps:cascade` SHALL move the following pins in the working tree only. It SHALL NOT commit, branch or push.
 
 - **library.** `github.com/open-platform-model/library` in `go.mod` SHALL move to the newest version the Go proxy serves in its major, through `go get <module>@<exact version>` followed by `go mod tidy`.
-- **opm-operator module.** The operator module pin in `internal/operator/pin.go` (`PinnedModuleVersion` and `PinnedOperatorVersion`) SHALL move only through `task operator:pin VERSION=<v>`. The target is the newest published release of `opmodel.dev/modules/opm_operator` in the pinned major whose stated operator version, read from the module's source without a render, has a `MAJOR.MINOR` not above the cli's own, the same rule install applies to a target module version.
+- **opm-operator module.** The operator module pin in `internal/operator/pin.go` (`PinnedModuleVersion` and `PinnedOperatorVersion`) SHALL move only through `hack/operator-pin <v>`, the program behind `task operator:pin VERSION=<v>`, built from the merge base like `opm`. The target is the newest published release of `opmodel.dev/modules/opm_operator` in the pinned major whose stated operator version, read from the module's source without a render, has a `MAJOR.MINOR` not above the cli's own, the same rule install applies to a target module version.
 - **Catalog and core as a consistent set.** This covers the `cue.mod/module.cue` files of the three templates, `hack/platform`, `examples`, `tests/fixtures/modules/podinfo`, `tests/e2e/testdata/operator-owned`, `internal/instinit/testdata/initvalues`, `internal/workflow/render/testdata/skip-unprovided`, `tests/e2e/testdata/duplicate-identities`, `tests/integration/module-apply/testdata`, `tests/fixtures/valid/simple-module` and `tests/fixtures/valid/module-with-debug-values`.
   - `opmodel.dev/catalogs/opm@v4` SHALL move to the newest published catalog in its major, resolved against `templates/minimal`'s catalog.
   - `opmodel.dev/core@v2` SHALL move to the core version that the file's resulting catalog pins. A file without a catalog SHALL use `templates/minimal`'s resulting catalog.
@@ -100,3 +100,41 @@ Source: workspace RELEASING.md, section "The cascade", "Title from diff class".
 
 - **WHEN** a run moved only the operator module pin, to a module version that deploys the same operator version
 - **THEN** `task -x deps:cascade:title` prints a `fix(deps)` title counting one moved pin, and `task -x deps:cascade:body` prints one table row for `opmodel.dev/modules/opm_operator@v0` and none for `github.com/open-platform-model/opm-operator`
+
+### Requirement: The cascade task leaves non-cascade files alone and runs no dependency code
+
+`task deps:cascade` SHALL NOT edit any of these:
+
+- `.cascade-frozen` or `.cascade-hold`;
+- `release-please-config.json`, `.release-please-manifest.json` or `CHANGELOG.md`;
+- anything under `.github/`;
+- `.opm-docs-version` or `docs-kit.cue`;
+- any `language.version`;
+- `hack/fixtures.sh` or `tests/fixtures/fixtures.go`.
+
+It SHALL NOT publish, seed a real registry or push. It SHALL NOT build or run a program that links a moved Go dependency: the only Go programs it runs are the `opm` and the `hack/operator-pin` it builds, before any pin moves, from the merge base with `CASCADE_BASE` (default `origin/main`), never from the work tree, which in merge mode may already carry an earlier run's library move.
+
+It SHALL append a warning to the cascade warnings file, without failing, in each of these cases:
+
+- a CUE upstream that differs from the merge base declares a `language.version` newer than the `cue` version `.github/workflows/pr.yml` installs;
+- a new major of a pinned upstream is available.
+
+#### Scenario: Release and settings files stay untouched by a full run
+
+- **WHEN** a run moves every pin
+- **THEN** the changed paths include nothing under `.github/`, no release-please file, no `CHANGELOG.md`, no `.cascade-*` file and no `.opm-docs-version`
+
+#### Scenario: A library move runs no library code
+
+- **WHEN** a run moves library to a newer version
+- **THEN** the task runs `go get` and `go mod tidy` for it and does not run `hack/docskit-dump` or any other program built from the moved tree
+
+#### Scenario: Merge mode builds opm from the merge base
+
+- **WHEN** a run on a `deps/cascade` branch that already pins a moved library, with `main` merged in, needs a version advance
+- **THEN** the task builds `opm` from the merge base's tree, which pins `main`'s library, and runs `go` for nothing else but `get`, `mod tidy` and that build
+
+#### Scenario: A newer language version is a warning
+
+- **WHEN** a moved catalog declares a `language.version` newer than the `cue` that `pr.yml` installs
+- **THEN** the pin still moves, and the warnings file names the module, its version and the two language versions
