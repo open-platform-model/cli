@@ -204,7 +204,7 @@ The offline set SHALL run as a step of the `Lint` job in `.github/workflows/pr.y
 - any `language.version`;
 - `hack/fixtures.sh` or `tests/fixtures/fixtures.go`.
 
-It SHALL NOT publish, seed a real registry or push. It SHALL NOT build or run a program that links a moved Go dependency: the only Go program it runs is the `opm` it builds from the unmodified tree before any pin moves.
+It SHALL NOT publish, seed a real registry or push. It SHALL NOT build or run a program that links a moved Go dependency: the only Go program it runs is the `opm` it builds, before any pin moves, from the merge base with `CASCADE_BASE` (default `origin/main`), never from the work tree, which in merge mode may already carry an earlier run's library move.
 
 It SHALL append a warning to the cascade warnings file, without failing, in each of these cases:
 
@@ -220,6 +220,11 @@ It SHALL append a warning to the cascade warnings file, without failing, in each
 
 - **WHEN** a run moves library to a newer version
 - **THEN** the task runs `go get` and `go mod tidy` for it and does not run `hack/docskit-dump` or any other program built from the moved tree
+
+#### Scenario: Merge mode builds opm from the merge base
+
+- **WHEN** a run on a `deps/cascade` branch that already pins a moved library, with `main` merged in, needs a version advance
+- **THEN** the task builds `opm` from the merge base's tree, which pins `main`'s library, and runs `go` for nothing else but `get`, `mod tidy` and that build
 
 #### Scenario: A newer language version is a warning
 

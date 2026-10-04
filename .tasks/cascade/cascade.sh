@@ -10,9 +10,12 @@
 # ($CASCADE_RESOLVER) answers every version question.
 #
 # It runs no code from a moved dependency: the only Go program it builds is
-# opm, from the tree before any pin moves. The docs-bundle check, which runs
-# hack/docskit-dump and so links the moved library, lives in the pull
-# request's CI instead (.github/scripts/docs-pins-check.sh, pr.yml Lint).
+# opm, from an export of the merge base $M, never from the work tree. In merge
+# mode the work tree is deps/cascade with main merged in, so it may already
+# pin a library an earlier run moved; the merge base is main. The docs-bundle
+# check, which runs hack/docskit-dump and so links the moved library, lives in
+# the pull request's CI instead (.github/scripts/docs-pins-check.sh, pr.yml
+# Lint).
 #
 # Exit: 0 when the working tree changed, 3 when there was nothing to do, any
 # other code on error. Run it as `task -x deps:cascade`. Progress goes to
@@ -448,8 +451,8 @@ if [ "$work" = 0 ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Phase B: tools, from the unmodified tree, so a library move that breaks
-# compilation cannot stop the task from producing its diff (contract rule 11).
+# Phase B: tools, before any edit, so a library move that breaks compilation
+# cannot stop the task from producing its diff (contract rule 11).
 
 # cue only when a cue.mod runs get and tidy, opm only for a version advance,
 # so a library- or operator-only run needs neither.
@@ -457,8 +460,13 @@ for d in "${CUE_DIRS[@]}"; do
   if [ -n "${MOVES[$d]}" ]; then command -v cue >/dev/null || die "cue is not on PATH"; break; fi
 done
 if [ "${#ADV_T[@]}" -gt 0 ]; then
-  mkdir -p "$STATE/bin"
-  go build -o "$STATE/bin/opm" ./cmd/opm
+  # opm comes from the merge base, not the work tree: in merge mode the work
+  # tree may carry an earlier run's library move that no one has reviewed.
+  rm -rf "$STATE/opm-src"
+  mkdir -p "$STATE/bin" "$STATE/opm-src"
+  git archive "$M" | tar -x -C "$STATE/opm-src"
+  go build -C "$STATE/opm-src" -buildvcs=false -o "$STATE/bin/opm" ./cmd/opm
+  rm -rf "$STATE/opm-src"
 fi
 
 # ---------------------------------------------------------------------------

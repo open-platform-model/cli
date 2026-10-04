@@ -56,6 +56,10 @@ The plan's list (`/.github/`, `/.tasks/`, `/Taskfile*.yml`, the release-please f
 
 `/Dockerfile` (no `RUN` step) and `/.opm-docs-version` (selects a released binary of the org's own tool) are left out.
 
+### D6. opm is built from the merge base, not the work tree
+
+The task builds `opm` for version advances. It used to build it from the work tree before any edit. In merge mode the work tree is `deps/cascade` with `main` merged in, so it already pins whatever library an earlier bot run moved, and that library's code ran in compute before anyone reviewed it. The task now exports the merge base (`git archive "$M"`; in merge mode that is `origin/main`) to `$STATE/opm-src`, builds `opm` there with `-buildvcs=false`, and removes the export. S2 puts a `go` shim on `PATH` and fails on any `go` call other than `get`, `mod tidy` and that build.
+
 ## Risks / Trade-offs
 
 - A grant missing from D2 breaks its job only after the default flips. Mitigation: the table was built from every step; the supervisor flips the default after the merge and watches the next runs.
