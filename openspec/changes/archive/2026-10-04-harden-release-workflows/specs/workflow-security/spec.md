@@ -45,3 +45,17 @@ A workflow triggered by `pull_request` SHALL NOT grant a write scope to a job th
 
 - **WHEN** a pull request changes `.tasks/cascade/cascade.sh`
 - **THEN** GitHub requests a review from the code owners
+
+### Requirement: Publishing jobs run only from main and only on a tag
+
+The publish-templates job of `release.yml` and the publish job of `publish-fixtures.yml` SHALL run only when `github.ref` is `refs/heads/main`, also on `workflow_dispatch`, so a dispatch from another branch cannot publish with `packages: write`. publish-templates and goreleaser SHALL check out the release tag as `refs/tags/<tag>`, so a branch name in the `tag` input fails the checkout. These guards stop a mistaken or bot-branch dispatch; a person with write access can still change the workflow on a branch, which code-owner review and the `release` Environment address. Source: security pass review of cli PR 306.
+
+#### Scenario: A manual release run from a branch
+
+- **WHEN** a maintainer dispatches `release.yml` from a branch other than `main` with a draft's tag
+- **THEN** publish-templates is skipped, and goreleaser keeps the release a draft because the templates did not publish
+
+#### Scenario: A branch name as the tag input
+
+- **WHEN** `release.yml` is dispatched from `main` with `tag` set to `deps/cascade`
+- **THEN** the publish-templates checkout of `refs/tags/deps/cascade` fails and nothing is published

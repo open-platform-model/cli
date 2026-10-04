@@ -11,6 +11,10 @@ name: Release
 # Only the App may create a tag, and release-please swallows a refused tag
 # creation (any 422), so another token would leave a draft with no tag.
 #
+# A manual run must start from main: publish-templates refuses any other
+# ref, and goreleaser keeps the draft without it. Both check out the tag as
+# refs/tags/<tag>, so a branch name in the tag input is refused.
+#
 # Recovery runbook:
 #   - Draft with missing or partial assets: re-run the failed jobs, or run
 #     this workflow by hand with the tag.
@@ -38,9 +42,9 @@ name: Release
 #     mode with the tag (see docs.yml). Only a release whose tree has
 #     hack/docskit-dump can have a bundle.
 #   - Published release whose downstreams were not notified: if Notify
-#     downstream failed, re-run the failed jobs; if it was skipped (a manual
-#     run from a branch other than main published the draft), nothing re-sends
-#     it and the downstream receivers' daily sweep picks the release up. The
+#     downstream failed, re-run the failed jobs; if it was skipped
+#     (CASCADE_NOTIFY=off), nothing re-sends it and the downstream receivers'
+#     daily sweep picks the release up. The
 #     job runs only after goreleaser published the release, never for a
 #     published tag (goreleaser's draft check fails first), and does not wait
 #     for publish-docs. CASCADE_NOTIFY=off stops the notify.
@@ -164,13 +168,14 @@ jobs:
             echo "::error::publish-templates did not succeed (${RESULT}); release ${TAG} stays a draft."
             echo "publish-templates did not succeed (${RESULT}); release ${TAG} stays a draft and no binary is built."
             echo "A transient failure: re-run the failed jobs. A gate failure: bump the template on main and cut the next patch."
+            echo "Skipped on a manual run: start the run from main."
             exit 1
           fi
 
       - name: Checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
+          ref: refs/tags/${{ needs.release-please.outputs.tag_name || inputs.tag }}
           fetch-depth: 0
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -213,7 +218,9 @@ jobs:
     # restore the templates of a published release.
     name: Publish template modules
     needs: release-please
-    if: always() && (needs.release-please.outputs.releases_created == 'true' || github.event_name == 'workflow_dispatch')
+    # Main only: a dispatch from another ref would publish with packages:
+    # write from that ref's workflow and scripts.
+    if: always() && github.ref == 'refs/heads/main' && (needs.release-please.outputs.releases_created == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -222,7 +229,8 @@ jobs:
       - name: Checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
+          # refs/tags/: the tag input never resolves to a branch.
+          ref: refs/tags/${{ needs.release-please.outputs.tag_name || inputs.tag }}
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
