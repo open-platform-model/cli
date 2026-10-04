@@ -30,7 +30,7 @@ Before applying, the CLI SHALL verify the installed `ModuleInstance` CRD's serve
 
 ### Requirement: Operator-version ceiling
 
-Before applying, the CLI SHALL read the cluster-scoped singleton `Platform` and compare `status.operatorVersion` to its own version on MAJOR.MINOR only: the patch number, the prerelease suffix and any build metadata SHALL be ignored on both sides, because the CLI and the operator share MAJOR.MINOR and release patches and prerelease counters independently. If the Platform or the field is absent, the check SHALL be skipped (solo cluster semantics). If the operator's MAJOR.MINOR is greater than the CLI's MAJOR.MINOR, apply SHALL refuse with an error telling the user to upgrade the CLI; the error SHALL name both full versions as read. If the CLI's own version is not valid semver (dev build), the check SHALL be skipped with a warning. If the operator version is not valid semver, the check SHALL be skipped with a warning. If reading the Platform fails due to RBAC, the check SHALL be skipped with a warning (a namespace-scoped user must remain able to apply).
+Before applying, the CLI SHALL read the cluster-scoped singleton `Platform` and compare `status.operatorVersion` to its own version on MAJOR.MINOR only: the patch number, the prerelease suffix and any build metadata SHALL be ignored on both sides, because the CLI and the operator share MAJOR.MINOR and release patches and prerelease counters independently. If the Platform or the field is absent, the check SHALL be skipped (solo cluster semantics). If the operator's MAJOR.MINOR is greater than the CLI's MAJOR.MINOR, apply SHALL refuse with an error telling the user to upgrade the CLI; the error SHALL name both full versions as read. If the CLI's own version is not valid semver (dev build), the check SHALL be skipped with a warning. If the operator version is not valid semver, the check SHALL be skipped with a warning. If reading the Platform fails due to RBAC, the check SHALL be skipped with a warning (a namespace-scoped user must remain able to apply). The instance apply that `opm operator install` performs for the operator's own instance SHALL skip this check, because install replaces the operator the Platform reports rather than driving it; install applies the same `MAJOR.MINOR` rule to the operator version of the module it installs instead (see the `operator-lifecycle` capability). Every other apply keeps the check, and the CRD-presence and CRD field-floor gates still run for the operator's instance. Source: 0021:D9:R3, 0021:D9:R4.
 
 #### Scenario: Solo cluster skips the ceiling
 
@@ -72,6 +72,16 @@ Before applying, the CLI SHALL read the cluster-scoped singleton `Platform` and 
 - **WHEN** `status.operatorVersion` is `1.1.0` (or `1.1.0-beta.1`) and the CLI version is `1.0.0`
 - **THEN** apply SHALL exit non-zero with an upgrade-the-CLI error naming both versions
 
+#### Scenario: Older CLI repairs a newer operator
+
+- **WHEN** `Platform/cluster` reports `status.operatorVersion` `1.1.0`, the CLI is `1.0.0`, and `opm operator install` targets a module that deploys operator `1.0.2`
+- **THEN** no ceiling refusal occurs and install proceeds
+
+#### Scenario: Ordinary apply against the same cluster still refused
+
+- **WHEN** the same CLI runs `opm instance apply` for any other instance against that cluster
+- **THEN** apply SHALL exit non-zero with the upgrade-the-CLI error
+
 ### Requirement: Status-RBAC pre-flight
 
 In CLI-executor mode, before applying any resource, the CLI SHALL issue a `SelfSubjectAccessReview` for `patch` on `moduleinstances/status` in the target namespace. On denial, apply SHALL abort with an actionable error explaining that inventory cannot be recorded and naming the remedies (grant `moduleinstances/status`, or `opm operator install --crds-only --rbac`). The pre-flight guarantees resources are never deployed without a recordable inventory.
@@ -89,7 +99,7 @@ In CLI-executor mode, before applying any resource, the CLI SHALL issue a `SelfS
 
 ### Requirement: Gate ordering and dry-run exemption
 
-The gates SHALL run in the order: CRD presence, CRD field floor, operator-version ceiling, ownership resolution, status-RBAC pre-flight, pre-apply existence check — all before the first resource write. Dry-run applies SHALL skip the gate battery (they write nothing the gates protect).
+The gates SHALL run in the order: CRD presence, CRD field floor, operator-version ceiling (skipped only for the operator's own instance during `opm operator install`), ownership resolution, status-RBAC pre-flight, pre-apply existence check — all before the first resource write. Dry-run applies SHALL skip the gate battery (they write nothing the gates protect).
 
 #### Scenario: Gates precede all writes
 
