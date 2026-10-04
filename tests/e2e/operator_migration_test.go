@@ -206,11 +206,36 @@ func TestE2E_Operator_MigratesManifestInstall(t *testing.T) {
 
 		_, stderr, err := runOPMWithEnv(t, tmpDir, homeDir, 90*time.Second, "operator", "install", "--skip-platform",
 			"--kubeconfig", kubeconfig, "--context", kindContext, "--timeout", "30s")
-		require.Error(t, err)
+		var exitErr *exec.ExitError
+		require.ErrorAs(t, err, &exitErr, "stderr: %s", stderr)
+		assert.Equal(t, 2, exitErr.ExitCode(), "stderr: %s", stderr)
 		assert.Contains(t, stderr, "operator migration refused")
 		assert.Contains(t, stderr, "ClusterRoleBinding/opm-operator-manager-rolebinding")
 		assert.Equal(t, crdRV, kubectlOut(t, kubeconfig, "get", "crd", "moduleinstances.opmodel.dev", "-o", "jsonpath={.metadata.resourceVersion}"), "the CRD step did not run")
 		assert.Equal(t, deployUID, uidOf(t, kubeconfig, "deployment", "opm-operator-system", "opm-operator-controller-manager"))
+	})
+
+	t.Run("an operator a GitOps tool applies refuses and changes nothing", func(t *testing.T) {
+		resetOperatorCluster(t, kubeconfig)
+		kubectlRun(t, kubeconfig, "apply", "--server-side", "--field-manager=opm-cli", "-f", manifest)
+		kubectlRun(t, kubeconfig, "label", "deployment", "opm-operator-controller-manager", "-n", "opm-operator-system",
+			"kustomize.toolkit.fluxcd.io/name=opm-operator")
+		deployUID := uidOf(t, kubeconfig, "deployment", "opm-operator-system", "opm-operator-controller-manager")
+
+		_, stderr, err := runOPMWithEnv(t, tmpDir, homeDir, 90*time.Second, "operator", "install", "--skip-platform",
+			"--kubeconfig", kubeconfig, "--context", kindContext, "--timeout", "30s")
+		var exitErr *exec.ExitError
+		require.ErrorAs(t, err, &exitErr, "stderr: %s", stderr)
+		assert.Equal(t, 2, exitErr.ExitCode(), "stderr: %s", stderr)
+		assert.Contains(t, stderr, "Deployment/opm-operator-system/opm-operator-controller-manager: is applied by Flux")
+		assert.Equal(t, deployUID, uidOf(t, kubeconfig, "deployment", "opm-operator-system", "opm-operator-controller-manager"))
+		for _, b := range supersededBindings {
+			ns := ""
+			if b[0] == "rolebinding" {
+				ns = "opm-operator-system"
+			}
+			assert.True(t, existsOnCluster(t, kubeconfig, b[0], ns, b[1]), "%s is kept", b[1])
+		}
 	})
 
 	t.Run("an interrupted migration completes on the next run", func(t *testing.T) {
