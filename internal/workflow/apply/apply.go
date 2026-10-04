@@ -21,6 +21,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// now is the clock Execute reads the start of the apply from; tests move it
+// back to stand for an apply that already spent part of its budget.
+var now = time.Now
+
 type Options struct {
 	DryRun                 bool
 	CreateNS               bool
@@ -150,7 +154,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	// to a --timeout budget that starts with the apply; the --wait readiness
 	// wait after it gets a fresh --timeout of its own.
 	timeout := inventory.ResolveTimeout(req.Options.Timeout)
-	budgetStart := time.Now()
+	budgetStart := now()
 
 	var applyResult *kubernetes.ApplyResult
 	if len(result.Resources) > 0 {

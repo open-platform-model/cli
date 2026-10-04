@@ -12,8 +12,7 @@ import (
 
 func TestResolveRegistry_FlagPrecedence(t *testing.T) {
 	// Set up env var
-	os.Setenv("OPM_REGISTRY", "env-registry.example.com")
-	defer os.Unsetenv("OPM_REGISTRY")
+	t.Setenv("OPM_REGISTRY", "env-registry.example.com")
 
 	result := ResolveRegistry(ResolveRegistryOptions{
 		FlagValue:   "flag-registry.example.com",
@@ -27,8 +26,7 @@ func TestResolveRegistry_FlagPrecedence(t *testing.T) {
 }
 
 func TestResolveRegistry_EnvPrecedence(t *testing.T) {
-	os.Setenv("OPM_REGISTRY", "env-registry.example.com")
-	defer os.Unsetenv("OPM_REGISTRY")
+	t.Setenv("OPM_REGISTRY", "env-registry.example.com")
 
 	result := ResolveRegistry(ResolveRegistryOptions{
 		FlagValue:   "", // No flag
@@ -43,7 +41,7 @@ func TestResolveRegistry_EnvPrecedence(t *testing.T) {
 
 func TestResolveRegistry_ConfigFallback(t *testing.T) {
 	// Ensure env is not set
-	os.Unsetenv("OPM_REGISTRY")
+	t.Setenv("OPM_REGISTRY", "")
 
 	result := ResolveRegistry(ResolveRegistryOptions{
 		FlagValue:   "",
@@ -56,7 +54,7 @@ func TestResolveRegistry_ConfigFallback(t *testing.T) {
 }
 
 func TestResolveRegistry_NoRegistry(t *testing.T) {
-	os.Unsetenv("OPM_REGISTRY")
+	t.Setenv("OPM_REGISTRY", "")
 
 	result := ResolveRegistry(ResolveRegistryOptions{
 		FlagValue:   "",
@@ -68,8 +66,7 @@ func TestResolveRegistry_NoRegistry(t *testing.T) {
 }
 
 func TestResolveConfigPath_FlagPrecedence(t *testing.T) {
-	os.Setenv("OPM_CONFIG", "/env/path/config.cue")
-	defer os.Unsetenv("OPM_CONFIG")
+	t.Setenv("OPM_CONFIG", "/env/path/config.cue")
 
 	result, err := ResolveConfigPath(ResolveConfigPathOptions{
 		FlagValue: "/flag/path/config.cue",
@@ -83,8 +80,7 @@ func TestResolveConfigPath_FlagPrecedence(t *testing.T) {
 }
 
 func TestResolveConfigPath_EnvPrecedence(t *testing.T) {
-	os.Setenv("OPM_CONFIG", "/env/path/config.cue")
-	defer os.Unsetenv("OPM_CONFIG")
+	t.Setenv("OPM_CONFIG", "/env/path/config.cue")
 
 	result, err := ResolveConfigPath(ResolveConfigPathOptions{
 		FlagValue: "", // No flag
@@ -97,7 +93,7 @@ func TestResolveConfigPath_EnvPrecedence(t *testing.T) {
 }
 
 func TestResolveConfigPath_Default(t *testing.T) {
-	os.Unsetenv("OPM_CONFIG")
+	t.Setenv("OPM_CONFIG", "")
 
 	result, err := ResolveConfigPath(ResolveConfigPathOptions{
 		FlagValue: "",
@@ -118,14 +114,9 @@ func TestSource_String(t *testing.T) {
 }
 
 func TestResolveKubernetes_FlagOverridesAll(t *testing.T) {
-	os.Setenv("OPM_KUBECONFIG", "/env/kubeconfig")
-	os.Setenv("OPM_CONTEXT", "env-context")
-	os.Setenv("OPM_NAMESPACE", "env-namespace")
-	defer func() {
-		os.Unsetenv("OPM_KUBECONFIG")
-		os.Unsetenv("OPM_CONTEXT")
-		os.Unsetenv("OPM_NAMESPACE")
-	}()
+	t.Setenv("OPM_KUBECONFIG", "/env/kubeconfig")
+	t.Setenv("OPM_CONTEXT", "env-context")
+	t.Setenv("OPM_NAMESPACE", "env-namespace")
 
 	result, err := ResolveKubernetes(ResolveKubernetesOptions{
 		KubeconfigFlag: "/flag/kubeconfig",
@@ -150,8 +141,7 @@ func TestResolveKubernetes_FlagOverridesAll(t *testing.T) {
 }
 
 func TestResolveKubernetes_EnvOverridesConfig(t *testing.T) {
-	os.Setenv("OPM_NAMESPACE", "env-namespace")
-	defer os.Unsetenv("OPM_NAMESPACE")
+	t.Setenv("OPM_NAMESPACE", "env-namespace")
 
 	result, err := ResolveKubernetes(ResolveKubernetesOptions{
 		Config: &GlobalConfig{
@@ -168,6 +158,9 @@ func TestResolveKubernetes_EnvOverridesConfig(t *testing.T) {
 }
 
 func TestResolveKubernetes_ConfigOverridesDefault(t *testing.T) {
+	t.Setenv("OPM_KUBECONFIG", "")
+	t.Setenv("OPM_NAMESPACE", "")
+
 	result, err := ResolveKubernetes(ResolveKubernetesOptions{
 		Config: &GlobalConfig{
 			Kubernetes: KubernetesConfig{
@@ -185,9 +178,9 @@ func TestResolveKubernetes_ConfigOverridesDefault(t *testing.T) {
 }
 
 func TestResolveKubernetes_DefaultsUsedWhenNothingSet(t *testing.T) {
-	os.Unsetenv("OPM_KUBECONFIG")
-	os.Unsetenv("OPM_CONTEXT")
-	os.Unsetenv("OPM_NAMESPACE")
+	t.Setenv("OPM_KUBECONFIG", "")
+	t.Setenv("OPM_CONTEXT", "")
+	t.Setenv("OPM_NAMESPACE", "")
 
 	result, err := ResolveKubernetes(ResolveKubernetesOptions{})
 	require.NoError(t, err)
@@ -201,14 +194,9 @@ func TestResolveKubernetes_DefaultsUsedWhenNothingSet(t *testing.T) {
 }
 
 func TestResolveKubernetes_AllFlags(t *testing.T) {
-	os.Setenv("OPM_KUBECONFIG", "/env/kubeconfig")
-	os.Setenv("OPM_CONTEXT", "env-context")
-	os.Setenv("OPM_NAMESPACE", "env-namespace")
-	defer func() {
-		os.Unsetenv("OPM_KUBECONFIG")
-		os.Unsetenv("OPM_CONTEXT")
-		os.Unsetenv("OPM_NAMESPACE")
-	}()
+	t.Setenv("OPM_KUBECONFIG", "/env/kubeconfig")
+	t.Setenv("OPM_CONTEXT", "env-context")
+	t.Setenv("OPM_NAMESPACE", "env-namespace")
 
 	result, err := ResolveKubernetes(ResolveKubernetesOptions{
 		KubeconfigFlag: "/flag/kubeconfig",
@@ -233,9 +221,9 @@ func TestResolveKubernetes_AllFlags(t *testing.T) {
 }
 
 func TestResolveKubernetes_Defaults(t *testing.T) {
-	os.Unsetenv("OPM_KUBECONFIG")
-	os.Unsetenv("OPM_CONTEXT")
-	os.Unsetenv("OPM_NAMESPACE")
+	t.Setenv("OPM_KUBECONFIG", "")
+	t.Setenv("OPM_CONTEXT", "")
+	t.Setenv("OPM_NAMESPACE", "")
 
 	result, err := ResolveKubernetes(ResolveKubernetesOptions{})
 	require.NoError(t, err)

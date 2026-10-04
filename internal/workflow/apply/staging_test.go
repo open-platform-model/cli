@@ -66,6 +66,14 @@ func TestExecute_CRDNotEstablishedSkipsPruneAndInventoryWrite(t *testing.T) {
 	kubernetes.WaitPollInterval = 5 * time.Millisecond
 	t.Cleanup(func() { kubernetes.WaitPollInterval = prev })
 
+	// The apply started an hour ago and spent nearly all of a budget of an
+	// hour and 300ms: the deadline is close, and the timeout must report the
+	// hour since the start of the apply, not the establish wait's own
+	// milliseconds.
+	prevNow := now
+	now = func() time.Time { return time.Now().Add(-time.Hour) }
+	t.Cleanup(func() { now = prevNow })
+
 	fake := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
 		map[schema.GroupVersionResource]string{
 			inventory.ModuleInstanceGVR: "ModuleInstanceList",
@@ -79,11 +87,6 @@ func TestExecute_CRDNotEstablishedSkipsPruneAndInventoryWrite(t *testing.T) {
 	var mu sync.Mutex
 	var mutations, patched []string
 	fake.PrependReactor("patch", "*", func(action k8stesting.Action) (bool, runtime.Object, error) {
-		if action.GetResource().Resource == "customresourcedefinitions" {
-			// The apply itself spends most of the budget, so a timeout
-			// measured from the start of the establish wait would read 0s.
-			time.Sleep(time.Second)
-		}
 		mu.Lock()
 		defer mu.Unlock()
 		res := action.GetResource().Resource
@@ -126,14 +129,13 @@ func TestExecute_CRDNotEstablishedSkipsPruneAndInventoryWrite(t *testing.T) {
 		},
 		K8sClient: &kubernetes.Client{Dynamic: fake, Clientset: cs},
 		Log:       output.InstanceLogger("demo"),
-		Options:   Options{Timeout: 1200 * time.Millisecond, SuccessAppliedMessage: "applied", SuccessUpToDateMessage: "up to date"},
+		Options:   Options{Timeout: time.Hour + 300*time.Millisecond, SuccessAppliedMessage: "applied", SuccessUpToDateMessage: "up to date"},
 	}
 
 	err := Execute(ctx, req)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "CustomResourceDefinition/foos.example.com")
-	assert.Contains(t, err.Error(), "timed out after")
-	assert.NotContains(t, err.Error(), "timed out after 0s", "the elapsed time counts from the start of the apply, not of the establish wait")
+	assert.Contains(t, err.Error(), "timed out after 1h0m", "the elapsed time counts from the start of the apply, not of the establish wait")
 	var exitErr *opmexit.ExitError
 	require.ErrorAs(t, err, &exitErr)
 	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
