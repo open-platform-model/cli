@@ -19,6 +19,43 @@ func compileX(t *testing.T, ctx *cue.Context, src string) cue.Value {
 	return v
 }
 
+// catalogRoleSchema is catalog_opm's #RoleSchema shape (role rules and
+// subjects, the subject an embedded disjunction of two structs), with the
+// subjects field spelled by subjectsField ("subjects!" or "subjects?").
+func catalogRoleSchema(subjectsField string) string {
+	return `
+#PolicyRuleSchema: #ResourcePolicyRuleSchema | #NonResourcePolicyRuleSchema
+#ResourcePolicyRuleSchema: {
+	apiGroups!: [...string]
+	resources!: [...string]
+	verbs!: [...string]
+	resourceNames?: [...string]
+	nonResourceURLs?: _|_
+}
+#NonResourcePolicyRuleSchema: {
+	nonResourceURLs!: [_, ...] & [...string]
+	verbs!: [...string]
+	apiGroups?:     _|_
+	resources?:     _|_
+	resourceNames?: _|_
+}
+#ServiceAccountSchema: {
+	name!:           string
+	automountToken?: bool
+}
+#WorkloadIdentitySchema: {
+	name!:           string
+	automountToken?: bool
+}
+#RoleSubjectSchema: {#WorkloadIdentitySchema | #ServiceAccountSchema}
+#X: {
+	name!: string
+	scope: "namespace" | "cluster"
+	rules!: [...#PolicyRuleSchema] & [_, ...]
+	` + subjectsField + `: [...#RoleSubjectSchema] & [_, ...]
+}`
+}
+
 type wantViolation struct {
 	path, kind string
 }
@@ -159,8 +196,10 @@ func TestCheck(t *testing.T) {
 		// The catalog_opm incident: role subjects made optional was refused
 		// as "default changed" with the same rendering on both sides.
 		{"catalog role subjects made optional",
-			`#S: {name!: string} | {sa!: string}, #X: {subjects!: [...#S] & [_, ...]}`,
-			`#S: {name!: string} | {sa!: string}, #X: {subjects?: [...#S] & [_, ...]}`, nil},
+			catalogRoleSchema("subjects!"), catalogRoleSchema("subjects?"), nil},
+		{"catalog role subjects made required",
+			catalogRoleSchema("subjects?"), catalogRoleSchema("subjects!"),
+			[]wantViolation{{"subjects", KindFieldMadeRequired}}},
 		{"non-empty open list made optional", `#X: {xs!: [...string] & [_, ...]}`, `#X: {xs?: [...string] & [_, ...]}`, nil},
 		{"regular non-empty open list made optional", `#X: {xs: [...string] & [_, ...]}`, `#X: {xs?: [...string] & [_, ...]}`, nil},
 		{"open list made optional", `#X: {xs: [...string]}`, `#X: {xs?: [...string]}`, nil},
@@ -183,6 +222,17 @@ func TestCheck(t *testing.T) {
 		// Adding a default is additive; the implicit [] used to be compared
 		// against it and reported "default changed".
 		{"authored list default added", `#X: {xs: [...string]}`, `#X: {xs: *["a"] | [...string]}`, nil},
+
+		// Defaults written inside an open list's fixed elements are folded
+		// into its implicit default, so they are compared element-wise.
+		{"open list fixed element default removed", `#X: {xs: [*"a" | string, ...string]}`, `#X: {xs: [string, ...string]}`,
+			[]wantViolation{{"xs[0]", KindDefaultRemoved}}},
+		{"open list fixed element nested default removed", `#X: {xs: [{a: *1 | int}, ...]}`, `#X: {xs: [{a: int}, ...]}`,
+			[]wantViolation{{"xs[0].a", KindDefaultRemoved}}},
+		{"open list fixed element nested default changed", `#X: {xs: [{a: *1 | int}, ...]}`, `#X: {xs: [{a: *2 | int}, ...]}`,
+			[]wantViolation{{"xs[0].a", KindDefaultChanged}, {"xs", KindDomainNarrowed}}},
+		{"open list fixed element default unchanged made optional", `#X: {xs!: [{a: *1 | int}, ...]}`, `#X: {xs?: [{a: *1 | int}, ...]}`, nil},
+		{"open list fixed element default added", `#X: {xs: [string, ...string]}`, `#X: {xs: [*"a" | string, ...string]}`, nil},
 	}
 
 	ctx := cuecontext.New()

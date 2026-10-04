@@ -129,6 +129,10 @@ func walk(path string, prev, next cue.Value, underMetadata bool, acc []Violation
 		return out
 	}
 
+	// An open list is a leaf, and its implicit default is not compared, so
+	// the defaults its fixed elements carry are compared here.
+	acc = openListDefaults(path, prev, next, acc)
+
 	// An unchanged leaf cannot have narrowed. Syntax(cue.All()) expands
 	// references (a changed definition behind a reference renders
 	// differently), so byte equality is a sound "unchanged" signal; rendering
@@ -265,6 +269,107 @@ func walkList(path string, prev, next cue.Value, acc []Violation) ([]Violation, 
 	return acc, true
 }
 
+// openListDefaults compares the authored defaults inside the fixed elements
+// of two plain open lists with the same number of fixed elements, at paths
+// name[i]. CUE folds those defaults into the open list's implicit default,
+// which [authoredDefault] skips, and the leaf subsume does not see a removed
+// one, so without this walk `[*"a" | string, ...string]` to
+// `[string, ...string]` would report nothing. Only defaults are judged here;
+// the list's value domain stays the leaf subsume's.
+func openListDefaults(path string, prev, next cue.Value, acc []Violation) []Violation {
+	pe, pok := openListElements(prev)
+	ne, nok := openListElements(next)
+	if !pok || !nok || len(pe) != len(ne) {
+		return acc
+	}
+	for i := range pe {
+		acc = walkDefaults(fmt.Sprintf("%s[%d]", path, i), pe[i], ne[i], false, acc)
+	}
+	return acc
+}
+
+// openListElements is the fixed elements of a plain open list (see
+// [implicitListDefault]); ok is false for any other value.
+func openListElements(v cue.Value) ([]cue.Value, bool) {
+	if !implicitListDefault(v) {
+		return nil, false
+	}
+	return listElements(v)
+}
+
+// walkDefaults applies the default rule alone through one position and
+// everything below it: struct fields present on both sides (by name, hidden
+// fields and 0010:D30's provenance skipped as in [walkStruct]), the elements
+// of equal-length closed lists, and the fixed elements of open lists.
+// Removed and added fields are not its concern.
+func walkDefaults(path string, prev, next cue.Value, underMetadata bool, acc []Violation) []Violation {
+	acc = checkDefaults(path, prev, next, acc)
+	if isWalkableStruct(prev) && isWalkableStruct(next) {
+		return walkStructDefaults(path, prev, next, underMetadata, acc)
+	}
+	if pe, ne, ok := closedListPairs(prev, next); ok {
+		for i := range pe {
+			acc = walkDefaults(fmt.Sprintf("%s[%d]", path, i), pe[i], ne[i], false, acc)
+		}
+		return acc
+	}
+	return openListDefaults(path, prev, next, acc)
+}
+
+// walkStructDefaults is [walkDefaults] over the fields two structs share.
+func walkStructDefaults(path string, prev, next cue.Value, underMetadata bool, acc []Violation) []Violation {
+	pit, perr := prev.Fields(cue.All())
+	nit, nerr := next.Fields(cue.All())
+	if perr != nil || nerr != nil {
+		return acc
+	}
+	nextByName := map[string]cue.Value{}
+	for nit.Next() {
+		if nit.Selector().LabelType() != cue.HiddenLabel {
+			nextByName[fieldName(nit.Selector())] = nit.Value()
+		}
+	}
+	for pit.Next() {
+		sel := pit.Selector()
+		name := fieldName(sel)
+		if sel.LabelType() == cue.HiddenLabel || (underMetadata && provenanceDenylist[name]) {
+			continue
+		}
+		if nv, ok := nextByName[name]; ok {
+			acc = walkDefaults(join(path, name), pit.Value(), nv, name == "metadata", acc)
+		}
+	}
+	return acc
+}
+
+// closedListPairs is the elements of two closed lists of equal length; ok is
+// false for any other pair.
+func closedListPairs(prev, next cue.Value) (pe, ne []cue.Value, ok bool) {
+	if prev.IncompleteKind() != cue.ListKind || next.IncompleteKind() != cue.ListKind ||
+		prev.Allows(cue.AnyIndex) || next.Allows(cue.AnyIndex) {
+		return nil, nil, false
+	}
+	pe, pok := listElements(prev)
+	ne, nok := listElements(next)
+	if !pok || !nok || len(pe) != len(ne) {
+		return nil, nil, false
+	}
+	return pe, ne, true
+}
+
+// listElements is the fixed elements of the list v.
+func listElements(v cue.Value) ([]cue.Value, bool) {
+	it, err := v.List()
+	if err != nil {
+		return nil, false
+	}
+	var out []cue.Value
+	for it.Next() {
+		out = append(out, it.Value())
+	}
+	return out, true
+}
+
 // leafIdentical reports whether two leaves emit byte-identical syntax under
 // cue.All(). Both operands come from the same conventions, so an unchanged
 // leaf formats identically; a rendering failure is treated as "different".
@@ -312,7 +417,8 @@ func checkDefaults(path string, prev, next cue.Value, acc []Violation) []Violati
 // wrote and which is not contract surface. Compared, it reports "default
 // changed" with the same rendering on both sides whenever the field's
 // constraint marker changes (measured on catalog_opm's role subjects, cue
-// v0.17.1).
+// v0.17.1). Defaults written inside an open list's fixed elements are folded
+// into that implicit default; [openListDefaults] compares them element-wise.
 func authoredDefault(v cue.Value) (cue.Value, bool) {
 	d, ok := v.Default()
 	if !ok || implicitListDefault(v) {
@@ -321,11 +427,12 @@ func authoredDefault(v cue.Value) (cue.Value, bool) {
 	return d, true
 }
 
-// implicitListDefault reports whether v is a plain open list, whose only
-// default is CUE's implicit one. Len is the discriminator: it evaluates on a
-// list value only (any disjunction, the sole carrier of an authored default,
-// has no length) and is non-concrete exactly when the list is open. The
-// authored-list-default test cases pin this behaviour of Len.
+// implicitListDefault reports whether v is a plain open list, whose own
+// default is CUE's implicit one (defaults written in its fixed elements are
+// [openListDefaults]' concern). Len is the discriminator: it evaluates on a
+// list value only (a disjunction, which is where an authored default at this
+// level lives, has no length) and is non-concrete exactly when the list is
+// open. The authored-list-default test cases pin this behaviour of Len.
 func implicitListDefault(v cue.Value) bool {
 	if v.IncompleteKind() != cue.ListKind {
 		return false
