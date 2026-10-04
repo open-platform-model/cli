@@ -156,3 +156,22 @@ func TestResolveInventory_ReturnsUnreadable(t *testing.T) {
 	assert.Equal(t, "settings", unreadable[0].Entry.Name)
 	assert.True(t, apierrors.IsForbidden(unreadable[0].Err))
 }
+
+// A failed read of the ModuleInstance record itself stops the command with
+// exit 1; only per-resource reads become unreadable entries.
+func TestResolveInventory_RecordReadErrorExitsGeneral(t *testing.T) {
+	client := makeCRClient()
+	fake, ok := client.Dynamic.(*dynamicfake.FakeDynamicClient)
+	require.True(t, ok)
+	fake.PrependReactor("get", "moduleinstances", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Group: "opmodel.dev", Resource: "moduleinstances"}, "guarded", nil)
+	})
+	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "guarded", Namespace: "default"}
+
+	inv, _, _, unreadable, err := ResolveInventory(context.Background(), client, rsf, "default", silentLogger())
+	assert.Nil(t, inv)
+	assert.Nil(t, unreadable)
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
+}
