@@ -4,6 +4,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # A new action release waits a week before Dependabot proposes it, so a
+    # compromised release is more likely caught upstream first.
+    cooldown:
+      default-days: 7
     # docs-kit's publish.yml is pinned by release tag, not SHA, and moves
     # with .opm-docs-version in one PR (docs-kit C5, C12; task
     # docs:pins:check), so Dependabot never bumps it alone.

@@ -38,7 +38,12 @@ jobs:
         with:
           version: 3.x
       - name: Verify the cascade wiring
-        run: task cascade:wiring:check
+        # The canonical .github check with this repo's values
+        # (.tasks/cascade/wiring-check.yaml); --pin-on-main also confirms the
+        # pinned SHA is on .github main. Local, offline: task cascade:wiring:check.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .tasks/cascade/wiring-check.sh --pin-on-main
       - name: Cascade task (offline)
         # task deps:cascade's offline scenarios against the stub resolver; no
         # registry or proxy access. Lint is the cli's required check (workspace
