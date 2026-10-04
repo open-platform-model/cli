@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -177,7 +178,7 @@ func captureLogs(t *testing.T) *bytes.Buffer {
 func mirrorRegistry(t *testing.T) string {
 	t.Helper()
 	return operatortest.Registry(t,
-		operatortest.Version{Module: oplib.PinnedModuleVersion, Operator: "1.0.0-beta.7"},
+		operatortest.Version{Module: oplib.PinnedModuleVersion, Operator: strings.TrimPrefix(oplib.PinnedOperatorVersion, "v")},
 		operatortest.Version{Module: "0.2.0", Operator: "1.0.0-beta.8"},
 	)
 }
@@ -215,7 +216,7 @@ func TestRunOperatorInstall_ResolvesThroughAMirrorOnly(t *testing.T) {
 
 	err := installWithoutCluster(t, reg, installFlags{})
 	require.Error(t, err, "the missing kubeconfig stops it after resolution")
-	assert.Contains(t, logs.String(), "operator module opmodel.dev/modules/opm_operator "+oplib.PinnedModuleVersion+" (pinned; deploys opm-operator v1.0.0-beta.7)")
+	assert.Contains(t, logs.String(), "operator module opmodel.dev/modules/opm_operator "+oplib.PinnedModuleVersion+" (pinned; deploys opm-operator "+oplib.PinnedOperatorVersion+")")
 
 	logs.Reset()
 	_ = installWithoutCluster(t, reg, installFlags{version: "0.2.0"})
