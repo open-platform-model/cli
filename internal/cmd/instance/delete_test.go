@@ -20,6 +20,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/operator"
@@ -130,6 +131,10 @@ func TestDeleteForceFlagIsConfirmationOnly(t *testing.T) {
 	forceFlag := cmd.Flags().Lookup("force")
 	require.NotNil(t, forceFlag)
 	assert.Contains(t, forceFlag.Usage, "confirmation")
+
+	// Orphaning armed instances is uninstall's explicit choice; the generic
+	// delete offers no way to strip finalizers.
+	assert.Nil(t, cmd.Flags().Lookup("remove-finalizers"))
 }
 
 // captureOutput runs fn with standard output, standard error and the logger
@@ -277,4 +282,191 @@ func TestExecuteInstanceDelete_ReadErrorKeepsModuleInstance(t *testing.T) {
 			assert.NoError(t, cmErr, "the ConfigMap is not deleted")
 		})
 	}
+}
+
+// guardScenario is a cluster for the operator-instance guard: the target's
+// ModuleInstance and the one ConfigMap its inventory tracks, plus any other
+// ModuleInstances.
+type guardScenario struct {
+	rec    *inventory.Record
+	cm     *unstructured.Unstructured
+	client *kubernetes.Client
+	fake   *fakedynamic.FakeDynamicClient
+}
+
+func moduleInstanceObj(namespace, name string, finalizers ...string) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": inventory.APIVersionModuleInstance, "kind": inventory.KindModuleInstance,
+		"metadata": map[string]any{"name": name, "namespace": namespace},
+	}}
+	if len(finalizers) > 0 {
+		obj.SetFinalizers(finalizers)
+	}
+	return obj
+}
+
+// newGuardScenario builds a CLI-owned record name/namespace with modulePath and
+// extra inventory entries; targetArmed puts the cleanup finalizer on the
+// target's own ModuleInstance; others are further objects in the cluster.
+func newGuardScenario(namespace, name, modulePath string, targetArmed bool, extraEntries []inventory.InventoryEntry, others ...runtime.Object) *guardScenario {
+	uuid := "uuid-" + name
+	cm := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1", "kind": "ConfigMap",
+		"metadata": map[string]any{"name": name + "-config", "namespace": namespace, "labels": map[string]any{
+			pkgcore.LabelManagedBy: pkgcore.LabelManagedByValue, pkgcore.LabelModuleInstanceUUID: uuid,
+		}},
+	}}
+	entries := append([]inventory.InventoryEntry{{Kind: "ConfigMap", Name: cm.GetName(), Namespace: namespace}}, extraEntries...)
+	rec := &inventory.Record{
+		Name: name, Namespace: namespace, Owner: inventory.OwnerCLI, ModulePath: modulePath, InstanceUUID: uuid,
+		Inventory: inventory.Inventory{Entries: entries},
+	}
+	var finalizers []string
+	if targetArmed {
+		finalizers = []string{inventory.CleanupFinalizer}
+	}
+	objs := append([]runtime.Object{cm.DeepCopy(), moduleInstanceObj(namespace, name, finalizers...)}, others...)
+	client, fake := fakeClusterClient(objs...)
+	return &guardScenario{rec: rec, cm: cm, client: client, fake: fake}
+}
+
+func (g *guardScenario) run(t *testing.T, dryRun bool) (string, error) {
+	t.Helper()
+	var runErr error
+	out := captureOutput(t, func() {
+		runErr = deleteResolvedInstance(context.Background(), g.client, &cmdutil.InstanceSelectorFlags{InstanceName: g.rec.Name}, g.rec.Namespace,
+			g.rec, []*unstructured.Unstructured{g.cm.DeepCopy()}, 5*time.Second, dryRun, output.InstanceLogger(g.rec.Name))
+	})
+	return out, runErr
+}
+
+func (g *guardScenario) assertUntouched(t *testing.T) {
+	t.Helper()
+	_, cmErr := g.fake.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, g.rec.Namespace, g.cm.GetName())
+	assert.NoError(t, cmErr, "the tracked ConfigMap still exists")
+	_, miErr := g.fake.Tracker().Get(inventory.ModuleInstanceGVR, g.rec.Namespace, g.rec.Name)
+	assert.NoError(t, miErr, "the ModuleInstance still exists")
+}
+
+func (g *guardScenario) assertDeleted(t *testing.T) {
+	t.Helper()
+	_, cmErr := g.fake.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, g.rec.Namespace, g.cm.GetName())
+	assert.True(t, apierrors.IsNotFound(cmErr), "the tracked ConfigMap is deleted")
+	_, miErr := g.fake.Tracker().Get(inventory.ModuleInstanceGVR, g.rec.Namespace, g.rec.Name)
+	assert.True(t, apierrors.IsNotFound(miErr), "the ModuleInstance is deleted")
+}
+
+func requireExitCode(t *testing.T, err error, code int) {
+	t.Helper()
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, code, exitErr.Code)
+}
+
+func armedHello() runtime.Object {
+	return moduleInstanceObj("default", "hello", inventory.CleanupFinalizer)
+}
+
+func TestDeleteResolvedInstance_OperatorInstanceRefusedWhileArmed(t *testing.T) {
+	g := newGuardScenario(operator.OperatorNamespace, operator.OperatorInstanceName, "", false, nil, armedHello())
+
+	_, err := g.run(t, false)
+	requireExitCode(t, err, opmexit.ExitValidationError)
+	assert.Contains(t, err.Error(), "default/hello")
+	assert.Contains(t, err.Error(), "opm operator uninstall --remove-finalizers")
+	assert.Contains(t, err.Error(), "orphaning")
+	g.assertUntouched(t)
+}
+
+// A dry run that passed where the real run refuses would mislead.
+func TestDeleteResolvedInstance_OperatorInstanceDryRunRefusesToo(t *testing.T) {
+	g := newGuardScenario(operator.OperatorNamespace, operator.OperatorInstanceName, "", false, nil, armedHello())
+
+	_, err := g.run(t, true)
+	requireExitCode(t, err, opmexit.ExitValidationError)
+	assert.Contains(t, err.Error(), "default/hello")
+	g.assertUntouched(t)
+}
+
+// The operator never reconciles or prunes the instance that deploys it, so the
+// operator-owned branch would report a prune that does not happen. The record
+// is refused before that branch, even with a ready operator.
+func TestDeleteResolvedInstance_OperatorOwnedOperatorInstanceRefused(t *testing.T) {
+	g := newGuardScenario(operator.OperatorNamespace, operator.OperatorInstanceName, "", false, nil, runningOperatorObjects()...)
+	g.rec.Owner = inventory.OwnerOperator
+	g.rec.Prune = true
+
+	out, err := g.run(t, false)
+	requireExitCode(t, err, opmexit.ExitValidationError)
+	assert.Contains(t, err.Error(), "spec.owner")
+	assert.Contains(t, err.Error(), "cli")
+	assert.Contains(t, err.Error(), "matched by coordinates")
+	assert.NotContains(t, out, "pruned")
+	assert.NotContains(t, err.Error(), "pruned")
+	g.assertUntouched(t)
+}
+
+func TestDeleteResolvedInstance_TargetItselfArmed(t *testing.T) {
+	g := newGuardScenario(operator.OperatorNamespace, operator.OperatorInstanceName, "", true, nil)
+
+	_, err := g.run(t, false)
+	requireExitCode(t, err, opmexit.ExitValidationError)
+	assert.Contains(t, err.Error(), "opm-operator-system/opm-operator (the instance being deleted)")
+	g.assertUntouched(t)
+}
+
+func TestDeleteResolvedInstance_ModulePathSignal(t *testing.T) {
+	g := newGuardScenario("platform", "ops", "opmodel.dev/modules/opm_operator@v0", false, nil, armedHello())
+
+	_, err := g.run(t, false)
+	requireExitCode(t, err, opmexit.ExitValidationError)
+	assert.Contains(t, err.Error(), "default/hello")
+	g.assertUntouched(t)
+}
+
+func TestDeleteResolvedInstance_InventoryCRDSignal(t *testing.T) {
+	crd := inventory.InventoryEntry{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition", Name: "moduleinstances.opmodel.dev"}
+	g := newGuardScenario("platform", "crds", "example.com/modules/crds@v0", false, []inventory.InventoryEntry{crd}, armedHello())
+
+	_, err := g.run(t, false)
+	requireExitCode(t, err, opmexit.ExitValidationError)
+	assert.Contains(t, err.Error(), "default/hello")
+	g.assertUntouched(t)
+}
+
+func TestDeleteResolvedInstance_LookAlikeIsNotGuarded(t *testing.T) {
+	crd := inventory.InventoryEntry{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition", Name: "widgets.example.opmodel.dev.io"}
+	g := newGuardScenario("default", "dash", "opmodel.dev/modules/opm_operator_dashboard@v0", false, []inventory.InventoryEntry{crd}, armedHello())
+
+	out, err := g.run(t, false)
+	require.NoError(t, err, out)
+	g.assertDeleted(t)
+}
+
+func TestDeleteResolvedInstance_OperatorInstanceNoArmedProceeds(t *testing.T) {
+	g := newGuardScenario(operator.OperatorNamespace, operator.OperatorInstanceName, "", false, nil)
+
+	out, err := g.run(t, false)
+	require.NoError(t, err, out)
+	g.assertDeleted(t)
+}
+
+func TestDeleteResolvedInstance_ListFailureFailsClosed(t *testing.T) {
+	g := newGuardScenario(operator.OperatorNamespace, operator.OperatorInstanceName, "", false, nil)
+	g.fake.PrependReactor("list", "moduleinstances", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Group: "opmodel.dev", Resource: "moduleinstances"}, "", errors.New("denied"))
+	})
+
+	_, err := g.run(t, false)
+	requireExitCode(t, err, opmexit.ExitPermissionDenied)
+	g.assertUntouched(t)
+}
+
+func TestDeleteResolvedInstance_OtherInstancesAreNotGuarded(t *testing.T) {
+	g := newGuardScenario("default", "hello", "example.com/modules/hello@v0", false, nil,
+		moduleInstanceObj("demo", "x", inventory.CleanupFinalizer))
+
+	out, err := g.run(t, false)
+	require.NoError(t, err, out)
+	g.assertDeleted(t)
 }
