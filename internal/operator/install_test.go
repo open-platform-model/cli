@@ -128,6 +128,27 @@ func TestInstall_FreshCluster(t *testing.T) {
 	assert.True(t, fc.exists(deploymentGVR, OperatorNamespace, ControllerDeploymentName))
 }
 
+// "Newer running operator does not block repair": the instance apply skips
+// the running-operator ceiling, so a Platform reporting an operator above
+// the CLI does not refuse install.
+func TestInstall_NewerRunningOperatorDoesNotBlockRepair(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	platform := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": inventory.APIVersionModuleInstance,
+		"kind":       inventory.KindPlatform,
+		"metadata":   map[string]any{"name": inventory.PlatformSingletonName},
+		"spec":       map[string]any{"type": "kubernetes"},
+		"status":     map[string]any{"operatorVersion": "1.1.0"},
+	}}
+	fc := newFakeCluster(t, platform)
+
+	result, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{})
+	require.NoError(t, err)
+	assert.True(t, result.Recorded)
+	assert.NotNil(t, fc.record())
+}
+
 // "Unchanged reinstall": every object keeps its uid and resourceVersion.
 func TestInstall_UnchangedReinstall(t *testing.T) {
 	releasedCLI(t)

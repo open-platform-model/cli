@@ -220,6 +220,15 @@ func newFakeCluster(t *testing.T, objs ...*unstructured.Unstructured) *fakeClust
 		return false, nil, nil
 	})
 	cs := k8sfake.NewClientset()
+	// The module renders its Namespace, so install must never create one
+	// outside the instance apply (the --create-namespace path writes through
+	// the typed client): log it and fail the call.
+	cs.PrependReactor("create", "namespaces", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		fc.mu.Lock()
+		fc.writes = append(fc.writes, "create namespaces")
+		fc.mu.Unlock()
+		return true, nil, fmt.Errorf("fake cluster: install created Namespace outside the render")
+	})
 	cs.PrependReactor("create", "selfsubjectaccessreviews", func(k8stesting.Action) (bool, runtime.Object, error) {
 		return true, &authorizationv1.SelfSubjectAccessReview{
 			Status: authorizationv1.SubjectAccessReviewStatus{Allowed: !fc.denyStatusRBAC, Reason: "test"},
