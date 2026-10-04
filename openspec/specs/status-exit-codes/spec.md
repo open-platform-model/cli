@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`opm instance status` reports its verdict through the exit code so a pipeline can act on it without parsing output: 0 when every tracked resource is healthy, 2 when the command ran but resources are not ready, 5 when the instance or its resources cannot be found, 1 for usage and unexpected errors, and 3 or 4 for cluster connectivity and RBAC failures.
+`opm instance status` reports its verdict through the exit code so a pipeline can act on it without parsing output: 0 when every tracked resource is healthy, 2 when the command ran but resources are not ready or a tracked resource could not be read, 5 when the instance or its resources cannot be found, 1 for usage errors and a failed read of the `ModuleInstance` record, 3 when no cluster client can be built, and 3 or 4 when the status evaluation itself hits a connectivity or RBAC failure.
 
 ## Requirements
 
@@ -42,30 +42,31 @@ The command SHALL exit with code 5 (`ExitNotFound`) when no ModuleInstance recor
 - **AND** no ModuleInstance record or tracked resources exist for it
 - **THEN** the command SHALL print a "no resources found" message and exit with code 5
 
-### Requirement: Status exits with code 1 for general errors
+### Requirement: Status exits with code 1 when the check cannot run
 
-The command SHALL exit with code 1 (`ExitGeneralError`) for errors that prevent the status check from completing, such as invalid flags, configuration errors, or unexpected API failures.
+The command SHALL exit with code 1 (`ExitGeneralError`) for errors that prevent the status check from running: invalid flags, configuration errors, and a failed read of the instance's `ModuleInstance` record. A failed read of an individual tracked resource during discovery SHALL NOT exit 1: it is an `Unknown` row and the command exits 2.
 
-#### Scenario: Invalid output format
+#### Scenario: Invalid output format is a general error
 
 - **WHEN** the user runs `opm instance status my-app -n prod -o invalid`
 - **THEN** the command SHALL exit with code 1 and print `invalid output format "invalid" (valid: table, wide, yaml, json)`
 
-#### Scenario: Kubernetes API error
+#### Scenario: ModuleInstance record read error
 
-- **WHEN** the Kubernetes API returns an unexpected error during resource discovery
+- **WHEN** reading the instance's `ModuleInstance` record fails with an error other than NotFound
 - **THEN** the command SHALL exit with code 1
 
-### Requirement: Status preserves existing connectivity exit codes
+#### Scenario: Tracked resource read error is not a general error
 
-The command SHALL continue to use exit code 3 (`ExitConnectivityError`) for cluster connectivity failures and exit code 4 (`ExitPermissionDenied`) for RBAC errors. These are handled by the `cmdutil.ExitCodeFromK8sError` function and are not changed.
+- **WHEN** the `ModuleInstance` record is read
+- **AND** reading one tracked resource fails with Forbidden
+- **THEN** the command SHALL list that resource as `Unknown` and exit with code 2, not 1 or 4
 
-#### Scenario: Cluster unreachable
+### Requirement: Status exits with code 3 when no cluster client can be built
 
-- **WHEN** the cluster is unreachable
+The command SHALL exit with code 3 (`ExitConnectivityError`) when no Kubernetes client can be built from the resolved kubeconfig and context (`cmdutil.NewK8sClient`). Errors from the status evaluation itself SHALL map through `cmdutil.ExitCodeFromK8sError` (3 for connectivity, 4 for authentication and RBAC). Per-resource read errors during discovery SHALL NOT be mapped this way.
+
+#### Scenario: Client cannot be built
+
+- **WHEN** the kubeconfig or context cannot produce a Kubernetes client
 - **THEN** the command SHALL exit with code 3
-
-#### Scenario: RBAC denied
-
-- **WHEN** the user lacks permissions to list resources
-- **THEN** the command SHALL exit with code 4
