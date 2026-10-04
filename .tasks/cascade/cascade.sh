@@ -33,7 +33,6 @@ RES=$CASCADE_RESOLVER
 cd "$(git rev-parse --show-toplevel)"
 
 LIB=github.com/open-platform-model/library
-OP=github.com/open-platform-model/opm-operator
 MOD=opmodel.dev/modules/opm_operator@v0
 PIN=internal/operator/pin.go
 CAT=opmodel.dev/catalogs/opm@v4
@@ -264,7 +263,9 @@ report() { # report DISPLAY FROM TO
 
 # ---------------------------------------------------------------------------
 # Phase A: resolve. Every call that decides a target runs here, before any
-# edit, so an error leaves the tree unchanged (contract §5.2 rule 5).
+# edit, so an error leaves the tree unchanged (contract §5.2 rule 5). The
+# operator module lane builds hack/operator-pin from the merge base here, not
+# in Phase B, because its select walk decides the target; still before any edit.
 
 r check-files --repo-root .
 [ "$RC" = 0 ] || die "check-files answered $RC"

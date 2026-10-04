@@ -132,7 +132,7 @@ It SHALL append a warning to the cascade warnings file, without failing, in each
 #### Scenario: Merge mode builds opm from the merge base
 
 - **WHEN** a run on a `deps/cascade` branch that already pins a moved library, with `main` merged in, needs a version advance
-- **THEN** the task builds `opm` from the merge base's tree, which pins `main`'s library, and runs `go` for nothing else but `get`, `mod tidy` and that build
+- **THEN** the task builds `opm` from the merge base's tree, which pins `main`'s library, and runs `go` for nothing else but `get`, `mod tidy` and the builds of `opm` and `hack/operator-pin` from the merge base
 
 #### Scenario: A newer language version is a warning
 

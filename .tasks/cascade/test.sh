@@ -394,10 +394,11 @@ fi
 # ---------------------------------------------------------------------------
 # Network scenarios (CASCADE_TEST_SET=all): the older versions are real, so
 # go get and cue mod get resolve them from the Go proxy and GHCR, or from a
-# warm cache. The operator module pin stays at the tree's version: no older
-# module release exists yet (0.1.0 is the first). Once one does, add an
-# "older" row for it, move it in setup_older with task operator:pin, and
-# count it in S5.
+# warm cache. setup_older leaves the operator module pin at the tree's version:
+# no older module release exists yet (0.1.0 is the first). S17 moves it alone,
+# from an unpublished 0.0.9, so the lane runs against the real registry. Once
+# an older release exists, add an "older" row for it, move it in setup_older
+# with task operator:pin, and count it in S5.
 
 OLDER="$HERE/testdata/older.tsv"
 CUE_DIRS=(
@@ -514,19 +515,17 @@ if [ "$SET" = all ]; then
     PATH="$TMP/s2/bin:$PATH" run "$d" "$TMP/s2/table" "$TMP/s2/log"
     # By pattern, not by path: the task names its state dir by the resolved git dir.
     opm_build='^build -C /.*/\.git/cascade/opm-src -buildvcs=false -o /.*/\.git/cascade/bin/opm \./cmd/opm$'
-    # hack/operator-pin, the operator module lane's program, builds the same way.
-    pin_build='^build -C /.*/\.git/cascade/operator-pin-src -buildvcs=false -o /.*/\.git/cascade/bin/operator-pin \./hack/operator-pin$'
     if [ "$RUN_RC" != 0 ]; then
       fail "S2 older pins" "first run exit $RUN_RC, want 0: $(why)"
     elif ! reason=$(golden "$d"); then
       fail "S2 older pins" "first run: $reason"
     elif ! grep -qE -- "$opm_build" "$TMP/s2/go.log"; then
       fail "S2 older pins" "opm was not built from the merge base's export: $(tr '\n' ';' <"$TMP/s2/go.log")"
-    elif other=$(grep -vE -e "$opm_build" -e "$pin_build" -e '^mod tidy$' -e '^get ' "$TMP/s2/go.log") ; then
+    elif other=$(grep -vE -e "$opm_build" -e '^mod tidy$' -e '^get ' "$TMP/s2/go.log") ; then
       # Anything else (run, test, another build) would run code the move pulled in.
       fail "S2 older pins" "the task ran go $(tr '\n' ';' <<<"$other")"
-    elif [ -e "$d/.git/cascade/opm-src" ]; then
-      fail "S2 older pins" "the task left the opm source export behind"
+    elif [ -e "$d/.git/cascade/opm-src" ] || [ -e "$d/.git/cascade/operator-pin-src" ]; then
+      fail "S2 older pins" "the task left a source export behind"
     elif grep -q '^published oci open-platform-model/docs/' "$TMP/s2/log"; then
       # The docs-bundle check runs hack/docskit-dump, which links the moved
       # library; it belongs to the pull request's CI, not to the task.
@@ -581,6 +580,47 @@ if [ "$SET" = all ]; then
       else
         pass "S2 older pins"
       fi
+    fi
+  fi
+
+  # S17 module pin moves: the module pin is below the newest release, so the
+  # task builds hack/operator-pin from the merge base, walks select down from
+  # the resolver's answer against GHCR, and writes the pin through the binary;
+  # nothing else moves.
+  d=$(sandbox s17)
+  pin=internal/operator/pin.go
+  want_mod=$(sed -n 's/^const PinnedModuleVersion = "\(.*\)"$/\1/p' "$d/$pin")
+  want_op=$(sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p' "$d/$pin")
+  current_rows "$d" >"$TMP/s17/table"
+  perl -pi -e 's/^const PinnedModuleVersion = "[^"]+"$/const PinnedModuleVersion = "0.0.9"/;
+    s/^const PinnedOperatorVersion = "[^"]+"$/const PinnedOperatorVersion = "v0.0.9"/' "$d/$pin"
+  if ! grep -qx 'const PinnedModuleVersion = "0.0.9"' "$d/$pin" ||
+    ! grep -qx 'const PinnedOperatorVersion = "v0.0.9"' "$d/$pin"; then
+    fail "S17 module pin moves" "the setup edit did not apply"
+  else
+    commit_setup "$d"
+    mkdir -p "$TMP/s17/bin"
+    printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>%q\nexec %q "$@"\n' \
+      "$TMP/s17/go.log" "$(command -v go)" >"$TMP/s17/bin/go"
+    chmod +x "$TMP/s17/bin/go"
+    : >"$TMP/s17/go.log"
+    PATH="$TMP/s17/bin:$PATH" run "$d" "$TMP/s17/table" "$TMP/s17/log"
+    pin_build='^build -C /.*/\.git/cascade/operator-pin-src -buildvcs=false -o /.*/\.git/cascade/bin/operator-pin \./hack/operator-pin$'
+    if [ "$RUN_RC" != 0 ]; then
+      fail "S17 module pin moves" "exit $RUN_RC, want 0: $(why)"
+    elif ! grep -qE -- "$pin_build" "$TMP/s17/go.log"; then
+      fail "S17 module pin moves" "operator-pin was not built from the merge base's export: $(tr '\n' ';' <"$TMP/s17/go.log")"
+    elif other=$(grep -vE -e "$pin_build" "$TMP/s17/go.log"); then
+      fail "S17 module pin moves" "the task ran go $(tr '\n' ';' <<<"$other")"
+    elif ! grep -qx "const PinnedModuleVersion = \"$want_mod\"" "$d/$pin" ||
+      ! grep -qx "const PinnedOperatorVersion = \"$want_op\"" "$d/$pin"; then
+      fail "S17 module pin moves" "\`$pin\` pins $(grep '^const Pinned' "$d/$pin" | tr '\n' ' '), want $want_mod and $want_op"
+    elif [ "$(g "$d" status --porcelain --untracked-files=all)" != " M $pin" ]; then
+      fail "S17 module pin moves" "changed paths: $(g "$d" status --porcelain --untracked-files=all | tr '\n' ' ')"
+    elif [ -e "$d/.git/cascade/operator-pin-src" ]; then
+      fail "S17 module pin moves" "the task left the operator-pin source export behind"
+    else
+      pass "S17 module pin moves"
     fi
   fi
 
