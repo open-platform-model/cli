@@ -199,7 +199,9 @@ func resetOperatorCluster(t *testing.T, kubeconfig string) {
 	kubectlDeleteIfExists(t, kubeconfig, "clusterrole", "opm-cli-user",
 		"opm-operator-manager-role", "opm-operator-metrics-auth-role", "opm-operator-metrics-reader",
 		"opm-operator-moduleinstance-admin-role", "opm-operator-moduleinstance-editor-role", "opm-operator-moduleinstance-viewer-role",
-		"opm-operator-transformerregistration-admin-role")
+		"opm-operator-transformerregistration-admin-role",
+		"opm-operator-platform-viewer-role", "opm-operator-modulepackage-viewer-role",
+		"opm-operator-transformerregistration-viewer-role")
 	// The module names each binding after its role; an earlier manifest
 	// install named them "-rolebinding".
 	kubectlDeleteIfExists(t, kubeconfig, "clusterrolebinding", "opm-cli-user",
