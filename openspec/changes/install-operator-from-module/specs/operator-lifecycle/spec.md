@@ -2,7 +2,7 @@
 
 ### Requirement: Install deploys the operator module as a CLI-owned instance in two steps
 
-`opm operator install` SHALL obtain the operator module `opmodel.dev/modules/opm_operator` from the CLI's configured module registry, render it as an instance named `opm-operator` in the namespace `opm-operator-system`, apply the rendered `CustomResourceDefinition` objects with server-side apply as field manager `opm-cli` and wait until each reports `Established=True`, and then apply the whole render as a CLI-owned ModuleInstance (`spec.owner: cli`) through the same apply the CLI uses for every instance. The instance record SHALL be written only after the CRDs are served. Every object the module renders, the CRDs and the Namespace included, SHALL be recorded in the instance's inventory, and no step SHALL refuse an object the same install applied. Install SHALL NOT create the Namespace outside the render. Apart from the render, install SHALL create only the cluster Platform and the opt-in `opm-cli-user` role. Re-running install with an unchanged module version and unchanged values SHALL change no live object, and installing another module version over the instance SHALL apply what changed and remove every object the previous version rendered and the new one does not, except CRDs and the Namespace.
+`opm operator install` SHALL obtain the operator module `opmodel.dev/modules/opm_operator` from the CLI's configured module registry, render it as an instance named `opm-operator` in the namespace `opm-operator-system`, apply the rendered `CustomResourceDefinition` objects with server-side apply as field manager `opm-cli` and wait until each reports `Established=True`, and then apply the whole render as a CLI-owned ModuleInstance (`spec.owner: cli`) through the same apply the CLI uses for every instance. The instance record SHALL be written only after the CRDs are served. Every object the module renders, the CRDs and the Namespace included, SHALL be recorded in the instance's inventory, and no step SHALL refuse an object the same install applied. Install SHALL NOT create the Namespace outside the render. Apart from the render, install SHALL create only the cluster Platform and the opt-in `opm-cli-user` role. Re-running install with an unchanged module version and unchanged values SHALL change no live object, and installing another module version over the instance SHALL apply what changed and remove every object the previous version rendered and the new one does not, except CRDs and the Namespace. Source: 0021:D11:R1, 0021:D11:R2.
 
 #### Scenario: Fresh cluster
 
@@ -47,7 +47,7 @@ Install SHALL run, before it writes any object, every check that can refuse it: 
 
 ### Requirement: The CLI pins a default operator module version and the operator it deploys
 
-Each CLI release SHALL name one default operator module version and SHALL record the operator version that module deploys, both readable from the CLI's source without a registry. The recorded operator version SHALL be the version the module's own source states it deploys. Install without `--version` SHALL install exactly that module version. The pin SHALL be produced by `task operator:pin VERSION=<v>` from the module's own statement of the operator it deploys, without a render, and no other task SHALL write it. The module is trusted as the configured registry serves it, as every other module the CLI installs is.
+Each CLI release SHALL name one default operator module version and SHALL record the operator version that module deploys, both readable from the CLI's source without a registry. The recorded operator version SHALL be the version the module's own source states it deploys. Install without `--version` SHALL install exactly that module version. The pin SHALL be produced by `task operator:pin VERSION=<v>` from the module's own statement of the operator it deploys, without a render, and no other task SHALL write it. The module is trusted as the configured registry serves it, as every other module the CLI installs is. Source: 0021:D11:R6.
 
 #### Scenario: Default install uses the pin
 
@@ -66,7 +66,7 @@ Each CLI release SHALL name one default operator module version and SHALL record
 
 ### Requirement: Another module version is installed from the registry as served
 
-`opm operator install --version <selector>` SHALL resolve the operator module version through the CLI's configured registry, a release version pinning it and a major (`v0`) floating to that major's newest release, and SHALL install it through the same render, checks and steps as the default. Install SHALL report the module version and the operator version it deploys. A selector the registry cannot satisfy SHALL refuse before any cluster call, and when the selector has the shape of an opm-operator release tag, the message SHALL say that `--version` now takes an operator module version. With the CLI's registry mapping pointed at a mirror holding the module and its dependencies, install SHALL need no other registry.
+`opm operator install --version <selector>` SHALL resolve the operator module version through the CLI's configured registry, a release version pinning it and a major (`v0`) floating to that major's newest release, and SHALL install it through the same render, checks and steps as the default. Install SHALL report the module version and the operator version it deploys. A selector the registry cannot satisfy SHALL refuse before any cluster call, and when the selector has the shape of an opm-operator release tag, the message SHALL say that `--version` now takes an operator module version. With the CLI's registry mapping pointed at a mirror holding the module and its dependencies, install SHALL need no other registry. Source: 0021:D11:R1, 0021:D11:R2.
 
 #### Scenario: Selecting another version
 
@@ -91,7 +91,7 @@ Before any object changes, install SHALL refuse a target module version (each re
 - whose render does not run the controller Deployment `opm-operator-controller-manager` with an image tagged with the operator version the module states;
 - whose rendered ModuleInstance CRD does not carry the fields the CLI requires of that CRD before it applies an instance, naming the floor.
 
-Install SHALL NOT be refused because the operator the cluster Platform reports has a `MAJOR.MINOR` above the CLI's, since install replaces the running operator rather than driving it. A target below the recorded module version or the running operator SHALL NOT be refused by this requirement.
+Install SHALL NOT be refused because the operator the cluster Platform reports has a `MAJOR.MINOR` above the CLI's, since install replaces the running operator rather than driving it. A target below the recorded module version or the running operator SHALL NOT be refused by this requirement. Source: 0021:D9:R3, 0021:D9:R4.
 
 #### Scenario: Operator newer than the CLI
 
@@ -148,7 +148,7 @@ Install SHALL report success only after the rendered CRDs are `Established` and 
 
 ### Requirement: Platform seeding and the opt-in user role stay install steps
 
-After the operator's rollout, and unless `--skip-platform` or `--crds-only` is given, install SHALL create the singleton `cluster` Platform subscribing to the catalog build it resolved before contacting the cluster, with a plain create as field manager `opm-cli`, never server-side apply or update. An existing Platform SHALL be reported and left untouched, an `AlreadyExists` response SHALL be a success-noop, and a create denied by RBAC SHALL degrade to a warning. Neither the Platform nor the `opm-cli-user` role of `--rbac` SHALL be part of the operator module's render or the instance's inventory; `--rbac` SHALL apply on the CRDs-only path as on the full one. Source: 0006:D12, 0006:D22, 0006:D23.
+After the operator's rollout, and unless `--skip-platform` or `--crds-only` is given, install SHALL create the singleton `cluster` Platform subscribing to the catalog build it resolved before contacting the cluster, with a plain create as field manager `opm-cli`, never server-side apply or update. An existing Platform SHALL be reported and left untouched, an `AlreadyExists` response SHALL be a success-noop, and a create denied by RBAC SHALL degrade to a warning. Neither the Platform nor the `opm-cli-user` role of `--rbac` SHALL be part of the operator module's render or the instance's inventory; `--rbac` SHALL apply on the CRDs-only path as on the full one. Source: 0006:D12, 0006:D22, 0006:D23, 0021:D11:R8.
 
 #### Scenario: Platform is seeded on a full install
 
@@ -172,7 +172,7 @@ After the operator's rollout, and unless `--skip-platform` or `--crds-only` is g
 
 ### Requirement: CRDs-only install applies the CRDs of the same module render
 
-`opm operator install --crds-only` SHALL render the same module version as a full install would, refuse under the operator-newer-than-CLI rule, the rendered-image rule and the CRD floor before applying any CRD, apply exactly the rendered `CustomResourceDefinition` objects with server-side apply as `opm-cli`, and wait for each to be `Established`. It SHALL write no instance record, no workload and no Platform, and SHALL perform no catalog lookup. A later full install of the same module version SHALL record those CRDs without recreating them.
+`opm operator install --crds-only` SHALL render the same module version as a full install would, refuse under the operator-newer-than-CLI rule, the rendered-image rule and the CRD floor before applying any CRD, apply exactly the rendered `CustomResourceDefinition` objects with server-side apply as `opm-cli`, and wait for each to be `Established`. It SHALL write no instance record, no workload and no Platform, and SHALL perform no catalog lookup. A later full install of the same module version SHALL record those CRDs without recreating them. Source: 0021:D11:R7.
 
 #### Scenario: Solo-cluster CRD install
 
@@ -191,7 +191,7 @@ After the operator's rollout, and unless `--skip-platform` or `--crds-only` is g
 
 ### Requirement: Uninstall deletes the operator instance's recorded inventory
 
-`opm operator uninstall` SHALL read the operator's instance record `opm-operator` in `opm-operator-system`. When none exists, it SHALL delete nothing and exit 2 naming `opm operator install` as the step that records the running operator. Otherwise, after the finalizer guard, it SHALL delete every object the record's inventory lists except CRDs and the Namespace, in descending resource-weight order, leaving behind any object that no longer carries this instance's identity, then delete the record. It SHALL delete no object the inventory does not list, SHALL NOT wait for deletion to complete, and SHALL treat an already absent object as deleted. Source: 0006:D34.
+`opm operator uninstall` SHALL read the operator's instance record `opm-operator` in `opm-operator-system`. When none exists, it SHALL delete nothing and exit 2 naming `opm operator install` as the step that records the running operator. Otherwise, after the finalizer guard, it SHALL delete every object the record's inventory lists except CRDs and the Namespace, in descending resource-weight order, leaving behind any object that no longer carries this instance's identity, then delete the record. It SHALL delete no object the inventory does not list, SHALL NOT wait for deletion to complete, and SHALL treat an already absent object as deleted. Source: 0006:D34, 0021:D11:R11.
 
 #### Scenario: Uninstall after a module install
 

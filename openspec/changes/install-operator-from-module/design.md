@@ -57,13 +57,13 @@ Example output (messages are the contract's shape; exact wording is the implemen
 
 ```text
 $ opm operator install
-INFO operator module opmodel.dev/modules/opm_operator 0.1.0 (pinned; deploys opm-operator v1.0.0-beta.6)
+INFO operator module opmodel.dev/modules/opm_operator 0.1.0 (pinned; deploys opm-operator v1.0.0-beta.7)
 INFO platform: module deps (cluster Platform not used for the operator)
 INFO CustomResourceDefinition/moduleinstances.opmodel.dev   created
 ...
 INFO opm-operator applied 19 resources successfully (19 created)
 INFO Platform/cluster created (opmodel.dev/catalogs/opm v4.6.0)
-[x] opm-operator v1.0.0-beta.6 installed from module 0.1.0
+[x] opm-operator v1.0.0-beta.7 installed from module 0.1.0
 
 $ opm operator install --version 0.4.0
 ERROR refusing opm_operator 0.4.0: it deploys opm-operator v1.1.0, newer than this CLI (v1.0.0-beta.9) - upgrade the CLI first
@@ -182,6 +182,18 @@ func Uninstall(ctx context.Context, client *kubernetes.Client, opts UninstallOpt
 - Spec names: the release-gates requirements and scenarios that name the embedded operator are REMOVED and ADDED under new names, since a MODIFIED requirement cannot drop a main-spec scenario. The CI check names stay: the `main` ruleset of `open-platform-model/cli` requires the status checks `E2E (kind, embedded operator)` and `G4 operator-embed evidence` (read 2026-10-04), so renaming the job or the check would block every PR until the owner edits the ruleset. The specs keep those names and a later change may rename them together with the ruleset.
 - `.github/scripts/e2e-cluster-applies.sh` keeps triggering on `internal/operator/`, which now holds `pin.go`.
 - `tests/e2e/operator_test.go`: `pinnedOperatorImage` composes the image from `PinnedOperatorVersion`; the lifecycle asserts the record, the inventory, the rollout, the uninstall-from-record behaviour and the no-record refusal.
+
+### Spike findings (2026-10-04)
+
+Gate (a) was not met when this was written: `opmodel.dev/modules/opm_operator` had no version on GHCR (the module release, opm-operator PR #221, was still open). The owner chose the first module release route: after #221 merges, `module-image.yml` is dispatched with `tag=v1.0.0-beta.7`, so module `0.1.0` deploys operator `v1.0.0-beta.7`. The findings below come from opm-operator `main` (`4eebece`, `modules/opm_operator`, identity `0.1.0`, `operator.Version` `1.0.0-beta.6` before that dispatch), rendered with a host-built `opm` from cli `main` (`opm module build . --name opm-operator -n opm-operator-system`, `KUBECONFIG=/nonexistent`), and are re-checked against the published module by task 2.5.
+
+**Spike A, the render.** The module is `opmodel.dev/modules/opm_operator@v0`, pinning core `v2.0.0-beta.2`, catalogs/opm `v4.6.0` and `cue.dev/x/k8s.io@v0` `v0.12.0`. The render reported `platform: module deps (opmodel.dev/catalogs/opm@v4 v4.6.0 ...)` and produced 19 objects: the four `opmodel.dev` CRDs, Namespace `opm-operator-system`, ClusterRoles `opm-operator-manager-role` and `opm-operator-metrics-auth-role` with a ClusterRoleBinding of the same name each, the five unbound ClusterRoles (`metrics-reader`, `moduleinstance-{admin,editor,viewer}-role`, `transformerregistration-admin-role`, all `opm-operator-` prefixed), and in `opm-operator-system` ServiceAccount `opm-operator-controller-manager`, Role and RoleBinding `opm-operator-leader-election-role`, Service `opm-operator-controller-manager-metrics-service` and Deployment `opm-operator-controller-manager`. The Deployment's container `manager` runs `ghcr.io/open-platform-model/opm-operator:v1.0.0-beta.6@sha256:7871a5dd…`, so the tag is read between the last `:` after the last `/` and the `@`. Every object, the CRDs included, carries `app.kubernetes.io/managed-by: opm-cli` and the instance identity labels (`module-instance.opmodel.dev/name`, `module-instance.opmodel.dev/uuid`). The pod carries `seccompProfile: RuntimeDefault`. `#config` is closed with the fields `image.repository`, `registry` (the operator's `--registry` mapping), `defaultServiceAccount`, `resources`, `replicas` and `extraArgs`; `debugValues` is `{}`. The module refuses any instance other than `opm-operator` in `opm-operator-system` (`_instanceGuard`).
+
+**Spike B, the operator-version reader.** The `operator` package is one file with no imports (`Version`, and `Image` whose `tag` interpolates `Version`). The reader fetches the module with `modconfig.NewRegistry(&modconfig.Config{CUERegistry: <mapping>}).Fetch`, the same cached registry `internal/modref.NewSource` builds for version resolution, so it uses CUE's own module cache and needs no second cache or environment setting; it compiles the `.cue` files of `operator/` with a plain `cuecontext` and reads `Version`. The kernel's acquired source would need a full module acquisition (the module and its dependencies) for one string, so it is not used. Tests serve module zips from `modregistrytest` with `CUE_CACHE_DIR` set to a temporary directory.
+
+**Spike C, the cascade resolver.** `cascade-resolve.sh newest cue opmodel.dev/modules/opm_operator@v0 --current v<pinned> --repo-root .` is the call: the `cue` kind reads GHCR, and the same call against `opmodel.dev/catalogs/opm@v4` answered `v4.6.0`. Until the module is published it exits 1 (`unknown on GHCR or private`). The resolver answers only the newest published version, so the lane passes that version to `go run ./hack/operator-pin select`, which walks the published versions at or below it, newest first, and prints the first whose `operator.Version` has a `MAJOR.MINOR` not above the cli's. No `.github` change is needed.
+
+**Reconciled with what merged.** `locate-operator-and-guard-its-instance` (cli #299) supplies `OperatorInstanceName`, `OperatorNamespace`, `ControllerDeploymentName` and `OperatorModulePath` in `internal/operator/names.go`; this change uses those constants and declares none of them again. `fix-compat-unauthored-defaults` (cli #300) touches no file this change edits. The ModuleOpts field `Namespace` is added beside `Values` and `DepsOnly`, because the synthetic-instance namespace otherwise comes only from the `--namespace` flag or environment.
 
 ## Evidence
 

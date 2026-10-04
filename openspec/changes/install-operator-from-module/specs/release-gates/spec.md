@@ -8,7 +8,7 @@ A release-pin check (G1) SHALL fail, naming every offending pin and its file, wh
 - a `cue.mod/local-module.cue` file is tracked anywhere in the repository;
 - the operator module pin in `internal/operator/pin.go` names a module version the registry does not serve, or records a `PinnedOperatorVersion` other than the operator version the pinned module's source states it deploys, or the pin cannot be read.
 
-The check SHALL report all failures in one run, not only the first, and SHALL exit zero when none holds. It SHALL run as a step inside the existing `lint` job of both the pull-request workflow and the push workflow, and only when the branch name (`head_ref`, or `ref_name` when `head_ref` is empty) starts with `release-please--`; on every other branch the step SHALL be skipped while the job still runs. `task deps:release-check` SHALL run the same check locally on any branch. Source: workspace RELEASING.md, section "Gates".
+The check SHALL report all failures in one run, not only the first, and SHALL exit zero when none holds. It SHALL run as a step inside the existing `lint` job of both the pull-request workflow and the push workflow, and only when the branch name (`head_ref`, or `ref_name` when `head_ref` is empty) starts with `release-please--`; on every other branch the step SHALL be skipped while the job still runs. `task deps:release-check` SHALL run the same check locally on any branch. Source: workspace RELEASING.md, section "Gates", 0021:D11:R6.
 
 #### Scenario: Clean release PR passes
 - **WHEN** a release-please PR's tree has no replace, no tracked `local-module.cue`, library pinned at an existing tag, no dev template pin, and an operator module pin whose module version the registry serves and whose operator version that module states
