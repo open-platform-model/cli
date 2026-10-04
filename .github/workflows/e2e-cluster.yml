@@ -1,5 +1,5 @@
 name: E2E Cluster
-# The cluster-backed e2e suite against the operator the CLI embeds: a kind
+# The cluster-backed e2e suite against the pinned operator module: a kind
 # cluster prepared with the local loop's own tasks (task cluster:create, task
 # cluster:operator), a registry seeded from the tree, and the whole tests/e2e
 # suite with OPM_E2E_REQUIRE_CLUSTER=1, so no cluster test can pass by skipping.

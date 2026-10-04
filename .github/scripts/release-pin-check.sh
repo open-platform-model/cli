@@ -73,8 +73,9 @@ done < <(git ls-files '*cue.mod/local-module.cue')
 # reads it without a render; a lookup that fails is a failure, not a pass.
 if ! pin_out=$(go run ./hack/operator-pin --check 2>&1); then
   while IFS= read -r line; do
-    # go run adds its own "exit status N" line; the tool's lines say why.
-    case "$line" in "" | "exit status "*) continue ;; esac
+    # go run adds its own "exit status N" line, and on a cold cache one
+    # "go: downloading ..." line per module; the tool's lines say why.
+    case "$line" in "" | "exit status "* | "go: "*) continue ;; esac
     fail "${line#operator-pin: }"
   done <<<"$pin_out"
 fi

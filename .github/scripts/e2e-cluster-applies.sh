@@ -32,10 +32,11 @@ cascade_branch=deps/cascade
 cascade_label=deps-cascade
 release_prefix=release-please--
 
-# Paths whose change makes the job apply: the operator embed and what it
-# serves, plus the job's own inputs (a change to them is tested where it is
-# made, not at the next release pull request). Extended regular expressions,
-# matched against the whole repo-relative path.
+# Paths whose change makes the job apply: the operator module pin and the
+# code that installs it, what the cluster serves, plus the job's own inputs
+# (a change to them is tested where it is made, not at the next release pull
+# request). Extended regular expressions, matched against the whole
+# repo-relative path.
 apply_paths=(
   '^internal/operator/'
   '^internal/cmd/operator/'
