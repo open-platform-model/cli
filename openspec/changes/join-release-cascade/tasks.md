@@ -49,10 +49,13 @@ All checks are read-only. Each result is an indented "Done:" note; design.md "Sp
 
 ## 2. Notify downstream after a release is published (wiring §10.1 items 1, 2, 9)
 
-- [ ] 2.1 In `.github/workflows/release.yml`, replace the version 2 `notify-downstream` job with the cli block of wiring §4.6, byte for byte with `<SHA>`, as the last job. The comment above it says only that the job is caller-owned, declares `environment: cascade` and passes the key as the pinned action's input, keeping every clause of the wiring §10.1 item 9 text that applies to it.
-- [ ] 2.2 Rewrite the runbook's notify recovery line at the top of `release.yml`: re-run the failed jobs when `Notify downstream` failed; when it was skipped (a manual run from a branch other than `main` published the draft), nothing re-sends it and the daily sweep picks it up; the job's `needs` and `if` reasons; `CASCADE_NOTIFY=off`.
-- [ ] 2.3 Check design D1's run matrix against the edited file, row by row.
-- [ ] 2.4 The local gate is green, then commit `ci(release): run the pinned cascade-notify action in a cascade Environment job`.
+- [x] 2.1 In `.github/workflows/release.yml`, replace the version 2 `notify-downstream` job with the cli block of wiring §4.6, byte for byte with `<SHA>`, as the last job. The comment above it says only that the job is caller-owned, declares `environment: cascade` and passes the key as the pinned action's input, keeping every clause of the wiring §10.1 item 9 text that applies to it.
+  Done: the job is the §4.6 cli block with `cascade-notify@<SHA> # .github main`; the four-line comment above it says it is the only job that reads the key, declares `environment: cascade`, passes `secrets.CASCADE_APP_PRIVATE_KEY` only as `private-key` of the pinned action, and has no checkout, `run:`, `env:`, `container:` or `services:`.
+- [x] 2.2 Rewrite the runbook's notify recovery line at the top of `release.yml`: re-run the failed jobs when `Notify downstream` failed; when it was skipped (a manual run from a branch other than `main` published the draft), nothing re-sends it and the daily sweep picks it up; the job's `needs` and `if` reasons; `CASCADE_NOTIFY=off`.
+- [x] 2.3 Check design D1's run matrix against the edited file, row by row.
+  Done: all seven rows hold. goreleaser's `if:` admits any `workflow_dispatch` ref, so a manual run from another branch can publish a draft while the `main` guard skips notify; that row and the runbook say the sweep covers it.
+- [x] 2.4 The local gate is green, then commit `ci(release): run the pinned cascade-notify action in a cascade Environment job`.
+  Done: `task lint` (0 issues), `task test:unit` (34 packages ok), `task openspec:check` (68/0), actionlint v1.7.12 with shellcheck on all workflows: clean.
 
 ## 3. Receiver, gate caller, resolver pin and Dependabot (wiring §10.1 items 2, 3, 4, 5, 7, 9)
 
