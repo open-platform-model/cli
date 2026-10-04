@@ -45,6 +45,12 @@ func implicitListDefault(v cue.Value) bool {
 
 The rest of `checkDefaults` is unchanged: prior has none, nothing to check; prior has one and next has none, `default removed`; both have one, compare.
 
+### Defaults inside an open list's fixed elements
+
+CUE folds a default written in a fixed element of an open list into the list's implicit default: `[*"a" | string, ...string]` has the implicit default `["a"]`, and `[{a: *1 | int}, ...]` has `[{a: 1}]`. Skipping the implicit default therefore also skipped these, and the leaf subsume does not see a removed default, so `[*"a" | string, ...string]` to `[string, ...string]` reported nothing (it reported `default changed` before this change; found in review).
+
+`walk` therefore calls `openListDefaults` on every leaf: when both sides are plain open lists (`implicitListDefault`) with the same number of fixed elements, `walkDefaults` applies the default rule alone to each pair at `name[i]` and below it (struct fields present on both sides, equal-length closed lists, nested open lists). It reports defaults only; the list's value domain stays the leaf subsume's, so a changed nested default reports `default changed` at `xs[0].a` and `domain narrowed` at `xs`. Pairs with a different number of fixed elements are left to the leaf subsume, as closed lists of unequal length are.
+
 ## Research & Decisions
 
 ### Telling an authored default from the implicit one
