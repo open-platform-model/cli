@@ -6,25 +6,6 @@
 
 ## Requirements
 
-### Requirement: Release runs from pushes to main through release-please
-The release workflow SHALL trigger on `push` to `main` and on `workflow_dispatch` with one required `tag` input, and never on a tag push. On a push, the `release-please` job SHALL run first, authenticated as the opm-release-please App with no `GITHUB_TOKEN` fallback, driven by `release-please-config.json` and `.release-please-manifest.json`: a Go package named `opm` on a `v`-prefixed, `beta` prerelease version line with `CHANGELOG.md` as the changelog. The configuration SHALL set `draft: true` and `force-tag-creation: true`, so release-please creates the git tag at the release commit itself and leaves the GitHub Release as a draft for goreleaser to fill and publish. The job SHALL expose `releases_created` and `tag_name` as outputs for the downstream jobs. On a manual run the `release-please` job SHALL be skipped. The configuration SHALL NOT carry a `release-as` value: a move to a new version line (for example `1.0.0-alpha.27` to `1.0.0-beta.1`) SHALL travel as a one-shot `Release-As: <version>` footer in the final commit message of one commit on main, because a configured `release-as` is re-applied on every run. Source: 0021:D10:R8.
-
-#### Scenario: Push without a merged release PR
-- **WHEN** a commit that is not a release PR merge lands on main
-- **THEN** release-please updates or opens the release PR and the goreleaser and publish-templates jobs are skipped
-
-#### Scenario: Release PR merged
-- **WHEN** the release PR merges to main
-- **THEN** release-please creates the tag at the release commit and a draft GitHub Release, and reports `releases_created == 'true'` with the new `tag_name`
-
-#### Scenario: Line change forced by a footer
-- **WHEN** the manifest holds `1.0.0-alpha.27` and a commit whose final footer paragraph carries `Release-As: 1.0.0-beta.1` lands on main
-- **THEN** release-please opens or retitles the release PR as `chore(main): release 1.0.0-beta.1`
-
-#### Scenario: Next release stays on the beta line
-- **WHEN** the manifest holds `1.0.0-beta.1` and a releasable commit without a `Release-As` footer lands on main
-- **THEN** release-please proposes `1.0.0-beta.2`
-
 ### Requirement: Binaries publish only when a release was created
 The `goreleaser` job SHALL `need` release-please and publish-templates and run only when `releases_created == 'true'` or the run is a manual `workflow_dispatch`, with `contents: write` and the repository `GITHUB_TOKEN`; `contents: write` is also what lets it see a draft release, which GitHub hides from read-only tokens. Before building it SHALL read the draft state of the GitHub Release for the tag and SHALL proceed only when the release is a draft. When the release is published it SHALL fail with a message that the release is already published and the next patch release must be cut instead. When no GitHub Release exists for the tag it SHALL fail with a message that names the tag and says to re-run the release-please job of the run that merged the release PR. When the lookup itself fails for any other reason it SHALL fail with that error and SHALL NOT report the release as published. After the draft check and before building, it SHALL fail unless the publish-templates job succeeded, with a message that the release stays a draft, so no release is published without its template modules. It SHALL run in a concurrency group per tag that never cancels a running job. Otherwise it SHALL check out `tag_name`, or the `tag` input on a manual run, with `fetch-depth: 0`, set up Go 1.26.0, and run `goreleaser release --clean`. The manual run is the recovery for a draft release whose tag exists without all of its assets, including one held back by a transient template failure; it SHALL NOT change a published release. Source: 0021:D10:R8.
 
@@ -155,3 +136,48 @@ No job, step or script of the release workflow SHALL move, delete or re-create a
 #### Scenario: Docs commit beside a fix
 - **WHEN** a `docs(...)` commit and a `fix(...)` commit land on `main`
 - **THEN** the release PR's changelog lists the fix and omits the docs commit
+
+### Requirement: Release-please runs on pushes to main
+The release workflow SHALL trigger on `push` to `main` and on `workflow_dispatch` with one required `tag` input, and never on a tag push. On a push, the `release-please` job SHALL run first, authenticated as the opm-release-please App with no `GITHUB_TOKEN` fallback, driven by `release-please-config.json` and `.release-please-manifest.json`: a Go package named `opm` on a `v`-prefixed, `beta` prerelease version line with `CHANGELOG.md` as the changelog. The configuration SHALL set `draft: true` and `force-tag-creation: true`, so release-please creates the git tag at the release commit itself and leaves the GitHub Release as a draft for goreleaser to fill and publish. The job SHALL expose `releases_created` and `tag_name` as outputs for the downstream jobs. On a manual run the `release-please` job SHALL be skipped. Source: 0021:D10:R8.
+
+#### Scenario: Release-please on a push without a merged release PR
+- **WHEN** a commit that is not a release PR merge lands on main
+- **THEN** release-please updates or opens the release PR and the goreleaser and publish-templates jobs are skipped
+
+#### Scenario: Release-please on a merged release PR
+- **WHEN** the release PR merges to main
+- **THEN** release-please creates the tag at the release commit and a draft GitHub Release, and reports `releases_created == 'true'` with the new `tag_name`
+
+#### Scenario: Releases without a release-as key stay on the beta line
+- **WHEN** the manifest holds `1.0.0-beta.1`, `release-please-config.json` carries no `release-as` key, and a releasable commit lands on main
+- **THEN** release-please proposes `1.0.0-beta.2`
+
+### Requirement: A version line moves only through a release-as key
+A forced version, such as a move to a new version line (for example `1.0.0-alpha.27` to `1.0.0-beta.1`), SHALL be a `release-as` value on the `.` package in `release-please-config.json`, set by a normal pull request. The key SHALL take effect only together with a releasable commit (a visible type: `feat`, `fix`, `perf`, `revert`, `deps` or `refactor`) on `main` since the last release, because release-please opens no release PR for hidden-type commits alone, whatever the key says; so the key pull request SHALL itself carry a releasable type, or land after a releasable commit since the last release. Because release-please re-applies a configured `release-as` on every run, the key SHALL be removed before any later release PR merges. Outside the span from the key pull request to the pull request that removes it, the configuration SHALL carry no `release-as` value. A `Release-As:` footer in a pull request body or a branch commit message SHALL NOT be relied on, because the `BLANK` squash message keeps it off `main`. A `BEGIN_COMMIT_OVERRIDE` block in a pull request body SHALL NOT be used, because release-please would take it as the commit message and apply its footers. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+
+#### Scenario: A release-as key forces the line change
+- **WHEN** the manifest holds `1.0.0-alpha.27`, a pull request that sets `release-as` to `1.0.0-beta.1` in `release-please-config.json` merges to main, and it or another commit since the last release has a releasable type
+- **THEN** release-please opens or retitles the release PR as `chore(main): release 1.0.0-beta.1`
+
+#### Scenario: A key pull request of a hidden type alone opens no release PR
+- **WHEN** the only commit on main since the last release is a `chore(...)`, `build(...)` or `ci(...)` pull request that sets `release-as`
+- **THEN** release-please opens no release PR, and the forced version waits for the next releasable commit
+
+#### Scenario: The key is removed once its release is cut
+- **WHEN** the release PR for the `release-as` version has merged and that version is tagged
+- **THEN** a pull request removes the `release-as` key before any later release PR merges, and later releasable commits advance the line normally
+
+#### Scenario: A footer forces nothing
+- **WHEN** a pull request whose body or branch commit message carries `Release-As: 1.1.0-beta.1`, and whose body has no `BEGIN_COMMIT_OVERRIDE` block, merges to main under the `BLANK` squash message
+- **THEN** the squash commit on main carries only the pull request title, and release-please proposes the next version from that title alone
+
+### Requirement: A breaking change is marked by a bang in the pull request title
+A breaking change SHALL be marked by `!` in the pull request title (`feat!:`, `fix(deps)!:`), which is the squash commit title once `squash_merge_commit_title` is `PR_TITLE`. Until that owner setting lands, a one-commit pull request squashes under its commit subject, so that subject SHALL carry the same `!`. A `BREAKING CHANGE:` footer in a pull request body or a branch commit message SHALL NOT be relied on, because the `BLANK` squash message keeps it off `main`; the migration note goes in the pull request body, and in the user docs when users need it to upgrade, and the release pull request's `CHANGELOG.md` SHALL be edited by hand to carry it as the last step before that release pull request merges, and the edit SHALL be redone if anything landed on `main` since, because release-please rebuilds the release pull request on every push to `main` and drops a hand edit. A `BEGIN_COMMIT_OVERRIDE` block in a pull request body SHALL NOT be used, because release-please would take it as the commit message. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+
+#### Scenario: Breaking change marked in the title
+- **WHEN** a pull request titled `feat!: ...` squash-merges to main while the manifest holds `1.0.0-beta.3`
+- **THEN** release-please lists it under breaking changes and proposes `1.0.0-beta.4`, advancing the `-beta.N` counter
+
+#### Scenario: A breaking footer alone marks nothing
+- **WHEN** a pull request titled `feat: ...` whose body carries a `BREAKING CHANGE:` footer and no `BEGIN_COMMIT_OVERRIDE` block squash-merges to main under the `BLANK` squash message
+- **THEN** the squash commit carries only the title, and release-please files it as an ordinary feature

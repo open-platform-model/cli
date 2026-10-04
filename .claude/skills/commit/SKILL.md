@@ -23,7 +23,8 @@ Common types: `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `style`, `ci`,
 - Scope is optional but encouraged when it clarifies the change.
 - Description must be lowercase, imperative mood, no period at the end.
 - Keep the first line under 72 characters.
-- The subject line should be sufficient. A body is only warranted for genuinely unusual cases, e.g., a non-obvious breaking change, a subtle reason the diff doesn't speak for itself, or context that would otherwise be lost. Default: no body.
+- The subject line should be sufficient. A body is only warranted for genuinely unusual cases, e.g., a subtle reason the diff doesn't speak for itself, or context that would otherwise be lost. Default: no body.
+- A breaking change is a `!` in the subject and the PR title (`feat!:`), with the migration note in the PR body: under the `BLANK` squash message a commit body never reaches `main`.
 
 ## Message Content
 

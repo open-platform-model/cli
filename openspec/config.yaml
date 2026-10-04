@@ -50,12 +50,18 @@ context: |
   All commits MUST follow Conventional Commits: type(scope): description
   Pre-GA note: from its first beta the cli (with opmodel.dev/core@v2,
   library and opm-operator) is on the path to GA.
-  A breaking change is still allowed during beta, but only as a `feat!` commit
-  whose `BREAKING CHANGE:` footer is the migration note the CHANGELOG shows. It
-  advances the `-beta.N` counter and never moves the module path to a new
-  major. Stable lines (opmodel.dev/catalogs/opm@v4 and the module fleets) keep
-  the normal SemVer rule: a break is a new major. A core beta break that would
-  force a catalogs/opm major needs owner sign-off. GA drops the suffix:
+  A breaking change is still allowed during beta, but only as a `!` in the PR
+  title (`feat!:`), which is the squash commit title and the CHANGELOG entry;
+  until the owner merge settings land, merge by squash only and give a
+  one-commit PR's commit subject the same `!`. The migration note goes in the PR
+  body, and in the user docs when users need it to upgrade; whoever merges the
+  release PR edits its `CHANGELOG.md` by hand to carry the note as the
+  last step before merging, and redoes the edit if anything landed on `main`
+  since (release-please rebuilds the release PR and drops it).
+  A breaking change advances the `-beta.N` counter and never moves the module
+  path to a new major. Stable lines (opmodel.dev/catalogs/opm@v4 and the module
+  fleets) keep the normal SemVer rule: a break is a new major. A core beta break
+  that would force a catalogs/opm major needs owner sign-off. GA drops the suffix:
   `prerelease: false` plus a visible carrier commit per package, in dependency
   order.
   Rationale: Enables predictable upgrades and changelog automation.
@@ -222,7 +228,7 @@ operations:
         checking that box, run the section's gates (`task lint`, `task test`) on the whole tree and make
         exactly the named Conventional Commit (types and scopes per § Commit Standards; optional plain Co-Authored-By: Claude
         <noreply@anthropic.com> trailer only, never a session link, never a bare @name, and
-        no body line starting with word( because the squash body reaches release-please). Do not start the next section with uncommitted work in the tree."
+        no body line starting with word( because a squash message other than BLANK copies commit bodies into main, where release-please parses such a line as a commit). Do not start the next section with uncommitted work in the tree."
       - "The commit task is the only delivery operation apply performs: no push, no PR, no tag,
         no release. Commit on the working branch the run started on. If the run started on
         main, create the working branch before the first commit task; never commit to main."
@@ -232,7 +238,8 @@ operations:
         again: the checked boxes plus a clean tree are the resume state."
       - "Delivery mode: unless proposal.md carries `Delivery: one PR per section`, all section
         commits ship in one PR after the last section and the PR title carries the change's
-        release class. In per-section mode each section commit is the PR title and therefore a
+        release class, the highest release type among its section commits (a `!` if any of them
+        breaks), because only the title reaches main under the BLANK squash message. In per-section mode each section commit is the PR title and therefore a
         release trigger; the change stays active on main between PRs, and spec sync and enhancement
         delivery logging wait for archive after the last PR."
   archive:

@@ -103,12 +103,18 @@ Commits: `type(scope): description`.
 
 Pre-GA note: from its first beta the cli (with opmodel.dev/core@v2,
 library and opm-operator) is on the path to GA.
-A breaking change is still allowed during beta, but only as a `feat!` commit
-whose `BREAKING CHANGE:` footer is the migration note the CHANGELOG shows. It
-advances the `-beta.N` counter and never moves the module path to a new
-major. Stable lines (opmodel.dev/catalogs/opm@v4 and the module fleets) keep
-the normal SemVer rule: a break is a new major. A core beta break that would
-force a catalogs/opm major needs owner sign-off. GA drops the suffix:
+A breaking change is still allowed during beta, but only as a `!` in the PR
+title (`feat!:`), which is the squash commit title and the CHANGELOG entry;
+until the owner merge settings land, merge by squash only and give a
+one-commit PR's commit subject the same `!`. The migration note goes in the PR
+body, and in the user docs when users need it to upgrade; whoever merges the
+release PR edits its `CHANGELOG.md` by hand to carry the note as the
+last step before merging, and redoes the edit if anything landed on `main`
+since (release-please rebuilds the release PR and drops it).
+A breaking change advances the `-beta.N` counter and never moves the module
+path to a new major. Stable lines (opmodel.dev/catalogs/opm@v4 and the module
+fleets) keep the normal SemVer rule: a break is a new major. A core beta break
+that would force a catalogs/opm major needs owner sign-off. GA drops the suffix:
 `prerelease: false` plus a visible carrier commit per package, in dependency
 order.
 
