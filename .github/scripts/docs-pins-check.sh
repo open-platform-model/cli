@@ -109,8 +109,12 @@ docs_bundle_status() {
     "https://${docs_registry}/v2/${docs_repo}/$1/manifests/$2" 2>/dev/null || true
 }
 
-if ! docs_pins=$(go run ./hack/docskit-dump pins 2>&1); then
-  problem "hack/docskit-dump pins failed: $(tr '\n' ' ' <<<"$docs_pins")"
+# stderr apart from the JSON: on a cold module cache go run prints its
+# "go: downloading" lines there, which would break the jq read below.
+dump_err=$(mktemp)
+trap 'rm -f "$dump_err"' EXIT
+if ! docs_pins=$(go run ./hack/docskit-dump pins 2>"$dump_err"); then
+  problem "hack/docskit-dump pins failed: $(tr '\n' ' ' <"$dump_err")"
   finish
 fi
 if ! entries=$(jq -er '.pins | to_entries[] | "\(.key) \(.value)"' <<<"$docs_pins"); then
