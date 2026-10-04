@@ -506,6 +506,9 @@ done
 # 5. Docs bundles: a warning, never a hold (design.md D9; contract §9.5).
 if [ -n "$LIB_T" ] || [ -n "$OP_T" ]; then
   if pins=$(go run ./hack/docskit-dump pins 2>"$STATE/docskit.err"); then
+    # Outside a process substitution, so a changed output shape stops the task.
+    entries=$(jq -er '.pins | to_entries[] | "\(.key)\t\(.value)"' <<<"$pins") ||
+      die "\`hack/docskit-dump pins\` printed no \`.pins\` entries"
     while IFS=$'\t' read -r project pin; do
       [ -n "$project" ] || continue
       r published oci "open-platform-model/docs/$project" "$pin"
@@ -518,7 +521,7 @@ if [ -n "$LIB_T" ] || [ -n "$OP_T" ]; then
         esac
         warn "$key" "docs bundle for \`$project\` \`$pin\` is not published; G1 will fail the next release PR until it is"
       fi
-    done < <(jq -r '.pins | to_entries[] | "\(.key)\t\(.value)"' <<<"$pins")
+    done <<<"$entries"
   else
     warn - "\`hack/docskit-dump pins\` did not build on the edited tree; docs bundles not checked"
   fi
