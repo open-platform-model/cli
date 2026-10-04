@@ -6,10 +6,10 @@ Coordination: cli#307 (another session) edits `internal/workflow/apply/apply.go`
 
 ## 1. Sort the instance tree by weight, then name (internal/kubernetes)
 
-- [ ] 1.1 Red first: in `internal/kubernetes/tree_test.go` add `TestGroupByComponent_SortsByWeightThenName` (one component holding a Deployment `web` (weight 100), a Service `web` (50), ConfigMaps `config-z` and `config-a` (15), given in that order: the group reads ConfigMap/config-a, ConfigMap/config-z, Service/web, Deployment/web), and a `BuildTree` test at depth 1 asserting the same order in `result.Components[0].Resources`. Verify: both fail on today's code.
-- [ ] 1.2 In `internal/kubernetes/tree.go`, per design.md § 1: `groupByComponent` sorts each group with a new `sortByWeightThenName` (a `sort.SliceStable` by name, kind, namespace, then `SortObjects(group, resourceorder.Ascending)`); rewrite the `groupByComponent` doc comment, which today says groups keep inventory order. Verify: `go test ./internal/kubernetes/...` passes, including 1.1.
-- [ ] 1.3 Check the tree integration program for position-based assertions within a component: `flock <lock> go run tests/integration/inst-tree/main.go` passes on `kind-opm-dev`; fix an assertion only if it encoded inventory order.
-- [ ] 1.4 `task fmt`, `task vet`, `task lint`, `task test:unit` and `task openspec:check` green, then commit `fix(kubernetes): sort instance tree resources by weight, then name`.
+- [x] 1.1 Red first: in `internal/kubernetes/tree_test.go` add `TestGroupByComponent_SortsByWeightThenName` (one component holding a Deployment `web` (weight 100), a Service `web` (50), ConfigMaps `config-z` and `config-a` (15), given in that order: the group reads ConfigMap/config-a, ConfigMap/config-z, Service/web, Deployment/web), and a `BuildTree` test at depth 1 asserting the same order in `result.Components[0].Resources`. Verify: both fail on today's code.
+- [x] 1.2 In `internal/kubernetes/tree.go`, per design.md § 1: `groupByComponent` sorts each group with a new `sortByWeightThenName` (a `sort.SliceStable` by name, kind, namespace, then `SortObjects(group, resourceorder.Ascending)`); rewrite the `groupByComponent` doc comment, which today says groups keep inventory order. Verify: `go test ./internal/kubernetes/...` passes, including 1.1.
+- [x] 1.3 Check the tree integration program for position-based assertions within a component: `flock <lock> go run tests/integration/inst-tree/main.go` passes on `kind-opm-dev`; fix an assertion only if it encoded inventory order.
+- [x] 1.4 `task fmt`, `task vet`, `task lint`, `task test:unit` and `task openspec:check` green, then commit `fix(kubernetes): sort instance tree resources by weight, then name`.
 
 ## 2. Skip objects of a new namespace in a dry run (internal/kubernetes, internal/workflow/apply, internal/cmd, tests/integration)
 

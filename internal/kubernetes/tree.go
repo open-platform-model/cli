@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/open-platform-model/cli/internal/output"
+	"github.com/open-platform-model/cli/pkg/resourceorder"
 )
 
 // noComponentLabel is the placeholder used for resources missing a component mapping.
@@ -254,8 +255,9 @@ func buildResourceNode(ctx context.Context, client *Client, res *unstructured.Un
 
 // groupByComponent groups resources by their entry in componentMap.
 // Resources absent from the map (or with an empty value) land in noComponentLabel.
-// Each group keeps the input slice order, which is the inventory's order: the
-// render order of the last apply, not weight order.
+// Each group is in weight-then-name order (see sortByWeightThenName), so the
+// tree does not depend on the inventory's order, which is the render order of
+// the last apply.
 func groupByComponent(resources []*unstructured.Unstructured, componentMap map[string]string) map[string][]*unstructured.Unstructured {
 	groups := make(map[string][]*unstructured.Unstructured)
 	for _, res := range resources {
@@ -266,7 +268,27 @@ func groupByComponent(resources []*unstructured.Unstructured, componentMap map[s
 		}
 		groups[comp] = append(groups[comp], res)
 	}
+	for _, group := range groups {
+		sortByWeightThenName(group)
+	}
 	return groups
+}
+
+// sortByWeightThenName orders objs in place ascending by resource weight, then
+// name. Kind and then namespace break the remaining ties, so the same set of
+// objects always comes out in the same order.
+func sortByWeightThenName(objs []*unstructured.Unstructured) {
+	sort.SliceStable(objs, func(i, j int) bool {
+		a, b := objs[i], objs[j]
+		if a.GetName() != b.GetName() {
+			return a.GetName() < b.GetName()
+		}
+		if a.GetKind() != b.GetKind() {
+			return a.GetKind() < b.GetKind()
+		}
+		return a.GetNamespace() < b.GetNamespace()
+	})
+	SortObjects(objs, resourceorder.Ascending)
 }
 
 // sortedComponentNames returns component names alphabetically, with noComponentLabel last.

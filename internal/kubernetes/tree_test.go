@@ -87,6 +87,55 @@ func TestGroupByComponent_MultipleComponents(t *testing.T) {
 	assert.Len(t, groups["database"], 1)
 }
 
+// weightOrderInput returns one component's resources in inventory order that
+// is not weight order: Deployment web (100), Service web (50), ConfigMaps
+// config-z and config-a (15).
+func weightOrderInput() (resources []*unstructured.Unstructured, componentMap map[string]string) {
+	resources = []*unstructured.Unstructured{
+		makeRes("Deployment", "ns", "web"),
+		makeRes("Service", "ns", "web"),
+		makeRes("ConfigMap", "ns", "config-z"),
+		makeRes("ConfigMap", "ns", "config-a"),
+	}
+	componentMap = map[string]string{
+		"Deployment/ns/web":     "server",
+		"Service/ns/web":        "server",
+		"ConfigMap/ns/config-z": "server",
+		"ConfigMap/ns/config-a": "server",
+	}
+	return resources, componentMap
+}
+
+var wantWeightOrder = []string{"ConfigMap/config-a", "ConfigMap/config-z", "Service/web", "Deployment/web"}
+
+func TestGroupByComponent_SortsByWeightThenName(t *testing.T) {
+	resources, componentMap := weightOrderInput()
+	groups := groupByComponent(resources, componentMap)
+
+	got := make([]string, 0, len(groups["server"]))
+	for _, res := range groups["server"] {
+		got = append(got, res.GetKind()+"/"+res.GetName())
+	}
+	assert.Equal(t, wantWeightOrder, got)
+}
+
+func TestGroupByComponent_EqualWeightAndNameOrderedByKindThenNamespace(t *testing.T) {
+	// Secret and ConfigMap share weight 15; with one name, kind and then
+	// namespace decide, whatever the inventory order.
+	resources := []*unstructured.Unstructured{
+		makeRes("Secret", "b", "config"),
+		makeRes("ConfigMap", "b", "config"),
+		makeRes("ConfigMap", "a", "config"),
+	}
+	groups := groupByComponent(resources, map[string]string{})
+
+	got := make([]string, 0, len(resources))
+	for _, res := range groups[noComponentLabel] {
+		got = append(got, res.GetKind()+"/"+res.GetNamespace())
+	}
+	assert.Equal(t, []string{"ConfigMap/a", "ConfigMap/b", "Secret/b"}, got)
+}
+
 func TestSortedComponentNames_AlphabeticalWithNoComponentLast(t *testing.T) {
 	groups := map[string][]*unstructured.Unstructured{
 		"zebra":          {},
@@ -381,6 +430,24 @@ func TestBuildTree_Depth1_ResourcesNoChildren(t *testing.T) {
 	assert.Equal(t, "web", node.Name)
 	assert.Equal(t, "1/1", node.Replicas)
 	assert.Empty(t, node.Children, "depth=1 should not walk ownership")
+}
+
+func TestBuildTree_Depth1_ResourcesInWeightThenNameOrder(t *testing.T) {
+	resources, componentMap := weightOrderInput()
+	opts := TreeOptions{
+		InstanceInfo:  InstanceInfo{Name: "my-app", Namespace: "ns"},
+		InventoryLive: resources,
+		ComponentMap:  componentMap,
+		Depth:         1,
+	}
+
+	result := BuildTree(context.Background(), makeTreeClient(), opts)
+	require.Len(t, result.Components, 1)
+	got := make([]string, 0, len(result.Components[0].Resources))
+	for _, node := range result.Components[0].Resources {
+		got = append(got, node.Kind+"/"+node.Name)
+	}
+	assert.Equal(t, wantWeightOrder, got)
 }
 
 func TestBuildTree_Depth2_FullTree(t *testing.T) {
