@@ -37,6 +37,9 @@ name: Release
 #     run): re-run the failed job, or dispatch docs.yml on main in release
 #     mode with the tag (see docs.yml). Only a release whose tree has
 #     hack/docskit-dump can have a bundle.
+#   - Published release whose downstreams were not notified (Notify downstream
+#     failed): re-run the failed jobs; the downstream receivers' daily sweep
+#     also picks the release up. CASCADE_NOTIFY=off stops the notify.
 
 on:
   push:
@@ -252,3 +255,23 @@ jobs:
       tag: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
       # hack/docskit-dump runs with go run (docs-kit C14).
       setup-go: true
+
+  notify-downstream:
+    name: Notify downstream
+    # Tells catalog_opm and opm-operator, which pin this cli as their release
+    # tool, that a release exists (workspace RELEASING.md, "Notify after
+    # publish"). Runs only after goreleaser published the release
+    # (publish-templates is already one of goreleaser's needs), also on a
+    # manual run that finishes a draft. A manual run on a published release
+    # fails goreleaser's draft check, so a release never notifies twice. It
+    # does not wait for publish-docs: a docs failure does not unpublish the
+    # release. The main guard keeps a branch dispatch away from the main-only
+    # cascade Environment, where the shared workflow mints the dispatch token.
+    # No secret is passed; the shared workflow chooses the targets.
+    needs: [release-please, goreleaser]
+    if: ${{ !cancelled() && needs.goreleaser.result == 'success' && github.ref == 'refs/heads/main' && vars.CASCADE_NOTIFY != 'off' }}
+    permissions:
+      contents: read
+    uses: open-platform-model/.github/.github/workflows/cascade-notify.yml@main
+    with:
+      tag: ${{ needs.release-please.outputs.tag_name || inputs.tag }}

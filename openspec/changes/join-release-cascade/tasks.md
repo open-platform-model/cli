@@ -64,7 +64,7 @@ All checks are read-only. Record each result as an indented "Done:" note. Then w
 
 ## 2. Notify downstream after a release publishes
 
-- [ ] 2.1 In `.github/workflows/release.yml`, add the job `notify-downstream` after `publish-docs`, exactly as design D1 shows:
+- [x] 2.1 In `.github/workflows/release.yml`, add the job `notify-downstream` after `publish-docs`, exactly as design D1 shows:
   - `needs: [release-please, goreleaser]`;
   - `if: ${{ !cancelled() && needs.goreleaser.result == 'success' && github.ref == 'refs/heads/main' && vars.CASCADE_NOTIFY != 'off' }}`;
   - `permissions: contents: read`;
@@ -72,9 +72,13 @@ All checks are read-only. Record each result as an indented "Done:" note. Then w
   - `with: tag: ${{ needs.release-please.outputs.tag_name || inputs.tag }}`.
 
   Add no `secrets:`, no `environment:` and no `org-github-ref`. The job comment says why it waits for goreleaser, why it never notifies twice, and why it has the `main` guard. It cites no wiring section number.
-- [ ] 2.2 Add one recovery line to the runbook comment at the top of `release.yml` (`:14-39`): "Published release whose downstreams were not notified (`Notify downstream` failed): re-run the failed jobs; the downstream receivers' daily sweep also picks the release up. `CASCADE_NOTIFY=off` stops the notify."
-- [ ] 2.3 Check the run matrix of design D1 by reading the edited file: every row's `needs` and `if` gives the stated outcome. Record any row that does not.
-- [ ] 2.4 The local gate (with `actionlint .github/workflows/release.yml`) is green, then commit `ci(release): notify downstream repos after a release is published`.
+  Done: `notify-downstream` appended after `publish-docs` with D1's needs, `if`, permissions, `uses` and `with`; no `secrets:`, `environment:` or `org-github-ref`.
+- [x] 2.2 Add one recovery line to the runbook comment at the top of `release.yml` (`:14-39`): "Published release whose downstreams were not notified (`Notify downstream` failed): re-run the failed jobs; the downstream receivers' daily sweep also picks the release up. `CASCADE_NOTIFY=off` stops the notify."
+  Done: Recovery line added at the end of the runbook comment.
+- [x] 2.3 Check the run matrix of design D1 by reading the edited file: every row's `needs` and `if` gives the stated outcome. Record any row that does not.
+  Done: All seven rows hold. `!cancelled()` replaces the implicit `success()`, so a skipped `release-please` on a manual run does not skip notify; on a template failure `goreleaser` still runs under `always()` and fails its template step, so notify is skipped.
+- [x] 2.4 The local gate (with `actionlint .github/workflows/release.yml`) is green, then commit `ci(release): notify downstream repos after a release is published`.
+  Done: `task lint` (0 issues), `task test:unit`, `task openspec:check` (68/0) green. actionlint v1.7.12 with shellcheck, with the `@main` ref resolved to A's branch copy (`p3-cli-join-lint.sh`): clean; a renamed input is reported, so the input check bites.
 
 ## 3. Receiver and gate callers
 
