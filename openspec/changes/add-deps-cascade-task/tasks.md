@@ -155,6 +155,15 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
 - [x] 4.10 Close the coverage gaps the verify pass found: S10 (`CASCADE_ALLOW_DIRTY` snapshot and the `CASCADE_EXPECT` hint) and S11 (never lower a human-set version) in the offline set, and a `classify` check of `classes` beside S5 (design.md D10). Gates as in 4.9, then commit `ci(cascade): test the dirty-tree snapshot, the expect hint and the never-lower rule`.
   Done: all PASS; turning the never-lower rule back into "write when it differs" makes S11 fail.
 - [x] 4.11 S2 also checks the `language.version` warning (D8) and that a resolver warning reaches the warnings file. Then commit `ci(cascade): name the language version in the cascade warning`.
+
+- [x] 4.12 Apply the Phase 2 implementation review and the contract v1.1 clarifications C4 to C8:
+  - C4 and review finding 4: `cascade-task.yml` checks the cli out at `repo`, with `org-github` beside it;
+  - C7: `deps:cascade:test` has no resolver precondition, and `test.sh` refuses a set but unusable `CASCADE_RESOLVER_REAL`;
+  - finding 1 (C8): the kind catalog never moves down (S12);
+  - finding 2: the docs-pins `jq` runs with `-e` outside a process substitution;
+  - finding 3: the `language.version` and docs-bundle warnings compare against the merge base (S13);
+  - nits 5 and 6: `cue` and `opm` only when needed, and a frozen unpublished podinfo stops the task in phase A (S14).
+  C5 already held (`test.sh` passes `CASCADE_STUB_TABLE` to its `semver-cmp` call); C6 already held (the offline step is in `Lint`). Gates as in 4.9.
   Done: the new check found a bug: the warning named the `semver-cmp` answer (`1`) instead of the language version, because the comparison overwrote the resolver output. Fixed; full set all PASS.
 
 ## 5. Archive (rides this PR)
