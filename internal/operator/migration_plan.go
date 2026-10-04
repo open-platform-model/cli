@@ -209,23 +209,33 @@ func (p *MigrationPlan) classify(want LegacyObject, live *unstructured.Unstructu
 	case isRendered:
 		p.Adopt = append(p.Adopt, live)
 	case isSuperseded(want):
-		if verdict == VerdictUnproven {
-			return block(reason)
+		if r := p.supersede(want, live, verdict, reason, rendered); r != "" {
+			return block(r)
 		}
-		if verdict != VerdictProven {
-			return MigrationBlock{}, false
-		}
-		repl, ref := replacementBinding(live, rendered)
-		if repl == "" {
-			return block(fmt.Sprintf("the module renders no %s to %s", want.Kind, ref))
-		}
-		p.DeleteBindings = append(p.DeleteBindings, SupersededBinding{Live: live, Replacement: repl})
 	case verdict == VerdictProven && legacyKey(want) == legacyKey(legacyDeployment):
 		return block("the module renders no Deployment of this name, so the earlier controller would keep running beside the module's")
 	case verdict == VerdictProven:
 		p.LeftInPlace = append(p.LeftInPlace, want)
 	}
 	return MigrationBlock{}, false
+}
+
+// supersede plans the delete of a proven superseded binding, or returns
+// why it blocks: it is unproven, or the render does not replace it. An
+// absent binding or one that is the instance's own is skipped.
+func (p *MigrationPlan) supersede(want LegacyObject, live *unstructured.Unstructured, verdict Verdict, reason string, rendered []*unstructured.Unstructured) string {
+	switch verdict {
+	case VerdictUnproven:
+		return reason
+	case VerdictProven:
+		repl, ref := replacementBinding(live, rendered)
+		if repl == "" {
+			return fmt.Sprintf("the module renders no %s to %s", want.Kind, ref)
+		}
+		p.DeleteBindings = append(p.DeleteBindings, SupersededBinding{Live: live, Replacement: repl})
+	case VerdictAbsent, VerdictOurs:
+	}
+	return ""
 }
 
 func isSuperseded(o LegacyObject) bool {
