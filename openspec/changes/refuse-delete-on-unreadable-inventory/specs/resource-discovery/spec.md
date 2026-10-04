@@ -2,7 +2,7 @@
 
 ### Requirement: Inventory discovery reports tracked resources it could not read
 
-When the CLI reads the live objects an instance's inventory tracks (one targeted GET per entry), every entry SHALL land in exactly one of three groups, each kept in inventory order: live (the read returned the object), missing (the read returned NotFound), or unreadable (the read failed with any other error, such as Forbidden or a timeout), the last carrying its read error. No entry SHALL be dropped. Every command that reads an instance this way (`opm instance delete`, `status`, `list`, `diff`, `tree` and `events`) SHALL tell the user about each unreadable entry instead of omitting it silently: `delete`, `status` and `list` as their own requirements state, and `diff`, `tree` and `events` with a warning that names the resource's kind, namespace and name and the read error. For `diff`, the warning SHALL also say that orphan detection could not check those resources. A warning SHALL NOT change the exit code of `diff`, `tree` or `events`.
+When the CLI reads the live objects an instance's inventory tracks (one targeted GET per entry), every entry SHALL land in exactly one of three groups, each kept in inventory order: live (the read returned the object), missing (the read returned NotFound), or unreadable (the read failed with any other error, such as Forbidden or a timeout), the last carrying its read error. No entry SHALL be dropped. Every command that reads an instance this way (`opm instance delete`, `status`, `list`, `diff`, `tree` and `events`) SHALL tell the user about each unreadable entry instead of omitting it silently: `delete`, `status` and `list` as their own requirements state, and `diff`, `tree` and `events` with a warning that names the resource's kind, namespace and name and the read error. For `diff`, the warning SHALL also say that orphan detection could not check those resources. A warning SHALL NOT change the exit code of `diff`, `tree` or `events`: a per-entry read error is not mapped through `cmdutil.ExitCodeFromK8sError`, so a Forbidden read of one tracked resource does not make `tree` exit 4. When `tree` can read none of the tracked resources, it SHALL print the warnings and then exit 5 with `no resources found`, as it does for a record that tracks no live resources.
 
 #### Scenario: A forbidden read is reported as unreadable
 
@@ -23,6 +23,13 @@ When the CLI reads the live objects an instance's inventory tracks (one targeted
 - **AND** one tracked resource cannot be read
 - **THEN** the command SHALL print a warning naming that resource and the read error
 - **AND** SHALL show the resources it could read
+
+#### Scenario: Tree with every tracked resource unreadable
+
+- **WHEN** the user runs `opm instance tree demo -n apps`
+- **AND** no tracked resource can be read
+- **THEN** the command SHALL print one warning per tracked resource naming it and the read error
+- **AND** SHALL exit 5 with `no resources found`
 
 #### Scenario: Diff warns that orphan detection is incomplete
 

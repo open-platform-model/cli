@@ -112,7 +112,7 @@ One line per instance keeps a cluster-wide list readable; `status` names each re
 
 ### 5. Diff, tree, events: warn
 
-`runInstanceDiff` calls `WarnUnreadable` (through the instance logger) and then one line: `orphan detection could not check N tracked resource(s)`. `tree` and `events` call `WarnUnreadable` after `ResolveInventory`. Their output is otherwise unchanged and their exit codes do not change: they still describe what they could read, and now say what they could not.
+`runInstanceDiff` calls `WarnUnreadable` (through the instance logger) and then one line: `orphan detection could not check N tracked resource(s)`. `tree` and `events` call `WarnUnreadable` after `ResolveInventory`. Their output is otherwise unchanged and their exit codes do not change: they still describe what they could read, and now say what they could not. When `tree` can read none of the tracked resources it prints the warnings and then exits 5 (`no resources found`) as before. `status` exits 2 in that case because its verdict is health, and an unread resource is not healthy; `tree` only draws what exists, and the warnings name the cause, so it keeps its not-found code rather than borrowing status's.
 
 ### Exit codes
 
@@ -120,7 +120,7 @@ One line per instance keeps a cluster-wide list readable; `status` names each re
 | --- | --- | --- |
 | `instance delete` (real run or dry run) | per-resource failure, `ModuleInstance` kept | 1 |
 | `instance status` | `Unknown` row, aggregate `NotReady` | 2 |
-| `instance list`, `diff`, `tree`, `events` | warning only | unchanged |
+| `instance list`, `diff`, `tree`, `events` | warning only | unchanged (tree with nothing readable: 5) |
 
 ### Example output
 
