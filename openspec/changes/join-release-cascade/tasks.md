@@ -96,5 +96,10 @@ All checks are read-only. Each result is an indented "Done:" note; design.md "Sp
 
 ## 6. Verify and archive
 
-- [ ] 6.1 Run the OpenSpec verify skill on `join-release-cascade` and resolve or report every CRITICAL and WARNING.
+- [x] 6.1 Run the OpenSpec verify skill on `join-release-cascade` and resolve or report every CRITICAL and WARNING.
+  Done (2026-10-04, at `3f3ce756`): Completeness: every task but 6.2 is done; all seven requirements have their implementation (`release.yml` `notify-downstream`, `deps-cascade.yml` `cascade` and `publish`, `cascade-gates.yml`, `cascade-task.yml` `ref:`, `dependabot.yml`, `wiring-check.sh` with its task and `Lint` step). Correctness: the static scenarios are covered by the wiring check (33 mutations refused); no CRITICAL. Read-only pre-merge checks: `compare 2376ffa...main` prints `identical`, `RECEIVER=true`, `PIN_COMMENT='.github main'`, the `grep -A1` shows only the one SHA (4 `uses:` and the resolver `ref:`), and `CASCADE_DRY_RUN` reads back `true`. Cleanliness: no dead code. WARNINGs, reported to the supervisor:
+  - the runtime scenarios (dispatch, sweep, a live publish, the label check, the gate statuses) have no test in this repo; they rest on the `.github` offline suites and sandbox cycle and on the post-merge dry run;
+  - once `CASCADE_DRY_RUN=false`, a gates-only run or G2's release-head code can forge compute's outputs past `publish`'s `if:` (design "Risks / Trade-offs"); the fix belongs in `.github` and the §5 templates for all four receivers, or in a `release-please--*` ruleset;
+  - the branch pins `.github` `main` from its first rebuild commit, because `.github` PR #9 merged before the rebuild, so there is no separate final `ci: pin the cascade to .github main` commit (wiring §10.1 pre-merge check step 1).
+  SUGGESTION: the `release-workflow` main spec says every release job runs on `ubuntu-latest`; `notify-downstream` now does, and only the pre-existing `publish-docs` caller job does not.
 - [ ] 6.2 Archive with `openspec archive join-release-cascade` and commit it in this PR (`docs(openspec): archive join-release-cascade`). The archive rides the implementing PR. Under the supervised swarm protocol, the supervisor decides when this runs, after review.
