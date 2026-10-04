@@ -9,8 +9,6 @@ import (
 	"sort"
 	"strings"
 
-	"cuelang.org/go/cue"
-
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/cueedit"
@@ -252,8 +250,11 @@ func statedVersion(ctx context.Context, k *kernel.Kernel, dir string) (string, e
 	if err != nil {
 		return "", refuse(fmt.Sprintf("tree does not load: %v", err))
 	}
-	version, err := mod.Package.LookupPath(cue.ParsePath("metadata.version")).String()
-	if err != nil || version == "" {
+	version := ""
+	if mod.Metadata != nil {
+		version = mod.Metadata.Version
+	}
+	if version == "" {
 		return "", refuse("not stated")
 	}
 	if err := cueedit.CheckVersion(version); err != nil {

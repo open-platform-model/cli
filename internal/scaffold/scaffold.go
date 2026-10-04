@@ -2,6 +2,7 @@ package scaffold
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"sort"
 	"strings"
 
-	"cuelang.org/go/cue"
 	"cuelang.org/go/mod/modconfig"
 	"cuelang.org/go/mod/module"
 
@@ -284,14 +284,16 @@ func assertDerives(ctx context.Context, k *kernel.Kernel, dir, newPath string) e
 	if err != nil {
 		return fmt.Errorf("internal error: scaffolded tree does not load: %w", err)
 	}
-	for field, want := range map[string]string{
-		"modulePath": newPath,
-		"version":    InitialVersion,
+	if mod.Metadata == nil {
+		return errors.New("internal error: scaffolded tree decoded no metadata")
+	}
+	// A fixed order: a donor failing both checks is always reported on
+	// modulePath.
+	for _, c := range []struct{ field, got, want string }{
+		{"modulePath", mod.Metadata.ModulePath, newPath},
+		{"version", mod.Metadata.Version, InitialVersion},
 	} {
-		got, err := mod.Package.LookupPath(cue.ParsePath("metadata." + field)).String()
-		if err != nil {
-			return fmt.Errorf("internal error: scaffolded metadata.%s does not evaluate: %w", field, err)
-		}
+		field, got, want := c.field, c.got, c.want
 		if got != want {
 			return &RefusalError{publish.Refusal{
 				Headline: fmt.Sprintf("the clone source does not derive metadata.%s from its identity package", field),

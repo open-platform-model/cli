@@ -7,15 +7,13 @@ The owner settled this in the beta.1 kernel walkthrough: "cli scaffold sites swi
 ## What Changes
 
 - `assertDerives` compares `mod.Metadata.ModulePath` and `mod.Metadata.Version` against the expected values instead of looking up `metadata.<field>` in `mod.Package`. Its "does not evaluate" internal-error branch becomes a nil-`Metadata` check. The two fields are checked in a fixed order (modulePath, then version) instead of map order.
-- `statedVersion` reads `mod.Metadata.Version`. A nil `Metadata` or an empty version refuses as "not stated", as an absent field does today.
+- `statedVersion` reads `mod.Metadata.Version`. A nil `Metadata` or an empty version refuses as "not stated" (a defensive guard; the acquire already refuses an absent or empty version).
 - The `cuelang.org/go/cue` import goes from both files once nothing else uses it.
 - The `pkg-types` requirement that the CLI uses the library's metadata types gains a scenario: the scaffold reads an acquired module's identity from `Metadata`, not from `Package`.
 
 Not in this change: the six render, vet and instance-init sites, which wait for library accessors (`Instance.ModuleMetadata()`, `Instance.Values()`, `Module.DebugValues()`). No `Module.InitValues()` accessor either: none is planned.
 
-Observable differences, both limited to `--from` clone sources outside the covered inputs:
-- A donor whose module does not embed core `#Module` and whose metadata omits `modulePath` or `version` used to fail with the internal error "scaffolded metadata.<field> does not evaluate" (exit 1). It now gets the donor-defect refusal "does not derive metadata.<field>" (exit 2) with an empty evidence value. A donor that embeds `#Module` declares both fields required, so omitting one still fails the acquire ("tree does not load"), unchanged.
-- A donor that fails both checks is now always reported on `modulePath`; before, map order picked the field at random.
+Observable difference: a `--from` donor that fails both checks is now always reported on `modulePath`; before, map order picked the field at random. No other input changes behaviour. The kernel's acquire shape gate (library `opm/internal/loader/shape.go`, `ModuleSpec`) already refuses a `kind: "Module"` tree whose `metadata.modulePath` or `metadata.version` is absent, empty or not concrete, so those inputs fail as "tree does not load" before either site reads a field, both before and after this change. The old "does not evaluate" branch and the new nil-`Metadata` branch are unreachable guards.
 
 For every input the existing unit and e2e tests cover, commands, flags, output and exit codes are unchanged.
 
@@ -34,6 +32,6 @@ None.
 ## Impact
 
 - Code: `internal/scaffold/scaffold.go` (`assertDerives`), `internal/scaffold/repair.go` (`statedVersion`).
-- Commands: `opm module init` (scaffold and `--from` clone, the post-rewrite assertion) and `opm module init` in repair mode (identity creation). Same refusals and headlines, except for the two donor cases listed under What Changes.
-- Tests: two new `TestDetectRepair` subtests run `statedVersion` through a real `kernel.New()` (a stated version is adopted; an unstated one refuses as "not stated"). The existing `DetectRepair` unit tests and the `TestE2E_ModInit_*` e2e tests (including `TestE2E_ModInit_NonDerivingDonorRefuses`) cover `assertDerives`.
+- Commands: `opm module init` (scaffold and `--from` clone, the post-rewrite assertion) and `opm module init` in repair mode (identity creation). Same refusals and headlines; only the field a doubly-failing donor is reported on becomes fixed.
+- Tests: two new `TestDetectRepair` subtests run `statedVersion` through a real `kernel.New()` (a stated version is adopted; an unstated one refuses, through the acquire's shape gate). The existing `DetectRepair` unit tests and the `TestE2E_ModInit_*` e2e tests (including `TestE2E_ModInit_NonDerivingDonorRefuses`) cover `assertDerives`.
 - Dependencies: none. Library pin unchanged (`v1.0.0-beta.4` already exposes `Module.Metadata`).

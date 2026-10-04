@@ -59,20 +59,20 @@ The `cueedit.CheckVersion` gate after it is unchanged.
 
 **Context**: `LookupPath(...).String()` errors on an absent, non-concrete or non-string field. `Metadata` was filled by `Decode` into a struct of strings.
 
-**Explored**: library `opm/module/module.go` (`NewModuleFromValue`, `decodeModuleMetadata`) and `opm/kernel/acquire.go` at `v1.0.0-beta.4`.
+**Explored**: library `opm/module/module.go` (`NewModuleFromValue`, `decodeModuleMetadata`), `opm/kernel/acquire.go` and `opm/internal/loader/shape.go` (`ModuleSpec`, `requireConcrete`) at `v1.0.0-beta.4`, plus a hermetic `kernel.New()` run in the new `TestDetectRepair` subtests.
 
 **Findings**:
-- A non-concrete or non-string `metadata.version` or `metadata.modulePath` fails `Decode`, so the acquire fails first. Both sites already handle acquire failure ("tree does not load"), before and after this change.
-- An absent field decodes to `""`, but only in a donor that does not embed core `#Module`. Core declares `modulePath!` and `version!` required, so in a `#Module` donor an absent field is non-concrete, `Decode` fails, and the acquire fails ("tree does not load"), unchanged. In `statedVersion` an empty version already refused as "not stated", and an absent one errored into the same refusal, so nothing changes.
-- In `assertDerives`, for a non-`#Module` donor (such as the e2e `litdonor` fixture shape), an absent field used to produce the "does not evaluate" internal error. Now it is `""` and fails the comparison, so it produces the donor-defect refusal with an empty `metadata.<field>` evidence row. That is the more accurate message for a clone source whose metadata does not state the field. Official templates cannot reach this path (publish gates enforce the derivation).
+- The acquire's shape gate requires `kind: "Module"` and concrete, non-empty `metadata.name`, `metadata.modulePath` and `metadata.version` (`ModuleSpec.RequiredConcreteFields`). An absent, empty or non-concrete field fails the acquire with "missing required field", whether or not the tree embeds core `#Module`. A non-string value passes the gate but fails `Decode`, so the acquire fails too.
+- Both sites already handle acquire failure ("tree does not load"), before and after this change. So by the time either site reads a field, both are non-empty strings, and the old "does not evaluate" branch, the `statedVersion` "not stated" branch and the new nil-`Metadata` branch are all unreachable guards.
+- An earlier draft of this design (and the plan review) assumed an absent field decodes to `""` for a donor outside core `#Module` and reaches the donor-defect refusal. The hermetic test shows the shape gate refuses that tree first, so no such behaviour change exists.
 
 **Options considered**:
 1. Read `Metadata`, nil-guard only (the plan entry's reading).
-2. Also treat `""` as "does not evaluate", to keep the old internal error for an absent field. This keeps an error that blames the CLI for a defect in the donor.
+2. Drop the guards entirely, trusting the shape gate. The library documents `Metadata` as "may be nil", so a guard costs nothing and survives a gate change.
 
 **Decision**: Option 1.
 
-**Rationale**: It matches the owner's decision and the plan entry. The only inputs that behave differently are a non-`#Module` donor with no `metadata.modulePath` or `metadata.version`, which now gets the donor-defect refusal (the accurate one), and a donor failing both checks, which is now reported on `modulePath` every time.
+**Rationale**: It matches the owner's decision and the plan entry. The only observable difference is that a donor failing both checks is now reported on `modulePath` every time.
 
 ## Risks / Trade-offs
 
@@ -80,4 +80,4 @@ The `cueedit.CheckVersion` gate after it is unchanged.
 
 ## Error handling
 
-Unchanged: an acquire failure is an internal error in `assertDerives` and a "tree does not load" refusal in `statedVersion`, a mismatch is the existing `RefusalError` (exit 2), and the new nil-`Metadata` branch is an internal error (exit 1). No command syntax or flags change; output changes only for the two donor cases in the Findings above.
+Unchanged: an acquire failure is an internal error in `assertDerives` and a "tree does not load" refusal in `statedVersion`, a mismatch is the existing `RefusalError` (exit 2), and the new nil-`Metadata` branch is an internal error (exit 1). No command syntax or flags change; output changes only in which field a donor failing both checks is reported on.

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -134,6 +135,53 @@ _p: id.ModulePath
 		var refusalErr *RefusalError
 		require.ErrorAs(t, err, &refusalErr)
 		assert.Contains(t, refusalErr.Refusal.Headline, "states no version")
+	})
+
+	t.Run("missing identity adopts the version the acquired module states", func(t *testing.T) {
+		dir := repairTree(t, map[string]string{
+			"cue.mod/module.cue": repairCueMod,
+			"module.cue": `package app
+
+kind: "Module"
+
+metadata: {
+	name:       "app"
+	modulePath: "example.com/modules/app@v1"
+	version:    "1.2.0"
+}
+`,
+		})
+		plan, err := DetectRepair(ctx, kernel.New(), dir, "")
+		require.NoError(t, err)
+		require.Len(t, plan.Actions, 1)
+		a := plan.Actions[0]
+		assert.True(t, a.Create)
+		assert.Equal(t, filepath.Join("identity", "identity.cue"), a.File)
+		assert.Equal(t, "example.com/modules/app@v1, 1.2.0", a.New)
+	})
+
+	// The kernel's shape gate refuses an absent metadata.version at acquire,
+	// so the refusal carries the load failure rather than "not stated".
+	t.Run("missing identity refuses when the module states no version", func(t *testing.T) {
+		dir := repairTree(t, map[string]string{
+			"cue.mod/module.cue": repairCueMod,
+			"module.cue": `package app
+
+kind: "Module"
+
+metadata: {
+	name:       "app"
+	modulePath: "example.com/modules/app@v1"
+}
+`,
+		})
+		_, err := DetectRepair(ctx, kernel.New(), dir, "")
+		var refusalErr *RefusalError
+		require.ErrorAs(t, err, &refusalErr)
+		assert.Contains(t, refusalErr.Refusal.Headline, "states no version")
+		require.Len(t, refusalErr.Refusal.Evidence, 1)
+		assert.Contains(t, refusalErr.Refusal.Evidence[0][2], "tree does not load")
+		assert.Contains(t, refusalErr.Refusal.Evidence[0][2], `"metadata.version" is absent`)
 	})
 
 	t.Run("malformed cue.mod is not silently rewritten", func(t *testing.T) {
