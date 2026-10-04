@@ -21,7 +21,8 @@ The CLI SHALL carry a fixed list of every object of every opm-operator operator 
 #### Scenario: A module release's manifest is not a source of the list
 
 - **WHEN** the opm-operator repository holds a release tagged `opm_operator-v0.1.0` that attaches an `install.yaml`
-- **THEN** no entry of the proof list comes from that manifest, and an object it created, carrying the operator instance's identity, is treated as the instance's own
+- **THEN** no entry of the proof list comes from that manifest
+- **AND** an existing object that manifest created, carrying the operator instance's identity, is classed as the instance's own (not as a proven earlier-manifest object): the migration does not delete or recreate it, does not list it in its report, and the apply guard admits it as an object of this instance
 
 #### Scenario: A same-named object of another kind is not on the list
 

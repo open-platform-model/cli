@@ -143,7 +143,7 @@ type AdmitSet map[K8sIdentity]struct{}
 
 `K8sIdentity` is new (`pkg/inventory/entry.go` has only `K8sIdentityEqual`, which compares two entries); task 4.1 adds it beside that function. An entry in `admit` passes the managed-by test, and only that test: a terminating admitted object is still refused. Every other caller passes `nil`, which keeps today's behaviour. `apply.Request` gains the set, so the instance apply admits the same objects as the check-phase guard. `Plan.Admit()` is `Adopt` plus the rendered objects whose identity is this instance's (`Ours`); the latter already pass today, and listing them keeps a resumed run's set complete.
 
-This is the admission 0012:D8:R6 describes: the proven objects pass as if adopted, and no adopt annotation is written on the user's behalf. The set needs no write, nothing of it outlives the run, and a resumed run recomputes it.
+This is the admission 0012:D8:R6 describes, and the one exception 0012:D8:R3 names to the ownership refusals of 0012:D1:R7 and 0012:D4:R2: the proven objects pass as if adopted, and no adopt annotation is written on the user's behalf. The set needs no write, nothing of it outlives the run, and a resumed run recomputes it.
 
 **Options considered:**
 
