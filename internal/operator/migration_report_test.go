@@ -78,7 +78,7 @@ func TestInstall_RerunAfterMigrationPrintsNothing(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, plan.Migration.LeftInPlace, "the v0.7 leftovers remain")
 	assert.Empty(t, MigrationReport(plan.Migration))
-	assert.False(t, plan.Migration.Writes())
+	assert.False(t, writesAnything(plan.Migration))
 	_, err = Install(context.Background(), newEnv(fc, render), plan)
 	require.NoError(t, err)
 	assert.Equal(t, uid, fc.mustGet(deploymentGVR, OperatorNamespace, ControllerDeploymentName).GetUID())

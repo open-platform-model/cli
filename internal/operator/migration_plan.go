@@ -92,11 +92,6 @@ func (p *MigrationPlan) Admit() inventory.AdmitSet {
 	return set
 }
 
-// Writes reports whether the plan makes any migration write.
-func (p *MigrationPlan) Writes() bool {
-	return p != nil && (len(p.MoveOwnership) > 0 || p.RecreateDeployment != nil || len(p.DeleteBindings) > 0)
-}
-
 // MigrationBlock is one object that blocks the migration, with the reason.
 type MigrationBlock struct {
 	Kind, Namespace, Name string

@@ -161,3 +161,8 @@ func paths(objs []*unstructured.Unstructured) []string {
 	}
 	return out
 }
+
+// writesAnything reports whether a plan makes any migration write.
+func writesAnything(p *MigrationPlan) bool {
+	return len(p.MoveOwnership) > 0 || p.RecreateDeployment != nil || len(p.DeleteBindings) > 0
+}

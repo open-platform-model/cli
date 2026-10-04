@@ -49,7 +49,7 @@ func TestPlanMigration_FreshCluster(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, &MigrationPlan{}, plan)
 	assert.False(t, plan.Migrates())
-	assert.False(t, plan.Writes())
+	assert.False(t, writesAnything(plan))
 }
 
 func TestPlanMigration_ManifestOrigins(t *testing.T) {
@@ -254,7 +254,7 @@ func TestPlanMigration_CRDsOnly(t *testing.T) {
 	assert.Empty(t, plan.DeleteBindings)
 	assert.Empty(t, plan.LeftInPlace)
 	assert.Empty(t, plan.MoveOwnership)
-	assert.False(t, plan.Writes())
+	assert.False(t, writesAnything(plan))
 
 	// An unproven CRD refuses.
 	cluster := manifestObjects(t, beta8, originOPMCLI)
