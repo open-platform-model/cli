@@ -1,8 +1,10 @@
 package kubernetes
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -431,9 +433,13 @@ func TestApply_RealApplyIgnoresNewNamespaces(t *testing.T) {
 }
 
 func TestApply_DryRunCustomResourceOfNewCRDInNewNamespaceSkippedOnce(t *testing.T) {
-	// The Foo has both reasons to be skipped; it counts once.
+	// The Foo has both reasons to be skipped; it counts once and is warned
+	// about for its CustomResourceDefinition, not for its namespace.
 	shortWaitPoll(t)
 	cluster := &stagingCluster{}
+	var logBuf bytes.Buffer
+	output.SetLogWriter(&logBuf)
+	t.Cleanup(func() { output.SetLogWriter(os.Stderr) })
 
 	result, err := Apply(context.Background(), cluster.client(t), stagingInput(), "test", ApplyOptions{
 		DryRun:            true,
@@ -444,4 +450,7 @@ func TestApply_DryRunCustomResourceOfNewCRDInNewNamespaceSkippedOnce(t *testing.
 	assert.Equal(t, 4, result.Skipped)
 	assert.Equal(t, 2, result.Applied)
 	assert.NotContains(t, cluster.patchOrder(), "Foo/my-foo")
+	logged := logBuf.String()
+	assert.Contains(t, logged, "its CustomResourceDefinition foos.example.com is created by this apply")
+	assert.NotContains(t, logged, "skipping Foo/my-foo in demo: namespace")
 }
