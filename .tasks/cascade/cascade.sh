@@ -9,6 +9,15 @@
 # add-deps-cascade-task, design.md D3 to D9. The shared resolver
 # ($CASCADE_RESOLVER) answers every version question.
 #
+# It runs no code from a moved dependency: the only Go programs it builds are
+# opm and hack/operator-pin, from an export of the merge base $M, never from
+# the work tree. In merge
+# mode the work tree is deps/cascade with main merged in, so it may already
+# pin a library an earlier run moved; the merge base is main. The docs-bundle
+# check, which runs hack/docskit-dump and so links the moved library, lives in
+# the pull request's CI instead (.github/scripts/docs-pins-check.sh, pr.yml
+# Lint).
+#
 # Exit: 0 when the working tree changed, 3 when there was nothing to do, any
 # other code on error. Run it as `task -x deps:cascade`. Progress goes to
 # stderr; warnings also go to $(git rev-parse --git-dir)/cascade/warnings.
@@ -87,6 +96,11 @@ warn() {
   printf 'cascade: warning: %s\n' "$2" >&2
   printf '%s\t%s\n' "$1" "$2" >>"$CASCADE_WARNINGS"
 }
+
+# The merge base: version advances count from it, and the Go programs the
+# task runs are built from its export (see the header).
+BASE_REF=${CASCADE_BASE:-origin/main}
+M=$(git merge-base "$BASE_REF" HEAD) || die "no merge base between \`$BASE_REF\` and HEAD"
 
 REGISTRY='testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
 export CUE_REGISTRY="$REGISTRY" OPM_REGISTRY="$REGISTRY" GOWORK=off
@@ -227,6 +241,17 @@ f_changed() {
   return 0
 }
 
+# build_base PKG NAME: build the cli package PKG from an export of the merge
+# base into $STATE/bin/NAME, never from the work tree, which in merge mode may
+# carry an earlier run's library move that no one has reviewed.
+build_base() {
+  rm -rf "$STATE/$2-src"
+  mkdir -p "$STATE/bin" "$STATE/$2-src"
+  git archive "$M" | tar -x -C "$STATE/$2-src"
+  go build -C "$STATE/$2-src" -buildvcs=false -o "$STATE/bin/$2" "$1"
+  rm -rf "$STATE/$2-src"
+}
+
 # go_requires: every require line of go.mod as "path version".
 go_requires() {
   awk '/^require \($/ { f = 1; next } f && /^\)/ { f = 0 } f && NF >= 2 { print $1, $2 }
@@ -254,6 +279,7 @@ report library "$LIB_CUR" "$LIB_T"
 # operator MAJOR.MINOR is not above the cli's, the rule install applies to a
 # target (0021:D9:R4). The resolver answers the newest release; operator-pin
 # walks down from it, reading each candidate's operator package (no render).
+# operator-pin is built from the merge base, and also writes the pin in Phase C.
 MOD_CUR=$(sed -n 's/^const PinnedModuleVersion = "\(.*\)"$/\1/p' "$PIN")
 [ -n "$MOD_CUR" ] || die "\`$PIN\` has no PinnedModuleVersion"
 MOD_CUR=v$MOD_CUR
@@ -261,8 +287,9 @@ newest "$MOD" cue "$MOD" --current "$MOD_CUR" --repo-root .
 MOD_T=""
 if [ -n "$NEW" ]; then
   CLI_V=$(jq -er '."."' .release-please-manifest.json) || die "cannot read the cli version from .release-please-manifest.json"
+  build_base ./hack/operator-pin operator-pin
   SEL_RC=0
-  SEL=$(go run ./hack/operator-pin select "$NEW" "$CLI_V") || SEL_RC=$?
+  SEL=$("$STATE/bin/operator-pin" select "$NEW" "$CLI_V") || SEL_RC=$?
   case "$SEL_RC" in
     0) if [ "v$SEL" != "$MOD_CUR" ]; then MOD_T=v$SEL; fi ;;
     3) warn "$MOD" "no \`$MOD\` release up to \`$NEW\` deploys an operator the cli \`$CLI_V\` can drive; the pin stays" ;;
@@ -354,8 +381,6 @@ elif [ "$CMP" = 1 ]; then
 fi
 
 # Version advances, once per PR (design.md D6; contract §5.2 rule 11).
-BASE_REF=${CASCADE_BASE:-origin/main}
-M=$(git merge-base "$BASE_REF" HEAD) || die "no merge base between \`$BASE_REF\` and HEAD"
 declare -A ADV_B=() ADV_T=() ADV_FINAL=()
 for d in "${ADV_DIRS[@]}"; do
   i="$d/identity/identity.cue"
@@ -447,43 +472,6 @@ if [ -n "$LIB_T" ] || [ -n "$MOD_T" ] || [ -n "$KIND_T" ]; then work=1; fi
 for d in "${CUE_DIRS[@]}"; do if [ -n "${MOVES[$d]}" ]; then work=1; fi; done
 if [ "${#ADV_T[@]}" -gt 0 ] || [ "${#REPIN[@]}" -gt 0 ]; then work=1; fi
 
-# docs_check: docs bundles, a warning, never a hold (design.md D9; contract
-# §9.5). It runs when library or the operator release differs from the merge base,
-# not only when this run moved it, and on both the exit-0 and the exit-3 path
-# (the working tree is the final tree on either), so a later run on the
-# branch keeps the warning.
-docs_check() {
-  local pins entries project pin key lib_base op_base
-  lib_base=$(git show "$M:go.mod" | awk -v m="$LIB" '$1 == m { print $2; exit }')
-  # The operator release the pinned module deploys, at the merge base (from
-  # pin.go, or from manifest.go before the module pin existed) and now.
-  op_base=$({ git show "$M:$PIN" 2>/dev/null || git show "$M:internal/operator/manifest.go" 2>/dev/null; } |
-    sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p')
-  op_now=$(sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p' "$PIN")
-  if [ "${LIB_T:-$LIB_CUR}" != "$lib_base" ] || [ "$op_now" != "$op_base" ]; then
-    if pins=$(go run ./hack/docskit-dump pins 2>"$STATE/docskit.err"); then
-      # Outside a process substitution, so a changed output shape stops the task.
-      entries=$(jq -er '.pins | to_entries[] | "\(.key)\t\(.value)"' <<<"$pins") ||
-        die "\`hack/docskit-dump pins\` printed no \`.pins\` entries"
-      while IFS=$'\t' read -r project pin; do
-        [ -n "$project" ] || continue
-        r published oci "open-platform-model/docs/$project" "$pin"
-        if [ "$RC" = 3 ]; then
-          case "$project" in
-            library) key=$LIB ;;
-            opm-operator) key=$OP ;;
-            core) key=$CORE ;;
-            *) key=- ;;
-          esac
-          warn "$key" "docs bundle for \`$project\` \`$pin\` is not published; G1 will fail the next release PR until it is"
-        fi
-      done <<<"$entries"
-    else
-      warn - "\`hack/docskit-dump pins\` did not build on the final tree; docs bundles not checked"
-    fi
-  fi
-}
-
 finish() {
   if [ -n "$START" ]; then
     if [ "$(snapshot)" != "$START" ]; then exit 0; fi
@@ -494,13 +482,12 @@ finish() {
 }
 if [ "$work" = 0 ]; then
   say "nothing to move"
-  docs_check
   finish
 fi
 
 # ---------------------------------------------------------------------------
-# Phase B: tools, from the unmodified tree, so a library move that breaks
-# compilation cannot stop the task from producing its diff (contract rule 11).
+# Phase B: tools, before any edit, so a library move that breaks compilation
+# cannot stop the task from producing its diff (contract rule 11).
 
 # cue only when a cue.mod runs get and tidy, opm only for a version advance,
 # so a library- or operator-module-only run needs neither.
@@ -508,8 +495,7 @@ for d in "${CUE_DIRS[@]}"; do
   if [ -n "${MOVES[$d]}" ]; then command -v cue >/dev/null || die "cue is not on PATH"; break; fi
 done
 if [ "${#ADV_T[@]}" -gt 0 ]; then
-  mkdir -p "$STATE/bin"
-  go build -o "$STATE/bin/opm" ./cmd/opm
+  build_base ./cmd/opm opm
 fi
 
 # ---------------------------------------------------------------------------
@@ -531,7 +517,8 @@ if [ -n "$LIB_T" ]; then
   done <<<"$after"
 fi
 if [ -n "$MOD_T" ]; then
-  task -x operator:pin VERSION="${MOD_T#v}" >&2
+  # task operator:pin's program, built from the merge base in Phase A.
+  "$STATE/bin/operator-pin" "${MOD_T#v}" >&2
 fi
 
 # 2. Catalog and core: templates first, then the test trees (CUE_DIRS order).
@@ -576,8 +563,5 @@ for c in "${CONSUMERS[@]}"; do
   [ -n "${REPIN[$c]:-}" ] || continue
   set_cue_dep_v "$c/cue.mod/module.cue" "$POD" "${REPIN[$c]}"
 done
-
-# 5. Docs bundles.
-docs_check
 
 finish

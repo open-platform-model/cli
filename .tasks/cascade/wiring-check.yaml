@@ -1,0 +1,13 @@
+pin-comment: .github main
+receiver: true
+env-allow: []
+publish-workflows: [release.yml, publish-fixtures.yml, docs.yml]
+ci:
+  workflow: pr.yml
+  job: lint
+notify:
+  needs: [release-please, goreleaser]
+  if: ${{ !cancelled() && needs.goreleaser.result == 'success' && github.ref == 'refs/heads/main' && vars.CASCADE_NOTIFY != 'off' }}
+  tag: ${{ needs.release-please.outputs.tag_name || inputs.tag }}
+publish:
+  labels-managed: true

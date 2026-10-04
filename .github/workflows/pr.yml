@@ -38,7 +38,12 @@ jobs:
         with:
           version: 3.x
       - name: Verify the cascade wiring
-        run: task cascade:wiring:check
+        # The canonical .github check with this repo's values
+        # (.tasks/cascade/wiring-check.yaml); --pin-on-main also confirms the
+        # pinned SHA is on .github main. Local, offline: task cascade:wiring:check.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .tasks/cascade/wiring-check.sh --pin-on-main
       - name: Cascade task (offline)
         # task deps:cascade's offline scenarios against the stub resolver; no
         # registry or proxy access. Lint is the cli's required check (workspace
@@ -56,6 +61,25 @@ jobs:
         # .opm-docs-version and every docs-kit publish.yml ref name the same
         # release (docs-kit C5, C12); offline. Local: task docs:pins:check.
         run: bash .tasks/opm-docs.sh pin-check
+      - name: Docs bundles for moved pins
+        # A warning, never a failure: when the PR moves library or the
+        # embedded operator, every docs bundle the tree pins should be
+        # published before the next release PR, whose G1 fails without it.
+        # It runs here, with this job's read-only token, and not in the
+        # cascade task, so the cascade's compute never runs a newly pinned
+        # library's code. Local: .github/scripts/docs-pins-check.sh --warn
+        # --moved-from origin/main.
+        if: github.event_name == 'pull_request'
+        timeout-minutes: 10
+        continue-on-error: true # a timeout stays a warning too
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if ! git fetch --no-tags --depth=1 origin "$BASE_SHA" 2>&1; then
+            echo "::warning title=Docs bundle::docs bundles not checked: cannot fetch the base commit $BASE_SHA"
+            exit 0
+          fi
+          .github/scripts/docs-pins-check.sh --warn --moved-from "$BASE_SHA"
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
