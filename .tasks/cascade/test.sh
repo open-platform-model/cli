@@ -481,8 +481,10 @@ if [ "$SET" = all ]; then
       fail "S2 older pins" "first run exit $RUN_RC, want 0: $(why)"
     elif ! reason=$(golden "$d"); then
       fail "S2 older pins" "first run: $reason"
-    elif ! warned "$d" "docs bundle for \`library\`"; then
-      fail "S2 older pins" "no docs-bundle warning"
+    elif grep -q '^published oci open-platform-model/docs/' "$TMP/s2/log"; then
+      # The docs-bundle check runs hack/docskit-dump, which links the moved
+      # library; it belongs to the pull request's CI, not to the task.
+      fail "S2 older pins" "the task looked up a docs bundle"
     elif ! warned "$d" "declares \`language.version\` \`v0.99.0\`, newer than the cue"; then
       fail "S2 older pins" "no language.version warning"
     elif ! grep -qF "$LIB	new major available" "$d/.git/cascade/warnings"; then
@@ -597,36 +599,6 @@ if [ "$SET" = all ]; then
         fi
       fi
     fi
-  fi
-
-  # S15 docs-bundle warning on exit 3: the merge base pins an older library in
-  # go.mod, a human commit on the branch restores the tree's, and this run
-  # moves nothing; the docs-bundle warning still reaches the warnings file
-  # (contract §6.4 step 6). It builds hack/docskit-dump, so it needs the Go
-  # module graph and runs in this set; the base's go.mod is never built.
-  d=$(sandbox s15)
-  current_rows "$d" >"$TMP/s15/table"
-  lib_v=$(awk -v m="$LIB" '$1 == m { print $2; exit }' "$d/go.mod")
-  cp "$d/go.mod" "$TMP/s15/go.mod"
-  sed -i "s#^\(\t$LIB\) $lib_v\$#\1 v0.0.1#" "$d/go.mod"
-  setup_ok=0
-  if [ "$(awk -v m="$LIB" '$1 == m { print $2; exit }' "$d/go.mod")" = v0.0.1 ]; then setup_ok=1; fi
-  commit_setup "$d"
-  cp "$TMP/s15/go.mod" "$d/go.mod"
-  g "$d" commit -q -am "a human moves library"
-  run "$d" "$TMP/s15/table" "$TMP/s15/log"
-  if [ "$setup_ok" != 1 ]; then
-    fail "S15 docs warning on exit 3" "the setup edit did not apply"
-  elif [ "$RUN_RC" != 3 ]; then
-    fail "S15 docs warning on exit 3" "exit $RUN_RC, want 3: $(why)"
-  elif ! clean "$d"; then
-    fail "S15 docs warning on exit 3" "the tree changed"
-  elif ! grep -q '^published oci open-platform-model/docs/library ' "$TMP/s15/log"; then
-    fail "S15 docs warning on exit 3" "no published oci call for the library bundle"
-  elif ! warned "$d" "docs bundle for \`library\`"; then
-    fail "S15 docs warning on exit 3" "no docs-bundle warning"
-  else
-    pass "S15 docs warning on exit 3"
   fi
 else
   skip "network scenarios" "CASCADE_TEST_SET=offline"
