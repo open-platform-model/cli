@@ -17,7 +17,7 @@ SemVer: MINOR after GA. A refusal becomes a migration; the breaking switch to th
 
 ## Dependencies / gates
 
-- **GATED: implementation starts only after `install-operator-from-module` is merged on `main`.** This change plugs into that change's install flow: the proof slot its check phase leaves immediately before the apply guard, and its write order (CRD step, then instance apply). Task 1.1 checks the gate.
+- **Stacked on `install-operator-from-module` (cli PR #307).** This change plugs into that change's install flow: the proof slot its check phase leaves immediately before the apply guard, and its write order (CRD step, then instance apply). Its branch is merged into this one and this change's PR targets #307's branch; the two merge back to back (see "Release coupling"). Task 1.1 checks the gate.
 - **GATED: enhancements PR #94 is merged**, so this change can declare 0012:D8:R6 and 0012:D8:R7 (task 1.1). `install-operator-from-module` already gates on it.
 - The cluster measurement needs a published operator module. `install-operator-from-module` already depends on it: rendered through the catalog_opm release with the pod seccomp profile (catalog_opm PR #141), with the five unbound ClusterRoles rendered through `objects@v1alpha1` until catalog_opm's `add-subjectless-roles` is released.
 - The operator's own instance stays CLI-owned. Handing it over to the operator, or any other ownership transfer, is out of scope.

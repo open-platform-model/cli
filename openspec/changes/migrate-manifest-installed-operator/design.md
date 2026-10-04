@@ -4,7 +4,7 @@ proposal.md, Why, describes the problem. The code this change touches, as read o
 
 - **The apply guard.** `inventory.PreApplyExistenceCheck` (`internal/inventory/stale.go`) GETs every rendered entry on a first apply. It refuses at the first object without an OPM `app.kubernetes.io/managed-by` value (`pkgcore.IsOPMManagedBy`). It logs a read error other than NotFound at debug level and skips the object. `apply.RunPreApplyExistenceCheck` (`internal/workflow/apply/apply.go`) skips the guard entirely when a previous inventory exists or on a dry run. The guard admits any OPM-managed object, whichever instance it belongs to.
 - **The writes.** `kubernetes.ApplyOne` server-side-applies with field manager `opm-cli` and `Force: true` (`internal/kubernetes/apply.go`, `internal/kubernetes/labels.go`). `inventory.PruneStaleResources` deletes with foreground propagation and never deletes a CRD or a Namespace (`kubernetes.IsProtectedKind`). `kubernetes.WaitAbsent` waits for objects to disappear; `operator.waitForTerminating` in `internal/operator/install.go` uses it.
-- **The install being replaced.** Today `operator.Install` server-side-applies the embedded `dist/install.yaml` (`internal/operator/manifest.go`, `PinnedOperatorVersion = "v1.0.0-beta.5"`). Change `install-operator-from-module` replaces it with a two-step module install: a check phase with no writes, the CRD step, then the instance apply. That change leaves a slot for this one in the check phase and in the write order. Its check phase runs `inventory.PreApplyExistenceCheck` over every rendered object inside `PlanInstall` when no record exists, as its last check, and leaves the proof slot immediately before it, as this change needs (see "Flow"); its instance apply runs the same guard again through `apply.RunPreApplyExistenceCheck`. Its instance apply applies the four CRDs again with the same field manager after the CRD step: `splitClusterDefinitions` (`internal/kubernetes/apply.go`) applies protected kinds first, and the install experiment reported `15 created, 4 unchanged` for those CRDs. The exact function names come from that change once it is merged (task 1.2).
+- **The install this change plugs into** (`install-operator-from-module`, cli PR #307, merged into this branch). `operator.PlanInstall` (`internal/operator/plan_install.go`) is the check phase and writes nothing: the record read, the values merge and render, `CheckTarget`, `inventory.GateStatusRBAC` (full install only), `waitForTerminating`, a comment marking the migration proof slot, and last, only when the operator instance has no record (`rec == nil`), `inventory.PreApplyExistenceCheck` over `workflowapply.CurrentInventoryEntries(plan.Objects())`, wrapped as `*operator.GuardError`. `plan.Objects()` is the whole render, or the four CRDs under `--crds-only`, so the `--crds-only` flow reaches the same slot and the same guard. `operator.Install` (`internal/operator/install.go`) is the write phase: the CRD step (`kubernetes.ApplyOne` per CRD, then `kubernetes.Wait` for Established), a comment marking the migration writes slot, then, unless `CRDsOnly`, `workflowapply.Execute` with a `workflowapply.Request` (no namespace creation, the operator ceiling skipped). `Execute` reaches `RunPreApplyExistenceCheck(ctx, client, hasPrevInventory, dryRun, currentEntries)` as its gate 6, which runs the guard only when the instance has no previous inventory. `kubernetes.Apply` server-side-applies every object, the CRDs first (`splitClusterDefinitions`), as field manager `opm-cli` with `Force: true` (`applyOne` in `internal/kubernetes/apply.go`), so the instance apply applies the CRDs again with force after the CRD step. The module 0.1.0 render (operator v1.0.0-beta.8) holds 22 objects: the 19 of the beta.5 manifest, renamed bindings aside, plus the ClusterRoles `opm-operator-{modulepackage,platform,transformerregistration}-viewer-role`.
 - **Identity labels.** `pkg/core/labels.go` defines `module-instance.opmodel.dev/{name,namespace,uuid}`. The operator module's render stamps them, and `app.kubernetes.io/managed-by: opm-cli`, on every object.
 
 ### What the earlier manifests contain (measured 2026-10-04)
@@ -58,26 +58,30 @@ In the same experiment, an upgrade that rolled the operator pod produced a 28 s 
 ### Flow
 
 ```text
-opm operator install
-  resolve + render module                            (install-operator-from-module)
-  check phase, no writes:
-    version, value and CRD checks, terminating wait  (install-operator-from-module)
-    migration.Plan(ctx, client, rendered, instance)  (this change)
+opm operator install                                  (internal/cmd/operator/install.go)
+  ResolveTarget: resolve the module version           (install-operator-from-module)
+  PlanInstall, no writes:                             (internal/operator/plan_install.go)
+    record read, values + render, CheckTarget,
+    GateStatusRBAC, waitForTerminating                (install-operator-from-module)
+    PlanMigration(ctx, client, render, crdsOnly)      (this change, the proof slot)
        GET every proof-list entry and every rendered object
-       -> Plan{Adopt, Ours, MoveOwnership, RecreateDeployment, DeleteBindings, LeftInPlace}
-       -> or *migration.RefusalError naming every object that blocks it
-    apply guard over the rendered objects, admitting Plan.Admit()
-                                                     (install-operator-from-module guard,
-                                                      its last check, after the proof slot)
-  write phase:
-    CRD step, wait until served                      (install-operator-from-module)
-    migration.MoveOwnership(ctx, client, plan)       (this change)
-    migration.Delete(ctx, client, plan, budget)      (this change)
+       -> *MigrationPlan{Adopt, Ours, MoveOwnership, RecreateDeployment,
+                         DeleteBindings, LeftInPlace}
+       -> or *MigrationRefusal naming every object that blocks it
+    PreApplyExistenceCheck(..., plan.Migration.Admit())
+       only when rec == nil                            (install-operator-from-module guard)
+  Install, writes:                                    (internal/operator/install.go)
+    CRD step: ApplyOne per CRD, Wait Established      (install-operator-from-module)
+    MoveOwnership(ctx, client, migration)             (this change, the writes slot,
+    DeleteSuperseded(ctx, client, migration, since)    skipped under --crds-only)
        1. delete the earlier Deployment (foreground), WaitAbsent
        2. delete the superseded bindings
-    instance apply, guard admitting Plan.Admit()     (install-operator-from-module)
+    workflowapply.Execute, Request.Admit = Admit()    (install-operator-from-module)
+       -> RunPreApplyExistenceCheck(..., admit)        only with no previous inventory
   report: migration lines, then the ordinary lines
 ```
+
+Everything lives in package `internal/operator` (files `legacy.go`, `migration_proof.go`, `migration_plan.go`, `migration_execute.go`, `migration_report.go`), not in a `migration` subpackage: the proof list is built from the names in `names.go`, and `PlanInstall` calls the planner, so a subpackage would import its own importer. The plan travels on `operator.Plan` as the field `Migration`.
 
 The proof runs before the check-phase guard, and both guard calls (the one in the check phase and the one inside the instance apply) admit `Plan.Admit()`. A proof placed after the guard would never run on a manifest-installed cluster: the guard refuses at `Namespace/opm-operator-system` first, exactly as the install experiment measured.
 
@@ -157,7 +161,7 @@ For each existing rendered object, adopted or `Ours`, whose `managedFields` hold
 
 The scope is deliberately narrow. Only the `kubectl-client-side-apply` manager moves. Fields owned by server-side `kubectl`, Flux, Argo CD or another tool's manager, by controllers, or set by API defaults stay where they are; the spec promises nothing about them. The move is cheap and is a no-op once no client-side manager is left, so it runs on every full install, not only on a migration run.
 
-**Unverified:** that the patch takes the annotation and the kustomize labels along. Section 1 measures this before anything else is built.
+**Measured (spike, 2026-10-04, kind v1.34.3, client-go v0.36.4).** On a throwaway cluster, the v1.0.0-beta.5 `install.yaml` was applied client-side with `kubectl apply`. A program then server-side-applied the module 0.1.0 `moduleinstances.opmodel.dev` CRD as `opm-cli` with force (the CRD step), sent `UpgradeManagedFieldsPatch(live, {kubectl-client-side-apply}, "opm-cli")` as a JSON patch for the Namespace, `ClusterRole opm-operator-metrics-reader`, the metrics Service and that CRD, and then server-side-applied the module-rendered objects as `opm-cli` with force (the instance apply). Before the move each object was owned by `kubectl-client-side-apply` (`Update`) and carried `last-applied-configuration`; the Namespace and Service also carried `managed-by=kustomize`, `name=opm-operator` and `control-plane=controller-manager`. After the move only the manager changed (`opm-cli` `Apply`; labels and annotation untouched, so the earlier operator keeps running unchanged). After the forced apply every object carried `managed-by=opm-cli`, no `last-applied-configuration`, and only the managers `opm-cli` (plus `kube-apiserver` on the CRD, for status); the Namespace lost `control-plane`, which the module does not render, and the Service kept it, which the module renders. Control: `ClusterRole opm-operator-metrics-auth-role`, applied the same way with no move, kept `last-applied-configuration` and its `kubectl-client-side-apply` manager. (`kubectl apply --server-side` is no control: kubectl runs the same upgrade itself.) Over an `opm-cli` server-side install of the same manifest the move is a no-op for all four objects, and the forced apply drops `kustomize`, `name=opm-operator` and the Namespace's `control-plane` alike. The design stands: `csaupgrade`, not the JSON-patch fallback.
 
 **Options considered:**
 
@@ -226,7 +230,7 @@ The cli `README.md` operator section gains a short note (task 4.6): the first in
 ## Risks / Trade-offs
 
 - [The operator is down from the Deployment delete until the new pod holds the leader lease; about 28 s were measured on a pod roll] → Accepted by the owner. The report says so, and the managed workloads keep running.
-- [csaupgrade does not move the kustomize labels or the annotation] → Section 1 measures it first. If it fails, this design takes the JSON-patch option for exactly the fields the proof list names plus the annotation, and the spec is unchanged.
+- [csaupgrade does not move the kustomize labels or the annotation] → Measured in section 1: it does, once the forced instance apply follows (see "Field ownership of client-side installs").
 - [An operator release manifest is missing from the table] → The program reads every operator release (`v<semver>`) at implementation time and the test against the downloaded set catches a gap among past releases; an operator release that still attaches a manifest after that is added by re-running the program, until `stop-operator-install-manifest` closes the list (see the proof-list decision). Module releases are never a source.
 - [Controller arguments a user patched onto the earlier Deployment, such as `--registry`, vanish with the recreate] → They become instance values under `install-operator-from-module`. The report's recreate line says the patches are not carried over, and the README migration note says to pass them as values on this install.
 - [An object on the list belongs to another instance and gets touched] → It reads `Unproven` and refuses the install before any write.

@@ -61,7 +61,7 @@ An object that already carries the operator instance's own identity, as after an
 
 ### Requirement: Install adopts the proven objects the module renders and no others
 
-On the first module install over an operator installed from an earlier manifest, install SHALL admit through the apply guard exactly the proven objects that the module renders. It SHALL record every object the module renders in the operator instance's inventory. The guard SHALL refuse every other existing object the render names that is neither proven nor already this instance's, as it does for any instance. Install SHALL offer no flag or prompt that overrides that refusal. The proven objects SHALL pass both the guard in install's check phase and the guard of the instance apply, so a manifest-installed cluster is not refused at either.
+On the first module install over an operator installed from an earlier manifest, install SHALL admit through the apply guard exactly the proven objects that the module renders. It SHALL record every object the module renders in the operator instance's inventory. The guard SHALL refuse every other existing object the render names that is neither proven nor already this instance's, as it does for any instance. Install SHALL offer no flag or prompt that overrides that refusal. The proven objects SHALL pass both the guard in install's check phase and the guard of the instance apply, so a manifest-installed cluster is not refused at either. Source: 0012:D8:R6.
 
 #### Scenario: Migration over an opm-cli server-side install
 
@@ -111,7 +111,7 @@ After a full install, a label or annotation on a rendered object that an earlier
 
 ### Requirement: Install recreates the earlier Deployment once
 
-When the operator's Deployment exists, is proven, and carries the selector of an earlier manifest, install SHALL delete it and wait until it is gone before the instance apply, so that the instance creates it with the module's selector. Install SHALL NOT delete a Deployment that carries the operator instance's identity or the module's selector. As a result, no install between module versions, and no install over a manifest rendered from the module, deletes the Deployment. The migration SHALL NOT touch the workloads of the instances that the operator manages.
+When the operator's Deployment exists, is proven, and carries the selector of an earlier manifest, install SHALL delete it and wait until it is gone before the instance apply, so that the instance creates it with the module's selector. Install SHALL NOT delete a Deployment that carries the operator instance's identity or the module's selector. As a result, no install between module versions, and no install over a manifest rendered from the module, deletes the Deployment. The migration SHALL NOT touch the workloads of the instances that the operator manages. Source: 0012:D8:R7.
 
 #### Scenario: Earlier Deployment is recreated
 
@@ -125,7 +125,7 @@ When the operator's Deployment exists, is proven, and carries the selector of an
 
 ### Requirement: Install deletes the superseded role bindings
 
-Install SHALL delete the earlier manifest's role bindings that the module's bindings replace: `ClusterRoleBinding opm-operator-manager-rolebinding`, `ClusterRoleBinding opm-operator-metrics-auth-rolebinding` and `RoleBinding opm-operator-system/opm-operator-leader-election-rolebinding`. It SHALL delete each one only when it is proven and the render holds a binding of the same kind and namespace whose `roleRef` equals the live binding's `roleRef`. When a proven superseded binding has no such replacement in the render, install SHALL refuse before any object changes, naming the binding and its `roleRef`. After a completed migration, no role binding of an earlier manifest SHALL remain in the cluster.
+Install SHALL delete the earlier manifest's role bindings that the module's bindings replace: `ClusterRoleBinding opm-operator-manager-rolebinding`, `ClusterRoleBinding opm-operator-metrics-auth-rolebinding` and `RoleBinding opm-operator-system/opm-operator-leader-election-rolebinding`. It SHALL delete each one only when it is proven and the render holds a binding of the same kind and namespace whose `roleRef` equals the live binding's `roleRef`. When a proven superseded binding has no such replacement in the render, install SHALL refuse before any object changes, naming the binding and its `roleRef`. After a completed migration, no role binding of an earlier manifest SHALL remain in the cluster. Source: 0012:D8:R7.
 
 #### Scenario: Three bindings are deleted
 
@@ -139,7 +139,7 @@ Install SHALL delete the earlier manifest's role bindings that the module's bind
 
 ### Requirement: The migration deletes only proven objects, and refuses otherwise
 
-The migration SHALL delete an object only when that object meets the proof. When an object the migration would adopt, recreate or delete (a rendered object on the proof list, the earlier Deployment, or a superseded binding) exists and is not proven, install SHALL refuse before any object changes, naming the object and the label or identity that failed the proof. An unproven object on the proof list that the module does not render and the migration does not delete SHALL NOT refuse the install; install SHALL leave it unchanged. The migration SHALL NOT delete or change any of the following:
+The migration SHALL delete an object only when that object meets the proof. When an object the migration would adopt, recreate or delete (a rendered object on the proof list, the earlier Deployment, or a superseded binding) exists and is not proven, install SHALL refuse before any object changes, naming the object and the label or identity that failed the proof. An unproven object on the proof list that the module does not render and the migration does not delete SHALL NOT refuse the install; install SHALL leave it unchanged. The migration SHALL NOT delete or change any of the following: Source: 0012:D8:R7.
 
 - any CustomResourceDefinition, other than the CRD step's own apply;
 - any custom resource stored under the operator's CRDs;
