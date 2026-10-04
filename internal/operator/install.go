@@ -11,87 +11,121 @@ import (
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
-	"github.com/open-platform-model/cli/pkg/resourceorder"
+	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
 )
 
-// InstallOptions configures an install run.
-type InstallOptions struct {
-	// CRDsOnly applies only the CustomResourceDefinition documents and waits
-	// only for their Established condition.
-	CRDsOnly bool
-
-	// Version, when non-empty, fetches install.yaml from that opm-operator
-	// release tag instead of using the embedded artifact.
-	Version string
-
-	// Timeout bounds the terminating guard and the readiness wait together.
-	Timeout time.Duration
-
-	// RBAC configures optional opm-cli-user ClusterRole/ClusterRoleBinding
-	// emission, appended to the plan regardless of CRDsOnly.
-	RBAC RBACOptions
-}
-
-// InstallResult reports the outcome of an install run.
+// InstallResult reports what an install wrote.
 type InstallResult struct {
-	// Version is the opm-operator version that was installed: the embedded
-	// pin, or the fetched --version tag.
-	Version string
-
-	// Source is "embedded" or "fetched".
-	Source string
-
-	// Applied is the number of resources server-side-applied.
-	Applied int
+	Target Target
+	// CRDs is the number of CRDs the CRD step applied.
+	CRDs int
+	// Recorded reports that the instance apply ran and wrote the record.
+	Recorded bool
+	// Extra is the number of --rbac objects applied.
+	Extra int
 }
 
-// Install waits for any planned object still terminating on the cluster to
-// disappear, then server-side-applies the operator manifest (or just its CRD
-// subset) with field manager opm-cli, then waits for the applied resources to
-// become ready. Both waits share the single opts.Timeout budget. Apply stops
-// at the first resource error — a partially applied operator install is not a
-// state worth waiting on.
-func Install(ctx context.Context, client *kubernetes.Client, opts InstallOptions) (*InstallResult, error) {
-	manifest, version, source, err := resolveManifest(ctx, opts.Version)
-	if err != nil {
-		return nil, err
-	}
+// RolloutError reports that the operator's controller Deployment did not
+// finish its rollout within the --timeout budget. Nothing is rolled back.
+type RolloutError struct{ Err error }
 
-	plan := InstallPlan(manifest)
-	if opts.CRDsOnly {
-		plan = CRDsOnlyPlan(manifest)
-	}
-	if rbacObjs := opts.RBAC.Objects(); len(rbacObjs) > 0 {
-		plan = append(plan, rbacObjs...)
-		kubernetes.SortObjects(plan, resourceorder.Ascending)
-	}
+func (e *RolloutError) Error() string {
+	return fmt.Sprintf("Deployment %s/%s did not complete its rollout: %v; every applied object and the instance record remain, and re-running 'opm operator install' completes it",
+		OperatorNamespace, ControllerDeploymentName, e.Err)
+}
 
-	result := &InstallResult{Version: version, Source: source}
+func (e *RolloutError) Unwrap() error { return e.Err }
 
-	// One budget for the terminating guard and the readiness wait: the user
-	// reasons about a single --timeout per command.
-	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
+// Install performs a plan's writes, in order, within the plan's --timeout
+// budget: the CRD step (server-side apply of the rendered CRDs as opm-cli,
+// then wait for Established), then, unless the plan is CRDs-only, the
+// CLI-owned instance apply of the whole render (no namespace creation, the
+// running-operator ceiling skipped, pruning on), then the --rbac objects,
+// then the controller Deployment's rollout. A step that fails stops the
+// install; nothing is rolled back, and re-running install completes it.
+func Install(ctx context.Context, env InstallEnv, plan *Plan) (*InstallResult, error) {
+	ctx, cancel := context.WithDeadline(ctx, plan.Deadline())
 	defer cancel()
-	budgetStart := time.Now()
+	result := &InstallResult{Target: plan.Target}
 
-	if err := waitForTerminating(ctx, client, plan, budgetStart); err != nil {
+	// Write 1: the CRDs, so the record is written only once they are served.
+	for _, crd := range plan.CRDs {
+		status, err := kubernetes.ApplyOne(ctx, env.Client, crd, kubernetes.ApplyOptions{})
+		if err != nil {
+			return result, fmt.Errorf("applying %s/%s: %w", crd.GetKind(), crd.GetName(), err)
+		}
+		result.CRDs++
+		output.Info(output.FormatResourceLine(crd.GetKind(), crd.GetNamespace(), crd.GetName(), status))
+	}
+	if err := kubernetes.Wait(ctx, env.Client, plan.CRDs, DefaultPredicate, plan.BudgetStart); err != nil {
 		return result, err
 	}
 
-	for _, obj := range plan {
-		status, err := kubernetes.ApplyOne(ctx, client, obj, kubernetes.ApplyOptions{})
+	// The migration writes slot: migrate-manifest-installed-operator deletes
+	// the proven earlier Deployment and superseded role bindings here, after
+	// the CRDs are served and before the instance apply (0012:D8:R7).
+
+	// Write 2: the instance apply records every rendered object, the CRDs
+	// and the Namespace included.
+	if !plan.CRDsOnly {
+		err := workflowapply.Execute(ctx, workflowapply.Request{
+			Result:    plan.Render,
+			K8sClient: env.Client,
+			Log:       output.InstanceLogger(OperatorInstanceName),
+			Options: workflowapply.Options{
+				CreateNS:               false,
+				SkipOperatorCeiling:    true,
+				Timeout:                remaining(plan.Deadline()),
+				SuccessAppliedMessage:  fmt.Sprintf("ModuleInstance %s/%s applied", OperatorNamespace, OperatorInstanceName),
+				SuccessUpToDateMessage: fmt.Sprintf("ModuleInstance %s/%s up to date", OperatorNamespace, OperatorInstanceName),
+			},
+		})
+		if err != nil {
+			return result, err
+		}
+		result.Recorded = true
+	}
+
+	// The opt-in user role is never part of the render or the record.
+	for _, obj := range plan.Extra {
+		status, err := kubernetes.ApplyOne(ctx, env.Client, obj, kubernetes.ApplyOptions{})
 		if err != nil {
 			return result, fmt.Errorf("applying %s/%s: %w", obj.GetKind(), obj.GetName(), err)
 		}
-		result.Applied++
+		result.Extra++
 		output.Info(output.FormatResourceLine(obj.GetKind(), obj.GetNamespace(), obj.GetName(), status))
 	}
 
-	if err := kubernetes.Wait(ctx, client, plan, DefaultPredicate, budgetStart); err != nil {
-		return result, err
+	if plan.CRDsOnly {
+		return result, nil
 	}
-
+	controller := controllerDeployment(plan.Render.Resources)
+	if controller == nil {
+		return result, fmt.Errorf("the render has no Deployment %s/%s to wait for", OperatorNamespace, ControllerDeploymentName)
+	}
+	if err := kubernetes.Wait(ctx, env.Client, []*unstructured.Unstructured{controller}, DefaultPredicate, plan.BudgetStart); err != nil {
+		return result, &RolloutError{Err: err}
+	}
 	return result, nil
+}
+
+// remaining is the time left before deadline, at least a millisecond, so a
+// spent budget fails the next wait instead of falling back to a default.
+func remaining(deadline time.Time) time.Duration {
+	if d := time.Until(deadline); d > time.Millisecond {
+		return d
+	}
+	return time.Millisecond
+}
+
+// controllerDeployment returns the rendered controller Deployment.
+func controllerDeployment(objs []*unstructured.Unstructured) *unstructured.Unstructured {
+	for _, obj := range objs {
+		if obj.GetKind() == kindDeployment && obj.GetName() == ControllerDeploymentName && obj.GetNamespace() == OperatorNamespace {
+			return obj
+		}
+	}
+	return nil
 }
 
 // waitForTerminating is the pre-apply guard: it reads every planned object
@@ -134,27 +168,4 @@ func terminatingObjects(ctx context.Context, client *kubernetes.Client, plan []*
 		}
 	}
 	return terminating, nil
-}
-
-// resolveManifest returns the manifest to install: the embedded, pinned
-// artifact by default, or a fetched one when version is non-empty.
-func resolveManifest(ctx context.Context, version string) (objs []*unstructured.Unstructured, resolvedVersion, source string, err error) {
-	return resolveManifestFrom(ctx, operatorReleaseBaseURL, version)
-}
-
-// resolveManifestFrom is the testable core of resolveManifest — baseURL is
-// injectable so tests can point a --version fetch at a stub server.
-func resolveManifestFrom(ctx context.Context, baseURL, version string) (objs []*unstructured.Unstructured, resolvedVersion, source string, err error) {
-	if version == "" {
-		objs, err := EmbeddedManifest()
-		return objs, PinnedOperatorVersion, "embedded", err
-	}
-
-	data, err := fetchManifest(ctx, baseURL, version)
-	if err != nil {
-		return nil, "", "", err
-	}
-
-	objs, err = ParseManifest(data)
-	return objs, version, "fetched", err
 }

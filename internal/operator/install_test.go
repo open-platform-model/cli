@@ -2,9 +2,6 @@ package operator
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -12,51 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	fakedynamic "k8s.io/client-go/dynamic/fake"
-	k8stesting "k8s.io/client-go/testing"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/version"
 )
-
-func TestResolveManifest_EmptyVersionUsesEmbedded(t *testing.T) {
-	objs, version, source, err := resolveManifest(context.Background(), "")
-	require.NoError(t, err)
-
-	assert.Equal(t, PinnedOperatorVersion, version)
-	assert.Equal(t, "embedded", source)
-	assert.Len(t, objs, 19)
-}
-
-func TestResolveManifest_VersionFetchesInstead(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("apiVersion: v1\nkind: Namespace\nmetadata:\n  name: fetched-ns\n"))
-	}))
-	defer server.Close()
-
-	objs, version, source, err := resolveManifestFrom(context.Background(), server.URL, "v1.0.0-alpha.3")
-	require.NoError(t, err)
-
-	assert.Equal(t, "v1.0.0-alpha.3", version)
-	assert.Equal(t, "fetched", source)
-	require.Len(t, objs, 1)
-	assert.Equal(t, "fetched-ns", objs[0].GetName())
-}
-
-func TestResolveManifest_FetchErrorPropagates(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer server.Close()
-
-	objs, version, source, err := resolveManifestFrom(context.Background(), server.URL, "v9.9.9")
-	require.Error(t, err)
-	assert.Empty(t, objs)
-	assert.Empty(t, version)
-	assert.Empty(t, source)
-	assert.ErrorContains(t, err, "v9.9.9")
-}
 
 // terminatingFixture returns obj with a deletionTimestamp set, as the
 // apiserver leaves a foreground-deleted object until its dependents are gone.
@@ -75,42 +33,6 @@ func fastPolling(t *testing.T) {
 	t.Cleanup(func() { kubernetes.WaitPollInterval = prev })
 }
 
-// stubApply makes the fake dynamic client accept server-side-apply patches
-// (which its tracker cannot do for unstructured objects) by storing the
-// applied body, marked ready, and counting each apply.
-func stubApply(t *testing.T, client *kubernetes.Client) *int {
-	t.Helper()
-	fake, ok := client.Dynamic.(*fakedynamic.FakeDynamicClient)
-	require.True(t, ok)
-	applied := 0
-	fake.PrependReactor("patch", "*", func(action k8stesting.Action) (bool, runtime.Object, error) {
-		patch, ok := action.(k8stesting.PatchAction)
-		require.True(t, ok)
-		obj := &unstructured.Unstructured{}
-		require.NoError(t, json.Unmarshal(patch.GetPatch(), obj))
-		switch obj.GetKind() {
-		case kindCustomResourceDefinition:
-			_ = unstructured.SetNestedSlice(obj.Object, []any{
-				map[string]any{"type": "Established", "status": "True"},
-			}, "status", "conditions")
-		case kindDeployment:
-			_ = unstructured.SetNestedMap(obj.Object, map[string]any{
-				"observedGeneration": int64(0),
-				"replicas":           int64(1),
-				"updatedReplicas":    int64(1),
-				"availableReplicas":  int64(1),
-			}, "status")
-		}
-		gvr := kubernetes.GVRFromUnstructured(obj)
-		if err := fake.Tracker().Add(obj); err != nil {
-			require.NoError(t, fake.Tracker().Update(gvr, obj, obj.GetNamespace()))
-		}
-		applied++
-		return true, obj, nil
-	})
-	return &applied
-}
-
 func deleteLater(t *testing.T, client *kubernetes.Client, obj *unstructured.Unstructured, after time.Duration) {
 	t.Helper()
 	go func() {
@@ -120,97 +42,211 @@ func deleteLater(t *testing.T, client *kubernetes.Client, obj *unstructured.Unst
 	}()
 }
 
-func TestInstall_TerminatingObjectDelaysApplyUntilGone(t *testing.T) {
-	fastPolling(t)
-	doomed := terminatingFixture(deploymentFixture(false))
-	client := fakeClientWith(doomed)
-	applied := stubApply(t, client)
-	deleteLater(t, client, doomed, 30*time.Millisecond)
+// releasedCLI makes the ldflags-set CLI version a released semver for the
+// test, so the instance apply's gates behave as in a release.
+func releasedCLI(t *testing.T) {
+	t.Helper()
+	orig := version.Version
+	version.Version = "v1.0.0-beta.9"
+	t.Cleanup(func() { version.Version = orig })
+}
 
-	result, err := Install(context.Background(), client, InstallOptions{Timeout: 2 * time.Second})
+// install plans and installs a render on the fake cluster.
+func install(t *testing.T, fc *fakeCluster, r *fakeRender, opts PlanOptions) (*InstallResult, error) {
+	t.Helper()
+	if opts.Timeout == 0 {
+		opts.Timeout = 2 * time.Second
+	}
+	env := newEnv(fc, r)
+	plan, err := PlanInstall(context.Background(), env, testResolution("v0.1.0"), defaultTarget, opts)
 	require.NoError(t, err)
-	assert.Equal(t, 19, result.Applied)
-	assert.Equal(t, 19, *applied)
+	return Install(context.Background(), env, plan)
 }
 
-func TestInstall_TerminatingObjectBeyondBudgetFailsWithNothingApplied(t *testing.T) {
-	fastPolling(t)
-	doomed := terminatingFixture(deploymentFixture(false))
-	client := fakeClientWith(doomed)
-	applied := stubApply(t, client)
+var (
+	deploymentGVR  = schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	clusterRoleGVR = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "clusterroles"}
+	namespaceGVR   = schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}
+)
 
-	result, err := Install(context.Background(), client, InstallOptions{Timeout: 30 * time.Millisecond})
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "timed out after")
-	assert.ErrorContains(t, err, "Deployment/opm-operator-controller-manager in opm-operator-system to finish terminating")
-	assert.Equal(t, 0, result.Applied)
-	assert.Equal(t, 0, *applied, "nothing may be applied while a planned object is terminating")
+func (fc *fakeCluster) mustGet(gvr schema.GroupVersionResource, ns, name string) *unstructured.Unstructured {
+	fc.t.Helper()
+	obj, err := fc.client.ResourceClient(gvr, ns).Get(context.Background(), name, metav1.GetOptions{})
+	require.NoError(fc.t, err, "%s %s/%s", gvr.Resource, ns, name)
+	return obj
 }
 
-func TestInstall_AbsentAndLiveObjectsDoNotDelayApply(t *testing.T) {
-	fastPolling(t)
-	// The Deployment exists and is live; everything else is absent.
-	client := fakeClientWith(deploymentFixture(true))
-	applied := stubApply(t, client)
+func (fc *fakeCluster) exists(gvr schema.GroupVersionResource, ns, name string) bool {
+	_, err := fc.client.ResourceClient(gvr, ns).Get(context.Background(), name, metav1.GetOptions{})
+	return err == nil
+}
 
-	start := time.Now()
-	result, err := Install(context.Background(), client, InstallOptions{Timeout: 2 * time.Second})
+func (fc *fakeCluster) record() *inventory.Record {
+	fc.t.Helper()
+	rec, err := inventory.GetRecord(context.Background(), fc.client, OperatorInstanceName, OperatorNamespace)
+	require.NoError(fc.t, err)
+	return rec
+}
+
+func entryNames(rec *inventory.Record) []string {
+	names := make([]string, 0, len(rec.Inventory.Entries))
+	for _, e := range rec.Inventory.Entries {
+		names = append(names, e.Kind+"/"+e.Name)
+	}
+	return names
+}
+
+// "Fresh cluster" and "The module's Namespace is not refused".
+func TestInstall_FreshCluster(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	fc := newFakeCluster(t)
+
+	result, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{})
 	require.NoError(t, err)
-	assert.Equal(t, 19, result.Applied)
-	assert.Equal(t, 19, *applied)
-	assert.Less(t, time.Since(start), time.Second)
+	assert.Equal(t, 4, result.CRDs)
+	assert.True(t, result.Recorded)
+
+	writes := fc.Writes()
+	require.GreaterOrEqual(t, len(writes), 4)
+	assert.Equal(t, []string{
+		"patch customresourcedefinitions", "patch customresourcedefinitions",
+		"patch customresourcedefinitions", "patch customresourcedefinitions",
+	}, writes[:4], "the CRDs are applied before any other object")
+	assert.NotContains(t, writes, "create namespaces", "install never creates the Namespace outside the render")
+
+	rec := fc.record()
+	require.NotNil(t, rec)
+	assert.Equal(t, inventory.OwnerCLI, rec.Owner)
+	names := entryNames(rec)
+	assert.Len(t, names, 8)
+	for _, crd := range CRDNames() {
+		assert.Contains(t, names, "CustomResourceDefinition/"+crd)
+	}
+	assert.Contains(t, names, "Namespace/"+OperatorNamespace)
+	assert.Contains(t, names, "Deployment/"+ControllerDeploymentName)
+	assert.True(t, fc.exists(deploymentGVR, OperatorNamespace, ControllerDeploymentName))
 }
 
-func TestInstall_CRDsOnlyPlanIsGuarded(t *testing.T) {
+// "Unchanged reinstall": every object keeps its uid and resourceVersion.
+func TestInstall_UnchangedReinstall(t *testing.T) {
+	releasedCLI(t)
 	fastPolling(t)
-	doomed := terminatingFixture(crdFixture(false))
-	client := fakeClientWith(doomed)
-	applied := stubApply(t, client)
-
-	result, err := Install(context.Background(), client, InstallOptions{CRDsOnly: true, Timeout: 30 * time.Millisecond})
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "CustomResourceDefinition/moduleinstances.opmodel.dev to finish terminating")
-	assert.Equal(t, 0, result.Applied)
-	assert.Equal(t, 0, *applied)
-
-	deleteLater(t, client, doomed, 30*time.Millisecond)
-	result, err = Install(context.Background(), client, InstallOptions{CRDsOnly: true, Timeout: 2 * time.Second})
+	fc := newFakeCluster(t)
+	r := &fakeRender{objs: moduleObjects(renderOpts{})}
+	_, err := install(t, fc, r, PlanOptions{})
 	require.NoError(t, err)
-	assert.Equal(t, 4, result.Applied)
+
+	type ident struct{ uid, rv string }
+	before := map[string]ident{}
+	for _, obj := range r.objs {
+		live := fc.mustGet(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace(), obj.GetName())
+		before[obj.GetKind()+"/"+obj.GetName()] = ident{string(live.GetUID()), live.GetResourceVersion()}
+	}
+
+	_, err = install(t, fc, r, PlanOptions{})
+	require.NoError(t, err)
+	for _, obj := range r.objs {
+		live := fc.mustGet(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace(), obj.GetName())
+		assert.Equal(t, before[obj.GetKind()+"/"+obj.GetName()], ident{string(live.GetUID()), live.GetResourceVersion()},
+			"%s/%s changed on an unchanged reinstall", obj.GetKind(), obj.GetName())
+	}
 }
 
-func TestInstall_RBACPlanIsGuarded(t *testing.T) {
+// "Upgrade drops an object the new version no longer renders".
+func TestInstall_UpgradePrunesWhatTheNewVersionDropped(t *testing.T) {
+	releasedCLI(t)
 	fastPolling(t)
-	doomed := terminatingFixture(clusterRole())
-	client := fakeClientWith(doomed)
-	applied := stubApply(t, client)
+	fc := newFakeCluster(t)
+	_, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{extraRole: "opm-operator-retired-role"})}, PlanOptions{})
+	require.NoError(t, err)
+	require.True(t, fc.exists(clusterRoleGVR, "", "opm-operator-retired-role"))
+
+	_, err = install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{moduleVer: "0.2.0"})}, PlanOptions{})
+	require.NoError(t, err)
+
+	assert.False(t, fc.exists(clusterRoleGVR, "", "opm-operator-retired-role"), "the dropped ClusterRole is pruned")
+	assert.True(t, fc.exists(namespaceGVR, "", OperatorNamespace))
+	for _, crd := range CRDNames() {
+		assert.True(t, fc.exists(crdGVR, "", crd))
+	}
+	assert.NotContains(t, entryNames(fc.record()), "ClusterRole/opm-operator-retired-role")
+}
+
+// "Platform and role are not recorded".
+func TestInstall_UserRoleIsNotRecorded(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	fc := newFakeCluster(t)
 	rbac := RBACOptions{Enabled: true, User: "alice"}
 
-	result, err := Install(context.Background(), client, InstallOptions{CRDsOnly: true, RBAC: rbac, Timeout: 30 * time.Millisecond})
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "ClusterRole/opm-cli-user to finish terminating")
-	assert.Equal(t, 0, result.Applied)
-	assert.Equal(t, 0, *applied)
-
-	deleteLater(t, client, doomed, 30*time.Millisecond)
-	result, err = Install(context.Background(), client, InstallOptions{CRDsOnly: true, RBAC: rbac, Timeout: 2 * time.Second})
+	result, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{Extra: rbac.Objects()})
 	require.NoError(t, err)
-	assert.Equal(t, 6, result.Applied, "4 CRDs + ClusterRole + ClusterRoleBinding")
+	assert.Equal(t, 2, result.Extra)
+	assert.True(t, fc.exists(clusterRoleGVR, "", "opm-cli-user"))
+	for _, name := range entryNames(fc.record()) {
+		assert.NotContains(t, name, "opm-cli-user")
+		assert.NotContains(t, name, "Platform/")
+	}
 }
 
-func TestInstall_AppliedObjectDisappearingFailsFast(t *testing.T) {
+// "Rollout does not complete": nothing is rolled back.
+func TestInstall_RolloutTimeoutKeepsEverything(t *testing.T) {
+	releasedCLI(t)
 	fastPolling(t)
-	client := fakeClientWith()
-	fake, ok := client.Dynamic.(*fakedynamic.FakeDynamicClient)
-	require.True(t, ok)
-	// Apply "succeeds" but stores nothing: every readiness read is NotFound.
-	fake.PrependReactor("patch", "*", func(k8stesting.Action) (bool, runtime.Object, error) {
-		return true, crdFixture(false), nil
-	})
+	fc := newFakeCluster(t)
+	fc.notReady = true
 
-	start := time.Now()
-	_, err := Install(context.Background(), client, InstallOptions{CRDsOnly: true, Timeout: 5 * time.Second})
+	_, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{Timeout: 300 * time.Millisecond})
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "was applied and has since disappeared")
-	assert.Less(t, time.Since(start), time.Second)
+	var rolloutErr *RolloutError
+	require.ErrorAs(t, err, &rolloutErr)
+	assert.Contains(t, err.Error(), ControllerDeploymentName)
+	assert.Contains(t, err.Error(), "timed out after")
+	assert.Contains(t, err.Error(), "re-running 'opm operator install' completes it")
+	assert.True(t, fc.exists(deploymentGVR, OperatorNamespace, ControllerDeploymentName))
+	assert.NotNil(t, fc.record(), "the record remains")
+}
+
+// "Solo-cluster CRD install" and "Full install after CRDs-only".
+func TestInstall_CRDsOnlyThenFullInstall(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	fc := newFakeCluster(t)
+	r := &fakeRender{objs: moduleObjects(renderOpts{})}
+
+	result, err := install(t, fc, r, PlanOptions{CRDsOnly: true})
+	require.NoError(t, err)
+	assert.Equal(t, 4, result.CRDs)
+	assert.False(t, result.Recorded)
+	uids := map[string]string{}
+	for _, crd := range CRDNames() {
+		live := fc.mustGet(crdGVR, "", crd)
+		uids[crd] = string(live.GetUID())
+	}
+	assert.Nil(t, fc.record(), "no ModuleInstance")
+	assert.False(t, fc.exists(deploymentGVR, OperatorNamespace, ControllerDeploymentName), "no Deployment")
+	assert.False(t, fc.exists(namespaceGVR, "", OperatorNamespace), "no Namespace")
+
+	_, err = install(t, fc, r, PlanOptions{})
+	require.NoError(t, err)
+	for _, crd := range CRDNames() {
+		assert.Equal(t, uids[crd], string(fc.mustGet(crdGVR, "", crd).GetUID()), "%s kept its uid", crd)
+	}
+	names := entryNames(fc.record())
+	for _, crd := range CRDNames() {
+		assert.Contains(t, names, "CustomResourceDefinition/"+crd)
+	}
+}
+
+// --rbac applies on the CRDs-only path as on the full one.
+func TestInstall_CRDsOnlyWithRBAC(t *testing.T) {
+	fastPolling(t)
+	fc := newFakeCluster(t)
+	rbac := RBACOptions{Enabled: true, User: "alice"}
+
+	result, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{CRDsOnly: true, Extra: rbac.Objects()})
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.Extra)
+	assert.True(t, fc.exists(clusterRoleGVR, "", "opm-cli-user"))
 }

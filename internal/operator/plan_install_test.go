@@ -75,11 +75,7 @@ func TestLooksLikeOperatorTag(t *testing.T) {
 }
 
 // operatorRecord is the operator instance's record as a fixture.
-func operatorRecord(owner string, values map[string]any, entries ...map[string]any) *unstructured.Unstructured {
-	inv := make([]any, len(entries))
-	for i, e := range entries {
-		inv[i] = e
-	}
+func operatorRecord(owner string, values map[string]any) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "opmodel.dev/v1alpha1",
 		"kind":       "ModuleInstance",
@@ -90,7 +86,7 @@ func operatorRecord(owner string, values map[string]any, entries ...map[string]a
 		},
 		"status": map[string]any{
 			"instanceUUID": testInstanceUUID,
-			"inventory":    map[string]any{"revision": int64(1), "count": int64(len(inv)), "entries": inv},
+			"inventory":    map[string]any{"revision": int64(1), "count": int64(0), "entries": []any{}},
 		},
 	}}
 	if values != nil {
