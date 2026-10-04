@@ -4,7 +4,7 @@
 
 **Reason**: Its scenario "Kubernetes API error" said any unexpected API error during resource discovery exits 1. A failed read of one tracked resource is now an `Unknown` row and exits 2 (mod-status, "Status lists unreadable tracked resources as Unknown"). The requirement is re-added below as "Status exits with code 1 when the check cannot run", scoped to flags, configuration and the `ModuleInstance` record read.
 
-**Migration**: A pipeline that treated exit 1 as "a tracked resource could not be read" now sees exit 2 for that case and reads the warning for the cause. Exit 1 still means the status check could not run.
+**Migration**: A tracked resource whose read failed was dropped silently, so status exited 0 (or 5 if nothing else was readable); the old spec promised 1, which the code never did. It now exits 2 with a warning naming the resource and the error, so a status gate that passed may now fail. Exit 1 still means the status check could not run.
 
 ### Requirement: Status preserves existing connectivity exit codes
 
