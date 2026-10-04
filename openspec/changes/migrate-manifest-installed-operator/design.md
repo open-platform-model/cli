@@ -67,7 +67,7 @@ opm operator install                                  (internal/cmd/operator/ins
        GET every proof-list entry and every rendered object
        -> *MigrationPlan{Adopt, Ours, MoveOwnership, RecreateDeployment,
                          DeleteBindings, LeftInPlace}
-       -> or *MigrationRefusal naming every object that blocks it
+       -> or *MigrationRefusalError naming every object that blocks it
     PreApplyExistenceCheck(..., plan.Migration.Admit())
        only when rec == nil                            (install-operator-from-module guard)
   Install, writes:                                    (internal/operator/install.go)
@@ -118,15 +118,15 @@ The list closes once operator releases stop attaching `install.yaml` (opm-operat
 ### Proof
 
 ```go
-// internal/operator/migration/proof.go
+// internal/operator/migration_proof.go
 type Verdict int // Absent, Proven, Ours, Unproven
 
-func Prove(live *unstructured.Unstructured, want LegacyObject, instanceUUID string) (Verdict, string /* reason */)
+func ProveLegacy(live *unstructured.Unstructured, want LegacyObject, instanceUUID string) (verdict Verdict, reason string)
 ```
 
 - `Absent` on NotFound.
 - `Ours` when `module-instance.opmodel.dev/uuid` equals the operator instance's UUID.
-- `Unproven` when any identity label is set to anything else, or when a listed label is missing or differs.
+- `Unproven` when any identity label is set to anything else, when a listed label is missing or differs, or, for the Deployment, when its `spec.selector.matchLabels` differs from the listed selector.
 - An object with no listed labels, such as the CRDs, is proven by kind, name and the absence of an identity.
 - A GET error other than NotFound refuses; it is never skipped. This is unlike `PreApplyExistenceCheck`, which skips. The migration cannot prove what it cannot read.
 

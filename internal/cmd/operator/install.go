@@ -333,10 +333,11 @@ func installError(err error) error {
 			err, oplib.OperatorModulePath)}
 	}
 	var (
-		ownedErr *oplib.OwnedRecordError
-		guardErr *oplib.GuardError
+		ownedErr     *oplib.OwnedRecordError
+		guardErr     *oplib.GuardError
+		migrationErr *oplib.MigrationRefusalError
 	)
-	if oplib.IsRefusal(err) || errors.As(err, &ownedErr) || errors.As(err, &guardErr) {
+	if oplib.IsRefusal(err) || errors.As(err, &ownedErr) || errors.As(err, &guardErr) || errors.As(err, &migrationErr) {
 		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err}
 	}
 	var rolloutErr *oplib.RolloutError

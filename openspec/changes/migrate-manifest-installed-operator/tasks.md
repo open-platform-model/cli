@@ -26,7 +26,7 @@ One PR, titled with the highest class among the section commits. The release cou
 
 ## 3. Proof and plan, refusing in the check phase
 
-- [ ] 3.1 Add `internal/operator/migration/proof.go`: `Prove(live, want, instanceUUID)` returns `Absent`, `Proven`, `Ours` or `Unproven` with a reason. Add table tests for:
+- [x] 3.1 Add `internal/operator/migration_proof.go` (package `operator`, see design.md "Flow"): `ProveLegacy(live, want, instanceUUID)` returns `Absent`, `Proven`, `Ours` or `Unproven` with a reason. Add table tests for:
   - a proven object;
   - an added label (still proven);
   - a CRD with no listed labels;
@@ -34,7 +34,7 @@ One PR, titled with the highest class among the section commits. The release cou
   - this instance's identity (`Ours`), including an object an operator module release's `install.yaml` created (the spec scenario "A module release's manifest is not a source of the list");
   - another instance's identity;
   - a partial identity
-- [ ] 3.2 Add `internal/operator/migration/plan.go`. `Plan(ctx, client, rendered, instance)` GETs every list entry and every rendered object and returns either a plan or a `RefusalError` naming every object that blocks it. The plan holds:
+- [x] 3.2 Add `internal/operator/migration_plan.go`. `PlanMigration(ctx, client, rendered, instanceUUID, crdsOnly)` GETs every list entry and every rendered object and returns either a plan or a `RefusalError` naming every object that blocks it. The plan holds:
   - `Adopt`: proven and rendered;
   - `Ours`: rendered and carrying this instance's identity;
   - `MoveOwnership`: objects in `Adopt` or `Ours` with a `kubectl-client-side-apply` manager;
@@ -42,7 +42,7 @@ One PR, titled with the highest class among the section commits. The release cou
   - `DeleteBindings`: the proven superseded bindings, each with the rendered binding of the same kind and namespace whose `roleRef` equals the live one;
   - `LeftInPlace`: proven, not rendered, and not a binding.
 
-  The objects that block the plan, all named in one `RefusalError` (exit 2): an `Unproven` list entry that is rendered, is the Deployment, or is a superseded binding; and a proven superseded binding with no replacement in the render. An `Unproven` list entry outside those sets is neither refused nor reported. A GET error other than NotFound refuses with the exit code `cmdutil.ExitCodeFromK8sError` gives (4 on Forbidden or Unauthorized). Fake dynamic client tests:
+  The objects that block the plan, all named in one `MigrationRefusalError` (exit 2): an `Unproven` list entry that is rendered, is the Deployment, or is a superseded binding; and a proven superseded binding with no replacement in the render. An `Unproven` list entry outside those sets is neither refused nor reported. A GET error other than NotFound refuses with the exit code `cmdutil.ExitCodeFromK8sError` gives (4 on Forbidden or Unauthorized). Fake dynamic client tests:
   - a fresh cluster gives an empty plan;
   - an opm-cli origin;
   - a client-side origin;
@@ -53,13 +53,13 @@ One PR, titled with the highest class among the section commits. The release cou
   - an unproven leftover ClusterRole that does not refuse;
   - an unreadable entry, with Forbidden and Unauthorized both exit 4;
   - a resumed run with the Deployment and one binding gone
-- [ ] 3.3 Call `Plan` in the proof slot of the install check phase found in 1.2: after the other refusing checks and the terminating wait, immediately before the check-phase `inventory.PreApplyExistenceCheck` call, so the proof runs before the guard. If the merged flow does not place the guard last, with only the proof slot between it and the checks before it, in the full flow and in the `--crds-only` flow alike, stop and report to the supervisor. Return the plan's refusal there. The plan is not executed and nothing is admitted yet, so a manifest-installed cluster with every object proven is still refused by the guard as before; one with an unproven object is now refused by the proof, naming every blocking object. Test with a fake client that fails the test on any write verb (create, update, patch, delete, apply) that a refusal sends no write
-- [ ] 3.4 `task fmt`, `task lint`, `task test` and `task openspec:check` green, then commit `feat(operator): prove the objects of an earlier operator manifest before install writes`
+- [x] 3.3 Call `PlanMigration` in the proof slot of the install check phase found in 1.2: after the other refusing checks and the terminating wait, immediately before the check-phase `inventory.PreApplyExistenceCheck` call, so the proof runs before the guard. If the merged flow does not place the guard last, with only the proof slot between it and the checks before it, in the full flow and in the `--crds-only` flow alike, stop and report to the supervisor. Return the plan's refusal there. The plan is not executed and nothing is admitted yet, so a manifest-installed cluster with every object proven is still refused by the guard as before; one with an unproven object is now refused by the proof, naming every blocking object. Test with a fake client that fails the test on any write verb (create, update, patch, delete, apply) that a refusal sends no write
+- [x] 3.4 `task fmt`, `task lint`, `task test` and `task openspec:check` green, then commit `feat(operator): prove the objects of an earlier operator manifest before install writes`
 
 ## 4. Execute the migration and admit the proven objects
 
 - [ ] 4.1 Add the comparable key `K8sIdentity{Group, Kind, Namespace, Name}` beside `K8sIdentityEqual` in `pkg/inventory/entry.go`, and `AdmitSet map[K8sIdentity]struct{}`. In `internal/inventory/stale.go`, `PreApplyExistenceCheck` takes an `AdmitSet`. An admitted entry passes the managed-by test only; a terminating admitted entry is still refused. Every existing caller passes `nil`. `apply.Request` carries the set to `RunPreApplyExistenceCheck`. Tests: an admitted kustomize-labelled object passes, an admitted terminating object is refused, an unadmitted one is refused, and `nil` keeps today's behaviour
-- [ ] 4.2 Add `internal/operator/migration/execute.go` with two functions:
+- [ ] 4.2 Add `internal/operator/migration_execute.go` with two functions:
   - `MoveOwnership(ctx, client, plan)` sends the ownership patches;
   - `Delete(ctx, client, plan, budget)` deletes the Deployment with foreground propagation and waits with `kubernetes.WaitAbsent`, then deletes `DeleteBindings`.
 
