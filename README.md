@@ -152,7 +152,7 @@ Use `opm operator` to put the opm-operator (and its CRDs) onto a cluster — a p
 - **Install needs a registry.** The module is pulled from the configured registry (`--registry`, `OPM_REGISTRY` or the config file). An air-gapped cluster installs from a mirror that serves the module and its dependencies.
 - **`--version` takes an operator module version**, not an opm-operator release tag: `--version 0.2.0` pins, `--version v0` floats. Without it, install uses the module version this CLI pins. Install prints the operator release the module deploys.
 - **Settings are instance values, not Deployment patches.** `-f/--values` files are layered over the values recorded on the operator's instance, so a reinstall keeps every recorded value it does not change; `--reset-values` starts from the module's defaults. The module's `#config` holds `registry` (the operator's own `--registry` mapping), `image.repository` (for a mirror), `defaultServiceAccount`, `resources`, `replicas` and `extraArgs`.
-- **Uninstall deletes what the instance recorded**, except the CRDs and the Namespace, then the record. An operator with no record (applied with kubectl, or by an older CLI) is refused; install it with this CLI first.
+- **Uninstall deletes what the instance recorded**, except the CRDs and the Namespace, then the record. An operator with no record, applied with kubectl or by an older CLI, is refused. Install it with this CLI first; over an operator an older CLI applied from its manifest, that install also refuses until a later CLI release migrates such clusters.
 
 | Command | Description |
 |---------|-------------|
