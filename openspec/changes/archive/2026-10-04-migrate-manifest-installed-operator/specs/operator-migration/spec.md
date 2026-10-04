@@ -36,6 +36,7 @@ An existing object SHALL be proven to come from an earlier operator release only
 - its kind, namespace and name match an entry of the proof list;
 - its labels include every label that entry lists (added labels do not disprove it);
 - it carries none of the OPM instance identity labels (`module-instance.opmodel.dev/uuid`, `module-instance.opmodel.dev/name`, `module-instance.opmodel.dev/namespace`).
+- it carries no mark of another tool that keeps applying it: no Flux tracking label (`kustomize.toolkit.fluxcd.io/name`, `helm.toolkit.fluxcd.io/name`), no Argo CD tracking label or annotation (`argocd.argoproj.io/instance`, `argocd.argoproj.io/tracking-id`), no Flux or Argo CD field manager, and no server-side apply by a field manager other than `opm-cli` or `kubectl`.
 
 An object that already carries the operator instance's own identity, as after an interrupted migration or a `kubectl apply` of a manifest rendered from the module, SHALL NOT need proof, because it is not foreign. An object that carries another instance's identity SHALL NOT be proven. An object that the CLI cannot read SHALL NOT be proven.
 
@@ -53,6 +54,11 @@ An object that already carries the operator instance's own identity, as after an
 
 - **WHEN** an object on the proof list carries the `module-instance.opmodel.dev/uuid` of an instance other than the operator's
 - **THEN** it is not proven, and install refuses before any object changes, naming the object and the instance whose identity it carries
+
+#### Scenario: Object a GitOps tool applies disproves the object
+
+- **WHEN** `Deployment opm-operator-system/opm-operator-controller-manager` carries the earlier manifest's labels and selector and the label `kustomize.toolkit.fluxcd.io/name`
+- **THEN** it is not proven, and install refuses before any object changes, naming Flux and saying to suspend its reconciliation of the operator first
 
 #### Scenario: Unreadable object refuses the install
 
@@ -101,7 +107,7 @@ After a full install, a label or annotation on a rendered object that an earlier
 
 #### Scenario: Fields of another manager are left alone
 
-- **WHEN** an adopted object holds a label owned by a field manager other than `kubectl-client-side-apply` and `opm-cli`
+- **WHEN** an adopted object holds a label that a field manager other than `kubectl-client-side-apply` and `opm-cli` owns through an update, such as `kubectl label`
 - **THEN** after install that label and its manager's ownership are unchanged
 
 #### Scenario: Earlier labels are dropped after an opm-cli install
@@ -111,12 +117,17 @@ After a full install, a label or annotation on a rendered object that an earlier
 
 ### Requirement: Install recreates the earlier Deployment once
 
-When the operator's Deployment exists, is proven, and carries the selector of an earlier manifest, install SHALL delete it and wait until it is gone before the instance apply, so that the instance creates it with the module's selector. Install SHALL NOT delete a Deployment that carries the operator instance's identity or the module's selector. As a result, no install between module versions, and no install over a manifest rendered from the module, deletes the Deployment. The migration SHALL NOT touch the workloads of the instances that the operator manages. Source: 0012:D8:R7.
+When the operator's Deployment exists, is proven, and carries the selector of an earlier manifest, install SHALL delete it and wait until it is gone before the instance apply, so that the instance creates it with the module's selector. Install SHALL NOT delete a Deployment that carries the operator instance's identity or the module's selector. When the operator's Deployment exists and is proven but the module renders no Deployment of that name, install SHALL refuse before any object changes, because the earlier controller would keep running beside the module's. As a result, no install between module versions, and no install over a manifest rendered from the module, deletes the Deployment. The migration SHALL NOT touch the workloads of the instances that the operator manages. Source: 0012:D8:R7.
 
 #### Scenario: Earlier Deployment is recreated
 
 - **WHEN** install migrates an operator installed from the v1.0.0-beta.5 manifest
 - **THEN** the Deployment `opm-operator-controller-manager` is deleted and created again with the module's selector, and install reports it as recreated
+
+#### Scenario: Earlier Deployment the module does not render refuses the install
+
+- **WHEN** the earlier manifest's Deployment is proven and the module version being installed renders no `Deployment opm-operator-system/opm-operator-controller-manager`
+- **THEN** install refuses before any object changes, naming the Deployment
 
 #### Scenario: Re-running install after the migration recreates nothing
 
