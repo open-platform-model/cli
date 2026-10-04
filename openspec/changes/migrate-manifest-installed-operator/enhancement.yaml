@@ -1,0 +1,14 @@
+# Enhancement declaration, read by `task enhancements:delivery:log` at archive time.
+# See enhancements/schema.cue #ChangeDeclaration.
+#
+# This change carries all of 0028:D8 (live requirements R2, R4 to R14): the
+# first module install migrates an operator installed from an earlier
+# release's manifest. It admits the proven objects through the CLI's current
+# managed-by guard, because the 0012:D8 adopt annotation is not implemented in
+# any frontend yet (0028 06-operational.md, "The migration does not wait for
+# the adopt annotation"); the observable rule, 0028:D8:R8, is the same.
+# 0028 is a draft on enhancements PR 93 at proposal time.
+implements:
+  - enhancement: "0028"
+    decisions: [D8]
+    resolves: []
