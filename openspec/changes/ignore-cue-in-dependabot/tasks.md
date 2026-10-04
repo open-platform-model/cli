@@ -4,6 +4,7 @@
 - [x] 1.2 Check the file: it parses as YAML (`yq` or `python3 -c 'import yaml,sys; yaml.safe_load(open(sys.argv[1]))' .github/dependabot.yml`), and `git diff` shows only the added comment and ignore entry.
 - [x] 1.3 `task lint` and `task openspec:check` green (no Go code changes, so the unit tests are not affected), then commit `ci(dependabot): leave cuelang.org/go to library releases`.
 - [x] 1.4 Run the opsx:verify skill for ignore-cue-in-dependabot and report the result to the supervisor.
+- [x] 1.5 After the supervisor's triage (extending j4), also ignore `cuelabs.dev/go/oci/ociregistry` in the same `ignore:` list, with a comment saying it moves with CUE; recheck the YAML.
 
 ## 2. Archive (rides this PR)
 

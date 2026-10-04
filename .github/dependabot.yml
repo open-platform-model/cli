@@ -32,7 +32,10 @@ updates:
       # the CUE check; it reaches the cli through the cascade's library bump,
       # whose go get raises cuelang.org/go by minimal version selection (owner
       # decision j4, 2026-10-03; workspace RELEASING.md, section "Pin classes").
+      # cuelabs.dev/go/oci/ociregistry is the CUE team's OCI module, whose
+      # version cuelang.org/go pins, so it moves with CUE.
       - dependency-name: "cuelang.org/go"
+      - dependency-name: "cuelabs.dev/go/oci/ociregistry"
     commit-message:
       # pr-title.yml does not accept "deps" as a type, so third-party Go bumps
       # land as "build(deps)", a hidden type that cuts no release.

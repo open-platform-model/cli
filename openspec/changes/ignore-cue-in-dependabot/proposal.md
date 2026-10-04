@@ -8,7 +8,7 @@ At origin/main (`5180cad1`) `.github/dependabot.yml` ignores only `github.com/op
 
 ## What Changes
 
-- `.github/dependabot.yml`: the `gomod` update also ignores `cuelang.org/go`, with a comment in the same style as the existing `github.com/open-platform-model/*` ignore. The comment says that CUE moves only through a library release and reaches the cli through the cascade's library bump, whose `go get` of the library raises `cuelang.org/go` by minimal version selection (kept by `go mod tidy`).
+- `.github/dependabot.yml`: the `gomod` update also ignores `cuelang.org/go`, with a comment in the same style as the existing `github.com/open-platform-model/*` ignore. The comment says that CUE moves only through a library release and reaches the cli through the cascade's library bump, whose `go get` of the library raises `cuelang.org/go` by minimal version selection (kept by `go mod tidy`). The same entry list also ignores `cuelabs.dev/go/oci/ociregistry` (a direct require at `go.mod:6`), the CUE team's OCI module whose version `cuelang.org/go` pins; a standalone bump of it would skip the library's CUE check the same way (supervisor triage of the plan, extending j4).
 - Main spec `repo-automation`: one ADDED requirement, "Dependabot leaves cuelang.org/go to library releases", and one MODIFIED requirement, "Dependabot leaves OPM Go modules to the release cascade", whose sentence about other Go modules now excepts `cuelang.org/go` (both scenarios kept). The archive commit also updates the spec's Purpose line to name `cuelang.org/go`.
 
 Not in this change:
@@ -26,10 +26,11 @@ None.
 
 ### Modified Capabilities
 
-- `repo-automation`: Dependabot also leaves `cuelang.org/go` alone.
+- `repo-automation`: Dependabot also leaves `cuelang.org/go` and `cuelabs.dev/go/oci/ociregistry` alone.
 
 ## Impact
 
+- Dependabot security updates for both ignored modules are suppressed too: a CUE security fix reaches the cli through a library release and the cascade, or a hand-made `fix(deps)` library bump.
 - Files: `.github/dependabot.yml` only. No Go code, command, flag or output changes.
 - Release class: `ci`. No release is cut; SemVer impact none (after GA as well).
 - Open pull requests: none of the open Dependabot pull requests (cli#208, #222, #251, #252, #273) moves `cuelang.org/go`, so none is closed by this change.
