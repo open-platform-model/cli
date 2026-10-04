@@ -128,40 +128,6 @@ Source: workspace RELEASING.md, section "The cascade", "The receiver" ("Version 
 - **WHEN** a first run advanced the podinfo fixture and its consumers, the result is committed, and a second run against the same base moves the consumers' catalog
 - **THEN** the second run exits 0, the consumers carry the new catalog and core, and their podinfo pin is the fixture's new version
 
-### Requirement: The cascade task leaves non-cascade files alone and reports risks as warnings
-
-`task deps:cascade` SHALL NOT edit any of these:
-
-- `.cascade-frozen` or `.cascade-hold`;
-- `release-please-config.json`, `.release-please-manifest.json` or `CHANGELOG.md`;
-- anything under `.github/`;
-- `.opm-docs-version` or `docs-kit.cue`;
-- any `language.version`;
-- `hack/fixtures.sh` or `tests/fixtures/fixtures.go`.
-
-It SHALL NOT publish, seed a real registry or push.
-
-It SHALL append a warning to the cascade warnings file, without failing, in each of these cases:
-
-- a CUE upstream that differs from the merge base declares a `language.version` newer than the `cue` version `.github/workflows/pr.yml` installs;
-- when library or the operator differs from the merge base, a docs bundle that `hack/docskit-dump pins` reports for the final tree is not published, including on a run that moves nothing (exit 3) under `ghcr.io/open-platform-model/docs`;
-- a new major of a pinned upstream is available.
-
-#### Scenario: An unpublished docs bundle is a warning
-
-- **WHEN** library moves to a version whose docs bundle is not published
-- **THEN** the pin still moves, and the warnings name the project and the version and say G1 will fail the next release PR until the bundle exists
-
-#### Scenario: The docs-bundle warning survives a run that moves nothing
-
-- **WHEN** a human commit on the branch moved library against the merge base, its docs bundle is not published, and a later run moves nothing
-- **THEN** the task exits 3 and the warnings file still holds the docs-bundle warning
-
-#### Scenario: Release and settings files are untouched
-
-- **WHEN** a run moves every pin
-- **THEN** the changed paths include nothing under `.github/`, no release-please file, no `CHANGELOG.md`, no `.cascade-*` file and no `.opm-docs-version`
-
 ### Requirement: Title and body tasks describe the cascade diff
 
 `task -x deps:cascade:title` SHALL print the shared resolver's one-line title for the diff against `CASCADE_BASE` (default `origin/main`). It SHALL use the path-class map `.tasks/cascade/classes`, which classes these paths as `test` and everything else as `shipped`:
@@ -226,3 +192,36 @@ The offline set SHALL run as a step of the `Lint` job in `.github/workflows/pr.y
 
 - **WHEN** `task -x deps:cascade:test` finishes, pass or fail
 - **THEN** `git status --porcelain` in the checkout is what it was before the run
+
+### Requirement: The cascade task leaves non-cascade files alone and runs no dependency code
+
+`task deps:cascade` SHALL NOT edit any of these:
+
+- `.cascade-frozen` or `.cascade-hold`;
+- `release-please-config.json`, `.release-please-manifest.json` or `CHANGELOG.md`;
+- anything under `.github/`;
+- `.opm-docs-version` or `docs-kit.cue`;
+- any `language.version`;
+- `hack/fixtures.sh` or `tests/fixtures/fixtures.go`.
+
+It SHALL NOT publish, seed a real registry or push. It SHALL NOT build or run a program that links a moved Go dependency: the only Go program it runs is the `opm` it builds from the unmodified tree before any pin moves.
+
+It SHALL append a warning to the cascade warnings file, without failing, in each of these cases:
+
+- a CUE upstream that differs from the merge base declares a `language.version` newer than the `cue` version `.github/workflows/pr.yml` installs;
+- a new major of a pinned upstream is available.
+
+#### Scenario: Release and settings files stay untouched by a full run
+
+- **WHEN** a run moves every pin
+- **THEN** the changed paths include nothing under `.github/`, no release-please file, no `CHANGELOG.md`, no `.cascade-*` file and no `.opm-docs-version`
+
+#### Scenario: A library move runs no library code
+
+- **WHEN** a run moves library to a newer version
+- **THEN** the task runs `go get` and `go mod tidy` for it and does not run `hack/docskit-dump` or any other program built from the moved tree
+
+#### Scenario: A newer language version is a warning
+
+- **WHEN** a moved catalog declares a `language.version` newer than the `cue` that `pr.yml` installs
+- **THEN** the pin still moves, and the warnings file names the module, its version and the two language versions
