@@ -155,6 +155,7 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
 - [x] 4.10 Close the coverage gaps the verify pass found: S10 (`CASCADE_ALLOW_DIRTY` snapshot and the `CASCADE_EXPECT` hint) and S11 (never lower a human-set version) in the offline set, and a `classify` check of `classes` beside S5 (design.md D10). Gates as in 4.9, then commit `ci(cascade): test the dirty-tree snapshot, the expect hint and the never-lower rule`.
   Done: all PASS; turning the never-lower rule back into "write when it differs" makes S11 fail.
 - [x] 4.11 S2 also checks the `language.version` warning (D8) and that a resolver warning reaches the warnings file. Then commit `ci(cascade): name the language version in the cascade warning`.
+  Done: the new check found a bug: the warning named the `semver-cmp` answer (`1`) instead of the language version, because the comparison overwrote the resolver output. Fixed; full set all PASS.
 
 - [x] 4.12 Apply the Phase 2 implementation review and the contract v1.1 clarifications C4 to C8:
   - C4 and review finding 4: `cascade-task.yml` checks the cli out at `repo`, with `org-github` beside it;
@@ -164,7 +165,9 @@ Every check runs in scratch copies under `$(git rev-parse --git-dir)/cascade-spi
   - finding 3: the `language.version` and docs-bundle warnings compare against the merge base (S13);
   - nits 5 and 6: `cue` and `opm` only when needed, and a frozen unpublished podinfo stops the task in phase A (S14).
   C5 already held (`test.sh` passes `CASCADE_STUB_TABLE` to its `semver-cmp` call); C6 already held (the offline step is in `Lint`). Gates as in 4.9.
-  Done: the new check found a bug: the warning named the `semver-cmp` answer (`1`) instead of the language version, because the comparison overwrote the resolver output. Fixed; full set all PASS.
+  Done: offline set (no resolver, no cue) and full set all PASS; S12 fails under the old kind rule.
+- [x] 4.13 Apply the Phase 2 re-review: the docs-bundle check runs on the exit-3 path too (finding 1; S15 in the full set, since it builds `hack/docskit-dump`), and 4.11 and 4.12 each carry their own result line (finding 2). Gates as in 4.9.
+  Done: offline and full sets all PASS; S15 fails when the check runs only after the edits.
 
 ## 5. Archive (rides this PR)
 

@@ -292,7 +292,7 @@ The cli sets no `CUE_VERSION` env. Its required PR CI installs `cuelang.org/go/c
 
 This follows contract §6.4 step 6 and §9.5. When library or the operator differs from the merge base after this run (not only when this run moved it, since the warnings file starts empty on every run and the PR body lists every pin moved against the base):
 
-- The task runs `go run ./hack/docskit-dump pins` on the edited tree. It prints JSON whose `.pins` maps `library`, `core` and `opm-operator` to bare versions (`hack/docskit-dump/main.go:54-78`).
+- The task runs `go run ./hack/docskit-dump pins` on the final tree. It runs on both the exit-0 and the exit-3 path, just before the result: on exit 3 the working tree already is the final tree, so a run that moves nothing after a human commit moved library or the operator still writes the warning (Phase 2 re-review, finding 1; test S15). It prints JSON whose `.pins` maps `library`, `core` and `opm-operator` to bare versions (`hack/docskit-dump/main.go:54-78`).
 - For each entry it calls `published oci open-platform-model/docs/<project> <pin>`.
 - Any exit other than 0 or 3 ends the task with that code (phase C, so the tree may be partly edited; contract §5.2 rule 5).
 - On exit 3 it warns: "docs bundle for `<project>` `<pin>` is not published; G1 will fail the next release PR until it is".
@@ -364,7 +364,7 @@ These calls decide no target, so they run in phase C.
 - **S10, allowed dirty tree and expect hint** (offline, added at verify). An untracked file with `CASCADE_ALLOW_DIRTY=1`: exit 3 by snapshot, and the file stays. `CASCADE_EXPECT` naming library and an unrelated key: only the library `newest` call carries `--expect`.
 - **S11, never lower** (offline, added at verify). A commit after the base sets `templates/minimal` to `1.99.0`: exit 3, the version stays, and the "above the cascade target" warning (D6).
 - **S5 also checks the path-class map** through the real resolver's `classify`: the test-class paths of every pattern in `classes`, and three shipped paths.
-- **Sets.** `CASCADE_TEST_SET=offline` runs the pre-checks plus S1, S3, S6, S7, S8, S10, S11, S12 (a kind catalog ahead of `hack/platform` stays), S13 (a `language.version` warning for a pin a human commit moved, on a run that moves nothing) and S14 (a frozen unpublished podinfo in a moving consumer stops the task in phase A). `all` (the default) adds S2, S4, S5 and S9.
+- **Sets.** `CASCADE_TEST_SET=offline` runs the pre-checks plus S1, S3, S6, S7, S8, S10, S11, S12 (a kind catalog ahead of `hack/platform` stays), S13 (a `language.version` warning for a pin a human commit moved, on a run that moves nothing) and S14 (a frozen unpublished podinfo in a moving consumer stops the task in phase A). `all` (the default) adds S2, S4, S5, S9 and S15 (a docs-bundle warning for a library a human commit moved, on a run that moves nothing; it builds `hack/docskit-dump`, so it needs the Go module graph).
 
 ### D11: CI placement
 
