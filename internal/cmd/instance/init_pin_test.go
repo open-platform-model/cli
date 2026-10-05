@@ -3,6 +3,7 @@ package instance
 import (
 	"context"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -53,7 +54,7 @@ func TestAcquireModule_Pinned(t *testing.T) {
 
 // TestInitWrite_Pinned pins init's exit code when the staged package's
 // dependency closure does not resolve: no response exits 3, a dependency the
-// registry does not hold exits 1.
+// registry does not hold exits 1, and nothing is left behind either way.
 func TestInitWrite_Pinned(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -71,9 +72,13 @@ func TestInitWrite_Pinned(t *testing.T) {
 				instinit.InstanceFile: []byte("package instance\n\nimport d \"" + tc.imp + "\"\n\nv: d.version\n"),
 				instinit.ValuesFile:   []byte("package instance\n"),
 			}
-			err := instinit.Write(context.Background(), filepath.Join(t.TempDir(), "web"), files, tc.registry(t))
+			parent := t.TempDir()
+			err := instinit.Write(context.Background(), filepath.Join(parent, "web"), files, tc.registry(t))
 			require.Error(t, err)
 			assert.Equal(t, tc.want, initExitCode(t, initError(err)), "%v", err)
+			left, readErr := os.ReadDir(parent)
+			require.NoError(t, readErr)
+			assert.Empty(t, left, "nothing may remain at the target path or beside it")
 		})
 	}
 }
