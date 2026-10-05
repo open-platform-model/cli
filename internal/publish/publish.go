@@ -148,6 +148,10 @@ type Plan struct {
 	Kind Kind
 	Dir  string
 
+	// ModuleName is the authored metadata.name, set by VetChecks when it is a
+	// concrete string (empty otherwise) for vet's log prefix.
+	ModuleName string
+
 	// DeclaredPath is the artifact's own identity ModulePath — the complete
 	// CUE module path including the major (read, never composed).
 	DeclaredPath string

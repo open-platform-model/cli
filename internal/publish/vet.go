@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
+
+	"github.com/open-platform-model/library/opm/module"
 )
 
 // VetChecks runs the subset of the publish gates `opm module vet` shares with
@@ -15,31 +17,37 @@ import (
 // not enforced — an open Version is a valid authoring state; publish is where
 // it must be filled.
 //
-// Returns the plan (check failures accumulate as refusals), and the loaded
-// module root value so the caller can continue into values validation without
-// a second load. A root that does not load is returned as an error — the
-// existing vet load-failure class — while a missing or broken identity
-// package is a check refusal.
-func VetChecks(ctx context.Context, opts Options) (*Plan, cue.Value, error) {
+// Returns the plan (check failures accumulate as refusals), and a module over
+// the loaded root so the caller can continue into values validation without a
+// second load. The module wraps the root as loaded here, in the caller's CUE
+// runtime: it is not a kernel-acquired module, and its Metadata is nil when an
+// open identity field (an authoring state vet allows) keeps the metadata from
+// decoding. The plan's ModuleName carries the authored metadata.name either
+// way. A root that does not load is returned as an error — the existing vet
+// load-failure class — while a missing or broken identity package is a check
+// refusal. The module is nil wherever no root loaded.
+func VetChecks(ctx context.Context, opts Options) (*Plan, *module.Module, error) {
 	if err := opts.requireInputs(); err != nil {
-		return nil, cue.Value{}, err
+		return nil, nil, err
 	}
 	absDir, err := statArtifactDir(opts.Dir)
 	if err != nil {
-		return nil, cue.Value{}, err
+		return nil, nil, err
 	}
 
 	p := &Plan{Kind: opts.Kind, Dir: absDir}
 
 	if !hasCueMod(absDir) {
 		p.refuse(noCueModRefusal(opts, absDir))
-		return p, cue.Value{}, nil
+		return p, nil, nil
 	}
 
 	root, pkgName, pkgPos, refusal := loadPackage(opts, absDir, ".")
 	if refusal != nil {
-		return nil, cue.Value{}, fmt.Errorf("loading module package from %s: %w", absDir, refusal.Err)
+		return nil, nil, fmt.Errorf("loading module package from %s: %w", absDir, refusal.Err)
 	}
+	mod := vettedModule(root)
+	p.ModuleName = authoredName(root)
 	a := &artifact{dir: absDir, root: root, rootPkgName: pkgName, rootPkgPos: pkgPos}
 
 	identity, _, _, refusal := loadPackage(opts, absDir, "./identity")
@@ -48,13 +56,13 @@ func VetChecks(ctx context.Context, opts Options) (*Plan, cue.Value, error) {
 			Headline: "the module's identity package does not load, so its identity cannot be checked",
 			Err:      refusal.Err,
 		})
-		return p, root, nil
+		return p, mod, nil
 	}
 	a.identity = identity
 
 	if err := a.readCueMod(opts.Context); err != nil {
 		p.refuse(Refusal{Headline: "cue.mod/module.cue cannot be read", Err: err})
-		return p, root, nil //nolint:nilerr // the read failure IS the refusal; the plan carries it
+		return p, mod, nil //nolint:nilerr // the read failure IS the refusal; the plan carries it
 	}
 	p.CueModPath, p.CueModPos = a.cueModPath, a.cueModPos
 
@@ -79,5 +87,27 @@ func VetChecks(ctx context.Context, opts Options) (*Plan, cue.Value, error) {
 	gateDerivation(p, a)
 	gateKernelLoad(ctx, p, opts)
 
-	return p, root, nil
+	return p, mod, nil
+}
+
+// vettedModule wraps the loaded root as a module. An open identity field
+// leaves the metadata undecodable; the package is still what vet validates,
+// so the module then carries the package with nil Metadata.
+func vettedModule(root cue.Value) *module.Module {
+	mod, err := module.NewModuleFromValue(root)
+	if err != nil {
+		return &module.Module{Package: root}
+	}
+	return mod
+}
+
+// authoredName is the root's metadata.name when it is a concrete string, else
+// "". It is read from the authored tree, so it survives an open version that
+// keeps the module's metadata from decoding as a whole.
+func authoredName(root cue.Value) string {
+	name, err := root.LookupPath(cue.ParsePath("metadata.name")).String()
+	if err != nil {
+		return ""
+	}
+	return name
 }
