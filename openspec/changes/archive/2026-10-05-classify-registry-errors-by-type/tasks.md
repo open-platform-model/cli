@@ -36,5 +36,5 @@ The cascade's identical bump (cli#322) merged to main afterwards; merging main l
 
 ## 4. Archive (after review, rides the PR)
 
-- [ ] 4.1 `openspec archive classify-registry-errors-by-type --yes`. Verify: the `catalog-registry-check` main spec's first requirement lists "5 not published", and the three main specs carry the new scenarios.
-- [ ] 4.2 `task openspec:check` green, then commit `chore(openspec): archive classify-registry-errors-by-type`.
+- [x] 4.1 `openspec archive classify-registry-errors-by-type --yes`. Verify: the `catalog-registry-check` main spec's first requirement lists "5 not published", and the three main specs carry the new scenarios.
+- [x] 4.2 `task openspec:check` green, then commit `chore(openspec): archive classify-registry-errors-by-type`.
