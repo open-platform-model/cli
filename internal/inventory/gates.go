@@ -109,13 +109,13 @@ func GateControllerVersionCeiling(ctx context.Context, client *kubernetes.Client
 		return nil
 	}
 
-	normalizedOp := ensureVPrefix(ctrlVersion)
-	if !semver.IsValid(normalizedOp) {
+	normalizedCtrl := ensureVPrefix(ctrlVersion)
+	if !semver.IsValid(normalizedCtrl) {
 		output.Warn("skipping controller-version ceiling check: controllerVersion is not valid semver", "controllerVersion", ctrlVersion)
 		return nil
 	}
 
-	if semver.Compare(semver.MajorMinor(normalizedOp), semver.MajorMinor(normalizedCLI)) > 0 {
+	if semver.Compare(semver.MajorMinor(normalizedCtrl), semver.MajorMinor(normalizedCLI)) > 0 {
 		return fmt.Errorf(
 			"your CLI (%s) is older than the cluster controller (%s) — upgrade the CLI before applying against this cluster",
 			cliVersion, ctrlVersion,
