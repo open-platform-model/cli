@@ -1,0 +1,8 @@
+# Implements part of enhancement 0012 (cli adoption of the Kubernetes tier's
+# health package). Decisions are deliberately not claimed here: 0012:D3 binds
+# the whole tier and both frontends, and this change delivers only the cli's
+# half of one package under 0012:D3:R6. Under-claiming is the safe direction.
+implements:
+  - enhancement: "0012"
+    decisions: []
+    resolves: []
