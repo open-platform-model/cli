@@ -8,16 +8,16 @@
 //	         the build's main module, synthesized and rendered by the kernel.
 //	Path B — the operator's call sequence: AcquireModuleFromRegistry +
 //	         SynthesizeInstance + Render (mirroring KernelModuleRenderer),
-//	         digested with the same inventory.ComputeRenderDigest.
+//	         digested with the library's shared k8sinventory.RenderDigest,
+//	         the digest the CLI workflow computes.
 //
 // Both paths render through Kernel.Render against the same platform module
 // directory (hack/platform/, passed to path A as --platform) with
-// RuntimeName "opm-cli": the
-// runtime identity is stamped into rendered labels
-// (app.kubernetes.io/managed-by), so a cross-actor comparison with different
-// runtime names differs by construction — the per-actor label is the KNOWN
-// delta, load-path equivalence is what this check proves (local staging ≡
-// registry acquisition; 0006:D37/D6).
+// RuntimeName "opm-cli". The shared render digest leaves the runtime's
+// app.kubernetes.io/managed-by value out (0012:D6), so the runtime name
+// would not move it; it is held constant anyway so the two paths differ in
+// nothing but how they load the module. Load-path equivalence is what this
+// check proves (local staging ≡ registry acquisition; 0006:D37/D6).
 //
 // Requires: registry serving testing.opmodel.dev/modules/cli/podinfo@v0 at the
 // fixture's version, the catalogs, and core — SKIPs otherwise unless
@@ -34,11 +34,11 @@ import (
 	"runtime"
 	"time"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	"github.com/open-platform-model/library/opm/k8s/object"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/config"
-	"github.com/open-platform-model/cli/internal/inventory"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
 	"github.com/open-platform-model/cli/tests/fixtures"
 )
@@ -171,7 +171,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("operator-path export: %w", err)
 	}
-	digestB, err := inventory.ComputeRenderDigest(resources)
+	digestB, err := k8sinventory.RenderDigest(resources)
 	if err != nil {
 		return err
 	}

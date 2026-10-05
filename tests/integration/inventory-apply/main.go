@@ -18,6 +18,8 @@ import (
 	"os"
 	"time"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -118,7 +120,7 @@ func main() {
 
 	// Verify stale set is empty.
 	prevEntries := latestEntries
-	stale := inventory.ComputeStaleSet(prevEntries, currentEntries)
+	stale := k8sinventory.StaleSet(prevEntries, currentEntries)
 	if len(stale) != 0 {
 		failf("expected empty stale set on idempotent re-apply, got %d entries", len(stale))
 	}
@@ -146,8 +148,7 @@ func main() {
 	newEntries := entriesFromResources(newResources)
 
 	// Compute stale set from previous [cm-a, cm-b] → current [cm-a, cm-c].
-	stale58 := inventory.ComputeStaleSet(latestEntries, newEntries)
-	stale58 = inventory.ApplyComponentRenameSafetyCheck(stale58, newEntries)
+	stale58 := k8sinventory.StaleSet(latestEntries, newEntries)
 	if len(stale58) != 1 {
 		failf("expected 1 stale entry (cm-b), got %d", len(stale58))
 	}
@@ -219,7 +220,7 @@ func main() {
 		// NOT calling WriteInventory, then verify the inventory is unchanged.
 		invBefore, err := inventory.GetRecord(ctx, client, instanceName, namespace)
 		check("reading inventory to verify no write", err)
-		entriesBefore := make([]inventory.InventoryEntry, len(invBefore.Inventory.Entries))
+		entriesBefore := make([]k8sinventory.Entry, len(invBefore.Inventory.Entries))
 		copy(entriesBefore, invBefore.Inventory.Entries)
 
 		// (We deliberately do not call WriteInventory here — testing the invariant.)
@@ -350,17 +351,17 @@ func failf(format string, args ...interface{}) {
 }
 
 // entriesFromResources builds inventory entries from rendered resources.
-func entriesFromResources(resources []*unstructured.Unstructured) []inventory.InventoryEntry {
-	entries := make([]inventory.InventoryEntry, len(resources))
+func entriesFromResources(resources []*unstructured.Unstructured) []k8sinventory.Entry {
+	entries := make([]k8sinventory.Entry, len(resources))
 	for i, r := range resources {
-		entries[i] = inventory.NewEntryFromResource(r)
+		entries[i] = k8sinventory.NewEntry(r)
 	}
 	return entries
 }
 
 // writeInventoryCR writes the ModuleInstance CR spec and its CLI-owned status
 // subset (the integration-test analog of the apply workflow's record write).
-func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, namespace, instanceID, modulePath, moduleVersion string, revision int, entries []inventory.InventoryEntry) error {
+func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, namespace, instanceID, modulePath, moduleVersion string, revision int, entries []k8sinventory.Entry) error {
 	if _, err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
 		Name:          name,
 		Namespace:     namespace,
@@ -376,7 +377,7 @@ func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, name
 		InstanceUUID: instanceID,
 		Inventory: inventory.Inventory{
 			Revision: revision,
-			Digest:   inventory.ComputeDigest(entries),
+			Digest:   k8sinventory.Digest(entries),
 			Count:    len(entries),
 			Entries:  entries,
 		},

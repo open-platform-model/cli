@@ -3,6 +3,8 @@ package query
 import (
 	"testing"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
@@ -25,10 +27,10 @@ func TestBuildStatusOptions(t *testing.T) {
 	inv := &inventory.Record{
 		Owner:         inventory.OwnerOperator,
 		ModuleVersion: "1.2.3",
-		Inventory:     inventory.Inventory{Entries: []inventory.InventoryEntry{{Kind: "Service", Namespace: "apps", Name: "web", Component: "frontend"}}},
+		Inventory:     inventory.Inventory{Entries: []k8sinventory.Entry{{Kind: "Service", Namespace: "apps", Name: "web", Component: "frontend"}}},
 	}
 	live := []*unstructured.Unstructured{{}}
-	missing := []inventory.InventoryEntry{{Kind: "ConfigMap", Namespace: "apps", Name: "cfg"}}
+	missing := []k8sinventory.Entry{{Kind: "ConfigMap", Namespace: "apps", Name: "cfg"}}
 	opts := BuildStatusOptions("apps", rsf, output.FormatWide, true, inv, live, missing, nil)
 	assert.Equal(t, "apps", opts.Namespace)
 	assert.Equal(t, "1.2.3", opts.Version)

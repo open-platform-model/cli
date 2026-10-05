@@ -6,20 +6,6 @@ Defines how the CLI turns a render's compiled objects into Kubernetes objects: i
 
 ## Requirements
 
-### Requirement: Rendered objects convert through the library's single export
-
-The CLI SHALL convert a render's compiled objects with the library's `opm/k8s/object`: it SHALL wrap them with `object.Resources` and export them with exactly one `object.Export` call per render. The render digest SHALL be computed from the exported JSON and the objects the CLI applies SHALL be the exported objects, so no compiled object is exported from CUE twice. The render digest SHALL keep its algorithm: sort by group (the `apiVersion` up to its last `/`), kind, namespace and name, then hash each object's CUE-export JSON in that order, so the same render yields the same digest it yielded before this conversion. An export failure SHALL exit with the general error code and name the failing resource.
-
-#### Scenario: The digest and the apply objects come from one export
-
-- **WHEN** `opm instance apply` or `opm module apply` renders a module
-- **THEN** the render digest and the objects passed to apply both come from one `object.Export` over the render's compiled objects
-
-#### Scenario: The render digest does not move
-
-- **WHEN** the CLI digests the three-object test set (a Deployment, a Service and a ConfigMap in namespace `ns`)
-- **THEN** the digest equals the value recorded before the conversion moved to the library
-
 ### Requirement: Label keys come from the library
 
 The CLI SHALL read every OPM label key and managed-by value, and decide whether a managed-by value is an OPM runtime, through the library's `opm/k8s/labels` (`ManagedBy`, `ManagedByCLI`, `ManagedByController`, `ManagedByLegacy`, `Component`, `ComponentName`, `ModuleInstanceName`, `ModuleInstanceNamespace`, `ModuleInstanceUUID`, `IsOPMManagedBy`), and SHALL NOT keep a copy of them (0012:D1).
@@ -52,3 +38,17 @@ Every CLI path that orders Kubernetes objects (apply, delete, prune, the `instan
 
 - **WHEN** the CLI's order test checks every weight constant, every group-version-kind entry, every kind entry (through a group and version the group-version-kind entries do not hold) and both fallbacks of the table the CLI carried before the move
 - **THEN** `object.Weight` returns the same weight for each
+
+### Requirement: One export feeds the apply objects and the shared render digest
+
+The CLI SHALL convert a render's compiled objects with the library's `opm/k8s/object`: it SHALL wrap them with `object.Resources` and export them with exactly one `object.Export` call per render. The objects the CLI applies SHALL be the exported objects, in render order, and the render digest SHALL be the library's `opm/k8s/inventory.RenderDigest` of the same exported set, so no compiled object is exported from CUE twice and the CLI keeps no render digest algorithm of its own (0012:D6). An export failure SHALL exit with the general error code and name the failing resource.
+
+#### Scenario: The digest and the apply objects come from one export
+
+- **WHEN** `opm instance apply` or `opm module apply` renders a module
+- **THEN** the render digest and the objects passed to apply both come from one `object.Export` over the render's compiled objects
+
+#### Scenario: The render digest is the library's
+
+- **WHEN** the CLI digests an exported object set
+- **THEN** the digest equals `inventory.RenderDigest` of that set

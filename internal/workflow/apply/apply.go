@@ -16,7 +16,7 @@ import (
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/version"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
-	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -88,8 +88,9 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		newNamespaces = []string{namespace}
 	}
 
-	// Operator-parity render digest, computed by the render workflow over the
-	// kernel-compiled resources (0006:D9/D30 — see inventory.ComputeRenderDigest).
+	// The library's shared render digest, computed by the render workflow
+	// over the render's single export; it leaves the managed-by value out so
+	// the CLI and the operator digest one render equally (0012:D6).
 	manifestDigest := result.RenderDigest
 	output.Debug("render digest computed", "digest", manifestDigest)
 
@@ -251,7 +252,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 // previewPrune reports what a real apply would do with the stale set, without
 // deleting anything: the prunable half under "would prune", then the protected
 // half (inventory.SplitProtected) as left behind.
-func previewPrune(prunable, protected []inventory.InventoryEntry, instanceLog *log.Logger) {
+func previewPrune(prunable, protected []k8sinventory.Entry, instanceLog *log.Logger) {
 	if len(prunable) > 0 {
 		instanceLog.Info(fmt.Sprintf("would prune %d stale resource(s)", len(prunable)))
 		for _, e := range prunable {
@@ -265,7 +266,7 @@ func previewPrune(prunable, protected []inventory.InventoryEntry, instanceLog *l
 }
 
 // logLeftBehind prints one left-behind line per protected stale entry.
-func logLeftBehind(protected []inventory.InventoryEntry, instanceLog *log.Logger) {
+func logLeftBehind(protected []k8sinventory.Entry, instanceLog *log.Logger) {
 	for _, e := range protected {
 		instanceLog.Warn(output.FormatResourceLine(e.Kind, e.Namespace, e.Name, output.StatusLeftBehind),
 			"reason", kubernetes.ProtectedKindReason)
@@ -351,7 +352,7 @@ func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, na
 // WriteInstanceRecord writes the ModuleInstance CR spec, then its status subset
 // on the status subresource, then (for a migration) deletes the ported legacy
 // Secret only after the status write succeeds.
-func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory.Record, legacy *inventory.LegacyInventory, currentEntries []inventory.InventoryEntry, manifestDigest string, instanceLog *log.Logger) error {
+func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory.Record, legacy *inventory.LegacyInventory, currentEntries []k8sinventory.Entry, manifestDigest string, instanceLog *log.Logger) error {
 	result := req.Result
 	name := result.Instance.Name
 	namespace := result.Instance.Namespace
@@ -377,9 +378,9 @@ func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory
 	statusInput := inventory.StatusInput{
 		Name:      name,
 		Namespace: namespace,
-		Inventory: pkginventory.Inventory{
+		Inventory: inventory.Inventory{
 			Revision: revision,
-			Digest:   inventory.ComputeDigest(currentEntries),
+			Digest:   k8sinventory.Digest(currentEntries),
 			Count:    len(currentEntries),
 			Entries:  currentEntries,
 		},
@@ -445,7 +446,7 @@ func nextRevision(prevRecord *inventory.Record, legacy *inventory.LegacyInventor
 	return prev + 1
 }
 
-func previousEntries(prevRecord *inventory.Record, legacy *inventory.LegacyInventory) []inventory.InventoryEntry {
+func previousEntries(prevRecord *inventory.Record, legacy *inventory.LegacyInventory) []k8sinventory.Entry {
 	switch {
 	case prevRecord != nil:
 		return prevRecord.Inventory.Entries
@@ -456,20 +457,22 @@ func previousEntries(prevRecord *inventory.Record, legacy *inventory.LegacyInven
 	}
 }
 
-func CurrentInventoryEntries(resources []*unstructured.Unstructured) []inventory.InventoryEntry {
-	entries := make([]inventory.InventoryEntry, 0, len(resources))
+func CurrentInventoryEntries(resources []*unstructured.Unstructured) []k8sinventory.Entry {
+	entries := make([]k8sinventory.Entry, 0, len(resources))
 	for _, r := range resources {
-		entries = append(entries, inventory.NewEntryFromResource(r))
+		entries = append(entries, k8sinventory.NewEntry(r))
 	}
 	return entries
 }
 
-func ComputeStaleInventorySet(prevEntries, currentEntries []inventory.InventoryEntry) []inventory.InventoryEntry {
-	staleSet := inventory.ComputeStaleSet(prevEntries, currentEntries)
-	return inventory.ApplyComponentRenameSafetyCheck(staleSet, currentEntries)
+// ComputeStaleInventorySet is the library's component-blind stale set: every
+// previous entry that no current entry is the same object as. A component
+// rename or an API version change leaves nothing stale (0012:D7).
+func ComputeStaleInventorySet(prevEntries, currentEntries []k8sinventory.Entry) []k8sinventory.Entry {
+	return k8sinventory.StaleSet(prevEntries, currentEntries)
 }
 
-func GuardEmptyRender(resourceCount int, prevEntries []inventory.InventoryEntry, force bool, instanceLog *log.Logger) error {
+func GuardEmptyRender(resourceCount int, prevEntries []k8sinventory.Entry, force bool, instanceLog *log.Logger) error {
 	if resourceCount != 0 {
 		return nil
 	}
@@ -482,7 +485,7 @@ func GuardEmptyRender(resourceCount int, prevEntries []inventory.InventoryEntry,
 	return nil
 }
 
-func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, hasPrevInventory, dryRun bool, currentEntries []inventory.InventoryEntry, admit inventory.AdmitSet) error {
+func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, hasPrevInventory, dryRun bool, currentEntries []k8sinventory.Entry, admit inventory.AdmitSet) error {
 	if hasPrevInventory || dryRun {
 		return nil
 	}

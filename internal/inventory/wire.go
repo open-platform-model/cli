@@ -1,10 +1,11 @@
 package inventory
 
 import (
-	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 )
 
-// The functions below map between the CLI's pkg/inventory types and the
+// The functions below map between the library's inventory entry, the CLI's
+// record block (Inventory) and the
 // ModuleInstance CRD's status.inventory object shape. Conversion targets the
 // CRD's OpenAPI field names (group/kind/namespace/name/v/component and
 // revision/digest/count/entries) explicitly — never Go struct-tag marshaling —
@@ -12,10 +13,10 @@ import (
 // (0006:D2/D31). All integer values use int64, the only integer
 // type the unstructured converter accepts.
 
-// entryToWire converts an InventoryEntry into the CRD entry object. Optional
+// entryToWire converts a k8sinventory.Entry into the CRD entry object. Optional
 // fields absent from the entry are omitted, matching the CRD's omitempty
 // semantics; kind and name (the CRD's required fields) are always present.
-func entryToWire(e pkginventory.InventoryEntry) map[string]any {
+func entryToWire(e k8sinventory.Entry) map[string]any {
 	m := map[string]any{
 		"kind": e.Kind,
 		"name": e.Name,
@@ -35,9 +36,9 @@ func entryToWire(e pkginventory.InventoryEntry) map[string]any {
 	return m
 }
 
-// entryFromWire reconstructs an InventoryEntry from a CRD entry object.
-func entryFromWire(m map[string]any) pkginventory.InventoryEntry {
-	return pkginventory.InventoryEntry{
+// entryFromWire reconstructs a k8sinventory.Entry from a CRD entry object.
+func entryFromWire(m map[string]any) k8sinventory.Entry {
+	return k8sinventory.Entry{
 		Group:     wireString(m, "group"),
 		Kind:      wireString(m, "kind"),
 		Namespace: wireString(m, "namespace"),
@@ -49,7 +50,7 @@ func entryFromWire(m map[string]any) pkginventory.InventoryEntry {
 
 // inventoryToWire converts an Inventory block into the CRD's status.inventory
 // object.
-func inventoryToWire(inv pkginventory.Inventory) map[string]any {
+func inventoryToWire(inv Inventory) map[string]any {
 	entries := make([]any, 0, len(inv.Entries))
 	for _, e := range inv.Entries {
 		entries = append(entries, entryToWire(e))
@@ -65,12 +66,12 @@ func inventoryToWire(inv pkginventory.Inventory) map[string]any {
 // inventoryFromWire reconstructs an Inventory block from the CRD's
 // status.inventory object. A nil or absent object yields an empty inventory
 // with a non-nil entries slice (the invariant callers rely on).
-func inventoryFromWire(m map[string]any) pkginventory.Inventory {
-	inv := pkginventory.Inventory{
+func inventoryFromWire(m map[string]any) Inventory {
+	inv := Inventory{
 		Revision: wireInt(m, "revision"),
 		Digest:   wireString(m, "digest"),
 		Count:    wireInt(m, "count"),
-		Entries:  []pkginventory.InventoryEntry{},
+		Entries:  []k8sinventory.Entry{},
 	}
 	if raw, ok := m["entries"].([]any); ok {
 		for _, item := range raw {

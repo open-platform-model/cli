@@ -19,6 +19,8 @@ import (
 	"os"
 	"time"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -285,9 +287,9 @@ func deployInstance(ctx context.Context, client *kubernetes.Client, name, ns, in
 		failf("apply errors for %s: %v", name, result.Errors[0])
 	}
 
-	entries := make([]inventory.InventoryEntry, len(resources))
+	entries := make([]k8sinventory.Entry, len(resources))
 	for i, r := range resources {
-		entries[i] = inventory.NewEntryFromResource(r)
+		entries[i] = k8sinventory.NewEntry(r)
 	}
 	err = writeInventoryCR(ctx, client, name, ns, instanceID, inventory.OwnerCLI, 1, entries)
 	check(fmt.Sprintf("writing inventory for %s", name), err)
@@ -295,7 +297,7 @@ func deployInstance(ctx context.Context, client *kubernetes.Client, name, ns, in
 
 // writeInventoryCR writes the ModuleInstance CR spec (with the given owner) and
 // its CLI-owned status subset.
-func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, ns, instanceID, owner string, revision int, entries []inventory.InventoryEntry) error {
+func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, ns, instanceID, owner string, revision int, entries []k8sinventory.Entry) error {
 	if _, err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
 		Name:          name,
 		Namespace:     ns,
@@ -311,7 +313,7 @@ func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, ns, 
 		InstanceUUID: instanceID,
 		Inventory: inventory.Inventory{
 			Revision: revision,
-			Digest:   inventory.ComputeDigest(entries),
+			Digest:   k8sinventory.Digest(entries),
 			Count:    len(entries),
 			Entries:  entries,
 		},

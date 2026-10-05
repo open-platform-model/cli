@@ -3,13 +3,15 @@ package operator
 import (
 	"testing"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/open-platform-model/cli/internal/inventory"
 )
 
-func crdEntry(name string) inventory.InventoryEntry {
-	return inventory.InventoryEntry{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition", Name: name}
+func crdEntry(name string) k8sinventory.Entry {
+	return k8sinventory.Entry{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition", Name: name}
 }
 
 func TestDeploysOperator(t *testing.T) {
@@ -48,7 +50,7 @@ func TestDeploysOperator(t *testing.T) {
 			name: "inventory holds an operator CRD",
 			rec: &inventory.Record{
 				Name: "crds", Namespace: "platform", ModulePath: "example.com/modules/crds@v0",
-				Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{
+				Inventory: inventory.Inventory{Entries: []k8sinventory.Entry{
 					{Kind: "ConfigMap", Name: "x", Namespace: "platform"},
 					crdEntry("moduleinstances.opmodel.dev"),
 				}},
@@ -59,7 +61,7 @@ func TestDeploysOperator(t *testing.T) {
 			name: "look-alike name, path and CRD",
 			rec: &inventory.Record{
 				Name: "opm-operator", Namespace: "default", ModulePath: "opmodel.dev/modules/opm_operator_dashboard@v0",
-				Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{crdEntry("widgets.example.opmodel.dev.io")}},
+				Inventory: inventory.Inventory{Entries: []k8sinventory.Entry{crdEntry("widgets.example.opmodel.dev.io")}},
 			},
 		},
 		{
@@ -70,14 +72,14 @@ func TestDeploysOperator(t *testing.T) {
 			name: "a CRD of a subgroup of opmodel.dev",
 			rec: &inventory.Record{
 				Name: "sub", Namespace: "default",
-				Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{crdEntry("widgets.example.opmodel.dev")}},
+				Inventory: inventory.Inventory{Entries: []k8sinventory.Entry{crdEntry("widgets.example.opmodel.dev")}},
 			},
 		},
 		{
 			name: "an opmodel.dev object that is not a CRD",
 			rec: &inventory.Record{
 				Name: "plat", Namespace: "default",
-				Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{
+				Inventory: inventory.Inventory{Entries: []k8sinventory.Entry{
 					{Group: "opmodel.dev", Kind: "Platform", Name: "cluster.opmodel.dev"},
 				}},
 			},

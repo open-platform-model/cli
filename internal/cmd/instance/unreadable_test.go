@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -28,7 +30,7 @@ func trackedConfigMap(name string) *unstructured.Unstructured {
 func TestShowInstanceTree_WarnsAboutUnreadable(t *testing.T) {
 	web := trackedConfigMap("web")
 	client, _ := fakeClusterClient(web.DeepCopy())
-	inv := &inventory.Record{Name: "demo", Namespace: "apps", Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{
+	inv := &inventory.Record{Name: "demo", Namespace: "apps", Inventory: inventory.Inventory{Entries: []k8sinventory.Entry{
 		{Kind: "ConfigMap", Namespace: "apps", Name: "web", Version: "v1"},
 		{Kind: "ConfigMap", Namespace: "apps", Name: "settings", Version: "v1"},
 	}}}
@@ -49,7 +51,7 @@ func TestShowInstanceTree_WarnsAboutUnreadable(t *testing.T) {
 // (no resources found), as for a record that tracks no live resources.
 func TestShowInstanceTree_AllUnreadableExitsNotFound(t *testing.T) {
 	client, _ := fakeClusterClient()
-	inv := &inventory.Record{Name: "demo", Namespace: "apps", Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{
+	inv := &inventory.Record{Name: "demo", Namespace: "apps", Inventory: inventory.Inventory{Entries: []k8sinventory.Entry{
 		{Kind: "ConfigMap", Namespace: "apps", Name: "settings", Version: "v1"},
 	}}}
 	unreadable := []inventory.UnreadableEntry{{Entry: inv.Inventory.Entries[0], Err: forbiddenRead("configmaps", "settings")}}
@@ -96,7 +98,7 @@ func TestDiscoverOrphanCandidates_WarnsAboutUnreadable(t *testing.T) {
 func TestShowInstanceStatus_UnreadableIsUnknownAndExitsNotReady(t *testing.T) {
 	web := trackedConfigMap("web")
 	client, _ := fakeClusterClient(web.DeepCopy())
-	inv := &inventory.Record{Name: "demo", Namespace: "apps", Owner: inventory.OwnerCLI, Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{
+	inv := &inventory.Record{Name: "demo", Namespace: "apps", Owner: inventory.OwnerCLI, Inventory: inventory.Inventory{Entries: []k8sinventory.Entry{
 		{Kind: "ConfigMap", Namespace: "apps", Name: "web", Version: "v1"},
 		{Kind: "ConfigMap", Namespace: "apps", Name: "settings", Version: "v1"},
 	}}}

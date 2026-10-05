@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -42,7 +44,7 @@ func operatorOwnedRecord() *inventory.Record {
 		Name:      "podinfo",
 		Namespace: "demo",
 		Owner:     inventory.OwnerOperator,
-		Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{{Kind: "Deployment", Name: "podinfo", Namespace: "demo"}}},
+		Inventory: inventory.Inventory{Entries: []k8sinventory.Entry{{Kind: "Deployment", Name: "podinfo", Namespace: "demo"}}},
 	}
 }
 
@@ -308,7 +310,7 @@ func moduleInstanceObj(namespace, name string, finalizers ...string) *unstructur
 // newGuardScenario builds a CLI-owned record name/namespace with modulePath and
 // extra inventory entries; targetArmed puts the cleanup finalizer on the
 // target's own ModuleInstance; others are further objects in the cluster.
-func newGuardScenario(namespace, name, modulePath string, targetArmed bool, extraEntries []inventory.InventoryEntry, others ...runtime.Object) *guardScenario {
+func newGuardScenario(namespace, name, modulePath string, targetArmed bool, extraEntries []k8sinventory.Entry, others ...runtime.Object) *guardScenario {
 	uuid := "uuid-" + name
 	cm := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1", "kind": "ConfigMap",
@@ -316,7 +318,7 @@ func newGuardScenario(namespace, name, modulePath string, targetArmed bool, extr
 			opmlabels.ManagedBy: opmlabels.ManagedByCLI, opmlabels.ModuleInstanceUUID: uuid,
 		}},
 	}}
-	entries := append([]inventory.InventoryEntry{{Kind: "ConfigMap", Name: cm.GetName(), Namespace: namespace}}, extraEntries...)
+	entries := append([]k8sinventory.Entry{{Kind: "ConfigMap", Name: cm.GetName(), Namespace: namespace}}, extraEntries...)
 	rec := &inventory.Record{
 		Name: name, Namespace: namespace, Owner: inventory.OwnerCLI, ModulePath: modulePath, InstanceUUID: uuid,
 		Inventory: inventory.Inventory{Entries: entries},
@@ -425,8 +427,8 @@ func TestDeleteResolvedInstance_ModulePathSignal(t *testing.T) {
 }
 
 func TestDeleteResolvedInstance_InventoryCRDSignal(t *testing.T) {
-	crd := inventory.InventoryEntry{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition", Name: "moduleinstances.opmodel.dev"}
-	g := newGuardScenario("platform", "crds", "example.com/modules/crds@v0", false, []inventory.InventoryEntry{crd}, armedHello())
+	crd := k8sinventory.Entry{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition", Name: "moduleinstances.opmodel.dev"}
+	g := newGuardScenario("platform", "crds", "example.com/modules/crds@v0", false, []k8sinventory.Entry{crd}, armedHello())
 
 	_, err := g.run(t, false)
 	requireExitCode(t, err, opmexit.ExitValidationError)
@@ -435,8 +437,8 @@ func TestDeleteResolvedInstance_InventoryCRDSignal(t *testing.T) {
 }
 
 func TestDeleteResolvedInstance_LookAlikeIsNotGuarded(t *testing.T) {
-	crd := inventory.InventoryEntry{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition", Name: "widgets.example.opmodel.dev.io"}
-	g := newGuardScenario("default", "dash", "opmodel.dev/modules/opm_operator_dashboard@v0", false, []inventory.InventoryEntry{crd}, armedHello())
+	crd := k8sinventory.Entry{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition", Name: "widgets.example.opmodel.dev.io"}
+	g := newGuardScenario("default", "dash", "opmodel.dev/modules/opm_operator_dashboard@v0", false, []k8sinventory.Entry{crd}, armedHello())
 
 	out, err := g.run(t, false)
 	require.NoError(t, err, out)
@@ -517,7 +519,7 @@ func TestExecuteInstanceDelete_UnreadableKeepsModuleInstance(t *testing.T) {
 	mi := moduleInstanceObj("apps", "demo")
 	inv := &inventory.Record{Name: "demo", Namespace: "apps", Owner: inventory.OwnerCLI}
 	unreadable := []inventory.UnreadableEntry{{
-		Entry: inventory.InventoryEntry{Kind: "ConfigMap", Namespace: "apps", Name: "settings", Version: "v1"},
+		Entry: k8sinventory.Entry{Kind: "ConfigMap", Namespace: "apps", Name: "settings", Version: "v1"},
 		Err:   forbiddenRead("configmaps", "settings"),
 	}}
 
@@ -563,7 +565,7 @@ func TestExecuteInstanceDelete_UnreadableNamespaceIsLeftBehind(t *testing.T) {
 	client, fake := fakeClusterClient(mi)
 	inv := &inventory.Record{Name: "demo", Namespace: "apps", Owner: inventory.OwnerCLI}
 	unreadable := []inventory.UnreadableEntry{{
-		Entry: inventory.InventoryEntry{Kind: "Namespace", Name: "apps", Version: "v1"},
+		Entry: k8sinventory.Entry{Kind: "Namespace", Name: "apps", Version: "v1"},
 		Err:   forbiddenRead("namespaces", "apps"),
 	}}
 
@@ -587,7 +589,7 @@ func TestDeleteResolvedInstance_OperatorOwnedIgnoresUnreadable(t *testing.T) {
 	rec.Prune = true
 	client, fake := fakeClusterClient(append(runningOperatorObjects(), moduleInstanceObj(rec.Namespace, rec.Name))...)
 	unreadable := []inventory.UnreadableEntry{{
-		Entry: inventory.InventoryEntry{Kind: "Deployment", Group: "apps", Namespace: "demo", Name: "podinfo", Version: "v1"},
+		Entry: k8sinventory.Entry{Kind: "Deployment", Group: "apps", Namespace: "demo", Name: "podinfo", Version: "v1"},
 		Err:   forbiddenRead("deployments", "podinfo"),
 	}}
 

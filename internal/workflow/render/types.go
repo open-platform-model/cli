@@ -37,9 +37,10 @@ type Result struct {
 	// Platform is the resolved platform-source provenance (0006:D21).
 	Platform platform.Resolution
 
-	// RenderDigest is the operator-parity render digest computed over the
-	// kernel-rendered resources (CUE-value serialization, operator sort
-	// order — see inventory.ComputeRenderDigest). Written verbatim to
+	// RenderDigest is the library's shared render digest
+	// (opm/k8s/inventory.RenderDigest) over the render's single export. It
+	// leaves the managed-by value out, so the CLI and the operator digest one
+	// render equally (0012:D6). Written verbatim to
 	// status.lastAppliedRenderDigest so a future ownership transfer has a
 	// recorded value to verify against (0006:D9/D30).
 	RenderDigest string

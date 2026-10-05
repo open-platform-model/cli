@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -15,7 +17,6 @@ import (
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
-	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
@@ -186,7 +187,7 @@ func specAnnotations(in SpecInput) map[string]string {
 type StatusInput struct {
 	Name                    string
 	Namespace               string
-	Inventory               pkginventory.Inventory
+	Inventory               Inventory
 	InstanceUUID            string
 	LastAppliedRenderDigest string
 	LastAppliedSourceDigest string
@@ -294,7 +295,7 @@ func recordFromUnstructured(obj *unstructured.Unstructured) *Record {
 	if invMap, ok, _ := unstructured.NestedMap(obj.Object, "status", "inventory"); ok {
 		rec.Inventory = inventoryFromWire(invMap)
 	} else {
-		rec.Inventory = pkginventory.Inventory{Entries: []pkginventory.InventoryEntry{}}
+		rec.Inventory = Inventory{Entries: []k8sinventory.Entry{}}
 	}
 
 	if obj.GetAnnotations()[AnnotationSource] == SourceLocal {

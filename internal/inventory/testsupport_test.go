@@ -10,7 +10,13 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 )
+
+// entry builds an inventory entry of component "app" at API version v1.
+func entry(group, kind, ns, name string) k8sinventory.Entry {
+	return k8sinventory.Entry{Group: group, Kind: kind, Namespace: ns, Name: name, Version: "v1", Component: "app"}
+}
 
 // newDynamicClient builds a *kubernetes.Client backed by a fake dynamic client
 // seeded with the given unstructured objects. ModuleInstance list kind is

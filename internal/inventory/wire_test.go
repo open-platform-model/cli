@@ -3,14 +3,14 @@ package inventory
 import (
 	"testing"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
 )
 
 func TestEntryToWire_VersionSerializesAsV(t *testing.T) {
-	e := pkginventory.InventoryEntry{
+	e := k8sinventory.Entry{
 		Group:     "apps",
 		Kind:      "Deployment",
 		Namespace: "demo",
@@ -32,7 +32,7 @@ func TestEntryToWire_VersionSerializesAsV(t *testing.T) {
 
 func TestEntryToWire_OmitsEmptyOptionalFields(t *testing.T) {
 	// Core-group resource with no component: group, v, component omitted.
-	e := pkginventory.InventoryEntry{
+	e := k8sinventory.Entry{
 		Kind:      "ConfigMap",
 		Namespace: "demo",
 		Name:      "settings",
@@ -49,7 +49,7 @@ func TestEntryToWire_OmitsEmptyOptionalFields(t *testing.T) {
 }
 
 func TestEntryWireRoundTrip(t *testing.T) {
-	cases := []pkginventory.InventoryEntry{
+	cases := []k8sinventory.Entry{
 		{Group: "apps", Kind: "Deployment", Namespace: "demo", Name: "podinfo", Version: "v1", Component: "web"},
 		{Kind: "ConfigMap", Namespace: "demo", Name: "settings"},
 		{Group: "networking.k8s.io", Kind: "Ingress", Namespace: "demo", Name: "podinfo", Version: "v1"},
@@ -62,11 +62,11 @@ func TestEntryWireRoundTrip(t *testing.T) {
 }
 
 func TestInventoryWireRoundTrip(t *testing.T) {
-	inv := pkginventory.Inventory{
+	inv := Inventory{
 		Revision: 3,
 		Digest:   "sha256:deadbeef",
 		Count:    2,
-		Entries: []pkginventory.InventoryEntry{
+		Entries: []k8sinventory.Entry{
 			{Group: "apps", Kind: "Deployment", Namespace: "demo", Name: "podinfo", Version: "v1", Component: "web"},
 			{Kind: "ConfigMap", Namespace: "demo", Name: "settings", Component: "web"},
 		},
@@ -78,7 +78,7 @@ func TestInventoryWireRoundTrip(t *testing.T) {
 }
 
 func TestInventoryToWire_UsesInt64Counters(t *testing.T) {
-	inv := pkginventory.Inventory{Revision: 5, Count: 7, Entries: nil}
+	inv := Inventory{Revision: 5, Count: 7, Entries: nil}
 
 	m := inventoryToWire(inv)
 

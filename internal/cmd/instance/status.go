@@ -3,6 +3,8 @@ package instance
 import (
 	"context"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -98,7 +100,7 @@ func runInstanceStatus(ctx context.Context, identifier string, cfg *config.Globa
 // rows, so the instance is not ready and the command exits 2.
 func showInstanceStatus(ctx context.Context, k8sClient *kubernetes.Client, namespace string, rsf *cmdutil.InstanceSelectorFlags,
 	outputFormat output.Format, verbose bool, inv *inventory.Record, liveResources []*unstructured.Unstructured,
-	missingEntries []inventory.InventoryEntry, unreadable []inventory.UnreadableEntry, logName string) error {
+	missingEntries []k8sinventory.Entry, unreadable []inventory.UnreadableEntry, logName string) error {
 	query.WarnUnreadable(output.InstanceLogger(logName), unreadable)
 	statusOpts := query.BuildStatusOptions(namespace, rsf, outputFormat, verbose, inv, liveResources, missingEntries, unreadable)
 	return query.PrintInstanceStatus(ctx, k8sClient, statusOpts, logName)
