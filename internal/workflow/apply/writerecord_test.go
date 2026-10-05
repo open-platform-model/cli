@@ -232,10 +232,12 @@ func TestWriteInstanceRecord_StoresTheLibraryInventoryDigest(t *testing.T) {
 			Inventory struct {
 				Digest string `json:"digest"`
 			} `json:"inventory"`
+			LastAppliedRenderDigest string `json:"lastAppliedRenderDigest"`
 		} `json:"status"`
 	}
 	require.NoError(t, json.Unmarshal(statusPatch, &written))
 
 	require.Equal(t, k8sinventory.Digest(entries), written.Status.Inventory.Digest)
 	require.NotEqual(t, retiredInventoryDigest, written.Status.Inventory.Digest)
+	require.Equal(t, "sha256:render", written.Status.LastAppliedRenderDigest)
 }

@@ -11,6 +11,7 @@ import (
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
@@ -20,7 +21,7 @@ func legacySecret(name, namespace, instanceName, instanceID string, byLabel bool
 	payload := `{"instanceMetadata":{"name":"` + instanceName + `","namespace":"` + namespace + `","uuid":"` + instanceID + `"},` +
 		`"inventory":{"revision":4,"digest":"sha256:legacy","count":2,"entries":[` +
 		`{"group":"","kind":"ConfigMap","namespace":"` + namespace + `","name":"cm-a"},` +
-		`{"group":"apps","kind":"Deployment","namespace":"` + namespace + `","name":"web","v":"v1"}]}}`
+		`{"group":"apps","kind":"Deployment","namespace":"` + namespace + `","name":"web","v":"v1","component":"server"}]}}`
 	s := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Data:       map[string][]byte{legacySecretKeyRecord: []byte(payload)},
@@ -56,9 +57,17 @@ func TestFindLegacySecretInventory_ByDirectName(t *testing.T) {
 	assert.Equal(t, "uuid-1", legacy.InstanceUUID)
 	assert.Equal(t, 4, legacy.Inventory.Revision)
 	assert.Equal(t, name, legacy.SecretName)
-	require.Len(t, legacy.Inventory.Entries, 2)
-	assert.Equal(t, "cm-a", legacy.Inventory.Entries[0].Name)
-	assert.Equal(t, "v1", legacy.Inventory.Entries[1].Version)
+	// The whole block is asserted, so a field the hand-written mapping drops
+	// fails here.
+	assert.Equal(t, Inventory{
+		Revision: 4,
+		Digest:   "sha256:legacy",
+		Count:    2,
+		Entries: []k8sinventory.Entry{
+			{Kind: "ConfigMap", Namespace: "demo", Name: "cm-a"},
+			{Group: "apps", Kind: "Deployment", Namespace: "demo", Name: "web", Version: "v1", Component: "server"},
+		},
+	}, legacy.Inventory)
 }
 
 func TestFindLegacySecretInventory_ByUUIDLabelFallback(t *testing.T) {

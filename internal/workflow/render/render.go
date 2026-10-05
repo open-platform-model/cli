@@ -305,11 +305,6 @@ func refuseDuplicateIdentities(out *kernel.RenderResult) error {
 	return nil
 }
 
-// newResult assembles the workflow Result from the render output and the
-// render environment. Warnings are the render's advisory facts worded by the CLI from the
-// diagnostics rows (unhandled optional traits, skew under the warn policy);
-// the 0010:D19 local-replacement warnings are emitted directly by renderInstance
-// from the replacement rows, after the render.
 // exportAndDigest exports the render's objects with exactly one
 // object.Export and computes the library's shared render digest over the
 // same exported set, so the digest and the apply objects come from one
@@ -328,6 +323,11 @@ func exportAndDigest(resources []*object.Resource) ([]object.Exported, string, e
 	return exported, digest, nil
 }
 
+// newResult assembles the workflow Result from the render output and the
+// render environment. Warnings are the render's advisory facts worded by the CLI from the
+// diagnostics rows (unhandled optional traits, skew under the warn policy);
+// the 0010:D19 local-replacement warnings are emitted directly by renderInstance
+// from the replacement rows, after the render.
 func newResult(env *renderEnv, out *kernel.RenderResult, renderDigest string, values map[string]any, sourceLocal bool) *Result {
 	return &Result{
 		Pairs:        out.Diagnostics.Pairs,
