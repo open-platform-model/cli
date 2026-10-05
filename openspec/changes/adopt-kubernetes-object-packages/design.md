@@ -8,7 +8,7 @@ Importers at the base of this change (`be1157d5`), re-checked by grep for both i
 - `pkg/core.Resource`: `internal/workflow/render/render.go`, `internal/inventory/digest.go`, `internal/inventory/digest_test.go`, `tests/integration/render-parity`.
 - `pkg/resourceorder`: `internal/kubernetes/{sort,apply,delete,tree}.go`, `internal/kubernetes/delete_test.go`, `internal/inventory/stale.go`, `internal/output/manifest.go`.
 
-`internal/operator/plan.go` and `install.go` (the operator install from cli PRs 307 and 309) import neither package; the install path reaches labels only through `migration_proof.go`. The duplicate check already uses `object.Duplicates` (cli PR 325).
+`internal/operator/{plan_install,install,uninstall}.go` (the operator install from cli PRs 307 and 309) import neither package; the install path reaches labels only through `migration_proof.go`. The duplicate check already uses `object.Duplicates` (cli PR 325).
 
 ## Goals / Non-Goals
 
