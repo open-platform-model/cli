@@ -1,0 +1,10 @@
+# Implements part of enhancement 0012 (cli adoption of the Kubernetes tier's
+# inventory package). Decisions are deliberately not claimed here:
+# 0012:D1, 0012:D6 and 0012:D7 bind both frontends (one digest computed equally
+# by the cli and the operator, a migration note in each frontend's release), so
+# the delivery log records them after the operator's inventory adoption has also
+# merged. Under-claiming is the safe direction.
+implements:
+  - enhancement: "0012"
+    decisions: []
+    resolves: []
