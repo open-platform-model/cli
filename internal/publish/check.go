@@ -12,6 +12,8 @@ import (
 	"cuelang.org/go/mod/modconfig"
 	"cuelang.org/go/mod/module"
 	"golang.org/x/mod/semver"
+
+	"github.com/open-platform-model/cli/internal/cuemod"
 )
 
 // ErrNotPublished reports that the coordinate handed to RegistryCheck names
@@ -208,9 +210,10 @@ func checkDeclaredIdentity(report *CheckReport, root cue.Value) {
 
 // fetchPublishedTree fetches a published build through CUE's own module
 // machinery — the same on-disk cache every package load hits, so the build is
-// fetched once — and returns the extracted tree's directory. A build the
-// registry answers "no" to is ErrNotPublished; a registry that cannot answer
-// is a *ConnectivityError.
+// fetched once — and returns the extracted tree's directory. A version the
+// registry answers it does not hold is ErrNotPublished; every other registry
+// answer, or none, is a *ConnectivityError; a failure that asks no registry
+// (the registry mapping does not build) is a plain error.
 func fetchPublishedTree(ctx context.Context, registry, repo, version string) (string, error) {
 	reg, err := modconfig.NewRegistry(&modconfig.Config{Env: registryEnv(registry)})
 	if err != nil {
@@ -222,9 +225,11 @@ func fetchPublishedTree(ctx context.Context, registry, repo, version string) (st
 	}
 	loc, err := reg.Fetch(ctx, mv)
 	if err != nil {
-		// Measured: an absent module version reports "module not found";
-		// transport failures report the failed request.
-		if strings.Contains(err.Error(), "not found") {
+		// The library's classification decides, not the text: a tag the
+		// registry does not hold (a 403 tag lookup reads the same) is
+		// unpublished; any other answer, an archive blob missing behind a
+		// held tag among them, or no answer at all, is connectivity.
+		if cuemod.IsVersionNotHeld(err) {
 			return "", fmt.Errorf("%s@%s: %w", repo, version, ErrNotPublished)
 		}
 		return "", &ConnectivityError{Op: fmt.Sprintf("fetching %s", mv), Err: err}

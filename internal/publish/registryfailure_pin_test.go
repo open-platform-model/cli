@@ -167,3 +167,35 @@ func TestCompatScan_PredecessorDependencyNotHeld(t *testing.T) {
 	require.ErrorAs(t, err, &connErr)
 	assert.Empty(t, verdicts, "members that compared before the abort refuse nothing")
 }
+
+// TestProbedPackageAbsent settles a not-found by the probed build itself. A
+// fetch that fails without asking the registry (the mapping does not build)
+// proves nothing: it reports neither absent nor an error of its own, so the
+// caller keeps the load's own *ConnectivityError.
+func TestProbedPackageAbsent(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		registry   func(t *testing.T) string
+		pkg        string
+		version    string
+		wantAbsent bool
+		wantConn   bool
+	}{
+		{"package present", healthy, "pkg", "v1.0.0", false, false},
+		{"package absent at a held version", healthy, "nothere", "v1.0.0", true, false},
+		{"version not held", healthy, "pkg", "v1.9.0", true, false},
+		{"refused connection", refused, "pkg", "v1.0.0", false, true},
+		{"registry mapping does not parse", func(*testing.T) string { return "::nonsense::" }, "pkg", "v1.0.0", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			coldCUECache(t)
+			absent, err := probedPackageAbsent(Options{Registry: tc.registry(t)}, "example.com/cat", tc.pkg, tc.version)
+			assert.Equal(t, tc.wantAbsent, absent)
+			var connErr *ConnectivityError
+			assert.Equal(t, tc.wantConn, errors.As(err, &connErr), "%v", err)
+			if !tc.wantConn {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
