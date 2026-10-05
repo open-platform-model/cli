@@ -1,6 +1,6 @@
 # Tasks: retire-legacy-manifest-migration
 
-One PR with the rename change after it (`rename-operator-command-to-controller`). Workers never push, tag or release.
+Ships as its own PR, merged before the rename sitting (gate G-REN); `rename-operator-command-to-controller` follows in a separate PR after G-PUB. Workers never push, tag or release.
 
 **Local gate:** `task fmt`, `task lint`, `go test ./internal/... ./pkg/...` (unit), `go vet -tags e2e ./tests/e2e/`, `task openspec:check`.
 
