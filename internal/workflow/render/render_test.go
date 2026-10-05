@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/open-platform-model/library/opm/helper/objectset"
+	"github.com/open-platform-model/library/opm/k8s/object"
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
 
@@ -304,7 +304,7 @@ func TestRefuseDuplicateIdentities_TwoRegistrations(t *testing.T) {
 	err := refuseDuplicateIdentities(out)
 
 	require.Error(t, err)
-	var dupErr *objectset.DuplicateIdentitiesError
+	var dupErr *object.DuplicateIdentitiesError
 	require.ErrorAs(t, err, &dupErr)
 	require.Len(t, dupErr.Duplicates, 1)
 	assert.Equal(t, "TransformerRegistration", dupErr.Duplicates[0].Identity.Kind)
@@ -345,7 +345,7 @@ func TestRefuseDuplicateIdentities_NamelessValueIsSkipped(t *testing.T) {
 
 	err := refuseDuplicateIdentities(out)
 
-	var dupErr *objectset.DuplicateIdentitiesError
+	var dupErr *object.DuplicateIdentitiesError
 	require.ErrorAs(t, err, &dupErr)
 	require.Len(t, dupErr.Duplicates, 1)
 	assert.Equal(t, "backup-system.k8up", dupErr.Duplicates[0].Identity.Name)

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	liberrors "github.com/open-platform-model/library/opm/errors"
-	"github.com/open-platform-model/library/opm/helper/objectset"
+	"github.com/open-platform-model/library/opm/k8s/object"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
@@ -28,7 +28,7 @@ const renderFailedMsg = "render failed"
 // prints the kernel's message verbatim: it already names the path and both
 // versions. An older-core refusal (*liberrors.PlatformCoreTooOldError, before
 // staging) prints verbatim too: the library's message names the platform,
-// the missing field and the core release required. A duplicate-identity refusal (*objectset.DuplicateIdentitiesError,
+// the missing field and the core release required. A duplicate-identity refusal (*object.DuplicateIdentitiesError,
 // raised by the CLI from the library's helper after the render) is the
 // library's message split at its first newline: the header under the
 // render-failed header, the identity rows as details, so the CLI and the
@@ -57,7 +57,7 @@ func printValidationError(err error) {
 		output.Error(fmt.Sprintf("%s: %s", renderFailedMsg, err))
 		return
 	}
-	var dupErr *objectset.DuplicateIdentitiesError
+	var dupErr *object.DuplicateIdentitiesError
 	if errors.As(err, &dupErr) {
 		header, rows, _ := strings.Cut(dupErr.Error(), "\n")
 		output.Error(fmt.Sprintf("%s: %s", renderFailedMsg, header))
