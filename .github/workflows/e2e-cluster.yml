@@ -1,12 +1,12 @@
 name: E2E Cluster
-# The cluster-backed e2e suite against the pinned operator module: a kind
+# The cluster-backed e2e suite against the pinned controller module: a kind
 # cluster prepared with the local loop's own tasks (task cluster:create, task
-# cluster:operator), a registry seeded from the tree, and the whole tests/e2e
+# cluster:controller), a registry seeded from the tree, and the whole tests/e2e
 # suite with OPM_E2E_REQUIRE_CLUSTER=1, so no cluster test can pass by skipping.
 #
 # The workflow triggers on every pull request and decides inside the job
-# (.github/scripts/e2e-cluster-applies.sh) whether to do the work: on operator,
-# operator-command, template and Platform changes, on the job's own inputs, on
+# (.github/scripts/e2e-cluster-applies.sh) whether to do the work: on controller,
+# controller-command, template and Platform changes, on the job's own inputs, on
 # the cascade pull request and on open release pull requests. Otherwise the job
 # passes in seconds and says why. A paths: filter or a job-level if: would leave
 # a required check pending or report a skip as a pass, so neither is used.
@@ -38,9 +38,9 @@ jobs:
       pull-requests: read
     env:
       # The CLI on the runner reads the tree's fixtures from the seeded
-      # registry on localhost:5000; the operator reads the same container by its
-      # name on kind's network (KIND_CUE_REGISTRY, applied by cluster:operator
-      # as the operator's --registry). Core and the catalogs come from GHCR on
+      # registry on localhost:5000; the controller reads the same container by its
+      # name on kind's network (KIND_CUE_REGISTRY, applied by cluster:controller
+      # as the controller's --registry). Core and the catalogs come from GHCR on
       # both sides, so a PR that bumps a fixture is tested before GHCR holds it.
       CUE_REGISTRY: 'testing.opmodel.dev=localhost:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
       OPM_REGISTRY: 'testing.opmodel.dev=localhost:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
@@ -97,7 +97,7 @@ jobs:
 
       - name: Install cue and crane
         if: steps.decide.outputs.applies == 'true'
-        # crane must be present: without it the operator lifecycle test takes
+        # crane must be present: without it the controller lifecycle test takes
         # its developer-machine fallback and asserts a rollout failure.
         run: |
           go install cuelang.org/go/cmd/cue@v0.17.1
@@ -110,7 +110,7 @@ jobs:
       - name: Start and seed the registry
         if: steps.decide.outputs.applies == 'true'
         # A named container, not a services: registry: kind's node must reach
-        # it by name once cluster:operator joins it to the kind network.
+        # it by name once cluster:controller joins it to the kind network.
         run: |
           docker run -d --name opm-registry -p 5000:5000 registry:2
           for _ in $(seq 1 30); do curl -fsS http://localhost:5000/v2/ >/dev/null && break; sleep 1; done
@@ -120,9 +120,9 @@ jobs:
         if: steps.decide.outputs.applies == 'true'
         run: task cluster:create
 
-      - name: Install the pinned operator module and wait for a Ready Platform
+      - name: Install the pinned controller module and wait for a Ready Platform
         if: steps.decide.outputs.applies == 'true'
-        run: task cluster:operator
+        run: task cluster:controller
 
       # -timeout matches task test:e2e; see that task's summary.
       - name: Run E2E tests (cluster required)
@@ -134,12 +134,12 @@ jobs:
         run: |
           set +e
           ctx=kind-opm-dev
-          echo "::group::operator logs"
-          kubectl --context "$ctx" -n opm-operator-system logs deploy/opm-operator-controller-manager --tail=500 --all-containers
+          echo "::group::controller logs"
+          kubectl --context "$ctx" -n opm-controller-system logs deploy/opm-controller-manager --tail=500 --all-containers
           echo "::endgroup::"
-          echo "::group::operator deployment"
-          kubectl --context "$ctx" -n opm-operator-system get deploy,pods -o wide
-          kubectl --context "$ctx" -n opm-operator-system get deploy/opm-operator-controller-manager -o jsonpath='{.spec.template.spec.containers[0].args}'; echo
+          echo "::group::controller deployment"
+          kubectl --context "$ctx" -n opm-controller-system get deploy,pods -o wide
+          kubectl --context "$ctx" -n opm-controller-system get deploy/opm-controller-manager -o jsonpath='{.spec.template.spec.containers[0].args}'; echo
           echo "::endgroup::"
           echo "::group::Platform/cluster"
           kubectl --context "$ctx" get platform cluster -o yaml

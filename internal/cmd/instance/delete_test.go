@@ -22,10 +22,10 @@ import (
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/controller"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
-	"github.com/open-platform-model/cli/internal/operator"
 	"github.com/open-platform-model/cli/internal/output"
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
@@ -39,11 +39,11 @@ func emptyClusterClient() *kubernetes.Client {
 	}
 }
 
-func operatorOwnedRecord() *inventory.Record {
+func controllerOwnedRecord() *inventory.Record {
 	return &inventory.Record{
 		Name:      "podinfo",
 		Namespace: "demo",
-		Owner:     inventory.OwnerOperator,
+		Owner:     inventory.OwnerController,
 		Inventory: inventory.Inventory{Entries: []k8sinventory.Entry{{Kind: "Deployment", Name: "podinfo", Namespace: "demo"}}},
 	}
 }
@@ -52,34 +52,34 @@ func operatorOwnedRecord() *inventory.Record {
 // delete anything — it wedges the CR in Terminating with its workloads
 // orphaned. So the readiness guard refuses rather than proceeding, and it says
 // why.
-func TestDeleteOperatorOwned_RefusesWhenOperatorIsNotReady(t *testing.T) {
-	err := deleteOperatorOwned(context.Background(), emptyClusterClient(), operatorOwnedRecord(),
+func TestDeleteControllerOwned_RefusesWhenControllerIsNotReady(t *testing.T) {
+	err := deleteControllerOwned(context.Background(), emptyClusterClient(), controllerOwnedRecord(),
 		time.Second, false, output.InstanceLogger("test"))
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not ready")
 	assert.Contains(t, err.Error(), inventory.CleanupFinalizer)
 	assert.Contains(t, err.Error(), "Terminating")
-	assert.Contains(t, err.Error(), "opm operator install")
+	assert.Contains(t, err.Error(), "opm controller install")
 }
 
 // The guard runs before the dry-run short-circuit: a dry run that reported
-// "would delete" against a down operator would be describing an outcome that
+// "would delete" against a down controller would be describing an outcome that
 // cannot happen.
-func TestDeleteOperatorOwned_DryRunStillRequiresAReadyOperator(t *testing.T) {
-	err := deleteOperatorOwned(context.Background(), emptyClusterClient(), operatorOwnedRecord(),
+func TestDeleteControllerOwned_DryRunStillRequiresAReadyController(t *testing.T) {
+	err := deleteControllerOwned(context.Background(), emptyClusterClient(), controllerOwnedRecord(),
 		time.Second, true, output.InstanceLogger("test"))
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not ready")
 }
 
-// runningOperatorObjects is an operator applied with kubectl from a release
+// runningControllerObjects is a controller applied with kubectl from a release
 // manifest: its four CRDs Established and its controller Deployment rolled
-// out, at the operator's fixed names, with no ModuleInstance recording it.
-func runningOperatorObjects() []runtime.Object {
+// out, at the controller's fixed names, with no ModuleInstance recording it.
+func runningControllerObjects() []runtime.Object {
 	var objs []runtime.Object
-	for _, name := range operator.CRDNames() {
+	for _, name := range controller.CRDNames() {
 		objs = append(objs, &unstructured.Unstructured{Object: map[string]any{
 			"apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition",
 			"metadata": map[string]any{"name": name},
@@ -88,7 +88,7 @@ func runningOperatorObjects() []runtime.Object {
 	}
 	return append(objs, &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "apps/v1", "kind": "Deployment",
-		"metadata": map[string]any{"name": operator.ControllerDeploymentName, "namespace": operator.OperatorNamespace},
+		"metadata": map[string]any{"name": controller.ControllerDeploymentName, "namespace": controller.ControllerNamespace},
 		"status": map[string]any{
 			"observedGeneration": int64(0), "replicas": int64(1),
 			"updatedReplicas": int64(1), "availableReplicas": int64(1),
@@ -104,19 +104,19 @@ func fakeClusterClient(objs ...runtime.Object) (*kubernetes.Client, *fakedynamic
 	return &kubernetes.Client{Dynamic: fake}, fake
 }
 
-// An operator applied with kubectl has no instance record; the readiness check
-// finds it by its fixed names, so an operator-owned delete goes ahead.
-func TestDeleteOperatorOwned_KubectlInstalledOperatorIsFound(t *testing.T) {
-	rec := operatorOwnedRecord()
+// A controller applied with kubectl has no instance record; the readiness check
+// finds it by its fixed names, so a controller-owned delete goes ahead.
+func TestDeleteControllerOwned_KubectlInstalledControllerIsFound(t *testing.T) {
+	rec := controllerOwnedRecord()
 	mi := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": inventory.APIVersionModuleInstance, "kind": inventory.KindModuleInstance,
 		"metadata": map[string]any{"name": rec.Name, "namespace": rec.Namespace},
 	}}
-	client, fake := fakeClusterClient(append(runningOperatorObjects(), mi)...)
+	client, fake := fakeClusterClient(append(runningControllerObjects(), mi)...)
 
 	var runErr error
 	captureOutput(t, func() {
-		runErr = deleteOperatorOwned(context.Background(), client, rec, 5*time.Second, false, output.InstanceLogger("test"))
+		runErr = deleteControllerOwned(context.Background(), client, rec, 5*time.Second, false, output.InstanceLogger("test"))
 	})
 	require.NoError(t, runErr)
 
@@ -126,7 +126,7 @@ func TestDeleteOperatorOwned_KubectlInstalledOperatorIsFound(t *testing.T) {
 
 // --force skips the confirmation prompt; it must not reach the readiness
 // guard, since forcing past that guard produces the wedge rather than avoiding
-// it. deleteOperatorOwned takes no force parameter at all — this pins the flag
+// it. deleteControllerOwned takes no force parameter at all — this pins the flag
 // to its stated meaning so a later change cannot quietly widen it.
 func TestDeleteForceFlagIsConfirmationOnly(t *testing.T) {
 	cmd := NewInstanceDeleteCmd(&config.GlobalConfig{})
@@ -286,7 +286,7 @@ func TestExecuteInstanceDelete_ReadErrorKeepsModuleInstance(t *testing.T) {
 	}
 }
 
-// guardScenario is a cluster for the operator-instance guard: the target's
+// guardScenario is a cluster for the controller-instance guard: the target's
 // ModuleInstance and the one ConfigMap its inventory tracks, plus any other
 // ModuleInstances.
 type guardScenario struct {
@@ -369,20 +369,20 @@ func armedHello() runtime.Object {
 	return moduleInstanceObj("default", "hello", inventory.CleanupFinalizer)
 }
 
-func TestDeleteResolvedInstance_OperatorInstanceRefusedWhileArmed(t *testing.T) {
-	g := newGuardScenario(operator.OperatorNamespace, operator.OperatorInstanceName, "", false, nil, armedHello())
+func TestDeleteResolvedInstance_ControllerInstanceRefusedWhileArmed(t *testing.T) {
+	g := newGuardScenario(controller.ControllerNamespace, controller.ControllerInstanceName, "", false, nil, armedHello())
 
 	_, err := g.run(t, false)
 	requireExitCode(t, err, opmexit.ExitValidationError)
 	assert.Contains(t, err.Error(), "default/hello")
-	assert.Contains(t, err.Error(), "opm operator uninstall --remove-finalizers")
+	assert.Contains(t, err.Error(), "opm controller uninstall --remove-finalizers")
 	assert.Contains(t, err.Error(), "orphaning")
 	g.assertUntouched(t)
 }
 
 // A dry run that passed where the real run refuses would mislead.
-func TestDeleteResolvedInstance_OperatorInstanceDryRunRefusesToo(t *testing.T) {
-	g := newGuardScenario(operator.OperatorNamespace, operator.OperatorInstanceName, "", false, nil, armedHello())
+func TestDeleteResolvedInstance_ControllerInstanceDryRunRefusesToo(t *testing.T) {
+	g := newGuardScenario(controller.ControllerNamespace, controller.ControllerInstanceName, "", false, nil, armedHello())
 
 	_, err := g.run(t, true)
 	requireExitCode(t, err, opmexit.ExitValidationError)
@@ -390,12 +390,12 @@ func TestDeleteResolvedInstance_OperatorInstanceDryRunRefusesToo(t *testing.T) {
 	g.assertUntouched(t)
 }
 
-// The operator never reconciles or prunes the instance that deploys it, so the
-// operator-owned branch would report a prune that does not happen. The record
-// is refused before that branch, even with a ready operator.
-func TestDeleteResolvedInstance_OperatorOwnedOperatorInstanceRefused(t *testing.T) {
-	g := newGuardScenario(operator.OperatorNamespace, operator.OperatorInstanceName, "", false, nil, runningOperatorObjects()...)
-	g.rec.Owner = inventory.OwnerOperator
+// The controller never reconciles or prunes the instance that deploys it, so the
+// controller-owned branch would report a prune that does not happen. The record
+// is refused before that branch, even with a ready controller.
+func TestDeleteResolvedInstance_ControllerOwnedControllerInstanceRefused(t *testing.T) {
+	g := newGuardScenario(controller.ControllerNamespace, controller.ControllerInstanceName, "", false, nil, runningControllerObjects()...)
+	g.rec.Owner = inventory.OwnerController
 	g.rec.Prune = true
 
 	out, err := g.run(t, false)
@@ -409,16 +409,16 @@ func TestDeleteResolvedInstance_OperatorOwnedOperatorInstanceRefused(t *testing.
 }
 
 func TestDeleteResolvedInstance_TargetItselfArmed(t *testing.T) {
-	g := newGuardScenario(operator.OperatorNamespace, operator.OperatorInstanceName, "", true, nil)
+	g := newGuardScenario(controller.ControllerNamespace, controller.ControllerInstanceName, "", true, nil)
 
 	_, err := g.run(t, false)
 	requireExitCode(t, err, opmexit.ExitValidationError)
-	assert.Contains(t, err.Error(), "opm-operator-system/opm-operator (the instance being deleted)")
+	assert.Contains(t, err.Error(), "opm-controller-system/opm-controller (the instance being deleted)")
 	g.assertUntouched(t)
 }
 
 func TestDeleteResolvedInstance_ModulePathSignal(t *testing.T) {
-	g := newGuardScenario("platform", "ops", "opmodel.dev/modules/opm_operator@v0", false, nil, armedHello())
+	g := newGuardScenario("platform", "ops", "opmodel.dev/modules/opm_controller@v0", false, nil, armedHello())
 
 	_, err := g.run(t, false)
 	requireExitCode(t, err, opmexit.ExitValidationError)
@@ -438,15 +438,15 @@ func TestDeleteResolvedInstance_InventoryCRDSignal(t *testing.T) {
 
 func TestDeleteResolvedInstance_LookAlikeIsNotGuarded(t *testing.T) {
 	crd := k8sinventory.Entry{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition", Name: "widgets.example.opmodel.dev.io"}
-	g := newGuardScenario("default", "dash", "opmodel.dev/modules/opm_operator_dashboard@v0", false, []k8sinventory.Entry{crd}, armedHello())
+	g := newGuardScenario("default", "dash", "opmodel.dev/modules/opm_controller_dashboard@v0", false, []k8sinventory.Entry{crd}, armedHello())
 
 	out, err := g.run(t, false)
 	require.NoError(t, err, out)
 	g.assertDeleted(t)
 }
 
-func TestDeleteResolvedInstance_OperatorInstanceNoArmedProceeds(t *testing.T) {
-	g := newGuardScenario(operator.OperatorNamespace, operator.OperatorInstanceName, "", false, nil)
+func TestDeleteResolvedInstance_ControllerInstanceNoArmedProceeds(t *testing.T) {
+	g := newGuardScenario(controller.ControllerNamespace, controller.ControllerInstanceName, "", false, nil)
 
 	out, err := g.run(t, false)
 	require.NoError(t, err, out)
@@ -454,7 +454,7 @@ func TestDeleteResolvedInstance_OperatorInstanceNoArmedProceeds(t *testing.T) {
 }
 
 func TestDeleteResolvedInstance_ListFailureFailsClosed(t *testing.T) {
-	g := newGuardScenario(operator.OperatorNamespace, operator.OperatorInstanceName, "", false, nil)
+	g := newGuardScenario(controller.ControllerNamespace, controller.ControllerInstanceName, "", false, nil)
 	g.fake.PrependReactor("list", "moduleinstances", func(k8stesting.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewForbidden(schema.GroupResource{Group: "opmodel.dev", Resource: "moduleinstances"}, "", errors.New("denied"))
 	})
@@ -473,14 +473,14 @@ func TestDeleteResolvedInstance_OtherInstancesAreNotGuarded(t *testing.T) {
 	g.assertDeleted(t)
 }
 
-// The operator-owned refusal comes before the cluster-wide list, so a user who
+// The controller-owned refusal comes before the cluster-wide list, so a user who
 // may not list ModuleInstances still gets exit 2 and the spec.owner remedy, in
 // a dry run too, and no list is attempted.
-func TestDeleteResolvedInstance_OperatorOwnedRefusedBeforeList(t *testing.T) {
+func TestDeleteResolvedInstance_ControllerOwnedRefusedBeforeList(t *testing.T) {
 	for _, dryRun := range []bool{false, true} {
 		t.Run(fmt.Sprintf("dryRun=%v", dryRun), func(t *testing.T) {
-			g := newGuardScenario(operator.OperatorNamespace, operator.OperatorInstanceName, "", false, nil)
-			g.rec.Owner = inventory.OwnerOperator
+			g := newGuardScenario(controller.ControllerNamespace, controller.ControllerInstanceName, "", false, nil)
+			g.rec.Owner = inventory.OwnerController
 			g.fake.PrependReactor("list", "moduleinstances", func(k8stesting.Action) (bool, runtime.Object, error) {
 				return true, nil, apierrors.NewForbidden(schema.GroupResource{Group: "opmodel.dev", Resource: "moduleinstances"}, "", errors.New("denied"))
 			})
@@ -490,7 +490,7 @@ func TestDeleteResolvedInstance_OperatorOwnedRefusedBeforeList(t *testing.T) {
 			assert.Contains(t, err.Error(), "spec.owner")
 			for _, a := range g.fake.Actions() {
 				assert.False(t, a.GetVerb() == "list" && a.GetResource().Resource == "moduleinstances",
-					"no ModuleInstance list before the operator-owned refusal")
+					"no ModuleInstance list before the controller-owned refusal")
 			}
 			g.assertUntouched(t)
 		})
@@ -581,13 +581,13 @@ func TestExecuteInstanceDelete_UnreadableNamespaceIsLeftBehind(t *testing.T) {
 	assert.True(t, apierrors.IsNotFound(miErr), "the ModuleInstance is deleted")
 }
 
-// The operator-owned branch deletes only the ModuleInstance and lets the
-// operator prune with its own credentials, so the CLI's unreadable entries do
+// The controller-owned branch deletes only the ModuleInstance and lets the
+// controller prune with its own credentials, so the CLI's unreadable entries do
 // not change it.
-func TestDeleteResolvedInstance_OperatorOwnedIgnoresUnreadable(t *testing.T) {
-	rec := operatorOwnedRecord()
+func TestDeleteResolvedInstance_ControllerOwnedIgnoresUnreadable(t *testing.T) {
+	rec := controllerOwnedRecord()
 	rec.Prune = true
-	client, fake := fakeClusterClient(append(runningOperatorObjects(), moduleInstanceObj(rec.Namespace, rec.Name))...)
+	client, fake := fakeClusterClient(append(runningControllerObjects(), moduleInstanceObj(rec.Namespace, rec.Name))...)
 	unreadable := []inventory.UnreadableEntry{{
 		Entry: k8sinventory.Entry{Kind: "Deployment", Group: "apps", Namespace: "demo", Name: "podinfo", Version: "v1"},
 		Err:   forbiddenRead("deployments", "podinfo"),
@@ -599,7 +599,7 @@ func TestDeleteResolvedInstance_OperatorOwnedIgnoresUnreadable(t *testing.T) {
 			rec, nil, unreadable, 5*time.Second, false, output.InstanceLogger(rec.Name))
 	})
 	require.NoError(t, runErr, out)
-	assert.Contains(t, out, "operator pruned")
+	assert.Contains(t, out, "controller pruned")
 	_, miErr := fake.Tracker().Get(inventory.ModuleInstanceGVR, rec.Namespace, rec.Name)
 	assert.True(t, apierrors.IsNotFound(miErr), "the ModuleInstance is deleted")
 }

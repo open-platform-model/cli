@@ -3,17 +3,17 @@
 // .github/workflows/publish-fixtures.yml. Consumers resolve it from GHCR like
 // any other module: nothing here requires a local registry.
 //
-// Forked from opm-operator/test/fixtures/modules/podinfo, which keeps its own
+// Forked from opm-controller/test/fixtures/modules/podinfo, which keeps its own
 // copy on its own coordinate. The two are independent artifacts and are meant
 // to drift: render-parity's correctness comes from comparing the CLI and
-// kernel render paths over the SAME fixture, not from matching the operator's
+// kernel render paths over the SAME fixture, not from matching the controller's
 // copy.
 //
 // Stateless web example module (opmodel.dev/core@v2). Renders a Deployment +
 // Service via the catalog's deployment- and service-transformers, with an HTTP
 // livenessProbe (/healthz) and readinessProbe (/readyz) on the podinfo HTTP
 // port (9898). Serves as a real-world "getting started" example a newcomer can
-// apply against a running operator to see OPM work end-to-end.
+// apply against a running controller to see OPM work end-to-end.
 package podinfo
 
 import (

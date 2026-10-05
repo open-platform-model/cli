@@ -102,7 +102,7 @@ Commits: `type(scope): description`.
 - Commit messages should be concise and scoped. AI attribution is limited to an optional plain `Co-Authored-By: Claude <noreply@anthropic.com>` trailer — never a `Claude-Session:` trailer, session URL, model-versioned co-author line, or "Generated with …" footer.
 
 Pre-GA note: from its first beta the cli (with opmodel.dev/core@v2,
-library and opm-operator) is on the path to GA.
+library and opm-controller) is on the path to GA.
 A breaking change is still allowed during beta, but only as a `!` in the PR
 title (`feat!:`), which is the squash commit title and the CHANGELOG entry;
 until the owner merge settings land, merge by squash only and give a

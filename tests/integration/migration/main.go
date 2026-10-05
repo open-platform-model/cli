@@ -7,7 +7,7 @@
 // status/list read CRs only (an unmigrated Secret is invisible).
 //
 // Requires a running kind cluster at context "kind-opm-dev" with the
-// ModuleInstance CRD installed (opm operator install --crds-only).
+// ModuleInstance CRD installed (opm controller install --crds-only).
 // Run with: go run tests/integration/migration/main.go
 package main
 

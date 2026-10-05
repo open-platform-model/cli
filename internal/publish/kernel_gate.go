@@ -8,7 +8,7 @@ import (
 )
 
 // gateKernelLoad (msg 12) acquires a module tree through the kernel's module
-// acquire — the same verb `opm module build` and the operator use — and
+// acquire — the same verb `opm module build` and the controller use — and
 // turns a refusal into a publish refusal carrying the kernel's own error.
 // Publish must not judge a module loadable by any test the kernel does not
 // apply (enhancement 0011: publish never judges an artifact differently from
@@ -36,7 +36,7 @@ func gateKernelLoad(ctx context.Context, p *Plan, opts Options) {
 	p.refuse(Refusal{
 		Headline: "the kernel would refuse to load this module",
 		Evidence: [][]string{{"loader", err.Error()}},
-		Consequence: "opm module build and the operator load modules through this loader; a\n" +
+		Consequence: "opm module build and the controller load modules through this loader; a\n" +
 			"published tag would be unloadable everywhere it is consumed.",
 		Action: kernelLoadAction(err),
 	})

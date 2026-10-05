@@ -58,4 +58,4 @@ Canonical glossary: [`opm/docs/legacy/glossary.md`](https://github.com/open-plat
 
 - CUE schema definitions (those belong in `catalog/docs/`).
 - End-user quickstarts (those belong in `opm/docs/site/`).
-- Kubernetes operator procedures (those belong in `opm-operator/docs/`).
+- Kubernetes controller procedures (those belong in `opm-controller/docs/`).

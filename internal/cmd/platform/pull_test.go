@@ -89,7 +89,7 @@ func platformDoc(spec, status map[string]any, generation int64) *unstructured.Un
 }
 
 // reconciledPlatform is the fixture cluster: one authored subscription and
-// one catalog an active TransformerRegistration contributed, as the operator
+// one catalog an active TransformerRegistration contributed, as the controller
 // resolved them.
 func reconciledPlatform() *unstructured.Unstructured {
 	return platformDoc(
@@ -102,7 +102,7 @@ func reconciledPlatform() *unstructured.Unstructured {
 		map[string]any{
 			"observedGeneration": int64(7),
 			"packageIdentity":    "gen-7-3f9a1c2b",
-			"operatorVersion":    "v1.0.0-alpha.20",
+			"controllerVersion":  "v1.0.0-alpha.20",
 			"registry": []any{
 				map[string]any{
 					"catalog": "opmodel.dev/catalogs/opm@v4",
@@ -303,7 +303,7 @@ func TestRunPlatformPull_ReportNamesWhatItReproduced(t *testing.T) {
 
 	assert.Contains(t, report, "cluster Platform CR cluster")
 	assert.Contains(t, report, "effective registry, package gen-7-3f9a1c2b")
-	assert.Contains(t, report, "generation 7 (observed 7), operator v1.0.0-alpha.20")
+	assert.Contains(t, report, "generation 7 (observed 7), controller v1.0.0-alpha.20")
 	assert.Contains(t, report, "registry: 2 entries")
 	assert.Contains(t, report, platform.EntrySourceSubscription)
 	assert.Contains(t, report, platform.EntrySourceRegistration)
@@ -315,7 +315,7 @@ func TestRunPlatformPull_ReportNamesWhatItReproduced(t *testing.T) {
 }
 
 // Without a recorded registry the spec is what generates, and the report
-// says so rather than claiming a package the operator never produced.
+// says so rather than claiming a package the controller never produced.
 func TestRunPlatformPull_ReportNamesTheSpecFallback(t *testing.T) {
 	cfg := pullConfig(t)
 	dir := filepath.Join(t.TempDir(), "cluster-platform")
@@ -329,8 +329,8 @@ func TestRunPlatformPull_ReportNamesTheSpecFallback(t *testing.T) {
 	report, err := runPull(t, cfg, newPullDynamic(solo), dir, false)
 	require.NoError(t, err)
 
-	assert.Contains(t, report, "spec registry, no operator generation recorded")
-	assert.Contains(t, report, "generation 3, no operator generation recorded")
+	assert.Contains(t, report, "spec registry, no controller generation recorded")
+	assert.Contains(t, report, "generation 3, no controller generation recorded")
 	assert.Contains(t, report, "registry: 1 entry")
 	assert.NotContains(t, report, platform.EntrySourceRegistration)
 }

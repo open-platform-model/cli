@@ -52,14 +52,14 @@ func TestExportAndDigest_IsTheLibraryDigestOfTheExport(t *testing.T) {
 	assert.Equal(t, want, digest)
 }
 
-// The managed-by value is the runtime's name, so the CLI and the operator
+// The managed-by value is the runtime's name, so the CLI and the controller
 // digest one render equally (0012:D6:R2).
 func TestExportAndDigest_IgnoresTheManagedByValue(t *testing.T) {
 	_, cli, err := exportAndDigest(digestResources(t, "opm-cli", "a"))
 	require.NoError(t, err)
-	_, operator, err := exportAndDigest(digestResources(t, "opm-controller", "a"))
+	_, controller, err := exportAndDigest(digestResources(t, "opm-controller", "a"))
 	require.NoError(t, err)
-	assert.Equal(t, cli, operator)
+	assert.Equal(t, cli, controller)
 }
 
 // Any other label moves the digest (0012:D6:R3).

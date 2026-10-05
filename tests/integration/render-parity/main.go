@@ -6,7 +6,7 @@
 //
 //	Path A — the CLI workflow (FromModule): local module directory, staged as
 //	         the build's main module, synthesized and rendered by the kernel.
-//	Path B — the operator's call sequence: AcquireModuleFromRegistry +
+//	Path B — the controller's call sequence: AcquireModuleFromRegistry +
 //	         SynthesizeInstance + Render (mirroring KernelModuleRenderer),
 //	         digested with the library's shared k8sinventory.RenderDigest,
 //	         the digest the CLI workflow computes.
@@ -44,7 +44,7 @@ import (
 )
 
 const (
-	// moduleDir is repo-local (forked from opm-operator's copy — see the
+	// moduleDir is repo-local (forked from opm-controller's copy — see the
 	// fixture's module.cue header) so render-parity runs in a standalone clone
 	// with no sibling checkout. Resolved relative to the repo root, the
 	// program's cwd.
@@ -128,7 +128,7 @@ func run() error {
 	digestA := resultA.RenderDigest
 	fmt.Printf("path A (CLI workflow, local dir):        %s (%d resources)\n", digestA, len(resultA.Resources))
 
-	// ── Path B: operator call sequence (registry acquisition) ─────────────
+	// ── Path B: controller call sequence (registry acquisition) ─────────────
 	k := kernel.New(kernel.WithRegistry(registry))
 
 	// Acquire the same platform module directory the CLI path resolved.
@@ -155,7 +155,7 @@ func run() error {
 		Values:    []kernel.Source{debugValues},
 	})
 	if err != nil {
-		return fmt.Errorf("operator-path synthesis: %w", err)
+		return fmt.Errorf("controller-path synthesis: %w", err)
 	}
 
 	out, err := k.Render(ctx, kernel.RenderInput{
@@ -164,18 +164,18 @@ func run() error {
 		RuntimeName: workflowrender.RuntimeName, // held constant — see file comment
 	})
 	if err != nil {
-		return fmt.Errorf("operator-path render: %w", err)
+		return fmt.Errorf("controller-path render: %w", err)
 	}
 
 	resources, err := object.Export(object.Resources(out.Compiled))
 	if err != nil {
-		return fmt.Errorf("operator-path export: %w", err)
+		return fmt.Errorf("controller-path export: %w", err)
 	}
 	digestB, err := k8sinventory.RenderDigest(resources)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("path B (operator sequence, registry):    %s (%d resources)\n", digestB, len(resources))
+	fmt.Printf("path B (controller sequence, registry):    %s (%d resources)\n", digestB, len(resources))
 
 	if digestA != digestB {
 		return fmt.Errorf("render digests differ: local-dir staging vs registry acquisition produced different bytes — check for content drift between %s and %s@%s, then suspect the load paths", absModuleDir, modulePath, moduleVersion)

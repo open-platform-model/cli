@@ -36,26 +36,26 @@ type Options struct {
 	// Wait, in CLI-executor mode, blocks after a successful apply and
 	// inventory write until every applied resource is healthy (see
 	// kubernetes.HealthyPredicate) or Timeout runs out. Ignored on dry-run. An
-	// operator-managed instance always waits for the operator, so the flag
+	// controller-managed instance always waits for the controller, so the flag
 	// changes nothing there.
 	Wait bool
 
-	// Timeout bounds the operator-reconcile wait in thin-editor mode. In
+	// Timeout bounds the controller-reconcile wait in thin-editor mode. In
 	// CLI-executor mode it bounds the CustomResourceDefinition establish wait,
 	// counted from the start of the apply, and, separately and in full, the
 	// readiness wait (Wait). Zero uses inventory.DefaultReconcileTimeout.
 	Timeout time.Duration
 
-	// SkipOperatorCeiling skips the operator-version ceiling gate. Only
-	// `opm operator install` sets it, for the operator's own instance:
-	// install replaces the operator the Platform reports rather than driving
-	// it, and applies the same MAJOR.MINOR rule to the operator it installs
+	// SkipControllerCeiling skips the controller-version ceiling gate. Only
+	// `opm controller install` sets it, for the controller's own instance:
+	// install replaces the controller the Platform reports rather than driving
+	// it, and applies the same MAJOR.MINOR rule to the controller it installs
 	// (0021:D9:R3, 0021:D9:R4). The CRD presence and field-floor gates still
 	// run.
-	SkipOperatorCeiling bool
+	SkipControllerCeiling bool
 
-	// SkipUnprovided is the command's --skip-unprovided. An operator-managed
-	// instance refuses it: the operator renders that instance and never
+	// SkipUnprovided is the command's --skip-unprovided. A controller-managed
+	// instance refuses it: the controller renders that instance and never
 	// skips.
 	SkipUnprovided bool
 }
@@ -86,14 +86,14 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 	// The library's shared render digest, computed by the render workflow
 	// over the render's single export; it leaves the managed-by value out so
-	// the CLI and the operator digest one render equally (0012:D6).
+	// the CLI and the controller digest one render equally (0012:D6).
 	manifestDigest := result.RenderDigest
 	output.Debug("render digest computed", "digest", manifestDigest)
 
 	// Pre-apply gates 1-3 (cluster probes). Skipped entirely on dry-run — they
 	// exist to protect writes, and a dry-run writes nothing (0006:D5).
 	if !dryRun {
-		if err := RunClusterGates(ctx, req.K8sClient, req.Options.SkipOperatorCeiling); err != nil {
+		if err := RunClusterGates(ctx, req.K8sClient, req.Options.SkipControllerCeiling); err != nil {
 			// Not Printed: the gates return bare errors without logging, so
 			// claiming otherwise makes a missing CRD exit silently.
 			return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err}
@@ -102,13 +102,13 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 	// Ownership has to be resolved on dry-run too: with no record the resolver
 	// below would see an absent CR and preview the CLI-executor path, promising
-	// resource applies that an operator-owned instance would never receive.
+	// resource applies that a controller-owned instance would never receive.
 	// --dry-run is server-side, so the client is connected and this read is safe.
 	if dryRun && instanceID != "" {
 		rec, err := inventory.GetRecord(ctx, req.K8sClient, name, namespace)
 		if err != nil {
 			instanceLog.Warn("could not read inventory CR, previewing as CLI-managed", "error", err)
-		} else if inventory.ResolveOwnership(rec) == inventory.ModeOperatorOwned {
+		} else if inventory.ResolveOwnership(rec) == inventory.ModeControllerOwned {
 			return previewThinEditor(req, rec)
 		}
 	}
@@ -118,11 +118,11 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	// can report what a real apply would prune.
 	prevRecord, legacy := LoadPreviousInventory(ctx, req.K8sClient, name, namespace, instanceID, dryRun, instanceLog)
 
-	// Gate 4: ownership — the single branch point (0006:D18). An operator-owned
+	// Gate 4: ownership — the single branch point (0006:D18). A controller-owned
 	// instance takes the thin-editor path and returns; everything below this
 	// point is CLI-executor mode. A dry-run never takes this path: an
-	// operator-owned instance was already previewed above.
-	if !dryRun && inventory.ResolveOwnership(prevRecord) == inventory.ModeOperatorOwned {
+	// controller-owned instance was already previewed above.
+	if !dryRun && inventory.ResolveOwnership(prevRecord) == inventory.ModeControllerOwned {
 		return executeThinEditor(ctx, req, prevRecord)
 	}
 
@@ -270,8 +270,8 @@ func logLeftBehind(protected []k8sinventory.Entry, instanceLog *log.Logger) {
 }
 
 // RunClusterGates runs the read-only pre-apply cluster gates in order: CRD
-// presence, CRD field floor, operator-version ceiling. skipCeiling skips the
-// last, for the operator's own install only (Options.SkipOperatorCeiling).
+// presence, CRD field floor, controller-version ceiling. skipCeiling skips the
+// last, for the controller's own install only (Options.SkipControllerCeiling).
 func RunClusterGates(ctx context.Context, client *kubernetes.Client, skipCeiling bool) error {
 	if err := inventory.GateCRDPresent(ctx, client); err != nil {
 		return err
@@ -280,10 +280,10 @@ func RunClusterGates(ctx context.Context, client *kubernetes.Client, skipCeiling
 		return err
 	}
 	if skipCeiling {
-		output.Debug("operator-version ceiling skipped: the operator's own install checks its target instead")
+		output.Debug("controller-version ceiling skipped: the controller's own install checks its target instead")
 		return nil
 	}
-	return inventory.GateOperatorVersionCeiling(ctx, client, version.Version)
+	return inventory.GateControllerVersionCeiling(ctx, client, version.Version)
 }
 
 // EnsureNamespaceIfRequested creates the instance namespace when createNS is
@@ -521,8 +521,8 @@ func FormatApplySummary(r *kubernetes.ApplyResult) string {
 
 // sourceDigest returns a deterministic digest identifying the module source of
 // this apply, derived from the canonical module reference (path@version). For
-// any non-empty reference this is byte-identical to the operator's
-// ModuleSourceDigest (opm-operator internal/status): on the CUE-native
+// any non-empty reference this is byte-identical to the controller's
+// ModuleSourceDigest (opm-controller internal/status): on the CUE-native
 // resolution path BOTH actors use the reference-identity digest — there is no
 // Flux artifact content digest here. Do not change one side without the
 // other. The empty-reference guard below is CLI-only (omits the status field
@@ -537,7 +537,7 @@ func sourceDigest(modulePath, moduleVersion string) string {
 }
 
 // valuesDigest returns a deterministic digest of the unified values blob.
-// Canonical-JSON semantics match the operator's ConfigDigest, including the
+// Canonical-JSON semantics match the controller's ConfigDigest, including the
 // empty case (SHA-256 of no bytes), so the field is cross-actor comparable.
 func valuesDigest(values map[string]any) string {
 	if len(values) == 0 {

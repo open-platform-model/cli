@@ -1,4 +1,4 @@
-// Forked from opm-operator/test/fixtures/modules/podinfo (components.cue) —
+// Forked from opm-controller/test/fixtures/modules/podinfo (components.cue) —
 // see module.cue for provenance and the drift-is-intended rationale.
 package podinfo
 

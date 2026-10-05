@@ -26,7 +26,7 @@ Apply resources in ascending weight order (CRDs before CRs, ConfigMaps before De
 
 Write a persisted instance inventory record (as a Kubernetes Secret) after each successful apply, containing the current owned resource set and deployed module version. Failed applies skip the inventory write to allow convergence on retry.
 
-Refuse deletion of controller-managed instances (`createdBy: "controller"`) to prevent CLI/operator conflicts.
+Refuse deletion of controller-managed instances (`createdBy: "controller"`) to prevent CLI/controller conflicts.
 
 Refuse applying an empty render result when a previous inventory exists (safety gate against accidental mass deletion), unless `--force` is provided.
 
@@ -48,4 +48,4 @@ See also ADR-009 for the pruning safety checks and ADR-012 for the inventory ide
 
 **Negative:** Two discovery paths (inventory-first, label-fallback) create more code paths to maintain.
 
-**Trade-off:** Refusing controller-managed instance deletion protects against CLI/operator conflicts but means users must use the controller to manage those instances.
+**Trade-off:** Refusing controller-managed instance deletion protects against CLI/controller conflicts but means users must use the controller to manage those instances.

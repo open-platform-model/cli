@@ -37,7 +37,7 @@ func clusterPlatformObj(spec map[string]any) *unstructured.Unstructured {
 }
 
 // clusterPlatformObjWithStatus is the reconciled document: a generation on
-// metadata and the operator's recorded status beside the spec.
+// metadata and the controller's recorded status beside the spec.
 func clusterPlatformObjWithStatus(spec, status map[string]any, generation int64) *unstructured.Unstructured {
 	obj := clusterPlatformObj(spec)
 	obj.Object["metadata"] = map[string]any{
@@ -54,7 +54,7 @@ func TestClusterPlatformGetterFor_ReadsSpecAndStatus(t *testing.T) {
 		map[string]any{
 			"observedGeneration": int64(7),
 			"packageIdentity":    "gen-7-3f9a1c2b",
-			"operatorVersion":    "v1.0.0-alpha.20",
+			"controllerVersion":  "v1.0.0-alpha.20",
 			"registry": []any{
 				map[string]any{
 					"catalog": "opmodel.dev/catalogs/opm@v4",
@@ -76,7 +76,7 @@ func TestClusterPlatformGetterFor_ReadsSpecAndStatus(t *testing.T) {
 	assert.Equal(t, "gen-7-3f9a1c2b", doc.Status["packageIdentity"])
 }
 
-// A Platform no operator has reconciled carries no status: the solo-cluster
+// A Platform no controller has reconciled carries no status: the solo-cluster
 // case, which resolution answers by generating from the spec.
 func TestClusterPlatformGetterFor_NoStatusIsNotAnError(t *testing.T) {
 	dyn := newFakeDynamic(clusterPlatformObj(map[string]any{"type": "kubernetes"}))

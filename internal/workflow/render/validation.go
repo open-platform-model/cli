@@ -32,7 +32,7 @@ const renderFailedMsg = "render failed"
 // raised by the CLI from the library's helper after the render) is the
 // library's message split at its first newline: the header under the
 // render-failed header, the identity rows as details, so the CLI and the
-// operator refuse the same module in the same words. Everything else goes
+// controller refuse the same module in the same words. Everything else goes
 // through the shared validation funnel (grouped CUE positions, values schema
 // failures, unresolved demands raised outside a render).
 func printValidationError(err error) {

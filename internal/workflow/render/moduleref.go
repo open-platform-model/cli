@@ -12,11 +12,11 @@ import "github.com/open-platform-model/library/opm/module"
 // well.
 //
 // The "v" prefix is load-bearing, not cosmetic. This pair is written verbatim
-// to ModuleInstance.spec.module, which the operator reads and passes straight
+// to ModuleInstance.spec.module, which the controller reads and passes straight
 // to the registry loader with no normalization of its own — and CUE rejects a
 // bare "0.1.0" as a malformed module version. A bare version therefore produces
-// a CR that the operator cannot resolve, which defeats the point of both actors
-// sharing one record. The operator's own CRD documents the v-prefixed form
+// a CR that the controller cannot resolve, which defeats the point of both actors
+// sharing one record. The controller's own CRD documents the v-prefixed form
 // (`Example: "v0.2.1"`).
 func CanonicalModuleRef(m module.ModuleMetadata) (path, version string) {
 	return m.ModulePath, ensureVPrefix(m.Version)

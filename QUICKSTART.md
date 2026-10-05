@@ -173,7 +173,7 @@ Some traits and resources are provider-fulfilled: the catalog that defines
 them ships no transformer, and a platform supplies one (the `backup` trait of
 `opmodel.dev/catalogs/opm@v4` is one). A module that attaches one renders
 only on a platform that carries a provider. Against the module's own deps,
-or on a cluster without the OPM operator, the render is refused:
+or on a cluster without the OPM controller, the render is refused:
 
 ```text
 ERRO render failed: 1 unresolved demand(s):
@@ -205,8 +205,8 @@ so the manifests on standard output stay clean.
 ModuleInstance, as the annotation
 `module-instance.opmodel.dev/skipped-contracts` (for example
 `db=opmodel.dev/catalogs/opm/traits/backup@v1alpha1`); the next apply that
-skips nothing removes it. An instance the OPM operator manages refuses the
-flag, because the operator renders it and never skips.
+skips nothing removes it. An instance the OPM controller manages refuses the
+flag, because the controller renders it and never skips.
 
 `opm module build` also takes a published module by its module path, for
 example `opm module build opmodel.dev/modules/web_app --version v1`.
@@ -303,15 +303,15 @@ This creates a local kind cluster named `opm-dev`.
 
 `opm instance apply` records what it deployed in a `ModuleInstance` custom
 resource, so the `ModuleInstance` CRD must exist on the cluster before you
-apply. Install just the CRDs (no operator) with:
+apply. Install just the CRDs (no controller) with:
 
 ```bash
-opm operator install --crds-only
+opm controller install --crds-only
 ```
 
 Apply fails fast with a hint if the CRD is missing or out of date. If your
 user is namespace-scoped, also grant write access to the
-`moduleinstances/status` subresource (or run `opm operator install
+`moduleinstances/status` subresource (or run `opm controller install
 --crds-only --rbac`) — apply aborts before touching any resource when it
 cannot record inventory.
 
@@ -369,7 +369,7 @@ task cluster:delete
 ## Next Steps
 
 - Run `opm instance --help` and `opm module --help`
-- See `README.md` for command overview and the operator-managed instance contract
+- See `README.md` for command overview and the controller-managed instance contract
 - See `AGENTS.md` for architecture and development guidance
 - Browse the public module catalog at
   <https://github.com/open-platform-model/modules>

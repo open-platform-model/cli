@@ -16,7 +16,7 @@ import (
 
 // ClusterPlatformModulePath is the generated cluster platform module's own
 // identity: the reserved, never-published platforms namespace (0019:D6), the
-// same path the operator generates under, so a CR that renders in-cluster
+// same path the controller generates under, so a CR that renders in-cluster
 // renders from a byte-identical module here.
 const ClusterPlatformModulePath = "opmodel.dev/platforms/cluster@v0"
 
@@ -42,7 +42,7 @@ type GenerateOptions struct {
 }
 
 // GenerateClusterModule turns a cluster Platform CR's spec into a platform
-// module on disk exactly as the operator's PlatformReconciler does: the
+// module on disk exactly as the controller's PlatformReconciler does: the
 // entries feed the library's generator, the dependency closure is derived
 // from the pinned modules' published module files, core is pinned at the
 // library's verified release and the module path is

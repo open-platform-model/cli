@@ -251,18 +251,18 @@ func main() {
 	}
 	fmt.Printf("   OK: AggregateStatus = %q (not Ready)\n", statusResult.AggregateStatus)
 
-	readInv68.Owner = inventory.OwnerOperator
+	readInv68.Owner = inventory.OwnerController
 	statusOpts := workflowquery.BuildStatusOptions(namespace, &cmdutil.InstanceSelectorFlags{InstanceName: instanceName, InstanceID: instanceID}, "table", false, readInv68, liveResources68, missingResources68, nil)
 	statusResult.Owner = statusOpts.Owner
 	formatted, err := kubernetes.FormatStatus(statusResult, "table")
-	check("formatting operator-managed status", err)
-	if !contains(formatted, "Owner:      operator") {
-		failf("6.8: expected formatted status to show operator owner, got: %s", formatted)
+	check("formatting controller-managed status", err)
+	if !contains(formatted, "Owner:      controller") {
+		failf("6.8: expected formatted status to show controller owner, got: %s", formatted)
 	}
-	if !contains(formatted, "operator-managed instance") {
-		failf("6.8: expected formatted status warning for operator-managed instance")
+	if !contains(formatted, "controller-managed instance") {
+		failf("6.8: expected formatted status warning for controller-managed instance")
 	}
-	fmt.Println("   OK: status formatting shows owner and operator-managed warning")
+	fmt.Println("   OK: status formatting shows owner and controller-managed warning")
 
 	// Cleanup.
 	fmt.Println()

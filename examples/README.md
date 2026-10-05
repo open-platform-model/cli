@@ -10,7 +10,7 @@ build against a public registry — no local registry, no sibling checkout.
 
 The former `hello-web` example was removed at the core v2 crossing: its
 hyphenated module name cannot exist on the v2 line (module names are
-snake_case and equal the module path leaf). The operator's fixture fleet
+snake_case and equal the module path leaf). The controller's fixture fleet
 republishes it as `hello_web`; a new example importing
 `opmodel.dev/modules/test/hello_web@v0` can be added once needed.
 

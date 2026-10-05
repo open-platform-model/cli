@@ -39,7 +39,7 @@ type Result struct {
 
 	// RenderDigest is the library's shared render digest
 	// (opm/k8s/inventory.RenderDigest) over the render's single export. It
-	// leaves the managed-by value out, so the CLI and the operator digest one
+	// leaves the managed-by value out, so the CLI and the controller digest one
 	// render equally (0012:D6). Written verbatim to
 	// status.lastAppliedRenderDigest so a future ownership transfer has a
 	// recorded value to verify against (0006:D9/D30).
@@ -121,7 +121,7 @@ type ModuleOpts struct {
 
 	// Values, when non-empty, are the values sources used instead of
 	// ValuesFiles and debugValues, checked against #config before synthesis
-	// like -f files. Operator install hands its merged values here.
+	// like -f files. Controller install hands its merged values here.
 	Values []kernel.Source
 
 	// Namespace, when set, is the synthetic instance's namespace, taking
@@ -130,8 +130,8 @@ type ModuleOpts struct {
 
 	// DepsOnly renders against the module's own dependency pins only: no
 	// --platform and no cluster Platform read, whatever PlatformFlag and
-	// ClusterPlatform hold. Operator install sets it, so repairing the
-	// operator never depends on the Platform it serves.
+	// ClusterPlatform hold. Controller install sets it, so repairing the
+	// controller never depends on the Platform it serves.
 	DepsOnly bool
 
 	// Name overrides the synthetic metadata.name. Empty falls back to

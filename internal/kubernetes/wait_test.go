@@ -36,8 +36,8 @@ func waitDeploymentFixture(ready bool) *unstructured.Unstructured {
 		"apiVersion": "apps/v1",
 		"kind":       "Deployment",
 		"metadata": map[string]any{
-			"name":      "opm-operator-controller-manager",
-			"namespace": "opm-operator-system",
+			"name":      "opm-controller-manager",
+			"namespace": "opm-controller-system",
 		},
 	}}
 	if ready {
@@ -170,7 +170,7 @@ func TestWaitAbsent_TimesOutNamingThePersistingObject(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "timed out")
 	assert.ErrorContains(t, err, "finish terminating")
-	assert.ErrorContains(t, err, "Deployment/opm-operator-controller-manager in opm-operator-system")
+	assert.ErrorContains(t, err, "Deployment/opm-controller-manager in opm-controller-system")
 }
 
 func TestWaitAbsent_AlreadyAbsentReturnsImmediately(t *testing.T) {
@@ -188,7 +188,7 @@ func TestWait_ReadinessFailsFastOnNotFound(t *testing.T) {
 	defer cancel()
 	err := Wait(ctx, client, []*unstructured.Unstructured{waitDeploymentFixture(false)}, HealthyPredicate, time.Now())
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "Deployment/opm-operator-controller-manager in opm-operator-system was applied and has since disappeared")
+	assert.ErrorContains(t, err, "Deployment/opm-controller-manager in opm-controller-system was applied and has since disappeared")
 	assert.NotContains(t, err.Error(), "timed out")
 	assert.Less(t, time.Since(start), time.Second, "must not wait out the timeout")
 }

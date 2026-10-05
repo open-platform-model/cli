@@ -39,7 +39,7 @@ type DeleteRequest struct {
 // ModuleInstance record last: only on a real run with no per-object error,
 // so a re-run can retry what failed. An object discovery could not read
 // (req.Unreadable) is such an error. Already absent objects count as
-// deleted. `opm instance delete` and `opm operator uninstall` share it. The
+// deleted. `opm instance delete` and `opm controller uninstall` share it. The
 // caller reports the result.
 func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteResult, error) {
 	instanceLog := req.Log

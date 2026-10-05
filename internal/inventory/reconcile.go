@@ -15,7 +15,7 @@ import (
 const reconcilePollInterval = 2 * time.Second
 
 // DefaultReconcileTimeout bounds a reconcile wait when the caller states no
-// preference. It matches the operator-install readiness waits.
+// preference. It matches the controller-install readiness waits.
 const DefaultReconcileTimeout = 5 * time.Minute
 
 // ResolveTimeout reads a caller-supplied bound, falling back to
@@ -31,7 +31,7 @@ func ResolveTimeout(timeout time.Duration) time.Duration {
 }
 
 // ReconcileOutcome is what a bounded reconcile wait observed. It is always
-// returned — including on timeout — so callers can report the operator's last
+// returned — including on timeout — so callers can report the controller's last
 // known verdict instead of a bare deadline error.
 type ReconcileOutcome struct {
 	// Record is the last successfully read CR state, or nil when the CR was
@@ -39,18 +39,18 @@ type ReconcileOutcome struct {
 	Record *Record
 
 	// Ready is the Ready condition attributed to the awaited generation, or
-	// nil when the operator had not yet reported one.
+	// nil when the controller had not yet reported one.
 	Ready *Condition
 
 	// Generation is the generation the wait was watching for.
 	Generation int64
 
-	// TimedOut reports that the wait hit its deadline before the operator
+	// TimedOut reports that the wait hit its deadline before the controller
 	// reconciled the awaited generation.
 	TimedOut bool
 }
 
-// Reconciled reports whether the operator observed the awaited generation and
+// Reconciled reports whether the controller observed the awaited generation and
 // reported it Ready.
 func (o *ReconcileOutcome) Reconciled() bool {
 	return o != nil && !o.TimedOut && o.Ready.IsTrue()
@@ -65,7 +65,7 @@ func (o *ReconcileOutcome) Describe() string {
 		return "timed out before the ModuleInstance became readable"
 	case o.TimedOut && o.Ready == nil:
 		return fmt.Sprintf(
-			"timed out waiting for the operator to reconcile generation %d (last observed generation %d); %s",
+			"timed out waiting for the controller to reconcile generation %d (last observed generation %d); %s",
 			o.Generation, o.Record.ObservedGeneration, o.Ready.Describe())
 	case o.TimedOut:
 		return fmt.Sprintf("timed out waiting for generation %d; last %s condition: %s",
@@ -75,7 +75,7 @@ func (o *ReconcileOutcome) Describe() string {
 	}
 }
 
-// WaitForReconcile polls the ModuleInstance CR until the operator has observed
+// WaitForReconcile polls the ModuleInstance CR until the controller has observed
 // the given generation and reported a Ready condition for it, or timeout
 // elapses. It never returns an error for a not-yet-reconciled or absent CR —
 // those are ordinary intermediate states that resolve into the returned
@@ -124,7 +124,7 @@ func waitForReconcile(ctx context.Context, client *kubernetes.Client, name, name
 }
 
 // WaitForAbsence polls until the ModuleInstance CR no longer exists — the
-// completion signal for an operator-finalized delete, whose cleanup finalizer
+// completion signal for a controller-finalized delete, whose cleanup finalizer
 // keeps the CR present until every workload is pruned.
 func WaitForAbsence(ctx context.Context, client *kubernetes.Client, name, namespace string, timeout time.Duration) error {
 	return waitForAbsence(ctx, client, name, namespace, timeout, reconcilePollInterval)
@@ -150,7 +150,7 @@ func waitForAbsence(ctx context.Context, client *kubernetes.Client, name, namesp
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf(
-				"timed out after %s waiting for ModuleInstance %q in namespace %q to be removed — the operator's %s finalizer may still be pruning workloads; check 'kubectl get moduleinstance %s -n %s -o yaml' and the operator logs",
+				"timed out after %s waiting for ModuleInstance %q in namespace %q to be removed — the controller's %s finalizer may still be pruning workloads; check 'kubectl get moduleinstance %s -n %s -o yaml' and the controller logs",
 				timeout, name, namespace, CleanupFinalizer, name, namespace)
 		case <-ticker.C:
 		}

@@ -65,7 +65,7 @@ jobs:
         run: bash .tasks/opm-docs.sh pin-check
       - name: Docs bundles for moved pins
         # A warning, never a failure: when the PR moves library or
-        # PinnedOperatorVersion, every docs bundle the tree pins should be
+        # PinnedControllerVersion, every docs bundle the tree pins should be
         # published before the next release PR, whose G1 fails without it.
         # It runs here, with this job's read-only token, and not in the
         # cascade task, so the cascade's compute never runs a newly pinned
@@ -169,7 +169,7 @@ jobs:
 
   fixtures:
     # The repo's published test fixtures (tests/fixtures/modules/*), the same
-    # flow opm-operator runs (hack/fixtures.sh is an identical copy in both):
+    # flow opm-controller runs (hack/fixtures.sh is an identical copy in both):
     #   check  every publish gate, dry-run against GHCR, plus changed-implies-
     #          bumped: a fixture edited in this PR must carry a version GHCR
     #          does not hold yet, because published versions are immutable.
@@ -218,7 +218,7 @@ jobs:
         env:
           CUE_REGISTRY: ${{ env.MIXED_CUE_REGISTRY }}
           OPM_REGISTRY: ${{ env.MIXED_CUE_REGISTRY }}
-        run: hack/fixtures.sh consumers examples tests/e2e/testdata/operator-owned
+        run: hack/fixtures.sh consumers examples tests/e2e/testdata/controller-owned
       - name: Render parity (tree vs seeded registry)
         env:
           CUE_REGISTRY: ${{ env.MIXED_CUE_REGISTRY }}
@@ -246,7 +246,7 @@ jobs:
       - name: Install ModuleInstance CRDs
         # The CLI records inventory in the ModuleInstance CR, so the CRD is a
         # hard prerequisite for every apply-path integration program.
-        run: go run ./cmd/opm operator install --crds-only --context kind-opm-dev
+        run: go run ./cmd/opm controller install --crds-only --context kind-opm-dev
       - name: Run integration scripts
         run: |
           go run tests/integration/deploy/main.go

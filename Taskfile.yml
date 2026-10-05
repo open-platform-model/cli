@@ -17,13 +17,13 @@ vars:
   OPM_REGISTRY:
     sh: echo "${OPM_REGISTRY:-testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works}"
   # Opt-in override for the kind dev cluster, EMPTY by default. Nothing the kind
-  # flow resolves is local-only any more, so the operator's own built-in default
+  # flow resolves is local-only any more, so the controller's own built-in default
   # (which routes both domains to GHCR) is correct out of the box and
-  # cluster:operator needs no local registry at all.
+  # cluster:controller needs no local registry at all.
   #
   # Set this only to iterate on a module you have published locally, e.g.
   #
-  #   task cluster:operator \
+  #   task cluster:controller \
   #     KIND_CUE_REGISTRY='testing.opmodel.dev=opm-registry:5000+insecure,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
   #
   # Use the IN-CLUSTER spelling: the host reaches the registry on localhost:5000
@@ -120,13 +120,13 @@ tasks:
     desc: Run end-to-end tests
     summary: |
       The explicit -timeout is load-bearing, not padding. Go's default is 10
-      minutes, and against a cluster whose operator cannot reconcile, the two
-      operator-owned tests alone burn ~9.5 minutes waiting out their 3m
+      minutes, and against a cluster whose controller cannot reconcile, the two
+      controller-owned tests alone burn ~9.5 minutes waiting out their 3m
       deadlines (cli issue 214). The suite then times out inside
-      TestE2E_Operator_InstallUninstallLifecycle, which is destructive by
-      design and rebuilds the dev operator in a t.Cleanup — a timeout kills the
+      TestE2E_Controller_InstallUninstallLifecycle, which is destructive by
+      design and rebuilds the dev controller in a t.Cleanup — a timeout kills the
       process before that cleanup runs, so the cluster is left without an
-      operator and the NEXT run fails for a reason that has nothing to do with
+      controller and the NEXT run fails for a reason that has nothing to do with
       it. Give the suite room to reach its own cleanups.
     cmds:
       - go test ./tests/e2e/... -v -timeout 25m
@@ -141,7 +141,7 @@ tasks:
       - go build -o bin/opm ./cmd/opm
       - hack/fixtures.sh check
       - CUE_REGISTRY='{{.MIXED_CUE_REGISTRY}}' hack/fixtures.sh seed
-      - CUE_REGISTRY='{{.MIXED_CUE_REGISTRY}}' hack/fixtures.sh consumers examples tests/e2e/testdata/operator-owned
+      - CUE_REGISTRY='{{.MIXED_CUE_REGISTRY}}' hack/fixtures.sh consumers examples tests/e2e/testdata/controller-owned
       - CUE_REGISTRY='{{.MIXED_CUE_REGISTRY}}' OPM_REGISTRY='{{.MIXED_CUE_REGISTRY}}' OPM_ITEST_RENDER_PARITY=1 go run tests/integration/render-parity/main.go
 
   test:verbose:
@@ -213,42 +213,42 @@ tasks:
       - task: cluster:delete
       - task: cluster:create
 
-  cluster:operator:
-    desc: Install a reconciling operator into the kind cluster
+  cluster:controller:
+    desc: Install a reconciling controller into the kind cluster
     summary: |
-      Brings up an opm-operator that can actually reconcile ModuleInstances,
-      which the operator-owned e2e tests require.
+      Brings up an opm-controller that can actually reconcile ModuleInstances,
+      which the controller-owned e2e tests require.
 
       By default this needs no local registry. Everything the kind flow
       resolves — core, the catalogs, and this repo's own
       testing.opmodel.dev/modules/cli/* fixtures — is published on GHCR, and the
-      operator's built-in --registry default already routes both domains there.
+      controller's built-in --registry default already routes both domains there.
 
       Two things still have to be true and neither is automatic:
 
         1. A cluster Platform singleton named "cluster" must exist, or every
            ModuleInstance parks at Ready=False/PlatformNotReady.
-        2. The operator ships with no workload permissions — it expects to
+        2. The controller ships with no workload permissions — it expects to
            impersonate a per-instance ServiceAccount the CLI cannot write.
 
       To iterate against a module published to your LOCAL registry, set
       KIND_CUE_REGISTRY (see the var's comment for the in-cluster spelling).
       That path additionally requires the registry container from
       `task registry:start` at the workspace root, joins it to kind's docker
-      network, and passes the mapping to `opm operator install` as the
-      operator module's `registry` value in a values file, so it is recorded
-      on the operator's instance and survives later installs. The module
-      renders it as the operator's --registry flag. The operator's registry is
+      network, and passes the mapping to `opm controller install` as the
+      controller module's `registry` value in a values file, so it is recorded
+      on the controller's instance and survives later installs. The module
+      renders it as the controller's --registry flag. The controller's registry is
       a COMMAND-LINE FLAG, not an env var: --registry wins over OPM_REGISTRY
-      (which is only read when the flag is empty), and the operator overwrites
+      (which is only read when the flag is empty), and the controller overwrites
       CUE_REGISTRY in its own process env. Setting either as a pod env var
       does nothing. Without KIND_CUE_REGISTRY no registry value is passed, so
       a mapping an earlier opt-in run recorded stays until
-      `opm operator install --reset-values`.
+      `opm controller install --reset-values`.
 
       It finishes by waiting for Platform/cluster to be Ready for its current
-      generation (cluster:operator:wait-ready), not merely stamped with
-      status.operatorVersion, so an operator that cannot serve the pinned
+      generation (cluster:controller:wait-ready), not merely stamped with
+      status.controllerVersion, so a controller that cannot serve the pinned
       core or catalogs fails here, naming the Platform's stall reason.
 
       Idempotent: safe to re-run.
@@ -277,42 +277,42 @@ tasks:
           # The kind network only exists once a cluster has been created, so this
           # cannot move into cluster:create. Errors when already connected.
           docker network connect kind {{.REGISTRY_CONTAINER}} 2>/dev/null || true
-          values=$(mktemp "${TMPDIR:-/tmp}/opm-operator-values.XXXXXX.cue")
+          values=$(mktemp "${TMPDIR:-/tmp}/opm-controller-values.XXXXXX.cue")
           trap 'rm -f "$values"' EXIT
           printf 'values: registry: "%s"\n' "$registry" > "$values"
-          echo "recording the operator registry value: $registry"
+          echo "recording the controller registry value: $registry"
           set -- -f "$values"
         else
-          echo "setting no operator registry value: the operator uses its built-in GHCR default unless an earlier run recorded a mapping (clear it with 'opm operator install --reset-values')"
+          echo "setting no controller registry value: the controller uses its built-in GHCR default unless an earlier run recorded a mapping (clear it with 'opm controller install --reset-values')"
         fi
-        ./{{.BUILD_DIR}}/{{.BINARY_NAME}} operator install --config hack/opm-config.cue --context kind-{{.CLUSTER_NAME}} --timeout 180s --skip-platform "$@"
+        ./{{.BUILD_DIR}}/{{.BINARY_NAME}} controller install --config hack/opm-config.cue --context kind-{{.CLUSTER_NAME}} --timeout 180s --skip-platform "$@"
       - kubectl --context kind-{{.CLUSTER_NAME}} apply -f hack/kind-platform.yaml
-      # The operator ships with no workload permissions — it expects to
+      # The controller ships with no workload permissions — it expects to
       # impersonate a per-instance ServiceAccount the CLI cannot write. Dev-only
       # grant; see the file header.
-      - kubectl --context kind-{{.CLUSTER_NAME}} apply -f hack/kind-operator-rbac.yaml
-      # status.operatorVersion is stamped on every reconcile whatever its
-      # outcome, so it proves only that the operator runs. The wait below asks
+      - kubectl --context kind-{{.CLUSTER_NAME}} apply -f hack/kind-controller-rbac.yaml
+      # status.controllerVersion is stamped on every reconcile whatever its
+      # outcome, so it proves only that the controller runs. The wait below asks
       # for Ready=True on the Platform's current generation instead.
-      - task: cluster:operator:wait-ready
+      - task: cluster:controller:wait-ready
         vars:
           CLUSTER_NAME: "{{.CLUSTER_NAME}}"
 
-  cluster:operator:wait-ready:
+  cluster:controller:wait-ready:
     desc: Wait until Platform/cluster is Ready for its current generation
     summary: |
       Passes only when Platform/cluster reports Ready=True AND
       status.observedGeneration equals metadata.generation.
 
-      The generation check matters: `opm operator install` creates the
+      The generation check matters: `opm controller install` creates the
       Platform (generation 1) subscribed to the newest catalogs, and
-      cluster:operator then applies hack/kind-platform.yaml, which changes the
+      cluster:controller then applies hack/kind-platform.yaml, which changes the
       spec (generation 2). A Ready=True left over from generation 1 says
       nothing about the pinned catalogs, so it does not count.
 
       On timeout it prints both generations, the Ready and Stalled conditions
       and where to look next, and fails. A Stalled=True with a reason such as
-      BuildFailed (MaterializeFailed on operator alpha.14) means the operator
+      BuildFailed (MaterializeFailed on controller alpha.14) means the controller
       cannot serve the core or catalogs the Platform pins.
 
       PLATFORM_READY_TIMEOUT sets the wait in seconds (default 120).
@@ -329,8 +329,8 @@ tasks:
           observed=$(kubectl --context "$ctx" get platform cluster -o jsonpath='{.status.observedGeneration}' 2>/dev/null || true)
           ready=$(kubectl --context "$ctx" get platform cluster -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
           if [ -n "$gen" ] && [ "$gen" = "$observed" ] && [ "$ready" = "True" ]; then
-            version=$(kubectl --context "$ctx" get platform cluster -o jsonpath='{.status.operatorVersion}' 2>/dev/null || true)
-            echo "operator ${version:-<unknown>} is reconciling; Platform/cluster is Ready for generation $gen"
+            version=$(kubectl --context "$ctx" get platform cluster -o jsonpath='{.status.controllerVersion}' 2>/dev/null || true)
+            echo "controller ${version:-<unknown>} is reconciling; Platform/cluster is Ready for generation $gen"
             exit 0
           fi
           if [ "$(date +%s)" -ge "$deadline" ]; then break; fi
@@ -351,25 +351,25 @@ tasks:
             echo "  $type: $status $(field "$type" reason): $(field "$type" message)" >&2
           fi
         done
-        echo "Check: kubectl --context $ctx -n opm-operator-system logs deploy/opm-operator-controller-manager" >&2
+        echo "Check: kubectl --context $ctx -n opm-controller-system logs deploy/opm-controller-manager" >&2
         echo "A 'Failed to resolve OPM core schema' line means the pod cannot reach the registry" >&2
         echo "its --registry flag (or built-in default) points at." >&2
         exit 1
 
-  cluster:operator:status:
-    desc: Report whether a reconciling operator is present in the kind cluster
+  cluster:controller:status:
+    desc: Report whether a reconciling controller is present in the kind cluster
     cmds:
       - |
-        replicas=$(kubectl --context kind-{{.CLUSTER_NAME}} -n opm-operator-system get deployment opm-operator-controller-manager \
+        replicas=$(kubectl --context kind-{{.CLUSTER_NAME}} -n opm-controller-system get deployment opm-controller-manager \
           -o jsonpath='{.status.availableReplicas}' 2>/dev/null || true)
         if [ -z "$replicas" ] || [ "$replicas" = "0" ]; then
-          echo "No reconciling operator. Run: task cluster:operator"
+          echo "No reconciling controller. Run: task cluster:controller"
           exit 1
         fi
-        echo "operator available replicas: $replicas"
-        kubectl --context kind-{{.CLUSTER_NAME}} -n opm-operator-system get deployment opm-operator-controller-manager \
+        echo "controller available replicas: $replicas"
+        kubectl --context kind-{{.CLUSTER_NAME}} -n opm-controller-system get deployment opm-controller-manager \
           -o jsonpath='{.spec.template.spec.containers[0].args}'; echo
-        echo "Platform/cluster operatorVersion: $(kubectl --context kind-{{.CLUSTER_NAME}} get platform cluster -o jsonpath='{.status.operatorVersion}' 2>/dev/null)"
+        echo "Platform/cluster controllerVersion: $(kubectl --context kind-{{.CLUSTER_NAME}} get platform cluster -o jsonpath='{.status.controllerVersion}' 2>/dev/null)"
 
   #########################
   ## Code quality tasks
@@ -449,7 +449,7 @@ tasks:
   # docs-kit.cue declares one docs bundle, cli: the command reference
   # opm-docs generates from hack/docskit-dump's dump of the cobra commands,
   # the authored pages under docs/site/, and the library, core and
-  # opm-operator versions the cli pins. CI builds, signs and publishes it
+  # opm-controller versions the cli pins. CI builds, signs and publishes it
   # through docs-kit's publish.yml (docs.yml, release.yml). These tasks run
   # the same opm-docs release locally. The release is pinned in
   # .opm-docs-version and in every publish.yml ref, and docs:bundle:check
@@ -483,32 +483,32 @@ tasks:
       - .bin/opm-docs check --project cli
 
   #########################
-  ## Operator lifecycle tasks
+  ## Controller lifecycle tasks
   #########################
-  operator:pin:
-    desc: Pin the default operator module version and the operator it deploys
+  controller:pin:
+    desc: Pin the default controller module version and the controller it deploys
     summary: |
-      Resolves the operator module version through the registry
+      Resolves the controller module version through the registry
       (OPM_REGISTRY, else CUE_REGISTRY, else the cli default), reads the
-      operator release it deploys from the module's operator package (no
-      render), and rewrites internal/operator/pin.go. The only writer of
+      controller release it deploys from the module's controller package (no
+      render), and rewrites internal/controller/pin.go. The only writer of
       that file.
 
       Usage:
-        task operator:pin VERSION=0.1.0
+        task controller:pin VERSION=0.1.0
     vars:
       VERSION: '{{.VERSION | default ""}}'
     preconditions:
       - sh: '[ -n "{{.VERSION}}" ]'
-        msg: "VERSION variable is required. Usage: task operator:pin VERSION=<module version>"
+        msg: "VERSION variable is required. Usage: task controller:pin VERSION=<module version>"
     cmds:
-      - go run ./hack/operator-pin "{{.VERSION}}"
+      - go run ./hack/controller-pin "{{.VERSION}}"
 
   #########################
   ## Release tasks
   #########################
   deps:release-check:
-    desc: "Check release pins (G1): no replace, published OPM pins (nested modules by their subdir tag), no dev template pins, the operator module pin is served and records the operator it deploys, a docs bundle for every docs pin (G2-pins)"
+    desc: "Check release pins (G1): no replace, published OPM pins (nested modules by their subdir tag), no dev template pins, the controller module pin is served and records the controller it deploys, a docs bundle for every docs pin (G2-pins)"
     cmds:
       - .github/scripts/release-pin-check.sh
 

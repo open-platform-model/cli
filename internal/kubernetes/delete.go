@@ -30,7 +30,7 @@ type DeleteOptions struct {
 
 	// InstanceUUID is the instance's recorded UUID (the ModuleInstance's
 	// status.instanceUUID). A live object whose UUID label differs is left
-	// behind. Empty disables the UUID comparison, as in the operator's prune:
+	// behind. Empty disables the UUID comparison, as in the controller's prune:
 	// every object is then judged on its managed-by label alone.
 	InstanceUUID string
 
@@ -237,7 +237,7 @@ func checkDeletable(ctx context.Context, client *Client, obj *unstructured.Unstr
 	if !opmlabels.IsOPMManagedBy(labels[opmlabels.ManagedBy]) {
 		return reasonNotManaged, false, nil
 	}
-	// The operator's tolerance: an object without a UUID label predates UUID
+	// The controller's tolerance: an object without a UUID label predates UUID
 	// stamping, and an instance without a recorded UUID has nothing to compare.
 	if liveUUID := labels[opmlabels.ModuleInstanceUUID]; instanceUUID != "" && liveUUID != "" && liveUUID != instanceUUID {
 		return reasonOtherInstance, false, nil

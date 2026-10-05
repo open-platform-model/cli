@@ -1,7 +1,7 @@
 bundles: cli: {
 	placement: {kind: "docs", root: "/docs/", owns: ["reference/cli/"]}
 	version: {from: "tag", prefix: "v"}
-	pins: {command: ["go", "run", "./hack/docskit-dump", "pins"], projects: ["library", "core", "opm-operator"]}
+	pins: {command: ["go", "run", "./hack/docskit-dump", "pins"], projects: ["library", "core", "opm-controller"]}
 	sources: [{
 		kind:        "cobra"
 		command:     ["go", "run", "./hack/docskit-dump"]

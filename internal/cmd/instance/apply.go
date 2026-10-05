@@ -39,7 +39,7 @@ func NewInstanceApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Long: `Deploy an OPM instance file to a Kubernetes cluster using server-side apply.
 
 Apply records what it deployed in a ModuleInstance custom resource, so the
-ModuleInstance CRD must be installed first (run 'opm operator install
+ModuleInstance CRD must be installed first (run 'opm controller install
 --crds-only'). Apply fails fast with a hint if it is missing or out of date.
 
 Arguments:
@@ -75,9 +75,9 @@ Examples:
 	c.Flags().BoolVar(&noPruneFlag, "no-prune", false, "Skip stale resource pruning")
 	c.Flags().BoolVar(&forceFlag, "force", false, "Allow empty render to prune all previously tracked resources")
 	c.Flags().BoolVar(&waitFlag, "wait", false,
-		"Wait until every applied resource is healthy before returning (skipped on --dry-run; operator-managed instances always wait for the operator)")
+		"Wait until every applied resource is healthy before returning (skipped on --dry-run; controller-managed instances always wait for the controller)")
 	c.Flags().DurationVar(&timeoutFlag, "timeout", inventory.DefaultReconcileTimeout,
-		"Bound on the CustomResourceDefinition establish wait (counted from the start of the apply), on the --wait readiness wait, and on the operator-reconcile wait (operator-managed instances)")
+		"Bound on the CustomResourceDefinition establish wait (counted from the start of the apply), on the --wait readiness wait, and on the controller-reconcile wait (controller-managed instances)")
 
 	return c
 }

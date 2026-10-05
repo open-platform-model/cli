@@ -6,8 +6,8 @@
 // with AcquirePlatformFromDir. The cluster CR and the deps are turned into
 // such a module first, through the library's generator
 // (opm/helper/platformmodule): the same helper and the same acquisition the
-// operator's PlatformReconciler runs, so the CLI's platform ingestion is
-// structurally the operator's own.
+// controller's PlatformReconciler runs, so the CLI's platform ingestion is
+// structurally the controller's own.
 package platform
 
 import (
@@ -18,7 +18,7 @@ import (
 )
 
 // Spec is the CLI's typed platform document: what a cluster Platform CR's
-// spec carries and what the operator-install seed writes. It is the one
+// spec carries and what the controller-install seed writes. It is the one
 // shape CR decode (DecodeCRSpec) and the seed (EnsureClusterPlatformForCatalog)
 // share.
 type Spec struct {
@@ -77,7 +77,7 @@ func (w wireSpec) toSpec(name string) Spec {
 }
 
 // wireFromSpec converts a Spec into the wire shape the CR carries — the
-// document the operator-install seed creates (0006:D22). Every entry's enable
+// document the controller-install seed creates (0006:D22). Every entry's enable
 // is written explicitly, so the CR states exactly what was subscribed.
 func wireFromSpec(s Spec) wireSpec {
 	w := wireSpec{Type: s.Type, SkewPolicy: s.SkewPolicy}
@@ -122,7 +122,7 @@ func DecodeCRSpec(spec map[string]any, name string) (Spec, error) {
 	return w.toSpec(name), nil
 }
 
-// Registry entry sources, as the operator records them on
+// Registry entry sources, as the controller records them on
 // status.registry[].source: an authored subscription, or a catalog an
 // accepted-and-active TransformerRegistration contributed (0015:D3).
 const (
@@ -139,14 +139,14 @@ type ReadyState struct {
 	Reason string
 }
 
-// Effective is the registry the operator generated the running package
+// Effective is the registry the controller generated the running package
 // from, decoded off the Platform CR's status (0015:D13/D17). Entries is
-// empty when the operator has recorded no registry - a solo cluster, or an
-// operator predating the field - and resolution then generates from the
+// empty when the controller has recorded no registry - a solo cluster, or an
+// controller predating the field - and resolution then generates from the
 // spec.
 type Effective struct {
 	// Entries are the resolved registry's catalogs in ascending Path order,
-	// each carrying the version the operator pinned and whether its
+	// each carrying the version the controller pinned and whether its
 	// transformers register.
 	Entries []Entry
 	// Sources maps each entry's path to how the catalog reached the
@@ -159,26 +159,26 @@ type Effective struct {
 	// generated from; behind metadata.generation means the spec has moved
 	// on since.
 	ObservedGeneration int64
-	// OperatorVersion is the operator that last patched the status, empty
+	// ControllerVersion is the controller that last patched the status, empty
 	// on a solo cluster.
-	OperatorVersion string
+	ControllerVersion string
 	// Ready is the Ready condition, nil when absent.
 	Ready *ReadyState
 }
 
 // wireStatus is the wire shape of a Platform CR's status, limited to the
 // fields resolution reads. Unknown fields are dropped by json.Unmarshal, so
-// a newer operator's status decodes without error.
+// a newer controller's status decodes without error.
 type wireStatus struct {
 	ObservedGeneration int64               `json:"observedGeneration,omitempty"`
 	PackageIdentity    string              `json:"packageIdentity,omitempty"`
 	Registry           []wireResolvedEntry `json:"registry,omitempty"`
 	Conditions         []wireCondition     `json:"conditions,omitempty"`
-	OperatorVersion    string              `json:"operatorVersion,omitempty"`
+	ControllerVersion  string              `json:"controllerVersion,omitempty"`
 }
 
-// wireResolvedEntry mirrors the operator's ResolvedRegistryEntry. enabled is
-// omitzero on the operator side, so an absent field means a disabled
+// wireResolvedEntry mirrors the controller's ResolvedRegistryEntry. enabled is
+// omitzero on the controller side, so an absent field means a disabled
 // catalog - the opposite default from spec.registry's enable.
 type wireResolvedEntry struct {
 	Catalog string `json:"catalog"`
@@ -194,19 +194,19 @@ type wireCondition struct {
 	Reason string `json:"reason"`
 }
 
-// readyConditionType is the Platform status condition the operator
+// readyConditionType is the Platform status condition the controller
 // summarizes module generation on.
 const readyConditionType = "Ready"
 
 // DecodeCR decodes a cluster Platform document into its spec and the
-// effective registry the operator recorded on status. The Spec half is
+// effective registry the controller recorded on status. The Spec half is
 // exactly DecodeCRSpec, legacy tolerance included. The Effective half is nil
 // when the CR carries no status at all; otherwise it is returned even with
-// no registry rows, so a caller can still report the operator version and
-// the generation the operator observed.
+// no registry rows, so a caller can still report the controller version and
+// the generation the controller observed.
 //
 // A status registry row without a version is refused naming the row: the
-// operator never writes one, so it means a hand-edited status, and
+// controller never writes one, so it means a hand-edited status, and
 // generating from it would silently drop the catalog's pin.
 func DecodeCR(doc *ClusterPlatform) (Spec, *Effective, error) {
 	if doc == nil {
@@ -234,7 +234,7 @@ func DecodeCR(doc *ClusterPlatform) (Spec, *Effective, error) {
 	eff := &Effective{
 		PackageIdentity:    w.PackageIdentity,
 		ObservedGeneration: w.ObservedGeneration,
-		OperatorVersion:    w.OperatorVersion,
+		ControllerVersion:  w.ControllerVersion,
 	}
 	if len(w.Registry) > 0 {
 		eff.Entries = make([]Entry, 0, len(w.Registry))
@@ -242,7 +242,7 @@ func DecodeCR(doc *ClusterPlatform) (Spec, *Effective, error) {
 		for _, row := range w.Registry {
 			if row.Version == "" {
 				return Spec{}, nil, fmt.Errorf(
-					"cluster Platform %q status.registry entry %q has no version; the operator never records one, so the status was written by hand",
+					"cluster Platform %q status.registry entry %q has no version; the controller never records one, so the status was written by hand",
 					doc.Name, row.Catalog)
 			}
 			eff.Entries = append(eff.Entries, Entry{Path: row.Catalog, Version: row.Version, Enable: row.Enabled})

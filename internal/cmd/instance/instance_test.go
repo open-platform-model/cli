@@ -165,13 +165,13 @@ func TestNewInstanceDeleteCmd(t *testing.T) {
 	assert.NotNil(t, cmd.Flags().Lookup("timeout"), "--timeout flag should be registered")
 }
 
-// Operator-owned instances are no longer refused by delete — they route to the
+// Controller-owned instances are no longer refused by delete — they route to the
 // finalizer-delegating path (0006:D18). Ownership routing itself is
 // covered by inventory.ResolveOwnership's tests; here we only assert that
 // delete consumes that resolver rather than a private rule of its own.
-func TestInstanceDelete_OperatorOwnedRoutesToDelegation(t *testing.T) {
-	assert.Equal(t, inventory.ModeOperatorOwned,
-		inventory.ResolveOwnership(&inventory.Record{Owner: inventory.OwnerOperator, Name: "demo", Namespace: "apps"}))
+func TestInstanceDelete_ControllerOwnedRoutesToDelegation(t *testing.T) {
+	assert.Equal(t, inventory.ModeControllerOwned,
+		inventory.ResolveOwnership(&inventory.Record{Owner: inventory.OwnerController, Name: "demo", Namespace: "apps"}))
 	assert.Equal(t, inventory.ModeCLIExecutor,
 		inventory.ResolveOwnership(&inventory.Record{Owner: inventory.OwnerCLI, Name: "demo", Namespace: "apps"}))
 }

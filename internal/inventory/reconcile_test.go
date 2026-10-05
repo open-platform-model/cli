@@ -161,7 +161,7 @@ func TestWaitForReconcile_FailedReconcileIsObservedNotAnError(t *testing.T) {
 }
 
 func TestWaitForReconcile_TimeoutReportsLastObservedCondition(t *testing.T) {
-	// The operator is still reporting on the previous generation.
+	// The controller is still reporting on the previous generation.
 	client := newDynamicClient(makeInstanceCR(5, 4, readyCond(ConditionTrue, "Reconciled", 4)))
 
 	outcome, err := waitForReconcile(context.Background(), client, "app", "ns", 5, 20*time.Millisecond, time.Millisecond)

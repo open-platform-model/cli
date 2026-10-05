@@ -4,15 +4,15 @@
 // against a live cluster with the ModuleInstance CRD installed.
 //
 // This covers the happy paths that require a real API server: CRD presence,
-// the CRD field floor, the operator-version ceiling being inert (skip) against
-// the current operator release (no Platform.status.operatorVersion), and the
+// the CRD field floor, the controller-version ceiling being inert (skip) against
+// the current controller release (no Platform.status.controllerVersion), and the
 // status-RBAC pre-flight passing for a cluster-admin. The refusal paths
 // (missing CRD hint, SSAR denial for a namespace-scoped user, refuse-when-newer
 // ceiling) are covered by internal/inventory unit tests and, for the ceiling,
-// by task 7.1 once an A6-carrying operator release exists.
+// by task 7.1 once an A6-carrying controller release exists.
 //
 // Requires a running kind cluster at context "kind-opm-dev" with the
-// ModuleInstance CRD installed (opm operator install --crds-only).
+// ModuleInstance CRD installed (opm controller install --crds-only).
 // Run with: go run tests/integration/gates/main.go
 package main
 
@@ -42,14 +42,14 @@ func main() {
 	check("GateCRDFieldFloor", inventory.GateCRDFieldFloor(ctx, client))
 	fmt.Println("   OK: CRD schema carries spec.owner and status.inventory")
 
-	step(3, "Operator-version ceiling is inert against the current operator (skip)")
+	step(3, "Controller-version ceiling is inert against the current controller (skip)")
 	// A released-semver CLI version against a cluster with no
-	// Platform.status.operatorVersion must be skipped (solo-cluster semantics),
+	// Platform.status.controllerVersion must be skipped (solo-cluster semantics),
 	// i.e. apply is permitted. Passing a real semver exercises the non-dev path.
-	if err := inventory.GateOperatorVersionCeiling(ctx, client, "1.0.0"); err != nil {
-		failf("expected the ceiling to be inert (skip) against the current operator, got: %v", err)
+	if err := inventory.GateControllerVersionCeiling(ctx, client, "1.0.0"); err != nil {
+		failf("expected the ceiling to be inert (skip) against the current controller, got: %v", err)
 	}
-	fmt.Println("   OK: ceiling skipped (no Platform.status.operatorVersion)")
+	fmt.Println("   OK: ceiling skipped (no Platform.status.controllerVersion)")
 
 	step(4, "Status-RBAC pre-flight passes for a permitted user")
 	check("GateStatusRBAC", inventory.GateStatusRBAC(ctx, client, "default"))

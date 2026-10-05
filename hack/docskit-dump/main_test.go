@@ -18,8 +18,8 @@ import (
 
 // TestPins_EqualTheSourcePins checks that the compiled pins equal the source
 // pins: the library require in the cli's go.mod, the DefaultSchemaModule line
-// of that library's opm/schema/loader.go, and the PinnedOperatorVersion line
-// of internal/operator/pin.go (the operator release the pinned module deploys).
+// of that library's opm/schema/loader.go, and the PinnedControllerVersion line
+// of internal/controller/pin.go (the controller release the pinned module deploys).
 func TestPins_EqualTheSourcePins(t *testing.T) {
 	got, err := pins()
 	require.NoError(t, err)
@@ -27,12 +27,12 @@ func TestPins_EqualTheSourcePins(t *testing.T) {
 	lib := goModLibrary(t, "../../go.mod")
 	libDir := moduleDir(t, libraryModule)
 	core := constValue(t, filepath.Join(libDir, "opm", "schema", "loader.go"), "DefaultSchemaModule", `opmodel\.dev/core@`)
-	op := constValue(t, "../../internal/operator/pin.go", "PinnedOperatorVersion", "")
+	op := constValue(t, "../../internal/controller/pin.go", "PinnedControllerVersion", "")
 
 	assert.Equal(t, map[string]string{
-		"library":      strings.TrimPrefix(lib, "v"),
-		"core":         strings.TrimPrefix(core, "v"),
-		"opm-operator": strings.TrimPrefix(op, "v"),
+		"library":        strings.TrimPrefix(lib, "v"),
+		"core":           strings.TrimPrefix(core, "v"),
+		"opm-controller": strings.TrimPrefix(op, "v"),
 	}, got)
 }
 

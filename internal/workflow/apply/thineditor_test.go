@@ -14,11 +14,11 @@ import (
 	"github.com/open-platform-model/library/opm/module"
 )
 
-func operatorOwnedRequest(result *workflowrender.Result) Request {
+func controllerOwnedRequest(result *workflowrender.Result) Request {
 	return Request{Result: result, Log: output.InstanceLogger("test")}
 }
 
-// A local render describes bytes the operator cannot fetch. Refused before any
+// A local render describes bytes the controller cannot fetch. Refused before any
 // write, so the failure costs nothing and leaves the CR untouched.
 func TestThinEditor_RefusesLocalSourceModule(t *testing.T) {
 	result := &workflowrender.Result{
@@ -27,8 +27,8 @@ func TestThinEditor_RefusesLocalSourceModule(t *testing.T) {
 		SourceLocal: true,
 	}
 
-	err := executeThinEditor(context.Background(), operatorOwnedRequest(result),
-		&inventory.Record{Owner: inventory.OwnerOperator, Name: "podinfo", Namespace: "demo"})
+	err := executeThinEditor(context.Background(), controllerOwnedRequest(result),
+		&inventory.Record{Owner: inventory.OwnerController, Name: "podinfo", Namespace: "demo"})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "local bytes")
@@ -41,14 +41,14 @@ func TestThinEditor_RefusesIncompleteModuleReference(t *testing.T) {
 		Module:   module.ModuleMetadata{},
 	}
 
-	err := executeThinEditor(context.Background(), operatorOwnedRequest(result),
-		&inventory.Record{Owner: inventory.OwnerOperator, Name: "podinfo", Namespace: "demo"})
+	err := executeThinEditor(context.Background(), controllerOwnedRequest(result),
+		&inventory.Record{Owner: inventory.OwnerController, Name: "podinfo", Namespace: "demo"})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "module reference")
 }
 
-// A dry-run against an operator-owned instance must preview the spec edit, not
+// A dry-run against a controller-owned instance must preview the spec edit, not
 // the CLI-executor render-and-apply it will never perform.
 func TestPreviewThinEditor_DescribesTheSpecEditOnly(t *testing.T) {
 	result := &workflowrender.Result{
@@ -58,8 +58,8 @@ func TestPreviewThinEditor_DescribesTheSpecEditOnly(t *testing.T) {
 		},
 	}
 
-	err := previewThinEditor(operatorOwnedRequest(result),
-		&inventory.Record{Owner: inventory.OwnerOperator, Name: "podinfo", Namespace: "demo"})
+	err := previewThinEditor(controllerOwnedRequest(result),
+		&inventory.Record{Owner: inventory.OwnerController, Name: "podinfo", Namespace: "demo"})
 
 	require.NoError(t, err)
 }
@@ -73,14 +73,14 @@ func TestPreviewThinEditor_RefusesLocalSourceModule(t *testing.T) {
 		SourceLocal: true,
 	}
 
-	err := previewThinEditor(operatorOwnedRequest(result),
-		&inventory.Record{Owner: inventory.OwnerOperator, Name: "podinfo", Namespace: "demo"})
+	err := previewThinEditor(controllerOwnedRequest(result),
+		&inventory.Record{Owner: inventory.OwnerController, Name: "podinfo", Namespace: "demo"})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "local bytes")
 }
 
-// The operator renders an operator-managed instance and never skips, so
+// The controller renders a controller-managed instance and never skips, so
 // --skip-unprovided is refused as a validation error before any spec write,
 // on the real edit and on the dry-run preview alike. The request carries no
 // client: reaching a write would panic.
@@ -91,9 +91,9 @@ func TestThinEditor_RefusesSkipUnprovided(t *testing.T) {
 			ModulePath: "testing.opmodel.dev/modules/cli/podinfo@v0", Name: "podinfo", Version: "0.1.4",
 		},
 	}
-	req := operatorOwnedRequest(result)
+	req := controllerOwnedRequest(result)
 	req.Options.SkipUnprovided = true
-	rec := &inventory.Record{Owner: inventory.OwnerOperator, Name: "hello", Namespace: "demo"}
+	rec := &inventory.Record{Owner: inventory.OwnerController, Name: "hello", Namespace: "demo"}
 
 	for name, run := range map[string]func() error{
 		"apply":   func() error { return executeThinEditor(context.Background(), req, rec) },
@@ -105,7 +105,7 @@ func TestThinEditor_RefusesSkipUnprovided(t *testing.T) {
 			var exitErr *opmexit.ExitError
 			require.ErrorAs(t, err, &exitErr)
 			assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
-			assert.Equal(t, `--skip-unprovided has no effect on instance "hello": the opm-operator renders it and does not skip provider-fulfilled contracts. Install a provider for the contract instead`, err.Error())
+			assert.Equal(t, `--skip-unprovided has no effect on instance "hello": the opm-controller renders it and does not skip provider-fulfilled contracts. Install a provider for the contract instead`, err.Error())
 		})
 	}
 }

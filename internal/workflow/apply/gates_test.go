@@ -15,7 +15,7 @@ import (
 )
 
 // withReleasedCLIVersion overrides the ldflags-set CLI version for the duration
-// of a test so the operator-version ceiling gate treats it as a released semver
+// of a test so the controller-version ceiling gate treats it as a released semver
 // (the default "dev" makes the gate skip its Platform probe). The value is newer
 // than any Platform the gate tests seed, so the ceiling passes.
 func withReleasedCLIVersion(t *testing.T) {
@@ -26,13 +26,13 @@ func withReleasedCLIVersion(t *testing.T) {
 }
 
 // The cluster gates must probe in a fixed order — CRD presence, then the CRD
-// field floor, then the operator-version ceiling — and short-circuit on the
+// field floor, then the controller-version ceiling — and short-circuit on the
 // first failure so a later probe never runs against an unmet precondition.
 func TestRunClusterGates_ProbeOrder(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("all pass: CRD (presence, field floor) then Platform (ceiling)", func(t *testing.T) {
-		withReleasedCLIVersion(t) // newer than the operator below, so the ceiling passes
+		withReleasedCLIVersion(t) // newer than the controller below, so the ceiling passes
 		client, rec := recordingDynamicClient(makeModuleInstanceCRD(true, true), makePlatform("1.0.0"))
 
 		require.NoError(t, RunClusterGates(ctx, client, false))
@@ -113,10 +113,10 @@ func TestExecute_DryRunSkipsClusterGates(t *testing.T) {
 	})
 }
 
-// "Older CLI repairs a newer operator" and "Ordinary apply against the same
-// cluster still refused": only the operator's own install skips the
+// "Older CLI repairs a newer controller" and "Ordinary apply against the same
+// cluster still refused": only the controller's own install skips the
 // ceiling, and the CRD gates still run for it.
-func TestRunClusterGates_OnlyOperatorInstallSkipsTheCeiling(t *testing.T) {
+func TestRunClusterGates_OnlyControllerInstallSkipsTheCeiling(t *testing.T) {
 	ctx := context.Background()
 	orig := version.Version
 	version.Version = "v1.0.0"

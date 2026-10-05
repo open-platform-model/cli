@@ -56,7 +56,7 @@ contacted.
 The synthetic instance defaults to "<module>-debug". --name and --namespace
 participate in instance identity (different values produce different instances,
 each with its own ModuleInstance CR). The ModuleInstance CRD must be installed
-first (run 'opm operator install --crds-only'). For persistent deploys, author
+first (run 'opm controller install --crds-only'). For persistent deploys, author
 an instance.cue file and use 'opm instance apply' instead.
 
 When switching from 'opm module apply' to 'opm instance apply' (or vice versa)
@@ -106,9 +106,9 @@ Examples:
 	c.Flags().BoolVar(&noPruneFlag, "no-prune", false, "Skip stale resource pruning")
 	c.Flags().BoolVar(&forceFlag, "force", false, "Allow empty render to prune all previously tracked resources")
 	c.Flags().BoolVar(&waitFlag, "wait", false,
-		"Wait until every applied resource is healthy before returning (skipped on --dry-run; operator-managed instances always wait for the operator)")
+		"Wait until every applied resource is healthy before returning (skipped on --dry-run; controller-managed instances always wait for the controller)")
 	c.Flags().DurationVar(&timeoutFlag, "timeout", inventory.DefaultReconcileTimeout,
-		"Bound on the CustomResourceDefinition establish wait (counted from the start of the apply), on the --wait readiness wait, and on the operator-reconcile wait (operator-managed instances)")
+		"Bound on the CustomResourceDefinition establish wait (counted from the start of the apply), on the --wait readiness wait, and on the controller-reconcile wait (controller-managed instances)")
 
 	return c
 }

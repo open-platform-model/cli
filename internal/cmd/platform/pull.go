@@ -31,7 +31,7 @@ func NewPlatformPullCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Short: "Write the cluster's platform module to a directory",
 		Long: `Reproduce the cluster's platform package on this machine.
 
-Reads the cluster Platform CR, generates the platform module the operator
+Reads the cluster Platform CR, generates the platform module the controller
 generated from the same inputs -- the effective registry it recorded on
 status.registry, or the CR's subscriptions when it has recorded none -- and
 writes that module's files to <dir>. Building against the result renders
@@ -248,7 +248,7 @@ func readModuleFiles(dir string) (platformmodule.Files, error) {
 }
 
 // pullReport is what the command prints: the provenance line resolution
-// produced, the generations and operator the status recorded, every registry
+// produced, the generations and controller the status recorded, every registry
 // entry with its source, and the build command that consumes the directory.
 func pullReport(res platform.Resolution, doc *platform.ClusterPlatform,
 	spec platform.Spec, eff *platform.Effective, dir string,
@@ -276,19 +276,19 @@ func pullReport(res platform.Resolution, doc *platform.ClusterPlatform,
 	return out
 }
 
-// describeGeneration names the CR generation, the generation the operator
-// observed and the operator that recorded it — the three facts that say how
+// describeGeneration names the CR generation, the generation the controller
+// observed and the controller that recorded it — the three facts that say how
 // far the pulled package is from the spec on the cluster.
 func describeGeneration(doc *platform.ClusterPlatform, eff *platform.Effective) string {
 	line := "generation " + strconv.FormatInt(doc.Generation, 10)
 	if eff == nil {
-		return line + ", no operator generation recorded"
+		return line + ", no controller generation recorded"
 	}
 	line += " (observed " + strconv.FormatInt(eff.ObservedGeneration, 10) + ")"
-	if eff.OperatorVersion == "" {
-		return line + ", operator version not recorded"
+	if eff.ControllerVersion == "" {
+		return line + ", controller version not recorded"
 	}
-	return line + ", operator " + eff.OperatorVersion
+	return line + ", controller " + eff.ControllerVersion
 }
 
 func enabledLabel(enable bool) string {

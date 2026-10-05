@@ -158,13 +158,13 @@ func TestResolveInstanceArg_ImportFreeInstancePackage(t *testing.T) {
 }
 
 // TestResolveInstanceArg_RegistryBackedInstancePackage acquires the
-// operator-owned e2e fixture, a renderable instance package that imports
+// controller-owned e2e fixture, a renderable instance package that imports
 // core and the podinfo fixture module, through the kernel. It resolves them
 // from the registry OPM_REGISTRY names (in PR CI, the job-local registry
 // seeded from the tree), else from the shipped default registry, and skips
 // when the registry is unreachable.
 func TestResolveInstanceArg_RegistryBackedInstancePackage(t *testing.T) {
-	dir, err := filepath.Abs(filepath.Join("..", "..", "tests", "e2e", "testdata", "operator-owned"))
+	dir, err := filepath.Abs(filepath.Join("..", "..", "tests", "e2e", "testdata", "controller-owned"))
 	require.NoError(t, err)
 	if _, statErr := os.Stat(filepath.Join(dir, "instance.cue")); statErr != nil {
 		t.Skipf("fixture not found: %v", statErr)
@@ -181,7 +181,7 @@ func TestResolveInstanceArg_RegistryBackedInstancePackage(t *testing.T) {
 		got, err := ResolveInstanceArg(context.Background(), arg, cfg)
 		skipIfRegistryUnavailable(t, err)
 		require.NoError(t, err, "arg %q", arg)
-		assert.Equal(t, InstanceArg{Name: "e2e-operator-owned", Namespace: "default"}, got, "arg %q", arg)
+		assert.Equal(t, InstanceArg{Name: "e2e-controller-owned", Namespace: "default"}, got, "arg %q", arg)
 		assert.Equal(t, "default", got.ToSelectorFlags("").Namespace, "the file's namespace applies without --namespace")
 		assert.Equal(t, "staging", got.ToSelectorFlags("staging").Namespace, "--namespace wins over the file")
 	}

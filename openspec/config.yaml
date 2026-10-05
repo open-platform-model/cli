@@ -49,7 +49,7 @@ context: |
   - PATCH: Bug fixes, performance improvements
   All commits MUST follow Conventional Commits: type(scope): description
   Pre-GA note: from its first beta the cli (with opmodel.dev/core@v2,
-  library and opm-operator) is on the path to GA.
+  library and opm-controller) is on the path to GA.
   A breaking change is still allowed during beta, but only as a `!` in the PR
   title (`feat!:`), which is the squash commit title and the CHANGELOG entry;
   until the owner merge settings land, merge by squash only and give a

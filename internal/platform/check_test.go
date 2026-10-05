@@ -457,7 +457,7 @@ func TestRenderDoesNotReorderTheInventory(t *testing.T) {
 // requires: `unfulfilled` is a report and `overSubscribed` is the gate, so an
 // unfulfilled-only platform is routable and an over-subscribed one is not.
 // Do not "fix" this into a single healthy/unhealthy verdict: a pre-flight that
-// failed on unfulfilled would refuse platforms the operator generates from
+// failed on unfulfilled would refuse platforms the controller generates from
 // happily, and one that passed on over-subscription would bless a platform
 // platform-package generation refuses.
 func TestRoutableIsAGateAndFulfilledIsNot(t *testing.T) {
