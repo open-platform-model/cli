@@ -11,7 +11,7 @@ import (
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 // legacySecret builds a Secret in the deleted Secret-backend envelope shape, for
@@ -27,8 +27,8 @@ func legacySecret(name, namespace, instanceName, instanceID string, byLabel bool
 	}
 	if byLabel {
 		s.Labels = map[string]string{
-			pkgcore.LabelModuleInstanceUUID: instanceID,
-			pkgcore.LabelComponent:          "inventory",
+			opmlabels.ModuleInstanceUUID: instanceID,
+			opmlabels.Component:          "inventory",
 		}
 	}
 	return s

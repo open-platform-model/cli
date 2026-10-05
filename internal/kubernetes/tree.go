@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/open-platform-model/cli/internal/output"
-	"github.com/open-platform-model/cli/pkg/resourceorder"
+	"github.com/open-platform-model/library/opm/k8s/object"
 )
 
 // noComponentLabel is the placeholder used for resources missing a component mapping.
@@ -291,7 +291,7 @@ func sortByWeightThenName(objs []*unstructured.Unstructured) {
 		}
 		return a.GetNamespace() < b.GetNamespace()
 	})
-	SortObjects(objs, resourceorder.Ascending)
+	SortObjects(objs, object.Ascending)
 }
 
 // sortedComponentNames returns component names alphabetically, with noComponentLabel last.

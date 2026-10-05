@@ -1,10 +1,4 @@
-# Package Types (pkg/)
-
-## Purpose
-
-Defines the exported `pkg/` package structure external tools can import, and which shared types it does not declare because they live in the library: the Kubernetes object wrapper, the OPM label vocabulary and the kind-class weight table.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Core types exported in pkg/
 Shared domain types the CLI owns SHALL be exported under `pkg/` for reuse by external tools. The package structure SHALL be:
@@ -57,10 +51,3 @@ There SHALL be no `pkg/bundle/` package — bundle support is not implemented (0
 - **WHEN** `opm module build`, `opm module apply` or `opm module vet` runs without `-f`, or `opm instance init` walks its values ladder
 - **THEN** the module's `debugValues` come from `Module.DebugValues()`
 - **AND** a module without `debugValues` gives the same error, values source and exit code as before
-
-### Requirement: No Component Go type
-There SHALL be no `Component` struct type in `pkg/`. Component information for display purposes SHALL be derived from the `MatchPlan` result or CUE value iteration.
-
-#### Scenario: No component package exists
-- **WHEN** code attempts to import `pkg/component`
-- **THEN** compilation fails — the package does not exist

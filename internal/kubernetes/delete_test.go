@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/open-platform-model/cli/pkg/resourceorder"
+	"github.com/open-platform-model/library/opm/k8s/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -18,7 +18,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 func TestSortObjects_Descending(t *testing.T) {
@@ -31,7 +31,7 @@ func TestSortObjects_Descending(t *testing.T) {
 		makeUnstructured("v1", "Service", "my-svc", "default"),
 	}
 
-	SortObjects(resources, resourceorder.Descending)
+	SortObjects(resources, object.Descending)
 
 	// Expected order: Webhook(500) > Deployment(100) > Service(50) > ConfigMap(15) > Namespace(0)
 	assert.Equal(t, "ValidatingWebhookConfiguration", resources[0].GetKind())
@@ -46,7 +46,7 @@ func TestDelete_DeletesOnlyTrackedInventoryResources(t *testing.T) {
 	namespace := "default"
 
 	tracked := makeUnstructured("v1", "ConfigMap", "tracked", namespace)
-	setOwnership(tracked, pkgcore.LabelManagedByValue, testInstanceUUID)
+	setOwnership(tracked, opmlabels.ManagedByCLI, testInstanceUUID)
 	untracked := makeUnstructured("v1", "ConfigMap", "untracked", namespace)
 
 	scheme := runtime.NewScheme()
@@ -84,10 +84,10 @@ const testInstanceUUID = "uuid-demo"
 func setOwnership(obj *unstructured.Unstructured, managedBy, uuid string) {
 	labels := map[string]string{}
 	if managedBy != "" {
-		labels[pkgcore.LabelManagedBy] = managedBy
+		labels[opmlabels.ManagedBy] = managedBy
 	}
 	if uuid != "" {
-		labels[pkgcore.LabelModuleInstanceUUID] = uuid
+		labels[opmlabels.ModuleInstanceUUID] = uuid
 	}
 	obj.SetLabels(labels)
 }
@@ -105,7 +105,7 @@ func owned(apiVersion, kind, name, namespace, managedBy, uuid string) *unstructu
 // and delete nothing.
 func TestDelete_LeavesBehind(t *testing.T) {
 	opmCM := func(name string) *unstructured.Unstructured {
-		return owned("v1", "ConfigMap", name, "default", pkgcore.LabelManagedByValue, testInstanceUUID)
+		return owned("v1", "ConfigMap", name, "default", opmlabels.ManagedByCLI, testInstanceUUID)
 	}
 	notFound := func(resource, name string) error {
 		return apierrors.NewNotFound(schema.GroupResource{Resource: resource}, name)
@@ -125,16 +125,16 @@ func TestDelete_LeavesBehind(t *testing.T) {
 	}{
 		{
 			name:         "Namespace is left behind",
-			inventory:    owned("v1", "Namespace", "apps", "", pkgcore.LabelManagedByValue, testInstanceUUID),
-			live:         owned("v1", "Namespace", "apps", "", pkgcore.LabelManagedByValue, testInstanceUUID),
+			inventory:    owned("v1", "Namespace", "apps", "", opmlabels.ManagedByCLI, testInstanceUUID),
+			live:         owned("v1", "Namespace", "apps", "", opmlabels.ManagedByCLI, testInstanceUUID),
 			instanceUUID: testInstanceUUID,
 			wantReason:   ProtectedKindReason,
 			wantPresent:  true,
 		},
 		{
 			name:         "CRD is left behind",
-			inventory:    owned("apiextensions.k8s.io/v1", "CustomResourceDefinition", "widgets.example.io", "", pkgcore.LabelManagedByValue, testInstanceUUID),
-			live:         owned("apiextensions.k8s.io/v1", "CustomResourceDefinition", "widgets.example.io", "", pkgcore.LabelManagedByValue, testInstanceUUID),
+			inventory:    owned("apiextensions.k8s.io/v1", "CustomResourceDefinition", "widgets.example.io", "", opmlabels.ManagedByCLI, testInstanceUUID),
+			live:         owned("apiextensions.k8s.io/v1", "CustomResourceDefinition", "widgets.example.io", "", opmlabels.ManagedByCLI, testInstanceUUID),
 			instanceUUID: testInstanceUUID,
 			wantReason:   ProtectedKindReason,
 			wantPresent:  true,
@@ -150,7 +150,7 @@ func TestDelete_LeavesBehind(t *testing.T) {
 		{
 			name:         "UUID of another instance",
 			inventory:    opmCM("cm"),
-			live:         owned("v1", "ConfigMap", "cm", "default", pkgcore.LabelManagedByValue, "uuid-other"),
+			live:         owned("v1", "ConfigMap", "cm", "default", opmlabels.ManagedByCLI, "uuid-other"),
 			instanceUUID: testInstanceUUID,
 			wantReason:   reasonOtherInstance,
 			wantPresent:  true,
@@ -158,14 +158,14 @@ func TestDelete_LeavesBehind(t *testing.T) {
 		{
 			name:         "no UUID label deletes on managed-by alone",
 			inventory:    opmCM("cm"),
-			live:         owned("v1", "ConfigMap", "cm", "default", pkgcore.LabelManagedByControllerValue, ""),
+			live:         owned("v1", "ConfigMap", "cm", "default", opmlabels.ManagedByController, ""),
 			instanceUUID: testInstanceUUID,
 			wantDeleted:  1,
 		},
 		{
 			name:        "no recorded instance UUID deletes on managed-by alone",
 			inventory:   opmCM("cm"),
-			live:        owned("v1", "ConfigMap", "cm", "default", pkgcore.LabelManagedByValue, "uuid-other"),
+			live:        owned("v1", "ConfigMap", "cm", "default", opmlabels.ManagedByCLI, "uuid-other"),
 			wantDeleted: 1,
 		},
 		{
@@ -299,7 +299,7 @@ func TestDelete_Unreadable(t *testing.T) {
 		for _, dryRun := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/dryRun=%v", tc.name, dryRun), func(t *testing.T) {
 				ctx := context.Background()
-				deploy := owned("apps/v1", "Deployment", "web", "default", pkgcore.LabelManagedByValue, testInstanceUUID)
+				deploy := owned("apps/v1", "Deployment", "web", "default", opmlabels.ManagedByCLI, testInstanceUUID)
 				var objs []runtime.Object
 				var live []*unstructured.Unstructured
 				if tc.withLive {
@@ -347,4 +347,48 @@ func TestDelete_Unreadable(t *testing.T) {
 			})
 		}
 	}
+}
+
+// deletedNames returns the names the fake dynamic client was asked to
+// delete, in call order.
+func deletedNames(t *testing.T, dyn *dynamicfake.FakeDynamicClient) []string {
+	t.Helper()
+	var names []string
+	for _, a := range dyn.Actions() {
+		if d, ok := a.(k8stesting.DeleteAction); ok {
+			names = append(names, d.GetName())
+		}
+	}
+	return names
+}
+
+// TestDelete_DeletesInDescendingWeightOrder pins the direction of the delete
+// path: highest weight first (Deployment, then Service, then ConfigMap),
+// equal weights in input order, whatever order the inventory lists them in.
+func TestDelete_DeletesInDescendingWeightOrder(t *testing.T) {
+	ctx := context.Background()
+	ns := "default"
+	inventory := []*unstructured.Unstructured{
+		owned("v1", "ConfigMap", "cm-1", ns, opmlabels.ManagedByCLI, testInstanceUUID),
+		owned("apps/v1", "Deployment", "deploy", ns, opmlabels.ManagedByCLI, testInstanceUUID),
+		owned("v1", "Service", "svc", ns, opmlabels.ManagedByCLI, testInstanceUUID),
+		owned("v1", "ConfigMap", "cm-2", ns, opmlabels.ManagedByCLI, testInstanceUUID),
+	}
+	live := make([]runtime.Object, len(inventory))
+	for i, o := range inventory {
+		live[i] = o.DeepCopy()
+	}
+	dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), live...)
+	client := &Client{Clientset: fake.NewClientset(), Dynamic: dyn}
+
+	result, err := Delete(ctx, client, DeleteOptions{
+		InstanceName:          "demo",
+		Namespace:             ns,
+		InstanceUUID:          testInstanceUUID,
+		InventoryLive:         inventory,
+		InventoryRecordExists: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 4, result.Deleted)
+	assert.Equal(t, []string{"deploy", "svc", "cm-1", "cm-2"}, deletedNames(t, dyn))
 }

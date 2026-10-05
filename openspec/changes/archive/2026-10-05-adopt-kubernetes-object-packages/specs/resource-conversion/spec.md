@@ -1,10 +1,22 @@
-# Resource Conversion
+## REMOVED Requirements
 
-## Purpose
+### Requirement: Resource wraps cue.Value with provenance
+**Reason**: `pkg/core.Resource` is deleted. The library's `opm/k8s/object.Resource` is the same wrapper, field for field (0012:D1).
+**Migration**: Use `object.Resource`, built from the kernel output with `object.NewResource` or `object.Resources`.
 
-Defines how the CLI turns a render's compiled objects into Kubernetes objects: it converts them through the library's `opm/k8s/object` single export, which feeds both the render digest and the objects it applies, reads OPM label keys from `opm/k8s/labels`, and orders objects by the library weight table.
+### Requirement: Resource provides accessor methods
+**Reason**: The accessors live on `object.Resource` in the library, unchanged.
+**Migration**: Call the same methods (`Kind`, `Name`, `Namespace`, `APIVersion`, `GVK`, `Labels`, `Annotations`) on `object.Resource`.
 
-## Requirements
+### Requirement: Resource provides conversion methods
+**Reason**: The conversions live on `object.Resource` in the library, and `object.Export` replaces the pair of calls the cli made. `MarshalYAML` and `ToMap` are not in `pkg/core` at all.
+**Migration**: Use `object.Export` to get the JSON and the unstructured object from one CUE export; `object.Resource.MarshalJSON` and `ToUnstructured` remain for a single object.
+
+### Requirement: Label constants in pkg/core and GVK weights in pkg/resourceorder
+**Reason**: Both packages are deleted; the labels are the library's `opm/k8s/labels` and the weights are `opm/k8s/object.Weight`.
+**Migration**: See the requirements "Label keys come from the library" and "Object order comes from the library weight table".
+
+## ADDED Requirements
 
 ### Requirement: Rendered objects convert through the library's single export
 

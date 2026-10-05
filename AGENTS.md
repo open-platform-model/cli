@@ -136,6 +136,7 @@ Read when entering `cli/`:
 - `internal/workflow/` - shared render/apply/query orchestration; `render` holds the kernel env and the single `Kernel.Render` call.
 - `pkg/loader/` - local-replacement provenance (module root lookup, `cue.mod/local-module.cue` replacements); instance packages load through the kernel.
 - `pkg/errors/` - shared structured errors; alias as `oerrors`.
+- No local Kubernetes object, label or order package: the object wrapper and its single export, the OPM label vocabulary and the kind-class weight table are the library's `opm/k8s/object` and `opm/k8s/labels` (import the labels as `opmlabels`). A `depguard` rule refuses the retired `pkg/core` and `pkg/resourceorder` paths.
 - `tests/integration/` - integration programs via `go run`.
 - `tests/e2e/` - end-to-end Go tests.
 

@@ -105,7 +105,7 @@ The cluster-query commands (`status`, `tree`, `events`, `delete`, `list`) SHALL 
 
 ### Requirement: `opm module build` output format, split files and ordering
 
-The `opm module build` subcommand SHALL accept `--output`/`-o` with exactly the values `yaml` (default) and `json`; any other value SHALL exit with code 1 and the message `invalid output format "<value>" (valid: yaml, json)`. With `--split`, it SHALL write one file per resource into `--out-dir` (default `./manifests`) named `<lowercase-kind>-<name>.<yaml|json>`; the second resource that resolves to the same base name SHALL receive the suffix `-2`, the third `-3`, and so on. Resources SHALL be emitted in a deterministic order, by apply weight (`pkg/resourceorder.GetWeight`), then namespace, then name, so identical input always yields identical output.
+The `opm module build` subcommand SHALL accept `--output`/`-o` with exactly the values `yaml` (default) and `json`; any other value SHALL exit with code 1 and the message `invalid output format "<value>" (valid: yaml, json)`. With `--split`, it SHALL write one file per resource into `--out-dir` (default `./manifests`) named `<lowercase-kind>-<name>.<yaml|json>`; the second resource that resolves to the same base name SHALL receive the suffix `-2`, the third `-3`, and so on. Resources SHALL be emitted in a deterministic order, by apply weight (the library's `opm/k8s/object.Weight`), then namespace, then name, so identical input always yields identical output.
 
 #### Scenario: Unsupported output format
 

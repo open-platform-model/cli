@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
+	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 )
@@ -119,4 +120,34 @@ func TestPreApplyExistenceCheck_AdmitSet(t *testing.T) {
 	err = PreApplyExistenceCheck(ctx, client, []InventoryEntry{nsEntry}, nil)
 	require.Error(t, err, "a nil set admits nothing")
 	assert.Contains(t, err.Error(), "Namespace/opm-operator-system")
+}
+
+// TestPruneStaleResources_DeletesInDescendingWeightOrder pins the direction
+// of the stale prune: highest weight first (Deployment, then Service, then
+// ConfigMap), equal weights in input order.
+func TestPruneStaleResources_DeletesInDescendingWeightOrder(t *testing.T) {
+	ctx := context.Background()
+	stale := []InventoryEntry{
+		{Group: "", Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "cm-1"},
+		{Group: "apps", Version: "v1", Kind: "Deployment", Namespace: "default", Name: "deploy"},
+		{Group: "", Version: "v1", Kind: "Service", Namespace: "default", Name: "svc"},
+		{Group: "", Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "cm-2"},
+	}
+	dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(),
+		liveObject("v1", "ConfigMap", "default", "cm-1"),
+		liveObject("apps/v1", "Deployment", "default", "deploy"),
+		liveObject("v1", "Service", "default", "svc"),
+		liveObject("v1", "ConfigMap", "default", "cm-2"),
+	)
+	client := &kubernetes.Client{Dynamic: dyn}
+
+	require.NoError(t, PruneStaleResources(ctx, client, stale))
+
+	var deleted []string
+	for _, a := range dyn.Actions() {
+		if d, ok := a.(k8stesting.DeleteAction); ok {
+			deleted = append(deleted, d.GetName())
+		}
+	}
+	assert.Equal(t, []string{"deploy", "svc", "cm-1", "cm-2"}, deleted)
 }

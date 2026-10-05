@@ -27,7 +27,7 @@ import (
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 const (
@@ -201,10 +201,10 @@ func createLegacySecretEntries(ctx context.Context, client *kubernetes.Client, n
 			Name:      inventory.LegacySecretName(name, id),
 			Namespace: namespace,
 			Labels: map[string]string{
-				pkgcore.LabelManagedBy:          pkgcore.LabelManagedByValue,
-				pkgcore.LabelModuleInstanceName: name,
-				pkgcore.LabelModuleInstanceUUID: id,
-				pkgcore.LabelComponent:          "inventory",
+				opmlabels.ManagedBy:          opmlabels.ManagedByCLI,
+				opmlabels.ModuleInstanceName: name,
+				opmlabels.ModuleInstanceUUID: id,
+				opmlabels.Component:          "inventory",
 			},
 		},
 		Data: map[string][]byte{"inventory": []byte(payload)},
@@ -241,7 +241,7 @@ func buildResources(names ...string) []*unstructured.Unstructured {
 				"name":      name,
 				"namespace": namespace,
 				"labels": map[string]interface{}{
-					pkgcore.LabelManagedBy:             pkgcore.LabelManagedByValue,
+					opmlabels.ManagedBy:                opmlabels.ManagedByCLI,
 					"module-instance.opmodel.dev/name": instanceName,
 					"module-instance.opmodel.dev/uuid": instanceID,
 				},

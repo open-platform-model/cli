@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 // Verdict is what the migration's proof says about one live object on the
@@ -31,9 +31,9 @@ const (
 // identityLabels are the OPM instance identity labels; an object carrying
 // any of them is never proven to come from an earlier manifest.
 var identityLabels = []string{
-	pkgcore.LabelModuleInstanceUUID,
-	pkgcore.LabelModuleInstanceName,
-	pkgcore.LabelModuleInstanceNamespace,
+	opmlabels.ModuleInstanceUUID,
+	opmlabels.ModuleInstanceName,
+	opmlabels.ModuleInstanceNamespace,
 }
 
 // ProveLegacy proves a live object against its proof-list entry (0012:D8:R6):
@@ -47,10 +47,10 @@ func ProveLegacy(live *unstructured.Unstructured, want LegacyObject, instanceUUI
 		return VerdictAbsent, ""
 	}
 	labels := live.GetLabels()
-	if uuid := labels[pkgcore.LabelModuleInstanceUUID]; uuid != "" && uuid == instanceUUID {
+	if uuid := labels[opmlabels.ModuleInstanceUUID]; uuid != "" && uuid == instanceUUID {
 		return VerdictOurs, ""
 	}
-	if uuid := labels[pkgcore.LabelModuleInstanceUUID]; uuid != "" {
+	if uuid := labels[opmlabels.ModuleInstanceUUID]; uuid != "" {
 		return VerdictUnproven, fmt.Sprintf("carries the identity of instance %s", instanceRef(labels))
 	}
 	for _, key := range identityLabels {
@@ -135,14 +135,14 @@ const kubectlApplyManager = "kubectl"
 
 // instanceRef names the instance an object's identity labels point at.
 func instanceRef(labels map[string]string) string {
-	name, ns := labels[pkgcore.LabelModuleInstanceName], labels[pkgcore.LabelModuleInstanceNamespace]
+	name, ns := labels[opmlabels.ModuleInstanceName], labels[opmlabels.ModuleInstanceNamespace]
 	switch {
 	case name != "" && ns != "":
 		return ns + "/" + name
 	case name != "":
 		return name
 	default:
-		return labels[pkgcore.LabelModuleInstanceUUID]
+		return labels[opmlabels.ModuleInstanceUUID]
 	}
 }
 

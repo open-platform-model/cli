@@ -5,14 +5,14 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/log"
-	"github.com/open-platform-model/cli/pkg/resourceorder"
+	"github.com/open-platform-model/library/opm/k8s/object"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/cli/internal/output"
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 // DeleteOptions configures a delete operation.
@@ -149,7 +149,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 	recordUnreadable(result, opts.Unreadable, instanceLog)
 
 	// Sort in reverse weight order (highest weight first = delete webhooks before deployments)
-	SortObjects(resources, resourceorder.Descending)
+	SortObjects(resources, object.Descending)
 
 	// Delete each workload resource
 	for _, res := range resources {
@@ -234,12 +234,12 @@ func checkDeletable(ctx context.Context, client *Client, obj *unstructured.Unstr
 	}
 
 	labels := live.GetLabels()
-	if !pkgcore.IsOPMManagedBy(labels[pkgcore.LabelManagedBy]) {
+	if !opmlabels.IsOPMManagedBy(labels[opmlabels.ManagedBy]) {
 		return reasonNotManaged, false, nil
 	}
 	// The operator's tolerance: an object without a UUID label predates UUID
 	// stamping, and an instance without a recorded UUID has nothing to compare.
-	if liveUUID := labels[pkgcore.LabelModuleInstanceUUID]; instanceUUID != "" && liveUUID != "" && liveUUID != instanceUUID {
+	if liveUUID := labels[opmlabels.ModuleInstanceUUID]; instanceUUID != "" && liveUUID != "" && liveUUID != instanceUUID {
 		return reasonOtherInstance, false, nil
 	}
 	return "", false, nil

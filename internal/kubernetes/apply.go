@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/open-platform-model/cli/internal/output"
-	"github.com/open-platform-model/cli/pkg/resourceorder"
+	"github.com/open-platform-model/library/opm/k8s/object"
 )
 
 // ApplyOptions configures an apply operation.
@@ -113,7 +113,7 @@ func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstru
 	instanceLog := output.InstanceLogger(instanceName)
 
 	sorted := append([]*unstructured.Unstructured(nil), resources...)
-	SortObjects(sorted, resourceorder.Ascending)
+	SortObjects(sorted, object.Ascending)
 	definitions, rest := splitClusterDefinitions(sorted)
 
 	applied := applyStage(ctx, client, definitions, opts, dryRunSkips{}, result, instanceLog)

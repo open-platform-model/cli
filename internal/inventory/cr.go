@@ -3,7 +3,7 @@ package inventory
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 // The ModuleInstance and Platform CRD coordinates. These are hardcoded rather
@@ -69,7 +69,7 @@ const (
 
 // LabelInstanceUUID is the label the render stamps on every resource carrying
 // the deterministic instance UUID; status.instanceUUID is extracted from it.
-const LabelInstanceUUID = pkgcore.LabelModuleInstanceUUID
+const LabelInstanceUUID = opmlabels.ModuleInstanceUUID
 
 // ModuleInstanceGVR is the ModuleInstance CRD's GroupVersionResource.
 var ModuleInstanceGVR = schema.GroupVersionResource{

@@ -34,12 +34,12 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/open-platform-model/library/opm/k8s/object"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/inventory"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
 	"github.com/open-platform-model/cli/tests/fixtures"
 )
 
@@ -167,11 +167,9 @@ func run() error {
 		return fmt.Errorf("operator-path render: %w", err)
 	}
 
-	resources := make([]*pkgcore.Resource, 0, len(out.Compiled))
-	for _, c := range out.Compiled {
-		resources = append(resources, &pkgcore.Resource{
-			Value: c.Value, Instance: c.Instance, Component: c.Component, Transformer: c.Transformer,
-		})
+	resources, err := object.Export(object.Resources(out.Compiled))
+	if err != nil {
+		return fmt.Errorf("operator-path export: %w", err)
 	}
 	digestB, err := inventory.ComputeRenderDigest(resources)
 	if err != nil {
