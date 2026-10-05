@@ -8,11 +8,11 @@
 
 ## 2. Labels from opm/k8s/labels
 
-- [ ] 2.1 Replace every `pkg/core` label constant and `IsOPMManagedBy` use with `github.com/open-platform-model/library/opm/k8s/labels`, imported as `opmlabels` (design KO4), by the table in proposal.md "Migration note": `internal/inventory/{cr,legacy,stale,store}.go` (`cr.go` keeps `LabelInstanceUUID` as an alias of `opmlabels.ModuleInstanceUUID`), `internal/kubernetes/delete.go`, `internal/operator/migration_proof.go`, `internal/platform/cluster.go`, `pkg/inventory/entry.go`. Set `render.RuntimeName = opmlabels.ManagedByCLI` in `internal/workflow/render/env.go` (same value)
-- [ ] 2.2 Move the tests the same way: `internal/cmd/instance/delete_test.go`, `internal/inventory/legacy_test.go`, `internal/kubernetes/delete_test.go`, `pkg/inventory/types_test.go`
-- [ ] 2.3 Move the integration programs: `tests/integration/{deploy,inst-list,inst-tree,inventory-apply,inventory-ops,migration}/main.go`. The programs carry `//go:build ignore`, so a package pattern compiles nothing; compile each by file: `for f in tests/integration/*/main.go; do go vet "$f" || exit 1; done`
-- [ ] 2.4 Confirm `grep -rn 'pkgcore\.Label\|pkgcore\.IsOPMManagedBy' --include=*.go . | grep -v '^./pkg/core/'` finds nothing (evidence for the spec scenario "Label values are unchanged")
-- [ ] 2.5 `task fmt`, `task lint`, `task test:unit` and `task openspec:check` green, then commit `refactor: read OPM label keys from the library labels package`
+- [x] 2.1 Replace every `pkg/core` label constant and `IsOPMManagedBy` use with `github.com/open-platform-model/library/opm/k8s/labels`, imported as `opmlabels` (design KO4), by the table in proposal.md "Migration note": `internal/inventory/{cr,legacy,stale,store}.go` (`cr.go` keeps `LabelInstanceUUID` as an alias of `opmlabels.ModuleInstanceUUID`), `internal/kubernetes/delete.go`, `internal/operator/migration_proof.go`, `internal/platform/cluster.go`, `pkg/inventory/entry.go`. Set `render.RuntimeName = opmlabels.ManagedByCLI` in `internal/workflow/render/env.go` (same value)
+- [x] 2.2 Move the tests the same way: `internal/cmd/instance/delete_test.go`, `internal/inventory/legacy_test.go`, `internal/kubernetes/delete_test.go`, `pkg/inventory/types_test.go`
+- [x] 2.3 Move the integration programs: `tests/integration/{deploy,inst-list,inst-tree,inventory-apply,inventory-ops,migration}/main.go`. The programs carry `//go:build ignore`, so a package pattern compiles nothing; compile each by file: `for f in tests/integration/*/main.go; do go vet "$f" || exit 1; done`
+- [x] 2.4 Confirm `grep -rn 'pkgcore\.Label\|pkgcore\.IsOPMManagedBy' --include=*.go . | grep -v '^./pkg/core/'` finds nothing (evidence for the spec scenario "Label values are unchanged")
+- [x] 2.5 `task fmt`, `task lint`, `task test:unit` and `task openspec:check` green, then commit `refactor: read OPM label keys from the library labels package`
 
 ## 3. One export for the render digest and the apply objects
 

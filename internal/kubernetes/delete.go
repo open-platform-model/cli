@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/cli/internal/output"
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 // DeleteOptions configures a delete operation.
@@ -234,12 +234,12 @@ func checkDeletable(ctx context.Context, client *Client, obj *unstructured.Unstr
 	}
 
 	labels := live.GetLabels()
-	if !pkgcore.IsOPMManagedBy(labels[pkgcore.LabelManagedBy]) {
+	if !opmlabels.IsOPMManagedBy(labels[opmlabels.ManagedBy]) {
 		return reasonNotManaged, false, nil
 	}
 	// The operator's tolerance: an object without a UUID label predates UUID
 	// stamping, and an instance without a recorded UUID has nothing to compare.
-	if liveUUID := labels[pkgcore.LabelModuleInstanceUUID]; instanceUUID != "" && liveUUID != "" && liveUUID != instanceUUID {
+	if liveUUID := labels[opmlabels.ModuleInstanceUUID]; instanceUUID != "" && liveUUID != "" && liveUUID != instanceUUID {
 		return reasonOtherInstance, false, nil
 	}
 	return "", false, nil

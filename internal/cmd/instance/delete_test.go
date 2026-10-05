@@ -25,7 +25,7 @@ import (
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/operator"
 	"github.com/open-platform-model/cli/internal/output"
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 func emptyClusterClient() *kubernetes.Client {
@@ -169,7 +169,7 @@ func captureOutput(t *testing.T, fn func()) string {
 // that the command passes the recorded instance UUID to Delete.
 func TestExecuteInstanceDelete_LeavesNamespaceBehind(t *testing.T) {
 	const uuid = "uuid-demo"
-	labels := map[string]any{pkgcore.LabelManagedBy: pkgcore.LabelManagedByValue, pkgcore.LabelModuleInstanceUUID: uuid}
+	labels := map[string]any{opmlabels.ManagedBy: opmlabels.ManagedByCLI, opmlabels.ModuleInstanceUUID: uuid}
 	cm := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1", "kind": "ConfigMap",
 		"metadata": map[string]any{"name": "web", "namespace": "apps", "labels": labels},
@@ -177,7 +177,7 @@ func TestExecuteInstanceDelete_LeavesNamespaceBehind(t *testing.T) {
 	foreign := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1", "kind": "ConfigMap",
 		"metadata": map[string]any{"name": "shared", "namespace": "apps", "labels": map[string]any{
-			pkgcore.LabelManagedBy: pkgcore.LabelManagedByValue, pkgcore.LabelModuleInstanceUUID: "uuid-other",
+			opmlabels.ManagedBy: opmlabels.ManagedByCLI, opmlabels.ModuleInstanceUUID: "uuid-other",
 		}},
 	}}
 	ns := &unstructured.Unstructured{Object: map[string]any{
@@ -239,7 +239,7 @@ func TestExecuteInstanceDelete_LeavesNamespaceBehind(t *testing.T) {
 // no completion. A dry run reports the failure as a check it could not make
 // and prints no "dry run complete" line.
 func TestExecuteInstanceDelete_ReadErrorKeepsModuleInstance(t *testing.T) {
-	labels := map[string]any{pkgcore.LabelManagedBy: pkgcore.LabelManagedByValue}
+	labels := map[string]any{opmlabels.ManagedBy: opmlabels.ManagedByCLI}
 	cm := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1", "kind": "ConfigMap",
 		"metadata": map[string]any{"name": "web", "namespace": "apps", "labels": labels},
@@ -313,7 +313,7 @@ func newGuardScenario(namespace, name, modulePath string, targetArmed bool, extr
 	cm := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1", "kind": "ConfigMap",
 		"metadata": map[string]any{"name": name + "-config", "namespace": namespace, "labels": map[string]any{
-			pkgcore.LabelManagedBy: pkgcore.LabelManagedByValue, pkgcore.LabelModuleInstanceUUID: uuid,
+			opmlabels.ManagedBy: opmlabels.ManagedByCLI, opmlabels.ModuleInstanceUUID: uuid,
 		}},
 	}}
 	entries := append([]inventory.InventoryEntry{{Kind: "ConfigMap", Name: cm.GetName(), Namespace: namespace}}, extraEntries...)
@@ -505,7 +505,7 @@ func forbiddenRead(resource, name string) error {
 // kept so it still tracks the unread one, the command exits 1, and the output
 // says the instance was kept and a re-run is safe (cli issue #283).
 func TestExecuteInstanceDelete_UnreadableKeepsModuleInstance(t *testing.T) {
-	labels := map[string]any{pkgcore.LabelManagedBy: pkgcore.LabelManagedByValue}
+	labels := map[string]any{opmlabels.ManagedBy: opmlabels.ManagedByCLI}
 	deploy := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "apps/v1", "kind": "Deployment",
 		"metadata": map[string]any{"name": "web", "namespace": "apps", "labels": labels},

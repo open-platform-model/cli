@@ -10,8 +10,8 @@ import (
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
 	"github.com/open-platform-model/cli/pkg/resourceorder"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 // ApplyComponentRenameSafetyCheck filters the stale set to remove entries
@@ -92,7 +92,7 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 		// Accepts any known OPM actor value (opm-cli, opm-controller, or
 		// legacy open-platform-model) for backward compatibility.
 		labels := unstrObj.GetLabels()
-		if !pkgcore.IsOPMManagedBy(labels[pkgcore.LabelManagedBy]) && !admit.Has(entry) {
+		if !opmlabels.IsOPMManagedBy(labels[opmlabels.ManagedBy]) && !admit.Has(entry) {
 			return fmt.Errorf("resource %s/%s in namespace %q already exists and is not managed by OPM — remove or rename it, or change the module to render a different name",
 				entry.Kind, entry.Name, entry.Namespace)
 		}

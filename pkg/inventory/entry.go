@@ -8,13 +8,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 func NewEntryFromResource(r *unstructured.Unstructured) InventoryEntry {
 	gvk := r.GroupVersionKind()
 	labels := r.GetLabels()
-	component := labels[pkgcore.LabelComponentName]
+	component := labels[opmlabels.ComponentName]
 	return InventoryEntry{
 		Group:     gvk.Group,
 		Kind:      gvk.Kind,

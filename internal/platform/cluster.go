@@ -12,7 +12,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 // ClusterPlatformGetterFor returns a ClusterPlatformGetter that reads the
@@ -94,7 +94,7 @@ func createClusterPlatform(ctx context.Context, dyn dynamic.Interface, spec Spec
 	}}
 
 	_, err = dyn.Resource(inventory.PlatformGVR).Create(ctx, doc, metav1.CreateOptions{
-		FieldManager: pkgcore.LabelManagedByValue, // "opm-cli"
+		FieldManager: opmlabels.ManagedByCLI, // "opm-cli"
 	})
 	switch {
 	case err == nil:

@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 func makeResource(group, version, kind, namespace, name, component string) *unstructured.Unstructured {
@@ -16,7 +16,7 @@ func makeResource(group, version, kind, namespace, name, component string) *unst
 	obj.SetGroupVersionKind(schema.GroupVersionKind{Group: group, Version: version, Kind: kind})
 	obj.SetNamespace(namespace)
 	obj.SetName(name)
-	obj.SetLabels(map[string]string{pkgcore.LabelComponentName: component})
+	obj.SetLabels(map[string]string{opmlabels.ComponentName: component})
 	return obj
 }
 

@@ -11,7 +11,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 func main() {
@@ -45,7 +45,7 @@ func main() {
 	// OPM labels that the CUE transformers normally inject via #context.labels.
 	// Since this integration test bypasses the render pipeline, we add them manually.
 	opmLabels := map[string]interface{}{
-		pkgcore.LabelManagedBy:             pkgcore.LabelManagedByValue,
+		opmlabels.ManagedBy:                opmlabels.ManagedByCLI,
 		"module-instance.opmodel.dev/name": instanceName,
 		"module-instance.opmodel.dev/uuid": instanceID,
 		"module.opmodel.dev/name":          instanceName,

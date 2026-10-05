@@ -10,8 +10,8 @@ import (
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
 	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 // This file is the only surviving reader of the deprecated inventory Secret
@@ -64,8 +64,8 @@ func FindLegacySecretInventory(ctx context.Context, client *kubernetes.Client, i
 
 	// Fallback: UUID-label lookup (handles renamed / legacy Secrets).
 	labelSelector := fmt.Sprintf("%s=%s,%s=%s",
-		pkgcore.LabelModuleInstanceUUID, instanceID,
-		pkgcore.LabelComponent, "inventory",
+		opmlabels.ModuleInstanceUUID, instanceID,
+		opmlabels.Component, "inventory",
 	)
 	list, err := client.Clientset.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {

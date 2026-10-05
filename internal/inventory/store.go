@@ -15,14 +15,14 @@ import (
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
 	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 // fieldManager is the server-side-apply field manager the CLI owns on the
 // ModuleInstance CR. It matches the resource-apply manager so a single actor
 // owns both the instance's workloads and its inventory record.
-const fieldManager = pkgcore.LabelManagedByValue // "opm-cli"
+const fieldManager = opmlabels.ManagedByCLI // "opm-cli"
 
 // GetRecord reads the ModuleInstance CR for an instance by name and namespace.
 // A NotFound response is returned as (nil, nil) — the "no inventory" /
@@ -333,9 +333,9 @@ func moduleRef(path, version string) map[string]any {
 
 func crLabels(name, namespace string) map[string]any {
 	return map[string]any{
-		pkgcore.LabelManagedBy:               pkgcore.LabelManagedByValue,
-		pkgcore.LabelModuleInstanceName:      name,
-		pkgcore.LabelModuleInstanceNamespace: namespace,
+		opmlabels.ManagedBy:               opmlabels.ManagedByCLI,
+		opmlabels.ModuleInstanceName:      name,
+		opmlabels.ModuleInstanceNamespace: namespace,
 	}
 }
 

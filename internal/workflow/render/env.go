@@ -7,6 +7,7 @@ import (
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 	"github.com/open-platform-model/library/opm/kernel"
 	libplatform "github.com/open-platform-model/library/opm/platform"
 
@@ -16,8 +17,9 @@ import (
 )
 
 // RuntimeName is the runtime identity the CLI injects into every kernel
-// render (#context.#runtimeName) — the peer of the operator's "opm-controller".
-const RuntimeName = "opm-cli"
+// render (#context.#runtimeName): the library's managed-by value for the cli,
+// the peer of the operator's opmlabels.ManagedByController.
+const RuntimeName = opmlabels.ManagedByCLI
 
 // The per-invocation kernel itself is constructed by config.NewKernel; this
 // file holds the render environment built on top of it.
