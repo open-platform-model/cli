@@ -486,13 +486,15 @@ tasks:
   ## Controller lifecycle tasks
   #########################
   controller:pin:
-    desc: Pin the default controller module version and the controller it deploys
+    desc: Pin the default controller module version, the controller it deploys and its CRDs
     summary: |
       Resolves the controller module version through the registry
       (OPM_REGISTRY, else CUE_REGISTRY, else the cli default), reads the
       controller release it deploys from the module's controller package (no
-      render), and rewrites internal/controller/pin.go. The only writer of
-      that file.
+      render), renders the version as install renders the controller's
+      instance, and rewrites internal/controller/pin.go and the CRD manifests
+      in internal/controller/crds/, which 'opm controller install --crds-only'
+      applies without a registry. The only writer of those files.
 
       Usage:
         task controller:pin VERSION=0.1.0

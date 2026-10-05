@@ -2,11 +2,19 @@
 // internal/controller/pin.go: the controller module version `opm controller
 // install` installs by default and the controller release that version
 // deploys, read from the module's own controller package without a render.
-// It is not linked into the opm binary.
+// It also renders that version as install renders the controller's instance
+// and writes the render's CRDs to internal/controller/crds/, the manifests
+// `opm controller install --crds-only` applies without a registry. It is not
+// linked into the opm binary.
 //
 //	go run ./hack/controller-pin <version>        # task controller:pin VERSION=<version>
 //	go run ./hack/controller-pin --check          # G1: the pin is served and consistent
+//	go run ./hack/controller-pin --crds-from <module-dir>
 //	go run ./hack/controller-pin select <max> <cli-version>
+//
+// --crds-from writes only the CRD manifests, from a local checkout of the
+// controller module, for the window before that version is published; the
+// re-pin against the published version must then change nothing.
 //
 // select prints the newest published module version at or below <max>
 // (bare SemVer, the cascade resolver's answer) whose controller MAJOR.MINOR is
@@ -25,20 +33,29 @@ import (
 	"go/format"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"golang.org/x/mod/semver"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/controller"
+	"github.com/open-platform-model/cli/internal/controller/crds"
 	"github.com/open-platform-model/cli/internal/modref"
+	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/publish"
+	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
 )
 
 // pinFile is where the pin lives, relative to the repository root (the
 // directory task runs in).
 const pinFile = "internal/controller/pin.go"
+
+// crdDir is where the CRD manifests live, relative to the repository root.
+const crdDir = "internal/controller/crds"
 
 // controllerConst is the constant the pin records the controller version in.
 const controllerConst = "PinnedControllerVersion"
@@ -47,7 +64,52 @@ const controllerConst = "PinnedControllerVersion"
 const exitNone = 3
 
 func main() {
-	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, registryMapping(), pinFile))
+	args := os.Args[1:]
+	if len(args) == 1 && args[0] == "--check" {
+		// G1 reads every stderr line as a finding; the render's progress
+		// lines are not findings.
+		output.SetLogWriter(io.Discard)
+	}
+	os.Exit(run(context.Background(), args, os.Stdout, os.Stderr, paths{
+		mapping: registryMapping(),
+		pin:     pinFile,
+		crds:    crdDir,
+		render:  renderModule,
+	}))
+}
+
+// paths is what one run works on: the registry mapping, the pin file, the
+// manifest directory and the render (tests replace it).
+type paths struct {
+	mapping string
+	pin     string
+	crds    string
+	render  renderFunc
+}
+
+// renderFunc renders the controller's instance from a published module
+// version, or from the local module directory dir when res is nil, and
+// returns the rendered objects.
+type renderFunc func(ctx context.Context, mapping string, res *modref.Resolution, dir string) ([]*unstructured.Unstructured, error)
+
+// renderModule renders the controller's instance as a fresh install does: no
+// recorded and no file values, through controller.ModuleRenderOpts.
+func renderModule(ctx context.Context, mapping string, res *modref.Resolution, dir string) ([]*unstructured.Unstructured, error) {
+	values, err := controller.MergeValues(controller.ValuesInput{})
+	if err != nil {
+		return nil, err
+	}
+	cfg := &config.GlobalConfig{Registry: mapping}
+	k8s := &config.ResolvedKubernetesConfig{Namespace: config.ResolvedField{Value: controller.ControllerNamespace}}
+	opts := controller.ModuleRenderOpts(cfg, k8s, res, values.Source)
+	if res == nil {
+		opts.ModulePath = dir
+	}
+	result, err := workflowrender.FromModule(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	return result.Resources, nil
 }
 
 func registryMapping() string {
@@ -65,12 +127,15 @@ type registry interface {
 	controller.ModuleFetcher
 }
 
-func run(ctx context.Context, args []string, stdout, stderr io.Writer, mapping, file string) int {
+func run(ctx context.Context, args []string, stdout, stderr io.Writer, p paths) int {
 	fail := func(err error) int {
 		fmt.Fprintln(stderr, "controller-pin:", err)
 		return 1
 	}
-	src, err := modref.NewSource(mapping)
+	if len(args) == 2 && args[0] == "--crds-from" {
+		return runCRDsFrom(ctx, stdout, stderr, p, args[1])
+	}
+	src, err := modref.NewSource(p.mapping)
 	if err != nil {
 		return fail(err)
 	}
@@ -81,18 +146,18 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, mapping, 
 
 	switch {
 	case len(args) == 1 && args[0] == "--check":
-		return runCheck(ctx, reg, stdout, stderr, mapping, file)
+		return runCheck(ctx, reg, stdout, stderr, p)
 	case len(args) == 3 && args[0] == "select":
 		return runSelect(ctx, reg, stdout, stderr, args[1], args[2])
 	case len(args) == 1 && !strings.HasPrefix(args[0], "-"):
-		return runPin(ctx, reg, stdout, stderr, mapping, file, args[0])
+		return runPin(ctx, reg, stdout, stderr, p, args[0])
 	default:
-		return fail(errors.New("usage: controller-pin <version> | --check | select <max-version> <cli-version>"))
+		return fail(errors.New("usage: controller-pin <version> | --check | --crds-from <module-dir> | select <max-version> <cli-version>"))
 	}
 }
 
-func runCheck(ctx context.Context, reg registry, stdout, stderr io.Writer, mapping, file string) int {
-	problems, err := check(ctx, reg, mapping, file)
+func runCheck(ctx context.Context, reg registry, stdout, stderr io.Writer, p paths) int {
+	problems, err := check(ctx, reg, p)
 	if err != nil {
 		fmt.Fprintln(stderr, "controller-pin:", err)
 		return 1
@@ -103,7 +168,7 @@ func runCheck(ctx context.Context, reg registry, stdout, stderr io.Writer, mappi
 	if len(problems) > 0 {
 		return 1
 	}
-	fmt.Fprintf(stdout, "%s: pin is served and consistent\n", file)
+	fmt.Fprintf(stdout, "%s: pin is served and consistent, and %s holds the CRDs it renders\n", p.pin, p.crds)
 	return 0
 }
 
@@ -122,36 +187,158 @@ func runSelect(ctx context.Context, reg registry, stdout, stderr io.Writer, maxV
 	return 0
 }
 
-func runPin(ctx context.Context, reg registry, stdout, stderr io.Writer, mapping, file, version string) int {
-	moduleVersion, ctrlVersion, err := resolve(ctx, reg, mapping, version)
-	if err == nil {
-		err = writePin(file, moduleVersion, ctrlVersion)
-	}
+// runPin writes the pin and the CRD manifests of one module version. The
+// render runs before anything is written, so a version that cannot be
+// resolved, read or rendered leaves both as they were.
+func runPin(ctx context.Context, reg registry, stdout, stderr io.Writer, p paths, version string) int {
+	err := func() error {
+		res, moduleVersion, ctrlVersion, err := resolve(ctx, reg, p.mapping, version)
+		if err != nil {
+			return err
+		}
+		files, err := renderManifests(ctx, p, res, "")
+		if err != nil {
+			return fmt.Errorf("rendering %s %s: %w", controller.ControllerModulePath, moduleVersion, err)
+		}
+		if err := writeManifests(p.crds, files); err != nil {
+			return err
+		}
+		if err := writePin(p.pin, moduleVersion, ctrlVersion); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "pinned %s %s (deploys opm-controller %s; %d CRDs in %s)\n",
+			controller.ControllerModulePath, moduleVersion, ctrlVersion, len(files), p.crds)
+		return nil
+	}()
 	if err != nil {
 		fmt.Fprintln(stderr, "controller-pin:", err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "pinned %s %s (deploys opm-controller %s)\n", controller.ControllerModulePath, moduleVersion, ctrlVersion)
+	return 0
+}
+
+// runCRDsFrom writes only the CRD manifests, from a local module directory.
+func runCRDsFrom(ctx context.Context, stdout, stderr io.Writer, p paths, dir string) int {
+	files, err := renderManifests(ctx, p, nil, dir)
+	if err == nil {
+		err = writeManifests(p.crds, files)
+	}
+	if err != nil {
+		fmt.Fprintf(stderr, "controller-pin: rendering %s: %v\n", dir, err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "wrote %d CRDs from %s to %s; %s is unchanged\n", len(files), dir, p.crds, p.pin)
 	return 0
 }
 
 // resolve resolves an exact module version (bare or "v"-prefixed) through
 // the registry and reads the controller version it deploys. It returns the
-// module version bare and the controller version "v"-prefixed.
-func resolve(ctx context.Context, reg registry, mapping, version string) (moduleVersion, ctrlVersion string, err error) {
+// resolution, the module version bare and the controller version
+// "v"-prefixed.
+func resolve(ctx context.Context, reg registry, mapping, version string) (res *modref.Resolution, moduleVersion, ctrlVersion string, err error) {
 	sel, err := modref.ParseSelector(strings.TrimPrefix(version, "v"))
 	if err != nil || sel.Exact == "" {
-		return "", "", fmt.Errorf("%q is not a module version such as 0.1.0", version)
+		return nil, "", "", fmt.Errorf("%q is not a module version such as 0.1.0", version)
 	}
-	res, err := modref.Resolve(ctx, reg, modref.Request{Path: controller.ControllerModulePath, Selector: sel, Registry: mapping})
+	res, err = modref.Resolve(ctx, reg, modref.Request{Path: controller.ControllerModulePath, Selector: sel, Registry: mapping})
 	if err != nil {
-		return "", "", err
+		return nil, "", "", err
 	}
 	ctrlVersion, err = controller.ReadControllerVersion(ctx, reg, res.Version)
 	if err != nil {
-		return "", "", err
+		return nil, "", "", err
 	}
-	return strings.TrimPrefix(res.Version, "v"), ctrlVersion, nil
+	return res, strings.TrimPrefix(res.Version, "v"), ctrlVersion, nil
+}
+
+// renderManifests renders the controller's instance and returns its CRD
+// manifests by file name.
+func renderManifests(ctx context.Context, p paths, res *modref.Resolution, dir string) (map[string][]byte, error) {
+	objs, err := p.render(ctx, p.mapping, res, dir)
+	if err != nil {
+		return nil, err
+	}
+	files := map[string][]byte{}
+	for _, obj := range objs {
+		if obj.GetKind() != crds.Kind {
+			continue
+		}
+		data, err := crds.Manifest(obj)
+		if err != nil {
+			return nil, err
+		}
+		name := crds.FileName(obj)
+		if _, dup := files[name]; dup {
+			return nil, fmt.Errorf("the render holds CRD %s twice", obj.GetName())
+		}
+		files[name] = data
+	}
+	if len(files) == 0 {
+		return nil, errors.New("the render holds no CustomResourceDefinition")
+	}
+	return files, nil
+}
+
+// writeManifests replaces every *.yaml manifest in dir with files.
+func writeManifests(dir string, files map[string][]byte) error {
+	old, err := readManifests(dir)
+	if err != nil {
+		return err
+	}
+	for name := range old {
+		if err := os.Remove(filepath.Join(dir, name)); err != nil {
+			return err
+		}
+	}
+	for name, data := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil { //nolint:gosec // a source file
+			return err
+		}
+	}
+	return nil
+}
+
+// readManifests returns the *.yaml files in dir by name.
+func readManifests(dir string) (map[string][]byte, error) {
+	names, err := filepath.Glob(filepath.Join(dir, "*.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	files := map[string][]byte{}
+	for _, n := range names {
+		data, err := os.ReadFile(n)
+		if err != nil {
+			return nil, err
+		}
+		files[filepath.Base(n)] = data
+	}
+	return files, nil
+}
+
+// manifestProblems compares the manifests on disk with the ones the pinned
+// version renders.
+func manifestProblems(dir, moduleVersion string, have, want map[string][]byte) []string {
+	fix := fmt.Sprintf("run 'task controller:pin VERSION=%s'", moduleVersion)
+	var problems []string
+	for name, data := range want {
+		got, ok := have[name]
+		switch {
+		case !ok:
+			problems = append(problems, fmt.Sprintf("%s: missing; %s %s renders CRD %s; %s",
+				filepath.Join(dir, name), controller.ControllerModulePath, moduleVersion, strings.TrimSuffix(name, ".yaml"), fix))
+		case !bytes.Equal(got, data):
+			problems = append(problems, fmt.Sprintf("%s: differs from the CRD %s %s renders; %s",
+				filepath.Join(dir, name), controller.ControllerModulePath, moduleVersion, fix))
+		}
+	}
+	for name := range have {
+		if _, ok := want[name]; !ok {
+			problems = append(problems, fmt.Sprintf("%s: %s %s renders no such CRD; %s",
+				filepath.Join(dir, name), controller.ControllerModulePath, moduleVersion, fix))
+		}
+	}
+	sort.Strings(problems)
+	return problems
 }
 
 // renderPin is the pin file's content.
@@ -203,12 +390,13 @@ func readPin(file string) (moduleVersion, ctrlVersion string, err error) {
 // check re-resolves the pinned module version and reports every way the pin
 // disagrees with what the registry serves. An error is a failure to check
 // (an unreadable pin, a registry that cannot be reached), never a pass.
-func check(ctx context.Context, reg registry, mapping, file string) ([]string, error) {
+func check(ctx context.Context, reg registry, p paths) ([]string, error) {
+	file := p.pin
 	moduleVersion, pinnedCtrl, err := readPin(file)
 	if err != nil {
 		return nil, err
 	}
-	_, ctrlVersion, err := resolve(ctx, reg, mapping, moduleVersion)
+	res, _, ctrlVersion, err := resolve(ctx, reg, p.mapping, moduleVersion)
 	if err != nil {
 		var refusal *modref.RefusalError
 		if errors.As(err, &refusal) {
@@ -221,11 +409,20 @@ func check(ctx context.Context, reg registry, mapping, file string) ([]string, e
 		}
 		return nil, fmt.Errorf("looking up %s %s: %w", controller.ControllerModulePath, moduleVersion, err)
 	}
+	var problems []string
 	if ctrlVersion != pinnedCtrl {
-		return []string{fmt.Sprintf("%s: %s is %s, but %s %s deploys opm-controller %s; run 'task controller:pin VERSION=%s'",
-			file, controllerConst, pinnedCtrl, controller.ControllerModulePath, moduleVersion, ctrlVersion, moduleVersion)}, nil
+		problems = append(problems, fmt.Sprintf("%s: %s is %s, but %s %s deploys opm-controller %s; run 'task controller:pin VERSION=%s'",
+			file, controllerConst, pinnedCtrl, controller.ControllerModulePath, moduleVersion, ctrlVersion, moduleVersion))
 	}
-	return nil, nil
+	want, err := renderManifests(ctx, p, res, "")
+	if err != nil {
+		return nil, fmt.Errorf("rendering %s %s: %w", controller.ControllerModulePath, moduleVersion, err)
+	}
+	have, err := readManifests(p.crds)
+	if err != nil {
+		return nil, err
+	}
+	return append(problems, manifestProblems(p.crds, moduleVersion, have, want)...), nil
 }
 
 // selectVersion walks the published module versions in max's major, at or
