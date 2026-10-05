@@ -270,3 +270,81 @@ func makeUnstructured(apiVersion, kind, name, namespace string) *unstructured.Un
 	}
 	return obj
 }
+
+// TestDelete_Unreadable covers tracked resources the caller's discovery could
+// not read. Each is a per-resource error, except a protected kind, which is
+// left behind as it would be if read; the readable resources are still
+// processed. Each case runs for real and as a dry run.
+func TestDelete_Unreadable(t *testing.T) {
+	forbidden := apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "settings", errors.New("denied"))
+	cmUnreadable := UnreadableResource{Kind: "ConfigMap", Namespace: "default", Name: "settings", Err: forbidden}
+	nsUnreadable := UnreadableResource{Kind: "Namespace", Name: "apps", Err: forbidden}
+	crdUnreadable := UnreadableResource{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition", Name: "widgets.example.io", Err: forbidden}
+
+	tests := []struct {
+		name          string
+		unreadable    []UnreadableResource
+		withLive      bool
+		recordExists  bool
+		wantErrors    int
+		wantLeftKinds []string
+	}{
+		{name: "unreadable ConfigMap fails beside a deleted Deployment", unreadable: []UnreadableResource{cmUnreadable}, withLive: true, recordExists: true, wantErrors: 1},
+		{name: "unreadable Namespace is left behind", unreadable: []UnreadableResource{nsUnreadable}, withLive: true, recordExists: true, wantLeftKinds: []string{"Namespace"}},
+		{name: "unreadable CRD is left behind", unreadable: []UnreadableResource{crdUnreadable}, withLive: true, recordExists: true, wantLeftKinds: []string{"CustomResourceDefinition"}},
+		{name: "unreadable alone is not no-resources-found", unreadable: []UnreadableResource{cmUnreadable}, wantErrors: 1},
+	}
+
+	for _, tc := range tests {
+		for _, dryRun := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/dryRun=%v", tc.name, dryRun), func(t *testing.T) {
+				ctx := context.Background()
+				deploy := owned("apps/v1", "Deployment", "web", "default", pkgcore.LabelManagedByValue, testInstanceUUID)
+				var objs []runtime.Object
+				var live []*unstructured.Unstructured
+				if tc.withLive {
+					objs = append(objs, deploy.DeepCopy())
+					live = append(live, deploy.DeepCopy())
+				}
+				dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), objs...)
+				client := &Client{Dynamic: dyn}
+
+				result, err := Delete(ctx, client, DeleteOptions{
+					InstanceName:          "demo",
+					Namespace:             "default",
+					InstanceUUID:          testInstanceUUID,
+					DryRun:                dryRun,
+					InventoryLive:         live,
+					InventoryRecordExists: tc.recordExists,
+					Unreadable:            tc.unreadable,
+				})
+				require.NoError(t, err)
+
+				require.Len(t, result.Errors, tc.wantErrors)
+				if tc.wantErrors > 0 {
+					assert.Equal(t, "ConfigMap", result.Errors[0].Kind)
+					assert.Equal(t, "settings", result.Errors[0].Name)
+					assert.True(t, apierrors.IsForbidden(result.Errors[0].Err))
+				}
+				var leftKinds []string
+				for _, lb := range result.LeftBehind {
+					assert.Equal(t, ProtectedKindReason, lb.Reason)
+					leftKinds = append(leftKinds, lb.Kind)
+				}
+				assert.Equal(t, tc.wantLeftKinds, leftKinds)
+
+				if !tc.withLive {
+					assert.Equal(t, 0, result.Deleted)
+					return
+				}
+				assert.Equal(t, 1, result.Deleted, "the readable Deployment is still processed")
+				_, getErr := dyn.Tracker().Get(GVRFromUnstructured(deploy), "default", "web")
+				if dryRun {
+					assert.NoError(t, getErr, "a dry run deletes nothing")
+				} else {
+					assert.True(t, apierrors.IsNotFound(getErr), "the Deployment is deleted")
+				}
+			})
+		}
+	}
+}

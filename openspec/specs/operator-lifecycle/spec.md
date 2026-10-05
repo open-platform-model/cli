@@ -334,7 +334,7 @@ After the operator's rollout, and unless `--skip-platform` or `--crds-only` is g
 
 ### Requirement: Uninstall deletes the operator instance's recorded inventory
 
-`opm operator uninstall` SHALL read the operator's instance record `opm-operator` in `opm-operator-system`. When none exists, it SHALL delete nothing and exit 2 naming `opm operator install` as the step that records the running operator. Otherwise, after the finalizer guard, it SHALL delete every object the record's inventory lists except CRDs and the Namespace, in descending resource-weight order, leaving behind any object that no longer carries this instance's identity, then delete the record. It SHALL delete no object the inventory does not list, SHALL NOT wait for deletion to complete, and SHALL treat an already absent object as deleted. Source: 0006:D34, 0021:D11:R11.
+`opm operator uninstall` SHALL read the operator's instance record `opm-operator` in `opm-operator-system`. When none exists, it SHALL delete nothing and exit 2 naming `opm operator install` as the step that records the running operator. Otherwise, after the finalizer guard, it SHALL delete every object the record's inventory lists except CRDs and the Namespace, in descending resource-weight order, leaving behind any object that no longer carries this instance's identity, then, when no object failed, delete the record. It SHALL delete no object the inventory does not list, SHALL NOT wait for deletion to complete, and SHALL treat an already absent object as deleted. Source: 0006:D34, 0021:D11:R11.
 
 #### Scenario: Uninstall after a module install
 
@@ -355,3 +355,15 @@ After the operator's rollout, and unless `--skip-platform` or `--crds-only` is g
 
 - **WHEN** uninstall runs again after an earlier run deleted the objects but failed to delete the record
 - **THEN** it treats the absent objects as deleted, deletes the record and exits zero
+
+### Requirement: Uninstall keeps the record when a recorded object could not be read
+
+When `opm operator uninstall` reads the objects its instance record lists and the read of one fails with an error other than NotFound, that object SHALL count as a failure for that object: it SHALL be listed with its read error and not deleted, the other recorded objects SHALL still be deleted, the instance record SHALL NOT be deleted, and the command SHALL exit 1 and SHALL NOT report the operator uninstalled. A recorded `Namespace` or `CustomResourceDefinition` that could not be read SHALL instead be left behind, as it would be if read, and SHALL NOT count as a failure. Re-running uninstall after the cause is fixed SHALL delete the remaining objects and the record.
+
+#### Scenario: Unreadable recorded object keeps the record
+
+- **WHEN** `opm operator uninstall` runs and reading the recorded ClusterRole fails with Forbidden
+- **THEN** the recorded ServiceAccount and Deployment SHALL be deleted
+- **AND** the ClusterRole SHALL be listed with the Forbidden error and SHALL NOT be deleted
+- **AND** the instance record SHALL NOT be deleted
+- **AND** the command SHALL exit 1 without reporting the operator uninstalled

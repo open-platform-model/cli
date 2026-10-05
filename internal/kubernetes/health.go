@@ -121,10 +121,11 @@ func IsHealthy(status HealthStatus) bool {
 
 // QuickInstanceHealth evaluates aggregate health from pre-fetched resources.
 // It calls EvaluateHealth on each live resource and counts healthy vs total.
-// missingCount is the number of inventory-tracked resources not found on the cluster.
-// Returns the aggregate status, ready count, and total count.
-func QuickInstanceHealth(resources []*unstructured.Unstructured, missingCount int) (status HealthStatus, readyCount, totalCount int) {
-	total := len(resources) + missingCount
+// unhealthyCount is the number of inventory-tracked resources that are missing
+// from the cluster or could not be read; each counts toward the total and not
+// toward ready. Returns the aggregate status, ready count, and total count.
+func QuickInstanceHealth(resources []*unstructured.Unstructured, unhealthyCount int) (status HealthStatus, readyCount, totalCount int) {
+	total := len(resources) + unhealthyCount
 	if total == 0 {
 		return HealthUnknown, 0, 0
 	}

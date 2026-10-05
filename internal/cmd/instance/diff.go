@@ -6,7 +6,9 @@ import (
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
+	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
@@ -14,6 +16,7 @@ import (
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/platform"
+	"github.com/open-platform-model/cli/internal/workflow/query"
 	"github.com/open-platform-model/cli/internal/workflow/render"
 )
 
@@ -100,18 +103,7 @@ func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil
 	var diffOpts kubernetes.DiffOptions
 	instanceID := result.Instance.UUID
 	if instanceID != "" {
-		// Orphan detection reads status.inventory from the ModuleInstance CR.
-		inv, invErr := inventory.GetRecord(ctx, k8sClient, result.Instance.Name, result.Instance.Namespace)
-		if invErr != nil {
-			instanceLog.Debug("could not read inventory for diff", "error", invErr)
-		} else if inv != nil {
-			liveResources, _, invDiscoverErr := inventory.DiscoverResourcesFromInventory(ctx, k8sClient, inv)
-			if invDiscoverErr != nil {
-				instanceLog.Debug("inventory discovery failed", "error", invDiscoverErr)
-			} else {
-				diffOpts.InventoryLive = liveResources
-			}
-		}
+		diffOpts.InventoryLive = discoverOrphanCandidates(ctx, k8sClient, result.Instance.Name, result.Instance.Namespace, instanceLog)
 	}
 
 	diffResult, err := kubernetes.Diff(ctx, k8sClient, result.Resources, result.Instance.Name, comparer, diffOpts)
@@ -159,4 +151,31 @@ func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil
 	}
 
 	return nil
+}
+
+// discoverOrphanCandidates returns the live resources the instance's
+// ModuleInstance inventory tracks, for orphan detection. A missing or
+// unreadable record yields none. Each tracked resource that could not be read
+// is warned about, followed by one line saying orphan detection could not
+// check it.
+func discoverOrphanCandidates(ctx context.Context, k8sClient *kubernetes.Client, name, namespace string, instanceLog *log.Logger) []*unstructured.Unstructured {
+	// Orphan detection reads status.inventory from the ModuleInstance CR.
+	inv, invErr := inventory.GetRecord(ctx, k8sClient, name, namespace)
+	if invErr != nil {
+		instanceLog.Debug("could not read inventory for diff", "error", invErr)
+		return nil
+	}
+	if inv == nil {
+		return nil
+	}
+	live, _, unreadable, discoverErr := inventory.DiscoverResourcesFromInventory(ctx, k8sClient, inv)
+	if discoverErr != nil {
+		instanceLog.Debug("inventory discovery failed", "error", discoverErr)
+		return nil
+	}
+	if n := len(unreadable); n > 0 {
+		query.WarnUnreadable(instanceLog, unreadable)
+		instanceLog.Warn(fmt.Sprintf("orphan detection could not check %d tracked resource(s)", n))
+	}
+	return live
 }

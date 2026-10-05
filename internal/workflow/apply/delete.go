@@ -23,16 +23,22 @@ type DeleteRequest struct {
 	// Record is the instance's ModuleInstance record; nil when none exists.
 	Record *inventory.Record
 	// Live are the live objects the record's inventory lists.
-	Live   []*unstructured.Unstructured
-	DryRun bool
-	Log    *log.Logger
+	Live []*unstructured.Unstructured
+	// Unreadable are the recorded objects discovery could not read (an
+	// error other than NotFound). Each is a per-object error, so the record
+	// is kept and the caller reports failure; a protected kind is left
+	// behind as it would be if read.
+	Unreadable []kubernetes.UnreadableResource
+	DryRun     bool
+	Log        *log.Logger
 }
 
 // DeleteRecorded deletes a CLI-owned instance's tracked objects, in
 // descending resource-weight order, leaving CRDs, Namespaces and any object
 // that no longer carries the instance's identity behind, then deletes the
 // ModuleInstance record last: only on a real run with no per-object error,
-// so a re-run can retry what failed. Already absent objects count as
+// so a re-run can retry what failed. An object discovery could not read
+// (req.Unreadable) is such an error. Already absent objects count as
 // deleted. `opm instance delete` and `opm operator uninstall` share it. The
 // caller reports the result.
 func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteResult, error) {
@@ -51,6 +57,7 @@ func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteR
 		DryRun:                req.DryRun,
 		InventoryLive:         req.Live,
 		InventoryRecordExists: req.Record != nil,
+		Unreadable:            req.Unreadable,
 	})
 	if err != nil {
 		instanceLog.Error("delete failed", "error", err)

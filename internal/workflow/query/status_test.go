@@ -29,7 +29,7 @@ func TestBuildStatusOptions(t *testing.T) {
 	}
 	live := []*unstructured.Unstructured{{}}
 	missing := []inventory.InventoryEntry{{Kind: "ConfigMap", Namespace: "apps", Name: "cfg"}}
-	opts := BuildStatusOptions("apps", rsf, output.FormatWide, true, inv, live, missing)
+	opts := BuildStatusOptions("apps", rsf, output.FormatWide, true, inv, live, missing, nil)
 	assert.Equal(t, "apps", opts.Namespace)
 	assert.Equal(t, "1.2.3", opts.Version)
 	assert.Equal(t, "operator", opts.Owner)

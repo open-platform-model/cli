@@ -225,7 +225,9 @@ func (e *NoRecordError) Error() string {
 // finalizer and proceeds). Objects are deleted in descending resource-weight
 // order, an object that no longer carries the instance's identity is left
 // behind, an already absent object counts as deleted, and deletion is not
-// waited for (fire-and-report).
+// waited for (fire-and-report). A recorded object that cannot be read (an
+// error other than NotFound) is a per-object error in UninstallResult.Errors,
+// so the record is kept and the caller does not report success.
 func Uninstall(ctx context.Context, client *kubernetes.Client, opts UninstallOptions) (*UninstallResult, error) {
 	rec, err := inventory.GetRecord(ctx, client, OperatorInstanceName, OperatorNamespace)
 	if err != nil {
@@ -248,7 +250,7 @@ func Uninstall(ctx context.Context, client *kubernetes.Client, opts UninstallOpt
 		}
 	}
 
-	live, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, rec)
+	live, _, unreadable, err := inventory.DiscoverResourcesFromInventory(ctx, client, rec)
 	if err != nil {
 		return nil, fmt.Errorf("reading the recorded objects: %w", err)
 	}
@@ -258,6 +260,7 @@ func Uninstall(ctx context.Context, client *kubernetes.Client, opts UninstallOpt
 		Namespace:    OperatorNamespace,
 		Record:       rec,
 		Live:         live,
+		Unreadable:   inventory.UnreadableResources(unreadable),
 		Log:          output.InstanceLogger(OperatorInstanceName),
 	})
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/charmbracelet/log"
 	"github.com/open-platform-model/cli/pkg/resourceorder"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -49,6 +50,23 @@ type DeleteOptions struct {
 	// "not found" — the caller deletes the CR itself (last) after Delete
 	// returns.
 	InventoryRecordExists bool
+
+	// Unreadable lists tracked resources the caller's discovery could not
+	// read. Each is a per-resource error (DeleteResult.Errors), so the caller
+	// keeps the ModuleInstance and a re-run retries, except a protected kind,
+	// which is left behind as it would be if read.
+	Unreadable []UnreadableResource
+}
+
+// UnreadableResource is a tracked resource whose discovery read failed with an
+// error other than NotFound. Delete treats it as DeleteOptions.Unreadable
+// describes; GetInstanceStatus lists it with health Unknown.
+type UnreadableResource struct {
+	Group     string
+	Kind      string
+	Namespace string
+	Name      string
+	Err       error
 }
 
 // DeleteResult contains the outcome of a delete operation.
@@ -94,7 +112,9 @@ const (
 // both sides carry one, still has this instance's UUID; otherwise it is left
 // behind (DeleteResult.LeftBehind). An object that is already gone counts
 // neither as deleted nor as an error; any other read error is a per-resource
-// error, so the caller keeps the ModuleInstance and a re-run retries.
+// error, so the caller keeps the ModuleInstance and a re-run retries. A
+// resource the caller's discovery could not read (opts.Unreadable) gets the
+// same outcome without a second read.
 func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteResult, error) {
 	result := &DeleteResult{}
 
@@ -116,7 +136,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 	result.Resources = resources
 
 	// Return error when no resources found and no ModuleInstance CR to delete.
-	if len(resources) == 0 && !opts.InventoryRecordExists {
+	if len(resources) == 0 && len(opts.Unreadable) == 0 && !opts.InventoryRecordExists {
 		return nil, &noResourcesFoundError{
 			InstanceName: opts.InstanceName,
 			InstanceID:   opts.InstanceID,
@@ -125,6 +145,8 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 	}
 
 	instanceLog.Debug("resources to delete", "count", len(resources))
+
+	recordUnreadable(result, opts.Unreadable, instanceLog)
 
 	// Sort in reverse weight order (highest weight first = delete webhooks before deployments)
 	SortObjects(resources, resourceorder.Descending)
@@ -178,6 +200,20 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 	// The ModuleInstance CR is deleted last by the caller (after this returns),
 	// so the inventory record is only removed once the instance is fully torn down.
 	return result, nil
+}
+
+// recordUnreadable adds the resources discovery could not read to result: a
+// protected kind is left behind, as checkDeletable would leave it if read, and
+// any other is a per-resource error worded like a failed re-read.
+func recordUnreadable(result *DeleteResult, unreadable []UnreadableResource, instanceLog *log.Logger) {
+	for _, u := range unreadable {
+		if IsProtectedKind(u.Group, u.Kind) {
+			result.LeftBehind = append(result.LeftBehind, LeftBehindResource{Kind: u.Kind, Namespace: u.Namespace, Name: u.Name, Reason: ProtectedKindReason})
+			continue
+		}
+		instanceLog.Warn(fmt.Sprintf("reading %s/%s: %v", u.Kind, u.Name, u.Err))
+		result.Errors = append(result.Errors, resourceError{Kind: u.Kind, Name: u.Name, Namespace: u.Namespace, Err: u.Err})
+	}
 }
 
 // checkDeletable decides whether Delete may remove obj. It returns a non-empty

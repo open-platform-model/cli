@@ -83,10 +83,11 @@ func runInstanceEvents(ctx context.Context, identifier string, cfg *config.Globa
 		return err
 	}
 
-	_, liveResources, _, err := query.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, instanceLog)
+	_, liveResources, _, unreadable, err := query.ResolveInventory(ctx, k8sClient, target.Selector, target.Namespace, instanceLog)
 	if err != nil {
 		return err
 	}
+	query.WarnUnreadable(instanceLog, unreadable)
 
 	eventsOpts.Namespace = target.Namespace
 	eventsOpts.InstanceName = target.Selector.InstanceName

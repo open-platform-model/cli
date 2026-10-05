@@ -2,12 +2,15 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // --- 7.6: Tests for output format selection ---
@@ -254,4 +257,33 @@ func TestFormatDuration(t *testing.T) {
 			assert.Equal(t, tc.expected, FormatDuration(d))
 		})
 	}
+}
+
+// A tracked resource discovery could not read is an Unknown row: not healthy,
+// so the instance is NotReady and the summary counts it as not ready.
+func TestGetInstanceStatus_UnreadableIsUnknown(t *testing.T) {
+	forbidden := apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "creds", errors.New("denied"))
+	unreadable := []UnreadableResource{{Kind: "Secret", Namespace: "default", Name: "creds", Err: forbidden}}
+
+	res, err := GetInstanceStatus(context.Background(), nil, StatusOptions{
+		InstanceName:        "my-app",
+		InventoryLive:       []*unstructured.Unstructured{makeResource("ConfigMap", nil)},
+		UnreadableResources: unreadable,
+	})
+	require.NoError(t, err)
+	require.Len(t, res.Resources, 2)
+	row := res.Resources[1]
+	assert.Equal(t, "Secret", row.Kind)
+	assert.Equal(t, "creds", row.Name)
+	assert.Equal(t, "default", row.Namespace)
+	assert.Equal(t, HealthUnknown, row.Status)
+	assert.Equal(t, "<unknown>", row.Age)
+	assert.Equal(t, HealthNotReady, res.AggregateStatus)
+	assert.Equal(t, statusSummary{Total: 2, Ready: 1, NotReady: 1}, res.Summary)
+
+	// Only unreadable entries: still a status, not "no resources found".
+	res, err = GetInstanceStatus(context.Background(), nil, StatusOptions{InstanceName: "my-app", UnreadableResources: unreadable})
+	require.NoError(t, err)
+	assert.Equal(t, HealthNotReady, res.AggregateStatus)
+	assert.Equal(t, statusSummary{Total: 1, NotReady: 1}, res.Summary)
 }

@@ -144,7 +144,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "FAIL: inventory not found after apply\n")
 		os.Exit(1)
 	}
-	discovered, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv)
+	discovered, _, _, err := inventory.DiscoverResourcesFromInventory(ctx, client, readInv)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: discovering from inventory: %v\n", err)
 		os.Exit(1)
@@ -191,7 +191,7 @@ func main() {
 	var dryUUID string
 	if dryInv != nil {
 		dryUUID = dryInv.InstanceUUID
-		dryLive, _, err = inventory.DiscoverResourcesFromInventory(ctx, client, dryInv)
+		dryLive, _, _, err = inventory.DiscoverResourcesFromInventory(ctx, client, dryInv)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: discovering from inventory for dry-run delete: %v\n", err)
 			os.Exit(1)
@@ -224,7 +224,7 @@ func main() {
 	var delUUID string
 	if delInv != nil {
 		delUUID = delInv.InstanceUUID
-		delLive, _, err = inventory.DiscoverResourcesFromInventory(ctx, client, delInv)
+		delLive, _, _, err = inventory.DiscoverResourcesFromInventory(ctx, client, delInv)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: discovering from inventory for delete: %v\n", err)
 			os.Exit(1)

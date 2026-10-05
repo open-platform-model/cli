@@ -202,7 +202,7 @@ func TestExecuteInstanceDelete_LeavesNamespaceBehind(t *testing.T) {
 			var runErr error
 			out := captureOutput(t, func() {
 				runErr = executeInstanceDelete(ctx, client, rsf, "apps", inv,
-					[]*unstructured.Unstructured{cm.DeepCopy(), foreign.DeepCopy(), ns.DeepCopy()}, dryRun, output.InstanceLogger("demo"))
+					[]*unstructured.Unstructured{cm.DeepCopy(), foreign.DeepCopy(), ns.DeepCopy()}, nil, dryRun, output.InstanceLogger("demo"))
 			})
 			require.NoError(t, runErr, out)
 
@@ -264,7 +264,7 @@ func TestExecuteInstanceDelete_ReadErrorKeepsModuleInstance(t *testing.T) {
 			var runErr error
 			out := captureOutput(t, func() {
 				runErr = executeInstanceDelete(ctx, client, &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}, "apps", inv,
-					[]*unstructured.Unstructured{cm.DeepCopy()}, dryRun, output.InstanceLogger("demo"))
+					[]*unstructured.Unstructured{cm.DeepCopy()}, nil, dryRun, output.InstanceLogger("demo"))
 			})
 			require.Error(t, runErr)
 			assert.NotContains(t, out, "Instance deleted")
@@ -335,7 +335,7 @@ func (g *guardScenario) run(t *testing.T, dryRun bool) (string, error) {
 	var runErr error
 	out := captureOutput(t, func() {
 		runErr = deleteResolvedInstance(context.Background(), g.client, &cmdutil.InstanceSelectorFlags{InstanceName: g.rec.Name}, g.rec.Namespace,
-			g.rec, []*unstructured.Unstructured{g.cm.DeepCopy()}, 5*time.Second, dryRun, output.InstanceLogger(g.rec.Name))
+			g.rec, []*unstructured.Unstructured{g.cm.DeepCopy()}, nil, 5*time.Second, dryRun, output.InstanceLogger(g.rec.Name))
 	})
 	return out, runErr
 }
@@ -493,4 +493,111 @@ func TestDeleteResolvedInstance_OperatorOwnedRefusedBeforeList(t *testing.T) {
 			g.assertUntouched(t)
 		})
 	}
+}
+
+// forbiddenRead is the error a discovery GET returns when RBAC denies it.
+func forbiddenRead(resource, name string) error {
+	return apierrors.NewForbidden(schema.GroupResource{Resource: resource}, name, errors.New("denied"))
+}
+
+// A tracked resource discovery could not read is a per-resource failure, as a
+// failed re-read is: the readable resources are deleted, the ModuleInstance is
+// kept so it still tracks the unread one, the command exits 1, and the output
+// says the instance was kept and a re-run is safe (cli issue #283).
+func TestExecuteInstanceDelete_UnreadableKeepsModuleInstance(t *testing.T) {
+	labels := map[string]any{pkgcore.LabelManagedBy: pkgcore.LabelManagedByValue}
+	deploy := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "apps/v1", "kind": "Deployment",
+		"metadata": map[string]any{"name": "web", "namespace": "apps", "labels": labels},
+	}}
+	cm := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1", "kind": "ConfigMap",
+		"metadata": map[string]any{"name": "settings", "namespace": "apps", "labels": labels},
+	}}
+	mi := moduleInstanceObj("apps", "demo")
+	inv := &inventory.Record{Name: "demo", Namespace: "apps", Owner: inventory.OwnerCLI}
+	unreadable := []inventory.UnreadableEntry{{
+		Entry: inventory.InventoryEntry{Kind: "ConfigMap", Namespace: "apps", Name: "settings", Version: "v1"},
+		Err:   forbiddenRead("configmaps", "settings"),
+	}}
+
+	for _, dryRun := range []bool{false, true} {
+		t.Run(fmt.Sprintf("dryRun=%v", dryRun), func(t *testing.T) {
+			client, fake := fakeClusterClient(deploy.DeepCopy(), cm.DeepCopy(), mi)
+
+			var runErr error
+			out := captureOutput(t, func() {
+				runErr = executeInstanceDelete(context.Background(), client, &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}, "apps", inv,
+					[]*unstructured.Unstructured{deploy.DeepCopy()}, unreadable, dryRun, output.InstanceLogger("demo"))
+			})
+			requireExitCode(t, runErr, opmexit.ExitGeneralError)
+			assert.NotContains(t, out, "Instance deleted")
+			assert.NotContains(t, out, "dry run complete")
+			assert.Contains(t, out, "ConfigMap/settings")
+			assert.Contains(t, out, "forbidden")
+
+			_, miErr := fake.Tracker().Get(inventory.ModuleInstanceGVR, "apps", "demo")
+			assert.NoError(t, miErr, "the ModuleInstance is kept")
+			_, cmErr := fake.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, "apps", "settings")
+			assert.NoError(t, cmErr, "the unread ConfigMap is not deleted")
+			_, deployErr := fake.Tracker().Get(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}, "apps", "web")
+
+			if dryRun {
+				assert.Contains(t, runErr.Error(), "1 resource(s) could not be checked")
+				assert.NoError(t, deployErr, "a dry run deletes nothing")
+				assert.NotContains(t, out, "The ModuleInstance was kept")
+				return
+			}
+			assert.Contains(t, runErr.Error(), "1 resource(s) failed to delete")
+			assert.True(t, apierrors.IsNotFound(deployErr), "the readable Deployment is deleted")
+			assert.Contains(t, out, "The ModuleInstance was kept")
+			assert.Contains(t, out, "re-running is safe")
+		})
+	}
+}
+
+// An unreadable Namespace is left behind, as it would be if read: delete never
+// deletes that kind, so it is no failure and the ModuleInstance goes.
+func TestExecuteInstanceDelete_UnreadableNamespaceIsLeftBehind(t *testing.T) {
+	mi := moduleInstanceObj("apps", "demo")
+	client, fake := fakeClusterClient(mi)
+	inv := &inventory.Record{Name: "demo", Namespace: "apps", Owner: inventory.OwnerCLI}
+	unreadable := []inventory.UnreadableEntry{{
+		Entry: inventory.InventoryEntry{Kind: "Namespace", Name: "apps", Version: "v1"},
+		Err:   forbiddenRead("namespaces", "apps"),
+	}}
+
+	var runErr error
+	out := captureOutput(t, func() {
+		runErr = executeInstanceDelete(context.Background(), client, &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}, "apps", inv,
+			nil, unreadable, false, output.InstanceLogger("demo"))
+	})
+	require.NoError(t, runErr, out)
+	assert.Contains(t, out, "Namespace/apps")
+	assert.Contains(t, out, output.StatusLeftBehind)
+	_, miErr := fake.Tracker().Get(inventory.ModuleInstanceGVR, "apps", "demo")
+	assert.True(t, apierrors.IsNotFound(miErr), "the ModuleInstance is deleted")
+}
+
+// The operator-owned branch deletes only the ModuleInstance and lets the
+// operator prune with its own credentials, so the CLI's unreadable entries do
+// not change it.
+func TestDeleteResolvedInstance_OperatorOwnedIgnoresUnreadable(t *testing.T) {
+	rec := operatorOwnedRecord()
+	rec.Prune = true
+	client, fake := fakeClusterClient(append(runningOperatorObjects(), moduleInstanceObj(rec.Namespace, rec.Name))...)
+	unreadable := []inventory.UnreadableEntry{{
+		Entry: inventory.InventoryEntry{Kind: "Deployment", Group: "apps", Namespace: "demo", Name: "podinfo", Version: "v1"},
+		Err:   forbiddenRead("deployments", "podinfo"),
+	}}
+
+	var runErr error
+	out := captureOutput(t, func() {
+		runErr = deleteResolvedInstance(context.Background(), client, &cmdutil.InstanceSelectorFlags{InstanceName: rec.Name}, rec.Namespace,
+			rec, nil, unreadable, 5*time.Second, false, output.InstanceLogger(rec.Name))
+	})
+	require.NoError(t, runErr, out)
+	assert.Contains(t, out, "operator pruned")
+	_, miErr := fake.Tracker().Get(inventory.ModuleInstanceGVR, rec.Namespace, rec.Name)
+	assert.True(t, apierrors.IsNotFound(miErr), "the ModuleInstance is deleted")
 }
