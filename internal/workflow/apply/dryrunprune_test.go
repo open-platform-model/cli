@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -218,7 +220,7 @@ func TestPreviewPrune_ListsLeftBehind(t *testing.T) {
 	output.SetLogWriter(&logBuf)
 	t.Cleanup(func() { output.SetLogWriter(os.Stderr) })
 
-	prunable, protected := inventory.SplitProtected([]inventory.InventoryEntry{
+	prunable, protected := inventory.SplitProtected([]k8sinventory.Entry{
 		{Kind: "Namespace", Name: "ns"},
 		{Kind: "Service", Namespace: "default", Name: "svc"},
 	})
@@ -229,7 +231,7 @@ func TestPreviewPrune_ListsLeftBehind(t *testing.T) {
 	assertLeftBehind(t, logBuf.String(), "Namespace/ns")
 
 	logBuf.Reset()
-	prunable, protected = inventory.SplitProtected([]inventory.InventoryEntry{{Kind: "Namespace", Name: "ns"}})
+	prunable, protected = inventory.SplitProtected([]k8sinventory.Entry{{Kind: "Namespace", Name: "ns"}})
 	previewPrune(prunable, protected, output.InstanceLogger("demo"))
 	assert.NotContains(t, logBuf.String(), "would prune", "nothing prunable, no would-prune block")
 	assertLeftBehind(t, logBuf.String(), "Namespace/ns")

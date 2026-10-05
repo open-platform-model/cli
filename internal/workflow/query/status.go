@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"github.com/charmbracelet/log"
@@ -37,7 +39,7 @@ func ResolveInventory(
 	rsf *cmdutil.InstanceSelectorFlags,
 	namespace string,
 	instanceLog *log.Logger,
-) (inv *inventory.Record, live []*unstructured.Unstructured, missing []inventory.InventoryEntry, unreadable []inventory.UnreadableEntry, err error) {
+) (inv *inventory.Record, live []*unstructured.Unstructured, missing []k8sinventory.Entry, unreadable []inventory.UnreadableEntry, err error) {
 	var invErr error
 	switch {
 	case rsf.InstanceID != "":
@@ -88,7 +90,7 @@ func WarnUnreadable(logger *log.Logger, unreadable []inventory.UnreadableEntry) 
 
 // BuildStatusOptions assembles the status options from a resolved inventory.
 // Missing entries become "Missing" rows and unreadable entries "Unknown" rows.
-func BuildStatusOptions(namespace string, rsf *cmdutil.InstanceSelectorFlags, outputFormat output.Format, verbose bool, inv *inventory.Record, liveResources []*unstructured.Unstructured, missingEntries []inventory.InventoryEntry, unreadable []inventory.UnreadableEntry) kubernetes.StatusOptions {
+func BuildStatusOptions(namespace string, rsf *cmdutil.InstanceSelectorFlags, outputFormat output.Format, verbose bool, inv *inventory.Record, liveResources []*unstructured.Unstructured, missingEntries []k8sinventory.Entry, unreadable []inventory.UnreadableEntry) kubernetes.StatusOptions {
 	componentMap := make(map[string]string)
 	for _, entry := range inv.Inventory.Entries {
 		key := entry.Kind + "/" + entry.Namespace + "/" + entry.Name

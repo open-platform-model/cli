@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/cli/internal/inventory"
@@ -280,17 +282,17 @@ func main() {
 }
 
 // entriesFromResources builds inventory entries from rendered resources.
-func entriesFromResources(resources []*unstructured.Unstructured) []inventory.InventoryEntry {
-	entries := make([]inventory.InventoryEntry, len(resources))
+func entriesFromResources(resources []*unstructured.Unstructured) []k8sinventory.Entry {
+	entries := make([]k8sinventory.Entry, len(resources))
 	for i, r := range resources {
-		entries[i] = inventory.NewEntryFromResource(r)
+		entries[i] = k8sinventory.NewEntry(r)
 	}
 	return entries
 }
 
 // writeInventoryCR writes the ModuleInstance CR spec and its CLI-owned status
 // subset (the integration-test analog of the apply workflow's record write).
-func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, namespace, instanceID, modulePath, moduleVersion string, revision int, entries []inventory.InventoryEntry) error {
+func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, namespace, instanceID, modulePath, moduleVersion string, revision int, entries []k8sinventory.Entry) error {
 	if _, err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
 		Name:          name,
 		Namespace:     namespace,
@@ -306,7 +308,7 @@ func writeInventoryCR(ctx context.Context, client *kubernetes.Client, name, name
 		InstanceUUID: instanceID,
 		Inventory: inventory.Inventory{
 			Revision: revision,
-			Digest:   inventory.ComputeDigest(entries),
+			Digest:   k8sinventory.Digest(entries),
 			Count:    len(entries),
 			Entries:  entries,
 		},

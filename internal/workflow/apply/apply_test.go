@@ -3,10 +3,11 @@ package apply
 import (
 	"testing"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
-	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -22,7 +23,7 @@ func TestCurrentInventoryEntries(t *testing.T) {
 }
 
 func TestPreviousEntries_FromCRRecord(t *testing.T) {
-	prev := &inventory.Record{Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{{Kind: "Service", Name: "web"}}}}
+	prev := &inventory.Record{Inventory: inventory.Inventory{Entries: []k8sinventory.Entry{{Kind: "Service", Name: "web"}}}}
 	entries := previousEntries(prev, nil)
 	require.Len(t, entries, 1)
 	assert.Equal(t, "Service", entries[0].Kind)
@@ -31,7 +32,7 @@ func TestPreviousEntries_FromCRRecord(t *testing.T) {
 
 func TestPreviousEntries_FromMigrationSource(t *testing.T) {
 	legacy := &inventory.LegacyInventory{
-		Inventory: pkginventory.Inventory{Entries: []inventory.InventoryEntry{{Kind: "ConfigMap", Name: "cfg"}}},
+		Inventory: inventory.Inventory{Entries: []k8sinventory.Entry{{Kind: "ConfigMap", Name: "cfg"}}},
 	}
 	entries := previousEntries(nil, legacy)
 	require.Len(t, entries, 1)
@@ -42,13 +43,13 @@ func TestNextRevision(t *testing.T) {
 	assert.Equal(t, 1, nextRevision(nil, nil))
 	assert.Equal(t, 3, nextRevision(&inventory.Record{Inventory: inventory.Inventory{Revision: 2}}, nil))
 
-	legacy := &inventory.LegacyInventory{Inventory: pkginventory.Inventory{Revision: 4}}
+	legacy := &inventory.LegacyInventory{Inventory: inventory.Inventory{Revision: 4}}
 	assert.Equal(t, 5, nextRevision(nil, legacy))
 }
 
 func TestGuardEmptyRender(t *testing.T) {
 	instanceLog := output.InstanceLogger("test")
-	err := GuardEmptyRender(0, []inventory.InventoryEntry{{Kind: "ConfigMap"}}, false, instanceLog)
+	err := GuardEmptyRender(0, []k8sinventory.Entry{{Kind: "ConfigMap"}}, false, instanceLog)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "render produced 0 resources")
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -13,37 +15,6 @@ import (
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 	"github.com/open-platform-model/library/opm/k8s/object"
 )
-
-// ApplyComponentRenameSafetyCheck filters the stale set to remove entries
-// where the current set contains the same K8s resource (same Group, Kind, Namespace, Name)
-// but under a different Component name.
-//
-// This prevents a component rename from triggering destructive deletion of resources
-// that are still desired — they have simply moved to a different component.
-func ApplyComponentRenameSafetyCheck(stale, current []InventoryEntry) []InventoryEntry {
-	if len(stale) == 0 {
-		return stale
-	}
-
-	filtered := make([]InventoryEntry, 0, len(stale))
-	for _, s := range stale {
-		isRename := false
-		for _, c := range current {
-			if K8sIdentityEqual(s, c) && s.Component != c.Component {
-				isRename = true
-				output.Debug("component rename detected, skipping prune",
-					"group", s.Group, "kind", s.Kind, "namespace", s.Namespace, "name", s.Name,
-					"oldComponent", s.Component, "newComponent", c.Component,
-				)
-				break
-			}
-		}
-		if !isRename {
-			filtered = append(filtered, s)
-		}
-	}
-	return filtered
-}
 
 // PreApplyExistenceCheck verifies that resources do not conflict with existing
 // cluster state on a first-time apply (no previous inventory).
@@ -60,7 +31,7 @@ func ApplyComponentRenameSafetyCheck(stale, current []InventoryEntry) []Inventor
 // instance's identity (0012:D8:R6). Every other caller passes nil.
 //
 // This check should be skipped entirely when a previous inventory exists.
-func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entries []InventoryEntry, admit AdmitSet) error {
+func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entries []k8sinventory.Entry, admit AdmitSet) error {
 	for _, entry := range entries {
 		gvr := schema.GroupVersionResource{
 			Group:    entry.Group,
@@ -103,7 +74,7 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 // SplitProtected partitions a stale set into the entries prune may delete and
 // the entries it always leaves behind (kubernetes.IsProtectedKind: core
 // Namespaces and CRDs), keeping the input order in both halves.
-func SplitProtected(stale []InventoryEntry) (prunable, protected []InventoryEntry) {
+func SplitProtected(stale []k8sinventory.Entry) (prunable, protected []k8sinventory.Entry) {
 	for _, e := range stale {
 		if kubernetes.IsProtectedKind(e.Group, e.Kind) {
 			protected = append(protected, e)
@@ -120,15 +91,15 @@ func SplitProtected(stale []InventoryEntry) (prunable, protected []InventoryEntr
 // even when the caller passes one; callers that report what was left behind
 // split the set first with SplitProtected.
 // 404 (not found) errors are treated as success (idempotent).
-func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale []InventoryEntry) error {
+func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale []k8sinventory.Entry) error {
 	if len(stale) == 0 {
 		return nil
 	}
 
 	// Sort in reverse weight order (highest weight deleted first)
-	sorted := make([]InventoryEntry, len(stale))
+	sorted := make([]k8sinventory.Entry, len(stale))
 	copy(sorted, stale)
-	object.Sort(sorted, func(e InventoryEntry) schema.GroupVersionKind {
+	object.Sort(sorted, func(e k8sinventory.Entry) schema.GroupVersionKind {
 		return schema.GroupVersionKind{Group: e.Group, Version: e.Version, Kind: e.Kind}
 	}, object.Descending)
 

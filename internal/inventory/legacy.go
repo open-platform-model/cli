@@ -10,7 +10,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
-	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
@@ -25,7 +25,7 @@ type LegacyInventory struct {
 	// InstanceUUID is the record's instance identity UUID.
 	InstanceUUID string
 	// Inventory is the ported inventory block (entries/revision/digest/count).
-	Inventory pkginventory.Inventory
+	Inventory Inventory
 	// SecretName and SecretNamespace locate the Secret to delete after the CR
 	// status write succeeds.
 	SecretName      string
@@ -45,7 +45,44 @@ type legacyRecord struct {
 		Namespace string `json:"namespace"`
 		UUID      string `json:"uuid"`
 	} `json:"instanceMetadata"`
-	Inventory pkginventory.Inventory `json:"inventory"`
+	Inventory legacyInventory `json:"inventory"`
+}
+
+// legacyInventory is the Secret's inventory block, with the JSON keys the
+// Secret backend wrote.
+type legacyInventory struct {
+	Revision int           `json:"revision,omitempty"`
+	Digest   string        `json:"digest,omitempty"`
+	Count    int           `json:"count,omitempty"`
+	Entries  []legacyEntry `json:"entries"`
+}
+
+// legacyEntry is one entry of the Secret's inventory block. The API version
+// is stored under the key "v".
+type legacyEntry struct {
+	Group     string `json:"group"`
+	Kind      string `json:"kind"`
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	Version   string `json:"v,omitempty"`
+	Component string `json:"component,omitempty"`
+}
+
+// toInventory maps the Secret's block to the CLI's record block. The digest
+// is carried as read; the migrating apply replaces it, as every apply does.
+func (l legacyInventory) toInventory() Inventory {
+	entries := make([]k8sinventory.Entry, 0, len(l.Entries))
+	for _, e := range l.Entries {
+		entries = append(entries, k8sinventory.Entry{
+			Group:     e.Group,
+			Kind:      e.Kind,
+			Namespace: e.Namespace,
+			Name:      e.Name,
+			Version:   e.Version,
+			Component: e.Component,
+		})
+	}
+	return Inventory{Revision: l.Revision, Digest: l.Digest, Count: l.Count, Entries: entries}
 }
 
 // FindLegacySecretInventory locates a legacy inventory Secret for migration
@@ -86,12 +123,9 @@ func decodeLegacySecret(name, namespace string, payload []byte) (*LegacyInventor
 	if err := json.Unmarshal(payload, &rec); err != nil {
 		return nil, fmt.Errorf("parsing legacy inventory Secret %q: %w", name, err)
 	}
-	if rec.Inventory.Entries == nil {
-		rec.Inventory.Entries = []pkginventory.InventoryEntry{}
-	}
 	return &LegacyInventory{
 		InstanceUUID:    rec.InstanceMetadata.UUID,
-		Inventory:       rec.Inventory,
+		Inventory:       rec.Inventory.toInventory(),
 		SecretName:      name,
 		SecretNamespace: namespace,
 	}, nil

@@ -96,7 +96,7 @@ func TestWriteInstanceRecord_StatusFailureRetainsLegacySecret(t *testing.T) {
 		SecretNamespace: namespace,
 		Inventory:       inventory.Inventory{Revision: 4},
 	}
-	currentEntries := []inventory.InventoryEntry{{Kind: "ConfigMap", Name: "cm-a", Namespace: namespace}}
+	currentEntries := []k8sinventory.Entry{{Kind: "ConfigMap", Name: "cm-a", Namespace: namespace}}
 
 	err := WriteInstanceRecord(ctx, req, nil, legacy, currentEntries, "sha256:deadbeef", req.Log)
 	require.Error(t, err, "a failed status write must fail the record write")
@@ -208,7 +208,7 @@ const retiredInventoryDigest = "sha256:ff47fc33e679f4ab80a04244a33d8ae6887140412
 // writes, not a digest of the CLI's own.
 func TestWriteInstanceRecord_StoresTheLibraryInventoryDigest(t *testing.T) {
 	const namespace = "demo"
-	entries := []inventory.InventoryEntry{
+	entries := []k8sinventory.Entry{
 		{Kind: "Namespace", Name: namespace, Version: "v1"},
 		{Group: "apps", Kind: "Deployment", Namespace: namespace, Name: "web", Version: "v1", Component: "web"},
 		{Kind: "ConfigMap", Namespace: namespace, Name: "settings", Version: "v1"},
@@ -236,10 +236,6 @@ func TestWriteInstanceRecord_StoresTheLibraryInventoryDigest(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(statusPatch, &written))
 
-	libEntries := make([]k8sinventory.Entry, 0, len(entries))
-	for _, e := range entries {
-		libEntries = append(libEntries, k8sinventory.Entry(e))
-	}
-	require.Equal(t, k8sinventory.Digest(libEntries), written.Status.Inventory.Digest)
+	require.Equal(t, k8sinventory.Digest(entries), written.Status.Inventory.Digest)
 	require.NotEqual(t, retiredInventoryDigest, written.Status.Inventory.Digest)
 }

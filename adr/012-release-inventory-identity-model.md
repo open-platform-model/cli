@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Accepted, amended 2026-10-05
+
+> **Amended (0012:D7).** The stale set is now the library's component-blind `opm/k8s/inventory.StaleSet`, so the OPM identity (with Component) and the component-rename safety check are gone: one identity, the Kubernetes identity (`inventory.SameObject`), decides both whether an entry is stale and whether two entries name the same object, with no change to any prune decision. The inventory digest is now the library's `inventory.Digest`, which hashes a canonical field-by-field encoding of the entries rather than their JSON form, so the stored `status.inventory.digest` changed once. The rest of this ADR is kept for the record.
 
 ## Context
 

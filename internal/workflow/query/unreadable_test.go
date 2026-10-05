@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	"github.com/charmbracelet/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,7 +34,7 @@ func captureLog(t *testing.T) *bytes.Buffer {
 
 func forbiddenEntry(kind, namespace, name string) inventory.UnreadableEntry {
 	return inventory.UnreadableEntry{
-		Entry: inventory.InventoryEntry{Kind: kind, Namespace: namespace, Name: name, Version: "v1"},
+		Entry: k8sinventory.Entry{Kind: kind, Namespace: namespace, Name: name, Version: "v1"},
 		Err:   apierrors.NewForbidden(schema.GroupResource{Resource: strings.ToLower(kind) + "s"}, name, nil),
 	}
 }
@@ -86,7 +88,7 @@ func TestEvaluateInstanceHealth_UnreadableCountsNotReady(t *testing.T) {
 	}}
 	client := makeCRClient(cm, sa)
 	forbidConfigMapGets(t, client)
-	inv := &inventory.Record{Name: "demo", Namespace: "apps", Inventory: inventory.Inventory{Entries: []inventory.InventoryEntry{
+	inv := &inventory.Record{Name: "demo", Namespace: "apps", Inventory: inventory.Inventory{Entries: []k8sinventory.Entry{
 		{Kind: "ConfigMap", Namespace: "apps", Name: "settings", Version: "v1"},
 		{Kind: "ServiceAccount", Namespace: "apps", Name: "runner", Version: "v1"},
 	}}}

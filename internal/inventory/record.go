@@ -1,8 +1,24 @@
 package inventory
 
 import (
-	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 )
+
+// Inventory is the status.inventory block the CLI records on a
+// ModuleInstance: the current set of objects the instance owns, with the
+// summary fields beside it. It carries no struct tags; wire.go maps it to the
+// CRD's field names.
+type Inventory struct {
+	// Revision increments on every successful apply.
+	Revision int
+	// Digest is the library's inventory digest of Entries
+	// (k8sinventory.Digest).
+	Digest string
+	// Count is len(Entries).
+	Count int
+	// Entries are the owned objects.
+	Entries []k8sinventory.Entry
+}
 
 // Record is the CLI's view of an instance's persisted inventory, backed by the
 // ModuleInstance CR. It replaces the Secret-era InstanceInventoryRecord: the
@@ -39,7 +55,7 @@ type Record struct {
 	InstanceUUID string
 
 	// Inventory is the CR's status.inventory block.
-	Inventory pkginventory.Inventory
+	Inventory Inventory
 
 	// LastApplied* mirror the CLI-owned status digest set.
 	LastAppliedRenderDigest string

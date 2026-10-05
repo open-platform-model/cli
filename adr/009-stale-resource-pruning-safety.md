@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Accepted, amended 2026-10-05
+
+> **Amended (0012:D7).** The stale set is now the library's component-blind `opm/k8s/inventory.StaleSet`: a previous entry is stale only when no current entry has its group, kind, namespace and name, whatever its component or API version. The component-aware identity and the component-rename safety check below are gone, and no prune decision changed: an object the old identity marked stale under a renamed component was exactly an object the safety check removed again. The rest of this ADR is kept for the record.
 
 ## Context
 

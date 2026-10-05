@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -353,10 +355,10 @@ func buildServiceResources(names []string) []*unstructured.Unstructured {
 }
 
 // entriesFromResources builds inventory entries from rendered resources.
-func entriesFromResources(resources []*unstructured.Unstructured) []inventory.InventoryEntry {
-	entries := make([]inventory.InventoryEntry, len(resources))
+func entriesFromResources(resources []*unstructured.Unstructured) []k8sinventory.Entry {
+	entries := make([]k8sinventory.Entry, len(resources))
 	for i, r := range resources {
-		entries[i] = inventory.NewEntryFromResource(r)
+		entries[i] = k8sinventory.NewEntry(r)
 	}
 	return entries
 }
@@ -380,7 +382,7 @@ func writeInventoryCR(ctx context.Context, client *kubernetes.Client, resources 
 		InstanceUUID: instanceID,
 		Inventory: inventory.Inventory{
 			Revision: 1,
-			Digest:   inventory.ComputeDigest(entries),
+			Digest:   k8sinventory.Digest(entries),
 			Count:    len(entries),
 			Entries:  entries,
 		},

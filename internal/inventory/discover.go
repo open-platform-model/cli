@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -21,7 +23,7 @@ const discoverConcurrency = 8
 // UnreadableEntry is an inventory entry whose live object could not be read:
 // its GET failed with an error other than NotFound.
 type UnreadableEntry struct {
-	Entry InventoryEntry
+	Entry k8sinventory.Entry
 	Err   error
 }
 
@@ -61,7 +63,7 @@ func UnreadableResources(unreadable []UnreadableEntry) []kubernetes.UnreadableRe
 //     (Forbidden, a timeout, a 5xx), with that error
 //
 // The error result is always nil: a failed read is reported per entry.
-func DiscoverResourcesFromInventory(ctx context.Context, client *kubernetes.Client, inv *Record) (live []*unstructured.Unstructured, missing []InventoryEntry, unreadable []UnreadableEntry, err error) {
+func DiscoverResourcesFromInventory(ctx context.Context, client *kubernetes.Client, inv *Record) (live []*unstructured.Unstructured, missing []k8sinventory.Entry, unreadable []UnreadableEntry, err error) {
 	if inv == nil || len(inv.Inventory.Entries) == 0 {
 		return nil, nil, nil, nil
 	}
@@ -82,7 +84,7 @@ func DiscoverResourcesFromInventory(ctx context.Context, client *kubernetes.Clie
 
 	for i, entry := range entries {
 		wg.Add(1)
-		go func(idx int, entry InventoryEntry) {
+		go func(idx int, entry k8sinventory.Entry) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()

@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,18 +31,18 @@ func liveObject(apiVersion, kind, ns, name string) *unstructured.Unstructured {
 }
 
 func TestSplitProtected(t *testing.T) {
-	stale := []InventoryEntry{
-		entry("", "ConfigMap", "default", "a", "app"),
-		entry("", "Namespace", "", "ns", "app"),
-		entry("apps", "Deployment", "default", "web", "app"),
-		entry("apiextensions.k8s.io", "CustomResourceDefinition", "", "widgets.example.io", "app"),
-		entry("example.io", "Namespace", "default", "not-core", "app"),
+	stale := []k8sinventory.Entry{
+		entry("", "ConfigMap", "default", "a"),
+		entry("", "Namespace", "", "ns"),
+		entry("apps", "Deployment", "default", "web"),
+		entry("apiextensions.k8s.io", "CustomResourceDefinition", "", "widgets.example.io"),
+		entry("example.io", "Namespace", "default", "not-core"),
 	}
 
 	prunable, protected := SplitProtected(stale)
 
-	assert.Equal(t, []InventoryEntry{stale[0], stale[2], stale[4]}, prunable)
-	assert.Equal(t, []InventoryEntry{stale[1], stale[3]}, protected)
+	assert.Equal(t, []k8sinventory.Entry{stale[0], stale[2], stale[4]}, prunable)
+	assert.Equal(t, []k8sinventory.Entry{stale[1], stale[3]}, protected)
 
 	p, q := SplitProtected(nil)
 	assert.Empty(t, p)
@@ -54,7 +56,7 @@ func TestPruneStaleResources_SkipsProtectedKinds(t *testing.T) {
 	crd := liveObject("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "widgets.example.io")
 	client := &kubernetes.Client{Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), cm, ns, crd)}
 
-	stale := []InventoryEntry{
+	stale := []k8sinventory.Entry{
 		{Group: "", Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "stale"},
 		{Group: "", Version: "v1", Kind: "Namespace", Name: "apps"},
 		{Group: "apiextensions.k8s.io", Version: "v1", Kind: "CustomResourceDefinition", Name: "widgets.example.io"},
@@ -76,7 +78,7 @@ func TestPreApplyExistenceCheck_UntrackedNamesNoFlag(t *testing.T) {
 	cm := liveObject("v1", "ConfigMap", "default", "taken")
 	client := &kubernetes.Client{Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), cm)}
 
-	err := PreApplyExistenceCheck(context.Background(), client, []InventoryEntry{
+	err := PreApplyExistenceCheck(context.Background(), client, []k8sinventory.Entry{
 		{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "taken"},
 	}, nil)
 	require.Error(t, err)
@@ -98,26 +100,26 @@ func TestPreApplyExistenceCheck_AdmitSet(t *testing.T) {
 	doomed.SetFinalizers([]string{"foregroundDeletion"})
 	client := &kubernetes.Client{Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), kustomized, foreign, doomed)}
 
-	nsEntry := InventoryEntry{Version: "v1", Kind: "Namespace", Name: "opm-operator-system"}
-	cmEntry := InventoryEntry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "taken"}
-	saEntry := InventoryEntry{Version: "v1", Kind: "ServiceAccount", Namespace: "default", Name: "doomed"}
+	nsEntry := k8sinventory.Entry{Version: "v1", Kind: "Namespace", Name: "opm-operator-system"}
+	cmEntry := k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "taken"}
+	saEntry := k8sinventory.Entry{Version: "v1", Kind: "ServiceAccount", Namespace: "default", Name: "doomed"}
 	admit := AdmitSet{
 		{Kind: "Namespace", Name: "opm-operator-system"}:               {},
 		{Kind: "ServiceAccount", Namespace: "default", Name: "doomed"}: {},
 	}
 	ctx := context.Background()
 
-	require.NoError(t, PreApplyExistenceCheck(ctx, client, []InventoryEntry{nsEntry}, admit), "an admitted kustomize-labeled object passes")
+	require.NoError(t, PreApplyExistenceCheck(ctx, client, []k8sinventory.Entry{nsEntry}, admit), "an admitted kustomize-labeled object passes")
 
-	err := PreApplyExistenceCheck(ctx, client, []InventoryEntry{nsEntry, cmEntry}, admit)
+	err := PreApplyExistenceCheck(ctx, client, []k8sinventory.Entry{nsEntry, cmEntry}, admit)
 	require.Error(t, err, "an unadmitted untracked object is refused")
 	assert.Contains(t, err.Error(), "ConfigMap/taken")
 
-	err = PreApplyExistenceCheck(ctx, client, []InventoryEntry{saEntry}, admit)
+	err = PreApplyExistenceCheck(ctx, client, []k8sinventory.Entry{saEntry}, admit)
 	require.Error(t, err, "an admitted terminating object is refused")
 	assert.Contains(t, err.Error(), "is terminating")
 
-	err = PreApplyExistenceCheck(ctx, client, []InventoryEntry{nsEntry}, nil)
+	err = PreApplyExistenceCheck(ctx, client, []k8sinventory.Entry{nsEntry}, nil)
 	require.Error(t, err, "a nil set admits nothing")
 	assert.Contains(t, err.Error(), "Namespace/opm-operator-system")
 }
@@ -127,7 +129,7 @@ func TestPreApplyExistenceCheck_AdmitSet(t *testing.T) {
 // ConfigMap), equal weights in input order.
 func TestPruneStaleResources_DeletesInDescendingWeightOrder(t *testing.T) {
 	ctx := context.Background()
-	stale := []InventoryEntry{
+	stale := []k8sinventory.Entry{
 		{Group: "", Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "cm-1"},
 		{Group: "apps", Version: "v1", Kind: "Deployment", Namespace: "default", Name: "deploy"},
 		{Group: "", Version: "v1", Kind: "Service", Namespace: "default", Name: "svc"},

@@ -34,6 +34,8 @@ import (
 	"strings"
 	"time"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -371,7 +373,7 @@ func waitForInstanceUUID(ctx context.Context, client *kubernetes.Client, name, n
 	}
 }
 
-func containsComponent(entries []inventory.InventoryEntry, component string) bool {
+func containsComponent(entries []k8sinventory.Entry, component string) bool {
 	for _, e := range entries {
 		// Inventory entry names are "<instance>-<component>" by convention.
 		if strings.Contains(e.Name, "-"+component) {

@@ -17,6 +17,8 @@ import (
 	"os"
 	"time"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,7 +75,7 @@ func main() {
 		failf("expected to find the legacy Secret for migration")
 	}
 
-	stale := inventory.ComputeStaleSet(legacy.Inventory.Entries, entriesOf(current))
+	stale := k8sinventory.StaleSet(legacy.Inventory.Entries, entriesOf(current))
 	if len(stale) != 1 || stale[0].Name != "cm-stale" {
 		failf("expected stale set [cm-stale], got %v", stale)
 	}
@@ -92,7 +94,7 @@ func main() {
 		Name: instanceName, Namespace: namespace, InstanceUUID: instanceID,
 		Inventory: inventory.Inventory{
 			Revision: legacy.Inventory.Revision + 1,
-			Digest:   inventory.ComputeDigest(entriesOf(current)),
+			Digest:   k8sinventory.Digest(entriesOf(current)),
 			Count:    2,
 			Entries:  entriesOf(current),
 		},
@@ -176,17 +178,17 @@ func main() {
 	fmt.Println("\n=== ALL SCENARIOS PASSED ===")
 }
 
-func entriesOf(resources []*unstructured.Unstructured) []inventory.InventoryEntry {
-	entries := make([]inventory.InventoryEntry, len(resources))
+func entriesOf(resources []*unstructured.Unstructured) []k8sinventory.Entry {
+	entries := make([]k8sinventory.Entry, len(resources))
 	for i, r := range resources {
-		entries[i] = inventory.NewEntryFromResource(r)
+		entries[i] = k8sinventory.NewEntry(r)
 	}
 	return entries
 }
 
 // createLegacySecret writes a Secret in the deleted Secret-backend envelope
 // shape for the primary test instance.
-func createLegacySecret(ctx context.Context, client *kubernetes.Client, entries []inventory.InventoryEntry, revision int) {
+func createLegacySecret(ctx context.Context, client *kubernetes.Client, entries []k8sinventory.Entry, revision int) {
 	createLegacySecretEntries(ctx, client, instanceName, instanceID, entries, revision)
 }
 
@@ -194,7 +196,7 @@ func createLegacySecretFor(ctx context.Context, client *kubernetes.Client, name,
 	createLegacySecretEntries(ctx, client, name, id, entriesOf(buildResources("cm-x")), revision)
 }
 
-func createLegacySecretEntries(ctx context.Context, client *kubernetes.Client, name, id string, entries []inventory.InventoryEntry, revision int) {
+func createLegacySecretEntries(ctx context.Context, client *kubernetes.Client, name, id string, entries []k8sinventory.Entry, revision int) {
 	payload := legacyRecordJSON(name, namespace, id, entries, revision)
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -216,7 +218,7 @@ func createLegacySecretEntries(ctx context.Context, client *kubernetes.Client, n
 	check("creating legacy Secret", err)
 }
 
-func legacyRecordJSON(name, ns, id string, entries []inventory.InventoryEntry, revision int) string {
+func legacyRecordJSON(name, ns, id string, entries []k8sinventory.Entry, revision int) string {
 	entriesJSON := ""
 	for i, e := range entries {
 		if i > 0 {
@@ -227,7 +229,7 @@ func legacyRecordJSON(name, ns, id string, entries []inventory.InventoryEntry, r
 	}
 	return fmt.Sprintf(
 		`{"instanceMetadata":{"name":%q,"namespace":%q,"uuid":%q},"inventory":{"revision":%d,"digest":%q,"count":%d,"entries":[%s]}}`,
-		name, ns, id, revision, inventory.ComputeDigest(entries), len(entries), entriesJSON,
+		name, ns, id, revision, k8sinventory.Digest(entries), len(entries), entriesJSON,
 	)
 }
 
