@@ -23,7 +23,7 @@ Release class: MAJOR after GA (a renamed command, a changed `spec.owner` value);
 ### Modified Capabilities
 
 - `operator-lifecycle`: retired (every requirement REMOVED, `retire_capabilities: true`), restated as `controller-lifecycle`.
-- Body or title wording only, the product word and names: `apply-preflight-gates`, `apply-pruning`, `artifact-publishing`, `cmd-structure`, `config-types`, `deploy`, `deps-cascade`, `docs-bundle`, `e2e-cluster-preconditions`, `e2e-cluster-workflow`, `health-export`, `instance-inventory`, `inventory-ownership`, `kernel-render`, `kind-cluster-tasks`, `mod-apply`, `platform-check`, `platform-pull`, `platform-resolution`, `pr-workflow`, `release-cascade-wiring`, `release-gates`, `release-workflow`, `resource-conversion`, `test-fixture-lineage`. A requirement whose title or scenario names change is REMOVED and ADDED under a new title; Purpose lines are edited in the main specs at archive.
+- Body or title wording only, the product word and names: `apply-preflight-gates`, `apply-pruning`, `artifact-publishing`, `cmd-structure`, `config-types`, `deploy`, `deps-cascade`, `docs-bundle`, `e2e-cluster-preconditions`, `e2e-cluster-workflow`, `health-evaluation`, `instance-inventory`, `inventory-ownership`, `kernel-render`, `kind-cluster-tasks`, `mod-apply`, `platform-check`, `platform-pull`, `platform-resolution`, `pr-workflow`, `release-cascade-wiring`, `release-gates`, `release-workflow`, `resource-conversion`, `test-fixture-lineage`. A requirement whose title or scenario names change is REMOVED and ADDED under a new title; Purpose lines are edited in the main specs at archive.
 
 ## Impact
 

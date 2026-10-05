@@ -50,7 +50,7 @@ The `module apply` subcommand SHALL accept the following flags with the listed b
 #### Scenario: Wait blocks until the applied resources are healthy
 
 - **WHEN** the user runs `opm module apply ./my-module --wait` against a CLI-managed instance
-- **THEN** after the apply and inventory write the subcommand SHALL poll every applied resource until each is healthy per `kubernetes.IsHealthy(kubernetes.EvaluateHealth(...))`
+- **THEN** after the apply and inventory write the subcommand SHALL poll every applied resource until each is healthy per the library's `health.IsHealthy(health.Evaluate(...))` from `opm/k8s/health`
 - **AND** SHALL print a success line and exit 0 once all are healthy
 - **WHEN** `--timeout` elapses first, or an applied resource has disappeared
 - **THEN** the subcommand SHALL exit non-zero with an error that lists the resources not yet healthy
@@ -82,12 +82,3 @@ The `module apply` subcommand SHALL accept the following flags with the listed b
 - **THEN** the subcommand SHALL refuse to proceed and SHALL return an error explaining the situation
 - **WHEN** the same conditions hold and `--force` IS provided
 - **THEN** the subcommand SHALL prune all previously tracked resources
-
-### Requirement: Apply log surfaces the synthetic instance name
-
-The subcommand SHALL log the resolved synthetic instance name (including the default `<module>-debug` suffix when applicable) prominently in the apply summary so the controller can recognise a synthetic-instance deployment in command-line scrollback or CI logs. <!-- Was: synthetic release name (0002 D9) -->
-
-#### Scenario: Synthetic instance name in apply log
-
-- **WHEN** the user runs `opm module apply ./my-module` against a cluster
-- **THEN** the apply log SHALL include a line identifying the instance as `my-module-debug` (or the user-provided `--name` value)
