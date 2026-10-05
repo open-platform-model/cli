@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -315,4 +316,36 @@ func TestUninstall_RemoveFinalizersStripsAndProceeds(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, live.GetFinalizers())
 	assert.False(t, fc.exists(deploymentGVR, OperatorNamespace, ControllerDeploymentName))
+}
+
+// "Unreadable recorded object": a recorded object whose read fails with an
+// error other than NotFound is a per-object error, the readable objects are
+// still deleted, and the record is kept so the uninstall is not reported as
+// done and a re-run retries.
+func TestUninstall_UnreadableObjectKeepsTheRecord(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	fc := newFakeCluster(t)
+	_, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{})
+	require.NoError(t, err)
+
+	forbid := true
+	fc.fake.PrependReactor("get", "clusterroles", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		if !forbid {
+			return false, nil, nil
+		}
+		get := action.(k8stesting.GetAction)
+		return true, nil, apierrors.NewForbidden(clusterRoleGVR.GroupResource(), get.GetName(), errors.New("no RBAC"))
+	})
+
+	result, err := Uninstall(context.Background(), fc.client, UninstallOptions{})
+	forbid = false
+	require.NoError(t, err)
+	require.Len(t, result.Errors, 1)
+	assert.ErrorContains(t, result.Errors[0], "opm-operator-manager-role")
+	assert.Equal(t, 2, result.Deleted, "ServiceAccount, Deployment")
+
+	assert.False(t, fc.exists(deploymentGVR, OperatorNamespace, ControllerDeploymentName))
+	assert.True(t, fc.exists(clusterRoleGVR, "", "opm-operator-manager-role"), "the unreadable object is not deleted")
+	assert.NotNil(t, fc.record(), "the record is kept and still tracks the unreadable object")
 }
