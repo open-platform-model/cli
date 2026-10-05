@@ -16,7 +16,7 @@ var podListingKinds = map[string]bool{
 }
 
 // listWorkloadPods lists pods for a workload resource using its label selector.
-// Only supported for workload kinds (Deployment, StatefulSet, DaemonSet).
+// Only supported for the kinds in podListingKinds (Deployment only).
 // Returns an empty slice for non-workload kinds.
 // Never call this on MissingResource entries — they have no live object.
 func listWorkloadPods(ctx context.Context, client *Client, resource *unstructured.Unstructured) ([]podInfo, error) {
