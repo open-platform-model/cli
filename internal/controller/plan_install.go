@@ -10,6 +10,7 @@ import (
 
 	"github.com/open-platform-model/library/opm/kernel"
 
+	"github.com/open-platform-model/cli/internal/controller/crds"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
@@ -44,8 +45,6 @@ type PlanOptions struct {
 	ValuesFiles []string
 	// ResetValues is --reset-values.
 	ResetValues bool
-	// CRDsOnly is --crds-only: only the rendered CRDs are applied.
-	CRDsOnly bool
 	// Timeout is the one --timeout budget, started by the terminating wait.
 	Timeout time.Duration
 	// Extra are objects install applies beside the render (the --rbac user
@@ -57,15 +56,18 @@ type PlanOptions struct {
 type Plan struct {
 	Target Target
 	Module *modref.Resolution
-	// Render is the instance's render.
+	// Render is the instance's render; nil for a CRDs-only plan.
 	Render *workflowrender.Result
-	// CRDs are the render's CustomResourceDefinitions.
+	// CRDs are the render's CustomResourceDefinitions, or the embedded ones
+	// for a CRDs-only plan.
 	CRDs []*unstructured.Unstructured
 	// PrevRecord is the controller instance's record; nil on a fresh cluster.
 	PrevRecord *inventory.Record
 	Values     *Values
-	CRDsOnly   bool
-	Extra      []*unstructured.Unstructured
+	// CRDsOnly marks a PlanCRDsOnly plan: only the CRDs (and Extra) are
+	// applied.
+	CRDsOnly bool
+	Extra    []*unstructured.Unstructured
 	// BudgetStart and Timeout are the --timeout budget the writes share.
 	BudgetStart time.Time
 	Timeout     time.Duration
@@ -159,33 +161,75 @@ func PlanInstall(ctx context.Context, env InstallEnv, res *modref.Resolution, ta
 		CRDs:       renderedCRDs(result.Resources),
 		PrevRecord: rec,
 		Values:     values,
-		CRDsOnly:   opts.CRDsOnly,
 		Extra:      opts.Extra,
 		Timeout:    opts.Timeout,
 	}
 
-	if !opts.CRDsOnly {
-		if err := inventory.GateStatusRBAC(ctx, env.Client, ControllerNamespace); err != nil {
-			return nil, &opmexit.ExitError{Code: opmexit.ExitPermissionDenied, Err: err}
-		}
-	}
-
-	plan.BudgetStart = time.Now()
-	waitCtx, cancel := context.WithDeadline(ctx, plan.Deadline())
-	defer cancel()
-	if err := waitForTerminating(waitCtx, env.Client, append(plan.Objects(), plan.Extra...), plan.BudgetStart); err != nil {
-		return nil, err
+	if err := inventory.GateStatusRBAC(ctx, env.Client, ControllerNamespace); err != nil {
+		return nil, &opmexit.ExitError{Code: opmexit.ExitPermissionDenied, Err: err}
 	}
 
 	// The apply guard, the last check: on a cluster with no record every
 	// object the plan applies must be absent or already OPM's.
-	if rec == nil {
-		entries := workflowapply.CurrentInventoryEntries(plan.Objects())
-		if err := inventory.PreApplyExistenceCheck(ctx, env.Client, entries); err != nil {
-			return nil, &GuardError{Err: err}
-		}
+	if err := waitThenGuard(ctx, env, plan, rec == nil); err != nil {
+		return nil, err
 	}
 	return plan, nil
+}
+
+// embeddedCRDs are the CRDs a CRDs-only install applies; tests replace it.
+var embeddedCRDs = crds.Objects
+
+// PinnedTarget is the module version this cli pins and the controller it
+// deploys.
+func PinnedTarget() Target {
+	return Target{ModuleVersion: "v" + PinnedModuleVersion, ControllerVersion: PinnedControllerVersion, Default: true}
+}
+
+// PlanCRDsOnly plans `opm controller install --crds-only` from the CRDs this
+// cli embeds, which task controller:pin rendered from the pinned module
+// version. It works offline: it resolves, fetches and renders nothing, and
+// reads no ModuleInstance, so it cannot know whether the controller's
+// instance is recorded. Its checks are the wait for terminating objects and
+// the apply guard over the CRDs, which always runs: a CRD that exists and is
+// not OPM's refuses the install. The target rules already held when the
+// version was pinned.
+func PlanCRDsOnly(ctx context.Context, env InstallEnv, opts PlanOptions) (*Plan, error) {
+	objs, err := embeddedCRDs()
+	if err != nil {
+		return nil, fmt.Errorf("reading the CRDs this cli embeds: %w", err)
+	}
+	plan := &Plan{
+		Target:   PinnedTarget(),
+		CRDs:     objs,
+		CRDsOnly: true,
+		Extra:    opts.Extra,
+		Timeout:  opts.Timeout,
+	}
+	if err := waitThenGuard(ctx, env, plan, true); err != nil {
+		return nil, err
+	}
+	return plan, nil
+}
+
+// waitThenGuard starts the plan's --timeout budget, waits out the objects
+// it applies that are terminating, then, when guard is set, refuses any of
+// its render objects that exists and is not OPM's.
+func waitThenGuard(ctx context.Context, env InstallEnv, plan *Plan, guard bool) error {
+	plan.BudgetStart = time.Now()
+	waitCtx, cancel := context.WithDeadline(ctx, plan.Deadline())
+	defer cancel()
+	if err := waitForTerminating(waitCtx, env.Client, append(plan.Objects(), plan.Extra...), plan.BudgetStart); err != nil {
+		return err
+	}
+	if !guard {
+		return nil
+	}
+	entries := workflowapply.CurrentInventoryEntries(plan.Objects())
+	if err := inventory.PreApplyExistenceCheck(ctx, env.Client, entries); err != nil {
+		return &GuardError{Err: err}
+	}
+	return nil
 }
 
 // renderWithValues merges the values over the record's and renders the
@@ -212,7 +256,7 @@ func renderWithValues(ctx context.Context, env InstallEnv, res *modref.Resolutio
 }
 
 // Objects returns the render objects the plan applies: every rendered
-// object, or only the CRDs for --crds-only.
+// object, or only the CRDs for a CRDs-only plan.
 func (p *Plan) Objects() []*unstructured.Unstructured {
 	if p.CRDsOnly {
 		return p.CRDs
@@ -228,11 +272,11 @@ func (p *Plan) Deadline() time.Time {
 // renderedCRDs returns the render's CustomResourceDefinitions in render
 // order.
 func renderedCRDs(objs []*unstructured.Unstructured) []*unstructured.Unstructured {
-	var crds []*unstructured.Unstructured
+	var out []*unstructured.Unstructured
 	for _, obj := range objs {
 		if obj.GetKind() == kindCustomResourceDefinition {
-			crds = append(crds, obj)
+			out = append(out, obj)
 		}
 	}
-	return crds
+	return out
 }

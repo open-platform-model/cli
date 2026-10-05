@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -126,6 +127,7 @@ func TestRunControllerInstallRejectsFlagsBeforeAnyIO(t *testing.T) {
 		{installFlags{skipPlatform: true, catalogPrerelease: true}, "--catalog-prerelease"},
 		{installFlags{crdsOnly: true, values: []string{"values.cue"}}, "--reset-values have no effect with --crds-only"},
 		{installFlags{crdsOnly: true, resetValues: true}, "--reset-values have no effect with --crds-only"},
+		{installFlags{crdsOnly: true, version: "0.2.0"}, "drop --version"},
 	} {
 		err := runControllerInstall(context.Background(), cfg, &cmdutil.K8sFlags{
 			Kubeconfig: filepath.Join(t.TempDir(), "nonexistent-kubeconfig"),
@@ -136,6 +138,27 @@ func TestRunControllerInstallRejectsFlagsBeforeAnyIO(t *testing.T) {
 		assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
 		assert.Contains(t, err.Error(), c.want)
 	}
+}
+
+// --crds-only touches no registry: with a registry mapping that cannot be
+// parsed and the module registry wired to fail the test, it goes straight to
+// the cluster and fails only at the missing kubeconfig.
+func TestRunControllerInstallCRDsOnlySkipsTheRegistry(t *testing.T) {
+	prev := newModuleRegistry
+	newModuleRegistry = func(string) (ctrllib.ModuleRegistry, error) {
+		t.Fatal("--crds-only built a module registry client")
+		return nil, nil
+	}
+	t.Cleanup(func() { newModuleRegistry = prev })
+	cfg := &config.GlobalConfig{Registry: "!!not a registry!!"}
+
+	err := runControllerInstall(context.Background(), cfg, &cmdutil.K8sFlags{
+		Kubeconfig: filepath.Join(t.TempDir(), "nonexistent-kubeconfig"),
+	}, installFlags{crdsOnly: true, timeout: time.Second})
+
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "registry")
+	assert.Contains(t, err.Error(), "nonexistent-kubeconfig")
 }
 
 // A refusal from catalog resolution prints through the refusal funnel and

@@ -77,8 +77,11 @@ from the registry before anything is applied. If the catalog has published
 no release yet, the command refuses and names --catalog-prerelease; an
 existing Platform is reported and left untouched, never rewritten.
 
---crds-only applies just the CRDs of the same render, for clusters where the
-CLI drives module lifecycle without a running controller.
+--crds-only applies just the CRDs, for clusters where the CLI drives module
+lifecycle without a running controller. They are the CRDs the pinned module
+version renders, carried in this CLI, so --crds-only needs no registry and
+talks only to the cluster: it resolves and renders no module, reads no
+ModuleInstance, and takes no --version, -f or --reset-values.
 
 Examples:
   # Install the pinned controller module and seed the cluster Platform
@@ -96,7 +99,7 @@ Examples:
   # Install the controller without creating a Platform
   opm controller install --skip-platform
 
-  # Install only the CRDs, plus RBAC for a specific user
+  # Install only the CRDs this CLI carries (no registry), plus RBAC for a user
   opm controller install --crds-only --rbac --user alice`,
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
@@ -116,7 +119,7 @@ Examples:
 	}
 
 	kf.AddTo(c)
-	c.Flags().BoolVar(&crdsOnlyFlag, "crds-only", false, "Install only the CustomResourceDefinitions of the controller module's render")
+	c.Flags().BoolVar(&crdsOnlyFlag, "crds-only", false, "Install only the CustomResourceDefinitions of the pinned controller module, carried in this CLI (no registry)")
 	c.Flags().BoolVar(&rbacFlag, "rbac", false, "Also create the opm-cli-user ClusterRole")
 	c.Flags().StringVar(&userFlag, "user", "", "Bind the opm-cli-user ClusterRole to this user (requires --rbac)")
 	c.Flags().StringVar(&groupFlag, "group", "", "Bind the opm-cli-user ClusterRole to this group (requires --rbac)")
@@ -155,13 +158,18 @@ func (f installFlags) seedsPlatform() bool {
 // a mode that creates no Platform is an error rather than a silently inert
 // flag, the same rule --user/--group follow against --rbac. -f and
 // --reset-values shape the controller's instance, which --crds-only does not
-// write.
+// write, and --crds-only installs only the CRDs of the pinned version, which
+// this CLI carries.
 func (f installFlags) validate() error {
 	if f.catalogPrerelease && !f.seedsPlatform() {
 		return errors.New("--catalog-prerelease has no effect without Platform seeding; drop --crds-only/--skip-platform or drop --catalog-prerelease")
 	}
 	if f.crdsOnly && (len(f.values) > 0 || f.resetValues) {
 		return errors.New("-f/--values and --reset-values have no effect with --crds-only, which records no controller instance; drop them or drop --crds-only")
+	}
+	if f.crdsOnly && f.version != "" {
+		return fmt.Errorf("--crds-only installs the CRDs of controller module %s, the version this CLI pins and carries; drop --version, or drop --crds-only to install module %s in full",
+			ctrllib.PinnedModuleVersion, f.version)
 	}
 	return nil
 }
@@ -193,9 +201,18 @@ func runControllerInstall(ctx context.Context, cfg *config.GlobalConfig, kf *cmd
 		ctx = context.Background()
 	}
 
-	catalogVersion, res, target, err := resolveBeforeCluster(ctx, cfg, flags)
-	if err != nil {
-		return err
+	// --crds-only needs no registry: its CRDs are carried in this CLI.
+	var (
+		catalogVersion string
+		res            *modref.Resolution
+		target         = ctrllib.PinnedTarget()
+	)
+	if !flags.crdsOnly {
+		var err error
+		catalogVersion, res, target, err = resolveBeforeCluster(ctx, cfg, flags)
+		if err != nil {
+			return err
+		}
 	}
 
 	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
@@ -218,13 +235,18 @@ func runControllerInstall(ctx context.Context, cfg *config.GlobalConfig, kf *cmd
 		Render:     moduleRenderer(cfg, k8sConfig),
 		CLIVersion: version.Version,
 	}
-	plan, err := ctrllib.PlanInstall(ctx, env, res, target, ctrllib.PlanOptions{
+	opts := ctrllib.PlanOptions{
 		ValuesFiles: flags.values,
 		ResetValues: flags.resetValues,
-		CRDsOnly:    flags.crdsOnly,
 		Timeout:     flags.timeout,
 		Extra:       rbac.Objects(),
-	})
+	}
+	var plan *ctrllib.Plan
+	if flags.crdsOnly {
+		plan, err = ctrllib.PlanCRDsOnly(ctx, env, opts)
+	} else {
+		plan, err = ctrllib.PlanInstall(ctx, env, res, target, opts)
+	}
 	if err != nil {
 		return installError(err)
 	}
@@ -234,11 +256,12 @@ func runControllerInstall(ctx context.Context, cfg *config.GlobalConfig, kf *cmd
 		return installError(withRerunHint(result, err))
 	}
 
-	what := "opm-controller " + target.ControllerVersion
 	if flags.crdsOnly {
-		what = "opm-controller CRDs (" + target.ControllerVersion + ")"
+		output.Println(output.FormatCheckmark(fmt.Sprintf("opm-controller CRDs (%s) installed from module %s, carried in this CLI",
+			target.ControllerVersion, target.Module())))
+	} else {
+		output.Println(output.FormatCheckmark(fmt.Sprintf("opm-controller %s installed from module %s", target.ControllerVersion, target.Module())))
 	}
-	output.Println(output.FormatCheckmark(fmt.Sprintf("%s installed from module %s", what, target.Module())))
 
 	// Seeding runs after the rollout, so the Platform CRD is Established
 	// before the write is attempted.

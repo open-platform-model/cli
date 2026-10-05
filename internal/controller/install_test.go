@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/open-platform-model/cli/internal/controller/crds"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/version"
@@ -229,14 +231,75 @@ func TestInstall_RolloutTimeoutKeepsEverything(t *testing.T) {
 	assert.NotNil(t, fc.record(), "the record remains")
 }
 
-// "Solo-cluster CRD install" and "Full install after CRDs-only".
+// installCRDsOnly plans and installs the embedded CRDs on the fake cluster.
+func installCRDsOnly(t *testing.T, fc *fakeCluster, r *fakeRender, opts PlanOptions) (*InstallResult, error) {
+	t.Helper()
+	if opts.Timeout == 0 {
+		opts.Timeout = 2 * time.Second
+	}
+	env := newEnv(fc, r)
+	plan, err := PlanCRDsOnly(context.Background(), env, opts)
+	if err != nil {
+		return nil, err
+	}
+	return Install(context.Background(), env, plan)
+}
+
+// "Solo-cluster CRD install with no registry" and "The controller's instance
+// record is not read": the embedded CRDs are applied as opm-cli and served,
+// nothing renders, and no ModuleInstance is read or written, even over a
+// record a full install would refuse.
+func TestInstall_CRDsOnlyAppliesTheEmbeddedCRDsOffline(t *testing.T) {
+	fastPolling(t)
+	fc := newFakeCluster(t, controllerRecord("controller", nil))
+	r := &fakeRender{err: errors.New("the CRDs-only install must not render")}
+
+	result, err := installCRDsOnly(t, fc, r, PlanOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 4, result.CRDs)
+	assert.False(t, result.Recorded)
+	assert.Equal(t, PinnedTarget(), result.Target)
+	assert.Zero(t, r.calls, "no render")
+
+	embedded, err := crds.Objects()
+	require.NoError(t, err)
+	for _, want := range embedded {
+		live := fc.mustGet(crdGVR, "", want.GetName())
+		assert.Equal(t, want.GetLabels(), live.GetLabels(), "%s carries the pinned render's labels", want.GetName())
+		assert.Equal(t, want.Object["spec"], live.Object["spec"], "%s is the embedded CRD", want.GetName())
+		assert.Equal(t, "opm-cli", fc.Manager("customresourcedefinitions", want.GetName()))
+	}
+	for _, read := range fc.Reads() {
+		assert.NotContains(t, read, "moduleinstances", "no ModuleInstance is read")
+	}
+	for _, w := range fc.Writes() {
+		assert.Equal(t, "patch customresourcedefinitions", w)
+	}
+	assert.Equal(t, "controller", fc.record().Owner, "the record is untouched")
+}
+
+// "A CRD OPM does not manage is refused": exit-2 guard error, nothing
+// applied.
+func TestPlanCRDsOnly_RefusesAForeignCRD(t *testing.T) {
+	foreign := renderedCRDObject(inventory.CRDNameModuleInstances, true)
+	fc := newFakeCluster(t, foreign)
+
+	_, err := installCRDsOnly(t, fc, &fakeRender{}, PlanOptions{})
+	var guardErr *GuardError
+	require.ErrorAs(t, err, &guardErr)
+	assert.Contains(t, err.Error(), inventory.CRDNameModuleInstances)
+	assert.Contains(t, err.Error(), "not managed by OPM")
+	assert.Empty(t, fc.Writes())
+}
+
+// "Full install after CRDs-only".
 func TestInstall_CRDsOnlyThenFullInstall(t *testing.T) {
 	releasedCLI(t)
 	fastPolling(t)
 	fc := newFakeCluster(t)
 	r := &fakeRender{objs: moduleObjects(renderOpts{})}
 
-	result, err := install(t, fc, r, PlanOptions{CRDsOnly: true})
+	result, err := installCRDsOnly(t, fc, r, PlanOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, 4, result.CRDs)
 	assert.False(t, result.Recorded)
@@ -266,7 +329,7 @@ func TestInstall_CRDsOnlyWithRBAC(t *testing.T) {
 	fc := newFakeCluster(t)
 	rbac := RBACOptions{Enabled: true, User: "alice"}
 
-	result, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{CRDsOnly: true, Extra: rbac.Objects()})
+	result, err := installCRDsOnly(t, fc, &fakeRender{}, PlanOptions{Extra: rbac.Objects()})
 	require.NoError(t, err)
 	assert.Equal(t, 2, result.Extra)
 	assert.True(t, fc.exists(clusterRoleGVR, "", "opm-cli-user"))

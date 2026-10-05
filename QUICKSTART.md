@@ -309,6 +309,9 @@ apply. Install just the CRDs (no controller) with:
 opm controller install --crds-only
 ```
 
+The CRDs come with the CLI (they are the ones its pinned controller module
+renders), so this step needs no registry.
+
 Apply fails fast with a hint if the CRD is missing or out of date. If your
 user is namespace-scoped, also grant write access to the
 `moduleinstances/status` subresource (or run `opm controller install

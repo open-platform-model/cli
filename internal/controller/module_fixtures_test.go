@@ -11,6 +11,7 @@ import (
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -189,7 +190,11 @@ type fakeCluster struct {
 
 	mu     sync.Mutex
 	writes []string
-	rv     int
+	// reads logs every get and list, as "<verb> <resource>".
+	reads []string
+	// managers is the field manager of the last apply, by "<resource>/<name>".
+	managers map[string]string
+	rv       int
 	// notReady keeps Deployments from rolling out.
 	notReady bool
 	// denyStatusRBAC makes the status-subresource access review deny.
@@ -207,7 +212,7 @@ func newFakeCluster(t *testing.T, objs ...*unstructured.Unstructured) *fakeClust
 	for i, o := range objs {
 		runtimeObjs[i] = o
 	}
-	fc := &fakeCluster{t: t}
+	fc := &fakeCluster{t: t, managers: map[string]string{}}
 	fc.fake = fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), listKinds, runtimeObjs...)
 	fc.fake.PrependReactor("patch", "*", fc.applyPatch)
 	fc.fake.PrependReactor("*", "*", func(action k8stesting.Action) (bool, runtime.Object, error) {
@@ -215,6 +220,10 @@ func newFakeCluster(t *testing.T, objs ...*unstructured.Unstructured) *fakeClust
 		case "create", "update", "delete", "delete-collection":
 			fc.mu.Lock()
 			fc.writes = append(fc.writes, action.GetVerb()+" "+action.GetResource().Resource)
+			fc.mu.Unlock()
+		case "get", "list":
+			fc.mu.Lock()
+			fc.reads = append(fc.reads, action.GetVerb()+" "+action.GetResource().Resource)
 			fc.mu.Unlock()
 		}
 		return false, nil, nil
@@ -238,6 +247,20 @@ func newFakeCluster(t *testing.T, objs ...*unstructured.Unstructured) *fakeClust
 	return fc
 }
 
+// Reads returns the logged gets and lists.
+func (fc *fakeCluster) Reads() []string {
+	fc.mu.Lock()
+	defer fc.mu.Unlock()
+	return append([]string(nil), fc.reads...)
+}
+
+// Manager returns the field manager of the last apply of resource/name.
+func (fc *fakeCluster) Manager(resource, name string) string {
+	fc.mu.Lock()
+	defer fc.mu.Unlock()
+	return fc.managers[resource+"/"+name]
+}
+
 // Writes returns the logged writes.
 func (fc *fakeCluster) Writes() []string {
 	fc.mu.Lock()
@@ -253,6 +276,7 @@ func (fc *fakeCluster) applyPatch(action k8stesting.Action) (bool, runtime.Objec
 	fc.mu.Lock()
 	defer fc.mu.Unlock()
 	fc.writes = append(fc.writes, "patch "+action.GetResource().Resource)
+	fc.recordManager(action, patch.GetName())
 	if patch.GetPatchType() != types.ApplyPatchType {
 		return false, nil, nil // JSON patches (finalizers) go to the tracker
 	}
@@ -312,6 +336,13 @@ func (fc *fakeCluster) applyPatch(action k8stesting.Action) (bool, runtime.Objec
 	fc.rv++
 	next.SetResourceVersion(strconv.Itoa(fc.rv))
 	return true, next, tracker.Update(gvr, next, ns)
+}
+
+// recordManager logs the field manager of a patch; the caller holds fc.mu.
+func (fc *fakeCluster) recordManager(action k8stesting.Action, name string) {
+	if po, ok := action.(interface{ GetPatchOptions() metav1.PatchOptions }); ok {
+		fc.managers[action.GetResource().Resource+"/"+name] = po.GetPatchOptions().FieldManager
+	}
 }
 
 // contentOf is an object without the fields the server manages.

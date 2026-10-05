@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/cli/internal/controller/controllertest"
+	"github.com/open-platform-model/cli/internal/controller/crds"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/modref"
 	"github.com/open-platform-model/cli/internal/publish"
@@ -248,16 +249,31 @@ func TestPlanInstall_WaitsOutTerminatingObjects(t *testing.T) {
 }
 
 // The CRDs-only plan guards only the CRDs and skips the status check.
-func TestPlanInstall_CRDsOnlyGuardsOnlyTheCRDs(t *testing.T) {
+func TestPlanCRDsOnly_GuardsOnlyTheCRDs(t *testing.T) {
 	foreignNS := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1", "kind": "Namespace", "metadata": map[string]any{"name": ControllerNamespace},
 	}}
 	fc := newFakeCluster(t, foreignNS)
 	fc.denyStatusRBAC = true
 
-	plan, err := PlanInstall(context.Background(), newEnv(fc, &fakeRender{objs: moduleObjects(renderOpts{})}),
-		testResolution("v0.1.0"), defaultTarget, PlanOptions{CRDsOnly: true, Timeout: time.Second})
+	plan, err := PlanCRDsOnly(context.Background(), newEnv(fc, &fakeRender{}), PlanOptions{Timeout: time.Second})
 	require.NoError(t, err)
+	assert.True(t, plan.CRDsOnly)
+	assert.Nil(t, plan.Render)
 	assert.Len(t, plan.Objects(), 4)
 	assert.Empty(t, fc.Writes())
+}
+
+// A CRD left terminating by an earlier delete is waited out, as on the full
+// path.
+func TestPlanCRDsOnly_WaitsOutATerminatingCRD(t *testing.T) {
+	fastPolling(t)
+	embedded, err := crds.Objects()
+	require.NoError(t, err)
+	terminating := terminatingFixture(embedded[0])
+	fc := newFakeCluster(t, terminating)
+	deleteLater(t, fc.client, terminating, 20*time.Millisecond)
+
+	_, err = PlanCRDsOnly(context.Background(), newEnv(fc, &fakeRender{}), PlanOptions{Timeout: 2 * time.Second})
+	require.NoError(t, err)
 }
