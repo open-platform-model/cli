@@ -8,13 +8,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/open-platform-model/library/opm/k8s/object"
-
-	"github.com/open-platform-model/cli/pkg/resourceorder"
 )
 
 // The literals below are the kind-class weight table the cli applied, deleted
-// and printed by in pkg/resourceorder before that package moved to the
-// library's opm/k8s/object (0012:D5:R2). They pin what the cli orders by: a
+// and printed by in its own pkg/resourceorder before the move to the
+// library's opm/k8s/object (0012:D5:R2); while both tables existed, this test
+// asserted each literal against both. They pin what the cli orders by: a
 // library release that moves any of these weights fails here on the bump PR,
 // so an order change is a reviewed edit in both repositories. A row the
 // library adds is the library's own TestWeightTableGuard, not this test.
@@ -46,36 +45,6 @@ var retiredWeightConstants = map[string]struct{ lib, want int }{
 	"WeightPDB":                {object.WeightPDB, 200},
 	"WeightWebhook":            {object.WeightWebhook, 500},
 	"WeightDefault":            {object.WeightDefault, 1000},
-}
-
-// retiredCopyConstants is the same constants as the retired package declared
-// them, so the literals above are proven to be the cli's own table.
-var retiredCopyConstants = map[string]int{
-	"WeightCRD":                resourceorder.WeightCRD,
-	"WeightNamespace":          resourceorder.WeightNamespace,
-	"WeightClusterRole":        resourceorder.WeightClusterRole,
-	"WeightClusterRoleBinding": resourceorder.WeightClusterRoleBinding,
-	"WeightServiceAccount":     resourceorder.WeightServiceAccount,
-	"WeightRole":               resourceorder.WeightRole,
-	"WeightRoleBinding":        resourceorder.WeightRoleBinding,
-	"WeightSecret":             resourceorder.WeightSecret,
-	"WeightConfigMap":          resourceorder.WeightConfigMap,
-	"WeightStorageClass":       resourceorder.WeightStorageClass,
-	"WeightPersistentVolume":   resourceorder.WeightPersistentVolume,
-	"WeightPVC":                resourceorder.WeightPVC,
-	"WeightService":            resourceorder.WeightService,
-	"WeightDeployment":         resourceorder.WeightDeployment,
-	"WeightStatefulSet":        resourceorder.WeightStatefulSet,
-	"WeightDaemonSet":          resourceorder.WeightDaemonSet,
-	"WeightJob":                resourceorder.WeightJob,
-	"WeightCronJob":            resourceorder.WeightCronJob,
-	"WeightIngress":            resourceorder.WeightIngress,
-	"WeightNetworkPolicy":      resourceorder.WeightNetworkPolicy,
-	"WeightHPA":                resourceorder.WeightHPA,
-	"WeightVPA":                resourceorder.WeightVPA,
-	"WeightPDB":                resourceorder.WeightPDB,
-	"WeightWebhook":            resourceorder.WeightWebhook,
-	"WeightDefault":            resourceorder.WeightDefault,
 }
 
 // retiredGVKWeights is every exact group-version-kind entry of the table.
@@ -165,27 +134,22 @@ func TestWeightTableMatchesRetiredCopy(t *testing.T) {
 	t.Run("constants", func(t *testing.T) {
 		for name, c := range retiredWeightConstants {
 			assert.Equal(t, c.want, c.lib, "object.%s", name)
-			assert.Equal(t, c.want, retiredCopyConstants[name], "resourceorder.%s", name)
 		}
-		assert.Len(t, retiredCopyConstants, len(retiredWeightConstants))
 	})
 	t.Run("gvk entries", func(t *testing.T) {
 		for gvk, want := range retiredGVKWeights {
 			assert.Equal(t, want, object.Weight(gvk), "object.Weight(%s)", gvk)
-			assert.Equal(t, want, resourceorder.GetWeight(gvk), "resourceorder.GetWeight(%s)", gvk)
 		}
 	})
 	t.Run("kind entries", func(t *testing.T) {
 		for kind, want := range retiredKindWeights {
 			gvk := kindOnlyGVK(kind)
 			assert.Equal(t, want, object.Weight(gvk), "object.Weight(%s)", gvk)
-			assert.Equal(t, want, resourceorder.GetWeight(gvk), "resourceorder.GetWeight(%s)", gvk)
 		}
 	})
 	t.Run("fallbacks", func(t *testing.T) {
 		for gvk, want := range retiredFallbacks {
 			assert.Equal(t, want, object.Weight(gvk), "object.Weight(%s)", gvk)
-			assert.Equal(t, want, resourceorder.GetWeight(gvk), "resourceorder.GetWeight(%s)", gvk)
 		}
 	})
 }
@@ -227,8 +191,8 @@ func objNames(objs []*unstructured.Unstructured) []string {
 	return out
 }
 
-// retiredSortOrder is the name sequence the retired sort produced for
-// orderSet, per direction.
+// retiredSortOrder is the name sequence the cli's retired sort produced for
+// orderSet, per direction (recorded while both sorts existed).
 var retiredSortOrder = map[object.Direction][]string{
 	object.Ascending: {
 		"crd", "ns", "cr", "sa", "cm-b", "cm-a", "sc", "svc",
@@ -241,23 +205,17 @@ var retiredSortOrder = map[object.Direction][]string{
 }
 
 func TestSortMatchesRetiredCopy(t *testing.T) {
-	gvkOf := (*unstructured.Unstructured).GroupVersionKind
 	for _, tc := range []struct {
 		name string
-		lib  object.Direction
-		old  resourceorder.Direction
+		dir  object.Direction
 	}{
-		{"ascending", object.Ascending, resourceorder.Ascending},
-		{"descending", object.Descending, resourceorder.Descending},
+		{"ascending", object.Ascending},
+		{"descending", object.Descending},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			lib := orderSet()
-			object.Sort(lib, gvkOf, tc.lib)
-			old := orderSet()
-			resourceorder.Sort(old, gvkOf, tc.old)
-
-			assert.Equal(t, objNames(old), objNames(lib))
-			assert.Equal(t, retiredSortOrder[tc.lib], objNames(lib))
+			objs := orderSet()
+			SortObjects(objs, tc.dir)
+			assert.Equal(t, retiredSortOrder[tc.dir], objNames(objs))
 		})
 	}
 }

@@ -4,6 +4,7 @@ run:
 linters:
   enable:
     - bodyclose
+    - depguard
     - dogsled
     - dupl
     - errname
@@ -31,6 +32,21 @@ linters:
     - unparam
     - whitespace
   settings:
+    depguard:
+      rules:
+        # The Kubernetes object wrapper, the OPM label vocabulary and the
+        # kind-class weight table are the library's (0012:D1, 0012:D5:R2).
+        # The cli deleted its copies; this rule stops one coming back under
+        # the old import paths. No allow list: nothing else is denied.
+        retired-kubernetes-copies:
+          list-mode: lax
+          files:
+            - $all
+          deny:
+            - pkg: github.com/open-platform-model/cli/pkg/core
+              desc: use github.com/open-platform-model/library/opm/k8s/object or github.com/open-platform-model/library/opm/k8s/labels
+            - pkg: github.com/open-platform-model/cli/pkg/resourceorder
+              desc: use github.com/open-platform-model/library/opm/k8s/object
     dupl:
       threshold: 150
     errcheck:
