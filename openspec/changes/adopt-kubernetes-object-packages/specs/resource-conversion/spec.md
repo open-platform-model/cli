@@ -20,7 +20,7 @@
 
 ### Requirement: Rendered objects convert through the library's single export
 
-The CLI SHALL convert a render's compiled objects with the library's `opm/k8s/object`: it SHALL wrap them with `object.Resources` and export them with exactly one `object.Export` call per render. The render digest SHALL be computed from the exported JSON and the objects the CLI applies SHALL be the exported objects, so no compiled object is exported from CUE twice. The render digest SHALL keep its algorithm: sort by group, kind, namespace and name, then hash each object's CUE-export JSON in that order, so the same render yields the same digest it yielded before this conversion. An export failure SHALL exit with the general error code and name the failing resource.
+The CLI SHALL convert a render's compiled objects with the library's `opm/k8s/object`: it SHALL wrap them with `object.Resources` and export them with exactly one `object.Export` call per render. The render digest SHALL be computed from the exported JSON and the objects the CLI applies SHALL be the exported objects, so no compiled object is exported from CUE twice. The render digest SHALL keep its algorithm: sort by group (the `apiVersion` up to its last `/`), kind, namespace and name, then hash each object's CUE-export JSON in that order, so the same render yields the same digest it yielded before this conversion. An export failure SHALL exit with the general error code and name the failing resource.
 
 #### Scenario: The digest and the apply objects come from one export
 
@@ -43,7 +43,7 @@ The CLI SHALL read every OPM label key and managed-by value, and decide whether 
 
 ### Requirement: Object order comes from the library weight table
 
-Every CLI path that orders Kubernetes objects (apply, delete, prune, the `instance tree` view and the `module build` output) SHALL order by the library's kind-class weight, `opm/k8s/object.Weight`, through `object.Sort` where it sorts by weight alone, ascending for apply and descending for delete and prune, and SHALL keep objects of equal weight in their input order. The CLI SHALL NOT keep its own weight table. The library table SHALL equal, entry for entry, the table the CLI applied by before the move, so the order of every known kind is unchanged (0012:D5:R1/R2).
+Every CLI path that orders Kubernetes objects (apply, delete, prune, the `instance tree` view and the `module build` output) SHALL order by the library's kind-class weight, `opm/k8s/object.Weight`. Apply, delete, prune and the tree view SHALL sort through `object.Sort`, ascending for apply and descending for delete and prune, and SHALL keep objects of equal weight in their input order. The `module build` output SHALL break equal weights by namespace, then name, as the `cmd-structure` requirement for its output order states. The CLI SHALL NOT keep its own weight table. Every weight constant, group-version-kind entry and kind entry of the table the CLI applied by before the move SHALL keep its weight in `object.Weight`, so the order of every kind the CLI table held is unchanged; the library's own weight-table guard test covers entries the library adds (0012:D5:R1/R2).
 
 #### Scenario: Ascending order for apply
 
@@ -62,5 +62,5 @@ Every CLI path that orders Kubernetes objects (apply, delete, prune, the `instan
 
 #### Scenario: The library table equals the table the CLI applied by
 
-- **WHEN** the CLI's order test checks every weight constant, every group-version-kind entry, every kind entry and both fallbacks of the table the CLI carried before the move
+- **WHEN** the CLI's order test checks every weight constant, every group-version-kind entry, every kind entry (through a group and version the group-version-kind entries do not hold) and both fallbacks of the table the CLI carried before the move
 - **THEN** `object.Weight` returns the same weight for each
