@@ -242,11 +242,9 @@ func loadPublishedPackage(opts Options, dir, repo, pkgPath, version string) (cue
 	if err := insts[0].Err; err != nil {
 		switch {
 		case cuemod.IsFetchNotFound(err):
-			absent, connErr := probedPackageAbsent(opts, repo, pkgPath, version)
-			if connErr != nil {
-				return cue.Value{}, false, connErr
-			}
-			if absent {
+			// A probe that fails as connectivity also ends in the load's own
+			// *ConnectivityError below, so the message names the load.
+			if absent, probeErr := probedPackageAbsent(opts, repo, pkgPath, version); probeErr == nil && absent {
 				return cue.Value{}, false, nil
 			}
 		case unprovidedImport(err):
@@ -286,14 +284,17 @@ func probedPackageAbsent(opts Options, repo, pkgPath, version string) (bool, err
 	return !hasCUEFile(filepath.Join(tree, filepath.FromSlash(pkgPath))), nil
 }
 
-// hasCUEFile reports whether dir directly holds a .cue file.
+// hasCUEFile reports whether dir directly holds a .cue file that cue/load
+// reads: a subdirectory or another file does not count, and neither does a
+// name starting with "_" or ".", which cue/load ignores.
 func hasCUEFile(dir string) bool {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return false
 	}
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".cue") {
+		name := e.Name()
+		if !e.IsDir() && strings.HasSuffix(name, ".cue") && !strings.HasPrefix(name, "_") && !strings.HasPrefix(name, ".") {
 			return true
 		}
 	}

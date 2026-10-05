@@ -2,6 +2,7 @@ package cuemod
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -39,4 +40,13 @@ v: missing.version
 	_, err := Tidy(context.Background(), dir, TidyOptions{Registry: registry})
 	require.Error(t, err)
 	assert.False(t, IsConnectivityError(err), "unexpected connectivity classification: %q", err.Error())
+}
+
+// TestIsVersionNotHeld_OnlyNotFound holds the kind boundary: a fetch failure
+// with no HTTP status that is not a not-found (an archive that does not
+// unzip, say) is not "not held", and neither is an unreachable registry.
+func TestIsVersionNotHeld_OnlyNotFound(t *testing.T) {
+	assert.True(t, IsVersionNotHeld(errors.New("cannot fetch example.com/x@v1.0.0: module not found")))
+	assert.False(t, IsVersionNotHeld(errors.New("cannot fetch example.com/x@v1.0.0: zip: not a valid zip file")))
+	assert.False(t, IsVersionNotHeld(errors.New("cannot fetch example.com/x@v1.0.0: cannot do HTTP request: connection refused")))
 }

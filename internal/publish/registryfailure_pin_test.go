@@ -27,16 +27,21 @@ language: version: "v0.9.0"
 
 // pinPredecessor is a published build example.com/cat@v1 v1.0.0 that depends
 // on example.com/dep@v0 v0.1.0. Package pkg imports imp; package plain
-// imports nothing.
+// imports nothing. Directory parent holds only a subpackage, docs holds only
+// a README, and hidden holds only a .cue file cue/load ignores: none is a
+// package at this version.
 func pinPredecessor(imp string) map[string]string {
 	return map[string]string{
 		"cue.mod/module.cue": `module: "example.com/cat@v1"
 language: version: "v0.9.0"
 deps: "example.com/dep@v0": v: "v0.1.0"
 `,
-		"root.cue":        "package cat\n",
-		"pkg/pkg.cue":     "package pkg\n\nimport d \"" + imp + "\"\n\nx: d\n",
-		"plain/plain.cue": "package plain\n\nx: 1\n",
+		"root.cue":           "package cat\n",
+		"pkg/pkg.cue":        "package pkg\n\nimport d \"" + imp + "\"\n\nx: d\n",
+		"plain/plain.cue":    "package plain\n\nx: 1\n",
+		"parent/sub/sub.cue": "package sub\n\nx: 1\n",
+		"docs/README.md":     "not CUE\n",
+		"hidden/_x.cue":      "package hidden\n\nx: 1\n",
 	}
 }
 
@@ -117,6 +122,12 @@ func TestLoadPublishedPackage_Pinned(t *testing.T) {
 		{"present", healthy, "pkg", "v1.0.0", "found"},
 		{"version not held", healthy, "pkg", "v1.9.0", "absent"},
 		{"package absent at a held version", healthy, "nothere", "v1.0.0", "absent"},
+		{"directory holds only a subpackage", healthy, "parent", "v1.0.0", "absent"},
+		{"directory holds only a README", healthy, "docs", "v1.0.0", "absent"},
+		// cue/load reports a directory whose only .cue file it ignores as
+		// "no files in package directory", which no registry answer caused
+		// and which the walk has always reported as connectivity.
+		{"directory holds only an ignored .cue file", healthy, "hidden", "v1.0.0", "connectivity"},
 		{"403 on the probed repository", fronted(cuemodtest.RepoAnswers("example.com/cat", http.StatusForbidden)), "pkg", "v1.0.0", "absent"},
 		{"dependency not held", func(t *testing.T) string { return pinRegistry(t, "example.com/dep@v0", false) }, "pkg", "v1.0.0", "connectivity"},
 		{"dependency answered 403", fronted(cuemodtest.RepoAnswers("example.com/dep", http.StatusForbidden)), "pkg", "v1.0.0", "connectivity"},
@@ -183,6 +194,9 @@ func TestProbedPackageAbsent(t *testing.T) {
 	}{
 		{"package present", healthy, "pkg", "v1.0.0", false, false},
 		{"package absent at a held version", healthy, "nothere", "v1.0.0", true, false},
+		{"directory holds only a subpackage", healthy, "parent", "v1.0.0", true, false},
+		{"directory holds only a README", healthy, "docs", "v1.0.0", true, false},
+		{"directory holds only an ignored .cue file", healthy, "hidden", "v1.0.0", true, false},
 		{"version not held", healthy, "pkg", "v1.9.0", true, false},
 		{"refused connection", refused, "pkg", "v1.0.0", false, true},
 		{"registry mapping does not parse", func(*testing.T) string { return "::nonsense::" }, "pkg", "v1.0.0", false, false},
@@ -198,4 +212,14 @@ func TestProbedPackageAbsent(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestUnprovidedImport_RegistryFailureIsNotAbsent holds the guard that keeps
+// a registry failure from reading as absent: the unversioned import text
+// counts only when the library's classification finds no registry failure.
+func TestUnprovidedImport_RegistryFailureIsNotAbsent(t *testing.T) {
+	const unprovided = "cannot find module providing package example.com/x"
+	assert.True(t, unprovidedImport(errors.New(unprovided)))
+	assert.False(t, unprovidedImport(errors.New(unprovided+": cannot do HTTP request: dial tcp: connection refused")))
+	assert.False(t, unprovidedImport(errors.New(unprovided+": GET /v2/x: 503 Service Unavailable: busy")))
 }
