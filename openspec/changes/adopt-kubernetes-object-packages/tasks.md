@@ -25,11 +25,11 @@
 
 ## 4. Order by the library weight table
 
-- [ ] 4.1 `internal/kubernetes/sort.go`: `SortObjects(objs, dir object.Direction)` calls `object.Sort` (design KO5). Move `apply.go`, `delete.go`, `tree.go` and `delete_test.go` to `object.Ascending` and `object.Descending`
-- [ ] 4.2 `internal/inventory/stale.go`: prune order through `object.Sort(..., object.Descending)`
-- [ ] 4.3 `internal/output/manifest.go`: the display sort reads the weight from `object.Weight`; its namespace and name keys stay
-- [ ] 4.4 Confirm `grep -rn 'resourceorder' --include=*.go . | grep -v '^./pkg/resourceorder/\|order_parity_test.go'` finds nothing (evidence for the spec requirement "Object order comes from the library weight table"), and that the section-1 parity tests and the existing apply, delete, tree and manifest order tests pass unchanged
-- [ ] 4.5 `task fmt`, `task lint`, `task test:unit` and `task openspec:check` green, then commit `refactor(kubernetes): order objects by the library weight table`
+- [x] 4.1 `internal/kubernetes/sort.go`: `SortObjects(objs, dir object.Direction)` calls `object.Sort` (design KO5). Move `apply.go`, `delete.go`, `tree.go` and `delete_test.go` to `object.Ascending` and `object.Descending`
+- [x] 4.2 `internal/inventory/stale.go`: prune order through `object.Sort(..., object.Descending)`
+- [x] 4.3 `internal/output/manifest.go`: the display sort reads the weight from `object.Weight`; its namespace and name keys stay
+- [x] 4.4 Confirm `grep -rn 'resourceorder' --include=*.go . | grep -v '^./pkg/resourceorder/\|order_parity_test.go'` finds nothing (evidence for the spec requirement "Object order comes from the library weight table"), and that the section-1 parity tests and the existing apply, delete, tree and manifest order tests pass unchanged
+- [x] 4.5 `task fmt`, `task lint`, `task test:unit` and `task openspec:check` green, then commit `refactor(kubernetes): order objects by the library weight table`
 
 ## 5. Delete pkg/core and pkg/resourceorder
 

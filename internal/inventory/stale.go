@@ -10,8 +10,8 @@ import (
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
-	"github.com/open-platform-model/cli/pkg/resourceorder"
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
+	"github.com/open-platform-model/library/opm/k8s/object"
 )
 
 // ApplyComponentRenameSafetyCheck filters the stale set to remove entries
@@ -128,9 +128,9 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 	// Sort in reverse weight order (highest weight deleted first)
 	sorted := make([]InventoryEntry, len(stale))
 	copy(sorted, stale)
-	resourceorder.Sort(sorted, func(e InventoryEntry) schema.GroupVersionKind {
+	object.Sort(sorted, func(e InventoryEntry) schema.GroupVersionKind {
 		return schema.GroupVersionKind{Group: e.Group, Version: e.Version, Kind: e.Kind}
-	}, resourceorder.Descending)
+	}, object.Descending)
 
 	var errs []error
 	for _, entry := range sorted {

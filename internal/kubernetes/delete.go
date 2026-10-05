@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/log"
-	"github.com/open-platform-model/cli/pkg/resourceorder"
+	"github.com/open-platform-model/library/opm/k8s/object"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -149,7 +149,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 	recordUnreadable(result, opts.Unreadable, instanceLog)
 
 	// Sort in reverse weight order (highest weight first = delete webhooks before deployments)
-	SortObjects(resources, resourceorder.Descending)
+	SortObjects(resources, object.Descending)
 
 	// Delete each workload resource
 	for _, res := range resources {

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/open-platform-model/cli/pkg/resourceorder"
+	"github.com/open-platform-model/library/opm/k8s/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,7 +31,7 @@ func TestSortObjects_Descending(t *testing.T) {
 		makeUnstructured("v1", "Service", "my-svc", "default"),
 	}
 
-	SortObjects(resources, resourceorder.Descending)
+	SortObjects(resources, object.Descending)
 
 	// Expected order: Webhook(500) > Deployment(100) > Service(50) > ConfigMap(15) > Namespace(0)
 	assert.Equal(t, "ValidatingWebhookConfiguration", resources[0].GetKind())

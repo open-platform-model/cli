@@ -6,7 +6,7 @@ import (
 	"io"
 	"sort"
 
-	resourceorder "github.com/open-platform-model/cli/pkg/resourceorder"
+	"github.com/open-platform-model/library/opm/k8s/object"
 
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -48,8 +48,8 @@ type ManifestOptions struct {
 func sortResources(resources []*unstructured.Unstructured) {
 	sort.Slice(resources, func(i, j int) bool {
 		// Primary: sort by weight
-		wi := resourceorder.GetWeight(resources[i].GroupVersionKind())
-		wj := resourceorder.GetWeight(resources[j].GroupVersionKind())
+		wi := object.Weight(resources[i].GroupVersionKind())
+		wj := object.Weight(resources[j].GroupVersionKind())
 		if wi != wj {
 			return wi < wj
 		}
