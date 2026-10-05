@@ -2,6 +2,7 @@ package scaffold
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"sort"
 	"strings"
 
-	"cuelang.org/go/cue"
 	"cuelang.org/go/mod/modconfig"
 	"cuelang.org/go/mod/module"
 
@@ -284,23 +284,24 @@ func assertDerives(ctx context.Context, k *kernel.Kernel, dir, newPath string) e
 	if err != nil {
 		return fmt.Errorf("internal error: scaffolded tree does not load: %w", err)
 	}
-	for field, want := range map[string]string{
-		"modulePath": newPath,
-		"version":    InitialVersion,
+	if mod.Metadata == nil {
+		return errors.New("internal error: scaffolded tree decoded no metadata")
+	}
+	// A fixed order: a donor failing both checks is always reported on
+	// modulePath.
+	for _, c := range []struct{ field, got, want string }{
+		{"modulePath", mod.Metadata.ModulePath, newPath},
+		{"version", mod.Metadata.Version, InitialVersion},
 	} {
-		got, err := mod.Package.LookupPath(cue.ParsePath("metadata." + field)).String()
-		if err != nil {
-			return fmt.Errorf("internal error: scaffolded metadata.%s does not evaluate: %w", field, err)
-		}
-		if got != want {
+		if c.got != c.want {
 			return &RefusalError{publish.Refusal{
-				Headline: fmt.Sprintf("the clone source does not derive metadata.%s from its identity package", field),
+				Headline: fmt.Sprintf("the clone source does not derive metadata.%s from its identity package", c.field),
 				Evidence: [][]string{
-					{"metadata." + field, got},
-					{"expected", want, "derived from identity/identity.cue after re-identification"},
+					{"metadata." + c.field, c.got},
+					{"expected", c.want, "derived from identity/identity.cue after re-identification"},
 				},
 				Consequence: "Re-identification rewrites the identity package and everything that\nderives from it; metadata carrying literals stays stamped with the\nsource's old identity.",
-				Action:      fmt.Sprintf("Clone a module whose metadata derives (%s: id.%s), or start\nfrom an official template:  opm module template list", field, deriveField(field)),
+				Action:      fmt.Sprintf("Clone a module whose metadata derives (%s: id.%s), or start\nfrom an official template:  opm module template list", c.field, deriveField(c.field)),
 			}}
 		}
 	}
