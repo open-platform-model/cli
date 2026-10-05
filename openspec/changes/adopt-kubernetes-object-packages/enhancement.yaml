@@ -1,0 +1,9 @@
+# Implements part of enhancement 0012 (cli adoption of the Kubernetes tier's
+# object and labels packages). Decisions are deliberately not claimed here:
+# 0012:D1 and 0012:D5 are delivered only once both frontends use the tier,
+# so the delivery log records them after the operator adoption has also
+# merged. Under-claiming is the safe direction.
+implements:
+  - enhancement: "0012"
+    decisions: []
+    resolves: []
