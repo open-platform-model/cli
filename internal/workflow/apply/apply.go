@@ -17,6 +17,7 @@ import (
 	"github.com/open-platform-model/cli/internal/version"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
 	pkginventory "github.com/open-platform-model/cli/pkg/inventory"
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -88,8 +89,9 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		newNamespaces = []string{namespace}
 	}
 
-	// Operator-parity render digest, computed by the render workflow over the
-	// kernel-compiled resources (0006:D9/D30 — see inventory.ComputeRenderDigest).
+	// The library's shared render digest, computed by the render workflow
+	// over the render's single export; it leaves the managed-by value out so
+	// the CLI and the operator digest one render equally (0012:D6).
 	manifestDigest := result.RenderDigest
 	output.Debug("render digest computed", "digest", manifestDigest)
 
@@ -379,7 +381,7 @@ func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory
 		Namespace: namespace,
 		Inventory: pkginventory.Inventory{
 			Revision: revision,
-			Digest:   inventory.ComputeDigest(currentEntries),
+			Digest:   libraryInventoryDigest(currentEntries),
 			Count:    len(currentEntries),
 			Entries:  currentEntries,
 		},
@@ -403,6 +405,17 @@ func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory
 	// write succeeds, so a failure leaves the Secret authoritative for a re-run.
 	cleanupLegacySecret(ctx, req.K8sClient, name, namespace, instanceID, legacy, instanceLog)
 	return nil
+}
+
+// libraryInventoryDigest is the library's inventory digest of entries
+// (0012:D7). The CLI entry type has the library Entry's fields in the same
+// order, so each converts directly.
+func libraryInventoryDigest(entries []inventory.InventoryEntry) string {
+	lib := make([]k8sinventory.Entry, 0, len(entries))
+	for _, e := range entries {
+		lib = append(lib, k8sinventory.Entry(e))
+	}
+	return k8sinventory.Digest(lib)
 }
 
 // SkippedContracts is the render's skipped demands as the

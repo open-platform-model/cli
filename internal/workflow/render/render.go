@@ -12,13 +12,13 @@ import (
 
 	"cuelang.org/go/cue"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	"github.com/open-platform-model/library/opm/k8s/object"
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
-	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/platform"
 	pkgerrors "github.com/open-platform-model/cli/pkg/errors"
@@ -263,16 +263,9 @@ func renderInstance(
 		output.Warn(w)
 	}
 
-	// One CUE export per object: the render digest hashes the exported JSON
-	// and the apply objects are the objects decoded from those same bytes.
-	exported, err := object.Export(object.Resources(out.Compiled))
+	exported, renderDigest, err := exportAndDigest(object.Resources(out.Compiled))
 	if err != nil {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("converting rendered resources: %w", err)}
-	}
-
-	renderDigest, err := inventory.ComputeRenderDigest(exported)
-	if err != nil {
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
+		return nil, err
 	}
 
 	result := newResult(env, out, renderDigest, decodeUnifiedValues(inst.Values()), sourceLocal)
@@ -317,6 +310,24 @@ func refuseDuplicateIdentities(out *kernel.RenderResult) error {
 // diagnostics rows (unhandled optional traits, skew under the warn policy);
 // the 0010:D19 local-replacement warnings are emitted directly by renderInstance
 // from the replacement rows, after the render.
+// exportAndDigest exports the render's objects with exactly one
+// object.Export and computes the library's shared render digest over the
+// same exported set, so the digest and the apply objects come from one
+// export (0012:D6). The exported objects keep the input order. Both
+// failures exit with the general error code; a digest failure is
+// unreachable after a successful export.
+func exportAndDigest(resources []*object.Resource) ([]object.Exported, string, error) {
+	exported, err := object.Export(resources)
+	if err != nil {
+		return nil, "", &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("converting rendered resources: %w", err)}
+	}
+	digest, err := k8sinventory.RenderDigest(exported)
+	if err != nil {
+		return nil, "", &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
+	}
+	return exported, digest, nil
+}
+
 func newResult(env *renderEnv, out *kernel.RenderResult, renderDigest string, values map[string]any, sourceLocal bool) *Result {
 	return &Result{
 		Pairs:        out.Diagnostics.Pairs,
