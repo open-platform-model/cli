@@ -234,7 +234,9 @@ func StyleNoun(s string) string {
 // FormatHealthStatus renders a health status string with the appropriate color.
 // Ready/Complete/Bound → green, Applied → dim (healthy, but no readiness signal to celebrate),
 // NotReady/Missing → red, Unknown/Pending/Lost → yellow, others → unstyled.
-// The set of healthy statuses is kubernetes.IsHealthy; this package cannot import it.
+// The set of healthy statuses is health.IsHealthy from the library's opm/k8s/health.
+// This generic package, imported by every command, keeps the strings as literals
+// rather than depend on the Kubernetes tier; the cli's status-string tests pin them.
 func FormatHealthStatus(status string) string {
 	switch status {
 	case "Ready", "Complete", "Bound":

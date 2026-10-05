@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/open-platform-model/library/opm/k8s/health"
+
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 
 	"github.com/charmbracelet/log"
@@ -19,7 +21,6 @@ import (
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/inventory"
-	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 )
 
@@ -96,7 +97,7 @@ func TestEvaluateInstanceHealth_UnreadableCountsNotReady(t *testing.T) {
 
 	summaries := EvaluateInstanceHealth(context.Background(), client, []*inventory.Record{inv}, 1, false)
 	require.Len(t, summaries, 1)
-	assert.Equal(t, string(kubernetes.HealthNotReady), summaries[0].Status)
+	assert.Equal(t, string(health.NotReady), summaries[0].Status)
 	assert.Equal(t, 1, summaries[0].ReadyCount)
 	assert.Equal(t, 2, summaries[0].TotalCount)
 

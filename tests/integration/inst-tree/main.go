@@ -26,6 +26,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/open-platform-model/library/opm/k8s/health"
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 
 	"github.com/charmbracelet/log"
@@ -200,7 +201,7 @@ func main() {
 
 	// Verify aggregate status is Unknown at depth=0 (resources weren't evaluated).
 	for _, comp := range tree0.Components {
-		if comp.Status != kubernetes.HealthUnknown {
+		if comp.Status != health.Unknown {
 			failf("depth=0: expected Unknown status for component %q, got %q", comp.Name, comp.Status)
 		}
 	}
