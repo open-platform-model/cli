@@ -2,7 +2,7 @@
 
 ### Requirement: Readiness is judged by the library health package
 
-Every cli path that judges whether a Kubernetes object or an instance is ready SHALL use the library's `opm/k8s/health`: `health.Evaluate` for one live object, `health.IsHealthy` for the healthy set (`Ready`, `Applied`, `Complete`, `Bound`), and `health.Aggregate` to fold an instance's or a component's statuses into one verdict with a ready count and a total. This covers `opm instance status`, `opm instance list`, `opm instance tree`, the `--wait` readiness wait of `opm instance apply` and `opm module apply`, and the operator readiness wait of `opm operator install`. Source: 0012:D3:R6.
+The cli SHALL take every decision the library's `opm/k8s/health` makes from that package: the status vocabulary (`health.Status` and its constants), the per-kind evaluation of one inventory object (`health.Evaluate`), the healthy set (`health.IsHealthy`: `Ready`, `Applied`, `Complete`, `Bound`), and the fold of an instance's or a component's statuses into one verdict with a ready count and a total (`health.Aggregate`). This covers `opm instance status`, `opm instance list`, `opm instance tree`, and the `--wait` readiness wait of `opm instance apply` and `opm module apply`. Three readiness checks are not decisions of the package and stay in the cli: the CustomResourceDefinition `Established` wait, the operator install wait's dispatch by kind (which judges a Deployment through `health.Evaluate` and treats other non-CRD kinds as ready once they exist), and the display-only ReplicaSet and pod child rows of `opm instance tree`, which never feed an aggregate. Source: 0012:D3:R6.
 
 #### Scenario: Status uses the library verdict
 
@@ -28,7 +28,7 @@ Every cli path that judges whether a Kubernetes object or an instance is ready S
 
 ### Requirement: The cli carries no readiness evaluator of its own
 
-No non-test Go file in the cli SHALL declare a health status type, a readiness evaluator, a healthy-set rule or an aggregate fold of its own, nor an alias to the library's. A unit test SHALL fail when a top-level declaration named `HealthStatus`, `EvaluateHealth`, `QuickInstanceHealth` or `IsHealthy`, or a function named `evaluate…Health`, appears in any non-test Go file of the repository. Source: 0012:D3:R6.
+No non-test Go file in the cli SHALL declare a copy of the package's decisions: a health status type, a per-kind evaluator of inventory objects, a healthy-set rule or an aggregate fold of its own, nor an alias to the library's. The exemptions named in the previous requirement are not copies. A unit test SHALL fail when a top-level declaration named `HealthStatus`, `EvaluateHealth`, `QuickInstanceHealth` or `IsHealthy`, or a function named `evaluate…Health`, appears in any non-test Go file of the repository. Source: 0012:D3:R6.
 
 #### Scenario: A reintroduced evaluator fails the unit tests
 

@@ -22,7 +22,7 @@ Callers at the base, re-checked by grep (18 production sites): `internal/kuberne
 ## Goals / Non-Goals
 
 **Goals:**
-- No cli source declares a health status type, a readiness evaluator, a healthy-set rule or an aggregate fold; all are the library's.
+- No cli source declares a health status type, a per-kind evaluator of inventory objects, a healthy-set rule or an aggregate fold; all are the library's. Three readiness checks are not decisions of the package and stay: the CRD `Established` predicate (`wait.go`), the operator install wait's kind dispatch (`internal/operator/wait.go`), and the display-only ReplicaSet and pod child rows of the tree (`replicaSetHealth`, `podToNode`), which never reach an aggregate.
 - Every JSON and YAML byte `opm instance status`, `list` and `tree` print is unchanged, proven by golden tests written before the switch.
 - A reintroduced copy fails `task test:unit`.
 
@@ -30,11 +30,13 @@ Callers at the base, re-checked by grep (18 production sites): `internal/kuberne
 - Any change to readiness rules, exit codes, colours or `--wait` behaviour.
 - Using `health.ProgressDeadlineExceeded`.
 
-## Decisions
+## Research & Decisions
 
 ### KH1. The library package is imported as `health`, with no alias type
 
 Every file that needs the vocabulary imports `github.com/open-platform-model/library/opm/k8s/health` under its own name, `health`. The cli has no package of that name, unlike `inventory`, so no `k8s` prefix is needed. Struct fields change type from `HealthStatus` to `health.Status`; the JSON and YAML tags stay. `internal/kubernetes` declares no `HealthStatus = health.Status` alias and no re-exported constants (0012:D3:R6). The one local variable named `health` (`buildResourceHealth` in `status.go`) is renamed `verdict` so it does not shadow the package.
+
+`internal/output` does not import the package. `FormatHealthStatus` keeps its string literals and its comment names `health.IsHealthy` as the healthy set: `output` is imported by every command, and importing a Kubernetes-tier package there would pull apimachinery into it for seven strings the constant table (KH4) already pins.
 
 ### KH2. Leftover private names move beside their callers, unchanged in meaning
 
@@ -45,6 +47,8 @@ Every file that needs the vocabulary imports `github.com/open-platform-model/lib
 ### KH3. The aggregate goes through `health.Aggregate` everywhere
 
 **Context**: three places fold statuses into one verdict.
+
+**Explored**: the base code of `GetInstanceStatus` (`status.go`), `aggregateStatus` (`tree.go`) and `EvaluateInstanceHealth` (`list.go`), read against `health.Aggregate` in library `v1.0.0-beta.6`.
 
 **Options considered**:
 1. Switch only `list.go` (the one `QuickInstanceHealth` caller) and leave the status and tree loops. Smallest diff, but leaves two hand-written folds of a rule the library now owns.
@@ -67,13 +71,17 @@ Section 1 adds golden tests on the base code, so the switch in section 2 is revi
 - `internal/kubernetes/tree_golden_test.go`: `FormatTree` JSON and YAML of a tree with a component per aggregate verdict and a pod child with raw phase `Running`, compared whole.
 - `internal/workflow/query/list_golden_test.go`: `RenderInstanceListOutput` JSON and YAML of summaries carrying `Ready`, `NotReady` and `Unknown`, captured from output and compared whole.
 - One table test pinning each constant's string (`"Ready"`, `"NotReady"`, `"Complete"`, `"Unknown"`, `"Missing"`, `"Applied"`, `"Bound"`), so a library rename shows up as a cli test failure too.
-- An aggregate table over `GetInstanceStatus` (fake clientset) and `aggregateStatus`: empty, all healthy, one NotReady, one missing, one unreadable, Applied-only.
+- An aggregate table over `GetInstanceStatus` (nil client) and `aggregateStatus`: empty, all healthy, one NotReady, one missing, one unreadable, Applied-only.
+- A table over `EvaluateInstanceHealth` with a fake dynamic client, since the list golden test renders hand-built summaries and never runs the fold: all healthy, one NotReady Deployment, missing plus unreadable (`NotReady (3/5)` through `formatStatusColumn`), discovery failure and an empty inventory (both `Unknown` 0/0).
+- `PrintInstanceStatus` on a Deployment whose `Available` is True but whose rollout is behind: row `NotReady`, exit 2.
 
 In section 2 only identifiers in these files change (`HealthReady` becomes `health.Ready`); the task checks with `git diff` that no expected literal line changed.
 
 ### KH5. The refusal check is a parse of the repo's Go files
 
 **Context**: 0012:D3:R6 asks the frontend's checks to refuse a reintroduced copy. The earlier adoptions refused a deleted *package path* with `depguard`. Here the copy lived in `internal/kubernetes`, which stays, so there is no import path to deny.
+
+**Explored**: the cli's `.golangci.yml` rules (`depguard` and `forbidigo` settings) and how the `pkg/core`, `pkg/resourceorder` and `pkg/inventory` adoptions refused their copies.
 
 **Options considered**:
 1. A `depguard` or `forbidigo` rule. `depguard` works on import paths; `forbidigo` forbids uses of identifiers, not declarations, and would not catch a renamed copy either.
@@ -87,6 +95,12 @@ In section 2 only identifiers in these files change (`HealthReady` becomes `heal
 ### KH6. Specs: retire `health-export`, add `health-evaluation`
 
 `health-export` specifies `internal/kubernetes` exports that no longer exist; MODIFYing it would leave its Purpose naming `health.go`. It is retired (all four requirements REMOVED, `retire_capabilities: true`), and `health-evaluation` states the new contract: the library judges readiness, the cli declares no evaluator, the status strings are stable output. `mod-apply`'s flag-surface requirement is MODIFIED with every scenario kept (OpenSpec 1.12), changing only the predicate named in the `--wait` scenario. `status-exit-codes` names `IsHealthy` without a package and stays true, so it is left alone.
+
+## Migration Plan
+
+No migration: no output, flag or stored data changes.
+
+Archive checklist (the archive rides the PR): `retire_capabilities: true` retires the emptied `health-export` spec, and the archiver replaces the TBD Purpose of the new `health-evaluation` main spec with: the library's `opm/k8s/health` judges readiness for the cli, the cli keeps no evaluator of its own, and the status strings are stable output.
 
 ## Risks / Trade-offs
 
