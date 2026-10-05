@@ -44,6 +44,8 @@ func TestVetChecks_CleanModulePasses(t *testing.T) {
 // TestVetChecks_OpenMetadataVersionKeepsName: an open metadata.version keeps
 // the module's metadata from decoding as a whole, yet the plan still carries
 // the authored name for vet's log prefix and the module still reaches #config.
+// It holds under the stub schema only: core v2.0.0-beta.4's #IdentityPackage
+// refuses an open Version, so this pins the defensive path.
 func TestVetChecks_OpenMetadataVersionKeepsName(t *testing.T) {
 	files := edit(moduleFiles(), "identity/identity.cue", `package identity
 

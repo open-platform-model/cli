@@ -75,9 +75,9 @@ func TestResolveModuleValues_UsesValuesFile(t *testing.T) {
 	dir := t.TempDir()
 	valuesFile := filepath.Join(dir, "values.cue")
 	require.NoError(t, os.WriteFile(valuesFile, []byte("package test\nvalues: {replicas: 3}\n"), 0o644))
-	pkg := packageWithConfig(t, `{#config: {replicas: int}, debugValues: {replicas: 1}}`)
+	mod := packageWithConfig(t, `{#config: {replicas: int}, debugValues: {replicas: 1}}`)
 
-	values, err := ResolveModuleValues(k, pkg, dir, []string{valuesFile})
+	values, err := ResolveModuleValues(k, mod, dir, []string{valuesFile})
 	require.NoError(t, err)
 	require.Len(t, values, 1, "the -f file is the single source; debugValues are not layered under it")
 	assert.Equal(t, valuesFile, values[0].Origin, "the -f file wins over debugValues")
@@ -90,9 +90,9 @@ func TestResolveModuleValues_ReturnsSourcesUnvalidated(t *testing.T) {
 	k := kernel.New()
 	valuesFile := filepath.Join(t.TempDir(), "values.cue")
 	require.NoError(t, os.WriteFile(valuesFile, []byte("package test\nvalues: {bogus: 1}\n"), 0o644))
-	pkg := packageWithConfig(t, `{#config: close({replicas: int | *1})}`)
+	mod := packageWithConfig(t, `{#config: close({replicas: int | *1})}`)
 
-	values, err := ResolveModuleValues(k, pkg, "mod", []string{valuesFile})
+	values, err := ResolveModuleValues(k, mod, "mod", []string{valuesFile})
 	require.NoError(t, err)
 	require.Len(t, values, 1)
 	assert.Equal(t, valuesFile, values[0].Origin)
@@ -107,11 +107,11 @@ func TestValidateValuesFiles_ConflictNamesTheFile(t *testing.T) {
 	f2 := filepath.Join(dir, "b.cue")
 	require.NoError(t, os.WriteFile(f1, []byte("package test\nvalues: {replicas: 3}\n"), 0o644))
 	require.NoError(t, os.WriteFile(f2, []byte("package test\nvalues: {replicas: 4}\n"), 0o644))
-	pkg := packageWithConfig(t, `{#config: {replicas: int}}`)
+	mod := packageWithConfig(t, `{#config: {replicas: int}}`)
 
-	sources, err := ResolveModuleValues(k, pkg, dir, []string{f1, f2})
+	sources, err := ResolveModuleValues(k, mod, dir, []string{f1, f2})
 	require.NoError(t, err)
-	err = validateValuesFiles(k, pkg.ConfigSchema(), sources)
+	err = validateValuesFiles(k, mod.ConfigSchema(), sources)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "conflicting values")
 	assert.True(t, positionsName(err, "b.cue"), "the conflict must be attributed to a values file: %v", cueerrors.Positions(err))
@@ -134,11 +134,11 @@ func TestValidateValuesFiles_SchemaViolationRejected(t *testing.T) {
 	k := kernel.New()
 	valuesFile := filepath.Join(t.TempDir(), "values.cue")
 	require.NoError(t, os.WriteFile(valuesFile, []byte("package test\nvalues: {bogus: 1}\n"), 0o644))
-	pkg := packageWithConfig(t, `{#config: close({replicas: int | *1})}`)
+	mod := packageWithConfig(t, `{#config: close({replicas: int | *1})}`)
 
-	sources, err := ResolveModuleValues(k, pkg, "mod", []string{valuesFile})
+	sources, err := ResolveModuleValues(k, mod, "mod", []string{valuesFile})
 	require.NoError(t, err)
-	err = validateValuesFiles(k, pkg.ConfigSchema(), sources)
+	err = validateValuesFiles(k, mod.ConfigSchema(), sources)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "field not allowed")
 	assert.True(t, positionsName(err, "values.cue"), "the violation must be attributed to the values file: %v", cueerrors.Positions(err))
@@ -148,9 +148,9 @@ func TestValidateValuesFiles_SchemaViolationRejected(t *testing.T) {
 // -f files are supplied to a module that declares no #config.
 func TestValidateValuesFiles_NoConfigSchema(t *testing.T) {
 	k := kernel.New()
-	pkg := packageWithConfig(t, `{metadata: name: "x"}`)
+	mod := packageWithConfig(t, `{metadata: name: "x"}`)
 
-	err := validateValuesFiles(k, pkg.ConfigSchema(), nil)
+	err := validateValuesFiles(k, mod.ConfigSchema(), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "#config")
 }
@@ -160,15 +160,15 @@ func TestValidateValuesFiles_NoConfigSchema(t *testing.T) {
 // debugValues and carrying the field's data.
 func TestResolveModuleValues_FallbackDebugValues(t *testing.T) {
 	k := kernel.New()
-	pkg := packageWithConfig(t, `{#config: {replicas: int}, debugValues: {replicas: 5}}`)
+	mod := packageWithConfig(t, `{#config: {replicas: int}, debugValues: {replicas: 5}}`)
 
-	values, err := ResolveModuleValues(k, pkg, "mod", nil)
+	values, err := ResolveModuleValues(k, mod, "mod", nil)
 	require.NoError(t, err)
 	require.Len(t, values, 1)
 	assert.Equal(t, filepath.Join("mod", "debugValues"), values[0].Origin)
 	// A Source carries bytes the kernel compiles where it uses them: read the
 	// field's data back through the validation primitive.
-	merged, err := k.ValidateConfigDetailed(pkg.ConfigSchema(), values)
+	merged, err := k.ValidateConfigDetailed(mod.ConfigSchema(), values)
 	require.NoError(t, err)
 	replicas, err := merged.LookupPath(cue.ParsePath("replicas")).Int64()
 	require.NoError(t, err)
@@ -179,9 +179,9 @@ func TestResolveModuleValues_FallbackDebugValues(t *testing.T) {
 // the module defines neither debugValues nor a -f flag.
 func TestResolveModuleValues_NoDebugValues(t *testing.T) {
 	k := kernel.New()
-	pkg := packageWithConfig(t, `{metadata: name: "x"}`)
+	mod := packageWithConfig(t, `{metadata: name: "x"}`)
 
-	_, err := ResolveModuleValues(k, pkg, "mod", nil)
+	_, err := ResolveModuleValues(k, mod, "mod", nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "debugValues")
 }

@@ -75,6 +75,10 @@ func TestE2E_ModuleVet_Output(t *testing.T) {
 	// Cheap failure first: a #config violation stops vet before any
 	// platform is resolved or generated.
 	assert.NotContains(t, stderr, "platform:")
+
+	// The log prefix names the module by its authored metadata.name ("demo"),
+	// not by the directory it was vetted from ("module").
+	assert.Contains(t, stderr, "m:demo:")
 }
 
 // TestE2E_ModuleVet_RendersAgainstModuleDeps vets a module with components
