@@ -4,37 +4,9 @@ Defines the ownership-focused instance inventory data model and the `ModuleInsta
 
 ## Requirements
 
-### Requirement: Inventory entry identity
-
-An `InventoryEntry` SHALL represent a single currently owned Kubernetes resource. Two entries SHALL be considered identity-equal when their Group, Kind, Namespace, Name, and Component fields all match. The Version field SHALL be excluded from identity comparison to prevent false orphans during Kubernetes API version migrations.
-
-#### Scenario: Same resource with different API version
-
-- **WHEN** comparing two entries with identical Group, Kind, Namespace, Name, Component but different Version
-- **THEN** the entries SHALL be identity-equal
-
-#### Scenario: Same resource with different component
-
-- **WHEN** comparing two entries with identical Group, Kind, Namespace, Name, Version but different Component
-- **THEN** the entries SHALL NOT be identity-equal
-
-### Requirement: Kubernetes identity equality
-
-A separate K8s identity comparison SHALL compare entries by Group, Kind, Namespace, and Name only (excluding both Version and Component). This SHALL be used by the component-rename safety check to detect when the same Kubernetes resource appears under a different component name.
-
-#### Scenario: Same K8s resource under different components
-
-- **WHEN** comparing two entries with identical Group, Kind, Namespace, Name but different Component
-- **THEN** the entries SHALL be K8s-identity-equal
-
-#### Scenario: Different K8s resources
-
-- **WHEN** comparing two entries with different Name
-- **THEN** the entries SHALL NOT be K8s-identity-equal
-
 ### Requirement: Entry construction from rendered resource
 
-The system SHALL construct an `InventoryEntry` from a rendered Kubernetes resource by extracting Group and Kind from the resource's GVK, Version from the GVK's Version field, Namespace and Name from the resource's metadata, and Component from the OPM component label when present.
+The system SHALL construct an inventory entry from a rendered Kubernetes resource with the library's `inventory.NewEntry`, which takes Group and Kind from the resource's GVK, Version from the GVK's Version field, Namespace and Name from the resource's metadata, and Component from the OPM component label when present.
 
 #### Scenario: Build entry from a namespaced Deployment
 
@@ -64,7 +36,7 @@ The CLI SHALL persist instance inventory in a `ModuleInstance` custom resource (
 
 After resources are applied and pruned, the CLI SHALL write, via the status subresource with field manager `opm-cli`: `status.inventory` (revision, digest, count, entries), `status.instanceUUID`, `status.lastAppliedRenderDigest`, `status.lastAppliedSourceDigest`, `status.lastAppliedConfigDigest`, and `status.lastAppliedAt`. The CLI MUST NOT write `status.conditions`, `status.observedGeneration`, `status.lastAttempted*`, `status.failureCounters`, `status.history`, or `status.nextRetryAt`.
 
-The digest fields SHALL be operator-parity: `lastAppliedRenderDigest` computed over the kernel-compiled resources with the operator's exact algorithm and serialization (sort by Group, Kind, Namespace, Name; concatenated CUE-value JSON; SHA-256 — see `kernel-render`), `lastAppliedSourceDigest` computed as the operator's `ModuleSourceDigest` (SHA-256 of the canonical `path@version` reference — identical on both actors' CUE-native paths), and `lastAppliedConfigDigest` matching the operator's `ConfigDigest` canonical-JSON semantics including the empty case (SHA-256 of no bytes).
+The digest fields SHALL be operator-parity: `lastAppliedRenderDigest` SHALL be the library's shared render digest, `opm/k8s/inventory.RenderDigest`, over the render's single export (see `kernel-render`), which leaves the managed-by label value out so the CLI and the operator digest one render to the same value (0012:D6:R2); `status.inventory.digest` SHALL be the library's `inventory.Digest` of the written entries (see "Deterministic inventory digest"); `lastAppliedSourceDigest` SHALL be computed as the operator's `ModuleSourceDigest` (SHA-256 of the canonical `path@version` reference — identical on both actors' CUE-native paths), and `lastAppliedConfigDigest` SHALL match the operator's `ConfigDigest` canonical-JSON semantics including the empty case (SHA-256 of no bytes).
 
 #### Scenario: Status subset after successful apply
 
@@ -86,6 +58,13 @@ The digest fields SHALL be operator-parity: `lastAppliedRenderDigest` computed o
 
 - **WHEN** the CLI and the operator compile the same instance against the same Platform spec
 - **THEN** the two render digests SHALL be byte-identical
+- **AND** the CLI's value SHALL equal `inventory.RenderDigest` of the render's export, which the operator also computes
+
+#### Scenario: Stored digests change once on upgrade
+
+- **WHEN** an instance last applied by a CLI release that predates the library digests is applied again with no change to its objects
+- **THEN** `status.inventory.digest` and `status.lastAppliedRenderDigest` SHALL change to the library values
+- **AND** the entries, revision increment and count SHALL be written as for any other apply
 
 ### Requirement: Spec write contents
 
@@ -108,7 +87,7 @@ On apply in CLI-executor mode, the CLI SHALL server-side-apply the CR spec with 
 
 ### Requirement: Entry wire shape targets the CRD schema
 
-Conversion between the CLI's `InventoryEntry` type and the CR's `status.inventory.entries[]` SHALL be performed by explicit mapping functions that produce/consume the CRD's field names (`group`, `kind`, `namespace`, `name`, `v`, `component`), independent of the Go struct's own JSON tags. The mapping SHALL round-trip losslessly.
+Conversion between the library's inventory entry and the CR's `status.inventory.entries[]` SHALL be performed by explicit mapping functions in the CLI that produce and consume the CRD's field names (`group`, `kind`, `namespace`, `name`, `v`, `component`). The library entry carries no struct tags, so no Go struct tag SHALL decide the wire shape. The mapping SHALL round-trip losslessly. The reader of a legacy inventory Secret SHALL decode the Secret's JSON with the same field names, `v` for the API version, into library entries.
 
 #### Scenario: Version serializes as `v`
 
@@ -119,6 +98,11 @@ Conversion between the CLI's `InventoryEntry` type and the CR's `status.inventor
 
 - **WHEN** an entry list is written to a CR and read back
 - **THEN** the resulting entries SHALL equal the originals
+
+#### Scenario: Legacy Secret entries keep their API version
+
+- **WHEN** a legacy inventory Secret whose entry carries `"v": "v1"` is read for migration
+- **THEN** the migrated entry SHALL have Version `v1`
 
 ### Requirement: instanceUUID is extracted from the render
 
@@ -164,9 +148,9 @@ Reading inventory SHALL be a direct GET of the `ModuleInstance` by name and name
 
 ### Requirement: Inventory represents current ownership only
 
-The public inventory contract SHALL represent the current set of resources owned by a instance. It SHALL contain the current `entries` list and MAY include ownership summary fields such as `revision`, `digest`, and `count`.
+The inventory the CLI records SHALL represent the current set of resources owned by a instance. It SHALL contain the current `entries` list and MAY include ownership summary fields such as `revision`, `digest`, and `count`.
 
-The public inventory contract MUST NOT require or embed:
+The recorded inventory MUST NOT require or embed:
 
 - raw values
 - source path or source version metadata
@@ -189,7 +173,7 @@ The public inventory contract MUST NOT require or embed:
 
 ### Requirement: Deterministic inventory digest
 
-When the system computes an inventory digest, it SHALL do so deterministically from the current owned resource set regardless of input order.
+The CLI SHALL compute the inventory digest with the library's `opm/k8s/inventory.Digest`, which hashes a canonical field-by-field encoding of the entries. The digest SHALL depend only on the entries' field values, never on their order or on how the CLI serialises an entry, and two inventories that differ in their set of entries or in any field of an entry SHALL produce different digests. The CLI SHALL NOT compute an inventory digest of its own. Source: 0012:D7:R2/R3. The release that first records this digest SHALL carry a migration note naming the one-time change of the stored value. Source: 0012:D7:R4.
 
 #### Scenario: Same entries in different order produce same digest
 
@@ -205,7 +189,12 @@ When the system computes an inventory digest, it SHALL do so deterministically f
 #### Scenario: Component rename changes digest
 
 - **WHEN** two ownership sets differ only by the `component` field of an entry
-- **THEN** the digests SHALL differ because inventory identity includes component ownership
+- **THEN** the digests SHALL differ, because every field of an entry is part of the encoding the digest hashes
+
+#### Scenario: The stored digest is the library's
+
+- **WHEN** an apply writes `status.inventory.digest`
+- **THEN** the value SHALL equal `inventory.Digest` of the written entries
 
 ### Requirement: Skipped contracts annotation
 
@@ -225,3 +214,22 @@ When an apply rendered with `--skip-unprovided` and the kernel skipped at least 
 
 - **WHEN** `opm instance apply --skip-unprovided` renders an instance with no unprovided demand
 - **THEN** the ModuleInstance SHALL NOT carry the annotation
+
+### Requirement: Inventory entries are the library's component-blind entries
+
+The CLI SHALL represent each currently owned Kubernetes resource as the library's `opm/k8s/inventory.Entry` (group, kind, namespace, name, API version, component), and SHALL NOT declare an entry type of its own. Two entries SHALL be the same object when their group, kind, namespace and name agree, as `inventory.SameObject` compares them: neither the API version nor the component SHALL count, so an API version migration or a component rename never makes an object look like a different one. Source: 0012:D7:R1.
+
+#### Scenario: Same object at a different API version
+
+- **WHEN** comparing two entries with identical group, kind, namespace, name and component but a different API version
+- **THEN** the entries SHALL be the same object
+
+#### Scenario: Same object under a different component
+
+- **WHEN** comparing two entries with identical group, kind, namespace, name and API version but a different component
+- **THEN** the entries SHALL be the same object
+
+#### Scenario: Different objects
+
+- **WHEN** comparing two entries that differ in name
+- **THEN** the entries SHALL NOT be the same object

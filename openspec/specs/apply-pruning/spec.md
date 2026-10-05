@@ -6,7 +6,7 @@ Defines the stale resource pruning behavior for `opm mod apply`. When a module i
 
 ### Requirement: Stale resource detection
 
-After rendering and before apply, the system SHALL compute the stale set as the set difference of previous inventory entries minus current inventory entries, using OPM identity equality (Group + Kind + Namespace + Name + Component). Resources in the stale set are candidates for pruning.
+After rendering and before apply, the system SHALL compute the stale set with the library's `opm/k8s/inventory.StaleSet`: every previous inventory entry that no current entry is the same object as, comparing group, kind, namespace and name only. The component and the API version SHALL NOT count, so an object that moved to another component or another API version of its group is never stale. Resources in the stale set are candidates for pruning. Source: 0012:D7:R1.
 
 #### Scenario: Resource removed from module
 
@@ -29,22 +29,18 @@ After rendering and before apply, the system SHALL compute the stale set as the 
 - **WHEN** the previous inventory entries are identical to the current render entries
 - **THEN** the stale set SHALL be empty
 
-### Requirement: Component-rename safety check
-
-Before pruning, the system SHALL filter the stale set to remove entries where an entry in the current set has the same K8s identity (Group + Kind + Namespace + Name) but a different Component. This prevents a component rename from triggering destructive deletion of resources that are still desired.
-
-#### Scenario: Component renamed without resource change
+#### Scenario: Component renamed without resource change is not stale
 
 - **WHEN** the previous inventory has `Deployment/my-app` under component `web`
 - **AND** the current render has `Deployment/my-app` under component `frontend`
-- **THEN** `Deployment/my-app` SHALL be removed from the stale set
+- **THEN** `Deployment/my-app` SHALL NOT appear in the stale set
 - **AND** the resource SHALL NOT be deleted
 
-#### Scenario: Genuine resource removal is not affected
+#### Scenario: Removal under a renamed component stays stale
 
 - **WHEN** the previous inventory has `Deployment/old-app` under component `web`
 - **AND** the current render does not contain `Deployment/old-app` under any component
-- **THEN** `Deployment/old-app` SHALL remain in the stale set
+- **THEN** `Deployment/old-app` SHALL appear in the stale set
 
 ### Requirement: Pre-apply existence check on first install
 
@@ -184,7 +180,7 @@ The `--max-history` flag SHALL control the maximum number of change entries reta
 
 ### Requirement: Apply flow orchestration
 
-The apply flow SHALL follow this sequence: (1) render resources, (2) compute manifest digest, (3) compute change ID, (4) read previous inventory, (5a) compute stale set, (5b) apply component-rename safety check, (5c) run pre-apply existence check if first install, (6) apply all rendered resources via SSA, (7a) prune stale resources if all applied successfully, (7b) skip prune and inventory write if any apply failed, (8) write the inventory record.
+The apply flow SHALL follow this sequence: (1) render resources, (2) compute manifest digest, (3) compute change ID, (4) read previous inventory, (5a) compute stale set, (5b) run pre-apply existence check if first install, (6) apply all rendered resources via SSA, (7a) prune stale resources if all applied successfully, (7b) skip prune and inventory write if any apply failed, (8) write the inventory record. No step SHALL filter the stale set after it is computed: the stale set is already component-blind.
 
 #### Scenario: Normal apply with pruning
 
