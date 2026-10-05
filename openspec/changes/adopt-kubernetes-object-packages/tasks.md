@@ -16,12 +16,12 @@
 
 ## 3. One export for the render digest and the apply objects
 
-- [ ] 3.1 Change `inventory.ComputeRenderDigest` to take `[]object.Exported`: sort a copy, stable, by group (`Object.GetAPIVersion()` up to its last `/`, as the old `parseAPIVersion` split it), `GetKind()`, `GetNamespace()` and `GetName()`, then hash each `JSON` in that order; never `Object.GroupVersionKind()`, which empties the whole key for a multi-slash `apiVersion`. Keep the doc comment's parity note and reword it to say the bytes are the single export's JSON (design KO2)
-- [ ] 3.2 In `internal/workflow/render/render.go`, replace the inline `pkgcore.Resource` loop, the digest call and the `ToUnstructured` loop with one `object.Export(object.Resources(out.Compiled))`, the digest over its result and `result.Resources` from each `Exported.Object` in order. An export failure returns `ExitGeneralError` with `converting rendered resources: %w` (design KO3). Drop the `pkgcore` import
-- [ ] 3.3 Move `internal/inventory/digest_test.go` to build its input with `object.Export` over the CUE test resources (`object.Resource` in `cueResource`); every existing digest test and both goldens from 1.4 stay green unchanged
-- [ ] 3.4 Move `tests/integration/render-parity/main.go` to `object.Resources` plus `object.Export` before `ComputeRenderDigest`, and build it (`go vet tests/integration/render-parity/main.go`; the build tag excludes it from package patterns)
-- [ ] 3.5 Confirm `grep -n 'MarshalJSON\|ToUnstructured\|pkgcore' internal/workflow/render/render.go` finds nothing (evidence for the spec scenario "The digest and the apply objects come from one export")
-- [ ] 3.6 `task fmt`, `task lint`, `task test:unit` and `task openspec:check` green, then commit `refactor(render): feed the render digest and the apply objects from one export`
+- [x] 3.1 Change `inventory.ComputeRenderDigest` to take `[]object.Exported`: sort a copy, stable, by group (`Object.GetAPIVersion()` up to its last `/`, as the old `parseAPIVersion` split it), `GetKind()`, `GetNamespace()` and `GetName()`, then hash each `JSON` in that order; never `Object.GroupVersionKind()`, which empties the whole key for a multi-slash `apiVersion`. Keep the doc comment's parity note and reword it to say the bytes are the single export's JSON (design KO2)
+- [x] 3.2 In `internal/workflow/render/render.go`, replace the inline `pkgcore.Resource` loop, the digest call and the `ToUnstructured` loop with one `object.Export(object.Resources(out.Compiled))`, the digest over its result and `result.Resources` from each `Exported.Object` in order. An export failure returns `ExitGeneralError` with `converting rendered resources: %w` (design KO3). Drop the `pkgcore` import
+- [x] 3.3 Move `internal/inventory/digest_test.go` to build its input with `object.Export` over the CUE test resources (`object.Resource` in `cueResource`); every existing digest test and both goldens from 1.4 stay green unchanged
+- [x] 3.4 Move `tests/integration/render-parity/main.go` to `object.Resources` plus `object.Export` before `ComputeRenderDigest`, and build it (`go vet tests/integration/render-parity/main.go`; the build tag excludes it from package patterns)
+- [x] 3.5 Confirm `grep -n 'MarshalJSON\|ToUnstructured\|pkgcore' internal/workflow/render/render.go` finds only `decodeUnifiedValues`, which encodes the instance's values for `spec.values`, not a rendered object (evidence for the spec scenario "The digest and the apply objects come from one export")
+- [x] 3.6 `task fmt`, `task lint`, `task test:unit` and `task openspec:check` green, then commit `refactor(render): feed the render digest and the apply objects from one export`
 
 ## 4. Order by the library weight table
 

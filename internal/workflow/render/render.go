@@ -21,7 +21,6 @@ import (
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/platform"
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
 	pkgerrors "github.com/open-platform-model/cli/pkg/errors"
 	"github.com/open-platform-model/cli/pkg/loader"
 )
@@ -264,29 +263,22 @@ func renderInstance(
 		output.Warn(w)
 	}
 
-	converted := make([]*pkgcore.Resource, 0, len(out.Compiled))
-	for _, c := range out.Compiled {
-		converted = append(converted, &pkgcore.Resource{
-			Value:       c.Value,
-			Instance:    c.Instance,
-			Component:   c.Component,
-			Transformer: c.Transformer,
-		})
+	// One CUE export per object: the render digest hashes the exported JSON
+	// and the apply objects are the objects decoded from those same bytes.
+	exported, err := object.Export(object.Resources(out.Compiled))
+	if err != nil {
+		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("converting rendered resources: %w", err)}
 	}
 
-	renderDigest, err := inventory.ComputeRenderDigest(converted)
+	renderDigest, err := inventory.ComputeRenderDigest(exported)
 	if err != nil {
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}
 
 	result := newResult(env, out, renderDigest, decodeUnifiedValues(inst.Values()), sourceLocal)
 
-	for _, r := range converted {
-		u, convErr := r.ToUnstructured()
-		if convErr != nil {
-			return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("converting resource %s/%s to unstructured: %w", r.Kind(), r.Name(), convErr)}
-		}
-		result.Resources = append(result.Resources, u)
+	for i := range exported {
+		result.Resources = append(result.Resources, exported[i].Object)
 	}
 
 	// Instance metadata is the kernel's decode, taken whole; the namespace

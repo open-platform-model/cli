@@ -8,25 +8,33 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	pkgcore "github.com/open-platform-model/cli/pkg/core"
+	"github.com/open-platform-model/library/opm/k8s/object"
 )
 
-// cueResource compiles a CUE manifest source into a *pkgcore.Resource.
-func cueResource(t *testing.T, src string) *pkgcore.Resource {
+// cueResource compiles a CUE manifest source into an *object.Resource.
+func cueResource(t *testing.T, src string) *object.Resource {
 	t.Helper()
 	v := cuecontext.New().CompileString(src)
 	require.NoError(t, v.Err())
-	return &pkgcore.Resource{Value: v, Instance: "demo", Component: "web", Transformer: "t"}
+	return &object.Resource{Value: v, Instance: "demo", Component: "web", Transformer: "t"}
 }
 
-// renderResources returns a typical 3-resource compiled set.
-func renderResources(t *testing.T) []*pkgcore.Resource {
+// export runs the render's single object.Export over the resources.
+func export(t *testing.T, resources ...*object.Resource) []object.Exported {
 	t.Helper()
-	return []*pkgcore.Resource{
+	out, err := object.Export(resources)
+	require.NoError(t, err)
+	return out
+}
+
+// renderResources returns a typical 3-resource compiled set, exported.
+func renderResources(t *testing.T) []object.Exported {
+	t.Helper()
+	return export(t,
 		cueResource(t, `apiVersion: "apps/v1", kind: "Deployment", metadata: {name: "app", namespace: "ns"}, spec: replicas: 2`),
 		cueResource(t, `apiVersion: "v1", kind: "Service", metadata: {name: "app", namespace: "ns"}, spec: port: 8080`),
 		cueResource(t, `apiVersion: "v1", kind: "ConfigMap", metadata: {name: "config", namespace: "ns"}, data: key: "value"`),
-	}
+	)
 }
 
 func TestComputeRenderDigest_Format(t *testing.T) {
@@ -38,8 +46,8 @@ func TestComputeRenderDigest_Format(t *testing.T) {
 
 func TestComputeRenderDigest_Deterministic_InputOrder(t *testing.T) {
 	r1 := renderResources(t)
-	r2 := []*pkgcore.Resource{r1[2], r1[0], r1[1]}
-	r3 := []*pkgcore.Resource{r1[1], r1[2], r1[0]}
+	r2 := []object.Exported{r1[2], r1[0], r1[1]}
+	r3 := []object.Exported{r1[1], r1[2], r1[0]}
 
 	d1, err := ComputeRenderDigest(r1)
 	require.NoError(t, err)
@@ -57,7 +65,7 @@ func TestComputeRenderDigest_ContentChange(t *testing.T) {
 	require.NoError(t, err)
 
 	changed := renderResources(t)
-	changed[0] = cueResource(t, `apiVersion: "apps/v1", kind: "Deployment", metadata: {name: "app", namespace: "ns"}, spec: replicas: 5`)
+	changed[0] = export(t, cueResource(t, `apiVersion: "apps/v1", kind: "Deployment", metadata: {name: "app", namespace: "ns"}, spec: replicas: 5`))[0]
 	modified, err := ComputeRenderDigest(changed)
 	require.NoError(t, err)
 
@@ -69,7 +77,7 @@ func TestComputeRenderDigest_AddedResource(t *testing.T) {
 	original, err := ComputeRenderDigest(resources)
 	require.NoError(t, err)
 
-	resources = append(resources, cueResource(t, `apiVersion: "v1", kind: "Secret", metadata: {name: "my-secret", namespace: "ns"}`))
+	resources = append(resources, export(t, cueResource(t, `apiVersion: "v1", kind: "Secret", metadata: {name: "my-secret", namespace: "ns"}`))...)
 	withExtra, err := ComputeRenderDigest(resources)
 	require.NoError(t, err)
 
@@ -86,19 +94,20 @@ func TestComputeRenderDigest_EmptySet(t *testing.T) {
 
 func TestComputeRenderDigest_DoesNotMutateInput(t *testing.T) {
 	resources := renderResources(t)
-	original := make([]*pkgcore.Resource, len(resources))
+	original := make([]object.Exported, len(resources))
 	copy(original, resources)
 
 	_, err := ComputeRenderDigest(resources)
 	require.NoError(t, err)
 
 	for i, r := range resources {
-		assert.Same(t, original[i], r, "input order must not be mutated")
+		assert.Same(t, original[i].Object, r.Object, "input order must not be mutated")
 	}
 }
 
-// goldenRenderDigest is the digest of renderResources at the base of the
-// move to the library's opm/k8s/object export. It must not move until the
+// goldenRenderDigest is the digest of renderResources recorded before the
+// digest moved from the retired pkg/core.Resource to the library's
+// opm/k8s/object export. It must not move until the
 // cli adopts the library's shared render digest with the operator, which
 // changes every stored digest once, on purpose.
 const goldenRenderDigest = "sha256:0404868537e1114e9ea6e7d02af68ba6a4693531727c4be713212753de6840ae"
@@ -113,22 +122,30 @@ func TestComputeRenderDigest_Golden(t *testing.T) {
 // group is the apiVersion up to the last slash ("a/b"), so it sorts after
 // "" and "apps" but before "z". A sort key that parsed the apiVersion as a
 // group-version would empty the key and move it, changing the digest.
-func multiSlashResources(t *testing.T) []*pkgcore.Resource {
+func multiSlashResources(t *testing.T) []object.Exported {
 	t.Helper()
-	return []*pkgcore.Resource{
+	return export(t,
 		cueResource(t, `apiVersion: "z/v1", kind: "Zed", metadata: {name: "z", namespace: "ns"}`),
 		cueResource(t, `apiVersion: "a/b/c", kind: "Odd", metadata: {name: "odd", namespace: "ns"}`),
 		cueResource(t, `apiVersion: "v1", kind: "ConfigMap", metadata: {name: "config", namespace: "ns"}`),
 		cueResource(t, `apiVersion: "apps/v1", kind: "Deployment", metadata: {name: "app", namespace: "ns"}`),
-	}
+	)
 }
 
-// goldenMultiSlashDigest is the digest of multiSlashResources at the base of
-// the move; see goldenRenderDigest.
+// goldenMultiSlashDigest is the digest of multiSlashResources recorded
+// before the same move; see goldenRenderDigest.
 const goldenMultiSlashDigest = "sha256:43021f99cc1864b793c40493c4d0c196a8b7a7f58c528d728d8986d1388e378e"
 
 func TestComputeRenderDigest_MultiSlashGolden(t *testing.T) {
 	d, err := ComputeRenderDigest(multiSlashResources(t))
 	require.NoError(t, err)
 	assert.Equal(t, goldenMultiSlashDigest, d)
+}
+
+func TestComputeRenderDigest_RefusesObjectWithoutJSON(t *testing.T) {
+	objs := renderResources(t)
+	objs[1].JSON = nil
+	_, err := ComputeRenderDigest(objs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "has no exported JSON")
 }
