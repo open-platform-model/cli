@@ -93,13 +93,20 @@ type paths struct {
 type renderFunc func(ctx context.Context, mapping string, res *modref.Resolution, dir string) ([]*unstructured.Unstructured, error)
 
 // renderModule renders the controller's instance as a fresh install does: no
-// recorded and no file values, through controller.ModuleRenderOpts.
+// recorded and no file values, through controller.ModuleRenderOpts. The
+// platform the render generates from the module's deps goes to a temporary
+// directory, never into the tree the pin writes.
 func renderModule(ctx context.Context, mapping string, res *modref.Resolution, dir string) ([]*unstructured.Unstructured, error) {
 	values, err := controller.MergeValues(controller.ValuesInput{})
 	if err != nil {
 		return nil, err
 	}
-	cfg := &config.GlobalConfig{Registry: mapping}
+	home, err := os.MkdirTemp("", "controller-pin-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(home)
+	cfg := &config.GlobalConfig{Registry: mapping, ConfigPath: filepath.Join(home, "config.cue")}
 	k8s := &config.ResolvedKubernetesConfig{Namespace: config.ResolvedField{Value: controller.ControllerNamespace}}
 	opts := controller.ModuleRenderOpts(cfg, k8s, res, values.Source)
 	if res == nil {
