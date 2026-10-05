@@ -61,6 +61,7 @@ The digest fields SHALL be operator-parity: `lastAppliedRenderDigest` SHALL be t
 
 - **WHEN** the CLI and the operator compile the same instance against the same Platform spec
 - **THEN** the two render digests SHALL be byte-identical
+- **AND** the CLI's value SHALL equal `inventory.RenderDigest` of the render's export, which the operator also computes
 
 #### Scenario: Stored digests change once on upgrade
 

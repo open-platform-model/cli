@@ -16,7 +16,7 @@ Both stored values change once in the release that first records them, with a mi
 - **Stale set.** The apply computes the stale set with `inventory.StaleSet`. `ApplyComponentRenameSafetyCheck` and its call in `internal/workflow/apply/apply.go` (`ComputeStaleInventorySet`) are deleted. Prune decisions do not change: a component rename or an API version change leaves nothing stale, as before.
 - **Entry type.** Every cli package holds the library's `inventory.Entry` and builds it with `inventory.NewEntry`. `pkg/inventory` is deleted with its tests, and `internal/inventory/aliases.go` with it. The record block (`Inventory`: revision, digest, count, entries), `K8sIdentity` and `AdmitSet` move into `internal/inventory`, which is the cli's own record and apply-guard code, not a shared contract.
 - **Wire mapping kept.** `internal/inventory/wire.go` keeps the explicit mapping between an entry and the ModuleInstance CRD's `status.inventory.entries[]` fields (`group`, `kind`, `namespace`, `name`, `v`, `component`). The library `Entry` carries no struct tags, so the legacy inventory Secret reader decodes the Secret's JSON through its own tagged struct and maps it the same way.
-- **Lint and docs.** The `depguard` rule from cli PR 328 also refuses `github.com/open-platform-model/cli/pkg/inventory`. ADR-009 and ADR-012 get an "Amended" status note recording that the stale set is component-blind and the rename filter is gone (0012:D7). `AGENTS.md` names `opm/k8s/inventory` beside the other tier packages.
+- **Lint and docs.** The `depguard` rule from cli PR 328 also refuses `github.com/open-platform-model/cli/pkg/inventory`. ADR-009 and ADR-012 get an "Amended" status note recording that the stale set is component-blind and the rename filter is gone (0012:D7); the ADR-012 note also records that the inventory digest is the library's canonical encoding. `AGENTS.md` names `opm/k8s/inventory` beside the other tier packages.
 - **Specs.** `pkg-types` no longer lists `pkg/inventory` and states that the inventory entry, stale set and digests are the library's; it keeps every sentence cli PRs 311 and 328 added. `public-inventory-package` is retired. `instance-inventory`, `apply-pruning`, `kernel-render` and `resource-conversion` state the library rules where they stated the cli's own.
 
 User-visible behaviour: every command, message, exit code, apply, prune and delete decision stays the same. Two stored status values change once (Migration note). A debug line (`component rename detected, skipping prune`) is no longer logged, since no entry needs rescuing.
@@ -27,24 +27,23 @@ User-visible behaviour: every command, message, exit code, apply, prune and dele
 
 BREAKING CHANGE: the cli records its inventory and render digests with the library's shared encodings, and no longer exports `pkg/inventory`.
 
-Stored values. On the first `opm instance apply` or `opm module apply` with this release, a CLI-owned ModuleInstance's `status.inventory.digest` and `status.lastAppliedRenderDigest` change, even when no object changed:
+On the first CLI apply with this release (`opm instance apply`, `opm module apply` or `opm operator install`), a CLI-owned ModuleInstance's `status.inventory.digest` and `status.lastAppliedRenderDigest` change once, even when no object changed:
 
 - `status.inventory.digest` hashes a canonical field-by-field encoding of the entries instead of their JSON form;
-- `status.lastAppliedRenderDigest` hashes each object with the `app.kubernetes.io/managed-by` value left out, so it now equals the value the operator records for the same render.
+- `status.lastAppliedRenderDigest` hashes a versioned canonical re-encoding of each object (sorted keys) with the `app.kubernetes.io/managed-by` value left out. Once the operator release that adopts the same package is running, it equals the value the operator records for the same render.
 
-The cli never compares either stored value, so the change triggers no re-apply and no object changes. An older cli writes the old encodings again, so a rollback changes them once more. A tool or script that compares these values across the upgrade sees one change with no inventory or object change behind it. Entry lists, revisions, counts and the other `lastApplied*` digests are unchanged.
+The cli never compares either value, so nothing is re-applied and no object changes. A rollback writes the old encodings again. External comparers must use `opm/k8s/inventory` from library v1.0.0-beta.6 or later.
 
 Go API. Importers of `pkg/inventory` move to `github.com/open-platform-model/library/opm/k8s/inventory`:
 
 | Removed (cli) | Use (library) |
 | --- | --- |
-| `InventoryEntry` | `inventory.Entry` (same fields; no struct tags, so each frontend maps it to its own wire shape) |
-| `NewEntryFromResource` | `inventory.NewEntry` |
+| `InventoryEntry`, `NewEntryFromResource` | `inventory.Entry` (no struct tags), `inventory.NewEntry` |
 | `K8sIdentityEqual` | `inventory.SameObject` |
-| `IdentityEqual` (component-aware) | none: the component-aware identity is retired (0012:D7); compare the fields directly if needed |
-| `ComputeStaleSet`, then the rename filter | `inventory.StaleSet` (component-blind, so no filter) |
-| `ComputeDigest` | `inventory.Digest` (new encoding, see above) |
-| `Inventory`, `K8sIdentity`, `AdmitSet` | none: the cli's record block and apply-guard set are internal to the cli |
+| `IdentityEqual` | none (component-aware identity retired, 0012:D7) |
+| `ComputeStaleSet` and the rename filter | `inventory.StaleSet` |
+| `ComputeDigest` | `inventory.Digest` |
+| `Inventory`, `K8sIdentity`, `AdmitSet` | none (cli-internal) |
 
 ## Not in this change
 
