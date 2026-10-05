@@ -47,29 +47,6 @@ The check SHALL report all failures in one run, not only the first, and SHALL ex
 - **WHEN** the release App pushes to `release-please--branches--main--components--opm` and the push workflow runs
 - **THEN** the push workflow's `lint` job runs the release-pin step against that tree
 
-### Requirement: A moved operator module pin on a release PR needs e2e evidence
-An operator evidence check (G4), whose CI check keeps the name `G4 operator-embed evidence` that the `main` ruleset requires, SHALL run on every pull request against `main`, on open, synchronize, reopen, label and unlabel events, as a job that is never skipped at job level. On a pull request whose branch does not start with `release-please--` it SHALL pass and say the check does not apply. On a release-please pull request it SHALL read the last released cli version from the base branch's `.release-please-manifest.json`, take the tag `v<version>`, and compare the pinned operator module version (`PinnedModuleVersion` in `internal/operator/pin.go`) at that tag with the one in the pull request; a tag that predates the module pin has no module version, which counts as moved. When they are equal it SHALL pass. When they differ it SHALL pass only if the pull request carries the label `e2e-verified`, and otherwise SHALL fail with a message naming both module versions, the tag, `task test:e2e`, the label, and that the check is interim until the cluster-backed e2e job runs on release pull requests in CI. When the tag does not exist, or the pull request's pin cannot be read, the check SHALL fail naming the tag or the file and SHALL NOT pass as unchanged. Source: workspace RELEASING.md, section "Gates".
-
-#### Scenario: Operator unchanged since the last release
-- **WHEN** a release-please PR's `PinnedModuleVersion` equals the one at the last cli tag
-- **THEN** the evidence check passes without looking at labels
-
-#### Scenario: Operator moved without evidence
-- **WHEN** a release-please PR's `PinnedModuleVersion` differs from the one at the last cli tag, or the last tag has no module pin, and the PR has no `e2e-verified` label
-- **THEN** the evidence check fails naming both versions and telling the reviewer to run `task test:e2e` and add `e2e-verified`
-
-#### Scenario: Adding the label re-runs the check
-- **WHEN** a human adds `e2e-verified` to that release-please PR
-- **THEN** the evidence check runs again on the label event and passes
-
-#### Scenario: Ordinary PR passes
-- **WHEN** a pull request from a feature branch changes `PinnedModuleVersion`
-- **THEN** the evidence check passes and states that it applies to release-please PRs only
-
-#### Scenario: Missing last tag fails closed
-- **WHEN** the version in the base branch's `.release-please-manifest.json` has no matching tag
-- **THEN** the evidence check fails naming the missing tag
-
 ### Requirement: Pull requests that move library or the operator warn about missing docs bundles
 
 `pr.yml`'s `lint` job SHALL run the step "Docs bundles for moved pins" on every pull request. The step SHALL fetch the pull request's base commit and run `.github/scripts/docs-pins-check.sh --warn --moved-from <base sha>`. When the `github.com/open-platform-model/library` version in `go.mod` and `PinnedOperatorVersion` in `internal/operator/pin.go` (in `internal/operator/manifest.go` at a base from before the operator module pin) both equal the base's, it SHALL check nothing and say so; a move of `PinnedModuleVersion` alone changes no docs pin. Otherwise it SHALL run `go run ./hack/docskit-dump pins` on the tree and look up each printed pin anonymously at `ghcr.io/open-platform-model/docs/<project>:<pin>`, and SHALL print a GitHub warning annotation, also written to the job summary, for each bundle that is missing (401, 403 or 404), each lookup that fails, a program that does not build, a base commit that cannot be fetched, and a library version or `PinnedOperatorVersion` it cannot read on either side (an empty read never counts as unchanged). Each GHCR request SHALL be bounded (`--connect-timeout 10 --max-time 30`) and the step SHALL have `timeout-minutes: 10` and `continue-on-error: true`, because the `lint` job is a required check. The step SHALL exit zero in every one of those cases, so it never fails the job: the blocking check stays G1 on the release pull request. The step runs with the job's read-only token. Source: security pass 2026-10-04, finding CAS-R2 (the check left the cascade task).

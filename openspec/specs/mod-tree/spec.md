@@ -297,7 +297,7 @@ The command SHALL display instance metadata in the header: instance name, module
 
 ### Requirement: Tree sorts resources within components by weight
 
-Within each component group, resources SHALL be sorted by OPM weight (ascending) and then alphabetically by name. This ensures tree output matches apply order. In practice, this ordering is preserved by maintaining the inventory entry order, which is written in weight-sorted order during `opm mod apply`.
+Within each component group, resources SHALL be sorted by OPM weight (ascending) and then alphabetically by name, with kind, API group and then namespace breaking any remaining tie, so the same inventory always prints in the same order. This ensures tree output matches apply order at weight granularity. The tree SHALL sort when it builds the groups; it SHALL NOT rely on the order of the inventory entries, which follow the render order of the last apply.
 
 #### Scenario: Resources sorted by weight
 
@@ -309,7 +309,10 @@ Within each component group, resources SHALL be sorted by OPM weight (ascending)
 - **WHEN** a component contains two ConfigMaps named `config-a` and `config-z` (both weight 15)
 - **THEN** the tree SHALL display `config-a` before `config-z` (alphabetical)
 
----
+#### Scenario: Inventory order does not decide the tree order
+
+- **WHEN** the inventory of the last apply lists a component's Deployment `web`, Service `web`, ConfigMap `config-z` and ConfigMap `config-a` in that order
+- **THEN** the tree SHALL display ConfigMap `config-a`, ConfigMap `config-z`, Service `web`, Deployment `web`, in the text, JSON and YAML outputs alike
 
 ### Requirement: Tree exit codes match CLI conventions
 

@@ -33,6 +33,13 @@ type ApplyOptions struct {
 	// budget rather than only the wait's share. Zero means the start of the
 	// wait. ApplyOne ignores it.
 	BudgetStart time.Time
+
+	// NewNamespaces names namespaces a dry run treats as created by this
+	// apply although no Namespace object of it says so: the instance
+	// namespace that --create-namespace would create. Apply adds every
+	// Namespace of its first stage whose pre-apply read returned NotFound.
+	// Ignored outside a dry run, and by ApplyOne.
+	NewNamespaces []string
 }
 
 // defaultEstablishTimeout bounds the CustomResourceDefinition wait when the
@@ -53,8 +60,8 @@ type ApplyResult struct {
 	// Unchanged is the number of resources that had no changes.
 	Unchanged int
 
-	// Skipped counts the custom resources a dry run did not send because the
-	// same apply would create their CustomResourceDefinition.
+	// Skipped counts the objects a dry run did not send because the same
+	// apply would create their CustomResourceDefinition or their namespace.
 	Skipped int
 
 	// Errors contains per-resource errors (non-fatal).
@@ -95,7 +102,9 @@ type stageOutcome struct {
 // and returns an error without applying the second stage if the wait fails.
 // The second stage applies everything else. A dry run waits for nothing, and
 // does not send a custom resource whose CustomResourceDefinition the same
-// apply creates: the server cannot validate it yet, so it is logged as
+// apply creates, nor a namespaced object whose namespace the same apply
+// creates (a Namespace of the first stage that did not exist, or one named in
+// opts.NewNamespaces): the server cannot validate it yet, so it is logged as
 // skipped and counted in Skipped. A resource that fails to apply is logged and
 // recorded in Errors, and the remaining resources are still applied.
 // instanceName is used for logging only.
@@ -107,16 +116,16 @@ func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstru
 	SortObjects(sorted, resourceorder.Ascending)
 	definitions, rest := splitClusterDefinitions(sorted)
 
-	applied := applyStage(ctx, client, definitions, opts, nil, result, instanceLog)
+	applied := applyStage(ctx, client, definitions, opts, dryRunSkips{}, result, instanceLog)
 
-	var newKinds map[schema.GroupKind]string
+	var skips dryRunSkips
 	if opts.DryRun {
-		newKinds = kindsOfNewCRDs(applied)
+		skips = dryRunSkips{kinds: kindsOfNewCRDs(applied), namespaces: newNamespaces(applied, opts.NewNamespaces)}
 	} else if err := waitEstablished(ctx, client, applied, opts.EstablishDeadline, opts.BudgetStart, instanceLog); err != nil {
 		return result, err
 	}
 
-	applyStage(ctx, client, rest, opts, newKinds, result, instanceLog)
+	applyStage(ctx, client, rest, opts, skips, result, instanceLog)
 	return result, nil
 }
 
@@ -142,21 +151,44 @@ func splitClusterDefinitions(objs []*unstructured.Unstructured) (definitions, re
 	return definitions, rest
 }
 
+// dryRunSkips is what a dry run's second stage does not send. kinds maps
+// each group and kind to the name of the CustomResourceDefinition this apply
+// creates for it; namespaces holds the namespaces this apply creates.
+type dryRunSkips struct {
+	kinds      map[schema.GroupKind]string
+	namespaces map[string]struct{}
+}
+
+// reason returns the warning for an object the dry run does not send, or ""
+// when it is sent. A custom resource with both reasons is reported once, for
+// its CustomResourceDefinition.
+func (s dryRunSkips) reason(res *unstructured.Unstructured) string {
+	if crdName, ok := s.kinds[res.GroupVersionKind().GroupKind()]; ok {
+		return fmt.Sprintf("skipping %s: its CustomResourceDefinition %s is created by this apply, so a dry run cannot validate it",
+			describeObjects([]*unstructured.Unstructured{res}), crdName)
+	}
+	if ns := res.GetNamespace(); ns != "" {
+		if _, ok := s.namespaces[ns]; ok {
+			return fmt.Sprintf("skipping %s/%s in %s: namespace %s is created by this apply, so a dry run cannot validate it",
+				res.GetKind(), res.GetName(), ns, ns)
+		}
+	}
+	return ""
+}
+
 // applyStage applies objs in order, logging one line per object and
-// recording counts and per-resource errors in result. An object whose group
-// and kind is in skip is not sent: skip maps each such kind to the name of the
-// CustomResourceDefinition this apply creates for it. It returns the objects
+// recording counts and per-resource errors in result. An object skips names
+// is not sent: it is logged as skipped and counted. It returns the objects
 // applied without error.
-func applyStage(ctx context.Context, client *Client, objs []*unstructured.Unstructured, opts ApplyOptions, skip map[schema.GroupKind]string, result *ApplyResult, instanceLog *log.Logger) []stageOutcome {
+func applyStage(ctx context.Context, client *Client, objs []*unstructured.Unstructured, opts ApplyOptions, skips dryRunSkips, result *ApplyResult, instanceLog *log.Logger) []stageOutcome {
 	var applied []stageOutcome
 	for _, res := range objs {
 		kind := res.GetKind()
 		name := res.GetName()
 		ns := res.GetNamespace()
 
-		if crdName, ok := skip[res.GroupVersionKind().GroupKind()]; ok {
-			instanceLog.Warn(fmt.Sprintf("skipping %s: its CustomResourceDefinition %s is created by this apply, so a dry run cannot validate it",
-				describeObjects([]*unstructured.Unstructured{res}), crdName))
+		if reason := skips.reason(res); reason != "" {
+			instanceLog.Warn(reason)
 			result.Skipped++
 			continue
 		}
@@ -237,6 +269,25 @@ func kindsOfNewCRDs(applied []stageOutcome) map[schema.GroupKind]string {
 		kinds[schema.GroupKind{Group: group, Kind: kind}] = o.obj.GetName()
 	}
 	return kinds
+}
+
+// newNamespaces returns the namespaces a dry run treats as created by this
+// apply: named, plus every core Namespace among applied that did not exist
+// before the apply.
+func newNamespaces(applied []stageOutcome, named []string) map[string]struct{} {
+	namespaces := make(map[string]struct{}, len(named))
+	for _, ns := range named {
+		if ns != "" {
+			namespaces[ns] = struct{}{}
+		}
+	}
+	for _, o := range applied {
+		gvk := o.obj.GroupVersionKind()
+		if o.absentBefore && gvk.Group == "" && gvk.Kind == "Namespace" {
+			namespaces[o.obj.GetName()] = struct{}{}
+		}
+	}
+	return namespaces
 }
 
 // ApplyOne performs server-side apply for a single resource.

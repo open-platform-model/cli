@@ -1,10 +1,4 @@
-# Package Types (pkg/)
-
-## Purpose
-
-Defines the exported `pkg/` package structure that makes all shared domain types available for external tools. Replaces the `internal/core/` subpackages with public equivalents.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Core types exported in pkg/
 Shared domain types the CLI owns SHALL be exported under `pkg/` for reuse by external tools. The package structure SHALL be:
@@ -34,10 +28,3 @@ There SHALL be no `pkg/bundle/` package — bundle support is not implemented (e
 - **WHEN** `opm module init` checks that a scaffolded or cloned tree derives its new identity, or reads the version a tree states to create its identity package
 - **THEN** it reads the identity fields (`modulePath`, `version`) from the acquired module's `Metadata`, not from its `Package` value
 - **AND** a clone source whose metadata does not derive the new identity still refuses with the existing "does not derive metadata" refusal
-
-### Requirement: No Component Go type
-There SHALL be no `Component` struct type in `pkg/`. Component information for display purposes SHALL be derived from the `MatchPlan` result or CUE value iteration.
-
-#### Scenario: No component package exists
-- **WHEN** code attempts to import `pkg/component`
-- **THEN** compilation fails — the package does not exist
