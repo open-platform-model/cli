@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	liberrors "github.com/open-platform-model/library/opm/errors"
-	"github.com/open-platform-model/library/opm/helper/objectset"
+	"github.com/open-platform-model/library/opm/k8s/object"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/output"
@@ -203,14 +203,14 @@ func TestPrintValidationError_UsesGroupedFormatting(t *testing.T) {
 // both producing components as details. The words are the library's, so the
 // operator refuses the same module identically; only the split is the CLI's.
 func TestPrintValidationError_DuplicateIdentitiesSplitsHeaderAndRows(t *testing.T) {
-	dupErr := &objectset.DuplicateIdentitiesError{Duplicates: []objectset.Duplicate{{
-		Identity: objectset.Identity{
+	dupErr := &object.DuplicateIdentitiesError{Duplicates: []object.Duplicate{{
+		Identity: object.Identity{
 			APIVersion: "opmodel.dev/v1alpha1",
 			Kind:       "TransformerRegistration",
 			Namespace:  "backup-system",
 			Name:       "backup-system.k8up",
 		},
-		Producers: []objectset.Producer{
+		Producers: []object.Producer{
 			{Component: "registration", Transformer: "opmodel.dev/catalogs/opm/transformers/transformer-registration-transformer@4.4.0"},
 			{Component: "registration-copy", Transformer: "opmodel.dev/catalogs/opm/transformers/transformer-registration-transformer@4.4.0"},
 		},

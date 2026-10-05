@@ -12,7 +12,7 @@ import (
 
 	"cuelang.org/go/cue"
 
-	"github.com/open-platform-model/library/opm/helper/objectset"
+	"github.com/open-platform-model/library/opm/k8s/object"
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
 	"github.com/open-platform-model/library/opm/schema"
@@ -315,8 +315,8 @@ func renderInstance(
 // raise the library's error (0015:D15). Pure over the render output, so it is
 // tested without a render.
 func refuseDuplicateIdentities(out *kernel.RenderResult) error {
-	if dups := objectset.Duplicates(out.Compiled); len(dups) > 0 {
-		return &objectset.DuplicateIdentitiesError{Duplicates: dups}
+	if dups := object.Duplicates(out.Compiled); len(dups) > 0 {
+		return &object.DuplicateIdentitiesError{Duplicates: dups}
 	}
 	return nil
 }
