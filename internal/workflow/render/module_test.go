@@ -277,6 +277,13 @@ func TestFromModule_RendersAgainstModuleDeps(t *testing.T) {
 	assert.Empty(t, result.Warnings, "no skew row against the module's own pins")
 	_, err = os.Stat(config.LegacyPlatformDirPath(configPath))
 	assert.ErrorIs(t, err, os.ErrNotExist)
+
+	// The result's module metadata and values are the fixture's own, read
+	// through Instance.ModuleMetadata and Instance.Values.
+	assert.Equal(t, "module_with_debug_values", result.Module.Name)
+	assert.Equal(t, "example.com/modules/module_with_debug_values@v0", result.Module.ModulePath)
+	assert.Equal(t, "0.1.0", result.Module.Version)
+	assert.Equal(t, map[string]any{"replicas": float64(2), "image": "nginx:1.28"}, result.Values)
 }
 
 // TestFromModule_AbsentClusterPlatformFallsBackToModuleDeps covers "module

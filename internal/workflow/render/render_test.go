@@ -401,3 +401,41 @@ func TestRefuseNamespaceOverride(t *testing.T) {
 		assert.False(t, strings.Contains(details, "0011:"), "no enhancement reference in CLI output")
 	})
 }
+
+// TestModuleMetadataOf pins how the render result carries the embedded
+// module's metadata: the library's decode taken whole, and zero metadata when
+// the instance has no #module or its metadata does not decode as a whole. The
+// last case is the one input where the result differs from the CLI's former
+// best-effort decode, which kept the fields that did decode.
+func TestModuleMetadataOf(t *testing.T) {
+	ctx := cuecontext.New()
+	inst := func(src string) *module.Instance {
+		v := ctx.CompileString(src)
+		require.NoError(t, v.Err())
+		return &module.Instance{Package: v}
+	}
+
+	t.Run("no embedded module", func(t *testing.T) {
+		assert.Equal(t, module.ModuleMetadata{}, moduleMetadataOf(inst(`{}`)))
+	})
+
+	t.Run("concrete metadata", func(t *testing.T) {
+		got := moduleMetadataOf(inst(`#module: metadata: {
+	name:       "demo"
+	modulePath: "example.com/modules/demo@v1"
+	version:    "1.2.0"
+}`))
+		assert.Equal(t, "demo", got.Name)
+		assert.Equal(t, "example.com/modules/demo@v1", got.ModulePath)
+		assert.Equal(t, "1.2.0", got.Version)
+	})
+
+	t.Run("open version gives zero metadata", func(t *testing.T) {
+		got := moduleMetadataOf(inst(`#module: metadata: {
+	name:       "demo"
+	modulePath: "example.com/modules/demo@v1"
+	version:    string
+}`))
+		assert.Equal(t, module.ModuleMetadata{}, got)
+	})
+}
