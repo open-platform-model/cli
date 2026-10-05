@@ -21,6 +21,7 @@ import (
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/operator"
 	"github.com/open-platform-model/cli/internal/output"
+	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
 	"github.com/open-platform-model/cli/internal/workflow/query"
 )
 
@@ -275,43 +276,20 @@ func deleteOperatorOwned(ctx context.Context, k8sClient *kubernetes.Client, inv 
 // A tracked resource discovery could not read (unreadable) is a per-resource
 // failure, so the ModuleInstance is kept and still tracks it.
 func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, dryRun bool, instanceLog *log.Logger) error {
-	instanceLog.Info(fmt.Sprintf("deleting resources in namespace %q", namespace))
-
-	deleteResult, err := kubernetes.Delete(ctx, k8sClient, kubernetes.DeleteOptions{
-		InstanceName:          rsf.InstanceName,
-		Namespace:             namespace,
-		InstanceID:            rsf.InstanceID,
-		InstanceUUID:          recordedUUID(inv),
-		DryRun:                dryRun,
-		InventoryLive:         liveResources,
-		InventoryRecordExists: inv != nil,
-		Unreadable:            inventory.UnreadableResources(unreadable),
+	deleteResult, err := workflowapply.DeleteRecorded(ctx, workflowapply.DeleteRequest{
+		Client:       k8sClient,
+		InstanceName: rsf.InstanceName,
+		InstanceID:   rsf.InstanceID,
+		Namespace:    namespace,
+		Record:       inv,
+		Live:         liveResources,
+		Unreadable:   inventory.UnreadableResources(unreadable),
+		DryRun:       dryRun,
+		Log:          instanceLog,
 	})
 	if err != nil {
-		instanceLog.Error("delete failed", "error", err)
 		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
-
-	for _, lb := range deleteResult.LeftBehind {
-		instanceLog.Warn(output.FormatResourceLine(lb.Kind, lb.Namespace, lb.Name, output.StatusLeftBehind), "reason", lb.Reason)
-	}
-
-	if len(deleteResult.Errors) > 0 {
-		instanceLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(deleteResult.Errors)))
-		for _, e := range deleteResult.Errors {
-			instanceLog.Error(e.Error())
-		}
-	}
-
-	// Delete the ModuleInstance CR last — only after every tracked workload
-	// resource is gone (0006:D1). Skipped on dry-run and on partial
-	// failure (so a re-run can retry the remaining workloads).
-	if !dryRun && inv != nil && len(deleteResult.Errors) == 0 {
-		if err := inventory.DeleteCR(ctx, k8sClient, inv.Name, inv.Namespace); err != nil {
-			instanceLog.Warn("could not delete ModuleInstance CR", "error", err)
-		}
-	}
-
 	return reportInstanceDelete(deleteResult, dryRun, instanceLog)
 }
 
@@ -345,15 +323,6 @@ func reportInstanceDelete(deleteResult *kubernetes.DeleteResult, dryRun bool, in
 		output.Println(output.FormatCheckmark("Instance deleted"))
 	}
 	return nil
-}
-
-// recordedUUID is the instance UUID the ModuleInstance recorded, or empty
-// when there is no record.
-func recordedUUID(inv *inventory.Record) string {
-	if inv == nil {
-		return ""
-	}
-	return inv.InstanceUUID
 }
 
 func confirmInstanceDelete(instanceName, instanceID, namespace string) bool {

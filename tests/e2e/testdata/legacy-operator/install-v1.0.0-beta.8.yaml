@@ -1533,6 +1533,52 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: opm-operator
+  name: opm-operator-modulepackage-viewer-role
+rules:
+- apiGroups:
+  - opmodel.dev
+  resources:
+  - modulepackages
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - opmodel.dev
+  resources:
+  - modulepackages/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: opm-operator
+  name: opm-operator-platform-viewer-role
+rules:
+- apiGroups:
+  - opmodel.dev
+  resources:
+  - platforms
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - opmodel.dev
+  resources:
+  - platforms/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: opm-operator
   name: opm-operator-transformerregistration-admin-role
 rules:
 - apiGroups:
@@ -1544,6 +1590,29 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - opmodel.dev
+  resources:
+  - transformerregistrations/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: opm-operator
+  name: opm-operator-transformerregistration-viewer-role
+rules:
+- apiGroups:
+  - opmodel.dev
+  resources:
+  - transformerregistrations
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - opmodel.dev
   resources:
@@ -1649,7 +1718,7 @@ spec:
         env:
         - name: GOMEMLIMIT
           value: 3276MiB
-        image: ghcr.io/open-platform-model/opm-operator:v1.0.0-beta.7@sha256:c10178d190deb16ede0cc3092a5cfb17dd0278d159b817b4ce4bdba8f1b68455
+        image: ghcr.io/open-platform-model/opm-operator:v1.0.0-beta.8@sha256:6ce599e344558c960b3f9e0fe5531d9ef30b118830dc8b611563172bf1949f68
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:

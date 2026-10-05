@@ -1,17 +1,27 @@
 package operatorcmd
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/modref"
+	oplib "github.com/open-platform-model/cli/internal/operator"
+	"github.com/open-platform-model/cli/internal/operator/operatortest"
+	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/platform"
 	"github.com/open-platform-model/cli/internal/publish"
 )
@@ -38,11 +48,15 @@ func TestNewOperatorInstallCmd(t *testing.T) {
 	for _, flag := range []string{
 		"crds-only", "rbac", "user", "group", "version", "timeout",
 		"kubeconfig", "context", "catalog-prerelease", "skip-platform",
+		"values", "reset-values",
 	} {
 		assert.NotNil(t, cmd.Flags().Lookup(flag), "expected --%s flag", flag)
 	}
 
-	for _, flag := range []string{"catalog-prerelease", "skip-platform"} {
+	assert.Equal(t, "f", cmd.Flags().Lookup("values").Shorthand)
+	assert.Equal(t, "", cmd.Flags().Lookup("version").DefValue, "--version defaults to the pinned module version")
+
+	for _, flag := range []string{"catalog-prerelease", "skip-platform", "reset-values"} {
 		assert.Equal(t, "false", cmd.Flags().Lookup(flag).DefValue,
 			"--%s must default off", flag)
 	}
@@ -85,6 +99,7 @@ func TestInstallFlagsValidate(t *testing.T) {
 			flags:   installFlags{skipPlatform: true, catalogPrerelease: true},
 			wantErr: true,
 		},
+		{name: "values with reset", flags: installFlags{values: []string{"v.cue"}, resetValues: true}},
 	}
 
 	for _, tt := range tests {
@@ -107,18 +122,23 @@ func TestInstallFlagsValidate(t *testing.T) {
 func TestRunOperatorInstallRejectsFlagsBeforeAnyIO(t *testing.T) {
 	cfg := &config.GlobalConfig{Registry: "!!not a registry!!"}
 
-	for _, flags := range []installFlags{
-		{crdsOnly: true, catalogPrerelease: true},
-		{skipPlatform: true, catalogPrerelease: true},
+	for _, c := range []struct {
+		flags installFlags
+		want  string
+	}{
+		{installFlags{crdsOnly: true, catalogPrerelease: true}, "--catalog-prerelease"},
+		{installFlags{skipPlatform: true, catalogPrerelease: true}, "--catalog-prerelease"},
+		{installFlags{crdsOnly: true, values: []string{"values.cue"}}, "--reset-values have no effect with --crds-only"},
+		{installFlags{crdsOnly: true, resetValues: true}, "--reset-values have no effect with --crds-only"},
 	} {
 		err := runOperatorInstall(context.Background(), cfg, &cmdutil.K8sFlags{
 			Kubeconfig: filepath.Join(t.TempDir(), "nonexistent-kubeconfig"),
-		}, flags)
+		}, c.flags)
 
 		var exitErr *opmexit.ExitError
 		require.ErrorAs(t, err, &exitErr)
 		assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
-		assert.Contains(t, err.Error(), "--catalog-prerelease")
+		assert.Contains(t, err.Error(), c.want)
 	}
 }
 
@@ -143,4 +163,141 @@ func TestCatalogResolveErrorMapping(t *testing.T) {
 
 	require.ErrorAs(t, catalogResolveError(errors.New("boom")), &exitErr)
 	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
+}
+
+// captureLogs routes the log stream into a buffer for the test's duration.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	output.SetupLogging(output.LogConfig{})
+	output.SetLogWriter(&buf)
+	t.Cleanup(func() { output.SetupLogging(output.LogConfig{}) })
+	return &buf
+}
+
+// mirrorRegistry serves the pinned operator module version and 0.2.0 from
+// an in-memory registry that is the only registry the mapping names.
+func mirrorRegistry(t *testing.T) string {
+	t.Helper()
+	return operatortest.Registry(t,
+		operatortest.Version{Module: oplib.PinnedModuleVersion, Operator: strings.TrimPrefix(oplib.PinnedOperatorVersion, "v")},
+		operatortest.Version{Module: "0.2.0", Operator: "1.0.0-beta.8"},
+	)
+}
+
+// installWithoutCluster runs install with --skip-platform against a
+// kubeconfig that does not exist, so it stops at the first cluster step.
+func installWithoutCluster(t *testing.T, registry string, flags installFlags) error {
+	t.Helper()
+	flags.skipPlatform = true
+	return runOperatorInstall(context.Background(), &config.GlobalConfig{Registry: registry}, &cmdutil.K8sFlags{
+		Kubeconfig: filepath.Join(t.TempDir(), "nonexistent-kubeconfig"),
+	}, flags)
+}
+
+// "Old-style operator tag": refused before any cluster call, saying what
+// --version takes now.
+func TestRunOperatorInstall_OldOperatorTagIsRefusedBeforeTheCluster(t *testing.T) {
+	reg := mirrorRegistry(t)
+	for _, old := range []string{"v1.0.0-beta.5", "1.0.0-beta.5"} {
+		err := installWithoutCluster(t, reg, installFlags{version: old})
+		var exitErr *opmexit.ExitError
+		require.ErrorAs(t, err, &exitErr, old)
+		assert.Equal(t, opmexit.ExitValidationError, exitErr.Code, old)
+		assert.Contains(t, err.Error(), "--version now takes an operator module version", old)
+		assert.NotContains(t, err.Error(), "kubeconfig", old)
+	}
+}
+
+// "Mirror only" and "Default install uses the pin", up to the cluster: the
+// module and the operator version it deploys resolve through a mapping that
+// names only the mirror, and the output names both versions.
+func TestRunOperatorInstall_ResolvesThroughAMirrorOnly(t *testing.T) {
+	logs := captureLogs(t)
+	reg := mirrorRegistry(t)
+
+	err := installWithoutCluster(t, reg, installFlags{})
+	require.Error(t, err, "the missing kubeconfig stops it after resolution")
+	assert.Contains(t, logs.String(), "operator module opmodel.dev/modules/opm_operator "+oplib.PinnedModuleVersion+" (pinned; deploys opm-operator "+oplib.PinnedOperatorVersion+")")
+
+	logs.Reset()
+	_ = installWithoutCluster(t, reg, installFlags{version: "0.2.0"})
+	assert.Contains(t, logs.String(), "opm_operator 0.2.0 (--version 0.2.0; deploys opm-operator v1.0.0-beta.8)")
+}
+
+// An unreachable registry exits 3 and names the mirror fix.
+func TestRunOperatorInstall_UnreachableRegistry(t *testing.T) {
+	err := installWithoutCluster(t, "opmodel.dev=127.0.0.1:1+insecure", installFlags{})
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitConnectivityError, exitErr.Code)
+	assert.Contains(t, err.Error(), "--registry or OPM_REGISTRY")
+	assert.Contains(t, err.Error(), oplib.OperatorModulePath)
+}
+
+func TestInstallErrorMapping(t *testing.T) {
+	cases := []struct {
+		err  error
+		code int
+	}{
+		{&oplib.TargetError{ModuleVersion: "v0.4.0", Rule: "newer"}, opmexit.ExitValidationError},
+		{&oplib.VersionError{ModuleVersion: "v0.4.0", Reason: "none"}, opmexit.ExitValidationError},
+		{&oplib.GuardError{Err: errors.New("exists")}, opmexit.ExitValidationError},
+		{&oplib.OwnedRecordError{}, opmexit.ExitValidationError},
+		{&modref.RefusalError{Refusal: publish.Refusal{Headline: "no such version"}}, opmexit.ExitValidationError},
+		{&publish.ConnectivityError{Op: "listing", Err: errors.New("refused")}, opmexit.ExitConnectivityError},
+		{&oplib.RolloutError{Err: errors.New("timed out")}, opmexit.ExitGeneralError},
+		{&opmexit.ExitError{Code: opmexit.ExitPermissionDenied, Err: errors.New("denied")}, opmexit.ExitPermissionDenied},
+		{&oplib.MigrationRefusalError{Blocks: []oplib.MigrationBlock{{Kind: "Deployment", Name: "x", Reason: "unproven"}}}, opmexit.ExitValidationError},
+		{&oplib.MigrationStoppedError{Step: "deleting x", Err: errors.New("conflict")}, opmexit.ExitGeneralError},
+		{&oplib.MigrationReadError{Kind: "ClusterRole", Name: "x", Err: apierrors.NewForbidden(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "x", errors.New("no get"))}, opmexit.ExitPermissionDenied},
+		// The rerun hint keeps the code of the error it wraps.
+		{withRerunHint(&oplib.InstallResult{CRDs: 4}, &oplib.RolloutError{Err: errors.New("timed out")}), opmexit.ExitGeneralError},
+	}
+	for _, c := range cases {
+		var exitErr *opmexit.ExitError
+		require.ErrorAs(t, installError(c.err), &exitErr, c.err.Error())
+		assert.Equal(t, c.code, exitErr.Code, c.err.Error())
+	}
+}
+
+// A failure after the CRD step says install is safe to re-run; one before
+// it, or a stopped migration that says how to complete itself, does not.
+func TestWithRerunHint(t *testing.T) {
+	const hint = "(install is idempotent, safe to re-run)"
+	failed := errors.New("apply failed")
+
+	err := withRerunHint(&oplib.InstallResult{CRDs: 4}, failed)
+	assert.ErrorIs(t, err, failed)
+	assert.Contains(t, err.Error(), hint)
+
+	assert.Same(t, failed, withRerunHint(nil, failed), "no result")
+	assert.Same(t, failed, withRerunHint(&oplib.InstallResult{}, failed), "the CRD step did not run")
+
+	stopped := &oplib.MigrationStoppedError{Step: "deleting x", Err: failed}
+	assert.Same(t, error(stopped), withRerunHint(&oplib.InstallResult{CRDs: 4}, stopped))
+	assert.NotContains(t, withRerunHint(&oplib.InstallResult{CRDs: 4}, stopped).Error(), hint)
+}
+
+// The operator's instance renders under its fixed name and namespace,
+// from the merged values only, against the module's own pins.
+func TestModuleRenderOpts(t *testing.T) {
+	cfg := &config.GlobalConfig{}
+	k8s := &config.ResolvedKubernetesConfig{}
+	res := &modref.Resolution{Path: oplib.OperatorModulePath, Version: "v0.1.0"}
+	values := kernel.Source{Origin: "merged values"}
+
+	opts := moduleRenderOpts(cfg, k8s, res, values)
+
+	assert.Same(t, res, opts.Published)
+	assert.Equal(t, oplib.OperatorInstanceName, opts.Name)
+	assert.Equal(t, oplib.OperatorNamespace, opts.Namespace)
+	assert.True(t, opts.DepsOnly, "the render never reads a Platform")
+	require.Len(t, opts.Values, 1)
+	assert.Equal(t, "merged values", opts.Values[0].Origin)
+	assert.Empty(t, opts.ValuesFiles)
+	assert.Empty(t, opts.PlatformFlag)
+	assert.Nil(t, opts.ClusterPlatform)
+	assert.Same(t, cfg, opts.Config)
+	assert.Same(t, k8s, opts.K8sConfig)
 }

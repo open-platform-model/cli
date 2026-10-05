@@ -42,6 +42,14 @@ type Options struct {
 	// readiness wait (Wait). Zero uses inventory.DefaultReconcileTimeout.
 	Timeout time.Duration
 
+	// SkipOperatorCeiling skips the operator-version ceiling gate. Only
+	// `opm operator install` sets it, for the operator's own instance:
+	// install replaces the operator the Platform reports rather than driving
+	// it, and applies the same MAJOR.MINOR rule to the operator it installs
+	// (0021:D9:R3, 0021:D9:R4). The CRD presence and field-floor gates still
+	// run.
+	SkipOperatorCeiling bool
+
 	// SkipUnprovided is the command's --skip-unprovided. An operator-managed
 	// instance refuses it: the operator renders that instance and never
 	// skips.
@@ -53,6 +61,10 @@ type Request struct {
 	K8sClient *kubernetes.Client
 	Log       *log.Logger
 	Options   Options
+	// Admit are existing objects the first-install existence check lets
+	// pass its untracked test. Only `opm operator install` sets it, to the
+	// objects its migration proved; nil for every other apply.
+	Admit inventory.AdmitSet
 }
 
 func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orchestration for apply flow spans gates, apply, prune, and CR spec+status writes
@@ -75,7 +87,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	// Pre-apply gates 1-3 (cluster probes). Skipped entirely on dry-run — they
 	// exist to protect writes, and a dry-run writes nothing (0006:D5).
 	if !dryRun {
-		if err := RunClusterGates(ctx, req.K8sClient); err != nil {
+		if err := RunClusterGates(ctx, req.K8sClient, req.Options.SkipOperatorCeiling); err != nil {
 			// Not Printed: the gates return bare errors without logging, so
 			// claiming otherwise makes a missing CRD exit silently.
 			return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err}
@@ -130,7 +142,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 	// Gate 6: existence check, first-ever apply only (no previous inventory).
 	hasPrevInventory := prevRecord != nil || legacy != nil
-	if err := RunPreApplyExistenceCheck(ctx, req.K8sClient, hasPrevInventory, dryRun, currentEntries); err != nil {
+	if err := RunPreApplyExistenceCheck(ctx, req.K8sClient, hasPrevInventory, dryRun, currentEntries, req.Admit); err != nil {
 		return err
 	}
 
@@ -251,13 +263,18 @@ func logLeftBehind(protected []inventory.InventoryEntry, instanceLog *log.Logger
 }
 
 // RunClusterGates runs the read-only pre-apply cluster gates in order: CRD
-// presence, CRD field floor, operator-version ceiling.
-func RunClusterGates(ctx context.Context, client *kubernetes.Client) error {
+// presence, CRD field floor, operator-version ceiling. skipCeiling skips the
+// last, for the operator's own install only (Options.SkipOperatorCeiling).
+func RunClusterGates(ctx context.Context, client *kubernetes.Client, skipCeiling bool) error {
 	if err := inventory.GateCRDPresent(ctx, client); err != nil {
 		return err
 	}
 	if err := inventory.GateCRDFieldFloor(ctx, client); err != nil {
 		return err
+	}
+	if skipCeiling {
+		output.Debug("operator-version ceiling skipped: the operator's own install checks its target instead")
+		return nil
 	}
 	return inventory.GateOperatorVersionCeiling(ctx, client, version.Version)
 }
@@ -451,11 +468,11 @@ func GuardEmptyRender(resourceCount int, prevEntries []inventory.InventoryEntry,
 	return nil
 }
 
-func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, hasPrevInventory, dryRun bool, currentEntries []inventory.InventoryEntry) error {
+func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, hasPrevInventory, dryRun bool, currentEntries []inventory.InventoryEntry, admit inventory.AdmitSet) error {
 	if hasPrevInventory || dryRun {
 		return nil
 	}
-	if err := inventory.PreApplyExistenceCheck(ctx, k8sClient, currentEntries); err != nil {
+	if err := inventory.PreApplyExistenceCheck(ctx, k8sClient, currentEntries, admit); err != nil {
 		return fmt.Errorf("pre-apply existence check failed: %w", err)
 	}
 	return nil

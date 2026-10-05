@@ -1,9 +1,10 @@
-# Operator-embed evidence (G4), workspace RELEASING.md, section "Gates".
+# Operator evidence (G4; the check keeps the name "G4 operator-embed evidence"
+# the main ruleset requires), workspace RELEASING.md, section "Gates".
 #
 # Interim: this whole workflow is retired once the cluster-backed e2e CI job
-# (cli change add-embedded-operator-e2e-job) has merged, has passed on a cli
-# release PR, and is a required check. Until then, a release-please PR whose
-# embedded opm-operator moved since the last cli release needs the label
+# runs on cli release PRs and is a required check. Until then, a
+# release-please PR whose pinned operator module (PinnedModuleVersion in
+# internal/operator/pin.go) moved since the last cli release needs the label
 # e2e-verified, added by a human after `task test:e2e`.
 #
 # The job always runs and decides in its step (a skipped job would read as a

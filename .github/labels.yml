@@ -141,7 +141,7 @@
 
 - name: "e2e-verified"
   color: "0e8a16"
-  description: "A human ran task test:e2e against the embedded operator (G4)"
+  description: "A human ran task test:e2e against the pinned operator module (G4)"
 
 # ---------------------------------------------------------------------------
 # Managed by bots (listed so the sync never deletes them). Colors and

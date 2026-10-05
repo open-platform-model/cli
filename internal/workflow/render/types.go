@@ -118,6 +118,21 @@ type ModuleOpts struct {
 	// ValuesFiles, when non-empty, override the module's debugValues.
 	ValuesFiles []string
 
+	// Values, when non-empty, are the values sources used instead of
+	// ValuesFiles and debugValues, checked against #config before synthesis
+	// like -f files. Operator install hands its merged values here.
+	Values []kernel.Source
+
+	// Namespace, when set, is the synthetic instance's namespace, taking
+	// precedence over the --namespace flag and the environment.
+	Namespace string
+
+	// DepsOnly renders against the module's own dependency pins only: no
+	// --platform and no cluster Platform read, whatever PlatformFlag and
+	// ClusterPlatform hold. Operator install sets it, so repairing the
+	// operator never depends on the Platform it serves.
+	DepsOnly bool
+
 	// Name overrides the synthetic metadata.name. Empty falls back to
 	// "<module.metadata.name>-debug".
 	Name string

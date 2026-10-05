@@ -1,0 +1,15 @@
+# Enhancement declaration, read by `task enhancements:delivery:log` at archive time.
+# See enhancements/schema.cue #ChangeDeclaration.
+#
+# Amendments merged in enhancements PR #94 (checked 2026-10-04 on main).
+#
+# This change delivers 0012:D8:R6 (install admits, as if adopted, exactly the
+# proven objects of an earlier operator manifest) and 0012:D8:R7 (install
+# deletes only the proven earlier Deployment and the superseded role
+# bindings). D8 is not claimed: the schema allows a decision number only when
+# the change delivers the decision whole, and R1 to R5 (the guard on every
+# apply, the adopt annotation, the ModulePackage identity) belong to other
+# changes. Cite R6/R7 in the delivery summary instead.
+implements:
+  - enhancement: "0012"
+    resolves: []

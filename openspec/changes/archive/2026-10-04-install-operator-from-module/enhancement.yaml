@@ -1,0 +1,22 @@
+# Enhancement declaration, read by `task enhancements:delivery:log` at archive time.
+# See enhancements/schema.cue #ChangeDeclaration.
+#
+# Amendments merged in enhancements PR #94 (checked 2026-10-04 on main).
+#
+# D9: R1/R2 (MAJOR.MINOR ceiling) were delivered earlier; this change lands
+# R3 (install is not refused by the running operator's ceiling) and R4
+# (install refuses a target module whose operator is above the CLI), which
+# completes D9.
+#
+# D11: this change lands R1, R2, R6, R7, R8, R10 and R11. R9 is the
+# operator's (opm-operator PR #211, merged, in v1.0.0-beta.6 and later);
+# R3, R4, R5 and R12 are the module release's (opm-operator
+# release-operator-module, PR #221). D11 is complete only when #221 has
+# merged; re-check that before archiving, and drop D11 from `decisions`
+# (citing R1/R2/R6/R7/R8/R10/R11 in the delivery summary) if it has not.
+#
+# 0012:D8:R6/R7 belong to migrate-manifest-installed-operator; not claimed.
+implements:
+  - enhancement: "0021"
+    decisions: [D9, D11]
+    resolves: []
