@@ -65,10 +65,6 @@ type Request struct {
 	K8sClient *kubernetes.Client
 	Log       *log.Logger
 	Options   Options
-	// Admit are existing objects the first-install existence check lets
-	// pass its untracked test. Only `opm operator install` sets it, to the
-	// objects its migration proved; nil for every other apply.
-	Admit inventory.AdmitSet
 }
 
 func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orchestration for apply flow spans gates, apply, prune, and CR spec+status writes
@@ -152,7 +148,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 	// Gate 6: existence check, first-ever apply only (no previous inventory).
 	hasPrevInventory := prevRecord != nil || legacy != nil
-	if err := RunPreApplyExistenceCheck(ctx, req.K8sClient, hasPrevInventory, dryRun, currentEntries, req.Admit); err != nil {
+	if err := RunPreApplyExistenceCheck(ctx, req.K8sClient, hasPrevInventory, dryRun, currentEntries); err != nil {
 		return err
 	}
 
@@ -485,11 +481,11 @@ func GuardEmptyRender(resourceCount int, prevEntries []k8sinventory.Entry, force
 	return nil
 }
 
-func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, hasPrevInventory, dryRun bool, currentEntries []k8sinventory.Entry, admit inventory.AdmitSet) error {
+func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, hasPrevInventory, dryRun bool, currentEntries []k8sinventory.Entry) error {
 	if hasPrevInventory || dryRun {
 		return nil
 	}
-	if err := inventory.PreApplyExistenceCheck(ctx, k8sClient, currentEntries, admit); err != nil {
+	if err := inventory.PreApplyExistenceCheck(ctx, k8sClient, currentEntries); err != nil {
 		return fmt.Errorf("pre-apply existence check failed: %w", err)
 	}
 	return nil

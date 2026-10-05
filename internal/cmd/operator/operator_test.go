@@ -10,8 +10,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/open-platform-model/library/opm/kernel"
 
@@ -195,17 +193,16 @@ func installWithoutCluster(t *testing.T, registry string, flags installFlags) er
 	}, flags)
 }
 
-// "Old-style operator tag": refused before any cluster call, saying what
-// --version takes now.
-func TestRunOperatorInstall_OldOperatorTagIsRefusedBeforeTheCluster(t *testing.T) {
+// A --version the registry does not serve, or that is not a version
+// selector, is refused before any cluster call.
+func TestRunOperatorInstall_UnservedVersionIsRefusedBeforeTheCluster(t *testing.T) {
 	reg := mirrorRegistry(t)
-	for _, old := range []string{"v1.0.0-beta.5", "1.0.0-beta.5"} {
-		err := installWithoutCluster(t, reg, installFlags{version: old})
+	for _, v := range []string{"v1.0.0-beta.5", "1.0.0-beta.5"} {
+		err := installWithoutCluster(t, reg, installFlags{version: v})
 		var exitErr *opmexit.ExitError
-		require.ErrorAs(t, err, &exitErr, old)
-		assert.Equal(t, opmexit.ExitValidationError, exitErr.Code, old)
-		assert.Contains(t, err.Error(), "--version now takes an operator module version", old)
-		assert.NotContains(t, err.Error(), "kubeconfig", old)
+		require.ErrorAs(t, err, &exitErr, v)
+		assert.Equal(t, opmexit.ExitValidationError, exitErr.Code, v)
+		assert.NotContains(t, err.Error(), "kubeconfig", v)
 	}
 }
 
@@ -248,9 +245,6 @@ func TestInstallErrorMapping(t *testing.T) {
 		{&publish.ConnectivityError{Op: "listing", Err: errors.New("refused")}, opmexit.ExitConnectivityError},
 		{&oplib.RolloutError{Err: errors.New("timed out")}, opmexit.ExitGeneralError},
 		{&opmexit.ExitError{Code: opmexit.ExitPermissionDenied, Err: errors.New("denied")}, opmexit.ExitPermissionDenied},
-		{&oplib.MigrationRefusalError{Blocks: []oplib.MigrationBlock{{Kind: "Deployment", Name: "x", Reason: "unproven"}}}, opmexit.ExitValidationError},
-		{&oplib.MigrationStoppedError{Step: "deleting x", Err: errors.New("conflict")}, opmexit.ExitGeneralError},
-		{&oplib.MigrationReadError{Kind: "ClusterRole", Name: "x", Err: apierrors.NewForbidden(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "x", errors.New("no get"))}, opmexit.ExitPermissionDenied},
 		// The rerun hint keeps the code of the error it wraps.
 		{withRerunHint(&oplib.InstallResult{CRDs: 4}, &oplib.RolloutError{Err: errors.New("timed out")}), opmexit.ExitGeneralError},
 	}
@@ -262,7 +256,7 @@ func TestInstallErrorMapping(t *testing.T) {
 }
 
 // A failure after the CRD step says install is safe to re-run; one before
-// it, or a stopped migration that says how to complete itself, does not.
+// it does not.
 func TestWithRerunHint(t *testing.T) {
 	const hint = "(install is idempotent, safe to re-run)"
 	failed := errors.New("apply failed")
@@ -273,10 +267,6 @@ func TestWithRerunHint(t *testing.T) {
 
 	assert.Same(t, failed, withRerunHint(nil, failed), "no result")
 	assert.Same(t, failed, withRerunHint(&oplib.InstallResult{}, failed), "the CRD step did not run")
-
-	stopped := &oplib.MigrationStoppedError{Step: "deleting x", Err: failed}
-	assert.Same(t, error(stopped), withRerunHint(&oplib.InstallResult{CRDs: 4}, stopped))
-	assert.NotContains(t, withRerunHint(&oplib.InstallResult{CRDs: 4}, stopped).Error(), hint)
 }
 
 // The operator's instance renders under its fixed name and namespace,

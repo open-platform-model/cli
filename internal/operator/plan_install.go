@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
-	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -16,7 +14,6 @@ import (
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/modref"
-	"github.com/open-platform-model/cli/internal/publish"
 	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
 )
@@ -69,66 +66,27 @@ type Plan struct {
 	Values     *Values
 	CRDsOnly   bool
 	Extra      []*unstructured.Unstructured
-	// Migration is the migration of an operator installed from an earlier
-	// release manifest; it plans no write on a cluster with nothing to
-	// migrate.
-	Migration *MigrationPlan
 	// BudgetStart and Timeout are the --timeout budget the writes share.
 	BudgetStart time.Time
 	Timeout     time.Duration
 }
 
-// operatorTagShape is the shape of an opm-operator release tag.
-var operatorTagShape = regexp.MustCompile(`^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$`)
-
-// looksLikeOperatorTag reports whether a --version value is shaped like an
-// opm-operator release tag rather than an operator module version: a
-// "v"-prefixed release, or a release on a major above the module's v0.
-func looksLikeOperatorTag(version string) bool {
-	if operatorTagShape.MatchString(version) {
-		return true
-	}
-	return operatorTagShape.MatchString("v"+version) && !strings.HasPrefix(version, "0.")
-}
-
-// operatorTagRefusal is the refusal for an old-style --version value.
-func operatorTagRefusal(version string, cause error) error {
-	r := publish.Refusal{
-		Headline: fmt.Sprintf("no operator module version matches %q: --version now takes an operator module version (for example %s), not an opm-operator release tag",
-			version, PinnedModuleVersion),
-		Action: "Pass a version of " + OperatorModulePath + "; install prints the operator release it deploys.",
-	}
-	var mr *modref.RefusalError
-	if errors.As(cause, &mr) {
-		r.Evidence = mr.Refusal.Evidence
-	}
-	return &modref.RefusalError{Refusal: r}
-}
-
 // ResolveTarget resolves the module version install deploys, the pin when
 // version is empty, and reads the operator release it states, all before any
 // cluster call. A selector the registry cannot satisfy is a
-// *modref.RefusalError (worded for an old operator tag when it looks like
-// one), an unreadable operator version a *VersionError, a registry that
-// cannot be reached a *publish.ConnectivityError.
+// *modref.RefusalError, an unreadable operator version a *VersionError, a
+// registry that cannot be reached a *publish.ConnectivityError.
 func ResolveTarget(ctx context.Context, src ModuleRegistry, registry, version string) (*modref.Resolution, Target, error) {
 	sel := modref.Selector{Exact: PinnedModuleVersion}
 	if version != "" {
 		var err error
 		sel, err = modref.ParseSelector(version)
 		if err != nil {
-			if looksLikeOperatorTag(version) {
-				return nil, Target{}, operatorTagRefusal(version, err)
-			}
 			return nil, Target{}, err
 		}
 	}
 	res, err := modref.Resolve(ctx, src, modref.Request{Path: OperatorModulePath, Selector: sel, Registry: registry})
 	if err != nil {
-		var mr *modref.RefusalError
-		if version != "" && errors.As(err, &mr) && looksLikeOperatorTag(version) {
-			return nil, Target{}, operatorTagRefusal(version, err)
-		}
 		return nil, Target{}, err
 	}
 	opVersion, err := ReadOperatorVersion(ctx, src, res.Version)
@@ -173,9 +131,8 @@ func (e *GuardError) Unwrap() error { return e.Err }
 // writes nothing: the record read, the values merge, the render (which
 // checks the values against the target's #config), the target rules
 // (CheckTarget), the status-subresource permission check, the wait for
-// terminating objects, the migration proof of an operator installed from an
-// earlier release manifest and, last, the apply guard over every object the
-// plan applies when no record exists yet. The terminating wait starts the
+// terminating objects and, last, the apply guard over every object the plan
+// applies when no record exists yet. The terminating wait starts the
 // --timeout budget the writes then share.
 func PlanInstall(ctx context.Context, env InstallEnv, res *modref.Resolution, target Target, opts PlanOptions) (*Plan, error) {
 	rec, err := inventory.GetRecord(ctx, env.Client, OperatorInstanceName, OperatorNamespace)
@@ -220,20 +177,11 @@ func PlanInstall(ctx context.Context, env InstallEnv, res *modref.Resolution, ta
 		return nil, err
 	}
 
-	// The migration proof (0012:D8:R6): which existing objects came from an
-	// earlier operator manifest. It runs before the guard, which would
-	// otherwise refuse the first of them.
-	plan.Migration, err = PlanMigration(ctx, env.Client, plan.Objects(), result.Instance.UUID, opts.CRDsOnly)
-	if err != nil {
-		return nil, err
-	}
-
 	// The apply guard, the last check: on a cluster with no record every
-	// object the plan applies must be absent, already OPM's, or admitted by
-	// the migration's proof.
+	// object the plan applies must be absent or already OPM's.
 	if rec == nil {
 		entries := workflowapply.CurrentInventoryEntries(plan.Objects())
-		if err := inventory.PreApplyExistenceCheck(ctx, env.Client, entries, plan.Migration.Admit()); err != nil {
+		if err := inventory.PreApplyExistenceCheck(ctx, env.Client, entries); err != nil {
 			return nil, &GuardError{Err: err}
 		}
 	}

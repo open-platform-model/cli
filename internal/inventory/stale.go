@@ -21,17 +21,11 @@ import (
 //
 // For each rendered resource entry, a GET is performed:
 //   - If the resource exists with a deletionTimestamp → error (terminating)
-//   - If the resource exists without OPM managed-by label → error (untracked),
-//     unless admit holds it
+//   - If the resource exists without OPM managed-by label → error (untracked)
 //   - If the resource does not exist → OK
 //
-// admit passes the untracked test only, never the terminating one. Only
-// `opm operator install` passes a non-empty set: the objects it proved came
-// from an earlier operator release manifest, or that carry the operator
-// instance's identity (0012:D8:R6). Every other caller passes nil.
-//
 // This check should be skipped entirely when a previous inventory exists.
-func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entries []k8sinventory.Entry, admit AdmitSet) error {
+func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entries []k8sinventory.Entry) error {
 	for _, entry := range entries {
 		gvr := schema.GroupVersionResource{
 			Group:    entry.Group,
@@ -63,7 +57,7 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 		// Accepts any known OPM actor value (opm-cli, opm-controller, or
 		// legacy open-platform-model) for backward compatibility.
 		labels := unstrObj.GetLabels()
-		if !opmlabels.IsOPMManagedBy(labels[opmlabels.ManagedBy]) && !admit.Has(entry) {
+		if !opmlabels.IsOPMManagedBy(labels[opmlabels.ManagedBy]) {
 			return fmt.Errorf("resource %s/%s in namespace %q already exists and is not managed by OPM — remove or rename it, or change the module to render a different name",
 				entry.Kind, entry.Name, entry.Namespace)
 		}

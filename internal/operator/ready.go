@@ -36,11 +36,8 @@ func (e *NotReadyError) Error() string {
 // a timeout.
 //
 // It locates the operator by its fixed names (names.go) and reads nothing
-// else: no embedded manifest, no instance record, no Namespace. Those names
-// hold for every operator release since v1.0.0-alpha.18 and for the operator
-// module, so a manifest install and a module install are found alike. Any read
-// that fails counts that object as not ready, so a caller proceeds only on a
-// positive finding.
+// else: no instance record, no Namespace. Any read that fails counts that
+// object as not ready, so a caller proceeds only on a positive finding.
 func CheckReady(ctx context.Context, client *kubernetes.Client) error {
 	pending := pendingObjects(ctx, client, fixedTargets(), DefaultPredicate)
 	if len(pending) == 0 {
