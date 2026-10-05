@@ -1,6 +1,6 @@
 # Tasks: rename-operator-command-to-controller
 
-Same PR as `retire-legacy-manifest-migration`, after it. Workers never push, tag or release, never run the e2e suite and never touch a cluster.
+Ships as its own PR after `retire-legacy-manifest-migration` has merged, and only after the controller release, its module 0.1.0 and its docs bundle are published (gate G-PUB). Workers never push, tag or release, never run the e2e suite and never touch a cluster.
 
 **Local gate:** `task fmt`, `task lint`, unit tests (`go test ./internal/... ./pkg/... ./hack/...`), `go vet -tags e2e ./tests/e2e/`, every `tests/integration/*/main.go` builds, `task cascade:wiring:check`, `CASCADE_TEST_SET=offline task -x deps:cascade:test`, `task docs:bundle:check`, `task openspec:check`.
 

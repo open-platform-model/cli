@@ -1,0 +1,9 @@
+# Delivers the cli side of 0032:D1: the owner enum without `operator` (R1),
+# the version ceiling reading only `controllerVersion` (R3), `opm controller`
+# with no alias (R4), the install coordinates (R5), no former name read or
+# written (R6) and the product vocabulary in help and messages (R7). R2
+# (handoff writes owner `controller`) is the controller's side.
+implements:
+  - enhancement: "0032"
+    decisions: [D1]
+    resolves: []

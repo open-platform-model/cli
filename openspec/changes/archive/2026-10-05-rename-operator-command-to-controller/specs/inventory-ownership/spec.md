@@ -41,7 +41,7 @@ The mapping from `spec.owner` to a CLI execution mode SHALL be implemented in ex
 
 ### Requirement: spec.owner names the instance owner
 
-Instance ownership SHALL be determined from the `ModuleInstance` CR's `spec.owner` field. A CR the CLI writes SHALL always carry `spec.owner: cli` explicitly. For reads: an absent CR or `spec.owner: cli` SHALL resolve to CLI-executor mode; `spec.owner: controller` SHALL resolve to controller-owned. (An absent or empty `spec.owner` on an existing CR means controller-managed by the controller's own defaulting contract; the CLI SHALL treat any value other than `cli` as controller-owned.)
+Instance ownership SHALL be determined from the `ModuleInstance` CR's `spec.owner` field. A CR the CLI writes SHALL always carry `spec.owner: cli` explicitly. For reads: an absent CR or `spec.owner: cli` SHALL resolve to CLI-executor mode; `spec.owner: controller` SHALL resolve to controller-owned. (An absent or empty `spec.owner` on an existing CR means controller-managed by the controller's own defaulting contract; the CLI SHALL treat any value other than `cli` as controller-owned.) Source: 0032:D1:R1, 0032:D1:R6.
 
 #### Scenario: CLI-owned instance
 
