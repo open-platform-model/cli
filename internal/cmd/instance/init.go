@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"cuelang.org/go/mod/module"
+	"github.com/open-platform-model/library/opm/kernel"
+	libmodule "github.com/open-platform-model/library/opm/module"
 	"github.com/spf13/cobra"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
@@ -279,13 +281,9 @@ func initPackage(ctx context.Context, cfg *config.GlobalConfig, in *initInputs) 
 		return initError(err)
 	}
 
-	k := config.NewKernel(cfg.Registry)
-	mod, err := k.AcquireModuleFromRegistry(ctx, res.Import(), res.Version)
+	mod, err := acquireModule(ctx, config.NewKernel(cfg.Registry), modVersion, route)
 	if err != nil {
-		if cuemod.IsConnectivityError(err) {
-			return initError(&publish.ConnectivityError{Op: fmt.Sprintf("fetching %s (registry %s)", modVersion, route), Err: err})
-		}
-		return initError(fmt.Errorf("loading %s: %w", modVersion, err))
+		return initError(err)
 	}
 
 	values, source, err := instinit.PickValues(mod.Package)
@@ -310,6 +308,20 @@ func initPackage(ctx context.Context, cfg *config.GlobalConfig, in *initInputs) 
 
 	report(in.dir, source, instinit.IsEmpty(values))
 	return nil
+}
+
+// acquireModule acquires the resolved module through the kernel. A registry
+// that gave no response is a *publish.ConnectivityError (exit 3); any other
+// failure, a registry answer among them, is "loading <module>" (exit 1).
+func acquireModule(ctx context.Context, k *kernel.Kernel, mv module.Version, route string) (*libmodule.Module, error) {
+	mod, err := k.AcquireModuleFromRegistry(ctx, mv.Path(), mv.Version())
+	if err != nil {
+		if cuemod.IsConnectivityError(err) {
+			return nil, &publish.ConnectivityError{Op: fmt.Sprintf("fetching %s (registry %s)", mv, route), Err: err}
+		}
+		return nil, fmt.Errorf("loading %s: %w", mv, err)
+	}
+	return mod, nil
 }
 
 // corePin reads the module's own opmodel.dev/core dependency from its

@@ -84,7 +84,7 @@ func compatScan(opts Options, repo string, versions []string, lineIsPrerelease b
 			if len(unresolved) == 0 {
 				break
 			}
-			pkgVal, found, err := loadPublishedPackage(opts, loadDir, repo+"/"+pkgPath, v)
+			pkgVal, found, err := loadPublishedPackage(opts, loadDir, repo, pkgPath, v)
 			if err != nil {
 				return err
 			}
@@ -210,14 +210,14 @@ func isReleasePrerelease(tag string) bool {
 }
 
 // loadPublishedPackage loads one published subpackage by
-// <importPath>@<version> — measured loadable standalone through
+// <repo>/<pkgPath>@<version> — measured loadable standalone through
 // load.Instances with only a registry env; the module zip is fetched once per
 // build and CUE-cached on disk, so probing several packages of one build
 // costs one fetch. Returns found=false on the loader's module-not-found
 // error (the package or the whole build is absent at that version — both are
 // the scan's negative signal); any other failure is a *ConnectivityError.
-func loadPublishedPackage(opts Options, dir, importPath, version string) (cue.Value, bool, error) {
-	pattern := importPath + "@" + version
+func loadPublishedPackage(opts Options, dir, repo, pkgPath, version string) (cue.Value, bool, error) {
+	pattern := repo + "/" + pkgPath + "@" + version
 	cfg := &load.Config{
 		Dir: dir,
 		Env: registryEnv(opts.Registry),
