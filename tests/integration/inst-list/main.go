@@ -19,6 +19,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/open-platform-model/library/opm/k8s/health"
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -192,9 +193,9 @@ func main() {
 		failf("expected 0 missing resources initially, got %d", len(missing))
 	}
 
-	status, ready, total := kubernetes.QuickInstanceHealth(live, len(missing))
-	if status != kubernetes.HealthReady {
-		failf("expected HealthReady initially, got %s", status)
+	status, ready, total := health.Aggregate(evaluateAll(live), len(missing))
+	if status != health.Ready {
+		failf("expected Ready initially, got %s", status)
 	}
 	if ready != 2 || total != 2 {
 		failf("expected 2/2, got %d/%d", ready, total)
@@ -215,9 +216,9 @@ func main() {
 		failf("expected 1 missing resource after delete, got %d", len(missing2))
 	}
 
-	status2, ready2, total2 := kubernetes.QuickInstanceHealth(live2, len(missing2))
-	if status2 != kubernetes.HealthNotReady {
-		failf("expected HealthNotReady after delete, got %s", status2)
+	status2, ready2, total2 := health.Aggregate(evaluateAll(live2), len(missing2))
+	if status2 != health.NotReady {
+		failf("expected NotReady after delete, got %s", status2)
 	}
 	if ready2 != 1 || total2 != 2 {
 		failf("expected 1/2 after delete, got %d/%d", ready2, total2)
@@ -388,4 +389,14 @@ func check(label string, err error) {
 func failf(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, "FAIL: "+format+"\n", args...)
 	os.Exit(1)
+}
+
+// evaluateAll judges each live object with health.Evaluate, as
+// `opm instance list` does before folding with health.Aggregate.
+func evaluateAll(live []*unstructured.Unstructured) []health.Status {
+	statuses := make([]health.Status, len(live))
+	for i, obj := range live {
+		statuses[i] = health.Evaluate(obj)
+	}
+	return statuses
 }

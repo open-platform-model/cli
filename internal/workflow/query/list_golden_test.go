@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/open-platform-model/library/opm/k8s/health"
+
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 
 	"github.com/stretchr/testify/assert"
@@ -14,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/cli/internal/inventory"
-	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 )
 
@@ -40,11 +41,11 @@ func captureStdout(t *testing.T, fn func()) string {
 
 func goldenSummaries() []InstanceSummary {
 	return []InstanceSummary{
-		{Name: "web", Module: "example.com/web@v1", Namespace: "prod", Version: "1.0.0", Status: string(kubernetes.HealthReady),
+		{Name: "web", Module: "example.com/web@v1", Namespace: "prod", Version: "1.0.0", Status: string(health.Ready),
 			ReadyCount: 3, TotalCount: 3, InstanceID: "11111111-1111-1111-1111-111111111111", LastApplied: "2026-10-01T10:00:00Z", Age: "4d", Owner: "cli"},
-		{Name: "db", Module: "example.com/db@v1", Namespace: "prod", Version: "2.1.0", Status: string(kubernetes.HealthNotReady),
+		{Name: "db", Module: "example.com/db@v1", Namespace: "prod", Version: "2.1.0", Status: string(health.NotReady),
 			ReadyCount: 3, TotalCount: 5, InstanceID: "22222222-2222-2222-2222-222222222222", LastApplied: "2026-10-02T10:00:00Z", Age: "3d", Owner: "operator"},
-		{Name: "jobs", Module: "-", Namespace: "prod", Version: "-", Status: string(kubernetes.HealthUnknown),
+		{Name: "jobs", Module: "-", Namespace: "prod", Version: "-", Status: string(health.Unknown),
 			ReadyCount: 0, TotalCount: 0, InstanceID: "33333333-3333-3333-3333-333333333333", LastApplied: "", Age: "<unknown>", Owner: "cli"},
 	}
 }

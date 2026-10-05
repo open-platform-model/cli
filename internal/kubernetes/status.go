@@ -10,6 +10,8 @@ import (
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/open-platform-model/library/opm/k8s/health"
+
 	"github.com/open-platform-model/cli/internal/output"
 )
 
@@ -81,7 +83,7 @@ type resourceHealth struct {
 	// Component is the source component name (from inventory).
 	Component string `json:"component,omitempty" yaml:"component,omitempty"`
 	// Status is the evaluated health status.
-	Status HealthStatus `json:"status" yaml:"status"`
+	Status health.Status `json:"status" yaml:"status"`
 	// Age is the human-readable age of the resource.
 	Age string `json:"age" yaml:"age"`
 	// Wide holds extra workload-specific info (replicas, image), populated when Wide mode is on.
@@ -130,7 +132,7 @@ type StatusResult struct {
 	// Resources is the list of resource health statuses.
 	Resources []resourceHealth `json:"resources" yaml:"resources"`
 	// AggregateStatus is the overall module health.
-	AggregateStatus HealthStatus `json:"aggregateStatus" yaml:"aggregateStatus"`
+	AggregateStatus health.Status `json:"aggregateStatus" yaml:"aggregateStatus"`
 	// Summary contains aggregate resource counts.
 	Summary statusSummary `json:"summary" yaml:"summary"`
 }
@@ -168,14 +170,8 @@ func GetInstanceStatus(ctx context.Context, client *Client, opts StatusOptions) 
 		Owner:        opts.Owner,
 		Namespace:    opts.Namespace,
 	}
-	allReady := true
-
 	for _, res := range resources {
-		rh, healthy := buildResourceHealth(ctx, client, res, opts)
-		result.Resources = append(result.Resources, rh)
-		if !healthy {
-			allReady = false
-		}
+		result.Resources = append(result.Resources, buildResourceHealth(ctx, client, res, opts))
 	}
 
 	// Append missing resources (tracked in inventory but not on cluster)
@@ -185,10 +181,9 @@ func GetInstanceStatus(ctx context.Context, client *Client, opts StatusOptions) 
 			Name:      m.Name,
 			Namespace: m.Namespace,
 			Component: opts.ComponentMap[m.Kind+"/"+m.Namespace+"/"+m.Name],
-			Status:    HealthMissing,
+			Status:    health.Missing,
 			Age:       "<unknown>",
 		})
-		allReady = false
 	}
 
 	// Append unreadable resources (tracked in inventory, read failed): their
@@ -199,39 +194,27 @@ func GetInstanceStatus(ctx context.Context, client *Client, opts StatusOptions) 
 			Name:      u.Name,
 			Namespace: u.Namespace,
 			Component: opts.ComponentMap[u.Kind+"/"+u.Namespace+"/"+u.Name],
-			Status:    HealthUnknown,
+			Status:    health.Unknown,
 			Age:       "<unknown>",
 		})
-		allReady = false
 	}
 
-	// Compute aggregate status
-	switch {
-	case len(result.Resources) == 0:
-		result.AggregateStatus = HealthUnknown
-	case allReady:
-		result.AggregateStatus = HealthReady
-	default:
-		result.AggregateStatus = HealthNotReady
+	// Every row carries a status (missing rows Missing, unreadable rows
+	// Unknown, both unhealthy), so the fold needs no separate unhealthy count.
+	statuses := make([]health.Status, len(result.Resources))
+	for i, r := range result.Resources {
+		statuses[i] = r.Status
 	}
-
-	// Compute summary
-	for _, r := range result.Resources {
-		result.Summary.Total++
-		if IsHealthy(r.Status) {
-			result.Summary.Ready++
-		} else {
-			result.Summary.NotReady++
-		}
-	}
+	aggregate, ready, total := health.Aggregate(statuses, 0)
+	result.AggregateStatus = aggregate
+	result.Summary = statusSummary{Total: total, Ready: ready, NotReady: total - ready}
 
 	return result, nil
 }
 
 // buildResourceHealth constructs a resourceHealth for a single live resource.
-// Returns the populated struct and whether the resource is healthy.
-func buildResourceHealth(ctx context.Context, client *Client, res *unstructured.Unstructured, opts StatusOptions) (resourceHealth, bool) {
-	health := EvaluateHealth(res)
+func buildResourceHealth(ctx context.Context, client *Client, res *unstructured.Unstructured, opts StatusOptions) resourceHealth {
+	verdict := health.Evaluate(res)
 	age := computeAge(res)
 
 	key := res.GetKind() + "/" + res.GetNamespace() + "/" + res.GetName()
@@ -241,7 +224,7 @@ func buildResourceHealth(ctx context.Context, client *Client, res *unstructured.
 		Name:      res.GetName(),
 		Namespace: res.GetNamespace(),
 		Component: opts.ComponentMap[key],
-		Status:    health,
+		Status:    verdict,
 		Age:       age,
 	}
 
@@ -251,15 +234,15 @@ func buildResourceHealth(ctx context.Context, client *Client, res *unstructured.
 
 	// listWorkloadPods is only called for live, unhealthy workloads.
 	// Missing resources are never passed through buildResourceHealth — they are
-	// appended directly in GetInstanceStatus, so health == HealthMissing cannot
-	// occur here.
-	if opts.Verbose && health == HealthNotReady {
+	// appended directly in GetInstanceStatus, so verdict == health.Missing
+	// cannot occur here.
+	if opts.Verbose && verdict == health.NotReady {
 		if pods, err := listWorkloadPods(ctx, client, res); err == nil && len(pods) > 0 {
 			rh.Verbose = &verboseInfo{Pods: pods}
 		}
 	}
 
-	return rh, IsHealthy(health)
+	return rh
 }
 
 // FormatStatusTable renders the status result as a formatted table (default format).

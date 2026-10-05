@@ -3,6 +3,8 @@ package kubernetes
 import (
 	"testing"
 
+	"github.com/open-platform-model/library/opm/k8s/health"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -17,17 +19,17 @@ func goldenStatusResult() *StatusResult {
 		Version:         "1.2.3",
 		Owner:           "cli",
 		Namespace:       "prod",
-		AggregateStatus: HealthNotReady,
+		AggregateStatus: health.NotReady,
 		Summary:         statusSummary{Total: 8, Ready: 4, NotReady: 4},
 		Resources: []resourceHealth{
-			{Kind: "Deployment", Name: "web", Namespace: "prod", Component: "server", Status: HealthReady, Age: "5m"},
-			{Kind: "StatefulSet", Name: "db", Namespace: "prod", Component: "database", Status: HealthNotReady, Age: "5m"},
-			{Kind: "Job", Name: "migrate", Namespace: "prod", Component: "database", Status: HealthComplete, Age: "4m"},
-			{Kind: "Secret", Name: "creds", Namespace: "prod", Component: "server", Status: HealthUnknown, Age: "<unknown>"},
-			{Kind: "Service", Name: "web", Namespace: "prod", Component: "server", Status: HealthMissing, Age: "<unknown>"},
-			{Kind: "ConfigMap", Name: "settings", Namespace: "prod", Component: "server", Status: HealthApplied, Age: "5m"},
-			{Kind: "PersistentVolumeClaim", Name: "data", Namespace: "prod", Component: "database", Status: HealthBound, Age: "5m"},
-			{Kind: "PersistentVolumeClaim", Name: "scratch", Namespace: "prod", Component: "database", Status: HealthStatus("Pending"), Age: "1m"},
+			{Kind: "Deployment", Name: "web", Namespace: "prod", Component: "server", Status: health.Ready, Age: "5m"},
+			{Kind: "StatefulSet", Name: "db", Namespace: "prod", Component: "database", Status: health.NotReady, Age: "5m"},
+			{Kind: "Job", Name: "migrate", Namespace: "prod", Component: "database", Status: health.Complete, Age: "4m"},
+			{Kind: "Secret", Name: "creds", Namespace: "prod", Component: "server", Status: health.Unknown, Age: "<unknown>"},
+			{Kind: "Service", Name: "web", Namespace: "prod", Component: "server", Status: health.Missing, Age: "<unknown>"},
+			{Kind: "ConfigMap", Name: "settings", Namespace: "prod", Component: "server", Status: health.Applied, Age: "5m"},
+			{Kind: "PersistentVolumeClaim", Name: "data", Namespace: "prod", Component: "database", Status: health.Bound, Age: "5m"},
+			{Kind: "PersistentVolumeClaim", Name: "scratch", Namespace: "prod", Component: "database", Status: health.Status("Pending"), Age: "1m"},
 		},
 	}
 }

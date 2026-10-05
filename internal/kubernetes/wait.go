@@ -10,6 +10,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/open-platform-model/library/opm/k8s/health"
 )
 
 // WaitPollInterval is how often the wait loops re-check the cluster. A
@@ -19,6 +21,9 @@ var WaitPollInterval = 2 * time.Second
 // conditionEstablished is the CustomResourceDefinition condition type that
 // reports the API server serves the new kind.
 const conditionEstablished = "Established"
+
+// conditionStatusTrue is the Kubernetes condition status value representing "true".
+const conditionStatusTrue = "True"
 
 // ReadyPredicate reports whether a live object (as currently observed on the
 // cluster) is ready.
@@ -46,11 +51,12 @@ func CRDEstablishedPredicate(obj *unstructured.Unstructured) bool {
 }
 
 // HealthyPredicate reports whether a live object is healthy by the same rule
-// `opm instance status` applies: EvaluateHealth judged by IsHealthy.
+// `opm instance status` applies: health.Evaluate judged by health.IsHealthy,
+// from the library's opm/k8s/health.
 // Workloads must have finished their rollout, Jobs completed and PVCs bound;
 // kinds with no readiness concept are healthy once they exist.
 func HealthyPredicate(obj *unstructured.Unstructured) bool {
-	return IsHealthy(EvaluateHealth(obj))
+	return health.IsHealthy(health.Evaluate(obj))
 }
 
 // AbsentPredicate is the readiness predicate of absence mode: no live object

@@ -3,6 +3,8 @@ package kubernetes
 import (
 	"testing"
 
+	"github.com/open-platform-model/library/opm/k8s/health"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,15 +18,15 @@ func goldenTreeResult() *TreeResult {
 			{
 				Name:          "server",
 				ResourceCount: 1,
-				Status:        HealthReady,
+				Status:        health.Ready,
 				Resources: []ResourceNode{
 					{
-						Kind: "Deployment", Name: "web", Namespace: "prod", Status: HealthReady, Replicas: "1/1",
+						Kind: "Deployment", Name: "web", Namespace: "prod", Status: health.Ready, Replicas: "1/1",
 						Children: []ResourceNode{
 							{
-								Kind: "ReplicaSet", Name: "web-abc", Namespace: "prod", Status: HealthReady, Replicas: "1 pods",
+								Kind: "ReplicaSet", Name: "web-abc", Namespace: "prod", Status: health.Ready, Replicas: "1 pods",
 								Children: []ResourceNode{
-									{Kind: "Pod", Name: "web-abc-xyz", Namespace: "prod", Status: HealthStatus("Running"), Ready: true},
+									{Kind: "Pod", Name: "web-abc-xyz", Namespace: "prod", Status: health.Status("Running"), Ready: true},
 								},
 							},
 						},
@@ -34,16 +36,16 @@ func goldenTreeResult() *TreeResult {
 			{
 				Name:          "database",
 				ResourceCount: 2,
-				Status:        HealthNotReady,
+				Status:        health.NotReady,
 				Resources: []ResourceNode{
-					{Kind: "StatefulSet", Name: "db", Namespace: "prod", Status: HealthNotReady, Replicas: "0/1"},
-					{Kind: "PersistentVolumeClaim", Name: "data", Namespace: "prod", Status: HealthBound, Replicas: "10Gi"},
+					{Kind: "StatefulSet", Name: "db", Namespace: "prod", Status: health.NotReady, Replicas: "0/1"},
+					{Kind: "PersistentVolumeClaim", Name: "data", Namespace: "prod", Status: health.Bound, Replicas: "10Gi"},
 				},
 			},
 			{
 				Name:          "jobs",
 				ResourceCount: 1,
-				Status:        HealthUnknown,
+				Status:        health.Unknown,
 			},
 		},
 	}

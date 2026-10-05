@@ -8,6 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/open-platform-model/library/opm/k8s/health"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"github.com/open-platform-model/cli/internal/inventory"
@@ -32,7 +35,7 @@ type InstanceSummary struct {
 
 type instanceHealthResult struct {
 	index  int
-	status kubernetes.HealthStatus
+	status health.Status
 	ready  int
 	total  int
 }
@@ -59,7 +62,7 @@ func EvaluateInstanceHealth(ctx context.Context, client *kubernetes.Client, inve
 				if logDiscoveryFailures {
 					output.Debug("failed to discover resources for instance", "instance", inv.Name, "error", err)
 				}
-				results[idx] = instanceHealthResult{index: idx, status: kubernetes.HealthUnknown}
+				results[idx] = instanceHealthResult{index: idx, status: health.Unknown}
 				return
 			}
 
@@ -70,7 +73,7 @@ func EvaluateInstanceHealth(ctx context.Context, client *kubernetes.Client, inve
 					inv.Name, inv.Namespace, n))
 			}
 
-			status, ready, total := kubernetes.QuickInstanceHealth(live, len(missing)+len(unreadable))
+			status, ready, total := health.Aggregate(evaluateAll(live), len(missing)+len(unreadable))
 			results[idx] = instanceHealthResult{index: idx, status: status, ready: ready, total: total}
 		}(i, inv)
 	}
@@ -83,6 +86,15 @@ func EvaluateInstanceHealth(ctx context.Context, client *kubernetes.Client, inve
 	}
 
 	return summaries
+}
+
+// evaluateAll judges each live object with health.Evaluate.
+func evaluateAll(live []*unstructured.Unstructured) []health.Status {
+	statuses := make([]health.Status, len(live))
+	for i, obj := range live {
+		statuses[i] = health.Evaluate(obj)
+	}
+	return statuses
 }
 
 func BuildInstanceSummary(inv *inventory.Record) InstanceSummary {

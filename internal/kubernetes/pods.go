@@ -9,6 +9,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+// podListingKinds names the kinds `opm instance status --verbose` lists pods
+// for, by the workload's label selector.
+var podListingKinds = map[string]bool{
+	kindDeployment: true,
+}
+
 // listWorkloadPods lists pods for a workload resource using its label selector.
 // Only supported for workload kinds (Deployment, StatefulSet, DaemonSet).
 // Returns an empty slice for non-workload kinds.
@@ -18,7 +24,7 @@ func listWorkloadPods(ctx context.Context, client *Client, resource *unstructure
 		return nil, nil
 	}
 	kind := resource.GetKind()
-	if !workloadKinds[kind] {
+	if !podListingKinds[kind] {
 		return nil, nil
 	}
 
@@ -68,8 +74,8 @@ func extractPodInfoFromPod(pod *corev1.Pod) podInfo {
 
 	// Determine ready from conditions
 	for _, cond := range pod.Status.Conditions {
-		if string(cond.Type) == string(HealthReady) {
-			info.Ready = cond.Status == conditionStatusTrue
+		if cond.Type == corev1.PodReady {
+			info.Ready = cond.Status == corev1.ConditionTrue
 			break
 		}
 	}

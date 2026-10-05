@@ -13,7 +13,8 @@ const kindDeployment = "Deployment"
 
 // DefaultPredicate dispatches to the readiness check appropriate for obj's
 // kind: CRD Established=True for CustomResourceDefinitions, workload rollout
-// health (via kubernetes.EvaluateHealth) for Deployments. Other kinds are
+// health (health.Evaluate from the library's opm/k8s/health, through
+// kubernetes.HealthyPredicate) for Deployments. Other kinds are
 // considered ready as soon as they exist.
 func DefaultPredicate(obj *unstructured.Unstructured) bool {
 	switch obj.GetKind() {

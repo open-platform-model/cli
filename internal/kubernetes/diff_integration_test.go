@@ -6,6 +6,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/open-platform-model/library/opm/k8s/health"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -142,7 +144,7 @@ func TestStatusIntegration_ReportsHealth(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(statusResult.Resources), 1)
-	assert.Equal(t, HealthReady, statusResult.AggregateStatus)
+	assert.Equal(t, health.Ready, statusResult.AggregateStatus)
 
 	// Cleanup
 	_, err = Delete(ctx, client, DeleteOptions{

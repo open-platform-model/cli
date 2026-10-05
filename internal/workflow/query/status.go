@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/open-platform-model/library/opm/k8s/health"
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -140,7 +141,7 @@ func PrintInstanceStatus(ctx context.Context, client *kubernetes.Client, opts ku
 	}
 	output.Println(formatted)
 
-	if !kubernetes.IsHealthy(result.AggregateStatus) {
+	if !health.IsHealthy(result.AggregateStatus) {
 		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: fmt.Errorf("instance %q: %d resource(s) not ready", opts.InstanceName, result.Summary.NotReady), Printed: true}
 	}
 	return nil
