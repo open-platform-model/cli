@@ -44,7 +44,7 @@ func goldenSummaries() []InstanceSummary {
 		{Name: "web", Module: "example.com/web@v1", Namespace: "prod", Version: "1.0.0", Status: string(health.Ready),
 			ReadyCount: 3, TotalCount: 3, InstanceID: "11111111-1111-1111-1111-111111111111", LastApplied: "2026-10-01T10:00:00Z", Age: "4d", Owner: "cli"},
 		{Name: "db", Module: "example.com/db@v1", Namespace: "prod", Version: "2.1.0", Status: string(health.NotReady),
-			ReadyCount: 3, TotalCount: 5, InstanceID: "22222222-2222-2222-2222-222222222222", LastApplied: "2026-10-02T10:00:00Z", Age: "3d", Owner: "operator"},
+			ReadyCount: 3, TotalCount: 5, InstanceID: "22222222-2222-2222-2222-222222222222", LastApplied: "2026-10-02T10:00:00Z", Age: "3d", Owner: "controller"},
 		{Name: "jobs", Module: "-", Namespace: "prod", Version: "-", Status: string(health.Unknown),
 			ReadyCount: 0, TotalCount: 0, InstanceID: "33333333-3333-3333-3333-333333333333", LastApplied: "", Age: "<unknown>", Owner: "cli"},
 	}
@@ -75,7 +75,7 @@ const goldenListJSON = `[
     "instanceID": "22222222-2222-2222-2222-222222222222",
     "lastApplied": "2026-10-02T10:00:00Z",
     "age": "3d",
-    "owner": "operator"
+    "owner": "controller"
   },
   {
     "name": "jobs",
@@ -114,7 +114,7 @@ const goldenListYAML = `- name: web
   instanceID: 22222222-2222-2222-2222-222222222222
   lastApplied: "2026-10-02T10:00:00Z"
   age: 3d
-  owner: operator
+  owner: controller
 - name: jobs
   module: '-'
   namespace: prod
