@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	"github.com/open-platform-model/library/opm/k8s/object"
 )
@@ -78,4 +79,16 @@ func TestExportAndDigest_DiffersFromTheRetiredDigest(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.NotEqual(t, retiredRenderDigest, digest)
+}
+
+// An object that cannot be exported fails the render with the general exit
+// code and an error naming the conversion.
+func TestExportAndDigest_ExportFailureIsAGeneralError(t *testing.T) {
+	_, _, err := exportAndDigest([]*object.Resource{
+		digestResource(t, `apiVersion: "v1", kind: "ConfigMap", metadata: {name: "config", namespace: "ns"}, data: key: string`),
+	})
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
+	assert.Contains(t, err.Error(), "converting rendered resources")
 }
