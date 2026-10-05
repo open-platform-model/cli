@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/mod/semver"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/library/opm/kernel"
@@ -190,10 +193,11 @@ func PinnedTarget() Target {
 // cli embeds, which task controller:pin rendered from the pinned module
 // version. It works offline: it resolves, fetches and renders nothing, and
 // reads no ModuleInstance, so it cannot know whether the controller's
-// instance is recorded. Its checks are the wait for terminating objects and
-// the apply guard over the CRDs, which always runs: a CRD that exists and is
-// not OPM's refuses the install. The target rules already held when the
-// version was pinned.
+// instance is recorded. Its checks are the wait for terminating objects, the
+// apply guard over the CRDs, which always runs (a CRD that exists and is not
+// OPM's refuses the install), and the refusal of a CRD a newer module
+// version installed. The target rules already held when the version was
+// pinned.
 func PlanCRDsOnly(ctx context.Context, env InstallEnv, opts PlanOptions) (*Plan, error) {
 	objs, err := embeddedCRDs()
 	if err != nil {
@@ -209,7 +213,43 @@ func PlanCRDsOnly(ctx context.Context, env InstallEnv, opts PlanOptions) (*Plan,
 	if err := waitThenGuard(ctx, env, plan, true); err != nil {
 		return nil, err
 	}
+	if err := refuseNewerCRDs(ctx, env.Client, objs); err != nil {
+		return nil, err
+	}
 	return plan, nil
+}
+
+// moduleVersionLabel is the label the kernel stamps with the module version
+// that rendered an object.
+const moduleVersionLabel = "module.opmodel.dev/version"
+
+// refuseNewerCRDs refuses a CRDs-only install over a CRD that a newer module
+// version than this cli's pin installed: applying the embedded CRDs would
+// replace that version's schemas under the controller it deployed. The
+// check reads the CRDs from the API server only, so the form stays offline.
+// A CRD that is absent, unlabeled or carries a version that is not semver is
+// not refused here (the apply guard has already refused one OPM does not
+// manage).
+func refuseNewerCRDs(ctx context.Context, client *kubernetes.Client, objs []*unstructured.Unstructured) error {
+	pinned := "v" + PinnedModuleVersion
+	for _, obj := range objs {
+		live, err := client.ResourceClient(kubernetes.GVRFromUnstructured(obj), "").Get(ctx, obj.GetName(), metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("reading %s/%s before apply: %w", obj.GetKind(), obj.GetName(), err)
+		}
+		recorded := live.GetLabels()[moduleVersionLabel]
+		if !semver.IsValid("v"+recorded) || semver.Compare("v"+recorded, pinned) <= 0 {
+			continue
+		}
+		return &TargetError{ModuleVersion: pinned, Rule: fmt.Sprintf(
+			"CustomResourceDefinition %s was installed by module version %s, newer than this cli's pin, and --crds-only would replace it with older CRDs; "+
+				"run a full install of that version instead (opm controller install --version %s)",
+			obj.GetName(), recorded, recorded)}
+	}
+	return nil
 }
 
 // waitThenGuard starts the plan's --timeout budget, waits out the objects

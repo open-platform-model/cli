@@ -81,7 +81,8 @@ existing Platform is reported and left untouched, never rewritten.
 lifecycle without a running controller. They are the CRDs the pinned module
 version renders, carried in this CLI, so --crds-only needs no registry and
 talks only to the cluster: it resolves and renders no module, reads no
-ModuleInstance, and takes no --version, -f or --reset-values.
+ModuleInstance, and takes no --version, -f or --reset-values. It refuses
+CRDs a newer module version installed; reinstall that version in full instead.
 
 Examples:
   # Install the pinned controller module and seed the cluster Platform

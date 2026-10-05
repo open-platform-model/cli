@@ -39,6 +39,9 @@ archive. Implements the rename plan's decision D17 (owner, 2026-10-06); no enhan
   ModuleInstance CRD field floor)
 - [x] 3.4 Docs: README, QUICKSTART and AGENTS name the offline CRDs-only form and the manifests the pin writes
 - [x] 3.5 Commit `feat(controller)!: install the CRDs-only form offline`
+- [x] 3.6 `PlanCRDsOnly` refuses (exit 2) a CRD that a newer module version than the pin installed, naming the full
+  install of that version; fake-client tests for the refusal and for applying over an older version's CRDs (review
+  finding, design C4); commit `fix(controller): refuse to downgrade CRDs a newer module installed`
 
 ## 4. Specs and checks
 

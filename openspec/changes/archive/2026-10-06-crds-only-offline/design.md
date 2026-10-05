@@ -64,6 +64,13 @@ label and pass. It runs no target rules: the controller-version, image and CRD-f
 the pin already judged. A unit test holds the embedded ModuleInstance CRD to the CLI's field floor and its labels to the
 pinned version.
 
+The plan also reads the existing CRDs from the API server and refuses (exit 2, nothing applied) when one carries a
+`module.opmodel.dev/version` label newer than the pinned module version: a full install of that version, made with
+`--version`, recorded those CRDs, and applying the pin's older schemas under the controller it deployed would be a
+silent downgrade. The refusal names the full install of that version as the remedy. Accepting the downgrade as a
+limitation was rejected, since before this change `--crds-only --version X` could match the installed version and that
+escape is gone. The read reaches only the API server, so the form stays offline.
+
 ### C5: Render options live in `internal/controller`
 
 `ModuleRenderOpts` moves from the command into `internal/controller`, and both install and the pin task call it, so the

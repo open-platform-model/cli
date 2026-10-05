@@ -292,6 +292,35 @@ func TestPlanCRDsOnly_RefusesAForeignCRD(t *testing.T) {
 	assert.Empty(t, fc.Writes())
 }
 
+// "CRDs a newer module version installed are not replaced": a full install
+// of 0.2.0 recorded the CRDs, so --crds-only at the 0.1.0 pin refuses with
+// exit 2, names the full-install remedy and writes nothing.
+func TestPlanCRDsOnly_RefusesCRDsOfANewerModuleVersion(t *testing.T) {
+	newer := labeled(renderedCRDObject(inventory.CRDNameModuleInstances, true), "crds", "0.2.0")
+	fc := newFakeCluster(t, newer)
+
+	_, err := installCRDsOnly(t, fc, &fakeRender{}, PlanOptions{})
+	var targetErr *TargetError
+	require.ErrorAs(t, err, &targetErr)
+	assert.Contains(t, err.Error(), inventory.CRDNameModuleInstances)
+	assert.Contains(t, err.Error(), "module version 0.2.0")
+	assert.Contains(t, err.Error(), "opm controller install --version 0.2.0")
+	assert.Empty(t, fc.Writes())
+}
+
+// CRDs an older or the same module version installed are applied over.
+func TestInstall_CRDsOnlyOverCRDsOfAnOlderModuleVersion(t *testing.T) {
+	fastPolling(t)
+	older := labeled(renderedCRDObject(inventory.CRDNameModuleInstances, true), "crds", "0.0.9")
+	fc := newFakeCluster(t, older)
+
+	result, err := installCRDsOnly(t, fc, &fakeRender{}, PlanOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 4, result.CRDs)
+	assert.Equal(t, PinnedModuleVersion,
+		fc.mustGet(crdGVR, "", inventory.CRDNameModuleInstances).GetLabels()[moduleVersionLabel])
+}
+
 // "Full install after CRDs-only".
 func TestInstall_CRDsOnlyThenFullInstall(t *testing.T) {
 	releasedCLI(t)
