@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.0-beta.10](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.9...v1.0.0-beta.10) (2026-10-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **operator:** install the operator from its module ([#307](https://github.com/open-platform-model/cli/issues/307))
+
+### Features
+
+* **operator:** install the operator from its module ([#307](https://github.com/open-platform-model/cli/issues/307)) ([23a2c55](https://github.com/open-platform-model/cli/commit/23a2c5521b08bf5abeb1386a2f52aad81d0e95bf))
+* **operator:** migrate a manifest-installed operator on install ([#309](https://github.com/open-platform-model/cli/issues/309)) ([cb1e3d3](https://github.com/open-platform-model/cli/commit/cb1e3d35b982b19f58aa0016097506cf936cab2d))
+
+
+### Bug Fixes
+
+* **kubernetes:** sort instance tree by weight, then name, and skip new-namespace objects in a dry run ([#313](https://github.com/open-platform-model/cli/issues/313)) ([ce69d5a](https://github.com/open-platform-model/cli/commit/ce69d5a4b0fa385f0a0a315b97455435ebf9f5eb))
+
+
+### Code Refactoring
+
+* **scaffold:** read module identity from mod.Metadata ([#311](https://github.com/open-platform-model/cli/issues/311)) ([91a039c](https://github.com/open-platform-model/cli/commit/91a039cb980e24ffd34ee7f19a5332b90bd7429b))
+
 ## [1.0.0-beta.9](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.8...v1.0.0-beta.9) (2026-10-04)
 
 
