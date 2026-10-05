@@ -1,8 +1,8 @@
 ## ADDED Requirements
 
-### Requirement: An unpublished coordinate exits 5 and every other registry failure exits 3
+### Requirement: An unpublished coordinate exits 5 and every other registry answer exits 3
 
-`opm catalog registry check <path@version>` SHALL exit 5 when the registry answers that it does not hold the named version, which includes a registry that answers the tag lookup with 403, because CUE reports that answer as not found. Every other failure to fetch the named build SHALL exit 3, the build never judged: no HTTP response, refused credentials (401), a rate limit, a server error, or a registry that holds the tag but cannot serve the build's archive. The CLI SHALL take this decision from the library's typed fetch classification and SHALL NOT match the error's message text itself. Source: 0021:D8:R12.
+`opm catalog registry check <path@version>` SHALL exit 5 when the registry answers that it does not hold the named version, which includes a registry that answers the tag lookup with 403, because CUE reports that answer as not found. A registry answer other than not-held, or no response, while the named build is fetched SHALL exit 3, the build never judged. A failure that asks no registry (a registry mapping that does not parse) exits 1. Source: 0011:D7. The CLI SHALL take the not-held decision from the library's typed fetch classification and SHALL NOT match the error's message text itself. Source: 0021:D8:R12.
 
 #### Scenario: Version not published
 
@@ -13,16 +13,6 @@
 
 - **WHEN** the registry answers the tag lookup for the named version with status 403
 - **THEN** the check exits 5
-
-#### Scenario: Refused credentials are not "not published"
-
-- **WHEN** the registry answers the fetch with status 401
-- **THEN** the check exits 3
-
-#### Scenario: Server error
-
-- **WHEN** the registry answers the fetch with status 503
-- **THEN** the check exits 3
 
 ## MODIFIED Requirements
 

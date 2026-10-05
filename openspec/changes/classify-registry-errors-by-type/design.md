@@ -69,7 +69,7 @@ if err != nil {
 }
 ```
 
-`cuemod.IsVersionNotHeld(err)` is `FetchNotFound` with `Status == 0`. The tag lookup's 404 and 403 reach the cli as `modregistry.ErrNotFound`, which CUE builds without the HTTP status, so they carry `Status` 0. The one `FetchNotFound` that carries a status is a 404 on a blob: a registry that holds the tag but not the module archive. Today its text has no lowercase `not found`, so it is a `*ConnectivityError` (exit 3), and the `Status` test keeps it there. This is an assumption to verify, not a measured fact: section 2 pins the blob row through a registry that drops the archive blob, and section 3 adjusts `IsVersionNotHeld` to whatever typed signal tells that row apart (the `Status`, or `ociregistry.ErrBlobUnknown` in the chain) if the pin shows otherwise. If no typed signal separates it, the implementer stops and reports, and does not fall back to text.
+`cuemod.IsVersionNotHeld(err)` is `FetchNotFound` with `Status == 0`. The tag lookup's 404 and 403 reach the cli as `modregistry.ErrNotFound`, which CUE builds without the HTTP status, so they carry `Status` 0. The one `FetchNotFound` that carries a status is a 404 on a blob: a registry that holds the tag but not the module archive. Today its text has no lowercase `not found`, so it is a `*ConnectivityError` (exit 3), and the `Status` test keeps it there. This is an assumption to verify, not a measured fact: the section 1 spike pins the blob row through a registry that answers the archive blob with 404, and section 3 adjusts `IsVersionNotHeld` to whatever typed signal tells that row apart (the `Status`, or `ociregistry.ErrBlobUnknown` in the chain) if the pin shows otherwise. If no typed signal separates it, the implementer stops and reports, and does not fall back to text.
 
 The same helper serves D3.
 
@@ -94,7 +94,7 @@ if err := insts[0].Err; err != nil {
 }
 ```
 
-`probedPackageAbsent` calls `fetchPublishedTree` for `repo@version`. It goes through the same on-disk module cache the load just used, so a present build costs no second download. `ErrNotPublished` means the version is absent: absent. A `*ConnectivityError` is returned as is. A fetched tree with no `.cue` file directly in `<tree>/<pkgPath>` means the package is absent at that version: absent. Otherwise the probed package is present, so the not-found concerned a dependency: a `*ConnectivityError`, as today.
+`probedPackageAbsent` calls `fetchPublishedTree` for `repo@version`. It goes through the same on-disk module cache the load just used, so a present build costs no second download. `ErrNotPublished` means the version is absent: absent. A `*ConnectivityError` is returned as is. Any other error from the disambiguating fetch (`fetchPublishedTree` also fails without asking the registry: the registry mapping does not build, the version does not form, the fetched source has no filesystem root) is not returned: the original load failure is, as `&ConnectivityError{Op: "loading "+pattern, Err: err}`, which is today's answer for that load (exit 3). A fetched tree with no `.cue` file directly in `<tree>/<pkgPath>` means the package is absent at that version: absent. Otherwise the probed package is present, so the not-found concerned a dependency: a `*ConnectivityError`, as today.
 
 `loadPublishedPackage` takes `repo` and `pkgPath` separately instead of the joined import path. The walk has no context today (`load.Instances` takes none), so the extra fetch uses `context.Background()` for the same reason.
 
@@ -103,17 +103,19 @@ Alternatives considered:
 2. Fetch first on every probe, before the load. Rejected: the same answer, but an extra registry round trip on the hot path, where the failure path is enough.
 3. Keep the text match for this one site. Rejected: it is one of the three probes the owner decision removes.
 
+**The unversioned `cannot find module providing package P` form.** The library classifies only the form whose `P` carries an exact version (a standalone `path@vX.Y.Z` load); the unversioned form, which reports an import that no module of the build provides (an import its fetched dependency does not provide, or a missing package under its own module path), is an author defect and stays unclassified (library spec `fetch-error-classification`). Today the text match reads it as absent (`found=false`). Under the rule above it would fall through to a `*ConnectivityError` (exit 3), an exit-code change. The section 1 spike measures the form (both variants) and pins today's answer; the outcome is recorded under "Spike findings" below. The cli keeps today's answer by a check that does not read the message text, or, if none exists, the implementer stops and reports it as an owner question, never changing the pin.
+
 ### D4. Platform build hint: the registry branch reads the kind
 
-`internal/config/platform.go:97-110` `platformBuildHint` picks a hint, not an exit code. The "pin a published build" case matches `module not found`, `cannot find package` and `cannot expand module graph`. Only the first is a registry answer, and `FetchNotFound` covers it. The other two are author defects that the library leaves unclassified by design (an undeclared import, a malformed dependency module file), so they stay text matches and say why in a comment, and so does the `#registry` branch. The case becomes `cuemod.IsFetchNotFound(err) || strings.Contains(msg, "cannot find package") || strings.Contains(msg, "cannot expand module graph")`. Section 2 pins the hint for each form the kernel produces on a platform directory (unpublished pin, undeclared import, `#registry` key mismatch, wrong kind, unreachable registry).
+`internal/config/platform.go:97-110` `platformBuildHint` picks a hint, not an exit code. The "pin a published build" case matches `module not found`, `cannot find package` and `cannot expand module graph`. Only the first is a registry answer, and `FetchNotFound` covers it. The other two are author defects that the library leaves unclassified by design (an undeclared import, a malformed dependency module file), so they stay text matches and say why in a comment, and so does the `#registry` branch. The case becomes `cuemod.IsFetchNotFound(err) || strings.Contains(msg, "cannot find package") || strings.Contains(msg, "cannot expand module graph")`. Section 1 pins the hint for each form the kernel produces on a platform directory (unpublished pin, a pinned catalog whose archive blob answers 404, undeclared import, `#registry` key mismatch, wrong kind, unreachable registry). `IsFetchNotFound` is broader than the text `module not found` (it also covers a `404 Not Found` status and the versioned `cannot find module providing package`) and narrower where `cannot do HTTP request` appears in the same message (unreachable wins), so the hint can change for those forms; a hint is not an exit code, and the pin records what the 404 form gets.
 
 The three readers live together in `internal/cuemod/connectivity.go` beside `IsConnectivityError`: `IsFetchNotFound(err)` (kind `FetchNotFound`, any status) and `IsVersionNotHeld(err)` (D2). `internal/cuemod` imports no other cli package, and `internal/publish` already imports it, so `internal/config` and `internal/publish` both read them with no import cycle (checked with `go list -deps`).
 
-### D5. Library bump and the objectset swap ride together, first
+### D5. Library bump and the objectset swap ride together, after the pins
 
-`go get github.com/open-platform-model/library@v1.0.0-beta.6` moves only that line (`cuelang.org/go` stays v0.17.1; checked with a scratch modfile, `go build ./...` passes). `opm/k8s/object` has the same `Duplicates` and `DuplicateIdentitiesError` as the deprecated `opm/helper/objectset`. The cli builds the error itself (`render.go:318-319`) and matches it with `errors.As` (`validation.go:60`), so both move in one commit and the refusal text does not change. Keeping objectset would leave two SA1019 findings in `task lint`, so the swap cannot wait for the later tier-adoption change.
+`go get github.com/open-platform-model/library@v1.0.0-beta.6` moves only that line (`cuelang.org/go` stays v0.17.1; checked with a scratch modfile, `go build ./...` passes). `opm/k8s/object` has the same `Duplicates`, `Duplicate`, `Identity`, `Producer` and `DuplicateIdentitiesError` as the deprecated `opm/helper/objectset`; the two render files and their two test files move. The cli builds the error itself (`render.go:318-319`) and matches it with `errors.As` (`validation.go:60`), so both move in one commit and the refusal text does not change. Keeping objectset would leave two SA1019 findings in `task lint`, so the swap cannot wait for the later tier-adoption change.
 
-beta.6 moves the kernel's default core to `opmodel.dev/core@v2.0.0-beta.4`. The cli's templates, `hack/platform` and fixtures pin core v2.0.0-beta.1, which the cascade moves separately. Section 1 runs the whole unit suite on the bump alone; a failure there is fixed in section 1 (or reported) before any probe changes.
+beta.6 moves the kernel's default core to `opmodel.dev/core@v2.0.0-beta.4`. The cli's templates, `hack/platform` and fixtures pin core v2.0.0-beta.1, which the cascade moves separately. Section 2 runs the whole unit suite on the bump alone, with the section 1 pins unchanged; a failure there is fixed in section 2 (or reported) before any probe changes.
 
 ### Test harness
 
@@ -121,12 +123,16 @@ The pin tests need registries that answer with a chosen status. `internal/cuemod
 
 ## Risks / Trade-offs
 
-- [The blob-404 row is not measured yet] → D2: section 2 pins it before section 3 relies on it; no typed signal means stop and report, never text.
+- [The blob-404 row is not measured yet] → D2: the section 1 spike pins it before section 3 relies on it; no typed signal means stop and report, never text.
 - [`Classify`'s text fallback reads CUE's text, so a CUE bump can still move a classification] → the library pins each form against the embedded CUE (`TestCUEFailureForms`) and fails on a change. The cli's pin tests run through real registries too, so a moved form also fails here, before a release.
 - [The disambiguating fetch in D3 adds a registry call on the not-found path] → it only runs on a failure, and the module cache makes it free for a present build.
-- [beta.6 brings unrelated library changes into the same PR] → section 1 isolates them; the PR body names it so the reviewer reads section 1's diff on its own.
+- [beta.6 brings unrelated library changes into the same PR] → section 2 isolates them, after section 1 pinned the answers on beta.4; the PR body names it so the reviewer reads section 2's diff on its own.
 - [A 5xx during `instance init`'s acquire exits 1 though the library calls it transient] → kept on purpose (no exit code moves). Changing it to 3 is a separate, visible decision for the owner.
+
+## Spike findings
+
+Section 1 writes the measured answers here.
 
 ## Migration Plan
 
-None. No exit code or flag changes; one help line gains the exit code 5 the command already returns. Rollback is a revert of the PR; the library bump can stay.
+None. No exit code, flag or help text changes. Rollback is a revert of the PR; the library bump can stay.
