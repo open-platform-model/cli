@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # cascade.sh: task deps:cascade. Moves the cli's upstream pins (library, the
-# embedded opm-operator, and the opm catalog and core in the templates and test
-# trees) to the newest published versions the release cascade allows, in the
-# working tree only: no commit, no branch, no push.
+# operator module pin in internal/operator/pin.go, and the opm catalog and core
+# in the templates and test trees) to the newest published versions the release
+# cascade allows, in the working tree only: no commit, no branch, no push.
 #
 # Design: workspace RELEASING.md, "The cascade" and "What each repo's task
 # moves"; Phase 2 cascade contract §5.2 and §6.4; openspec change
 # add-deps-cascade-task, design.md D3 to D9. The shared resolver
 # ($CASCADE_RESOLVER) answers every version question.
 #
-# It runs no code from a moved dependency: the only Go program it builds is
-# opm, from an export of the merge base $M, never from the work tree. In merge
+# It runs no code from a moved dependency: the only Go programs it builds are
+# opm and hack/operator-pin, from an export of the merge base $M, never from
+# the work tree. In merge
 # mode the work tree is deps/cascade with main merged in, so it may already
 # pin a library an earlier run moved; the merge base is main. The docs-bundle
 # check, which runs hack/docskit-dump and so links the moved library, lives in
@@ -32,7 +33,8 @@ RES=$CASCADE_RESOLVER
 cd "$(git rev-parse --show-toplevel)"
 
 LIB=github.com/open-platform-model/library
-OP=github.com/open-platform-model/opm-operator
+MOD=opmodel.dev/modules/opm_operator@v0
+PIN=internal/operator/pin.go
 CAT=opmodel.dev/catalogs/opm@v4
 CORE=opmodel.dev/core@v2
 POD=testing.opmodel.dev/modules/cli/podinfo@v0
@@ -93,6 +95,11 @@ warn() {
   printf 'cascade: warning: %s\n' "$2" >&2
   printf '%s\t%s\n' "$1" "$2" >>"$CASCADE_WARNINGS"
 }
+
+# The merge base: version advances count from it, and the Go programs the
+# task runs are built from its export (see the header).
+BASE_REF=${CASCADE_BASE:-origin/main}
+M=$(git merge-base "$BASE_REF" HEAD) || die "no merge base between \`$BASE_REF\` and HEAD"
 
 REGISTRY='testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works'
 export CUE_REGISTRY="$REGISTRY" OPM_REGISTRY="$REGISTRY" GOWORK=off
@@ -233,6 +240,17 @@ f_changed() {
   return 0
 }
 
+# build_base PKG NAME: build the cli package PKG from an export of the merge
+# base into $STATE/bin/NAME, never from the work tree, which in merge mode may
+# carry an earlier run's library move that no one has reviewed.
+build_base() {
+  rm -rf "$STATE/$2-src"
+  mkdir -p "$STATE/bin" "$STATE/$2-src"
+  git archive "$M" | tar -x -C "$STATE/$2-src"
+  go build -C "$STATE/$2-src" -buildvcs=false -o "$STATE/bin/$2" "$1"
+  rm -rf "$STATE/$2-src"
+}
+
 # go_requires: every require line of go.mod as "path version".
 go_requires() {
   awk '/^require \($/ { f = 1; next } f && /^\)/ { f = 0 } f && NF >= 2 { print $1, $2 }
@@ -245,7 +263,9 @@ report() { # report DISPLAY FROM TO
 
 # ---------------------------------------------------------------------------
 # Phase A: resolve. Every call that decides a target runs here, before any
-# edit, so an error leaves the tree unchanged (contract §5.2 rule 5).
+# edit, so an error leaves the tree unchanged (contract §5.2 rule 5). The
+# operator module lane builds hack/operator-pin from the merge base here, not
+# in Phase B, because its select walk decides the target; still before any edit.
 
 r check-files --repo-root .
 [ "$RC" = 0 ] || die "check-files answered $RC"
@@ -256,11 +276,29 @@ newest "$LIB" go "$LIB" --current "$LIB_CUR" --repo-root .
 LIB_T=$NEW
 report library "$LIB_CUR" "$LIB_T"
 
-OP_CUR=$(sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p' internal/operator/manifest.go)
-[ -n "$OP_CUR" ] || die "internal/operator/manifest.go has no PinnedOperatorVersion"
-newest "$OP" release opm-operator --asset install.yaml --current "$OP_CUR" --repo-root .
-OP_T=$NEW
-report opm-operator "$OP_CUR" "$OP_T"
+# The operator module: the newest published release in the pinned major whose
+# operator MAJOR.MINOR is not above the cli's, the rule install applies to a
+# target (0021:D9:R4). The resolver answers the newest release; operator-pin
+# walks down from it, reading each candidate's operator package (no render).
+# operator-pin is built from the merge base, and also writes the pin in Phase C.
+MOD_CUR=$(sed -n 's/^const PinnedModuleVersion = "\(.*\)"$/\1/p' "$PIN")
+[ -n "$MOD_CUR" ] || die "\`$PIN\` has no PinnedModuleVersion"
+MOD_CUR=v$MOD_CUR
+newest "$MOD" cue "$MOD" --current "$MOD_CUR" --repo-root .
+MOD_T=""
+if [ -n "$NEW" ]; then
+  CLI_V=$(jq -er '."."' .release-please-manifest.json) || die "cannot read the cli version from .release-please-manifest.json"
+  build_base ./hack/operator-pin operator-pin
+  SEL_RC=0
+  SEL=$("$STATE/bin/operator-pin" select "$NEW" "$CLI_V") || SEL_RC=$?
+  case "$SEL_RC" in
+    0) if [ "v$SEL" != "$MOD_CUR" ]; then MOD_T=v$SEL; fi ;;
+    3) warn "$MOD" "no \`$MOD\` release up to \`$NEW\` deploys an operator the cli \`$CLI_V\` can drive; the pin stays" ;;
+    *) die "\`hack/operator-pin select $NEW $CLI_V\` failed (exit $SEL_RC)" "$SEL_RC" ;;
+  esac
+  if [ -n "$MOD_T" ]; then vcmp "$MOD_T" "$MOD_CUR"; if [ "$CMP" != 1 ]; then MOD_T=""; fi; fi
+fi
+report "opm-operator module" "$MOD_CUR" "$MOD_T"
 
 CAT_REP=$(cue_dep_v "$REP/cue.mod/module.cue" "$CAT")
 [ -n "$CAT_REP" ] || die "\`$REP/cue.mod/module.cue\` pins no \`$CAT\`"
@@ -344,8 +382,6 @@ elif [ "$CMP" = 1 ]; then
 fi
 
 # Version advances, once per PR (design.md D6; contract §5.2 rule 11).
-BASE_REF=${CASCADE_BASE:-origin/main}
-M=$(git merge-base "$BASE_REF" HEAD) || die "no merge base between \`$BASE_REF\` and HEAD"
 declare -A ADV_B=() ADV_T=() ADV_FINAL=()
 for d in "${ADV_DIRS[@]}"; do
   i="$d/identity/identity.cue"
@@ -433,7 +469,7 @@ done
 
 # Anything to do?
 work=0
-if [ -n "$LIB_T" ] || [ -n "$OP_T" ] || [ -n "$KIND_T" ]; then work=1; fi
+if [ -n "$LIB_T" ] || [ -n "$MOD_T" ] || [ -n "$KIND_T" ]; then work=1; fi
 for d in "${CUE_DIRS[@]}"; do if [ -n "${MOVES[$d]}" ]; then work=1; fi; done
 if [ "${#ADV_T[@]}" -gt 0 ] || [ "${#REPIN[@]}" -gt 0 ]; then work=1; fi
 
@@ -455,25 +491,19 @@ fi
 # cannot stop the task from producing its diff (contract rule 11).
 
 # cue only when a cue.mod runs get and tidy, opm only for a version advance,
-# so a library- or operator-only run needs neither.
+# so a library- or operator-module-only run needs neither.
 for d in "${CUE_DIRS[@]}"; do
   if [ -n "${MOVES[$d]}" ]; then command -v cue >/dev/null || die "cue is not on PATH"; break; fi
 done
 if [ "${#ADV_T[@]}" -gt 0 ]; then
-  # opm comes from the merge base, not the work tree: in merge mode the work
-  # tree may carry an earlier run's library move that no one has reviewed.
-  rm -rf "$STATE/opm-src"
-  mkdir -p "$STATE/bin" "$STATE/opm-src"
-  git archive "$M" | tar -x -C "$STATE/opm-src"
-  go build -C "$STATE/opm-src" -buildvcs=false -o "$STATE/bin/opm" ./cmd/opm
-  rm -rf "$STATE/opm-src"
+  build_base ./cmd/opm opm
 fi
 
 # ---------------------------------------------------------------------------
 # Phase C: edit (contract §5.2 rule 12 and §6.4). A failure here exits
 # non-zero and may leave a partly edited tree; callers discard it.
 
-# 1. Shipped: library, then the operator embed.
+# 1. Shipped: library, then the operator module pin.
 if [ -n "$LIB_T" ]; then
   before=$(go_requires)
   go get "$LIB@$LIB_T"
@@ -487,8 +517,9 @@ if [ -n "$LIB_T" ]; then
     fi
   done <<<"$after"
 fi
-if [ -n "$OP_T" ]; then
-  task -x operator:sync VERSION="$OP_T" >&2
+if [ -n "$MOD_T" ]; then
+  # task operator:pin's program, built from the merge base in Phase A.
+  "$STATE/bin/operator-pin" "${MOD_T#v}" >&2
 fi
 
 # 2. Catalog and core: templates first, then the test trees (CUE_DIRS order).

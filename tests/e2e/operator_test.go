@@ -5,25 +5,23 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/open-platform-model/cli/internal/operator"
 )
 
 // kindContext is the kind cluster context these tests run against. Matches
 // TestMain's dummy config.cue and the workspace's `task cluster:create`.
 const kindContext = "kind-opm-dev"
 
-// pinnedInstallYAML locates the embedded operator manifest so the pinned
-// image reference can be read directly, instead of duplicating it here where
-// it would silently go stale after a `task operator:sync`.
-const pinnedInstallYAMLRelPath = "../../internal/operator/dist/install.yaml"
-
-var pinnedImageRe = regexp.MustCompile(`image:\s*(\S+)`)
+// operatorImageRepository is the repository the operator module renders the
+// controller image from by default.
+const operatorImageRepository = "ghcr.io/open-platform-model/opm-operator"
 
 // requireClusterEnv opts a run into treating a missing or unusable cluster as
 // a failure. CI's cluster job sets it, so a cluster-backed test cannot pass by
@@ -64,18 +62,12 @@ func requireKindCluster(t *testing.T) string {
 	return kubeconfig
 }
 
-// pinnedOperatorImage reads the pinned image reference out of the embedded
-// manifest, so the pull-reachability check always matches what `install`
-// actually applies.
+// pinnedOperatorImage is the image the pinned operator module deploys,
+// composed from the operator version the CLI records beside the module pin,
+// so the pull-reachability check matches what `install` applies.
 func pinnedOperatorImage(t *testing.T) string {
 	t.Helper()
-
-	data, err := os.ReadFile(pinnedInstallYAMLRelPath)
-	require.NoError(t, err)
-
-	m := pinnedImageRe.FindSubmatch(data)
-	require.NotNil(t, m, "could not find image: reference in %s", pinnedInstallYAMLRelPath)
-	return string(m[1])
+	return operatorImageRepository + ":" + operator.PinnedOperatorVersion
 }
 
 // imagePullable reports whether the pinned operator image's manifest is
@@ -195,29 +187,37 @@ func restoreDevOperator(t *testing.T) {
 	}
 }
 
-// resetOperatorCluster removes everything the operator manifest can create,
+// resetOperatorCluster removes everything an operator install can create,
 // including CRDs and the Namespace (which `opm operator uninstall` itself
 // deliberately never touches), so each e2e run starts from a clean slate.
 func resetOperatorCluster(t *testing.T, kubeconfig string) {
 	t.Helper()
 	stripAllModuleInstanceFinalizers(t, kubeconfig)
 	kubectlDeleteIfExists(t, kubeconfig, "moduleinstances.opmodel.dev", "--all-namespaces", "--all")
-	kubectlDeleteIfExists(t, kubeconfig, "crd", "moduleinstances.opmodel.dev", "modulepackages.opmodel.dev", "platforms.opmodel.dev")
+	kubectlDeleteIfExists(t, kubeconfig, append([]string{"crd"}, operator.CRDNames()...)...)
 	kubectlDeleteIfExists(t, kubeconfig, "namespace", "opm-operator-system")
 	kubectlDeleteIfExists(t, kubeconfig, "clusterrole", "opm-cli-user",
 		"opm-operator-manager-role", "opm-operator-metrics-auth-role", "opm-operator-metrics-reader",
-		"opm-operator-moduleinstance-admin-role", "opm-operator-moduleinstance-editor-role", "opm-operator-moduleinstance-viewer-role")
+		"opm-operator-moduleinstance-admin-role", "opm-operator-moduleinstance-editor-role", "opm-operator-moduleinstance-viewer-role",
+		"opm-operator-transformerregistration-admin-role",
+		"opm-operator-platform-viewer-role", "opm-operator-modulepackage-viewer-role",
+		"opm-operator-transformerregistration-viewer-role")
+	// The module names each binding after its role; an earlier manifest
+	// install named them "-rolebinding".
 	kubectlDeleteIfExists(t, kubeconfig, "clusterrolebinding", "opm-cli-user",
+		"opm-operator-manager-role", "opm-operator-metrics-auth-role",
 		"opm-operator-manager-rolebinding", "opm-operator-metrics-auth-rolebinding")
 }
 
 // TestE2E_Operator_InstallUninstallLifecycle exercises the full
 // `opm operator install`/`uninstall` lifecycle against a real kind cluster:
-// full install (waiting for readiness if the pinned image is reachable, else
-// just CRD-established + Deployment-created — design risk 1), idempotent
+// full install of the pinned operator module (waiting for readiness if the
+// pinned image is reachable, else just CRD-established + Deployment-created —
+// design risk 1) recorded as the CLI-owned instance opm-operator, idempotent
 // re-install, uninstall's finalizer guard and its --remove-finalizers
-// override (CRDs/Namespace surviving throughout), and a solo --crds-only
-// install onto a freshly reset cluster.
+// override deleting from the record (CRDs/Namespace surviving throughout),
+// uninstall's refusal without a record, and a solo --crds-only install onto
+// a freshly reset cluster.
 // This test is DESTRUCTIVE: resetOperatorCluster deletes the CRDs, the
 // opm-operator-system Namespace, and every ModuleInstance, which tears down the
 // reconciling operator that the operator-owned tests require. Those tests
@@ -267,6 +267,18 @@ func TestE2E_Operator_InstallUninstallLifecycle(t *testing.T) {
 		assertCRDEstablished(t, kubeconfig, "transformerregistrations.opmodel.dev")
 		assertResourceExists(t, kubeconfig, "namespace", "", "opm-operator-system")
 		assertResourceExists(t, kubeconfig, "deployment", "opm-operator-system", "opm-operator-controller-manager")
+
+		// The install is recorded: a CLI-owned instance of the pinned module
+		// whose inventory lists the CRDs and the Namespace too.
+		owner := kubectlOut(t, kubeconfig, "get", "moduleinstance", "opm-operator", "-n", "opm-operator-system",
+			"-o", "jsonpath={.spec.owner}")
+		assert.Equal(t, "cli", owner)
+		kinds := kubectlOut(t, kubeconfig, "get", "moduleinstance", "opm-operator", "-n", "opm-operator-system",
+			"-o", "jsonpath={.status.inventory.entries[*].kind}")
+		assert.Equal(t, 4, strings.Count(kinds, "CustomResourceDefinition"), "inventory kinds: %s", kinds)
+		assert.Contains(t, kinds, "Namespace")
+		assert.Contains(t, kinds, "Deployment")
+		assert.Contains(t, stderr, operator.PinnedOperatorVersion, "the output names the operator version")
 	})
 
 	t.Run("idempotent re-install reports unchanged", func(t *testing.T) {
@@ -305,9 +317,20 @@ func TestE2E_Operator_InstallUninstallLifecycle(t *testing.T) {
 			"-o", "jsonpath={.metadata.finalizers}")
 		assert.JSONEq(t, `["example.com/foreign"]`, finalizers)
 
-		// CRDs and the Namespace survive uninstall.
+		// CRDs and the Namespace survive uninstall; the record is gone.
 		assertCRDEstablished(t, kubeconfig, "moduleinstances.opmodel.dev")
 		assertResourceExists(t, kubeconfig, "namespace", "", "opm-operator-system")
+		out := kubectlOut(t, kubeconfig, "get", "moduleinstance", "opm-operator", "-n", "opm-operator-system",
+			"--ignore-not-found", "-o", "name")
+		assert.Empty(t, out, "uninstall deletes the operator's instance record")
+	})
+
+	t.Run("uninstall without a record refuses and deletes nothing", func(t *testing.T) {
+		_, stderr, err := runOPMWithEnv(t, tmpDir, homeDir, 30*time.Second,
+			"operator", "uninstall", "--kubeconfig", kubeconfig, "--context", kindContext)
+		require.Error(t, err)
+		assert.Contains(t, stderr, "opm operator install")
+		assertCRDEstablished(t, kubeconfig, "moduleinstances.opmodel.dev")
 	})
 
 	t.Run("install immediately after uninstall waits out the terminating Deployment", func(t *testing.T) {

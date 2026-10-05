@@ -56,21 +56,10 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	}
 	mod := src.module
 
-	values, err := ResolveModuleValues(k, mod.Package, src.valuesOrigin, opts.ValuesFiles)
+	values, err := moduleValues(k, src, opts)
 	if err != nil {
 		printValidationError(err)
 		return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
-	}
-
-	// -f files are checked against #config before synthesis, so a conflict
-	// or a violation is attributed to the file it came from and a cheap
-	// failure never reaches the synthesized build. debugValues are left to
-	// the build itself.
-	if len(opts.ValuesFiles) > 0 {
-		if err := validateValuesFiles(k, mod.ConfigSchema(), values); err != nil {
-			printValidationError(err)
-			return nil, &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
-		}
 	}
 
 	modName, synthName, synthNamespace := syntheticIdentity(mod, opts, namespace)
@@ -92,7 +81,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	// (after the cluster Platform, for module apply); the deps are read from
 	// the acquired source.
 	var deps *platform.ModuleDeps
-	if opts.PlatformFlag == "" {
+	if opts.PlatformFlag == "" || opts.DepsOnly {
 		deps, err = moduleDepsOf(mod.Source, src.moduleRoot)
 		if err != nil {
 			printValidationError(err)
@@ -102,12 +91,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 
 	// Platform resolution + acquisition only after synthesis validated the
 	// values: cheap failures never hit the cluster or registry.
-	env, err := resolvePlatformEnv(ctx, k, opts.Config, platform.ResolveOptions{
-		PlatformFlag: opts.PlatformFlag,
-		Cluster:      opts.ClusterPlatform,
-		Deps:         deps,
-		DepsKind:     platform.DepsModule,
-	})
+	env, err := resolvePlatformEnv(ctx, k, opts.Config, opts.platformOptions(deps))
 	if err != nil {
 		return nil, err
 	}
@@ -119,6 +103,44 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	// after the render. A published module's bytes come from the registry: no
 	// local provenance, no module context.
 	return renderInstance(ctx, env, inst, opts.K8sConfig, src.moduleRoot, src.local)
+}
+
+// moduleValues returns the values sources of a module render: the caller's
+// Values, else -f files, else debugValues. -f files and caller-supplied
+// sources are checked against #config before synthesis, so a conflict or a
+// violation is attributed to the source it came from and a cheap failure
+// never reaches the synthesized build. debugValues are left to the build
+// itself.
+func moduleValues(k *kernel.Kernel, src *acquiredModule, opts ModuleOpts) ([]kernel.Source, error) {
+	values := opts.Values
+	if len(values) == 0 {
+		var err error
+		values, err = ResolveModuleValues(k, src.module.Package, src.valuesOrigin, opts.ValuesFiles)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(opts.ValuesFiles) > 0 || len(opts.Values) > 0 {
+		if err := validateValuesFiles(k, src.module.ConfigSchema(), values); err != nil {
+			return nil, err
+		}
+	}
+	return values, nil
+}
+
+// platformOptions is where the render's platform comes from: --platform,
+// then the cluster Platform, then deps. DepsOnly keeps only deps, so neither
+// the flag nor the cluster is consulted.
+func (o ModuleOpts) platformOptions(deps *platform.ModuleDeps) platform.ResolveOptions {
+	if o.DepsOnly {
+		return platform.ResolveOptions{Deps: deps, DepsKind: platform.DepsModule}
+	}
+	return platform.ResolveOptions{
+		PlatformFlag: o.PlatformFlag,
+		Cluster:      o.ClusterPlatform,
+		Deps:         deps,
+		DepsKind:     platform.DepsModule,
+	}
 }
 
 // moduleLabel names the module for logs: the directory, or
@@ -219,7 +241,10 @@ func syntheticIdentity(mod *module.Module, opts ModuleOpts, namespace string) (m
 		synthName = strings.ReplaceAll(modName, "_", "-") + "-debug"
 	}
 	synthNamespace = defaultNamespace
-	if s := opts.K8sConfig.Namespace.Source; s == config.SourceFlag || s == config.SourceEnv {
+	switch s := opts.K8sConfig.Namespace.Source; {
+	case opts.Namespace != "":
+		synthNamespace = opts.Namespace
+	case s == config.SourceFlag || s == config.SourceEnv:
 		synthNamespace = namespace
 	}
 	return modName, synthName, synthNamespace

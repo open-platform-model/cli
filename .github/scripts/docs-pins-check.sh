@@ -13,8 +13,11 @@
 #   (default)        print one line per problem on stdout; exit 1 if any.
 #                    G1 (release-pin-check.sh) runs this mode.
 #   --moved-from REV check only when the library version in go.mod or
-#                    PinnedOperatorVersion differs between REV and the work
-#                    tree; otherwise say so and exit 0.
+#                    PinnedOperatorVersion (internal/operator/pin.go; at a REV
+#                    from before the operator module pin, manifest.go) differs
+#                    between REV and the work tree; otherwise say so and exit
+#                    0. A module pin move that deploys the same operator
+#                    changes no docs pin, so it checks nothing.
 #   --warn           every problem, a failed build or lookup included, is a
 #                    GitHub warning annotation (and a job-summary line when
 #                    GITHUB_STEP_SUMMARY is set); exit 0. pr.yml's Lint job
@@ -40,7 +43,10 @@ while [ "$#" -gt 0 ]; do
 done
 
 LIB=github.com/open-platform-model/library
-MANIFEST=internal/operator/manifest.go
+PIN=internal/operator/pin.go
+# Where PinnedOperatorVersion lived before the operator module pin replaced
+# the embedded manifest; only a base revision can still have it.
+OLD_PIN=internal/operator/manifest.go
 
 problems=0
 problem() {
@@ -61,19 +67,22 @@ lib_of() { awk -v m="$LIB" '$1 == m { print $2; exit }'; }
 op_of() { sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p'; }
 
 if [ -n "$moved_from" ]; then
+  base_pin=$PIN
+  if ! git cat-file -e "$moved_from:$PIN" 2>/dev/null; then base_pin=$OLD_PIN; fi
   if ! base_gomod=$(git show "$moved_from:go.mod" 2>/dev/null) ||
-    ! base_manifest=$(git show "$moved_from:$MANIFEST" 2>/dev/null); then
-    problem "docs bundles not checked: cannot read go.mod and $MANIFEST at $moved_from"
+    ! base_pinfile=$(git show "$moved_from:$base_pin" 2>/dev/null); then
+    problem "docs bundles not checked: cannot read go.mod and $base_pin at $moved_from"
     finish
   fi
   lib_base=$(lib_of <<<"$base_gomod")
-  op_base=$(op_of <<<"$base_manifest")
+  op_base=$(op_of <<<"$base_pinfile")
   lib_tree=$(lib_of <go.mod)
-  op_tree=$(op_of <"$MANIFEST")
-  # An empty read means go.mod or the manifest changed shape; two empty reads
+  op_tree=""
+  if [ -f "$PIN" ]; then op_tree=$(op_of <"$PIN"); fi
+  # An empty read means go.mod or the pin file changed shape; two empty reads
   # would compare equal and skip the check without a word.
   if [ -z "$lib_base" ] || [ -z "$lib_tree" ] || [ -z "$op_base" ] || [ -z "$op_tree" ]; then
-    problem "docs bundles not checked: cannot read the $LIB version in go.mod or PinnedOperatorVersion in $MANIFEST (base ${lib_base:-?}/${op_base:-?}, tree ${lib_tree:-?}/${op_tree:-?})"
+    problem "docs bundles not checked: cannot read the $LIB version in go.mod or PinnedOperatorVersion in $PIN ($base_pin at the base) (base ${lib_base:-?}/${op_base:-?}, tree ${lib_tree:-?}/${op_tree:-?})"
     finish
   fi
   if [ "$lib_tree" = "$lib_base" ] && [ "$op_tree" = "$op_base" ]; then
@@ -100,8 +109,12 @@ docs_bundle_status() {
     "https://${docs_registry}/v2/${docs_repo}/$1/manifests/$2" 2>/dev/null || true
 }
 
-if ! docs_pins=$(go run ./hack/docskit-dump pins 2>&1); then
-  problem "hack/docskit-dump pins failed: $(tr '\n' ' ' <<<"$docs_pins")"
+# stderr apart from the JSON: on a cold module cache go run prints its
+# "go: downloading" lines there, which would break the jq read below.
+dump_err=$(mktemp)
+trap 'rm -f "$dump_err"' EXIT
+if ! docs_pins=$(go run ./hack/docskit-dump pins 2>"$dump_err"); then
+  problem "hack/docskit-dump pins failed: $(tr '\n' ' ' <"$dump_err")"
   finish
 fi
 if ! entries=$(jq -er '.pins | to_entries[] | "\(.key) \(.value)"' <<<"$docs_pins"); then
