@@ -85,12 +85,12 @@ In section 2 only identifiers in these files change (`HealthReady` becomes `heal
 
 **Options considered**:
 1. A `depguard` or `forbidigo` rule. `depguard` works on import paths; `forbidigo` forbids uses of identifiers, not declarations, and would not catch a renamed copy either.
-2. A unit test that parses every non-test `.go` file under the repo root (skipping `.git`, `.claude`, `testdata` and `vendor`) with `go/parser` and fails on a top-level declaration named `HealthStatus`, `EvaluateHealth`, `QuickInstanceHealth`, `IsHealthy`, or any function whose name starts with `evaluate` and ends with `Health`.
+2. A unit test that parses every non-test `.go` file under the repo root (skipping `.git`, `.claude`, `testdata` and `vendor`) with `go/parser` and fails on a top-level declaration named `HealthStatus`, `EvaluateHealth`, `QuickInstanceHealth`, `IsHealthy`, or any function whose name starts with `evaluate` and ends with `Health`. In `internal/kubernetes`, where the copy lived, it also fails on a top-level type alias or value bound directly to a name of the library package (`type Status = health.Status`, `var Healthy = health.IsHealthy`), under whatever name the file imports it.
 3. No check, relying on review.
 
 **Decision**: option 2, in `internal/kubernetes/health_refusal_test.go`, with a doc comment citing 0012:D3:R6 and naming the library package to use instead.
 
-**Rationale**: it runs in `task test:unit` and CI with no new tool. It is name-based, so it catches the copy coming back as it was, not a rewritten evaluator under new names; that residual is held by review, as 0012 holds other imports. The test proves it fires by running the same scan over an in-memory source that declares `func EvaluateHealth`.
+**Rationale**: it runs in `task test:unit` and CI with no new tool. It is name-based, so it catches the copy coming back as it was, not a rewritten evaluator under new names; that residual is held by review, as 0012 holds other imports. The test proves it fires by running the same scans over in-memory sources that declare `func EvaluateHealth` and re-export the library's names.
 
 ### KH6. Specs: retire `health-export`, add `health-evaluation`
 
