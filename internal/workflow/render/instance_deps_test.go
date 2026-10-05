@@ -57,7 +57,7 @@ func writeInitInstance(t *testing.T, k *kernel.Kernel) string {
 	if err != nil {
 		t.Skipf("podinfo fixture unavailable (registry/cache): %v", err)
 	}
-	values, source, err := instinit.PickValues(mod.Package)
+	values, source, err := instinit.PickValues(mod)
 	require.NoError(t, err)
 	files, err := instinit.Render(instinit.Input{
 		Name:              "hello",

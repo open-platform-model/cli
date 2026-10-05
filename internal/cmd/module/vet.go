@@ -143,7 +143,7 @@ func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath 
 	// Resolve the values to validate against #config: -f files as
 	// file-backed kernel sources, else debugValues as one source attributed
 	// to the module's debugValues.
-	sources, err := render.ResolveModuleValues(k, mod.Package, modulePath, rf.Values)
+	sources, err := render.ResolveModuleValues(k, mod, modulePath, rf.Values)
 	if err != nil {
 		// A -f file that cannot be read or parsed is an input error, not a
 		// verdict on the module; a module without debugValues is.

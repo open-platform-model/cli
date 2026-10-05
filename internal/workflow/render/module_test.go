@@ -15,7 +15,6 @@ import (
 
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
-	"github.com/open-platform-model/library/opm/schema"
 
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -59,14 +58,14 @@ func TestFromModule_RejectsInstancePackage(t *testing.T) {
 }
 
 // packageWithConfig compiles a bare module package value carrying a #config
-// schema and optional debugValues, as ResolveModuleValues reads them. It
-// needs no kernel: the kernel compiles values sources in the schema value's
-// own context.
-func packageWithConfig(t *testing.T, src string) cue.Value {
+// schema and optional debugValues, wrapped as the module ResolveModuleValues
+// reads them from. It needs no kernel: the kernel compiles values sources in
+// the schema value's own context.
+func packageWithConfig(t *testing.T, src string) *module.Module {
 	t.Helper()
 	pkg := cuecontext.New().CompileString(src)
 	require.NoError(t, pkg.Err())
-	return pkg
+	return &module.Module{Package: pkg}
 }
 
 // TestResolveModuleValues_UsesValuesFile asserts that supplied -f files are
@@ -112,7 +111,7 @@ func TestValidateValuesFiles_ConflictNamesTheFile(t *testing.T) {
 
 	sources, err := ResolveModuleValues(k, pkg, dir, []string{f1, f2})
 	require.NoError(t, err)
-	err = validateValuesFiles(k, pkg.LookupPath(schema.Config), sources)
+	err = validateValuesFiles(k, pkg.ConfigSchema(), sources)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "conflicting values")
 	assert.True(t, positionsName(err, "b.cue"), "the conflict must be attributed to a values file: %v", cueerrors.Positions(err))
@@ -139,7 +138,7 @@ func TestValidateValuesFiles_SchemaViolationRejected(t *testing.T) {
 
 	sources, err := ResolveModuleValues(k, pkg, "mod", []string{valuesFile})
 	require.NoError(t, err)
-	err = validateValuesFiles(k, pkg.LookupPath(schema.Config), sources)
+	err = validateValuesFiles(k, pkg.ConfigSchema(), sources)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "field not allowed")
 	assert.True(t, positionsName(err, "values.cue"), "the violation must be attributed to the values file: %v", cueerrors.Positions(err))
@@ -151,7 +150,7 @@ func TestValidateValuesFiles_NoConfigSchema(t *testing.T) {
 	k := kernel.New()
 	pkg := packageWithConfig(t, `{metadata: name: "x"}`)
 
-	err := validateValuesFiles(k, pkg.LookupPath(schema.Config), nil)
+	err := validateValuesFiles(k, pkg.ConfigSchema(), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "#config")
 }
@@ -169,7 +168,7 @@ func TestResolveModuleValues_FallbackDebugValues(t *testing.T) {
 	assert.Equal(t, filepath.Join("mod", "debugValues"), values[0].Origin)
 	// A Source carries bytes the kernel compiles where it uses them: read the
 	// field's data back through the validation primitive.
-	merged, err := k.ValidateConfigDetailed(pkg.LookupPath(schema.Config), values)
+	merged, err := k.ValidateConfigDetailed(pkg.ConfigSchema(), values)
 	require.NoError(t, err)
 	replicas, err := merged.LookupPath(cue.ParsePath("replicas")).Int64()
 	require.NoError(t, err)

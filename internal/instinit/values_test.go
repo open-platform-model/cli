@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/open-platform-model/library/opm/module"
+
 	"github.com/open-platform-model/cli/internal/config"
 )
 
@@ -26,7 +28,7 @@ func TestPickValues_AcquiredModule(t *testing.T) {
 	mod, err := k.AcquireModuleFromDir(context.Background(), dir)
 	require.NoError(t, err)
 
-	values, source, err := PickValues(mod.Package)
+	values, source, err := PickValues(mod)
 	require.NoError(t, err)
 	assert.Equal(t, FromInitValues, source)
 
@@ -138,7 +140,7 @@ func TestPickValues(t *testing.T) {
 			pkg := cuecontext.New().CompileString(tc.src)
 			require.NoError(t, pkg.Err())
 
-			got, source, err := PickValues(pkg)
+			got, source, err := PickValues(&module.Module{Package: pkg})
 			require.NoError(t, err)
 			assert.Equal(t, tc.source, source)
 			assert.Equal(t, tc.want, string(got))
@@ -150,7 +152,7 @@ func TestPickValues(t *testing.T) {
 func TestPickValues_RendersIntoValuesFile(t *testing.T) {
 	pkg := cuecontext.New().CompileString(`debugValues: {image: {repository: "ghcr.io/x", tag: string | *"1.0"}, replicas: 1}`)
 	require.NoError(t, pkg.Err())
-	values, source, err := PickValues(pkg)
+	values, source, err := PickValues(&module.Module{Package: pkg})
 	require.NoError(t, err)
 
 	in := webAppInput(t)
@@ -176,4 +178,13 @@ func TestIsEmpty(t *testing.T) {
 	assert.True(t, IsEmpty([]byte("{\n}\n")))
 	assert.False(t, IsEmpty([]byte("{a: 1}")))
 	assert.False(t, IsEmpty([]byte("[]")))
+}
+
+// TestPickValues_NilModule: a nil module has neither initValues nor
+// debugValues, so the ladder walks to empty.
+func TestPickValues_NilModule(t *testing.T) {
+	values, source, err := PickValues(nil)
+	require.NoError(t, err)
+	assert.Equal(t, FromEmpty, source)
+	assert.True(t, IsEmpty(values))
 }
