@@ -96,3 +96,39 @@ func TestComputeRenderDigest_DoesNotMutateInput(t *testing.T) {
 		assert.Same(t, original[i], r, "input order must not be mutated")
 	}
 }
+
+// goldenRenderDigest is the digest of renderResources at the base of the
+// move to the library's opm/k8s/object export. It must not move until the
+// cli adopts the library's shared render digest with the operator, which
+// changes every stored digest once, on purpose.
+const goldenRenderDigest = "sha256:0404868537e1114e9ea6e7d02af68ba6a4693531727c4be713212753de6840ae"
+
+func TestComputeRenderDigest_Golden(t *testing.T) {
+	d, err := ComputeRenderDigest(renderResources(t))
+	require.NoError(t, err)
+	assert.Equal(t, goldenRenderDigest, d)
+}
+
+// multiSlashResources holds an object whose apiVersion has two slashes. Its
+// group is the apiVersion up to the last slash ("a/b"), so it sorts after
+// "" and "apps" but before "z". A sort key that parsed the apiVersion as a
+// group-version would empty the key and move it, changing the digest.
+func multiSlashResources(t *testing.T) []*pkgcore.Resource {
+	t.Helper()
+	return []*pkgcore.Resource{
+		cueResource(t, `apiVersion: "z/v1", kind: "Zed", metadata: {name: "z", namespace: "ns"}`),
+		cueResource(t, `apiVersion: "a/b/c", kind: "Odd", metadata: {name: "odd", namespace: "ns"}`),
+		cueResource(t, `apiVersion: "v1", kind: "ConfigMap", metadata: {name: "config", namespace: "ns"}`),
+		cueResource(t, `apiVersion: "apps/v1", kind: "Deployment", metadata: {name: "app", namespace: "ns"}`),
+	}
+}
+
+// goldenMultiSlashDigest is the digest of multiSlashResources at the base of
+// the move; see goldenRenderDigest.
+const goldenMultiSlashDigest = "sha256:43021f99cc1864b793c40493c4d0c196a8b7a7f58c528d728d8986d1388e378e"
+
+func TestComputeRenderDigest_MultiSlashGolden(t *testing.T) {
+	d, err := ComputeRenderDigest(multiSlashResources(t))
+	require.NoError(t, err)
+	assert.Equal(t, goldenMultiSlashDigest, d)
+}
