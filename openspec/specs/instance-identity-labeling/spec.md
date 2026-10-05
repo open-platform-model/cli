@@ -109,7 +109,7 @@ The label keys for identity labels SHALL be defined as constants alongside exist
 
 ### Requirement: Runtime identity injected via catalog mandatory field
 
-The CLI's `mod apply` (and any other render entrypoint that produces Kubernetes resources) MUST fill the catalog's `#TransformerContext.#runtimeName` field with `core.LabelManagedByValue` (`"opm-cli"`). The catalog declares `#runtimeName` as a mandatory field; CUE evaluation MUST fail if the CLI omits it. The `#runtimeName` value drives the `app.kubernetes.io/managed-by` label on every rendered resource.
+The CLI's `mod apply` (and any other render entrypoint that produces Kubernetes resources) MUST fill the catalog's `#TransformerContext.#runtimeName` field with the library's `opm/k8s/labels.ManagedByCLI` (`"opm-cli"`); the CLI's `render.RuntimeName` SHALL be that constant, not a copy of its value. The catalog declares `#runtimeName` as a mandatory field; CUE evaluation MUST fail if the CLI omits it. The `#runtimeName` value drives the `app.kubernetes.io/managed-by` label on every rendered resource.
 
 #### Scenario: CLI-applied resources carry runtime identity
 
@@ -121,5 +121,5 @@ The CLI's `mod apply` (and any other render entrypoint that produces Kubernetes 
 
 - **GIVEN** the CLI render pipeline executed against a minimal valid `#ModuleInstance`
 - **WHEN** the rendered resources are inspected
-- **THEN** the value of `metadata.labels["app.kubernetes.io/managed-by"]` exactly equals `core.LabelManagedByValue`
+- **THEN** the value of `metadata.labels["app.kubernetes.io/managed-by"]` exactly equals `opm/k8s/labels.ManagedByCLI`
 - **AND** the value of `metadata.labels["module-instance.opmodel.dev/uuid"]` is non-empty <!-- Was: module-release.opmodel.dev/uuid -->

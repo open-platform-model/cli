@@ -2,17 +2,17 @@
 
 ## Purpose
 
-Defines the exported `pkg/` package structure that makes all shared domain types available for external tools. Replaces the `internal/core/` subpackages with public equivalents.
+Defines the exported `pkg/` package structure external tools can import, and which shared types it does not declare because they live in the library: the Kubernetes object wrapper, the OPM label vocabulary and the kind-class weight table.
 
 ## Requirements
 
 ### Requirement: Core types exported in pkg/
 Shared domain types the CLI owns SHALL be exported under `pkg/` for reuse by external tools. The package structure SHALL be:
-- `pkg/core/` — `Resource`, label constants, unstructured conversion helpers (ordering weights live in `pkg/resourceorder`)
 - `pkg/errors/` — CLI error types, sentinels and grouped CUE error helpers
 - `pkg/inventory/` — the public inventory package
 - `pkg/loader/` — instance-file loading and local-replacement provenance readers
-- `pkg/resourceorder/` — apply and delete ordering weights
+
+The Kubernetes object wrapper, the OPM label vocabulary and the kind-class weight table SHALL NOT be declared in `pkg/`: they are the library's `opm/k8s/object` (`Resource`, `Export`, `Weight`, `Sort`) and `opm/k8s/labels`, and the CLI SHALL use those packages wherever it wraps a rendered object, reads or writes an OPM label, or orders objects. There SHALL be no `pkg/core/` and no `pkg/resourceorder/` package (0012:D1, 0012:D5:R2).
 
 Module and instance metadata types SHALL NOT be declared in `pkg/`: they are the library's `opm/schema.ModuleMetadata` and `opm/schema.InstanceMetadata` (aliased in `opm/module`), carried by every acquired artifact, and the CLI SHALL use those types wherever it holds decoded metadata. Where the CLI holds an acquired `*module.Module`, it SHALL read the module's identity fields (`name`, `modulePath`, `version`) from the module's decoded `Metadata` and SHALL NOT look them up in the module's `Package` value.
 
@@ -25,7 +25,11 @@ There SHALL be no `pkg/bundle/` package — bundle support is not implemented (0
 
 #### Scenario: External tool imports pkg/core
 - **WHEN** an external Go module imports `github.com/open-platform-model/cli/pkg/core`
-- **THEN** it can access `Resource`, label constants, and `GetWeight()` without importing any `internal/` packages
+- **THEN** compilation fails — the package does not exist; the resource wrapper is the library's `opm/k8s/object.Resource` and the label constants are in `opm/k8s/labels`
+
+#### Scenario: External tool imports pkg/resourceorder
+- **WHEN** an external Go module imports `github.com/open-platform-model/cli/pkg/resourceorder`
+- **THEN** compilation fails — the package does not exist; the weight table is the library's `opm/k8s/object.Weight`, with `Sort` and `Direction` beside it
 
 #### Scenario: External tool imports pkg/module
 - **WHEN** code attempts to import `github.com/open-platform-model/cli/pkg/module`

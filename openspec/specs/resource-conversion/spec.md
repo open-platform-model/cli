@@ -2,76 +2,53 @@
 
 ## Purpose
 
-Defines the `pkg/core.Resource` type — a CUE-value-based resource with provenance metadata and lazy conversion methods. Replaces the previous `Resource` wrapping `*unstructured.Unstructured`.
+Defines how the CLI turns a render's compiled objects into Kubernetes objects: it converts them through the library's `opm/k8s/object` single export, which feeds both the render digest and the objects it applies, reads OPM label keys from `opm/k8s/labels`, and orders objects by the library weight table.
 
 ## Requirements
 
-### Requirement: Resource wraps cue.Value with provenance
-The `pkg/core.Resource` struct SHALL hold a `cue.Value` field (concrete, fully evaluated CUE value of a rendered resource) and provenance strings: `Release`, `Component`, `Transformer`.
+### Requirement: Rendered objects convert through the library's single export
 
-#### Scenario: Resource stores CUE value
-- **WHEN** the engine produces a resource from a transformer output
-- **THEN** the `Resource.Value` field contains the concrete CUE value and `Release`, `Component`, `Transformer` are populated with provenance strings
+The CLI SHALL convert a render's compiled objects with the library's `opm/k8s/object`: it SHALL wrap them with `object.Resources` and export them with exactly one `object.Export` call per render. The render digest SHALL be computed from the exported JSON and the objects the CLI applies SHALL be the exported objects, so no compiled object is exported from CUE twice. The render digest SHALL keep its algorithm: sort by group (the `apiVersion` up to its last `/`), kind, namespace and name, then hash each object's CUE-export JSON in that order, so the same render yields the same digest it yielded before this conversion. An export failure SHALL exit with the general error code and name the failing resource.
 
-### Requirement: Resource provides accessor methods
-The `Resource` type SHALL provide accessor methods that read from the underlying `cue.Value` without triggering full conversion.
+#### Scenario: The digest and the apply objects come from one export
 
-#### Scenario: Kind accessor
-- **WHEN** `resource.Kind()` is called
-- **THEN** it returns the string value at CUE path `kind` (e.g., "Deployment", "Service")
+- **WHEN** `opm instance apply` or `opm module apply` renders a module
+- **THEN** the render digest and the objects passed to apply both come from one `object.Export` over the render's compiled objects
 
-#### Scenario: Name accessor
-- **WHEN** `resource.Name()` is called
-- **THEN** it returns the string value at CUE path `metadata.name`
+#### Scenario: The render digest does not move
 
-#### Scenario: Namespace accessor
-- **WHEN** `resource.Namespace()` is called on a namespaced resource
-- **THEN** it returns the string value at CUE path `metadata.namespace`
-- **WHEN** `resource.Namespace()` is called on a cluster-scoped resource
-- **THEN** it returns an empty string
+- **WHEN** the CLI digests the three-object test set (a Deployment, a Service and a ConfigMap in namespace `ns`)
+- **THEN** the digest equals the value recorded before the conversion moved to the library
 
-#### Scenario: GVK accessor
-- **WHEN** `resource.GVK()` is called
-- **THEN** it returns a `schema.GroupVersionKind` parsed from the `apiVersion` and `kind` CUE fields
+### Requirement: Label keys come from the library
 
-#### Scenario: Labels accessor
-- **WHEN** `resource.Labels()` is called
-- **THEN** it returns `map[string]string` decoded from CUE path `metadata.labels`
+The CLI SHALL read every OPM label key and managed-by value, and decide whether a managed-by value is an OPM runtime, through the library's `opm/k8s/labels` (`ManagedBy`, `ManagedByCLI`, `ManagedByController`, `ManagedByLegacy`, `Component`, `ComponentName`, `ModuleInstanceName`, `ModuleInstanceNamespace`, `ModuleInstanceUUID`, `IsOPMManagedBy`), and SHALL NOT keep a copy of them (0012:D1).
 
-#### Scenario: Annotations accessor
-- **WHEN** `resource.Annotations()` is called
-- **THEN** it returns `map[string]string` decoded from CUE path `metadata.annotations`
+#### Scenario: Label values are unchanged
 
-### Requirement: Resource provides conversion methods
-The `Resource` type SHALL provide lazy conversion methods that transform the `cue.Value` into other formats on demand.
+- **WHEN** the CLI writes its inventory record or checks a live object's managed-by label
+- **THEN** it uses the keys and values `app.kubernetes.io/managed-by`, `opm-cli`, `opm-controller`, `open-platform-model`, `opmodel.dev/component`, `component.opmodel.dev/name` and `module-instance.opmodel.dev/{name,namespace,uuid}`, as before
 
-#### Scenario: MarshalJSON conversion
-- **WHEN** `resource.MarshalJSON()` is called
-- **THEN** it returns the JSON byte representation of the CUE value
+### Requirement: Object order comes from the library weight table
 
-#### Scenario: MarshalYAML conversion
-- **WHEN** `resource.MarshalYAML()` is called
-- **THEN** it returns the YAML byte representation of the CUE value
+Every CLI path that orders Kubernetes objects (apply, delete, prune, the `instance tree` view, the `module build` output, and the operator install and uninstall, which apply and delete through the same paths) SHALL order by the library's kind-class weight, `opm/k8s/object.Weight`. Apply, delete, prune and the tree view SHALL sort through `object.Sort`, ascending for apply and descending for delete and prune, and SHALL keep objects of equal weight in their input order. The `module build` output SHALL break equal weights by namespace, then name, as the `cmd-structure` requirement for its output order states. The CLI SHALL NOT keep its own weight table. Every weight constant, group-version-kind entry and kind entry of the table the CLI applied by before the move SHALL keep its weight in `object.Weight`, so the order of every kind the CLI table held is unchanged; the library's own weight-table guard test covers entries the library adds (0012:D5:R1/R2).
 
-#### Scenario: ToUnstructured conversion
-- **WHEN** `resource.ToUnstructured()` is called
-- **THEN** it returns a `*unstructured.Unstructured` populated from the CUE value's JSON representation
+#### Scenario: Ascending order for apply
 
-#### Scenario: ToMap conversion
-- **WHEN** `resource.ToMap()` is called
-- **THEN** it returns a `map[string]any` representation of the CUE value
+- **WHEN** the sort runs ascending over a Deployment, a CustomResourceDefinition and a ConfigMap
+- **THEN** the result is CustomResourceDefinition, ConfigMap, Deployment
 
-#### Scenario: Conversion errors are returned
-- **WHEN** a conversion method is called on a Resource with a non-concrete or errored CUE value
-- **THEN** the method returns a descriptive error (not a panic)
+#### Scenario: Descending order for delete
 
-### Requirement: Label constants in pkg/core and GVK weights in pkg/resourceorder
-The `pkg/core` package SHALL export all label constants (`LabelManagedBy`, `LabelModuleInstanceName`, `LabelModuleInstanceNamespace`, `LabelModuleInstanceUUID`, `LabelComponent`, etc.). The `GetWeight(gvk)` function for resource ordering SHALL live in `pkg/resourceorder` (see the `pkg-resourceorder` capability); `pkg/core` SHALL NOT export a `GetWeight`. The label values MUST be identical to the former `internal/core` constants.
+- **WHEN** the sort runs descending over the same three objects
+- **THEN** the result is Deployment, ConfigMap, CustomResourceDefinition
 
-#### Scenario: Label constants are accessible from pkg/core
-- **WHEN** code imports `pkg/core`
-- **THEN** all label constants (e.g., `core.LabelManagedBy`, `core.LabelModuleInstanceName`) are accessible with the same string values as before
+#### Scenario: Equal weights keep input order
 
-#### Scenario: GetWeight returns ordering weights
-- **WHEN** `resourceorder.GetWeight(gvk)` is called with a known GVK (e.g., CRD, Deployment)
-- **THEN** it returns the same integer weight as the former `internal/core.GetWeight()`
+- **WHEN** the sort runs over two ConfigMaps `b` then `a`
+- **THEN** the result is `b` then `a`
+
+#### Scenario: The library table equals the table the CLI applied by
+
+- **WHEN** the CLI's order test checks every weight constant, every group-version-kind entry, every kind entry (through a group and version the group-version-kind entries do not hold) and both fallbacks of the table the CLI carried before the move
+- **THEN** `object.Weight` returns the same weight for each
