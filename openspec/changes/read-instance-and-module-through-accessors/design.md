@@ -28,7 +28,7 @@ Callers that move with the signatures: `internal/workflow/render/module.go:118`,
 - Output, log lines and exit codes stay the same for every input.
 
 **Non-Goals:**
-- `initValues` (`internal/instinit/values.go:32`). The library has no accessor, and the decision covers only `debugValues`.
+- `initValues` (`internal/instinit/values.go:32`). The library has no accessor for it, and this change moves only the reads library PR 194 added accessors for.
 - The duplicate-identity check (already `object.Duplicates`, cli PR 325).
 - Changing which CUE runtime vet validates in.
 
@@ -51,7 +51,9 @@ func moduleMetadataOf(inst *module.Instance) module.ModuleMetadata {
 
 The old decode returned zero metadata for an absent `#module` or `metadata`. The library returns nil there, so the helper maps nil to zero. That keeps `result.Module` a value, as `CanonicalModuleRef`, the instance log line and `spec.module` expect.
 
-One input differs. The old decode was best-effort: when `metadata` failed to decode, it kept the fields that did decode. The library returns nil, so the result is now zero metadata. This cannot happen on a render path. The instance has already rendered, and the kernel refuses to load a module whose identity fields are not concrete (`ErrMissingRequiredField` in the library's shape gate). So the embedded module's metadata always decodes. The old debug log line "could not decode module metadata" goes with the helper. It printed only under debug logging.
+One input differs. The old decode was best-effort: when `metadata` failed to decode, it kept the fields that did decode. The library decode is all or nothing and returns nil, so the result is now zero metadata. Nil maps to zero by choice: a nil result is carried as a module with no metadata, the same as an absent subtree.
+
+That input is reachable. A module the kernel acquires on its own passes the shape gate, which requires concrete `metadata.name`, `modulePath` and `version`. An instance file does not: the instance shape gate requires only the instance's `metadata.name` and `metadata.namespace`, and checks only the `kind` of its embedded `#module`, not the concreteness of the module's identity. So an instance whose embedded module still has an open `metadata.version` (for example a local replacement of a module in authoring) loads. It renders as long as no matched transformer reads the module version (core's `#transformer` exposes it as `#moduleMetadata.version`). In that gap the old decode kept the name and module path, and the new path gives zero metadata, which `spec.module` and the instance log line then show. The case is narrow, it involves a module that is not publishable yet, and the change is pinned by a `TestModuleMetadataOf` case so it is visible. The old debug log line "could not decode module metadata" goes with the helper. It printed only under debug logging.
 
 `decodeUnifiedValues` stays. It is the cli's own conversion to the JSON map for `spec.values`, and it already handles the zero value through `Exists()`.
 
@@ -70,13 +72,13 @@ if err != nil {
 
 The returned module is not the one `gateKernelLoad` acquires through the kernel. That module is not always there: the gate is skipped when an identity field is open, and vet allows an open `Version`. Vet validates `#config` and `debugValues` in that case too. The wrapped root is also built in the runtime the identity schema lives in, which the comment above `cueCtx` in `vet.go` keeps on purpose. Using the kernel's module would make it depend on which runtime the kernel acquires in.
 
-Every path that returned `cue.Value{}` now returns a nil module. Vet only reaches the module when the plan has no refusals and no error. The paths that return a zero root (no `cue.mod`, identity package refusals) always carry a refusal.
+The module is built right after `loadPackage` succeeds and is returned on every path that returns `root`, including the identity-package and `cue.mod` read refusals. Only the paths that returned `cue.Value{}` return a nil module: the input precondition and directory errors, the root load error, and the no-`cue.mod` refusal. Vet only reaches the module when the plan has no refusals and no error.
 
 ### Vet: the log name comes from the plan
 
 Vet names the module in its log prefix with the authored `metadata.name`, else the directory's base name. With an open `Version`, the library's decode fails as a whole, so `mod.Metadata` is nil while `metadata.name` is concrete. If vet took its name from `mod.Metadata`, an open-version module's log lines would show the directory name instead. That would be a visible change.
 
-So `VetChecks` records `metadata.name` on the plan as `ModuleName` (empty when absent, non-concrete or not a string), read from the root next to the other authored-tree reads in `gateDerivation`. Vet uses `plan.ModuleName` and falls back to `filepath.Base(modulePath)`, as it does today. The publish package reads the authored tree before the kernel touches it. That is its job, and the `pkg-types` rule about acquired modules does not cover it. `internal/cmd/module/vet.go` no longer reads from any CUE value.
+So `VetChecks` records `metadata.name` on the plan as `ModuleName` (empty when absent, non-concrete or not a string), read from the root next to the other authored-tree reads in `gateDerivation`. Vet uses `plan.ModuleName` and falls back to `filepath.Base(modulePath)`, as it does today. The publish package reads the authored tree before the kernel touches it. That is its job, and the `pkg-types` rule about acquired modules does not cover it. `internal/cmd/module/vet.go` then reads no module field off a CUE value. It still looks up `#IdentityPackage` in the identity schema it loads, which is not a module read.
 
 ### `debugValues` through the module
 
@@ -93,7 +95,7 @@ The unit tests that compile a bare package (`packageWithConfig`, the `PickValues
 ## Risks / Trade-offs
 
 - [The vet module is built by the cli, not acquired by the kernel] → It is the same value vet validated before; only the type around it changes. The design and the `VetChecks` godoc say so, so no reader takes it for a kernel-acquired module.
-- [`Plan.ModuleName` is a second place that reads `metadata.name`] → It is the only reader. Vet's own read goes away, so the count stays at one.
+- [`Plan.ModuleName` is a second place that reads `metadata.name`] → It is the only `metadata.name` read on the vet path; vet's own read goes away. Publish's authored-tree gates (`gatePackageName`, the members check) already read it the same way.
 - [Signature changes collide with the next cli change that touches `init.go`, `render/module.go` and `render.go`] → That change is planned to land after this one and builds on it. Each section here is small.
 
 ## Migration Plan
