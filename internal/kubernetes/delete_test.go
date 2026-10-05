@@ -348,3 +348,47 @@ func TestDelete_Unreadable(t *testing.T) {
 		}
 	}
 }
+
+// deletedNames returns the names the fake dynamic client was asked to
+// delete, in call order.
+func deletedNames(t *testing.T, dyn *dynamicfake.FakeDynamicClient) []string {
+	t.Helper()
+	var names []string
+	for _, a := range dyn.Actions() {
+		if d, ok := a.(k8stesting.DeleteAction); ok {
+			names = append(names, d.GetName())
+		}
+	}
+	return names
+}
+
+// TestDelete_DeletesInDescendingWeightOrder pins the direction of the delete
+// path: highest weight first (Deployment, then Service, then ConfigMap),
+// equal weights in input order, whatever order the inventory lists them in.
+func TestDelete_DeletesInDescendingWeightOrder(t *testing.T) {
+	ctx := context.Background()
+	ns := "default"
+	inventory := []*unstructured.Unstructured{
+		owned("v1", "ConfigMap", "cm-1", ns, opmlabels.ManagedByCLI, testInstanceUUID),
+		owned("apps/v1", "Deployment", "deploy", ns, opmlabels.ManagedByCLI, testInstanceUUID),
+		owned("v1", "Service", "svc", ns, opmlabels.ManagedByCLI, testInstanceUUID),
+		owned("v1", "ConfigMap", "cm-2", ns, opmlabels.ManagedByCLI, testInstanceUUID),
+	}
+	live := make([]runtime.Object, len(inventory))
+	for i, o := range inventory {
+		live[i] = o.DeepCopy()
+	}
+	dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), live...)
+	client := &Client{Clientset: fake.NewClientset(), Dynamic: dyn}
+
+	result, err := Delete(ctx, client, DeleteOptions{
+		InstanceName:          "demo",
+		Namespace:             ns,
+		InstanceUUID:          testInstanceUUID,
+		InventoryLive:         inventory,
+		InventoryRecordExists: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 4, result.Deleted)
+	assert.Equal(t, []string{"deploy", "svc", "cm-1", "cm-2"}, deletedNames(t, dyn))
+}
