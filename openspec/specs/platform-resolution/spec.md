@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Platform-source resolution by precedence with visible provenance (enhancement 0006 D11/D17/D21/D39): `--platform <dir>`, the cluster `Platform` CR, then a platform generated from the render's own dependency pins; there is no local default platform. Every source resolves to a platform module directory the kernel acquires with `AcquirePlatformFromDir`; the cluster CR is generated into one through the library's platform-module helper, the operator's own ingestion path (0019 D5/D6), from the effective registry the operator recorded on the CR's status (0015 D6).
+Platform-source resolution by precedence with visible provenance (0006:D11/D17/D21/D39): `--platform <dir>`, the cluster `Platform` CR, then a platform generated from the render's own dependency pins; there is no local default platform. Every source resolves to a platform module directory the kernel acquires with `AcquirePlatformFromDir`; the cluster CR is generated into one through the library's platform-module helper, the controller's own ingestion path (0019:D5/D6), from the effective registry the controller recorded on the CR's status (0015:D6).
 
 ## Requirements
 
@@ -59,40 +59,9 @@ When no published version satisfies the active mode, resolution SHALL refuse rat
 - **WHEN** the version listing fails in transport
 - **THEN** the failure SHALL be reported as a connectivity failure naming the lookup and the registry, distinct from a refusal, because no version was ever judged
 
-### Requirement: Acquisition mirrors the operator
-
-A cluster `Platform` CR SHALL be turned into a platform module exactly as the operator does it: the CR's `spec.type` and its registry entries (path, `version`, `enable`) feed the library's platform-module generator, the dependency closure is derived from the pinned modules' published module files through the CLI's configured registry, core is pinned at the library's verified release, and the module path is `opmodel.dev/platforms/cluster@v0`. The registry entries SHALL be the effective registry the operator recorded on `status.registry` when present (each entry's catalog, version and enabled flag, which is the operator's own resolution of subscriptions and active claims), and the `spec.registry` subscriptions (with `enable` defaulting to true) otherwise. Every platform source SHALL then be acquired through the kernel's directory acquisition, so a bad pin, a key-to-import mismatch or an unpublished build fails at acquisition naming the entry or dependency, identically for the flag, CR and local sources. The CLI MUST NOT synthesize a platform value from typed inputs and MUST NOT persist any built platform value.
-
-The generated module SHALL live under the OPM home cache at `cache/platforms/<content-hash>/`, where the hash covers the generated files' bytes, so an unchanged CR maps to the same directory across invocations, generation is idempotent, and two concurrent invocations converge on identical content. The CLI MUST NOT publish the generated module, write it to the cluster, or treat it as user-editable; it is derived state and may be deleted at any time.
-
-#### Scenario: CR generates the operator's module
-
-- **WHEN** the cluster CR subscribes `opmodel.dev/catalogs/opm@v4` at `4.0.1`, its status records that one entry, and the CLI resolves it
-- **THEN** the generated `cue.mod/module.cue` pins that catalog, core at the library's verified release and the catalog's transitive dependencies, and `platform.cue` carries one importing `#registry` entry for it, byte-identical to what the operator generates for the same CR and library release
-
-#### Scenario: An active claim's catalog is generated
-
-- **WHEN** the cluster CR's status registry records an entry sourced from a registration for `opmodel.dev/catalogs/k8up@v1` at `1.2.0` beside the subscribed catalogs
-- **THEN** the generated `cue.mod` pins that catalog at `1.2.0` and `platform.cue` carries an enabled importing entry for it, and a module demanding a contract the provider fulfils renders on the laptop as it does in the cluster
-
-#### Scenario: Unchanged CR reuses the cache
-
-- **WHEN** two invocations resolve the same cluster CR
-- **THEN** both acquire the same `cache/platforms/<hash>/` directory and the second performs no rewrite
-
-#### Scenario: Unpublished pin fails at acquisition
-
-- **WHEN** the CR names a catalog version that is not published
-- **THEN** resolution fails naming the catalog path and version, before any instance is rendered
-
-#### Scenario: Same failure surface for every source
-
-- **WHEN** a `--platform` module, a generated CR module or the local default fails to build
-- **THEN** the error names the failing dependency or `#registry` entry the same way regardless of source, and the reported provenance still names the source
-
 ### Requirement: The cluster arm reads the effective registry
 
-When the cluster Platform's status carries a resolved registry, resolution SHALL generate from it and SHALL report the recorded package identity in the provenance. When it carries none, resolution SHALL generate from the spec and SHALL say so. Resolution SHALL warn, never silently substitute, in two cases: when `status.observedGeneration` is behind `metadata.generation`, naming both generations, because the effective package predates the spec being edited; and when the Platform's `Ready` condition is `False`, naming its reason, because the effective package is the last one the operator accepted. Neither warning changes which package is generated. The write-if-absent seeding of a missing Platform is unchanged: it happens only when no CR exists, and it seeds the spec the render consumed.
+When the cluster Platform's status carries a resolved registry, resolution SHALL generate from it and SHALL report the recorded package identity in the provenance. When it carries none, resolution SHALL generate from the spec and SHALL say so. Resolution SHALL warn, never silently substitute, in two cases: when `status.observedGeneration` is behind `metadata.generation`, naming both generations, because the effective package predates the spec being edited; and when the Platform's `Ready` condition is `False`, naming its reason, because the effective package is the last one the controller accepted. Neither warning changes which package is generated. The write-if-absent seeding of a missing Platform is unchanged: it happens only when no CR exists, and it seeds the spec the render consumed.
 
 #### Scenario: Effective registry wins over the spec
 
@@ -102,7 +71,7 @@ When the cluster Platform's status carries a resolved registry, resolution SHALL
 #### Scenario: No recorded registry falls back to the spec
 
 - **WHEN** the CR's status carries no registry
-- **THEN** the generated module carries the spec's subscriptions and the provenance says the spec was used because no operator generation is recorded
+- **THEN** the generated module carries the spec's subscriptions and the provenance says the spec was used because no controller generation is recorded
 
 #### Scenario: A stale status warns
 
@@ -206,7 +175,7 @@ The CLI SHALL resolve the platform for every render by precedence, and no preced
 - `opm instance build`, `opm instance vet`, `opm instance diff`, `opm instance apply` and `opm module apply` resolve `--platform <dir>` (highest) > the cluster `Platform` CR named `cluster` > a platform generated from the render's own dependency pins (see "Renders fall back to their own deps").
 - `opm platform check` resolves its `[dir]` argument (highest) > `--platform <dir>` > the cluster `Platform` CR, and SHALL refuse when none is available, naming all three.
 
-Every source resolves to a platform module directory the kernel acquires; the CR source is generated into one first from the effective registry the operator recorded on the CR's status, or from the CR's spec when no operator has recorded one (see "Acquisition mirrors the operator" and "The cluster arm reads the effective registry"), and the deps sources are generated into one from committed dependency pins. Every command that renders SHALL report which platform source it resolved, the directory it acquired and, for the CR source, whether the effective registry or the spec was used and the package identity the operator recorded. A `--platform` argument that is a file, or a directory holding no platform module, SHALL fail naming the expected shape (a directory with `cue.mod/module.cue` and a `#Platform` package). The `--provider` flag SHALL NOT exist (superseded by `--platform`, 0006:D21).
+Every source resolves to a platform module directory the kernel acquires; the CR source is generated into one first from the effective registry the controller recorded on the CR's status, or from the CR's spec when no controller has recorded one (see "Acquisition mirrors the controller" and "The cluster arm reads the effective registry"), and the deps sources are generated into one from committed dependency pins. Every command that renders SHALL report which platform source it resolved, the directory it acquired and, for the CR source, whether the effective registry or the spec was used and the package identity the controller recorded. A `--platform` argument that is a file, or a directory holding no platform module, SHALL fail naming the expected shape (a directory with `cue.mod/module.cue` and a `#Platform` package). The `--provider` flag SHALL NOT exist (superseded by `--platform`, 0006:D21).
 
 #### Scenario: Flag wins
 
@@ -244,15 +213,15 @@ Every source resolves to a platform module directory the kernel acquires; the CR
 - **THEN** the command SHALL fail naming the argument, the flag and the cluster as the sources it looked for
 - **AND** it SHALL NOT read any directory under the OPM home
 
-### Requirement: Only operator install seeds the cluster Platform
+### Requirement: Only controller install seeds the cluster Platform
 
-`opm operator install` SHALL seed the singleton `cluster` Platform with a plain create (field manager `opm-cli`), treating `AlreadyExists` as success-noop (0006:D22), subscribing to the catalog build it resolved from the registry. The CLI MUST NOT use server-side apply or update for this write and MUST NOT overwrite an existing Platform. A forbidden create SHALL degrade to a warning. The reported provenance SHALL name the catalog coordinate and version the install resolved and SHALL NOT claim any other source.
+`opm controller install` SHALL seed the singleton `cluster` Platform with a plain create (field manager `opm-cli`), treating `AlreadyExists` as success-noop (0006:D22), subscribing to the catalog build it resolved from the registry. The CLI MUST NOT use server-side apply or update for this write and MUST NOT overwrite an existing Platform. A forbidden create SHALL degrade to a warning. The reported provenance SHALL name the catalog coordinate and version the install resolved and SHALL NOT claim any other source.
 
 No render-bearing command SHALL create, update or seed a `Platform`: `opm instance apply` and `opm module apply` SHALL leave a cluster without a `Platform` without one.
 
 #### Scenario: Install seeds an absent Platform
 
-- **WHEN** `opm operator install` completes against a cluster with no `Platform` CR
+- **WHEN** `opm controller install` completes against a cluster with no `Platform` CR
 - **THEN** a `Platform` named `cluster` SHALL be created subscribing to the resolved catalog build
 
 #### Scenario: Concurrent create tolerated
@@ -267,7 +236,7 @@ No render-bearing command SHALL create, update or seed a `Platform`: `opm instan
 
 #### Scenario: Install reports its own provenance
 
-- **WHEN** `opm operator install` seeds the Platform from a registry-resolved catalog version
+- **WHEN** `opm controller install` seeds the Platform from a registry-resolved catalog version
 - **THEN** the reported provenance SHALL name the catalog module path and the resolved version
 
 #### Scenario: Apply never seeds a Platform
@@ -323,16 +292,47 @@ When `opm instance build`, `opm instance vet`, `opm instance diff`, `opm instanc
 - **WHEN** `opm instance build ./hello --context staging` runs
 - **THEN** the cluster `Platform` SHALL be read from the `staging` context
 
-### Requirement: Operator install renders against the operator module's own pins
+### Requirement: Controller install renders against the controller module's own pins
 
-`opm operator install`, the CRDs-only form included, SHALL render the operator module against a platform generated from the module's own committed dependency pins, and SHALL NOT read the cluster `Platform` or accept a `--platform` directory for that render. Every other command keeps its precedence under "Platform source precedence by command". The same module version and values SHALL render the same objects whether or not the cluster holds a Platform and whatever it subscribes to, and a Platform that is missing, not Ready or unreadable SHALL NOT refuse the render. The provenance line SHALL name the module's deps as the source. This narrows 0006:D11's precedence for the operator's own instance only, so repairing the operator never depends on the Platform it serves. Source: 0021:D11:R10.
+`opm controller install`, the CRDs-only form included, SHALL render the controller module against a platform generated from the module's own committed dependency pins, and SHALL NOT read the cluster `Platform` or accept a `--platform` directory for that render. Every other command keeps its precedence under "Platform source precedence by command". The same module version and values SHALL render the same objects whether or not the cluster holds a Platform and whatever it subscribes to, and a Platform that is missing, not Ready or unreadable SHALL NOT refuse the render. The provenance line SHALL name the module's deps as the source. This narrows 0006:D11's precedence for the controller's own instance only, so repairing the controller never depends on the Platform it serves. Source: 0021:D11:R10.
 
 #### Scenario: Seeded Platform on another catalog release
 
-- **WHEN** the cluster Platform subscribes to a catalog release other than the one the operator module pins, and install re-runs with the same module version and values
+- **WHEN** the cluster Platform subscribes to a catalog release other than the one the controller module pins, and install re-runs with the same module version and values
 - **THEN** the render is the one the module's own pins produce, and no live object changes
 
 #### Scenario: Stalled Platform does not block repair
 
 - **WHEN** the cluster Platform is `Stalled` and install runs
 - **THEN** the render succeeds from the module's pins and install proceeds to its checks
+
+### Requirement: Acquisition mirrors the controller
+
+A cluster `Platform` CR SHALL be turned into a platform module exactly as the controller does it: the CR's `spec.type` and its registry entries (path, `version`, `enable`) feed the library's platform-module generator, the dependency closure is derived from the pinned modules' published module files through the CLI's configured registry, core is pinned at the library's verified release, and the module path is `opmodel.dev/platforms/cluster@v0`. The registry entries SHALL be the effective registry the controller recorded on `status.registry` when present (each entry's catalog, version and enabled flag, which is the controller's own resolution of subscriptions and active claims), and the `spec.registry` subscriptions (with `enable` defaulting to true) otherwise. Every platform source SHALL then be acquired through the kernel's directory acquisition, so a bad pin, a key-to-import mismatch or an unpublished build fails at acquisition naming the entry or dependency, identically for the flag, CR and local sources. The CLI MUST NOT synthesize a platform value from typed inputs and MUST NOT persist any built platform value.
+
+The generated module SHALL live under the OPM home cache at `cache/platforms/<content-hash>/`, where the hash covers the generated files' bytes, so an unchanged CR maps to the same directory across invocations, generation is idempotent, and two concurrent invocations converge on identical content. The CLI MUST NOT publish the generated module, write it to the cluster, or treat it as user-editable; it is derived state and may be deleted at any time.
+
+#### Scenario: CR generates the controller's module
+
+- **WHEN** the cluster CR subscribes `opmodel.dev/catalogs/opm@v4` at `4.0.1`, its status records that one entry, and the CLI resolves it
+- **THEN** the generated `cue.mod/module.cue` pins that catalog, core at the library's verified release and the catalog's transitive dependencies, and `platform.cue` carries one importing `#registry` entry for it, byte-identical to what the controller generates for the same CR and library release
+
+#### Scenario: An active claim's catalog is generated
+
+- **WHEN** the cluster CR's status registry records an entry sourced from a registration for `opmodel.dev/catalogs/k8up@v1` at `1.2.0` beside the subscribed catalogs
+- **THEN** the generated `cue.mod` pins that catalog at `1.2.0` and `platform.cue` carries an enabled importing entry for it, and a module demanding a contract the provider fulfils renders on the laptop as it does in the cluster
+
+#### Scenario: Unchanged CR reuses the cache
+
+- **WHEN** two invocations resolve the same cluster CR
+- **THEN** both acquire the same `cache/platforms/<hash>/` directory and the second performs no rewrite
+
+#### Scenario: Unpublished pin fails at acquisition
+
+- **WHEN** the CR names a catalog version that is not published
+- **THEN** resolution fails naming the catalog path and version, before any instance is rendered
+
+#### Scenario: Same failure surface for every source
+
+- **WHEN** a `--platform` module, a generated CR module or the local default fails to build
+- **THEN** the error names the failing dependency or `#registry` entry the same way regardless of source, and the reported provenance still names the source

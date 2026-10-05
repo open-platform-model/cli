@@ -10,7 +10,7 @@ The identity-driven publish pipeline behind `opm module publish` and `opm catalo
 
 `opm module publish [dir]` and `opm catalog publish [dir]` SHALL share one implementation: load the artifact tree and its `identity/` subpackage, validate the identity package by unifying it against core's `#IdentityPackage` (surfacing CUE's own diagnostic — never a hand-rolled comparison), derive the registry coordinates by reading and splitting the declared `modulePath` (never composing from parts, never editing the artifact to match a coordinate), run the gates, and push via CUE's module machinery with credentials from the same resolver chain reads use. What is published SHALL be exactly the committed tree — no copied build directory, no generated files in the pushed bytes.
 
-For a module, publish SHALL additionally load the tree through the kernel's module loader, the same loader `opm module build` and the operator use, and SHALL refuse with the loader's own error when the loader refuses. Publish SHALL NOT judge a module loadable by any test the kernel does not apply.
+For a module, publish SHALL additionally load the tree through the kernel's module loader, the same loader `opm module build` and the controller use, and SHALL refuse with the loader's own error when the loader refuses. Publish SHALL NOT judge a module loadable by any test the kernel does not apply.
 
 #### Scenario: Clean artifact publishes at its declared version
 

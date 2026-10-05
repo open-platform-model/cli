@@ -15,5 +15,5 @@ Same PR as `retire-legacy-manifest-migration`, after it. Workers never push, tag
 
 ## 2. Specs and archive
 
-- [ ] 2.1 Deltas: `controller-lifecycle` ADDED-all with a Purpose, `operator-lifecycle` REMOVED-all (`retire_capabilities: true`), and the wording deltas listed in the proposal; `openspec validate rename-operator-command-to-controller --strict` passes.
-- [ ] 2.2 Verify the implementation against the change (opsx verify), archive it, edit the Purpose lines of the surviving main specs that name the operator, confirm `git grep -i operator openspec/specs` lists only the kept check name, `task openspec:check` passes, then commit `chore(openspec): archive rename-operator-command-to-controller`.
+- [x] 2.1 Deltas: `controller-lifecycle` ADDED-all with a Purpose, `operator-lifecycle` REMOVED-all (`retire_capabilities: true`), and the wording deltas listed in the proposal; `openspec validate rename-operator-command-to-controller --strict` passes.
+- [x] 2.2 Verify the implementation against the change (opsx verify), archive it, edit the Purpose lines of the surviving main specs that name the operator, confirm `git grep -i operator openspec/specs` lists only the kept check name, `task openspec:check` passes, then commit `chore(openspec): archive rename-operator-command-to-controller`.
