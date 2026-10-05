@@ -213,7 +213,7 @@ CLI operation at all. Removing CRDs is a deliberate, manual cluster-admin action
 
 Manifest sourcing: the CLI **embeds** the CRD manifests and `dist/install.yaml` of a pinned controller version at build time (`go:embed`), with a `--version` flag to fetch a different release from GitHub instead. Embedding keeps the learner path offline-friendly and makes "this CLI build is compatible with this CRD version" a build-time fact; fetching covers skew.
 
-Apply-time behavior when the CRD is missing: `opm instance apply` fails with a one-line hint (`ModuleInstance CRD not found — run 'opm install crds'`) rather than auto-installing. Installing CRDs is a cluster-admin write; doing it implicitly inside an application apply surprises exactly the controllers who care. A `--install-crds` convenience flag on `apply` is open (OQ-2).
+Apply-time behavior when the CRD is missing: `opm instance apply` fails with a one-line hint (`ModuleInstance CRD not found — run 'opm install crds'`) rather than auto-installing. Installing CRDs is a cluster-admin write; doing it implicitly inside an application apply surprises exactly the operators who care. A `--install-crds` convenience flag on `apply` is open (OQ-2).
 
 Upgrade semantics: `opm install crds` server-side-applies with field manager `opm-cli`, so re-running upgrades CRDs in place; the command warns when the cluster's CRD version is newer than the CLI's embedded copy.
 

@@ -202,11 +202,9 @@ func resetControllerCluster(t *testing.T, kubeconfig string) {
 		"opm-controller-transformerregistration-admin-role",
 		"opm-controller-platform-viewer-role", "opm-controller-modulepackage-viewer-role",
 		"opm-controller-transformerregistration-viewer-role")
-	// The module names each binding after its role; an earlier manifest
-	// install named them "-rolebinding".
+	// The module names each binding after its role.
 	kubectlDeleteIfExists(t, kubeconfig, "clusterrolebinding", "opm-cli-user",
-		"opm-controller-manager-role", "opm-controller-metrics-auth-role",
-		"opm-controller-manager-rolebinding", "opm-controller-metrics-auth-rolebinding")
+		"opm-controller-manager-role", "opm-controller-metrics-auth-role")
 	// kubectl delete gives up after its timeout and the error is ignored;
 	// a CRD still terminating when the next case applies the manifest
 	// makes that case's install refuse to apply over it.

@@ -333,7 +333,7 @@ func TestE2E_ThinEditor_ValuesRoundTrip(t *testing.T) {
 		"the controller should have scaled the Deployment to the new value")
 }
 
-// TestE2E_Delete_ControllerOwnedDelegates covers both outcomes of an
+// TestE2E_Delete_ControllerOwnedDelegates covers both outcomes of a
 // controller-owned delete. Whether the workloads go away depends on spec.prune,
 // which has no CRD default and which the CLI does not write — so the default
 // for a CLI-created instance is that the controller orphans them. The CLI must

@@ -125,7 +125,7 @@ tasks:
       deadlines (cli issue 214). The suite then times out inside
       TestE2E_Controller_InstallUninstallLifecycle, which is destructive by
       design and rebuilds the dev controller in a t.Cleanup — a timeout kills the
-      process before that cleanup runs, so the cluster is left without an
+      process before that cleanup runs, so the cluster is left without a
       controller and the NEXT run fails for a reason that has nothing to do with
       it. Give the suite room to reach its own cleanups.
     cmds:

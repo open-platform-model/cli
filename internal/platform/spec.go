@@ -141,7 +141,7 @@ type ReadyState struct {
 
 // Effective is the registry the controller generated the running package
 // from, decoded off the Platform CR's status (0015:D13/D17). Entries is
-// empty when the controller has recorded no registry - a solo cluster, or an
+// empty when the controller has recorded no registry - a solo cluster, or a
 // controller predating the field - and resolution then generates from the
 // spec.
 type Effective struct {

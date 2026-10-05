@@ -120,7 +120,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 	// Gate 4: ownership — the single branch point (0006:D18). A controller-owned
 	// instance takes the thin-editor path and returns; everything below this
-	// point is CLI-executor mode. A dry-run never takes this path: an
+	// point is CLI-executor mode. A dry-run never takes this path: a
 	// controller-owned instance was already previewed above.
 	if !dryRun && inventory.ResolveOwnership(prevRecord) == inventory.ModeControllerOwned {
 		return executeThinEditor(ctx, req, prevRecord)

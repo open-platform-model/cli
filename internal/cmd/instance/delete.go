@@ -133,7 +133,7 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 
 // deleteResolvedInstance deletes an instance whose record has been read. It
 // first guards an instance that deploys the controller, on both branches and on
-// a dry run alike. Ownership is then the single branch point (0006:D18): an
+// a dry run alike. Ownership is then the single branch point (0006:D18): a
 // controller-owned instance is deleted by deleting its CR and letting the
 // controller's finalizer prune the workloads.
 //
