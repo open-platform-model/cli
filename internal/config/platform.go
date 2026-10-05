@@ -14,6 +14,7 @@ import (
 	liberrors "github.com/open-platform-model/library/opm/errors"
 	"github.com/open-platform-model/library/opm/platform"
 
+	"github.com/open-platform-model/cli/internal/cuemod"
 	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
@@ -100,7 +101,14 @@ func platformBuildHint(dir string, err error) string {
 	switch {
 	case errors.Is(err, liberrors.ErrWrongKind), errors.Is(err, liberrors.ErrInvalidPackage):
 		return "platform.cue must be a single package embedding core.#Platform"
-	case strings.Contains(msg, "module not found"), strings.Contains(msg, "cannot find package"), strings.Contains(msg, "cannot expand module graph"):
+	// "cannot find package" is cue/load's prefix for every failed import, so
+	// it catches registry failures (an unpublished pin, an archive blob 404, a
+	// refused registry) as well as an import no declared dependency provides;
+	// each gets this hint, as before. "cannot expand module graph" wraps a
+	// dependency module file that does not parse. The library's not-found
+	// classification covers a registry answer that reaches this function
+	// without the import prefix. The switch picks a hint, never an exit code.
+	case cuemod.IsFetchNotFound(err), strings.Contains(msg, "cannot find package"), strings.Contains(msg, "cannot expand module graph"):
 		return "Pin a published build in " + modFile + ", then try again"
 	case strings.Contains(msg, "#registry"):
 		return "Each #registry entry's key must equal the module path of the catalog it imports (#catalog); fix the entry named above in " + filepath.Join(dir, PlatformCUEFileName)

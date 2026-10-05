@@ -2,8 +2,11 @@ package publish
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -15,7 +18,10 @@ import (
 	"cuelang.org/go/cue/load"
 	"golang.org/x/mod/semver"
 
+	liberrors "github.com/open-platform-model/library/opm/errors"
+
 	"github.com/open-platform-model/cli/internal/compat"
+	"github.com/open-platform-model/cli/internal/cuemod"
 
 	"github.com/open-platform-model/cli/internal/output"
 )
@@ -84,7 +90,7 @@ func compatScan(opts Options, repo string, versions []string, lineIsPrerelease b
 			if len(unresolved) == 0 {
 				break
 			}
-			pkgVal, found, err := loadPublishedPackage(opts, loadDir, repo+"/"+pkgPath, v)
+			pkgVal, found, err := loadPublishedPackage(opts, loadDir, repo, pkgPath, v)
 			if err != nil {
 				return err
 			}
@@ -210,14 +216,21 @@ func isReleasePrerelease(tag string) bool {
 }
 
 // loadPublishedPackage loads one published subpackage by
-// <importPath>@<version> — measured loadable standalone through
+// <repo>/<pkgPath>@<version> — measured loadable standalone through
 // load.Instances with only a registry env; the module zip is fetched once per
 // build and CUE-cached on disk, so probing several packages of one build
-// costs one fetch. Returns found=false on the loader's module-not-found
-// error (the package or the whole build is absent at that version — both are
-// the scan's negative signal); any other failure is a *ConnectivityError.
-func loadPublishedPackage(opts Options, dir, importPath, version string) (cue.Value, bool, error) {
-	pattern := importPath + "@" + version
+// costs one fetch.
+//
+// It returns found=false when the package is absent at that version — the
+// registry does not hold the version, or the version holds no CUE files for
+// the package — which is the scan's negative signal. Both reach the loader as
+// the library's FetchNotFound, and so does a dependency of the probed build
+// that the registry does not hold, so a not-found is settled by fetching the
+// probed build itself (probedPackageAbsent). A predecessor package whose
+// import no module of its build provides also reads as absent
+// (unprovidedImport). Any other failure is a *ConnectivityError.
+func loadPublishedPackage(opts Options, dir, repo, pkgPath, version string) (cue.Value, bool, error) {
+	pattern := repo + "/" + pkgPath + "@" + version
 	cfg := &load.Config{
 		Dir: dir,
 		Env: registryEnv(opts.Registry),
@@ -227,10 +240,14 @@ func loadPublishedPackage(opts Options, dir, importPath, version string) (cue.Va
 		return cue.Value{}, false, &ConnectivityError{Op: "loading " + pattern, Err: fmt.Errorf("no instance returned")}
 	}
 	if err := insts[0].Err; err != nil {
-		// Measured against CUE v0.17: an absent module version and an absent
-		// package within an existing version both report "cannot find module
-		// providing package"; transport failures report "cannot fetch".
-		if strings.Contains(err.Error(), "cannot find module providing package") {
+		switch {
+		case cuemod.IsFetchNotFound(err):
+			// A probe that fails as connectivity also ends in the load's own
+			// *ConnectivityError below, so the message names the load.
+			if absent, probeErr := probedPackageAbsent(opts, repo, pkgPath, version); probeErr == nil && absent {
+				return cue.Value{}, false, nil
+			}
+		case unprovidedImport(err):
 			return cue.Value{}, false, nil
 		}
 		return cue.Value{}, false, &ConnectivityError{Op: "loading " + pattern, Err: err}
@@ -240,6 +257,63 @@ func loadPublishedPackage(opts Options, dir, importPath, version string) (cue.Va
 		return cue.Value{}, false, fmt.Errorf("evaluating published package %s: %w", pattern, err)
 	}
 	return v, true, nil
+}
+
+// probedPackageAbsent settles a not-found from loading <repo>/<pkgPath> at
+// version by fetching the probed build through the same on-disk module cache
+// the load used (a held build costs no second download). The package is
+// absent when the registry does not hold the version, or when the fetched
+// tree has no CUE file directly in pkgPath. Otherwise the not-found concerned
+// a dependency of the build and the package is not absent. A registry that
+// fails the fetch returns that *ConnectivityError; a fetch that fails without
+// asking the registry proves nothing, and the caller reports the load's own
+// failure. The walk carries no context (load.Instances takes none), so the
+// fetch runs under context.Background.
+func probedPackageAbsent(opts Options, repo, pkgPath, version string) (bool, error) {
+	tree, err := fetchPublishedTree(context.Background(), opts.Registry, repo, version)
+	if err != nil {
+		if errors.Is(err, ErrNotPublished) {
+			return true, nil
+		}
+		var connErr *ConnectivityError
+		if errors.As(err, &connErr) {
+			return false, err
+		}
+		return false, nil
+	}
+	return !hasCUEFile(filepath.Join(tree, filepath.FromSlash(pkgPath))), nil
+}
+
+// hasCUEFile reports whether dir directly holds a .cue file that cue/load
+// reads: a subdirectory or another file does not count, and neither does a
+// name starting with "_" or ".", which cue/load ignores.
+func hasCUEFile(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if !e.IsDir() && strings.HasSuffix(name, ".cue") && !strings.HasPrefix(name, "_") && !strings.HasPrefix(name, ".") {
+			return true
+		}
+	}
+	return false
+}
+
+// unprovidedImport reports a load failure the library leaves unclassified on
+// purpose because no registry interaction failed: an import that no module
+// of the loaded build provides (one its declared dependency does not hold, or
+// a package missing under the build's own module path). The compat walk has
+// always read such a predecessor as absent, and keeps that answer. This is
+// the one message-text match left in the walk, and it runs only after the
+// library's classification found no registry failure; CUE reports the cause
+// as an internal type and flattens it into the instance error, so the text is
+// the only signal. TestLoadPublishedPackage_Pinned fails if CUE rewords it.
+func unprovidedImport(err error) bool {
+	var fe *liberrors.FetchError
+	return !errors.As(liberrors.Classify(err), &fe) &&
+		strings.Contains(err.Error(), "cannot find module providing package")
 }
 
 // findMember locates the member with the given name and apiVersion — 0011:D9's

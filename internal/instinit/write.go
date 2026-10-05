@@ -30,8 +30,11 @@ var defaultOps = writeOps{tidy: cuemod.Tidy, rename: os.Rename}
 // the result onto dir. On any error nothing remains at dir or beside it.
 //
 // A registry that cannot be reached while tidy resolves the closure comes
-// back as a *publish.ConnectivityError; every other failure is wrapped as
-// "initializing <dir>".
+// back as a *publish.ConnectivityError; every other failure, a registry
+// answer that a dependency is not held among them, is wrapped as
+// "initializing <dir>". cuemod.IsConnectivityError takes that decision from
+// the library's classification of the flattened tidy error, not from its
+// text.
 func Write(ctx context.Context, dir string, files Files, registry string) error {
 	return write(ctx, dir, files, registry, defaultOps)
 }

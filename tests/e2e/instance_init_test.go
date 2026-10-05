@@ -147,8 +147,9 @@ func TestE2E_InstanceInit_GeneratedPackageTidiesAndLoads(t *testing.T) {
 
 // TestE2E_InstanceInit_TidyRegistryFailureShape shows how a registry
 // failure surfaces from cuemod.Tidy on an empty module cache for a real
-// instance package: flattened to text, so only cuemod.IsConnectivityError's
-// text match recognizes it.
+// instance package: flattened to text, with no net.Error in the chain, so
+// cuemod.IsConnectivityError recognizes it only through the library's
+// classification (whose text fallback reads the flattened form).
 func TestE2E_InstanceInit_TidyRegistryFailureShape(t *testing.T) {
 	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
 		t.Skip("skipping registry-backed e2e tests")
@@ -161,7 +162,7 @@ func TestE2E_InstanceInit_TidyRegistryFailureShape(t *testing.T) {
 	_, err := cuemod.Tidy(ctx, dir, cuemod.TidyOptions{Registry: cuemodtest.UnreachableRegistry})
 	require.Error(t, err)
 	var netErr net.Error
-	assert.False(t, errors.As(err, &netErr), "cmd/cue now keeps the net.Error; the text match may be retired: %v", err)
+	assert.False(t, errors.As(err, &netErr), "cmd/cue now keeps the net.Error; the library's text fallback for this form may be retired: %v", err)
 	assert.True(t, cuemod.IsConnectivityError(err), "unrecognized registry failure: %v", err)
 }
 

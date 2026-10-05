@@ -1,0 +1,73 @@
+package config
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/open-platform-model/cli/internal/cuemod/cuemodtest"
+	oerrors "github.com/open-platform-model/cli/pkg/errors"
+)
+
+// hintPlatform writes a platform module whose cue.mod declares deps and
+// whose platform.cue holds src, and returns its directory.
+func hintPlatform(t *testing.T, deps, src string) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "platform")
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "cue.mod"), 0o700))
+	mod := "module: \"example.com/platform@v0\"\nlanguage: version: \"v0.9.0\"\n" + deps
+	require.NoError(t, os.WriteFile(filepath.Join(dir, filepath.FromSlash(PlatformModuleFileName)), []byte(mod), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, PlatformCUEFileName), []byte(src), 0o600))
+	return dir
+}
+
+const (
+	importsDep = "package platform\n\nimport d \"example.com/dep@v0\"\n\nv: d.version\n"
+	depPinned  = "deps: \"example.com/dep@v0\": v: \"" + cuemodtest.DepNewest + "\"\n"
+)
+
+// TestPlatformBuildHint_Pinned pins the hint each platform build failure
+// form gets. The registry-backed #registry key-mismatch hint is pinned by
+// TestBuildPlatformModule_KeyImportDriftNamesTheEntry.
+func TestPlatformBuildHint_Pinned(t *testing.T) {
+	const pin, kind = "Pin a published build in ", "platform.cue must be a single package embedding core.#Platform"
+	for _, tc := range []struct {
+		name     string
+		registry func(t *testing.T) string
+		deps     string
+		src      string
+		want     string
+	}{
+		{"unpublished catalog pin", cuemodtest.Registry, "deps: \"example.com/dep@v0\": v: \"v0.9.0\"\n", importsDep, pin},
+		{"pinned build's archive blob answers 404", func(t *testing.T) string {
+			return cuemodtest.Fronted(t, cuemodtest.Registry(t), cuemodtest.BlobAnswers("example.com/dep", http.StatusNotFound))
+		}, depPinned, importsDep, pin},
+		{"undeclared import", cuemodtest.Registry, "", importsDep, pin},
+		{"not a #Platform", cuemodtest.Registry, "", "package platform\n\nv: 1\n", kind},
+		{"refused registry", func(*testing.T) string { return cuemodtest.UnreachableRegistry }, depPinned, importsDep, pin},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cuemodtest.ColdCache(t)
+			dir := hintPlatform(t, tc.deps, tc.src)
+			_, err := BuildPlatformModule(context.Background(), dir, tc.registry(t))
+			require.Error(t, err)
+			var detail *oerrors.DetailError
+			require.True(t, errors.As(err, &detail), "%v", err)
+			assert.Contains(t, detail.Hint, tc.want, "%v", err)
+		})
+	}
+}
+
+// TestPlatformBuildHint_NotFoundWithoutImportPrefix holds the not-found
+// branch for a registry answer that does not carry cue/load's "cannot find
+// package" prefix, which the old "module not found" match also caught.
+func TestPlatformBuildHint_NotFoundWithoutImportPrefix(t *testing.T) {
+	hint := platformBuildHint(t.TempDir(), errors.New("cannot fetch example.com/dep@v0.9.0: module not found"))
+	assert.Contains(t, hint, "Pin a published build in ")
+}
