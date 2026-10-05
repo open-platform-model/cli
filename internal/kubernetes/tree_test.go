@@ -400,6 +400,9 @@ func makeReadyDeployment(ns, name string) *unstructured.Unstructured {
 	res := makeRes("Deployment", ns, name)
 	_ = unstructured.SetNestedField(res.Object, int64(1), "spec", "replicas")
 	_ = unstructured.SetNestedField(res.Object, int64(1), "status", "readyReplicas")
+	_ = unstructured.SetNestedField(res.Object, int64(1), "status", "updatedReplicas")
+	_ = unstructured.SetNestedField(res.Object, int64(1), "status", "availableReplicas")
+	_ = unstructured.SetNestedField(res.Object, int64(1), "status", "replicas")
 	// Deployment Available condition = true
 	_ = unstructured.SetNestedSlice(res.Object, []interface{}{
 		map[string]interface{}{"type": "Available", "status": "True"},
@@ -431,6 +434,7 @@ func TestBuildTree_Depth0_ComponentSummaryOnly(t *testing.T) {
 	assert.Equal(t, "server", comp.Name)
 	assert.Equal(t, 2, comp.ResourceCount)
 	assert.Empty(t, comp.Resources, "depth=0 should not populate Resources")
+	assert.Equal(t, health.Unknown, comp.Status, "depth=0 builds no resource nodes, so nothing folds")
 }
 
 func TestBuildTree_Depth1_ResourcesNoChildren(t *testing.T) {
@@ -453,6 +457,32 @@ func TestBuildTree_Depth1_ResourcesNoChildren(t *testing.T) {
 	assert.Equal(t, "web", node.Name)
 	assert.Equal(t, "1/1", node.Replicas)
 	assert.Empty(t, node.Children, "depth=1 should not walk ownership")
+	assert.Equal(t, health.Ready, node.Status)
+	assert.Equal(t, health.Ready, result.Components[0].Status)
+}
+
+// A Deployment whose Available condition is True but whose rollout is behind
+// (updatedReplicas below spec.replicas) takes the library verdict NotReady,
+// and the component folds to NotReady with it.
+func TestBuildTree_Depth1_RolloutBehindIsNotReady(t *testing.T) {
+	res := makeReadyDeployment("ns", "web")
+	_ = unstructured.SetNestedField(res.Object, int64(3), "spec", "replicas")
+	for _, field := range []string{"readyReplicas", "availableReplicas", "replicas"} {
+		_ = unstructured.SetNestedField(res.Object, int64(3), "status", field)
+	}
+	_ = unstructured.SetNestedField(res.Object, int64(1), "status", "updatedReplicas")
+	opts := TreeOptions{
+		InstanceInfo:  InstanceInfo{Name: "my-app", Namespace: "ns"},
+		InventoryLive: []*unstructured.Unstructured{res},
+		ComponentMap:  map[string]string{"Deployment/ns/web": "server"},
+		Depth:         1,
+	}
+
+	result := BuildTree(context.Background(), makeTreeClient(), opts)
+	require.Len(t, result.Components, 1)
+	require.Len(t, result.Components[0].Resources, 1)
+	assert.Equal(t, health.NotReady, result.Components[0].Resources[0].Status)
+	assert.Equal(t, health.NotReady, result.Components[0].Status)
 }
 
 func TestBuildTree_Depth1_ResourcesInWeightThenNameOrder(t *testing.T) {
