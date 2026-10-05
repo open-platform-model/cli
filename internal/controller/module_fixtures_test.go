@@ -106,7 +106,7 @@ func moduleObjects(o renderOpts) []*unstructured.Unstructured {
 		labeled(&unstructured.Unstructured{Object: map[string]any{
 			"apiVersion": "v1", "kind": "ServiceAccount",
 			"metadata": map[string]any{"name": ControllerDeploymentName, "namespace": ControllerNamespace},
-		}}, "controller-manager", mv),
+		}}, "manager", mv),
 	)
 	if o.extraRole != "" {
 		objs = append(objs, labeled(&unstructured.Unstructured{Object: map[string]any{
@@ -122,7 +122,7 @@ func moduleObjects(o renderOpts) []*unstructured.Unstructured {
 			"spec": map[string]any{"template": map[string]any{"spec": map[string]any{"containers": []any{
 				map[string]any{"name": "manager", "image": "ghcr.io/open-platform-model/opm-controller:" + tag + "@sha256:0000"},
 			}}}},
-		}}, "controller-manager", mv))
+		}}, "manager", mv))
 	}
 	return objs
 }
