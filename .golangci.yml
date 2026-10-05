@@ -35,7 +35,7 @@ linters:
     depguard:
       rules:
         # The Kubernetes object wrapper, the OPM label vocabulary and the
-        # kind-class weight table are the library's (0012:D1, 0012:D5:R2).
+        # kind-class weight table are the library's (0012:D1/D5:R2).
         # The cli deleted its copies; this rule stops one coming back under
         # the old import paths. No allow list: nothing else is denied.
         retired-kubernetes-copies:
