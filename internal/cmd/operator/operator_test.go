@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/open-platform-model/library/opm/kernel"
 
@@ -246,12 +248,35 @@ func TestInstallErrorMapping(t *testing.T) {
 		{&publish.ConnectivityError{Op: "listing", Err: errors.New("refused")}, opmexit.ExitConnectivityError},
 		{&oplib.RolloutError{Err: errors.New("timed out")}, opmexit.ExitGeneralError},
 		{&opmexit.ExitError{Code: opmexit.ExitPermissionDenied, Err: errors.New("denied")}, opmexit.ExitPermissionDenied},
+		{&oplib.MigrationRefusalError{Blocks: []oplib.MigrationBlock{{Kind: "Deployment", Name: "x", Reason: "unproven"}}}, opmexit.ExitValidationError},
+		{&oplib.MigrationStoppedError{Step: "deleting x", Err: errors.New("conflict")}, opmexit.ExitGeneralError},
+		{&oplib.MigrationReadError{Kind: "ClusterRole", Name: "x", Err: apierrors.NewForbidden(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "x", errors.New("no get"))}, opmexit.ExitPermissionDenied},
+		// The rerun hint keeps the code of the error it wraps.
+		{withRerunHint(&oplib.InstallResult{CRDs: 4}, &oplib.RolloutError{Err: errors.New("timed out")}), opmexit.ExitGeneralError},
 	}
 	for _, c := range cases {
 		var exitErr *opmexit.ExitError
 		require.ErrorAs(t, installError(c.err), &exitErr, c.err.Error())
 		assert.Equal(t, c.code, exitErr.Code, c.err.Error())
 	}
+}
+
+// A failure after the CRD step says install is safe to re-run; one before
+// it, or a stopped migration that says how to complete itself, does not.
+func TestWithRerunHint(t *testing.T) {
+	const hint = "(install is idempotent, safe to re-run)"
+	failed := errors.New("apply failed")
+
+	err := withRerunHint(&oplib.InstallResult{CRDs: 4}, failed)
+	assert.ErrorIs(t, err, failed)
+	assert.Contains(t, err.Error(), hint)
+
+	assert.Same(t, failed, withRerunHint(nil, failed), "no result")
+	assert.Same(t, failed, withRerunHint(&oplib.InstallResult{}, failed), "the CRD step did not run")
+
+	stopped := &oplib.MigrationStoppedError{Step: "deleting x", Err: failed}
+	assert.Same(t, error(stopped), withRerunHint(&oplib.InstallResult{CRDs: 4}, stopped))
+	assert.NotContains(t, withRerunHint(&oplib.InstallResult{CRDs: 4}, stopped).Error(), hint)
 }
 
 // The operator's instance renders under its fixed name and namespace,

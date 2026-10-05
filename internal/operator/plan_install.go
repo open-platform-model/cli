@@ -69,6 +69,10 @@ type Plan struct {
 	Values     *Values
 	CRDsOnly   bool
 	Extra      []*unstructured.Unstructured
+	// Migration is the migration of an operator installed from an earlier
+	// release manifest; it plans no write on a cluster with nothing to
+	// migrate.
+	Migration *MigrationPlan
 	// BudgetStart and Timeout are the --timeout budget the writes share.
 	BudgetStart time.Time
 	Timeout     time.Duration
@@ -169,8 +173,9 @@ func (e *GuardError) Unwrap() error { return e.Err }
 // writes nothing: the record read, the values merge, the render (which
 // checks the values against the target's #config), the target rules
 // (CheckTarget), the status-subresource permission check, the wait for
-// terminating objects and, last, the apply guard over every object the plan
-// applies when no record exists yet. The terminating wait starts the
+// terminating objects, the migration proof of an operator installed from an
+// earlier release manifest and, last, the apply guard over every object the
+// plan applies when no record exists yet. The terminating wait starts the
 // --timeout budget the writes then share.
 func PlanInstall(ctx context.Context, env InstallEnv, res *modref.Resolution, target Target, opts PlanOptions) (*Plan, error) {
 	rec, err := inventory.GetRecord(ctx, env.Client, OperatorInstanceName, OperatorNamespace)
@@ -215,17 +220,20 @@ func PlanInstall(ctx context.Context, env InstallEnv, res *modref.Resolution, ta
 		return nil, err
 	}
 
-	// The migration proof slot: migrate-manifest-installed-operator proves,
-	// here and nowhere else, which objects came from an earlier operator
-	// manifest, and hands the guard below the set it admits (0012:D8:R6).
-	// Nothing but that proof may run between the terminating wait and the
-	// guard.
+	// The migration proof (0012:D8:R6): which existing objects came from an
+	// earlier operator manifest. It runs before the guard, which would
+	// otherwise refuse the first of them.
+	plan.Migration, err = PlanMigration(ctx, env.Client, plan.Objects(), result.Instance.UUID, opts.CRDsOnly)
+	if err != nil {
+		return nil, err
+	}
 
 	// The apply guard, the last check: on a cluster with no record every
-	// object the plan applies must be absent or already OPM's.
+	// object the plan applies must be absent, already OPM's, or admitted by
+	// the migration's proof.
 	if rec == nil {
 		entries := workflowapply.CurrentInventoryEntries(plan.Objects())
-		if err := inventory.PreApplyExistenceCheck(ctx, env.Client, entries); err != nil {
+		if err := inventory.PreApplyExistenceCheck(ctx, env.Client, entries, plan.Migration.Admit()); err != nil {
 			return nil, &GuardError{Err: err}
 		}
 	}

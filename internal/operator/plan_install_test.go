@@ -145,6 +145,9 @@ func TestPlanInstall_RefusalsWriteNothing(t *testing.T) {
 	foreignNS := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1", "kind": "Namespace", "metadata": map[string]any{"name": OperatorNamespace},
 	}}
+	foreignRole := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRole", "metadata": map[string]any{"name": "team-a-role"},
+	}}
 	cases := []struct {
 		name    string
 		cluster []*unstructured.Unstructured
@@ -197,12 +200,22 @@ func TestPlanInstall_RefusalsWriteNothing(t *testing.T) {
 		},
 		{
 			name:    "an object exists and is not OPM's",
-			cluster: []*unstructured.Unstructured{foreignNS},
-			render:  &fakeRender{objs: moduleObjects(renderOpts{})},
-			want:    []string{"Namespace/opm-operator-system", "not managed by OPM"},
+			cluster: []*unstructured.Unstructured{foreignRole},
+			render:  &fakeRender{objs: moduleObjects(renderOpts{extraRole: "team-a-role"})},
+			want:    []string{"ClusterRole/team-a-role", "not managed by OPM"},
 			check: func(t *testing.T, err error) {
 				var ge *GuardError
 				require.ErrorAs(t, err, &ge)
+			},
+		},
+		{
+			name:    "an object of an earlier manifest fails the proof",
+			cluster: []*unstructured.Unstructured{foreignNS},
+			render:  &fakeRender{objs: moduleObjects(renderOpts{})},
+			want:    []string{"operator migration refused", "Namespace/opm-operator-system: label app.kubernetes.io/managed-by is missing"},
+			check: func(t *testing.T, err error) {
+				var mr *MigrationRefusalError
+				require.ErrorAs(t, err, &mr)
 			},
 		},
 		{

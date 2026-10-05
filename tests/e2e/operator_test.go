@@ -207,6 +207,30 @@ func resetOperatorCluster(t *testing.T, kubeconfig string) {
 	kubectlDeleteIfExists(t, kubeconfig, "clusterrolebinding", "opm-cli-user",
 		"opm-operator-manager-role", "opm-operator-metrics-auth-role",
 		"opm-operator-manager-rolebinding", "opm-operator-metrics-auth-rolebinding")
+	// kubectl delete gives up after its timeout and the error is ignored;
+	// a CRD still terminating when the next case applies the manifest
+	// makes that case's install refuse to apply over it.
+	waitGone(t, kubeconfig, append([]string{"crd"}, operator.CRDNames()...)...)
+}
+
+// waitGone polls until none of the named objects of a kind exists, failing
+// the test after three minutes.
+func waitGone(t *testing.T, kubeconfig string, kindAndNames ...string) {
+	t.Helper()
+	args := append(append([]string{"--kubeconfig", kubeconfig, "--context", kindContext, "get"}, kindAndNames...), "--ignore-not-found", "-o", "name")
+	deadline := time.Now().Add(3 * time.Minute)
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		out, err := exec.CommandContext(ctx, "kubectl", args...).Output()
+		cancel()
+		if err == nil && strings.TrimSpace(string(out)) == "" {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("still present after 3m: %s (err %v)", out, err)
+		}
+		time.Sleep(2 * time.Second)
+	}
 }
 
 // TestE2E_Operator_InstallUninstallLifecycle exercises the full

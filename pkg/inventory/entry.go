@@ -40,6 +40,25 @@ func K8sIdentityEqual(a, b InventoryEntry) bool {
 		a.Name == b.Name
 }
 
+// K8sIdentity is the comparable key K8sIdentityEqual compares: an object's
+// group, kind, namespace and name, without its component or version.
+type K8sIdentity struct{ Group, Kind, Namespace, Name string }
+
+// IdentityOf is an entry's K8sIdentity.
+func IdentityOf(e InventoryEntry) K8sIdentity {
+	return K8sIdentity{Group: e.Group, Kind: e.Kind, Namespace: e.Namespace, Name: e.Name}
+}
+
+// AdmitSet is an explicit set of objects the first-install existence check
+// lets pass its untracked-object test.
+type AdmitSet map[K8sIdentity]struct{}
+
+// Has reports whether the set admits the entry; a nil set admits nothing.
+func (s AdmitSet) Has(e InventoryEntry) bool {
+	_, ok := s[IdentityOf(e)]
+	return ok
+}
+
 func ComputeStaleSet(previous, current []InventoryEntry) []InventoryEntry {
 	if len(previous) == 0 {
 		return []InventoryEntry{}
