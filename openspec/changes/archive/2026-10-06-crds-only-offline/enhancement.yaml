@@ -1,0 +1,17 @@
+# Enhancement declaration, read by `task enhancements:delivery:log` at archive time.
+# See enhancements/schema.cue #ChangeDeclaration.
+#
+# Delivers the cli side of 0021:D11:R1 and 0021:D11:R7 as revised on
+# 2026-10-06 (enhancements commits 688fddf and 421e28b): the CLI carries the
+# CRDs of its pinned module version and no other controller manifest (R1),
+# and the CRDs-only form applies them without reaching a registry or reading
+# the controller's instance (R7). D11 was claimed by
+# install-operator-from-module, so no decision is claimed here. Under-claiming
+# is the safe direction.
+#
+# Depends on the revised 0021:D11 reaching enhancements main; without it this
+# change contradicts 0021:D11:R1 ("no controller manifest of its own").
+implements:
+  - enhancement: "0021"
+    decisions: []
+    resolves: []

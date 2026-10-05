@@ -33,8 +33,9 @@ namespace, no values, deps-only) and keeps the `CustomResourceDefinition` object
 `config/crd/bases` files do not. With those labels:
 
 - the apply guard of a later full install accepts the existing CRDs as OPM's;
-- the CRDs-only and full CRD steps apply the same objects, so 0021:D11:R7 ("the CRDs-only form applies only the CRDs of
-  the same render the full install applies") still holds for the pinned version.
+- the CRDs-only and full CRD steps apply the same objects, so revised 0021:D11:R7 ("the same CRDs the full install of
+  that version applies, without reaching a registry or reading the controller's instance") holds for the pinned
+  version.
 
 The alternative, embedding `config/crd/bases` and adding labels at apply time, keeps a second copy of the label set in
 the CLI that drifts from the render. It was rejected.

@@ -1,5 +1,5 @@
 Ships inside PR B (`refactor!: rename the operator command and package to the controller`), after the rename's own
-archive. Implements the rename plan's decision D17 (owner, 2026-10-06); no enhancement decision is delivered.
+archive. Implements 0021:D11:R1/R7 (revised 2026-10-06); `enhancement.yaml` claims no decision.
 
 ## 1. Share the controller render
 
