@@ -147,14 +147,25 @@ Without a host argument, the configured registry mapping is resolved to its host
 
 Use `opm operator` to put the opm-operator (and its CRDs) onto a cluster — a prerequisite for any `opm instance apply`.
 
+`opm operator install` installs the operator from its OPM module, `opmodel.dev/modules/opm_operator`, as the CLI-owned ModuleInstance `opm-operator` in `opm-operator-system`. The operator never reconciles that instance, so re-running the CLI is always the way to repair or upgrade the operator.
+
+- **Install needs a registry.** The module is pulled from the configured registry (`--registry`, `OPM_REGISTRY` or the config file). An air-gapped cluster installs from a mirror that serves the module and its dependencies.
+- **`--version` takes an operator module version**, not an opm-operator release tag: `--version 0.2.0` pins, `--version v0` floats. Without it, install uses the module version this CLI pins. Install prints the operator release the module deploys.
+- **Settings are instance values, not Deployment patches.** `-f/--values` files are layered over the values recorded on the operator's instance, so a reinstall keeps every recorded value it does not change; `--reset-values` starts from the module's defaults. The module's `#config` holds `registry` (the operator's own `--registry` mapping), `image.repository` (for a mirror), `defaultServiceAccount`, `resources`, `replicas` and `extraArgs`.
+- **Uninstall deletes what the instance recorded**, except the CRDs and the Namespace, then the record. An operator with no record, applied with kubectl or by an older CLI, is refused. Install it with this CLI first; over an operator an older CLI applied from its manifest, that install also refuses until the CLI can migrate such an operator.
+
 | Command | Description |
 |---------|-------------|
-| `operator install` | Install the opm-operator (`--crds-only`, `--rbac [--user\|--group]`, `--version`, `--timeout`) |
-| `operator uninstall` | Remove the opm-operator, preserving CRDs and its Namespace (`--remove-finalizers`) |
+| `operator install` | Install the operator module (`--version`, `-f/--values`, `--reset-values`, `--crds-only`, `--rbac [--user\|--group]`, `--skip-platform`, `--catalog-prerelease`, `--timeout`) |
+| `operator uninstall` | Remove the recorded operator, preserving CRDs and its Namespace (`--remove-finalizers`) |
 
 ```bash
-# Install the full operator and wait for it to become ready
+# Install the pinned operator module and wait for it to roll out
 opm operator install
+
+# Let the operator resolve modules through a mirror (recorded on its instance)
+echo 'values: registry: "opmodel.dev=mirror.example/opm"' > operator-values.cue
+opm operator install -f operator-values.cue
 
 # CLI-solo path: install just the CRDs, no running operator
 opm operator install --crds-only

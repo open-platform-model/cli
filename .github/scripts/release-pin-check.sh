@@ -2,8 +2,9 @@
 # Release-pin gate (G1): a release must never ship a local, unpublished or
 # mismatched upstream pin. The rule is shared by every repo in the release
 # cascade (workspace RELEASING.md, section "Gates"); the cli adds the checks that
-# the embedded opm-operator manifest matches PinnedOperatorVersion and that
-# every version its docs bundle pins has a docs bundle (docs-kit gate G2-pins).
+# the operator module pin in internal/operator/pin.go is served and records the
+# operator release that module deploys, and that every version its docs bundle
+# pins has a docs bundle (docs-kit gate G2-pins).
 #
 # CI runs this in the lint job of pr.yml and ci.yml on release-please branches
 # only; `task deps:release-check` runs it locally on any branch.
@@ -66,21 +67,17 @@ while IFS= read -r file; do
   fail "${file}: tracked local-module.cue (git rm --cached it; it redirects a module to a local path)"
 done < <(git ls-files '*cue.mod/local-module.cue')
 
-# 5. The embedded operator manifest matches PinnedOperatorVersion.
-manifest=internal/operator/manifest.go
-installyaml=internal/operator/dist/install.yaml
-pinned=$(sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p' "$manifest")
-images=$(grep -E '^\s*image: ghcr\.io/open-platform-model/opm-operator:' "$installyaml" || true)
-count=$(grep -c . <<<"$images" || true)
-if [ -z "$pinned" ]; then
-  fail "${manifest}: cannot read PinnedOperatorVersion (task operator:sync VERSION=<tag>)"
-elif [ "$count" -ne 1 ]; then
-  fail "${installyaml}: expected exactly one opm-operator image line, found ${count} (task operator:sync VERSION=${pinned})"
-else
-  tag=$(sed -E 's#.*opm-operator:([^@[:space:]]+).*#\1#' <<<"$images")
-  if [ "$tag" != "$pinned" ]; then
-    fail "${installyaml}: operator image tag ${tag} differs from PinnedOperatorVersion ${pinned} in ${manifest} (task operator:sync VERSION=<tag>)"
-  fi
+# 5. The operator module pin is served and consistent (0021:D11:R6): the
+# registry serves PinnedModuleVersion, and PinnedOperatorVersion is the
+# operator release that module's operator package states. hack/operator-pin
+# reads it without a render; a lookup that fails is a failure, not a pass.
+if ! pin_out=$(go run ./hack/operator-pin --check 2>&1); then
+  while IFS= read -r line; do
+    # go run adds its own "exit status N" line, and on a cold cache one
+    # "go: downloading ..." line per module; the tool's lines say why.
+    case "$line" in "" | "exit status "* | "go: "*) continue ;; esac
+    fail "${line#operator-pin: }"
+  done <<<"$pin_out"
 fi
 
 # 6. Every version the cli's docs bundle pins has a docs bundle (docs-kit gate
@@ -103,4 +100,4 @@ if [ "${#failures[@]}" -gt 0 ]; then
   echo "release-pin: ${#failures[@]} violation(s); see workspace RELEASING.md, section \"Gates\" (G1)" >&2
   exit 1
 fi
-echo "release-pin: ok (no replace, published OPM pins, no dev template pins, operator embed matches ${pinned}, docs bundles exist for every docs pin)"
+echo "release-pin: ok (no replace, published OPM pins, no dev template pins, operator module pin served and consistent, docs bundles exist for every docs pin)"

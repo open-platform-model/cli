@@ -1,3 +1,8 @@
+// Package operator implements the opm-operator lifecycle surface: the pinned
+// operator module and the operator release it deploys, planning and
+// performing the install of that module as the CLI-owned instance
+// opm-operator, the record-driven uninstall and its safety checks, and the
+// running-operator check.
 package operator
 
 import (

@@ -7,11 +7,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
@@ -191,19 +189,98 @@ func TestRemoveCleanupFinalizer_ContinuesPastAFailureAndReturnsCombinedError(t *
 	assert.Empty(t, liveB.GetFinalizers())
 }
 
+// "Uninstall after a module install": every recorded object except the CRDs
+// and the Namespace, then the record.
+func TestUninstall_DeletesTheRecordedInventory(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	fc := newFakeCluster(t)
+	_, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{})
+	require.NoError(t, err)
+
+	result, err := Uninstall(context.Background(), fc.client, UninstallOptions{})
+	require.NoError(t, err)
+	assert.Empty(t, result.Errors)
+	assert.Equal(t, 3, result.Deleted, "ClusterRole, ServiceAccount, Deployment")
+	assert.Equal(t, 5, result.LeftBehind, "four CRDs and the Namespace")
+
+	assert.False(t, fc.exists(deploymentGVR, OperatorNamespace, ControllerDeploymentName))
+	assert.False(t, fc.exists(clusterRoleGVR, "", "opm-operator-manager-role"))
+	assert.True(t, fc.exists(namespaceGVR, "", OperatorNamespace))
+	for _, crd := range CRDNames() {
+		assert.True(t, fc.exists(crdGVR, "", crd))
+	}
+	assert.Nil(t, fc.record(), "the record is deleted last")
+}
+
+// "Object an older release installed is removed".
+func TestUninstall_RemovesWhatAnOlderReleaseRecorded(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	fc := newFakeCluster(t)
+	_, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{extraRole: "opm-operator-old-role"})}, PlanOptions{})
+	require.NoError(t, err)
+
+	_, err = Uninstall(context.Background(), fc.client, UninstallOptions{})
+	require.NoError(t, err)
+	assert.False(t, fc.exists(clusterRoleGVR, "", "opm-operator-old-role"))
+}
+
+// "No record": nothing is deleted.
+func TestUninstall_NoRecordDeletesNothing(t *testing.T) {
+	fc := newFakeCluster(t, deploymentFixture(true))
+
+	result, err := Uninstall(context.Background(), fc.client, UninstallOptions{})
+	require.Error(t, err)
+	assert.Nil(t, result)
+	var noRecord *NoRecordError
+	require.ErrorAs(t, err, &noRecord)
+	assert.Contains(t, err.Error(), "opm operator install")
+	assert.Empty(t, fc.Writes())
+	assert.True(t, fc.exists(deploymentGVR, OperatorNamespace, ControllerDeploymentName))
+}
+
+// "Re-running uninstall": absent objects count as deleted, then the record.
+func TestUninstall_ReRunDeletesTheRecord(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	fc := newFakeCluster(t)
+	r := &fakeRender{objs: moduleObjects(renderOpts{})}
+	_, err := install(t, fc, r, PlanOptions{})
+	require.NoError(t, err)
+	for _, obj := range r.objs {
+		if obj.GetKind() == kindCustomResourceDefinition || obj.GetKind() == kindNamespace {
+			continue
+		}
+		require.NoError(t, fc.client.ResourceClient(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace()).
+			Delete(context.Background(), obj.GetName(), metav1.DeleteOptions{}))
+	}
+
+	result, err := Uninstall(context.Background(), fc.client, UninstallOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 0, result.Deleted)
+	assert.Empty(t, result.Errors)
+	assert.Nil(t, fc.record())
+}
+
+func TestUninstall_RefusesWhenArmedAndRemoveFinalizersFalse(t *testing.T) {
+	inst := moduleInstanceFixture("default", "jellyfin", cleanupFinalizer)
+	fc := newFakeCluster(t, inst, operatorRecord("cli", nil))
+
+	result, err := Uninstall(context.Background(), fc.client, UninstallOptions{RemoveFinalizers: false})
+	require.Error(t, err)
+	assert.Nil(t, result)
+	var guardErr *FinalizerGuardError
+	require.ErrorAs(t, err, &guardErr)
+	assert.Equal(t, []ArmedInstance{{Namespace: "default", Name: "jellyfin"}}, guardErr.Armed)
+	assert.Empty(t, fc.Writes())
+}
+
 func TestUninstall_RemoveFinalizersPartialFailureDoesNotDeleteResources(t *testing.T) {
 	instA := moduleInstanceFixture("default", "jellyfin", cleanupFinalizer)
 	instB := moduleInstanceFixture("media", "seerr", cleanupFinalizer)
-	manifest, err := EmbeddedManifest()
-	require.NoError(t, err)
-	plan := UninstallPlan(manifest)
-	client := fakeClientWith(append([]*unstructured.Unstructured{instA, instB}, plan...)...)
-
-	fake, ok := client.Dynamic.(interface {
-		PrependReactor(verb, resource string, reaction k8stesting.ReactionFunc)
-	})
-	require.True(t, ok)
-	fake.PrependReactor("patch", "moduleinstances", func(action k8stesting.Action) (bool, runtime.Object, error) {
+	fc := newFakeCluster(t, instA, instB, operatorRecord("cli", nil), deploymentFixture(true))
+	fc.fake.PrependReactor("patch", "moduleinstances", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		patchAction, ok := action.(k8stesting.PatchAction)
 		if ok && patchAction.GetName() == "jellyfin" {
 			return true, nil, errors.New("transient conflict")
@@ -211,100 +288,31 @@ func TestUninstall_RemoveFinalizersPartialFailureDoesNotDeleteResources(t *testi
 		return false, nil, nil
 	})
 
-	result, err := Uninstall(context.Background(), client, UninstallOptions{RemoveFinalizers: true})
+	result, err := Uninstall(context.Background(), fc.client, UninstallOptions{RemoveFinalizers: true})
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.ErrorContains(t, err, "default/jellyfin")
 
-	// seerr was stripped — processing continued past jellyfin's failure.
-	liveB, getErr := client.Dynamic.Resource(moduleInstanceGVR).Namespace("media").Get(context.Background(), "seerr", metav1.GetOptions{})
+	liveB, getErr := fc.client.Dynamic.Resource(moduleInstanceGVR).Namespace("media").Get(context.Background(), "seerr", metav1.GetOptions{})
 	require.NoError(t, getErr)
 	assert.Empty(t, liveB.GetFinalizers())
-
-	// The operator's own resources were never touched: Uninstall must not
-	// proceed to its delete loop while any armed instance failed to strip.
-	_, err = client.Dynamic.Resource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}).
-		Namespace("opm-operator-system").Get(context.Background(), "opm-operator-controller-manager", metav1.GetOptions{})
-	require.NoError(t, err, "Deployment should still exist")
-}
-
-func TestUninstall_IsIdempotentWhenNothingLeftToDelete(t *testing.T) {
-	client := fakeClientWith() // Nothing pre-seeded — simulates "already uninstalled".
-
-	result, err := Uninstall(context.Background(), client, UninstallOptions{})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	assert.Empty(t, result.Errors)
-}
-
-func TestUninstall_RefusesWhenArmedAndRemoveFinalizersFalse(t *testing.T) {
-	inst := moduleInstanceFixture("default", "jellyfin", cleanupFinalizer)
-	client := fakeClientWith(inst)
-
-	result, err := Uninstall(context.Background(), client, UninstallOptions{RemoveFinalizers: false})
-	require.Error(t, err)
-	assert.Nil(t, result)
-	var guardErr *FinalizerGuardError
-	require.ErrorAs(t, err, &guardErr)
-	assert.Equal(t, []ArmedInstance{{Namespace: "default", Name: "jellyfin"}}, guardErr.Armed)
-
-	// Nothing else was touched: the instance still exists with the finalizer intact.
-	live, err := client.Dynamic.Resource(moduleInstanceGVR).Namespace("default").Get(context.Background(), "jellyfin", metav1.GetOptions{})
-	require.NoError(t, err)
-	assert.Equal(t, []string{cleanupFinalizer}, live.GetFinalizers())
+	assert.NotNil(t, fc.record(), "nothing of the operator was deleted")
+	assert.True(t, fc.exists(deploymentGVR, OperatorNamespace, ControllerDeploymentName))
 }
 
 func TestUninstall_RemoveFinalizersStripsAndProceeds(t *testing.T) {
-	inst := moduleInstanceFixture("default", "jellyfin", cleanupFinalizer)
-	manifest, err := EmbeddedManifest()
+	releasedCLI(t)
+	fastPolling(t)
+	fc := newFakeCluster(t, moduleInstanceFixture("default", "jellyfin", cleanupFinalizer))
+	_, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{})
 	require.NoError(t, err)
-	plan := UninstallPlan(manifest)
-	client := fakeClientWith(append([]*unstructured.Unstructured{inst}, plan...)...)
 
-	result, err := Uninstall(context.Background(), client, UninstallOptions{RemoveFinalizers: true})
+	result, err := Uninstall(context.Background(), fc.client, UninstallOptions{RemoveFinalizers: true})
 	require.NoError(t, err)
-	require.NotNil(t, result)
-	assert.Equal(t, len(plan), result.Deleted)
-	assert.Empty(t, result.Errors)
+	assert.Equal(t, 3, result.Deleted)
 
-	live, err := client.Dynamic.Resource(moduleInstanceGVR).Namespace("default").Get(context.Background(), "jellyfin", metav1.GetOptions{})
+	live, err := fc.client.Dynamic.Resource(moduleInstanceGVR).Namespace("default").Get(context.Background(), "jellyfin", metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Empty(t, live.GetFinalizers())
-
-	_, err = client.Dynamic.Resource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}).
-		Namespace("opm-operator-system").Get(context.Background(), "opm-operator-controller-manager", metav1.GetOptions{})
-	assert.True(t, apierrors.IsNotFound(err))
-}
-
-func TestUninstall_NoArmedInstancesDeletesEverythingInPlan(t *testing.T) {
-	manifest, err := EmbeddedManifest()
-	require.NoError(t, err)
-	plan := UninstallPlan(manifest)
-	client := fakeClientWith(plan...)
-
-	result, err := Uninstall(context.Background(), client, UninstallOptions{})
-	require.NoError(t, err)
-	assert.Equal(t, len(plan), result.Deleted)
-	assert.Empty(t, result.Errors)
-}
-
-func TestUninstall_NeverTargetsCRDsOrNamespace(t *testing.T) {
-	manifest, err := EmbeddedManifest()
-	require.NoError(t, err)
-	// Seed the full manifest, including CRDs and the Namespace, to prove
-	// Uninstall leaves them alone even though they're present on the "cluster".
-	client := fakeClientWith(manifest...)
-
-	result, err := Uninstall(context.Background(), client, UninstallOptions{})
-	require.NoError(t, err)
-	assert.Empty(t, result.Errors)
-
-	for _, obj := range manifest {
-		if obj.GetKind() != kindCustomResourceDefinition && obj.GetKind() != kindNamespace {
-			continue
-		}
-		live, err := client.Dynamic.Resource(kubernetes.GVRFromUnstructured(obj)).Namespace(obj.GetNamespace()).Get(context.Background(), obj.GetName(), metav1.GetOptions{})
-		require.NoError(t, err, "CRD/Namespace should not have been deleted")
-		assert.NotNil(t, live)
-	}
+	assert.False(t, fc.exists(deploymentGVR, OperatorNamespace, ControllerDeploymentName))
 }
