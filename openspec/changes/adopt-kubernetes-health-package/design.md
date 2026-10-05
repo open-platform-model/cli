@@ -72,7 +72,7 @@ Section 1 adds golden tests on the base code, so the switch in section 2 is revi
 - `internal/workflow/query/list_golden_test.go`: `RenderInstanceListOutput` JSON and YAML of summaries carrying `Ready`, `NotReady` and `Unknown`, captured from output and compared whole.
 - One table test pinning each constant's string (`"Ready"`, `"NotReady"`, `"Complete"`, `"Unknown"`, `"Missing"`, `"Applied"`, `"Bound"`), so a library rename shows up as a cli test failure too.
 - An aggregate table over `GetInstanceStatus` (nil client) and `aggregateStatus`: empty, all healthy, one NotReady, one missing, one unreadable, Applied-only.
-- A table over `EvaluateInstanceHealth` with a fake dynamic client, since the list golden test renders hand-built summaries and never runs the fold: all healthy, one NotReady Deployment, missing plus unreadable (`NotReady (3/5)` through `formatStatusColumn`), discovery failure and an empty inventory (both `Unknown` 0/0).
+- A table over `EvaluateInstanceHealth` with a fake dynamic client, since the list golden test renders hand-built summaries and never runs the fold: all healthy, one NotReady Deployment, missing plus unreadable (`NotReady (3/5)` through `formatStatusColumn`), an empty inventory (`Unknown` 0/0). The discovery-failure branch is unreachable from a test, since discovery returns no error at this base.
 - `PrintInstanceStatus` on a Deployment whose `Available` is True but whose rollout is behind: row `NotReady`, exit 2.
 
 In section 2 only identifiers in these files change (`HealthReady` becomes `health.Ready`); the task checks with `git diff` that no expected literal line changed.

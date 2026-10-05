@@ -77,6 +77,109 @@ func TestAggregateStatus_AppliedIsHealthy(t *testing.T) {
 	}, 2))
 }
 
+// A component with no evaluated resource node (depth 0) has nothing to fold
+// and is Unknown, whatever its resource count.
+func TestAggregateStatus_NothingToFoldIsUnknown(t *testing.T) {
+	assert.Equal(t, HealthUnknown, aggregateStatus(nil, 3))
+	assert.Equal(t, HealthUnknown, aggregateStatus(nil, 0))
+}
+
+// These strings are `opm instance status|list|tree -o json|yaml` output.
+// They must never change spelling.
+func TestHealthStatusStrings(t *testing.T) {
+	for want, got := range map[string]HealthStatus{
+		"Ready":    HealthReady,
+		"NotReady": HealthNotReady,
+		"Complete": HealthComplete,
+		"Unknown":  HealthUnknown,
+		"Missing":  HealthMissing,
+		"Applied":  HealthApplied,
+		"Bound":    HealthBound,
+	} {
+		assert.Equal(t, want, string(got))
+	}
+}
+
+// GetInstanceStatus folds every row (live, missing, unreadable) into the
+// instance verdict and the summary counts.
+func TestGetInstanceStatus_Aggregate(t *testing.T) {
+	readyDeploy := func() *unstructured.Unstructured {
+		return makeWorkload("Deployment", 1, map[string]interface{}{"replicas": int64(1)}, map[string]interface{}{
+			"observedGeneration": int64(1), "replicas": int64(1), "updatedReplicas": int64(1), "availableReplicas": int64(1),
+		})
+	}
+	notReadyDeploy := makeWorkload("Deployment", 1, map[string]interface{}{"replicas": int64(2)}, map[string]interface{}{
+		"observedGeneration": int64(1), "replicas": int64(2), "updatedReplicas": int64(1), "availableReplicas": int64(1),
+	})
+	forbidden := apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "creds", errors.New("denied"))
+
+	tests := []struct {
+		name       string
+		live       []*unstructured.Unstructured
+		missing    []MissingResource
+		unreadable []UnreadableResource
+		wantAgg    HealthStatus
+		wantRows   []HealthStatus
+		wantSum    statusSummary
+	}{
+		{
+			name:     "all healthy",
+			live:     []*unstructured.Unstructured{readyDeploy(), makeResource("ConfigMap", nil)},
+			wantAgg:  HealthReady,
+			wantRows: []HealthStatus{HealthReady, HealthApplied},
+			wantSum:  statusSummary{Total: 2, Ready: 2, NotReady: 0},
+		},
+		{
+			name:     "applied only",
+			live:     []*unstructured.Unstructured{makeResource("ConfigMap", nil), makeResource("ServiceAccount", nil)},
+			wantAgg:  HealthReady,
+			wantRows: []HealthStatus{HealthApplied, HealthApplied},
+			wantSum:  statusSummary{Total: 2, Ready: 2, NotReady: 0},
+		},
+		{
+			name:     "one not-ready Deployment",
+			live:     []*unstructured.Unstructured{notReadyDeploy, makeResource("ConfigMap", nil)},
+			wantAgg:  HealthNotReady,
+			wantRows: []HealthStatus{HealthNotReady, HealthApplied},
+			wantSum:  statusSummary{Total: 2, Ready: 1, NotReady: 1},
+		},
+		{
+			name:     "one missing entry",
+			live:     []*unstructured.Unstructured{makeResource("ConfigMap", nil)},
+			missing:  []MissingResource{{Kind: "Service", Namespace: "default", Name: "web"}},
+			wantAgg:  HealthNotReady,
+			wantRows: []HealthStatus{HealthApplied, HealthMissing},
+			wantSum:  statusSummary{Total: 2, Ready: 1, NotReady: 1},
+		},
+		{
+			name:       "one unreadable entry",
+			live:       []*unstructured.Unstructured{makeResource("ConfigMap", nil)},
+			unreadable: []UnreadableResource{{Kind: "Secret", Namespace: "default", Name: "creds", Err: forbidden}},
+			wantAgg:    HealthNotReady,
+			wantRows:   []HealthStatus{HealthApplied, HealthUnknown},
+			wantSum:    statusSummary{Total: 2, Ready: 1, NotReady: 1},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := GetInstanceStatus(context.Background(), nil, StatusOptions{
+				InstanceName:        "my-app",
+				InventoryLive:       tc.live,
+				MissingResources:    tc.missing,
+				UnreadableResources: tc.unreadable,
+			})
+			require.NoError(t, err)
+			rows := make([]HealthStatus, len(res.Resources))
+			for i, r := range res.Resources {
+				rows[i] = r.Status
+			}
+			assert.Equal(t, tc.wantRows, rows)
+			assert.Equal(t, tc.wantAgg, res.AggregateStatus)
+			assert.Equal(t, tc.wantSum, res.Summary)
+		})
+	}
+}
+
 func TestFormatStatus_JSON(t *testing.T) {
 	result := &StatusResult{
 		InstanceName:    "my-app",
