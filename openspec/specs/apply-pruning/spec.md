@@ -42,52 +42,6 @@ After rendering and before apply, the system SHALL compute the stale set with th
 - **AND** the current render does not contain `Deployment/old-app` under any component
 - **THEN** `Deployment/old-app` SHALL appear in the stale set
 
-### Requirement: Pre-apply existence check on first install
-
-On first-time apply (no previous inventory), the system SHALL check each rendered resource against the cluster. If a resource exists with a `deletionTimestamp` (terminating), or exists without OPM labels (untracked), the apply SHALL fail with a clear error message. This check SHALL be skipped entirely when a previous inventory exists. A caller MAY pass an explicit admission set of resources; a resource in that set SHALL pass the untracked-resource test, and SHALL still fail the terminating-resource test. Only `opm operator install` SHALL pass a non-empty set, holding exactly the existing resources it proved came from an earlier opm-operator release manifest, or that already carry the operator instance's identity; every other caller SHALL pass none. No flag SHALL fill the set. The untracked-resource error SHALL NOT name a flag that would bypass it, since no flag does; it SHALL tell the user to remove or rename the existing resource, or to change the module so it renders a different name. Source: 0012:D8:R6.
-
-#### Scenario: Untracked resource detected on first install
-
-- **WHEN** performing a first-time apply
-- **AND** a rendered resource already exists on the cluster without OPM labels
-- **THEN** the command SHALL fail with an error indicating the resource is untracked
-
-#### Scenario: Terminating resource detected on first install
-
-- **WHEN** performing a first-time apply
-- **AND** a rendered resource exists on the cluster with a `deletionTimestamp`
-- **THEN** the command SHALL fail with an error indicating the resource is terminating
-
-#### Scenario: Check skipped when inventory exists
-
-- **WHEN** performing a subsequent apply (previous inventory exists)
-- **THEN** the pre-apply existence check SHALL be skipped entirely
-
-#### Scenario: Untracked-resource error names no bypass flag
-
-- **WHEN** performing a first-time apply
-- **AND** a rendered resource already exists on the cluster without OPM labels
-- **THEN** the error SHALL NOT mention `--force`
-- **AND** the error SHALL tell the user to remove or rename the existing resource, or to change the module to render a different name
-
-#### Scenario: Admitted resource passes the untracked test
-
-- **WHEN** performing a first-time apply of the operator instance from `opm operator install`
-- **AND** a rendered resource exists without OPM labels, and install proved it came from an earlier operator release manifest
-- **THEN** the check SHALL NOT fail for that resource
-
-#### Scenario: Admitted terminating resource still fails
-
-- **WHEN** performing a first-time apply with an admission set
-- **AND** an admitted resource exists with a `deletionTimestamp`
-- **THEN** the command SHALL fail with an error indicating the resource is terminating
-
-#### Scenario: Other commands admit nothing
-
-- **WHEN** `opm instance apply` performs a first-time apply
-- **AND** a rendered resource already exists on the cluster without OPM labels
-- **THEN** the command SHALL fail with an error indicating the resource is untracked
-
 ### Requirement: Stale resources pruned after successful apply
 
 After all rendered resources have been successfully applied, stale resources SHALL be deleted in reverse weight order (highest weight first — custom resources before CRDs). Deletion SHALL treat 404 as success (resource already gone). A `Namespace` in the core API group and a `CustomResourceDefinition` in the `apiextensions.k8s.io` group SHALL never be pruned, with no flag to override this: deleting a Namespace deletes everything inside it, and deleting a CRD deletes every custom resource of its kind in the cluster. Every stale resource of a protected kind SHALL be reported as left behind, one line per resource naming its kind, namespace and name with the status `left behind`.
@@ -207,3 +161,37 @@ When `--dry-run` is set and pruning is enabled, the apply SHALL list the stale r
 
 - **WHEN** `opm instance apply --dry-run --no-prune` runs with a non-empty stale set
 - **THEN** the output SHALL list no `would prune` and no `left behind` lines
+
+### Requirement: First-time apply refuses existing objects OPM does not manage
+
+On first-time apply (no previous inventory), the system SHALL check each rendered resource against the cluster. If a resource exists with a `deletionTimestamp` (terminating), or exists without OPM labels (untracked), the apply SHALL fail with a clear error message. This check SHALL be skipped entirely when a previous inventory exists. The check SHALL take no admission set and no flag SHALL bypass it, for every command alike, `opm operator install` included. The untracked-resource error SHALL NOT name a flag that would bypass it, since no flag does; it SHALL tell the user to remove or rename the existing resource, or to change the module so it renders a different name.
+
+#### Scenario: Untracked resource detected on first install
+
+- **WHEN** performing a first-time apply
+- **AND** a rendered resource already exists on the cluster without OPM labels
+- **THEN** the command SHALL fail with an error indicating the resource is untracked
+
+#### Scenario: Terminating resource detected on first install
+
+- **WHEN** performing a first-time apply
+- **AND** a rendered resource exists on the cluster with a `deletionTimestamp`
+- **THEN** the command SHALL fail with an error indicating the resource is terminating
+
+#### Scenario: Check skipped when inventory exists
+
+- **WHEN** performing a subsequent apply (previous inventory exists)
+- **THEN** the pre-apply existence check SHALL be skipped entirely
+
+#### Scenario: Untracked-resource error names no bypass flag
+
+- **WHEN** performing a first-time apply
+- **AND** a rendered resource already exists on the cluster without OPM labels
+- **THEN** the error SHALL NOT mention `--force`
+- **AND** the error SHALL tell the user to remove or rename the existing resource, or to change the module to render a different name
+
+#### Scenario: Operator install meets the same check
+
+- **WHEN** `opm operator install` performs the first apply of the operator instance
+- **AND** a rendered resource already exists on the cluster without OPM labels
+- **THEN** the command SHALL fail with an error indicating the resource is untracked, as any other first-time apply does

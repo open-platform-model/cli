@@ -17,5 +17,5 @@ One PR with the rename change after it (`rename-operator-command-to-controller`)
 
 ## 2. Specs and archive
 
-- [ ] 2.1 `task openspec:check` passes with this change's deltas (`operator-migration` REMOVED-only with `retire_capabilities: true`; `apply-pruning` and `operator-lifecycle` REMOVED + ADDED retitles).
-- [ ] 2.2 Verify the implementation against the change (opsx verify), archive it (`openspec archive retire-legacy-manifest-migration --yes`), confirm `openspec/specs/operator-migration` is gone and `task openspec:check` still passes, then commit `chore(openspec): archive retire-legacy-manifest-migration`.
+- [x] 2.1 `task openspec:check` passes with this change's deltas (`operator-migration` REMOVED-only with `retire_capabilities: true`; `apply-pruning` and `operator-lifecycle` REMOVED + ADDED retitles).
+- [x] 2.2 Verify the implementation against the change (opsx verify), archive it (`openspec archive retire-legacy-manifest-migration --yes`), confirm `openspec/specs/operator-migration` is gone and `task openspec:check` still passes, then commit `chore(openspec): archive retire-legacy-manifest-migration`.
