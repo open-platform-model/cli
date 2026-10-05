@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/open-platform-model/library/opm/kernel"
-	"github.com/open-platform-model/library/opm/schema"
+	"github.com/open-platform-model/library/opm/module"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
@@ -103,7 +103,7 @@ func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath 
 
 	// Identity and coordinate checks run between module load and the values
 	// stanza, so a module with no debugValues still reports coordinate drift.
-	plan, modVal, err := publish.VetChecks(ctx, publish.Options{
+	plan, mod, err := publish.VetChecks(ctx, publish.Options{
 		Dir:            modulePath,
 		Kind:           publish.KindModule,
 		Context:        cueCtx,
@@ -126,12 +126,11 @@ func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath 
 		}
 	}
 
-	// Derive a display name for log output.
-	modName := filepath.Base(modulePath)
-	if nameVal := modVal.LookupPath(cue.ParsePath("metadata.name")); nameVal.Exists() {
-		if name, nameErr := nameVal.String(); nameErr == nil && name != "" {
-			modName = name
-		}
+	// Derive a display name for log output: the authored metadata.name, else
+	// the directory's base name.
+	modName := plan.ModuleName
+	if modName == "" {
+		modName = filepath.Base(modulePath)
 	}
 	moduleLog := output.InstanceLogger(modName)
 
@@ -144,7 +143,7 @@ func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath 
 	// Resolve the values to validate against #config: -f files as
 	// file-backed kernel sources, else debugValues as one source attributed
 	// to the module's debugValues.
-	sources, err := render.ResolveModuleValues(k, modVal, modulePath, rf.Values)
+	sources, err := render.ResolveModuleValues(k, mod, modulePath, rf.Values)
 	if err != nil {
 		// A -f file that cannot be read or parsed is an input error, not a
 		// verdict on the module; a module without debugValues is.
@@ -155,7 +154,7 @@ func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath 
 		return &opmexit.ExitError{Code: code, Err: err}
 	}
 
-	if err := validateVetValues(k, modVal, modName, sources, len(rf.Values) > 0); err != nil {
+	if err := validateVetValues(k, mod, modName, sources, len(rf.Values) > 0); err != nil {
 		return err
 	}
 
@@ -213,8 +212,8 @@ func renderVetModule(ctx context.Context, cfg *config.GlobalConfig, modulePath s
 // here as it does in build; an incomplete merge is a #config violation at
 // its position, printed as the grouped block and returned framed with the
 // module name.
-func validateVetValues(k *kernel.Kernel, modVal cue.Value, modName string, sources []kernel.Source, hasValuesFiles bool) error {
-	configSchema := modVal.LookupPath(schema.Config)
+func validateVetValues(k *kernel.Kernel, mod *module.Module, modName string, sources []kernel.Source, hasValuesFiles bool) error {
+	configSchema := mod.ConfigSchema()
 	if hasValuesFiles && !configSchema.Exists() {
 		return &opmexit.ExitError{
 			Code: opmexit.ExitValidationError,

@@ -7,17 +7,19 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 
 	"github.com/open-platform-model/library/opm/kernel"
+	"github.com/open-platform-model/library/opm/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// runVetChecks runs VetChecks on files with the stub schema. None of the
-// fixtures declare debugValues — the checks must report regardless.
-func runVetChecks(t *testing.T, files map[string]string) *Plan {
+// runVetChecks runs VetChecks on files with the stub schema and returns the
+// plan and the vetted module. None of the fixtures declare debugValues — the
+// checks must report regardless.
+func runVetChecks(t *testing.T, files map[string]string) (*Plan, *module.Module) {
 	t.Helper()
 	dir := writeTree(t, files)
 	ctx := cuecontext.New()
-	p, root, err := VetChecks(context.Background(), Options{
+	p, mod, err := VetChecks(context.Background(), Options{
 		Dir:            dir,
 		Kind:           KindModule,
 		Context:        ctx,
@@ -25,14 +27,47 @@ func runVetChecks(t *testing.T, files map[string]string) *Plan {
 		IdentitySchema: stubSchema(t, ctx),
 	})
 	require.NoError(t, err)
-	require.True(t, root.Exists())
-	return p
+	require.NotNil(t, mod)
+	require.True(t, mod.Package.Exists())
+	return p, mod
 }
 
 func TestVetChecks_CleanModulePasses(t *testing.T) {
-	p := runVetChecks(t, moduleFiles())
+	p, mod := runVetChecks(t, moduleFiles())
 	assert.Empty(t, p.Refusals, refusalHeadlines(p))
 	assert.Equal(t, "example.com/modules/demo@v1", p.DeclaredPath)
+	assert.Equal(t, "demo", p.ModuleName)
+	require.NotNil(t, mod.Metadata, "concrete metadata decodes")
+	assert.Equal(t, "demo", mod.Metadata.Name)
+}
+
+// TestVetChecks_OpenMetadataVersionKeepsName: an open metadata.version keeps
+// the module's metadata from decoding as a whole, yet the plan still carries
+// the authored name for vet's log prefix and the module still reaches #config.
+// It holds under the stub schema only: core v2.0.0-beta.4's #IdentityPackage
+// refuses an open Version, so this pins the defensive path.
+func TestVetChecks_OpenMetadataVersionKeepsName(t *testing.T) {
+	files := edit(moduleFiles(), "identity/identity.cue", `package identity
+
+ModulePath: "example.com/modules/demo@v1"
+Version:    string
+`)
+	files = edit(files, "module.cue", `package demo
+
+kind: "Module"
+metadata: {
+	name:       "demo"
+	modulePath: "example.com/modules/demo@v1"
+	version:    string
+}
+
+#config: replicas: int
+`)
+	p, mod := runVetChecks(t, files)
+	assert.Empty(t, p.Refusals, refusalHeadlines(p))
+	assert.Equal(t, "demo", p.ModuleName)
+	assert.Nil(t, mod.Metadata, "an open version does not decode")
+	assert.True(t, mod.ConfigSchema().Exists())
 }
 
 func TestVetChecks_CoordinateDrift(t *testing.T) {
@@ -40,7 +75,7 @@ func TestVetChecks_CoordinateDrift(t *testing.T) {
 language: version: "v0.17.0"
 source: kind: "self"
 `)
-	p := runVetChecks(t, files)
+	p, _ := runVetChecks(t, files)
 	require.Len(t, p.Refusals, 1, refusalHeadlines(p))
 	r := p.Refusals[0]
 	assert.Contains(t, r.Headline, "disagrees with itself about where it lives")
@@ -59,7 +94,7 @@ metadata: {
 	version:    "1.0.0"
 }
 `)
-	p := runVetChecks(t, files)
+	p, _ := runVetChecks(t, files)
 	require.Len(t, p.Refusals, 1, refusalHeadlines(p))
 	assert.Contains(t, p.Refusals[0].Headline, "states a version its identity package does not")
 	assert.Contains(t, p.Refusals[0].Action, "version: id.Version")
@@ -71,7 +106,7 @@ func TestVetChecks_NonConformantIdentity(t *testing.T) {
 ModulePath:     "example.com/modules/demo@v1"
 CatalogVersion: "1.2.0"
 `)
-	p := runVetChecks(t, files)
+	p, _ := runVetChecks(t, files)
 	require.NotEmpty(t, p.Refusals)
 	r := p.Refusals[0]
 	assert.Contains(t, r.Headline, "#IdentityPackage")
@@ -97,7 +132,7 @@ metadata: {
 	modulePath: "example.com/modules/demo@v1"
 }
 `)
-	p := runVetChecks(t, files)
+	p, _ := runVetChecks(t, files)
 	assert.Empty(t, p.Refusals, refusalHeadlines(p))
 }
 
@@ -118,12 +153,12 @@ metadata: {
 	version:    "2.0.0"
 }
 `)
-	p := runVetChecks(t, files)
+	p, _ := runVetChecks(t, files)
 	assert.Contains(t, refusalHeadlines(p), "within the major")
 }
 
 func TestVetChecks_KernelLoad(t *testing.T) {
-	p := runVetChecks(t, defaultedIdentityFiles())
+	p, _ := runVetChecks(t, defaultedIdentityFiles())
 	require.Len(t, p.Refusals, 1, refusalHeadlines(p))
 	assert.Contains(t, p.Refusals[0].Headline, "the kernel would refuse to load this module")
 }

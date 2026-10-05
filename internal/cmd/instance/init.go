@@ -286,7 +286,7 @@ func initPackage(ctx context.Context, cfg *config.GlobalConfig, in *initInputs) 
 		return initError(err)
 	}
 
-	values, source, err := instinit.PickValues(mod.Package)
+	values, source, err := instinit.PickValues(mod)
 	if err != nil {
 		return initError(err)
 	}

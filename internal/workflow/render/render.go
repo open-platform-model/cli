@@ -15,7 +15,6 @@ import (
 	"github.com/open-platform-model/library/opm/k8s/object"
 	"github.com/open-platform-model/library/opm/kernel"
 	"github.com/open-platform-model/library/opm/module"
-	"github.com/open-platform-model/library/opm/schema"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
@@ -280,7 +279,7 @@ func renderInstance(
 		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}
 
-	result := newResult(env, out, renderDigest, decodeUnifiedValues(inst.Package.LookupPath(schema.Values)), sourceLocal)
+	result := newResult(env, out, renderDigest, decodeUnifiedValues(inst.Values()), sourceLocal)
 
 	for _, r := range converted {
 		u, convErr := r.ToUnstructured()
@@ -301,9 +300,9 @@ func renderInstance(
 		}
 	}
 
-	// Module metadata decoded from the embedded #module value (carries the
-	// full registry modulePath for the canonical spec.module reference).
-	result.Module = decodeModuleMetadata(inst.Package.LookupPath(schema.Module))
+	// The embedded module's metadata carries the full registry modulePath for
+	// the canonical spec.module reference.
+	result.Module = moduleMetadataOf(inst)
 
 	return result, nil
 }
@@ -370,22 +369,16 @@ func formatAdvisories(d kernel.RenderDiagnostics) []string {
 	return warnings
 }
 
-// decodeModuleMetadata decodes the embedded module's metadata from the
-// instance package's module value into the library's type. The library keeps
-// its own decoder private and the instance exposes no accessor for this
-// subtree, so the CLI reads it here.
-func decodeModuleMetadata(moduleVal cue.Value) module.ModuleMetadata {
-	meta := module.ModuleMetadata{}
-	if !moduleVal.Exists() {
-		return meta
+// moduleMetadataOf is the metadata of the module the instance embeds, or zero
+// metadata when the instance carries none. The library returns nil both for
+// an absent #module and for embedded metadata that does not decode as a
+// whole (an open identity field); the render result carries either as a
+// module with no metadata.
+func moduleMetadataOf(inst *module.Instance) module.ModuleMetadata {
+	if m := inst.ModuleMetadata(); m != nil {
+		return *m
 	}
-	if mv := moduleVal.LookupPath(cue.ParsePath("metadata")); mv.Exists() {
-		// Best-effort decode: leaves zero-value fields if metadata is partial.
-		if err := mv.Decode(&meta); err != nil {
-			output.Debug("could not decode module metadata", "err", err)
-		}
-	}
-	return meta
+	return module.ModuleMetadata{}
 }
 
 // decodeUnifiedValues converts the instance's concrete, merged values into a

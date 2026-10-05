@@ -115,7 +115,7 @@ func moduleValues(k *kernel.Kernel, src *acquiredModule, opts ModuleOpts) ([]ker
 	values := opts.Values
 	if len(values) == 0 {
 		var err error
-		values, err = ResolveModuleValues(k, src.module.Package, src.valuesOrigin, opts.ValuesFiles)
+		values, err = ResolveModuleValues(k, src.module, src.valuesOrigin, opts.ValuesFiles)
 		if err != nil {
 			return nil, err
 		}
