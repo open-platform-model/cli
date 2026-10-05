@@ -14,5 +14,5 @@ One PR, titled `ci(release): retire the G4 operator-embed evidence check`. Worke
 
 ## 2. Archive
 
-- [ ] 2.1 Sync the deltas into `openspec/specs/` and archive the change; `task openspec:check` passes and `grep -rn 'e2e-verified' openspec/specs` is empty.
-- [ ] 2.2 Commit `chore(openspec): archive retire-g4-operator-embed-evidence`.
+- [x] 2.1 Sync the deltas into `openspec/specs/` and archive the change; `task openspec:check` passes and `grep -rn 'e2e-verified' openspec/specs` is empty.
+- [x] 2.2 Commit `chore(openspec): archive retire-g4-operator-embed-evidence`.
