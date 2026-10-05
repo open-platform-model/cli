@@ -207,10 +207,15 @@ func runPin(ctx context.Context, reg registry, stdout, stderr io.Writer, p paths
 		if err != nil {
 			return fmt.Errorf("rendering %s %s: %w", controller.ControllerModulePath, moduleVersion, err)
 		}
+		pin, err := renderPin(moduleVersion, ctrlVersion)
+		if err != nil {
+			return err
+		}
 		if err := writeManifests(p.crds, files); err != nil {
 			return err
 		}
-		if err := writePin(p.pin, moduleVersion, ctrlVersion); err != nil {
+		// The pin goes last, so a failed manifest write leaves the old pin.
+		if err := os.WriteFile(p.pin, pin, 0o644); err != nil { //nolint:gosec // a source file
 			return err
 		}
 		fmt.Fprintf(stdout, "pinned %s %s (deploys opm-controller %s; %d CRDs in %s)\n",
@@ -286,21 +291,51 @@ func renderManifests(ctx context.Context, p paths, res *modref.Resolution, dir s
 	return files, nil
 }
 
-// writeManifests replaces every *.yaml manifest in dir with files.
+// writeManifests replaces every *.yaml manifest in dir with files. It first
+// writes every new manifest to a temporary file beside it, so a failed write
+// (disk full, permissions) removes those and leaves the old set untouched;
+// only then does it remove the manifests the new set drops and rename the
+// temporary files into place.
 func writeManifests(dir string, files map[string][]byte) error {
 	old, err := readManifests(dir)
 	if err != nil {
 		return err
 	}
-	for name := range old {
-		if err := os.Remove(filepath.Join(dir, name)); err != nil {
-			return err
+	staged := make(map[string]string, len(files))
+	cleanup := func() {
+		for _, tmp := range staged {
+			_ = os.Remove(tmp)
 		}
 	}
 	for name, data := range files {
-		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil { //nolint:gosec // a source file
+		f, err := os.CreateTemp(dir, "."+name+".*.tmp")
+		if err != nil {
+			cleanup()
 			return err
 		}
+		staged[name] = f.Name()
+		_, werr := f.Write(data)
+		cerr := f.Close()
+		if err := errors.Join(werr, cerr, os.Chmod(f.Name(), 0o644)); err != nil {
+			cleanup()
+			return err
+		}
+	}
+	for name := range old {
+		if _, kept := files[name]; kept {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, name)); err != nil {
+			cleanup()
+			return err
+		}
+	}
+	for name, tmp := range staged {
+		if err := os.Rename(tmp, filepath.Join(dir, name)); err != nil {
+			cleanup()
+			return err
+		}
+		delete(staged, name)
 	}
 	return nil
 }
@@ -365,14 +400,6 @@ const PinnedModuleVersion = %q
 const %s = %q
 `, moduleVersion, controllerConst, controllerConst, ctrlVersion)
 	return format.Source(b.Bytes())
-}
-
-func writePin(file, moduleVersion, ctrlVersion string) error {
-	data, err := renderPin(moduleVersion, ctrlVersion)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(file, data, 0o644) //nolint:gosec // a source file
 }
 
 var (

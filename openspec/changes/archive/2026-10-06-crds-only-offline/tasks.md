@@ -24,6 +24,9 @@ archive. Implements 0021:D11:R1/R7 (revised 2026-10-06); `enhancement.yaml` clai
   (`modules/opm_controller`), and record the cutover re-pin
 - [x] 2.7 Commit `feat(controller): embed the CRDs the pinned controller module renders` (plus
   `fix(controller): keep the pin render's generated platform out of the tree`, found while bootstrapping)
+- [x] 2.8 Stage every manifest as a temporary file before removing or replacing any, and write the pin last, so a failed
+  write leaves the pin and the manifests unchanged; a test with a read-only directory (review finding); commit
+  `fix(controller): stage the pin's manifest writes`
 
 ## 3. Install the CRDs offline
 

@@ -164,6 +164,32 @@ func TestPin_RefusedVersionLeavesThePinAndTheManifests(t *testing.T) {
 	}
 }
 
+// A manifest write that fails (here a read-only directory) leaves the old
+// manifests and the pin as they were, with no temporary file behind.
+func TestPin_FailedWriteLeavesThePinAndTheManifests(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	p := testPaths(t, pinRegistry(t), &fakeRender{})
+	require.NoError(t, os.WriteFile(p.pin, []byte("unchanged\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(p.crds, "kept.opmodel.dev.yaml"), []byte("kept\n"), 0o644))
+	require.NoError(t, os.Chmod(p.crds, 0o555))
+	t.Cleanup(func() { _ = os.Chmod(p.crds, 0o755) })
+
+	code, _, _ := runTool(t, p, "0.2.0")
+	assert.Equal(t, 1, code)
+	got, err := os.ReadFile(p.pin)
+	require.NoError(t, err)
+	assert.Equal(t, "unchanged\n", string(got))
+	entries, err := os.ReadDir(p.crds)
+	require.NoError(t, err)
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	assert.Equal(t, []string{"kept.opmodel.dev.yaml"}, names)
+}
+
 // A render without a CRD is no pin.
 func TestPin_RenderWithoutCRDsIsRefused(t *testing.T) {
 	p := testPaths(t, pinRegistry(t), &fakeRender{})
