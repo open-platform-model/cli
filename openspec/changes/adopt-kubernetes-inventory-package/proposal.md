@@ -69,7 +69,7 @@ None.
 
 ## Impact
 
-- Code: delete `pkg/inventory/`, `internal/inventory/{aliases,digest}.go` and `internal/inventory/digest_test.go`; delete `ApplyComponentRenameSafetyCheck` from `internal/inventory/stale.go`. Switch `internal/inventory/{discover,legacy,record,stale,store,wire}.go`, `internal/workflow/apply/apply.go`, `internal/workflow/render/{render,types}.go`, `internal/workflow/query/status.go`, `internal/cmd/instance/{status,tree,delete}.go`, `internal/operator/{migration_plan,names,plan_install}.go`, their tests, and the `tests/integration/{deploy,inst-list,inst-tree,inventory-apply,inventory-ops,migration,module-apply,render-parity}` programs.
+- Code: delete `pkg/inventory/`, `internal/inventory/{aliases,digest}.go` and `internal/inventory/digest_test.go`; delete `ApplyComponentRenameSafetyCheck` from `internal/inventory/stale.go`. Switch `internal/inventory/{discover,legacy,record,stale,store,wire}.go`, `internal/workflow/apply/apply.go`, `internal/workflow/render/{render,types}.go`, `internal/workflow/query/status.go`, `internal/cmd/instance/status.go`, the tests the compiler names, and the `tests/integration/{deploy,inst-list,inst-tree,inventory-apply,inventory-ops,migration,module-apply,render-parity}` programs.
 - API: `pkg/inventory` is removed (breaking). `internal/` signatures change from `InventoryEntry` to the library `Entry`.
 - Stored data: `status.inventory.digest` and `status.lastAppliedRenderDigest` change once (Migration note). No CRD change.
 - Lint: the `depguard` rule gains one denied path.

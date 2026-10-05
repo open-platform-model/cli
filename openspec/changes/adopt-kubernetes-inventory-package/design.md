@@ -116,7 +116,7 @@ The `retired-kubernetes-copies` rule gains `github.com/open-platform-model/cli/p
 - [A user compares stored digests across the upgrade] → the migration note in the PR body and the release CHANGELOG names both fields, the cause and the rollback behaviour.
 - [The operator's adoption lands in a different library release] → both frontends already pin `v1.0.0-beta.6`; the cli release that carries this change should be the one the operator's inventory adoption ships beside, so a mixed cluster never records two encodings of the render digest for long. Neither frontend compares the other's stored render digest today, so a gap is cosmetic.
 - [A branch elsewhere still imports `pkg/inventory`] → it fails to compile on merge, and the depguard message names the replacement.
-- [`cli-e4` and the lifecycle adoption touch the same files] → they replace `PreApplyExistenceCheck`, `AdmitSet` and `PruneStaleResources`; this change only renames their entry type, so whichever lands second rebuilds on the other.
+- [The ownership and lifecycle adoptions touch the same files] → they replace `PreApplyExistenceCheck`, `AdmitSet` and `PruneStaleResources`; this change only renames their entry type, so whichever lands second rebuilds on the other.
 
 ## Migration Plan
 
