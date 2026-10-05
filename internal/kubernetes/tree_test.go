@@ -396,8 +396,10 @@ func TestWalkOwnership_PassiveResourceReturnsNil(t *testing.T) {
 // Section 5: Tree building
 // ─────────────────────────────────────────────────────────────────────────────
 
-func makeReadyDeployment(ns, name string) *unstructured.Unstructured {
-	res := makeRes("Deployment", ns, name)
+// makeReadyDeployment builds Deployment ns/web, rolled out and ready by the
+// library rule.
+func makeReadyDeployment() *unstructured.Unstructured {
+	res := makeRes("Deployment", "ns", "web")
 	_ = unstructured.SetNestedField(res.Object, int64(1), "spec", "replicas")
 	_ = unstructured.SetNestedField(res.Object, int64(1), "status", "readyReplicas")
 	_ = unstructured.SetNestedField(res.Object, int64(1), "status", "updatedReplicas")
@@ -414,7 +416,7 @@ func TestBuildTree_Depth0_ComponentSummaryOnly(t *testing.T) {
 	ctx := context.Background()
 	client := makeTreeClient()
 
-	r1 := makeReadyDeployment("ns", "web")
+	r1 := makeReadyDeployment()
 	r2 := makeRes("ConfigMap", "ns", "cfg")
 	_ = unstructured.SetNestedField(r2.Object, nil, "status") // passive
 
@@ -441,7 +443,7 @@ func TestBuildTree_Depth1_ResourcesNoChildren(t *testing.T) {
 	ctx := context.Background()
 	client := makeTreeClient() // no K8s objects — walkOwnership should not be called
 
-	res := makeReadyDeployment("ns", "web")
+	res := makeReadyDeployment()
 	opts := TreeOptions{
 		InstanceInfo:  InstanceInfo{Name: "my-app", Namespace: "ns"},
 		InventoryLive: []*unstructured.Unstructured{res},
@@ -465,7 +467,7 @@ func TestBuildTree_Depth1_ResourcesNoChildren(t *testing.T) {
 // (updatedReplicas below spec.replicas) takes the library verdict NotReady,
 // and the component folds to NotReady with it.
 func TestBuildTree_Depth1_RolloutBehindIsNotReady(t *testing.T) {
-	res := makeReadyDeployment("ns", "web")
+	res := makeReadyDeployment()
 	_ = unstructured.SetNestedField(res.Object, int64(3), "spec", "replicas")
 	for _, field := range []string{"readyReplicas", "availableReplicas", "replicas"} {
 		_ = unstructured.SetNestedField(res.Object, int64(3), "status", field)
@@ -533,7 +535,7 @@ func TestBuildTree_Depth2_FullTree(t *testing.T) {
 	}
 	client := makeTreeClient(rs, pod)
 
-	deploy := makeReadyDeployment("ns", "web")
+	deploy := makeReadyDeployment()
 	deploy.SetUID(deployUID)
 
 	opts := TreeOptions{
