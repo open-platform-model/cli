@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -216,6 +217,55 @@ func TestSortMatchesRetiredCopy(t *testing.T) {
 			objs := orderSet()
 			SortObjects(objs, tc.dir)
 			assert.Equal(t, retiredSortOrder[tc.dir], objNames(objs))
+		})
+	}
+}
+
+// TestSortObjectsStableOnLargeInput pins that SortObjects keeps equal-weight
+// objects in their input order, in both directions. The input is large
+// enough (96 objects) that an unstable sort reorders equal elements, which
+// the 15-object orderSet does not reveal. Names count down while the input
+// order counts up, so a sort that fell back to the name would also fail.
+func TestSortObjectsStableOnLargeInput(t *testing.T) {
+	const pairs = 48
+	build := func() []*unstructured.Unstructured {
+		objs := make([]*unstructured.Unstructured, 0, 2*pairs)
+		for i := range pairs {
+			cm := &unstructured.Unstructured{}
+			cm.SetAPIVersion("v1")
+			cm.SetKind("ConfigMap")
+			cm.SetName(fmt.Sprintf("cm-%03d", pairs-i))
+			deploy := &unstructured.Unstructured{}
+			deploy.SetAPIVersion("apps/v1")
+			deploy.SetKind("Deployment")
+			deploy.SetName(fmt.Sprintf("deploy-%03d", pairs-i))
+			objs = append(objs, cm, deploy)
+		}
+		return objs
+	}
+	inputOrder := func(kind string) []string {
+		var names []string
+		for _, o := range build() {
+			if o.GetKind() == kind {
+				names = append(names, o.GetName())
+			}
+		}
+		return names
+	}
+	cms, deploys := inputOrder("ConfigMap"), inputOrder("Deployment")
+
+	for _, tc := range []struct {
+		name string
+		dir  object.Direction
+		want []string
+	}{
+		{"ascending", object.Ascending, append(append([]string{}, cms...), deploys...)},
+		{"descending", object.Descending, append(append([]string{}, deploys...), cms...)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			objs := build()
+			SortObjects(objs, tc.dir)
+			assert.Equal(t, tc.want, objNames(objs))
 		})
 	}
 }
