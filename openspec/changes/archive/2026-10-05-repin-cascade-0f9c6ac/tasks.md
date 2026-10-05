@@ -10,8 +10,5 @@ One PR, titled `ci(deps): pin the cascade to .github 0f9c6ac`. Workers never tou
 - [x] 1.2 Move all five `.github` references to `0f9c6ac2c9b752a79f4874f637ef9955bcf00c13 # .github main`; `grep -rn -A1 'open-platform-model/.github' .github/workflows` shows no other SHA.
 - [x] 1.3 Prove `.tasks/cascade/wiring-check.sh` is byte-identical to the file at that SHA with `cmp` against the local `.github` object and the `gh api` raw content.
 - [x] 1.4 Check the README at that SHA: no caller input changed and the cli's wiring-check row is unchanged, so `wiring-check.yaml` and `pr.yml` stay.
-- [x] 1.5 Commit `ci(deps): pin the cascade to .github 0f9c6ac`.
-
-## 2. Verification
-
-- [x] 2.1 Run the gates.
+- [x] 1.5 Run the local gate.
+- [x] 1.6 Commit `ci(deps): pin the cascade to .github 0f9c6ac`.
