@@ -137,7 +137,7 @@ Before any object changes, install SHALL refuse when the controller's instance r
 
 ### Requirement: The CLI pins a default controller module version and the controller it deploys
 
-Each CLI release SHALL name one default controller module version and SHALL record the controller version that module deploys, both readable from the CLI's source without a registry. The recorded controller version SHALL be the version the module's own source states it deploys. Install without `--version` SHALL install exactly that module version. The pin SHALL be produced by `task controller:pin VERSION=<v>` from the module's own statement of the controller it deploys, without a render, and no other task SHALL write it. The module is trusted as the configured registry serves it, as every other module the CLI installs is. Source: 0021:D11:R6.
+Each CLI release SHALL name one default controller module version and SHALL record the controller version that module deploys, both readable from the CLI's source without a registry. The recorded controller version SHALL be the version the module's own source states it deploys. Install without `--version` SHALL install exactly that module version. The pin SHALL be produced by `task controller:pin VERSION=<v>`, which reads the controller version from the module's own statement of the controller it deploys, without a render. The same task SHALL render that module version as install renders the controller's instance (the instance `opm-controller` in `opm-controller-system`, no values, against the module's own dependency pins) and write the render's `CustomResourceDefinition` objects as the manifests the CLI embeds for `--crds-only`, one file per CRD, replacing the previous set. A render that fails SHALL leave the pin and the manifests unchanged. No other task SHALL write the pin or the manifests, except that the pin tool MAY write the manifests alone from a local checkout of the module before that version is published. The release pin check (G1) SHALL fail when the embedded manifests differ from a fresh render of the pinned version. The module is trusted as the configured registry serves it, as every other module the CLI installs is. Source: 0021:D11:R6.
 
 #### Scenario: Default install uses the pin
 
@@ -147,12 +147,17 @@ Each CLI release SHALL name one default controller module version and SHALL reco
 #### Scenario: Pin refresh is one reviewable diff
 
 - **WHEN** `task controller:pin VERSION=0.2.0` runs and module `0.2.0` states it deploys controller `1.0.0-beta.6`
-- **THEN** only the pin file changes, carrying module version `0.2.0` and controller version `v1.0.0-beta.6`
+- **THEN** only the pin file and the embedded CRD manifests change: the pin carries module version `0.2.0` and controller version `v1.0.0-beta.6`, and the manifests are the CRDs that version renders
 
 #### Scenario: A module without a readable controller version is refused by the pin task
 
 - **WHEN** `task controller:pin VERSION=<v>` runs against a module version whose source states no controller version, or a non-semver one
-- **THEN** the task exits non-zero naming the module version, and the pin file is unchanged
+- **THEN** the task exits non-zero naming the module version, and the pin file and the manifests are unchanged
+
+#### Scenario: The pin check finds drifted CRD manifests
+
+- **WHEN** an embedded CRD manifest differs from the render of the pinned module version, or one is missing or extra
+- **THEN** the release pin check fails naming each such manifest and `task controller:pin VERSION=<pinned version>`
 
 ### Requirement: Install refuses a target version the CLI cannot drive or that disagrees with itself
 
@@ -241,25 +246,6 @@ After the controller's rollout, and unless `--skip-platform` or `--crds-only` is
 - **WHEN** install with `--rbac --user alice` completes
 - **THEN** neither `Platform/cluster` nor the `opm-cli-user` ClusterRole or its binding appears in the controller instance's inventory
 
-### Requirement: CRDs-only install applies the CRDs of the same module render
-
-`opm controller install --crds-only` SHALL render the same module version as a full install would, refuse under the controller-newer-than-CLI rule, the rendered-image rule and the CRD floor before applying any CRD, apply exactly the rendered `CustomResourceDefinition` objects with server-side apply as `opm-cli`, and wait for each to be `Established`. It SHALL write no instance record, no workload and no Platform, and SHALL perform no catalog lookup. A later full install of the same module version SHALL record those CRDs without recreating them. Source: 0021:D11:R7.
-
-#### Scenario: Solo-cluster CRD install
-
-- **WHEN** `opm controller install --crds-only` runs against an empty cluster
-- **THEN** exactly the four rendered CRDs exist and are `Established`, and no ModuleInstance, Deployment or Platform exists
-
-#### Scenario: Full install after CRDs-only
-
-- **WHEN** a full install of the same module version follows a CRDs-only install
-- **THEN** the four CRDs keep their uid and appear in the new record's inventory
-
-#### Scenario: CRDs-only with a values file
-
-- **WHEN** `opm controller install --crds-only -f values.cue` runs
-- **THEN** the command fails flag validation before any registry or cluster call
-
 ### Requirement: Uninstall deletes the controller instance's recorded inventory
 
 `opm controller uninstall` SHALL read the controller's instance record `opm-controller` in `opm-controller-system`. When none exists, it SHALL delete nothing and exit 2 naming `opm controller install` as the step that records the running controller. Otherwise, after the finalizer guard, it SHALL delete every object the record's inventory lists except CRDs and the Namespace, in descending resource-weight order, leaving behind any object that no longer carries this instance's identity, then, when no object failed, delete the record. It SHALL delete no object the inventory does not list, SHALL NOT wait for deletion to complete, and SHALL treat an already absent object as deleted. Source: 0006:D34, 0021:D11:R11.
@@ -298,7 +284,7 @@ When `opm controller uninstall` reads the objects its instance record lists and 
 
 ### Requirement: Install runs every refusing check before its first write
 
-Install SHALL run, before it writes any object, every check that can refuse it: resolving the module and reading the controller version it deploys, rendering it, the check of the values against the target version's `#config`, the target rules of install (the controller version against the CLI's, the rendered image against the module's stated controller version, and the rendered ModuleInstance CRD against the CLI's floor), the status-subresource permission check, and, on a cluster with no record of the controller's instance, the apply guard over every object the render names. The apply guard SHALL admit no object it would refuse for any other instance. With a record, install runs no apply guard: the instance apply takes over any object the render names, including one new to the inventory that already exists and OPM does not manage. Objects of the render that exist with a deletion timestamp SHALL be waited out within `--timeout` before the apply guard runs, so install right after uninstall waits instead of refusing; a terminating object that outlives the budget SHALL fail the command with nothing applied. Only after every check passed SHALL install write, in this order: the CRD step, then the instance apply, then the Platform seed. An install that refuses SHALL change no object in the cluster.
+Install SHALL run, before it writes any object, every check that can refuse it: resolving the module and reading the controller version it deploys, rendering it, the check of the values against the target version's `#config`, the target rules of install (the controller version against the CLI's, the rendered image against the module's stated controller version, and the rendered ModuleInstance CRD against the CLI's floor), the status-subresource permission check, and, on a cluster with no record of the controller's instance, the apply guard over every object the render names. The apply guard SHALL admit no object it would refuse for any other instance. With a record, install runs no apply guard: the instance apply takes over any object the render names, including one new to the inventory that already exists and OPM does not manage. Objects of the render that exist with a deletion timestamp SHALL be waited out within `--timeout` before the apply guard runs, so install right after uninstall waits instead of refusing; a terminating object that outlives the budget SHALL fail the command with nothing applied. Only after every check passed SHALL install write, in this order: the CRD step, then the instance apply, then the Platform seed. The CRDs-only form resolves, fetches, renders and reads nothing of the module and reads no `ModuleInstance`: its checks are the flag validation, the wait for terminating CRDs within `--timeout`, and the apply guard over the embedded CRDs, which runs whether or not a record exists. An install that refuses SHALL change no object in the cluster.
 
 #### Scenario: A refused install leaves the CRDs untouched
 
@@ -362,3 +348,38 @@ The controller SHALL count as running only when every one of these `CustomResour
 
 - **WHEN** the cluster holds none of the four CRDs and no `opm-controller-manager` Deployment
 - **THEN** the running-controller check SHALL report the controller as not ready, naming the missing objects, and point at `opm controller install`
+
+### Requirement: CRDs-only install applies the CRDs pinned with the CLI, without a registry
+
+`opm controller install --crds-only` SHALL apply the `CustomResourceDefinition` manifests the CLI embeds, which are the CRDs the pinned module version renders for the instance `opm-controller` in `opm-controller-system`, with server-side apply as `opm-cli`, and wait for each to be `Established`. It SHALL make no registry request: it SHALL NOT resolve, fetch or render the controller module and SHALL perform no catalog lookup. It SHALL NOT read any `ModuleInstance`, the controller's instance record included, and SHALL write no instance record, no workload and no Platform, so its only network peer is the Kubernetes API server. With `--rbac` it SHALL also apply the `opm-cli-user` role as a full install does. A later full install of the pinned module version SHALL record those CRDs without recreating them. `--version`, `-f/--values` and `--reset-values` SHALL be rejected with `--crds-only` as flag-validation errors before any cluster call, because the form installs only the pinned version and records no values. Source: 0021:D11:R7.
+
+#### Scenario: Solo-cluster CRD install with no registry
+
+- **WHEN** `opm controller install --crds-only` runs against an empty cluster while no registry can be reached
+- **THEN** exactly the four CRDs of the pinned module version exist and are `Established`, applied by field manager `opm-cli`, and no ModuleInstance, Deployment or Platform exists
+- **AND** the command exits 0 and names the pinned module version
+
+#### Scenario: The controller's instance record is not read
+
+- **WHEN** `opm controller install --crds-only` runs on a cluster whose record `opm-controller` in `opm-controller-system` has `spec.owner: controller`
+- **THEN** the CRDs are applied, and no `ModuleInstance` is read or changed
+
+#### Scenario: Full install after CRDs-only
+
+- **WHEN** a full install of the pinned module version follows a CRDs-only install
+- **THEN** the four CRDs keep their uid and appear in the new record's inventory
+
+#### Scenario: A CRD OPM does not manage is refused
+
+- **WHEN** `opm controller install --crds-only` runs and `moduleinstances.opmodel.dev` exists without OPM's managed-by label
+- **THEN** the command exits 2 naming that CRD, and nothing has been applied
+
+#### Scenario: CRDs-only with a values file
+
+- **WHEN** `opm controller install --crds-only -f values.cue` runs
+- **THEN** the command fails flag validation before any registry or cluster call
+
+#### Scenario: CRDs-only with a version
+
+- **WHEN** `opm controller install --crds-only --version 0.2.0` runs
+- **THEN** the command fails flag validation before any registry or cluster call, naming the module version the CLI pins
