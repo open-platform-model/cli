@@ -81,7 +81,7 @@ func legacyLive(t *testing.T, o LegacyObject, origin string) *unstructured.Unstr
 	}
 	obj.SetManagedFields([]metav1.ManagedFieldsEntry{{
 		Manager: manager, Operation: op, APIVersion: apiVersion, FieldsType: "FieldsV1",
-		FieldsV1: &metav1.FieldsV1{Raw: []byte(`{"f:metadata":{"f:labels":{}}}`)},
+		FieldsV1: metav1.NewFieldsV1(`{"f:metadata":{"f:labels":{}}}`),
 	}})
 	return obj
 }
