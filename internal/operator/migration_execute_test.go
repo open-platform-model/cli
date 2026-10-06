@@ -274,7 +274,7 @@ func TestMoveOwnership_LeavesOtherManagers(t *testing.T) {
 	ns := findObj(cluster, "Namespace", OperatorNamespace)
 	ns.SetManagedFields(append(ns.GetManagedFields(), metav1.ManagedFieldsEntry{
 		Manager: "kubectl-label", Operation: metav1.ManagedFieldsOperationUpdate, APIVersion: "v1", FieldsType: "FieldsV1",
-		FieldsV1: &metav1.FieldsV1{Raw: []byte(`{"f:metadata":{"f:labels":{"f:team":{}}}}`)},
+		FieldsV1: metav1.NewFieldsV1(`{"f:metadata":{"f:labels":{"f:team":{}}}}`),
 	}))
 	fc := newFakeCluster(t, cluster...)
 	require.NoError(t, MoveOwnership(context.Background(), fc.client, planFor(t, fc)))
