@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.0'
+          go-version: '1.26.8'
       - name: Release-pin gate (G1)
         # Release PRs only: no local, unpublished or mismatched pin ships
         # (workspace RELEASING.md, section "Gates"). Local: task deps:release-check.
@@ -33,7 +33,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v2.11.3
+          version: v2.11.4
           args: --timeout=5m
           # A run restored whole from the action's cache has reported
           # //nolint:staticcheck directives as unused (nolintlint) that a full
@@ -49,7 +49,7 @@ jobs:
     # main. Core and the catalogs still come from GHCR.
     services:
       registry:
-        image: registry:2
+        image: registry:3.1.2@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8
         ports:
           - 5000:5000
     env:
@@ -61,7 +61,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.0'
+          go-version: '1.26.8'
       - name: Build opm
         run: go build -o bin/opm ./cmd/opm
       - name: Install cue
@@ -79,13 +79,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
       - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         with:
           version: 3.x
       - name: Install openspec
-        run: npm install -g @fission-ai/openspec@1.12.0
+        run: npm install -g @fission-ai/openspec@1.14.1
       - name: Validate main specs and active changes
         run: task openspec:check

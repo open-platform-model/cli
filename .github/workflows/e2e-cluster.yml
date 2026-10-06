@@ -78,7 +78,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: steps.decide.outputs.applies == 'true'
         with:
-          go-version: '1.26.0'
+          go-version: '1.26.8'
 
       - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         if: steps.decide.outputs.applies == 'true'
@@ -89,7 +89,7 @@ jobs:
         if: steps.decide.outputs.applies == 'true'
         # Same version and checksum as pr.yml's integration job.
         run: |
-          KIND_VERSION="v0.31.0"
+          KIND_VERSION="v0.33.0"
           curl -Lo ./kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
           echo "eb244cbafcc157dff60cf68693c14c9a75c4e6e6fedaf9cd71c58117cb93e3fa  ./kind" | sha256sum -c -
           chmod +x ./kind
@@ -112,7 +112,7 @@ jobs:
         # A named container, not a services: registry: kind's node must reach
         # it by name once cluster:operator joins it to the kind network.
         run: |
-          docker run -d --name opm-registry -p 5000:5000 registry:2
+          docker run -d --name opm-registry -p 5000:5000 registry:3.1.2@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8
           for _ in $(seq 1 30); do curl -fsS http://localhost:5000/v2/ >/dev/null && break; sleep 1; done
           hack/fixtures.sh seed
 

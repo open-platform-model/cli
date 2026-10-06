@@ -7,7 +7,7 @@ vars:
   BINARY_NAME: opm
   BUILD_DIR: bin
   CLUSTER_NAME: opm-dev
-  K8S_NODE_IMAGE: "kindest/node:v1.34.3@sha256:08497ee19eace7b4b5348db5c6a1591d7752b164530a36f855cb0f2bdcbadd48"
+  K8S_NODE_IMAGE: "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
   REGISTRY_CONTAINER: '{{.REGISTRY_CONTAINER | default "opm-registry"}}'
   # Canonical mapping (Registry Policy, root AGENTS.md): both opmodel.dev/* and
   # testing.opmodel.dev/* read from GHCR. The testing domain carries this repo's
@@ -390,7 +390,7 @@ tasks:
   openspec:install:
     desc: Install the openspec CLI at the version CI pins
     cmds:
-      - npm install -g @fission-ai/openspec@1.12.0
+      - npm install -g @fission-ai/openspec@1.14.1
 
   openspec:check:
     desc: Validate every main spec and active change under openspec strict mode
