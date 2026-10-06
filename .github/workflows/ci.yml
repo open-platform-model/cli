@@ -86,6 +86,6 @@ jobs:
         with:
           version: 3.x
       - name: Install openspec
-        run: npm install -g @fission-ai/openspec@1.14.1
+        run: npm install -g @fission-ai/openspec@1.12.0
       - name: Validate main specs and active changes
         run: task openspec:check
