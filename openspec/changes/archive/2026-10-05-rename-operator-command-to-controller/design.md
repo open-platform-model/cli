@@ -29,5 +29,5 @@ The cli names the controller in four kinds of places: Go packages and identifier
 
 ## Risks / Trade-offs
 
-- Merging before `opm_controller` 0.1.0 is public breaks `opm controller install` and the e2e job → the cutover gates the merge on G-PUB.
+- Merging before `opm_controller` 0.1.0 is public breaks `opm controller install` and the e2e job → the PR merges only after that release and its module are published.
 - `cmdutil`'s registry-backed test and the examples resolve podinfo `0.1.13` from GHCR → they fail locally until the fixture is published; CI uses a seeded registry.
