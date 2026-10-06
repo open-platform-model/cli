@@ -85,10 +85,11 @@ func (e *FinalizerGuardError) Error() string {
 }
 
 // OwnInstanceOwnerError reports that a delete was refused because the target
-// deploys the controller and is controller-owned. The controller never reconciles,
-// finalizes or prunes the instance that deploys it, so the controller-owned
-// delete would wait on, and report, a cleanup that does not happen. The remedy
-// is the one the controller itself names for such an instance.
+// deploys the controller and is controller-owned. The controller applies and
+// prunes nothing for the instance that deploys it, and on delete at most removes
+// its own cleanup finalizer without pruning, so the controller-owned delete would
+// remove the instance without the cleanup the user expects. The remedy is the one
+// the controller itself names for such an instance.
 type OwnInstanceOwnerError struct {
 	Namespace string
 	Name      string

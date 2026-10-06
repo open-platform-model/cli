@@ -158,10 +158,11 @@ func deleteResolvedInstance(ctx context.Context, k8sClient *kubernetes.Client, r
 // controller (controller.DeploysController) in two cases; every other instance
 // passes untouched.
 //
-// A controller-owned record is refused before any read: the controller never
-// reconciles, finalizes or prunes the instance that deploys it, so the
-// controller-owned branch would wait on, and report, a cleanup that does not
-// happen. The remedy is to set spec.owner to cli; the CLI does not write it.
+// A controller-owned record is refused before any read: the controller applies
+// and prunes nothing for the instance that deploys it, and on delete at most
+// removes its own cleanup finalizer without pruning, so the controller-owned
+// branch would remove the instance without the cleanup the user expects. The
+// remedy is to set spec.owner to cli; the CLI does not write it.
 //
 // Otherwise the delete is refused while any ModuleInstance carries the
 // controller's cleanup finalizer: removing the controller then leaves each one
