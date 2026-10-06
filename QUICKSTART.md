@@ -312,6 +312,10 @@ opm controller install --crds-only
 The CRDs come with the CLI (they are the ones its pinned controller module
 renders), so this step needs no registry.
 
+A cluster whose `opmodel.dev` CRDs an earlier installer applied (they carry
+no OPM labels) is refused: the CLI neither adopts nor migrates those CRDs,
+so start from a fresh cluster.
+
 Apply fails fast with a hint if the CRD is missing or out of date. If your
 user is namespace-scoped, also grant write access to the
 `moduleinstances/status` subresource (or run `opm controller install

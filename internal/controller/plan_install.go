@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"golang.org/x/mod/semver"
@@ -11,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/controller/crds"
@@ -194,10 +196,10 @@ func PinnedTarget() Target {
 // version. It works offline: it resolves, fetches and renders nothing, and
 // reads no ModuleInstance, so it cannot know whether the controller's
 // instance is recorded. Its checks are the wait for terminating objects, the
-// apply guard over the CRDs, which always runs (a CRD that exists and is not
-// OPM's refuses the install), and the refusal of a CRD a newer module
-// version installed. The target rules already held when the version was
-// pinned.
+// check of the existing CRDs (one an earlier installer applied, or one a
+// newer module version installed, is refused), and the apply guard over the
+// CRDs, which always runs (a CRD that exists and is not OPM's refuses the
+// install). The target rules already held when the version was pinned.
 func PlanCRDsOnly(ctx context.Context, env InstallEnv, opts PlanOptions) (*Plan, error) {
 	objs, err := embeddedCRDs()
 	if err != nil {
@@ -210,10 +212,13 @@ func PlanCRDsOnly(ctx context.Context, env InstallEnv, opts PlanOptions) (*Plan,
 		Extra:    opts.Extra,
 		Timeout:  opts.Timeout,
 	}
-	if err := waitThenGuard(ctx, env, plan, true); err != nil {
+	if err := waitThenGuard(ctx, env, plan, false); err != nil {
 		return nil, err
 	}
-	if err := refuseNewerCRDs(ctx, env.Client, objs); err != nil {
+	if err := checkExistingCRDs(ctx, env.Client, objs); err != nil {
+		return nil, err
+	}
+	if err := applyGuard(ctx, env, plan); err != nil {
 		return nil, err
 	}
 	return plan, nil
@@ -223,14 +228,22 @@ func PlanCRDsOnly(ctx context.Context, env InstallEnv, opts PlanOptions) (*Plan,
 // that rendered an object.
 const moduleVersionLabel = "module.opmodel.dev/version"
 
-// refuseNewerCRDs refuses a CRDs-only install over a CRD that a newer module
-// version than this cli's pin installed: applying the embedded CRDs would
-// replace that version's schemas under the controller it deployed. The
-// check reads the CRDs from the API server only, so the form stays offline.
-// A CRD that is absent, unlabeled or carries a version that is not semver is
-// not refused here (the apply guard has already refused one OPM does not
-// manage).
-func refuseNewerCRDs(ctx context.Context, client *kubernetes.Client, objs []*unstructured.Unstructured) error {
+// opmCRDGroupSuffix ends the name of every CRD the controller module renders.
+const opmCRDGroupSuffix = ".opmodel.dev"
+
+// checkExistingCRDs reads the CRDs a CRDs-only install would apply from the
+// API server only, so the form stays offline, and refuses two cases before
+// any write:
+//
+//   - an opmodel.dev CRD that carries no OPM managed-by label. An installer
+//     from before the CLI carried its CRDs applied it; the CLI adopts and
+//     migrates no such CRD (a *GuardError, exit 2, saying to start fresh);
+//   - a CRD whose module.opmodel.dev/version is newer than this cli's pin:
+//     applying the embedded CRDs would replace that version's schemas (a
+//     *TargetError, exit 2).
+//
+// A CRD that is absent, or OPM's without a semver module version, passes.
+func checkExistingCRDs(ctx context.Context, client *kubernetes.Client, objs []*unstructured.Unstructured) error {
 	pinned := "v" + PinnedModuleVersion
 	for _, obj := range objs {
 		live, err := client.ResourceClient(kubernetes.GVRFromUnstructured(obj), "").Get(ctx, obj.GetName(), metav1.GetOptions{})
@@ -240,14 +253,22 @@ func refuseNewerCRDs(ctx context.Context, client *kubernetes.Client, objs []*uns
 		if err != nil {
 			return fmt.Errorf("reading %s/%s before apply: %w", obj.GetKind(), obj.GetName(), err)
 		}
-		recorded := live.GetLabels()[moduleVersionLabel]
+		labels := live.GetLabels()
+		if strings.HasSuffix(obj.GetName(), opmCRDGroupSuffix) && !opmlabels.IsOPMManagedBy(labels[opmlabels.ManagedBy]) {
+			return &GuardError{Err: fmt.Errorf(
+				"CustomResourceDefinition %s already exists without OPM's labels: an earlier installer bootstrapped this cluster, "+
+					"and this CLI neither adopts nor migrates CRDs it did not install; start fresh, on a new cluster or one with no opmodel.dev CRDs, "+
+					"then run opm controller install --crds-only again",
+				obj.GetName())}
+		}
+		recorded := labels[moduleVersionLabel]
 		if !semver.IsValid("v"+recorded) || semver.Compare("v"+recorded, pinned) <= 0 {
 			continue
 		}
 		return &TargetError{ModuleVersion: pinned, Rule: fmt.Sprintf(
-			"CustomResourceDefinition %s was installed by module version %s, newer than this cli's pin, and --crds-only would replace it with older CRDs; "+
-				"run a full install of that version instead (opm controller install --version %s)",
-			obj.GetName(), recorded, recorded)}
+			"CustomResourceDefinition %s was installed by module version %s, newer than this CLI's pin, and --crds-only would replace it with older CRDs; "+
+				"run --crds-only from a CLI that pins module version %s or newer, or install that version in full (opm controller install --version %s)",
+			obj.GetName(), recorded, recorded, recorded)}
 	}
 	return nil
 }
@@ -265,6 +286,12 @@ func waitThenGuard(ctx context.Context, env InstallEnv, plan *Plan, guard bool) 
 	if !guard {
 		return nil
 	}
+	return applyGuard(ctx, env, plan)
+}
+
+// applyGuard refuses any of the plan's render objects that exists and is not
+// OPM's.
+func applyGuard(ctx context.Context, env InstallEnv, plan *Plan) error {
 	entries := workflowapply.CurrentInventoryEntries(plan.Objects())
 	if err := inventory.PreApplyExistenceCheck(ctx, env.Client, entries); err != nil {
 		return &GuardError{Err: err}

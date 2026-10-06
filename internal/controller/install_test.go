@@ -278,9 +278,11 @@ func TestInstall_CRDsOnlyAppliesTheEmbeddedCRDsOffline(t *testing.T) {
 	assert.Equal(t, "controller", fc.record().Owner, "the record is untouched")
 }
 
-// "A CRD OPM does not manage is refused": exit-2 guard error, nothing
+// "CRDs an earlier installer applied are refused, not adopted": an
+// opmodel.dev CRD without OPM's labels is an exit-2 guard error that says an
+// earlier installer bootstrapped the cluster and to start fresh; nothing is
 // applied.
-func TestPlanCRDsOnly_RefusesAForeignCRD(t *testing.T) {
+func TestPlanCRDsOnly_RefusesCRDsAnEarlierInstallerApplied(t *testing.T) {
 	foreign := renderedCRDObject(inventory.CRDNameModuleInstances, true)
 	fc := newFakeCluster(t, foreign)
 
@@ -288,13 +290,17 @@ func TestPlanCRDsOnly_RefusesAForeignCRD(t *testing.T) {
 	var guardErr *GuardError
 	require.ErrorAs(t, err, &guardErr)
 	assert.Contains(t, err.Error(), inventory.CRDNameModuleInstances)
-	assert.Contains(t, err.Error(), "not managed by OPM")
+	assert.Contains(t, err.Error(), "without OPM's labels")
+	assert.Contains(t, err.Error(), "an earlier installer bootstrapped this cluster")
+	assert.Contains(t, err.Error(), "neither adopts nor migrates")
+	assert.Contains(t, err.Error(), "start fresh")
 	assert.Empty(t, fc.Writes())
 }
 
-// "CRDs a newer module version installed are not replaced": a full install
-// of 0.2.0 recorded the CRDs, so --crds-only at the 0.1.0 pin refuses with
-// exit 2, names the full-install remedy and writes nothing.
+// "CRDs a newer module version installed are not replaced": module version
+// 0.2.0 installed the CRDs (a full install, or --crds-only from a CLI that
+// pins it), so --crds-only at the 0.1.0 pin refuses with exit 2, names both
+// remedies and writes nothing.
 func TestPlanCRDsOnly_RefusesCRDsOfANewerModuleVersion(t *testing.T) {
 	newer := labeled(renderedCRDObject(inventory.CRDNameModuleInstances, true), "crds", "0.2.0")
 	fc := newFakeCluster(t, newer)
@@ -304,6 +310,7 @@ func TestPlanCRDsOnly_RefusesCRDsOfANewerModuleVersion(t *testing.T) {
 	require.ErrorAs(t, err, &targetErr)
 	assert.Contains(t, err.Error(), inventory.CRDNameModuleInstances)
 	assert.Contains(t, err.Error(), "module version 0.2.0")
+	assert.Contains(t, err.Error(), "run --crds-only from a CLI that pins module version 0.2.0 or newer")
 	assert.Contains(t, err.Error(), "opm controller install --version 0.2.0")
 	assert.Empty(t, fc.Writes())
 }

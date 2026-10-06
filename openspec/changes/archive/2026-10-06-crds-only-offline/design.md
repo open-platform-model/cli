@@ -65,12 +65,21 @@ label and pass. It runs no target rules: the controller-version, image and CRD-f
 the pin already judged. A unit test holds the embedded ModuleInstance CRD to the CLI's field floor and its labels to the
 pinned version.
 
-The plan also reads the existing CRDs from the API server and refuses (exit 2, nothing applied) when one carries a
-`module.opmodel.dev/version` label newer than the pinned module version: a full install of that version, made with
-`--version`, recorded those CRDs, and applying the pin's older schemas under the controller it deployed would be a
-silent downgrade. The refusal names the full install of that version as the remedy. Accepting the downgrade as a
-limitation was rejected, since before this change `--crds-only --version X` could match the installed version and that
-escape is gone. The read reaches only the API server, so the form stays offline.
+Before the apply guard, the plan reads the existing CRDs from the API server and refuses two cases (exit 2, nothing
+applied):
+
+- **An `opmodel.dev` CRD without OPM's managed-by label.** An installer from before the CLI carried its CRDs applied it.
+  The CLI adopts and migrates no such CRD: clusters bootstrapped that way start fresh. The refusal says so plainly,
+  instead of the apply guard's generic "not managed by OPM" text, and names no adoption flag because none exists.
+  Adopting them (relabelling and taking over field ownership) was rejected: it would be migration code kept alive for
+  clusters that predate the cutover.
+- **A CRD whose `module.opmodel.dev/version` label is newer than the pinned module version.** Either a full install of
+  that version (`--version`) or `--crds-only` from a newer CLI that pins it installed those CRDs, and applying the pin's
+  older schemas would be a silent downgrade. The refusal names both remedies: `--crds-only` from a CLI that pins that
+  module version or newer, or a full install of that version. Accepting the downgrade as a limitation was rejected,
+  since before this change `--crds-only --version X` could match the installed version and that escape is gone.
+
+The read reaches only the API server, so the form stays offline.
 
 ### C5: Render options live in `internal/controller`
 

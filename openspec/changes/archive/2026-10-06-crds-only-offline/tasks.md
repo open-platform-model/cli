@@ -45,6 +45,10 @@ archive. Implements 0021:D11:R1/R7 (revised 2026-10-06); `enhancement.yaml` clai
 - [x] 3.6 `PlanCRDsOnly` refuses (exit 2) a CRD that a newer module version than the pin installed, naming the full
   install of that version; fake-client tests for the refusal and for applying over an older version's CRDs (review
   finding, design C4); commit `fix(controller): refuse to downgrade CRDs a newer module installed`
+- [x] 3.7 `PlanCRDsOnly` refuses an `opmodel.dev` CRD without OPM's labels with a message saying an earlier installer
+  bootstrapped the cluster, that the CLI neither adopts nor migrates it, and to start fresh (no adoption code); the
+  newer-version refusal names both remedies, `--crds-only` from a CLI that pins that version or newer and a full
+  install of it (design C4); commit `fix(controller): say why --crds-only refuses CRDs it did not install`
 
 ## 4. Specs and checks
 
