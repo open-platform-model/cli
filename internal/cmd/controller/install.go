@@ -83,7 +83,7 @@ version renders, carried in this CLI, so --crds-only needs no registry and
 talks only to the cluster: it resolves and renders no module, reads no
 ModuleInstance, and takes no --version, -f or --reset-values. It refuses
 opmodel.dev CRDs an earlier installer applied (no OPM labels): such a
-cluster starts fresh, since the CLI adopts and migrates nothing. It also
+cluster starts fresh, since --crds-only adopts and migrates nothing. It also
 refuses CRDs a newer module version installed: run --crds-only from a CLI
 that pins that version or newer, or install that version in full.
 

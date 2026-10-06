@@ -78,6 +78,9 @@ applied):
   older schemas would be a silent downgrade. The refusal names both remedies: `--crds-only` from a CLI that pins that
   module version or newer, or a full install of that version. Accepting the downgrade as a limitation was rejected,
   since before this change `--crds-only --version X` could match the installed version and that escape is gone.
+  The comparison applies only when the existing CRD's `module.opmodel.dev/name` equals the embedded CRD's
+  (`opm_controller`): another module's version (a full install of the retired `opm_operator`, say) says nothing about
+  the pin, so such a CRD skips the comparison and goes to the apply guard.
 
 The read reaches only the API server, so the form stays offline.
 

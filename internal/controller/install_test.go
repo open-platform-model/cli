@@ -293,7 +293,8 @@ func TestPlanCRDsOnly_RefusesCRDsAnEarlierInstallerApplied(t *testing.T) {
 	assert.Contains(t, err.Error(), "without OPM's labels")
 	assert.Contains(t, err.Error(), "an earlier installer bootstrapped this cluster")
 	assert.Contains(t, err.Error(), "neither adopts nor migrates")
-	assert.Contains(t, err.Error(), "start fresh")
+	assert.Contains(t, err.Error(), "start fresh on a new cluster")
+	assert.NotContains(t, err.Error(), "no opmodel.dev CRDs", "never invite deleting the CRDs")
 	assert.Empty(t, fc.Writes())
 }
 
@@ -313,6 +314,22 @@ func TestPlanCRDsOnly_RefusesCRDsOfANewerModuleVersion(t *testing.T) {
 	assert.Contains(t, err.Error(), "run --crds-only from a CLI that pins module version 0.2.0 or newer")
 	assert.Contains(t, err.Error(), "opm controller install --version 0.2.0")
 	assert.Empty(t, fc.Writes())
+}
+
+// A newer version of another module (here the retired opm_operator) is not
+// compared with the pin: the CRD goes on to the apply guard, which accepts an
+// OPM-managed CRD, and is applied over.
+func TestInstall_CRDsOnlyIgnoresAnotherModulesVersion(t *testing.T) {
+	fastPolling(t)
+	other := labeled(renderedCRDObject(inventory.CRDNameModuleInstances, true), "crds", "9.0.0")
+	labels := other.GetLabels()
+	labels[moduleNameLabel] = "opm_operator"
+	other.SetLabels(labels)
+	fc := newFakeCluster(t, other)
+
+	result, err := installCRDsOnly(t, fc, &fakeRender{}, PlanOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 4, result.CRDs)
 }
 
 // CRDs an older or the same module version installed are applied over.

@@ -228,6 +228,10 @@ func PlanCRDsOnly(ctx context.Context, env InstallEnv, opts PlanOptions) (*Plan,
 // that rendered an object.
 const moduleVersionLabel = "module.opmodel.dev/version"
 
+// moduleNameLabel is the label the kernel stamps with the name of the module
+// that rendered an object.
+const moduleNameLabel = "module.opmodel.dev/name"
+
 // opmCRDGroupSuffix ends the name of every CRD the controller module renders.
 const opmCRDGroupSuffix = ".opmodel.dev"
 
@@ -238,11 +242,13 @@ const opmCRDGroupSuffix = ".opmodel.dev"
 //   - an opmodel.dev CRD that carries no OPM managed-by label. An installer
 //     from before the CLI carried its CRDs applied it; the CLI adopts and
 //     migrates no such CRD (a *GuardError, exit 2, saying to start fresh);
-//   - a CRD whose module.opmodel.dev/version is newer than this cli's pin:
+//   - a CRD the embedded CRD's module (module.opmodel.dev/name) rendered
+//     whose module.opmodel.dev/version is newer than this cli's pin:
 //     applying the embedded CRDs would replace that version's schemas (a
-//     *TargetError, exit 2).
+//     *TargetError, exit 2). Versions of another module are not compared.
 //
-// A CRD that is absent, or OPM's without a semver module version, passes.
+// A CRD that is absent, OPM's without a semver module version, or another
+// module's passes.
 func checkExistingCRDs(ctx context.Context, client *kubernetes.Client, objs []*unstructured.Unstructured) error {
 	pinned := "v" + PinnedModuleVersion
 	for _, obj := range objs {
@@ -257,9 +263,12 @@ func checkExistingCRDs(ctx context.Context, client *kubernetes.Client, objs []*u
 		if strings.HasSuffix(obj.GetName(), opmCRDGroupSuffix) && !opmlabels.IsOPMManagedBy(labels[opmlabels.ManagedBy]) {
 			return &GuardError{Err: fmt.Errorf(
 				"CustomResourceDefinition %s already exists without OPM's labels: an earlier installer bootstrapped this cluster, "+
-					"and this CLI neither adopts nor migrates CRDs it did not install; start fresh, on a new cluster or one with no opmodel.dev CRDs, "+
+					"and this CLI neither adopts nor migrates CRDs it did not install; start fresh on a new cluster, "+
 					"then run opm controller install --crds-only again",
 				obj.GetName())}
+		}
+		if labels[moduleNameLabel] != obj.GetLabels()[moduleNameLabel] {
+			continue
 		}
 		recorded := labels[moduleVersionLabel]
 		if !semver.IsValid("v"+recorded) || semver.Compare("v"+recorded, pinned) <= 0 {

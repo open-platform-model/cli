@@ -313,7 +313,7 @@ The CRDs come with the CLI (they are the ones its pinned controller module
 renders), so this step needs no registry.
 
 A cluster whose `opmodel.dev` CRDs an earlier installer applied (they carry
-no OPM labels) is refused: the CLI neither adopts nor migrates those CRDs,
+no OPM labels) is refused: `--crds-only` neither adopts nor migrates those CRDs,
 so start from a fresh cluster.
 
 Apply fails fast with a hint if the CRD is missing or out of date. If your

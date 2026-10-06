@@ -49,6 +49,10 @@ archive. Implements 0021:D11:R1/R7 (revised 2026-10-06); `enhancement.yaml` clai
   bootstrapped the cluster, that the CLI neither adopts nor migrates it, and to start fresh (no adoption code); the
   newer-version refusal names both remedies, `--crds-only` from a CLI that pins that version or newer and a full
   install of it (design C4); commit `fix(controller): say why --crds-only refuses CRDs it did not install`
+- [x] 3.8 The start-fresh refusal says only "start fresh on a new cluster" (deleting the CRDs would delete every OPM
+  object under them); the downgrade comparison applies only to CRDs of the embedded CRD's module
+  (`module.opmodel.dev/name`); help, README and QUICKSTART scope "adopts and migrates nothing" to `--crds-only`;
+  commit `fix(controller): scope the --crds-only refusals`
 
 ## 4. Specs and checks
 

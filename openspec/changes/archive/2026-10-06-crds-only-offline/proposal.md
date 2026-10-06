@@ -15,6 +15,10 @@ controller module, while every other install path stays module-based. Enhancemen
 - `opm controller install --crds-only` applies the embedded CRDs with server-side apply as `opm-cli` and waits for
   `Established`. It makes no registry request, renders nothing and reads no ModuleInstance. Its only network peer is
   the Kubernetes API server.
+- `--crds-only` refuses with exit 2, before any write, `opmodel.dev` CRDs without OPM's labels, which an earlier
+  installer applied: such a cluster starts fresh on a new cluster, with no adoption or migration. It also refuses CRDs
+  a newer version of the controller module installed, naming both remedies: `--crds-only` from a CLI that pins that
+  version or newer, or a full install of that version.
 - **BREAKING**: `--crds-only` refuses `--version` as a flag-validation error. It installs only the CRDs of the module
   version this CLI pins.
 - The pin check (`go run ./hack/controller-pin --check`, part of G1) also fails when the embedded manifests differ from
