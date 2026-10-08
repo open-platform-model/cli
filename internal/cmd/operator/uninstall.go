@@ -26,7 +26,8 @@ func NewOperatorUninstallCmd(cfg *config.GlobalConfig) *cobra.Command {
 opm-operator in opm-operator-system) lists, then the record, except the CRDs
 and the operator's Namespace — those remain for a deliberate, separate
 'kubectl delete crd' once you're sure no ModuleInstance data is still needed.
-An object that no longer carries the instance's identity is left behind.
+An object that no longer carries the instance's identity, or whose
+opmodel.dev/adopt annotation names another instance, is left behind.
 
 With no record, uninstall deletes nothing: run 'opm operator install' first,
 so the running operator is recorded.

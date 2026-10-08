@@ -14,6 +14,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+	"github.com/open-platform-model/library/opm/k8s/ownership"
 )
 
 var widgetGVK = schema.GroupVersionKind{Group: "example.io", Version: "v1", Kind: "Widget"}
@@ -78,7 +79,9 @@ func TestGetLive_ResolvesByDiscovery(t *testing.T) {
 func TestDeleteProven_UnresolvedKindStops(t *testing.T) {
 	for name, outcome := range map[string]kubetest.Outcome{"kind not served": widgetNotServed, "discovery down": widgetDown} {
 		t.Run(name, func(t *testing.T) {
-			err := deleteProven(context.Background(), widgetClient(outcome), widget())
+			w := widget()
+			plan := &MigrationPlan{deleteVerdicts: map[objKey]ownership.DeleteVerdict{keyOf(w): {}}}
+			err := deleteProven(context.Background(), widgetClient(outcome), plan, w)
 			var stopped *MigrationStoppedError
 			require.ErrorAs(t, err, &stopped)
 		})

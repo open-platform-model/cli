@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -95,6 +96,18 @@ func setOwnership(obj *unstructured.Unstructured, managedBy, uuid string) {
 	obj.SetLabels(labels)
 }
 
+// adoptedBy sets the adopt annotation of obj to an instance UUID.
+func adoptedBy(obj *unstructured.Unstructured, uuid string) *unstructured.Unstructured {
+	obj.SetAnnotations(map[string]string{opmlabels.AnnotationAdopt: uuid})
+	return obj
+}
+
+// withUID gives obj a UID, as every object the API server stores has one.
+func withUID(obj *unstructured.Unstructured, uid string) *unstructured.Unstructured {
+	obj.SetUID(types.UID(uid))
+	return obj
+}
+
 func owned(apiVersion, kind, name, namespace, managedBy, uuid string) *unstructured.Unstructured {
 	obj := makeUnstructured(apiVersion, kind, name, namespace)
 	setOwnership(obj, managedBy, uuid)
@@ -124,6 +137,7 @@ func TestDelete_LeavesBehind(t *testing.T) {
 		dryDeleted   int    // a dry run issues no delete call, so a delete-time NotFound cannot happen
 		wantReason   string // non-empty: left behind with this reason
 		wantErr      bool
+		wantReplaced bool // the error is ErrReplaced
 		wantPresent  bool // the live object still exists afterwards
 	}{
 		{
@@ -147,7 +161,7 @@ func TestDelete_LeavesBehind(t *testing.T) {
 			inventory:    opmCM("cm"),
 			live:         owned("v1", "ConfigMap", "cm", "default", "", testInstanceUUID),
 			instanceUUID: testInstanceUUID,
-			wantReason:   reasonNotManaged,
+			wantReason:   "ConfigMap/default/cm is not managed by OPM; left in place",
 			wantPresent:  true,
 		},
 		{
@@ -155,7 +169,37 @@ func TestDelete_LeavesBehind(t *testing.T) {
 			inventory:    opmCM("cm"),
 			live:         owned("v1", "ConfigMap", "cm", "default", opmlabels.ManagedByCLI, "uuid-other"),
 			instanceUUID: testInstanceUUID,
-			wantReason:   reasonOtherInstance,
+			wantReason:   "ConfigMap/default/cm belongs to module instance uuid-other, not this one; left in place",
+			wantPresent:  true,
+		},
+		{
+			name:         "adopted by another instance",
+			inventory:    opmCM("cm"),
+			live:         adoptedBy(opmCM("cm"), "uuid-other"),
+			instanceUUID: testInstanceUUID,
+			wantReason:   "ConfigMap/default/cm is being adopted by module instance uuid-other, not this one; left in place",
+			wantPresent:  true,
+		},
+		{
+			name:         "adopt annotation naming this instance is deleted",
+			inventory:    opmCM("cm"),
+			live:         adoptedBy(opmCM("cm"), testInstanceUUID),
+			instanceUUID: testInstanceUUID,
+			wantDeleted:  1,
+		},
+		{
+			name:         "replaced between the re-read and the delete",
+			inventory:    opmCM("cm"),
+			live:         withUID(opmCM("cm"), "uid-read"),
+			instanceUUID: testInstanceUUID,
+			reactor: func(dyn *dynamicfake.FakeDynamicClient) {
+				dyn.PrependReactor("delete", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewConflict(schema.GroupResource{Resource: "configmaps"}, "cm", errors.New("the UID in the precondition does not match"))
+				})
+			},
+			wantErr:      true,
+			wantReplaced: true,
+			dryDeleted:   1,
 			wantPresent:  true,
 		},
 		{
@@ -233,11 +277,7 @@ func TestDelete_LeavesBehind(t *testing.T) {
 					wantDeleted = tc.dryDeleted
 				}
 				assert.Equal(t, wantDeleted, result.Deleted)
-				if tc.wantErr {
-					assert.Len(t, result.Errors, 1)
-				} else {
-					assert.Empty(t, result.Errors)
-				}
+				assertDeleteErrors(t, result, tc.wantErr && (!dryRun || tc.dryDeleted == 0), tc.wantReplaced)
 				if tc.wantReason != "" {
 					require.Len(t, result.LeftBehind, 1)
 					lb := result.LeftBehind[0]
@@ -349,6 +389,21 @@ func TestDelete_Unreadable(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// assertDeleteErrors checks the per-resource errors of a Delete: none, or
+// one, which is ErrReplaced when wantReplaced. A dry run sends no delete, so
+// the caller passes wantErr false for a failure only a delete can raise.
+func assertDeleteErrors(t *testing.T, result *DeleteResult, wantErr, wantReplaced bool) {
+	t.Helper()
+	if !wantErr {
+		assert.Empty(t, result.Errors)
+		return
+	}
+	require.Len(t, result.Errors, 1)
+	if wantReplaced {
+		assert.ErrorIs(t, result.Errors[0].Err, ErrReplaced)
 	}
 }
 

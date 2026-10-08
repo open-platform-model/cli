@@ -15,6 +15,7 @@ import (
 	"github.com/open-platform-model/cli/internal/output"
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 	"github.com/open-platform-model/library/opm/k8s/object"
+	"github.com/open-platform-model/library/opm/k8s/ownership"
 )
 
 // PreApplyExistenceCheck verifies that resources do not conflict with existing
@@ -157,25 +158,45 @@ func (e *PruneError) Unwrap() []error {
 	return e.Errs
 }
 
-// PruneStaleResources deletes the stale resources from the cluster.
-// Resources are deleted in reverse weight order (highest weight first).
+// LeftBehind is a stale entry the prune did not delete because the library's
+// delete verdict skipped it: its live object is not OPM-managed, belongs to
+// another instance, or is adopted by another instance. Reason is the
+// library's message. The object is not the instance's to track, so a caller
+// that records an inventory after the prune leaves the entry out.
+type LeftBehind struct {
+	Entry  k8sinventory.Entry
+	Reason string
+}
+
+// PruneStaleResources deletes the stale resources the instance still owns.
+// Resources are judged and deleted in reverse weight order (highest weight
+// first). Each goes through kubernetes.JudgedDelete: its live object is read
+// and the library's delete verdict is asked with instanceUUID, which is the
+// identity stored in the instance's record, the one that applied the stale
+// objects, and never the identity of the current render: after a module
+// moved to a new path the two differ, and the stale objects carry the
+// recorded one. An entry the verdict skips is returned in leftBehind and is
+// not deleted. A delete carries a precondition on the UID that was read.
+//
 // A core Namespace or a CRD (kubernetes.IsProtectedKind) is never deleted,
 // even when the caller passes one; callers that report what was left behind
 // split the set first with SplitProtected.
-// A PersistentVolumeClaim is deleted like any other entry here: the caller
+// A PersistentVolumeClaim is judged like any other entry here: the caller
 // decides on --delete-data and removes the claims it keeps from stale first
 // (SplitDataClaims).
-// 404 (not found) errors are treated as success (idempotent). An entry whose
+// An object that is already gone is a success (idempotent). An entry whose
 // kind is not served at the recorded version is a failed delete, never a
-// success: the object may still be in the cluster.
+// success: the object may still be in the cluster. So is an entry whose live
+// read fails, and one whose object was replaced between the read and the
+// delete (kubernetes.ErrReplaced).
 //
 // A delete that fails does not stop the loop. A failed API discovery request
 // does: that entry and every entry not yet tried are reported as failed, with
 // the discovery error. When any failed, the error is a
 // *PruneError naming the entries that are still in the cluster.
-func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale []k8sinventory.Entry) error {
+func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale []k8sinventory.Entry, instanceUUID string) (leftBehind []LeftBehind, err error) {
 	if len(stale) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Sort in reverse weight order (highest weight deleted first)
@@ -192,7 +213,7 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 			continue
 		}
 
-		err := deleteEntry(ctx, client, entry)
+		outcome, err := kubernetes.JudgedDelete(ctx, client, entryObject(entry), entry.Version, instanceUUID, false)
 		if kubernetes.IsDiscoveryFailure(err) {
 			// The cluster cannot say where this entry lives: stop, and report
 			// it and every entry not yet tried as still in the cluster.
@@ -206,19 +227,28 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 			break
 		}
 
-		if err != nil && !apierrors.IsNotFound(err) {
+		switch {
+		case err != nil:
 			failed.Failed = append(failed.Failed, entry)
 			failed.Errs = append(failed.Errs, fmt.Errorf("deleting %s/%s: %w", entry.Kind, entry.Name, err))
-			continue
+		case outcome.Skip == ownership.SkipAlreadyAbsent:
+			output.Debug("stale resource already gone", "kind", entry.Kind, "namespace", entry.Namespace, "name", entry.Name)
+		case outcome.Skip != "":
+			leftBehind = append(leftBehind, LeftBehind{Entry: entry, Reason: outcome.Message})
+		default:
+			output.Debug("pruned stale resource", "kind", entry.Kind, "namespace", entry.Namespace, "name", entry.Name)
 		}
-
-		output.Debug("pruned stale resource", "kind", entry.Kind, "namespace", entry.Namespace, "name", entry.Name)
 	}
 
 	if len(failed.Failed) > 0 {
-		return &failed
+		return leftBehind, &failed
 	}
-	return nil
+	return leftBehind, nil
+}
+
+// entryObject is the ownership identity of an inventory entry.
+func entryObject(e k8sinventory.Entry) ownership.Object {
+	return ownership.Object{Group: e.Group, Kind: e.Kind, Namespace: e.Namespace, Name: e.Name}
 }
 
 // entryGVK is the group, version and kind an inventory entry records.
@@ -234,15 +264,4 @@ func getEntry(ctx context.Context, client *kubernetes.Client, entry k8sinventory
 		return nil, err
 	}
 	return resource.Get(ctx, entry.Name, metav1.GetOptions{})
-}
-
-// deleteEntry deletes the live object of an inventory entry with foreground
-// propagation.
-func deleteEntry(ctx context.Context, client *kubernetes.Client, entry k8sinventory.Entry) error {
-	resource, err := client.ResourceClientFor(ctx, entryGVK(entry), entry.Namespace)
-	if err != nil {
-		return err
-	}
-	propagation := metav1.DeletePropagationForeground
-	return resource.Delete(ctx, entry.Name, metav1.DeleteOptions{PropagationPolicy: &propagation})
 }

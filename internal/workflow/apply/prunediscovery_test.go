@@ -43,7 +43,8 @@ func TestPruneStale_ExitCode(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+			// The stale object is the instance's own, so the verdict allows the delete.
+			dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), renderedConfigMap(stale[0].Name))
 			if tt.deleteErr != nil {
 				dyn.PrependReactor("delete", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
 					return true, nil, tt.deleteErr
@@ -55,7 +56,7 @@ func TestPruneStale_ExitCode(t *testing.T) {
 			}
 			client := &kubernetes.Client{Dynamic: dyn, Resources: resources}
 
-			notPruned, code, err := pruneStale(context.Background(), client, stale, output.InstanceLogger("demo"))
+			notPruned, code, err := pruneStale(context.Background(), client, stale, "", output.InstanceLogger("demo"))
 
 			require.NoError(t, err)
 			assert.Equal(t, stale, notPruned, "the entry stays in the record")
