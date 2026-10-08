@@ -24,8 +24,9 @@ import (
 	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
-// The three hints a platform build failure can get beside the shape hint.
+// The four hints a platform build failure can get beside the shape hint.
 const (
+	hintLogin   = "Log in to the registry, then retry:  opm registry login"
 	hintPin     = "Pin a published build in "
 	hintDefault = "Fix the platform module at "
 	hintKey     = "Each #registry entry's key must equal the module path of the catalog it imports (#catalog)"
@@ -98,7 +99,8 @@ func nestedDepRegistry(t *testing.T) string {
 // drive. Every case resolves against a local registry and a cold cache. Two
 // rows changed their hint when the hint moved from the message text to the
 // error type; each states the old and the new text. The exit class did not
-// move.
+// move. The refused credential has its own test,
+// TestPlatformBuildHint_RefusedCredential.
 func TestPlatformBuildHint_Forms(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -145,14 +147,6 @@ func TestPlatformBuildHint_Forms(t *testing.T) {
 			contains: "ambiguous import",
 			want:     hintPin,
 		},
-		{
-			name:     "registry answers 401",
-			registry: func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusUnauthorized) },
-			deps:     depPinned,
-			src:      importsDep,
-			contains: "401 Unauthorized",
-			want:     hintPin,
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cuemodtest.ColdCache(t)
@@ -169,6 +163,98 @@ func TestPlatformBuildHint_Forms(t *testing.T) {
 			require.True(t, errors.As(err, &detail), "%v", err)
 			assert.Contains(t, detail.Message, tc.contains)
 			assert.Contains(t, detail.Hint, tc.want, "%s", detail.Message)
+		})
+	}
+}
+
+// blobAnswers serves the fixture registry with every blob of example.com/dep
+// answering status: the tag lookup passes and the archive fetch is refused.
+func blobAnswers(status int) func(t *testing.T) string {
+	return func(t *testing.T) string {
+		return cuemodtest.Fronted(t, cuemodtest.Registry(t), cuemodtest.BlobAnswers("example.com/dep", status))
+	}
+}
+
+// TestPlatformBuildHint_RefusedCredential holds the login hint, and the
+// permission cause, for a platform build the registry refuses. Before, each
+// row got "Pin a published build in <dir>/cue.mod/module.cue, then try
+// again" and the validation cause. The hint names the host when the registry
+// mapping holds exactly one, and is the bare command when it holds two.
+func TestPlatformBuildHint_RefusedCredential(t *testing.T) {
+	sole := func(registry string) string { return hintLogin + " " + registry }
+	bare := func(string) string { return hintLogin }
+	for _, tc := range []struct {
+		name     string
+		registry func(t *testing.T) string
+		contains string
+		want     func(registry string) string
+	}{
+		{
+			name:     "registry answers 401",
+			registry: func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusUnauthorized) },
+			contains: "401 Unauthorized",
+			want:     sole,
+		},
+		{"archive blob answers 401", blobAnswers(http.StatusUnauthorized), "401 Unauthorized", sole},
+		{"archive blob answers 403", blobAnswers(http.StatusForbidden), "403 Forbidden", sole},
+		{
+			name: "registry mapping with two hosts",
+			registry: func(t *testing.T) string {
+				return "example.com/dep=" + cuemodtest.StatusRegistry(t, http.StatusUnauthorized) + ",registry.invalid"
+			},
+			contains: "401 Unauthorized",
+			want:     bare,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("DOCKER_CONFIG", t.TempDir())
+			cuemodtest.ColdCache(t)
+			dir := hintPlatform(t, depPinned, importsDep)
+			registry := tc.registry(t)
+			_, err := BuildPlatformModule(context.Background(), dir, registry)
+			require.Error(t, err)
+			require.ErrorIs(t, err, oerrors.ErrPermission)
+			require.NotErrorIs(t, err, oerrors.ErrValidation)
+			var detail *oerrors.DetailError
+			require.True(t, errors.As(err, &detail), "%v", err)
+			assert.Contains(t, detail.Message, tc.contains, "the registry's own answer stays in the message")
+			assert.Equal(t, tc.want(registry), detail.Hint, "%s", detail.Message)
+		})
+	}
+}
+
+// TestPlatformBuildHint_RefusalNotTypedAsOne_Pinned records known gaps, it
+// does not state the wanted answer. Each registry here refuses the caller,
+// yet the refusal reaches the cli typed as something else, so the build keeps
+// the pin hint and the validation cause: CUE's registry client reports a 403
+// answer to the tag lookup as "module not found", a token endpoint that
+// answers 403 ends the same way, and a token endpoint that answers 401 fails
+// with "cannot do HTTP request: ...: 401 Unauthorized", which the library
+// reads as no response. The wanted answer for all three is the login hint
+// and the permission cause. The reading of registry error text is the
+// library's alone; when it types one of these as a refusal, its row fails:
+// move it to TestPlatformBuildHint_RefusedCredential.
+func TestPlatformBuildHint_RefusalNotTypedAsOne_Pinned(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		registry func(t *testing.T) string
+		contains string
+	}{
+		{"tag lookup answers 403", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusForbidden) }, "module not found"},
+		{"token endpoint answers 403", func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusForbidden) }, "module not found"},
+		{"token endpoint answers 401", func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusUnauthorized) }, "401 Unauthorized"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("DOCKER_CONFIG", t.TempDir())
+			cuemodtest.ColdCache(t)
+			dir := hintPlatform(t, depPinned, importsDep)
+			_, err := BuildPlatformModule(context.Background(), dir, tc.registry(t))
+			require.Error(t, err)
+			require.ErrorIs(t, err, oerrors.ErrValidation, "the gap closed: move the row to TestPlatformBuildHint_RefusedCredential")
+			var detail *oerrors.DetailError
+			require.True(t, errors.As(err, &detail), "%v", err)
+			assert.Contains(t, detail.Message, tc.contains, "what the user sees of the registry's answer")
+			assert.Contains(t, detail.Hint, hintPin, "the gap closed: move the row to TestPlatformBuildHint_RefusedCredential")
 		})
 	}
 }

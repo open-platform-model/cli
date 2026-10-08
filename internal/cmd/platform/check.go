@@ -58,6 +58,11 @@ severity of the word:
                     provider that implements it, and an unmet demand is
                     refused by the render that demands it
 
+A platform module that does not build exits with the validation error code,
+with one exception: when the registry refuses the credentials while the
+module's imports resolve, the command exits 4 and names the login command
+(opm registry login).
+
 The platform is resolved as [dir] > --platform > the cluster's Platform,
 read through --kubeconfig/--context. With none of the three the command
 refuses; it never checks a platform from the OPM home directory.
@@ -118,8 +123,8 @@ func runPlatformCheck(ctx context.Context, args []string, cfg *config.GlobalConf
 
 	p, err := config.BuildPlatformModule(ctx, dir, cfg.Registry)
 	if err != nil {
-		cmdutil.PrintValidationError("platform module does not build", err)
-		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err, Printed: true}
+		printBuildError(err)
+		return &opmexit.ExitError{Code: buildExitCode(err), Err: err, Printed: true}
 	}
 
 	inv, err := p.Contracts()
@@ -169,6 +174,30 @@ func checkClusterGetter(cfg *config.GlobalConfig, kf cmdutil.K8sFlags) (platform
 		return nil, &opmexit.ExitError{Code: opmexit.ExitConnectivityError, Err: fmt.Errorf("connecting to cluster: %w", err)}
 	}
 	return platform.ClusterPlatformGetterFor(client.Dynamic), nil
+}
+
+// printBuildError prints a platform build failure. A registry that refused
+// the credentials prints whole: the registry's answer and the login hint.
+// The grouped CUE diagnostic would reduce it to "import failed" at the
+// import's position, which names neither. Every other cause prints through
+// the validation funnel.
+func printBuildError(err error) {
+	const msg = "platform module does not build"
+	if errors.Is(err, oerrors.ErrPermission) {
+		output.Error(msg, "error", err)
+		return
+	}
+	cmdutil.PrintValidationError(msg, err)
+}
+
+// buildExitCode maps a platform build failure onto the command's exit codes:
+// a registry that refused the credentials is a permission failure, and
+// every other cause is a verdict on the platform module.
+func buildExitCode(err error) int {
+	if errors.Is(err, oerrors.ErrPermission) {
+		return opmexit.ExitPermissionDenied
+	}
+	return opmexit.ExitValidationError
 }
 
 // checkResolveError maps a resolution failure onto the command's exit codes:

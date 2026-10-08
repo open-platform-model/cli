@@ -2,7 +2,7 @@
 
 ### Requirement: A platform that cannot build fails with its build diagnostic
 
-If the resolved platform does not build, the command SHALL report the build failure with the CLI's grouped CUE diagnostics and exit with the validation error code, rather than reporting an empty inventory. When the platform does not build because the registry refused the credentials, the command SHALL exit with the permission error code 4 in place of the validation error code, and the diagnostic SHALL end with the `opm registry login` hint. If the platform builds but its inventory cannot be read, the command SHALL fail naming the missing field and the core release that introduced it, rather than reporting a partial inventory. When the inventory cannot be read because the platform module pins a core release older than one the kernel reads, the command SHALL also name the platform directory and the `cue mod get` command that re-pins core there to the release the kernel was verified against.
+If the resolved platform does not build, the command SHALL report the build failure with the CLI's grouped CUE diagnostics and exit with the validation error code, rather than reporting an empty inventory. When the platform does not build because the registry refused the credentials, the command SHALL exit with the permission error code 4 in place of the validation error code, and SHALL print the registry's answer and the `opm registry login` hint in place of the grouped CUE diagnostics. If the platform builds but its inventory cannot be read, the command SHALL fail naming the missing field and the core release that introduced it, rather than reporting a partial inventory. When the inventory cannot be read because the platform module pins a core release older than one the kernel reads, the command SHALL also name the platform directory and the `cue mod get` command that re-pins core there to the release the kernel was verified against.
 
 #### Scenario: A broken platform module reports the build error
 
@@ -27,4 +27,4 @@ If the resolved platform does not build, the command SHALL report the build fail
 #### Scenario: A registry that refuses the credentials
 
 - **WHEN** the platform module's imports resolve against a registry that answers 401
-- **THEN** the command prints the build diagnostic with the hint `Log in to the registry, then retry:  opm registry login <host>`, exits with the permission error code 4, and prints no contract report
+- **THEN** the command prints the registry's 401 answer and the hint `Log in to the registry, then retry:  opm registry login <host>`, exits with the permission error code 4, and prints no contract report

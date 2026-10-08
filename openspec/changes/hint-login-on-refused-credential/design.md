@@ -100,16 +100,37 @@ exit 4 (`ExitPermissionDenied`). Every other build failure keeps `ErrValidation`
 **Rationale**: the decision is made once, where the cause is read; the command reads a
 sentinel. Exit 4 is the documented code for a refused credential on publish and `module vet`.
 
+### How `opm platform check` prints the refusal
+
+**Context**: found while implementing. The command prints a build failure through the
+validation funnel. A failed import carries a CUE error with a source position, so the funnel
+takes its grouped form and prints only `import failed` at `platform.cue:<line>:<col>`. The
+registry's answer and the hint of the `DetailError` are not printed. That holds for every
+failed import today, the unpublished pin included.
+**Options considered**:
+
+1. Print the hint after the grouped block for every cause. It changes the output of causes
+   this change does not name.
+2. Print a refused credential whole (the `DetailError`: location, the registry's answer, the
+   hint) and leave every other cause on the funnel.
+
+**Decision**: option 2. The command MUST print a refused credential with `output.Error` and
+every other cause as before.
+**Rationale**: the position of the import is not where the user fixes a refused credential;
+the answer and the login command are. The hidden pin hint is recorded as a question for the
+owner, and the command test records what an unpublished pin prints today.
+
 ## Error output
 
 ```text
 ERRO platform module does not build
-Error: platform module error
-  Location: /path/to/platform
-
-  loading platform package from /path/to/platform (.): import failed: ...: cannot fetch example.com/dep@v0.2.0: module example.com/dep@v0.2.0: 401 Unauthorized: unauthorized: Unauthorized
-
-Hint: Log in to the registry, then retry:  opm registry login ghcr.io
+  error=
+  | Error: platform module error
+  |   Location: /path/to/platform
+  |
+  |   loading platform package from /path/to/platform (.): import failed: ...: cannot fetch example.com/dep@v0.2.0: module example.com/dep@v0.2.0: 401 Unauthorized: unauthorized: Unauthorized
+  |
+  | Hint: Log in to the registry, then retry:  opm registry login ghcr.io
 ```
 
 Exit codes of `opm platform check` for a build failure: 4 for a refused registry credential,
