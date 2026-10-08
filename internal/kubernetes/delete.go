@@ -237,7 +237,9 @@ func (result *DeleteResult) WaitUntilGone(ctx context.Context, client *Client, t
 	waitCtx, cancel := context.WithDeadline(ctx, start.Add(timeout))
 	defer cancel()
 
-	err := WaitDeleted(waitCtx, client, deleted, start)
+	err := WaitDeleted(waitCtx, client, deleted, start, func(left int) {
+		instanceLog.Info(fmt.Sprintf("%d of %d deleted resource(s) still terminating", left, len(deleted)))
+	})
 	var terminating *TerminatingError
 	if errors.As(err, &terminating) {
 		result.Terminating = terminating.Objects

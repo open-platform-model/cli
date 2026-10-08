@@ -49,6 +49,7 @@ The command lists each resource that is still there, with its finalizers, and ex
 INFO r:Deployment/media/jellyfin                         - deleted
 INFO r:ConfigMap/media/jellyfin-config                   - deleted
 INFO waiting for 2 deleted resource(s) to be gone timeout=2m0s
+INFO 1 of 2 deleted resource(s) still terminating
 WARN r:ConfigMap/media/jellyfin-config                   ! terminating finalizers=example.io/backup
 ERRO timed out after 2m0s: 1 deleted resource(s) are still terminating
 
@@ -58,9 +59,11 @@ Run the same command again to wait again; re-running is safe.
 Without --wait the command deletes the ModuleInstance and does not wait for them.
 ```
 
+While it waits, the command prints how many resources are left each time one goes, and every 30 seconds otherwise.
+
 The command does not print `Instance deleted`, and it keeps the `ModuleInstance`. `opm instance list` still shows the instance, because resources of the instance still exist.
 
-A line that ends with `error=` in place of `finalizers=` is a resource that the command could not read at the end of the wait. The command does not count a resource that it cannot read as gone.
+A line that ends with `error=` in place of `finalizers=` is a resource that the command could not read at the end of the wait; `not read before the timeout` means that the timeout passed before the first read of it answered. The command does not count a resource that it cannot read as gone.
 
 The exit code is 1, not 3. Exit code 3 means that the cluster did not answer. Here the cluster answered each read and said that the resource exists.
 

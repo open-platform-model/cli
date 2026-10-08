@@ -62,7 +62,7 @@ func waitDeleted(t *testing.T, dyn *dynamicfake.FakeDynamicClient, timeout time.
 	start := time.Now()
 	ctx, cancel := context.WithDeadline(context.Background(), start.Add(timeout))
 	defer cancel()
-	return WaitDeleted(ctx, &Client{Resources: kubetest.Resources(), Dynamic: dyn}, objs, start)
+	return WaitDeleted(ctx, &Client{Resources: kubetest.Resources(), Dynamic: dyn}, objs, start, nil)
 }
 
 // The run records, per step, the UID an accepted delete was sent with, and
@@ -206,7 +206,7 @@ func TestWaitDeleted_UnservedKindIsNotGone(t *testing.T) {
 	ctx, cancel := context.WithDeadline(context.Background(), start.Add(40*time.Millisecond))
 	defer cancel()
 
-	err := WaitDeleted(ctx, client, []DeletedObject{obj}, start)
+	err := WaitDeleted(ctx, client, []DeletedObject{obj}, start, nil)
 
 	var terminating *TerminatingError
 	require.ErrorAs(t, err, &terminating)
@@ -222,11 +222,80 @@ func TestWaitDeleted_CancellationReturnsTheContextError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := WaitDeleted(ctx, &Client{Resources: kubetest.Resources(), Dynamic: dyn}, []DeletedObject{deletedCM("cm")}, time.Now())
+	err := WaitDeleted(ctx, &Client{Resources: kubetest.Resources(), Dynamic: dyn}, []DeletedObject{deletedCM("cm")}, time.Now(), nil)
 
 	require.ErrorIs(t, err, context.Canceled)
 	var terminating *TerminatingError
 	assert.NotErrorAs(t, err, &terminating)
+}
+
+// A read that answers after the budget ended still counts: the object is
+// reported with the finalizers that read showed, not as an object nothing is
+// known about.
+func TestWaitDeleted_ReadThatAnswersAfterTheDeadlineCounts(t *testing.T) {
+	shortWaitPoll(t)
+	dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), terminatingCM("held", "example.io/hold"))
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+
+	err := WaitDeleted(ctx, &Client{Resources: kubetest.Resources(), Dynamic: dyn},
+		[]DeletedObject{deletedCM("held"), deletedCM("gone")}, time.Now(), nil)
+
+	var terminating *TerminatingError
+	require.ErrorAs(t, err, &terminating)
+	require.Len(t, terminating.Objects, 1, "the object that reads NotFound is gone, deadline or not")
+	assert.Equal(t, []string{"example.io/hold"}, terminating.Objects[0].Finalizers)
+	assert.NoError(t, terminating.Objects[0].Err)
+}
+
+// An object the budget ended for before any read of it answered is reported
+// as not read, never as terminating without a cause and never as gone.
+func TestWaitDeleted_ObjectNeverReadIsReportedAsNotRead(t *testing.T) {
+	shortWaitPoll(t)
+	dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+	dyn.PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, ctx.Err() // the read is cut by the deadline
+	})
+
+	err := WaitDeleted(ctx, &Client{Resources: kubetest.Resources(), Dynamic: dyn}, []DeletedObject{deletedCM("cm")}, time.Now(), nil)
+
+	var terminating *TerminatingError
+	require.ErrorAs(t, err, &terminating)
+	require.Len(t, terminating.Objects, 1)
+	assert.ErrorIs(t, terminating.Objects[0].Err, errNotRead)
+}
+
+// Progress is reported each time the number of objects left drops, and
+// again after waitProgressPolls polls without a drop.
+func TestWaitDeleted_ReportsProgress(t *testing.T) {
+	dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), terminatingCM("a"), terminatingCM("held"))
+	var gets atomic.Int32
+	dyn.PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+		if gets.Add(1) == 3 {
+			require.NoError(t, dyn.Tracker().Delete(configMapsGVR, "default", "a"))
+		}
+		return false, nil, nil
+	})
+	shortWaitPoll(t)
+	start := time.Now()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var progress []int
+	polls := 0
+	err := WaitDeleted(ctx, &Client{Resources: kubetest.Resources(), Dynamic: dyn}, []DeletedObject{deletedCM("a"), deletedCM("held")}, start,
+		func(left int) {
+			progress = append(progress, left)
+			polls++
+			if polls == 2 {
+				cancel()
+			}
+		})
+
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Equal(t, []int{1, 1}, progress, "once when a went, once more after the quiet polls")
+	assert.GreaterOrEqual(t, int(gets.Load()), 3+waitProgressPolls)
 }
 
 // waitCluster holds the objects of one instance: "held" stays after its

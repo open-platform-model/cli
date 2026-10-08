@@ -69,6 +69,8 @@ Uninstall shares the delete routine, so the option is reachable. It is not wired
 - `workflowapply.DeleteRecorded`: with `DeleteRequest.Wait`, on a real run without per-resource errors, it calls `WaitUntilGone` after it printed the kept, left-behind and error lines, so the line that says the command is waiting is the last one before the silence. It does not release the record when `Terminating` is not empty.
 - The command prints the report.
 
+While it waits, the command prints how many resources are left each time the number drops and every 15 polls (30 seconds) otherwise, on any stream: at most one line per resource plus one per 30 seconds. A read that answers after the deadline still counts; an object that no read answered for is reported as "not read before the timeout".
+
 `WaitAbsent` is not reused: it knows no UID, and its timeout is one error string with no finalizers.
 
 ## Risks / Trade-offs

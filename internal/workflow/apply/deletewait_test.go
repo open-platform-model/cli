@@ -164,3 +164,28 @@ func TestDeleteRecorded_WaitCanceledKeepsTheRecord(t *testing.T) {
 	assert.Nil(t, result)
 	assert.True(t, recordExists(dyn))
 }
+
+// While it waits, the delete says how many deleted objects are left each
+// time one goes, so the command is not silent until the end.
+func TestDeleteRecorded_WaitReportsProgress(t *testing.T) {
+	logBuf := captureLog(t)
+	dyn, rec, live := planCluster([]string{"held", "slow"}, "held", "slow")
+	dyn.PrependReactor("delete", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, nil // both stay after their accepted delete
+	})
+	reads := 0
+	dyn.PrependReactor("get", "configmaps", func(a k8stesting.Action) (bool, runtime.Object, error) {
+		if g, ok := a.(k8stesting.GetAction); ok && g.GetName() == "slow" {
+			reads++
+			if reads == 3 { // the verdict read, one poll, then it goes
+				require.NoError(t, dyn.Tracker().Delete(configMaps, "apps", "slow"))
+			}
+		}
+		return false, nil, nil
+	})
+
+	result := deleteRecordedWaiting(t, dyn, rec, live)
+
+	require.Len(t, result.Terminating, 1)
+	assert.Contains(t, logBuf.String(), "1 of 2 deleted resource(s) still terminating")
+}

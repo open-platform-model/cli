@@ -2,6 +2,7 @@ package instance
 
 import (
 	"regexp"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,13 +25,21 @@ func (s *claimScenario) holdConfigMaps() {
 }
 
 // requests lists what the scenario's cluster received, one "verb resource"
-// per request, in order.
+// per request. The requests before the first delete are sorted: discovery
+// reads the tracked resources concurrently, so their order means nothing.
+// From the first delete on the order is the one they were sent in, which is
+// what shows whether anything is read after a delete.
 func (s *claimScenario) requests() []string {
 	actions := s.fake.Actions()
 	out := make([]string, 0, len(actions))
-	for _, a := range actions {
+	firstDelete := len(actions)
+	for i, a := range actions {
 		out = append(out, a.GetVerb()+" "+a.GetResource().Resource)
+		if a.GetVerb() == "delete" && i < firstDelete {
+			firstDelete = i
+		}
 	}
+	sort.Strings(out[:firstDelete])
 	return out
 }
 
@@ -52,10 +61,10 @@ To delete claims together with an instance, pass --delete-data.
 `
 
 var noWaitRequests = []string{
+	"get configmaps",
+	"get configmaps",
 	"get moduleinstances",
 	"get persistentvolumeclaims",
-	"get configmaps",
-	"get configmaps",
 	"delete configmaps",
 	"delete moduleinstances",
 }

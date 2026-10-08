@@ -75,7 +75,11 @@ func (e *TerminatingError) Error() string {
 // *TerminatingError naming what is left; when ctx is canceled, the context's
 // error. The first poll is immediate, and the rest follow at
 // WaitPollInterval.
-func WaitDeleted(ctx context.Context, client *Client, objs []DeletedObject, since time.Time) error {
+//
+// onProgress, when set, is called with the number of objects still there
+// each time that number drops, and otherwise once every
+// waitProgressPolls polls, so a caller can show that the wait is alive.
+func WaitDeleted(ctx context.Context, client *Client, objs []DeletedObject, since time.Time, onProgress func(left int)) error {
 	pending := make([]pendingDelete, len(objs))
 	for i, obj := range objs {
 		pending[i] = pendingDelete{object: obj}
@@ -84,10 +88,17 @@ func WaitDeleted(ctx context.Context, client *Client, objs []DeletedObject, sinc
 	ticker := time.NewTicker(WaitPollInterval)
 	defer ticker.Stop()
 
+	quiet := 0 // polls since the last progress call
 	for {
+		before := len(pending)
 		pending = pollDeleted(ctx, client, pending)
 		if len(pending) == 0 {
 			return nil
+		}
+		quiet++
+		if onProgress != nil && (len(pending) < before || quiet >= waitProgressPolls) {
+			onProgress(len(pending))
+			quiet = 0
 		}
 
 		select {
@@ -100,6 +111,9 @@ func WaitDeleted(ctx context.Context, client *Client, objs []DeletedObject, sinc
 			for i := range pending {
 				left[i] = pending[i].seen
 				left[i].Entry = pending[i].object.Entry
+				if !pending[i].read {
+					left[i].Err = errNotRead
+				}
 			}
 			return &TerminatingError{Elapsed: time.Since(since).Round(time.Second), Objects: left}
 		case <-ticker.C:
@@ -107,16 +121,26 @@ func WaitDeleted(ctx context.Context, client *Client, objs []DeletedObject, sinc
 	}
 }
 
+// waitProgressPolls is the number of polls without a drop after which
+// WaitDeleted reports progress again: 30 seconds at the default interval.
+const waitProgressPolls = 15
+
+// errNotRead is the error of an object the budget ended for before any read
+// of it answered: the wait knows nothing about it, and does not call it gone.
+var errNotRead = errors.New("not read before the timeout")
+
 // pendingDelete is a deleted object the wait has not yet seen gone, with
-// what its last completed read showed.
+// what its last answered read showed; read is false until one answered.
 type pendingDelete struct {
 	object DeletedObject
 	seen   TerminatingObject
+	read   bool
 }
 
 // pollDeleted reads each pending object once and returns the ones that are
-// still there. A read that ctx cut short changes nothing: what the read
-// before it showed is kept for the report.
+// still there. A read that answered counts, also when ctx ended meanwhile. A
+// read that ctx cut short changes nothing: what the read before it showed is
+// kept for the report.
 func pollDeleted(ctx context.Context, client *Client, pending []pendingDelete) []pendingDelete {
 	left := make([]pendingDelete, 0, len(pending))
 	for i := range pending {
@@ -126,11 +150,11 @@ func pollDeleted(ctx context.Context, client *Client, pending []pendingDelete) [
 		switch {
 		case err == nil && finalizers == nil:
 			continue
+		case err == nil:
+			p.seen, p.read = TerminatingObject{Finalizers: finalizers}, true
 		case ctx.Err() != nil:
-		case err != nil:
-			p.seen.Err = fmt.Errorf("reading %s/%s: %w", entry.Kind, entry.Name, err)
 		default:
-			p.seen = TerminatingObject{Finalizers: finalizers}
+			p.seen.Err, p.read = fmt.Errorf("reading %s/%s: %w", entry.Kind, entry.Name, err), true
 		}
 		left = append(left, p)
 	}

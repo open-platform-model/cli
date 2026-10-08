@@ -15,3 +15,9 @@
 
 - [x] 3.1 Add `docs/site/diagnostics/wait-for-a-deleted-instance.md` and name the flag in the `README.md` command table
 - [x] 3.2 `task openspec:check`, `task docs:bundle:check` and `task cascade:wiring:check` green, then commit `docs(instance): describe delete --wait`
+
+## 4. Review fixes
+
+- [x] 4.1 Make the request-order assertions of the pin test and the operator-managed test independent of the order of the concurrent discovery reads; repeat both 300 times
+- [x] 4.2 Print a progress line while waiting, each time the number of resources left drops and every 15 polls otherwise; count a read that answers after the deadline, and report an object that no read answered for as not read; tests for the three
+- [x] 4.3 `task fmt`, `task vet`, `task lint`, `task test:unit`, `task openspec:check` and `task docs:bundle:check` green, then commit `fix(instance): report progress while delete waits`

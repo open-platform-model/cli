@@ -4,6 +4,8 @@
 
 `opm instance delete` SHALL accept `--wait`. With `--wait`, on a real run of a CLI-owned instance in which no tracked resource failed, the command SHALL, after every planned action is done and before it deletes the `ModuleInstance` record, poll each resource whose delete the API server accepted until the resource is gone or `--timeout` (default `5m0s`) has passed since the wait started. A resource is gone when its read returns NotFound, or when the live object under its name has a UID other than the one of the object that was deleted. A read that fails with another error SHALL NOT count as gone.
 
+While it waits, the command SHALL print a line that says how many of the deleted resources are still terminating each time that number drops, and at least every 30 seconds otherwise.
+
 The command SHALL NOT wait for a resource it did not delete: a kept `PersistentVolumeClaim`, a resource left behind, or a resource that was already absent.
 
 When every such resource is gone, the command SHALL delete the `ModuleInstance` record and report as it does without `--wait`. When the timeout passes first, the command SHALL list each resource that is still terminating, with its finalizers when it has any, SHALL NOT delete the `ModuleInstance` record, SHALL NOT print a success line, and SHALL exit 1.
@@ -23,6 +25,7 @@ Without `--wait`, the output and the exit code of the command SHALL be the same 
 
 - **WHEN** running `opm instance delete --wait --timeout 30s` for a CLI-owned instance that tracks a ConfigMap carrying a finalizer that no controller removes
 - **THEN** after 30 seconds the command SHALL list the ConfigMap as terminating and name its finalizer
+- **AND** a resource that no read answered for before the timeout SHALL be listed with that as its error, not as gone
 - **AND** the `ModuleInstance` record SHALL NOT be deleted
 - **AND** the command SHALL exit 1
 
