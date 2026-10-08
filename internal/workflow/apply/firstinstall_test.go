@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
 
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
@@ -68,5 +69,8 @@ func TestExecute_NoFirstInstallWarningWithoutCause(t *testing.T) {
 
 		require.NoError(t, Execute(context.Background(), cluster.request(Options{}, "a")))
 		assert.NotContains(t, logBuf.String(), firstInstallWarning)
+		for _, a := range cluster.client.Clientset.(*k8sfake.Clientset).Actions() {
+			assert.NotEqual(t, "secrets", a.GetResource().Resource, "an apply with a record makes no request on Secrets: %s", a.GetVerb())
+		}
 	})
 }
