@@ -60,6 +60,9 @@ const (
 	// StatusKept marks a PersistentVolumeClaim prune or delete kept on
 	// purpose because --delete-data was not set.
 	StatusKept = "kept"
+	// StatusTerminating marks a deleted object that still exists: its
+	// dependents or its finalizers hold it.
+	StatusTerminating = "terminating"
 	// The statuses below are a dry run's: what the real apply would do with
 	// an object it does not apply or does not prune.
 	//
@@ -100,7 +103,7 @@ func statusStyle(status string) lipgloss.Style {
 		return lipgloss.NewStyle().Faint(true)
 	case StatusDeleted:
 		return lipgloss.NewStyle().Foreground(colorRed)
-	case StatusLeftBehind, StatusWouldSkip, StatusWouldKeep, StatusWouldLetGo:
+	case StatusLeftBehind, StatusTerminating, StatusWouldSkip, StatusWouldKeep, StatusWouldLetGo:
 		return lipgloss.NewStyle().Foreground(ColorYellow)
 	case StatusWouldRefuse, StatusCannotCheck:
 		return lipgloss.NewStyle().Bold(true).Foreground(colorBoldRed)
@@ -128,7 +131,7 @@ func statusIcon(status string) string {
 		return "="
 	case StatusDeleted:
 		return "-"
-	case StatusLeftBehind, StatusWouldRefuse, StatusWouldSkip, StatusWouldKeep, StatusWouldLetGo, StatusCannotCheck:
+	case StatusLeftBehind, StatusTerminating, StatusWouldRefuse, StatusWouldSkip, StatusWouldKeep, StatusWouldLetGo, StatusCannotCheck:
 		return "!"
 	case statusFailed:
 		return "!"

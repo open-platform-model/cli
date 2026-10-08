@@ -83,7 +83,7 @@ func (s *claimScenario) run(t *testing.T, dryRun, deleteData bool) (string, erro
 	var runErr error
 	out := captureOutput(t, func() {
 		runErr = executeInstanceDelete(context.Background(), s.client, &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}, "apps",
-			s.inv, s.live, nil, dryRun, deleteData, output.InstanceLogger("demo"))
+			s.inv, s.live, nil, deleteFlags{DryRun: dryRun, DeleteData: deleteData}, output.InstanceLogger("demo"))
 	})
 	return out, runErr
 }

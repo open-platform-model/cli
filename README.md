@@ -83,7 +83,7 @@ Use `opm instance` when you are starting from an instance file or when you want 
 | `instance diff` | Compare an instance file with live cluster state |
 | `instance status` | Show resource status for a deployed instance |
 | `instance tree` | Show instance resource hierarchy |
-| `instance delete` | Delete instance resources from a cluster (for a CLI-managed instance, PersistentVolumeClaims are kept unless `--delete-data`) |
+| `instance delete` | Delete instance resources from a cluster (for a CLI-managed instance, PersistentVolumeClaims are kept unless `--delete-data`; `--wait` returns only when the deleted resources are gone) |
 | `instance list` | List deployed instances |
 | `instance events` | Show events for an instance |
 

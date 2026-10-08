@@ -3,6 +3,7 @@ package apply
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/charmbracelet/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -42,7 +43,13 @@ type DeleteRequest struct {
 	// DeleteData deletes tracked PersistentVolumeClaims too. When false each
 	// is kept and listed in the result's Kept.
 	DeleteData bool
-	Log        *log.Logger
+	// Wait waits, after the deletes, until every deleted object is gone or
+	// Timeout passed (zero uses inventory.DefaultReconcileTimeout). Objects
+	// that are still there then are listed in the result's Terminating, and
+	// the record is kept. Without it no object is read after its delete.
+	Wait    bool
+	Timeout time.Duration
+	Log     *log.Logger
 }
 
 // RecordDeleteError reports that every tracked object of an instance was
@@ -62,6 +69,26 @@ func (e *RecordDeleteError) Error() string {
 
 func (e *RecordDeleteError) Unwrap() error { return e.Err }
 
+// logDeleteResult prints one line for each object a delete left behind, kept
+// or failed on.
+func logDeleteResult(deleteResult *kubernetes.DeleteResult, instanceLog *log.Logger) {
+	for _, lb := range deleteResult.LeftBehind {
+		instanceLog.Warn(output.FormatResourceLine(lb.Kind, lb.Namespace, lb.Name, output.StatusLeftBehind), "reason", lb.Reason)
+	}
+
+	// Kept on purpose, so an informational line and never a warning.
+	for _, k := range deleteResult.Kept {
+		instanceLog.Info(output.FormatResourceLine(k.Kind, k.Namespace, k.Name, output.StatusKept))
+	}
+
+	if len(deleteResult.Errors) > 0 {
+		instanceLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(deleteResult.Errors)))
+		for _, e := range deleteResult.Errors {
+			instanceLog.Error(e.Error())
+		}
+	}
+}
+
 // DeleteRecorded deletes a CLI-owned instance's tracked objects, in
 // descending resource-weight order, leaving CRDs, Namespaces and any object
 // that no longer carries the instance's identity behind, and keeping
@@ -69,7 +96,9 @@ func (e *RecordDeleteError) Unwrap() error { return e.Err }
 // ModuleInstance record last: only on a real run whose deletion plan
 // releases the hold (lifecycle.MayReleaseHold), which no per-object error
 // allows, so a re-run can retry what failed. An object discovery could not read
-// (req.Unreadable) is such an error. Already absent objects count as
+// (req.Unreadable) is such an error. With req.Wait, a deleted object that
+// still exists when the wait ends holds the record too, and is no error
+// here: the caller reports the result's Terminating. Already absent objects count as
 // deleted. A record delete that fails is returned as a *RecordDeleteError
 // and is not logged here: the caller reports it and must not report success.
 // `opm instance delete` and `opm operator uninstall` share it. The caller
@@ -98,19 +127,15 @@ func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteR
 		return nil, err
 	}
 
-	for _, lb := range deleteResult.LeftBehind {
-		instanceLog.Warn(output.FormatResourceLine(lb.Kind, lb.Namespace, lb.Name, output.StatusLeftBehind), "reason", lb.Reason)
-	}
+	logDeleteResult(deleteResult, instanceLog)
 
-	// Kept on purpose, so an informational line and never a warning.
-	for _, k := range deleteResult.Kept {
-		instanceLog.Info(output.FormatResourceLine(k.Kind, k.Namespace, k.Name, output.StatusKept))
-	}
-
-	if len(deleteResult.Errors) > 0 {
-		instanceLog.Warn(fmt.Sprintf("%d resource(s) had errors", len(deleteResult.Errors)))
-		for _, e := range deleteResult.Errors {
-			instanceLog.Error(e.Error())
+	// The wait of --wait comes after every line above, so that it is the
+	// last thing on screen while the command is silent. A dry run sent no
+	// delete, and a run with a failed object fails already: neither waits.
+	if req.Wait && !req.DryRun && len(deleteResult.Errors) == 0 {
+		if err := deleteResult.WaitUntilGone(ctx, req.Client, inventory.ResolveTimeout(req.Timeout), instanceLog); err != nil {
+			instanceLog.Error("delete interrupted", "error", err)
+			return nil, err
 		}
 	}
 
@@ -119,9 +144,11 @@ func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteR
 	// deleted or left in place. A failed object holds it, so a re-run can
 	// retry. Skipped on a dry run. An error the delete reported holds it too,
 	// whatever the plan says: an unreadable object whose error wraps a
-	// NotFound reads to the plan as already gone, yet it may still exist.
+	// NotFound reads to the plan as already gone, yet it may still exist. So
+	// does a deleted object that outlived the wait of req.Wait: the record
+	// goes on tracking what still exists, and a re-run waits again.
 	release := lifecycle.MayReleaseHold(deleteResult.Run.Plan, deleteResult.Run.State, lifecycle.HoldInput{}).Release &&
-		len(deleteResult.Errors) == 0
+		len(deleteResult.Errors) == 0 && len(deleteResult.Terminating) == 0
 	if !req.DryRun && req.Record != nil && release {
 		if err := inventory.DeleteCR(ctx, req.Client, req.Record.Name, req.Record.Namespace); err != nil {
 			return nil, &RecordDeleteError{Namespace: req.Record.Namespace, Name: req.Record.Name, Err: err}
