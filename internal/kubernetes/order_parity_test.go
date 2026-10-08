@@ -271,7 +271,7 @@ func TestSortMatchesPinnedOrder(t *testing.T) {
 // TestSortObjectsStableOnLargeInput pins that SortObjects keeps equal-weight
 // objects in their input order, in both directions. The input is large
 // enough (96 objects) that an unstable sort reorders equal elements, which
-// the 15-object orderSet does not reveal. Names count down while the input
+// the small orderSet does not reveal. Names count down while the input
 // order counts up, so a sort that fell back to the name would also fail.
 func TestSortObjectsStableOnLargeInput(t *testing.T) {
 	const pairs = 48

@@ -53,5 +53,5 @@ None.
 - `go.mod`, `go.sum`: library pin.
 - `internal/kubernetes/order_parity_test.go`: literals, expected sort order, comments, test names.
 - `openspec/specs/resource-conversion/spec.md`: one requirement replaced.
-- Users: apply, prune and delete order, the `instance tree` order inside a component, and the `module build` document order change for the kinds in the table. `status` and `diff` do not sort by weight and do not change.
+- Users: apply, prune and delete order, the `instance tree` order inside a component, and the document order of `module build` and `instance build` change for the kinds in the table. `status` and `diff` do not sort by weight and do not change.
 - Other beta.7 changes checked against the cli (design.md): the adopt rule and the lifecycle package have no effect (the cli imports neither package); `*ResolutionError` keeps the message text and the fetch kinds the cli reads.

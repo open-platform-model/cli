@@ -1,6 +1,6 @@
 ## Context
 
-See proposal.md for the motivation. The cli holds no weight table of its own: `internal/kubernetes.SortObjects` (apply, delete, tree), `internal/inventory` (prune) and `internal/output` (`module build` documents) all read `opm/k8s/object.Weight`. The bump therefore changes the order with no cli code edit. The only failing check on the bumped pin is `internal/kubernetes/order_parity_test.go` (`TestWeightTableMatchesRetiredCopy`, `TestSortMatchesRetiredCopy`); every other unit test passes on beta.7.
+See proposal.md for the motivation. The cli holds no weight table of its own: `internal/kubernetes.SortObjects` (apply, delete, tree), `internal/inventory` (prune) and `internal/output` (`module build` and `instance build` documents) all read `opm/k8s/object.Weight`. The bump therefore changes the order with no cli code edit. The only failing check on the bumped pin is `internal/kubernetes/order_parity_test.go` (`TestWeightTableMatchesRetiredCopy`, `TestSortMatchesRetiredCopy`); every other unit test passes on beta.7.
 
 ## Goals / Non-Goals
 
