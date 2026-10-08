@@ -88,12 +88,17 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	instanceID := result.Instance.UUID
 	dryRun := req.Options.DryRun
 
-	wouldCreateNS, err := EnsureNamespaceIfRequested(ctx, req.K8sClient, namespace, req.Options.CreateNS, dryRun, instanceLog)
+	// --create-namespace only reads here. The namespace is created after the
+	// last check that can refuse the apply, so that a refusal has changed
+	// nothing. Until then the checks below read in a namespace that may not
+	// exist: the API answers NotFound there, which they take as no record and
+	// no resource.
+	createNamespace, err := namespaceToCreate(ctx, req.K8sClient, namespace, req.Options.CreateNS, dryRun, instanceLog)
 	if err != nil {
 		return err
 	}
 	var newNamespaces []string
-	if wouldCreateNS {
+	if createNamespace && dryRun {
 		newNamespaces = []string{namespace}
 	}
 
@@ -159,7 +164,9 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		return err
 	}
 	if len(result.Resources) == 0 && len(prevEntries) == 0 {
-		return nil
+		// Nothing to apply and nothing left that can refuse: the namespace
+		// the flag asks for is still created.
+		return ensureNamespace(ctx, req.K8sClient, namespace, createNamespace && !dryRun, instanceLog)
 	}
 
 	// Gate 6: existence check, first-ever apply only (no previous inventory).
@@ -174,6 +181,11 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		if len(alreadyManaged) > 0 {
 			instanceLog.Warn(unrecordedResourcesWarning(len(alreadyManaged), len(currentEntries), name, instanceID, dryRun))
 		}
+	}
+
+	// The first write of the apply: every check that can refuse has passed.
+	if err := ensureNamespace(ctx, req.K8sClient, namespace, createNamespace && !dryRun, instanceLog); err != nil {
+		return err
 	}
 
 	if dryRun {
@@ -347,28 +359,43 @@ func RunClusterGates(ctx context.Context, client *kubernetes.Client, skipCeiling
 	return inventory.GateOperatorVersionCeiling(ctx, client, version.Version)
 }
 
-// EnsureNamespaceIfRequested creates the instance namespace when createNS is
-// set and it is missing. On a dry run it creates nothing and reports
-// wouldCreate: the namespace is missing, so the objects in it cannot be
-// validated by the server.
-func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Client, namespace string, createNS, dryRun bool, instanceLog *log.Logger) (wouldCreate bool, err error) {
+// namespaceToCreate reports whether --create-namespace has a namespace to
+// create: createNS is set and the instance namespace is missing. It only
+// reads. A dry run says here that the namespace would be created: the objects
+// in it cannot be validated by the server.
+func namespaceToCreate(ctx context.Context, k8sClient *kubernetes.Client, namespace string, createNS, dryRun bool, instanceLog *log.Logger) (bool, error) {
 	if !createNS || namespace == "" {
 		return false, nil
 	}
 
-	created, err := k8sClient.EnsureNamespace(ctx, namespace, dryRun)
+	// The dry-run form of EnsureNamespace is the read: it creates nothing.
+	missing, err := k8sClient.EnsureNamespace(ctx, namespace, true)
 	if err != nil {
 		instanceLog.Error("ensuring namespace", "error", err)
 		return false, &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 	}
-	if created {
-		if dryRun {
-			instanceLog.Info(fmt.Sprintf("namespace %q would be created", namespace))
-		} else {
-			instanceLog.Info(fmt.Sprintf("namespace %q created", namespace))
-		}
+	if missing && dryRun {
+		instanceLog.Info(fmt.Sprintf("namespace %q would be created", namespace))
 	}
-	return created && dryRun, nil
+	return missing, nil
+}
+
+// ensureNamespace creates the instance namespace when create is set, which
+// the caller derives from namespaceToCreate on a real run. A namespace that
+// appeared since that read is left as it is.
+func ensureNamespace(ctx context.Context, k8sClient *kubernetes.Client, namespace string, create bool, instanceLog *log.Logger) error {
+	if !create {
+		return nil
+	}
+	created, err := k8sClient.EnsureNamespace(ctx, namespace, false)
+	if err != nil {
+		instanceLog.Error("ensuring namespace", "error", err)
+		return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
+	}
+	if created {
+		instanceLog.Info(fmt.Sprintf("namespace %q created", namespace))
+	}
+	return nil
 }
 
 // LoadPreviousInventory reads the ModuleInstance CR for an instance. It
@@ -388,12 +415,14 @@ func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, na
 
 // unreadableRecordError is the refusal for a ModuleInstance read that failed
 // with anything but NotFound. The exit code follows the cause: permission
-// denied, connectivity, or general.
+// denied, connectivity, or general. Every call site is ahead of the first
+// write of the apply, the namespace create included, which is what the text
+// promises.
 func unreadableRecordError(name, namespace string, cause error) error {
 	return &opmexit.ExitError{
 		Code: exitCodeFromK8sError(cause),
 		Err: fmt.Errorf("cannot read the ModuleInstance record %q in namespace %q: %w\n"+
-			"apply stopped: without the record it cannot tell a first install from an existing instance.\n"+
+			"apply stopped before any change: without the record it cannot tell a first install from an existing instance.\n"+
 			"Check that you can read moduleinstances.%s in that namespace, then run the command again",
 			name, namespace, cause, inventory.GroupOpmodel),
 	}

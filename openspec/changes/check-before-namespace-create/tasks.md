@@ -1,10 +1,10 @@
 ## 1. Checks before the namespace create
 
-- [ ] 1.1 Write `internal/workflow/apply/createns_test.go`: one case per refusing check (cluster gate, unreadable record, denied status permission, unreadable object, untracked cluster-scoped object, terminating object) with `CreateNS` set and the namespace missing, each asserting the refusal, no `create namespaces` call and no other write; see them fail on the current code
-- [ ] 1.2 Split `EnsureNamespaceIfRequested` in `internal/workflow/apply/apply.go` into the read (first) and the create (after the existence check, before `kubernetes.Apply`, and before the nothing-to-apply return); the cases of 1.1 pass
-- [ ] 1.3 Add success cases to the same file: the namespace is created before the first patch and the record is written at revision 1; an existing namespace is not created; nothing to apply still creates it; `go test ./internal/workflow/apply` passes, the dry-run tests in `newnamespace_test.go` unchanged
-- [ ] 1.4 Reword the two refusals to "apply stopped before any change" (`internal/inventory/stale.go`, `unreadableRecordError`), replace `TestExecute_RefusalAfterNamespaceCreateClaimsNoMore` by the cases of 1.1, and assert the text in the tests
-- [ ] 1.5 `task fmt`, `task vet`, `task lint`, `task openspec:check` and `task test:unit` green, then commit fix(apply): run the checks before --create-namespace creates the namespace
+- [x] 1.1 Write `internal/workflow/apply/createns_test.go`: one case per refusing check (cluster gate, unreadable record, denied status permission, unreadable object, untracked cluster-scoped object, terminating object) with `CreateNS` set and the namespace missing, each asserting the refusal, no `create namespaces` call and no other write; see them fail on the current code
+- [x] 1.2 Split `EnsureNamespaceIfRequested` in `internal/workflow/apply/apply.go` into the read (first) and the create (after the existence check, before `kubernetes.Apply`, and before the nothing-to-apply return); the cases of 1.1 pass
+- [x] 1.3 Add success cases to the same file: the namespace is created before the first patch and the record is written at revision 1; an existing namespace is not created; nothing to apply still creates it; `go test ./internal/workflow/apply` passes, the dry-run tests in `newnamespace_test.go` unchanged
+- [x] 1.4 Reword the two refusals to "apply stopped before any change" (`internal/inventory/stale.go`, `unreadableRecordError`), replace `TestExecute_RefusalAfterNamespaceCreateClaimsNoMore` by the cases of 1.1, and assert the text in the tests
+- [x] 1.5 `task fmt`, `task vet`, `task lint`, `task openspec:check` and `task test:unit` green, then commit fix(apply): run the checks before --create-namespace creates the namespace
 
 ## 2. Install-level test for an unreadable object
 
