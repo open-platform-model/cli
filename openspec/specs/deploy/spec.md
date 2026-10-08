@@ -71,10 +71,10 @@ A developer wants to delete a deployed module after deleting the source files.
 | FR-D-020 | `instance delete` MUST discover resources via the persisted instance inventory record (the `ModuleInstance` CR); when none exists it MUST exit 5 (not found) rather than fall back to labels. |
 | FR-D-021 | `instance delete` MUST NOT require module source. |
 | FR-D-022 | `instance delete` MUST delete in descending weight order. |
-| FR-D-023 | `instance delete` MUST support `--force` to skip confirmation. |
+| FR-D-023 | `instance delete` MUST support `--yes` / `-y` to skip confirmation; `--force` stays as its deprecated alias (capability `flag-conventions`). |
 | FR-D-024 | `instance delete` MUST support `--dry-run` to preview. |
 | FR-D-025 | `instance delete` MUST take the instance as a positional `<file|name|uuid>` argument. The namespace comes from `--namespace` / `-n`, the instance file, or the configured default. |
-| FR-D-026 | `instance delete` MUST prompt for confirmation (unless --force). |
+| FR-D-026 | `instance delete` MUST prompt for confirmation (unless `--yes`). |
 | FR-D-027 | `instance delete` MUST accept an instance UUID as the positional argument, resolved by matching `status.instanceUUID` across the namespace's `ModuleInstance` CRs. |
 | FR-D-028 | `instance delete` MUST use ownership-inventory-based enumeration from the persisted instance inventory record; there is no label-based enumeration path. |
 
@@ -602,7 +602,7 @@ Arguments:
 
 Flags:
   -n, --namespace string    Target namespace
-      --force               Skip confirmation prompt
+  -y, --yes                 Skip the confirmation prompt
       --dry-run             Preview without deleting
       --timeout duration    Wait for the operator to finish deleting an operator-owned instance
       --kubeconfig string   Path to kubeconfig

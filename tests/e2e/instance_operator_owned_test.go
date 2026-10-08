@@ -351,7 +351,7 @@ func TestE2E_Delete_OperatorOwnedDelegates(t *testing.T) {
 		makeOperatorOwned(t, kubeconfig)
 
 		stdout, stderr, err := runOperatorOwnedOPM(t, 10*time.Minute,
-			"instance", "delete", operatorOwnedInstance, "--force")
+			"instance", "delete", operatorOwnedInstance, "--yes")
 		require.NoError(t, err, "delete failed: %s%s", stdout, stderr)
 
 		combined := stdout + stderr
@@ -375,7 +375,7 @@ func TestE2E_Delete_OperatorOwnedDelegates(t *testing.T) {
 			"--type=merge", "-p", `{"spec":{"prune":true}}`)
 
 		stdout, stderr, err := runOperatorOwnedOPM(t, 10*time.Minute,
-			"instance", "delete", operatorOwnedInstance, "--force")
+			"instance", "delete", operatorOwnedInstance, "--yes")
 		require.NoError(t, err, "delete failed: %s%s", stdout, stderr)
 
 		assert.Contains(t, stdout+stderr, "operator pruned")
