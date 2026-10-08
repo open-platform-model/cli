@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -34,6 +35,7 @@ func NewInstanceDeleteCmd(cfg *config.GlobalConfig) *cobra.Command {
 		yesFlag     bool
 		forceFlag   bool
 		dryRunFlag  bool
+		deleteData  bool
 		timeoutFlag time.Duration
 	)
 
@@ -41,7 +43,19 @@ func NewInstanceDeleteCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Use:   "delete <file|name|uuid>",
 		Short: "Delete instance resources from cluster",
 		Long: `Delete the resources belonging to an OPM instance from a Kubernetes cluster
-(CRDs and Namespaces are left behind).
+(CRDs and Namespaces are left behind, PersistentVolumeClaims are kept).
+
+PersistentVolumeClaims are kept by default, because deleting one deletes the
+data on its volume. Each kept claim is listed with the status "kept", the
+command still exits 0, and the closing output prints the 'kubectl delete pvc'
+command for each one. The ModuleInstance is deleted, so OPM no longer tracks a
+kept claim and no later opm command deletes it; applying the instance again
+takes it back. Pass --delete-data to delete the claims and their data with the
+instance; the confirmation prompt then names each claim. Claims a StatefulSet
+created from volumeClaimTemplates are not tracked by OPM and are never deleted
+here, with or without the flag: Kubernetes keeps them by default. On an
+operator-managed instance the operator decides what is removed, and
+--delete-data has no effect.
 
 CustomResourceDefinitions and Namespaces are never deleted, since deleting one
 takes every custom resource of its kind, or everything inside it, with it.
@@ -81,10 +95,18 @@ Examples:
   opm instance delete jellyfin -n media --dry-run
 
   # Skip the confirmation prompt
-  opm instance delete jellyfin -n media --yes`,
+  opm instance delete jellyfin -n media --yes
+
+  # Also delete the PersistentVolumeClaims and the data on them
+  opm instance delete jellyfin -n media --delete-data`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runDelete(c.Context(), args[0], cfg, &kf, namespace, yesFlag || forceFlag, dryRunFlag, timeoutFlag)
+			return runDelete(c.Context(), args[0], cfg, &kf, namespace, deleteFlags{
+				SkipConfirm: yesFlag || forceFlag,
+				DryRun:      dryRunFlag,
+				DeleteData:  deleteData,
+				Timeout:     timeoutFlag,
+			})
 		},
 	}
 
@@ -96,6 +118,7 @@ Examples:
 	c.Flags().BoolVar(&forceFlag, "force", false, "Skip the confirmation prompt")
 	cmdutil.DeprecateFlag(c, "force", "yes")
 	c.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Preview without deleting")
+	c.Flags().BoolVar(&deleteData, "delete-data", false, deleteDataFlagHelp)
 	c.Flags().DurationVar(&timeoutFlag, "timeout", inventory.DefaultReconcileTimeout,
 		"Bound on the operator-cleanup wait (operator-managed instances only)")
 
@@ -106,7 +129,20 @@ Examples:
 // read what the flags resolved to without a cluster.
 var runDelete = runInstanceDelete
 
-func runInstanceDelete(ctx context.Context, identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, skipConfirm, dryRun bool, timeout time.Duration) error {
+// deleteDataFlagHelp is the help of --delete-data on instance delete.
+const deleteDataFlagHelp = "Also delete PersistentVolumeClaims and the data on them (kept by default)"
+
+// deleteFlags carries the delete command's behavior flags.
+type deleteFlags struct {
+	// SkipConfirm is --yes (or its deprecated alias): do not prompt.
+	SkipConfirm bool
+	DryRun      bool
+	// DeleteData is --delete-data: delete tracked PersistentVolumeClaims too.
+	DeleteData bool
+	Timeout    time.Duration
+}
+
+func runInstanceDelete(ctx context.Context, identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, flags deleteFlags) error {
 	target, err := cmdutil.ResolveInstanceTarget(ctx, identifier, cfg, kf, namespaceFlag)
 	if err != nil {
 		return err
@@ -123,21 +159,41 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 		return err
 	}
 
-	if dryRun {
-		instanceLog.Info("dry run - no changes will be made")
-	} else if !skipConfirm {
-		if !confirmInstanceDelete(rsf.InstanceName, rsf.InstanceID, namespace) {
-			instanceLog.Info("deletion canceled")
-			return nil
-		}
-	}
-
+	// The record is read before the prompt, so that the prompt can name the
+	// claims --delete-data deletes. The read changes nothing.
 	inv, liveResources, _, unreadable, err := query.ResolveInventory(ctx, k8sClient, rsf, namespace, instanceLog)
 	if err != nil {
 		return err
 	}
 
-	return deleteResolvedInstance(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, timeout, dryRun, instanceLog)
+	if flags.DryRun {
+		instanceLog.Info("dry run - no changes will be made")
+	} else if !flags.SkipConfirm {
+		output.Prompt(deletePrompt(rsf.InstanceName, rsf.InstanceID, namespace, claimsToDelete(inv, liveResources, flags.DeleteData)))
+		if !readConfirmation(os.Stdin) {
+			instanceLog.Info("deletion canceled")
+			return nil
+		}
+	}
+
+	return deleteResolvedInstance(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, flags.Timeout, flags.DryRun, flags.DeleteData, instanceLog)
+}
+
+// claimsToDelete lists, as "<namespace>/<name>", the PersistentVolumeClaims a
+// delete with these flags removes: the live tracked claims of a CLI-owned
+// instance when deleteData is set, and none otherwise. An operator-managed
+// instance lists none, since the operator decides what it removes.
+func claimsToDelete(inv *inventory.Record, live []*unstructured.Unstructured, deleteData bool) []string {
+	if !deleteData || inventory.ResolveOwnership(inv) == inventory.ModeOperatorOwned {
+		return nil
+	}
+	var claims []string
+	for _, obj := range live {
+		if kubernetes.IsDataClaim(obj.GroupVersionKind().Group, obj.GetKind()) {
+			claims = append(claims, obj.GetNamespace()+"/"+obj.GetName())
+		}
+	}
+	return claims
 }
 
 // deleteResolvedInstance deletes an instance whose record has been read. It
@@ -151,16 +207,19 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 // ModuleInstance; the operator-owned branch ignores them, since it deletes only
 // the ModuleInstance and the operator prunes with its own credentials.
 func deleteResolvedInstance(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string,
-	inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, timeout time.Duration, dryRun bool, instanceLog *log.Logger) error {
+	inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, timeout time.Duration, dryRun, deleteData bool, instanceLog *log.Logger) error {
 	if err := guardOperatorInstanceDelete(ctx, k8sClient, inv); err != nil {
 		return err
 	}
 
 	if inventory.ResolveOwnership(inv) == inventory.ModeOperatorOwned {
+		if deleteData {
+			instanceLog.Warn(workflowapply.DeleteDataOperatorManagedNote)
+		}
 		return deleteOperatorOwned(ctx, k8sClient, inv, timeout, dryRun, instanceLog)
 	}
 
-	return executeInstanceDelete(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, dryRun, instanceLog)
+	return executeInstanceDelete(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, dryRun, deleteData, instanceLog)
 }
 
 // guardOperatorInstanceDelete refuses to delete an instance that deploys the
@@ -285,8 +344,10 @@ func deleteOperatorOwned(ctx context.Context, k8sClient *kubernetes.Client, inv 
 // A tracked resource discovery could not read (unreadable) is a per-resource
 // failure, so the ModuleInstance is kept and still tracks it. A ModuleInstance
 // delete that fails after the workloads are gone fails the command with the
-// exit code of its cause.
-func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, dryRun bool, instanceLog *log.Logger) error {
+// exit code of its cause. A PersistentVolumeClaim is kept unless deleteData;
+// a kept claim does not block the ModuleInstance delete, so it is left
+// untracked, where no later opm command can delete it.
+func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, dryRun, deleteData bool, instanceLog *log.Logger) error {
 	deleteResult, err := workflowapply.DeleteRecorded(ctx, workflowapply.DeleteRequest{
 		Client:       k8sClient,
 		InstanceName: rsf.InstanceName,
@@ -296,6 +357,7 @@ func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rs
 		Live:         liveResources,
 		Unreadable:   inventory.UnreadableResources(unreadable),
 		DryRun:       dryRun,
+		DeleteData:   deleteData,
 		Log:          instanceLog,
 	})
 	if err != nil {
@@ -338,21 +400,65 @@ func reportInstanceDelete(deleteResult *kubernetes.DeleteResult, dryRun bool, in
 		output.Println(output.FormatCheckmark(fmt.Sprintf("Instance deleted — %d resource(s) left behind", leftBehind)))
 		output.Details("Remove them with 'kubectl delete' once nothing else needs them.")
 	default:
-		instanceLog.Info("all resources have been deleted")
+		if len(deleteResult.Kept) == 0 {
+			instanceLog.Info("all resources have been deleted")
+		}
 		output.Println(output.FormatCheckmark("Instance deleted"))
 	}
+	reportKeptClaims(deleteResult.Kept, dryRun, instanceLog)
 	return nil
 }
 
-func confirmInstanceDelete(instanceName, instanceID, namespace string) bool {
-	var prompt string
-	if instanceName != "" {
-		prompt = fmt.Sprintf("Delete the resources for instance %q in namespace %q (CRDs and Namespaces are left behind)? [y/N]: ", instanceName, namespace)
-	} else {
-		prompt = fmt.Sprintf("Delete the resources for instance-id %q in namespace %q (CRDs and Namespaces are left behind)? [y/N]: ", instanceID, namespace)
+// reportKeptClaims closes a delete that kept PersistentVolumeClaims: how many,
+// that OPM no longer tracks them, and the command that deletes each one. The
+// claims are kept on purpose, so nothing here is a warning. A dry run says
+// what a real run would keep.
+func reportKeptClaims(kept []kubernetes.LeftBehindResource, dryRun bool, instanceLog *log.Logger) {
+	if len(kept) == 0 {
+		return
 	}
-	output.Prompt(prompt)
-	scanner := bufio.NewScanner(os.Stdin)
+	if dryRun {
+		instanceLog.Info(fmt.Sprintf("dry run: %d PersistentVolumeClaim(s) would be kept with the data on them; pass --delete-data to delete them",
+			len(kept)))
+		return
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "Kept %d PersistentVolumeClaim(s) and the data on them. OPM no longer tracks them.\n", len(kept))
+	b.WriteString("Applying the instance again takes them back. To delete a claim and its data:\n")
+	for _, k := range kept {
+		fmt.Fprintf(&b, "  kubectl delete pvc %s -n %s\n", k.Name, k.Namespace)
+	}
+	b.WriteString("To delete claims together with an instance, pass --delete-data.")
+	output.Details(b.String())
+}
+
+// deletePrompt is the confirmation question of instance delete. claims are
+// the PersistentVolumeClaims this run deletes ("<namespace>/<name>"); when
+// there are any, the prompt names each one before the question.
+func deletePrompt(instanceName, instanceID, namespace string, claims []string) string {
+	var b strings.Builder
+	if len(claims) > 0 {
+		b.WriteString("--delete-data: these PersistentVolumeClaims and the data on them will be deleted:\n")
+		for _, c := range claims {
+			b.WriteString("  " + c + "\n")
+		}
+	}
+	subject := fmt.Sprintf("instance %q", instanceName)
+	if instanceName == "" {
+		subject = fmt.Sprintf("instance-id %q", instanceID)
+	}
+	left := "CRDs and Namespaces are left behind, PersistentVolumeClaims are kept"
+	if len(claims) > 0 {
+		left = "CRDs and Namespaces are left behind"
+	}
+	fmt.Fprintf(&b, "Delete the resources for %s in namespace %q (%s)? [y/N]: ", subject, namespace, left)
+	return b.String()
+}
+
+// readConfirmation reads one line and reports whether it says yes. Anything
+// else, a closed input included, is a no.
+func readConfirmation(in io.Reader) bool {
+	scanner := bufio.NewScanner(in)
 	if scanner.Scan() {
 		answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
 		return answer == "y" || answer == "yes"

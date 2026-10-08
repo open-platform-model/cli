@@ -1,10 +1,10 @@
 ## 1. Instance delete keeps claims
 
-- [ ] 1.1 Write the failing tests first: `kubernetes.Delete` keeps a tracked claim by default (read or unreadable), deletes it with `DeleteData`, and does not keep a `PersistentVolumeClaim` of another group; `executeInstanceDelete` deletes the record, exits 0, prints the `kubectl` line and no warning; the dry run lists the claim as kept; the prompt names the claims with `--delete-data`; the flag reaches the delete; an operator-managed instance warns
-- [ ] 1.2 `internal/kubernetes`: `IsDataClaim` in `protected.go`; `DeleteOptions.DeleteData` and `DeleteResult.Kept` in `delete.go`; `internal/output`: status `kept`
-- [ ] 1.3 `internal/workflow/apply/delete.go`: `DeleteRequest.DeleteData`, kept lines at INFO
-- [ ] 1.4 `internal/cmd/instance/delete.go`: `--delete-data`, record read before the prompt, prompt text, closing output, help text
-- [ ] 1.5 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `feat(cmd)!: keep PersistentVolumeClaims on instance delete unless --delete-data`
+- [x] 1.1 Write the failing tests first: `kubernetes.Delete` keeps a tracked claim by default (read or unreadable), deletes it with `DeleteData`, and does not keep a `PersistentVolumeClaim` of another group; `executeInstanceDelete` deletes the record, exits 0, prints the `kubectl` line and no warning; the dry run lists the claim as kept; the prompt names the claims with `--delete-data`; the flag reaches the delete; an operator-managed instance warns
+- [x] 1.2 `internal/kubernetes`: `IsDataClaim` in `protected.go`; `DeleteOptions.DeleteData` and `DeleteResult.Kept` in `delete.go`; `internal/output`: status `kept`
+- [x] 1.3 `internal/workflow/apply/delete.go`: `DeleteRequest.DeleteData`, kept lines at INFO
+- [x] 1.4 `internal/cmd/instance/delete.go`: `--delete-data`, record read before the prompt, prompt text, closing output, help text
+- [x] 1.5 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `feat(cmd)!: keep PersistentVolumeClaims on instance delete unless --delete-data`
 
 ## 2. Prune keeps stale claims
 

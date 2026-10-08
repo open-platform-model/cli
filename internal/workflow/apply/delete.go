@@ -12,6 +12,10 @@ import (
 	"github.com/open-platform-model/cli/internal/output"
 )
 
+// DeleteDataOperatorManagedNote is the warning every command prints when
+// --delete-data is set for an operator-managed instance.
+const DeleteDataOperatorManagedNote = "--delete-data has no effect on an operator-managed instance: the operator decides what it removes"
+
 // DeleteRequest is a CLI-owned instance delete: the instance's recorded
 // inventory, already read from the cluster, and its record.
 type DeleteRequest struct {
@@ -30,6 +34,9 @@ type DeleteRequest struct {
 	// behind as it would be if read.
 	Unreadable []kubernetes.UnreadableResource
 	DryRun     bool
+	// DeleteData deletes tracked PersistentVolumeClaims too. When false each
+	// is kept and listed in the result's Kept.
+	DeleteData bool
 	Log        *log.Logger
 }
 
@@ -52,7 +59,8 @@ func (e *RecordDeleteError) Unwrap() error { return e.Err }
 
 // DeleteRecorded deletes a CLI-owned instance's tracked objects, in
 // descending resource-weight order, leaving CRDs, Namespaces and any object
-// that no longer carries the instance's identity behind, then deletes the
+// that no longer carries the instance's identity behind, and keeping
+// PersistentVolumeClaims unless req.DeleteData, then deletes the
 // ModuleInstance record last: only on a real run with no per-object error,
 // so a re-run can retry what failed. An object discovery could not read
 // (req.Unreadable) is such an error. Already absent objects count as
@@ -74,6 +82,7 @@ func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteR
 		InstanceID:            req.InstanceID,
 		InstanceUUID:          uuid,
 		DryRun:                req.DryRun,
+		DeleteData:            req.DeleteData,
 		InventoryLive:         req.Live,
 		InventoryRecordExists: req.Record != nil,
 		Unreadable:            req.Unreadable,
@@ -85,6 +94,11 @@ func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteR
 
 	for _, lb := range deleteResult.LeftBehind {
 		instanceLog.Warn(output.FormatResourceLine(lb.Kind, lb.Namespace, lb.Name, output.StatusLeftBehind), "reason", lb.Reason)
+	}
+
+	// Kept on purpose, so an informational line and never a warning.
+	for _, k := range deleteResult.Kept {
+		instanceLog.Info(output.FormatResourceLine(k.Kind, k.Namespace, k.Name, output.StatusKept))
 	}
 
 	if len(deleteResult.Errors) > 0 {
