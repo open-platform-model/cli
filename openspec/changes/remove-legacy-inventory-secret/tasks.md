@@ -13,5 +13,5 @@
 
 ## 3. Migration note
 
-- [ ] 3.1 Write `docs/site/diagnostics/legacy-inventory-secret.md`: the warning, what it means, the migration step with opm v1.0.0-beta.10, and the cleanup by hand when the step was skipped
-- [ ] 3.2 `task docs:bundle:check` and `task lint` green, then commit `docs(apply): add the migration note for the removed legacy inventory Secret`
+- [x] 3.1 Write `docs/site/diagnostics/legacy-inventory-secret.md`: the warning, what it means, the migration step with opm v1.0.0-beta.10, and the cleanup by hand when the step was skipped
+- [x] 3.2 `task docs:bundle:check` and `task lint` green, then commit `docs(apply): add the migration note for the removed legacy inventory Secret`
