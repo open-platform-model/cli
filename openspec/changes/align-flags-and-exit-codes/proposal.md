@@ -20,8 +20,9 @@ printed with stray indentation.
 - `opm module vet` gains `--name`, as `module build` and `module apply` have.
   `--instance-name` stays there as a deprecated alias with the same effect.
 - The exit code of a usage error stays 1, as the main specs state it today. `opm --help` now
-  prints the exit code table, and a test on the binary's entry point pins the code for an
-  unknown command, an unknown flag and a wrong argument count.
+  prints the exit code table, and a test pins the code for an unknown command, an unknown
+  flag and a wrong argument count. `opm instance status --help` states that command's own
+  codes, which the root table points at.
 - `opm version` and `opm module template list` gain `-o`/`--output` (`json`, `yaml`, and the
   text or table they print today as the default).
 - The help of every command is free of tab-indented lines; `opm catalog` and `opm registry`
@@ -42,6 +43,9 @@ the next `1.0.0-beta.N`.
 
 ### Modified Capabilities
 
+- `deploy`: the requirement "Instance delete of an instance that deploys the operator is
+  guarded" names `--yes` as the prompt flag; its deprecated alias bypasses the guard no more
+  than `--yes` does.
 - `mod-vet`: the requirement "mod vet command flags and syntax" names `--name` as the flag
   for the synthesized instance's name and `--instance-name` as its deprecated alias.
 

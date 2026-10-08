@@ -41,37 +41,48 @@ commit 7b6962f2:
 
 ### Deprecated aliases use cobra's own mechanism
 
-A deprecated flag is a second flag registered on the command and marked with
-`Flags().MarkDeprecated(name, "use --new")`. Cobra then hides it from help and from
+A deprecated flag is a second flag registered on the command and marked through
+`cmdutil.DeprecateFlag(c, old, replacement)`, a thin wrapper over cobra's
+`Flags().MarkDeprecated(old, "use --"+replacement)`. Cobra then hides it from help and from
 completion, and prints `Flag --old has been deprecated, use --new` on standard error when it
-is used. No home-made warning code.
+is used. No home-made warning code. The wrapper panics at construction when either flag is
+missing, so a typo cannot ship.
 
 ```go
 // instance delete
 c.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip the confirmation prompt")
 c.Flags().BoolVar(&forceFlag, "force", false, "Skip the confirmation prompt")
-_ = c.Flags().MarkDeprecated("force", "use --yes")
-// RunE: skipPrompt := yesFlag || forceFlag
+cmdutil.DeprecateFlag(c, "force", "yes")
+// RunE: runDelete(..., yesFlag || forceFlag, ...)
 ```
 
+`runDelete` is a package variable holding `runInstanceDelete`, so a test reads what the
+flags resolved to without a cluster.
+
 ```go
-// module vet
-c.Flags().StringVar(&nameFlag, "name", "", "Synthetic instance name (default: <module name>-debug)")
-_ = c.Flags().MarkDeprecated("instance-name", "use --name")
+// module vet: both flags write the same field
+c.Flags().StringVar(&rf.InstanceName, "name", "", "Synthetic instance name (default: <module name>-debug)")
+cmdutil.DeprecateFlag(c, "instance-name", "name")
 c.MarkFlagsMutuallyExclusive("name", "instance-name")
-// RunE: if nameFlag != "" { rf.InstanceName = nameFlag }
 ```
 
 `cmdutil.RenderFlags` is not changed: `module build` and `module apply` keep hiding and
 ignoring `--instance-name`, which the task does not name.
 
-### Output formats are parsed in the command package
+### Output formats share two helpers in `cmdutil`
 
-`opm version` and `opm module template list` each validate `--output` against their own
-list and marshal a small struct with `encoding/json` (indented) or `sigs.k8s.io/yaml`,
-both already dependencies. The error text follows the existing commands:
-`invalid output format "<v>" (valid: ...)`, exit 1 (`ExitGeneralError`), as
-`cmd-structure` and `status-exit-codes` specify for the same mistake.
+`cmdutil.CheckOutputFormat(value, valid...)` refuses an unknown `--output` value and
+`cmdutil.WriteStructured(w, format, v)` marshals a small tagged struct with `encoding/json`
+(indented) or `gopkg.in/yaml.v3`, already a direct dependency. `opm version` and
+`opm module template list` each pass their own list of values. The error text follows the
+existing commands: `invalid output format "<v>" (valid: ...)`, exit 1 (`ExitGeneralError`),
+as `cmd-structure` and `status-exit-codes` specify for the same mistake.
+
+### The root help names a command whose help states its codes
+
+The root table ends by pointing at `opm instance status` as the example of a command that
+differs. That command's help did not state its exit codes, so it gains the table of the
+`status-exit-codes` capability; no code changes.
 
 ### The exit code mapping moves into `internal/cmd`
 

@@ -84,7 +84,7 @@ Examples:
   opm instance delete jellyfin -n media --yes`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runInstanceDelete(c.Context(), args[0], cfg, &kf, namespace, yesFlag || forceFlag, dryRunFlag, timeoutFlag)
+			return runDelete(c.Context(), args[0], cfg, &kf, namespace, yesFlag || forceFlag, dryRunFlag, timeoutFlag)
 		},
 	}
 
@@ -101,6 +101,10 @@ Examples:
 
 	return c
 }
+
+// runDelete is what the delete command runs. It is a variable so a test can
+// read what the flags resolved to without a cluster.
+var runDelete = runInstanceDelete
 
 func runInstanceDelete(ctx context.Context, identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, skipConfirm, dryRun bool, timeout time.Duration) error {
 	target, err := cmdutil.ResolveInstanceTarget(ctx, identifier, cfg, kf, namespaceFlag)
