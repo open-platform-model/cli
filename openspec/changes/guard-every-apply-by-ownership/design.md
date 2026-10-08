@@ -63,7 +63,7 @@ type GuardResult struct {
     LetGo   []LetGo              // refused as adopted-elsewhere: entry and library message
 }
 
-// Guard returns a *GuardRefusal holding every refused object with its
+// Guard returns a *GuardRefusalError holding every refused object with its
 // ownership.ApplyRefusal and message, or the read error of the first object
 // it could not read. It writes nothing.
 func Guard(ctx context.Context, client *kubernetes.Client, in GuardInput) (GuardResult, error)
@@ -121,7 +121,7 @@ A test in `internal/kubernetes` lists the allowed call sites of `ApplyOne` and o
 #### The first install that meets its own objects
 
 **Context**: With no record and a changed identity, every object is refused as `other-instance`, and the library's remedy says "remove it from module instance <old UUID>", which is the same instance. The cli#333 warning, which carries the legacy Secret hint, is printed after the guard and so is not reached.
-**Decision**: On a first apply, when any refusal is `other-instance`, the cli adds one line of its own after the library's messages: the objects may be the instance's own under an earlier identity; annotate each as shown; nothing has to be removed first. The line also names the legacy Secret case.
+**Decision**: On a first apply (no record), when any refusal is `other-instance`, the cli adds one line of its own after the library's messages: the objects may be the instance's own under an earlier identity; annotate each as shown; nothing has to be removed first. The line also names the legacy Secret case.
 **Rationale**: The library cannot know that the other identity is this instance's past. The cli does not reword the library's line; it adds its own.
 
 #### The dry run
@@ -142,7 +142,7 @@ Codes: 0 success, 1 general, 2 validation, 3 connectivity, 4 permission denied, 
 | 5 | Later apply; the read of a rendered object fails with an error other than NotFound | `applyOne` read the object and ignored the error; the apply went on and the patch decided | exit 4, 3 or 1 by the read error, before any write | The rule of cli#332 for the first install now holds on every apply. |
 | 6 | Any apply; an existing object carries the adopt annotation with this instance's UUID | exit 1 on a first apply when OPM does not manage it | exit 0; applied and recorded | 0012:D8:R2. |
 | 7 | Any apply but `operator install`; an object's adopt annotation names another instance (in the inventory, or outside it when OPM manages it) | exit 0; applied over | exit 0; not applied, one warning, not recorded | 0012:D8:R8. No code change. |
-| 8 | `operator install`, no record; a rendered object exists, OPM-managed, UUID label of another instance | exit 0; applied over | exit 2; guard refusal, nothing written | 0012:D8:R1; exit 2 is the code install's guard has today. |
+| 8 | `operator install`, no record; a rendered object exists, OPM-managed, UUID label of another instance | exit 0; applied over. For an object on the proof list of an earlier operator manifest (the CRDs, the Namespace, the controller Deployment and others) the migration proof already refused it, exit 2 | exit 2; guard refusal, nothing written; the proof-list objects are still refused by the migration proof first, with its message | 0012:D8:R1; exit 2 is the code install's guard has today. |
 | 9 | `operator install` with a record; a rendered object new to the inventory exists and is foreign or another instance's | exit 0; no guard ran, applied over | exit 2; guard refusal, nothing written | 0012:D8:R1. |
 | 10 | `operator install` with a record; the guard's read of a rendered object fails | no guard ran | exit 2, nothing written | The rule the guard has today without a record, now with one. |
 | 11 | `operator install`; a rendered object's adopt annotation names another instance | exit 0; applied over | exit 2; guard refusal naming the object and the instance, nothing written | Owner decision of 2026-10-08. |
@@ -150,8 +150,8 @@ Codes: 0 success, 1 general, 2 validation, 3 connectivity, 4 permission denied, 
 Example, row 3 (`opm instance apply`, UUID shortened):
 
 ```text
-ERRO ConfigMap/default/settings exists and is not managed by OPM; to let this instance take it over, annotate it opmodel.dev/adopt=6f1c...e2
-ERRO apply refused: 1 object(s) belong to someone else
+apply refused: 1 object(s) cannot be applied by this instance:
+  ConfigMap/default/settings exists and is not managed by OPM; to let this instance take it over, annotate it opmodel.dev/adopt=6f1c...e2
 apply stopped before any change
 ```
 
@@ -161,7 +161,7 @@ Example, row 7:
 WARN ConfigMap/default/settings was adopted by module instance 9a40...17; this instance no longer applies it and drops it from its inventory; to take it back, annotate it opmodel.dev/adopt=6f1c...e2
 ```
 
-The first line of each ownership message is the library's text and MUST NOT be reworded by the cli. The lines around it are the cli's.
+Each object line of a refusal, and the warning of row 7, is the library's text and MUST NOT be reworded by the cli. The lines around them are the cli's. The refusal is one error, printed once by the command, as the existence check's was. A failed read keeps the text cli#332 gave it ("pre-apply existence check failed: cannot check whether ...").
 
 ### Security
 
