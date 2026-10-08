@@ -605,13 +605,15 @@ func TestConfigHint_FailingFieldIsOnTheCUEPath(t *testing.T) {
 	}
 }
 
-// TestConfigHint_WordInAValueIsNotTheField pins the hint for a config that is
-// invalid at another field while a value holds the name of a removed field.
-// Matched on the message text, it got the removed-field hint ("The 'cacheDir'
-// field was removed. ..."); read from the failing field's path, it gets the
-// generic hint.
+// TestConfigHint_WordInAValueIsNotTheField holds the generic hint for a
+// config that is invalid at another field while a value holds the name of a
+// removed field. Old hint, from the word in the message: "The 'cacheDir'
+// field was removed. Re-run 'opm config init' (or delete the field)". New
+// hint, from the failing field's path: "Check your config.cue against the
+// expected schema. Run 'opm config vet' for validation.".
 func TestConfigHint_WordInAValueIsNotTheField(t *testing.T) {
 	detail := configHintErr(t, "config: kubernetes: namespace: \"cacheDir\"\n")
 	assert.Contains(t, detail.Message, "cacheDir")
-	assert.Contains(t, detail.Hint, "The 'cacheDir' field was removed")
+	assert.ErrorIs(t, detail, oerrors.ErrValidation)
+	assert.Contains(t, detail.Hint, "Check your config.cue against the expected schema")
 }

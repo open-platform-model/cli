@@ -22,8 +22,8 @@
 
 ## 4. Config hints read the failing field
 
-- [ ] 4.1 Change `removedFieldHint` in `internal/config/loader.go` to take the error and use `cueErrorUnder`, in today's order; a row section 1 found without a path keeps its match and is noted for the allowlist. Verify: `TestValidateConfigSchema_ProvidersRejected`, `TestValidateConfigSchema_CacheDirRejected` and `TestLoadConfigFile_SkewPolicyInvalidValue` pass unedited, and the "word in a value" case of 1.4 now gets the generic hint.
-- [ ] 4.2 `task lint` and `task test` green, then commit `fix(config): pick the config hint from the failing field, not from the message`
+- [x] 4.1 Change `removedFieldHint` in `internal/config/loader.go` to take the error and use `cueErrorUnder`, in today's order; a row section 1 found without a path keeps its match and is noted for the allowlist. Verify: `TestValidateConfigSchema_ProvidersRejected`, `TestValidateConfigSchema_CacheDirRejected` and `TestLoadConfigFile_SkewPolicyInvalidValue` pass unedited, and the "word in a value" case of 1.4 now gets the generic hint.
+- [x] 4.2 `task lint` and `task test` green, then commit `fix(config): pick the config hint from the failing field, not from the message`
 
 ## 5. Guard and records
 
