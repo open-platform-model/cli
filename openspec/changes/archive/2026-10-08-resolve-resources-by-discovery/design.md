@@ -100,7 +100,7 @@ No command gets a new exit code value. `ExitCodeFromK8sError` gives 4 for Forbid
 | apply, objects | stop at the object, exit 4/3/1 (`Apply` returns the error) |
 | apply, prune | stop the prune, write the record with every entry not pruned, exit 4/3/1 |
 | diff of rendered objects | read failure for the object, exit 4/3/1 (cli#338 path) |
-| `instance delete` | per-resource failure, record kept, exit 1: `reportInstanceDelete` gives every per-resource failure a fixed 1 (cli#332). Changing that is outside this change. |
+| `instance delete` | per-resource failure, record kept, exit 4/3/1 by the cause of the discovery failure (`deleteFailureExitCode`); every other per-resource failure keeps the fixed 1 of cli#332. The readable resources are still deleted. |
 | `instance status` | the resource is health Unknown, exit 2 (cli#332) |
 | `instance tree`, `events`, `list`, diff orphan detection | a warning that names the resource (cli#332 and cli#338 paths) |
 
@@ -116,6 +116,6 @@ WARN reading Widget/demo: kind "Widget" of example.io/v1 is not served by the cl
 
 ## Risks / Trade-offs
 
-- An instance whose record names a kind the cluster no longer serves cannot be deleted with `opm instance delete` until the record is corrected or the kind is served again. This is the requested behaviour; the alternative forgets live objects. An escape flag is an owner decision and is not part of this change.
+- An instance whose record names a kind the cluster no longer serves cannot be deleted with `opm instance delete` until the kind is served again (its definition installed) or, when only the API version was removed, a new apply has rewritten the entry. The command prints that hint. This is the requested behaviour; the alternative forgets live objects. No escape exists for a kind that stays gone at every version; none is built here (owner ruling 2026-10-08).
 - A cluster that denies discovery to the user now fails commands that worked before with a guessed name. Kubernetes grants discovery to every authenticated user by default (`system:discovery`).
 - One extra request per group-version per command.

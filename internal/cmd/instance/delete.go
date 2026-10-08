@@ -315,7 +315,8 @@ func reportInstanceDelete(deleteResult *kubernetes.DeleteResult, dryRun bool, in
 			output.Details("The ModuleInstance was kept, so it still tracks these resources.\n" +
 				"Fix the cause (for example missing RBAC) and re-run; re-running is safe.")
 		}
-		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf(format, n), Printed: true}
+		hintUnservedKinds(deleteResult)
+		return &opmexit.ExitError{Code: deleteFailureExitCode(deleteResult), Err: fmt.Errorf(format, n), Printed: true}
 	}
 
 	leftBehind := len(deleteResult.LeftBehind)

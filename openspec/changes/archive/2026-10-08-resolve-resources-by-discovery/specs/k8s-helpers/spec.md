@@ -45,7 +45,8 @@ When discovery answers and the group and version, or the kind in it, is not serv
 - **WHEN** `opm instance delete` runs and the record lists an object whose kind the cluster does not serve at the recorded version
 - **THEN** the command SHALL report a failure for that object, with a message that names the kind and the API version
 - **AND** it SHALL NOT delete the `ModuleInstance` record
-- **AND** it SHALL exit non-zero
+- **AND** it SHALL exit with code 1
+- **AND** it SHALL print a hint that names the ways out: install the definition of the kind again, or apply the instance again when only the API version was removed
 
 #### Scenario: Prune with a stale kind the cluster does not serve
 
@@ -65,13 +66,13 @@ When discovery answers and the group and version, or the kind in it, is not serv
 
 ### Requirement: A failed discovery request is an error
 
-When a discovery request fails (the API server denies it, is unavailable, or the request fails in any other way), the cli SHALL NOT read the failure as "the kind is not served" or as "the object does not exist". The API error SHALL stay in the error chain. An apply SHALL stop at a failed discovery request, in its first-install check, in its apply of objects and in its prune, and SHALL exit with code 4 when access is denied, 3 when the server is unavailable and 1 otherwise. A command that reads recorded objects SHALL report the failure through the same path as a failed read of the object.
+When a discovery request fails (the API server denies it, is unavailable, or the request fails in any other way), the cli SHALL NOT read the failure as "the kind is not served" or as "the object does not exist". The API error SHALL stay in the error chain. An apply SHALL stop at a failed discovery request, in its first-install check, in its apply of objects and in its prune, and SHALL exit with code 4 when access is denied, 3 when the server is unavailable and 1 otherwise. `opm instance delete` SHALL exit with the same codes when a discovery request for a recorded object failed. Any other command that reads recorded objects SHALL report the failure through the same path as a failed read of the object.
 
 #### Scenario: Discovery is forbidden during delete
 
 - **WHEN** `opm instance delete` runs and the discovery request for the group and version of a recorded object answers Forbidden
 - **THEN** the command SHALL report a failure for that object, with the Forbidden error in its message, and keep the `ModuleInstance` record
-- **AND** it SHALL exit non-zero, with the code it gives any failed read of a tracked resource
+- **AND** it SHALL exit with code 4 (3 when the discovery request timed out or the server is unavailable, 1 for any other discovery failure)
 
 #### Scenario: Discovery is forbidden during diff
 
