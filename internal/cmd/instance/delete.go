@@ -53,9 +53,12 @@ kept claim and no later opm command deletes it; applying the instance again
 takes it back. Pass --delete-data to delete the claims and their data with the
 instance; the confirmation prompt then names each claim. Claims a StatefulSet
 created from volumeClaimTemplates are not tracked by OPM and are never deleted
-here, with or without the flag: Kubernetes keeps them by default. On an
-operator-managed instance the operator decides what is removed, and
---delete-data has no effect.
+here, with or without the flag: Kubernetes keeps them by default.
+
+None of this holds for an operator-managed instance: there the operator
+deletes what the instance tracks, PersistentVolumeClaims included, when
+spec.prune is set, and leaves all of it running otherwise. The confirmation
+prompt says which, and --delete-data has no effect.
 
 CustomResourceDefinitions and Namespaces are never deleted, since deleting one
 takes every custom resource of its kind, or everything inside it, with it.
@@ -172,10 +175,21 @@ func confirmAndDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cm
 		return err
 	}
 
+	// Said before the question: on an operator-managed instance the flag
+	// changes nothing, and the user must know that when they answer.
+	operatorManaged := inventory.ResolveOwnership(inv) == inventory.ModeOperatorOwned
+	if operatorManaged && flags.DeleteData {
+		instanceLog.Warn(workflowapply.DeleteDataOperatorManagedNote)
+	}
+
 	if flags.DryRun {
 		instanceLog.Info("dry run - no changes will be made")
 	} else if !flags.SkipConfirm {
-		output.Prompt(deletePrompt(rsf.InstanceName, rsf.InstanceID, namespace, claimsToDelete(inv, liveResources, flags.DeleteData)))
+		prompt := deletePrompt(rsf.InstanceName, rsf.InstanceID, namespace, claimsToDelete(inv, liveResources, flags.DeleteData))
+		if operatorManaged {
+			prompt = operatorManagedDeletePrompt(rsf.InstanceName, rsf.InstanceID, namespace, inv.Prune)
+		}
+		output.Prompt(prompt)
 		if !readConfirmation(in) {
 			instanceLog.Info("deletion canceled")
 			return nil
@@ -219,9 +233,6 @@ func deleteResolvedInstance(ctx context.Context, k8sClient *kubernetes.Client, r
 	}
 
 	if inventory.ResolveOwnership(inv) == inventory.ModeOperatorOwned {
-		if deleteData {
-			instanceLog.Warn(workflowapply.DeleteDataOperatorManagedNote)
-		}
 		return deleteOperatorOwned(ctx, k8sClient, inv, timeout, dryRun, instanceLog)
 	}
 
@@ -459,6 +470,23 @@ func deletePrompt(instanceName, instanceID, namespace string, claims []string) s
 	}
 	fmt.Fprintf(&b, "Delete the resources for %s in namespace %q (%s)? [y/N]: ", subject, namespace, left)
 	return b.String()
+}
+
+// operatorManagedDeletePrompt is the confirmation question for an
+// operator-managed instance. opm keeps no PersistentVolumeClaim there: the
+// operator removes what the instance tracks when spec.prune is set, and
+// leaves all of it running otherwise. The prompt says which, and never says
+// that claims are kept.
+func operatorManagedDeletePrompt(instanceName, instanceID, namespace string, prune bool) string {
+	subject := fmt.Sprintf("instance %q", instanceName)
+	if instanceName == "" {
+		subject = fmt.Sprintf("instance-id %q", instanceID)
+	}
+	effect := "spec.prune is not set, so the operator leaves its tracked resources running"
+	if prune {
+		effect = "spec.prune is set, so the operator deletes its tracked resources, PersistentVolumeClaims and the data on them included"
+	}
+	return fmt.Sprintf("This instance is operator-managed: %s.\nDelete the ModuleInstance for %s in namespace %q? [y/N]: ", effect, subject, namespace)
 }
 
 // readConfirmation reads one line and reports whether it says yes. Anything

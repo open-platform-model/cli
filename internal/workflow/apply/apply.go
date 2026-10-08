@@ -259,6 +259,10 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	var keptClaims []k8sinventory.Entry
 	if !req.Options.DeleteData {
 		prunable, keptClaims = inventory.SplitDataClaims(prunable)
+		if !req.Options.NoPrune {
+			// A claim that is already gone is not kept and leaves the record.
+			keptClaims = inventory.ClaimsInCluster(ctx, req.K8sClient, keptClaims)
+		}
 	}
 
 	if dryRun && instanceID != "" && !req.Options.NoPrune {

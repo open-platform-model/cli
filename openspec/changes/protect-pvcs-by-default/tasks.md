@@ -1,6 +1,6 @@
 ## 1. Instance delete keeps claims
 
-- [x] 1.1 Write the failing tests first: `kubernetes.Delete` keeps a tracked claim by default (read or unreadable), deletes it with `DeleteData`, and does not keep a `PersistentVolumeClaim` of another group; `executeInstanceDelete` deletes the record, exits 0, prints the `kubectl` line and no warning; the dry run lists the claim as kept; the prompt names the claims with `--delete-data`; the flag reaches the delete; an operator-managed instance warns
+- [x] 1.1 Write the tests, and check that they fail with the claim test switched off: `kubernetes.Delete` keeps a tracked claim by default (read or unreadable), deletes it with `DeleteData`, and does not keep a `PersistentVolumeClaim` of another group; `executeInstanceDelete` deletes the record, exits 0, prints the `kubectl` line and no warning; the dry run lists the claim as kept; the prompt names the claims with `--delete-data`; the flag reaches the delete; an operator-managed instance warns
 - [x] 1.2 `internal/kubernetes`: `IsDataClaim` in `protected.go`; `DeleteOptions.DeleteData` and `DeleteResult.Kept` in `delete.go`; `internal/output`: status `kept`
 - [x] 1.3 `internal/workflow/apply/delete.go`: `DeleteRequest.DeleteData`, kept lines at INFO
 - [x] 1.4 `internal/cmd/instance/delete.go`: `--delete-data`, record read before the prompt, prompt text, closing output, help text
@@ -8,7 +8,7 @@
 
 ## 2. Prune keeps stale claims
 
-- [x] 2.1 Write the failing tests first: a stale claim is not deleted, stays in the written inventory, is listed as kept at INFO, and the apply exits 0 with its success line; with `DeleteData` it is deleted and leaves the inventory; a later apply with the flag removes a claim kept earlier; the dry-run preview lists it as kept, or as would prune with the flag; `--delete-data` with `--no-prune` is a usage error on both apply commands; all three commands offer the flag; an operator-managed apply warns
+- [x] 2.1 Write the tests, and check that they fail with the claim test switched off: a stale claim is not deleted, stays in the written inventory, is listed as kept at INFO, and the apply exits 0 with its success line; with `DeleteData` it is deleted and leaves the inventory; a later apply with the flag removes a claim kept earlier; the dry-run preview lists it as kept, or as would prune with the flag; `--delete-data` with `--no-prune` is a usage error on both apply commands; all three commands offer the flag; an operator-managed apply warns
 - [x] 2.2 `internal/inventory/stale.go`: `SplitDataClaims`
 - [x] 2.3 `internal/workflow/apply`: `Options.DeleteData`, the split, the preview, the record entries, the thin-editor note
 - [x] 2.4 `internal/cmd/instance/apply.go` and `internal/cmd/module/apply.go`: `--delete-data`, exclusion with `--no-prune`, help text
@@ -19,3 +19,10 @@
 - [x] 3.1 Add `docs/site/diagnostics/kept-volume-claims.md`: what is kept, how to delete, the record handling, StatefulSet claims, operator-managed instances, and the migration note for the changed default
 - [x] 3.2 Update the `README.md` command notes
 - [x] 3.3 `task docs:bundle:check` and `task openspec:check` green, then commit `docs: describe kept PersistentVolumeClaims and the --delete-data flag`
+
+## 4. Review fixes
+
+- [x] 4.1 The delete prompt of an operator-managed instance does not say that claims are kept and says what `spec.prune` makes the operator do; the `--delete-data` note prints before the question; tests and the `deploy` delta
+- [x] 4.2 A stale claim that is already gone is not kept and leaves the record; an unreadable one is kept; tests and the `apply-pruning` delta
+- [x] 4.3 `PruneStaleResources` states its claim precondition; help, docs page and README say that an operator-managed instance is not covered
+- [x] 4.4 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `fix(cmd): tell the truth about claims on an operator-managed delete and drop stale claims that are gone`

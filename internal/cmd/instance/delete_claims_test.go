@@ -257,20 +257,76 @@ func TestInstanceDeleteCmd_DeleteDataFlag(t *testing.T) {
 	assert.Empty(t, flag.Deprecated)
 }
 
-// On an operator-managed instance --delete-data changes nothing, and the
-// command says so before it goes on.
-func TestDeleteResolvedInstance_DeleteDataOnOperatorManagedWarns(t *testing.T) {
-	rec := operatorOwnedRecord()
-	run := func(deleteData bool) string {
-		return captureOutput(t, func() {
-			// The delete itself stops at the operator-readiness guard on this
-			// empty cluster; the note is printed before it.
-			_ = deleteResolvedInstance(context.Background(), emptyClusterClient(), &cmdutil.InstanceSelectorFlags{InstanceName: rec.Name}, rec.Namespace,
-				rec, nil, nil, 0, false, deleteData, output.InstanceLogger("demo"))
-		})
+// operatorManaged turns the scenario's instance into an operator-managed one
+// with the given spec.prune.
+func (s *claimScenario) operatorManaged(t *testing.T, prune bool) {
+	t.Helper()
+	mi, err := s.fake.Tracker().Get(inventory.ModuleInstanceGVR, "apps", "demo")
+	require.NoError(t, err)
+	obj := mi.(*unstructured.Unstructured)
+	require.NoError(t, unstructured.SetNestedField(obj.Object, inventory.OwnerOperator, "spec", "owner"))
+	require.NoError(t, unstructured.SetNestedField(obj.Object, prune, "spec", "prune"))
+	require.NoError(t, s.fake.Tracker().Update(inventory.ModuleInstanceGVR, obj, "apps"))
+}
+
+// On an operator-managed instance opm keeps no claim: the operator removes
+// what the instance tracks when spec.prune is set. The prompt must say that
+// and must never say that claims are kept, with or without --delete-data,
+// and the note that --delete-data has no effect comes before the question.
+func TestConfirmAndDelete_OperatorManagedPromptDoesNotPromiseKeptClaims(t *testing.T) {
+	for _, prune := range []bool{true, false} {
+		for _, deleteData := range []bool{true, false} {
+			t.Run(fmt.Sprintf("prune=%v/deleteData=%v", prune, deleteData), func(t *testing.T) {
+				s := newClaimScenario()
+				s.operatorManaged(t, prune)
+				out, err := s.confirm(t, "demo", deleteFlags{DeleteData: deleteData}, "n\n")
+				require.NoError(t, err, out)
+
+				question := strings.Index(out, "[y/N]")
+				require.GreaterOrEqual(t, question, 0, out)
+				assert.NotContains(t, out, "are kept", "no promise that claims are kept")
+				assert.NotContains(t, out, "will be deleted:", "the claim list is for CLI-owned instances")
+				assert.Contains(t, out, "This instance is operator-managed")
+				if prune {
+					assert.Contains(t, out, "spec.prune is set, so the operator deletes its tracked resources, PersistentVolumeClaims and the data on them included")
+				} else {
+					assert.Contains(t, out, "spec.prune is not set, so the operator leaves its tracked resources running")
+				}
+
+				note := strings.Index(out, workflowapply.DeleteDataOperatorManagedNote)
+				if deleteData {
+					require.GreaterOrEqual(t, note, 0, out)
+					assert.Less(t, note, question, "the note comes before the question")
+					assert.Contains(t, lineWith(out, workflowapply.DeleteDataOperatorManagedNote), "WARN")
+				} else {
+					assert.Equal(t, -1, note, out)
+				}
+
+				assert.Contains(t, out, "deletion canceled")
+				assert.True(t, s.exists(inventory.ModuleInstanceGVR, "demo"), "a declined prompt deletes nothing")
+				assert.True(t, s.exists(claimGVR, "data"))
+			})
+		}
 	}
-	assert.Contains(t, run(true), workflowapply.DeleteDataOperatorManagedNote)
-	assert.NotContains(t, run(false), "--delete-data")
+}
+
+// With --yes there is no prompt; the note about --delete-data still prints.
+func TestConfirmAndDelete_OperatorManagedDeleteDataWarnsWithYes(t *testing.T) {
+	s := newClaimScenario()
+	s.operatorManaged(t, true)
+	// The delete then stops at the operator-readiness guard of this cluster.
+	out, err := s.confirm(t, "demo", deleteFlags{DeleteData: true, SkipConfirm: true}, "")
+	require.Error(t, err)
+	assert.Contains(t, out, workflowapply.DeleteDataOperatorManagedNote)
+	assert.NotContains(t, out, "[y/N]")
+	assert.True(t, s.exists(inventory.ModuleInstanceGVR, "demo"))
+}
+
+func TestOperatorManagedDeletePrompt(t *testing.T) {
+	p := operatorManagedDeletePrompt("", "abc-123", "media", true)
+	assert.Contains(t, p, `instance-id "abc-123" in namespace "media"`)
+	assert.True(t, strings.HasSuffix(p, "[y/N]: "))
+	assert.NotContains(t, p, "are kept")
 }
 
 // confirm runs the whole read, prompt and delete step against the scenario's

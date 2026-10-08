@@ -48,7 +48,7 @@ The cli deletes tracked objects in two places: `kubernetes.Delete` (used by `opm
 
 ### Record handling when prune keeps a claim
 
-**Decision**: the kept claim stays in the written inventory (as an entry prune failed to delete already does). It is stale again on every later apply, is listed as kept each time, and an apply with `--delete-data` prunes it. `opm instance delete` then sees it through the inventory and applies its own rule.
+**Decision**: the kept claim stays in the written inventory (as an entry prune failed to delete already does). Before it keeps a claim, the apply reads it (`inventory.ClaimsInCluster`): a claim that is already gone (NotFound) is not reported and leaves the record, so a claim the user removed with `kubectl` is not listed for ever; any other read error keeps it. It is stale again on every later apply, is listed as kept each time, and an apply with `--delete-data` prunes it. `opm instance delete` then sees it through the inventory and applies its own rule.
 **Rationale**: given by the task. An apply keeps the instance, so the record is the right place to remember the claim. With `--no-prune` nothing changes: the stale set is neither deleted nor recorded, as today.
 
 ### Exit code and log level
@@ -84,7 +84,7 @@ type DeleteRequest struct { /* ... */ DeleteData bool }
 
 ### Operator-managed instances
 
-**Decision**: `--delete-data` is accepted and ignored with one WARN line, on delete and on both apply commands: `--delete-data has no effect on an operator-managed instance: the operator decides what it removes`.
+**Decision**: `--delete-data` is accepted and ignored with one WARN line, on delete and on both apply commands: `--delete-data has no effect on an operator-managed instance: the operator decides what it removes`. On delete the line prints before the confirmation question. The delete prompt of an operator-managed instance has its own text (`operatorManagedDeletePrompt`): it never says that claims are kept, and it says what `spec.prune` makes the operator do, claims included. The operator's prune exempts only Namespaces and CustomResourceDefinitions (`opm-operator/internal/apply/prune.go`, read at `59537b7`).
 **Options considered**: refusing (as `--skip-unprovided` is refused) would fail scripts that pass the flag to mixed fleets for no safety gain; staying silent would hide that the flag did nothing.
 
 ## Command syntax and output
@@ -133,6 +133,6 @@ Exit codes: 0 when claims are kept; 1 for `--delete-data` with `--no-prune` (usa
 ## Risks / Trade-offs
 
 - A user who relied on delete to free storage now leaves claims behind, and they cost money. Mitigation: every run lists them and prints the command; the migration note says it.
-- A stale claim kept by prune is reported on every apply until it is deleted. Accepted: it is one INFO line, and it is the only reminder.
+- A stale claim kept by prune is reported on every apply while it is in the cluster. Accepted: it is one INFO line, and it is the only reminder. Once the claim is gone the next apply drops the entry.
 - The prompt reorder changes when "not found" is reported. Accepted, see above.
 - Operator-managed instances are not protected. Out of scope here; the docs page says it. It is a question for the owner whether the operator gets the same default.

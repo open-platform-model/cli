@@ -118,6 +118,23 @@ func SplitDataClaims(stale []k8sinventory.Entry) (prunable, claims []k8sinventor
 	return prunable, claims
 }
 
+// ClaimsInCluster returns the claims prune keeps that are still, or may still
+// be, in the cluster, in input order. A claim whose read answers NotFound is
+// dropped: nothing is left to keep, so the caller neither reports it nor
+// records it, as a prune treats an object that is already gone. Any other
+// read error keeps the claim, since it may still hold data.
+func ClaimsInCluster(ctx context.Context, client *kubernetes.Client, claims []k8sinventory.Entry) []k8sinventory.Entry {
+	var present []k8sinventory.Entry
+	for _, e := range claims {
+		if _, err := getEntry(ctx, client, e); apierrors.IsNotFound(err) {
+			output.Debug("stale claim already gone", "namespace", e.Namespace, "name", e.Name)
+			continue
+		}
+		present = append(present, e)
+	}
+	return present
+}
+
 // PruneError reports the stale resources a prune could not delete. The
 // objects are still in the cluster, so a caller that records an inventory
 // after the prune must keep Failed in it.
@@ -145,6 +162,9 @@ func (e *PruneError) Unwrap() []error {
 // A core Namespace or a CRD (kubernetes.IsProtectedKind) is never deleted,
 // even when the caller passes one; callers that report what was left behind
 // split the set first with SplitProtected.
+// A PersistentVolumeClaim is deleted like any other entry here: the caller
+// decides on --delete-data and removes the claims it keeps from stale first
+// (SplitDataClaims).
 // 404 (not found) errors are treated as success (idempotent). An entry whose
 // kind is not served at the recorded version is a failed delete, never a
 // success: the object may still be in the cluster.

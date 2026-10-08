@@ -2,12 +2,16 @@ package apply
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8stesting "k8s.io/client-go/testing"
 
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
@@ -209,6 +213,69 @@ func TestExecute_DryRunPreviewsKeptClaims(t *testing.T) {
 		assert.NotEmpty(t, logLine(log, "would keep 1 stale PersistentVolumeClaim(s)", "--delete-data"), log)
 		assert.NotContains(t, log, "WARN")
 	}
+}
+
+// A stale claim that is no longer in the cluster is not kept: nothing is
+// reported, and the entry leaves the record without --delete-data. A claim
+// that is still there is kept beside it.
+func TestExecute_StaleClaimAlreadyGoneLeavesTheRecord(t *testing.T) {
+	withReleasedCLIVersion(t)
+	logBuf := captureLog(t)
+	cluster := newApplyCluster(
+		cliOwnedInstanceWith("demo", "default", configMapEntry("keep"), claimEntry("gone"), claimEntry("library")),
+		liveClaim("library"),
+	)
+
+	var err error
+	stdout := captureStdout(t, func() {
+		err = Execute(context.Background(), cluster.request(Options{}, "keep"))
+	})
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "applied")
+	assert.Empty(t, cluster.deletes())
+
+	entries, written := cluster.writtenInventory(t)
+	require.True(t, written)
+	assert.ElementsMatch(t, []string{"keep", "library"}, entryNames(entries), "the absent claim leaves the record, the present one stays")
+	log := logBuf.String()
+	assert.Empty(t, logLine(log, "PersistentVolumeClaim/default/gone"), "an absent claim is not reported as kept:\n%s", log)
+	assert.NotEmpty(t, logLine(log, "keeping 1 stale PersistentVolumeClaim(s)"), log)
+}
+
+// With every stale claim gone, the apply reports nothing about claims.
+func TestExecute_OnlyAbsentStaleClaimsReportNothing(t *testing.T) {
+	withReleasedCLIVersion(t)
+	for _, dryRun := range []bool{false, true} {
+		logBuf := captureLog(t)
+		cluster := newApplyCluster(cliOwnedInstanceWith("demo", "default", configMapEntry("keep"), claimEntry("gone")))
+		captureStdout(t, func() {
+			require.NoError(t, Execute(context.Background(), cluster.request(Options{DryRun: dryRun}, "keep")))
+		})
+		assert.Empty(t, logLine(logBuf.String(), "PersistentVolumeClaim"), logBuf.String())
+		if !dryRun {
+			entries, _ := cluster.writtenInventory(t)
+			assert.Equal(t, []string{"keep"}, entryNames(entries))
+		}
+	}
+}
+
+// A stale claim that cannot be read may still hold data: it is kept and
+// stays in the record.
+func TestExecute_UnreadableStaleClaimIsKept(t *testing.T) {
+	withReleasedCLIVersion(t)
+	logBuf := captureLog(t)
+	cluster := claimCluster()
+	cluster.dyn.PrependReactor("get", "persistentvolumeclaims", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "persistentvolumeclaims"}, "data", errors.New("no read access"))
+	})
+
+	captureStdout(t, func() {
+		require.NoError(t, Execute(context.Background(), cluster.request(Options{}, "keep")))
+	})
+	entries, _ := cluster.writtenInventory(t)
+	assert.ElementsMatch(t, []string{"keep", "data"}, entryNames(entries))
+	assert.NotEmpty(t, logLine(logBuf.String(), "PersistentVolumeClaim/default/data", output.StatusKept))
+	assert.Equal(t, []string{"configmaps/gone"}, cluster.deletes())
 }
 
 func TestSplitDataClaims(t *testing.T) {

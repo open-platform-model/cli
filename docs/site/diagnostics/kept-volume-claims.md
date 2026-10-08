@@ -5,7 +5,7 @@ type: how-to
 weight: 29
 ---
 
-`opm instance delete` and the prune of `opm instance apply` and `opm module apply` do not delete a PersistentVolumeClaim. Deleting a claim deletes the data on its volume under the usual reclaim policy, so `opm` does it only when you pass `--delete-data`.
+For an instance that the CLI manages, `opm instance delete` and the prune of `opm instance apply` and `opm module apply` do not delete a PersistentVolumeClaim. Deleting a claim deletes the data on its volume under the usual reclaim policy, so `opm` does it only when you pass `--delete-data`.
 
 > [!WARNING]
 > **The default changed after `v1.0.0-beta.10`**
@@ -48,7 +48,7 @@ What happens to the claim next depends on the command:
 | Command | The claim afterwards |
 | --- | --- |
 | `opm instance delete` | The `ModuleInstance` is deleted, so OPM no longer tracks the claim. No later `opm` command deletes it. If you apply the instance again, the apply takes the claim back and warns that it was not recorded. |
-| `opm instance apply`, `opm module apply` | The claim stays in the inventory of the instance. Every later apply lists it as kept again, until an apply with `--delete-data` prunes it. |
+| `opm instance apply`, `opm module apply` | The claim stays in the inventory of the instance. Every later apply lists it as kept again, until an apply with `--delete-data` prunes it or you delete the claim yourself. An apply drops a claim that is no longer in the cluster from the inventory and does not list it. |
 
 ## Causes and fixes
 
@@ -79,6 +79,6 @@ Run the apply once with `--delete-data`. It prunes every stale claim of the inst
 ## What the flag does not cover
 
 - **Claims that a StatefulSet creates.** A StatefulSet creates one claim per replica from its `volumeClaimTemplates`. OPM does not track those claims, so `opm` never deletes them, with or without `--delete-data`. Kubernetes keeps them when the StatefulSet is deleted, unless the StatefulSet sets `persistentVolumeClaimRetentionPolicy`. Delete them with `kubectl delete pvc`.
-- **Operator-managed instances.** The operator decides what it removes when it prunes or deletes an instance. `--delete-data` has no effect there, and the command prints a warning that says so.
+- **Operator-managed instances.** Nothing on this page holds for them. The operator decides what it removes when it prunes or deletes an instance, and it does not keep PersistentVolumeClaims: with `spec.prune` set, a delete removes the claims and the data on them. The confirmation prompt of `opm instance delete` says so. `--delete-data` has no effect there, and the command prints a warning that says so before it asks.
 - **Other kinds.** Only a `PersistentVolumeClaim` of the core API group is kept. Namespaces and CustomResourceDefinitions are never deleted, and no flag changes that.
 - **`opm operator uninstall`.** The operator module renders no claim, so uninstall has nothing to keep.
