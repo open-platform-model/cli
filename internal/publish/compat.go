@@ -301,19 +301,16 @@ func hasCUEFile(dir string) bool {
 	return false
 }
 
-// unprovidedImport reports a load failure the library leaves unclassified on
-// purpose because no registry interaction failed: an import that no module
-// of the loaded build provides (one its declared dependency does not hold, or
-// a package missing under the build's own module path). The compat walk has
-// always read such a predecessor as absent, and keeps that answer. This is
-// the one message-text match left in the walk, and it runs only after the
-// library's classification found no registry failure; CUE reports the cause
-// as an internal type and flattens it into the instance error, so the text is
-// the only signal. TestLoadPublishedPackage_Pinned fails if CUE rewords it.
+// unprovidedImport reports a load failure the library types as an import no
+// module of the loaded build provides (one its declared dependency does not
+// hold, or a package missing under the build's own module path). No registry
+// interaction failed, and the compat walk has always read such a predecessor
+// as absent. The library's classification takes a registry failure first, so
+// a failed fetch anywhere in the cause never reads as absent. Source:
+// 0021:D8:R12.
 func unprovidedImport(err error) bool {
-	var fe *liberrors.FetchError
-	return !errors.As(liberrors.Classify(err), &fe) &&
-		strings.Contains(err.Error(), "cannot find module providing package")
+	var re *liberrors.ResolutionError
+	return errors.As(liberrors.Classify(err), &re) && re.Kind == liberrors.ResolutionImportUnprovided
 }
 
 // findMember locates the member with the given name and apiVersion — 0011:D9's

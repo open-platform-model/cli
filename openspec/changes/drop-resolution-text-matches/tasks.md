@@ -9,9 +9,9 @@
 
 ## 2. The compat walk reads the resolution kind
 
-- [ ] 2.1 Replace the body of `unprovidedImport` in `internal/publish/compat.go` as `design.md` D1 says, and rewrite its doc comment and the sentence in `loadPublishedPackage`'s comment that calls it a text match. Verify: `grep -n 'strings.Contains(err.Error()' internal/publish/compat.go` prints nothing.
-- [ ] 2.2 Verify with no test edited: `go test ./internal/publish/ -run 'TestLoadPublishedPackage_Pinned|TestUnprovidedImport_RegistryFailureIsNotAbsent|TestProbedPackageAbsent|TestCompatScan|TestGateCompat'` passes, every row unchanged.
-- [ ] 2.3 `task lint` and `task test` green, then commit `refactor(publish): read an unprovided import from the library's resolution kind`
+- [x] 2.1 Replace the body of `unprovidedImport` in `internal/publish/compat.go` as `design.md` D1 says, and rewrite its doc comment and the sentence in `loadPublishedPackage`'s comment that calls it a text match. Verify: `grep -n 'strings.Contains(err.Error()' internal/publish/compat.go` prints nothing.
+- [x] 2.2 Verify with no test edited: `go test ./internal/publish/ -run 'TestLoadPublishedPackage_Pinned|TestUnprovidedImport_RegistryFailureIsNotAbsent|TestProbedPackageAbsent|TestCompatScan|TestGateCompat'` passes, every row unchanged.
+- [x] 2.3 `task lint` and `task test` green, then commit `refactor(publish): read an unprovided import from the library's resolution kind`
 
 ## 3. Platform build hints read types and the CUE path
 
