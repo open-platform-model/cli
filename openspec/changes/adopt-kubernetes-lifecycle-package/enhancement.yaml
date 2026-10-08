@@ -1,0 +1,9 @@
+# Implements the cli's part of the deletion protocol of enhancement 0012
+# (0012:D4:R1, R5 and R6, for the cli frontend). No decision is claimed here:
+# 0012:D4 binds both frontends, so the delivery log records it once the
+# operator's deletion adoption has merged too. Under-claiming is the safe
+# direction.
+implements:
+  - enhancement: "0012"
+    decisions: []
+    resolves: []
