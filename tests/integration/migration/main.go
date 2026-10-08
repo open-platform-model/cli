@@ -151,7 +151,8 @@ func main() {
 	// The apply's inventory load must read the CR, not the Secret: with a CR
 	// present, LoadPreviousInventory never consults the legacy Secret, so the
 	// migration path is not re-entered.
-	prevRecord, legacy := workflowapply.LoadPreviousInventory(ctx, client, instanceName, namespace, instanceID, false, output.InstanceLogger("migrate-idempotence"))
+	prevRecord, legacy, err := workflowapply.LoadPreviousInventory(ctx, client, instanceName, namespace, instanceID, false, output.InstanceLogger("migrate-idempotence"))
+	check("loading the previous inventory", err)
 	if legacy != nil {
 		failf("a present CR must make the leftover Secret invisible as inventory, but it was read for migration")
 	}

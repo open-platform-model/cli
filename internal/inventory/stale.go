@@ -24,8 +24,11 @@ import (
 //   - If the resource exists without OPM managed-by label → error (untracked),
 //     unless admit holds it
 //   - If the resource does not exist → OK
+//   - If the read fails with anything but NotFound → error (unreadable), with
+//     the read error in the chain
 //
-// admit passes the untracked test only, never the terminating one. Only
+// admit passes the untracked test only, never the terminating one and never
+// the unreadable one. Only
 // `opm operator install` passes a non-empty set: the objects it proved came
 // from an earlier operator release manifest, or that carry the operator
 // instance's identity (0012:D8:R6). Every other caller passes nil.
@@ -45,10 +48,11 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 			if apierrors.IsNotFound(err) {
 				continue // Resource doesn't exist — OK for first install
 			}
-			// Other errors (RBAC, etc.) — warn but don't fail
-			output.Debug("could not check resource existence (skipping)",
-				"kind", entry.Kind, "name", entry.Name, "err", err)
-			continue
+			// Any other answer leaves the question open, and the forced apply
+			// that follows would take over whatever holds the name.
+			return fmt.Errorf("cannot check whether %s/%s in namespace %q already exists: %w\n"+
+				"apply stopped before any rendered resource was applied. Check that you can read that resource, then run the command again",
+				entry.Kind, entry.Name, entry.Namespace, err)
 		}
 
 		obj = unstrObj
@@ -85,12 +89,37 @@ func SplitProtected(stale []k8sinventory.Entry) (prunable, protected []k8sinvent
 	return prunable, protected
 }
 
+// PruneError reports the stale resources a prune could not delete. The
+// objects are still in the cluster, so a caller that records an inventory
+// after the prune must keep Failed in it.
+type PruneError struct {
+	// Failed are the entries whose delete failed, in delete order.
+	Failed []k8sinventory.Entry
+	// Errs holds the delete error of each entry in Failed, by index.
+	Errs []error
+}
+
+func (e *PruneError) Error() string {
+	if len(e.Errs) == 0 {
+		return "pruning stale resources failed"
+	}
+	return fmt.Sprintf("pruning stale resources: %d error(s): %v", len(e.Errs), e.Errs[0])
+}
+
+// Unwrap exposes every delete error to errors.Is and errors.As.
+func (e *PruneError) Unwrap() []error {
+	return e.Errs
+}
+
 // PruneStaleResources deletes the stale resources from the cluster.
 // Resources are deleted in reverse weight order (highest weight first).
 // A core Namespace or a CRD (kubernetes.IsProtectedKind) is never deleted,
 // even when the caller passes one; callers that report what was left behind
 // split the set first with SplitProtected.
 // 404 (not found) errors are treated as success (idempotent).
+//
+// A delete that fails does not stop the loop. When any failed, the error is a
+// *PruneError naming the entries that are still in the cluster.
 func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale []k8sinventory.Entry) error {
 	if len(stale) == 0 {
 		return nil
@@ -103,7 +132,7 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 		return schema.GroupVersionKind{Group: e.Group, Version: e.Version, Kind: e.Kind}
 	}, object.Descending)
 
-	var errs []error
+	var failed PruneError
 	for _, entry := range sorted {
 		if kubernetes.IsProtectedKind(entry.Group, entry.Kind) {
 			output.Debug("leaving protected resource behind", "kind", entry.Kind, "name", entry.Name)
@@ -122,17 +151,16 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 		})
 
 		if err != nil && !apierrors.IsNotFound(err) {
-			output.Warn("failed to prune stale resource",
-				"kind", entry.Kind, "name", entry.Name, "err", err)
-			errs = append(errs, fmt.Errorf("deleting %s/%s: %w", entry.Kind, entry.Name, err))
+			failed.Failed = append(failed.Failed, entry)
+			failed.Errs = append(failed.Errs, fmt.Errorf("deleting %s/%s: %w", entry.Kind, entry.Name, err))
 			continue
 		}
 
 		output.Debug("pruned stale resource", "kind", entry.Kind, "namespace", entry.Namespace, "name", entry.Name)
 	}
 
-	if len(errs) > 0 {
-		return fmt.Errorf("pruning stale resources: %d error(s): %w", len(errs), errs[0])
+	if len(failed.Failed) > 0 {
+		return &failed
 	}
 	return nil
 }

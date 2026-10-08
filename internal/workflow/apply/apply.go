@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -111,8 +112,9 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	if dryRun && instanceID != "" {
 		rec, err := inventory.GetRecord(ctx, req.K8sClient, name, namespace)
 		if err != nil {
-			instanceLog.Warn("could not read inventory CR, previewing as CLI-managed", "error", err)
-		} else if inventory.ResolveOwnership(rec) == inventory.ModeOperatorOwned {
+			return unreadableRecordError(name, namespace, err)
+		}
+		if inventory.ResolveOwnership(rec) == inventory.ModeOperatorOwned {
 			return previewThinEditor(req, rec)
 		}
 	}
@@ -120,7 +122,10 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	// Load the previous inventory from the CR; when absent, look for a legacy
 	// Secret to migrate. Both are read-only, so a dry-run loads them too and
 	// can report what a real apply would prune.
-	prevRecord, legacy := LoadPreviousInventory(ctx, req.K8sClient, name, namespace, instanceID, dryRun, instanceLog)
+	prevRecord, legacy, err := LoadPreviousInventory(ctx, req.K8sClient, name, namespace, instanceID, dryRun, instanceLog)
+	if err != nil {
+		return unreadableRecordError(name, namespace, err)
+	}
 
 	// Gate 4: ownership — the single branch point (0006:D18). An operator-owned
 	// instance takes the thin-editor path and returns; everything below this
@@ -212,12 +217,19 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)), Printed: true}
 		}
 
+		// Entries prune failed to delete are still in the cluster: they stay
+		// in the record, so the next apply finds them stale and retries.
+		recordEntries := currentEntries
+		var notPruned []k8sinventory.Entry
 		if !req.Options.NoPrune {
 			if len(prunable) > 0 {
 				instanceLog.Info(fmt.Sprintf("pruning %d stale resource(s)", len(prunable)))
-				if err := inventory.PruneStaleResources(ctx, req.K8sClient, prunable); err != nil {
-					instanceLog.Warn("pruning stale resources failed", "error", err)
+				var err error
+				notPruned, err = pruneStale(ctx, req.K8sClient, prunable, instanceLog)
+				if err != nil {
+					return err
 				}
+				recordEntries = append(append([]k8sinventory.Entry{}, currentEntries...), notPruned...)
 			}
 			if len(protected) > 0 {
 				instanceLog.Warn(fmt.Sprintf("leaving %d resource(s) behind", len(protected)))
@@ -225,8 +237,14 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			}
 		}
 
-		if err := WriteInstanceRecord(ctx, req, prevRecord, legacy, currentEntries, manifestDigest, instanceLog); err != nil {
+		if err := WriteInstanceRecord(ctx, req, prevRecord, legacy, recordEntries, manifestDigest, instanceLog); err != nil {
 			return err
+		}
+
+		if len(notPruned) > 0 {
+			err := fmt.Errorf("%d stale resource(s) could not be pruned and stay in the inventory; fix the cause and run apply again to retry", len(notPruned))
+			instanceLog.Error(err.Error())
+			return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
 		}
 	}
 
@@ -248,6 +266,30 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 	return nil
 }
+
+// pruneStale deletes the prunable stale resources. It returns the entries it
+// could not delete, each already reported on its own line with the delete
+// error; the caller keeps them in the record and fails the command after the
+// write. The error result is for a failure that names no entries, where the
+// caller must stop before the write so that no entry is dropped unseen.
+func pruneStale(ctx context.Context, client *kubernetes.Client, prunable []k8sinventory.Entry, instanceLog *log.Logger) ([]k8sinventory.Entry, error) {
+	err := inventory.PruneStaleResources(ctx, client, prunable)
+	if err == nil {
+		return nil, nil
+	}
+	var pruneErr *inventory.PruneError
+	if !errors.As(err, &pruneErr) {
+		instanceLog.Error("pruning stale resources failed", "error", err)
+		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
+	}
+	for i, e := range pruneErr.Failed {
+		instanceLog.Error(output.FormatResourceLine(e.Kind, e.Namespace, e.Name, statusPruneFailed), "error", pruneErr.Errs[i])
+	}
+	return pruneErr.Failed, nil
+}
+
+// statusPruneFailed is the status of a stale resource whose delete failed.
+const statusPruneFailed = "prune failed"
 
 // previewPrune reports what a real apply would do with the stale set, without
 // deleting anything: the prunable half under "would prune", then the protected
@@ -316,37 +358,53 @@ func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Clien
 
 // LoadPreviousInventory reads the ModuleInstance CR for an instance. When no
 // CR exists, it looks for a legacy inventory Secret to migrate (0006:D6).
-// Returns (nil, nil) on a missing instance ID or a first apply with no legacy
-// Secret. Both reads are read-only, so dryRun only changes the wording of the
-// migration message.
-func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, name, namespace, instanceID string, dryRun bool, instanceLog *log.Logger) (*inventory.Record, *inventory.LegacyInventory) {
+// Returns no record and no legacy inventory on a missing instance ID or a
+// first apply with no legacy Secret. Both reads are read-only, so dryRun only
+// changes the wording of the migration message.
+//
+// A CR read that fails with anything but NotFound is returned as the error:
+// only a NotFound answer proves there is no record, and a caller that went on
+// without one would run a first install over an existing instance.
+func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, name, namespace, instanceID string, dryRun bool, instanceLog *log.Logger) (*inventory.Record, *inventory.LegacyInventory, error) {
 	if instanceID == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	prevRecord, err := inventory.GetRecord(ctx, k8sClient, name, namespace)
 	if err != nil {
-		instanceLog.Warn("could not read inventory CR, proceeding without it", "error", err)
-		return nil, nil
+		return nil, nil, err
 	}
 	if prevRecord != nil {
-		return prevRecord, nil
+		return prevRecord, nil, nil
 	}
 
 	legacy, err := inventory.FindLegacySecretInventory(ctx, k8sClient, name, namespace, instanceID)
 	if err != nil {
 		instanceLog.Warn("could not read legacy inventory Secret, proceeding as first apply", "error", err)
-		return nil, nil
+		return nil, nil, nil
 	}
 	if legacy == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if dryRun {
 		instanceLog.Info("legacy inventory Secret would be migrated to ModuleInstance CR")
 	} else {
 		instanceLog.Info("migrating legacy inventory Secret to ModuleInstance CR")
 	}
-	return nil, legacy
+	return nil, legacy, nil
+}
+
+// unreadableRecordError is the refusal for a ModuleInstance read that failed
+// with anything but NotFound. The exit code follows the cause: permission
+// denied, connectivity, or general.
+func unreadableRecordError(name, namespace string, cause error) error {
+	return &opmexit.ExitError{
+		Code: exitCodeFromK8sError(cause),
+		Err: fmt.Errorf("cannot read the ModuleInstance record %q in namespace %q: %w\n"+
+			"apply stopped: without the record it cannot tell a first install from an existing instance.\n"+
+			"Check that you can read moduleinstances.%s in that namespace, then run the command again",
+			name, namespace, cause, inventory.GroupOpmodel),
+	}
 }
 
 // WriteInstanceRecord writes the ModuleInstance CR spec, then its status subset
@@ -490,7 +548,13 @@ func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client
 		return nil
 	}
 	if err := inventory.PreApplyExistenceCheck(ctx, k8sClient, currentEntries, admit); err != nil {
-		return fmt.Errorf("pre-apply existence check failed: %w", err)
+		// An object the check could not read carries the API error, so the
+		// exit code follows it; an untracked or terminating object maps to
+		// the general code.
+		return &opmexit.ExitError{
+			Code: exitCodeFromK8sError(err),
+			Err:  fmt.Errorf("pre-apply existence check failed: %w", err),
+		}
 	}
 	return nil
 }
