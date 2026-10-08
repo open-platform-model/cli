@@ -14,6 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8stesting "k8s.io/client-go/testing"
+
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 const beta8 = "v1.0.0-beta.8"
@@ -147,6 +149,9 @@ func TestPlanMigration_Refusals(t *testing.T) {
 		l["module-instance.opmodel.dev/namespace"] = "team-a"
 		o.SetLabels(l)
 	}
+	adoptedByOther := func(o *unstructured.Unstructured) {
+		o.SetAnnotations(map[string]string{opmlabels.AnnotationAdopt: "other-uuid"})
+	}
 	mutated := func(kind, name string, f func(*unstructured.Unstructured)) []*unstructured.Unstructured {
 		objs := manifestObjects(t, beta8, originOPMCLI)
 		f(findObj(objs, kind, name))
@@ -163,6 +168,24 @@ func TestPlanMigration_Refusals(t *testing.T) {
 			cluster: mutated("ClusterRoleBinding", "opm-operator-manager-rolebinding", otherInstance),
 			render:  migrationModuleObjects(""),
 			want:    []string{"1 object(s)", "ClusterRoleBinding/opm-operator-manager-rolebinding: carries the identity of instance team-a/web", "nothing was changed"},
+		},
+		{
+			// Proven, and annotated for another instance: every other delete
+			// path leaves such an object behind; install cannot complete
+			// without the delete, so it refuses.
+			name:    "a proven binding adopted by another instance",
+			cluster: mutated("ClusterRoleBinding", "opm-operator-manager-rolebinding", adoptedByOther),
+			render:  migrationModuleObjects(""),
+			want: []string{"1 object(s)",
+				"ClusterRoleBinding/opm-operator-manager-rolebinding: ClusterRoleBinding/opm-operator-manager-rolebinding is being adopted by module instance other-uuid, not this one",
+				"nothing was changed"},
+		},
+		{
+			name:    "the proven Deployment adopted by another instance",
+			cluster: mutated("Deployment", ControllerDeploymentName, adoptedByOther),
+			render:  migrationModuleObjects(""),
+			want: []string{"1 object(s)",
+				"Deployment/opm-operator-system/opm-operator-controller-manager is being adopted by module instance other-uuid, not this one"},
 		},
 		{
 			name:    "a proven binding with no replacement in the render",

@@ -13,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stesting "k8s.io/client-go/testing"
+
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 func moduleInstanceFixture(namespace, name string, finalizers ...string) *unstructured.Unstructured {
@@ -211,6 +213,29 @@ func TestUninstall_DeletesTheRecordedInventory(t *testing.T) {
 		assert.True(t, fc.exists(crdGVR, "", crd))
 	}
 	assert.Nil(t, fc.record(), "the record is deleted last")
+}
+
+// "Recorded object adopted by another instance is left behind": uninstall
+// does not delete it, counts it, and still deletes the record.
+func TestUninstall_LeavesAnObjectAdoptedByAnotherInstance(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	fc := newFakeCluster(t)
+	_, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{})
+	require.NoError(t, err)
+
+	role := fc.mustGet(clusterRoleGVR, "", "opm-operator-manager-role")
+	role.SetAnnotations(map[string]string{opmlabels.AnnotationAdopt: "uuid-of-another-instance"})
+	_, err = fc.client.ResourceClient(clusterRoleGVR, "").Update(context.Background(), role, metav1.UpdateOptions{})
+	require.NoError(t, err)
+
+	result, err := Uninstall(context.Background(), fc.client, UninstallOptions{})
+	require.NoError(t, err)
+	assert.Empty(t, result.Errors)
+	assert.Equal(t, 2, result.Deleted, "ServiceAccount, Deployment")
+	assert.Equal(t, 6, result.LeftBehind, "four CRDs, the Namespace and the adopted ClusterRole")
+	assert.True(t, fc.exists(clusterRoleGVR, "", "opm-operator-manager-role"), "the adopted ClusterRole is still there")
+	assert.Nil(t, fc.record(), "a left-behind object does not keep the record")
 }
 
 // "Object an older release installed is removed".

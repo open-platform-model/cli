@@ -268,6 +268,7 @@ jobs:
           go run tests/integration/deploy/main.go
           go run tests/integration/inventory-apply/main.go
           go run tests/integration/inventory-ops/main.go
+          go run tests/integration/delete-ownership/main.go
           go run tests/integration/inst-list/main.go
           go run tests/integration/gates/main.go
       - name: Delete kind cluster

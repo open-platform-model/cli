@@ -33,6 +33,15 @@ func liveObject(apiVersion, kind, ns, name string) *unstructured.Unstructured {
 	return obj
 }
 
+// staleObject is a live object in "default" the instance still owns: it carries the OPM
+// managed-by label, as every object an apply wrote does, so the delete
+// verdict lets a prune delete it.
+func staleObject(apiVersion, kind, name string) *unstructured.Unstructured {
+	obj := liveObject(apiVersion, kind, "default", name)
+	obj.SetLabels(map[string]string{opmlabels.ManagedBy: opmlabels.ManagedByCLI})
+	return obj
+}
+
 func TestSplitProtected(t *testing.T) {
 	stale := []k8sinventory.Entry{
 		entry("", "ConfigMap", "default", "a"),
@@ -54,7 +63,7 @@ func TestSplitProtected(t *testing.T) {
 
 func TestPruneStaleResources_SkipsProtectedKinds(t *testing.T) {
 	ctx := context.Background()
-	cm := liveObject("v1", "ConfigMap", "default", "stale")
+	cm := staleObject("v1", "ConfigMap", "stale")
 	ns := liveObject("v1", "Namespace", "", "apps")
 	crd := liveObject("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "widgets.example.io")
 	client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), cm, ns, crd)}
@@ -64,7 +73,8 @@ func TestPruneStaleResources_SkipsProtectedKinds(t *testing.T) {
 		{Group: "", Version: "v1", Kind: "Namespace", Name: "apps"},
 		{Group: "apiextensions.k8s.io", Version: "v1", Kind: "CustomResourceDefinition", Name: "widgets.example.io"},
 	}
-	require.NoError(t, PruneStaleResources(ctx, client, stale))
+	_, pruneErr := PruneStaleResources(ctx, client, stale, "")
+	require.NoError(t, pruneErr)
 
 	_, err := client.ResourceClient(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, "default").Get(ctx, "stale", metav1.GetOptions{})
 	assert.True(t, apierrors.IsNotFound(err), "the ConfigMap is pruned")
@@ -139,14 +149,15 @@ func TestPruneStaleResources_DeletesInDescendingWeightOrder(t *testing.T) {
 		{Group: "", Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "cm-2"},
 	}
 	dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(),
-		liveObject("v1", "ConfigMap", "default", "cm-1"),
-		liveObject("apps/v1", "Deployment", "default", "deploy"),
-		liveObject("v1", "Service", "default", "svc"),
-		liveObject("v1", "ConfigMap", "default", "cm-2"),
+		staleObject("v1", "ConfigMap", "cm-1"),
+		staleObject("apps/v1", "Deployment", "deploy"),
+		staleObject("v1", "Service", "svc"),
+		staleObject("v1", "ConfigMap", "cm-2"),
 	)
 	client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dyn}
 
-	require.NoError(t, PruneStaleResources(ctx, client, stale))
+	_, err := PruneStaleResources(ctx, client, stale, "")
+	require.NoError(t, err)
 
 	var deleted []string
 	for _, a := range dyn.Actions() {
