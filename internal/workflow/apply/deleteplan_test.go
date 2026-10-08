@@ -198,3 +198,81 @@ func TestDeleteRecorded_ReadOfAnotherObject(t *testing.T) {
 		assert.False(t, isDelete, "nothing is deleted")
 	}
 }
+
+// A PersistentVolumeClaim the delete keeps never enters the plan: it is not
+// read for a verdict and not deleted, it is listed as kept, and it does not
+// hold the record.
+func TestDeleteRecorded_KeptClaimIsOutsideThePlan(t *testing.T) {
+	captureLog(t)
+	dyn, rec, live := planCluster([]string{"web"}, "web")
+	pvc := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1", "kind": "PersistentVolumeClaim",
+		"metadata": map[string]any{"name": "data", "namespace": "apps", "labels": map[string]any{
+			opmlabels.ManagedBy: opmlabels.ManagedByCLI,
+		}},
+	}}
+	pvcs := schema.GroupVersionResource{Version: "v1", Resource: "persistentvolumeclaims"}
+	require.NoError(t, dyn.Tracker().Create(pvcs, pvc.DeepCopy(), "apps"))
+	rec.Inventory.Entries = append(rec.Inventory.Entries, k8sinventory.Entry{Version: "v1", Kind: "PersistentVolumeClaim", Namespace: "apps", Name: "data"})
+
+	result := deleteRecorded(t, dyn, rec, append(live, pvc), nil)
+
+	require.Len(t, result.Kept, 1)
+	assert.Equal(t, "data", result.Kept[0].Name)
+	assert.Equal(t, 1, result.Deleted)
+	for _, a := range dyn.Actions() {
+		assert.NotEqual(t, "persistentvolumeclaims", a.GetResource().Resource, "the kept claim is neither read nor deleted")
+	}
+	_, err := dyn.Tracker().Get(pvcs, "apps", "data")
+	assert.NoError(t, err)
+	assert.False(t, recordExists(dyn), "a kept claim does not hold the record")
+}
+
+// A dry run follows the same plan: every object is read and judged, no
+// delete is sent, and the record stays.
+func TestDeleteRecorded_DryRunFollowsThePlan(t *testing.T) {
+	captureLog(t)
+	dyn, rec, live := planCluster([]string{"a", "b"}, "a", "b")
+
+	result, err := DeleteRecorded(context.Background(), DeleteRequest{
+		Client:       &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dyn},
+		InstanceName: "demo",
+		Namespace:    "apps",
+		Record:       rec,
+		Live:         live,
+		DryRun:       true,
+		Log:          output.InstanceLogger("demo"),
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, 2, result.Deleted, "both would be deleted")
+	gets := 0
+	for _, a := range dyn.Actions() {
+		_, isDelete := a.(k8stesting.DeleteAction)
+		assert.False(t, isDelete, "a dry run sends no delete")
+		if _, ok := a.(k8stesting.GetAction); ok {
+			gets++
+		}
+	}
+	assert.Equal(t, 2, gets, "each object is read for its verdict")
+	assert.True(t, recordExists(dyn))
+}
+
+// A resource counts as deleted when the API server accepts its delete, also
+// when it still exists afterwards, as an object held by a finalizer does:
+// it is not a failure and the record is deleted.
+func TestDeleteRecorded_AcceptedDeleteOfAnObjectThatStays(t *testing.T) {
+	captureLog(t)
+	dyn, rec, live := planCluster([]string{"held"}, "held")
+	dyn.PrependReactor("delete", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, nil // accepted; the object stays, as under a finalizer
+	})
+
+	result := deleteRecorded(t, dyn, rec, live, nil)
+
+	assert.Equal(t, 1, result.Deleted)
+	assert.Empty(t, result.Errors)
+	_, err := dyn.Tracker().Get(configMaps, "apps", "held")
+	assert.NoError(t, err, "the object is still there")
+	assert.False(t, recordExists(dyn))
+}
