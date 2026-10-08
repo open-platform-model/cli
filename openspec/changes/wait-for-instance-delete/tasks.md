@@ -13,5 +13,5 @@
 
 ## 3. Documentation
 
-- [ ] 3.1 Add `docs/site/diagnostics/wait-for-a-deleted-instance.md` and name the flag in the `README.md` command table
-- [ ] 3.2 `task openspec:check`, `task docs:bundle:check` and `task cascade:wiring:check` green, then commit `docs(instance): describe delete --wait`
+- [x] 3.1 Add `docs/site/diagnostics/wait-for-a-deleted-instance.md` and name the flag in the `README.md` command table
+- [x] 3.2 `task openspec:check`, `task docs:bundle:check` and `task cascade:wiring:check` green, then commit `docs(instance): describe delete --wait`
