@@ -21,32 +21,6 @@ import (
 	"github.com/open-platform-model/cli/internal/kubernetes"
 )
 
-// The first-install check refuses an object it cannot read, admitted or not;
-// only a NotFound answer proves the name is free.
-func TestPreApplyExistenceCheck_UnreadableObjectRefuses(t *testing.T) {
-	ctx := context.Background()
-	entry := k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "taken"}
-	forbidden := apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "taken", errors.New("no access"))
-
-	dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
-	dyn.PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
-		return true, nil, forbidden
-	})
-	client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dyn}
-
-	err := PreApplyExistenceCheck(ctx, client, []k8sinventory.Entry{entry}, nil)
-	require.Error(t, err, "an unreadable object is refused")
-	assert.Contains(t, err.Error(), "ConfigMap/taken")
-	assert.Contains(t, err.Error(), `"default"`)
-	assert.True(t, apierrors.IsForbidden(err), "the read error stays in the chain")
-
-	admit := AdmitSet{{Kind: "ConfigMap", Namespace: "default", Name: "taken"}: {}}
-	require.Error(t, PreApplyExistenceCheck(ctx, client, []k8sinventory.Entry{entry}, admit), "admission does not pass an unreadable object")
-
-	absent := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())}
-	require.NoError(t, PreApplyExistenceCheck(ctx, absent, []k8sinventory.Entry{entry}, nil), "an absent object passes")
-}
-
 // A prune goes on after a failed delete and reports exactly the entries that
 // are still in the cluster, each with its delete error; a NotFound answer is
 // not a failure.

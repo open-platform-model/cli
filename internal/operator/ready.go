@@ -7,6 +7,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 )
 
@@ -42,11 +43,28 @@ func (e *NotReadyError) Error() string {
 // that fails counts that object as not ready, so a caller proceeds only on a
 // positive finding.
 func CheckReady(ctx context.Context, client *kubernetes.Client) error {
-	pending := pendingObjects(ctx, client, fixedTargets(), DefaultPredicate)
-	if len(pending) == 0 {
-		return nil
+	_, err := ReadyModuleInstanceCRD(ctx, client)
+	return err
+}
+
+// ReadyModuleInstanceCRD is CheckReady for a caller that also needs what the
+// gate read: on a ready operator it returns the live ModuleInstance CRD, so
+// that a question about the operator's API (SpecFieldSupport) costs no second
+// read and cannot see another object than the gate saw. It refuses exactly
+// when CheckReady refuses.
+func ReadyModuleInstanceCRD(ctx context.Context, client *kubernetes.Client) (*unstructured.Unstructured, error) {
+	var crd *unstructured.Unstructured
+	keep := func(live *unstructured.Unstructured) bool {
+		if live.GetKind() == kindCustomResourceDefinition && live.GetName() == inventory.CRDNameModuleInstances {
+			crd = live
+		}
+		return DefaultPredicate(live)
 	}
-	return &NotReadyError{Pending: kubernetes.DescribeObjectList(pending)}
+	pending := pendingObjects(ctx, client, fixedTargets(), keep)
+	if len(pending) > 0 {
+		return nil, &NotReadyError{Pending: kubernetes.DescribeObjectList(pending)}
+	}
+	return crd, nil
 }
 
 // fixedTargets are the objects whose liveness defines "the operator is

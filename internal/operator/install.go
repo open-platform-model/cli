@@ -93,6 +93,7 @@ func Install(ctx context.Context, env InstallEnv, plan *Plan) (*InstallResult, e
 				CreateNS:               false,
 				SkipOperatorCeiling:    true,
 				AfterCallerWrites:      true,
+				RefuseLetGo:            true,
 				Timeout:                remaining(plan.Deadline()),
 				SuccessAppliedMessage:  fmt.Sprintf("ModuleInstance %s/%s applied", OperatorNamespace, OperatorInstanceName),
 				SuccessUpToDateMessage: fmt.Sprintf("ModuleInstance %s/%s up to date", OperatorNamespace, OperatorInstanceName),

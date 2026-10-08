@@ -1,0 +1,9 @@
+# Implements part of enhancement 0012 (cli adoption of the Kubernetes tier's
+# apply verdict). Decisions are deliberately not claimed here: 0012:D4 and
+# 0012:D8 bind both frontends, so the delivery log records them after the
+# operator's ownership adoption has also merged. Under-claiming is the safe
+# direction.
+implements:
+  - enhancement: "0012"
+    decisions: []
+    resolves: []

@@ -51,6 +51,13 @@ type Record struct {
 	// so an operator-owned delete can report what will actually happen.
 	Prune bool
 
+	// DataPolicy is the CR's spec.dataPolicy as it is written, empty when the
+	// field is absent. The operator reads it to decide whether a prune or a
+	// deletion removes PersistentVolumeClaims: only "Delete" removes them. The
+	// CLI does not write this field and does not interpret it here; it reads
+	// it so an operator-owned delete can report what will actually happen.
+	DataPolicy string
+
 	// InstanceUUID is the CR's status.instanceUUID.
 	InstanceUUID string
 
