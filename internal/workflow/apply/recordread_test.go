@@ -145,6 +145,28 @@ func (c *applyCluster) writtenInventory(t *testing.T) (entries []k8sinventory.En
 	return entries, written
 }
 
+// writtenRevision is the inventory revision of the last status write.
+func (c *applyCluster) writtenRevision(t *testing.T) int {
+	t.Helper()
+	revision := -1
+	for _, a := range c.dyn.Actions() {
+		patch, ok := a.(k8stesting.PatchAction)
+		if !ok || a.GetResource().Resource != "moduleinstances" || a.GetSubresource() != "status" {
+			continue
+		}
+		var body struct {
+			Status struct {
+				Inventory struct {
+					Revision int `json:"revision"`
+				} `json:"inventory"`
+			} `json:"status"`
+		}
+		require.NoError(t, json.Unmarshal(patch.GetPatch(), &body))
+		revision = body.Status.Inventory.Revision
+	}
+	return revision
+}
+
 // entryNames is the names of the entries, in order.
 func entryNames(entries []k8sinventory.Entry) []string {
 	names := make([]string, 0, len(entries))

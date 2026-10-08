@@ -6,10 +6,10 @@
 
 ## 2. Remove the legacy inventory Secret path
 
-- [ ] 2.1 Add a test in `internal/workflow/apply`: an instance with a legacy Secret (entries A, B, C), no record, and A, B, C in the cluster with the label; `Execute` rendering A and B applies them, records exactly A and B at revision 1, deletes nothing, prints the warning, and makes no request on Secrets. See the "no request on Secrets" and "C is not deleted" assertions fail on the current code
-- [ ] 2.2 Delete `internal/inventory/legacy.go` and `legacy_test.go`; drop the `legacy` value from `LoadPreviousInventory`, `WriteInstanceRecord`, `nextRevision` and `previousEntries`; delete `cleanupLegacySecret`; update or delete the tests that exist for the path; correct comments that still describe a Secret inventory
-- [ ] 2.3 Delete `tests/integration/migration/main.go` and its `go run` lines in `Taskfile.yml` and `.github/workflows/pr.yml`; `go vet` the remaining integration programs
-- [ ] 2.4 `task fmt`, `task vet`, `task lint`, `task test:unit`, `task openspec:check` and `task cascade:wiring:check` green, then commit `feat(apply)!: remove the legacy inventory Secret path`
+- [x] 2.1 Add a test in `internal/workflow/apply`: an instance with a legacy Secret (entries A, B, C), no record, and A, B, C in the cluster with the label; `Execute` rendering A and B applies them, records exactly A and B at revision 1, deletes nothing, prints the warning, and makes no request on Secrets. See the "no request on Secrets" and "C is not deleted" assertions fail on the current code
+- [x] 2.2 Delete `internal/inventory/legacy.go` and `legacy_test.go`; drop the `legacy` value from `LoadPreviousInventory`, `WriteInstanceRecord`, `nextRevision` and `previousEntries`; delete `cleanupLegacySecret`; update or delete the tests that exist for the path; correct comments that still describe a Secret inventory
+- [x] 2.3 Delete `tests/integration/migration/main.go` and its `go run` lines in `Taskfile.yml` and `.github/workflows/pr.yml`; `go vet` the remaining integration programs
+- [x] 2.4 `task fmt`, `task vet`, `task lint`, `task test:unit`, `task openspec:check` and `task cascade:wiring:check` green, then commit `feat(apply)!: remove the legacy inventory Secret path`
 
 ## 3. Migration note
 

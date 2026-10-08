@@ -119,10 +119,9 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		}
 	}
 
-	// Load the previous inventory from the CR; when absent, look for a legacy
-	// Secret to migrate. Both are read-only, so a dry-run loads them too and
-	// can report what a real apply would prune.
-	prevRecord, legacy, err := LoadPreviousInventory(ctx, req.K8sClient, name, namespace, instanceID, dryRun, instanceLog)
+	// Load the previous inventory from the CR. The read is read-only, so a
+	// dry-run loads it too and can report what a real apply would prune.
+	prevRecord, err := LoadPreviousInventory(ctx, req.K8sClient, name, namespace, instanceID)
 	if err != nil {
 		return unreadableRecordError(name, namespace, err)
 	}
@@ -144,7 +143,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		}
 	}
 
-	prevEntries := previousEntries(prevRecord, legacy)
+	prevEntries := previousEntries(prevRecord)
 	currentEntries := CurrentInventoryEntries(result.Resources)
 	staleSet := ComputeStaleInventorySet(prevEntries, currentEntries)
 
@@ -156,8 +155,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	}
 
 	// Gate 6: existence check, first-ever apply only (no previous inventory).
-	hasPrevInventory := prevRecord != nil || legacy != nil
-	alreadyManaged, err := RunPreApplyExistenceCheck(ctx, req.K8sClient, hasPrevInventory, dryRun, currentEntries, req.Admit)
+	alreadyManaged, err := RunPreApplyExistenceCheck(ctx, req.K8sClient, prevRecord != nil, dryRun, currentEntries, req.Admit)
 	if err != nil {
 		return err
 	}
@@ -241,7 +239,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			}
 		}
 
-		if err := WriteInstanceRecord(ctx, req, prevRecord, legacy, recordEntries, manifestDigest, instanceLog); err != nil {
+		if err := WriteInstanceRecord(ctx, req, prevRecord, recordEntries, manifestDigest, instanceLog); err != nil {
 			return err
 		}
 
@@ -360,42 +358,19 @@ func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Clien
 	return created && dryRun, nil
 }
 
-// LoadPreviousInventory reads the ModuleInstance CR for an instance. When no
-// CR exists, it looks for a legacy inventory Secret to migrate (0006:D6).
-// Returns no record and no legacy inventory on a missing instance ID or a
-// first apply with no legacy Secret. Both reads are read-only, so dryRun only
-// changes the wording of the migration message.
+// LoadPreviousInventory reads the ModuleInstance CR for an instance. It
+// returns no record on a missing instance ID or when no CR exists, which is a
+// first apply. The CR is the only inventory: an inventory Secret that an opm
+// release before v1.0.0-alpha.2 wrote is never read.
 //
 // A CR read that fails with anything but NotFound is returned as the error:
 // only a NotFound answer proves there is no record, and a caller that went on
 // without one would run a first install over an existing instance.
-func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, name, namespace, instanceID string, dryRun bool, instanceLog *log.Logger) (*inventory.Record, *inventory.LegacyInventory, error) {
+func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, name, namespace, instanceID string) (*inventory.Record, error) {
 	if instanceID == "" {
-		return nil, nil, nil
+		return nil, nil
 	}
-
-	prevRecord, err := inventory.GetRecord(ctx, k8sClient, name, namespace)
-	if err != nil {
-		return nil, nil, err
-	}
-	if prevRecord != nil {
-		return prevRecord, nil, nil
-	}
-
-	legacy, err := inventory.FindLegacySecretInventory(ctx, k8sClient, name, namespace, instanceID)
-	if err != nil {
-		instanceLog.Warn("could not read legacy inventory Secret, proceeding as first apply", "error", err)
-		return nil, nil, nil
-	}
-	if legacy == nil {
-		return nil, nil, nil
-	}
-	if dryRun {
-		instanceLog.Info("legacy inventory Secret would be migrated to ModuleInstance CR")
-	} else {
-		instanceLog.Info("migrating legacy inventory Secret to ModuleInstance CR")
-	}
-	return nil, legacy, nil
+	return inventory.GetRecord(ctx, k8sClient, name, namespace)
 }
 
 // unreadableRecordError is the refusal for a ModuleInstance read that failed
@@ -412,9 +387,8 @@ func unreadableRecordError(name, namespace string, cause error) error {
 }
 
 // WriteInstanceRecord writes the ModuleInstance CR spec, then its status subset
-// on the status subresource, then (for a migration) deletes the ported legacy
-// Secret only after the status write succeeds.
-func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory.Record, legacy *inventory.LegacyInventory, currentEntries []k8sinventory.Entry, manifestDigest string, instanceLog *log.Logger) error {
+// on the status subresource.
+func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory.Record, currentEntries []k8sinventory.Entry, manifestDigest string, instanceLog *log.Logger) error {
 	result := req.Result
 	name := result.Instance.Name
 	namespace := result.Instance.Namespace
@@ -436,7 +410,7 @@ func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory
 		return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
-	revision := nextRevision(prevRecord, legacy)
+	revision := nextRevision(prevRecord)
 	statusInput := inventory.StatusInput{
 		Name:      name,
 		Namespace: namespace,
@@ -461,10 +435,6 @@ func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory
 		return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 	output.Debug("inventory written to ModuleInstance CR", "revision", revision)
-
-	// Delete the migrated (or leftover) legacy Secret only after the status
-	// write succeeds, so a failure leaves the Secret authoritative for a re-run.
-	cleanupLegacySecret(ctx, req.K8sClient, name, namespace, instanceID, legacy, instanceLog)
 	return nil
 }
 
@@ -482,25 +452,10 @@ func SkippedContracts(result *workflowrender.Result) []string {
 	return pairs
 }
 
-func cleanupLegacySecret(ctx context.Context, client *kubernetes.Client, name, namespace, instanceID string, legacy *inventory.LegacyInventory, instanceLog *log.Logger) {
-	secretName := inventory.LegacySecretName(name, instanceID)
-	secretNS := namespace
-	if legacy != nil {
-		secretName = legacy.SecretName
-		secretNS = legacy.SecretNamespace
-	}
-	if err := inventory.DeleteLegacySecret(ctx, client, secretName, secretNS); err != nil {
-		instanceLog.Warn("could not delete legacy inventory Secret", "error", err)
-	}
-}
-
-func nextRevision(prevRecord *inventory.Record, legacy *inventory.LegacyInventory) int {
+func nextRevision(prevRecord *inventory.Record) int {
 	prev := 0
-	switch {
-	case prevRecord != nil:
+	if prevRecord != nil {
 		prev = prevRecord.Inventory.Revision
-	case legacy != nil:
-		prev = legacy.Inventory.Revision
 	}
 	if prev < 0 {
 		prev = 0
@@ -508,15 +463,11 @@ func nextRevision(prevRecord *inventory.Record, legacy *inventory.LegacyInventor
 	return prev + 1
 }
 
-func previousEntries(prevRecord *inventory.Record, legacy *inventory.LegacyInventory) []k8sinventory.Entry {
-	switch {
-	case prevRecord != nil:
-		return prevRecord.Inventory.Entries
-	case legacy != nil:
-		return legacy.Inventory.Entries
-	default:
+func previousEntries(prevRecord *inventory.Record) []k8sinventory.Entry {
+	if prevRecord == nil {
 		return nil
 	}
+	return prevRecord.Inventory.Entries
 }
 
 func CurrentInventoryEntries(resources []*unstructured.Unstructured) []k8sinventory.Entry {
