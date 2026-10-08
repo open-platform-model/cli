@@ -14,9 +14,9 @@
 
 - **Report "no registry" only after the fetch failed.** MUST NOT refuse before the fetch: a run with nothing configured still succeeds today from a warm CUE module cache, and a run with only `CUE_REGISTRY` set resolves through it. The test is `registry == "" && CUE_REGISTRY == ""`, applied to the error of `SchemaCache().Get()`.
 - **Exit 2 for the no-registry case.** The cli has no dedicated configuration exit code (`internal/exit/exit.go`: 1 general, 2 validation, 3 connectivity, 4 permission, 5 not found). `opm registry login` already refuses "no registry is configured" with exit 2 and the same `opm config init` action (`internal/cmd/registry/login.go`), so the same condition gets the same code.
-- **One classifier in `internal/publish`.** `registryFailure(op, err)` returns `*ConnectivityError` when `cuemod.IsConnectivityError(err)`, else `*RegistryError{Unauthorized: cuemod.IsUnauthorized(err)}`. `cuemod.IsUnauthorized` is new and reads the same library classification (`FetchUnauthorized`). `ConnectivityError` keeps its type, text and every other construction site.
+- **One classifier in `internal/publish`.** `RegistryFailure(op, host, err)` returns `*ConnectivityError` when `cuemod.IsConnectivityError(err)`, else `*RegistryError{Unauthorized: cuemod.IsUnauthorized(err), Host: host}`. `cuemod.IsUnauthorized` is new and reads the same library classification (`FetchUnauthorized`). `ConnectivityError` keeps its type, text and every other construction site.
 - **Exit 3 stays for every registry failure on publish.** A 401 could map to the existing code 4 (permission denied), but that is a change to the documented exit contract and is left to the owner. `publishError` maps `*RegistryError` to 3 like `*ConnectivityError`.
-- **Hints at the command layer.** `internal/publish` returns typed errors; `cmdutil` adds the `opm registry login` line, as `operator install` adds its mirror hint.
+- **Hints at the command layer.** `internal/publish` returns typed errors; `cmdutil` adds the `opm registry login <host>` line, as `operator install` adds its mirror hint. The host is the one the registry mapping routes the module to (`RegistryHost`), because the bare command refuses when the mapping names several hosts, which the default mapping does.
 
 ```go
 // internal/config
@@ -27,8 +27,9 @@ type NoRegistryError struct{ Op, ConfigPath string; ConfigExists bool; Err error
 func IsUnauthorized(err error) bool
 
 // internal/publish
-type RegistryError struct{ Op string; Unauthorized bool; Err error }
-func RegistryFailure(op string, err error) error
+type RegistryError struct{ Op string; Unauthorized bool; Host string; Err error }
+func RegistryFailure(op, host string, err error) error
+func RegistryHost(registry, modulePath string) string // host[+insecure] the mapping routes the module to, or ""
 
 // internal/cmdutil
 func NoRegistryError(cfg *config.GlobalConfig, op string, err error) error // the exit-2 error, or nil when a registry is configured
@@ -40,10 +41,10 @@ Messages:
 no registry is configured: loading core schema: <cause>
   Set one with --registry, OPM_REGISTRY or the registry field of <config path>.
   To write a config file with the default registry, run:  opm config init
-  (when the config file exists:  opm config init --force)
+  (when the config file exists: add a registry field to it, or replace the whole file with  opm config init --force)
 
 registry refused the credentials (authentication or permission): pushing <repo>:<tag>: <cause>
-  Log in to the registry, then retry:  opm registry login
+  Log in to the registry, then retry:  opm registry login <host>
 
 registry operation failed: listing published versions of <path>: <cause>
 registry unreachable: listing published versions of <path>: <cause>
@@ -53,7 +54,7 @@ registry unreachable: listing published versions of <path>: <cause>
 
 ### Where the no-registry test runs
 
-**Context**: every command builds its kernel with `config.NewKernel(cfg.Registry)`; only `module vet` and the publish commands load the core schema through `SchemaCache().Get()` (`internal/config/platform.go` holds a third call that is not on a command path changed here).
+**Context**: every command builds its kernel with `config.NewKernel(cfg.Registry)`; only `module vet` and the publish commands load the core schema through `SchemaCache().Get()`.
 **Explored**: `internal/config/kernel.go`, the library's `kernel.New` and `schema.OCILoader`.
 **Options considered**:
 1. Refuse in `config.Load` or `NewKernel` when the registry is empty - one place, but it breaks runs that work today (warm cache, `CUE_REGISTRY` only) and commands that need no registry.
@@ -68,6 +69,9 @@ registry unreachable: listing published versions of <path>: <cause>
 **Rationale**: the label and the next step are the defect the task names; the exit table is a published contract.
 
 ## Risks / Trade-offs
+
+- **Known gap: a refusing token endpoint.** A registry that hands out bearer tokens and whose token endpoint answers 403 lets the lookup pass (CUE reads a 403 there as not found) and fails the push with "cannot do HTTP request: ...: 403 Forbidden". The library's text classification reads the prefix as no response, so the push is still "registry unreachable". The cli MUST NOT read registry error text itself (the library owns the one text fallback), so the fix is a library change and a pin bump. `TestPush_TokenEndpointRefusal_Pinned` holds the present answer and fails when the library closes the gap. A token endpoint that answers 401 is named correctly.
+- A 403 on the already-published lookup returns no error (not found), so the refused-credentials message shows on the push, not on a dry run.
 
 - A push error reaches the classifier as flattened text ("cannot make scratch config: 401 Unauthorized: ..."), so it classifies through the library's one text fallback → tests drive a real registry answer for both 401 and 403 on the push.
 - With nothing configured and a warm cache for core only, vet passes the schema fetch and later fails on a catalog fetch with CUE's own error → not covered here; reported as a follow-up.

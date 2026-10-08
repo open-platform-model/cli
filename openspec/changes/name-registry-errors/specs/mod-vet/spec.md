@@ -9,7 +9,7 @@ The `opm mod vet` command SHALL signal its verdict through the process exit code
 | 0 | Validation and render passed |
 | 1 | Usage error (invalid flags, missing arguments), or the platform could not be generated or acquired (an unpublished pin, a bad `--platform` directory) |
 | 2 | Validation error (CUE errors, invalid values, missing `debugValues`, identity/coordinate check failures), render refusal (unmatched components, unresolved demands, a failed transformer), or no registry configured (core-schema fetch) |
-| 3 | Registry unreachable (core-schema fetch) |
+| 3 | The core-schema fetch failed against a configured registry (unreachable, or any failure answer) |
 
 #### Scenario: Exit code 0 on success
 
