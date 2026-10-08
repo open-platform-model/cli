@@ -372,7 +372,7 @@ The apply SHALL print no such warning when no rendered resource exists yet, or w
 
 ### Requirement: Prune keeps stale PersistentVolumeClaims unless delete-data is set
 
-The prune of `opm instance apply` and `opm module apply` SHALL NOT delete a stale `PersistentVolumeClaim` of the core API group unless `--delete-data` is set. A kept claim SHALL stay in the written inventory, so that it is stale again on the next apply and an apply with `--delete-data` removes it. Each kept claim SHALL be listed on its own line, naming its kind, namespace and name with the status `kept`, at the informational log level and never as a warning or an error; one more line SHALL say how many claims were kept and name `--delete-data`. A stale claim that is no longer in the cluster (its read answers NotFound) SHALL NOT be kept: it SHALL NOT be listed, and it SHALL leave the written inventory without `--delete-data`, as an already-deleted stale resource does. A stale claim whose read fails in any other way SHALL be kept. A kept claim SHALL NOT fail the apply: the exit code SHALL be 0 and the success line SHALL print. With `--delete-data`, a stale claim SHALL be pruned like any other stale resource and SHALL leave the inventory. `--delete-data` and `--no-prune` SHALL exclude each other: both together SHALL be a usage error. On an operator-managed instance `--delete-data` SHALL have no effect, and the command SHALL print a warning that says so.
+The prune of `opm instance apply` and `opm module apply` SHALL NOT delete a stale `PersistentVolumeClaim` of the core API group unless `--delete-data` is set. A kept claim SHALL stay in the written inventory, so that it is stale again on the next apply and an apply with `--delete-data` removes it. Each kept claim SHALL be listed on its own line, naming its kind, namespace and name with the status `kept`, at the informational log level and never as a warning or an error; one more line SHALL say how many claims were kept and name `--delete-data`. A stale claim that is no longer in the cluster (its read answers NotFound) SHALL NOT be kept: it SHALL NOT be listed, and it SHALL leave the written inventory without `--delete-data`, as an already-deleted stale resource does. A stale claim whose read fails in any other way SHALL be kept. A kept claim SHALL NOT fail the apply: the exit code SHALL be 0 and the success line SHALL print. With `--delete-data`, a stale claim SHALL be pruned like any other stale resource and SHALL leave the inventory. `--delete-data` and `--no-prune` SHALL exclude each other: both together SHALL be a usage error. On an operator-managed instance `--delete-data` SHALL NOT change what the operator does and SHALL NOT fail the command: the command SHALL print a warning that says so, names `spec.dataPolicy` of the `ModuleInstance` as the setting that an operator with that field obeys for PersistentVolumeClaims, and says that an older operator deletes them.
 
 #### Scenario: Stale claim is kept and stays in the inventory
 
@@ -419,3 +419,10 @@ The prune of `opm instance apply` and `opm module apply` SHALL NOT delete a stal
 
 - **WHEN** `opm instance apply --no-prune --delete-data` is run
 - **THEN** the process SHALL exit 1 and standard error SHALL name both flags
+
+#### Scenario: Delete-data on an operator-managed instance
+
+- **WHEN** `opm instance apply --delete-data` or `opm module apply --delete-data` runs for an operator-managed instance
+- **THEN** the command SHALL print a warning that `--delete-data` does not change what the operator does
+- **AND** the warning SHALL name `spec.dataPolicy` and say that an older operator deletes PersistentVolumeClaims
+- **AND** the apply SHALL go on as without the flag
