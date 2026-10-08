@@ -21,7 +21,7 @@ import (
 const clientSideApplyManager = "kubectl-client-side-apply"
 
 // objKey identifies a Kubernetes object by group, kind, namespace and name.
-type objKey = inventory.K8sIdentity
+type objKey = ownership.Object
 
 func keyOf(obj *unstructured.Unstructured) objKey {
 	return objKey{Group: obj.GroupVersionKind().Group, Kind: obj.GetKind(), Namespace: obj.GetNamespace(), Name: obj.GetName()}
@@ -219,7 +219,7 @@ func (p *MigrationPlan) judgeDeletes(instanceUUID string) []MigrationBlock {
 	for _, live := range doomed {
 		key := keyOf(live)
 		verdict := ownership.CanDelete(ownership.DeleteInput{
-			Object:       ownership.Object{Group: key.Group, Kind: key.Kind, Namespace: key.Namespace, Name: key.Name},
+			Object:       key,
 			Live:         live,
 			InstanceUUID: instanceUUID,
 			Admit:        true,

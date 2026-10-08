@@ -96,7 +96,8 @@ func TestExecute_DryRunFirstInstallOverManagedResourcesWarns(t *testing.T) {
 }
 
 // A dry run refuses nothing in the first-install look: an object a real run
-// would refuse ends the look without a warning and without an error.
+// would refuse is left out of the look, without an error and without a
+// refusal in the output.
 func TestExecute_DryRunFirstInstallLookRefusesNothing(t *testing.T) {
 	withReleasedCLIVersion(t)
 	logBuf := captureLog(t)
@@ -106,6 +107,24 @@ func TestExecute_DryRunFirstInstallLookRefusesNothing(t *testing.T) {
 
 	require.NoError(t, Execute(context.Background(), cluster.request(Options{WarnUnrecorded: true, DryRun: true}, "a")))
 	assert.NotContains(t, logBuf.String(), firstInstallWarning)
+	assert.NotContains(t, logBuf.String(), "not managed by OPM", "a dry run prints no refusal")
+	assert.NotContains(t, logBuf.String(), "apply refused")
+}
+
+// The warning counts the existing OPM-managed resources the guard allows: an
+// object of another instance, which a real run refuses, is not among them.
+func TestExecute_DryRunFirstInstallWarningLeavesOutRefusedObjects(t *testing.T) {
+	withReleasedCLIVersion(t)
+	logBuf := captureLog(t)
+	cluster := newApplyCluster(
+		liveManagedConfigMap("a"),
+		liveConfigMap("b", opmlabels.ManagedByCLI, "uuid-of-another-instance", ""),
+	)
+
+	require.NoError(t, Execute(context.Background(), cluster.request(Options{WarnUnrecorded: true, DryRun: true}, "a", "b", "c")))
+
+	assert.Contains(t, logBuf.String(), "1 of 3 rendered resource(s)")
+	assert.NotContains(t, logBuf.String(), "uuid-of-another-instance", "a dry run prints no refusal")
 }
 
 // A caller that does not ask for the warning gets none: `opm operator

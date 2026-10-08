@@ -13,81 +13,9 @@ import (
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
-	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 	"github.com/open-platform-model/library/opm/k8s/object"
 	"github.com/open-platform-model/library/opm/k8s/ownership"
 )
-
-// PreApplyExistenceCheck verifies that resources do not conflict with existing
-// cluster state on a first-time apply (no previous inventory).
-//
-// For each rendered resource entry, a GET is performed:
-//   - If the resource exists with a deletionTimestamp → error (terminating)
-//   - If the resource exists without OPM managed-by label → error (untracked),
-//     unless admit holds it
-//   - If the resource does not exist, or the cluster does not serve its kind → OK
-//   - If the read, or the discovery request that resolves the kind, fails
-//     with anything but NotFound → error (unreadable), with the error in the
-//     chain
-//
-// admit passes the untracked test only, never the terminating one and never
-// the unreadable one. Only
-// `opm operator install` passes a non-empty set: the objects it proved came
-// from an earlier operator release manifest, or that carry the operator
-// instance's identity (0012:D8:R6). Every other caller passes nil.
-//
-// This check should be skipped entirely when a previous inventory exists.
-func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entries []k8sinventory.Entry, admit AdmitSet) error {
-	_, err := FirstInstallCheck(ctx, client, entries, admit)
-	return err
-}
-
-// FirstInstallCheck is PreApplyExistenceCheck that also reports what passed
-// while already in the cluster: managed holds, in entry order, the entries
-// whose object exists with an OPM managed-by label. Such an object was
-// applied by OPM before, yet the caller has no inventory that records it, so
-// a caller that goes on takes it into a new inventory. An admitted object is
-// not OPM-managed and is not reported.
-func FirstInstallCheck(ctx context.Context, client *kubernetes.Client, entries []k8sinventory.Entry, admit AdmitSet) (managed []k8sinventory.Entry, err error) {
-	for _, entry := range entries {
-		var obj interface{ GetDeletionTimestamp() *metav1.Time }
-		unstrObj, err := getEntry(ctx, client, entry)
-		if err != nil {
-			// A kind the cluster does not serve has no objects: typically the
-			// module renders its CustomResourceDefinition in the same apply.
-			if apierrors.IsNotFound(err) || kubernetes.IsKindNotServed(err) {
-				continue // Resource doesn't exist — OK for first install
-			}
-			// Any other answer leaves the question open, and the forced apply
-			// that follows would take over whatever holds the name.
-			return nil, fmt.Errorf("cannot check whether %s/%s in namespace %q already exists: %w\n"+
-				"Check that you can read that resource, then run the command again",
-				entry.Kind, entry.Name, entry.Namespace, err)
-		}
-
-		obj = unstrObj
-
-		// Check for terminating resources
-		if obj.GetDeletionTimestamp() != nil {
-			return nil, fmt.Errorf("resource %s/%s in namespace %q is terminating (deletionTimestamp set) — wait for deletion to complete before applying",
-				entry.Kind, entry.Name, entry.Namespace)
-		}
-
-		// Check for untracked resources (not managed by OPM).
-		// Accepts any known OPM actor value (opm-cli, opm-controller, or
-		// legacy open-platform-model) for backward compatibility.
-		labels := unstrObj.GetLabels()
-		if opmlabels.IsOPMManagedBy(labels[opmlabels.ManagedBy]) {
-			managed = append(managed, entry)
-			continue
-		}
-		if !admit.Has(entry) {
-			return nil, fmt.Errorf("resource %s/%s in namespace %q already exists and is not managed by OPM — remove or rename it, or change the module to render a different name",
-				entry.Kind, entry.Name, entry.Namespace)
-		}
-	}
-	return managed, nil
-}
 
 // SplitProtected partitions a stale set into the entries prune may delete and
 // the entries it always leaves behind (kubernetes.IsProtectedKind: core

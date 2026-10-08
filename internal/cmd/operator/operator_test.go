@@ -14,11 +14,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/open-platform-model/library/opm/k8s/ownership"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/modref"
 	oplib "github.com/open-platform-model/cli/internal/operator"
 	"github.com/open-platform-model/cli/internal/operator/operatortest"
@@ -245,6 +247,8 @@ func TestInstallErrorMapping(t *testing.T) {
 		{&oplib.TargetError{ModuleVersion: "v0.4.0", Rule: "newer"}, opmexit.ExitValidationError},
 		{&oplib.VersionError{ModuleVersion: "v0.4.0", Reason: "none"}, opmexit.ExitValidationError},
 		{&oplib.GuardError{Err: errors.New("exists")}, opmexit.ExitValidationError},
+		// The guard refuses an object another instance owns or adopts.
+		{&oplib.GuardError{Err: &inventory.GuardRefusalError{Refused: []inventory.Refused{{Reason: ownership.RefuseAdoptedElsewhere, Message: "Deployment/x was adopted"}}}}, opmexit.ExitValidationError},
 		// An object install cannot read. The guard's refusal keeps its code
 		// whatever API error it wraps; the same read failing in an earlier
 		// check exits by the API error.

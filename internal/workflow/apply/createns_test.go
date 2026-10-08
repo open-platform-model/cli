@@ -102,7 +102,7 @@ func TestExecute_RefusalCreatesNoNamespace(t *testing.T) {
 			name:    "existence check: terminating cluster-scoped object",
 			cluster: []*unstructured.Unstructured{terminating},
 			code:    opmexit.ExitGeneralError,
-			want:    "is terminating",
+			want:    "is being deleted",
 		},
 	}
 	for _, c := range cases {

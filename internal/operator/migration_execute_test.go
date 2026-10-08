@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/open-platform-model/library/opm/k8s/ownership"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,8 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	k8stesting "k8s.io/client-go/testing"
-
-	"github.com/open-platform-model/cli/internal/inventory"
 )
 
 var (
@@ -232,8 +231,8 @@ func TestPlanInstall_AdmitsProvenObjects(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, plan.Migration.Migrates())
 	admit := plan.Migration.Admit()
-	assert.Contains(t, admit, inventory.K8sIdentity{Kind: "Namespace", Name: OperatorNamespace})
-	assert.Contains(t, admit, inventory.K8sIdentity{Group: "apps", Kind: "Deployment", Namespace: OperatorNamespace, Name: ControllerDeploymentName})
+	assert.Contains(t, admit, ownership.Object{Kind: "Namespace", Name: OperatorNamespace})
+	assert.Contains(t, admit, ownership.Object{Group: "apps", Kind: "Deployment", Namespace: OperatorNamespace, Name: ControllerDeploymentName})
 	assert.Empty(t, fc.Writes())
 }
 
