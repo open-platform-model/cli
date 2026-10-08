@@ -15,8 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8stesting "k8s.io/client-go/testing"
 
-	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
-
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 )
 
@@ -67,9 +65,9 @@ func TestExecute_FailedPruneKeepsTheEntryAndFails(t *testing.T) {
 	assert.NotContains(t, stdout, "applied", "no success line after a failed prune")
 	assert.NotContains(t, stdout, "up to date", "no success line after a failed prune")
 
-	names, written := cluster.writtenInventory(t)
+	entries, written := cluster.writtenInventory(t)
 	require.True(t, written, "the record is still written")
-	assert.ElementsMatch(t, []string{"keep", "stuck"}, names,
+	assert.ElementsMatch(t, []string{"keep", "stuck"}, entryNames(entries),
 		"the record holds the current entry and the entry prune failed to delete, not the deleted one")
 
 	var failureLine string
@@ -88,11 +86,7 @@ func TestExecute_FailedPruneKeepsTheEntryAndFails(t *testing.T) {
 	}
 	assert.Contains(t, logBuf.String(), "run apply again", "the output says a re-run retries the prune")
 
-	written2 := make([]k8sinventory.Entry, 0, len(names))
-	for _, n := range names {
-		written2 = append(written2, k8sinventory.Entry{Kind: "ConfigMap", Namespace: "default", Name: n, Version: "v1"})
-	}
-	stale := ComputeStaleInventorySet(written2, CurrentInventoryEntries(cluster.request(Options{}, "keep").Result.Resources))
+	stale := ComputeStaleInventorySet(entries, CurrentInventoryEntries(cluster.request(Options{}, "keep").Result.Resources))
 	require.Len(t, stale, 1, "the kept entry is stale again on the next apply")
 	assert.Equal(t, "stuck", stale[0].Name)
 }
@@ -111,7 +105,7 @@ func TestExecute_SuccessfulPruneDropsTheEntry(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "applied")
-	names, written := cluster.writtenInventory(t)
+	entries, written := cluster.writtenInventory(t)
 	require.True(t, written)
-	assert.Equal(t, []string{"keep"}, names)
+	assert.Equal(t, []string{"keep"}, entryNames(entries))
 }

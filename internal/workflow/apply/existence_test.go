@@ -9,6 +9,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -57,4 +58,31 @@ func TestExecute_LaterApplySkipsTheExistenceCheck(t *testing.T) {
 	})
 
 	assert.NoError(t, Execute(context.Background(), cluster.request(Options{}, "app")))
+}
+
+// --create-namespace creates the namespace before the read-only checks, so a
+// refusal after it can only promise that no rendered resource was applied:
+// the message makes no wider claim, and no resource or record is written.
+func TestExecute_RefusalAfterNamespaceCreateClaimsNoMore(t *testing.T) {
+	withReleasedCLIVersion(t)
+	captureLog(t)
+	cluster := newApplyCluster()
+	cluster.dyn.PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "app", errors.New("no access"))
+	})
+
+	err := Execute(context.Background(), cluster.request(Options{CreateNS: true}, "app"))
+
+	requireExitCode(t, err, opmexit.ExitPermissionDenied)
+	assert.Contains(t, err.Error(), "before any rendered resource was applied")
+	assert.NotContains(t, err.Error(), "before any change")
+	assert.Empty(t, cluster.writes(), "no rendered resource is applied and no record is written")
+
+	var created []string
+	for _, a := range cluster.client.Clientset.(*k8sfake.Clientset).Actions() {
+		if a.GetVerb() == "create" && a.GetResource().Resource == "namespaces" {
+			created = append(created, a.GetResource().Resource)
+		}
+	}
+	assert.Equal(t, []string{"namespaces"}, created, "the namespace the flag asks for is created before the check, as before this change")
 }

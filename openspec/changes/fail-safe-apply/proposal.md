@@ -8,9 +8,9 @@
 
 ## What Changes
 
-- An apply (real or dry run) whose `ModuleInstance` record read fails with anything other than NotFound stops with an error before any resource is applied and before any record is written.
+- An apply (real or dry run) whose `ModuleInstance` record read fails with anything other than NotFound stops with an error before any rendered resource is applied and before any record is written. A namespace that `--create-namespace` created earlier in the run stays.
 - When prune fails to delete a stale resource, the apply still writes the record, and the record keeps every entry that was not deleted. The output names each such resource with its error. The command exits non-zero and prints no success line. The next apply retries the prune.
-- On a first install, an object the existence check cannot read (any error other than NotFound) refuses the apply. The same check guards `opm operator install`, which refuses in the same way.
+- On a first install, an object the existence check cannot read (any error other than NotFound) refuses the apply. The same check guards `opm operator install`, which refuses too, with the exit code of its other apply-guard refusals (2).
 - Exit codes come from the existing table (`internal/exit`): a failed read exits 4 on Forbidden or Unauthorized, 3 on a server timeout or an unavailable server, 1 otherwise; a failed prune exits 1.
 
 No flag, no command and no inventory field changes. The success path does not change. The existence check still runs on a first install only.

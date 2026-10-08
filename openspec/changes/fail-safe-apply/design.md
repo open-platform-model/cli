@@ -60,7 +60,16 @@ An error from `PruneStaleResources` that is not a `*PruneError` cannot happen to
 
 ### Exit codes
 
-**Decision**: An unreadable record and an unreadable object in the existence check use `exitCodeFromK8sError`: 4 for Forbidden or Unauthorized, 3 for a server timeout or an unavailable server, 1 otherwise. A failed prune exits 1, as a failed resource apply does, because several deletes can fail for different reasons. The untracked and terminating refusals keep exit 1.
+**Decision**: An unreadable record and an unreadable object in the existence check use `exitCodeFromK8sError`: 4 for Forbidden or Unauthorized, 3 for a server timeout or an unavailable server, 1 otherwise. A failed prune exits 1, as a failed resource apply does, because several deletes can fail for different reasons. The untracked and terminating refusals keep exit 1. Exit 3 covers only the two API answers the mapper knows (server timeout, service unavailable); a gateway timeout or a refused connection exits 1, as before. `opm operator install` wraps the check error in its apply-guard refusal and exits 2, as for an untracked object; its exit codes are not part of this change.
+
+### Order against --create-namespace
+
+**Context**: `EnsureNamespaceIfRequested` runs before the record read and the existence check, so a refusal can follow a namespace create.
+**Options considered**:
+1. Move the namespace create after the read-only checks. It changes the order of the success path.
+2. Keep the order and make the messages claim only that no rendered resource was applied.
+**Decision**: Option 2.
+**Rationale**: The success path must not change in this fix. An empty namespace is harmless and the re-run reuses it.
 
 ### Error text
 
@@ -74,7 +83,7 @@ Check that you can read moduleinstances.opmodel.dev in that namespace, then run 
 
 ```text
 cannot check whether ConfigMap/app in namespace "default" already exists: <cause>
-apply stopped before any change. Check that you can read that resource, then run the command again.
+apply stopped before any rendered resource was applied. Check that you can read that resource, then run the command again.
 ```
 
 ```text

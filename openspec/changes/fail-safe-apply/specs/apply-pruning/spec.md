@@ -2,7 +2,7 @@
 
 ### Requirement: Unreadable instance record stops the apply
 
-When the read of the instance's `ModuleInstance` record fails with any error other than NotFound, `opm instance apply` and `opm module apply` SHALL stop with an error. The system SHALL NOT treat the failed read as a first install: it SHALL NOT apply any resource, SHALL NOT prune, and SHALL NOT write the record. This SHALL hold for a dry run too, which SHALL NOT print a preview built without the record. The error SHALL name the instance and its namespace, carry the cause of the failed read, and tell the user to check access to the record and run the command again. The exit code SHALL be 4 when the read was denied (Forbidden or Unauthorized), 3 when the server timed out or was unavailable, and 1 otherwise. A NotFound answer SHALL still mean that no record exists.
+When the read of the instance's `ModuleInstance` record fails with any error other than NotFound, `opm instance apply` and `opm module apply` SHALL stop with an error. The system SHALL NOT treat the failed read as a first install: it SHALL NOT apply any resource, SHALL NOT prune, and SHALL NOT write the record. This SHALL hold for a dry run too, which SHALL NOT print a preview built without the record. The error SHALL name the instance and its namespace, carry the cause of the failed read, and tell the user to check access to the record and run the command again. The exit code SHALL be 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure. A NotFound answer SHALL still mean that no record exists. A namespace that `--create-namespace` created before the read SHALL stay.
 
 #### Scenario: Read error on a real apply
 
@@ -51,7 +51,7 @@ When the delete of a stale resource fails with any error other than NotFound, th
 
 ### Requirement: Pre-apply existence check on first install
 
-On first-time apply (no previous inventory), the system SHALL check each rendered resource against the cluster. If a resource exists with a `deletionTimestamp` (terminating), or exists without OPM labels (untracked), the apply SHALL fail with a clear error message. If a resource cannot be read (the read fails with any error other than NotFound), the apply SHALL fail too: the error SHALL name the resource and carry the read error, and the exit code SHALL be 4 when the read was denied (Forbidden or Unauthorized), 3 when the server timed out or was unavailable, and 1 otherwise. A NotFound answer SHALL mean the resource does not exist, and passes. This check SHALL be skipped entirely when a previous inventory exists. A caller MAY pass an explicit admission set of resources; a resource in that set SHALL pass the untracked-resource test, and SHALL still fail the terminating-resource test and the unreadable-resource test. Only `opm operator install` SHALL pass a non-empty set, holding exactly the existing resources it proved came from an earlier opm-operator release manifest, or that already carry the operator instance's identity; every other caller SHALL pass none. No flag SHALL fill the set. The untracked-resource error SHALL NOT name a flag that would bypass it, since no flag does; it SHALL tell the user to remove or rename the existing resource, or to change the module so it renders a different name. Source: 0012:D8:R6.
+On first-time apply (no previous inventory), the system SHALL check each rendered resource against the cluster. If a resource exists with a `deletionTimestamp` (terminating), or exists without OPM labels (untracked), the apply SHALL fail with a clear error message. If a resource cannot be read (the read fails with any error other than NotFound), the apply SHALL fail too: the error SHALL name the resource and carry the read error, and SHALL NOT claim more than that no rendered resource was applied, since `--create-namespace` creates the namespace before the check. For `opm instance apply` and `opm module apply` the exit code SHALL be 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure; `opm operator install` SHALL refuse with the exit code of its other apply-guard refusals (2). A NotFound answer SHALL mean the resource does not exist, and passes. This check SHALL be skipped entirely when a previous inventory exists. A caller MAY pass an explicit admission set of resources; a resource in that set SHALL pass the untracked-resource test, and SHALL still fail the terminating-resource test and the unreadable-resource test. Only `opm operator install` SHALL pass a non-empty set, holding exactly the existing resources it proved came from an earlier opm-operator release manifest, or that already carry the operator instance's identity; every other caller SHALL pass none. No flag SHALL fill the set. The untracked-resource error SHALL NOT name a flag that would bypass it, since no flag does; it SHALL tell the user to remove or rename the existing resource, or to change the module so it renders a different name. Source: 0012:D8:R6.
 
 #### Scenario: Untracked resource detected on first install
 
@@ -70,8 +70,21 @@ On first-time apply (no previous inventory), the system SHALL check each rendere
 - **WHEN** performing a first-time apply
 - **AND** the read of a rendered resource fails with Forbidden
 - **THEN** the command SHALL fail with an error naming the resource and the read error
-- **AND** the command SHALL exit 4
+- **AND** `opm instance apply` SHALL exit 4
 - **AND** no rendered resource SHALL be applied
+
+#### Scenario: Refusal after the namespace was created
+
+- **WHEN** `opm instance apply --create-namespace` performs a first-time apply into a missing namespace
+- **AND** the read of a rendered resource fails with Forbidden
+- **THEN** the namespace SHALL have been created
+- **AND** no rendered resource SHALL be applied
+- **AND** the error SHALL NOT say that nothing changed
+
+#### Scenario: Operator install refuses an unreadable resource
+
+- **WHEN** `opm operator install` plans a first install and the read of an object it would apply fails with Forbidden
+- **THEN** the command SHALL refuse with exit code 2 and an error naming the resource and the read error
 
 #### Scenario: Absent resource passes
 

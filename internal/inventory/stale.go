@@ -51,7 +51,7 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 			// Any other answer leaves the question open, and the forced apply
 			// that follows would take over whatever holds the name.
 			return fmt.Errorf("cannot check whether %s/%s in namespace %q already exists: %w\n"+
-				"apply stopped before any change. Check that you can read that resource, then run the command again",
+				"apply stopped before any rendered resource was applied. Check that you can read that resource, then run the command again",
 				entry.Kind, entry.Name, entry.Namespace, err)
 		}
 
@@ -100,6 +100,9 @@ type PruneError struct {
 }
 
 func (e *PruneError) Error() string {
+	if len(e.Errs) == 0 {
+		return "pruning stale resources failed"
+	}
 	return fmt.Sprintf("pruning stale resources: %d error(s): %v", len(e.Errs), e.Errs[0])
 }
 

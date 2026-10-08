@@ -19,6 +19,7 @@ import (
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	"github.com/open-platform-model/library/opm/module"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -86,7 +87,8 @@ func (c *applyCluster) request(opts Options, configMaps ...string) Request {
 }
 
 // writes lists every mutating call the dynamic client received, as
-// "<verb> <resource>[/<subresource>] <name>".
+// "<verb> <resource>[/<subresource>] <name>". Calls through the typed
+// clientset (the namespace create of --create-namespace) are not in it.
 func (c *applyCluster) writes() []string {
 	var out []string
 	for _, a := range c.dyn.Actions() {
@@ -106,9 +108,9 @@ func (c *applyCluster) writes() []string {
 	return out
 }
 
-// writtenInventory is the names of the inventory entries of the last status
-// write, and whether a status write was issued at all.
-func (c *applyCluster) writtenInventory(t *testing.T) (names []string, written bool) {
+// writtenInventory is the inventory entries of the last status write, as
+// written, and whether a status write was issued at all.
+func (c *applyCluster) writtenInventory(t *testing.T) (entries []k8sinventory.Entry, written bool) {
 	t.Helper()
 	for _, a := range c.dyn.Actions() {
 		patch, ok := a.(k8stesting.PatchAction)
@@ -120,20 +122,36 @@ func (c *applyCluster) writtenInventory(t *testing.T) (names []string, written b
 				Inventory struct {
 					Count   int `json:"count"`
 					Entries []struct {
-						Name string `json:"name"`
+						Group     string `json:"group"`
+						Kind      string `json:"kind"`
+						Namespace string `json:"namespace"`
+						Name      string `json:"name"`
+						Version   string `json:"v"`
+						Component string `json:"component"`
 					} `json:"entries"`
 				} `json:"inventory"`
 			} `json:"status"`
 		}
 		require.NoError(t, json.Unmarshal(patch.GetPatch(), &body))
-		names = names[:0]
+		entries = entries[:0]
 		for _, e := range body.Status.Inventory.Entries {
-			names = append(names, e.Name)
+			entries = append(entries, k8sinventory.Entry{
+				Group: e.Group, Kind: e.Kind, Namespace: e.Namespace, Name: e.Name, Version: e.Version, Component: e.Component,
+			})
 		}
-		assert.Equal(t, len(names), body.Status.Inventory.Count, "the recorded count matches the entries")
+		assert.Equal(t, len(entries), body.Status.Inventory.Count, "the recorded count matches the entries")
 		written = true
 	}
-	return names, written
+	return entries, written
+}
+
+// entryNames is the names of the entries, in order.
+func entryNames(entries []k8sinventory.Entry) []string {
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name)
+	}
+	return names
 }
 
 // captureLog routes the log stream into a buffer for the test.
@@ -210,7 +228,7 @@ func TestExecute_MissingRecordIsAFirstInstall(t *testing.T) {
 
 	require.NoError(t, Execute(context.Background(), cluster.request(Options{}, "app")))
 
-	names, written := cluster.writtenInventory(t)
+	entries, written := cluster.writtenInventory(t)
 	require.True(t, written, "the record is written")
-	assert.Equal(t, []string{"app"}, names)
+	assert.Equal(t, []string{"app"}, entryNames(entries))
 }
