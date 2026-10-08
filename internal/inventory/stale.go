@@ -130,11 +130,12 @@ func (e *PruneError) Unwrap() []error {
 // even when the caller passes one; callers that report what was left behind
 // split the set first with SplitProtected.
 // 404 (not found) errors are treated as success (idempotent). An entry whose
-// kind cannot be resolved (not served at the recorded version, or a failed
-// discovery request) is a failed delete, never a success: the object may
-// still be in the cluster.
+// kind is not served at the recorded version is a failed delete, never a
+// success: the object may still be in the cluster.
 //
-// A delete that fails does not stop the loop. When any failed, the error is a
+// A delete that fails does not stop the loop. A failed API discovery request
+// does: that entry and every entry not yet tried are reported as failed, with
+// the discovery error. When any failed, the error is a
 // *PruneError naming the entries that are still in the cluster.
 func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale []k8sinventory.Entry) error {
 	if len(stale) == 0 {
@@ -149,13 +150,25 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 	}, object.Descending)
 
 	var failed PruneError
-	for _, entry := range sorted {
+	for i, entry := range sorted {
 		if kubernetes.IsProtectedKind(entry.Group, entry.Kind) {
 			output.Debug("leaving protected resource behind", "kind", entry.Kind, "name", entry.Name)
 			continue
 		}
 
 		err := deleteEntry(ctx, client, entry)
+		if kubernetes.IsDiscoveryFailure(err) {
+			// The cluster cannot say where this entry lives: stop, and report
+			// it and every entry not yet tried as still in the cluster.
+			for _, left := range sorted[i:] {
+				if kubernetes.IsProtectedKind(left.Group, left.Kind) {
+					continue
+				}
+				failed.Failed = append(failed.Failed, left)
+				failed.Errs = append(failed.Errs, fmt.Errorf("deleting %s/%s: %w", left.Kind, left.Name, err))
+			}
+			break
+		}
 
 		if err != nil && !apierrors.IsNotFound(err) {
 			failed.Failed = append(failed.Failed, entry)

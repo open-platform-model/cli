@@ -65,7 +65,7 @@ When discovery answers and the group and version, or the kind in it, is not serv
 
 ### Requirement: A failed discovery request is an error
 
-When a discovery request fails (the API server denies it, is unavailable, or the request fails in any other way), the cli SHALL NOT read the failure as "the kind is not served" or as "the object does not exist". The failure SHALL be reported through the same path as a failed read of the object, with the API error in the error chain, so that the command exits with code 4 when access is denied, 3 when the server is unavailable and 1 otherwise, where that path sets the exit code from the error.
+When a discovery request fails (the API server denies it, is unavailable, or the request fails in any other way), the cli SHALL NOT read the failure as "the kind is not served" or as "the object does not exist". The API error SHALL stay in the error chain. An apply SHALL stop at a failed discovery request, in its first-install check, in its apply of objects and in its prune, and SHALL exit with code 4 when access is denied, 3 when the server is unavailable and 1 otherwise. A command that reads recorded objects SHALL report the failure through the same path as a failed read of the object.
 
 #### Scenario: Discovery is forbidden during delete
 
@@ -85,20 +85,35 @@ When a discovery request fails (the API server denies it, is unavailable, or the
 - **THEN** the apply SHALL stop before it applies anything
 - **AND** the error chain SHALL carry the ServiceUnavailable error
 
+#### Scenario: Discovery fails during the apply of objects
+
+- **WHEN** an apply sends its objects and the discovery request for one of them answers ServiceUnavailable
+- **THEN** the apply SHALL send no further object, SHALL NOT prune and SHALL NOT write the record
+- **AND** it SHALL exit with code 3
+- **AND** a dry run SHALL stop in the same way
+
 #### Scenario: Discovery fails during prune
 
-- **WHEN** an apply prunes a stale entry and the discovery request for its group and version fails
-- **THEN** the prune SHALL report a failure for that entry and the record SHALL still list it
+- **WHEN** an apply prunes stale entries and the discovery request for the group and version of one of them answers Forbidden
+- **THEN** the prune SHALL delete nothing more
+- **AND** the record written after it SHALL still list that entry and every stale entry not yet pruned
+- **AND** the command SHALL exit with code 4
 
 ### Requirement: An apply waits until discovery serves the kinds its definitions add
 
-Outside a dry run, after the CustomResourceDefinitions of an apply report Established, the apply SHALL wait until discovery serves every kind that the remaining objects of the apply use and that one of those definitions defines. The wait SHALL be bounded by the same deadline as the wait for Established. A discovery failure during the wait SHALL stop the apply.
+Outside a dry run, after the CustomResourceDefinitions of an apply report Established, the apply SHALL wait until discovery serves every kind that the remaining objects of the apply use and that one of those definitions defines and serves at the object's version. The wait SHALL be bounded by the same deadline as the wait for Established. A discovery failure during the wait SHALL stop the apply.
 
 #### Scenario: A custom resource applied with its definition
 
 - **WHEN** an apply holds a CustomResourceDefinition and an object of the kind it defines
 - **AND** discovery starts to serve the kind shortly after the definition reports Established
 - **THEN** the apply SHALL apply the object without an error
+
+#### Scenario: An object at a version its definition does not serve
+
+- **WHEN** an apply holds a CustomResourceDefinition that serves `v1` and an object of its kind at `v1alpha1`
+- **THEN** the apply SHALL NOT wait for that kind
+- **AND** it SHALL report an error for that object that names the kind and the API version, and SHALL apply the other objects
 
 #### Scenario: Discovery never serves the kind
 

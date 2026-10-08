@@ -36,7 +36,7 @@ func widgetClient(outcome kubetest.Outcome) *kubernetes.Client {
 
 var (
 	widgetNotServed = kubetest.Outcome{Err: &kubernetes.KindNotServedError{GVK: widgetGVK}}
-	widgetDown      = kubetest.Outcome{Err: apierrors.NewServiceUnavailable("discovery is down")}
+	widgetDown      = kubetest.Outcome{Err: &kubernetes.DiscoveryError{GroupVersion: widgetGVK.GroupVersion(), Err: apierrors.NewServiceUnavailable("discovery is down")}}
 )
 
 // Before the first install the cluster does not serve the kinds of the

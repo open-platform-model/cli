@@ -117,7 +117,10 @@ func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstru
 	SortObjects(sorted, object.Ascending)
 	definitions, rest := splitClusterDefinitions(sorted)
 
-	applied := applyStage(ctx, client, definitions, opts, dryRunSkips{}, result, instanceLog)
+	applied, err := applyStage(ctx, client, definitions, opts, dryRunSkips{}, result, instanceLog)
+	if err != nil {
+		return result, err
+	}
 
 	var skips dryRunSkips
 	if opts.DryRun {
@@ -126,7 +129,9 @@ func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstru
 		return result, err
 	}
 
-	applyStage(ctx, client, rest, opts, skips, result, instanceLog)
+	if _, err := applyStage(ctx, client, rest, opts, skips, result, instanceLog); err != nil {
+		return result, err
+	}
 	return result, nil
 }
 
@@ -180,8 +185,10 @@ func (s dryRunSkips) reason(res *unstructured.Unstructured) string {
 // applyStage applies objs in order, logging one line per object and
 // recording counts and per-resource errors in result. An object skips names
 // is not sent: it is logged as skipped and counted. It returns the objects
-// applied without error.
-func applyStage(ctx context.Context, client *Client, objs []*unstructured.Unstructured, opts ApplyOptions, skips dryRunSkips, result *ApplyResult, instanceLog *log.Logger) []stageOutcome {
+// applied without error. A failed API discovery request is not a
+// per-resource error: it stops the stage and is returned, since the cluster
+// cannot say where the remaining objects go.
+func applyStage(ctx context.Context, client *Client, objs []*unstructured.Unstructured, opts ApplyOptions, skips dryRunSkips, result *ApplyResult, instanceLog *log.Logger) ([]stageOutcome, error) {
 	var applied []stageOutcome
 	for _, res := range objs {
 		kind := res.GetKind()
@@ -195,6 +202,9 @@ func applyStage(ctx context.Context, client *Client, objs []*unstructured.Unstru
 		}
 
 		status, absentBefore, err := applyOne(ctx, client, res, opts)
+		if IsDiscoveryFailure(err) {
+			return applied, fmt.Errorf("applying %s/%s: %w", kind, name, err)
+		}
 		if err != nil {
 			instanceLog.Warn(fmt.Sprintf("applying %s/%s: %v", kind, name, err))
 			result.Errors = append(result.Errors, resourceError{
@@ -218,7 +228,7 @@ func applyStage(ctx context.Context, client *Client, objs []*unstructured.Unstru
 		instanceLog.Info(output.FormatResourceLine(kind, ns, name, status))
 		applied = append(applied, stageOutcome{obj: res, absentBefore: absentBefore})
 	}
-	return applied
+	return applied, nil
 }
 
 // waitEstablished waits until every CustomResourceDefinition among applied
@@ -255,14 +265,29 @@ func waitEstablished(ctx context.Context, client *Client, applied []stageOutcome
 }
 
 // kindsDefinedBy returns, in first-use order and once each, the kinds of
-// objs that one of crds defines (matched on spec.group and spec.names.kind).
+// objs that one of crds defines and serves: spec.group and spec.names.kind
+// match, and spec.versions lists the object's version with served true. An
+// object at a version its definition does not serve is left out, so the
+// apply fails on it at once instead of waiting for a kind that never comes.
 func kindsDefinedBy(crds, objs []*unstructured.Unstructured) []schema.GroupVersionKind {
-	defined := make(map[schema.GroupKind]struct{}, len(crds))
+	defined := make(map[schema.GroupVersionKind]struct{})
 	for _, crd := range crds {
 		group, _, _ := unstructured.NestedString(crd.Object, "spec", "group")        //nolint:errcheck // a malformed CRD is ignored
 		kind, _, _ := unstructured.NestedString(crd.Object, "spec", "names", "kind") //nolint:errcheck // a malformed CRD is ignored
-		if group != "" && kind != "" {
-			defined[schema.GroupKind{Group: group, Kind: kind}] = struct{}{}
+		versions, _, _ := unstructured.NestedSlice(crd.Object, "spec", "versions")   //nolint:errcheck // a malformed CRD is ignored
+		if group == "" || kind == "" {
+			continue
+		}
+		for _, v := range versions {
+			version, ok := v.(map[string]any)
+			if !ok {
+				continue
+			}
+			name, _ := version["name"].(string)   //nolint:errcheck // a malformed version is ignored
+			served, _ := version["served"].(bool) //nolint:errcheck // a malformed version is ignored
+			if name != "" && served {
+				defined[schema.GroupVersionKind{Group: group, Version: name, Kind: kind}] = struct{}{}
+			}
 		}
 	}
 
@@ -270,7 +295,7 @@ func kindsDefinedBy(crds, objs []*unstructured.Unstructured) []schema.GroupVersi
 	seen := make(map[schema.GroupVersionKind]struct{})
 	for _, obj := range objs {
 		gvk := obj.GroupVersionKind()
-		if _, ok := defined[gvk.GroupKind()]; !ok {
+		if _, ok := defined[gvk]; !ok {
 			continue
 		}
 		if _, dup := seen[gvk]; dup {
@@ -305,7 +330,7 @@ func waitServed(ctx context.Context, client *Client, kinds []schema.GroupVersion
 				if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
 					return ctx.Err()
 				}
-				return fmt.Errorf("timed out after %s waiting for the API server to serve an established kind: %w",
+				return fmt.Errorf("timed out after %s waiting for API discovery to list a kind its CustomResourceDefinition serves: %w",
 					time.Since(since).Round(time.Second), err)
 			case <-ticker.C:
 			}

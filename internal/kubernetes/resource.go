@@ -8,10 +8,9 @@ import (
 	"sync"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
 )
 
 // ResourceResolver resolves the resource that serves a kind. The name of a
@@ -40,6 +39,28 @@ func (e *KindNotServedError) Error() string {
 func IsKindNotServed(err error) bool {
 	var notServed *KindNotServedError
 	return errors.As(err, &notServed)
+}
+
+// DiscoveryError reports that the API discovery request for a group and
+// version failed, so the cluster gave no answer about the kinds it serves
+// there. It wraps the request error, so apierrors.IsForbidden and the like
+// see it. A caller that holds one stops: every further object of that group
+// and version would fail the same way.
+type DiscoveryError struct {
+	GroupVersion schema.GroupVersion
+	Err          error
+}
+
+func (e *DiscoveryError) Error() string {
+	return fmt.Sprintf("discovering the resources of %s: %v", e.GroupVersion, e.Err)
+}
+
+func (e *DiscoveryError) Unwrap() error { return e.Err }
+
+// IsDiscoveryFailure reports whether err is, or wraps, a *DiscoveryError.
+func IsDiscoveryFailure(err error) bool {
+	var failed *DiscoveryError
+	return errors.As(err, &failed)
 }
 
 // errNoResolver is returned by a Client built without a ResourceResolver.
@@ -75,23 +96,30 @@ func (c *Client) ResourceClient(gvr schema.GroupVersionResource, ns string) dyna
 
 // discoveryResolver is the ResourceResolver backed by the cluster's API
 // discovery. It reads one discovery document per group and version
-// (/api/v1, /apis/<group>/<version>) and keeps it in memory.
+// (/api/v1, /apis/<group>/<version>) through client-go's discovery client and
+// keeps it in memory. It reads single documents instead of building a
+// RESTMapper over every group, because that mapper drops a group whose
+// discovery failed, and a failed request would then look like a kind that is
+// not served.
 //
 // Only a document that holds the asked kind answers from memory. A kind that
 // is missing is asked for again on every call, because a
 // CustomResourceDefinition can start to serve it during the command; that
 // costs one request, the same as the read it stands in front of.
 type discoveryResolver struct {
-	rest rest.Interface
+	discovery discovery.ServerResourcesInterfaceWithContext
 
 	mu     sync.Mutex
 	served map[schema.GroupVersion]map[string]string // kind -> resource
 }
 
 // NewDiscoveryResolver returns a ResourceResolver that asks the API server
-// behind restClient, the REST client of a discovery client.
-func NewDiscoveryResolver(restClient rest.Interface) ResourceResolver {
-	return &discoveryResolver{rest: restClient, served: map[schema.GroupVersion]map[string]string{}}
+// behind client.
+func NewDiscoveryResolver(client discovery.DiscoveryInterface) ResourceResolver {
+	return &discoveryResolver{
+		discovery: discovery.ToDiscoveryInterfaceWithContext(client),
+		served:    map[schema.GroupVersion]map[string]string{},
+	}
 }
 
 func (r *discoveryResolver) ResourceFor(ctx context.Context, gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
@@ -112,7 +140,7 @@ func (r *discoveryResolver) ResourceFor(ctx context.Context, gvk schema.GroupVer
 			delete(r.served, gv)
 			return schema.GroupVersionResource{}, &KindNotServedError{GVK: gvk}
 		}
-		return schema.GroupVersionResource{}, fmt.Errorf("discovering the resources of %s: %w", gv, err)
+		return schema.GroupVersionResource{}, &DiscoveryError{GroupVersion: gv, Err: err}
 	}
 	r.served[gv] = kinds
 
@@ -127,13 +155,8 @@ func (r *discoveryResolver) ResourceFor(ctx context.Context, gvk schema.GroupVer
 // resource that serves each. Subresources are left out; when several
 // resources serve one kind, the first listed wins.
 func (r *discoveryResolver) fetch(ctx context.Context, gv schema.GroupVersion) (map[string]string, error) {
-	path := "/apis/" + gv.Group + "/" + gv.Version
-	if gv.Group == "" {
-		path = "/api/" + gv.Version
-	}
-
-	list := &metav1.APIResourceList{}
-	if err := r.rest.Get().AbsPath(path).Do(ctx).Into(list); err != nil {
+	list, err := r.discovery.ServerResourcesForGroupVersionWithContext(ctx, gv.String())
+	if err != nil {
 		return nil, err
 	}
 

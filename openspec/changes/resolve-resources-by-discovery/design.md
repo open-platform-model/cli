@@ -24,17 +24,16 @@ Read paths split into two groups. cli#332 and cli#338 made a failed read of a re
 
 **Context**: The cli always knows group, version and kind of the object it addresses (a rendered object or an inventory entry). It needs only the resource name.
 
-**Explored**: `k8s.io/client-go` v0.37.1 `restmapper.NewDeferredDiscoveryRESTMapper` with `memory.NewMemCacheClient`; `discovery.ServerResourcesForGroupVersion`; a direct GET of `/api/v1` or `/apis/<group>/<version>` through the discovery REST client.
+**Explored**: `k8s.io/client-go` v0.37.1 `restmapper.NewDeferredDiscoveryRESTMapper` with `memory.NewMemCacheClient`; `discovery.ServerResourcesForGroupVersionWithContext` (`discovery/discovery_client.go:815`).
 
 **Options considered**:
 
 1. Deferred discovery RESTMapper (kubectl's pattern). Pro: standard. Con: it loads every group of the cluster (2 requests with aggregated discovery, one per group-version without), and `restmapper.GetAPIGroupResources` drops groups whose discovery failed, so a denied or unavailable group reads as "no match". That is the empty answer this change must not accept.
-2. `ServerResourcesForGroupVersion`. Pro: one request per group-version. Con: for `v1` it returns an empty list on Forbidden and NotFound, and it takes no context.
-3. A direct GET of the group-version document with the caller's context. Pro: one request per group-version, the exact API error, the caller's deadline. Con: about 100 lines of own code.
+2. `ServerResourcesForGroupVersionWithContext` behind a small cache. Pro: one request per group-version, the exact API error, the caller's context. It tolerates one error only: NotFound for `v1` gives an empty list, which this design reads as "not served" as well. Con: the cache and the two typed errors are own code.
 
-**Decision**: Option 3.
+**Decision**: Option 2.
 
-**Rationale**: It is the only option where a failed discovery request cannot look like an unserved kind. It is also the cheapest: an instance touches a handful of group-versions.
+**Rationale**: It is the option where a failed discovery request cannot look like an unserved kind. It is also the cheapest: an instance touches a handful of group-versions.
 
 ### Resolver contract
 
@@ -48,7 +47,11 @@ type ResourceResolver interface {
 // It never unwraps to an API status error, so apierrors.IsNotFound is false.
 type KindNotServedError struct{ GVK schema.GroupVersionKind }
 
+// DiscoveryError: the discovery request failed. It unwraps to the API error.
+type DiscoveryError struct{ GroupVersion schema.GroupVersion; Err error }
+
 func IsKindNotServed(err error) bool
+func IsDiscoveryFailure(err error) bool
 
 // On Client:
 func (c *Client) ResourceFor(ctx, gvk) (schema.GroupVersionResource, error)
@@ -56,7 +59,7 @@ func (c *Client) ResourceClientFor(ctx, gvk, namespace) (dynamic.ResourceInterfa
 ```
 
 - A 404 from the group-version document, or a document without the kind, is `*KindNotServedError`: `kind "Widget" of example.io/v1 is not served by the cluster`.
-- Any other failure is `discovering resources of <group/version>: %w` with the API error wrapped, so `apierrors.IsForbidden` and the exit code mapping keep working.
+- Any other failure is a `*DiscoveryError` (`discovering the resources of <group/version>: ...`) that unwraps to the API error, so `apierrors.IsForbidden` and the exit code mapping keep working, and a caller can tell it from one object's error.
 - Cache: positive answers only, per group-version, in memory, guarded by a mutex. A miss always asks the server again (and replaces the cached document), because a CustomResourceDefinition can add a kind during the command. The cost of a miss is one request, the same as the 404 read it replaces.
 - Subresources (`deployments/status`) are skipped. The first resource whose `kind` matches wins.
 - No retry layer is added. client-go's own handling of `Retry-After` stays the only one. The caller's context bounds every request.
@@ -66,10 +69,10 @@ func (c *Client) ResourceClientFor(ctx, gvk, namespace) (dynamic.ResourceInterfa
 
 | Call site | Unserved kind | Discovery failure |
 | --- | --- | --- |
-| `applyOne` | per-resource error (existing path) | per-resource error |
+| `applyOne` in `Apply` | per-resource error (existing path) | the apply stops at once and returns the error; nothing more is sent, no prune, no record write |
 | `checkDeletable`, `deleteResource` | per-resource error, record kept | same |
 | `DiscoverResourcesFromInventory` | unreadable entry | unreadable entry |
-| `PruneStaleResources` | failed entry in `PruneError` | failed entry |
+| `PruneStaleResources` | failed entry in `PruneError` | the prune stops; that entry and every untried entry are failed entries, kept in the record |
 | `FirstInstallCheck` | object does not exist | error, apply stops |
 | `fetchLiveState` (diff) | object does not exist (added) | diff error (existing path) |
 | `pollObjects` (wait) | error, wait stops | error, wait stops |
@@ -83,13 +86,23 @@ func (c *Client) ResourceClientFor(ctx, gvk, namespace) (dynamic.ResourceInterfa
 
 **Context**: The API server updates the discovery document of a group after a CustomResourceDefinition becomes Established, not in the same step. The old code sent the PATCH straight to the guessed path, so it did not depend on discovery.
 
-**Decision**: `Apply` waits, after `waitEstablished` and under the same deadline, until the resolver serves each kind that the second stage uses and a first-stage definition defines. `KindNotServedError` keeps the wait going; any other error stops it. The operator install path applies its definitions with `ApplyOne` and waits with `Wait`; its instance apply goes through `Apply` and gets the same wait.
+**Decision**: `Apply` waits, after `waitEstablished` and under the same deadline, until the resolver serves each kind that the second stage uses and a first-stage definition defines and serves (`spec.versions` lists the object's version with `served: true`). An object at a version its definition does not serve is not waited for: it fails at once with the named error and the other objects are applied. `KindNotServedError` keeps the wait going; any other error stops it. The operator install path applies its definitions with `ApplyOne` and waits with `Wait`; its instance apply goes through `Apply` and gets the same wait.
 
 **Assumption not verified here**: the size of that lag on a real cluster. No cluster is available to this change; the repo's e2e job covers the path.
 
 ## Error handling and exit codes
 
-No command gets a new exit code. The resolver's errors go through the paths of cli#332 and cli#338. Where such a path sets the exit code from the error (`ExitCodeFromK8sError`: the diff of rendered objects, the first-install check and the other apply refusals), the code is 4 for Forbidden or Unauthorized, 3 for ServerTimeout or ServiceUnavailable, 1 otherwise; a `KindNotServedError` maps to 1. Where the path has a fixed code, it keeps it: `instance delete` exits 1 for any per-resource failure (`reportInstanceDelete`), and `instance status` shows an unreadable resource as health Unknown and exits 2.
+No command gets a new exit code value. `ExitCodeFromK8sError` gives 4 for Forbidden or Unauthorized, 3 for ServerTimeout or ServiceUnavailable, 1 otherwise; a `KindNotServedError` maps to 1.
+
+| Command path | Failed discovery request |
+| --- | --- |
+| apply, first-install check | stop before anything is applied, exit 4/3/1 |
+| apply, objects | stop at the object, exit 4/3/1 (`Apply` returns the error) |
+| apply, prune | stop the prune, write the record with every entry not pruned, exit 4/3/1 |
+| diff of rendered objects | read failure for the object, exit 4/3/1 (cli#338 path) |
+| `instance delete` | per-resource failure, record kept, exit 1: `reportInstanceDelete` gives every per-resource failure a fixed 1 (cli#332). Changing that is outside this change. |
+| `instance status` | the resource is health Unknown, exit 2 (cli#332) |
+| `instance tree`, `events`, `list`, diff orphan detection | a warning that names the resource (cli#332 and cli#338 paths) |
 
 Example, delete of a record with an unserved kind:
 

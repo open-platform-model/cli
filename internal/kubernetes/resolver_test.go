@@ -83,7 +83,7 @@ func newDiscoveryResolver(t *testing.T, docs map[string][]metav1.APIResource) (R
 
 	cs, err := clientset.NewForConfig(&rest.Config{Host: httpServer.URL})
 	require.NoError(t, err)
-	return NewDiscoveryResolver(cs.Discovery().RESTClient()), server
+	return NewDiscoveryResolver(cs.Discovery()), server
 }
 
 var (
@@ -194,8 +194,7 @@ func TestDiscoveryResolver_FailedRequestIsNotAnUnservedKind(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			resolver, server := newDiscoveryResolver(t, nil)
-			// The core group too: client-go's own helper reads a forbidden
-			// /api/v1 as an empty list.
+			// The core group too: it is read from another path.
 			server.set(func(s *discoveryServer) {
 				s.status[examplePath] = tt.code
 				s.status["/api/v1"] = tt.code
@@ -205,6 +204,7 @@ func TestDiscoveryResolver_FailedRequestIsNotAnUnservedKind(t *testing.T) {
 				_, err := resolver.ResourceFor(context.Background(), gvk)
 				require.Error(t, err)
 				assert.False(t, IsKindNotServed(err), "a failed request is not an answer: %v", err)
+				assert.True(t, IsDiscoveryFailure(err))
 				assert.False(t, apierrors.IsNotFound(err))
 				assert.True(t, tt.check(err), "the API error stays in the chain: %v", err)
 				assert.Contains(t, err.Error(), gvk.GroupVersion().String())
@@ -224,6 +224,27 @@ func TestDiscoveryResolver_CanceledContext(t *testing.T) {
 	require.Error(t, err)
 	assert.False(t, IsKindNotServed(err))
 	assert.ErrorIs(t, err, context.Canceled)
+}
+
+// NewClient must give the client the resolver that asks the cluster: every
+// other test sets a fake one.
+func TestNewClient_ResolvesThroughTheClustersDiscovery(t *testing.T) {
+	server := &discoveryServer{
+		docs:   map[string][]metav1.APIResource{monitoringPath: {{Name: "prometheuses", Kind: "Prometheus"}}},
+		status: map[string]int{}, hits: map[string]int{},
+	}
+	httpServer := httptest.NewServer(server)
+	t.Cleanup(httpServer.Close)
+
+	ResetClient()
+	t.Cleanup(ResetClient)
+	client, err := NewClient(ClientOptions{Kubeconfig: writeKubeconfig(t, httpServer.URL)})
+	require.NoError(t, err)
+
+	gvr, err := client.ResourceFor(context.Background(), prometheusGVK)
+	require.NoError(t, err)
+	assert.Equal(t, "prometheuses", gvr.Resource)
+	assert.Equal(t, 1, server.requests(monitoringPath))
 }
 
 func TestClient_ResourceForWithoutResolver(t *testing.T) {

@@ -99,7 +99,7 @@ func NewClient(opts ClientOptions) (*Client, error) {
 		Dynamic:    dynamicClient,
 		Clientset:  clientset,
 		RestConfig: restConfig,
-		Resources:  NewDiscoveryResolver(clientset.Discovery().RESTClient()),
+		Resources:  NewDiscoveryResolver(clientset.Discovery()),
 	}
 
 	return cachedClient, nil

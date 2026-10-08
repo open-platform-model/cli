@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,8 +42,10 @@ func promCluster(t *testing.T, outcome kubetest.Outcome, objs ...*unstructured.U
 var (
 	promServed    = kubetest.Outcome{Resource: "prometheuses"}
 	promNotServed = kubetest.Outcome{Err: &kubernetes.KindNotServedError{GVK: promGVK}}
-	promForbidden = kubetest.Outcome{Err: apierrors.NewForbidden(schema.GroupResource{Group: promGVK.Group}, "", errors.New("no discovery"))}
-	promDown      = kubetest.Outcome{Err: apierrors.NewServiceUnavailable("discovery is down")}
+	promForbidden = kubetest.Outcome{Err: &kubernetes.DiscoveryError{GroupVersion: promGVK.GroupVersion(),
+		Err: apierrors.NewForbidden(schema.GroupResource{Group: promGVK.Group}, "", errors.New("no discovery"))}}
+	promDown = kubetest.Outcome{Err: &kubernetes.DiscoveryError{GroupVersion: promGVK.GroupVersion(),
+		Err: apierrors.NewServiceUnavailable("discovery is down")}}
 )
 
 func promRecord() *Record {
@@ -113,7 +116,13 @@ func TestPruneStaleResources_ResolvesByDiscovery(t *testing.T) {
 
 			var pruneErr *PruneError
 			require.ErrorAs(t, err, &pruneErr, "the entry must not count as pruned")
-			assert.Equal(t, []k8sinventory.Entry{promEntry}, pruneErr.Failed)
+			want := []k8sinventory.Entry{promEntry}
+			if outcome == promForbidden {
+				// A failed discovery request stops the prune: the untried
+				// entry is reported too.
+				want = append(want, cm)
+			}
+			assert.Equal(t, want, pruneErr.Failed)
 			assert.Contains(t, err.Error(), "Prometheus/main")
 			assert.Equal(t, outcome == promForbidden, apierrors.IsForbidden(err))
 			assert.Equal(t, outcome == promNotServed, kubernetes.IsKindNotServed(err))
@@ -147,4 +156,31 @@ func TestFirstInstallCheck_ResolvesByDiscovery(t *testing.T) {
 		assert.True(t, apierrors.IsServiceUnavailable(err), "the API error stays in the chain")
 		assert.Contains(t, err.Error(), "Prometheus/main")
 	})
+}
+
+// A failed discovery request stops the prune: the entry it hit and every
+// entry not yet tried are reported as still in the cluster, and nothing more
+// is deleted. An entry of a kind that is not served does not stop it.
+func TestPruneStaleResources_DiscoveryFailureStopsThePrune(t *testing.T) {
+	ctx := context.Background()
+	cm := k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "stale"}
+	ns := k8sinventory.Entry{Version: "v1", Kind: "Namespace", Name: "apps"}
+	liveCM := liveObject("v1", "ConfigMap", "default", "stale")
+
+	// Prune order is highest weight first: the Prometheus before the ConfigMap.
+	client, _ := promCluster(t, promForbidden, livePrometheus())
+	_, err := client.Dynamic.Resource(kubetest.GVR(liveCM)).Namespace("default").Create(ctx, liveCM, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	err = PruneStaleResources(ctx, client, []k8sinventory.Entry{cm, promEntry, ns})
+
+	var pruneErr *PruneError
+	require.ErrorAs(t, err, &pruneErr)
+	assert.Equal(t, []k8sinventory.Entry{promEntry, cm}, pruneErr.Failed, "the failed entry and the untried one, never the protected one")
+	for _, e := range pruneErr.Errs {
+		assert.True(t, kubernetes.IsDiscoveryFailure(e))
+		assert.True(t, apierrors.IsForbidden(e))
+	}
+	_, err = client.Dynamic.Resource(kubetest.GVR(liveCM)).Namespace("default").Get(ctx, "stale", metav1.GetOptions{})
+	require.NoError(t, err, "nothing is deleted after the failure")
 }

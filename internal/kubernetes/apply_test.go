@@ -244,6 +244,10 @@ func stagingCRD() *unstructured.Unstructured {
 	crd := stagingObject("apiextensions.k8s.io/v1", "CustomResourceDefinition", "foos.example.com", "")
 	_ = unstructured.SetNestedField(crd.Object, "example.com", "spec", "group")
 	_ = unstructured.SetNestedField(crd.Object, "Foo", "spec", "names", "kind")
+	_ = unstructured.SetNestedSlice(crd.Object, []any{
+		map[string]any{"name": "v1", "served": true},
+		map[string]any{"name": "v1beta1", "served": false},
+	}, "spec", "versions")
 	return crd
 }
 

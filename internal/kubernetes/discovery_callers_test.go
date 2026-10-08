@@ -73,7 +73,7 @@ func TestDelete_UsesTheResourceTheClusterServes(t *testing.T) {
 // A recorded kind the cluster does not serve, and a discovery request that
 // fails, are per-resource errors: never "already gone".
 func TestDelete_UnresolvedKindIsAnError(t *testing.T) {
-	forbidden := apierrors.NewForbidden(schema.GroupResource{Group: promGVK.Group}, "", errors.New("no discovery"))
+	forbidden := discoveryFailure(promGVK, apierrors.NewForbidden(schema.GroupResource{Group: promGVK.Group}, "", errors.New("no discovery")))
 	tests := map[string]struct {
 		outcome error
 		check   func(t *testing.T, err error)
@@ -164,7 +164,7 @@ func TestDiff_ResolvesRenderedKinds(t *testing.T) {
 
 	t.Run("discovery unavailable", func(t *testing.T) {
 		client, _ := irregularCluster(t)
-		unavailable := apierrors.NewServiceUnavailable("discovery is down")
+		unavailable := discoveryFailure(promGVK, apierrors.NewServiceUnavailable("discovery is down"))
 		client.Resources = kubetest.ResourcesWith(map[schema.GroupVersionKind]kubetest.Outcome{promGVK: {Err: unavailable}})
 		result, err := Diff(context.Background(), client, []*unstructured.Unstructured{rendered.DeepCopy()}, "demo", NewComparer())
 		require.NoError(t, err)
@@ -198,10 +198,16 @@ func TestApply_WaitsUntilDiscoveryServesTheNewKind(t *testing.T) {
 	resources := kubetest.ResourcesWith(map[schema.GroupVersionKind]kubetest.Outcome{fooGVK: {Err: &KindNotServedError{GVK: fooGVK}}})
 	client.Resources = resources
 
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 	go func() {
 		// Serve the kind once the apply has asked for it and been refused.
 		for resources.Calls(fooGVK) < 2 {
-			time.Sleep(time.Millisecond)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Millisecond):
+			}
 		}
 		resources.Set(fooGVK, kubetest.Outcome{Resource: "foos"})
 	}()
@@ -234,11 +240,78 @@ func TestApply_DiscoveryFailureStopsTheWait(t *testing.T) {
 	shortWaitPoll(t)
 	cluster := &stagingCluster{established: true}
 	client := cluster.client(t)
-	forbidden := apierrors.NewForbidden(schema.GroupResource{Group: fooGVK.Group}, "", errors.New("no discovery"))
+	forbidden := discoveryFailure(fooGVK, apierrors.NewForbidden(schema.GroupResource{Group: fooGVK.Group}, "", errors.New("no discovery")))
 	client.Resources = kubetest.ResourcesWith(map[schema.GroupVersionKind]kubetest.Outcome{fooGVK: {Err: forbidden}})
 
 	_, err := Apply(context.Background(), client, stagingInput(), "test", ApplyOptions{})
 
 	require.Error(t, err)
 	assert.True(t, apierrors.IsForbidden(err))
+}
+
+// discoveryFailure is the error the resolver returns when the discovery
+// request for the group and version of gvk fails with cause.
+func discoveryFailure(gvk schema.GroupVersionKind, cause error) error {
+	return &DiscoveryError{GroupVersion: gvk.GroupVersion(), Err: cause}
+}
+
+// A failed discovery request is not one object's error: the apply stops at
+// it, sends nothing more, and returns the API error for the exit code. It is
+// the same in a dry run.
+func TestApply_DiscoveryFailureStopsTheApply(t *testing.T) {
+	serviceGVK := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
+	unavailable := discoveryFailure(serviceGVK, apierrors.NewServiceUnavailable("discovery is down"))
+
+	for _, dryRun := range []bool{false, true} {
+		cluster := &stagingCluster{}
+		client := cluster.client(t)
+		client.Resources = kubetest.ResourcesWith(map[schema.GroupVersionKind]kubetest.Outcome{serviceGVK: {Err: unavailable}})
+		input := []*unstructured.Unstructured{
+			stagingObject("v1", "ConfigMap", "cfg", "demo"),
+			stagingObject("v1", "Service", "web", "demo"),
+			stagingObject("apps/v1", "Deployment", "web", "demo"),
+		}
+
+		result, err := Apply(context.Background(), client, input, "test", ApplyOptions{DryRun: dryRun})
+
+		require.Error(t, err, "dryRun=%v", dryRun)
+		assert.True(t, IsDiscoveryFailure(err))
+		assert.True(t, apierrors.IsServiceUnavailable(err), "the API error stays in the chain")
+		assert.Contains(t, err.Error(), "Service/web")
+		assert.Empty(t, result.Errors, "it is not a per-resource error")
+		assert.Equal(t, []string{"ConfigMap/cfg"}, cluster.patchOrder(), "nothing is sent after the failure")
+	}
+}
+
+// An object at a version its CustomResourceDefinition does not serve fails at
+// once and alone: the apply does not wait for a kind that never comes, and
+// the other objects are applied.
+func TestApply_VersionTheDefinitionDoesNotServeFailsAtOnce(t *testing.T) {
+	shortWaitPoll(t)
+	for _, version := range []string{"v1alpha1", "v1beta1"} {
+		t.Run(version, func(t *testing.T) {
+			gvk := schema.GroupVersionKind{Group: "example.com", Version: version, Kind: "Foo"}
+			cluster := &stagingCluster{established: true}
+			client := cluster.client(t)
+			resources := kubetest.ResourcesWith(map[schema.GroupVersionKind]kubetest.Outcome{gvk: {Err: &KindNotServedError{GVK: gvk}}})
+			client.Resources = resources
+			input := []*unstructured.Unstructured{
+				stagingCRD(),
+				stagingObject("example.com/"+version, "Foo", "my-foo", "demo"),
+				stagingObject("v1", "ConfigMap", "cfg", "demo"),
+			}
+
+			start := time.Now()
+			result, err := Apply(context.Background(), client, input, "test", ApplyOptions{
+				EstablishDeadline: start.Add(30 * time.Second),
+			})
+
+			require.NoError(t, err)
+			assert.Less(t, time.Since(start), 10*time.Second, "the apply must not wait out the deadline")
+			assert.Equal(t, 1, resources.Calls(gvk), "asked once, by the apply of the object itself")
+			require.Len(t, result.Errors, 1)
+			assert.True(t, IsKindNotServed(result.Errors[0].Err))
+			assert.Contains(t, cluster.patchOrder(), "ConfigMap/cfg")
+		})
+	}
 }

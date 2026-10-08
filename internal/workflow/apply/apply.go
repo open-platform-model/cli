@@ -264,11 +264,12 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		// in the record, so the next apply finds them stale and retries.
 		recordEntries := currentEntries
 		var notPruned []k8sinventory.Entry
+		pruneExit := opmexit.ExitGeneralError
 		if !req.Options.NoPrune {
 			if len(prunable) > 0 {
 				instanceLog.Info(fmt.Sprintf("pruning %d stale resource(s)", len(prunable)))
 				var err error
-				notPruned, err = pruneStale(ctx, req.K8sClient, prunable, instanceLog)
+				notPruned, pruneExit, err = pruneStale(ctx, req.K8sClient, prunable, instanceLog)
 				if err != nil {
 					return err
 				}
@@ -287,7 +288,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		if len(notPruned) > 0 {
 			err := fmt.Errorf("%d stale resource(s) could not be pruned and stay in the inventory; fix the cause and run apply again to retry", len(notPruned))
 			instanceLog.Error(err.Error())
-			return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
+			return &opmexit.ExitError{Code: pruneExit, Err: err, Printed: true}
 		}
 	}
 
@@ -313,22 +314,28 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 // pruneStale deletes the prunable stale resources. It returns the entries it
 // could not delete, each already reported on its own line with the delete
 // error; the caller keeps them in the record and fails the command after the
-// write. The error result is for a failure that names no entries, where the
-// caller must stop before the write so that no entry is dropped unseen.
-func pruneStale(ctx context.Context, client *kubernetes.Client, prunable []k8sinventory.Entry, instanceLog *log.Logger) ([]k8sinventory.Entry, error) {
-	err := inventory.PruneStaleResources(ctx, client, prunable)
+// write with exitCode: 1, or, when a failed API discovery request stopped the
+// prune, the code of that failure (4 denied, 3 unavailable). The error result
+// is for a failure that names no entries, where the caller must stop before
+// the write so that no entry is dropped unseen.
+func pruneStale(ctx context.Context, client *kubernetes.Client, prunable []k8sinventory.Entry, instanceLog *log.Logger) (notPruned []k8sinventory.Entry, exitCode int, err error) {
+	exitCode = opmexit.ExitGeneralError
+	err = inventory.PruneStaleResources(ctx, client, prunable)
 	if err == nil {
-		return nil, nil
+		return nil, exitCode, nil
 	}
 	var pruneErr *inventory.PruneError
 	if !errors.As(err, &pruneErr) {
 		instanceLog.Error("pruning stale resources failed", "error", err)
-		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
+		return nil, exitCode, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
 	}
 	for i, e := range pruneErr.Failed {
 		instanceLog.Error(output.FormatResourceLine(e.Kind, e.Namespace, e.Name, statusPruneFailed), "error", pruneErr.Errs[i])
+		if kubernetes.IsDiscoveryFailure(pruneErr.Errs[i]) {
+			exitCode = exitCodeFromK8sError(pruneErr.Errs[i])
+		}
 	}
-	return pruneErr.Failed, nil
+	return pruneErr.Failed, exitCode, nil
 }
 
 // statusPruneFailed is the status of a stale resource whose delete failed.
