@@ -63,8 +63,30 @@ const (
 	// StatusTerminating marks a deleted object that still exists: its
 	// dependents or its finalizers hold it.
 	StatusTerminating = "terminating"
-	StatusValid       = "valid"
-	statusFailed      = "failed"
+	// The statuses below are a dry run's: what the real apply would do with
+	// an object it does not apply or does not prune.
+	//
+	// StatusWouldRefuse marks a rendered object the ownership guard of the
+	// real apply refuses.
+	StatusWouldRefuse = "would refuse"
+	// StatusWouldSkip marks a rendered object the real apply leaves out
+	// because another instance adopted it.
+	StatusWouldSkip = "would skip"
+	// StatusWouldPrune marks a stale object the real prune deletes. It has
+	// no icon and no color: nothing needs attention.
+	StatusWouldPrune = "would prune"
+	// StatusWouldKeep marks a stale object the real prune leaves in place
+	// because it is not managed by OPM or belongs to another instance.
+	StatusWouldKeep = "would keep"
+	// StatusWouldLetGo marks a stale object the real prune leaves in place
+	// because another instance is adopting it.
+	StatusWouldLetGo = "would let go"
+	// StatusCannotCheck marks a stale object a dry run could not read, so
+	// the real prune fails on it.
+	StatusCannotCheck = "cannot check"
+
+	StatusValid  = "valid"
+	statusFailed = "failed"
 )
 
 // StatusStyle returns the lipgloss style for a given resource status string.
@@ -81,8 +103,10 @@ func statusStyle(status string) lipgloss.Style {
 		return lipgloss.NewStyle().Faint(true)
 	case StatusDeleted:
 		return lipgloss.NewStyle().Foreground(colorRed)
-	case StatusLeftBehind, StatusTerminating:
+	case StatusLeftBehind, StatusTerminating, StatusWouldSkip, StatusWouldKeep, StatusWouldLetGo:
 		return lipgloss.NewStyle().Foreground(ColorYellow)
+	case StatusWouldRefuse, StatusCannotCheck:
+		return lipgloss.NewStyle().Bold(true).Foreground(colorBoldRed)
 	case statusFailed:
 		return lipgloss.NewStyle().Bold(true).Foreground(colorBoldRed)
 	default:
@@ -107,7 +131,7 @@ func statusIcon(status string) string {
 		return "="
 	case StatusDeleted:
 		return "-"
-	case StatusLeftBehind, StatusTerminating:
+	case StatusLeftBehind, StatusTerminating, StatusWouldRefuse, StatusWouldSkip, StatusWouldKeep, StatusWouldLetGo, StatusCannotCheck:
 		return "!"
 	case statusFailed:
 		return "!"

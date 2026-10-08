@@ -170,18 +170,6 @@ func CoreSchemaError(cfg *config.GlobalConfig, err error) error {
 // mapping routes it to the host a refused schema fetch names.
 const coreModulePath = "opmodel.dev/core"
 
-// registryLoginHint is the next step after a registry refused the caller:
-// the login command for the host the failed operation was routed to. With no
-// known host it is the bare command, which resolves the configured mapping
-// and lists the hosts when it names several.
-func registryLoginHint(host string) string {
-	const hint = "Log in to the registry, then retry:  opm registry login"
-	if host == "" {
-		return hint
-	}
-	return hint + " " + host
-}
-
 // publishError maps pipeline errors to exit codes. A registry that refused
 // the caller (a *publish.RegistryError marked Unauthorized: a 401 or 403) is
 // a permission failure, exit 4, and gains the login hint. Any other failed
@@ -195,7 +183,7 @@ func publishError(err error) error {
 		if regErr.Unauthorized {
 			return &opmexit.ExitError{
 				Code: opmexit.ExitPermissionDenied,
-				Err:  fmt.Errorf("%w\n  %s", err, registryLoginHint(regErr.Host)),
+				Err:  fmt.Errorf("%w\n  %s", err, config.RegistryLoginHint(regErr.Host)),
 			}
 		}
 		return &opmexit.ExitError{Code: opmexit.ExitConnectivityError, Err: err}

@@ -72,7 +72,7 @@ func TestPlatformBuildHint_Pinned(t *testing.T) {
 // registry answer that does not carry cue/load's import prefix: the library
 // classifies the form as a fetch failure.
 func TestPlatformBuildHint_NotFoundWithoutImportPrefix(t *testing.T) {
-	hint := platformBuildHint(t.TempDir(), errors.New("cannot fetch example.com/dep@v0.9.0: module not found"))
+	hint := platformBuildHint(t.TempDir(), DefaultRegistry, errors.New("cannot fetch example.com/dep@v0.9.0: module not found"))
 	assert.Contains(t, hint, "Pin a published build in ")
 }
 
@@ -88,8 +88,8 @@ func TestPlatformBuildHint_CUEErrorPath(t *testing.T) {
 	require.Error(t, other)
 
 	wrap := func(err error) error { return fmt.Errorf("building platform package from dir: %w", err) }
-	assert.Contains(t, platformBuildHint(t.TempDir(), wrap(under)), hintKey)
-	assert.Contains(t, platformBuildHint(t.TempDir(), wrap(other)), hintDefault)
+	assert.Contains(t, platformBuildHint(t.TempDir(), DefaultRegistry, wrap(under)), hintKey)
+	assert.Contains(t, platformBuildHint(t.TempDir(), DefaultRegistry, wrap(other)), hintDefault)
 
 	// The library's shape check names #registry in its text only: it
 	// flattens the CUE cause and wraps the missing-field sentinel. Old hint,
@@ -98,7 +98,7 @@ func TestPlatformBuildHint_CUEErrorPath(t *testing.T) {
 	// drives the same form through a real build.
 	shape := fmt.Errorf("validating platform package in dir: required field %q entry %q is incomplete at %q (an embedded catalog supplies it): %v: %w",
 		"#registry", "example.com/x@v1", "version", "#registry.\"example.com/x@v1\".version: required field missing", liberrors.ErrMissingRequiredField)
-	shapeHint := platformBuildHint(t.TempDir(), shape)
+	shapeHint := platformBuildHint(t.TempDir(), DefaultRegistry, shape)
 	assert.Contains(t, shapeHint, hintDefault)
 	assert.NotContains(t, shapeHint, hintKey)
 }

@@ -16,6 +16,7 @@ import (
 
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
+	"github.com/open-platform-model/library/opm/k8s/ownership"
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
@@ -139,6 +140,84 @@ func TestPruneStaleResources_AsksTheDeleteVerdict(t *testing.T) {
 			if tc.wantIs != nil {
 				assert.ErrorIs(t, err, tc.wantIs)
 			}
+		})
+	}
+}
+
+// TestPreviewPruneStaleResources_AsksTheSameVerdict covers the preview of a
+// prune: for each live state it gives the answer of the real prune (would
+// delete, left behind with the verdict's reason, or failed) and sends no
+// delete, also where the real prune would send one.
+func TestPreviewPruneStaleResources_AsksTheSameVerdict(t *testing.T) {
+	entry := k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "old"}
+	denied := apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "old", errors.New("denied"))
+
+	tests := map[string]struct {
+		live       *unstructured.Unstructured
+		readErr    error
+		wantPrune  bool
+		wantSkip   ownership.SkipReason
+		wantReason string
+		wantFailed bool
+	}{
+		"owned object would be pruned": {
+			live: staleCM(opmlabels.ManagedByCLI, recordedUUID, ""), wantPrune: true,
+		},
+		"name taken by an object OPM does not manage": {
+			live: staleCM("", "", ""), wantSkip: ownership.SkipNotOPMManaged, wantReason: "is not managed by OPM",
+		},
+		"another instance's object": {
+			live: staleCM(opmlabels.ManagedByController, "uuid-other", ""), wantSkip: ownership.SkipOwnerMismatch, wantReason: "belongs to module instance uuid-other",
+		},
+		"object adopted by another instance": {
+			live: staleCM(opmlabels.ManagedByCLI, recordedUUID, "uuid-other"), wantSkip: ownership.SkipAdoptedElsewhere, wantReason: "is being adopted by module instance uuid-other",
+		},
+		"already gone is in neither list": {},
+		"read denied": {
+			live: staleCM(opmlabels.ManagedByCLI, recordedUUID, ""), readErr: denied, wantFailed: true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var objs []runtime.Object
+			if tc.live != nil {
+				objs = append(objs, tc.live)
+			}
+			dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), objs...)
+			if tc.readErr != nil {
+				dyn.PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+					return true, nil, tc.readErr
+				})
+			}
+			client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dyn}
+
+			wouldPrune, leftBehind, err := PreviewPruneStaleResources(context.Background(), client, []k8sinventory.Entry{entry}, recordedUUID)
+
+			for _, a := range dyn.Actions() {
+				assert.Equal(t, "get", a.GetVerb(), "the preview only reads")
+			}
+			if tc.wantPrune {
+				assert.Equal(t, []k8sinventory.Entry{entry}, wouldPrune)
+			} else {
+				assert.Empty(t, wouldPrune)
+			}
+			if tc.wantSkip != "" {
+				require.Len(t, leftBehind, 1)
+				assert.Equal(t, entry, leftBehind[0].Entry)
+				assert.Equal(t, tc.wantSkip, leftBehind[0].Skip)
+				assert.Contains(t, leftBehind[0].Reason, tc.wantReason)
+			} else {
+				assert.Empty(t, leftBehind)
+			}
+			if !tc.wantFailed {
+				require.NoError(t, err)
+				return
+			}
+			var pruneErr *PruneError
+			require.ErrorAs(t, err, &pruneErr)
+			assert.Equal(t, []k8sinventory.Entry{entry}, pruneErr.Failed)
+			assert.ErrorIs(t, err, tc.readErr)
+			assert.Contains(t, err.Error(), "checking ConfigMap/old", "a preview failure is not worded as a delete")
 		})
 	}
 }

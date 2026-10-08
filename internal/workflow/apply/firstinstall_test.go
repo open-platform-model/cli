@@ -11,6 +11,8 @@ import (
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
+
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 )
 
 // firstInstallWarning is the text only the first-install warning carries.
@@ -95,36 +97,28 @@ func TestExecute_DryRunFirstInstallOverManagedResourcesWarns(t *testing.T) {
 	assert.False(t, written, "a dry run writes no record")
 }
 
-// A dry run refuses nothing in the first-install look: an object a real run
-// would refuse is left out of the look, without an error and without a
-// refusal in the output.
-func TestExecute_DryRunFirstInstallLookRefusesNothing(t *testing.T) {
-	withReleasedCLIVersion(t)
-	logBuf := captureLog(t)
-	foreign := renderedConfigMap("a")
+// A dry run that previews a refusal stops there, as the real run does, and
+// prints no first-install warning: the warning is for an apply that goes on.
+func TestExecute_DryRunFirstInstallThatPreviewsARefusalPrintsNoWarning(t *testing.T) {
+	foreign := renderedConfigMap("b")
 	foreign.SetLabels(nil) // exists, no managed-by label
-	cluster := newApplyCluster(foreign)
+	cases := map[string]*unstructured.Unstructured{
+		"an object OPM does not manage": foreign,
+		"an object of another instance": liveConfigMap("b", opmlabels.ManagedByCLI, otherIdentity, ""),
+	}
+	for name, refused := range cases {
+		t.Run(name, func(t *testing.T) {
+			withReleasedCLIVersion(t)
+			logBuf := captureLog(t)
+			cluster := newApplyCluster(liveManagedConfigMap("a"), refused)
 
-	require.NoError(t, Execute(context.Background(), cluster.request(Options{WarnUnrecorded: true, DryRun: true}, "a")))
-	assert.NotContains(t, logBuf.String(), firstInstallWarning)
-	assert.NotContains(t, logBuf.String(), "not managed by OPM", "a dry run prints no refusal")
-	assert.NotContains(t, logBuf.String(), "apply refused")
-}
+			err := Execute(context.Background(), cluster.request(Options{WarnUnrecorded: true, DryRun: true}, "a", "b", "c"))
 
-// The warning counts the existing OPM-managed resources the guard allows: an
-// object of another instance, which a real run refuses, is not among them.
-func TestExecute_DryRunFirstInstallWarningLeavesOutRefusedObjects(t *testing.T) {
-	withReleasedCLIVersion(t)
-	logBuf := captureLog(t)
-	cluster := newApplyCluster(
-		liveManagedConfigMap("a"),
-		liveConfigMap("b", opmlabels.ManagedByCLI, "uuid-of-another-instance", ""),
-	)
-
-	require.NoError(t, Execute(context.Background(), cluster.request(Options{WarnUnrecorded: true, DryRun: true}, "a", "b", "c")))
-
-	assert.Contains(t, logBuf.String(), "1 of 3 rendered resource(s)")
-	assert.NotContains(t, logBuf.String(), "uuid-of-another-instance", "a dry run prints no refusal")
+			requireExitCode(t, err, opmexit.ExitGeneralError)
+			assert.NotEmpty(t, logLine(logBuf.String(), "ConfigMap/default/b", "would refuse"))
+			assert.NotContains(t, logBuf.String(), firstInstallWarning)
+		})
+	}
 }
 
 // A caller that does not ask for the warning gets none: `opm operator

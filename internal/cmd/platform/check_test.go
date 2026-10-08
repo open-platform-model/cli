@@ -458,7 +458,14 @@ func writePlatformModuleDir(t *testing.T, modFile, platformCUE string) string {
 // details streams, and the error it returned.
 func runCheck(t *testing.T, dir string) (report, diagnostics string, err error) {
 	t.Helper()
-	cmd := NewPlatformCheckCmd(&config.GlobalConfig{Registry: config.DefaultRegistry})
+	return runCheckAgainst(t, config.DefaultRegistry, dir)
+}
+
+// runCheckAgainst is runCheck with the registry mapping the command resolves
+// through.
+func runCheckAgainst(t *testing.T, registry, dir string) (report, diagnostics string, err error) {
+	t.Helper()
+	cmd := NewPlatformCheckCmd(&config.GlobalConfig{Registry: registry})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{dir})

@@ -92,7 +92,9 @@ func TestExecute_DryRunReportsWouldPrune(t *testing.T) {
 		cliOwnedInstanceWith("demo", "default", append([]any{
 			map[string]any{"group": "", "kind": "ConfigMap", "namespace": "default", "name": "keep", "v": "v1", "component": "app"},
 			map[string]any{"group": "", "kind": "ConfigMap", "namespace": "default", "name": "stale", "v": "v1", "component": "app"},
-		}, protectedEntries()...)...))
+		}, protectedEntries()...)...),
+		// The stale object is still in the cluster and is the instance's own.
+		renderedConfigMap("stale"))
 	fake.PrependReactor("patch", "configmaps", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		return true, renderedConfigMap("keep"), nil
 	})
@@ -220,28 +222,35 @@ func TestExecute_PruneLeavesProtectedKindsBehind(t *testing.T) {
 	assertLeftBehind(t, logBuf.String(), "Namespace/apps", "CustomResourceDefinition/widgets.example.io")
 }
 
+// previewPrune lists only what the verdict lets the prune delete, then the
+// protected kinds; a stale entry whose object is gone is not listed, and an
+// empty stale set reports nothing.
 func TestPreviewPrune_ListsLeftBehind(t *testing.T) {
 	var logBuf bytes.Buffer
 	output.SetLogWriter(&logBuf)
 	t.Cleanup(func() { output.SetLogWriter(os.Stderr) })
+	ctx := context.Background()
+	client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), renderedConfigMap("stale"))}
 
 	prunable, protected := inventory.SplitProtected([]k8sinventory.Entry{
 		{Kind: "Namespace", Name: "ns"},
-		{Kind: "Service", Namespace: "default", Name: "svc"},
+		{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "stale"},
+		{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "gone"},
 	})
-	previewPrune(prunable, protected, output.InstanceLogger("demo"))
+	require.NoError(t, previewPrune(ctx, client, prunable, protected, "", output.InstanceLogger("demo")))
 	assert.Contains(t, logBuf.String(), "would prune 1 stale resource(s)")
-	assert.Contains(t, logBuf.String(), "Service/default/svc")
+	assert.NotEmpty(t, logLine(logBuf.String(), "ConfigMap/default/stale", "would prune"))
+	assert.NotContains(t, logBuf.String(), "ConfigMap/default/gone", "an object that is already gone is not listed")
 	assert.Contains(t, logBuf.String(), "would leave 1 resource(s) behind")
 	assertLeftBehind(t, logBuf.String(), "Namespace/ns")
 
 	logBuf.Reset()
 	prunable, protected = inventory.SplitProtected([]k8sinventory.Entry{{Kind: "Namespace", Name: "ns"}})
-	previewPrune(prunable, protected, output.InstanceLogger("demo"))
+	require.NoError(t, previewPrune(ctx, client, prunable, protected, "", output.InstanceLogger("demo")))
 	assert.NotContains(t, logBuf.String(), "would prune", "nothing prunable, no would-prune block")
 	assertLeftBehind(t, logBuf.String(), "Namespace/ns")
 
 	logBuf.Reset()
-	previewPrune(nil, nil, output.InstanceLogger("demo"))
+	require.NoError(t, previewPrune(ctx, client, nil, nil, "", output.InstanceLogger("demo")))
 	assert.Empty(t, logBuf.String(), "an empty stale set reports nothing")
 }

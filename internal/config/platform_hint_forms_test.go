@@ -24,8 +24,9 @@ import (
 	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
-// The three hints a platform build failure can get beside the shape hint.
+// The four hints a platform build failure can get beside the shape hint.
 const (
+	hintLogin   = "Log in to the registry, then retry:  opm registry login"
 	hintPin     = "Pin a published build in "
 	hintDefault = "Fix the platform module at "
 	hintKey     = "Each #registry entry's key must equal the module path of the catalog it imports (#catalog)"
@@ -98,7 +99,8 @@ func nestedDepRegistry(t *testing.T) string {
 // drive. Every case resolves against a local registry and a cold cache. Two
 // rows changed their hint when the hint moved from the message text to the
 // error type; each states the old and the new text. The exit class did not
-// move.
+// move. The refused credential has its own test,
+// TestPlatformBuildHint_RefusedCredential.
 func TestPlatformBuildHint_Forms(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -145,14 +147,6 @@ func TestPlatformBuildHint_Forms(t *testing.T) {
 			contains: "ambiguous import",
 			want:     hintPin,
 		},
-		{
-			name:     "registry answers 401",
-			registry: func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusUnauthorized) },
-			deps:     depPinned,
-			src:      importsDep,
-			contains: "401 Unauthorized",
-			want:     hintPin,
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cuemodtest.ColdCache(t)
@@ -171,4 +165,140 @@ func TestPlatformBuildHint_Forms(t *testing.T) {
 			assert.Contains(t, detail.Hint, tc.want, "%s", detail.Message)
 		})
 	}
+}
+
+// blobAnswers serves the fixture registry with every blob of example.com/dep
+// answering status: the tag lookup passes and the archive fetch is refused.
+func blobAnswers(status int) func(t *testing.T) string {
+	return func(t *testing.T) string {
+		return cuemodtest.Fronted(t, cuemodtest.Registry(t), cuemodtest.BlobAnswers("example.com/dep", status))
+	}
+}
+
+// TestPlatformBuildHint_RefusedCredential holds the login hint, and the
+// permission cause, for a platform build the registry refuses. Before, each
+// row got "Pin a published build in <dir>/cue.mod/module.cue, then try
+// again" and the validation cause. The hint names the host every declared
+// dependency routes to, also under a prefix mapping with a catch-all, the
+// shape of the cli's default mapping. It is the bare command when the
+// declared dependencies route to two hosts.
+func TestPlatformBuildHint_RefusedCredential(t *testing.T) {
+	sole := func(host string) string { return hintLogin + " " + host }
+	bare := func(string) string { return hintLogin }
+	// otherDep is declared and never imported: it routes to the catch-all.
+	const otherDep = "deps: \"other.example/x@v0\": v: \"v0.1.0\"\n"
+	var refusing string
+	prefixed := func(t *testing.T) string {
+		refusing = cuemodtest.StatusRegistry(t, http.StatusUnauthorized)
+		return "example.com=" + refusing + ",registry.invalid"
+	}
+	for _, tc := range []struct {
+		name     string
+		registry func(t *testing.T) string
+		deps     string
+		contains string
+		want     func(registry string) string
+	}{
+		{
+			name:     "registry answers 401",
+			registry: func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusUnauthorized) },
+			deps:     depPinned,
+			contains: "401 Unauthorized",
+			want:     sole,
+		},
+		{"archive blob answers 401", blobAnswers(http.StatusUnauthorized), depPinned, "401 Unauthorized", sole},
+		{"archive blob answers 403", blobAnswers(http.StatusForbidden), depPinned, "403 Forbidden", sole},
+		{
+			name:     "prefix mapping with a catch-all, dependencies on one host",
+			registry: prefixed,
+			deps:     depPinned,
+			contains: "401 Unauthorized",
+			want:     func(string) string { return sole(refusing) },
+		},
+		{
+			name:     "prefix mapping with a catch-all, dependencies on two hosts",
+			registry: prefixed,
+			deps:     depPinned + otherDep,
+			contains: "401 Unauthorized",
+			want:     bare,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("DOCKER_CONFIG", t.TempDir())
+			cuemodtest.ColdCache(t)
+			dir := hintPlatform(t, tc.deps, importsDep)
+			registry := tc.registry(t)
+			_, err := BuildPlatformModule(context.Background(), dir, registry)
+			require.Error(t, err)
+			require.ErrorIs(t, err, oerrors.ErrPermission)
+			require.NotErrorIs(t, err, oerrors.ErrValidation)
+			var detail *oerrors.DetailError
+			require.True(t, errors.As(err, &detail), "%v", err)
+			assert.Contains(t, detail.Message, tc.contains, "the registry's own answer stays in the message")
+			assert.Equal(t, tc.want(registry), detail.Hint, "%s", detail.Message)
+		})
+	}
+}
+
+// TestPlatformBuildHint_RefusalNotTypedAsOne_Pinned records known gaps, it
+// does not state the wanted answer. Each registry here refuses the caller,
+// yet the refusal reaches the cli typed as something else, so the build keeps
+// the pin hint and the validation cause: CUE's registry client reports a 403
+// answer to the tag lookup as "module not found", a token endpoint that
+// answers 403 ends the same way, and a token endpoint that answers 401 fails
+// with "cannot do HTTP request: ...: 401 Unauthorized", which the library
+// reads as no response. The wanted answer for all three is the login hint
+// and the permission cause. The reading of registry error text is the
+// library's alone; when it types one of these as a refusal, its row fails:
+// move it to TestPlatformBuildHint_RefusedCredential.
+func TestPlatformBuildHint_RefusalNotTypedAsOne_Pinned(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		registry func(t *testing.T) string
+		contains string
+	}{
+		{"tag lookup answers 403", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusForbidden) }, "module not found"},
+		{"token endpoint answers 403", func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusForbidden) }, "module not found"},
+		{"token endpoint answers 401", func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusUnauthorized) }, "401 Unauthorized"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("DOCKER_CONFIG", t.TempDir())
+			cuemodtest.ColdCache(t)
+			dir := hintPlatform(t, depPinned, importsDep)
+			_, err := BuildPlatformModule(context.Background(), dir, tc.registry(t))
+			require.Error(t, err)
+			require.ErrorIs(t, err, oerrors.ErrValidation, "the gap closed: move the row to TestPlatformBuildHint_RefusedCredential")
+			var detail *oerrors.DetailError
+			require.True(t, errors.As(err, &detail), "%v", err)
+			assert.Contains(t, detail.Message, tc.contains, "what the user sees of the registry's answer")
+			assert.Contains(t, detail.Hint, hintPin, "the gap closed: move the row to TestPlatformBuildHint_RefusedCredential")
+		})
+	}
+}
+
+// TestPlatformRegistryHost holds the host the login hint names, without a
+// registry: the one host every declared dependency routes to, and none when
+// they route to several, when none is declared, or when the module file is
+// not there. Under the cli's default mapping a platform on opmodel.dev
+// modules names ghcr.io, although that mapping holds two hosts.
+func TestPlatformRegistryHost(t *testing.T) {
+	const core = "deps: \"opmodel.dev/core@v2\": v: \"v2.0.0\"\n"
+	for _, tc := range []struct {
+		name     string
+		deps     string
+		registry string
+		want     string
+	}{
+		{"default mapping, opmodel.dev dependencies", core + "deps: \"opmodel.dev/catalogs/opm@v4\": v: \"v4.0.0\"\n", DefaultRegistry, "ghcr.io"},
+		{"default mapping, one dependency on the catch-all", core + "deps: \"example.com/dep@v0\": v: \"v0.2.0\"\n", DefaultRegistry, ""},
+		{"one catch-all registry over plain HTTP", core, "localhost:5000+insecure", "localhost:5000+insecure"},
+		{"no dependency declared", "", DefaultRegistry, ""},
+		{"mapping that does not parse", core, "=,", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := hintPlatform(t, tc.deps, "package platform\n")
+			assert.Equal(t, tc.want, platformRegistryHost(dir, tc.registry))
+		})
+	}
+	assert.Empty(t, platformRegistryHost(t.TempDir(), DefaultRegistry), "no module file")
 }
