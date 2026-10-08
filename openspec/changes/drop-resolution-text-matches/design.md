@@ -92,12 +92,16 @@ func cueErrorUnder(err error, prefix ...string) bool
 
 ### D4. The guard test
 
-A test in `internal/` parses every non-test `.go` file under `cmd/`, `internal/` and `pkg/` with
-`go/parser` and reports a call to `strings.Contains`, `HasPrefix`, `HasSuffix`, `Index`,
-`EqualFold`, `Cut` or a `regexp` match method whose argument is an `.Error()` call or a variable
-assigned from one in the same function. The four sites that stay are an allowlist of
-`file: function` pairs, each with its reason. The pattern follows `TestNoLocalHealthEvaluator`
-(`internal/kubernetes/health_refusal_test.go`).
+`TestNoErrorTextMatch` (`pkg/errors/textmatch_refusal_test.go`) parses every non-test `.go` file
+under `cmd/`, `internal/` and `pkg/` with `go/parser`. It reports a `strings` predicate
+(`Contains`, `HasPrefix`, `HasSuffix`, `Index`, `EqualFold`, `Cut`, `Split`, `Fields` and their
+variants) or a `regexp` match method over an error's text, a comparison of an `Error()` call, and
+a switch over one. An error's text is an `Error()` call, a CUE error's `Msg()`, or a variable
+assigned from either or from an expression over such a variable, inside one function. The four
+sites that stay are an allowlist of `file: function` pairs, each with its reason, and an entry
+that is no longer in the code fails the test too. The pattern follows `TestNoLocalHealthEvaluator`
+(`internal/kubernetes/health_refusal_test.go`). Limit: a text handed to another function as a
+string is not followed there.
 
 Justification under Principle VII: without it the rule is prose, and the search for this change
 found four text matches where the swarm's notes named two.
