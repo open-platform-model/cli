@@ -9,5 +9,5 @@
 
 ## 2. The docs page
 
-- [ ] 2.1 `docs/site/diagnostics/kept-volume-claims.md`: the operator keeps claims unless `spec.dataPolicy` is `Delete`, `--delete-data` does not change that, what an older operator does and how to check, and the forced recreate under `spec.rollout.forceConflicts`; `task docs:bundle:check` passes
-- [ ] 2.2 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `docs(site): say that the operator keeps claims unless spec.dataPolicy is Delete`
+- [x] 2.1 `docs/site/diagnostics/kept-volume-claims.md`: the operator keeps claims unless `spec.dataPolicy` is `Delete`, `--delete-data` does not change that, what an older operator does and how to check, and the forced recreate under `spec.rollout.forceConflicts`; `task docs:bundle:check` passes
+- [x] 2.2 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `docs(site): say that the operator keeps claims unless spec.dataPolicy is Delete`
