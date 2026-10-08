@@ -13,11 +13,15 @@ package publish
 
 import (
 	"fmt"
+	"strings"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/mod/modconfig"
 	"cuelang.org/go/mod/modregistry"
 
 	"github.com/open-platform-model/library/opm/kernel"
+
+	"github.com/open-platform-model/cli/internal/cuemod"
 )
 
 // Kind names the artifact kind being published. The two entry points differ
@@ -241,3 +245,68 @@ func (e *ConnectivityError) Error() string {
 }
 
 func (e *ConnectivityError) Unwrap() error { return e.Err }
+
+// RegistryError reports a registry lookup, fetch or push that failed for a
+// reason other than getting no response: the registry answered with a
+// failure, or the operation failed on the way to it. It is not a
+// *ConnectivityError, and like one it is not a refusal: the artifact was
+// never judged.
+type RegistryError struct {
+	// Op names the registry operation that failed.
+	Op string
+	// Unauthorized is true when the registry refused the caller (401 or
+	// 403): the credentials are missing, wrong, or may not do this.
+	Unauthorized bool
+	// Host is the registry host the operation was routed to, in the form
+	// `opm registry login` takes (with +insecure for plain HTTP), or "" when
+	// it is not known.
+	Host string
+	Err  error
+}
+
+func (e *RegistryError) Error() string {
+	if e.Unauthorized {
+		return fmt.Sprintf("registry refused the credentials (authentication or permission): %s: %v", e.Op, e.Err)
+	}
+	return fmt.Sprintf("registry operation failed: %s: %v", e.Op, e.Err)
+}
+
+func (e *RegistryError) Unwrap() error { return e.Err }
+
+// RegistryFailure names a failed registry operation by its cause, from the
+// library's typed classification: no response at all is a
+// *ConnectivityError, and everything else is a *RegistryError, marked
+// Unauthorized for a 401 or 403 answer and carrying host. The cause stays
+// wrapped and in the message.
+//
+// Known gap, held by TestPush_TokenEndpointRefusal_Pinned: a registry that
+// hands out bearer tokens and whose token endpoint answers 403 reaches the
+// library as "cannot do HTTP request: ...: 403 Forbidden", which it reads as
+// no response, so that refusal is still a *ConnectivityError. The reading of
+// registry error text is the library's alone, so the fix belongs there.
+func RegistryFailure(op, host string, err error) error {
+	if cuemod.IsConnectivityError(err) {
+		return &ConnectivityError{Op: op, Err: err}
+	}
+	return &RegistryError{Op: op, Unauthorized: cuemod.IsUnauthorized(err), Host: host, Err: err}
+}
+
+// RegistryHost names the host the registry mapping (CUE_REGISTRY syntax;
+// empty reads CUE_REGISTRY from the environment) routes modulePath to, in
+// the form `opm registry login` takes: the host, with +insecure when it is
+// served over plain HTTP. It returns "" when the mapping does not resolve.
+func RegistryHost(registry, modulePath string) string {
+	resolver, err := modconfig.NewResolver(&modconfig.Config{CUERegistry: registry})
+	if err != nil {
+		return ""
+	}
+	base, _, _ := strings.Cut(modulePath, "@")
+	loc, ok := resolver.ResolveToLocation(base, "v0.0.0")
+	if !ok || loc.Host == "" {
+		return ""
+	}
+	if loc.Insecure {
+		return loc.Host + "+insecure"
+	}
+	return loc.Host
+}

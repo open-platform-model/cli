@@ -35,6 +35,15 @@ func IsConnectivityError(err error) bool {
 	return fetchKindIs(err, liberrors.FetchUnreachable)
 }
 
+// IsUnauthorized reports whether err means the registry answered and refused
+// the caller: a 401 (the credentials are missing or wrong) or a 403 (the
+// credentials may not do this) that reaches the library as such. CUE's
+// registry client reports a 403 answer to a tag lookup as not found, so that
+// case is IsFetchNotFound, not this.
+func IsUnauthorized(err error) bool {
+	return fetchKindIs(err, liberrors.FetchUnauthorized)
+}
+
 // IsFetchNotFound reports whether err is a registry answer that it does not
 // hold what was asked for: a module version (including a 403 tag lookup,
 // which CUE reports as not found), a package a path@version load names, or a
