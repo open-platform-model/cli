@@ -231,27 +231,6 @@ func TestExecute_OwnObjectsOfAnOlderCLIAreApplied(t *testing.T) {
 	}
 }
 
-// A dry run refuses nothing because of the guard, with or without a record.
-func TestExecute_DryRunRefusesNothingBecauseOfTheGuard(t *testing.T) {
-	cases := map[string][]*unstructured.Unstructured{
-		"first apply": {liveConfigMap("new", "", "", "")},
-		"later apply": {recordWithIdentity(renderIdentity, "app"), liveConfigMap("new", opmlabels.ManagedByCLI, otherIdentity, "")},
-	}
-	for name, objs := range cases {
-		t.Run(name, func(t *testing.T) {
-			withReleasedCLIVersion(t)
-			logBuf := captureLog(t)
-			cluster := newApplyCluster(objs...)
-
-			require.NoError(t, Execute(context.Background(), cluster.request(Options{DryRun: true, WarnUnrecorded: true}, "app", "new")))
-
-			assert.NotContains(t, logBuf.String(), "apply refused")
-			assert.NotContains(t, logBuf.String(), "not managed by OPM")
-			assert.NotContains(t, logBuf.String(), "belongs to module instance")
-		})
-	}
-}
-
 // With RefuseLetGo, which only `opm operator install` sets, an object adopted
 // by another instance refuses the apply, and the refusal does not claim that
 // nothing was changed when the caller wrote before the apply.

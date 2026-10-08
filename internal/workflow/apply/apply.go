@@ -194,8 +194,9 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 	// Gate 6: the ownership guard over every rendered object, on a first
 	// install and on every later apply (0012:D8:R1). Objects in a namespace
-	// this apply creates cannot exist yet. A dry run refuses nothing: it only
-	// looks, for the first-install warning below.
+	// this apply creates cannot exist yet. A dry run asks the same guard with
+	// the same input, so it previews the refusal of the real run and exits
+	// with its code; it only words the result differently.
 	checkEntries := currentEntries
 	if createNamespace {
 		checkEntries = entriesOutside(currentEntries, namespace)
@@ -208,14 +209,13 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		RefuseLetGo:  req.Options.RefuseLetGo,
 	}
 	var guard inventory.GuardResult
-	switch {
-	case !dryRun:
+	if dryRun {
+		guard, err = previewOwnershipGuard(ctx, req.K8sClient, guardInput, prevRecord == nil, instanceLog)
+	} else {
 		guard, err = RunOwnershipGuard(ctx, req.K8sClient, guardInput, prevRecord == nil, nothingChanged)
-		if err != nil {
-			return err
-		}
-	case req.Options.WarnUnrecorded && prevRecord == nil:
-		guard.Managed = previewAlreadyManaged(ctx, req.K8sClient, guardInput)
+	}
+	if err != nil {
+		return err
 	}
 	if req.Options.WarnUnrecorded && prevRecord == nil && len(guard.Managed) > 0 {
 		instanceLog.Warn(unrecordedResourcesWarning(len(guard.Managed), len(currentEntries), name, instanceID, dryRun))
@@ -229,10 +229,17 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	recordedRender := currentEntries
 	if len(guard.LetGo) > 0 {
 		for _, lg := range guard.LetGo {
+			if dryRun {
+				instanceLog.Warn(output.FormatResourceLine(lg.Entry.Kind, lg.Entry.Namespace, lg.Entry.Name, output.StatusWouldSkip), "reason", lg.Message)
+				continue
+			}
 			instanceLog.Warn(lg.Message)
 		}
 		applyResources, recordedRender = withoutLetGo(result.Resources, guard.LetGo)
 	}
+	// Nothing is left to apply: a closing line says so, since no summary
+	// and no success line follows an apply of nothing.
+	allLetGo := len(guard.LetGo) > 0 && len(applyResources) == 0
 
 	// The first write of the apply: every check that can refuse has passed.
 	if err := ensureNamespace(ctx, req.K8sClient, namespace, createNamespace && !dryRun, instanceLog); err != nil {
@@ -278,6 +285,9 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		} else {
 			instanceLog.Info(FormatApplySummary(applyResult))
 		}
+	}
+	if allLetGo && dryRun {
+		instanceLog.Info("dry run complete: " + nothingAppliedLine(len(guard.LetGo), true))
 	}
 
 	// CRDs and Namespaces are never pruned (kubernetes.IsProtectedKind); they
@@ -344,6 +354,10 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			instanceLog.Error(err.Error())
 			return &opmexit.ExitError{Code: pruneExit, Err: err, Printed: true}
 		}
+	}
+
+	if allLetGo && !dryRun {
+		instanceLog.Warn(nothingAppliedLine(len(guard.LetGo), false))
 	}
 
 	if applyResult != nil && len(applyResult.Errors) == 0 && !dryRun {
@@ -714,18 +728,69 @@ const earlierIdentityHint = "If these are this instance's own objects under an e
 	"its ModuleInstance record was deleted, or opm v1.0.0-alpha.1 or older recorded it in a Secret), " +
 	"annotate each object as shown above; nothing has to be removed first"
 
-// previewAlreadyManaged is the look of a dry run for the first-install
-// warning: the rendered entries that already exist under OPM management and
-// that the guard would allow. A dry run refuses nothing, so the guard's
-// refusals are dropped here, and an object it cannot read only ends the look.
-func previewAlreadyManaged(ctx context.Context, k8sClient *kubernetes.Client, in inventory.GuardInput) []k8sinventory.Entry {
+// dryRunChangedNothing closes every error of a dry run that stops at the
+// ownership guard.
+const dryRunChangedNothing = "the dry run changed nothing"
+
+// previewOwnershipGuard runs the ownership guard of a dry run. It is the
+// guard of the real run (inventory.Guard) with the same input, so the two
+// cannot judge differently; it writes nothing. Each object the real run
+// would refuse is reported on its own line with the library's message, which
+// names the owner and the annotation that lifts the refusal, and the dry run
+// then fails with the code of the real refusal (1), so that a caller can gate
+// on it. An object the guard could not read fails the dry run with the real
+// run's error and code. firstApply adds the earlier-identity hint, as in
+// RunOwnershipGuard.
+func previewOwnershipGuard(ctx context.Context, k8sClient *kubernetes.Client, in inventory.GuardInput, firstApply bool, instanceLog *log.Logger) (inventory.GuardResult, error) {
 	guard, err := inventory.Guard(ctx, k8sClient, in)
-	var refusal *inventory.GuardRefusalError
-	if err != nil && !errors.As(err, &refusal) {
-		output.Debug("first-install preview stopped", "error", err)
-		return nil
+	if err == nil {
+		return guard, nil
 	}
-	return guard.Managed
+	var refusal *inventory.GuardRefusalError
+	if !errors.As(err, &refusal) {
+		return inventory.GuardResult{}, &opmexit.ExitError{
+			Code: exitCodeFromK8sError(err),
+			Err:  fmt.Errorf("dry run: pre-apply existence check failed: %w\n%s", err, dryRunChangedNothing),
+		}
+	}
+	for i := range refusal.Refused {
+		r := &refusal.Refused[i]
+		instanceLog.Error(output.FormatResourceLine(r.Entry.Kind, r.Entry.Namespace, r.Entry.Name, output.StatusWouldRefuse), "reason", r.Message)
+	}
+	hint := ""
+	if firstApply && refusal.Has(ownership.RefuseOtherInstance) {
+		hint = "\n" + earlierIdentityHint
+	}
+	// The objects are listed above, so the error only counts them. The
+	// refusal stays in the chain for a caller that asks for it.
+	return inventory.GuardResult{}, &opmexit.ExitError{
+		Code: opmexit.ExitGeneralError,
+		Err:  &previewedRefusalError{refusal: refusal, hint: hint},
+	}
+}
+
+// previewedRefusalError is a dry run's report of a refusal it previewed.
+type previewedRefusalError struct {
+	refusal *inventory.GuardRefusalError
+	hint    string
+}
+
+func (e *previewedRefusalError) Error() string {
+	return fmt.Sprintf("dry run: a real apply would be refused: %d object(s) cannot be applied by this instance (listed above)%s\n%s",
+		len(e.refusal.Refused), e.hint, dryRunChangedNothing)
+}
+
+func (e *previewedRefusalError) Unwrap() error { return e.refusal }
+
+// nothingAppliedLine is the closing line of an apply that let go of every
+// rendered object, so that it applied nothing; preview words it for a dry
+// run.
+func nothingAppliedLine(letGo int, preview bool) string {
+	verb := "nothing applied"
+	if preview {
+		verb = "nothing would be applied"
+	}
+	return fmt.Sprintf("%s: all %d rendered resource(s) are adopted by another instance", verb, letGo)
 }
 
 // withoutLetGo is the rendered resources and their inventory entries without

@@ -84,7 +84,8 @@ func TestExecute_HandOverStaysUntilTheAnnotationNamesThisInstance(t *testing.T) 
 
 // When the only rendered object is adopted by another instance, nothing is
 // applied and nothing is deleted; the apply still succeeds and writes the
-// record, now with an empty inventory.
+// record, now with an empty inventory. One closing line says that nothing was
+// applied and why, and no success line claims an apply.
 func TestExecute_LetsGoOfItsOnlyObject(t *testing.T) {
 	withReleasedCLIVersion(t)
 	logBuf := captureLog(t)
@@ -93,7 +94,11 @@ func TestExecute_LetsGoOfItsOnlyObject(t *testing.T) {
 		liveConfigMap("settings", opmlabels.ManagedByCLI, renderIdentity, otherIdentity),
 	)
 
-	require.NoError(t, Execute(context.Background(), cluster.request(Options{}, "settings")))
+	var err error
+	stdout := captureStdout(t, func() {
+		err = Execute(context.Background(), cluster.request(Options{}, "settings"))
+	})
+	require.NoError(t, err)
 
 	for _, w := range cluster.writes() {
 		assert.NotContains(t, w, "configmaps", "the adopted object is neither applied nor deleted")
@@ -101,5 +106,28 @@ func TestExecute_LetsGoOfItsOnlyObject(t *testing.T) {
 	entries, written := cluster.writtenInventory(t)
 	require.True(t, written, "the record is written")
 	assert.Empty(t, entries)
-	assert.Contains(t, logBuf.String(), "was adopted by module instance "+otherIdentity)
+	log := logBuf.String()
+	assert.Contains(t, log, "was adopted by module instance "+otherIdentity)
+	assert.Equal(t, 1, strings.Count(log, "nothing applied: all 1 rendered resource(s) are adopted by another instance"), "one closing line")
+	assert.Less(t, strings.Index(log, "was adopted by"), strings.Index(log, "nothing applied"), "after the warning")
+	assert.NotContains(t, stdout, "applied", "no success line")
+	assert.NotContains(t, stdout, "up to date")
+}
+
+// An apply that still applies one object prints no such line.
+func TestExecute_NoClosingLineWhileSomethingIsApplied(t *testing.T) {
+	withReleasedCLIVersion(t)
+	logBuf := captureLog(t)
+	cluster := newApplyCluster(
+		recordWithIdentity(renderIdentity, "app", "settings"),
+		liveConfigMap("app", opmlabels.ManagedByCLI, renderIdentity, ""),
+		liveConfigMap("settings", opmlabels.ManagedByCLI, renderIdentity, otherIdentity),
+	)
+
+	for _, dryRun := range []bool{false, true} {
+		logBuf.Reset()
+		require.NoError(t, Execute(context.Background(), cluster.request(Options{DryRun: dryRun}, "app", "settings")))
+		assert.NotContains(t, logBuf.String(), "nothing applied")
+		assert.NotContains(t, logBuf.String(), "nothing would be applied")
+	}
 }
