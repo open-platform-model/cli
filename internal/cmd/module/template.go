@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/scaffold"
 )
@@ -30,7 +31,9 @@ pipeline.`,
 // binary that knows the table belongs to the release train that published
 // the templates.
 func newModuleTemplateListCmd() *cobra.Command {
-	return &cobra.Command{
+	var outputFlag string
+
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List the official module templates",
 		Long: `List the official module templates: name, description, and the default
@@ -39,6 +42,16 @@ major an unsuffixed shortcut floats within. Every name is usable as an
 binary, release-coupled to the published set.`,
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
+			if err := cmdutil.CheckOutputFormat(outputFlag, "table", "json", "yaml"); err != nil {
+				return err
+			}
+			if outputFlag != "table" {
+				rows := make([]templateOutput, 0, len(scaffold.Official))
+				for _, tpl := range scaffold.Official {
+					rows = append(rows, templateOutput{Name: tpl.Name, Description: tpl.Description, DefaultMajor: tpl.DefaultMajor})
+				}
+				return cmdutil.WriteStructured(c.OutOrStdout(), outputFlag, rows)
+			}
 			t := output.NewTable("NAME", "DESCRIPTION", "DEFAULT MAJOR")
 			for _, tpl := range scaffold.Official {
 				t.Row(tpl.Name, tpl.Description, tpl.DefaultMajor)
@@ -47,4 +60,16 @@ binary, release-coupled to the published set.`,
 			return nil
 		},
 	}
+
+	c.Flags().StringVarP(&outputFlag, "output", "o", "table", "Output format (table, json, yaml)")
+
+	return c
+}
+
+// templateOutput is one row of 'opm module template list' in its json and
+// yaml form. The field names are a contract for scripts.
+type templateOutput struct {
+	Name         string `json:"name" yaml:"name"`
+	Description  string `json:"description" yaml:"description"`
+	DefaultMajor string `json:"defaultMajor" yaml:"defaultMajor"`
 }

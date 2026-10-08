@@ -2,6 +2,8 @@ package modulecmd
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 
 	"github.com/open-platform-model/cli/internal/config"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -237,4 +240,43 @@ func TestTemplateList_SharesTheExpansionTable(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, scaffold.Segment+"/"+tpl.Name, ref.Base)
 	}
+}
+
+func TestTemplateList_OutputJSONAndYAML(t *testing.T) {
+	want := make([]map[string]string, 0, len(scaffold.Official))
+	for _, tpl := range scaffold.Official {
+		want = append(want, map[string]string{"name": tpl.Name, "description": tpl.Description, "defaultMajor": tpl.DefaultMajor})
+	}
+
+	for format, unmarshal := range map[string]func([]byte, any) error{"json": json.Unmarshal, "yaml": yaml.Unmarshal} {
+		t.Run(format, func(t *testing.T) {
+			c := NewModuleTemplateCmd()
+			out := new(bytes.Buffer)
+			c.SetArgs([]string{"list", "-o", format})
+			c.SetOut(out)
+			require.NoError(t, c.Execute())
+
+			var got []map[string]string
+			require.NoError(t, unmarshal(out.Bytes(), &got))
+			assert.Equal(t, want, got, "one entry per official template, in the table's order")
+		})
+	}
+}
+
+func TestTemplateList_InvalidOutputFormat(t *testing.T) {
+	c := NewModuleTemplateCmd()
+	out := new(bytes.Buffer)
+	c.SetArgs([]string{"list", "--output", "wide"})
+	c.SetOut(out)
+	c.SetErr(new(bytes.Buffer))
+	c.SilenceUsage = true
+	c.SilenceErrors = true
+
+	err := c.Execute()
+	require.Error(t, err)
+	assert.Equal(t, `invalid output format "wide" (valid: table, json, yaml)`, err.Error())
+	assert.Empty(t, out.String())
+	var exitErr *opmexit.ExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
 }

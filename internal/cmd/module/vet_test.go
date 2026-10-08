@@ -3,8 +3,11 @@ package modulecmd
 import (
 	"bytes"
 	"errors"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -85,10 +88,77 @@ func TestNewModuleVetCmd_PlatformFlagNamesTheModuleDeps(t *testing.T) {
 	cmd := NewModuleVetCmd(&config.GlobalConfig{})
 	assert.Equal(t, "Render against this platform module directory instead of the module's own deps",
 		cmd.Flags().Lookup("platform").Usage)
-	for _, name := range []string{"values", "namespace", "instance-name", "platform"} {
+	for _, name := range []string{"values", "namespace", "name", "instance-name", "platform"} {
 		assert.NotNil(t, cmd.Flags().Lookup(name), "--%s is registered", name)
 	}
 	assert.Contains(t, cmd.Long, "--platform <dir>")
+}
+
+// --name is the spelling module build and module apply use; --instance-name
+// stays as its deprecated alias.
+func TestNewModuleVetCmd_NameFlagAndDeprecatedAlias(t *testing.T) {
+	cmd := NewModuleVetCmd(&config.GlobalConfig{})
+
+	name := cmd.Flags().Lookup("name")
+	require.NotNil(t, name, "--name is registered")
+	assert.Empty(t, name.Deprecated)
+	assert.Equal(t, NewModuleBuildCmd(&config.GlobalConfig{}).Flags().Lookup("name").Usage, name.Usage,
+		"vet and build describe --name the same way")
+
+	old := cmd.Flags().Lookup("instance-name")
+	require.NotNil(t, old, "the old spelling still parses")
+	assert.Equal(t, "use --name", old.Deprecated)
+	assert.True(t, old.Hidden, "a deprecated flag is not in the help")
+
+	var warnings bytes.Buffer
+	cmd.SetOut(&warnings)
+	require.NoError(t, cmd.ParseFlags([]string{"--instance-name", "web"}))
+	assert.Equal(t, "Flag --instance-name has been deprecated, use --name\n", warnings.String())
+}
+
+func TestModVet_NameAndInstanceNameTogetherIsAUsageError(t *testing.T) {
+	cmd := NewModuleVetCmd(&config.GlobalConfig{})
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{filepath.Join(t.TempDir(), "absent"), "--name", "a", "--instance-name", "b"})
+
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "[instance-name name] were all set")
+	var exitErr *opmexit.ExitError
+	assert.False(t, errors.As(err, &exitErr), "a usage error exits 1 through main's non-ExitError path")
+}
+
+// Both spellings name the synthesized instance. Registry-backed like
+// TestModVet_ValidModule, and skipped the same way.
+func TestModVet_NameAndItsAliasSetTheInstanceName(t *testing.T) {
+	fixtureDir := filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "simple-module")
+	for _, flag := range []string{"--name", "--instance-name"} {
+		t.Run(flag, func(t *testing.T) {
+			tmpHome, cleanup := setupTestConfig(t)
+			defer cleanup()
+			t.Setenv("HOME", tmpHome)
+
+			var logs bytes.Buffer
+			output.SetLogWriter(&logs)
+			t.Cleanup(func() { output.SetLogWriter(os.Stderr) })
+
+			cmd := NewModuleVetCmd(&config.GlobalConfig{ConfigPath: filepath.Join(tmpHome, ".opm", "config.cue")})
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			cmd.SetArgs([]string{fixtureDir, flag, "web"})
+
+			err := cmd.Execute()
+			var exitErr *opmexit.ExitError
+			var noRegistry *config.NoRegistryError
+			if errors.As(err, &noRegistry) || (errors.As(err, &exitErr) && exitErr.Code == opmexit.ExitConnectivityError) {
+				t.Skipf("core not resolvable (registry or cache unavailable?): %v", err)
+			}
+			require.NoError(t, err)
+			assert.Contains(t, logs.String(), `"web"`)
+			assert.NotContains(t, logs.String(), "simple-module-debug")
+		})
+	}
 }
 
 func TestModVet_RejectsInstancePackage(t *testing.T) {
@@ -254,4 +324,50 @@ func TestModVet_OnlyCUERegistryIsConfigured(t *testing.T) {
 	assert.Equal(t, opmexit.ExitConnectivityError, exitErr.Code, "%v", err)
 	assert.NotContains(t, err.Error(), "no registry is configured")
 	assert.Contains(t, err.Error(), "loading core schema: ")
+}
+
+// The core schema fetch is classified as publish classifies it: only no
+// response is unreachable, another failure answer is a failed registry
+// operation, and a refused credential exits 4 and points to the login.
+func TestModVet_SchemaFetchFailureIsNamed(t *testing.T) {
+	fixtureDir := filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "simple-module")
+	for _, tc := range []struct {
+		name     string
+		registry func(t *testing.T) string
+		want     string
+		code     int
+		login    bool
+	}{
+		{"refused connection", func(*testing.T) string { return cuemodtest.UnreachableRegistry }, "registry unreachable: loading core schema: ", opmexit.ExitConnectivityError, false},
+		{"401", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusUnauthorized) }, "registry refused the credentials (authentication or permission): loading core schema: ", opmexit.ExitPermissionDenied, true},
+		// Known gap, pinned: CUE's registry client reports a 403 answer to
+		// the schema's tag lookup as "not found", so the refusal never
+		// reaches the classification and the fetch reads as a failed
+		// registry operation. The same holds for publish.
+		{"403", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusForbidden) }, "registry operation failed: loading core schema: ", opmexit.ExitConnectivityError, false},
+		{"503", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusServiceUnavailable) }, "registry operation failed: loading core schema: ", opmexit.ExitConnectivityError, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cuemodtest.ColdCache(t)
+			registry := tc.registry(t)
+
+			cmd := NewModuleVetCmd(&config.GlobalConfig{Registry: registry})
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			cmd.SetArgs([]string{fixtureDir})
+			err := cmd.Execute()
+
+			var exitErr *opmexit.ExitError
+			require.ErrorAs(t, err, &exitErr)
+			assert.Equal(t, tc.code, exitErr.Code, "%v", err)
+			assert.Contains(t, err.Error(), tc.want)
+			assert.Equal(t, tc.login, strings.HasSuffix(err.Error(), "opm registry login "+registry), "%v", err)
+		})
+	}
+}
+
+func TestNewModuleVetCmd_HelpStatesTheExitCodes(t *testing.T) {
+	long := NewModuleVetCmd(&config.GlobalConfig{}).Long
+	assert.Contains(t, long, "Exit codes: 0 valid, 1 usage error")
+	assert.Contains(t, long, "4 the registry refused the credentials.")
 }

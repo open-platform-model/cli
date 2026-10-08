@@ -48,13 +48,7 @@ func RunPublish(cmd *cobra.Command, cfg *config.GlobalConfig, kind publish.Kind,
 	k := config.NewKernel(cfg.Registry)
 	schemaVal, err := k.SchemaCache().Get()
 	if err != nil {
-		if noReg := NoRegistryError(cfg, "loading core schema", err); noReg != nil {
-			return noReg
-		}
-		// The schema fetch is a registry round-trip like the lookup and the
-		// push: its failure is a registry failure, not a verdict on the
-		// artifact.
-		return publishError(publish.RegistryFailure("loading core schema", publish.RegistryHost(cfg.Registry, coreModulePath), err))
+		return CoreSchemaError(cfg, err)
 	}
 	identitySchema := schemaVal.LookupPath(cue.MakePath(cue.Def("IdentityPackage")))
 	if !identitySchema.Exists() {
@@ -157,6 +151,19 @@ func PrintRefusals(refusals []publish.Refusal) {
 			Details: r.Details(),
 		})
 	}
+}
+
+// CoreSchemaError maps a failed core schema fetch to its exit code, for every
+// command that fetches the schema before it can judge anything: no registry
+// configured is 2, a registry that refused the credentials (401 or 403) is 4
+// with the login hint, and any other failed registry operation is 3. The
+// schema fetch is a registry round-trip like the lookup and the push: its
+// failure is a registry failure, not a verdict on the artifact.
+func CoreSchemaError(cfg *config.GlobalConfig, err error) error {
+	if noReg := NoRegistryError(cfg, "loading core schema", err); noReg != nil {
+		return noReg
+	}
+	return publishError(publish.RegistryFailure("loading core schema", publish.RegistryHost(cfg.Registry, coreModulePath), err))
 }
 
 // coreModulePath is the module the core schema is fetched from; the registry

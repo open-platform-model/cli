@@ -31,34 +31,39 @@ func NewModuleVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Short: "Validate module without generating manifests",
 		Long: `Validate an OPM module without generating manifests.
 
-	This command first verifies the module's identity and coordinates — the
-	identity package conforms to core's #IdentityPackage, metadata derives from
-	it, and cue.mod agrees with the declared module path — then validates the
-	module's #config contract using either the module's debugValues (default) or
-	explicit values files passed with -f/--values.
+This command first verifies the module's identity and coordinates — the
+identity package conforms to core's #IdentityPackage, metadata derives from
+it, and cue.mod agrees with the declared module path — then validates the
+module's #config contract using either the module's debugValues (default) or
+explicit values files passed with -f/--values.
 
-	It then renders the module exactly as 'opm module build' does and reports
-	each rendered object without printing it, so vet and build reach the same
-	verdict. By default the render runs against a platform generated from the
-	module's own cue.mod/module.cue, one registry entry per catalog the module
-	pins, at the pinned version; the cluster is not read. Pass --platform <dir>
-	to render against a platform module instead.
+It then renders the module exactly as 'opm module build' does and reports
+each rendered object without printing it, so vet and build reach the same
+verdict. By default the render runs against a platform generated from the
+module's own cue.mod/module.cue, one registry entry per catalog the module
+pins, at the pinned version; the cluster is not read. Pass --platform <dir>
+to render against a platform module instead.
 
-	Arguments:
-	  path    Path to module directory (default: current directory)
+Exit codes: 0 valid, 1 usage error or the platform could not be generated
+or acquired, 2 validation failure, render refusal or no registry
+configured, 3 the core schema fetch failed (registry unreachable, or
+another registry error), 4 the registry refused the credentials.
 
-	Examples:
-	  # Validate debugValues in current directory against the module's deps
-	  opm module vet
+Arguments:
+  path    Path to module directory (default: current directory)
 
-	  # Validate module against explicit values
-	  opm module vet ./my-module -f prod-values.cue
+Examples:
+  # Validate debugValues in current directory against the module's deps
+  opm module vet
 
-	  # Validate by merging multiple values files
-	  opm module vet ./my-module -f base.cue -f prod.cue
+  # Validate module against explicit values
+  opm module vet ./my-module -f prod-values.cue
 
-	  # Validate against a platform module instead of the module's deps
-	  opm module vet ./my-module --platform ./pulled-platform`,
+  # Validate by merging multiple values files
+  opm module vet ./my-module -f base.cue -f prod.cue
+
+  # Validate against a platform module instead of the module's deps
+  opm module vet ./my-module --platform ./pulled-platform`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return runVet(c.Context(), cfg, args, &rf)
@@ -67,6 +72,11 @@ func NewModuleVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 
 	rf.AddTo(c)
 	useModuleDepsPlatformHelp(c)
+	// --name is the spelling module build and module apply use. Both flags
+	// write the same field, and cobra refuses the two together.
+	c.Flags().StringVar(&rf.InstanceName, "name", "", "Synthetic instance name (default: <module name>-debug)")
+	cmdutil.DeprecateFlag(c, "instance-name", "name")
+	c.MarkFlagsMutuallyExclusive("name", "instance-name")
 
 	return c
 }
@@ -241,15 +251,9 @@ func identitySchemaForVet(cfg *config.GlobalConfig) (*kernel.Kernel, cue.Value, 
 	k := config.NewKernel(cfg.Registry)
 	schemaVal, err := k.SchemaCache().Get()
 	if err != nil {
-		if noReg := cmdutil.NoRegistryError(cfg, "loading core schema", err); noReg != nil {
-			return nil, cue.Value{}, noReg
-		}
-		// A registry round-trip, same failure class as publish's lookup and
-		// push: connectivity (exit 3), not a verdict on the module.
-		return nil, cue.Value{}, &opmexit.ExitError{
-			Code: opmexit.ExitConnectivityError,
-			Err:  fmt.Errorf("loading core schema: %w", err),
-		}
+		// A registry round-trip, classified as publish classifies it: not a
+		// verdict on the module.
+		return nil, cue.Value{}, cmdutil.CoreSchemaError(cfg, err)
 	}
 	identitySchema := schemaVal.LookupPath(cue.MakePath(cue.Def("IdentityPackage")))
 	if !identitySchema.Exists() {

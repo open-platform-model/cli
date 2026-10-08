@@ -662,3 +662,39 @@ func TestExecuteInstanceDelete_FailedRecordDeleteFails(t *testing.T) {
 		})
 	}
 }
+
+// Both spellings reach the delete as "skip the prompt": --yes, its shorthand,
+// and the deprecated --force. Without any of them the delete confirms.
+func TestInstanceDeleteCmd_YesAndItsDeprecatedAliasSkipThePrompt(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{"no flag confirms", []string{"jellyfin"}, false},
+		{"--yes", []string{"jellyfin", "--yes"}, true},
+		{"-y", []string{"jellyfin", "-y"}, true},
+		{"deprecated --force", []string{"jellyfin", "--force"}, true},
+		{"--dry-run alone does not skip", []string{"jellyfin", "--dry-run"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got, called bool
+			orig := runDelete
+			t.Cleanup(func() { runDelete = orig })
+			runDelete = func(_ context.Context, _ string, _ *config.GlobalConfig, _ *cmdutil.K8sFlags, _ string, skipConfirm, _ bool, _ time.Duration) error {
+				got, called = skipConfirm, true
+				return nil
+			}
+
+			cmd := NewInstanceDeleteCmd(&config.GlobalConfig{})
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			cmd.SetArgs(tt.args)
+			require.NoError(t, cmd.Execute())
+
+			require.True(t, called)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

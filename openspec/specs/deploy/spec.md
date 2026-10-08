@@ -71,10 +71,10 @@ A developer wants to delete a deployed module after deleting the source files.
 | FR-D-020 | `instance delete` MUST discover resources via the persisted instance inventory record (the `ModuleInstance` CR); when none exists it MUST exit 5 (not found) rather than fall back to labels. |
 | FR-D-021 | `instance delete` MUST NOT require module source. |
 | FR-D-022 | `instance delete` MUST delete in descending weight order. |
-| FR-D-023 | `instance delete` MUST support `--force` to skip confirmation. |
+| FR-D-023 | `instance delete` MUST support `--yes` / `-y` to skip confirmation; `--force` stays as its deprecated alias (capability `flag-conventions`). |
 | FR-D-024 | `instance delete` MUST support `--dry-run` to preview. |
 | FR-D-025 | `instance delete` MUST take the instance as a positional `<file|name|uuid>` argument. The namespace comes from `--namespace` / `-n`, the instance file, or the configured default. |
-| FR-D-026 | `instance delete` MUST prompt for confirmation (unless --force). |
+| FR-D-026 | `instance delete` MUST prompt for confirmation (unless `--yes`). |
 | FR-D-027 | `instance delete` MUST accept an instance UUID as the positional argument, resolved by matching `status.instanceUUID` across the namespace's `ModuleInstance` CRs. |
 | FR-D-028 | `instance delete` MUST use ownership-inventory-based enumeration from the persisted instance inventory record; there is no label-based enumeration path. |
 
@@ -330,18 +330,18 @@ The guard SHALL run after the target instance is resolved and before any object 
 - When the target is operator-owned, the command SHALL refuse with exit code 2 and delete and patch nothing, naming the signal that matched and the remedy of setting `spec.owner` to `cli`. The operator never reconciles, finalizes or prunes the instance that deploys it, so the operator-owned delete would wait on, and report, a cleanup that does not happen.
 - Otherwise the command SHALL list `ModuleInstance` resources cluster-wide. When any carries `opmodel.dev/cleanup`, the command SHALL refuse with exit code 2, delete and patch nothing, and name each such instance as `namespace/name`, marking the target itself when it is one of them, and name `opm operator uninstall` with its `--remove-finalizers` choice and that choice's consequence (the named instances' workloads are orphaned). Deleting the operator while it still owes cleanup leaves every armed instance unable to finish deletion until an operator runs again. When the cluster-wide list fails, the command SHALL fail closed with the exit code `opm` maps that Kubernetes error to (4 for a permission or authentication denial) and delete nothing.
 
-`opm instance delete` SHALL offer no flag that removes finalizers and SHALL NOT write `spec.owner`. `--force` SHALL keep its meaning, skipping the confirmation prompt, and SHALL NOT bypass either refusal. Every other instance's delete SHALL be unchanged by this requirement.
+`opm instance delete` SHALL offer no flag that removes finalizers and SHALL NOT write `spec.owner`. `--yes` SHALL keep its one meaning, skipping the confirmation prompt, and SHALL NOT bypass either refusal; neither SHALL `--force`, its deprecated alias on this command (capability `flag-conventions`). Every other instance's delete SHALL be unchanged by this requirement.
 
 #### Scenario: Refused while an instance waits on the operator's cleanup
 
-- **WHEN** `opm instance delete opm-operator -n opm-operator-system --force` runs for a CLI-owned record while `default/hello` carries the `opmodel.dev/cleanup` finalizer
+- **WHEN** `opm instance delete opm-operator -n opm-operator-system --yes` runs for a CLI-owned record while `default/hello` carries the `opmodel.dev/cleanup` finalizer
 - **THEN** the command SHALL exit 2 without deleting any object, and the record and every object its inventory lists SHALL still exist
 - **AND** the error SHALL name `default/hello` and `opm operator uninstall --remove-finalizers` and state that this choice orphans its workloads
 
 #### Scenario: Operator-owned instance of the operator is refused
 
 - **WHEN** the record `opm-operator` in `opm-operator-system` is operator-owned, with `spec.prune: true`, and no `ModuleInstance` carries `opmodel.dev/cleanup`
-- **AND** `opm instance delete opm-operator -n opm-operator-system --force` runs
+- **AND** `opm instance delete opm-operator -n opm-operator-system --yes` runs
 - **THEN** the command SHALL exit 2 and the `ModuleInstance` `opm-operator` SHALL still exist
 - **AND** the error SHALL name the matched signal and say to set `spec.owner` to `cli`, and SHALL NOT report that any resource was pruned
 
@@ -352,27 +352,27 @@ The guard SHALL run after the target instance is resolved and before any object 
 
 #### Scenario: The target itself carries the finalizer
 
-- **WHEN** `opm instance delete opm-operator -n opm-operator-system --force` runs for a CLI-owned record while the `ModuleInstance` `opm-operator` itself carries `opmodel.dev/cleanup` and no other instance does
+- **WHEN** `opm instance delete opm-operator -n opm-operator-system --yes` runs for a CLI-owned record while the `ModuleInstance` `opm-operator` itself carries `opmodel.dev/cleanup` and no other instance does
 - **THEN** the command SHALL exit 2, naming `opm-operator-system/opm-operator` as the instance being deleted
 
 #### Scenario: The operator module under another name is guarded
 
-- **WHEN** `opm instance delete ops -n platform --force` runs for a CLI-owned record whose module path is `opmodel.dev/modules/opm_operator@v0` while `default/hello` carries `opmodel.dev/cleanup`
+- **WHEN** `opm instance delete ops -n platform --yes` runs for a CLI-owned record whose module path is `opmodel.dev/modules/opm_operator@v0` while `default/hello` carries `opmodel.dev/cleanup`
 - **THEN** the command SHALL exit 2 without deleting any object
 
 #### Scenario: A record holding the operator's CRDs is guarded
 
-- **WHEN** `opm instance delete crds -n platform --force` runs for a CLI-owned record of another name and module path whose inventory holds the `CustomResourceDefinition` `moduleinstances.opmodel.dev`, while `default/hello` carries `opmodel.dev/cleanup`
+- **WHEN** `opm instance delete crds -n platform --yes` runs for a CLI-owned record of another name and module path whose inventory holds the `CustomResourceDefinition` `moduleinstances.opmodel.dev`, while `default/hello` carries `opmodel.dev/cleanup`
 - **THEN** the command SHALL exit 2 without deleting any object
 
 #### Scenario: Look-alike names are not the operator
 
-- **WHEN** `opm instance delete dash -n default --force` runs for a CLI-owned record whose module path is `opmodel.dev/modules/opm_operator_dashboard@v0` and whose inventory holds only the `CustomResourceDefinition` `widgets.example.opmodel.dev.io`, while another instance carries `opmodel.dev/cleanup`
+- **WHEN** `opm instance delete dash -n default --yes` runs for a CLI-owned record whose module path is `opmodel.dev/modules/opm_operator_dashboard@v0` and whose inventory holds only the `CustomResourceDefinition` `widgets.example.opmodel.dev.io`, while another instance carries `opmodel.dev/cleanup`
 - **THEN** the delete SHALL proceed without the guard
 
 #### Scenario: No armed instance, no refusal
 
-- **WHEN** `opm instance delete opm-operator -n opm-operator-system --force` runs for a CLI-owned record and no `ModuleInstance` carries `opmodel.dev/cleanup`
+- **WHEN** `opm instance delete opm-operator -n opm-operator-system --yes` runs for a CLI-owned record and no `ModuleInstance` carries `opmodel.dev/cleanup`
 - **THEN** the guard SHALL pass and the delete SHALL proceed as for any CLI-owned instance
 
 #### Scenario: List failure fails closed
@@ -382,8 +382,13 @@ The guard SHALL run after the target instance is resolved and before any object 
 
 #### Scenario: Other instances are not guarded
 
-- **WHEN** `opm instance delete hello -n default --force` runs for a CLI-owned instance of another module while another instance carries `opmodel.dev/cleanup`
+- **WHEN** `opm instance delete hello -n default --yes` runs for a CLI-owned instance of another module while another instance carries `opmodel.dev/cleanup`
 - **THEN** the delete SHALL proceed without the guard
+
+#### Scenario: The deprecated alias does not bypass the guard
+
+- **WHEN** `opm instance delete opm-operator -n opm-operator-system --force` runs for a CLI-owned record while `default/hello` carries the `opmodel.dev/cleanup` finalizer
+- **THEN** the command SHALL exit 2 without deleting any object, exactly as with `--yes`
 
 ### Requirement: Instance delete keeps the ModuleInstance when a tracked resource could not be read
 
@@ -602,7 +607,7 @@ Arguments:
 
 Flags:
   -n, --namespace string    Target namespace
-      --force               Skip confirmation prompt
+  -y, --yes                 Skip the confirmation prompt
       --dry-run             Preview without deleting
       --timeout duration    Wait for the operator to finish deleting an operator-owned instance
       --kubeconfig string   Path to kubeconfig
