@@ -400,3 +400,36 @@ func TestUninstall_FailedRecordDeleteIsAnError(t *testing.T) {
 	assert.False(t, fc.exists(clusterRoleGVR, "", "opm-operator-manager-role"))
 	assert.NotNil(t, fc.record(), "the record is still there")
 }
+
+// "Recorded objects are deleted in the plan's order": the controller
+// Deployment before its ServiceAccount and ClusterRole, each delete with
+// foreground propagation and a precondition on the UID that was read.
+func TestUninstall_DeletesInThePlansOrder(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	fc := newFakeCluster(t)
+	_, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{})
+	require.NoError(t, err)
+	fc.fake.ClearActions()
+
+	_, err = Uninstall(context.Background(), fc.client, UninstallOptions{})
+	require.NoError(t, err)
+
+	var order []string
+	for _, a := range fc.fake.Actions() {
+		d, ok := a.(k8stesting.DeleteAction)
+		if !ok || d.GetResource().Resource == moduleInstancesResource {
+			continue
+		}
+		order = append(order, d.GetResource().Resource)
+		opts := d.GetDeleteOptions()
+		require.NotNil(t, opts.PropagationPolicy)
+		assert.Equal(t, metav1.DeletePropagationForeground, *opts.PropagationPolicy)
+		require.NotNil(t, opts.Preconditions, "each delete carries the UID of the object that was read")
+		require.NotNil(t, opts.Preconditions.UID)
+		assert.NotEmpty(t, *opts.Preconditions.UID)
+	}
+	require.Len(t, order, 3)
+	assert.Equal(t, "deployments", order[0], "highest weight first: %v", order)
+	assert.ElementsMatch(t, []string{"serviceaccounts", "clusterroles"}, order[1:])
+}

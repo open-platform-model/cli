@@ -13,7 +13,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
-	"github.com/open-platform-model/library/opm/k8s/object"
+	"github.com/open-platform-model/library/opm/k8s/lifecycle"
 	"github.com/open-platform-model/library/opm/k8s/ownership"
 )
 
@@ -96,15 +96,17 @@ type LeftBehind struct {
 	Reason string
 }
 
-// PruneStaleResources deletes the stale resources the instance still owns.
-// Resources are judged and deleted in reverse weight order (highest weight
-// first). Each goes through kubernetes.JudgedDelete: its live object is read
-// and the library's delete verdict is asked with instanceUUID, which is the
+// PruneStaleResources deletes the stale resources the instance still owns,
+// as the library's deletion plan orders and judges them
+// (kubernetes.RunDeletion): highest weight first, each live object read and
+// the library's delete verdict asked with instanceUUID, which is the
 // identity stored in the instance's record, the one that applied the stale
 // objects, and never the identity of the current render: after a module
 // moved to a new path the two differ, and the stale objects carry the
 // recorded one. An entry the verdict skips is returned in leftBehind and is
 // not deleted. A delete carries a precondition on the UID that was read.
+// A prune holds no record, so it asks no hold verdict: the caller writes the
+// record afterwards and keeps the failed entries in it.
 //
 // A core Namespace or a CRD (kubernetes.IsProtectedKind) is never deleted,
 // even when the caller passes one; callers that report what was left behind
@@ -118,54 +120,38 @@ type LeftBehind struct {
 // read fails, and one whose object was replaced between the read and the
 // delete (kubernetes.ErrReplaced).
 //
-// A delete that fails does not stop the loop. A failed API discovery request
-// does: that entry and every entry not yet tried are reported as failed, with
-// the discovery error. When any failed, the error is a
+// A delete that fails does not stop the prune. A failed API discovery request
+// ends its requests: that entry and every entry not yet tried are reported
+// as failed, with the discovery error. When any failed, the error is a
 // *PruneError naming the entries that are still in the cluster.
 func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale []k8sinventory.Entry, instanceUUID string) (leftBehind []LeftBehind, err error) {
 	if len(stale) == 0 {
 		return nil, nil
 	}
 
-	// Sort in reverse weight order (highest weight deleted first)
-	sorted := make([]k8sinventory.Entry, len(stale))
-	copy(sorted, stale)
-	object.Sort(sorted, func(e k8sinventory.Entry) schema.GroupVersionKind {
-		return schema.GroupVersionKind{Group: e.Group, Version: e.Version, Kind: e.Kind}
-	}, object.Descending)
-
 	var failed PruneError
-	for i, entry := range sorted {
-		if kubernetes.IsProtectedKind(entry.Group, entry.Kind) {
-			output.Debug("leaving protected resource behind", "kind", entry.Kind, "name", entry.Name)
-			continue
-		}
-
-		outcome, err := kubernetes.JudgedDelete(ctx, client, entryObject(entry), entry.Version, instanceUUID, false)
-		if kubernetes.IsDiscoveryFailure(err) {
-			// The cluster cannot say where this entry lives: stop, and report
-			// it and every entry not yet tried as still in the cluster.
-			for _, left := range sorted[i:] {
-				if kubernetes.IsProtectedKind(left.Group, left.Kind) {
-					continue
-				}
-				failed.Failed = append(failed.Failed, left)
-				failed.Errs = append(failed.Errs, fmt.Errorf("deleting %s/%s: %w", left.Kind, left.Name, err))
+	plan := lifecycle.NewDeletionPlan(stale, lifecycle.Policy{Prune: true}, instanceUUID)
+	_, err = kubernetes.RunDeletion(ctx, client, plan, kubernetes.DeletionOptions{
+		StopOnDiscoveryFailure: true,
+		OnStep: func(step kubernetes.StepResult) {
+			entry := step.Entry
+			switch {
+			case step.Outcome.Result == lifecycle.ResultFailed:
+				failed.Failed = append(failed.Failed, entry)
+				failed.Errs = append(failed.Errs, fmt.Errorf("deleting %s/%s: %w", entry.Kind, entry.Name, step.Err))
+			case step.Outcome.Skip == ownership.SkipAlreadyAbsent:
+				output.Debug("stale resource already gone", "kind", entry.Kind, "namespace", entry.Namespace, "name", entry.Name)
+			case step.Outcome.Skip == ownership.SkipSafetyExcluded:
+				output.Debug("leaving protected resource behind", "kind", entry.Kind, "name", entry.Name)
+			case step.Outcome.Skip != "":
+				leftBehind = append(leftBehind, LeftBehind{Entry: entry, Reason: step.Outcome.Message})
+			default:
+				output.Debug("pruned stale resource", "kind", entry.Kind, "namespace", entry.Namespace, "name", entry.Name)
 			}
-			break
-		}
-
-		switch {
-		case err != nil:
-			failed.Failed = append(failed.Failed, entry)
-			failed.Errs = append(failed.Errs, fmt.Errorf("deleting %s/%s: %w", entry.Kind, entry.Name, err))
-		case outcome.Skip == ownership.SkipAlreadyAbsent:
-			output.Debug("stale resource already gone", "kind", entry.Kind, "namespace", entry.Namespace, "name", entry.Name)
-		case outcome.Skip != "":
-			leftBehind = append(leftBehind, LeftBehind{Entry: entry, Reason: outcome.Message})
-		default:
-			output.Debug("pruned stale resource", "kind", entry.Kind, "namespace", entry.Namespace, "name", entry.Name)
-		}
+		},
+	})
+	if err != nil {
+		return leftBehind, err
 	}
 
 	if len(failed.Failed) > 0 {

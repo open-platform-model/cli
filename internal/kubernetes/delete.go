@@ -6,13 +6,11 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/log"
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+	"github.com/open-platform-model/library/opm/k8s/lifecycle"
 	"github.com/open-platform-model/library/opm/k8s/object"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/library/opm/k8s/ownership"
@@ -43,8 +41,11 @@ type DeleteOptions struct {
 	DryRun bool
 
 	// InventoryLive is the list of live resources pre-fetched from the
-	// ModuleInstance CR inventory by the caller. Resources are deleted from this
-	// list. When nil or empty (and InventoryRecordExists is false), Delete
+	// ModuleInstance CR inventory by the caller. The deletion plan is built
+	// from these objects and from Unreadable, and from nothing else: a
+	// recorded object the caller's read did not find is not in the plan, so
+	// it is never read again and never deleted. When nil or empty (and
+	// InventoryRecordExists is false, and nothing is unreadable), Delete
 	// returns noResourcesFoundError.
 	InventoryLive []*unstructured.Unstructured
 
@@ -99,6 +100,11 @@ type DeleteResult struct {
 
 	// Errors contains per-resource errors (non-fatal).
 	Errors []resourceError
+
+	// Run is the deletion plan as it was driven. The caller asks
+	// lifecycle.MayReleaseHold with its plan and state before it deletes
+	// the instance's record.
+	Run DeletionRun
 }
 
 // LeftBehindResource is a tracked resource Delete did not remove, with the
@@ -113,23 +119,26 @@ type LeftBehindResource struct {
 // KeptClaimReason is the reason of every entry in DeleteResult.Kept.
 const KeptClaimReason = "PersistentVolumeClaims are kept unless --delete-data is set"
 
-// Delete removes the resources belonging to an instance deployment.
-// opts.InventoryLive must be pre-fetched from the ModuleInstance CR inventory by
-// the caller. Resources are deleted in reverse weight order. The ModuleInstance
-// CR itself is deleted last by the caller, after Delete returns.
+// Delete removes the resources belonging to an instance deployment, as the
+// library's deletion plan orders and judges them (RunDeletion). The plan is
+// built from the recorded objects the caller's read found (opts.InventoryLive)
+// or could not read (opts.Unreadable), and judged with opts.InstanceUUID. The ModuleInstance CR itself is deleted last by the
+// caller, after Delete returns, and only when the hold verdict of
+// DeleteResult.Run releases it.
 //
-// A CRD or Namespace is never deleted, and a PersistentVolumeClaim only with
-// opts.DeleteData (DeleteResult.Kept otherwise). Every other object goes
-// through JudgedDelete: it is read again just before its delete and deleted
+// A PersistentVolumeClaim is deleted only with opts.DeleteData; otherwise it
+// stays out of the plan and is listed in DeleteResult.Kept. For every other
+// entry the plan decides: a CRD or Namespace is never deleted and never
+// read; any other object is read again just before its delete and deleted
 // only when the library's delete verdict allows it for opts.InstanceUUID
 // (still OPM-managed, not another instance's, not adopted by another
 // instance); otherwise it is left behind with the verdict's message
 // (DeleteResult.LeftBehind). An object that is already gone counts neither as
 // deleted nor as an error; any other read error, and a delete refused because
 // the object was replaced since the read (ErrReplaced), is a per-resource
-// error, so the caller keeps the ModuleInstance and a re-run retries. A
-// resource the caller's discovery could not read (opts.Unreadable) gets the
-// same outcome without a second read.
+// error, so the hold verdict keeps the ModuleInstance and a re-run retries. A
+// resource the caller's discovery could not read (opts.Unreadable) is
+// reported first and gets the same outcome without a second read.
 func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteResult, error) {
 	result := &DeleteResult{}
 
@@ -163,53 +172,96 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 
 	recordUnreadable(result, opts.Unreadable, opts.DeleteData, instanceLog)
 
-	// Sort in reverse weight order (highest weight first = delete webhooks before deployments)
+	// Highest weight first, the order the plan deletes in.
 	SortObjects(resources, object.Descending)
 
-	// Delete each workload resource
-	for _, res := range resources {
-		kind := res.GetKind()
-		name := res.GetName()
-		ns := res.GetNamespace()
-
-		if !opts.DeleteData && IsDataClaim(res.GroupVersionKind().Group, kind) {
-			result.Kept = append(result.Kept, LeftBehindResource{Kind: kind, Namespace: ns, Name: name, Reason: KeptClaimReason})
-			continue
-		}
-
-		gvk := res.GroupVersionKind()
-		if IsProtectedKind(gvk.Group, kind) {
-			result.LeftBehind = append(result.LeftBehind, LeftBehindResource{Kind: kind, Namespace: ns, Name: name, Reason: ProtectedKindReason})
-			continue
-		}
-
-		outcome, err := JudgedDelete(ctx, client, objectOf(res), gvk.Version, opts.InstanceUUID, opts.DryRun)
-		switch {
-		case err != nil:
-			// Worded as before the verdict moved to the library: a failed
-			// read and a failed delete each keep their own line.
-			verb := "deleting"
-			if IsLiveReadFailure(err) {
-				verb = "reading"
+	// A kept claim never enters the plan: it is reported from the live read.
+	if !opts.DeleteData {
+		for _, res := range resources {
+			if IsDataClaim(res.GroupVersionKind().Group, res.GetKind()) {
+				result.Kept = append(result.Kept, LeftBehindResource{Kind: res.GetKind(), Namespace: res.GetNamespace(), Name: res.GetName(), Reason: KeptClaimReason})
 			}
-			instanceLog.Warn(fmt.Sprintf("%s %s/%s: %v", verb, kind, name, err))
-			result.Errors = append(result.Errors, resourceError{Kind: kind, Name: name, Namespace: ns, Err: err})
-		case outcome.Skip == ownership.SkipAlreadyAbsent:
-			instanceLog.Debug("resource already gone", "kind", kind, "namespace", ns, "name", name)
-		case outcome.Skip != "":
-			result.LeftBehind = append(result.LeftBehind, LeftBehindResource{Kind: kind, Namespace: ns, Name: name, Reason: outcome.Message})
-		case opts.DryRun:
-			instanceLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
-			result.Deleted++
-		default:
-			instanceLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
-			result.Deleted++
 		}
+	}
+
+	// Reported above, before the run; the plan still holds them, so that a
+	// failed one holds the record.
+	unreadable := make(map[ownership.Object]error, len(opts.Unreadable))
+	for _, u := range opts.Unreadable {
+		unreadable[ownership.Object{Group: u.Group, Kind: u.Kind, Namespace: u.Namespace, Name: u.Name}] = u.Err
+	}
+
+	plan := lifecycle.NewDeletionPlan(planEntries(opts), lifecycle.Policy{Prune: true}, opts.InstanceUUID)
+	run, err := RunDeletion(ctx, client, plan, DeletionOptions{
+		DryRun:     opts.DryRun,
+		Unreadable: unreadable,
+		OnStep: func(step StepResult) {
+			if _, reported := unreadable[entryObject(step.Entry)]; reported {
+				return
+			}
+			recordStep(result, step, opts.DryRun, instanceLog)
+		},
+	})
+	result.Run = run
+	if err != nil {
+		return nil, err
 	}
 
 	// The ModuleInstance CR is deleted last by the caller (after this returns),
 	// so the inventory record is only removed once the instance is fully torn down.
 	return result, nil
+}
+
+// planEntries are the entries Delete plans over: one per recorded object the
+// caller's read found or could not read, without the PersistentVolumeClaims
+// Delete keeps. A recorded object that read did not find has no entry here,
+// so the set of objects a delete can touch is the set the caller saw, which
+// is also what the confirmation prompt was built from. An unreadable object
+// carries no version; the plan never sends a request for it.
+func planEntries(opts DeleteOptions) []k8sinventory.Entry {
+	planned := make([]k8sinventory.Entry, 0, len(opts.InventoryLive)+len(opts.Unreadable))
+	keep := func(e k8sinventory.Entry) {
+		if opts.DeleteData || !IsDataClaim(e.Group, e.Kind) {
+			planned = append(planned, e)
+		}
+	}
+	for _, res := range opts.InventoryLive {
+		gvk := res.GroupVersionKind()
+		keep(k8sinventory.Entry{Group: gvk.Group, Version: gvk.Version, Kind: gvk.Kind, Namespace: res.GetNamespace(), Name: res.GetName()})
+	}
+	for _, u := range opts.Unreadable {
+		keep(k8sinventory.Entry{Group: u.Group, Kind: u.Kind, Namespace: u.Namespace, Name: u.Name})
+	}
+	return planned
+}
+
+// recordStep adds one finished step of the plan to result and prints its
+// line: a failed read or delete is a per-resource error, a skip other than
+// "already gone" is left behind, and a delete counts.
+func recordStep(result *DeleteResult, step StepResult, dryRun bool, instanceLog *log.Logger) {
+	kind, ns, name := step.Entry.Kind, step.Entry.Namespace, step.Entry.Name
+	switch {
+	case step.Outcome.Result == lifecycle.ResultFailed:
+		// A failed read and a failed delete each keep their own line.
+		verb := "deleting"
+		if step.Failed == lifecycle.ActionRead {
+			verb = "reading"
+		}
+		instanceLog.Warn(fmt.Sprintf("%s %s/%s: %v", verb, kind, name, step.Err))
+		result.Errors = append(result.Errors, resourceError{Kind: kind, Name: name, Namespace: ns, Err: step.Err})
+	case step.Outcome.Skip == ownership.SkipAlreadyAbsent:
+		instanceLog.Debug("resource already gone", "kind", kind, "namespace", ns, "name", name)
+	case step.Outcome.Skip == ownership.SkipSafetyExcluded:
+		result.LeftBehind = append(result.LeftBehind, LeftBehindResource{Kind: kind, Namespace: ns, Name: name, Reason: ProtectedKindReason})
+	case step.Outcome.Skip != "":
+		result.LeftBehind = append(result.LeftBehind, LeftBehindResource{Kind: kind, Namespace: ns, Name: name, Reason: step.Outcome.Message})
+	case dryRun:
+		instanceLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
+		result.Deleted++
+	default:
+		instanceLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
+		result.Deleted++
+	}
 }
 
 // recordUnreadable adds the resources discovery could not read to result: a
@@ -236,92 +288,3 @@ func recordUnreadable(result *DeleteResult, unreadable []UnreadableResource, del
 // holds its name. It is never reported as deleted; the next run reads the
 // new object and judges it.
 var ErrReplaced = errors.New("the object was replaced after it was read, so it was not deleted")
-
-// liveReadError marks an error of JudgedDelete as a failure of the live
-// read, kind resolution included, as opposed to a failure of the DELETE. It
-// adds no text of its own.
-type liveReadError struct{ err error }
-
-func (e *liveReadError) Error() string { return e.err.Error() }
-func (e *liveReadError) Unwrap() error { return e.err }
-
-// IsLiveReadFailure reports whether an error of JudgedDelete came from
-// reading the live object, so that no DELETE was sent.
-func IsLiveReadFailure(err error) bool {
-	var readErr *liveReadError
-	return errors.As(err, &readErr)
-}
-
-// DeleteOutcome is what JudgedDelete did with one object.
-type DeleteOutcome struct {
-	// Deleted reports that the API server accepted the DELETE.
-	Deleted bool
-	// Skip is why the object was left in place; empty when the delete
-	// verdict allowed the delete. An object that is already gone, at the
-	// read or at the DELETE, is ownership.SkipAlreadyAbsent.
-	Skip ownership.SkipReason
-	// Message is the library's wording of the skip, for the user.
-	Message string
-}
-
-// JudgedDelete is the one way the CLI deletes an object of an instance. It
-// reads the live object under the resource the cluster serves its kind as,
-// asks the library's delete verdict with instanceUUID, the identity that
-// applied the object, and only on a proceed verdict sends the DELETE, with
-// foreground propagation and a precondition on the UID of the object it
-// read. A dry run stops after the verdict.
-//
-// A kind OPM never deletes is skipped without a read. A read that fails with
-// anything but NotFound, a kind that cannot be resolved included, is returned
-// as the error (IsLiveReadFailure): the object may still exist. A DELETE
-// refused on the UID precondition is ErrReplaced.
-func JudgedDelete(ctx context.Context, client *Client, obj ownership.Object, version, instanceUUID string, dryRun bool) (DeleteOutcome, error) {
-	if ownership.SafetyExcluded(obj.Group, obj.Kind) {
-		return outcomeOf(ownership.CanDelete(ownership.DeleteInput{Object: obj, InstanceUUID: instanceUUID})), nil
-	}
-
-	gvk := schema.GroupVersionKind{Group: obj.Group, Version: version, Kind: obj.Kind}
-	resource, err := client.ResourceClientFor(ctx, gvk, obj.Namespace)
-	if err != nil {
-		return DeleteOutcome{}, &liveReadError{err: err}
-	}
-	live, err := resource.Get(ctx, obj.Name, metav1.GetOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return DeleteOutcome{}, &liveReadError{err: err}
-		}
-		live = nil
-	}
-
-	verdict := ownership.CanDelete(ownership.DeleteInput{Object: obj, Live: live, InstanceUUID: instanceUUID})
-	if !verdict.Proceed() || dryRun {
-		return outcomeOf(verdict), nil
-	}
-
-	propagation := metav1.DeletePropagationForeground
-	err = resource.Delete(ctx, obj.Name, metav1.DeleteOptions{
-		PropagationPolicy: &propagation,
-		Preconditions:     verdict.Preconditions(),
-	})
-	switch {
-	case err == nil:
-		return DeleteOutcome{Deleted: true}, nil
-	case apierrors.IsNotFound(err):
-		// Gone between the read and the delete: already done.
-		return DeleteOutcome{Skip: ownership.SkipAlreadyAbsent, Message: obj.String() + " no longer exists"}, nil
-	case apierrors.IsConflict(err) && verdict.Preconditions() != nil:
-		return DeleteOutcome{}, fmt.Errorf("%w: %w", ErrReplaced, err)
-	default:
-		return DeleteOutcome{}, err
-	}
-}
-
-func outcomeOf(v ownership.DeleteVerdict) DeleteOutcome {
-	return DeleteOutcome{Skip: v.Skip, Message: v.Message}
-}
-
-// objectOf is the ownership identity of a live or rendered object.
-func objectOf(obj *unstructured.Unstructured) ownership.Object {
-	gvk := obj.GroupVersionKind()
-	return ownership.Object{Group: gvk.Group, Kind: gvk.Kind, Namespace: obj.GetNamespace(), Name: obj.GetName()}
-}
