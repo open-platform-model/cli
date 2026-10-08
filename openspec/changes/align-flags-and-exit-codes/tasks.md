@@ -1,9 +1,9 @@
 ## 1. Confirmation and name flags
 
-- [ ] 1.1 `internal/cmd/instance/delete.go`: add `--yes`/`-y`, keep `--force` as a deprecated alias through cobra's `MarkDeprecated`, update the help text and the example; a test in `delete_test.go` fails before the change (no `yes` flag, `force` not deprecated) and passes after
-- [ ] 1.2 `internal/cmd/module/vet.go`: add `--name`, mark `--instance-name` deprecated, refuse both together; tests in `vet_test.go` fail before and pass after (flag present, alias sets the same name, both together is a usage error)
-- [ ] 1.3 A test over the command tree pins the `--force` and `--yes` conventions: `--force` is offered, not deprecated, on `instance apply`, `module apply`, `platform pull` and `config init`; `--yes` with `-y` is offered on `instance delete` and `module init`
-- [ ] 1.4 `task fmt`, `task vet`, `task lint` and `task test:unit` green, then commit `feat(cmd): add --yes to instance delete and --name to module vet`
+- [x] 1.1 `internal/cmd/instance/delete.go`: add `--yes`/`-y`, keep `--force` as a deprecated alias through cobra's `MarkDeprecated`, update the help text and the example; a test in `delete_test.go` fails before the change (no `yes` flag, `force` not deprecated) and passes after
+- [x] 1.2 `internal/cmd/module/vet.go`: add `--name`, mark `--instance-name` deprecated, refuse both together; tests in `vet_test.go` fail before and pass after (flag present, alias sets the same name, both together is a usage error)
+- [x] 1.3 A test over the command tree pins the `--force` and `--yes` conventions: `--force` is offered, not deprecated, on `instance apply`, `module apply`, `platform pull` and `config init`; `--yes` with `-y` is offered on `instance delete` and `module init`
+- [x] 1.4 `task fmt`, `task vet`, `task lint` and `task test:unit` green, then commit `feat(cmd): add --yes to instance delete and --name to module vet`
 
 ## 2. Exit code of a usage error and help layout
 

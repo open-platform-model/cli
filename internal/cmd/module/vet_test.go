@@ -3,6 +3,7 @@ package modulecmd
 import (
 	"bytes"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -83,10 +84,76 @@ func TestNewModuleVetCmd_PlatformFlagNamesTheModuleDeps(t *testing.T) {
 	cmd := NewModuleVetCmd(&config.GlobalConfig{})
 	assert.Equal(t, "Render against this platform module directory instead of the module's own deps",
 		cmd.Flags().Lookup("platform").Usage)
-	for _, name := range []string{"values", "namespace", "instance-name", "platform"} {
+	for _, name := range []string{"values", "namespace", "name", "instance-name", "platform"} {
 		assert.NotNil(t, cmd.Flags().Lookup(name), "--%s is registered", name)
 	}
 	assert.Contains(t, cmd.Long, "--platform <dir>")
+}
+
+// --name is the spelling module build and module apply use; --instance-name
+// stays as its deprecated alias.
+func TestNewModuleVetCmd_NameFlagAndDeprecatedAlias(t *testing.T) {
+	cmd := NewModuleVetCmd(&config.GlobalConfig{})
+
+	name := cmd.Flags().Lookup("name")
+	require.NotNil(t, name, "--name is registered")
+	assert.Empty(t, name.Deprecated)
+	assert.Equal(t, NewModuleBuildCmd(&config.GlobalConfig{}).Flags().Lookup("name").Usage, name.Usage,
+		"vet and build describe --name the same way")
+
+	old := cmd.Flags().Lookup("instance-name")
+	require.NotNil(t, old, "the old spelling still parses")
+	assert.Equal(t, "use --name", old.Deprecated)
+	assert.True(t, old.Hidden, "a deprecated flag is not in the help")
+
+	var warnings bytes.Buffer
+	cmd.SetOut(&warnings)
+	require.NoError(t, cmd.ParseFlags([]string{"--instance-name", "web"}))
+	assert.Equal(t, "Flag --instance-name has been deprecated, use --name\n", warnings.String())
+}
+
+func TestModVet_NameAndInstanceNameTogetherIsAUsageError(t *testing.T) {
+	cmd := NewModuleVetCmd(&config.GlobalConfig{})
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{filepath.Join(t.TempDir(), "absent"), "--name", "a", "--instance-name", "b"})
+
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "[instance-name name] were all set")
+	var exitErr *opmexit.ExitError
+	assert.False(t, errors.As(err, &exitErr), "a usage error exits 1 through main's non-ExitError path")
+}
+
+// Both spellings name the synthesized instance. Registry-backed like
+// TestModVet_ValidModule, and skipped the same way.
+func TestModVet_NameAndItsAliasSetTheInstanceName(t *testing.T) {
+	fixtureDir := filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "simple-module")
+	for _, flag := range []string{"--name", "--instance-name"} {
+		t.Run(flag, func(t *testing.T) {
+			tmpHome, cleanup := setupTestConfig(t)
+			defer cleanup()
+			t.Setenv("HOME", tmpHome)
+
+			var logs bytes.Buffer
+			output.SetLogWriter(&logs)
+			t.Cleanup(func() { output.SetLogWriter(os.Stderr) })
+
+			cmd := NewModuleVetCmd(&config.GlobalConfig{ConfigPath: filepath.Join(tmpHome, ".opm", "config.cue")})
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			cmd.SetArgs([]string{fixtureDir, flag, "web"})
+
+			err := cmd.Execute()
+			var exitErr *opmexit.ExitError
+			if errors.As(err, &exitErr) && exitErr.Code == opmexit.ExitConnectivityError {
+				t.Skipf("core not resolvable (registry or cache unavailable?): %v", err)
+			}
+			require.NoError(t, err)
+			assert.Contains(t, logs.String(), `"web"`)
+			assert.NotContains(t, logs.String(), "simple-module-debug")
+		})
+	}
 }
 
 func TestModVet_RejectsInstancePackage(t *testing.T) {

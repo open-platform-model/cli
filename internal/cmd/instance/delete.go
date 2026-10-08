@@ -31,6 +31,7 @@ func NewInstanceDeleteCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var namespace string
 
 	var (
+		yesFlag     bool
 		forceFlag   bool
 		dryRunFlag  bool
 		timeoutFlag time.Duration
@@ -57,7 +58,7 @@ the instance that deploys it, so set spec.owner to cli first. And while any
 instance still carries the operator's opmodel.dev/cleanup finalizer: removing
 the operator would leave them unable to finish deletion. Run
 'opm operator uninstall --remove-finalizers' to remove that finalizer first,
-which orphans those instances' workloads. --force does not bypass either.
+which orphans those instances' workloads. --yes does not bypass either.
 
 Arguments:
   file         Path to an instance.cue file or directory containing one.
@@ -79,17 +80,21 @@ Examples:
   # Preview what would be deleted
   opm instance delete jellyfin -n media --dry-run
 
-  # Skip confirmation prompt
-  opm instance delete jellyfin -n media --force`,
+  # Skip the confirmation prompt
+  opm instance delete jellyfin -n media --yes`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runInstanceDelete(c.Context(), args[0], cfg, &kf, namespace, forceFlag, dryRunFlag, timeoutFlag)
+			return runInstanceDelete(c.Context(), args[0], cfg, &kf, namespace, yesFlag || forceFlag, dryRunFlag, timeoutFlag)
 		},
 	}
 
 	kf.AddTo(c)
 	c.Flags().StringVarP(&namespace, "namespace", "n", "", "Target namespace")
-	c.Flags().BoolVar(&forceFlag, "force", false, "Skip confirmation prompt")
+	c.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip the confirmation prompt")
+	// --force was the first spelling of --yes. On every other command --force
+	// overrides a refusal, so here it stays only as a deprecated alias.
+	c.Flags().BoolVar(&forceFlag, "force", false, "Skip the confirmation prompt")
+	cmdutil.DeprecateFlag(c, "force", "yes")
 	c.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Preview without deleting")
 	c.Flags().DurationVar(&timeoutFlag, "timeout", inventory.DefaultReconcileTimeout,
 		"Bound on the operator-cleanup wait (operator-managed instances only)")
@@ -97,7 +102,7 @@ Examples:
 	return c
 }
 
-func runInstanceDelete(ctx context.Context, identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, force, dryRun bool, timeout time.Duration) error {
+func runInstanceDelete(ctx context.Context, identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, skipConfirm, dryRun bool, timeout time.Duration) error {
 	target, err := cmdutil.ResolveInstanceTarget(ctx, identifier, cfg, kf, namespaceFlag)
 	if err != nil {
 		return err
@@ -116,7 +121,7 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 
 	if dryRun {
 		instanceLog.Info("dry run - no changes will be made")
-	} else if !force {
+	} else if !skipConfirm {
 		if !confirmInstanceDelete(rsf.InstanceName, rsf.InstanceID, namespace) {
 			instanceLog.Info("deletion canceled")
 			return nil

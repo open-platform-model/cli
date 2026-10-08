@@ -109,6 +109,20 @@ func (f *InstanceSelectorFlags) LogName() string {
 	return fmt.Sprintf("instance:%s", f.InstanceID)
 }
 
+// DeprecateFlag marks the flag old of c as a deprecated spelling of the flag
+// replacement. Cobra then leaves old out of help and completion and prints
+// one line on standard error when it is used; the flag keeps working. Both
+// flags must be registered on c: a missing one is a programming error and
+// panics when the command is built.
+func DeprecateFlag(c *cobra.Command, old, replacement string) {
+	if c.Flags().Lookup(replacement) == nil {
+		panic(fmt.Sprintf("cmdutil.DeprecateFlag: %s has no --%s flag", c.CommandPath(), replacement))
+	}
+	if err := c.Flags().MarkDeprecated(old, "use --"+replacement); err != nil {
+		panic(fmt.Sprintf("cmdutil.DeprecateFlag: %s: %v", c.CommandPath(), err))
+	}
+}
+
 // ResolveModulePath returns the module path from command args,
 // defaulting to the current directory.
 func ResolveModulePath(args []string) string {

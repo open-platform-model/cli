@@ -67,6 +67,11 @@ func NewModuleVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 
 	rf.AddTo(c)
 	useModuleDepsPlatformHelp(c)
+	// --name is the spelling module build and module apply use. Both flags
+	// write the same field, and cobra refuses the two together.
+	c.Flags().StringVar(&rf.InstanceName, "name", "", "Synthetic instance name (default: <module name>-debug)")
+	cmdutil.DeprecateFlag(c, "instance-name", "name")
+	c.MarkFlagsMutuallyExclusive("name", "instance-name")
 
 	return c
 }
