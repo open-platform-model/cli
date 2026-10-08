@@ -33,14 +33,33 @@ type DeleteRequest struct {
 	Log        *log.Logger
 }
 
+// RecordDeleteError reports that every tracked object of an instance was
+// deleted and the delete of its ModuleInstance record then failed. The record
+// is still in the cluster and lists objects that are gone; a re-run finds them
+// absent and tries the record again.
+type RecordDeleteError struct {
+	Namespace string
+	Name      string
+	Err       error
+}
+
+func (e *RecordDeleteError) Error() string {
+	return fmt.Sprintf("the tracked resources of ModuleInstance %s/%s were deleted, but the record remains: %v; fix the cause and re-run, re-running is safe",
+		e.Namespace, e.Name, e.Err)
+}
+
+func (e *RecordDeleteError) Unwrap() error { return e.Err }
+
 // DeleteRecorded deletes a CLI-owned instance's tracked objects, in
 // descending resource-weight order, leaving CRDs, Namespaces and any object
 // that no longer carries the instance's identity behind, then deletes the
 // ModuleInstance record last: only on a real run with no per-object error,
 // so a re-run can retry what failed. An object discovery could not read
 // (req.Unreadable) is such an error. Already absent objects count as
-// deleted. `opm instance delete` and `opm operator uninstall` share it. The
-// caller reports the result.
+// deleted. A record delete that fails is returned as a *RecordDeleteError
+// and is not logged here: the caller reports it and must not report success.
+// `opm instance delete` and `opm operator uninstall` share it. The caller
+// reports the result.
 func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteResult, error) {
 	instanceLog := req.Log
 	instanceLog.Info(fmt.Sprintf("deleting resources in namespace %q", req.Namespace))
@@ -80,7 +99,7 @@ func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteR
 	// failure (so a re-run can retry the remaining workloads).
 	if !req.DryRun && req.Record != nil && len(deleteResult.Errors) == 0 {
 		if err := inventory.DeleteCR(ctx, req.Client, req.Record.Name, req.Record.Namespace); err != nil {
-			instanceLog.Warn("could not delete ModuleInstance CR", "error", err)
+			return nil, &RecordDeleteError{Namespace: req.Record.Namespace, Name: req.Record.Name, Err: err}
 		}
 	}
 	return deleteResult, nil

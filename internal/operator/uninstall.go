@@ -227,7 +227,9 @@ func (e *NoRecordError) Error() string {
 // behind, an already absent object counts as deleted, and deletion is not
 // waited for (fire-and-report). A recorded object that cannot be read (an
 // error other than NotFound) is a per-object error in UninstallResult.Errors,
-// so the record is kept and the caller does not report success.
+// so the record is kept and the caller does not report success. A record
+// delete that fails after the objects are gone is returned as an error
+// (a *workflowapply.RecordDeleteError).
 func Uninstall(ctx context.Context, client *kubernetes.Client, opts UninstallOptions) (*UninstallResult, error) {
 	rec, err := inventory.GetRecord(ctx, client, OperatorInstanceName, OperatorNamespace)
 	if err != nil {

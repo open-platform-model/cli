@@ -349,3 +349,30 @@ func TestUninstall_UnreadableObjectKeepsTheRecord(t *testing.T) {
 	assert.True(t, fc.exists(clusterRoleGVR, "", "opm-operator-manager-role"), "the unreadable object is not deleted")
 	assert.NotNil(t, fc.record(), "the record is kept and still tracks the unreadable object")
 }
+
+// "Forbidden record delete": every recorded object is deleted and the delete
+// of the record then fails. Uninstall returns the error, with the cause
+// reachable, so the command reports no uninstall; the record stays.
+func TestUninstall_FailedRecordDeleteIsAnError(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	fc := newFakeCluster(t)
+	_, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{})
+	require.NoError(t, err)
+
+	fc.fake.PrependReactor("delete", moduleInstanceGVR.Resource, func(action k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(moduleInstanceGVR.GroupResource(), OperatorInstanceName, errors.New("no RBAC"))
+	})
+
+	result, err := Uninstall(context.Background(), fc.client, UninstallOptions{})
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.True(t, apierrors.IsForbidden(err), "the cause is reachable through unwrapping")
+	assert.Contains(t, err.Error(), OperatorNamespace+"/"+OperatorInstanceName)
+	assert.Contains(t, err.Error(), "the record remains")
+	assert.Contains(t, err.Error(), "re-running is safe")
+
+	assert.False(t, fc.exists(deploymentGVR, OperatorNamespace, ControllerDeploymentName), "the recorded objects are deleted")
+	assert.False(t, fc.exists(clusterRoleGVR, "", "opm-operator-manager-role"))
+	assert.NotNil(t, fc.record(), "the record is still there")
+}

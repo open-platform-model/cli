@@ -603,3 +603,62 @@ func TestDeleteResolvedInstance_OperatorOwnedIgnoresUnreadable(t *testing.T) {
 	_, miErr := fake.Tracker().Get(inventory.ModuleInstanceGVR, rec.Namespace, rec.Name)
 	assert.True(t, apierrors.IsNotFound(miErr), "the ModuleInstance is deleted")
 }
+
+// The tracked ConfigMap is deleted and the delete of the ModuleInstance record
+// then fails: the command prints no success line, says the record remains and
+// that a re-run is safe, and exits with the code of the cause. The re-run,
+// with the cause gone, deletes the record and exits 0.
+func TestExecuteInstanceDelete_FailedRecordDeleteFails(t *testing.T) {
+	miGR := schema.GroupResource{Group: inventory.GroupOpmodel, Resource: inventory.ModuleInstanceGVR.Resource}
+	tests := []struct {
+		name     string
+		cause    error
+		wantCode int
+	}{
+		{"forbidden", apierrors.NewForbidden(miGR, "demo", errors.New("no delete access")), opmexit.ExitPermissionDenied},
+		{"internal error", apierrors.NewInternalError(errors.New("etcd is down")), opmexit.ExitGeneralError},
+	}
+	inv := &inventory.Record{Name: "demo", Namespace: "apps", Owner: inventory.OwnerCLI}
+	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cm := trackedConfigMap("web")
+			cm.SetLabels(map[string]string{opmlabels.ManagedBy: opmlabels.ManagedByCLI})
+			client, fake := fakeClusterClient(cm.DeepCopy(), moduleInstanceObj("apps", "demo"))
+			failing := true
+			fake.PrependReactor("delete", inventory.ModuleInstanceGVR.Resource, func(k8stesting.Action) (bool, runtime.Object, error) {
+				if failing {
+					return true, nil, tt.cause
+				}
+				return false, nil, nil
+			})
+
+			var runErr error
+			out := captureOutput(t, func() {
+				runErr = executeInstanceDelete(context.Background(), client, rsf, "apps", inv,
+					[]*unstructured.Unstructured{cm.DeepCopy()}, nil, false, output.InstanceLogger("demo"))
+			})
+			requireExitCode(t, runErr, tt.wantCode)
+			assert.NotContains(t, out, "Instance deleted")
+			assert.NotContains(t, out, "all resources have been deleted")
+			assert.Contains(t, out, "apps/demo")
+			assert.Contains(t, out, "the record remains")
+			assert.Contains(t, out, "re-running is safe")
+
+			_, cmErr := fake.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, "apps", "web")
+			assert.True(t, apierrors.IsNotFound(cmErr), "the tracked ConfigMap is deleted")
+			_, miErr := fake.Tracker().Get(inventory.ModuleInstanceGVR, "apps", "demo")
+			require.NoError(t, miErr, "the ModuleInstance is still there")
+
+			failing = false
+			out = captureOutput(t, func() {
+				runErr = executeInstanceDelete(context.Background(), client, rsf, "apps", inv, nil, nil, false, output.InstanceLogger("demo"))
+			})
+			require.NoError(t, runErr, out)
+			assert.Contains(t, out, "Instance deleted")
+			_, miErr = fake.Tracker().Get(inventory.ModuleInstanceGVR, "apps", "demo")
+			assert.True(t, apierrors.IsNotFound(miErr), "the re-run deletes the ModuleInstance")
+		})
+	}
+}
