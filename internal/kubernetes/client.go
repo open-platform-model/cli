@@ -45,6 +45,11 @@ type Client struct {
 
 	// RestConfig is the underlying REST configuration.
 	RestConfig *rest.Config
+
+	// Resources resolves the resource that serves a kind. NewClient sets the
+	// resolver backed by the cluster's API discovery; ResourceFor fails on a
+	// Client without one.
+	Resources ResourceResolver
 }
 
 // cachedClient stores the singleton client for reuse within a command.
@@ -94,6 +99,7 @@ func NewClient(opts ClientOptions) (*Client, error) {
 		Dynamic:    dynamicClient,
 		Clientset:  clientset,
 		RestConfig: restConfig,
+		Resources:  NewDiscoveryResolver(clientset.Discovery().RESTClient()),
 	}
 
 	return cachedClient, nil

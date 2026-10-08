@@ -1,9 +1,9 @@
 ## 1. Resolver in internal/kubernetes
 
-- [ ] 1.1 Add `ResourceResolver`, `KindNotServedError`, `IsKindNotServed` and the discovery-backed resolver (positive cache, mutex, caller's context) to `internal/kubernetes/resource.go`; add `Client.Resources`, `Client.ResourceFor` and `Client.ResourceClientFor`; wire the resolver in `NewClient`
-- [ ] 1.2 Add `internal/kubernetes/kubetest` with the resolver for fake clients
-- [ ] 1.3 Unit tests against an `httptest` server: irregular plural, one request per group-version, refresh on a miss, unserved group-version, unserved kind, Forbidden and ServiceUnavailable kept in the chain and not NotFound, `/api/v1` path for the core group, subresources skipped, a client with no resolver
-- [ ] 1.4 `task fmt`, `task vet`, `task lint` and `task test:unit` green, then commit `fix(kubernetes): add a resource resolver backed by API discovery`
+- [x] 1.1 Add `ResourceResolver`, `KindNotServedError`, `IsKindNotServed` and the discovery-backed resolver (positive cache, mutex, caller's context) to `internal/kubernetes/resource.go`; add `Client.Resources`, `Client.ResourceFor` and `Client.ResourceClientFor`; wire the resolver in `NewClient`
+- [x] 1.2 Add `internal/kubernetes/kubetest` with the resolver for fake clients
+- [x] 1.3 Unit tests against an `httptest` server: irregular plural, one request per group-version, refresh on a miss, unserved group-version, unserved kind, Forbidden and ServiceUnavailable kept in the chain and not NotFound, `/api/v1` path for the core group, subresources skipped, a client with no resolver
+- [x] 1.4 `task fmt`, `task vet`, `task lint` and `task test:unit` green, then commit `fix(kubernetes): add a resource resolver backed by API discovery`
 
 ## 2. Callers use the resolver; guessing removed
 
