@@ -16,6 +16,6 @@
 
 ## 3. Docs and migration note
 
-- [ ] 3.1 Add `docs/site/diagnostics/kept-volume-claims.md`: what is kept, how to delete, the record handling, StatefulSet claims, operator-managed instances, and the migration note for the changed default
-- [ ] 3.2 Update the `README.md` command notes
-- [ ] 3.3 `task docs:bundle:check` and `task openspec:check` green, then commit `docs: describe kept PersistentVolumeClaims and the --delete-data flag`
+- [x] 3.1 Add `docs/site/diagnostics/kept-volume-claims.md`: what is kept, how to delete, the record handling, StatefulSet claims, operator-managed instances, and the migration note for the changed default
+- [x] 3.2 Update the `README.md` command notes
+- [x] 3.3 `task docs:bundle:check` and `task openspec:check` green, then commit `docs: describe kept PersistentVolumeClaims and the --delete-data flag`
