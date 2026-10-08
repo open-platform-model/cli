@@ -89,7 +89,7 @@ func (c *Client) ResourceClientFor(ctx, gvk, namespace) (dynamic.ResourceInterfa
 
 ## Error handling and exit codes
 
-No command gets a new exit code. The resolver's errors go through the paths of cli#332 and cli#338: `ExitCodeFromK8sError` gives 4 for Forbidden or Unauthorized, 3 for ServerTimeout or ServiceUnavailable, 1 otherwise. A `KindNotServedError` maps to 1. `instance status` keeps its own rule (an unreadable resource is health Unknown, exit 2).
+No command gets a new exit code. The resolver's errors go through the paths of cli#332 and cli#338. Where such a path sets the exit code from the error (`ExitCodeFromK8sError`: the diff of rendered objects, the first-install check and the other apply refusals), the code is 4 for Forbidden or Unauthorized, 3 for ServerTimeout or ServiceUnavailable, 1 otherwise; a `KindNotServedError` maps to 1. Where the path has a fixed code, it keeps it: `instance delete` exits 1 for any per-resource failure (`reportInstanceDelete`), and `instance status` shows an unreadable resource as health Unknown and exits 2.
 
 Example, delete of a record with an unserved kind:
 

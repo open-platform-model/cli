@@ -70,7 +70,13 @@ When a discovery request fails (the API server denies it, is unavailable, or the
 #### Scenario: Discovery is forbidden during delete
 
 - **WHEN** `opm instance delete` runs and the discovery request for the group and version of a recorded object answers Forbidden
-- **THEN** the command SHALL report a failure for that object and keep the `ModuleInstance` record
+- **THEN** the command SHALL report a failure for that object, with the Forbidden error in its message, and keep the `ModuleInstance` record
+- **AND** it SHALL exit non-zero, with the code it gives any failed read of a tracked resource
+
+#### Scenario: Discovery is forbidden during diff
+
+- **WHEN** `opm instance diff` runs and the discovery request for the group and version of a rendered object answers Forbidden
+- **THEN** the command SHALL report that object as a read failure, not as added
 - **AND** it SHALL exit with code 4
 
 #### Scenario: Discovery is unavailable during the first-install check
