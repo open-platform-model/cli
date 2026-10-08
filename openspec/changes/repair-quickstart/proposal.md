@@ -6,11 +6,11 @@
 - Line 121 says `cd my-app` after `opm mod init example.com/modules/my_app@v0` created `./my_app/`; lines 146-158 and 190 pass `./my-app` too.
 - Line 9 asks for Go 1.25+. `go.mod` says `go 1.26.0`.
 
-The file is also a second quickstart. The site quickstart (`docs/site/start/quickstart.md` in the `opm` repo, served at `/docs/start/quickstart/`) walks the same path: `opm config init`, `opm module init`, `opm module build`, an instance of a published module, `opm operator install --crds-only`, `opm instance apply`, `status` and `delete`. It was run end to end on 2026-10-03 and carries a note that says so. `docs/STYLE.md` already rules where such a page lives: "End-user quickstarts (those belong in `opm/docs/site/`)".
+The file is also a second quickstart. The site quickstart (`docs/site/start/quickstart.md` in the `opm` repo, which site pages link as `/docs/start/quickstart/`) walks the same path: `opm config init`, `opm module init`, `opm module build`, an instance of a published module, `opm operator install --crds-only`, `opm instance apply`, `status` and `delete`. It was run end to end on 2026-10-03 and carries a note that says so. `docs/STYLE.md` already rules where such a page lives: "End-user quickstarts (those belong in `opm/docs/site/`)".
 
 ## What Changes
 
-- `QUICKSTART.md` becomes a short pointer: the site quickstart, the install page in `docs/site/start/install-the-cli.md`, the build commands in `AGENTS.md`, and `README.md`.
+- `QUICKSTART.md` becomes a short pointer: the site quickstart by the GitHub URL of its source page (design.md, "Which address the pointer carries"), the install page in `docs/site/start/install-the-cli.md`, the build commands in `AGENTS.md`, and `README.md`.
 - Nothing else. No file links to `QUICKSTART.md` outside `openspec/changes/archive/` (checked with a case-insensitive search for `quickstart` over the tree), so the file keeps its path and no link changes.
 
 **Not in this change:**
