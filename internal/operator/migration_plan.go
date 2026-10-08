@@ -152,7 +152,7 @@ func PlanMigration(ctx context.Context, client *kubernetes.Client, rendered []*u
 		if crdsOnly && !isRendered {
 			continue
 		}
-		live, err := getLive(ctx, client, legacyGVR(want), want.Namespace, want.Name, want.Kind)
+		live, err := getLive(ctx, client, legacyGVK(want), want.Namespace, want.Name, false)
 		if err != nil {
 			return nil, err
 		}
@@ -168,7 +168,7 @@ func PlanMigration(ctx context.Context, client *kubernetes.Client, rendered []*u
 		if listed[key] {
 			continue
 		}
-		live, err := getLive(ctx, client, kubernetes.GVRFromUnstructured(obj), obj.GetNamespace(), obj.GetName(), obj.GetKind())
+		live, err := getLive(ctx, client, obj.GroupVersionKind(), obj.GetNamespace(), obj.GetName(), true)
 		if err != nil {
 			return nil, err
 		}
@@ -284,21 +284,32 @@ func hasClientSideApply(obj *unstructured.Unstructured) bool {
 	return false
 }
 
-// legacyGVR is a proof-list entry's resource; every kind on the list is
-// served at v1 of its group.
-func legacyGVR(o LegacyObject) schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: o.Group, Version: "v1", Resource: kubernetes.KindToResource(o.Kind)}
+// legacyGVK is a proof-list entry's kind; every kind on the list is served
+// at v1 of its group.
+func legacyGVK(o LegacyObject) schema.GroupVersionKind {
+	return schema.GroupVersionKind{Group: o.Group, Version: "v1", Kind: o.Kind}
 }
 
 // getLive reads one object: nil when it does not exist, a
-// *MigrationReadError on any other failure.
-func getLive(ctx context.Context, client *kubernetes.Client, gvr schema.GroupVersionResource, namespace, name, kind string) (*unstructured.Unstructured, error) {
-	live, err := client.ResourceClient(gvr, namespace).Get(ctx, name, metav1.GetOptions{})
+// *MigrationReadError on any other failure, a failed discovery request
+// included. unservedIsAbsent says what a kind the cluster does not serve
+// means: no object (a rendered object whose CustomResourceDefinition is not
+// installed yet), or a read failure (a proof-list entry, whose kinds every
+// cluster serves).
+func getLive(ctx context.Context, client *kubernetes.Client, gvk schema.GroupVersionKind, namespace, name string, unservedIsAbsent bool) (*unstructured.Unstructured, error) {
+	resource, err := client.ResourceClientFor(ctx, gvk, namespace)
+	if err != nil {
+		if unservedIsAbsent && kubernetes.IsKindNotServed(err) {
+			return nil, nil
+		}
+		return nil, &MigrationReadError{Kind: gvk.Kind, Namespace: namespace, Name: name, Err: err}
+	}
+	live, err := resource.Get(ctx, name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, &MigrationReadError{Kind: kind, Namespace: namespace, Name: name, Err: err}
+		return nil, &MigrationReadError{Kind: gvk.Kind, Namespace: namespace, Name: name, Err: err}
 	}
 	return live, nil
 }

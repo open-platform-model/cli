@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 
 	"github.com/stretchr/testify/assert"
@@ -110,7 +112,7 @@ func TestExecute_DryRunReportsWouldPrune(t *testing.T) {
 				Resources: []*unstructured.Unstructured{renderedConfigMap("keep")},
 				Instance:  module.InstanceMetadata{Name: "demo", Namespace: "default", UUID: "uuid-1"},
 			},
-			K8sClient: &kubernetes.Client{Dynamic: fake},
+			K8sClient: &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fake},
 			Log:       output.InstanceLogger("demo"),
 			Options:   Options{DryRun: true, NoPrune: noPrune},
 		}
@@ -204,7 +206,7 @@ func TestExecute_PruneLeavesProtectedKindsBehind(t *testing.T) {
 			Resources: []*unstructured.Unstructured{renderedConfigMap("keep")},
 			Instance:  module.InstanceMetadata{Name: "demo", Namespace: "default", UUID: "uuid-1"},
 		},
-		K8sClient: &kubernetes.Client{Dynamic: fake, Clientset: clientset},
+		K8sClient: &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fake, Clientset: clientset},
 		Log:       output.InstanceLogger("demo"),
 		Options:   Options{SuccessAppliedMessage: "applied", SuccessUpToDateMessage: "up to date"},
 	}

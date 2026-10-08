@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -137,7 +139,7 @@ func waitExecuteRequest(persist bool, opts Options) Request {
 			Resources: []*unstructured.Unstructured{configMap()},
 			Instance:  module.InstanceMetadata{Name: "demo", Namespace: "default"},
 		},
-		K8sClient: &kubernetes.Client{Dynamic: fake},
+		K8sClient: &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fake},
 		Log:       output.InstanceLogger("demo"),
 		Options:   opts,
 	}

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/open-platform-model/library/opm/k8s/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,6 +53,7 @@ func TestDelete_DeletesOnlyTrackedInventoryResources(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	client := &Client{
+		Resources: kubetest.Resources(),
 		Clientset: fake.NewClientset(tracked.DeepCopy(), untracked.DeepCopy()),
 		Dynamic:   dynamicfake.NewSimpleDynamicClient(scheme, tracked.DeepCopy(), untracked.DeepCopy()),
 	}
@@ -69,10 +72,10 @@ func TestDelete_DeletesOnlyTrackedInventoryResources(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Equal(t, 1, result.Deleted)
 
-	_, err = client.ResourceClient(GVRFromUnstructured(tracked), namespace).Get(ctx, tracked.GetName(), metav1.GetOptions{})
+	_, err = client.ResourceClient(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, namespace).Get(ctx, tracked.GetName(), metav1.GetOptions{})
 	assert.Error(t, err)
 
-	remaining, err := client.ResourceClient(GVRFromUnstructured(untracked), namespace).Get(ctx, untracked.GetName(), metav1.GetOptions{})
+	remaining, err := client.ResourceClient(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, namespace).Get(ctx, untracked.GetName(), metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, untracked.GetName(), remaining.GetName())
 }
@@ -213,7 +216,7 @@ func TestDelete_LeavesBehind(t *testing.T) {
 				if tc.reactor != nil {
 					tc.reactor(dyn)
 				}
-				client := &Client{Dynamic: dyn}
+				client := &Client{Resources: kubetest.Resources(), Dynamic: dyn}
 
 				result, err := Delete(ctx, client, DeleteOptions{
 					InstanceName:          "demo",
@@ -249,7 +252,7 @@ func TestDelete_LeavesBehind(t *testing.T) {
 				if tc.live == nil {
 					return
 				}
-				_, getErr := dyn.Tracker().Get(GVRFromUnstructured(tc.live), tc.live.GetNamespace(), tc.live.GetName())
+				_, getErr := dyn.Tracker().Get(kubetest.GVR(tc.live), tc.live.GetNamespace(), tc.live.GetName())
 				if tc.wantPresent || dryRun {
 					assert.NoError(t, getErr, "the object is still on the cluster")
 				} else {
@@ -307,7 +310,7 @@ func TestDelete_Unreadable(t *testing.T) {
 					live = append(live, deploy.DeepCopy())
 				}
 				dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), objs...)
-				client := &Client{Dynamic: dyn}
+				client := &Client{Resources: kubetest.Resources(), Dynamic: dyn}
 
 				result, err := Delete(ctx, client, DeleteOptions{
 					InstanceName:          "demo",
@@ -338,7 +341,7 @@ func TestDelete_Unreadable(t *testing.T) {
 					return
 				}
 				assert.Equal(t, 1, result.Deleted, "the readable Deployment is still processed")
-				_, getErr := dyn.Tracker().Get(GVRFromUnstructured(deploy), "default", "web")
+				_, getErr := dyn.Tracker().Get(kubetest.GVR(deploy), "default", "web")
 				if dryRun {
 					assert.NoError(t, getErr, "a dry run deletes nothing")
 				} else {
@@ -379,7 +382,7 @@ func TestDelete_DeletesInDescendingWeightOrder(t *testing.T) {
 		live[i] = o.DeepCopy()
 	}
 	dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), live...)
-	client := &Client{Clientset: fake.NewClientset(), Dynamic: dyn}
+	client := &Client{Resources: kubetest.Resources(), Clientset: fake.NewClientset(), Dynamic: dyn}
 
 	result, err := Delete(ctx, client, DeleteOptions{
 		InstanceName:          "demo",

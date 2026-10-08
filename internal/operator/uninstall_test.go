@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -12,8 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stesting "k8s.io/client-go/testing"
-
-	"github.com/open-platform-model/cli/internal/kubernetes"
 )
 
 func moduleInstanceFixture(namespace, name string, finalizers ...string) *unstructured.Unstructured {
@@ -253,7 +252,7 @@ func TestUninstall_ReRunDeletesTheRecord(t *testing.T) {
 		if obj.GetKind() == kindCustomResourceDefinition || obj.GetKind() == kindNamespace {
 			continue
 		}
-		require.NoError(t, fc.client.ResourceClient(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace()).
+		require.NoError(t, fc.client.ResourceClient(kubetest.GVR(obj), obj.GetNamespace()).
 			Delete(context.Background(), obj.GetName(), metav1.DeleteOptions{}))
 	}
 

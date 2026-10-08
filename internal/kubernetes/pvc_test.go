@@ -8,6 +8,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	storagev1 "k8s.io/api/storage/v1"
@@ -243,6 +245,7 @@ func TestApplyOne_PVCResizeSendsLiveSize(t *testing.T) {
 		return true, live.DeepCopy(), nil
 	})
 	client := &Client{
+		Resources: kubetest.Resources(),
 		Dynamic:   dyn,
 		Clientset: fake.NewClientset(storageClass("standard", nil)),
 	}

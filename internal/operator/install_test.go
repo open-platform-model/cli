@@ -15,6 +15,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/version"
 )
@@ -40,8 +41,10 @@ func deleteLater(t *testing.T, client *kubernetes.Client, obj *unstructured.Unst
 	t.Helper()
 	go func() {
 		time.Sleep(after)
-		err := client.ResourceClient(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace()).Delete(context.Background(), obj.GetName(), metav1.DeleteOptions{})
-		assert.NoError(t, err)
+		resource, err := client.ResourceClientFor(context.Background(), obj.GroupVersionKind(), obj.GetNamespace())
+		if assert.NoError(t, err) {
+			assert.NoError(t, resource.Delete(context.Background(), obj.GetName(), metav1.DeleteOptions{}))
+		}
 	}()
 }
 
@@ -170,14 +173,14 @@ func TestInstall_UnchangedReinstall(t *testing.T) {
 	type ident struct{ uid, rv string }
 	before := map[string]ident{}
 	for _, obj := range r.objs {
-		live := fc.mustGet(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace(), obj.GetName())
+		live := fc.mustGet(kubetest.GVR(obj), obj.GetNamespace(), obj.GetName())
 		before[obj.GetKind()+"/"+obj.GetName()] = ident{string(live.GetUID()), live.GetResourceVersion()}
 	}
 
 	_, err = install(t, fc, r, PlanOptions{})
 	require.NoError(t, err)
 	for _, obj := range r.objs {
-		live := fc.mustGet(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace(), obj.GetName())
+		live := fc.mustGet(kubetest.GVR(obj), obj.GetNamespace(), obj.GetName())
 		assert.Equal(t, before[obj.GetKind()+"/"+obj.GetName()], ident{string(live.GetUID()), live.GetResourceVersion()},
 			"%s/%s changed on an unchanged reinstall", obj.GetKind(), obj.GetName())
 	}

@@ -322,13 +322,22 @@ func buildNameIndex(live []interface{}) map[string]map[string]interface{} {
 	return index
 }
 
-// FetchLiveState fetches a single resource from the cluster.
+// fetchLiveState fetches a single resource from the cluster. An object of a
+// kind the cluster does not serve does not exist, so that answer is a
+// NotFound error like the one a read of an absent object gives; a discovery
+// request that fails is returned as it is.
 func fetchLiveState(ctx context.Context, client *Client, resource *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	gvr := GVRFromUnstructured(resource)
-	ns := resource.GetNamespace()
 	name := resource.GetName()
+	gvk := resource.GroupVersionKind()
 
-	return client.ResourceClient(gvr, ns).Get(ctx, name, metav1.GetOptions{})
+	resourceClient, err := client.ResourceClientFor(ctx, gvk, resource.GetNamespace())
+	if IsKindNotServed(err) {
+		return nil, apierrors.NewNotFound(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, name)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return resourceClient.Get(ctx, name, metav1.GetOptions{})
 }
 
 // resourceKey generates a unique key for a resource based on GVK, namespace, and name.

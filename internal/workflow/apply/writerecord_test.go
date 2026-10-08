@@ -6,6 +6,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,7 +56,7 @@ func clientWithFailingStatusWrite(onSpecPatch func([]byte)) *kubernetes.Client {
 		}}, nil
 	})
 
-	return &kubernetes.Client{Dynamic: fake, Clientset: k8sfake.NewClientset()}
+	return &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fake, Clientset: k8sfake.NewClientset()}
 }
 
 // A failed status write fails the record write: the caller must not report an
@@ -166,7 +168,7 @@ func clientCapturingStatusWrite(onStatusPatch func([]byte)) *kubernetes.Client {
 			},
 		}}, nil
 	})
-	return &kubernetes.Client{Dynamic: fake, Clientset: k8sfake.NewClientset()}
+	return &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fake, Clientset: k8sfake.NewClientset()}
 }
 
 // retiredInventoryDigest is the value the CLI's own inventory digest (the

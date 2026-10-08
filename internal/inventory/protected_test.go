@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 
@@ -55,7 +57,7 @@ func TestPruneStaleResources_SkipsProtectedKinds(t *testing.T) {
 	cm := liveObject("v1", "ConfigMap", "default", "stale")
 	ns := liveObject("v1", "Namespace", "", "apps")
 	crd := liveObject("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "widgets.example.io")
-	client := &kubernetes.Client{Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), cm, ns, crd)}
+	client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), cm, ns, crd)}
 
 	stale := []k8sinventory.Entry{
 		{Group: "", Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "stale"},
@@ -77,7 +79,7 @@ func TestPruneStaleResources_SkipsProtectedKinds(t *testing.T) {
 // The first-install refusal names no bypass flag, since none bypasses it.
 func TestPreApplyExistenceCheck_UntrackedNamesNoFlag(t *testing.T) {
 	cm := liveObject("v1", "ConfigMap", "default", "taken")
-	client := &kubernetes.Client{Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), cm)}
+	client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), cm)}
 
 	err := PreApplyExistenceCheck(context.Background(), client, []k8sinventory.Entry{
 		{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "taken"},
@@ -99,7 +101,7 @@ func TestPreApplyExistenceCheck_AdmitSet(t *testing.T) {
 	now := metav1.Now()
 	doomed.SetDeletionTimestamp(&now)
 	doomed.SetFinalizers([]string{"foregroundDeletion"})
-	client := &kubernetes.Client{Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), kustomized, foreign, doomed)}
+	client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), kustomized, foreign, doomed)}
 
 	nsEntry := k8sinventory.Entry{Version: "v1", Kind: "Namespace", Name: "opm-operator-system"}
 	cmEntry := k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "taken"}
@@ -142,7 +144,7 @@ func TestPruneStaleResources_DeletesInDescendingWeightOrder(t *testing.T) {
 		liveObject("v1", "Service", "default", "svc"),
 		liveObject("v1", "ConfigMap", "default", "cm-2"),
 	)
-	client := &kubernetes.Client{Dynamic: dyn}
+	client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dyn}
 
 	require.NoError(t, PruneStaleResources(ctx, client, stale))
 
@@ -164,7 +166,7 @@ func TestFirstInstallCheck_ReportsManagedObjects(t *testing.T) {
 	old := liveObject("v1", "ConfigMap", "default", "by-old-opm")
 	old.SetLabels(map[string]string{opmlabels.ManagedBy: opmlabels.ManagedByLegacy})
 	admitted := liveObject("v1", "ConfigMap", "default", "admitted")
-	client := &kubernetes.Client{Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), cli, old, admitted)}
+	client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), cli, old, admitted)}
 
 	entry := func(name string) k8sinventory.Entry {
 		return k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: name}

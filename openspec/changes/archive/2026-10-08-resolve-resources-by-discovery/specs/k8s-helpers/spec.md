@@ -1,50 +1,18 @@
-# Kubernetes Shared Helpers
+## REMOVED Requirements
 
-## Purpose
+### Requirement: Unified GVR resolution from unstructured objects
 
-Shared utility functions in `internal/kubernetes/` that eliminate duplication across K8s operations (apply, delete). Provides resource resolution from API discovery, a `ResourceClient` abstraction for namespace-vs-cluster scoping, and consolidates path utilities to a single source of truth.
+**Reason**: The requirement prescribed a guessed plural (a table of known kinds, then "lowercase + s"). A wrong guess made a delete or a prune read 404 as "already gone" and forget an object that still existed.
 
----
+**Migration**: See "Resource names come from API discovery". No user action.
 
-## Requirements
+### Requirement: Shared resource utilities live in a dedicated file
 
-### Requirement: ResourceClient method eliminates namespaced-vs-cluster-scoped branching
+**Reason**: The requirement listed the guessing functions (`kindToResource`, `knownKindResources`, `heuristicPluralize`) as required content of `resource.go`. They are removed.
 
-The `*Client` type SHALL provide a `ResourceClient` method that accepts a `schema.GroupVersionResource` and a namespace string, and returns the appropriate `dynamic.ResourceInterface`. When namespace is non-empty, it SHALL return a namespace-scoped client. When namespace is empty, it SHALL return a cluster-scoped client. All K8s operations (apply, delete) SHALL use this method instead of inline branching.
+**Migration**: See "Resource resolution has one implementation". No user action.
 
-#### Scenario: Namespaced resource client
-
-- **WHEN** `ResourceClient` is called with namespace `"production"`
-- **THEN** it SHALL return a `dynamic.ResourceInterface` scoped to the `"production"` namespace
-
-#### Scenario: Cluster-scoped resource client
-
-- **WHEN** `ResourceClient` is called with an empty namespace `""`
-- **THEN** it SHALL return a cluster-scoped `dynamic.ResourceInterface`
-
-#### Scenario: Apply uses ResourceClient for GET and PATCH
-
-- **WHEN** `ApplyOne` performs a GET to check existing state and a PATCH to apply
-- **THEN** both operations SHALL use `client.ResourceClient(gvr, ns)` instead of inline `if ns != ""` branching
-
-#### Scenario: Delete uses ResourceClient
-
-- **WHEN** `deleteResource` deletes a resource
-- **THEN** it SHALL use `client.ResourceClient(gvr, ns).Delete(...)` instead of inline branching
-
-### Requirement: Single expandTilde implementation across the codebase
-
-There SHALL be exactly one implementation of tilde expansion (`~` to home directory) used by both the config and kubernetes packages. The `config.ExpandTilde` function SHALL be the canonical implementation. The `kubernetes` package SHALL import and call `config.ExpandTilde` instead of maintaining its own copy.
-
-#### Scenario: Kubernetes kubeconfig resolution uses config.ExpandTilde
-
-- **WHEN** `resolveKubeconfig` in `kubernetes/client.go` needs to expand a tilde in a path
-- **THEN** it SHALL call `config.ExpandTilde(path)` from `internal/config`
-
-#### Scenario: No duplicate expandTilde exists in the codebase
-
-- **WHEN** the codebase is searched for functions named `expandTilde` (case-insensitive)
-- **THEN** only `config.ExpandTilde` SHALL exist as an implementation (the kubernetes copy SHALL be removed)
+## ADDED Requirements
 
 ### Requirement: Resource names come from API discovery
 

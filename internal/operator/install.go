@@ -6,7 +6,6 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
@@ -169,14 +168,15 @@ func waitForTerminating(ctx context.Context, client *kubernetes.Client, plan []*
 }
 
 // terminatingObjects returns the planned objects that exist on the cluster
-// with metadata.deletionTimestamp set. A NotFound read means nothing to wait
-// on; any other read error is returned, since the guard cannot tell whether
-// the object is terminating.
+// with metadata.deletionTimestamp set. A NotFound read, or a kind the cluster
+// does not serve yet, means nothing to wait on; any other read or discovery
+// error is returned, since the guard cannot tell whether the object is
+// terminating.
 func terminatingObjects(ctx context.Context, client *kubernetes.Client, plan []*unstructured.Unstructured) ([]*unstructured.Unstructured, error) {
 	var terminating []*unstructured.Unstructured
 	for _, obj := range plan {
-		live, err := client.ResourceClient(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace()).Get(ctx, obj.GetName(), metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
+		live, err := getObject(ctx, client, obj)
+		if apierrors.IsNotFound(err) || kubernetes.IsKindNotServed(err) {
 			continue
 		}
 		if err != nil {

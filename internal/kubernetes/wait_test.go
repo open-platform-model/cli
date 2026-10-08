@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -57,7 +59,7 @@ func waitFakeClient(objs ...*unstructured.Unstructured) *Client {
 	for i, o := range objs {
 		runtimeObjs[i] = o
 	}
-	return &Client{Dynamic: fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), runtimeObjs...)}
+	return &Client{Resources: kubetest.Resources(), Dynamic: fakedynamic.NewSimpleDynamicClient(runtime.NewScheme(), runtimeObjs...)}
 }
 
 func TestCRDEstablishedPredicate(t *testing.T) {
@@ -88,7 +90,7 @@ func TestWait_ReturnsNilOnceObjectBecomesReady(t *testing.T) {
 	go func() {
 		time.Sleep(20 * time.Millisecond)
 		ready := waitCRDFixture(true)
-		_, err := client.ResourceClient(GVRFromUnstructured(ready), "").Update(context.Background(), ready, metav1.UpdateOptions{})
+		_, err := client.ResourceClient(kubetest.GVR(ready), "").Update(context.Background(), ready, metav1.UpdateOptions{})
 		assert.NoError(t, err)
 	}()
 
@@ -150,7 +152,7 @@ func TestWaitAbsent_ReturnsOnceObjectDisappears(t *testing.T) {
 
 	go func() {
 		time.Sleep(20 * time.Millisecond)
-		err := client.ResourceClient(GVRFromUnstructured(doomed), doomed.GetNamespace()).Delete(context.Background(), doomed.GetName(), metav1.DeleteOptions{})
+		err := client.ResourceClient(kubetest.GVR(doomed), doomed.GetNamespace()).Delete(context.Background(), doomed.GetName(), metav1.DeleteOptions{})
 		assert.NoError(t, err)
 	}()
 

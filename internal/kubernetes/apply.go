@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -116,16 +117,21 @@ func Apply(ctx context.Context, client *Client, resources []*unstructured.Unstru
 	SortObjects(sorted, object.Ascending)
 	definitions, rest := splitClusterDefinitions(sorted)
 
-	applied := applyStage(ctx, client, definitions, opts, dryRunSkips{}, result, instanceLog)
+	applied, err := applyStage(ctx, client, definitions, opts, dryRunSkips{}, result, instanceLog)
+	if err != nil {
+		return result, err
+	}
 
 	var skips dryRunSkips
 	if opts.DryRun {
 		skips = dryRunSkips{kinds: kindsOfNewCRDs(applied), namespaces: newNamespaces(applied, opts.NewNamespaces)}
-	} else if err := waitEstablished(ctx, client, applied, opts.EstablishDeadline, opts.BudgetStart, instanceLog); err != nil {
+	} else if err := waitEstablished(ctx, client, applied, rest, opts.EstablishDeadline, opts.BudgetStart, instanceLog); err != nil {
 		return result, err
 	}
 
-	applyStage(ctx, client, rest, opts, skips, result, instanceLog)
+	if _, err := applyStage(ctx, client, rest, opts, skips, result, instanceLog); err != nil {
+		return result, err
+	}
 	return result, nil
 }
 
@@ -179,8 +185,10 @@ func (s dryRunSkips) reason(res *unstructured.Unstructured) string {
 // applyStage applies objs in order, logging one line per object and
 // recording counts and per-resource errors in result. An object skips names
 // is not sent: it is logged as skipped and counted. It returns the objects
-// applied without error.
-func applyStage(ctx context.Context, client *Client, objs []*unstructured.Unstructured, opts ApplyOptions, skips dryRunSkips, result *ApplyResult, instanceLog *log.Logger) []stageOutcome {
+// applied without error. A failed API discovery request is not a
+// per-resource error: it stops the stage and is returned, since the cluster
+// cannot say where the remaining objects go.
+func applyStage(ctx context.Context, client *Client, objs []*unstructured.Unstructured, opts ApplyOptions, skips dryRunSkips, result *ApplyResult, instanceLog *log.Logger) ([]stageOutcome, error) {
 	var applied []stageOutcome
 	for _, res := range objs {
 		kind := res.GetKind()
@@ -194,6 +202,9 @@ func applyStage(ctx context.Context, client *Client, objs []*unstructured.Unstru
 		}
 
 		status, absentBefore, err := applyOne(ctx, client, res, opts)
+		if IsDiscoveryFailure(err) {
+			return applied, fmt.Errorf("applying %s/%s: %w", kind, name, err)
+		}
 		if err != nil {
 			instanceLog.Warn(fmt.Sprintf("applying %s/%s: %v", kind, name, err))
 			result.Errors = append(result.Errors, resourceError{
@@ -217,14 +228,15 @@ func applyStage(ctx context.Context, client *Client, objs []*unstructured.Unstru
 		instanceLog.Info(output.FormatResourceLine(kind, ns, name, status))
 		applied = append(applied, stageOutcome{obj: res, absentBefore: absentBefore})
 	}
-	return applied
+	return applied, nil
 }
 
 // waitEstablished waits until every CustomResourceDefinition among applied
-// reports Established=True, or deadline passes (zero: defaultEstablishTimeout
-// from now). since is when the budget behind deadline started (zero: now); a
-// timeout reports the time elapsed from it.
-func waitEstablished(ctx context.Context, client *Client, applied []stageOutcome, deadline, since time.Time, instanceLog *log.Logger) error {
+// reports Established=True, and then until API discovery serves each kind of
+// rest that one of them defines, or deadline passes (zero:
+// defaultEstablishTimeout from now). since is when the budget behind deadline
+// started (zero: now); a timeout reports the time elapsed from it.
+func waitEstablished(ctx context.Context, client *Client, applied []stageOutcome, rest []*unstructured.Unstructured, deadline, since time.Time, instanceLog *log.Logger) error {
 	var crds []*unstructured.Unstructured
 	for _, o := range applied {
 		if isCRD(o.obj.GroupVersionKind()) {
@@ -248,6 +260,81 @@ func waitEstablished(ctx context.Context, client *Client, applied []stageOutcome
 	defer cancel()
 	if err := Wait(waitCtx, client, crds, CRDEstablishedPredicate, since); err != nil {
 		return fmt.Errorf("waiting for CustomResourceDefinitions to be established: %w", err)
+	}
+	return waitServed(waitCtx, client, kindsDefinedBy(crds, rest), since)
+}
+
+// kindsDefinedBy returns, in first-use order and once each, the kinds of
+// objs that one of crds defines and serves: spec.group and spec.names.kind
+// match, and spec.versions lists the object's version with served true. An
+// object at a version its definition does not serve is left out, so the
+// apply fails on it at once instead of waiting for a kind that never comes.
+func kindsDefinedBy(crds, objs []*unstructured.Unstructured) []schema.GroupVersionKind {
+	defined := make(map[schema.GroupVersionKind]struct{})
+	for _, crd := range crds {
+		group, _, _ := unstructured.NestedString(crd.Object, "spec", "group")        //nolint:errcheck // a malformed CRD is ignored
+		kind, _, _ := unstructured.NestedString(crd.Object, "spec", "names", "kind") //nolint:errcheck // a malformed CRD is ignored
+		versions, _, _ := unstructured.NestedSlice(crd.Object, "spec", "versions")   //nolint:errcheck // a malformed CRD is ignored
+		if group == "" || kind == "" {
+			continue
+		}
+		for _, v := range versions {
+			version, ok := v.(map[string]any)
+			if !ok {
+				continue
+			}
+			name, _ := version["name"].(string)   //nolint:errcheck // a malformed version is ignored
+			served, _ := version["served"].(bool) //nolint:errcheck // a malformed version is ignored
+			if name != "" && served {
+				defined[schema.GroupVersionKind{Group: group, Version: name, Kind: kind}] = struct{}{}
+			}
+		}
+	}
+
+	var kinds []schema.GroupVersionKind
+	seen := make(map[schema.GroupVersionKind]struct{})
+	for _, obj := range objs {
+		gvk := obj.GroupVersionKind()
+		if _, ok := defined[gvk]; !ok {
+			continue
+		}
+		if _, dup := seen[gvk]; dup {
+			continue
+		}
+		seen[gvk] = struct{}{}
+		kinds = append(kinds, gvk)
+	}
+	return kinds
+}
+
+// waitServed polls API discovery until it serves every kind of kinds, or ctx
+// ends. The API server lists a kind in discovery shortly after its
+// CustomResourceDefinition is Established, not in the same step. Only "not
+// served" keeps the wait going: a discovery request that fails is returned.
+// since is when the budget behind ctx's deadline started.
+func waitServed(ctx context.Context, client *Client, kinds []schema.GroupVersionKind, since time.Time) error {
+	ticker := time.NewTicker(WaitPollInterval)
+	defer ticker.Stop()
+
+	for _, gvk := range kinds {
+		for {
+			_, err := client.ResourceFor(ctx, gvk)
+			if err == nil {
+				break
+			}
+			if !IsKindNotServed(err) {
+				return err
+			}
+			select {
+			case <-ctx.Done():
+				if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+					return ctx.Err()
+				}
+				return fmt.Errorf("timed out after %s waiting for API discovery to list a kind its CustomResourceDefinition serves: %w",
+					time.Since(since).Round(time.Second), err)
+			case <-ticker.C:
+			}
+		}
 	}
 	return nil
 }
@@ -300,7 +387,10 @@ func ApplyOne(ctx context.Context, client *Client, obj *unstructured.Unstructure
 // applyOne is ApplyOne that also reports whether the pre-apply read returned
 // NotFound, which, unlike the "created" status, no other read error implies.
 func applyOne(ctx context.Context, client *Client, obj *unstructured.Unstructured, opts ApplyOptions) (status string, absentBefore bool, err error) {
-	gvr := GVRFromUnstructured(obj)
+	gvr, err := client.ResourceFor(ctx, obj.GroupVersionKind())
+	if err != nil {
+		return "", false, err
+	}
 	ns := obj.GetNamespace()
 
 	// Check if resource already exists to determine status after apply.

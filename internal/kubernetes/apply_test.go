@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -55,7 +57,7 @@ func dryRunClient(t *testing.T, existing *unstructured.Unstructured, projected f
 	fake.PrependReactor("patch", "configmaps", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		return true, projected(), nil
 	})
-	return &Client{Dynamic: fake}
+	return &Client{Resources: kubetest.Resources(), Dynamic: fake}
 }
 
 func TestApplyOne_DryRunStatus(t *testing.T) {
@@ -217,7 +219,7 @@ func (c *stagingCluster) client(t *testing.T) *Client {
 		obj.SetResourceVersion("2")
 		return true, obj, nil
 	})
-	return &Client{Dynamic: fake}
+	return &Client{Resources: kubetest.Resources(), Dynamic: fake}
 }
 
 func (c *stagingCluster) patchOrder() []string {
@@ -242,6 +244,10 @@ func stagingCRD() *unstructured.Unstructured {
 	crd := stagingObject("apiextensions.k8s.io/v1", "CustomResourceDefinition", "foos.example.com", "")
 	_ = unstructured.SetNestedField(crd.Object, "example.com", "spec", "group")
 	_ = unstructured.SetNestedField(crd.Object, "Foo", "spec", "names", "kind")
+	_ = unstructured.SetNestedSlice(crd.Object, []any{
+		map[string]any{"name": "v1", "served": true},
+		map[string]any{"name": "v1beta1", "served": false},
+	}, "spec", "versions")
 	return crd
 }
 

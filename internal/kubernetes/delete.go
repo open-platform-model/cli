@@ -225,7 +225,13 @@ func checkDeletable(ctx context.Context, client *Client, obj *unstructured.Unstr
 		return ProtectedKindReason, false, nil
 	}
 
-	live, err := client.ResourceClient(GVRFromUnstructured(obj), obj.GetNamespace()).Get(ctx, obj.GetName(), metav1.GetOptions{})
+	// A kind that cannot be resolved is an error here, never "gone": the
+	// object may live on under a name or a version this read did not reach.
+	resource, err := client.ResourceClientFor(ctx, gvk, obj.GetNamespace())
+	if err != nil {
+		return "", false, err
+	}
+	live, err := resource.Get(ctx, obj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return "", true, nil
@@ -247,13 +253,15 @@ func checkDeletable(ctx context.Context, client *Client, obj *unstructured.Unstr
 
 // deleteResource deletes a single resource with foreground propagation.
 func deleteResource(ctx context.Context, client *Client, obj *unstructured.Unstructured) error {
-	gvr := GVRFromUnstructured(obj)
-	ns := obj.GetNamespace()
+	resource, err := client.ResourceClientFor(ctx, obj.GroupVersionKind(), obj.GetNamespace())
+	if err != nil {
+		return err
+	}
 	propagation := metav1.DeletePropagationForeground
 
 	deleteOpts := metav1.DeleteOptions{
 		PropagationPolicy: &propagation,
 	}
 
-	return client.ResourceClient(gvr, ns).Delete(ctx, obj.GetName(), deleteOpts)
+	return resource.Delete(ctx, obj.GetName(), deleteOpts)
 }

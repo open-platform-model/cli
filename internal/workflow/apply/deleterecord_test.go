@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -44,7 +46,7 @@ func TestDeleteRecorded_FailedRecordDeleteIsAnError(t *testing.T) {
 	})
 
 	result, err := DeleteRecorded(context.Background(), DeleteRequest{
-		Client:       &kubernetes.Client{Dynamic: dyn},
+		Client:       &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dyn},
 		InstanceName: "demo",
 		Namespace:    "apps",
 		Record:       &inventory.Record{Name: "demo", Namespace: "apps", Owner: inventory.OwnerCLI},
