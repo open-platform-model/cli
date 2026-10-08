@@ -39,10 +39,13 @@ func TestExecute_InstanceRecordedOnlyInALegacySecretIsAFirstInstall(t *testing.T
 			`{"group":"","kind":"ConfigMap","namespace":"default","name":"c","v":"v1"}]}}`)},
 	}))
 
-	require.NoError(t, Execute(context.Background(), cluster.request(Options{}, "a", "b")))
+	require.NoError(t, Execute(context.Background(), cluster.request(Options{WarnUnrecorded: true}, "a", "b")))
 
 	for _, a := range clientset.Actions() {
 		assert.NotEqual(t, "secrets", a.GetResource().Resource, "no request on Secrets: %s", a.GetVerb())
+	}
+	for _, a := range cluster.dyn.Actions() {
+		assert.NotEqual(t, "secrets", a.GetResource().Resource, "no request on Secrets through the dynamic client: %s", a.GetVerb())
 	}
 	assert.Equal(t, []string{
 		"patch configmaps a",

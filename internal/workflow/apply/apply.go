@@ -59,6 +59,14 @@ type Options struct {
 	// instance refuses it: the operator renders that instance and never
 	// skips.
 	SkipUnprovided bool
+
+	// WarnUnrecorded makes a first install (no ModuleInstance record) warn
+	// when rendered resources already exist in the cluster under OPM
+	// management, on a real run and on a dry run. `opm instance apply` and
+	// `opm module apply` set it. `opm operator install` does not: it applies
+	// the render's CRDs itself before this workflow runs, so a fresh install
+	// always finds them.
+	WarnUnrecorded bool
 }
 
 type Request struct {
@@ -159,8 +167,13 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	if err != nil {
 		return err
 	}
-	if len(alreadyManaged) > 0 {
-		instanceLog.Warn(unrecordedResourcesWarning(len(alreadyManaged), len(currentEntries)))
+	if req.Options.WarnUnrecorded {
+		if dryRun && prevRecord == nil {
+			alreadyManaged = previewAlreadyManaged(ctx, req.K8sClient, currentEntries)
+		}
+		if len(alreadyManaged) > 0 {
+			instanceLog.Warn(unrecordedResourcesWarning(len(alreadyManaged), len(currentEntries), name, instanceID, dryRun))
+		}
 	}
 
 	if dryRun {
@@ -519,6 +532,19 @@ func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client
 	return managed, nil
 }
 
+// previewAlreadyManaged is the read-only half of the first-install check for
+// a dry run: the rendered entries that already exist under OPM management. A
+// dry run refuses nothing here, so an object the check would refuse on a real
+// run only ends the look.
+func previewAlreadyManaged(ctx context.Context, k8sClient *kubernetes.Client, currentEntries []k8sinventory.Entry) []k8sinventory.Entry {
+	managed, err := inventory.FirstInstallCheck(ctx, k8sClient, currentEntries, nil)
+	if err != nil {
+		output.Debug("first-install preview stopped", "error", err)
+		return nil
+	}
+	return managed
+}
+
 // lastMigratingRelease is the last opm release that moved an inventory kept
 // in a Secret into the ModuleInstance record.
 const lastMigratingRelease = "v1.0.0-beta.10"
@@ -526,12 +552,23 @@ const lastMigratingRelease = "v1.0.0-beta.10"
 // unrecordedResourcesWarning is the warning of a first install that found
 // existing of its rendered resources already in the cluster under OPM
 // management. No record lists them, so the apply cannot know what else an
-// earlier apply created: it says what it does and what it leaves alone.
-func unrecordedResourcesWarning(existing, rendered int) string {
-	return fmt.Sprintf("%d of %d rendered resource(s) already exist and are managed by OPM, but the instance has no ModuleInstance record. "+
-		"Apply updates them in place and records them; it prunes nothing, so a resource an earlier apply created and this render no longer produces stays in the cluster untracked. "+
-		"If opm v1.0.0-alpha.1 or older last applied this instance, its inventory is in a Secret this release does not read: apply the instance once with opm %s first",
-		existing, rendered, lastMigratingRelease)
+// earlier apply created.
+//
+// The two runs give different advice. A dry run has written nothing, so the
+// instance can still be applied with the release that migrates. A real run
+// writes the record next, and that release then deletes the Secret without
+// reading it: the Secret is the only list of the old inventory, so the text
+// says to keep it and names it.
+func unrecordedResourcesWarning(existing, rendered int, instanceName, instanceID string, dryRun bool) string {
+	head := fmt.Sprintf("%d of %d rendered resource(s) already exist and are managed by OPM, but the instance has no ModuleInstance record. ", existing, rendered)
+	if dryRun {
+		return head + fmt.Sprintf("A real apply would update them in place and record them; it would prune nothing, so a resource an earlier apply created and this render no longer produces would stay in the cluster untracked. "+
+			"If opm v1.0.0-alpha.1 or older last applied this instance, its inventory is in a Secret this release does not read: apply the instance once with opm %s before you apply it with this release",
+			lastMigratingRelease)
+	}
+	return head + fmt.Sprintf("This apply updates them in place and records them; it prunes nothing, so a resource an earlier apply created and this render no longer produces stays in the cluster untracked. "+
+		"If opm v1.0.0-alpha.1 or older last applied this instance, the Secret %q in this namespace still lists what it owned: keep it, do not apply this instance with an older opm, and remove the leftovers as the opm docs page \"Legacy inventory Secret\" says",
+		"opm."+instanceName+"."+instanceID)
 }
 
 // FormatDryRunSummary is the closing line of a dry run: how many resources

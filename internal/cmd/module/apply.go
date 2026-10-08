@@ -189,6 +189,7 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 			Wait:                   opts.wait,
 			Timeout:                opts.timeout,
 			SkipUnprovided:         rf.SkipUnprovided,
+			WarnUnrecorded:         true,
 			SuccessUpToDateMessage: "Instance up to date",
 			SuccessAppliedMessage:  "Instance applied",
 		},

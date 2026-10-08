@@ -15,3 +15,10 @@
 
 - [x] 3.1 Write `docs/site/diagnostics/legacy-inventory-secret.md`: the warning, what it means, the migration step with opm v1.0.0-beta.10, and the cleanup by hand when the step was skipped
 - [x] 3.2 `task docs:bundle:check` and `task lint` green, then commit `docs(apply): add the migration note for the removed legacy inventory Secret`
+
+## 4. Review fixes
+
+- [x] 4.1 Make the warning opt-in (`Options.WarnUnrecorded`, set by `opm instance apply` and `opm module apply`) so `opm operator install` prints none; assert it in `TestInstall_FreshCluster`
+- [x] 4.2 Print the warning on a dry run through a read-only look that refuses nothing; word the real-run warning for a run that writes the record (name the Secret, say to keep it, no advice to apply with the migrating release)
+- [x] 4.3 Docs page: list Secrets by label and by name; cleanup reads the Secret before deleting it and selects by instance; correct the stale comments in `tests/integration`
+- [x] 4.4 `task fmt`, `task vet`, `task lint`, `task test:unit`, `task openspec:check`, `task docs:bundle:check` and `task cascade:wiring:check` green, then commit `fix(apply): keep the first-install warning off operator install and show it on a dry run`

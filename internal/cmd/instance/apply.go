@@ -145,6 +145,7 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 			Wait:                   flags.Wait,
 			Timeout:                flags.Timeout,
 			SkipUnprovided:         rff.SkipUnprovided,
+			WarnUnrecorded:         true,
 			SuccessUpToDateMessage: "Instance up to date",
 			SuccessAppliedMessage:  "Instance applied",
 		},

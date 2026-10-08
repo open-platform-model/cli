@@ -14,25 +14,34 @@ weight: 28
 
 ## Migrate before you upgrade
 
-An instance needs the step only when a release up to `v1.0.0-alpha.1` applied it last. Any apply since then with `v1.0.0-alpha.2` to `v1.0.0-beta.10` has already moved its inventory.
+An instance needs the step only when a release up to `v1.0.0-alpha.1` applied it last. An apply since then with `v1.0.0-alpha.2` to `v1.0.0-beta.10` moved its inventory and deleted the Secret, unless that apply could not read the Secret. An instance that still has the Secret needs the step.
 
-List the Secrets by their name:
+List the Secrets by the inventory label, and by name for a Secret that lost the label:
 
 ```bash
+kubectl get secrets --all-namespaces --selector opmodel.dev/component=inventory
 kubectl get secrets --all-namespaces | grep ' opm\.'
 ```
 
 For each instance you find, run `opm instance apply` (or `opm module apply`) once with `opm` `v1.0.0-beta.10`. That apply writes the `ModuleInstance`, prunes what the module no longer renders, and deletes the Secret. A dry run moves nothing. Then upgrade.
 
+To check an instance with the new release before you apply it, run the apply with `--dry-run`: it prints the warning below when the instance has no `ModuleInstance` and its resources are already in the cluster.
+
 ## The message
 
-A release after `v1.0.0-beta.10` treats an instance without a `ModuleInstance` as a first install. When resources it renders are already in the cluster and carry the OPM managed-by label, apply prints this warning once, on standard error, before it applies. The exit code does not change.
+A release after `v1.0.0-beta.10` treats an instance without a `ModuleInstance` as a first install. When resources it renders are already in the cluster and carry the OPM managed-by label, `opm instance apply` and `opm module apply` print one warning on standard error, before anything is applied. The exit code does not change.
+
+A dry run has written nothing, so it names the migration step:
 
 ```text
-WARN 2 of 3 rendered resource(s) already exist and are managed by OPM, but the instance has no ModuleInstance record. Apply updates them in place and records them; it prunes nothing, so a resource an earlier apply created and this render no longer produces stays in the cluster untracked. If opm v1.0.0-alpha.1 or older last applied this instance, its inventory is in a Secret this release does not read: apply the instance once with opm v1.0.0-beta.10 first
+WARN 2 of 3 rendered resource(s) already exist and are managed by OPM, but the instance has no ModuleInstance record. A real apply would update them in place and record them; it would prune nothing, so a resource an earlier apply created and this render no longer produces would stay in the cluster untracked. If opm v1.0.0-alpha.1 or older last applied this instance, its inventory is in a Secret this release does not read: apply the instance once with opm v1.0.0-beta.10 before you apply it with this release
 ```
 
-A dry run does not check the cluster for existing resources and prints no such warning.
+A real apply goes on and writes the record, so it names the Secret to keep:
+
+```text
+WARN 2 of 3 rendered resource(s) already exist and are managed by OPM, but the instance has no ModuleInstance record. This apply updates them in place and records them; it prunes nothing, so a resource an earlier apply created and this render no longer produces stays in the cluster untracked. If opm v1.0.0-alpha.1 or older last applied this instance, the Secret "opm.blog.0b9f3c1e-6a53-5f0b-9d0e-3a8f6f0c1d2e" in this namespace still lists what it owned: keep it, do not apply this instance with an older opm, and remove the leftovers as the opm docs page "Legacy inventory Secret" says
+```
 
 ## What it means
 
@@ -42,12 +51,23 @@ Apply found resources that an earlier OPM apply created, and no record that list
 
 ### An old release recorded the instance in a Secret
 
-You upgraded before the migration step. Nothing that runs was removed, and the instance now has a `ModuleInstance`. Two things are left over, and no later apply cleans them up:
+You applied with the new release before the migration step. Nothing that runs was removed, and the instance now has a `ModuleInstance`. Resources that the old inventory listed and the module no longer renders are left over, and no later apply removes them.
 
-- The Secret `opm.<instance name>.<instance id>`. Delete it with `kubectl delete secret`.
-- Resources the old inventory listed and the module no longer renders. They still carry the label `app.kubernetes.io/managed-by` with the value `opm-cli` or `open-platform-model`. Compare the resources with that label in the namespace against `opm instance status`, and delete by hand what the instance does not list.
+> [!CAUTION]
+> Do not apply this instance with `v1.0.0-beta.10` or older now. Those releases find the new `ModuleInstance`, skip the Secret, and delete it unread. The Secret is the only list of what the old inventory held.
 
-To avoid the manual cleanup, run the migration step above before the first apply with the new release.
+Clean up by hand, in this order:
+
+1. Read the old inventory from the Secret. Its `inventory` key holds a JSON record with one entry per resource (`group`, `kind`, `namespace`, `name`):
+
+   ```bash
+   kubectl get secret opm.<instance name>.<instance id> --namespace <namespace> --output jsonpath='{.data.inventory}' | base64 --decode
+   ```
+
+2. Compare the entries with what `opm instance status` lists for the instance. Delete, with `kubectl delete`, each resource the Secret lists and the instance does not.
+3. Delete the Secret with `kubectl delete secret`.
+
+When the Secret is gone, select by the instance, never by the managed-by label alone: other instances in the namespace carry that label too. The resources of one instance carry `module-instance.opmodel.dev/name=<instance name>`.
 
 ### An earlier first apply stopped part way
 
@@ -55,4 +75,4 @@ When a first apply fails on one resource, it writes no `ModuleInstance`. The nex
 
 ### The `ModuleInstance` was deleted and its resources were kept
 
-Apply records the resources again. Resources the deleted record listed and the module no longer renders stay in the cluster; find them by the label as above.
+Apply records the rendered resources again. Resources that the deleted record listed and the module no longer renders stay in the cluster. Find them by the label `module-instance.opmodel.dev/name=<instance name>` and compare them with `opm instance status`.

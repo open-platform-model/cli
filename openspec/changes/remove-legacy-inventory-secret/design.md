@@ -52,17 +52,27 @@ func FirstInstallCheck(ctx context.Context, client *kubernetes.Client, entries [
 
 and `PreApplyExistenceCheck` calls it and drops the list. `RunPreApplyExistenceCheck` in the apply workflow returns the list; `Execute` warns when it is not empty. An admitted resource is not OPM-managed and is not in the list.
 
-A dry run skips the existence check today and keeps doing so, so a dry run prints no warning.
+The warning is opt-in: `Options.WarnUnrecorded`, set by `opm instance apply` and `opm module apply`. `opm operator install` leaves it off, because `Install` applies the render's CRDs (`internal/operator/install.go`) before it calls `Execute`, so the check of a fresh install always finds four objects OPM manages.
+
+A dry run skips the existence check and keeps doing so for its refusals. With `WarnUnrecorded` and no record it runs the same reads once through `previewAlreadyManaged`, which returns the managed list and turns an error into a debug line: a dry run refuses nothing it did not refuse before.
 
 ### Warning text
 
-One WARN line on the log stream (standard error), exit code unchanged:
+One WARN line on the log stream (standard error), exit code unchanged. The two runs differ in their last sentence.
+
+Dry run, nothing written yet:
 
 ```text
-WARN 2 of 3 rendered resource(s) already exist and are managed by OPM, but the instance has no ModuleInstance record. Apply updates them in place and records them; it prunes nothing, so a resource an earlier apply created and this render no longer produces stays in the cluster untracked. If opm v1.0.0-alpha.1 or older last applied this instance, its inventory is in a Secret this release does not read: apply the instance once with opm v1.0.0-beta.10 first
+WARN 2 of 3 rendered resource(s) already exist and are managed by OPM, but the instance has no ModuleInstance record. A real apply would update them in place and record them; it would prune nothing, so a resource an earlier apply created and this render no longer produces would stay in the cluster untracked. If opm v1.0.0-alpha.1 or older last applied this instance, its inventory is in a Secret this release does not read: apply the instance once with opm v1.0.0-beta.10 before you apply it with this release
 ```
 
-The warning also prints on the retry of a first apply that failed part way. The first two sentences are true there too; the last one is conditional.
+Real run. It writes the record next. `v1.0.0-beta.10` then finds the record, skips the Secret and deletes it by name, so sending the user there would destroy the only list of the old inventory. The text names the Secret (built from the instance name and id, not read) and says to keep it:
+
+```text
+WARN 2 of 3 rendered resource(s) already exist and are managed by OPM, but the instance has no ModuleInstance record. This apply updates them in place and records them; it prunes nothing, so a resource an earlier apply created and this render no longer produces stays in the cluster untracked. If opm v1.0.0-alpha.1 or older last applied this instance, the Secret "opm.demo.<id>" in this namespace still lists what it owned: keep it, do not apply this instance with an older opm, and remove the leftovers as the opm docs page "Legacy inventory Secret" says
+```
+
+The warning also prints on the retry of a first apply that failed part way, and after a record was deleted by hand. Its first two sentences are true there too; the last one is conditional.
 
 ### Removal of the code
 
