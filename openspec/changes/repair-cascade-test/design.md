@@ -39,7 +39,7 @@ Measured on `origin/main` d2f4ee3e, in a scratch copy: with `v1.0.0-beta.2` and 
 
 ### The version name
 
-The name MUST sort below the tree's version in SemVer, in the stub's `semver-cmp` and in Go. `v<X.Y.Z>-0.cascade.<suffix>` does: a numeric first prerelease identifier sorts below every alphanumeric one (`alpha`, `beta`, `rc`) and below the release. `<suffix>` is the tree's prerelease (`beta.6`), or `release` when it has none, so one name always holds one content in the module cache. The test asserts the order with the stub before it uses the name.
+The name MUST sort below the tree's version in SemVer, in the stub's `semver-cmp` and in Go. `v0.0.0-0.cascade.<tree version without v>` does (`v0.0.0-0.cascade.1.0.0-beta.6`): a `v0.0.0` prerelease sorts below every version a module path without a major suffix can pin, Go pseudo-versions such as `v1.0.1-0.<time>-<hash>` included. The suffix is the tree's version, so one name always holds one content in the module cache. The test asserts the order with the stub before it uses the name, with its own FAIL text. A library on a `/v2` path would need a `v2.0.0-0...` name; the module path constant in `test.sh` changes then anyway.
 
 ### Environment of the setup
 
@@ -48,6 +48,16 @@ The name MUST sort below the tree's version in SemVer, in the stub's `semver-cmp
 - `GOPROXY=file://$TMP/goproxy,<the user's GOPROXY>`: the file proxy answers only the made-up version; a missing file falls through.
 - `GONOSUMDB=$LIB`: the checksum database cannot know the made-up version. Scoped to the setup; the task run still verifies the real library.
 - `GONOPROXY=none`, so a developer's `GOPRIVATE` setting cannot route around the file proxy; `GOWORK=off` as before.
+
+### Deviation from the cascade contract
+
+**Context**: the shared cascade contract (`open-platform-model/.github`, `openspec/changes/archive/2026-10-04-add-cascade-resolver/contract.md`, section 8) says `older.tsv` lists "per pin key, an older real published version" and that in S2 "the older versions are real, so `cue mod get` and `go get` resolve". Every repo's `test.sh` follows that shape.
+
+**Decision**: the cli departs from section 8 for one pin key, the library. It has no `older.tsv` row; its older version is made up from the tree's library. Catalog, core and podinfo keep section 8 as written.
+
+**Rationale**: section 8 assumes an older published version that the tree compiles against. For a Go library pin that holds only while the consumer uses no API newer than the row. Today no such library version exists, so S2, S4 and S9 cannot hold under the letter of section 8.
+
+**Open**: the contract text belongs to `.github` and this change does not touch it. Whether the contract gets a clarification, and whether sibling repos with a Go pin take the same setup, is the owner's decision. Until then `test.sh` names the deviation in a comment where it happens.
 
 ### Failure text
 
@@ -65,4 +75,6 @@ The check reads `pins.sh` and the stub's `semver-cmp` only. It moves above the o
 
 - [The made-up version stays in the developer's Go module cache] → a few megabytes, a name no real release can take, content fixed per name. The Go caches are tool caches; the checkout stays untouched.
 - [`zip` is missing] → the scenario fails with a FAIL line that names `zip`; it never skips.
+- [The older catalog and core are still real published versions under unchanged CUE source] → S9's first run moves all 13 CUE trees from the `oldest` to the `older` rows with a real `cue mod get` and `cue mod tidy` (`cascade.sh` phase C). A template or test tree that starts to use a definition the `older` catalog or core lacks breaks S9 the same way the library broke. This change does not remove that: the equivalent repair needs a local OCI registry in the test, which is not small. The `older.tsv` order check does not see it; only the network job does.
+- [The task's `go mod tidy` in S2 has nothing to re-resolve, because the older library has the tree's requirements] → the warning path for a requirement that tidy moves cannot be reached by the suite. No scenario asserted it before.
 - [S2 no longer downloads an older library from the real proxy] → the task's own `go get` of the tree version still goes through the real proxy path; the older download was setup, not an assertion.

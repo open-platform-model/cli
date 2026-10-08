@@ -7,7 +7,7 @@
 - Its offline set, selected by `CASCADE_TEST_SET=offline`, SHALL run without registry or proxy access. It SHALL check:
   - the stub checksum;
   - that `pins.sh` reads the worktree and `HEAD` the same;
-  - that every `older` row of `testdata/older.tsv` is older than the tree's pin, and every `oldest` row older than its `older` row;
+  - that every `older` row of `testdata/older.tsv` is older than the tree's pin, that the `oldest` catalog and core rows are older than their `older` rows, and that the `oldest` podinfo row is older than the tree's fixture version;
   - the no-op, error and dirty-tree scenarios.
 - The full set SHALL add:
   - the older-pins scenario, including its second, idempotent run;

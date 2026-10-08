@@ -145,17 +145,20 @@ why() { tail -n 3 "$RUN_OUT" | tr '\n' ' '; }
 # from the merge base), and no published older library holds every package the
 # cli imports once the cli adopts new library API. lib_older_name names a
 # version below the tree's, which older_lib fills with the tree's own library.
+# This departs from contract §8, which asks for an older real published version
+# per pin key (openspec change repair-cascade-test, design.md, "Deviation from
+# the cascade contract").
 OLDER="$HERE/testdata/older.tsv"
 older() { awk -F'\t' -v r="$1" -v k="$2" '$1 == r && $2 == k { print $3; exit }' "$OLDER"; }
 # older_than A B: true when A ranks below B (the stub's semver-cmp).
 older_than() { [ "$(CASCADE_STUB_TABLE=/dev/null "$STUB" semver-cmp "$1" "$2")" = -1 ]; }
-# lib_older_name V: vX.Y.Z-0.cascade.<V's prerelease, or "release">. A numeric
-# first prerelease identifier ranks below alpha, beta, rc and the release; the
-# suffix keeps one name to one content in the Go module cache.
+# lib_older_name V: v0.0.0-0.cascade.<V without its v and build metadata>. A
+# v0.0.0 prerelease ranks below every version a v0 or v1 module path can pin,
+# pseudo-versions included; the suffix keeps one name to one content in the Go
+# module cache.
 lib_older_name() {
-  local pre=release
-  case "$1" in *-*) pre=${1#*-} ;; esac
-  printf '%s-0.cascade.%s\n' "${1%%-*}" "$pre"
+  local v=${1#v}
+  printf 'v0.0.0-0.cascade.%s\n' "${v%%+*}"
 }
 
 # ---------------------------------------------------------------------------
@@ -188,7 +191,16 @@ while IFS=$'\t' read -r key _ _ v _; do
   case "$key" in
     # The operator module pin and the operator release it records stay put.
     "$OP" | "$MOD") continue ;;
-    "$LIB") LIB_TREE=$v; LIB_OLD=$(lib_older_name "$v"); o=$LIB_OLD ;;
+    "$LIB")
+      # No row: the name is derived, so a failure here is a defect of
+      # lib_older_name, not of older.tsv.
+      LIB_TREE=$v
+      LIB_OLD=$(lib_older_name "$v")
+      if ! older_than "$LIB_OLD" "$v"; then
+        fail "older.tsv" "the made-up library \`$LIB_OLD\` is not older than the tree's \`$v\`; fix lib_older_name in test.sh"
+        ok=0
+      fi
+      continue ;;
     *) o=$(older older "$key") ;;
   esac
   if [ -z "$o" ] || ! older_than "$o" "$v"; then
