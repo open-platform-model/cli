@@ -8,11 +8,11 @@
 
 ## 2. Prune keeps stale claims
 
-- [ ] 2.1 Write the failing tests first: a stale claim is not deleted, stays in the written inventory, is listed as kept at INFO, and the apply exits 0 with its success line; with `DeleteData` it is deleted and leaves the inventory; a later apply with the flag removes a claim kept earlier; the dry-run preview lists it as kept, or as would prune with the flag; `--delete-data` with `--no-prune` is a usage error on both apply commands; all three commands offer the flag; an operator-managed apply warns
-- [ ] 2.2 `internal/inventory/stale.go`: `SplitDataClaims`
-- [ ] 2.3 `internal/workflow/apply`: `Options.DeleteData`, the split, the preview, the record entries, the thin-editor note
-- [ ] 2.4 `internal/cmd/instance/apply.go` and `internal/cmd/module/apply.go`: `--delete-data`, exclusion with `--no-prune`, help text
-- [ ] 2.5 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `feat(cmd)!: keep stale PersistentVolumeClaims on prune unless --delete-data`
+- [x] 2.1 Write the failing tests first: a stale claim is not deleted, stays in the written inventory, is listed as kept at INFO, and the apply exits 0 with its success line; with `DeleteData` it is deleted and leaves the inventory; a later apply with the flag removes a claim kept earlier; the dry-run preview lists it as kept, or as would prune with the flag; `--delete-data` with `--no-prune` is a usage error on both apply commands; all three commands offer the flag; an operator-managed apply warns
+- [x] 2.2 `internal/inventory/stale.go`: `SplitDataClaims`
+- [x] 2.3 `internal/workflow/apply`: `Options.DeleteData`, the split, the preview, the record entries, the thin-editor note
+- [x] 2.4 `internal/cmd/instance/apply.go` and `internal/cmd/module/apply.go`: `--delete-data`, exclusion with `--no-prune`, help text
+- [x] 2.5 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `feat(cmd)!: keep stale PersistentVolumeClaims on prune unless --delete-data`
 
 ## 3. Docs and migration note
 

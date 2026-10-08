@@ -102,6 +102,22 @@ func SplitProtected(stale []k8sinventory.Entry) (prunable, protected []k8sinvent
 	return prunable, protected
 }
 
+// SplitDataClaims partitions a stale set into the entries prune may delete
+// and the PersistentVolumeClaims (kubernetes.IsDataClaim) it keeps unless the
+// user passes --delete-data, keeping the input order in both halves. Unlike a
+// protected entry, a kept claim stays in the record the caller writes, so a
+// later apply with the flag finds it stale and prunes it.
+func SplitDataClaims(stale []k8sinventory.Entry) (prunable, claims []k8sinventory.Entry) {
+	for _, e := range stale {
+		if kubernetes.IsDataClaim(e.Group, e.Kind) {
+			claims = append(claims, e)
+			continue
+		}
+		prunable = append(prunable, e)
+	}
+	return prunable, claims
+}
+
 // PruneError reports the stale resources a prune could not delete. The
 // objects are still in the cluster, so a caller that records an inventory
 // after the prune must keep Failed in it.

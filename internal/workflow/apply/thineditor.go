@@ -30,6 +30,10 @@ func executeThinEditor(ctx context.Context, req Request, rec *inventory.Record) 
 	req.Log.Info("instance is operator-managed — editing its spec and waiting for the operator",
 		"owner", inventory.DisplayOwner(rec.Owner))
 
+	if req.Options.DeleteData {
+		req.Log.Warn(DeleteDataOperatorManagedNote)
+	}
+
 	modulePath, moduleVersion, err := resolveThinEditRef(req, name, namespace)
 	if err != nil {
 		return err
@@ -84,6 +88,10 @@ func previewThinEditor(req Request, rec *inventory.Record) error {
 
 	req.Log.Info("instance is operator-managed — previewing the spec edit",
 		"owner", inventory.DisplayOwner(rec.Owner))
+
+	if req.Options.DeleteData {
+		req.Log.Warn(DeleteDataOperatorManagedNote)
+	}
 
 	modulePath, moduleVersion, err := resolveThinEditRef(req, name, namespace)
 	if err != nil {

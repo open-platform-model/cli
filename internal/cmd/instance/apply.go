@@ -25,12 +25,13 @@ func NewInstanceApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var namespace string
 
 	var (
-		dryRunFlag   bool
-		createNSFlag bool
-		noPruneFlag  bool
-		forceFlag    bool
-		waitFlag     bool
-		timeoutFlag  time.Duration
+		dryRunFlag     bool
+		createNSFlag   bool
+		noPruneFlag    bool
+		deleteDataFlag bool
+		forceFlag      bool
+		waitFlag       bool
+		timeoutFlag    time.Duration
 	)
 
 	c := &cobra.Command{
@@ -41,6 +42,13 @@ func NewInstanceApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 Apply records what it deployed in a ModuleInstance custom resource, so the
 ModuleInstance CRD must be installed first (run 'opm operator install
 --crds-only'). Apply fails fast with a hint if it is missing or out of date.
+
+Pruning keeps PersistentVolumeClaims: a claim the module no longer renders
+stays in the cluster and in the inventory, is listed with the status "kept",
+and does not fail the apply. Pass --delete-data to prune such claims and the
+data on them; a claim kept by an earlier apply is pruned then too. On an
+operator-managed instance the operator decides what is pruned, and
+--delete-data has no effect.
 
 Arguments:
   instance.cue    Path to the instance .cue file (required)
@@ -57,12 +65,13 @@ Examples:
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return runInstanceApply(args[0], cfg, &rff, &kf, namespace, applyFlags{
-				DryRun:   dryRunFlag,
-				CreateNS: createNSFlag,
-				NoPrune:  noPruneFlag,
-				Force:    forceFlag,
-				Wait:     waitFlag,
-				Timeout:  timeoutFlag,
+				DryRun:     dryRunFlag,
+				CreateNS:   createNSFlag,
+				NoPrune:    noPruneFlag,
+				DeleteData: deleteDataFlag,
+				Force:      forceFlag,
+				Wait:       waitFlag,
+				Timeout:    timeoutFlag,
 			})
 		},
 	}
@@ -73,6 +82,8 @@ Examples:
 	c.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Server-side dry run (no changes made); skips objects whose CustomResourceDefinition or namespace the apply creates, which the server cannot validate yet")
 	c.Flags().BoolVar(&createNSFlag, "create-namespace", false, "Create target namespace if it does not exist")
 	c.Flags().BoolVar(&noPruneFlag, "no-prune", false, "Skip stale resource pruning")
+	c.Flags().BoolVar(&deleteDataFlag, "delete-data", false, cmdutil.DeleteDataPruneFlagHelp)
+	c.MarkFlagsMutuallyExclusive("no-prune", "delete-data")
 	c.Flags().BoolVar(&forceFlag, "force", false, "Allow empty render to prune all previously tracked resources")
 	c.Flags().BoolVar(&waitFlag, "wait", false,
 		"Wait until every applied resource is healthy before returning (skipped on --dry-run; operator-managed instances always wait for the operator)")
@@ -87,9 +98,11 @@ type applyFlags struct {
 	DryRun   bool
 	CreateNS bool
 	NoPrune  bool
-	Force    bool
-	Wait     bool
-	Timeout  time.Duration
+	// DeleteData is --delete-data: prune stale PersistentVolumeClaims too.
+	DeleteData bool
+	Force      bool
+	Wait       bool
+	Timeout    time.Duration
 }
 
 // runInstanceApply executes the instance apply command.
@@ -141,6 +154,7 @@ func runInstanceApply(instanceFile string, cfg *config.GlobalConfig, rff *cmduti
 			DryRun:                 flags.DryRun,
 			CreateNS:               flags.CreateNS,
 			NoPrune:                flags.NoPrune,
+			DeleteData:             flags.DeleteData,
 			Force:                  flags.Force,
 			Wait:                   flags.Wait,
 			Timeout:                flags.Timeout,
