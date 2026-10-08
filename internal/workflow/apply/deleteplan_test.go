@@ -3,6 +3,7 @@ package apply
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -288,4 +289,24 @@ func TestDeleteRecorded_AcceptedDeleteOfAnObjectThatStays(t *testing.T) {
 	_, err := dyn.Tracker().Get(configMaps, "apps", "held")
 	assert.NoError(t, err, "the object is still there")
 	assert.False(t, recordExists(dyn))
+}
+
+// An unreadable object whose error wraps a NotFound. The plan reads a
+// NotFound answer as "already gone" and would release the hold, but the
+// delete reported an error for the object, which may still exist. The record
+// is released only when the plan releases it and no object had an error.
+func TestDeleteRecorded_ReportedErrorHoldsTheRecordWhateverThePlanSays(t *testing.T) {
+	captureLog(t)
+	dyn, rec, live := planCluster([]string{"web", "odd"}, "web", "odd")
+	notFound := apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, "odd")
+	unreadable := []kubernetes.UnreadableResource{{
+		Kind: "ConfigMap", Namespace: "apps", Name: "odd", Err: fmt.Errorf("reading through a proxy: %w", notFound),
+	}}
+
+	result := deleteRecorded(t, dyn, rec, live[:1], unreadable)
+
+	require.Len(t, result.Errors, 1, "the unreadable object is reported as an error")
+	_, err := dyn.Tracker().Get(configMaps, "apps", "odd")
+	require.NoError(t, err, "the object still exists")
+	assert.True(t, recordExists(dyn), "an object with an error holds the record")
 }

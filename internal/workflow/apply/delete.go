@@ -117,8 +117,11 @@ func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteR
 	// Delete the ModuleInstance CR last (0006:D1), and only when the
 	// deletion plan's hold verdict releases it: every planned object was
 	// deleted or left in place. A failed object holds it, so a re-run can
-	// retry. Skipped on a dry run.
-	release := lifecycle.MayReleaseHold(deleteResult.Run.Plan, deleteResult.Run.State, lifecycle.HoldInput{}).Release
+	// retry. Skipped on a dry run. An error the delete reported holds it too,
+	// whatever the plan says: an unreadable object whose error wraps a
+	// NotFound reads to the plan as already gone, yet it may still exist.
+	release := lifecycle.MayReleaseHold(deleteResult.Run.Plan, deleteResult.Run.State, lifecycle.HoldInput{}).Release &&
+		len(deleteResult.Errors) == 0
 	if !req.DryRun && req.Record != nil && release {
 		if err := inventory.DeleteCR(ctx, req.Client, req.Record.Name, req.Record.Namespace); err != nil {
 			return nil, &RecordDeleteError{Namespace: req.Record.Namespace, Name: req.Record.Name, Err: err}
