@@ -95,7 +95,10 @@ func nestedDepRegistry(t *testing.T) string {
 
 // TestPlatformBuildHint_Forms pins the hint, and the validation exit class,
 // of the platform build failures TestPlatformBuildHint_Pinned does not
-// drive. Every case resolves against a local registry and a cold cache.
+// drive. Every case resolves against a local registry and a cold cache. Two
+// rows changed their hint when the hint moved from the message text to the
+// error type; each states the old and the new text. The exit class did not
+// move.
 func TestPlatformBuildHint_Forms(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -112,7 +115,13 @@ func TestPlatformBuildHint_Forms(t *testing.T) {
 			deps:     depPinned,
 			src:      importsDep,
 			contains: "bogus: field not allowed",
-			want:     hintDefault,
+			// Old hint, from the message text, which carried neither matched
+			// phrase: "Fix the platform module at <dir> (pins in
+			// <dir>/cue.mod/module.cue), then try again". New hint, from the
+			// library's resolution kind, the one this defect already got when
+			// it was met while the module graph is expanded: "Pin a published
+			// build in <dir>/cue.mod/module.cue, then try again".
+			want: hintPin,
 		},
 		{
 			name:     "import whose package name does not match",
@@ -120,7 +129,12 @@ func TestPlatformBuildHint_Forms(t *testing.T) {
 			deps:     depPinned,
 			src:      "package platform\n\nimport d \"example.com/dep@v0:other\"\n\nv: d.version\n",
 			contains: "no files in package directory with package name",
-			want:     hintPin,
+			// Old hint, from cue/load's "cannot find package" prefix: "Pin a
+			// published build in <dir>/cue.mod/module.cue, then try again".
+			// New hint, because this is neither a fetch nor a resolution
+			// failure and no other pin cures it: "Fix the platform module at
+			// <dir> (pins in <dir>/cue.mod/module.cue), then try again".
+			want: hintDefault,
 		},
 		{
 			name:     "ambiguous import",

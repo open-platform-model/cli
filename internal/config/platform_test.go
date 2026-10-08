@@ -201,9 +201,13 @@ func TestBuildPlatformModule_KeyImportDriftNamesTheEntry(t *testing.T) {
 func TestBuildPlatformModule_EntryWithoutCatalogIsRefusedByShape(t *testing.T) {
 	// Registry-backed: a second entry that embeds no catalog is refused by
 	// the library's shape check, which names #registry in its text only and
-	// keeps no CUE path. Matched on the word "#registry", it got the hint
+	// keeps no CUE path. Old hint, from the word "#registry" in the message:
 	// "Each #registry entry's key must equal the module path of the catalog
-	// it imports (#catalog); fix the entry named above in <dir>/platform.cue".
+	// it imports (#catalog); fix the entry named above in <dir>/platform.cue",
+	// which does not describe an entry with no catalog. New hint, because no
+	// evaluation error sits at a path under #registry: "Fix the platform
+	// module at <dir> (pins in <dir>/cue.mod/module.cue), then try again".
+	// The exit class (validation) did not move.
 	dir := copyHackPlatform(t)
 	cuePath := filepath.Join(dir, "platform.cue")
 	content, err := os.ReadFile(cuePath)
@@ -221,5 +225,6 @@ func TestBuildPlatformModule_EntryWithoutCatalogIsRefusedByShape(t *testing.T) {
 	var detail *oerrors.DetailError
 	require.True(t, errors.As(err, &detail), "%v", err)
 	assert.Contains(t, detail.Message, `required field "#registry" entry "example.com/x@v1"`)
-	assert.Contains(t, detail.Hint, hintKey)
+	assert.Contains(t, detail.Hint, hintDefault)
+	assert.NotContains(t, detail.Hint, hintKey)
 }

@@ -66,9 +66,9 @@ func TestPlatformBuildHint_Pinned(t *testing.T) {
 	}
 }
 
-// TestPlatformBuildHint_NotFoundWithoutImportPrefix holds the not-found
-// branch for a registry answer that does not carry cue/load's "cannot find
-// package" prefix, which the old "module not found" match also caught.
+// TestPlatformBuildHint_NotFoundWithoutImportPrefix holds the pin hint for a
+// registry answer that does not carry cue/load's import prefix: the library
+// classifies the form as a fetch failure.
 func TestPlatformBuildHint_NotFoundWithoutImportPrefix(t *testing.T) {
 	hint := platformBuildHint(t.TempDir(), errors.New("cannot fetch example.com/dep@v0.9.0: module not found"))
 	assert.Contains(t, hint, "Pin a published build in ")

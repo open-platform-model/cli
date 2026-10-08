@@ -15,10 +15,10 @@
 
 ## 3. Platform build hints read types and the CUE path
 
-- [ ] 3.1 Add `cueErrorUnder` to `internal/config` (`design.md` D3) with a unit test: a path under the selector, a path elsewhere, an error with no CUE error in its chain, nil.
-- [ ] 3.2 Rewrite `platformBuildHint` in `internal/config/platform.go` as `design.md` D2 says; drop the `msg` variable and the `strings` import if unused; rewrite the comment above the pin case. Verify: `grep -n 'strings.Contains' internal/config/platform.go` prints nothing.
-- [ ] 3.3 Flip only the rows the proposal names (direct-path module file to the pin hint; package-name mismatch to the default hint; the shape-check row to the default hint, if section 1 reached it). Replace `TestPlatformBuildHint_NotFoundWithoutImportPrefix` only if its text form no longer classifies. Verify: every other row of section 1 passes unedited, and `errors.Is(err, oerrors.ErrValidation)` holds on each.
-- [ ] 3.4 `task lint` and `task test` green, then commit `fix(config): pick the platform build hint from the error type and the CUE path`
+- [x] 3.1 Add `cueErrorUnder` to `internal/config` (`design.md` D3) with a unit test: a path under the selector, a path elsewhere, an error with no CUE error in its chain, nil.
+- [x] 3.2 Rewrite `platformBuildHint` in `internal/config/platform.go` as `design.md` D2 says; drop the `msg` variable and the `strings` import if unused; rewrite the comment above the pin case. Verify: `grep -n 'strings.Contains' internal/config/platform.go` prints nothing.
+- [x] 3.3 Flip only the rows the proposal names (direct-path module file to the pin hint; package-name mismatch to the default hint; the shape-check row to the default hint, if section 1 reached it). Replace `TestPlatformBuildHint_NotFoundWithoutImportPrefix` only if its text form no longer classifies. Verify: every other row of section 1 passes unedited, and `errors.Is(err, oerrors.ErrValidation)` holds on each.
+- [x] 3.4 `task lint` and `task test` green, then commit `fix(config): pick the platform build hint from the error type and the CUE path`
 
 ## 4. Config hints read the failing field
 
