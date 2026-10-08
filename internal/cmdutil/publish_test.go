@@ -1,13 +1,20 @@
 package cmdutil
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/cuemod/cuemodtest"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/publish"
 )
@@ -84,5 +91,60 @@ func TestPublishError_LoginHint(t *testing.T) {
 		errors.New("zipping failed"),
 	} {
 		assert.NotContains(t, publishError(err).Error(), hint, "%v", err)
+	}
+}
+
+// runPublish runs the shared publish body on an empty directory: every case
+// below fails at the core schema fetch, before the directory is read.
+func runPublish(t *testing.T, cfg *config.GlobalConfig) error {
+	t.Helper()
+	cmd := &cobra.Command{}
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	return RunPublish(cmd, cfg, publish.KindModule, []string{t.TempDir()}, &PublishFlags{DryRun: true})
+}
+
+// With no registry configured anywhere, a core schema that cannot be loaded
+// is reported as the missing configuration (exit 2, opm config init), not as
+// an unreachable registry.
+func TestRunPublish_NoRegistryConfigured(t *testing.T) {
+	// CUE_CACHE_DIR names a regular file, so the fetch fails before it asks
+	// any registry and the test needs no network.
+	notADir := filepath.Join(t.TempDir(), "cache")
+	require.NoError(t, os.WriteFile(notADir, nil, 0o600))
+	t.Setenv("CUE_CACHE_DIR", notADir)
+	t.Setenv("CUE_REGISTRY", "")
+
+	err := runPublish(t, &config.GlobalConfig{})
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitValidationError, exitErr.Code, "%v", err)
+	assert.Contains(t, err.Error(), "no registry is configured: loading core schema: ")
+	assert.Contains(t, err.Error(), "opm config init")
+	assert.NotContains(t, err.Error(), "unreachable")
+}
+
+// The core schema fetch is classified like the lookup and the push: only no
+// response is unreachable, and a refused credential points to the login.
+func TestRunPublish_SchemaFetchFailureIsNamed(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		registry func(t *testing.T) string
+		want     string
+		login    bool
+	}{
+		{"refused connection", func(*testing.T) string { return cuemodtest.UnreachableRegistry }, "registry unreachable: loading core schema: ", false},
+		{"401", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusUnauthorized) }, "registry refused the credentials (authentication or permission): loading core schema: ", true},
+		{"503", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusServiceUnavailable) }, "registry operation failed: loading core schema: ", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cuemodtest.ColdCache(t)
+			err := runPublish(t, &config.GlobalConfig{Registry: tc.registry(t)})
+			var exitErr *opmexit.ExitError
+			require.ErrorAs(t, err, &exitErr)
+			assert.Equal(t, opmexit.ExitConnectivityError, exitErr.Code, "%v", err)
+			assert.Contains(t, err.Error(), tc.want)
+			assert.Equal(t, tc.login, bytes.Contains([]byte(err.Error()), []byte(registryLoginHint)), "%v", err)
+		})
 	}
 }

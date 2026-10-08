@@ -39,13 +39,18 @@ func (f *PublishFlags) AddTo(cmd *cobra.Command) {
 // RunPublish is the shared body of both publish commands: resolve core's
 // #IdentityPackage from the kernel schema cache, compute the plan, print it,
 // print any refusals through the validation funnel, and push on GO outside
-// --dry-run. Exit codes: refusal 2, failed registry operation 3, unexpected 1.
+// --dry-run. Exit codes: refusal 2 (and a core schema that cannot be loaded
+// because no registry is configured), failed registry operation 3,
+// unexpected 1.
 func RunPublish(cmd *cobra.Command, cfg *config.GlobalConfig, kind publish.Kind, args []string, flags *PublishFlags) error {
 	dir := ResolveModulePath(args)
 
 	k := config.NewKernel(cfg.Registry)
 	schemaVal, err := k.SchemaCache().Get()
 	if err != nil {
+		if noReg := NoRegistryError(cfg, "loading core schema", err); noReg != nil {
+			return noReg
+		}
 		// The schema fetch is a registry round-trip like the lookup and the
 		// push: its failure is a registry failure, not a verdict on the
 		// artifact.

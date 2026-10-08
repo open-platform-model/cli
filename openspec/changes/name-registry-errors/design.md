@@ -21,7 +21,7 @@
 ```go
 // internal/config
 func RegistryConfigured(registry string) bool
-type NoRegistryError struct{ Op, ConfigPath string; Err error }
+type NoRegistryError struct{ Op, ConfigPath string; ConfigExists bool; Err error }
 
 // internal/cuemod
 func IsUnauthorized(err error) bool
@@ -31,7 +31,7 @@ type RegistryError struct{ Op string; Unauthorized bool; Err error }
 func RegistryFailure(op string, err error) error
 
 // internal/cmdutil
-func CoreSchemaError(cfg *config.GlobalConfig, err error) (error, bool) // the no-registry exit error, when it applies
+func NoRegistryError(cfg *config.GlobalConfig, op string, err error) error // the exit-2 error, or nil when a registry is configured
 ```
 
 Messages:
@@ -40,6 +40,7 @@ Messages:
 no registry is configured: loading core schema: <cause>
   Set one with --registry, OPM_REGISTRY or the registry field of <config path>.
   To write a config file with the default registry, run:  opm config init
+  (when the config file exists:  opm config init --force)
 
 registry refused the credentials (authentication or permission): pushing <repo>:<tag>: <cause>
   Log in to the registry, then retry:  opm registry login

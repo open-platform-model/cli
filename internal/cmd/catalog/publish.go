@@ -29,7 +29,8 @@ declares.
 	machinery: no copied build directory, no generated version override, and no
 	git state is checked, so commit first.
 
-	Exit codes: 0 published (or dry-run GO), 2 refused, 3 registry operation
+	Exit codes: 0 published (or dry-run GO), 2 refused or no registry
+	configured, 3 registry operation
 	failed (unreachable, credentials refused, or another registry error).
 
 	Arguments:

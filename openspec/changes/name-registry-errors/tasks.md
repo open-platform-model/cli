@@ -9,10 +9,10 @@
 
 ## 2. No registry configured
 
-- [ ] 2.1 `internal/config`: add `RegistryConfigured` and `NoRegistryError`, with tests
-- [ ] 2.2 `internal/cmdutil`: add `CoreSchemaError`, use it in `RunPublish`, with tests
-- [ ] 2.3 `internal/cmd/module/vet.go`: use `CoreSchemaError` for the failed schema fetch, with a test
-- [ ] 2.4 task fmt, task lint and task test:unit green, then commit fix(config): say when no registry is configured and point to opm config init
+- [x] 2.1 `internal/config`: add `RegistryConfigured` and `NoRegistryError`, with tests
+- [x] 2.2 `internal/cmdutil`: add `NoRegistryError`, use it in `RunPublish`, with tests
+- [x] 2.3 `internal/cmd/module/vet.go`: use `NoRegistryError` for the failed schema fetch, with a test
+- [x] 2.4 task fmt, task lint and task test:unit green, then commit fix(config): say when no registry is configured and point to opm config init
 
 ## 3. Docs
 
