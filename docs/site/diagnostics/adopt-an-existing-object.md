@@ -90,8 +90,8 @@ Three cases refuse objects that the instance wrote itself.
 `opm instance apply --dry-run` and `opm module apply --dry-run` run the same check as the real apply and change nothing. A dry run prints one line for each object that the real apply does not apply:
 
 ```text
-ERRO r:ConfigMap/default/settings   ! would refuse reason="ConfigMap/default/settings exists and is not managed by OPM; to let this instance take it over, annotate it opmodel.dev/adopt=6f1c0a52-8d1e-5c1b-9a61-0d4c6c2f7be2"
-WARN r:ConfigMap/default/shared     ! would skip reason="ConfigMap/default/shared was adopted by module instance 9a40c1de-52f0-5b0e-8c11-4f2a9f3d1e17; this instance no longer applies it and drops it from its inventory; to take it back, annotate it opmodel.dev/adopt=6f1c0a52-8d1e-5c1b-9a61-0d4c6c2f7be2"
+ERRO m:demo: r:ConfigMap/default/settings                      ! would refuse reason="ConfigMap/default/settings exists and is not managed by OPM; to let this instance take it over, annotate it opmodel.dev/adopt=6f1c0a52-8d1e-5c1b-9a61-0d4c6c2f7be2"
+WARN m:demo: r:ConfigMap/default/shared                        ! would skip reason="ConfigMap/default/shared is being adopted by module instance 9a40c1de-52f0-5b0e-8c11-4f2a9f3d1e17; this instance does not apply it; to let this instance take it over, annotate it opmodel.dev/adopt=6f1c0a52-8d1e-5c1b-9a61-0d4c6c2f7be2"
 ```
 
 | Line | Meaning | Exit code of the dry run |

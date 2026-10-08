@@ -51,37 +51,37 @@ Alternative: a distinct exit code for "previewed refusal". Rejected: a new code 
 
 ### Output
 
-Lines go to the log stream (stderr), like every other resource line of the apply. Each uses the existing resource-line format with a new status word and the library's message as the reason. The message names the object, the owner where there is one, and the adopt annotation to set.
+Lines go to the log stream (stderr), like every other resource line of the apply. The samples below are the lines of a unit-test run of `apply.Execute` for an instance named `demo`, with the UUIDs shortened; the `cannot check` line and the two closing lines are composed from the code. Each uses the existing resource-line format with a new status word and the library's message as the reason. The message names the object, the owner where there is one, and the adopt annotation to set.
 
 Dry run, guard refuses (exit 1):
 
 ```text
-ERRO r:ConfigMap/default/settings   ! would refuse reason="ConfigMap/default/settings exists and is not managed by OPM; to let this instance take it over, annotate it opmodel.dev/adopt=6f1c0a52-..."
-Error: dry run: a real apply would be refused: 1 object(s) cannot be applied by this instance (listed above)
+ERRO m:demo: r:ConfigMap/default/settings                      ! would refuse reason="ConfigMap/default/settings exists and is not managed by OPM; to let this instance take it over, annotate it opmodel.dev/adopt=6f1c0a52-..."
+dry run: a real apply would be refused: 1 object(s) cannot be applied by this instance (listed above)
 the dry run changed nothing
 ```
 
 Dry run, an object is adopted elsewhere (exit 0):
 
 ```text
-WARN r:ConfigMap/default/settings   ! would skip reason="ConfigMap/default/settings was adopted by module instance 9a40c1de-...; this instance no longer applies it and drops it from its inventory; to take it back, annotate it opmodel.dev/adopt=6f1c0a52-..."
+WARN m:demo: r:ConfigMap/default/shared                        ! would skip reason="ConfigMap/default/shared is being adopted by module instance 9a40c1de-...; this instance does not apply it; to let this instance take it over, annotate it opmodel.dev/adopt=6f1c0a52-..."
 ```
 
 Dry run, prune preview:
 
 ```text
-INFO would prune 1 stale resource(s)
-INFO r:ConfigMap/default/old-a      - would prune
-WARN r:ConfigMap/default/old-b      ! would keep reason="ConfigMap/default/old-b belongs to module instance 9a40c1de-..., not this one; left in place"
-WARN r:ConfigMap/default/old-c      ! would let go reason="ConfigMap/default/old-c is being adopted by module instance 9a40c1de-..., not this one; left in place"
-ERRO r:ConfigMap/default/old-d      ! cannot check error="..."
+INFO m:demo: would prune 1 stale resource(s)
+INFO m:demo: r:ConfigMap/default/old-a                           would prune
+WARN m:demo: r:ConfigMap/default/old-b                         ! would keep reason="ConfigMap/default/old-b belongs to module instance 9a40c1de-..., not this one; left in place"
+WARN m:demo: r:ConfigMap/default/old-c                         ! would let go reason="ConfigMap/default/old-c is being adopted by module instance 9a40c1de-..., not this one; left in place"
+ERRO m:demo: r:ConfigMap/default/old-d                         ! cannot check error="..."
 ```
 
 Everything adopted elsewhere:
 
 ```text
-WARN nothing applied: all 2 rendered resource(s) are adopted by another instance          (real run, exit 0)
-INFO dry run complete: nothing would be applied: all 2 rendered resource(s) are adopted by another instance
+WARN m:demo: nothing applied: all 2 rendered resource(s) are adopted by another instance          (real run, exit 0)
+INFO m:demo: dry run complete: nothing would be applied: all 2 rendered resource(s) are adopted by another instance
 ```
 
 Status words and their meaning, one word per outcome:
@@ -102,7 +102,6 @@ The real prune prints `left behind` for both `would keep` and `would let go`. Th
 `inventory.PruneStaleResources` and a new `inventory.PreviewPruneStaleResources` share one function that takes `dryRun` and passes it to `kubernetes.RunDeletion`. The preview therefore gets the plan's order, the same verdict and the same failure rules, and adds no call site that can send a DELETE.
 
 ```go
-// PruneStep is one stale entry the preview judged.
 func PreviewPruneStaleResources(ctx, client, stale, instanceUUID) (wouldPrune []k8sinventory.Entry, leftBehind []LeftBehind, err error)
 ```
 

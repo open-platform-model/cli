@@ -1,7 +1,7 @@
 ## 1. The dry run runs the ownership guard
 
 - [x] 1.1 Add the status words `would refuse` and `would skip` to `internal/output/styles.go`; verify with a formatter test that each renders with the attention icon.
-- [x] 1.2 In `internal/workflow/apply/apply.go`, run `inventory.Guard` on a dry run with the same input as the real run, print one `would refuse` line per refused object, return exit 1 with the dry-run error, return the real run's code for an unreadable object, print `would skip` for a let-go object and leave it out of the server-side dry run; delete `previewAlreadyManaged`. Verify with tests in `guard_test.go`, `existence_test.go`, `letgo_test.go` and `firstinstall_test.go`: refusal lines, exit codes, no write, both first and later apply.
+- [x] 1.2 In `internal/workflow/apply/apply.go`, run `inventory.Guard` on a dry run with the same input as the real run, print one `would refuse` line per refused object, return exit 1 with the dry-run error, return the real run's code for an unreadable object, print `would skip` for a let-go object and leave it out of the server-side dry run; delete `previewAlreadyManaged`. Verify with tests in `dryrunguard_test.go`, `letgo_test.go` and `firstinstall_test.go`: refusal lines, exit codes, no write, both first and later apply.
 - [x] 1.3 Print the closing line when every rendered object is let go, on a real run (exit 0, record written) and on a dry run; verify with `TestExecute_LetsGoOfItsOnlyObject` and a dry-run twin.
 - [x] 1.4 `task fmt`, `task vet`, `task lint`, `task test:unit` green, then commit `fix(apply): run the ownership guard on a dry run`.
 
