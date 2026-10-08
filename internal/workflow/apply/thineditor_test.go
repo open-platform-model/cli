@@ -149,4 +149,7 @@ func TestDeleteDataOperatorManagedNote_NamesTheDataPolicy(t *testing.T) {
 	assert.Contains(t, DeleteDataOperatorManagedNote, "--delete-data does not change what the operator does")
 	assert.Contains(t, DeleteDataOperatorManagedNote, "spec.dataPolicy")
 	assert.Contains(t, DeleteDataOperatorManagedNote, "PersistentVolumeClaims")
+	// No released operator had the field when this was written: the note
+	// must not promise that every operator keeps claims.
+	assert.Contains(t, DeleteDataOperatorManagedNote, "an older operator deletes them")
 }

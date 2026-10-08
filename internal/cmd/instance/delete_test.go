@@ -56,7 +56,7 @@ func operatorOwnedRecord() *inventory.Record {
 // orphaned. So the readiness guard refuses rather than proceeding, and it says
 // why.
 func TestDeleteOperatorOwned_RefusesWhenOperatorIsNotReady(t *testing.T) {
-	err := deleteOperatorOwned(context.Background(), emptyClusterClient(), operatorOwnedRecord(),
+	err := deleteOperatorOwned(context.Background(), emptyClusterClient(), operatorOwnedRecord(), operatorClaims{},
 		time.Second, false, output.InstanceLogger("test"))
 
 	require.Error(t, err)
@@ -70,7 +70,7 @@ func TestDeleteOperatorOwned_RefusesWhenOperatorIsNotReady(t *testing.T) {
 // "would delete" against a down operator would be describing an outcome that
 // cannot happen.
 func TestDeleteOperatorOwned_DryRunStillRequiresAReadyOperator(t *testing.T) {
-	err := deleteOperatorOwned(context.Background(), emptyClusterClient(), operatorOwnedRecord(),
+	err := deleteOperatorOwned(context.Background(), emptyClusterClient(), operatorOwnedRecord(), operatorClaims{},
 		time.Second, true, output.InstanceLogger("test"))
 
 	require.Error(t, err)
@@ -119,7 +119,7 @@ func TestDeleteOperatorOwned_KubectlInstalledOperatorIsFound(t *testing.T) {
 
 	var runErr error
 	captureOutput(t, func() {
-		runErr = deleteOperatorOwned(context.Background(), client, rec, 5*time.Second, false, output.InstanceLogger("test"))
+		runErr = deleteOperatorOwned(context.Background(), client, rec, operatorClaims{}, 5*time.Second, false, output.InstanceLogger("test"))
 	})
 	require.NoError(t, runErr)
 
@@ -340,7 +340,7 @@ func (g *guardScenario) run(t *testing.T, dryRun bool) (string, error) {
 	var runErr error
 	out := captureOutput(t, func() {
 		runErr = deleteResolvedInstance(context.Background(), g.client, &cmdutil.InstanceSelectorFlags{InstanceName: g.rec.Name}, g.rec.Namespace,
-			g.rec, []*unstructured.Unstructured{g.cm.DeepCopy()}, nil, 5*time.Second, dryRun, false, output.InstanceLogger(g.rec.Name))
+			g.rec, []*unstructured.Unstructured{g.cm.DeepCopy()}, nil, operatorClaims{}, 5*time.Second, dryRun, false, output.InstanceLogger(g.rec.Name))
 	})
 	return out, runErr
 }
@@ -599,7 +599,7 @@ func TestDeleteResolvedInstance_OperatorOwnedIgnoresUnreadable(t *testing.T) {
 	var runErr error
 	out := captureOutput(t, func() {
 		runErr = deleteResolvedInstance(context.Background(), client, &cmdutil.InstanceSelectorFlags{InstanceName: rec.Name}, rec.Namespace,
-			rec, nil, unreadable, 5*time.Second, false, false, output.InstanceLogger(rec.Name))
+			rec, nil, unreadable, operatorClaims{}, 5*time.Second, false, false, output.InstanceLogger(rec.Name))
 	})
 	require.NoError(t, runErr, out)
 	assert.Contains(t, out, "operator pruned")

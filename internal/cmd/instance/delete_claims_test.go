@@ -26,6 +26,7 @@ import (
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+	"github.com/open-platform-model/cli/internal/operator"
 	"github.com/open-platform-model/cli/internal/output"
 	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
 )
@@ -274,61 +275,108 @@ func (s *claimScenario) operatorManaged(t *testing.T, prune bool, dataPolicy str
 	require.NoError(t, s.fake.Tracker().Update(inventory.ModuleInstanceGVR, obj, "apps"))
 }
 
+// moduleInstanceCRD is the ModuleInstance CRD of an operator release: with
+// spec.dataPolicy in its schema, or as every release before the field.
+func moduleInstanceCRD(withDataPolicy bool) *unstructured.Unstructured {
+	props := map[string]any{"prune": map[string]any{"type": "boolean"}}
+	if withDataPolicy {
+		props["dataPolicy"] = map[string]any{"type": "string"}
+	}
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition",
+		"metadata": map[string]any{"name": inventory.CRDNameModuleInstances},
+		"spec": map[string]any{"versions": []any{map[string]any{
+			"name": "v1alpha1", "served": true,
+			"schema": map[string]any{"openAPIV3Schema": map[string]any{
+				"properties": map[string]any{"spec": map[string]any{"properties": props}},
+			}},
+		}}},
+		"status": map[string]any{"conditions": []any{map[string]any{"type": "Established", "status": "True"}}},
+	}}
+}
+
+// installCRD puts the ModuleInstance CRD of an operator release into the
+// scenario's cluster.
+func (s *claimScenario) installCRD(t *testing.T, withDataPolicy bool) {
+	t.Helper()
+	require.NoError(t, s.fake.Tracker().Add(moduleInstanceCRD(withDataPolicy)))
+}
+
+// The three operators a delete can meet, by what the ModuleInstance CRD says.
+const (
+	crdWithField    = "CRD has spec.dataPolicy"
+	crdWithoutField = "CRD has no spec.dataPolicy"
+	crdUnreadable   = "CRD cannot be read"
+)
+
 const (
 	promptOperatorDeletesClaims = "so the operator deletes its tracked resources, PersistentVolumeClaims and the data on them included."
 	promptOperatorKeepsClaims   = "so the operator deletes its tracked resources and keeps PersistentVolumeClaims and the data on them."
 	promptOperatorOrphans       = "spec.prune is not set, so the operator leaves its tracked resources running."
+	promptOldOperator           = "spec.prune is set and the operator in this cluster has no spec.dataPolicy, " + promptOperatorDeletesClaims
 )
 
 // On an operator-managed instance the operator deletes, not opm, so the prompt
-// says what the instance's spec.prune and spec.dataPolicy make the operator
-// do, read from the cluster: claims go only under spec.prune with the policy
-// Delete. The prompt is the same with and without --delete-data, never lists
-// claims as the CLI-owned prompt does, and the note about --delete-data comes
-// before the question.
+// says what the operator does, read from the cluster. It says that claims are
+// kept only when the installed CRD has spec.dataPolicy and the instance's
+// value is not Delete, and then with what an operator older than its CRDs
+// does. An operator whose CRD has no such field deletes claims, and the prompt
+// says so whatever the instance carries. The prompt is the same with and
+// without --delete-data, and the note about the flag comes before it.
 func TestConfirmAndDelete_OperatorManagedPromptSaysWhatTheOperatorDoes(t *testing.T) {
 	tests := []struct {
 		name       string
+		crd        string
 		prune      bool
 		dataPolicy string
 		want       []string
-		older      bool
+		notWant    []string
 	}{
-		{"no prune", false, "", []string{promptOperatorOrphans}, false},
-		{"no prune, Delete", false, "Delete", []string{promptOperatorOrphans}, false},
-		{"prune, Delete", true, "Delete", []string{"spec.prune is set and spec.dataPolicy is Delete, " + promptOperatorDeletesClaims}, false},
-		{"prune, Keep", true, "Keep", []string{"spec.prune is set and spec.dataPolicy is Keep, " + promptOperatorKeepsClaims}, true},
-		{"prune, absent", true, "", []string{"spec.prune is set and spec.dataPolicy is not set, " + promptOperatorKeepsClaims}, true},
-		{"prune, unknown value", true, "Retain", []string{
-			`spec.prune is set and spec.dataPolicy is "Retain", not a value opm knows, read as Keep, ` + promptOperatorKeepsClaims,
-		}, true},
-		{"prune, lower-case delete is not Delete", true, "delete", []string{`spec.dataPolicy is "delete"`, promptOperatorKeepsClaims}, true},
+		{"no prune", crdWithField, false, "", []string{promptOperatorOrphans}, []string{"PersistentVolumeClaims"}},
+		{"no prune, Delete", crdWithField, false, "Delete", []string{promptOperatorOrphans}, []string{"PersistentVolumeClaims"}},
+		{"prune, Delete", crdWithField, true, "Delete",
+			[]string{"spec.prune is set and spec.dataPolicy is Delete, " + promptOperatorDeletesClaims}, []string{keptClaimsHedge, "keeps"}},
+		{"prune, Keep", crdWithField, true, "Keep",
+			[]string{"spec.prune is set and spec.dataPolicy is Keep, " + promptOperatorKeepsClaims, keptClaimsHedge}, []string{promptOperatorDeletesClaims}},
+		{"prune, absent", crdWithField, true, "",
+			[]string{"spec.prune is set and spec.dataPolicy is not set, " + promptOperatorKeepsClaims, keptClaimsHedge}, []string{promptOperatorDeletesClaims}},
+		{"prune, unknown value", crdWithField, true, "Retain",
+			[]string{`spec.prune is set and spec.dataPolicy is "Retain", not a value opm knows, read as Keep, ` + promptOperatorKeepsClaims, keptClaimsHedge},
+			[]string{promptOperatorDeletesClaims}},
+		{"prune, lower-case delete is not Delete", crdWithField, true, "delete",
+			[]string{`spec.dataPolicy is "delete"`, promptOperatorKeepsClaims}, []string{promptOperatorDeletesClaims}},
+		{"operator without the field", crdWithoutField, true, "", []string{promptOldOperator}, []string{"keeps", "kept", keptClaimsHedge}},
+		{"operator without the field, no prune", crdWithoutField, false, "", []string{promptOperatorOrphans}, []string{"PersistentVolumeClaims"}},
+		{"unreadable CRD", crdUnreadable, true, "",
+			[]string{"spec.prune is set and spec.dataPolicy is not set, so the operator deletes its tracked resources.\n", undecidedClaimsNote},
+			[]string{promptOperatorKeepsClaims, promptOperatorDeletesClaims}},
+		{"unreadable CRD, Delete", crdUnreadable, true, "Delete",
+			[]string{"spec.prune is set and spec.dataPolicy is Delete, " + promptOperatorDeletesClaims}, []string{undecidedClaimsNote}},
 	}
 	for _, tt := range tests {
 		for _, deleteData := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s/deleteData=%v", tt.name, deleteData), func(t *testing.T) {
 				s := newClaimScenario()
 				s.operatorManaged(t, tt.prune, tt.dataPolicy)
+				if tt.crd != crdUnreadable {
+					s.installCRD(t, tt.crd == crdWithField)
+				}
 				out, err := s.confirm(t, "demo", deleteFlags{DeleteData: deleteData}, "n\n")
 				require.NoError(t, err, out)
 
 				question := strings.Index(out, "[y/N]")
 				require.GreaterOrEqual(t, question, 0, out)
-				assert.Contains(t, out, "This instance is operator-managed")
+				start := strings.Index(out, "This instance is operator-managed")
+				require.GreaterOrEqual(t, start, 0, out)
+				prompt := out[start:]
 				for _, w := range tt.want {
-					assert.Contains(t, out, w)
+					assert.Contains(t, prompt, w)
+				}
+				for _, w := range tt.notWant {
+					assert.NotContains(t, prompt, w)
 				}
 				assert.NotContains(t, out, "will be deleted:", "the claim list is for CLI-owned instances")
 				assert.NotContains(t, out, "PersistentVolumeClaims are kept)", "the CLI-owned prompt is not used")
-				if !tt.prune || tt.dataPolicy != "Delete" {
-					assert.NotContains(t, out, promptOperatorDeletesClaims)
-				}
-				if tt.older {
-					assert.Contains(t, out, olderOperatorNote)
-					assert.Less(t, strings.Index(out, olderOperatorNote), question, "said before the question")
-				} else {
-					assert.NotContains(t, out, olderOperatorNote)
-				}
 
 				note := strings.Index(out, workflowapply.DeleteDataOperatorManagedNote)
 				if deleteData {
@@ -347,6 +395,14 @@ func TestConfirmAndDelete_OperatorManagedPromptSaysWhatTheOperatorDoes(t *testin
 	}
 }
 
+// An instance that tracks no claim gets no sentence about claims.
+func TestOperatorManagedDeletePrompt_NoTrackedClaimSaysNothingAboutClaims(t *testing.T) {
+	p := operatorManagedDeletePrompt("demo", "", "apps", true, operatorClaims{dataPolicy: "Keep", field: operator.FieldPresent})
+	assert.Contains(t, p, "This instance is operator-managed: spec.prune is set, so the operator deletes its tracked resources.\n")
+	assert.NotContains(t, p, "PersistentVolumeClaims")
+	assert.NotContains(t, p, "spec.dataPolicy")
+}
+
 // With --yes there is no prompt; the note about --delete-data still prints.
 func TestConfirmAndDelete_OperatorManagedDeleteDataWarnsWithYes(t *testing.T) {
 	s := newClaimScenario()
@@ -359,8 +415,13 @@ func TestConfirmAndDelete_OperatorManagedDeleteDataWarnsWithYes(t *testing.T) {
 	assert.True(t, s.exists(inventory.ModuleInstanceGVR, "demo"))
 }
 
+func trackedDataClaim() []k8sinventory.Entry {
+	return []k8sinventory.Entry{{Kind: "PersistentVolumeClaim", Namespace: "apps", Name: "data"}}
+}
+
 func TestOperatorManagedDeletePrompt(t *testing.T) {
-	p := operatorManagedDeletePrompt("", "abc-123", "media", true, "Delete")
+	p := operatorManagedDeletePrompt("", "abc-123", "media", true,
+		operatorClaims{tracked: trackedDataClaim(), dataPolicy: "Delete", field: operator.FieldPresent})
 	assert.Contains(t, p, `instance-id "abc-123" in namespace "media"`)
 	assert.True(t, strings.HasSuffix(p, "[y/N]: "))
 	assert.NotContains(t, p, "keeps PersistentVolumeClaims")
@@ -369,7 +430,8 @@ func TestOperatorManagedDeletePrompt(t *testing.T) {
 // The value comes from the cluster. One opm does not know is shown quoted, so
 // a control character in it cannot rewrite the terminal line of the prompt.
 func TestOperatorManagedDeletePrompt_UnknownPolicyIsQuoted(t *testing.T) {
-	p := operatorManagedDeletePrompt("demo", "", "apps", true, "Delete\x1b[2K\rKeep")
+	p := operatorManagedDeletePrompt("demo", "", "apps", true,
+		operatorClaims{tracked: trackedDataClaim(), dataPolicy: "Delete\x1b[2K\rKeep", field: operator.FieldPresent})
 	assert.NotContains(t, p, "\x1b")
 	assert.NotContains(t, p, "\r")
 	assert.Contains(t, p, `"Delete\x1b[2K\rKeep"`)
@@ -388,33 +450,46 @@ func operatorClaimRecord(dataPolicy string) *inventory.Record {
 	}
 }
 
-func runOperatorOwnedDelete(t *testing.T, rec *inventory.Record, dryRun bool) string {
+// runOperatorOwnedDelete deletes rec against a cluster with a ready operator
+// whose ModuleInstance CRD has spec.dataPolicy or not, reading the claims the
+// way the command does.
+func runOperatorOwnedDelete(t *testing.T, rec *inventory.Record, withDataPolicy, dryRun bool) string {
 	t.Helper()
-	client, _ := fakeClusterClient(append(runningOperatorObjects(), moduleInstanceObj(rec.Namespace, rec.Name))...)
+	var objs []runtime.Object
+	for _, o := range runningOperatorObjects() {
+		if u := o.(*unstructured.Unstructured); u.GetName() != inventory.CRDNameModuleInstances {
+			objs = append(objs, o)
+		}
+	}
+	objs = append(objs, moduleInstanceCRD(withDataPolicy), moduleInstanceObj(rec.Namespace, rec.Name))
+	client, _ := fakeClusterClient(objs...)
 	var runErr error
 	out := captureOutput(t, func() {
-		runErr = deleteOperatorOwned(context.Background(), client, rec, 5*time.Second, dryRun, output.InstanceLogger(rec.Name))
+		claims := readOperatorClaims(context.Background(), client, rec)
+		runErr = deleteOperatorOwned(context.Background(), client, rec, claims, 5*time.Second, dryRun, output.InstanceLogger(rec.Name))
 	})
 	require.NoError(t, runErr, out)
 	return out
 }
 
 // The ModuleInstance being gone does not prove that claims are gone or left.
-// When the instance tracked a claim the data policy keeps, the closing output
-// does not say that everything was pruned: it names the claim, the policy and
-// what an older operator did, and prints the command that deletes the claim.
+// When the operator may have kept a claim, the closing output says neither
+// that everything was pruned nor that the claim is still there: it names the
+// claim, the policy and what an operator older than its CRDs did, and prints
+// the commands that show and delete the claim.
 func TestDeleteOperatorOwned_KeptClaimsAreNamedAtTheEnd(t *testing.T) {
 	for _, dataPolicy := range []string{"", "Keep", "Retain"} {
 		t.Run("dataPolicy="+dataPolicy, func(t *testing.T) {
-			out := runOperatorOwnedDelete(t, operatorClaimRecord(dataPolicy), false)
+			out := runOperatorOwnedDelete(t, operatorClaimRecord(dataPolicy), true, false)
 
-			assert.Contains(t, out, "PersistentVolumeClaims and the data on them kept ("+describeDataPolicy(dataPolicy)+")")
-			assert.Contains(t, out, "Instance deleted: the operator pruned its tracked resources and keeps PersistentVolumeClaims")
+			assert.Contains(t, out, "PersistentVolumeClaims and the data on them kept ("+describeDataPolicy(dataPolicy)+") unless the operator is older than its CRDs")
+			assert.Contains(t, out, "Instance deleted: the operator finished its cleanup")
 			assert.NotContains(t, out, "operator pruned 2 resources")
 			assert.NotContains(t, out, "all resources have been deleted")
-			assert.Contains(t, out, "The instance tracked 1 PersistentVolumeClaim(s)")
+			assert.NotContains(t, out, "keeps PersistentVolumeClaims", "nothing read proves that the claims are still there")
+			assert.Contains(t, out, "The instance tracked 1 PersistentVolumeClaim(s). An operator that has spec.dataPolicy keeps them")
 			assert.Contains(t, out, describeDataPolicy(dataPolicy))
-			assert.Contains(t, out, "An operator released before spec.dataPolicy deleted them")
+			assert.Contains(t, out, "An operator older than its CRDs deleted them")
 			assert.Contains(t, out, "kubectl get pvc -n apps")
 			assert.Contains(t, out, "kubectl delete pvc data -n apps")
 			assert.NotContains(t, out, "kubectl delete pvc web")
@@ -422,46 +497,92 @@ func TestDeleteOperatorOwned_KeptClaimsAreNamedAtTheEnd(t *testing.T) {
 	}
 }
 
-// With the policy Delete, or with no claim in the inventory, the operator
-// prunes everything the instance tracks and the closing line says so.
+// The operator prunes everything the instance tracks when the policy is
+// Delete, when its CRD has no spec.dataPolicy, and when no claim is tracked.
+// The closing line then says so, as it did before the field existed.
 func TestDeleteOperatorOwned_FullPruneIsReportedAsBefore(t *testing.T) {
 	noClaim := operatorClaimRecord("")
 	noClaim.Inventory.Entries = noClaim.Inventory.Entries[:1]
 	tests := []struct {
-		name string
-		rec  *inventory.Record
-		want string
+		name           string
+		rec            *inventory.Record
+		withDataPolicy bool
+		want           []string
 	}{
-		{"Delete", operatorClaimRecord("Delete"), "operator pruned 2 resources"},
-		{"no claim tracked", noClaim, "operator pruned 1 resources"},
+		{"Delete", operatorClaimRecord("Delete"), true, []string{
+			"operator pruned 2 resources", "PersistentVolumeClaims and the data on them included (spec.dataPolicy is Delete)",
+		}},
+		{"operator without the field", operatorClaimRecord(""), false, []string{
+			"operator pruned 2 resources", "PersistentVolumeClaims and the data on them included (the operator in this cluster has no spec.dataPolicy)",
+		}},
+		{"no claim tracked", noClaim, true, []string{"operator pruned 1 resources"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out := runOperatorOwnedDelete(t, tt.rec, false)
-			assert.Contains(t, out, tt.want)
+			out := runOperatorOwnedDelete(t, tt.rec, tt.withDataPolicy, false)
+			for _, w := range tt.want {
+				assert.Contains(t, out, w)
+			}
 			assert.NotContains(t, out, "kubectl delete pvc")
-			assert.NotContains(t, out, "An operator released before")
+			assert.NotContains(t, out, "kept")
 		})
 	}
-	out := runOperatorOwnedDelete(t, operatorClaimRecord("Delete"), false)
-	assert.Contains(t, out, "PersistentVolumeClaims and the data on them included (spec.dataPolicy is Delete)")
+	assert.NotContains(t, runOperatorOwnedDelete(t, noClaim, true, false), "PersistentVolumeClaims")
 }
 
 // The dry run states the same outcome for claims as the prompt does.
 func TestDeleteOperatorOwned_DryRunStatesTheClaimOutcome(t *testing.T) {
-	kept := runOperatorOwnedDelete(t, operatorClaimRecord(""), true)
-	assert.Contains(t, kept, "would prune its 2 tracked resource(s), PersistentVolumeClaims and the data on them kept (spec.dataPolicy is not set)")
-	assert.Contains(t, kept, olderOperatorNote)
+	kept := runOperatorOwnedDelete(t, operatorClaimRecord(""), true, true)
+	assert.Contains(t, kept, "would prune its 2 tracked resource(s), PersistentVolumeClaims and the data on them kept (spec.dataPolicy is not set) unless the operator is older than its CRDs")
 
-	deleted := runOperatorOwnedDelete(t, operatorClaimRecord("Delete"), true)
+	deleted := runOperatorOwnedDelete(t, operatorClaimRecord("Delete"), true, true)
 	assert.Contains(t, deleted, "would prune its 2 tracked resource(s), PersistentVolumeClaims and the data on them included (spec.dataPolicy is Delete)")
-	assert.NotContains(t, deleted, olderOperatorNote)
+
+	old := runOperatorOwnedDelete(t, operatorClaimRecord("Keep"), false, true)
+	assert.Contains(t, old, "would prune its 2 tracked resource(s), PersistentVolumeClaims and the data on them included (the operator in this cluster has no spec.dataPolicy)")
+	assert.NotContains(t, old, "kept")
 
 	orphaned := operatorClaimRecord("Delete")
 	orphaned.Prune = false
-	out := runOperatorOwnedDelete(t, orphaned, true)
+	out := runOperatorOwnedDelete(t, orphaned, true, true)
 	assert.Contains(t, out, "would be left running (spec.prune is not set)")
 	assert.NotContains(t, out, "PersistentVolumeClaims")
+}
+
+// The CRD is read only when its answer changes a message: an operator-managed
+// instance with spec.prune set that tracks a claim.
+func TestReadOperatorClaims_ReadsTheCRDOnlyWhenItMatters(t *testing.T) {
+	noClaim := operatorClaimRecord("")
+	noClaim.Inventory.Entries = noClaim.Inventory.Entries[:1]
+	noPrune := operatorClaimRecord("")
+	noPrune.Prune = false
+	cliOwned := operatorClaimRecord("")
+	cliOwned.Owner = inventory.OwnerCLI
+	tests := []struct {
+		name      string
+		rec       *inventory.Record
+		wantReads int
+		wantFate  claimFate
+	}{
+		{"operator-managed, prune, claim", operatorClaimRecord(""), 1, claimsKept},
+		{"no claim tracked", noClaim, 0, claimsNone},
+		{"no prune", noPrune, 0, claimsNone},
+		{"CLI-owned", cliOwned, 0, claimsNone},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, fake := fakeClusterClient(moduleInstanceCRD(true))
+			claims := readOperatorClaims(context.Background(), client, tt.rec)
+			reads := 0
+			for _, a := range fake.Actions() {
+				if a.GetVerb() == "get" && a.GetResource().Resource == "customresourcedefinitions" {
+					reads++
+				}
+			}
+			assert.Equal(t, tt.wantReads, reads)
+			assert.Equal(t, tt.wantFate, claims.fate())
+		})
+	}
 }
 
 // A core-group claim only: a kind of the same name in another API group is

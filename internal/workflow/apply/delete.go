@@ -14,10 +14,11 @@ import (
 
 // DeleteDataOperatorManagedNote is the warning every command prints when
 // --delete-data is set for an operator-managed instance. The flag steers only
-// what opm itself deletes; there the operator deletes, and the instance's
-// spec.dataPolicy is what it obeys.
+// what opm itself deletes; there the operator deletes. An operator that has
+// spec.dataPolicy obeys that field, and one released before it prunes claims.
 const DeleteDataOperatorManagedNote = "--delete-data does not change what the operator does with an operator-managed instance: " +
-	"spec.dataPolicy on the ModuleInstance decides whether the operator deletes PersistentVolumeClaims"
+	"an operator that has spec.dataPolicy keeps PersistentVolumeClaims unless that field of the ModuleInstance is Delete, " +
+	"and an older operator deletes them"
 
 // DeleteRequest is a CLI-owned instance delete: the instance's recorded
 // inventory, already read from the cluster, and its record.

@@ -4,11 +4,11 @@ cli#345 made the CLI keep PersistentVolumeClaims unless `--delete-data`, and tol
 
 ## What Changes
 
-- The delete prompt of an operator-managed instance reads `spec.prune` and `spec.dataPolicy`. With `spec.prune` and `dataPolicy: Delete` it says that claims are deleted. With `spec.prune` and `Keep`, no value, or an unknown value it says that claims are kept, shows the value as it is, and adds one sentence: an operator released before `spec.dataPolicy` deletes claims whatever the field says, and `opm` cannot tell which operator runs in the cluster.
-- The dry run and the run with `--yes` state the same outcome, and the closing output of a delete that tracked claims the policy keeps no longer says that the operator pruned every tracked resource: it names the claims and prints the `kubectl delete pvc` command for each.
-- The warning for `--delete-data` on an operator-managed instance (`opm instance delete`, `opm instance apply`, `opm module apply`) says that the flag does not change what the operator does and names `spec.dataPolicy` as the setting. It stays a warning; the command goes on.
+- The delete prompt of an operator-managed instance reads `spec.prune` and `spec.dataPolicy`, and, when the instance tracks a claim, reads from the installed `ModuleInstance` CRD whether the operator has `spec.dataPolicy` at all. No released operator had the field when this was written. When the CRD lacks it, the prompt says that the operator deletes claims. When the CRD has it: with `dataPolicy: Delete` claims are deleted; with `Keep`, no value, or an unknown value they are kept, the value is shown as it is, and one sentence says that an operator older than its CRDs deletes them.
+- The dry run and the run with `--yes` state the same outcome, and the closing output of a delete after which the operator may have kept claims no longer says that the operator pruned every tracked resource: it names the claims and prints the `kubectl delete pvc` command for each.
+- The warning for `--delete-data` on an operator-managed instance (`opm instance delete`, `opm instance apply`, `opm module apply`) says that the flag does not change what the operator does, names `spec.dataPolicy` as the setting of an operator that has it, and says that an older operator deletes claims. It stays a warning; the command goes on.
 - The help of the three commands and the page `docs/site/diagnostics/kept-volume-claims.md` say the same, and the page names the exception the operator documents: a forced recreate under `spec.rollout.forceConflicts` deletes and recreates a claim whatever the data policy says.
-- The CLI reads `spec.dataPolicy` from the unstructured `ModuleInstance` it already reads. It does not import the operator's Go types and adds no cluster read.
+- The CLI reads `spec.dataPolicy` from the unstructured `ModuleInstance` it already reads, and does not import the operator's Go types. The CRD read is one more GET of an object the delete of an operator-managed instance reads already for its readiness gate.
 
 What does not change: everything the CLI does for an instance it owns (cli#345), the flags, the exit codes, and what the operator does.
 
@@ -30,7 +30,8 @@ None.
 - `internal/cmd/instance/delete.go`: the prompt, the dry-run and progress lines and the closing output of the operator-owned branch; the help text.
 - `internal/cmd/instance/apply.go`, `internal/cmd/module/apply.go`: one help sentence each.
 - `internal/workflow/apply/delete.go`: the text of the constant `DeleteDataOperatorManagedNote`, nothing else in that package.
+- `internal/operator/crdfield.go` (new): `ModuleInstanceSpecField`, a read of the ModuleInstance CRD schema.
 - `internal/inventory/record.go`, `internal/inventory/store.go`: one new field `Record.DataPolicy` and its read from `spec.dataPolicy`, beside `Record.Prune`. No logic there changes.
 - `docs/site/diagnostics/kept-volume-claims.md`.
 - Tests in `internal/cmd/instance`, `internal/inventory` and `internal/workflow/apply`.
-- No dependency, no new API call, no operator change. The wording is true only for an operator release that carries `spec.dataPolicy` (opm-operator#267, not merged when this was written); the prompt says so.
+- No dependency, no operator change.
