@@ -85,25 +85,6 @@ On apply in CLI-executor mode, the CLI SHALL server-side-apply the CR spec with 
 - **WHEN** applying with multiple `--values` files
 - **THEN** `spec.values` SHALL contain the single unified result the render consumed, not the individual layers
 
-### Requirement: Entry wire shape targets the CRD schema
-
-Conversion between the library's inventory entry and the CR's `status.inventory.entries[]` SHALL be performed by explicit mapping functions in the CLI that produce and consume the CRD's field names (`group`, `kind`, `namespace`, `name`, `v`, `component`). The library entry carries no struct tags, so no Go struct tag SHALL decide the wire shape. The mapping SHALL round-trip losslessly. The reader of a legacy inventory Secret SHALL decode the Secret's JSON with the same field names, `v` for the API version, into library entries.
-
-#### Scenario: Version serializes as `v`
-
-- **WHEN** an entry with Version `v1` is written to the CR
-- **THEN** the entry object in `status.inventory.entries[]` SHALL carry the key `v` with value `v1`
-
-#### Scenario: Round-trip preserves the entry set
-
-- **WHEN** an entry list is written to a CR and read back
-- **THEN** the resulting entries SHALL equal the originals
-
-#### Scenario: Legacy Secret entries keep their API version
-
-- **WHEN** a legacy inventory Secret whose entry carries `"v": "v1"` is read for migration
-- **THEN** the migrated entry SHALL have Version `v1`
-
 ### Requirement: instanceUUID is extracted from the render
 
 The CLI SHALL populate `status.instanceUUID` from the rendered resources' `module-instance.opmodel.dev/uuid` label (first non-empty value). If no rendered resource carries the label, the field SHALL be omitted. The CLI MUST NOT generate the UUID itself.
@@ -233,3 +214,17 @@ The CLI SHALL represent each currently owned Kubernetes resource as the library'
 
 - **WHEN** comparing two entries that differ in name
 - **THEN** the entries SHALL NOT be the same object
+
+### Requirement: Entry wire shape follows the CRD schema
+
+Conversion between the library's inventory entry and the CR's `status.inventory.entries[]` SHALL be performed by explicit mapping functions in the CLI that produce and consume the CRD's field names (`group`, `kind`, `namespace`, `name`, `v`, `component`). The library entry carries no struct tags, so no Go struct tag SHALL decide the wire shape. The mapping SHALL round-trip losslessly.
+
+#### Scenario: Version serializes as `v`
+
+- **WHEN** an entry with Version `v1` is written to the CR
+- **THEN** the entry object in `status.inventory.entries[]` SHALL carry the key `v` with value `v1`
+
+#### Scenario: Round-trip preserves the entry set
+
+- **WHEN** an entry list is written to a CR and read back
+- **THEN** the resulting entries SHALL equal the originals
