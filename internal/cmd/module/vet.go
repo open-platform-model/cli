@@ -246,6 +246,9 @@ func identitySchemaForVet(cfg *config.GlobalConfig) (*kernel.Kernel, cue.Value, 
 	k := config.NewKernel(cfg.Registry)
 	schemaVal, err := k.SchemaCache().Get()
 	if err != nil {
+		if noReg := cmdutil.NoRegistryError(cfg, "loading core schema", err); noReg != nil {
+			return nil, cue.Value{}, noReg
+		}
 		// A registry round-trip, same failure class as publish's lookup and
 		// push: connectivity (exit 3), not a verdict on the module.
 		return nil, cue.Value{}, &opmexit.ExitError{
