@@ -2,7 +2,8 @@
 # test.sh (openspec change add-deps-cascade-task, design.md D10; checked live
 # 2026-10-04). "older" rows feed S2 and S4, "oldest" rows S9; pin-of rows are
 # copied into the stub tables as they are. test.sh fails when a row is not older.
-older	github.com/open-platform-model/library	v1.0.0-beta.2
+# No library row: test.sh makes the older library from the tree's own, because
+# the sandbox must compile against it (openspec change repair-cascade-test).
 older	opmodel.dev/catalogs/opm@v4	v4.4.3
 older	opmodel.dev/core@v2	v2.0.0-alpha.13
 oldest	opmodel.dev/catalogs/opm@v4	v4.4.2

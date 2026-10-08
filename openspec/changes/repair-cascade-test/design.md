@@ -47,7 +47,7 @@ The name MUST sort below the tree's version in SemVer, in the stub's `semver-cmp
 
 - `GOPROXY=file://$TMP/goproxy,<the user's GOPROXY>`: the file proxy answers only the made-up version; a missing file falls through.
 - `GONOSUMDB=$LIB`: the checksum database cannot know the made-up version. Scoped to the setup; the task run still verifies the real library.
-- `GOPRIVATE=` and `GONOPROXY=` empty, so a developer's private settings cannot route around the file proxy; `GOFLAGS=-mod=mod`; `GOWORK=off` as before.
+- `GONOPROXY=none`, so a developer's `GOPRIVATE` setting cannot route around the file proxy; `GOWORK=off` as before.
 
 ### Failure text
 
