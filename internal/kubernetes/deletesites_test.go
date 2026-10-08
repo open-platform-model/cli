@@ -26,12 +26,19 @@ var allowedDeleteSites = []string{
 	"internal/operator/migration_execute.go:deleteProven",
 }
 
+// cliKubernetesPackage is this package's import path. Its own
+// Delete(ctx, client, opts) is the instance delete loop, which sends its
+// deletes through JudgedDelete, so a call of it is not a send.
+const cliKubernetesPackage = "github.com/open-platform-model/cli/internal/kubernetes"
+
 // TestDeleteCallSites fails when a DELETE or a DELETE of a collection is
 // sent from a function outside the allowed list, so a new delete cannot
 // bypass the ownership verdict unseen. It reads the non-test Go files under
 // internal/, cmd/ and pkg/ and reports every call of a method named Delete
-// or DeleteCollection that takes a context first, the shape of the dynamic
-// and typed client calls.
+// or DeleteCollection with three or more arguments, the shape of the dynamic
+// and typed client calls, whatever the arguments are and wherever the call
+// stands: in a function, a method, or a function literal of a package-level
+// variable.
 func TestDeleteCallSites(t *testing.T) {
 	root := filepath.Join("..", "..")
 	var got []string
@@ -52,14 +59,8 @@ func TestDeleteCallSites(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			for _, decl := range file.Decls {
-				fn, ok := decl.(*ast.FuncDecl)
-				if !ok || fn.Body == nil {
-					continue
-				}
-				if sendsDelete(fn.Body) {
-					got = append(got, filepath.ToSlash(rel)+":"+fn.Name.Name)
-				}
+			for _, site := range deleteSites(file) {
+				got = append(got, filepath.ToSlash(rel)+":"+site)
 			}
 			return nil
 		})
@@ -70,27 +71,93 @@ func TestDeleteCallSites(t *testing.T) {
 		"a delete of an instance's object goes through JudgedDelete; a new exception needs a reason in allowedDeleteSites")
 }
 
-// sendsDelete reports whether body calls a method named Delete or
-// DeleteCollection whose first argument is named ctx.
-func sendsDelete(body *ast.BlockStmt) bool {
+// TestDeleteSites_Matcher pins what the call-site matcher sees, so the guard
+// above cannot go blind: a send is found whatever its context argument is
+// called and inside a function literal, and this package's own Delete is not
+// one, under any import name.
+func TestDeleteSites_Matcher(t *testing.T) {
+	const src = `package x
+
+import (
+	"context"
+
+	k8s "github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/kubernetes"
+)
+
+func named(ctx context.Context) { _ = r.Delete(ctx, "a", o) }
+
+func background() { _ = r.Delete(context.Background(), "a", o) }
+
+func otherName(waitCtx context.Context) { _ = c.Resource(g).Namespace("n").Delete(waitCtx, "a", o) }
+
+func collection(ctx context.Context) { _ = r.DeleteCollection(ctx, o, l) }
+
+func inLiteral() { f := func() { _ = r.Delete(context.TODO(), "a", o) }; f() }
+
+var packageLevel = func() error { return r.Delete(context.Background(), "a", o) }
+
+func instanceLoop(ctx context.Context) { _, _ = kubernetes.Delete(ctx, c, o) }
+
+func instanceLoopRenamed(ctx context.Context) { _, _ = k8s.Delete(ctx, c, o) }
+
+func notASend() { m.Delete("key"); _ = os.Remove("f") }
+`
+	file, err := parser.ParseFile(token.NewFileSet(), "x.go", src, parser.SkipObjectResolution)
+	require.NoError(t, err)
+	assert.Equal(t,
+		[]string{"named", "background", "otherName", "collection", "inLiteral", "package-level declaration"},
+		deleteSites(file))
+}
+
+// deleteSites returns, in source order, the top-level declarations of file
+// that send a delete: a function or method by its name, anything else as
+// "package-level declaration".
+func deleteSites(file *ast.File) []string {
+	// The names this file imports the CLI's kubernetes package under.
+	ownPackage := map[string]bool{}
+	for _, imp := range file.Imports {
+		if strings.Trim(imp.Path.Value, `"`) != cliKubernetesPackage {
+			continue
+		}
+		name := "kubernetes"
+		if imp.Name != nil {
+			name = imp.Name.Name
+		}
+		ownPackage[name] = true
+	}
+
+	var sites []string
+	for _, decl := range file.Decls {
+		name := "package-level declaration"
+		if fn, ok := decl.(*ast.FuncDecl); ok {
+			name = fn.Name.Name
+		}
+		if sendsDelete(decl, ownPackage) {
+			sites = append(sites, name)
+		}
+	}
+	return sites
+}
+
+// sendsDelete reports whether node holds a call of a method named Delete or
+// DeleteCollection with three or more arguments, other than a call of the
+// CLI's own kubernetes.Delete.
+func sendsDelete(node ast.Node, ownPackage map[string]bool) bool {
 	found := false
-	ast.Inspect(body, func(n ast.Node) bool {
+	ast.Inspect(node, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
-		if !ok || len(call.Args) < 2 {
+		if !ok || len(call.Args) < 3 {
 			return true
 		}
 		sel, ok := call.Fun.(*ast.SelectorExpr)
 		if !ok || (sel.Sel.Name != "Delete" && sel.Sel.Name != "DeleteCollection") {
 			return true
 		}
-		// This package's own Delete(ctx, client, opts) is the instance delete
-		// loop, which sends its deletes through JudgedDelete.
-		if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == "kubernetes" {
+		if pkg, ok := sel.X.(*ast.Ident); ok && ownPackage[pkg.Name] {
 			return true
 		}
-		if first, ok := call.Args[0].(*ast.Ident); ok && first.Name == "ctx" {
-			found = true
-		}
+		found = true
 		return true
 	})
 	return found

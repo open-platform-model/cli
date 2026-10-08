@@ -186,7 +186,13 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 		outcome, err := JudgedDelete(ctx, client, objectOf(res), gvk.Version, opts.InstanceUUID, opts.DryRun)
 		switch {
 		case err != nil:
-			instanceLog.Warn(fmt.Sprintf("could not delete %s/%s: %v", kind, name, err))
+			// Worded as before the verdict moved to the library: a failed
+			// read and a failed delete each keep their own line.
+			verb := "deleting"
+			if IsLiveReadFailure(err) {
+				verb = "reading"
+			}
+			instanceLog.Warn(fmt.Sprintf("%s %s/%s: %v", verb, kind, name, err))
 			result.Errors = append(result.Errors, resourceError{Kind: kind, Name: name, Namespace: ns, Err: err})
 		case outcome.Skip == ownership.SkipAlreadyAbsent:
 			instanceLog.Debug("resource already gone", "kind", kind, "namespace", ns, "name", name)
@@ -231,6 +237,21 @@ func recordUnreadable(result *DeleteResult, unreadable []UnreadableResource, del
 // new object and judges it.
 var ErrReplaced = errors.New("the object was replaced after it was read, so it was not deleted")
 
+// liveReadError marks an error of JudgedDelete as a failure of the live
+// read, kind resolution included, as opposed to a failure of the DELETE. It
+// adds no text of its own.
+type liveReadError struct{ err error }
+
+func (e *liveReadError) Error() string { return e.err.Error() }
+func (e *liveReadError) Unwrap() error { return e.err }
+
+// IsLiveReadFailure reports whether an error of JudgedDelete came from
+// reading the live object, so that no DELETE was sent.
+func IsLiveReadFailure(err error) bool {
+	var readErr *liveReadError
+	return errors.As(err, &readErr)
+}
+
 // DeleteOutcome is what JudgedDelete did with one object.
 type DeleteOutcome struct {
 	// Deleted reports that the API server accepted the DELETE.
@@ -252,8 +273,8 @@ type DeleteOutcome struct {
 //
 // A kind OPM never deletes is skipped without a read. A read that fails with
 // anything but NotFound, a kind that cannot be resolved included, is returned
-// as the error: the object may still exist. A DELETE refused on the UID
-// precondition is ErrReplaced.
+// as the error (IsLiveReadFailure): the object may still exist. A DELETE
+// refused on the UID precondition is ErrReplaced.
 func JudgedDelete(ctx context.Context, client *Client, obj ownership.Object, version, instanceUUID string, dryRun bool) (DeleteOutcome, error) {
 	if ownership.SafetyExcluded(obj.Group, obj.Kind) {
 		return outcomeOf(ownership.CanDelete(ownership.DeleteInput{Object: obj, InstanceUUID: instanceUUID})), nil
@@ -262,12 +283,12 @@ func JudgedDelete(ctx context.Context, client *Client, obj ownership.Object, ver
 	gvk := schema.GroupVersionKind{Group: obj.Group, Version: version, Kind: obj.Kind}
 	resource, err := client.ResourceClientFor(ctx, gvk, obj.Namespace)
 	if err != nil {
-		return DeleteOutcome{}, err
+		return DeleteOutcome{}, &liveReadError{err: err}
 	}
 	live, err := resource.Get(ctx, obj.Name, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return DeleteOutcome{}, err
+			return DeleteOutcome{}, &liveReadError{err: err}
 		}
 		live = nil
 	}

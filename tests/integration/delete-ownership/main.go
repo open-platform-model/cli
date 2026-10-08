@@ -52,9 +52,35 @@ func main() {
 	fmt.Println("=== OPM Delete Ownership Integration Test ===")
 
 	client, err := kubernetes.NewClient(kubernetes.ClientOptions{Context: clusterContext})
-	check("creating Kubernetes client", err)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: creating Kubernetes client: %v\n", err)
+		os.Exit(1)
+	}
 	cleanup(ctx, client)
-	defer cleanup(ctx, client)
+	// The scenarios panic with a failure on the first thing that is wrong, so
+	// that the test objects are removed on a failed run too.
+	code := 0
+	func() {
+		defer func() {
+			if f, ok := recover().(failure); ok {
+				fmt.Fprintln(os.Stderr, "FAIL: "+string(f))
+				code = 1
+			}
+		}()
+		scenarios(ctx, client)
+	}()
+	cleanup(ctx, client)
+	if code != 0 {
+		os.Exit(code)
+	}
+	fmt.Println()
+	fmt.Println("=== ALL SCENARIOS PASSED ===")
+}
+
+// failure is the panic value of a failed check.
+type failure string
+
+func scenarios(ctx context.Context, client *kubernetes.Client) {
 
 	// ----------------------------------------------------------------
 	step(1, "prune leaves a stale name a user's object took, and deletes its own")
@@ -111,9 +137,6 @@ func main() {
 	}
 	waitFor(ctx, client, "replaced", true)
 	fmt.Println("   OK: Conflict, and the object is still there")
-
-	fmt.Println()
-	fmt.Println("=== ALL SCENARIOS PASSED ===")
 }
 
 // configMap builds a test ConfigMap. managed stamps the labels an apply of
@@ -144,11 +167,17 @@ func create(ctx context.Context, client *kubernetes.Client, obj *unstructured.Un
 	return created
 }
 
-// cleanup deletes every ConfigMap of the test.
+// cleanup deletes every ConfigMap of the test and gives each a moment to go.
+// It never fails the run.
 func cleanup(ctx context.Context, client *kubernetes.Client) {
 	for _, name := range names {
 		_ = client.ResourceClient(configMapGVR, namespace).Delete(ctx, name, metav1.DeleteOptions{})
-		waitFor(ctx, client, name, false)
+	}
+	for _, name := range names {
+		func() {
+			defer func() { _ = recover() }()
+			waitFor(ctx, client, name, false)
+		}()
 	}
 }
 
@@ -176,12 +205,10 @@ func step(n int, desc string) { fmt.Printf("\n--- Step %d: %s\n", n, desc) }
 
 func check(label string, err error) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "FAIL: %s: %v\n", label, err)
-		os.Exit(1)
+		failf("%s: %v", label, err)
 	}
 }
 
 func failf(format string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, "FAIL: "+format+"\n", args...)
-	os.Exit(1)
+	panic(failure(fmt.Sprintf(format, args...)))
 }

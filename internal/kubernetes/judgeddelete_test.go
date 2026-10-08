@@ -59,6 +59,7 @@ func TestJudgedDelete(t *testing.T) {
 		wantDeleted bool
 		wantErr     bool
 		wantIs      error
+		wantRead    bool // the error is a failed live read: no DELETE was sent
 		wantDeletes int
 	}{
 		{name: "owned object is deleted", obj: cm, version: "v1", live: mine(), wantDeleted: true, wantDeletes: 1},
@@ -107,7 +108,7 @@ func TestJudgedDelete(t *testing.T) {
 					return true, nil, apierrors.NewForbidden(gr, "cm", errors.New("denied"))
 				})
 			},
-			wantErr: true,
+			wantErr: true, wantRead: true,
 		},
 	}
 	for _, tc := range tests {
@@ -131,6 +132,7 @@ func TestJudgedDelete(t *testing.T) {
 				} else {
 					assert.NotErrorIs(t, err, ErrReplaced)
 				}
+				assert.Equal(t, tc.wantRead, IsLiveReadFailure(err), "the caller can tell a failed read from a failed delete")
 				assert.False(t, got.Deleted, "a failed delete is never reported as deleted")
 			} else {
 				require.NoError(t, err)
