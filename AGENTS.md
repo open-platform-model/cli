@@ -256,7 +256,8 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 
 - `task fmt` - run `go fmt ./...` and `goimports -w .`.
 - `task vet` - run `go vet ./...`.
-- `task lint` - run `golangci-lint run ./...`.
+- `task lint` - run `task lint:config`, then `golangci-lint run ./...`.
+- `task lint:config` - verify `.golangci.yml` against the schema committed under `.github/golangci-lint/`, with no network, and check that `.golangci-lint-version`, that schema and the workflows' use of the golangci-lint action agree (`.github/scripts/lint-config-check.sh`; CI's `Lint` jobs run the same script). `task lint:config:test` is its scenario test.
 - `task lint:fix` - run `golangci-lint run --fix ./...`.
 - `task tidy` - run `go mod tidy`.
 - `task openspec:check` - run `openspec validate --all --strict` over `openspec/` (main specs and active changes); `task openspec:install` installs the pinned openspec CLI once.
@@ -356,6 +357,14 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 - `gocyclo` threshold: 15; refactor before complexity grows.
 - Tests relax `dupl`, `errcheck`, `goconst`, `gosec`.
 - `examples/`, `experiments/`, `third_party/`, `builtin/` excluded from lint/format.
+
+### Moving the golangci-lint version
+
+`.golangci-lint-version` is the only place that names the version CI installs; the action reads it through `version-file`, and no workflow sets `version`. The action's own configuration check stays off (`verify: false`) because it downloads the schema from golangci-lint.run on every run, which failed the required `Lint` job twice on 2026-10-08.
+
+- A patch move (`v2.11.4` to `v2.11.5`): edit `.golangci-lint-version`. The schema is per minor line and stays.
+- A minor or major move: edit `.golangci-lint-version`, replace the schema in `.github/golangci-lint/` with `jsonschema/golangci.jsonschema.json` of `github.com/golangci/golangci-lint` at the new tag, saved as `golangci.vX.Y.jsonschema.json`, remove the old file, and rewrite `SHA256SUMS` (`sha256sum golangci.vX.Y.jsonschema.json > SHA256SUMS` in that directory). Say in the PR body where the file came from, so the reviewer can compare the checksum.
+- `task lint:config` must pass with a local golangci-lint of the same minor line. It uses the hidden `--schema` flag of `golangci-lint config verify`; if a release drops the flag, the check fails on the bump PR and needs a new design, not a silent `verify: false`.
 
 ## Documentation And Output Conventions
 

@@ -9,5 +9,5 @@
 
 ## 2. Contributor docs
 
-- [ ] 2.1 `AGENTS.md`: the `task lint` entry, the two new tasks, and how to move the linter version (version file, schema, checksum); verify every named path and task exists
-- [ ] 2.2 `task lint` and `task openspec:check` green, then commit `docs: say how to move the golangci-lint version`
+- [x] 2.1 `AGENTS.md`: the `task lint` entry, the two new tasks, and how to move the linter version (version file, schema, checksum); verify every named path and task exists
+- [x] 2.2 `task lint` and `task openspec:check` green, then commit `docs: say how to move the golangci-lint version`
