@@ -1,0 +1,89 @@
+---
+title: "Adopt an existing object"
+description: "opm instance apply, opm module apply and opm operator install refuse to apply over an object that another owner holds: what each refusal means, how to adopt an object with the opmodel.dev/adopt annotation, how to hand an object from one instance to another, and what a dry run does not show."
+type: how-to
+weight: 30
+---
+
+For an instance that the CLI manages, every apply checks every object it renders against the cluster before it changes anything. `opm` applies over an existing object only when the object belongs to the instance. When an object belongs to someone else, the apply stops before its first change and tells you how to adopt the object.
+
+> [!WARNING]
+> **The check changed after `v1.0.0-beta.10`**
+>
+> Releases up to `v1.0.0-beta.10` ran this check only on the first apply of an instance, and let the apply take over any object that carried OPM labels, whichever instance owned it. Later releases run the check on every apply. An apply that took over an existing object before can now exit 1, and `opm operator install` can exit 2. Nothing is changed in the cluster when that happens. No flag turns the check off.
+
+## The message
+
+A refused apply names every object it refuses, one line each, and says that it stopped before any change:
+
+```text
+apply refused: 1 object(s) cannot be applied by this instance:
+  ConfigMap/default/settings exists and is not managed by OPM; to let this instance take it over, annotate it opmodel.dev/adopt=6f1c0a52-8d1e-5c1b-9a61-0d4c6c2f7be2
+apply stopped before any change
+```
+
+An object that another instance adopted is not a refusal. The apply prints one warning for it and goes on:
+
+```text
+WARN ConfigMap/default/settings was adopted by module instance 9a40c1de-52f0-5b0e-8c11-4f2a9f3d1e17; this instance no longer applies it and drops it from its inventory; to take it back, annotate it opmodel.dev/adopt=6f1c0a52-8d1e-5c1b-9a61-0d4c6c2f7be2
+```
+
+## What it means
+
+| Message | Meaning | Exit code |
+| --- | --- | --- |
+| `exists and is not managed by OPM` | The object is in the cluster and no OPM apply wrote it. The instance does not have it in its inventory. | 1 |
+| `belongs to module instance <UUID>` | An OPM apply of another instance wrote the object. The instance does not have it in its inventory. | 1 |
+| `is being deleted` | The object has a deletion timestamp. Kubernetes removes it when its finalizers are done. No annotation lifts this refusal. | 1 |
+| `cannot check whether ... already exists` | The read of the object failed, so `opm` cannot tell who owns it. | 4 when the read was denied, 3 when the API server was unavailable, 1 otherwise |
+| `was adopted by module instance <UUID>`, `is being adopted by module instance <UUID>` | The `opmodel.dev/adopt` annotation of the object names another instance. This instance does not apply the object, does not delete it, and removes it from its inventory. | 0 |
+
+An object that the inventory of the instance already lists is always applied, also when its labels name another instance. Only a deletion timestamp or an `opmodel.dev/adopt` annotation for another instance stops it.
+
+`opm operator install` runs the same check on every install and exits 2 for each row above. It also refuses, with exit 2, an object that another instance adopted: the operator needs every object that its module renders.
+
+## Causes and fixes
+
+### You want the instance to own the object
+
+Set the annotation that the refusal prints, then run the apply again:
+
+```bash
+kubectl annotate configmap settings -n default opmodel.dev/adopt=6f1c0a52-8d1e-5c1b-9a61-0d4c6c2f7be2
+```
+
+The value is the UUID of the instance. The apply then writes the object as the module renders it and adds it to the inventory. `opm` never sets this annotation, and no `opm` flag does.
+
+### The object must stay as it is
+
+Change the module or its values so that it renders the object under another name, or does not render it.
+
+### You want to move an object from one instance to another
+
+1. Annotate the object with the UUID of the instance that takes it over. The refusal of that instance prints the annotation.
+2. Apply the instance that takes it over. It applies the object and records it.
+3. Apply the first instance. It prints the `was adopted by` warning, removes the object from its inventory, and does not delete it. Remove the object from the first instance's module or values to stop the warning.
+
+To move the object back, set the annotation to the UUID of the first instance and apply it.
+
+### The object is being deleted
+
+Wait until the object is gone, then apply again. If it does not go away, find what holds its finalizer. A PersistentVolumeClaim, for example, stays until no pod mounts it. `opm` cannot change the workload while one of the instance's objects is in this state, so release the object with `kubectl`.
+
+### The refused objects are the instance's own
+
+Three cases refuse objects that the instance wrote itself.
+
+- **Leftover CustomResourceDefinitions and Namespaces.** `opm instance delete` and `opm operator uninstall` never delete a CustomResourceDefinition or a Namespace, and leave the labels on them. If you install the module again under another instance name, another namespace or another module path, the new instance has another UUID and the leftovers are refused as `belongs to module instance`. Annotate each one as the refusal shows. If nothing else uses them, you can delete them instead.
+- **An instance with no record whose identity changed.** The UUID of an instance comes from its module path, its name and its namespace. If the `ModuleInstance` of the instance was deleted, or `opm` `v1.0.0-alpha.1` or older recorded the instance in a Secret, and one of the three changed since, then every object is refused as `belongs to module instance`. The refusal adds a line that says so. Annotate each object as shown. You do not have to remove anything first.
+- **An object of the instance that is being deleted.** See "The object is being deleted" above.
+
+## What a dry run does not show
+
+`--dry-run` refuses nothing because of this check, and prints none of the lines above. A dry run can succeed where the real run refuses. The real run refuses before it changes anything, so it is safe to run it to find out.
+
+## What the check does not cover
+
+- **Operator-managed instances.** The operator applies those instances. This page describes only what the CLI does.
+- **The `--rbac` objects of `opm operator install`.** They belong to no instance and are applied without this check.
+- **Who can set the annotation.** Everyone who can patch an object can set `opmodel.dev/adopt` on it. With the UUID of an instance, the next apply of that instance takes the object over. With another UUID, the instance stops applying the object, and `opm operator install` refuses while one of the operator's objects carries such an annotation. The warning and the refusal name the object and the UUID each time.

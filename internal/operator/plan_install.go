@@ -10,6 +10,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	"github.com/open-platform-model/library/opm/kernel"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -163,14 +164,17 @@ func (e *RecordedValuesError) Error() string {
 func (e *RecordedValuesError) Unwrap() error { return e.Err }
 
 // GuardError is the apply guard's refusal: an object the plan applies
-// already exists and is not OPM's, is terminating, or could not be read by
-// the guard (the read error is then in the chain). The install command exits
+// exists and is not OPM's, belongs to or is adopted by another instance, is
+// terminating, or could not be read by the guard (the read error is then in
+// the chain). Nothing was written. The install command exits
 // 2 on every GuardError, whatever it wraps. An object that is unreadable
 // before the guard runs is refused earlier, by the terminating wait or the
 // migration proof, with the exit code of the read error.
 type GuardError struct{ Err error }
 
-func (e *GuardError) Error() string { return e.Err.Error() }
+func (e *GuardError) Error() string {
+	return "refusing to install: " + e.Err.Error() + "\nnothing was changed"
+}
 func (e *GuardError) Unwrap() error { return e.Err }
 
 // PlanInstall runs every check that can refuse the install, in order, and
@@ -179,7 +183,7 @@ func (e *GuardError) Unwrap() error { return e.Err }
 // (CheckTarget), the status-subresource permission check, the wait for
 // terminating objects, the migration proof of an operator installed from an
 // earlier release manifest and, last, the apply guard over every object the
-// plan applies when no record exists yet. The terminating wait starts the
+// plan applies, with or without a record. The terminating wait starts the
 // --timeout budget the writes then share.
 func PlanInstall(ctx context.Context, env InstallEnv, res *modref.Resolution, target Target, opts PlanOptions) (*Plan, error) {
 	rec, err := inventory.GetRecord(ctx, env.Client, OperatorInstanceName, OperatorNamespace)
@@ -232,18 +236,24 @@ func PlanInstall(ctx context.Context, env InstallEnv, res *modref.Resolution, ta
 		return nil, err
 	}
 
-	// The apply guard, the last check: on a cluster with no record every
-	// object the plan applies must be absent, already OPM's, or admitted by
-	// the migration's proof.
-	if rec == nil {
-		entries := workflowapply.CurrentInventoryEntries(plan.Objects())
-		if _, err := inventory.Guard(ctx, env.Client, inventory.GuardInput{
-			Entries:      entries,
-			InstanceUUID: result.Instance.UUID,
-			Admit:        plan.Migration.Admit(),
-		}); err != nil {
-			return nil, &GuardError{Err: err}
-		}
+	// The apply guard, the last check, on every install: an object the plan
+	// applies must be absent, in the record, this instance's, or admitted by
+	// the migration's proof. Install needs every object it renders, so an
+	// object another instance is adopting refuses here too, where any other
+	// apply would leave it out and go on. Nothing has been written yet, so no
+	// write of the install reaches an object the guard did not allow.
+	var previous []k8sinventory.Entry
+	if rec != nil {
+		previous = rec.Inventory.Entries
+	}
+	if _, err := inventory.Guard(ctx, env.Client, inventory.GuardInput{
+		Entries:      workflowapply.CurrentInventoryEntries(plan.Objects()),
+		Previous:     previous,
+		InstanceUUID: result.Instance.UUID,
+		Admit:        plan.Migration.Admit(),
+		RefuseLetGo:  true,
+	}); err != nil {
+		return nil, &GuardError{Err: err}
 	}
 	return plan, nil
 }
