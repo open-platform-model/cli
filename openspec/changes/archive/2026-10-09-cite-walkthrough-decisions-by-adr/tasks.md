@@ -17,5 +17,5 @@ git grep -nE "\b([Dd]ecisions?|[Tt]asks?|[Ii]tems?) [a-j][1-5]\b" -- . ':!opensp
 
 ## 2. Verify and archive
 
-- [ ] 2.1 Archive the change, which syncs the `repo-automation` delta into the main spec. Verify: both commands of the walkthrough-id check print nothing except `openspec/specs/release-workflow/spec.md:156` and `:175`, whose "owner decision 2026-10-02" cites workspace RELEASING.md, section "Owner settings", a release setting with no row in ADR-013 and not a walkthrough id; and `git diff origin/main -- openspec/specs/repo-automation/spec.md` changes only the `Source:` sentence of "Dependabot leaves cuelang.org/go to library releases".
-- [ ] 2.2 `task openspec:check` green, then commit `docs(openspec): archive cite-walkthrough-decisions-by-adr`.
+- [x] 2.1 Archive the change, which syncs the `repo-automation` delta into the main spec. Verify: both commands of the walkthrough-id check print nothing except `openspec/specs/release-workflow/spec.md:156` and `:175`, whose "owner decision 2026-10-02" cites workspace RELEASING.md, section "Owner settings", a release setting with no row in ADR-013 and not a walkthrough id; and `git diff origin/main -- openspec/specs/repo-automation/spec.md` changes only the `Source:` sentence of "Dependabot leaves cuelang.org/go to library releases".
+- [x] 2.2 `task openspec:check` green, then commit `docs(openspec): archive cite-walkthrough-decisions-by-adr`.
