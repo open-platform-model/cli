@@ -1,139 +1,110 @@
 ## Context
 
-See `proposal.md` for the motivation. The state of the code at the base of this change:
+See `proposal.md` for the motivation. The state of the code at the base of this change (cli `main` at 4d4884fa):
 
-- `internal/inventory/stale.go`: `FirstInstallCheck` reads every rendered entry and refuses a terminating, an untracked or an unreadable object. It passes every OPM-managed object, whichever instance its UUID label names. `RunPreApplyExistenceCheck` in `internal/workflow/apply/apply.go` skips it when a record exists and on a dry run.
 - `internal/inventory/stale.go`: `PruneStaleResources` deletes each stale entry by its recorded name, with foreground propagation, no read and no precondition.
-- `internal/kubernetes/delete.go`: `checkDeletable` reads each object again and compares the managed-by label and the UUID label; `deleteResource` sends no precondition.
-- `internal/operator/plan_install.go`: the apply guard runs only when the operator instance has no record. `internal/operator/migration_execute.go`: `deleteProven` deletes with a precondition on the UID the migration proof read.
+- `internal/kubernetes/delete.go`: `checkDeletable` reads each object again and compares the managed-by label and the UUID label; `deleteResource` sends no precondition. `opm instance delete` and `opm operator uninstall` share it through `internal/workflow/apply/delete.go`.
+- `internal/operator/migration_execute.go`: `deleteProven` deletes with a precondition on the UID the migration proof read, after no ownership verdict.
 - `internal/kubernetes/protected.go`: `IsProtectedKind` restates the library's `ownership.SafetyExcluded`.
 
 Constraints:
 
-- The library verdicts are pure. The caller reads the live object and hands it in; the library reads no cluster and words the refusal (`opm/k8s/ownership` package doc).
-- The contract is 0012:D4:R2 and 0012:D8:R1 to R8, with the "annotation only" rule of 0012:D8:R8.
-- The fail-safe rules stay: an unreadable record or object stops the apply (cli#332), a refusal before the first write changes nothing (cli#334), a failed prune keeps the entry (cli#332), a failed record delete is an error (cli#338), reads resolve kinds by discovery (cli#342), PersistentVolumeClaims are kept unless `--delete-data` (cli#345).
+- The library verdict is pure. The caller reads the live object and hands it in; the library reads no cluster and words the skip (`opm/k8s/ownership` package doc).
+- The contract is 0012:D4:R1, 0012:D7:R1 and 0012:D8:R7 and R8.
+- The fail-safe rules stay: a failed prune keeps the entry (cli#332), a failed record delete is an error (cli#338), reads resolve kinds by discovery (cli#342), PersistentVolumeClaims are kept unless `--delete-data` (cli#345), errors are told apart by type and never by message text (cli#346).
 - No command syntax changes. No flag is added, removed or renamed.
 
-Reversibility: costly two-way. The cli can change how it calls the verdict at any release. What users see (which applies are refused, the adopt annotation) is the contract of 0012:D8, already accepted by the owner; this change does not decide it.
+Reversibility: costly two-way. The cli can change how it calls the verdict at any release. What users see (which objects a prune or delete leaves) is the contract of 0012:D8, already accepted by the owner.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- One function decides apply ownership and one decides delete ownership, for every cli path, and both are the library's.
+- One function, the library's, decides delete ownership for every object the cli deletes on behalf of an instance: prune, `instance delete`, `operator uninstall` and the migration's deletes. A test keeps it so.
 - Prune never deletes an object without a live read and a verdict.
 - Every delete after a verdict carries the UID precondition.
-- An object adopted by another instance leaves the inventory and stays in the cluster.
+- No instance deletes an object whose adopt annotation names another instance.
 
 **Non-Goals:**
 
-- The deletion protocol: `opm/k8s/lifecycle`, the order, the finalizer hold, the propagation policy. The next change replaces the two delete loops with the library's deletion plan; this change keeps the loops and only changes the per-object decision and the precondition.
-- A command or flag that sets the adopt annotation (0012:D8:R6 excludes it).
-- A change to what a dry run refuses.
-- Ownership of the `--rbac` objects of `opm operator install`.
+- The apply guard, the adopt annotation on apply, and the hand-over on apply: change `guard-every-apply-by-ownership`.
+- The deletion protocol: `opm/k8s/lifecycle`, the order, the finalizer hold, the propagation policy. A later change replaces the two delete loops with the library's deletion plan; this change keeps the loops and changes only the per-object decision and the precondition.
+- The delete of the cli's own `ModuleInstance` record, and the removal of the cleanup finalizer from other instances' records by `operator uninstall`. Neither is a delete of an instance's object under 0012:D8.
+- A change to the dry run.
 
 ## Decisions
 
-### Paths and verdicts
+### Paths, identities and verdicts
 
-The cli MUST call the verdict named here on each path and MUST act on each answer as stated.
+The cli MUST call `ownership.CanDelete` on each path below, with the identity named, and MUST act on each answer as stated.
 
-| Path | Input to the verdict | Answer | cli action |
+| Path | Identity given to the verdict | Answer | cli action |
 | --- | --- | --- | --- |
-| Apply guard (`instance apply`, `module apply`, the instance apply inside `operator install`) | `CanApply{Object, Live, InInventory, InstanceUUID, Admit}` for every rendered object. `InInventory` is true when the previous record lists the same object (group, kind, namespace, name). `Admit` is true only for an object in the operator install's admit set. | allowed | Apply. |
-| | | `terminating`, `foreign-object`, `other-instance` | Refuse the apply before its first write. Report every refused object, one line each, with the library's message. |
-| | | `adopted-elsewhere` | Do not apply the object. One warning line with the library's message. Leave it out of the record. The apply goes on and this refusal alone does not change the exit code (0012:D8:R8). |
-| | read error other than NotFound and other than "kind not served" | (no verdict) | Refuse the apply before its first write, as cli#332 set for the first install. |
-| Prune | `CanDelete{Object, Live, InstanceUUID}` for every prunable stale entry, after the protected-kind split and the claim split | proceed | DELETE, foreground, with `verdict.Preconditions()`. |
+| Prune | The `InstanceUUID` of the record the apply read before it rendered anything into the cluster (`status.instanceUUID`), never the render's | proceed | DELETE, foreground, with `verdict.Preconditions()`. |
 | | | `already-absent` | Done; the entry leaves the record. |
 | | | `not-opm-managed`, `owner-mismatch`, `adopted-elsewhere` | Leave behind: one `left behind` warning line with the library's message; the entry leaves the record. |
 | | | `safety-excluded` | Not reached for a split set; when reached, left behind as today. |
-| | read error other than NotFound; DELETE answers Conflict on the precondition | (no verdict) | A failed prune: the entry stays in the record and the command fails after the write (cli#332). |
-| `instance delete`, `operator uninstall` | `CanDelete{Object, Live, InstanceUUID}` on the existing re-read; `InstanceUUID` is the record's | proceed | DELETE, foreground, with `verdict.Preconditions()`. |
+| | | (no verdict) read error other than NotFound; DELETE answers Conflict on the precondition | A failed prune: the entry stays in the record and the command fails after the write (cli#332). |
+| `instance delete`, `operator uninstall` | The record's `InstanceUUID`, as today | proceed | DELETE, foreground, with `verdict.Preconditions()`. |
 | | | `already-absent` | Neither deleted nor an error, as today. |
-| | | any other skip | `left behind` with the library's message; not an error, as today. |
-| | read error; Conflict on the precondition | (no verdict) | A per-resource error: the record is kept and the command fails, as today for a failed re-read or delete. |
-| `operator install`, check phase guard | The apply guard above over every object the plan applies, on every install | refusals | `GuardError`, exit 2, as today. `adopted-elsewhere` is not a refusal here either: the CRD step and the instance apply both skip the object. |
-| `operator install`, migration deletes | `CanDelete{Object, Live, InstanceUUID, Admit: true}` on the object the migration proof read, in the check phase | proceed | The delete in the write phase carries `verdict.Preconditions()`. This is the UID precondition `deleteProven` sends today. |
-| | | any skip | A block of the migration refusal (exit 2), with the library's message; nothing is written. |
+| | | any other skip | `left behind` with the library's message; not an error, as today; counted in the closing line, as today. |
+| | | (no verdict) read error; Conflict on the precondition | A per-resource error: the record is kept and the command fails with the code it has today for a failed delete. |
+| `operator install`, migration deletes | The operator instance's UUID from the render, with `Admit: true`, on the object the migration proof read, in the check phase | proceed | The delete in the write phase carries `verdict.Preconditions()`. This is the UID precondition `deleteProven` sends today. |
+| | | any skip | A block of the migration refusal (exit 2), naming the object and the instance in the library's message; nothing is written. |
 
 `IsProtectedKind` MUST delegate to `ownership.SafetyExcluded`, so the protected-kind rule has one definition. The split of protected kinds and of claims before prune stays as it is.
+
+Deletes outside the verdict, on purpose: the `ModuleInstance` record itself (`internal/inventory/store.go`), which the cli owns by `spec.owner`. Section 2 of `tasks.md` adds a test that lists the allowed call sites of `.Delete(` on a resource client, so a new delete cannot bypass the verdict unseen.
 
 ### Shape in the code
 
 ```go
-// internal/inventory: the apply guard, replacing FirstInstallCheck.
-type GuardInput struct {
-    Entries      []k8sinventory.Entry  // every rendered object, in render order
-    Previous     []k8sinventory.Entry  // the record's inventory; nil on a first apply
-    InstanceUUID string
-    Admit        AdmitSet              // keyed by ownership.Object; nil for every caller but operator install
-}
-
-type GuardResult struct {
-    Managed []k8sinventory.Entry // allowed, exists, OPM-managed, not in Previous: the cli#333 warning counts these
-    LetGo   []LetGo              // refused as adopted-elsewhere: entry and library message
-}
-
-// Guard returns a *GuardRefusal (every terminating, foreign-object and
-// other-instance verdict) or the read error of the first object it could not
-// read. It writes nothing.
-func Guard(ctx context.Context, client *kubernetes.Client, in GuardInput) (GuardResult, error)
-
 // internal/kubernetes: one judged delete, shared by instance delete and prune.
-// It reads the live object, asks ownership.CanDelete, and on proceed sends the
-// DELETE with the verdict's preconditions.
+// It resolves the kind by discovery, reads the live object, asks
+// ownership.CanDelete, and on proceed sends the DELETE with foreground
+// propagation and the verdict's preconditions. A dry run stops after the verdict.
 type DeleteOutcome struct {
     Deleted bool                 // the DELETE was accepted
     Skip    ownership.SkipReason // set when the verdict skipped
     Message string               // the library's message for the skip
 }
 
+// ErrReplaced reports a DELETE the API server refused on the UID
+// precondition: the object was replaced since the read. Callers test it with
+// errors.Is; it is never reported as deleted.
+var ErrReplaced = errors.New("object was replaced since it was read")
+
 func JudgedDelete(ctx context.Context, client *Client, obj ownership.Object, version, instanceUUID string, dryRun bool) (DeleteOutcome, error)
 ```
 
-`AdmitSet` becomes `map[ownership.Object]struct{}`; `K8sIdentity` and `IdentityOf` go, as their comment at `internal/inventory/admit.go` announces. `checkDeletable`, `deleteResource`, `deleteEntry`, `reasonNotManaged` and `reasonOtherInstance` go.
+`checkDeletable`, `deleteResource`, `deleteEntry`, `reasonNotManaged` and `reasonOtherInstance` go. `PruneStaleResources` takes the recorded identity as an argument and returns the entries left behind with their messages beside the `*PruneError`.
 
-Apply flow, real run (`internal/workflow/apply/apply.go`):
+Apply flow, real run (`internal/workflow/apply/apply.go`); only the marked steps change:
 
 ```text
-cluster gates -> read record -> ownership mode -> status RBAC -> empty-render guard
-  -> Guard(all rendered entries, previous inventory, UUID, admit)     refuses here, before any write
-  -> cli#333 warning from GuardResult.Managed (first apply only)
-  -> create namespace -> Apply(rendered minus LetGo)
-  -> stale = StaleSet(previous, rendered)                              a LetGo object is rendered, so never stale and never pruned
-  -> split protected, split claims -> prune through JudgedDelete
-  -> write record: (rendered minus LetGo) + failed prunes + kept claims
+read record (identity R) -> ... -> apply rendered objects (identity N stamped by the render)
+  -> stale = StaleSet(previous, rendered)
+  -> split protected, split claims
+  -> prune through JudgedDelete with identity R                  * changed
+  -> write record: rendered + failed prunes + kept claims,
+     status.instanceUUID = N                                     (order unchanged: after the prune)
 ```
-
-With `--create-namespace` and a missing namespace the guard skips the objects in that namespace, as the existence check does today.
 
 ### Research & Decisions
 
-#### Where the apply verdict runs
+#### Which identity prune judges with
 
-**Context**: 0012:D8:R1 needs the verdict on every apply. The cli must also keep "a refusal changes nothing" (cli#334).
-**Explored**: `internal/workflow/apply/apply.go` (gate order), `internal/kubernetes/apply.go` (`applyOne` reads the object just before its patch).
+**Context**: `CanDelete` skips as `owner-mismatch` when the live UUID label and the given identity are both set and differ. An instance's identity is a UUID v5 of `<module path without the major>:<instance name>:<namespace>` (core `src/module_instance.cue`). The record is found by name and namespace, so within one record the identity changes only when the module's path changes; a major bump and a move to another hosting registry do not change it. After such a change the rendered objects are relabelled by the apply, and every stale object still carries the old identity.
 **Options considered**:
-1. Status quo: first install only. Leaves the takeover on later applies; contradicts 0012:D8:R1.
-2. One pass before the first write, over every rendered object. All-or-nothing refusal; one extra GET per object on later applies.
-3. Judge inside `applyOne` on its own read. No extra GET and the smallest window between read and write, but a refusal arrives after earlier objects were applied.
-**Decision**: Option 2.
-**Rationale**: It keeps the fail-safe rule that a refused apply has written nothing, and it is the shape the existence check already has. The cost is one read per rendered object on applies that had none.
-
-#### What a hand-over does to the inventory and the prune
-
-**Context**: 0012:D8:R8 says the instance drops the object and never deletes it; 0012:D7:R1 words this as "in the stale set, and the deletion plan skips it".
-**Options considered**:
-1. Remove the object from the rendered set before the stale set is computed, so prune sees it as stale and `CanDelete` skips it.
-2. Keep it out of the apply and out of the record, and compute the stale set from the full render, so prune never sees it.
-**Decision**: Option 2.
-**Rationale**: The outcome is the one 0012:D7:R1 asks for (not recorded, not deleted), with no path on which a prune of that object is even attempted. If the annotation goes away later, the next apply judges the object as one outside the inventory.
+1. The render's identity. After a path change every stale object is skipped as `owner-mismatch` and dropped from the record at exit 0: abandoned.
+2. The recorded identity (`status.instanceUUID` of the record the apply read).
+3. Either identity.
+**Decision**: Option 2 (owner decision of 2026-10-08: prune judges with the recorded identity, the one that applied the objects, also when the rendered identity differs).
+**Rationale**: The recorded identity is the one the stale objects carry, and it is what `instance delete` uses, so prune and delete judge one object alike. The record takes the new identity only in the write after the prune, so the stale objects are always judged with the identity that applied them. A stale object that carries neither identity is another instance's and is left behind. A record with no stored identity disables the comparison, as the library defines.
 
 #### Delete precondition
 
-**Context**: The brief asks for the UID and the resourceVersion "where the library asks for them".
+**Context**: The task asks for the UID and the resourceVersion "where the library asks for them".
 **Explored**: `DeleteVerdict.Preconditions()` returns the UID only; its doc says a resourceVersion precondition fails on any status update or finalizer write between the read and the DELETE.
 **Options considered**:
 1. Status quo: no precondition (prune, instance delete).
@@ -145,93 +116,91 @@ With `--create-namespace` and a missing namespace the guard skips the objects in
 #### Read errors and precondition conflicts
 
 **Context**: The library leaves the policy for a failed read to the frontend.
-**Decision**: Fail closed everywhere. Apply: refuse before any write, with the exit code of the read error (4 denied, 3 unavailable, 1 other), the rule cli#332 set. Prune: a failed prune (entry kept, exit 1 after the record write, or the discovery failure's code as cli#342 set). Instance delete and uninstall: a per-resource error (record kept), as today. A DELETE that answers Conflict on the UID precondition is reported as not deleted and handled as a failed delete on each path; the next run reads the new object and judges it.
+**Decision**: Fail closed everywhere. Prune: a failed prune (entry kept, exit 1 after the record write, or the discovery failure's code as cli#342 set). Instance delete and uninstall: a per-resource error (record kept), as today. A DELETE that answers Conflict on the UID precondition is `ErrReplaced`: reported as not deleted and handled as a failed delete on each path; the next run reads the new object and judges it. The Conflict is recognised by the API status reason, not by text (cli#346).
 **Rationale**: Each of these is the outcome the path already has for the nearest existing failure, so no new exit code appears.
 
-#### Operator install
+#### The migration's deletes: refuse, not skip
 
-**Context**: Install applies CRDs itself before the instance apply, proves which earlier-manifest objects it may take (0012:D8:R6) and deletes the earlier Deployment and bindings (0012:D8:R7).
+**Context**: Install deletes the earlier Deployment and the superseded bindings (0012:D8:R7). `CanDelete` can skip one, in practice when its adopt annotation names another instance. 0012:D8:R8 words that case as a skip.
 **Options considered**:
-1. Status quo: guard only without a record; with a record, the instance apply takes over anything.
-2. The guard on every install; admitted objects pass `Admit: true`; migration deletes pass `CanDelete` with `Admit: true` in the check phase, on the object the proof read.
-**Decision**: Option 2. A skip verdict on an object the migration would delete refuses the install in the check phase.
-**Rationale**: 0012:D8:R1 has no exception for an instance with a record. Judging the migration deletes in the check phase keeps "every refusing check runs before the first write". Refusing on a skip, in place of leaving the object, is the safe side: the earlier Deployment must go before the module's Deployment can apply, and an install that cannot remove it cannot complete.
+1. Status quo: delete on the proof alone.
+2. Skip the object and go on.
+3. Refuse the install in the check phase, exit 2, naming the object and its owner.
+**Decision**: Option 3 (owner decision of 2026-10-08: when `opm operator install` meets an object it needs that another instance owns, it refuses with exit 2 before changing anything).
+**Rationale**: The earlier Deployment must go before the module's Deployment can apply, so an install that skips it cannot complete, and would report success on an operator it did not replace. This is the one place where the cli refuses on an object annotated for another instance, and it departs from the letter of 0012:D8:R8; the enhancement needs a revision note for it.
+
+#### The stale set (0012:D7:R1)
+
+**Context**: 0012:D7:R1 binds the end state: the stale set is exactly what the instance recorded and no longer renders.
+**Decision**: The stale set is computed as today (`inventory.StaleSet`) and is not filtered. Ownership is decided per stale object by the verdict; an object the verdict skips is left in the cluster and leaves the record.
+**Rationale**: The requirement's end state holds, and the mechanism is the library's.
 
 #### The dry run
 
-**Context**: Spec `apply-pruning` says a dry run refuses nothing and that its first-install look ends silently on an object a real run would refuse.
-**Options considered**:
-1. Unchanged.
-2. The dry run runs the guard and the delete verdicts and prints "would refuse" and "would leave behind".
-**Decision**: Option 1 in this change.
-**Rationale**: Option 2 is a visible change to dry-run output on its own and fits a follow-up. The gap is real: a dry run can list an apply or a prune that the real run refuses or skips. It is recorded as a question for the owner in the proposal gate report.
+**Decision**: Unchanged in this change. The prune preview reads no stale object for a verdict, so it can list as `would prune` an object the real run leaves behind. `instance delete --dry-run` already runs the per-object check and now shows the library's reasons.
+**Rationale**: A change to dry-run output is a visible change on its own. A follow-up change prints "would leave behind" lines; the migration note states the gap until then.
 
 ### Exit codes and messages
 
-Codes: 0 success, 1 general, 2 validation, 3 connectivity, 4 permission denied, 5 not found. Cases not listed keep their code and their text; that includes every case cli#332, cli#334, cli#338, cli#341, cli#342 and cli#345 settled.
+Codes: 0 success, 1 general, 2 validation, 3 connectivity, 4 permission denied, 5 not found. Cases not listed keep their code and their text; that includes every case cli#332, cli#334, cli#338, cli#341, cli#342, cli#345 and cli#346 settled.
 
 | # | Case | Before | After | Reason |
 | --- | --- | --- | --- | --- |
-| 1 | First apply; a rendered object exists and OPM does not manage it | exit 1; "already exists and is not managed by OPM ... remove or rename it" | exit 1; the library's `foreign-object` message, which names the adopt annotation | Same code. The remedy changes because an override now exists (0012:D8:R3). |
-| 2 | First apply; a rendered object exists, OPM-managed, UUID label of another instance | exit 0; applied over, counted in the cli#333 warning | exit 1; `other-instance` | 0012:D8:R1. The old pass is the takeover the audit confirmed. |
-| 3 | Later apply; an object new to the inventory exists and OPM does not manage it, or it carries another instance's UUID | exit 0; applied over | exit 1; `foreign-object` or `other-instance` | 0012:D8:R1: the guard runs on every apply. |
-| 4 | Later apply; a rendered object is terminating | exit 0; the patch is accepted and the garbage collector then removes the object | exit 1; `terminating`, before any write | 0012:D8:R5. |
-| 5 | Later apply; the read of a rendered object fails with an error other than NotFound | no read was made; the apply went on | exit 4, 3 or 1 by the read error, before any write | The rule of cli#332 for the first install now holds on every apply, because the guard reads on every apply. |
-| 6 | Any apply; an existing object carries the adopt annotation with this instance's UUID | exit 1 on a first apply when OPM does not manage it | exit 0; applied and recorded | 0012:D8:R2. |
-| 7 | Any apply; an object's adopt annotation names another instance (in the inventory, or outside it when OPM manages it) | exit 0; applied over | exit 0; not applied, one warning, not recorded | 0012:D8:R8. No code change. |
-| 8 | Prune; the live stale object is not OPM-managed, carries another instance's UUID, or is adopted elsewhere | exit 0; deleted | exit 0; `left behind`, entry dropped | Audit finding B1; 0012:D4:R1. No code change. |
-| 9 | Prune; the live read fails with an error other than NotFound | no read was made | exit 1 after the record write, entry kept; a discovery failure keeps its code (4 or 3) | The failed-prune rule of cli#332 and cli#342, applied to the new read. |
-| 10 | Prune or delete; the DELETE answers Conflict on the UID precondition | not possible | prune: as row 9; `instance delete` and `operator uninstall`: a per-resource error, record kept, the command's existing failure code | The library's rule: a failed precondition is never reported as deleted. |
-| 11 | `instance delete`, `operator uninstall`; the live object's adopt annotation names another instance | deleted | `left behind`; exit code unchanged | 0012:D8:R8. |
-| 12 | `instance delete`, `operator uninstall`; left-behind reasons | "no longer managed by OPM", "owned by another instance" | the library's messages | One wording for both frontends. No code change. |
-| 13 | `operator install` with a record; a rendered object new to the inventory exists and is foreign | exit 0; applied over | exit 2; guard refusal, nothing written | 0012:D8:R1. Exit 2 is the code install's guard has today. |
-| 14 | `operator install`; a proven earlier Deployment or binding gets a skip verdict (in practice: its adopt annotation names another instance) | deleted | exit 2; migration refusal, nothing written | 0012:D8:R8: no instance deletes an object annotated for another. |
+| 1 | Prune; the live stale object is not OPM-managed, carries a UUID other than the recorded one, or is adopted elsewhere | exit 0; deleted | exit 0; `left behind`, entry dropped | Audit finding B1; 0012:D4:R1, 0012:D8:R8. No code change. |
+| 2 | Prune; the live read fails with an error other than NotFound | no read was made; the delete was tried | exit 1 after the record write, entry kept; a discovery failure keeps its code (4 or 3) | The failed-prune rule of cli#332 and cli#342, applied to the new read. |
+| 3 | Prune; the DELETE answers Conflict on the UID precondition | not possible | as row 2: exit 1, entry kept | The library's rule: a failed precondition is never reported as deleted. |
+| 4 | Prune on the first apply after the module's path changed; stale objects carry the recorded identity | exit 0; deleted | exit 0; deleted | No change: prune judges with the recorded identity. |
+| 5 | `instance delete`, `operator uninstall`; the live object's adopt annotation names another instance | deleted | `left behind`; exit code unchanged (0 when nothing failed) | 0012:D8:R8. |
+| 6 | `instance delete`, `operator uninstall`; left-behind reasons | "no longer managed by OPM", "owned by another instance" | the library's messages | One wording for both frontends. No code change. |
+| 7 | `instance delete`, `operator uninstall`; the DELETE answers Conflict on the UID precondition | not possible | a per-resource error, record kept; `instance delete` exits with the code of `deleteFailureExitCode` (`internal/cmd/instance/delete_exit.go`), as for any failed delete | As row 3. |
+| 8 | `operator install`; a proven earlier Deployment or binding gets a skip verdict (in practice: its adopt annotation names another instance) | deleted | exit 2; migration refusal naming the object and the instance, nothing written | Owner decision of 2026-10-08; 0012:D8:R8: no instance deletes an object annotated for another. |
 
-Example, row 3 (`opm instance apply`, UUID shortened):
-
-```text
-ERRO ConfigMap/default/settings exists and is not managed by OPM; to let this instance take it over, annotate it opmodel.dev/adopt=6f1c...e2
-ERRO apply refused: 1 object(s) belong to someone else
-apply stopped before any change
-```
-
-Example, row 7:
-
-```text
-WARN ConfigMap/default/settings was adopted by module instance 9a40...17; this instance no longer applies it and drops it from its inventory; to take it back, annotate it opmodel.dev/adopt=6f1c...e2
-```
-
-Example, row 8:
+Example, row 1 (`opm instance apply`):
 
 ```text
 WARN ConfigMap/default/old  left behind  reason="ConfigMap/default/old is not managed by OPM; left in place"
 ```
 
-The first line of each ownership message is the library's text and MUST NOT be reworded by the cli. The lines around it are the cli's.
+Example, row 5 (`opm instance delete`, UUID shortened; the closing line that follows counts one resource left behind, as today):
+
+```text
+WARN ClusterRole/viewer  left behind  reason="ClusterRole/viewer is being adopted by module instance 9a40...17, not this one; left in place"
+```
+
+The reason is the library's text and MUST NOT be reworded by the cli. The lines around it are the cli's.
 
 ### Security
 
-- Assets: objects in the cluster that this instance did not create, and their data.
-- Trust boundary: the cluster API. Live labels and annotations are input that any principal with patch rights on the object can set. This is by design: the adopt annotation is an act of someone who may already change the object (0012:D8).
-- Threats and mitigations: taking over a foreign object on apply (the guard on every apply); deleting an object another party recreated under a recorded name (the live read, the verdict and the UID precondition); deciding on a read that failed (every check fails closed). Baseline: the contract of 0012:D8 and the library's verdict tests.
-- The cli decides nothing about ownership itself after this change. Its own policy is limited to read errors, exit codes and output.
-- Residual risk, owner: the cli maintainers. A principal who can patch an object can set the adopt annotation and so hand it to an instance, or take it out of one. The same principal can already edit or delete the object.
-- Refusal messages carry object names and instance UUIDs. Neither is a secret.
+- Assets: objects in the cluster that this instance does not own, and their data.
+- Trust boundary: the cluster API. Live labels and annotations are input that any principal with patch rights on the object can set.
+- Threats and mitigations: deleting an object another party created or recreated under a recorded name (the live read, the verdict and the UID precondition); deciding on a read that failed (every check fails closed). Baseline: the contract of 0012:D8 and the library's verdict tests.
+- The cli decides nothing about delete ownership itself after this change. Its own policy is limited to read errors, exit codes and output.
+- Residual risk, owner: the cli maintainers. Enhancement 0012 records two risks of the adopt annotation (a mistyped UUID, an annotation removed too early) in its `05-risks.md`; the one below is not there yet and belongs beside them. A principal with patch rights on an object, and no delete rights, can set the adopt annotation to another instance's UUID. The object then survives `opm instance delete` and `opm operator uninstall`, and a prune. For a role binding or a network policy that is a grant or a rule that outlives the removal of its instance. On a proven earlier binding it blocks `opm operator install` (row 8).
+- Detection: the object is never left silently. Each is printed as a `left behind` warning that names the instance in the annotation, and the closing line of `instance delete` and `operator uninstall` gives the number left behind. The exit code stays 0, because a left-behind object is the contract's outcome and not a failure.
+- Refusal and left-behind messages carry object names and instance UUIDs. Neither is a secret.
 
 ## Risks / Trade-offs
 
-- [An apply that passed now refuses, for example two instances that have shared an object] -> The message names the annotation that resolves it; a migration note and a docs page say what to do; the refusal comes before any write.
-- [The window between the guard's read and the patch, and between the delete read and the DELETE] -> The UID precondition closes the recreate case on delete. A label or annotation change inside the window is not closed, on either path; the server-side apply has no matching precondition. The operator has the same window. Accepted, and stated in the docs page.
-- [One more GET per rendered object on every apply, one per stale object on prune] -> The first apply and `instance delete` already pay it. `applyOne` reads the object once more for its status line; reusing the guard's read there is allowed and not required.
-- [An instance with no UUID in its render or its record] -> The library then compares no identity inside the inventory and refuses every non-empty UUID outside it. The cli passes what it has and adds no rule.
-- [`operator install` over a record now reads and judges every object] -> The reads already happen in the terminating wait; the guard adds one pass.
-- [The next change replaces the delete loops with `opm/k8s/lifecycle`] -> `JudgedDelete` is the single seam: that change removes it and its two call sites. Outcomes and messages do not change again, because the lifecycle package uses the same verdict and the same precondition.
+- [A failed prune on the apply that follows a module path change] -> The record written by that apply holds the new identity and keeps the failed entries (cli#332). The retry judges them with the new identity, so they are left behind and dropped, with a warning each. The user deletes them by hand. The same holds for a PersistentVolumeClaim kept across a path change and pruned later with `--delete-data`. Both fail on the safe side: nothing is deleted that should stay. Recorded as a question for the owner.
+- [The window between the delete read and the DELETE] -> The UID precondition closes the recreate case. A label or annotation change inside the window is not closed. The operator has the same window. Accepted.
+- [One more GET per stale object on prune] -> `instance delete` already pays it.
+- [Between this change and `guard-every-apply-by-ownership` the annotation is honoured on delete and not on apply] -> Stated in the migration note; both changes are meant for the same beta.
+- [The fake dynamic client does not enforce delete preconditions] -> Unit tests assert the request's precondition and inject the Conflict; the integration script of section 2 checks the real API server's answer.
+- [A later change replaces the delete loops with `opm/k8s/lifecycle`] -> `JudgedDelete` is the single seam: that change removes it and its two call sites. Outcomes and messages do not change again, because the lifecycle package uses the same verdict and the same precondition.
 
 ## Migration Plan
 
-No data migration and no change to the record's shape. The release note says: the guard now runs on every apply; how to adopt an object (`kubectl annotate <kind> <name> opmodel.dev/adopt=<instance uuid>`, the UUID being the value of the instance's `module-instance.opmodel.dev/uuid` label, printed in the refusal); prune and delete leave behind what they do not own. Rollback is a revert of the change; no stored state depends on it.
+No data migration and no change to the record's shape. Rollback is a revert of the change; no stored state depends on it.
+
+Migration note for the PR body and the release:
+
+- Prune now reads each stale object before it deletes it. It leaves in the cluster, and removes from the inventory, an object that OPM does not manage, that belongs to another instance, or whose `opmodel.dev/adopt` annotation names another instance. Each is printed as `left behind` with the reason. Delete it with `kubectl delete` when nothing else needs it.
+- `opm instance delete` and `opm operator uninstall` leave behind an object whose `opmodel.dev/adopt` annotation names another instance. The left-behind reasons have new wording.
+- `opm instance apply --dry-run` does not run this check: it can list a stale object as `would prune` that the real run leaves behind.
+- This release honours the adopt annotation when it deletes and not yet when it applies: an instance whose object is annotated for another instance still re-applies it until the release that carries the apply guard.
+- `opm operator install` refuses, with exit 2 and nothing changed, when the earlier operator Deployment or a superseded role binding is annotated for another instance. Remove the annotation, then run the install again.
 
 ## Open Questions
 
-- Whether the dry run should preview guard refusals and left-behind objects (see "The dry run"). A later change can add it without changing this one.
-- Whether the `--rbac` objects of `opm operator install` come under the guard. They carry no OPM label and belong to no inventory, so every honest answer needs a labelling or recording decision first.
+- Follow-up change: the dry-run prune preview prints "would leave behind" lines.
+- Follow-up after `guard-every-apply-by-ownership`: whether the `--rbac` objects of `opm operator install` come under any ownership rule. They are applied, never deleted by the cli, so this change does not meet them.
