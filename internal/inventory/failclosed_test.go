@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
@@ -42,4 +43,39 @@ func TestPreApplyExistenceCheck_UnreadableObjectRefuses(t *testing.T) {
 
 	absent := &kubernetes.Client{Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())}
 	require.NoError(t, PreApplyExistenceCheck(ctx, absent, []k8sinventory.Entry{entry}, nil), "an absent object passes")
+}
+
+// A prune goes on after a failed delete and reports exactly the entries that
+// are still in the cluster, each with its delete error; a NotFound answer is
+// not a failure.
+func TestPruneStaleResources_ReportsTheEntriesItCouldNotDelete(t *testing.T) {
+	ctx := context.Background()
+	denied := apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "stuck", errors.New("no delete access"))
+	dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(),
+		liveObject("v1", "ConfigMap", "default", "stuck"),
+		liveObject("v1", "ConfigMap", "default", "gone"),
+	)
+	dyn.PrependReactor("delete", "configmaps", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		if action.(k8stesting.DeleteAction).GetName() == "stuck" {
+			return true, nil, denied
+		}
+		return false, nil, nil
+	})
+	client := &kubernetes.Client{Dynamic: dyn}
+
+	stuck := k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "stuck"}
+	gone := k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "gone"}
+	absent := k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "absent"}
+
+	err := PruneStaleResources(ctx, client, []k8sinventory.Entry{stuck, gone, absent})
+
+	var pruneErr *PruneError
+	require.ErrorAs(t, err, &pruneErr)
+	assert.Equal(t, []k8sinventory.Entry{stuck}, pruneErr.Failed, "only the entry whose delete failed is reported")
+	require.Len(t, pruneErr.Errs, 1)
+	assert.Contains(t, pruneErr.Errs[0].Error(), "ConfigMap/stuck")
+	assert.True(t, apierrors.IsForbidden(err), "the delete error stays in the chain")
+
+	_, getErr := client.ResourceClient(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, "default").Get(ctx, "gone", metav1.GetOptions{})
+	assert.True(t, apierrors.IsNotFound(getErr), "the delete after the failed one still ran")
 }

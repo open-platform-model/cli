@@ -12,6 +12,6 @@
 
 ## 3. Failed prune keeps the entry and fails the command
 
-- [ ] 3.1 Add a test in `internal/inventory` that `PruneStaleResources` returns a `PruneError` listing exactly the entries whose delete failed, and a test in `internal/workflow/apply` that `Execute` writes a record holding the current entries plus the failed entry, names the resource in the output, prints no success line and exits 1; see them fail on the current code
-- [ ] 3.2 Add `PruneError` to `internal/inventory/stale.go` and return it from `PruneStaleResources`; in `Execute` keep the failed entries in the written record and return exit 1 after the write; verify the 3.1 tests pass
-- [ ] 3.3 `task lint`, `task test:unit` and `task openspec:check` green, then commit `fix(apply): keep entries a failed prune left behind and exit non-zero`
+- [x] 3.1 Add a test in `internal/inventory` that `PruneStaleResources` returns a `PruneError` listing exactly the entries whose delete failed, and a test in `internal/workflow/apply` that `Execute` writes a record holding the current entries plus the failed entry, names the resource in the output, prints no success line and exits 1; see them fail on the current code
+- [x] 3.2 Add `PruneError` to `internal/inventory/stale.go` and return it from `PruneStaleResources`; in `Execute` keep the failed entries in the written record and return exit 1 after the write; verify the 3.1 tests pass
+- [x] 3.3 `task lint`, `task test:unit` and `task openspec:check` green, then commit `fix(apply): keep entries a failed prune left behind and exit non-zero`

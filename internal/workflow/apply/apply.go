@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -216,12 +217,19 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)), Printed: true}
 		}
 
+		// Entries prune failed to delete are still in the cluster: they stay
+		// in the record, so the next apply finds them stale and retries.
+		recordEntries := currentEntries
+		var notPruned []k8sinventory.Entry
 		if !req.Options.NoPrune {
 			if len(prunable) > 0 {
 				instanceLog.Info(fmt.Sprintf("pruning %d stale resource(s)", len(prunable)))
-				if err := inventory.PruneStaleResources(ctx, req.K8sClient, prunable); err != nil {
-					instanceLog.Warn("pruning stale resources failed", "error", err)
+				var err error
+				notPruned, err = pruneStale(ctx, req.K8sClient, prunable, instanceLog)
+				if err != nil {
+					return err
 				}
+				recordEntries = append(append([]k8sinventory.Entry{}, currentEntries...), notPruned...)
 			}
 			if len(protected) > 0 {
 				instanceLog.Warn(fmt.Sprintf("leaving %d resource(s) behind", len(protected)))
@@ -229,8 +237,14 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			}
 		}
 
-		if err := WriteInstanceRecord(ctx, req, prevRecord, legacy, currentEntries, manifestDigest, instanceLog); err != nil {
+		if err := WriteInstanceRecord(ctx, req, prevRecord, legacy, recordEntries, manifestDigest, instanceLog); err != nil {
 			return err
+		}
+
+		if len(notPruned) > 0 {
+			err := fmt.Errorf("%d stale resource(s) could not be pruned and stay in the inventory; fix the cause and run apply again to retry", len(notPruned))
+			instanceLog.Error(err.Error())
+			return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
 		}
 	}
 
@@ -252,6 +266,30 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 	return nil
 }
+
+// pruneStale deletes the prunable stale resources. It returns the entries it
+// could not delete, each already reported on its own line with the delete
+// error; the caller keeps them in the record and fails the command after the
+// write. The error result is for a failure that names no entries, where the
+// caller must stop before the write so that no entry is dropped unseen.
+func pruneStale(ctx context.Context, client *kubernetes.Client, prunable []k8sinventory.Entry, instanceLog *log.Logger) ([]k8sinventory.Entry, error) {
+	err := inventory.PruneStaleResources(ctx, client, prunable)
+	if err == nil {
+		return nil, nil
+	}
+	var pruneErr *inventory.PruneError
+	if !errors.As(err, &pruneErr) {
+		instanceLog.Error("pruning stale resources failed", "error", err)
+		return nil, &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
+	}
+	for i, e := range pruneErr.Failed {
+		instanceLog.Error(output.FormatResourceLine(e.Kind, e.Namespace, e.Name, statusPruneFailed), "error", pruneErr.Errs[i])
+	}
+	return pruneErr.Failed, nil
+}
+
+// statusPruneFailed is the status of a stale resource whose delete failed.
+const statusPruneFailed = "prune failed"
 
 // previewPrune reports what a real apply would do with the stale set, without
 // deleting anything: the prunable half under "would prune", then the protected
