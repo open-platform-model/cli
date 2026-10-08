@@ -1,6 +1,6 @@
 ---
 title: "Adopt an existing object"
-description: "opm instance apply, opm module apply and opm operator install refuse to apply over an object that another owner holds: what each refusal means, how to adopt an object with the opmodel.dev/adopt annotation, how to hand an object from one instance to another, and what a dry run does not show."
+description: "opm instance apply, opm module apply and opm operator install refuse to apply over an object that another owner holds: what each refusal means, how to adopt an object with the opmodel.dev/adopt annotation, how to hand an object from one instance to another, and what a dry run shows."
 type: how-to
 weight: 30
 ---
@@ -10,7 +10,7 @@ For an instance that the CLI manages, every apply checks every object it renders
 > [!WARNING]
 > **The check changed after `v1.0.0-beta.10`**
 >
-> Releases up to `v1.0.0-beta.10` ran this check only on the first apply of an instance, and let the apply take over any object that carried OPM labels, whichever instance owned it. Later releases run the check on every apply. An apply that took over an existing object before can now exit 1, and `opm operator install` can exit 2. Nothing is changed in the cluster when that happens. No flag turns the check off.
+> Releases up to `v1.0.0-beta.10` ran this check only on the first apply of an instance, and let the apply take over any object that carried OPM labels, whichever instance owned it. Later releases run the check on every apply, and on every dry run of an apply. An apply that took over an existing object before can now exit 1, and `opm operator install` can exit 2. A dry run of such an apply exits 1 too, where it exited 0 before: see "What a dry run shows". Nothing is changed in the cluster when that happens. No flag turns the check off.
 
 ## The message
 
@@ -85,9 +85,36 @@ Three cases refuse objects that the instance wrote itself.
 - **An instance with no record whose identity changed.** The UUID of an instance comes from its module path, its name and its namespace. If the `ModuleInstance` of the instance was deleted, or `opm` `v1.0.0-alpha.1` or older recorded the instance in a Secret, and one of the three changed since, then every object is refused as `belongs to module instance`. The refusal adds a line that says so. Annotate each object as shown. You do not have to remove anything first.
 - **An object of the instance that is being deleted.** See "The object is being deleted" above.
 
-## What a dry run does not show
+## What a dry run shows
 
-`--dry-run` refuses nothing because of this check, and prints none of the lines above. A dry run can succeed where the real run refuses. The real run refuses before it changes anything, so it is safe to run it to find out.
+`opm instance apply --dry-run` and `opm module apply --dry-run` run the same check as the real apply and change nothing. A dry run prints one line for each object that the real apply does not apply:
+
+```text
+ERRO r:ConfigMap/default/settings   ! would refuse reason="ConfigMap/default/settings exists and is not managed by OPM; to let this instance take it over, annotate it opmodel.dev/adopt=6f1c0a52-8d1e-5c1b-9a61-0d4c6c2f7be2"
+WARN r:ConfigMap/default/shared     ! would skip reason="ConfigMap/default/shared was adopted by module instance 9a40c1de-52f0-5b0e-8c11-4f2a9f3d1e17; this instance no longer applies it and drops it from its inventory; to take it back, annotate it opmodel.dev/adopt=6f1c0a52-8d1e-5c1b-9a61-0d4c6c2f7be2"
+```
+
+| Line | Meaning | Exit code of the dry run |
+| --- | --- | --- |
+| `would refuse` | The real apply refuses this object. The reason is the message of the table above. | 1 |
+| `would skip` | Another instance adopted the object. The real apply does not apply it and goes on. | 0 |
+
+When a dry run prints a `would refuse` line, it stops as the real apply does. It does not send the other objects to the API server, and it exits 1. A dry run that cannot read an object exits by the read error: 4, 3 or 1. A script can thus use the exit code of the dry run to find out if the apply is refused.
+
+The dry run also shows what the apply does with objects that the module no longer renders:
+
+| Line | Meaning | Exit code of the dry run |
+| --- | --- | --- |
+| `would prune` | The real apply deletes the object. | 0 |
+| `would keep` | The object is not managed by OPM, or it belongs to another instance. The real apply leaves it in the cluster and removes it from the inventory. | 0 |
+| `would let go` | Another instance is adopting the object. The real apply leaves it in the cluster and removes it from the inventory. | 0 |
+| `cannot check` | The dry run could not read the object, so the real apply cannot delete it. | 4 when a discovery request was denied, 3 when it was unavailable, 1 otherwise |
+
+An object that is already gone has no line. The cluster can change between the dry run and the apply, and the apply checks again.
+
+When another instance adopted every object that the module renders, the apply has nothing to apply. It prints `nothing applied: all <n> rendered resource(s) are adopted by another instance`, writes the inventory without them and exits 0. The dry run prints `nothing would be applied` with the same reason.
+
+`opm operator install` has no `--dry-run` flag.
 
 ## What the check does not cover
 

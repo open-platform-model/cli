@@ -13,5 +13,5 @@
 
 ## 3. Docs
 
-- [ ] 3.1 Rewrite the section "What a dry run does not show" of `docs/site/diagnostics/adopt-an-existing-object.md` as "What a dry run shows", with the status words and exit codes, and correct the page description; verify with `task docs:bundle:check`.
-- [ ] 3.2 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit`, `task cascade:wiring:check` green, then commit `docs(apply): say what a dry run shows of the ownership check`.
+- [x] 3.1 Rewrite the section "What a dry run does not show" of `docs/site/diagnostics/adopt-an-existing-object.md` as "What a dry run shows", with the status words and exit codes, and correct the page description; verify with `task docs:bundle:check`.
+- [x] 3.2 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit`, `task cascade:wiring:check` green, then commit `docs(apply): say what a dry run shows of the ownership check`.
