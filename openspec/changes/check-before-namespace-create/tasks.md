@@ -8,7 +8,7 @@
 
 ## 2. Install-level test for an unreadable object
 
-- [ ] 2.1 Add `internal/operator/unreadable_test.go`: `PlanInstall` refuses an object whose read is denied, at each of its three reads, with the error type of that read and no write; `go test ./internal/operator` passes
-- [ ] 2.2 Add the rows to `TestInstallErrorMapping` in `internal/cmd/operator/operator_test.go` that map those error shapes to their exit codes (a `GuardError` wrapping a Forbidden read: 2)
-- [ ] 2.3 Update the comment on `GuardError` in `internal/operator/plan_install.go` to name the unreadable and terminating cases and its exit code
-- [ ] 2.4 `task lint`, `task test:unit`, `task docs:bundle:check` and `task cascade:wiring:check` green, then commit test(operator): show that install refuses an object it cannot read
+- [x] 2.1 Add `internal/operator/unreadable_test.go`: `PlanInstall` refuses an object whose read is denied, at each of its three reads, with the error type of that read and no write; `go test ./internal/operator` passes
+- [x] 2.2 Add the rows to `TestInstallErrorMapping` in `internal/cmd/operator/operator_test.go` that map those error shapes to their exit codes (a `GuardError` wrapping a Forbidden read: 2)
+- [x] 2.3 Update the comment on `GuardError` in `internal/operator/plan_install.go` to name the unreadable and terminating cases and its exit code
+- [x] 2.4 `task lint`, `task test:unit`, `task docs:bundle:check` and `task cascade:wiring:check` green, then commit test(operator): show that install refuses an object it cannot read

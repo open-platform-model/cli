@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -236,6 +237,7 @@ func TestRunOperatorInstall_UnreachableRegistry(t *testing.T) {
 }
 
 func TestInstallErrorMapping(t *testing.T) {
+	unreadable := apierrors.NewForbidden(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "x", errors.New("no get"))
 	cases := []struct {
 		err  error
 		code int
@@ -243,6 +245,11 @@ func TestInstallErrorMapping(t *testing.T) {
 		{&oplib.TargetError{ModuleVersion: "v0.4.0", Rule: "newer"}, opmexit.ExitValidationError},
 		{&oplib.VersionError{ModuleVersion: "v0.4.0", Reason: "none"}, opmexit.ExitValidationError},
 		{&oplib.GuardError{Err: errors.New("exists")}, opmexit.ExitValidationError},
+		// An object install cannot read. The guard's refusal keeps its code
+		// whatever API error it wraps; the same read failing in an earlier
+		// check exits by the API error.
+		{&oplib.GuardError{Err: fmt.Errorf("cannot check whether ClusterRole/x already exists: %w", unreadable)}, opmexit.ExitValidationError},
+		{fmt.Errorf("checking ClusterRole/x before apply: %w", unreadable), opmexit.ExitPermissionDenied},
 		{&oplib.OwnedRecordError{}, opmexit.ExitValidationError},
 		{&modref.RefusalError{Refusal: publish.Refusal{Headline: "no such version"}}, opmexit.ExitValidationError},
 		{&publish.ConnectivityError{Op: "listing", Err: errors.New("refused")}, opmexit.ExitConnectivityError},

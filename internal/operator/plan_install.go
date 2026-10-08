@@ -162,8 +162,12 @@ func (e *RecordedValuesError) Error() string {
 
 func (e *RecordedValuesError) Unwrap() error { return e.Err }
 
-// GuardError is the apply guard's refusal: an object the render names
-// already exists and is not OPM's.
+// GuardError is the apply guard's refusal: an object the plan applies
+// already exists and is not OPM's, is terminating, or could not be read by
+// the guard (the read error is then in the chain). The install command exits
+// 2 on every GuardError, whatever it wraps. An object that is unreadable
+// before the guard runs is refused earlier, by the terminating wait or the
+// migration proof, with the exit code of the read error.
 type GuardError struct{ Err error }
 
 func (e *GuardError) Error() string { return e.Err.Error() }
