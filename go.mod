@@ -11,7 +11,7 @@ require (
 	github.com/gonvenience/ytbx v1.5.0
 	github.com/homeport/dyff v1.12.0
 	github.com/open-platform-model/docs-kit/cobradump v0.1.0
-	github.com/open-platform-model/library v1.0.0-beta.7
+	github.com/open-platform-model/library v1.0.0-beta.8
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/mod v0.41.0
