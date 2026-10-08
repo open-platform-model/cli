@@ -1,7 +1,9 @@
 package operator
 
 import (
+	"bytes"
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/version"
 )
 
@@ -102,10 +105,16 @@ func TestInstall_FreshCluster(t *testing.T) {
 	fastPolling(t)
 	fc := newFakeCluster(t)
 
+	var logBuf bytes.Buffer
+	output.SetLogWriter(&logBuf)
+	t.Cleanup(func() { output.SetLogWriter(os.Stderr) })
+
 	result, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, 4, result.CRDs)
 	assert.True(t, result.Recorded)
+	assert.NotContains(t, logBuf.String(), "already exist and are managed by OPM",
+		"install applies the CRDs itself first: a fresh install is not warned about them")
 
 	writes := fc.Writes()
 	require.GreaterOrEqual(t, len(writes), 4)

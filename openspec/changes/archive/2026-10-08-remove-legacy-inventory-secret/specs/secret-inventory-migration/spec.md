@@ -1,8 +1,26 @@
-## Purpose
+## REMOVED Requirements
 
-What the CLI does with the inventory Secret that opm releases up to v1.0.0-alpha.1 wrote: nothing. The migration onto the `ModuleInstance` CR (0006:D8/D14) was removed before v1.0.0; v1.0.0-beta.10 is the last release that performs it. The capability keeps its name for history.
+### Requirement: Migration triggers on apply when a Secret exists and no CR does
 
-## Requirements
+**Reason**: The legacy inventory Secret path is removed before v1.0.0. Apply no longer reads a Secret.
+**Migration**: Apply the instance once with opm v1.0.0-beta.10, the last release that migrates, then upgrade.
+
+### Requirement: Record port mapping
+
+**Reason**: Nothing is ported any more; the path is removed.
+**Migration**: Apply the instance once with opm v1.0.0-beta.10, which ports the record, then upgrade.
+
+### Requirement: Secret is deleted only after the CR status write succeeds
+
+**Reason**: Apply no longer deletes a legacy inventory Secret.
+**Migration**: A Secret that is still in the cluster after the upgrade is deleted by hand with `kubectl delete secret`.
+
+### Requirement: No Secret reads outside migration
+
+**Reason**: Replaced by "No command reads a legacy inventory Secret", which covers apply too.
+**Migration**: None.
+
+## ADDED Requirements
 
 ### Requirement: No command reads a legacy inventory Secret
 

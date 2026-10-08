@@ -21,7 +21,7 @@ type Inventory struct {
 }
 
 // Record is the CLI's view of an instance's persisted inventory, backed by the
-// ModuleInstance CR. It replaces the Secret-era InstanceInventoryRecord: the
+// ModuleInstance CR: the
 // instance identity lives in metadata, module identity in spec.module, the UUID
 // in status.instanceUUID, and ownership in spec.owner.
 type Record struct {

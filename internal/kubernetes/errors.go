@@ -38,7 +38,7 @@ func IsNoResourcesFound(err error) bool {
 	return errors.Is(err, errNoResourcesFound)
 }
 
-// InstanceNotFoundError is returned when no inventory Secret exists for the
+// InstanceNotFoundError is returned when no ModuleInstance record exists for the
 // given instance name/namespace. It is used by commands that require an
 // inventory to operate (status, delete).
 type InstanceNotFoundError struct {

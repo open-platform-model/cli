@@ -3,7 +3,7 @@
 // Integration test for the inventory-aware apply flow (RFC-0001).
 //
 // Tests covered:
-//   - 5.10: First-time apply creates an inventory Secret with correct entries
+//   - 5.10: First-time apply creates a ModuleInstance record with correct entries
 //   - 5.11: Idempotent re-apply produces the same change ID and empty stale set
 //   - 5.8:  Rename scenario — old resources pruned, new applied
 //   - 5.9:  Partial apply failure — no prune, no inventory write
@@ -34,7 +34,7 @@ const (
 	clusterContext = "kind-opm-dev"
 	instanceName   = "opm-inv-apply-test"
 	namespace      = "default"
-	// Fixed instance UUID for deterministic inventory Secret naming.
+	// Fixed instance UUID for deterministic instance identity.
 	instanceID = "a1b2c3d4-1111-2222-3333-aabbccddeeff"
 
 	modulePath    = "opmodel.dev/modules/opm_inv_apply_test@v0"
@@ -61,7 +61,7 @@ func main() {
 	cleanup(ctx, client)
 
 	// ----------------------------------------------------------------
-	// Scenario 5.10: First-time apply creates inventory Secret
+	// Scenario 5.10: First-time apply creates the ModuleInstance record
 	// ----------------------------------------------------------------
 	step(1, "5.10: First-time apply — inventory created")
 

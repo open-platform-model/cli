@@ -109,7 +109,6 @@ tasks:
       - go run tests/integration/inst-list/main.go
       - go run tests/integration/inst-tree/main.go
       - go run tests/integration/module-apply/main.go
-      - go run tests/integration/migration/main.go
       - go run tests/integration/gates/main.go
       - go run tests/integration/ssa-ownership/main.go
       - go run tests/integration/platform-build/main.go

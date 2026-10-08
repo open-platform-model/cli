@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -152,4 +153,27 @@ func TestPruneStaleResources_DeletesInDescendingWeightOrder(t *testing.T) {
 		}
 	}
 	assert.Equal(t, []string{"deploy", "svc", "cm-1", "cm-2"}, deleted)
+}
+
+// FirstInstallCheck reports the entries that already exist under OPM
+// management, in entry order: an absent object and an admitted foreign
+// object are not among them.
+func TestFirstInstallCheck_ReportsManagedObjects(t *testing.T) {
+	cli := liveObject("v1", "ConfigMap", "default", "by-cli")
+	cli.SetLabels(map[string]string{opmlabels.ManagedBy: opmlabels.ManagedByCLI})
+	old := liveObject("v1", "ConfigMap", "default", "by-old-opm")
+	old.SetLabels(map[string]string{opmlabels.ManagedBy: opmlabels.ManagedByLegacy})
+	admitted := liveObject("v1", "ConfigMap", "default", "admitted")
+	client := &kubernetes.Client{Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), cli, old, admitted)}
+
+	entry := func(name string) k8sinventory.Entry {
+		return k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: name}
+	}
+	admit := AdmitSet{{Kind: "ConfigMap", Namespace: "default", Name: "admitted"}: {}}
+
+	managed, err := FirstInstallCheck(context.Background(), client,
+		[]k8sinventory.Entry{entry("by-cli"), entry("absent"), entry("admitted"), entry("by-old-opm")}, admit)
+
+	require.NoError(t, err)
+	assert.Equal(t, []k8sinventory.Entry{entry("by-cli"), entry("by-old-opm")}, managed)
 }
