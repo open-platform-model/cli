@@ -85,12 +85,28 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v2.11.4
+          # The one place that names the linter version; the committed schema
+          # and the check in the next step follow it.
+          version-file: .golangci-lint-version
+          # The action's own configuration check downloads the JSON schema
+          # from golangci-lint.run on every run; the next step runs the same
+          # check from the schema committed in this repository.
+          verify: false
           args: --timeout=5m
           # A run restored whole from the action's cache has reported
           # //nolint:staticcheck directives as unused (nolintlint) that a full
           # analysis of the same commit uses, so lint runs uncached.
           skip-cache: true
+      - name: Verify the linter configuration (offline)
+        # golangci-lint config verify against .github/golangci-lint/, with no
+        # network; it also keeps the version file, the schema and this
+        # workflow's use of the action in step. After the action, which puts
+        # golangci-lint on PATH. Local: task lint:config.
+        run: bash .github/scripts/lint-config-check.sh
+      - name: Linter configuration check scenarios (offline)
+        # Every refusal of the step above, against copies of this tree.
+        # Local: task lint:config:test.
+        run: bash .github/scripts/lint-config-check-test.sh
 
   unit:
     name: Unit Tests

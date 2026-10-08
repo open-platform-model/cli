@@ -374,9 +374,20 @@ tasks:
   ## Code quality tasks
   #########################
   lint:
-    desc: Run linters
+    desc: Check the linter configuration (offline), then run linters
     cmds:
+      - task: lint:config
       - golangci-lint run ./...
+
+  lint:config:
+    desc: Verify .golangci.yml against the committed schema, and that .golangci-lint-version, the schema and the workflows agree (offline)
+    cmds:
+      - bash .github/scripts/lint-config-check.sh
+
+  lint:config:test:
+    desc: Scenario test of the linter configuration check (offline)
+    cmds:
+      - bash .github/scripts/lint-config-check-test.sh
 
   lint:fix:
     desc: Run linters and fix issues

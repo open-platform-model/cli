@@ -33,7 +33,7 @@ The PR workflow SHALL set `OPM_REGISTRY` and `CUE_REGISTRY` as workflow-level en
 - **THEN** the fixture resolves from the job-local registry seeded from the tree, and core and the catalogs resolve from GHCR
 
 ### Requirement: Lint and unit mirror the push workflow
-The `lint` job SHALL run golangci-lint v2.11.3 and the `unit` job SHALL run `go test ./internal/...`, both on Go 1.26.0, exactly as the push-triggered CI workflow does.
+The `lint` job SHALL run golangci-lint at the version the file `.golangci-lint-version` names and the `unit` job SHALL run `go test ./internal/...`, both on Go 1.26.0, exactly as the push-triggered CI workflow does.
 
 #### Scenario: Lint violation fails the PR
 - **WHEN** the pull request introduces a lint violation
