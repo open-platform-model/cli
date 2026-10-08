@@ -27,7 +27,7 @@
 
 ## 5. Guard and records
 
-- [ ] 5.1 Add the guard test of `design.md` D4 with the allowlist (`internal/cuemod/tidy.go` `classify`, `internal/publish/identity.go` `conformIdentity`, `pkg/errors/grouped_errors.go` `groupCUEErrors`, `internal/workflow/render/validation.go` `printValidationError`), each with its reason. Verify: it passes, and it fails when a `strings.Contains(err.Error(), "x")` is added to a scratch non-test file (remove the file after).
-- [ ] 5.2 Update the comment block at the top of `internal/cuemod/connectivity.go` and the `internal/publish` and `internal/config` lines of `AGENTS.md` where they describe a text match that is gone. Verify: `grep -rn 'message-text match\|text match left' internal cmd pkg AGENTS.md` shows only the allowlisted sites.
-- [ ] 5.3 Run `task openspec:check` and the three touched packages whole (`go test ./internal/publish/ ./internal/config/ ./internal/cuemod/`). Verify: both pass.
-- [ ] 5.4 `task lint` and `task test` green, then commit `test(errors): refuse a new error-text match outside the named exceptions`
+- [x] 5.1 Add the guard test of `design.md` D4 with the allowlist (`internal/cuemod/tidy.go` `classify`, `internal/publish/identity.go` `conformIdentity`, `pkg/errors/grouped_errors.go` `groupCUEErrors`, `internal/workflow/render/validation.go` `printValidationError`), each with its reason. Verify: it passes, and it fails when a `strings.Contains(err.Error(), "x")` is added to a scratch non-test file (remove the file after).
+- [x] 5.2 Update the comment block at the top of `internal/cuemod/connectivity.go` and the `internal/publish` and `internal/config` lines of `AGENTS.md` where they describe a text match that is gone. Verify: `grep -rn 'message-text match\|text match left' internal cmd pkg AGENTS.md` shows only the allowlisted sites.
+- [x] 5.3 Run `task openspec:check` and the three touched packages whole (`go test ./internal/publish/ ./internal/config/ ./internal/cuemod/`). Verify: both pass.
+- [x] 5.4 `task lint` and `task test` green, then commit `test(errors): refuse a new error-text match outside the named exceptions`

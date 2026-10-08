@@ -1,4 +1,6 @@
+# The cli half of 0021:D8:R12 only (the library half shipped in library#218).
+# The schema names whole decisions, and this change does not complete D8, so
+# no decision is claimed here.
 implements:
   - enhancement: "0021"
-    decisions: [D8]
     resolves: []
