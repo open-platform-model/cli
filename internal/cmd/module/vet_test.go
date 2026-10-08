@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -322,4 +324,50 @@ func TestModVet_OnlyCUERegistryIsConfigured(t *testing.T) {
 	assert.Equal(t, opmexit.ExitConnectivityError, exitErr.Code, "%v", err)
 	assert.NotContains(t, err.Error(), "no registry is configured")
 	assert.Contains(t, err.Error(), "loading core schema: ")
+}
+
+// The core schema fetch is classified as publish classifies it: only no
+// response is unreachable, another failure answer is a failed registry
+// operation, and a refused credential exits 4 and points to the login.
+func TestModVet_SchemaFetchFailureIsNamed(t *testing.T) {
+	fixtureDir := filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "simple-module")
+	for _, tc := range []struct {
+		name     string
+		registry func(t *testing.T) string
+		want     string
+		code     int
+		login    bool
+	}{
+		{"refused connection", func(*testing.T) string { return cuemodtest.UnreachableRegistry }, "registry unreachable: loading core schema: ", opmexit.ExitConnectivityError, false},
+		{"401", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusUnauthorized) }, "registry refused the credentials (authentication or permission): loading core schema: ", opmexit.ExitPermissionDenied, true},
+		// Known gap, pinned: CUE's registry client reports a 403 answer to
+		// the schema's tag lookup as "not found", so the refusal never
+		// reaches the classification and the fetch reads as a failed
+		// registry operation. The same holds for publish.
+		{"403", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusForbidden) }, "registry operation failed: loading core schema: ", opmexit.ExitConnectivityError, false},
+		{"503", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusServiceUnavailable) }, "registry operation failed: loading core schema: ", opmexit.ExitConnectivityError, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cuemodtest.ColdCache(t)
+			registry := tc.registry(t)
+
+			cmd := NewModuleVetCmd(&config.GlobalConfig{Registry: registry})
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			cmd.SetArgs([]string{fixtureDir})
+			err := cmd.Execute()
+
+			var exitErr *opmexit.ExitError
+			require.ErrorAs(t, err, &exitErr)
+			assert.Equal(t, tc.code, exitErr.Code, "%v", err)
+			assert.Contains(t, err.Error(), tc.want)
+			assert.Equal(t, tc.login, strings.HasSuffix(err.Error(), "opm registry login "+registry), "%v", err)
+		})
+	}
+}
+
+func TestNewModuleVetCmd_HelpStatesTheExitCodes(t *testing.T) {
+	long := NewModuleVetCmd(&config.GlobalConfig{}).Long
+	assert.Contains(t, long, "Exit codes: 0 valid, 1 usage error")
+	assert.Contains(t, long, "4 the registry refused the credentials.")
 }

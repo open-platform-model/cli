@@ -44,6 +44,11 @@ module's own cue.mod/module.cue, one registry entry per catalog the module
 pins, at the pinned version; the cluster is not read. Pass --platform <dir>
 to render against a platform module instead.
 
+Exit codes: 0 valid, 1 usage error or the platform could not be generated
+or acquired, 2 validation failure, render refusal or no registry
+configured, 3 the core schema fetch failed (registry unreachable, or
+another registry error), 4 the registry refused the credentials.
+
 Arguments:
   path    Path to module directory (default: current directory)
 
@@ -246,15 +251,9 @@ func identitySchemaForVet(cfg *config.GlobalConfig) (*kernel.Kernel, cue.Value, 
 	k := config.NewKernel(cfg.Registry)
 	schemaVal, err := k.SchemaCache().Get()
 	if err != nil {
-		if noReg := cmdutil.NoRegistryError(cfg, "loading core schema", err); noReg != nil {
-			return nil, cue.Value{}, noReg
-		}
-		// A registry round-trip, same failure class as publish's lookup and
-		// push: connectivity (exit 3), not a verdict on the module.
-		return nil, cue.Value{}, &opmexit.ExitError{
-			Code: opmexit.ExitConnectivityError,
-			Err:  fmt.Errorf("loading core schema: %w", err),
-		}
+		// A registry round-trip, classified as publish classifies it: not a
+		// verdict on the module.
+		return nil, cue.Value{}, cmdutil.CoreSchemaError(cfg, err)
 	}
 	identitySchema := schemaVal.LookupPath(cue.MakePath(cue.Def("IdentityPackage")))
 	if !identitySchema.Exists() {
