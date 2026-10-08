@@ -10,6 +10,8 @@ import (
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+	"github.com/open-platform-model/library/opm/k8s/lifecycle"
 )
 
 // DeleteDataOperatorManagedNote is the warning every command prints when
@@ -65,8 +67,9 @@ func (e *RecordDeleteError) Unwrap() error { return e.Err }
 // descending resource-weight order, leaving CRDs, Namespaces and any object
 // that no longer carries the instance's identity behind, and keeping
 // PersistentVolumeClaims unless req.DeleteData, then deletes the
-// ModuleInstance record last: only on a real run with no per-object error,
-// so a re-run can retry what failed. An object discovery could not read
+// ModuleInstance record last: only on a real run whose deletion plan
+// releases the hold (lifecycle.MayReleaseHold), which no per-object error
+// allows, so a re-run can retry what failed. An object discovery could not read
 // (req.Unreadable) is such an error. Already absent objects count as
 // deleted. A record delete that fails is returned as a *RecordDeleteError
 // and is not logged here: the caller reports it and must not report success.
@@ -77,8 +80,10 @@ func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteR
 	instanceLog.Info(fmt.Sprintf("deleting resources in namespace %q", req.Namespace))
 
 	uuid := ""
+	var entries []k8sinventory.Entry
 	if req.Record != nil {
 		uuid = req.Record.InstanceUUID
+		entries = req.Record.Inventory.Entries
 	}
 	deleteResult, err := kubernetes.Delete(ctx, req.Client, kubernetes.DeleteOptions{
 		InstanceName:          req.InstanceName,
@@ -87,6 +92,7 @@ func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteR
 		InstanceUUID:          uuid,
 		DryRun:                req.DryRun,
 		DeleteData:            req.DeleteData,
+		Entries:               entries,
 		InventoryLive:         req.Live,
 		InventoryRecordExists: req.Record != nil,
 		Unreadable:            req.Unreadable,
@@ -112,10 +118,12 @@ func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteR
 		}
 	}
 
-	// Delete the ModuleInstance CR last — only after every tracked workload
-	// resource is gone (0006:D1). Skipped on dry-run and on partial
-	// failure (so a re-run can retry the remaining workloads).
-	if !req.DryRun && req.Record != nil && len(deleteResult.Errors) == 0 {
+	// Delete the ModuleInstance CR last (0006:D1), and only when the
+	// deletion plan's hold verdict releases it: every planned object was
+	// deleted or left in place. A failed object holds it, so a re-run can
+	// retry. Skipped on a dry run.
+	release := lifecycle.MayReleaseHold(deleteResult.Run.Plan, deleteResult.Run.State, lifecycle.HoldInput{}).Release
+	if !req.DryRun && req.Record != nil && release {
 		if err := inventory.DeleteCR(ctx, req.Client, req.Record.Name, req.Record.Namespace); err != nil {
 			return nil, &RecordDeleteError{Namespace: req.Record.Namespace, Name: req.Record.Name, Err: err}
 		}
