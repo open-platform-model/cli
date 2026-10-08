@@ -232,6 +232,7 @@ func TestExecute_UnreadableRecordStopsTheApply(t *testing.T) {
 				requireExitCode(t, err, cause.code)
 				assert.Contains(t, err.Error(), `"demo"`, "the error names the instance")
 				assert.Contains(t, err.Error(), `"default"`, "the error names the namespace")
+				assert.Contains(t, err.Error(), "apply stopped before any change")
 				assert.ErrorIs(t, err, cause.err, "the cause stays in the chain")
 				assert.Empty(t, cluster.writes(), "nothing is applied and no record is written")
 				assert.NotContains(t, logBuf.String(), "dry run complete", "no preview is printed without the record")

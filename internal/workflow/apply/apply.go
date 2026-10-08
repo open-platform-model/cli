@@ -67,6 +67,12 @@ type Options struct {
 	// the render's CRDs itself before this workflow runs, so a fresh install
 	// always finds them.
 	WarnUnrecorded bool
+
+	// AfterCallerWrites says that the caller wrote to the cluster in the same
+	// command before this workflow runs, so a refusal here cannot say that
+	// nothing was changed. Only `opm operator install` sets it: it applies
+	// the render's CRDs and its migration first.
+	AfterCallerWrites bool
 }
 
 type Request struct {
@@ -88,12 +94,18 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	instanceID := result.Instance.UUID
 	dryRun := req.Options.DryRun
 
-	wouldCreateNS, err := EnsureNamespaceIfRequested(ctx, req.K8sClient, namespace, req.Options.CreateNS, dryRun, instanceLog)
+	// --create-namespace only reads here. The namespace is created after the
+	// last check that can refuse the apply, so that a refusal has changed
+	// nothing. A missing namespace holds no record and no resource, so the
+	// checks below send no read into it: the API would answer such a read
+	// with Forbidden, not NotFound, for a caller whose rights come from a
+	// RoleBinding the namespace does not have yet.
+	createNamespace, err := namespaceToCreate(ctx, req.K8sClient, namespace, req.Options.CreateNS, dryRun, instanceLog)
 	if err != nil {
 		return err
 	}
 	var newNamespaces []string
-	if wouldCreateNS {
+	if createNamespace && dryRun {
 		newNamespaces = []string{namespace}
 	}
 
@@ -117,10 +129,11 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	// below would see an absent CR and preview the CLI-executor path, promising
 	// resource applies that an operator-owned instance would never receive.
 	// --dry-run is server-side, so the client is connected and this read is safe.
-	if dryRun && instanceID != "" {
+	nothingChanged := !req.Options.AfterCallerWrites
+	if dryRun && instanceID != "" && !createNamespace {
 		rec, err := inventory.GetRecord(ctx, req.K8sClient, name, namespace)
 		if err != nil {
-			return unreadableRecordError(name, namespace, err)
+			return unreadableRecordError(name, namespace, err, nothingChanged)
 		}
 		if inventory.ResolveOwnership(rec) == inventory.ModeOperatorOwned {
 			return previewThinEditor(req, rec)
@@ -129,9 +142,12 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 	// Load the previous inventory from the CR. The read is read-only, so a
 	// dry-run loads it too and can report what a real apply would prune.
-	prevRecord, err := LoadPreviousInventory(ctx, req.K8sClient, name, namespace, instanceID)
-	if err != nil {
-		return unreadableRecordError(name, namespace, err)
+	var prevRecord *inventory.Record
+	if !createNamespace {
+		prevRecord, err = LoadPreviousInventory(ctx, req.K8sClient, name, namespace, instanceID)
+		if err != nil {
+			return unreadableRecordError(name, namespace, err, nothingChanged)
+		}
 	}
 
 	// Gate 4: ownership — the single branch point (0006:D18). An operator-owned
@@ -159,21 +175,33 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		return err
 	}
 	if len(result.Resources) == 0 && len(prevEntries) == 0 {
-		return nil
+		// Nothing to apply and nothing left that can refuse: the namespace
+		// the flag asks for is still created.
+		return ensureNamespace(ctx, req.K8sClient, namespace, createNamespace && !dryRun, instanceLog)
 	}
 
 	// Gate 6: existence check, first-ever apply only (no previous inventory).
-	alreadyManaged, err := RunPreApplyExistenceCheck(ctx, req.K8sClient, prevRecord != nil, dryRun, currentEntries, req.Admit)
+	// Objects in a namespace this apply creates cannot exist yet.
+	checkEntries := currentEntries
+	if createNamespace {
+		checkEntries = entriesOutside(currentEntries, namespace)
+	}
+	alreadyManaged, err := RunPreApplyExistenceCheck(ctx, req.K8sClient, prevRecord != nil, dryRun, checkEntries, req.Admit, nothingChanged)
 	if err != nil {
 		return err
 	}
 	if req.Options.WarnUnrecorded {
 		if dryRun && prevRecord == nil {
-			alreadyManaged = previewAlreadyManaged(ctx, req.K8sClient, currentEntries)
+			alreadyManaged = previewAlreadyManaged(ctx, req.K8sClient, checkEntries)
 		}
 		if len(alreadyManaged) > 0 {
 			instanceLog.Warn(unrecordedResourcesWarning(len(alreadyManaged), len(currentEntries), name, instanceID, dryRun))
 		}
+	}
+
+	// The first write of the apply: every check that can refuse has passed.
+	if err := ensureNamespace(ctx, req.K8sClient, namespace, createNamespace && !dryRun, instanceLog); err != nil {
+		return err
 	}
 
 	if dryRun {
@@ -347,28 +375,59 @@ func RunClusterGates(ctx context.Context, client *kubernetes.Client, skipCeiling
 	return inventory.GateOperatorVersionCeiling(ctx, client, version.Version)
 }
 
-// EnsureNamespaceIfRequested creates the instance namespace when createNS is
-// set and it is missing. On a dry run it creates nothing and reports
-// wouldCreate: the namespace is missing, so the objects in it cannot be
-// validated by the server.
-func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Client, namespace string, createNS, dryRun bool, instanceLog *log.Logger) (wouldCreate bool, err error) {
+// namespaceToCreate reports whether --create-namespace has a namespace to
+// create: createNS is set and the instance namespace is missing. It only
+// reads. A dry run says here that the namespace would be created: the objects
+// in it cannot be validated by the server.
+func namespaceToCreate(ctx context.Context, k8sClient *kubernetes.Client, namespace string, createNS, dryRun bool, instanceLog *log.Logger) (bool, error) {
 	if !createNS || namespace == "" {
 		return false, nil
 	}
 
-	created, err := k8sClient.EnsureNamespace(ctx, namespace, dryRun)
+	// The dry-run form of EnsureNamespace is the read: it creates nothing.
+	missing, err := k8sClient.EnsureNamespace(ctx, namespace, true)
 	if err != nil {
 		instanceLog.Error("ensuring namespace", "error", err)
 		return false, &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
 	}
-	if created {
-		if dryRun {
-			instanceLog.Info(fmt.Sprintf("namespace %q would be created", namespace))
-		} else {
-			instanceLog.Info(fmt.Sprintf("namespace %q created", namespace))
+	if missing && dryRun {
+		instanceLog.Info(fmt.Sprintf("namespace %q would be created", namespace))
+	}
+	return missing, nil
+}
+
+// ensureNamespace creates the instance namespace when create is set, which
+// the caller derives from namespaceToCreate on a real run. The checks before
+// it looked at nothing inside the namespace because it was missing, so a
+// namespace that appeared since that read stops the apply: it may hold a
+// record or resources that nothing checked.
+func ensureNamespace(ctx context.Context, k8sClient *kubernetes.Client, namespace string, create bool, instanceLog *log.Logger) error {
+	if !create {
+		return nil
+	}
+	created, err := k8sClient.EnsureNamespace(ctx, namespace, false)
+	if err != nil {
+		instanceLog.Error("ensuring namespace", "error", err)
+		return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
+	}
+	if !created {
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf(
+			"namespace %q was created by someone else while apply was checking the cluster, and apply has not looked inside it\n"+
+				"apply stopped before any change. Run the command again", namespace)}
+	}
+	instanceLog.Info(fmt.Sprintf("namespace %q created", namespace))
+	return nil
+}
+
+// entriesOutside is the entries that are not in namespace, in order.
+func entriesOutside(entries []k8sinventory.Entry, namespace string) []k8sinventory.Entry {
+	out := make([]k8sinventory.Entry, 0, len(entries))
+	for _, e := range entries {
+		if e.Namespace != namespace {
+			out = append(out, e)
 		}
 	}
-	return created && dryRun, nil
+	return out
 }
 
 // LoadPreviousInventory reads the ModuleInstance CR for an instance. It
@@ -388,14 +447,21 @@ func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, na
 
 // unreadableRecordError is the refusal for a ModuleInstance read that failed
 // with anything but NotFound. The exit code follows the cause: permission
-// denied, connectivity, or general.
-func unreadableRecordError(name, namespace string, cause error) error {
+// denied, connectivity, or general. nothingChanged adds that the apply
+// stopped before any change: every call site is ahead of the apply's first
+// write, the namespace create included, so it is false only when the caller
+// wrote before the apply (Options.AfterCallerWrites).
+func unreadableRecordError(name, namespace string, cause error, nothingChanged bool) error {
+	stopped := "apply stopped"
+	if nothingChanged {
+		stopped += " before any change"
+	}
 	return &opmexit.ExitError{
 		Code: exitCodeFromK8sError(cause),
 		Err: fmt.Errorf("cannot read the ModuleInstance record %q in namespace %q: %w\n"+
-			"apply stopped: without the record it cannot tell a first install from an existing instance.\n"+
+			"%s: without the record it cannot tell a first install from an existing instance.\n"+
 			"Check that you can read moduleinstances.%s in that namespace, then run the command again",
-			name, namespace, cause, inventory.GroupOpmodel),
+			name, namespace, cause, stopped, inventory.GroupOpmodel),
 	}
 }
 
@@ -514,8 +580,9 @@ func GuardEmptyRender(resourceCount int, prevEntries []k8sinventory.Entry, force
 // RunPreApplyExistenceCheck runs the first-install existence check: never on
 // a dry run and never when a previous inventory exists. It returns the
 // rendered entries that already exist under OPM management
-// (inventory.FirstInstallCheck).
-func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, hasPrevInventory, dryRun bool, currentEntries []k8sinventory.Entry, admit inventory.AdmitSet) ([]k8sinventory.Entry, error) {
+// (inventory.FirstInstallCheck). nothingChanged makes a refusal say that the
+// apply stopped before any change.
+func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, hasPrevInventory, dryRun bool, currentEntries []k8sinventory.Entry, admit inventory.AdmitSet, nothingChanged bool) ([]k8sinventory.Entry, error) {
 	if hasPrevInventory || dryRun {
 		return nil, nil
 	}
@@ -524,9 +591,13 @@ func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client
 		// An object the check could not read carries the API error, so the
 		// exit code follows it; an untracked or terminating object maps to
 		// the general code.
+		stopped := ""
+		if nothingChanged {
+			stopped = "\napply stopped before any change"
+		}
 		return nil, &opmexit.ExitError{
 			Code: exitCodeFromK8sError(err),
-			Err:  fmt.Errorf("pre-apply existence check failed: %w", err),
+			Err:  fmt.Errorf("pre-apply existence check failed: %w%s", err, stopped),
 		}
 	}
 	return managed, nil

@@ -62,7 +62,7 @@ func FirstInstallCheck(ctx context.Context, client *kubernetes.Client, entries [
 			// Any other answer leaves the question open, and the forced apply
 			// that follows would take over whatever holds the name.
 			return nil, fmt.Errorf("cannot check whether %s/%s in namespace %q already exists: %w\n"+
-				"apply stopped before any rendered resource was applied. Check that you can read that resource, then run the command again",
+				"Check that you can read that resource, then run the command again",
 				entry.Kind, entry.Name, entry.Namespace, err)
 		}
 
