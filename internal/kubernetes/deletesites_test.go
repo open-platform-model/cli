@@ -23,6 +23,7 @@ import (
 var allowedDeleteSites = []string{
 	"internal/inventory/store.go:DeleteCR",
 	"internal/kubernetes/delete.go:JudgedDelete",
+	"internal/kubernetes/deletion.go:sendDelete",
 	"internal/operator/migration_execute.go:deleteProven",
 }
 
