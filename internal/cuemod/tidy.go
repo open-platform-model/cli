@@ -65,6 +65,9 @@ func (e *NotTidyError) Error() string {
 // notTidyPrefix is how cmd/cue flattens modload.ErrModuleNotTidy (an
 // internal type errors.As cannot reach): "module is not tidy, use 'cue mod
 // tidy'[: <reason>]". A test pins it against the embedded CUE version.
+// The library's classification does not read this form either: it is not a
+// fetch or a resolution failure. This is one of the named text matches
+// TestNoErrorTextMatch allows.
 const (
 	notTidyPrefix    = "module is not tidy"
 	notTidySuggested = "module is not tidy, use 'cue mod tidy'"

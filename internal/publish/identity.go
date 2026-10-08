@@ -30,6 +30,10 @@ func conformIdentity(a *artifact, schema cue.Value) *Refusal {
 	// incomplete — but openness is 0011:D4's gate (refusal 1, fillable by
 	// --version), not a conformance failure, so incompleteness errors are
 	// dropped here. One cause, one refusal.
+	//
+	// The message text is the only signal: the public CUE API gives an
+	// incomplete-value error no type and no code to test. This is one of the
+	// named text matches TestNoErrorTextMatch allows.
 	var kept cueerrors.Error
 	for _, e := range cueerrors.Errors(err) {
 		if strings.Contains(e.Error(), "incomplete value") {
