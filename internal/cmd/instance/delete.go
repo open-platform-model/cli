@@ -63,8 +63,8 @@ prompt says which, and --delete-data has no effect.
 CustomResourceDefinitions and Namespaces are never deleted, since deleting one
 takes every custom resource of its kind, or everything inside it, with it.
 Each tracked resource is also read again just before its delete, and a
-resource that is no longer managed by OPM or now belongs to another instance
-is left behind. Every resource left behind is listed with its reason; remove
+resource that is no longer managed by OPM, now belongs to another instance, or
+carries an opmodel.dev/adopt annotation naming another instance is left behind. Every resource left behind is listed with its reason; remove
 it with 'kubectl delete' once nothing else needs it.
 
 Deleting an instance that deploys the operator (the instance opm-operator in

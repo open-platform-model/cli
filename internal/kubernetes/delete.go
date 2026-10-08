@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/charmbracelet/log"
@@ -11,8 +12,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/open-platform-model/cli/internal/output"
-	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
+	"github.com/open-platform-model/library/opm/k8s/ownership"
 )
 
 // DeleteOptions configures a delete operation.
@@ -29,9 +32,9 @@ type DeleteOptions struct {
 	InstanceID string
 
 	// InstanceUUID is the instance's recorded UUID (the ModuleInstance's
-	// status.instanceUUID). A live object whose UUID label differs is left
-	// behind. Empty disables the UUID comparison, as in the operator's prune:
-	// every object is then judged on its managed-by label alone.
+	// status.instanceUUID), the identity the delete verdict is asked with. A
+	// live object whose UUID label or adopt annotation names another instance
+	// is left behind. Empty disables the UUID label comparison.
 	InstanceUUID string
 
 	// DryRun previews resources to delete without removing them. The
@@ -84,8 +87,9 @@ type DeleteResult struct {
 	Resources []*unstructured.Unstructured
 
 	// LeftBehind lists the resources Delete declined to remove: a protected
-	// kind (IsProtectedKind), or an object whose live labels show it is no
-	// longer OPM-managed or belongs to another instance. They are not errors.
+	// kind (IsProtectedKind), or an object the delete verdict skipped because
+	// it is no longer OPM-managed, belongs to another instance or is adopted
+	// by another instance. They are not errors.
 	LeftBehind []LeftBehindResource
 
 	// Kept lists the PersistentVolumeClaims Delete kept because
@@ -106,15 +110,8 @@ type LeftBehindResource struct {
 	Reason    string
 }
 
-// Reasons a tracked resource is left behind by Delete, besides
-// ProtectedKindReason.
-const (
-	// KeptClaimReason is the reason of every entry in DeleteResult.Kept.
-	KeptClaimReason = "PersistentVolumeClaims are kept unless --delete-data is set"
-
-	reasonNotManaged    = "no longer managed by OPM"
-	reasonOtherInstance = "owned by another instance"
-)
+// KeptClaimReason is the reason of every entry in DeleteResult.Kept.
+const KeptClaimReason = "PersistentVolumeClaims are kept unless --delete-data is set"
 
 // Delete removes the resources belonging to an instance deployment.
 // opts.InventoryLive must be pre-fetched from the ModuleInstance CR inventory by
@@ -122,11 +119,14 @@ const (
 // CR itself is deleted last by the caller, after Delete returns.
 //
 // A CRD or Namespace is never deleted, and a PersistentVolumeClaim only with
-// opts.DeleteData (DeleteResult.Kept otherwise). Every other object is read again just
-// before its delete and deleted only while it is still OPM-managed and, when
-// both sides carry one, still has this instance's UUID; otherwise it is left
-// behind (DeleteResult.LeftBehind). An object that is already gone counts
-// neither as deleted nor as an error; any other read error is a per-resource
+// opts.DeleteData (DeleteResult.Kept otherwise). Every other object goes
+// through JudgedDelete: it is read again just before its delete and deleted
+// only when the library's delete verdict allows it for opts.InstanceUUID
+// (still OPM-managed, not another instance's, not adopted by another
+// instance); otherwise it is left behind with the verdict's message
+// (DeleteResult.LeftBehind). An object that is already gone counts neither as
+// deleted nor as an error; any other read error, and a delete refused because
+// the object was replaced since the read (ErrReplaced), is a per-resource
 // error, so the caller keeps the ModuleInstance and a re-run retries. A
 // resource the caller's discovery could not read (opts.Unreadable) gets the
 // same outcome without a second read.
@@ -177,44 +177,28 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 			continue
 		}
 
-		reason, gone, err := checkDeletable(ctx, client, res, opts.InstanceUUID)
+		gvk := res.GroupVersionKind()
+		if IsProtectedKind(gvk.Group, kind) {
+			result.LeftBehind = append(result.LeftBehind, LeftBehindResource{Kind: kind, Namespace: ns, Name: name, Reason: ProtectedKindReason})
+			continue
+		}
+
+		outcome, err := JudgedDelete(ctx, client, objectOf(res), gvk.Version, opts.InstanceUUID, opts.DryRun)
 		switch {
 		case err != nil:
-			instanceLog.Warn(fmt.Sprintf("reading %s/%s: %v", kind, name, err))
+			instanceLog.Warn(fmt.Sprintf("could not delete %s/%s: %v", kind, name, err))
 			result.Errors = append(result.Errors, resourceError{Kind: kind, Name: name, Namespace: ns, Err: err})
-			continue
-		case gone:
+		case outcome.Skip == ownership.SkipAlreadyAbsent:
 			instanceLog.Debug("resource already gone", "kind", kind, "namespace", ns, "name", name)
-			continue
-		case reason != "":
-			result.LeftBehind = append(result.LeftBehind, LeftBehindResource{Kind: kind, Namespace: ns, Name: name, Reason: reason})
-			continue
-		}
-
-		if opts.DryRun {
+		case outcome.Skip != "":
+			result.LeftBehind = append(result.LeftBehind, LeftBehindResource{Kind: kind, Namespace: ns, Name: name, Reason: outcome.Message})
+		case opts.DryRun:
 			instanceLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusUnchanged))
 			result.Deleted++
-			continue
+		default:
+			instanceLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
+			result.Deleted++
 		}
-
-		if err := deleteResource(ctx, client, res); err != nil {
-			if apierrors.IsNotFound(err) {
-				// Gone between the re-read and the delete: already done.
-				instanceLog.Debug("resource already gone", "kind", kind, "namespace", ns, "name", name)
-				continue
-			}
-			instanceLog.Warn(fmt.Sprintf("deleting %s/%s: %v", kind, name, err))
-			result.Errors = append(result.Errors, resourceError{
-				Kind:      kind,
-				Name:      name,
-				Namespace: ns,
-				Err:       err,
-			})
-			continue
-		}
-
-		instanceLog.Info(output.FormatResourceLine(kind, ns, name, output.StatusDeleted))
-		result.Deleted++
 	}
 
 	// The ModuleInstance CR is deleted last by the caller (after this returns),
@@ -223,7 +207,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 }
 
 // recordUnreadable adds the resources discovery could not read to result: a
-// protected kind is left behind, as checkDeletable would leave it if read, a
+// protected kind is left behind, as Delete leaves it when it is readable, a
 // claim is kept unless deleteData, and any other is a per-resource error
 // worded like a failed re-read.
 func recordUnreadable(result *DeleteResult, unreadable []UnreadableResource, deleteData bool, instanceLog *log.Logger) {
@@ -241,52 +225,82 @@ func recordUnreadable(result *DeleteResult, unreadable []UnreadableResource, del
 	}
 }
 
-// checkDeletable decides whether Delete may remove obj. It returns a non-empty
-// reason when the object is left behind, gone when the live object no longer
-// exists, and an error when the live read fails for any other reason.
-func checkDeletable(ctx context.Context, client *Client, obj *unstructured.Unstructured, instanceUUID string) (reason string, gone bool, err error) {
-	gvk := obj.GroupVersionKind()
-	if IsProtectedKind(gvk.Group, gvk.Kind) {
-		return ProtectedKindReason, false, nil
-	}
+// ErrReplaced reports a DELETE the API server refused on its UID
+// precondition: the object that was read and judged is gone, and another
+// holds its name. It is never reported as deleted; the next run reads the
+// new object and judges it.
+var ErrReplaced = errors.New("the object was replaced after it was read, so it was not deleted")
 
-	// A kind that cannot be resolved is an error here, never "gone": the
-	// object may live on under a name or a version this read did not reach.
-	resource, err := client.ResourceClientFor(ctx, gvk, obj.GetNamespace())
-	if err != nil {
-		return "", false, err
-	}
-	live, err := resource.Get(ctx, obj.GetName(), metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return "", true, nil
-		}
-		return "", false, err
-	}
-
-	labels := live.GetLabels()
-	if !opmlabels.IsOPMManagedBy(labels[opmlabels.ManagedBy]) {
-		return reasonNotManaged, false, nil
-	}
-	// The operator's tolerance: an object without a UUID label predates UUID
-	// stamping, and an instance without a recorded UUID has nothing to compare.
-	if liveUUID := labels[opmlabels.ModuleInstanceUUID]; instanceUUID != "" && liveUUID != "" && liveUUID != instanceUUID {
-		return reasonOtherInstance, false, nil
-	}
-	return "", false, nil
+// DeleteOutcome is what JudgedDelete did with one object.
+type DeleteOutcome struct {
+	// Deleted reports that the API server accepted the DELETE.
+	Deleted bool
+	// Skip is why the object was left in place; empty when the delete
+	// verdict allowed the delete. An object that is already gone, at the
+	// read or at the DELETE, is ownership.SkipAlreadyAbsent.
+	Skip ownership.SkipReason
+	// Message is the library's wording of the skip, for the user.
+	Message string
 }
 
-// deleteResource deletes a single resource with foreground propagation.
-func deleteResource(ctx context.Context, client *Client, obj *unstructured.Unstructured) error {
-	resource, err := client.ResourceClientFor(ctx, obj.GroupVersionKind(), obj.GetNamespace())
+// JudgedDelete is the one way the CLI deletes an object of an instance. It
+// reads the live object under the resource the cluster serves its kind as,
+// asks the library's delete verdict with instanceUUID, the identity that
+// applied the object, and only on a proceed verdict sends the DELETE, with
+// foreground propagation and a precondition on the UID of the object it
+// read. A dry run stops after the verdict.
+//
+// A kind OPM never deletes is skipped without a read. A read that fails with
+// anything but NotFound, a kind that cannot be resolved included, is returned
+// as the error: the object may still exist. A DELETE refused on the UID
+// precondition is ErrReplaced.
+func JudgedDelete(ctx context.Context, client *Client, obj ownership.Object, version, instanceUUID string, dryRun bool) (DeleteOutcome, error) {
+	if ownership.SafetyExcluded(obj.Group, obj.Kind) {
+		return outcomeOf(ownership.CanDelete(ownership.DeleteInput{Object: obj, InstanceUUID: instanceUUID})), nil
+	}
+
+	gvk := schema.GroupVersionKind{Group: obj.Group, Version: version, Kind: obj.Kind}
+	resource, err := client.ResourceClientFor(ctx, gvk, obj.Namespace)
 	if err != nil {
-		return err
+		return DeleteOutcome{}, err
 	}
+	live, err := resource.Get(ctx, obj.Name, metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return DeleteOutcome{}, err
+		}
+		live = nil
+	}
+
+	verdict := ownership.CanDelete(ownership.DeleteInput{Object: obj, Live: live, InstanceUUID: instanceUUID})
+	if !verdict.Proceed() || dryRun {
+		return outcomeOf(verdict), nil
+	}
+
 	propagation := metav1.DeletePropagationForeground
-
-	deleteOpts := metav1.DeleteOptions{
+	err = resource.Delete(ctx, obj.Name, metav1.DeleteOptions{
 		PropagationPolicy: &propagation,
+		Preconditions:     verdict.Preconditions(),
+	})
+	switch {
+	case err == nil:
+		return DeleteOutcome{Deleted: true}, nil
+	case apierrors.IsNotFound(err):
+		// Gone between the read and the delete: already done.
+		return DeleteOutcome{Skip: ownership.SkipAlreadyAbsent, Message: obj.String() + " no longer exists"}, nil
+	case apierrors.IsConflict(err) && verdict.Preconditions() != nil:
+		return DeleteOutcome{}, fmt.Errorf("%w: %w", ErrReplaced, err)
+	default:
+		return DeleteOutcome{}, err
 	}
+}
 
-	return resource.Delete(ctx, obj.GetName(), deleteOpts)
+func outcomeOf(v ownership.DeleteVerdict) DeleteOutcome {
+	return DeleteOutcome{Skip: v.Skip, Message: v.Message}
+}
+
+// objectOf is the ownership identity of a live or rendered object.
+func objectOf(obj *unstructured.Unstructured) ownership.Object {
+	gvk := obj.GroupVersionKind()
+	return ownership.Object{Group: gvk.Group, Kind: gvk.Kind, Namespace: obj.GetNamespace(), Name: obj.GetName()}
 }
