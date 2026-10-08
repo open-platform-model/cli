@@ -139,6 +139,29 @@ warned() { grep -qF -- "$2" "$1/.git/cascade/warnings" 2>/dev/null; }
 # why: the tail of the last run's output, for a FAIL line.
 why() { tail -n 3 "$RUN_OUT" | tr '\n' ' '; }
 
+# The older versions the network scenarios move the pins back to. Catalog, core
+# and podinfo come from testdata/older.tsv. The library does not: the sandbox
+# must compile against it (go mod tidy in the setup, the task's build of opm
+# from the merge base), and no published older library holds every package the
+# cli imports once the cli adopts new library API. lib_older_name names a
+# version below the tree's, which older_lib fills with the tree's own library.
+# This departs from contract §8, which asks for an older real published version
+# per pin key. The owner allowed the departure on 2026-10-09, for the library
+# key only (openspec change repair-cascade-test, design.md, "Deviation from the
+# cascade contract").
+OLDER="$HERE/testdata/older.tsv"
+older() { awk -F'\t' -v r="$1" -v k="$2" '$1 == r && $2 == k { print $3; exit }' "$OLDER"; }
+# older_than A B: true when A ranks below B (the stub's semver-cmp).
+older_than() { [ "$(CASCADE_STUB_TABLE=/dev/null "$STUB" semver-cmp "$1" "$2")" = -1 ]; }
+# lib_older_name V: v0.0.0-0.cascade.<V without its v and build metadata>. A
+# v0.0.0 prerelease ranks below every version a v0 or v1 module path can pin,
+# pseudo-versions included; the suffix keeps one name to one content in the Go
+# module cache.
+lib_older_name() {
+  local v=${1#v}
+  printf 'v0.0.0-0.cascade.%s\n' "${v%%+*}"
+}
+
 # ---------------------------------------------------------------------------
 # Pre-checks (both sets).
 
@@ -158,6 +181,44 @@ if (cd "$pre" && diff <(.tasks/cascade/pins.sh WORKTREE) <(.tasks/cascade/pins.s
 else
   fail "pins.sh WORKTREE equals HEAD" "the two reads differ on a clean copy"
 fi
+
+# The older rows must stay older than the tree (contract §8). Offline: it reads
+# pins.sh and the stub's semver-cmp only, so the required Lint job sees a stale
+# row in the pull request that makes it stale.
+ok=1
+LIB_TREE=""
+LIB_OLD=""
+while IFS=$'\t' read -r key _ _ v _; do
+  case "$key" in
+    # The operator module pin and the operator release it records stay put.
+    "$OP" | "$MOD") continue ;;
+    "$LIB")
+      # No row: the name is derived, so a failure here is a defect of
+      # lib_older_name, not of older.tsv.
+      LIB_TREE=$v
+      LIB_OLD=$(lib_older_name "$v")
+      if ! older_than "$LIB_OLD" "$v"; then
+        fail "older.tsv" "the made-up library \`$LIB_OLD\` is not older than the tree's \`$v\`; fix lib_older_name in test.sh"
+        ok=0
+      fi
+      continue ;;
+    *) o=$(older older "$key") ;;
+  esac
+  if [ -z "$o" ] || ! older_than "$o" "$v"; then
+    fail "older.tsv" "\`older.tsv\` \`$key\` \`${o:-missing}\` is not older than the tree's \`$v\`; pick an older published version"
+    ok=0
+  fi
+done < <(cd "$pre" && .tasks/cascade/pins.sh WORKTREE)
+if [ -z "$LIB_TREE" ]; then fail "older.tsv" "pins.sh prints no \`$LIB\` pin"; ok=0; fi
+for key in "$CAT" "$CORE"; do
+  if ! older_than "$(older oldest "$key")" "$(older older "$key")"; then
+    fail "older.tsv" "the oldest \`$key\` is not older than its older row"; ok=0
+  fi
+done
+if ! older_than "$(older oldest "$POD")" "v$(id_version "$pre/$PODDIR/identity/identity.cue")"; then
+  fail "older.tsv" "the oldest podinfo is not older than the tree's fixture"; ok=0
+fi
+if [ "$ok" = 1 ]; then pass "older.tsv"; fi
 
 # ---------------------------------------------------------------------------
 # Offline scenarios (both sets): no GHCR, Go proxy or GitHub access.
@@ -392,15 +453,15 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Network scenarios (CASCADE_TEST_SET=all): the older versions are real, so
-# go get and cue mod get resolve them from the Go proxy and GHCR, or from a
-# warm cache. setup_older leaves the operator module pin at the tree's version:
+# Network scenarios (CASCADE_TEST_SET=all): the task's go get and cue mod get
+# resolve the tree's versions from the Go proxy and GHCR, or from a warm cache.
+# The older catalog and core are real; the older library is the tree's own
+# under a lower name (older_lib). setup_older leaves the operator module pin at the tree's version:
 # no older module release exists yet (0.1.0 is the first). S17 moves it alone,
 # from an unpublished 0.0.9, so the lane runs against the real registry. Once
 # an older release exists, add an "older" row for it, move it in setup_older
 # with task operator:pin, and count it in S5.
 
-OLDER="$HERE/testdata/older.tsv"
 CUE_DIRS=(
   templates/minimal templates/standard templates/advanced hack/platform "$PODDIR"
   examples tests/e2e/testdata/operator-owned
@@ -415,29 +476,66 @@ GOLDEN=$(printf '%s\n' templates/minimal/identity/identity.cue templates/standar
   templates/advanced/identity/identity.cue "$PODDIR/identity/identity.cue" \
   examples/cue.mod/module.cue tests/e2e/testdata/operator-owned/cue.mod/module.cue | LC_ALL=C sort)
 
-older() { awk -F'\t' -v r="$1" -v k="$2" '$1 == r && $2 == k { print $3; exit }' "$OLDER"; }
 next_patch() { awk -F. -v OFS=. '{ $NF = $NF + 1; print }' <<<"$1"; }
-# older_than A B: true when A ranks below B (the stub's semver-cmp).
-older_than() { [ "$(CASCADE_STUB_TABLE=/dev/null "$STUB" semver-cmp "$1" "$2")" = -1 ]; }
 # set_v FILE KEY VERSION: rewrite KEY's v: in a module.cue as text, untidy on purpose.
 set_v() {
   K="$2" V="$3" perl -0pi -e 's/("\Q$ENV{K}\E": \{\n\s*v:\s*)"[^"]+"/$1"$ENV{V}"/' "$1"
   [ "$(cue_dep_v "$1" "$2")" = "$3" ]
 }
+# older_lib: serve the tree's library as $LIB_OLD from a file proxy under $TMP
+# (the layout of GOPROXY: @v/list, .info, .mod, .zip). Built once per test run.
+# Sets SETUP_WHY and returns 1 on failure.
+GOPROXY_DIR="$TMP/goproxy"
+older_lib() {
+  local at="$GOPROXY_DIR/$LIB/@v" src="$TMP/goproxy-src" dir out="$TMP/older-lib.out"
+  if [ -f "$at/list" ]; then return 0; fi
+  if ! command -v zip >/dev/null; then SETUP_WHY="zip is not on PATH"; return 1; fi
+  if ! (cd "$TMP" && GOWORK=off go mod download "$LIB@$LIB_TREE") >"$out" 2>&1; then
+    SETUP_WHY="go mod download $LIB@$LIB_TREE: $(tail -n 3 "$out" | tr '\n' ' ')"; return 1
+  fi
+  dir="$(go env GOMODCACHE)/$LIB@$LIB_TREE"
+  mkdir -p "$at" "$src/$LIB@$LIB_OLD"
+  if ! { cp -r "$dir/." "$src/$LIB@$LIB_OLD/" && chmod -R u+w "$src" &&
+    (cd "$src" && zip -q -r -X -D "$at/$LIB_OLD.zip" "$LIB@$LIB_OLD") &&
+    cp "$dir/go.mod" "$at/$LIB_OLD.mod"; } >"$out" 2>&1; then
+    SETUP_WHY="could not pack $dir as $LIB_OLD: $(tail -n 3 "$out" | tr '\n' ' ')"; return 1
+  fi
+  printf '{"Version":"%s","Time":"2026-01-01T00:00:00Z"}\n' "$LIB_OLD" >"$at/$LIB_OLD.info"
+  printf '%s\n' "$LIB_OLD" >"$at/list"
+}
+# setup_go DIR ARGS...: go ARGS in DIR with the file proxy in front of the
+# usual one (GONOPROXY=none, so a GOPRIVATE setting cannot route around it).
+# The checksum database cannot know $LIB_OLD, so it is off for the library,
+# here only: the task's own run verifies the real library as always.
+setup_go() {
+  local d="$1" out="$TMP/setup-go.out"; shift
+  if ! (cd "$d" && GOWORK=off GONOPROXY=none GONOSUMDB="$LIB" \
+    GOPROXY="file://$GOPROXY_DIR,$(go env GOPROXY)" go "$@") >"$out" 2>&1; then
+    SETUP_WHY="go $* with library $LIB_OLD: $(tail -n 3 "$out" | tr '\n' ' ')"; return 1
+  fi
+}
 # setup_older DIR CATALOG CORE [PODINFO]: move every pin the task moves back to
-# the given versions (library to its older row; the operator module pin stays).
+# the given versions (library to $LIB_OLD; the operator module pin stays).
+# On failure it returns 1 with the failed step in SETUP_WHY.
 setup_older() {
   local d="$1" c m
-  (cd "$d" && GOWORK=off go get "$LIB@$(older older "$LIB")" && GOWORK=off go mod tidy) >/dev/null 2>&1 || return 1
+  SETUP_WHY=""
+  older_lib || return 1
+  setup_go "$d" get "$LIB@$LIB_OLD" || return 1
+  setup_go "$d" mod tidy || return 1
   for c in "${CUE_DIRS[@]}"; do
     m="$d/$c/cue.mod/module.cue"
-    if [ -n "$(cue_dep_v "$m" "$CAT")" ]; then set_v "$m" "$CAT" "$2" || return 1; fi
-    set_v "$m" "$CORE" "$3" || return 1
+    if [ -n "$(cue_dep_v "$m" "$CAT")" ]; then
+      set_v "$m" "$CAT" "$2" || { SETUP_WHY="could not set \`$CAT\` to $2 in $c"; return 1; }
+    fi
+    set_v "$m" "$CORE" "$3" || { SETUP_WHY="could not set \`$CORE\` to $3 in $c"; return 1; }
   done
   perl -pi -e 's/^(\s*version:\s*)"[^"]+"/$1"'"${2#v}"'"/ if $seen; $seen = 1 if /opmodel\.dev\/catalogs\/opm\@v4:/' \
     "$d/hack/kind-platform.yaml"
   if [ -n "${4:-}" ]; then
-    for c in "${CONSUMERS[@]}"; do set_v "$d/$c/cue.mod/module.cue" "$POD" "$4" || return 1; done
+    for c in "${CONSUMERS[@]}"; do
+      set_v "$d/$c/cue.mod/module.cue" "$POD" "$4" || { SETUP_WHY="could not set \`$POD\` to $4 in $c"; return 1; }
+    done
   fi
 }
 # golden DIR: the tree differs from the original (the root commit "base") in
@@ -468,28 +566,6 @@ golden() {
 commit_run() { g "$1" add -A; g "$1" commit -q -m "run"; }
 
 if [ "$SET" = all ]; then
-  # The older rows must stay older than the tree (contract §8).
-  d=$(sandbox older)
-  ok=1
-  while IFS=$'\t' read -r key _ _ v _; do
-    # The operator module pin and the operator release it records stay put.
-    case "$key" in "$OP" | "$MOD") continue ;; esac
-    o=$(older older "$key")
-    if [ -z "$o" ] || ! older_than "$o" "$v"; then
-      fail "older.tsv" "\`older.tsv\` \`$key\` \`${o:-missing}\` is not older than the tree's \`$v\`; pick an older published version"
-      ok=0
-    fi
-  done < <(cd "$d" && .tasks/cascade/pins.sh WORKTREE)
-  for key in "$CAT" "$CORE"; do
-    if ! older_than "$(older oldest "$key")" "$(older older "$key")"; then
-      fail "older.tsv" "the oldest \`$key\` is not older than its older row"; ok=0
-    fi
-  done
-  if ! older_than "$(older oldest "$POD")" "v$(id_version "$d/$PODDIR/identity/identity.cue")"; then
-    fail "older.tsv" "the oldest podinfo is not older than the tree's fixture"; ok=0
-  fi
-  if [ "$ok" = 1 ]; then pass "older.tsv"; fi
-
   OLD_CAT=$(older older "$CAT")
   OLD_CORE=$(older older "$CORE")
 
@@ -502,7 +578,7 @@ if [ "$SET" = all ]; then
     printf 'warn\tgo\t%s\tnew major available: %sv2.0.0%s\n' "$LIB" '`' '`'
     current_rows "$d"; grep '^pin-of' "$OLDER"; } >"$TMP/s2/table"
   if ! setup_older "$d" "$OLD_CAT" "$OLD_CORE"; then
-    fail "S2 older pins" "the setup did not apply"
+    fail "S2 older pins" "the setup did not apply: $SETUP_WHY"
   else
     commit_setup "$d"
     # A go shim logs every go subcommand of the first run: get, mod tidy and
@@ -630,7 +706,7 @@ if [ "$SET" = all ]; then
   frozen_file=tests/integration/module-apply/testdata/cue.mod/module.cue
   sibling=tests/e2e/testdata/duplicate-identities/cue.mod/module.cue
   if ! setup_older "$d" "$OLD_CAT" "$OLD_CORE"; then
-    fail "S4 frozen" "the setup did not apply"
+    fail "S4 frozen" "the setup did not apply: $SETUP_WHY"
   else
     [ -f "$d/.cascade-frozen" ] || printf 'frozen:\n' >"$d/.cascade-frozen"
     printf '  - path: %s\n    pins: ["%s", "%s"]\n    reason: "test freeze"\n' \
@@ -659,7 +735,7 @@ if [ "$SET" = all ]; then
   { grep '^pin-of' "$OLDER"; cat "$TMP/s9/current"; } >"$TMP/s9/table2"
   next_pod=v$(next_patch "$(id_version "$d/$PODDIR/identity/identity.cue")")
   if ! setup_older "$d" "$(older oldest "$CAT")" "$(older oldest "$CORE")" "$(older oldest "$POD")"; then
-    fail "S9 second move" "the setup did not apply"
+    fail "S9 second move" "the setup did not apply: $SETUP_WHY"
   else
     commit_setup "$d"
     run "$d" "$TMP/s9/table1" "$TMP/s9/log1"
