@@ -274,7 +274,9 @@ func deleteOperatorOwned(ctx context.Context, k8sClient *kubernetes.Client, inv 
 // executeInstanceDelete deletes the instance's tracked workloads, then the
 // ModuleInstance CR last (after all workloads are gone; skipped on dry-run).
 // A tracked resource discovery could not read (unreadable) is a per-resource
-// failure, so the ModuleInstance is kept and still tracks it.
+// failure, so the ModuleInstance is kept and still tracks it. A ModuleInstance
+// delete that fails after the workloads are gone fails the command with the
+// exit code of its cause.
 func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, dryRun bool, instanceLog *log.Logger) error {
 	deleteResult, err := workflowapply.DeleteRecorded(ctx, workflowapply.DeleteRequest{
 		Client:       k8sClient,
@@ -288,6 +290,13 @@ func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rs
 		Log:          instanceLog,
 	})
 	if err != nil {
+		var recordErr *workflowapply.RecordDeleteError
+		if errors.As(err, &recordErr) {
+			instanceLog.Error(fmt.Sprintf("deleting ModuleInstance %s/%s: its tracked resources were deleted, but the record remains",
+				recordErr.Namespace, recordErr.Name), "error", recordErr.Err)
+			output.Details("The ModuleInstance still lists resources that are gone.\n" +
+				"Fix the cause (for example missing RBAC) and re-run; re-running is safe.")
+		}
 		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 	return reportInstanceDelete(deleteResult, dryRun, instanceLog)
