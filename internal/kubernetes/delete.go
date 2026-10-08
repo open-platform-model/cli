@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/charmbracelet/log"
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
@@ -100,6 +101,13 @@ type DeleteResult struct {
 
 	// Errors contains per-resource errors (non-fatal).
 	Errors []resourceError
+
+	// Terminating lists the deleted objects that still existed when
+	// WaitUntilGone ran out of time, and WaitElapsed how long that wait
+	// took. Empty when the caller did not wait and when every deleted object
+	// went. The caller keeps the instance's record while it is not empty.
+	Terminating []TerminatingObject
+	WaitElapsed time.Duration
 
 	// Run is the deletion plan as it was driven. The caller asks
 	// lifecycle.MayReleaseHold with its plan and state before it deletes
@@ -210,6 +218,36 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 	// The ModuleInstance CR is deleted last by the caller (after this returns),
 	// so the inventory record is only removed once the instance is fully torn down.
 	return result, nil
+}
+
+// WaitUntilGone waits, for at most timeout from now, until the objects whose
+// delete the run of result sent and the API server accepted are gone
+// (WaitDeleted), and records in result.Terminating the ones that are not.
+// Kept claims, objects left behind and objects that were already gone are not
+// waited for. Only a canceled context is an error. It is for the result of a
+// real run: a dry run sent no delete.
+func (result *DeleteResult) WaitUntilGone(ctx context.Context, client *Client, timeout time.Duration, instanceLog *log.Logger) error {
+	deleted := DeletedObjects(result.Run)
+	if len(deleted) == 0 {
+		return nil
+	}
+	instanceLog.Info(fmt.Sprintf("waiting for %d deleted resource(s) to be gone", len(deleted)), "timeout", timeout)
+
+	start := time.Now()
+	waitCtx, cancel := context.WithDeadline(ctx, start.Add(timeout))
+	defer cancel()
+
+	err := WaitDeleted(waitCtx, client, deleted, start)
+	var terminating *TerminatingError
+	if errors.As(err, &terminating) {
+		result.Terminating = terminating.Objects
+		result.WaitElapsed = terminating.Elapsed
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("waiting for the deleted resources to be gone: %w", err)
+	}
+	return nil
 }
 
 // planEntries are the entries Delete plans over: one per recorded object the

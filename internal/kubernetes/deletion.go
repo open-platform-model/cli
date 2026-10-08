@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	"github.com/open-platform-model/library/opm/k8s/lifecycle"
@@ -54,6 +55,13 @@ type StepResult struct {
 	// delete refused on its UID precondition wraps ErrReplaced. Nil when
 	// the step did not fail.
 	Err error
+
+	// UID is the UID the accepted delete of the step was sent with, the one
+	// of the object that was read and judged. Empty when no delete was
+	// accepted (a dry run, a skip, a failure) or the plan named no UID
+	// precondition. WaitDeleted uses it to tell the deleted object from a
+	// new one under the same name.
+	UID types.UID
 }
 
 // DeletionRun is a deletion plan driven as far as it went: the plan, its
@@ -85,6 +93,7 @@ func RunDeletion(ctx context.Context, client *Client, plan lifecycle.DeletionPla
 		ev      lifecycle.Event
 		last    lifecycle.ActionKind // the action ev answers
 		lastErr error                // its error as the caller sees it
+		lastUID types.UID            // the UID a sent delete carried
 	)
 	for {
 		next, act, err := lifecycle.Advance(plan, run.State, ev)
@@ -92,23 +101,14 @@ func RunDeletion(ctx context.Context, client *Client, plan lifecycle.DeletionPla
 			return run, fmt.Errorf("advancing the deletion plan: %w", err)
 		}
 		for _, o := range next.Outcomes[len(run.State.Outcomes):] {
-			res := StepResult{Entry: steps[o.Step].Entry, Outcome: o}
-			if o.Result == lifecycle.ResultFailed {
-				// A step fails only on the answer to its own read or delete.
-				res.Failed = last
-				res.Err = lastErr
-				if res.Err == nil {
-					// The transition refused what the read returned.
-					res.Err = errors.New(o.Message)
-				}
-			}
+			res := stepResult(steps[o.Step].Entry, o, last, lastErr, lastUID)
 			run.Steps = append(run.Steps, res)
 			if opts.OnStep != nil {
 				opts.OnStep(res)
 			}
 		}
 		run.State = next
-		ev, last, lastErr = lifecycle.Event{}, act.Kind, nil
+		ev, last, lastErr, lastUID = lifecycle.Event{}, act.Kind, nil, ""
 
 		switch act.Kind {
 		case lifecycle.ActionDone:
@@ -122,6 +122,7 @@ func RunDeletion(ctx context.Context, client *Client, plan lifecycle.DeletionPla
 			}
 			ev.Err = p.sendDelete(ctx, act)
 			lastErr = ev.Err
+			lastUID = preconditionUID(act)
 			if ev.Err != nil && apierrors.IsConflict(ev.Err) && act.Preconditions != nil {
 				lastErr = fmt.Errorf("%w: %w", ErrReplaced, ev.Err)
 			}
@@ -129,6 +130,38 @@ func RunDeletion(ctx context.Context, client *Client, plan lifecycle.DeletionPla
 			// Recorded by the transition; nothing to perform.
 		}
 	}
+}
+
+// stepResult is the result of a step the transition just finished with
+// outcome o. last, lastErr and lastUID describe the action the transition was
+// answering: its kind, its error as the caller sees it, and the UID a sent
+// delete carried.
+func stepResult(entry k8sinventory.Entry, o lifecycle.Outcome, last lifecycle.ActionKind, lastErr error, lastUID types.UID) StepResult {
+	res := StepResult{Entry: entry, Outcome: o}
+	switch o.Result {
+	case lifecycle.ResultDeleted:
+		// Recorded only on the answer to the step's own delete.
+		res.UID = lastUID
+	case lifecycle.ResultFailed:
+		// A step fails only on the answer to its own read or delete.
+		res.Failed = last
+		res.Err = lastErr
+		if res.Err == nil {
+			// The transition refused what the read returned.
+			res.Err = errors.New(o.Message)
+		}
+	case lifecycle.ResultSkipped:
+	}
+	return res
+}
+
+// preconditionUID is the UID precondition of a delete the plan named; empty
+// when it named none.
+func preconditionUID(act lifecycle.Action) types.UID {
+	if act.Preconditions == nil || act.Preconditions.UID == nil {
+		return ""
+	}
+	return *act.Preconditions.UID
 }
 
 // performer performs the reads and deletes a deletion plan names.

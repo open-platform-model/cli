@@ -30,8 +30,8 @@ None.
 
 ## Impact
 
-- `internal/kubernetes`: the deletion run records the UID each accepted delete was sent with; a poll helper waits for deleted objects; `Delete` gets a wait option and reports what is still terminating.
-- `internal/workflow/apply/delete.go`: `DeleteRecorded` passes the option and holds the record when resources are still terminating.
+- `internal/kubernetes`: the deletion run records the UID each accepted delete was sent with; a poll helper waits for deleted objects; the delete result can wait for its deleted objects and lists what is still terminating.
+- `internal/workflow/apply/delete.go`: `DeleteRecorded` gets the wait option and holds the record when resources are still terminating.
 - `internal/cmd/instance/delete.go`: the flag, the help, the timeout report.
 - `docs/site/diagnostics/`, `README.md`: user documentation.
 - No new dependency. No change to the apply path, to `internal/config` or to `internal/operator`.

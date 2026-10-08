@@ -1,9 +1,9 @@
 ## 1. The bounded wait in the delete routine
 
-- [ ] 1.1 Add tests in `internal/kubernetes`: `RunDeletion` records the UID of an accepted delete and none on a dry run, skip or failure; `WaitDeleted` returns at once when every object is NotFound, counts another UID under the same name as gone, polls until a terminating object goes, returns a `*TerminatingError` with finalizers at the deadline, keeps an object with a failing read pending, and returns the context error on cancellation
-- [ ] 1.2 Add `StepResult.UID`, `WaitDeleted` and `TerminatingError`; add `DeleteOptions.Wait` and `Timeout` and `DeleteResult.Terminating` to `Delete`, with tests that a kept claim, a left-behind resource and a run with a failed resource are not waited for and that a dry run does not wait
-- [ ] 1.3 Add `Wait` and `Timeout` to `workflowapply.DeleteRequest`; `DeleteRecorded` keeps the record when resources are still terminating; test both outcomes
-- [ ] 1.4 `task fmt`, `task vet`, `task lint` and `task test:unit` green, then commit `feat(kubernetes): wait for deleted objects to be gone`
+- [x] 1.1 Add tests in `internal/kubernetes`: `RunDeletion` records the UID of an accepted delete and none on a dry run, skip or failure; `WaitDeleted` returns at once when every object is NotFound, counts another UID under the same name as gone, polls until a terminating object goes, returns a `*TerminatingError` with finalizers at the deadline, keeps an object with a failing read pending, and returns the context error on cancellation
+- [x] 1.2 Add `StepResult.UID`, `WaitDeleted` and `TerminatingError`; add `DeleteResult.WaitUntilGone` and `DeleteResult.Terminating`, with a test that a kept claim and a left-behind resource are not waited for
+- [x] 1.3 Add `Wait` and `Timeout` to `workflowapply.DeleteRequest`; `DeleteRecorded` waits on a real run without a failed resource and keeps the record when resources are still terminating; test both outcomes, the dry run, the failed resource and a canceled wait
+- [x] 1.4 `task fmt`, `task vet`, `task lint` and `task test:unit` green, then commit `feat(kubernetes): wait for deleted objects to be gone`
 
 ## 2. The flag on instance delete
 

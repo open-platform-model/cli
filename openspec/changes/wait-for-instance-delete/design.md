@@ -65,8 +65,8 @@ Uninstall shares the delete routine, so the option is reachable. It is not wired
 
 - `kubernetes.StepResult.UID`: set from the delete precondition when a delete was accepted.
 - `kubernetes.WaitDeleted`: the poll helper. It takes its budget from the context deadline, like `Wait` and `WaitAbsent`, and uses `WaitPollInterval`. On the deadline it returns a `*TerminatingError` that lists the pending objects with their finalizers or last read error. On cancellation it returns the context error.
-- `kubernetes.Delete`: with `DeleteOptions.Wait`, on a real run without per-resource errors, it waits and puts the pending objects in `DeleteResult.Terminating`.
-- `workflowapply.DeleteRecorded`: does not release the record when `Terminating` is not empty.
+- `kubernetes.DeleteResult.WaitUntilGone`: waits for the objects the run of the result deleted and puts the pending ones in `DeleteResult.Terminating`. `Delete` itself does not wait.
+- `workflowapply.DeleteRecorded`: with `DeleteRequest.Wait`, on a real run without per-resource errors, it calls `WaitUntilGone` after it printed the kept, left-behind and error lines, so the line that says the command is waiting is the last one before the silence. It does not release the record when `Terminating` is not empty.
 - The command prints the report.
 
 `WaitAbsent` is not reused: it knows no UID, and its timeout is one error string with no finalizers.
