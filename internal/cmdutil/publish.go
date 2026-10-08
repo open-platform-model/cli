@@ -40,8 +40,8 @@ func (f *PublishFlags) AddTo(cmd *cobra.Command) {
 // #IdentityPackage from the kernel schema cache, compute the plan, print it,
 // print any refusals through the validation funnel, and push on GO outside
 // --dry-run. Exit codes: refusal 2 (and a core schema that cannot be loaded
-// because no registry is configured), failed registry operation 3,
-// unexpected 1.
+// because no registry is configured), failed registry operation 3, refused
+// registry credential 4, unexpected 1.
 func RunPublish(cmd *cobra.Command, cfg *config.GlobalConfig, kind publish.Kind, args []string, flags *PublishFlags) error {
 	dir := ResolveModulePath(args)
 
@@ -175,16 +175,21 @@ func registryLoginHint(host string) string {
 	return hint + " " + host
 }
 
-// publishError maps pipeline errors to exit codes: a failed registry
-// operation is exit 3, whether the registry gave no response
-// (*publish.ConnectivityError) or answered with a failure
-// (*publish.RegistryError), because the artifact was never judged; anything
-// else is unexpected (1). A refused credential gains the login hint.
+// publishError maps pipeline errors to exit codes. A registry that refused
+// the caller (a *publish.RegistryError marked Unauthorized: a 401 or 403) is
+// a permission failure, exit 4, and gains the login hint. Any other failed
+// registry operation is exit 3, whether the registry gave no response
+// (*publish.ConnectivityError) or answered with another failure
+// (*publish.RegistryError). In none of them was the artifact judged.
+// Anything else is unexpected (1).
 func publishError(err error) error {
 	var regErr *publish.RegistryError
 	if errors.As(err, &regErr) {
 		if regErr.Unauthorized {
-			err = fmt.Errorf("%w\n  %s", err, registryLoginHint(regErr.Host))
+			return &opmexit.ExitError{
+				Code: opmexit.ExitPermissionDenied,
+				Err:  fmt.Errorf("%w\n  %s", err, registryLoginHint(regErr.Host)),
+			}
 		}
 		return &opmexit.ExitError{Code: opmexit.ExitConnectivityError, Err: err}
 	}

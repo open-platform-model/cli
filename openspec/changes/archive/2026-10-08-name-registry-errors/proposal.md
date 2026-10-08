@@ -6,7 +6,7 @@ Two first-hour failures name the wrong cause. With no registry configured, `opm 
 
 - When the core schema cannot be loaded and no registry is configured (no `--registry`, no `OPM_REGISTRY`, no `registry` in the config file, and no `CUE_REGISTRY` in the environment), `opm module vet`, `opm module publish` and `opm catalog publish` say "no registry is configured", keep the cause, point to `opm config init`, and exit 2 instead of 3.
 - The publish commands classify a failed core-schema fetch, already-published lookup and push with the typed registry classification the cli already uses (`internal/cuemod/connectivity.go`): only no response at all is "registry unreachable"; a 401 or 403 is "the registry refused the credentials" and points to `opm registry login`; any other registry answer is "registry operation failed". The registry's own error text stays in the message in every case.
-- The publish exit codes do not change for a registry failure: every one of the three classes still exits 3, because the artifact was never judged.
+- A refused credential on publish exits 4 (permission denied), by owner decision after the review. The other two classes keep exit 3. In none of the three was the artifact judged.
 - Help text and the publish pages name the three classes.
 
 Not changed: the `CUE_REGISTRY` fallback (a run with only `CUE_REGISTRY` set resolves as it does today, and a warm CUE module cache still serves a run with nothing configured); the catalog compatibility walk and `opm catalog registry check`, whose registry failures keep their pinned classification; `opm module vet`'s exit 3 for every other failed core-schema fetch; flags.

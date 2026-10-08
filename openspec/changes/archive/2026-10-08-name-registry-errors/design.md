@@ -15,7 +15,7 @@
 - **Report "no registry" only after the fetch failed.** MUST NOT refuse before the fetch: a run with nothing configured still succeeds today from a warm CUE module cache, and a run with only `CUE_REGISTRY` set resolves through it. The test is `registry == "" && CUE_REGISTRY == ""`, applied to the error of `SchemaCache().Get()`.
 - **Exit 2 for the no-registry case.** The cli has no dedicated configuration exit code (`internal/exit/exit.go`: 1 general, 2 validation, 3 connectivity, 4 permission, 5 not found). `opm registry login` already refuses "no registry is configured" with exit 2 and the same `opm config init` action (`internal/cmd/registry/login.go`), so the same condition gets the same code.
 - **One classifier in `internal/publish`.** `RegistryFailure(op, host, err)` returns `*ConnectivityError` when `cuemod.IsConnectivityError(err)`, else `*RegistryError{Unauthorized: cuemod.IsUnauthorized(err), Host: host}`. `cuemod.IsUnauthorized` is new and reads the same library classification (`FetchUnauthorized`). `ConnectivityError` keeps its type, text and every other construction site.
-- **Exit 3 stays for every registry failure on publish.** A 401 could map to the existing code 4 (permission denied), but that is a change to the documented exit contract and is left to the owner. `publishError` maps `*RegistryError` to 3 like `*ConnectivityError`.
+- **A refused credential exits 4; other registry failures keep 3.** The first build kept 3 for every class and left the code to the owner, who chose the existing code 4 (permission denied) for a 401 or 403. `publishError` maps a `*RegistryError` marked `Unauthorized` to 4, and any other `*RegistryError` to 3 like `*ConnectivityError`. The token-endpoint gap below still exits 3, because it is not recognised as a refusal.
 - **Hints at the command layer.** `internal/publish` returns typed errors; `cmdutil` adds the `opm registry login <host>` line, as `operator install` adds its mirror hint. The host is the one the registry mapping routes the module to (`RegistryHost`), because the bare command refuses when the mapping names several hosts, which the default mapping does.
 
 ```go
@@ -65,8 +65,8 @@ registry unreachable: listing published versions of <path>: <cause>
 ### Exit code of a refused credential
 
 **Options considered**: keep 3; move to 4 (`ExitPermissionDenied`); move to 1.
-**Decision**: keep 3, ask the owner about 4.
-**Rationale**: the label and the next step are the defect the task names; the exit table is a published contract.
+**Decision**: 4, by owner decision (the first build kept 3 and asked).
+**Rationale**: 4 is the cli's code for a permission failure, and a script can then tell a credential problem from a network problem.
 
 ## Risks / Trade-offs
 

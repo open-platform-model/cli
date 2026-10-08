@@ -3,7 +3,7 @@
 - [x] 1.1 Add tests that drive a real 401, 403, 429 and 503 answer through the already-published lookup and the push, and see them fail on the current code
 - [x] 1.2 `internal/cuemod`: add `IsUnauthorized` beside `IsConnectivityError`, with tests
 - [x] 1.3 `internal/publish`: add `RegistryError` and `RegistryFailure`, and use it in `gateAlreadyPublished` and `Push`
-- [x] 1.4 `internal/cmdutil`: map `*RegistryError` to exit 3 in `publishError`, add the `opm registry login` hint, classify the core-schema fetch, with tests
+- [x] 1.4 `internal/cmdutil`: map `*RegistryError` to its exit code in `publishError` (3, and 4 for a refused credential after the owner's decision), add the `opm registry login` hint, classify the core-schema fetch, with tests
 - [x] 1.5 Update the exit-code line of the `module publish` and `catalog publish` help
 - [x] 1.6 task fmt, task lint and task test:unit green, then commit fix(publish): name a refused credential instead of calling the registry unreachable
 

@@ -21,7 +21,8 @@ import (
 )
 
 // TestPublishError_ExitCodes pins the pipeline-error → exit-code mapping:
-// a failed registry operation is 3, anything else unexpected is 1.
+// a refused registry credential is 4, any other failed registry operation
+// is 3, anything else unexpected is 1.
 func TestPublishError_ExitCodes(t *testing.T) {
 	tests := []struct {
 		name string
@@ -51,9 +52,14 @@ func TestPublishError_ExitCodes(t *testing.T) {
 			want: opmexit.ExitConnectivityError,
 		},
 		{
-			name: "a refused credential maps to ExitConnectivityError",
+			name: "a refused credential maps to ExitPermissionDenied",
 			err:  &publish.RegistryError{Op: "push", Unauthorized: true, Err: errors.New("401 Unauthorized")},
-			want: opmexit.ExitConnectivityError,
+			want: opmexit.ExitPermissionDenied,
+		},
+		{
+			name: "a wrapped refused credential still maps to ExitPermissionDenied",
+			err:  fmt.Errorf("publishing: %w", &publish.RegistryError{Op: "push", Unauthorized: true, Err: errors.New("403 Forbidden")}),
+			want: opmexit.ExitPermissionDenied,
 		},
 		{
 			name: "anything else maps to ExitGeneralError",
@@ -129,17 +135,19 @@ func TestRunPublish_NoRegistryConfigured(t *testing.T) {
 }
 
 // The core schema fetch is classified like the lookup and the push: only no
-// response is unreachable, and a refused credential points to the login.
+// response is unreachable, and a refused credential exits 4 and points to
+// the login.
 func TestRunPublish_SchemaFetchFailureIsNamed(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		registry func(t *testing.T) string
 		want     string
+		code     int
 		login    bool
 	}{
-		{"refused connection", func(*testing.T) string { return cuemodtest.UnreachableRegistry }, "registry unreachable: loading core schema: ", false},
-		{"401", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusUnauthorized) }, "registry refused the credentials (authentication or permission): loading core schema: ", true},
-		{"503", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusServiceUnavailable) }, "registry operation failed: loading core schema: ", false},
+		{"refused connection", func(*testing.T) string { return cuemodtest.UnreachableRegistry }, "registry unreachable: loading core schema: ", opmexit.ExitConnectivityError, false},
+		{"401", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusUnauthorized) }, "registry refused the credentials (authentication or permission): loading core schema: ", opmexit.ExitPermissionDenied, true},
+		{"503", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusServiceUnavailable) }, "registry operation failed: loading core schema: ", opmexit.ExitConnectivityError, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cuemodtest.ColdCache(t)
@@ -147,7 +155,7 @@ func TestRunPublish_SchemaFetchFailureIsNamed(t *testing.T) {
 			err := runPublish(t, &config.GlobalConfig{Registry: registry})
 			var exitErr *opmexit.ExitError
 			require.ErrorAs(t, err, &exitErr)
-			assert.Equal(t, opmexit.ExitConnectivityError, exitErr.Code, "%v", err)
+			assert.Equal(t, tc.code, exitErr.Code, "%v", err)
 			assert.Contains(t, err.Error(), tc.want)
 			// The hint names the host the schema fetch was routed to.
 			assert.Equal(t, tc.login, strings.HasSuffix(err.Error(), "opm registry login "+registry), "%v", err)
